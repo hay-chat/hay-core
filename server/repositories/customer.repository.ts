@@ -1,4 +1,5 @@
 import { Repository, SelectQueryBuilder } from "typeorm";
+import type { QueryDeepPartialEntity } from "typeorm";
 import { Customer } from "../database/entities/customer.entity";
 import { AppDataSource } from "../database/data-source";
 import { BaseRepository } from "./base.repository";
@@ -84,7 +85,10 @@ export class CustomerRepository extends BaseRepository<Customer> {
       return null;
     }
 
-    await this.getLegacyRepository().update({ id, organization_id: organizationId }, data as any);
+    await this.getLegacyRepository().update(
+      { id, organization_id: organizationId },
+      data as QueryDeepPartialEntity<Customer>,
+    );
 
     return await this.findById(id);
   }

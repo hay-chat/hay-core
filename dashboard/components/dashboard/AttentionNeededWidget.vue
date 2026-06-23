@@ -184,9 +184,10 @@ const fetchAttentionConversations = async (forceRefresh = false) => {
 
         // Calculate wait times and filter out those without valid wait times
         const withWaitTimes = merged
-          .map((conv: any) => {
-            const waitTime = getWaitTime(conv);
-            return waitTime !== null ? { ...conv, waitTime } : null;
+          .map((conv): AttentionConversation | null => {
+            const source = conv as Omit<AttentionConversation, "waitTime">;
+            const waitTime = getWaitTime(source);
+            return waitTime !== null ? { ...source, waitTime } : null;
           })
           .filter((conv): conv is AttentionConversation => conv !== null);
 
@@ -222,14 +223,16 @@ const viewConversation = (id: string) => {
 let unsubscribeConversationUpdated: (() => void) | null = null;
 let unsubscribeMessageReceived: (() => void) | null = null;
 
-const handleConversationUpdated = async (payload: any) => {
-  const updatedConv = payload;
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null;
+
+const handleConversationUpdated = async (payload: unknown) => {
+  if (!isRecord(payload)) return;
 
   // Check if status changed to/from attention-needed states
-  const needsAttention =
-    updatedConv.status === "pending-human" || updatedConv.status === "human-took-over";
+  const needsAttention = payload.status === "pending-human" || payload.status === "human-took-over";
 
-  const isInList = attentionConversations.value.some((c) => c.id === updatedConv.id);
+  const isInList = attentionConversations.value.some((c) => c.id === payload.id);
 
   if (needsAttention || isInList) {
     // Refresh the list after a small delay to avoid race conditions
@@ -239,7 +242,8 @@ const handleConversationUpdated = async (payload: any) => {
   }
 };
 
-const handleMessageReceived = async (payload: any) => {
+const handleMessageReceived = async (payload: unknown) => {
+  if (!isRecord(payload)) return;
   const { conversationId } = payload;
 
   // Check if this conversation is in our attention list

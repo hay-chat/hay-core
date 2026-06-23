@@ -5,7 +5,8 @@ export interface Message {
   type: MessageType;
   usage_metadata?: Record<string, unknown> | null;
   sender?: string | null;
-  deliveryState?: "pending" | "sent" | "failed"; // Client-side delivery state for optimistic updates
+  deliveryState?: "pending" | "sent" | "failed" | "queued" | "blocked"; // Client-side delivery state for optimistic updates
+  delivery_state?: "pending" | "sent" | "failed" | "queued" | "blocked"; // Raw server-side snake_case delivery state
   errorMessage?: string; // Error message if delivery failed
   metadata?: {
     model?: string;

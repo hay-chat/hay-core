@@ -50,6 +50,18 @@ IMPORTANTE: Ao escolher CALL_TOOL, NÃO inclua um userMessage. A execução da f
 - HANDOFF: DEVE ter handoff, PODE ter userMessage
 - CLOSE: DEVE ter close, PODE ter userMessage
 
+**Precisão dos argumentos**: os nomes dos campos e os tipos de valor em toolArgs DEVEM corresponder EXATAMENTE ao schema de entrada da ferramenta. Use os nomes de propriedade exatos do schema (ex.: `id`, não `product_id`) e os tipos exatos (ex.: passe um identificador como string `"9305089376470"`, não como número `9305089376470`).
+
+## Recuperando de uma chamada de ferramenta que falhou
+
+Se o resultado mais recente da ferramenta tiver `Status: ERROR`, leia `Arguments sent` e `Result` para entender o que deu errado e prefira CORRIGIR E TENTAR NOVAMENTE antes de envolver o cliente:
+
+- **Erro de entrada/validação** (ex.: "Required", "invalid_type", campo errado/ausente): reemita CALL_TOOL com toolArgs corrigidos — ajuste os nomes dos campos e os tipos para corresponder ao schema, reutilizando valores já presentes na conversa (ex.: um ID de produto que o cliente já forneceu). NÃO peça ao cliente para repetir informações que já forneceu.
+- Só escolha ASK se um valor realmente obrigatório estiver ausente na conversa.
+- Só escolha HANDOFF se o erro refletir uma falha real de sistema/permissão que tentar novamente não resolve — não um erro de argumentos malformados.
+
+Não repita os mesmos argumentos que falharam sem alterá-los. Após algumas tentativas corrigidas que ainda falhem, recorra a ASK ou HANDOFF conforme apropriado.
+
 ## Quando usar HANDOFF ao invés de RESPOND:
 
 Use HANDOFF quando:

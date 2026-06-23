@@ -1,9 +1,41 @@
 import { Message, MessageType } from "@server/database/entities/message.entity";
 import { config } from "@server/config/env";
-import OpenAI from "openai";
 import fs from "fs";
 import path from "path";
 import { createLogger } from "@server/lib/logger";
+import { llmProviderFactory } from "@server/services/llm/llm-provider.factory";
+import { emitUsage } from "@server/services/llm/usage-sink";
+import {
+  buildRepairMessages,
+  StructuredOutputError,
+  validateJsonString,
+} from "@server/services/llm/structured-output";
+import type {
+  ChatMessage,
+  ChatProvider,
+  ChatRequest,
+  ChatResult,
+  EmbeddingRequest,
+  ModelTier,
+  UsageRecord,
+} from "@server/services/llm/provider.types";
+
+function sumUsage(a: UsageRecord, b: UsageRecord): UsageRecord {
+  return {
+    promptTokens: a.promptTokens + b.promptTokens,
+    completionTokens: a.completionTokens + b.completionTokens,
+    totalTokens: a.totalTokens + b.totalTokens,
+    estimated: a.estimated || b.estimated,
+  };
+}
+
+/** Result of a chat call with its normalized usage + provenance, for callers that need it. */
+export interface ChatMeta<T> {
+  content: T;
+  usage: ChatResult["usage"];
+  model: string;
+  provider: string;
+}
 
 const logger = createLogger("llm");
 
@@ -12,10 +44,19 @@ export interface ChatOptions {
   prompt?: string;
   jsonSchema?: object;
   strictSchema?: boolean; // Whether to enforce strict schema adherence (default: true for reliability)
+  /**
+   * Task-complexity tier; resolves to a concrete model via the org's provider config.
+   * Primary selector — prefer this over `model`. Defaults to "hard".
+   */
+  tier?: ModelTier;
+  /** Escape hatch: a concrete model id, bypassing tier resolution. */
   model?: string;
+  /** Organization whose provider config to use. Falls back to the env default bundle. */
+  organizationId?: string;
   temperature?: number;
   max_tokens?: number;
   stream?: boolean;
+  signal?: AbortSignal;
 }
 
 export interface EmbeddingOptions {
@@ -24,14 +65,9 @@ export interface EmbeddingOptions {
 }
 
 export class LLMService {
-  private openai: OpenAI;
   private logFilePath: string;
 
   constructor() {
-    this.openai = new OpenAI({
-      apiKey: config.openai.apiKey,
-    });
-
     // Create logs directory if it doesn't exist
     const logsDir = path.join(process.cwd(), "logs");
     if (!fs.existsSync(logsDir)) {
@@ -43,119 +79,234 @@ export class LLMService {
     this.logFilePath = path.join(logsDir, `llm-${today}.log`);
   }
 
-  async invoke<T = string>(options: ChatOptions): Promise<T> {
+  /** Resolve the org's provider bundle and build the provider-neutral request. */
+  private async resolveChat(options: ChatOptions): Promise<{
+    bundle: Awaited<ReturnType<typeof llmProviderFactory.forOrganization>>;
+    request: ChatRequest;
+    organizationId?: string;
+    tier: ModelTier;
+  }> {
     const {
       history,
       prompt,
       jsonSchema,
       strictSchema = true, // Default to strict mode for guaranteed schema compliance
-      model = "gpt-4o",
+      tier = "hard",
+      model,
+      organizationId,
       temperature = 0.7,
       max_tokens = 2000,
-      stream = false,
+      signal,
     } = options;
 
-    try {
-      const preparedMessages = this.prepareMessages(history || "", prompt);
+    const bundle = await llmProviderFactory.forOrganization(organizationId);
+    const resolvedModel = model ?? bundle.tiers[tier];
 
-      const requestConfig: OpenAI.Chat.Completions.ChatCompletionCreateParamsNonStreaming = {
-        model,
-        messages: preparedMessages,
-        temperature,
-        max_tokens,
-        ...(jsonSchema &&
-          (strictSchema
-            ? {
-                // Structured Outputs with strict schema validation
-                response_format: {
-                  type: "json_schema",
-                  json_schema: {
-                    name: "structured_response",
-                    schema: jsonSchema as Record<string, unknown>,
-                    strict: true,
-                  },
-                },
-              }
-            : {
-                // JSON mode without strict validation (schema in prompt only)
-                response_format: { type: "json_object" },
-              })),
-      };
+    const request: ChatRequest = {
+      model: resolvedModel,
+      messages: this.prepareMessages(history || "", prompt),
+      temperature,
+      maxTokens: max_tokens,
+      signal,
+      ...(jsonSchema && {
+        structured: {
+          schema: jsonSchema as Record<string, unknown>,
+          strict: strictSchema,
+        },
+      }),
+    };
 
-      if (stream) {
-        const streamResponse = await this.executeWithTimeout(
-          this.openai.chat.completions.create({
-            ...requestConfig,
-            stream: true,
-          }),
-          60000, // 60 second timeout for streaming
-        );
-        return this.streamToAsyncIterable(streamResponse) as T;
-      }
-
-      const response = await this.executeWithTimeout(
-        this.openai.chat.completions.create(requestConfig),
-        30000, // 30 second timeout for non-streaming
-      );
-      const content = response.choices[0]?.message?.content;
-
-      // Debugging: Log response information
-      this.logLLMResponseDebugInfo(response);
-
-      if (!content) {
-        throw new Error("No content received from OpenAI");
-      }
-      return content as T;
-    } catch (error) {
-      if (error instanceof Error && error.message.includes("timeout")) {
-        throw new Error(`OpenAI API timeout: ${error.message}`);
-      }
-      throw new Error(`Failed to generate chat response: ${error}`);
-    }
-  }
-
-  async embedding(options: EmbeddingOptions): Promise<number[]> {
-    const { text, model = "text-embedding-3-small" } = options;
-
-    try {
-      const response = await this.executeWithTimeout(
-        this.openai.embeddings.create({
-          model,
-          input: text,
-        }),
-        30000, // 30 second timeout for embeddings
-      );
-
-      return response.data[0]?.embedding || [];
-    } catch (error) {
-      if (error instanceof Error && error.message.includes("timeout")) {
-        throw new Error(`OpenAI embedding timeout: ${error.message}`);
-      }
-      throw new Error(`Failed to generate embedding: ${error}`);
-    }
+    return { bundle, request, organizationId, tier };
   }
 
   /**
-   * Executes a promise with a timeout
-   * @param promise The promise to execute
-   * @param timeoutMs Timeout in milliseconds (default: 30000ms / 30s)
-   * @returns The promise result
-   * @throws Error if the operation times out
+   * Chat completion. Returns the raw string content (callers JSON.parse structured
+   * responses). When `stream` is set, returns the async iterable of content chunks.
    */
-  private async executeWithTimeout<T>(promise: Promise<T>, timeoutMs: number = 30000): Promise<T> {
-    return Promise.race([
-      promise,
-      new Promise<T>((_, reject) =>
-        setTimeout(() => reject(new Error(`Operation timeout after ${timeoutMs}ms`)), timeoutMs),
-      ),
-    ]);
+  async invoke<T = string>(options: ChatOptions): Promise<T> {
+    if (options.stream) {
+      const { bundle, request, organizationId, tier } = await this.resolveChat(options);
+      try {
+        const streamResponse = await this.runWithTimeout(60000, request, (req) =>
+          bundle.chat.chatStream(req),
+        );
+        // Meter once the stream is fully consumed.
+        streamResponse.completion
+          .then((meta) =>
+            emitUsage({
+              kind: "chat",
+              usage: meta.usage,
+              model: meta.model,
+              provider: meta.provider,
+              organizationId,
+              tier,
+            }),
+          )
+          .catch(() => undefined);
+        return streamResponse.stream as T;
+      } catch (error) {
+        throw this.wrapError(error, "chat response");
+      }
+    }
+
+    return (await this.invokeWithMeta<T>(options)).content;
   }
 
-  private prepareMessages(
-    history: string | Message[],
-    systemPrompt?: string,
-  ): OpenAI.Chat.Completions.ChatCompletionMessageParam[] {
-    const messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [];
+  /**
+   * Like `invoke`, but also returns normalized usage + provider/model provenance.
+   * Non-streaming only. Every call fires the usage seam.
+   */
+  async invokeWithMeta<T = string>(options: ChatOptions): Promise<ChatMeta<T>> {
+    const { bundle, request, organizationId, tier } = await this.resolveChat(options);
+
+    let result: ChatResult;
+    try {
+      result = await this.runWithTimeout(30000, request, (req) => bundle.chat.chat(req));
+      result = await this.coerceStructured(bundle.chat, request, result);
+    } catch (error) {
+      if (error instanceof StructuredOutputError) throw error;
+      throw this.wrapError(error, "chat response");
+    }
+
+    emitUsage({
+      kind: "chat",
+      usage: result.usage,
+      model: result.model,
+      provider: result.provider,
+      organizationId,
+      tier,
+    });
+    this.logChatResultDebugInfo(result);
+
+    if (!result.content) {
+      throw new Error("No content received from LLM provider");
+    }
+    return {
+      content: result.content as T,
+      usage: result.usage,
+      model: result.model,
+      provider: result.provider,
+    };
+  }
+
+  /**
+   * Guarantee `result.content` is schema-valid JSON when a structured spec was
+   * requested. Strict-capable providers (rung 1) are trusted verbatim; others are
+   * validated and given exactly one repair round-trip (its tokens summed into the
+   * returned usage). Refusals and truncated responses are surfaced as errors.
+   */
+  private async coerceStructured(
+    provider: ChatProvider,
+    request: ChatRequest,
+    result: ChatResult,
+  ): Promise<ChatResult> {
+    if (!request.structured) return result;
+    const name = request.structured.name ?? "structured_response";
+
+    if (result.finishReason === "content_filter") {
+      throw new StructuredOutputError(
+        "Provider refused or filtered the response",
+        result.content,
+        name,
+      );
+    }
+    if (result.finishReason === "length") {
+      throw new StructuredOutputError(
+        "Response truncated before valid JSON (max tokens)",
+        result.content,
+        name,
+      );
+    }
+    // Strict-capable providers constrain decoding — trust verbatim (preserves the
+    // legacy OpenAI path, including the loose json_object mode, with zero validation).
+    if (provider.capabilities.strictJsonSchema) return result;
+
+    const schema = request.structured.schema;
+    const first = validateJsonString(schema, result.content);
+    if (first.valid) return result;
+
+    // One bounded repair round-trip.
+    const repairReq: ChatRequest = {
+      ...request,
+      messages: buildRepairMessages(request.messages, result.content, first.errors),
+    };
+    const repaired = await this.runWithTimeout(30000, repairReq, (req) => provider.chat(req));
+    const summedUsage = sumUsage(result.usage, repaired.usage);
+
+    const second = validateJsonString(schema, repaired.content);
+    if (second.valid) {
+      return { ...repaired, usage: summedUsage };
+    }
+    throw new StructuredOutputError(
+      `Structured output failed schema validation after repair: ${second.errors}`,
+      repaired.content,
+      name,
+    );
+  }
+
+  async embedding(options: EmbeddingOptions): Promise<number[]> {
+    const { text, model = config.openai.models.embedding.model } = options;
+    const bundle = await llmProviderFactory.forOrganization();
+
+    try {
+      const embedRequest: EmbeddingRequest = { model, input: text };
+      const result = await this.runWithTimeout(30000, embedRequest, (req) =>
+        bundle.embedding.embed(req),
+      );
+
+      emitUsage({
+        kind: "embedding",
+        usage: result.usage,
+        model: result.model,
+        provider: result.provider,
+      });
+
+      return result.embeddings[0] ?? [];
+    } catch (error) {
+      throw this.wrapError(error, "embedding", "LLM embedding timeout");
+    }
+  }
+
+  private wrapError(error: unknown, what: string, timeoutLabel = "LLM provider timeout"): Error {
+    if (error instanceof Error && error.message.includes("timeout")) {
+      return new Error(`${timeoutLabel}: ${error.message}`);
+    }
+    return new Error(`Failed to generate ${what}: ${error}`);
+  }
+
+  /**
+   * Run a provider call with a timeout that actually CANCELS the in-flight request
+   * (via AbortSignal) rather than just abandoning the promise. Any caller-supplied
+   * signal is combined with the timeout signal. For streaming, `run` resolves once
+   * the stream is established, so the timer only bounds establishment, not the
+   * lifetime of the stream.
+   */
+  private async runWithTimeout<TReq extends { signal?: AbortSignal }, TRes>(
+    timeoutMs: number,
+    request: TReq,
+    run: (req: TReq) => Promise<TRes>,
+  ): Promise<TRes> {
+    const controller = new AbortController();
+    const signal = request.signal
+      ? AbortSignal.any([request.signal, controller.signal])
+      : controller.signal;
+    let timedOut = false;
+    const timer = setTimeout(() => {
+      timedOut = true;
+      controller.abort();
+    }, timeoutMs);
+    try {
+      return await run({ ...request, signal });
+    } catch (err) {
+      if (timedOut) throw new Error(`Operation timeout after ${timeoutMs}ms`);
+      throw err;
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
+  private prepareMessages(history: string | Message[], systemPrompt?: string): ChatMessage[] {
+    const messages: ChatMessage[] = [];
 
     if (systemPrompt) {
       messages.push({ role: "system", content: systemPrompt });
@@ -170,20 +321,7 @@ export class LLMService {
     return messages;
   }
 
-  private async *streamToAsyncIterable(
-    stream: AsyncIterable<OpenAI.Chat.Completions.ChatCompletionChunk>,
-  ): AsyncIterable<string> {
-    for await (const chunk of stream) {
-      const content = chunk.choices[0]?.delta?.content;
-      if (content) {
-        yield content;
-      }
-    }
-  }
-
-  private serializeMessages(
-    messages: Message[],
-  ): OpenAI.Chat.Completions.ChatCompletionMessageParam[] {
+  private serializeMessages(messages: Message[]): ChatMessage[] {
     return messages.map((message) => {
       let role: "system" | "user" | "assistant";
 
@@ -226,7 +364,14 @@ export class LLMService {
           }
         }
 
-        content = `Tool: ${message.metadata.toolName || "unknown"}\nStatus: ${message.metadata.toolStatus || "unknown"}\nResult:\n${JSON.stringify(formattedOutput, null, 2)}`;
+        // Include the arguments that were sent so the planner can see exactly
+        // what it submitted — essential for correcting a failed call (e.g. it
+        // sent `product_id` when the tool's schema requires `id`).
+        const toolInput = message.metadata.toolInput;
+        const inputLine =
+          toolInput !== undefined ? `\nArguments sent:\n${JSON.stringify(toolInput, null, 2)}` : "";
+
+        content = `Tool: ${message.metadata.toolName || "unknown"}\nStatus: ${message.metadata.toolStatus || "unknown"}${inputLine}\nResult:\n${JSON.stringify(formattedOutput, null, 2)}`;
       }
 
       return {
@@ -247,33 +392,25 @@ export class LLMService {
     }
   }
 
-  private logLLMResponseDebugInfo(response: OpenAI.Chat.Completions.ChatCompletion): void {
+  private logChatResultDebugInfo(result: ChatResult): void {
     this.writeToLog("=== LLM RESPONSE DEBUG INFO ===");
-    this.writeToLog(`Model: ${response.model}`);
-    this.writeToLog(`Created: ${new Date(response.created * 1000).toISOString()}`);
-    this.writeToLog(`Finish reason: ${response.choices[0]?.finish_reason}`);
+    this.writeToLog(`Provider: ${result.provider}`);
+    this.writeToLog(`Model: ${result.model}`);
+    this.writeToLog(`Finish reason: ${result.finishReason}`);
+    this.writeToLog("--- TOKEN USAGE ---");
+    this.writeToLog(`Prompt tokens: ${result.usage.promptTokens}`);
+    this.writeToLog(`Completion tokens: ${result.usage.completionTokens}`);
+    this.writeToLog(
+      `Total tokens: ${result.usage.totalTokens}${result.usage.estimated ? " (estimated)" : ""}`,
+    );
 
-    if (response.usage) {
-      this.writeToLog("--- TOKEN USAGE ---");
-      this.writeToLog(`Prompt tokens: ${response.usage.prompt_tokens}`);
-      this.writeToLog(`Completion tokens: ${response.usage.completion_tokens}`);
-      this.writeToLog(`Total tokens: ${response.usage.total_tokens}`);
-
-      // Calculate approximate cost (rough estimates for GPT-4o)
-      const inputCost = (response.usage.prompt_tokens / 1000) * 0.005; // $5 per 1M tokens
-      const outputCost = (response.usage.completion_tokens / 1000) * 0.015; // $15 per 1M tokens
-      const totalCost = inputCost + outputCost;
-      this.writeToLog(`Estimated cost: $${totalCost.toFixed(6)}`);
-    }
-
-    const responseContent = response.choices[0]?.message?.content || "";
+    const responseContent = result.content;
     this.writeToLog(`Response length: ${responseContent.length} chars`);
     this.writeToLog(
       `Response preview: "${responseContent.substring(0, 200)}${
         responseContent.length > 200 ? "..." : ""
       }"`,
     );
-
     this.writeToLog("=== END LLM RESPONSE DEBUG INFO ===");
   }
 }

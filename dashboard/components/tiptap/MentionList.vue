@@ -105,7 +105,7 @@ const selectItem = (index: number) => {
       label: item.label,
       type: item.type,
       pluginId: item.pluginId,
-    } as any);
+    });
   }
 };
 

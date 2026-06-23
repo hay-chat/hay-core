@@ -45,11 +45,9 @@ export class PluginPagesService {
     const plugins = pluginManagerService.getAllPlugins();
 
     for (const plugin of plugins) {
-      const manifest = plugin.manifest as any;
-
       // Only process system plugins (autoActivate)
       // Organization-specific plugins would be handled separately when enabled
-      if (manifest.autoActivate) {
+      if (plugin.manifest.autoActivate) {
         await this.syncPluginPages(plugin.pluginId);
       }
     }

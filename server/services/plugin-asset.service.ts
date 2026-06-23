@@ -2,10 +2,16 @@ import { Request, Response } from "express";
 import path from "path";
 import fs from "fs/promises";
 import { pluginRegistryRepository } from "../repositories/plugin-registry.repository";
-import type { HayPluginManifest } from "@server/types/plugin.types";
 import { createLogger } from "@server/lib/logger";
 
 const logger = createLogger("plugin-asset");
+
+/**
+ * Type guard for Node.js filesystem errors that carry an OS error code (e.g. "ENOENT").
+ */
+function isErrnoException(error: unknown): error is NodeJS.ErrnoException {
+  return error instanceof Error && "code" in error;
+}
 
 interface AssetCache {
   content: string | Buffer;
@@ -19,11 +25,45 @@ export class PluginAssetService {
   private readonly cacheTimeout = 5 * 60 * 1000; // 5 minutes
 
   /**
-   * Serve a plugin thumbnail
+   * Plugin thumbnail filenames in priority order (svg > png > jpg) with the
+   * Content-Type each should be served with.
+   */
+  private static readonly thumbnailCandidates: ReadonlyArray<{
+    file: string;
+    contentType: string;
+  }> = [
+    { file: "thumbnail.svg", contentType: "image/svg+xml" },
+    { file: "thumbnail.png", contentType: "image/png" },
+    { file: "thumbnail.jpg", contentType: "image/jpeg" },
+  ];
+
+  /**
+   * Read the first thumbnail that exists in the plugin directory, honouring the
+   * svg > png > jpg priority order. Returns null if none exist.
+   */
+  private async readThumbnail(
+    pluginDir: string,
+  ): Promise<{ content: Buffer; contentType: string } | null> {
+    for (const candidate of PluginAssetService.thumbnailCandidates) {
+      try {
+        const content = await fs.readFile(path.join(pluginDir, candidate.file));
+        return { content, contentType: candidate.contentType };
+      } catch (error) {
+        // Missing file → try the next candidate; anything else is a real error.
+        if (isErrnoException(error) && error.code === "ENOENT") continue;
+        throw error;
+      }
+    }
+    return null;
+  }
+
+  /**
+   * Serve a plugin thumbnail. Resolves the image as svg > png > jpg so a plugin
+   * can ship any of them; an SVG is preferred for crisp scaling.
    */
   async serveThumbnail(req: Request, res: Response): Promise<void> {
     const { pluginName } = req.params;
-    const cacheKey = `${pluginName}/thumbnail.jpg`;
+    const cacheKey = `${pluginName}/thumbnail`;
 
     // Check cache first
     if (this.assetCache.has(cacheKey)) {
@@ -35,7 +75,7 @@ export class PluginAssetService {
         return;
       }
 
-      res.setHeader("Content-Type", "image/jpeg");
+      res.setHeader("Content-Type", cached.contentType);
       res.setHeader("ETag", cached.etag);
       res.setHeader("Cache-Control", "public, max-age=86400"); // Cache for 24 hours
       res.setHeader("Last-Modified", cached.lastModified.toUTCString());
@@ -43,73 +83,29 @@ export class PluginAssetService {
       return;
     }
 
-    // Find the plugin to get the correct directory path
+    // Resolve the plugin directory. If the plugin isn't registered, fall back to
+    // treating pluginName as the directory name.
     const plugin = await pluginRegistryRepository.findByPluginId(pluginName);
-    if (!plugin) {
-      // If no plugin found, fallback to using pluginName as directory (for backward compatibility)
-      const pluginDir = path.join(process.cwd(), "..", "plugins", pluginName);
-      const thumbnailPath = path.join(pluginDir, "thumbnail.jpg");
-
-      try {
-        const content = await fs.readFile(thumbnailPath);
-        const etag = this.generateETag(content);
-        const lastModified = new Date();
-
-        // Cache the thumbnail
-        this.assetCache.set(cacheKey, {
-          content,
-          contentType: "image/jpeg",
-          etag,
-          lastModified,
-        });
-
-        // Set cache timeout (24 hours for thumbnails)
-        setTimeout(
-          () => {
-            this.assetCache.delete(cacheKey);
-          },
-          24 * 60 * 60 * 1000,
-        );
-
-        // Check if-none-match header for etag
-        if (req.headers["if-none-match"] === etag) {
-          res.status(304).end();
-          return;
-        }
-
-        res.setHeader("Content-Type", "image/jpeg");
-        res.setHeader("ETag", etag);
-        res.setHeader("Cache-Control", "public, max-age=86400");
-        res.setHeader("Last-Modified", lastModified.toUTCString());
-        res.send(content);
-        return;
-      } catch (error) {
-        res.status(404).json({ error: "Thumbnail not found" });
-        return;
-      }
-    }
-
-    // Build path to plugin thumbnail using the stored pluginPath
     const pluginDir = path.join(
       process.cwd(),
       "..",
       "plugins",
-      plugin.pluginPath, // Use the actual directory name stored in DB
+      plugin ? plugin.pluginPath : pluginName,
     );
-    const thumbnailPath = path.join(pluginDir, "thumbnail.jpg");
 
     try {
-      const content = await fs.readFile(thumbnailPath);
+      const thumbnail = await this.readThumbnail(pluginDir);
+      if (!thumbnail) {
+        res.status(404).json({ error: "Thumbnail not found" });
+        return;
+      }
+
+      const { content, contentType } = thumbnail;
       const etag = this.generateETag(content);
       const lastModified = new Date();
 
       // Cache the thumbnail
-      this.assetCache.set(cacheKey, {
-        content,
-        contentType: "image/jpeg",
-        etag,
-        lastModified,
-      });
+      this.assetCache.set(cacheKey, { content, contentType, etag, lastModified });
 
       // Set cache timeout (24 hours for thumbnails)
       setTimeout(
@@ -125,13 +121,16 @@ export class PluginAssetService {
         return;
       }
 
-      res.setHeader("Content-Type", "image/jpeg");
+      // SVGs are served from the same origin; nosniff + img-only usage keeps them
+      // from being executed as documents.
+      res.setHeader("X-Content-Type-Options", "nosniff");
+      res.setHeader("Content-Type", contentType);
       res.setHeader("ETag", etag);
       res.setHeader("Cache-Control", "public, max-age=86400"); // Cache for 24 hours
       res.setHeader("Last-Modified", lastModified.toUTCString());
       res.send(content);
     } catch (error) {
-      // If thumbnail doesn't exist, return 404
+      logger.error({ err: error, pluginName }, "Failed to serve plugin thumbnail");
       res.status(404).json({ error: "Thumbnail not found" });
     }
   }
@@ -246,8 +245,8 @@ export class PluginAssetService {
       res.setHeader("Cache-Control", "public, max-age=3600");
       res.setHeader("Last-Modified", lastModified.toUTCString());
       res.send(content);
-    } catch (error: any) {
-      if (error.code === "ENOENT") {
+    } catch (error: unknown) {
+      if (isErrnoException(error) && error.code === "ENOENT") {
         res.status(404).json({ error: "File not found" });
       } else {
         logger.error({ err: error, filePath, pluginName }, "Failed to serve public file");
@@ -352,8 +351,8 @@ export class PluginAssetService {
       res.setHeader("Cache-Control", "public, max-age=3600");
       res.setHeader("Last-Modified", lastModified.toUTCString());
       res.send(content);
-    } catch (error: any) {
-      if (error.code === "ENOENT") {
+    } catch (error: unknown) {
+      if (isErrnoException(error) && error.code === "ENOENT") {
         res.status(404).json({ error: "File not found" });
       } else {
         logger.error({ err: error, assetPath, pluginName }, "Failed to serve UI asset");

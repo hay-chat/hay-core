@@ -1,7 +1,7 @@
 import { defineStore } from "pinia";
 
 interface WidgetData {
-  data: any;
+  data: unknown;
   timestamp: number;
   error?: string;
 }
@@ -34,11 +34,11 @@ export const useAnalyticsStore = defineStore("analytics", {
     },
   },
   actions: {
-    async fetchData(
+    async fetchData<T>(
       widgetId: string,
-      fetcher: () => Promise<any>,
+      fetcher: () => Promise<T>,
       options?: { ttl?: number; forceRefresh?: boolean },
-    ) {
+    ): Promise<T> {
       const { ttl = 5 * 60 * 1000, forceRefresh = false } = options || {}; // Default TTL: 5 minutes
 
       // Check if data exists and is still fresh
@@ -49,7 +49,7 @@ export const useAnalyticsStore = defineStore("analytics", {
         !existingData.error &&
         Date.now() - existingData.timestamp < ttl
       ) {
-        return existingData.data;
+        return existingData.data as T;
       }
 
       // Set loading state
@@ -83,7 +83,7 @@ export const useAnalyticsStore = defineStore("analytics", {
       }
     },
 
-    async refreshData(widgetId: string, fetcher: () => Promise<any>) {
+    async refreshData<T>(widgetId: string, fetcher: () => Promise<T>): Promise<T> {
       return this.fetchData(widgetId, fetcher, { forceRefresh: true });
     },
 

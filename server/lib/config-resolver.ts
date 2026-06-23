@@ -2,7 +2,7 @@ import type { ConfigFieldDescriptor } from "@server/types/plugin-sdk.types";
 import { decryptConfig, decryptValue } from "@server/lib/auth/utils/encryption";
 
 export interface ResolvedConfigField {
-  value: any;
+  value: unknown;
   source: "env" | "database" | "default";
   isEncrypted: boolean;
   canOverride: boolean;
@@ -10,7 +10,7 @@ export interface ResolvedConfigField {
 }
 
 export interface ResolvedConfig {
-  values: Record<string, any>;
+  values: Record<string, unknown>;
   metadata: Record<string, ResolvedConfigField>;
 }
 
@@ -103,9 +103,9 @@ export function resolveConfigWithEnv(
  */
 export function resolveConfigForWorker(
   dbConfig: Record<string, unknown> | undefined,
-  authState: { credentials?: Record<string, any> } | null | undefined,
+  authState: { credentials?: Record<string, unknown> } | null | undefined,
   configSchema: Record<string, ConfigFieldDescriptor>,
-): Record<string, any> {
+): Record<string, unknown> {
   const resolved = resolveConfigWithEnv(dbConfig, configSchema, {
     decrypt: true,
     maskSecrets: false, // Worker needs real values
@@ -135,10 +135,10 @@ export function resolveConfigForWorker(
  * Mask configuration for logging to prevent .env leakage
  */
 export function maskConfigForLogging(
-  config: Record<string, any>,
+  config: Record<string, unknown>,
   schema: Record<string, ConfigFieldDescriptor>,
-): Record<string, any> {
-  const masked: Record<string, any> = {};
+): Record<string, unknown> {
+  const masked: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(config)) {
     if (schema[key]?.encrypted || schema[key]?.env) {
       masked[key] = "********";

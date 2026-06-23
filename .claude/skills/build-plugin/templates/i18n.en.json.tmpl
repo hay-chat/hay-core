@@ -1,0 +1,17 @@
+{
+  "_comment": "Plugin translations. One file per locale at plugins/.../<name>/i18n/<locale>.json (e.g. en.json, pt.json). The plugin manager loads every *.json here onto manifest.i18n; getPluginTranslations serves the org's locale (falling back to en). The dashboard resolves chips/labels via plugins.<pluginId>.tools.<toolName>.label. Keys under `tools` MUST be the exact MCP tool names; without a label the UI falls back to humanizeToolName (list_event_types -> 'List Event Types'). Ship en.json at minimum.",
+  "name": "<Human Name>",
+  "description": "<One-sentence description shown in the integrations list.>",
+  "tools": {
+    "<tool_name>": {
+      "label": "<Short Action Label>",
+      "description": "<One-line, customer-support-friendly description of the action.>"
+    }
+  },
+  "config": {
+    "<configField>": {
+      "label": "<Field Label>",
+      "description": "<Help text for this config field.>"
+    }
+  }
+}

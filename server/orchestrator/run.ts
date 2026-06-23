@@ -9,7 +9,7 @@ import { agentRepository } from "@server/repositories/agent.repository";
 import { MessageType } from "@server/database/entities/message.entity";
 import { ToolExecutionService } from "@server/services/core/tool-execution.service";
 import { Conversation } from "@server/database/entities/conversation.entity";
-import type { ConversationContext, ProcessingPhase } from "./types";
+import type { ConversationContext, GuardrailLogEntry, ProcessingPhase } from "./types";
 import { userRepository } from "@server/repositories/user.repository";
 import { LLMService } from "@server/services/core/llm.service";
 import { PromptService } from "@server/services/prompt.service";
@@ -119,11 +119,11 @@ async function updateProcessingState(
 
     // Save to database
     await conversationRepository.updateById(conversation.id, {
-      orchestration_status: orchestrationStatus as any,
+      orchestration_status: { ...orchestrationStatus },
     });
 
     // Update local reference
-    conversation.orchestration_status = orchestrationStatus as any;
+    conversation.orchestration_status = { ...orchestrationStatus };
 
     // Broadcast via WebSocket
     await publishStatusChange(
@@ -205,7 +205,13 @@ async function saveConfidenceLog(
   }
 
   try {
-    const orchestrationStatus = (conversation.orchestration_status as any) || {};
+    const orchestrationStatus =
+      (conversation.orchestration_status as unknown as ConversationContext) ||
+      ({
+        version: "v1" as const,
+        lastTurn: 0,
+        toolLog: [],
+      } satisfies ConversationContext);
 
     // Initialize guardrail log if not exists
     if (!orchestrationStatus.guardrailLog) {
@@ -213,7 +219,7 @@ async function saveConfidenceLog(
     }
 
     // Build log entry
-    const logEntry: any = {
+    const logEntry: GuardrailLogEntry = {
       timestamp: new Date().toISOString(),
     };
 
@@ -264,7 +270,7 @@ async function saveConfidenceLog(
 
     // Update conversation
     await conversationRepository.updateById(conversation.id, {
-      orchestration_status: orchestrationStatus,
+      orchestration_status: { ...orchestrationStatus },
     });
 
     logger.debug(
@@ -640,9 +646,9 @@ export const runConversation = async (conversationId: string) => {
         toolLog: [],
       };
       await conversationRepository.updateById(conversation.id, {
-        orchestration_status: initialContext as any,
+        orchestration_status: { ...initialContext },
       });
-      conversation.orchestration_status = initialContext as any;
+      conversation.orchestration_status = { ...initialContext };
     }
 
     // Update processing state to executing

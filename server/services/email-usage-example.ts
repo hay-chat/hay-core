@@ -6,7 +6,7 @@
  */
 
 import { emailService } from "./email.service";
-import { getDashboardUrl, getCdnUrl } from "../config/env";
+import { getDashboardUrl } from "../config/env";
 
 /**
  * Example 1: Send a simple email

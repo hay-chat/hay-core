@@ -243,6 +243,10 @@
   "apiTokens": {
     "title": "API Tokens",
     "description": "Manage API tokens for organization-level access",
+    "connectionDetails": "Connection details",
+    "connectionDetailsDescription": "Use these when connecting Hay to another platform, such as the Shopify chat widget.",
+    "serverUrl": "Hay.chat Server URL",
+    "organizationId": "Organization ID",
     "createToken": "Create Token",
     "apiTokens": "API Tokens",
     "apiTokensDescription": "Tokens provide organization-level API access. They can only be viewed once upon creation.",
@@ -580,5 +584,55 @@
     "dateWeeksAgo": "{weeks} weeks ago",
     "connectedTo": "Connected to {accountLogin}",
     "completionFailed": "Failed to complete installation"
+  },
+  "llmSettings": {
+    "title": "AI Models",
+    "description": "Choose which AI provider and models power your agents. Embeddings stay managed by Hay.",
+    "save": "Save Changes",
+    "saveSuccess": "AI model settings saved",
+    "saveFailed": "Failed to save AI model settings",
+    "loadFailed": "Failed to load AI model settings",
+    "modelCustom": "Custom…",
+    "modelCustomPlaceholder": "Enter a model id",
+    "warning": {
+      "title": "Advanced — changes here affect every agent",
+      "description": "These settings control the AI provider and models behind your agents. Changing the defaults can radically change response quality, cost, latency, and reliability. Only proceed if you know what you're doing.",
+      "unlock": "I understand — let me edit",
+      "unlocked": "Editing unlocked. Save carefully — changes apply to all agents in this organization."
+    },
+    "chat": {
+      "title": "Chat Provider",
+      "description": "The provider and account used to generate agent responses.",
+      "provider": "Provider",
+      "providerHelper": "OpenAI-compatible covers OpenAI, Mistral, Grok, and custom endpoints.",
+      "vendor": "Vendor",
+      "vendorHelper": "Selects the right request format and structured-output handling.",
+      "vendorCustom": "Custom (OpenAI-compatible)",
+      "providerCustom": "Custom (OpenAI-compatible)",
+      "baseUrl": "Base URL",
+      "baseUrlHelper": "The provider's OpenAI-compatible API base URL.",
+      "byo": "Use my own API key",
+      "byoHint": "When off, Hay's managed AI is used (billed with your plan).",
+      "apiKey": "API Key",
+      "apiKeyPlaceholder": "Enter your provider API key",
+      "apiKeyHelper": "Stored encrypted; never shown again after saving.",
+      "apiKeySet": "A key is set. Enter a new one to replace it."
+    },
+    "tiers": {
+      "title": "Model Tiers",
+      "description": "Agents pick a tier by task complexity; map each tier to a model for your provider.",
+      "hard": "Hard (most capable)",
+      "hardHelper": "Orchestration, planning, and guardrails.",
+      "medium": "Medium (balanced)",
+      "mediumHelper": "Audits and translations.",
+      "easy": "Easy (cheapest)",
+      "easyHelper": "Bulk document summaries."
+    },
+    "embedding": {
+      "title": "Embeddings (Managed)",
+      "description": "Embeddings are always managed by Hay and pinned to 1536 dimensions.",
+      "model": "Embedding Model",
+      "modelHelper": "Must produce 1536-dimension vectors (e.g. text-embedding-3-small)."
+    }
   }
 }

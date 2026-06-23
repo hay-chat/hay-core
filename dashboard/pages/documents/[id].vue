@@ -12,17 +12,6 @@
             v-if="document.sourceUrl && document.importMethod === 'web'"
             variant="outline"
             size="sm"
-            :loading="recrawling"
-            :disabled="recrawling"
-            @click="recrawlFromSource"
-          >
-            <RefreshCw v-if="!recrawling" class="h-4 w-4 mr-2" />
-            {{ $t("documents.actions.updateFromSource") }}
-          </Button>
-          <Button
-            v-if="document.sourceUrl && document.importMethod === 'web'"
-            variant="outline"
-            size="sm"
             @click="visitSource"
           >
             <ExternalLink class="h-4 w-4 mr-2" />
@@ -221,7 +210,6 @@ import {
   Globe,
   ExternalLink,
   Pencil,
-  RefreshCw,
   Trash2,
 } from "lucide-vue-next";
 
@@ -403,7 +391,6 @@ const visitSource = () => {
   }
 };
 
-const recrawling = ref(false);
 const deleting = ref(false);
 const showDeleteDialog = ref(false);
 
@@ -422,20 +409,6 @@ const confirmDelete = async () => {
   } finally {
     deleting.value = false;
     showDeleteDialog.value = false;
-  }
-};
-
-const recrawlFromSource = async () => {
-  if (!document.value || recrawling.value) return;
-  recrawling.value = true;
-  try {
-    await HayApi.documents.recrawl.mutate({ documentId: document.value.id });
-    toast.success(t("documents.toast.updateStarted", { name: document.value.title }));
-  } catch (err) {
-    console.error("Recrawl error:", err);
-    toast.error(t("documents.toast.updateFailed"));
-  } finally {
-    recrawling.value = false;
   }
 };
 
@@ -520,7 +493,7 @@ useHead({
 
   h1 {
     font-size: 1.5rem;
-    border-bottom: 1px solid var(--border);
+    border-bottom: 1px solid var(--color-border);
     padding-bottom: 0.5rem;
   }
 
@@ -620,20 +593,50 @@ useHead({
 
   table {
     width: 100%;
-    border-collapse: collapse;
-    margin-bottom: 1rem;
+    border-collapse: separate;
+    border-spacing: 0;
+    margin: 0.5rem 0 1.25rem;
+    font-size: 0.875rem;
+    border: 1px solid var(--color-border);
+    border-radius: 0.5rem;
+    overflow: hidden;
   }
 
   th,
   td {
-    border: 1px solid var(--border);
     padding: 0.5rem 0.75rem;
-    text-align: left;
+    border-bottom: 1px solid var(--color-border);
+    vertical-align: top;
+  }
+
+  th + th,
+  td + td {
+    border-left: 1px solid var(--color-border);
+  }
+
+  tbody tr:last-child td {
+    border-bottom: none;
   }
 
   th {
-    background-color: var(--background-secondary);
+    background-color: var(--color-background-secondary);
     font-weight: 600;
+    text-align: left;
+  }
+
+  tbody tr:nth-child(even) {
+    background-color: var(--color-background-secondary);
+  }
+
+  /* Honor GFM column alignment (align attr emitted by marked) */
+  th[align="center"],
+  td[align="center"] {
+    text-align: center;
+  }
+
+  th[align="right"],
+  td[align="right"] {
+    text-align: right;
   }
 
   img {

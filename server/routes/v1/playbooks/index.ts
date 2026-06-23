@@ -11,17 +11,54 @@ import { In } from "typeorm";
 
 const playbookService = new PlaybookService();
 
+/**
+ * Strip a single wrapping code fence from an LLM-generated markdown string.
+ *
+ * The generation model is told to return raw markdown, but it sometimes wraps
+ * the whole `instructions` value in a ```/```markdown fence (mimicking the
+ * example block in the prompt). When that happens the downstream preview runs
+ * the fenced text through `marked`, which escapes the inline mention spans and
+ * surfaces literal `<span class="mention-token ...">` markup instead of chips.
+ * Unwrapping here fixes both the wizard preview and the saved Tiptap document
+ * from a single place.
+ */
+function stripWrappingCodeFence(markdown: string): string {
+  const trimmed = markdown.trim();
+  const match = /^```[^\n]*\n([\s\S]*?)\n?```$/.exec(trimmed);
+  return match ? match[1].trim() : markdown;
+}
+
 const playbookStatusEnum = z.enum([
   PlaybookStatus.DRAFT,
   PlaybookStatus.ACTIVE,
   PlaybookStatus.ARCHIVED,
 ]);
 
+const instructionItemSchema = z.object({
+  id: z.string(),
+  level: z.number(),
+  instructions: z.string(),
+});
+
+// Tiptap document (the format produced by the editor and persisted to the
+// jsonb instructions column after the Tiptap migration). Kept loose on inner
+// node shape since Tiptap nodes are open-ended.
+const tiptapContentSchema = z.object({ type: z.string().optional() }).passthrough();
+
+// Instructions may be a Tiptap document, a legacy structured list, a raw
+// string, or null.
+const instructionsSchema = z.union([
+  tiptapContentSchema,
+  z.array(instructionItemSchema),
+  z.string(),
+  z.null(),
+]);
+
 const createPlaybookSchema = z.object({
   title: z.string().min(1).max(255),
   trigger: z.string().min(1).max(255),
   description: z.string().optional(),
-  instructions: z.any().optional(),
+  instructions: instructionsSchema.optional(),
   status: playbookStatusEnum.optional().default(PlaybookStatus.DRAFT),
   agentIds: z.array(z.string().uuid()).optional(),
 });
@@ -30,7 +67,7 @@ const updatePlaybookSchema = z.object({
   title: z.string().min(1).max(255).optional(),
   trigger: z.string().min(1).max(255).optional(),
   description: z.string().optional(),
-  instructions: z.any().optional(),
+  instructions: instructionsSchema.optional(),
   status: playbookStatusEnum.optional(),
   agentIds: z.array(z.string().uuid()).optional(),
 });
@@ -77,7 +114,7 @@ export const playbooksRouter = t.router({
   create: scopedProcedure(RESOURCES.PLAYBOOKS, ACTIONS.CREATE)
     .input(createPlaybookSchema)
     .mutation(async ({ ctx, input }) => {
-      const playbook = await playbookService.createPlaybook(ctx.organizationId!, input as any);
+      const playbook = await playbookService.createPlaybook(ctx.organizationId!, input);
       return playbook;
     }),
 
@@ -366,7 +403,7 @@ export const playbooksRouter = t.router({
       let documents: { id: string; title: string; description: string }[] = [];
       if (input.documentIds.length > 0) {
         const docs = await documentRepository.findByOrganization(ctx.organizationId!, {
-          where: { id: In(input.documentIds) } as any,
+          where: { id: In(input.documentIds) },
           select: ["id", "title", "description"],
         });
         documents = docs.map((doc) => ({
@@ -406,6 +443,9 @@ export const playbooksRouter = t.router({
 
       try {
         const parsed = JSON.parse(response);
+        if (typeof parsed.instructions === "string") {
+          parsed.instructions = stripWrappingCodeFence(parsed.instructions);
+        }
         return {
           ...parsed,
           references: {

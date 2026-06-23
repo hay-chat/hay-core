@@ -6,6 +6,11 @@ import type {
   SendEmailHttpRequest,
   SendEmailHttpResponse,
 } from "../../../types/plugin-api.types";
+import type {
+  PluginInstanceConfig,
+  LocalMCPServerConfig,
+  RemoteMCPServerConfig,
+} from "../../../types/plugin.types";
 import { createLogger } from "@server/lib/logger";
 import { mcpRegistryService } from "../../../services/mcp-registry.service";
 
@@ -220,16 +225,16 @@ router.post(
       }
 
       // Update config with MCP server definition
-      const config = instance.config || {};
+      const config: PluginInstanceConfig = instance.config || {};
       if (!config.mcpServers) {
         config.mcpServers = { local: [], remote: [] };
       }
 
-      const mcpServers = config.mcpServers as any;
+      const mcpServers = config.mcpServers;
       mcpServers.local = mcpServers.local || [];
 
       // Check for duplicate serverId
-      if (mcpServers.local.some((s: any) => s.serverId === finalServerId)) {
+      if (mcpServers.local.some((s: LocalMCPServerConfig) => s.serverId === finalServerId)) {
         return res.status(400).json({
           success: false,
           error: `MCP server with ID '${finalServerId}' already registered`,
@@ -359,16 +364,16 @@ router.post(
       }
 
       // Update config with MCP server definition
-      const config = instance.config || {};
+      const config: PluginInstanceConfig = instance.config || {};
       if (!config.mcpServers) {
         config.mcpServers = { local: [], remote: [] };
       }
 
-      const mcpServers = config.mcpServers as any;
+      const mcpServers = config.mcpServers;
       mcpServers.remote = mcpServers.remote || [];
 
       // Check for duplicate serverId
-      if (mcpServers.remote.some((s: any) => s.serverId === finalServerId)) {
+      if (mcpServers.remote.some((s: RemoteMCPServerConfig) => s.serverId === finalServerId)) {
         return res.status(400).json({
           success: false,
           error: `MCP server with ID '${finalServerId}' already registered`,

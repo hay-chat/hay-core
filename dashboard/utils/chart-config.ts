@@ -1,10 +1,9 @@
-import type {
-  TooltipItem,
-  TooltipOptions,
-  LegendOptions,
-  CartesianScaleOptions,
-  ChartType,
-} from "chart.js";
+import type { TooltipItem, ChartOptions, ChartType } from "chart.js";
+
+// Consumer-facing (DeepPartial) Chart.js option fragments returned by the helpers below.
+type TooltipConfig = NonNullable<NonNullable<ChartOptions["plugins"]>["tooltip"]>;
+type ScaleConfig = NonNullable<ChartOptions["scales"]>;
+type LegendConfig = NonNullable<NonNullable<ChartOptions["plugins"]>["legend"]>;
 
 // Chart color palette based on your design system
 export const CHART_COLORS = {
@@ -48,7 +47,7 @@ export const STATUS_COLORS = {
 export const getTooltipConfig = (options?: {
   showPercentage?: boolean;
   formatValue?: (value: number) => string;
-}): any => ({
+}): TooltipConfig => ({
   enabled: true,
   mode: "index" as const,
   intersect: false,
@@ -91,7 +90,9 @@ export const getTooltipConfig = (options?: {
         const numericData = context.dataset.data.map((d) => {
           if (typeof d === "number") return d;
           if (d === null) return 0;
-          if (typeof d === "object" && "y" in d) return (d as any).y;
+          if (typeof d === "object" && "y" in d && typeof d.y === "number") {
+            return d.y;
+          }
           return 0;
         });
         const total = numericData.reduce((a, b) => a + b, 0);
@@ -103,7 +104,7 @@ export const getTooltipConfig = (options?: {
 
       return label ? `${label}: ${formattedValue}` : formattedValue;
     },
-  } as TooltipOptions["callbacks"],
+  },
 });
 
 // Grid and scale configuration
@@ -111,7 +112,7 @@ export const getScaleConfig = (options?: {
   hideXGrid?: boolean;
   hideYGrid?: boolean;
   beginAtZero?: boolean;
-}): any => ({
+}): ScaleConfig => ({
   x: {
     grid: {
       display: !options?.hideXGrid,
@@ -124,10 +125,10 @@ export const getScaleConfig = (options?: {
         family: "Inter, ui-sans-serif, system-ui, sans-serif",
         size: 11,
       },
-    } as CartesianScaleOptions["ticks"],
+    },
     border: {
       display: false,
-    } as CartesianScaleOptions["border"],
+    },
   },
   y: {
     grid: {
@@ -141,16 +142,16 @@ export const getScaleConfig = (options?: {
         family: "Inter, ui-sans-serif, system-ui, sans-serif",
         size: 11,
       },
-    } as CartesianScaleOptions["ticks"],
+    },
     border: {
       display: false,
-    } as CartesianScaleOptions["border"],
+    },
     ...(options?.beginAtZero !== undefined && { beginAtZero: options.beginAtZero }),
   },
 });
 
 // Legend configuration
-export const getLegendConfig = (show = false): any => ({
+export const getLegendConfig = (show = false): LegendConfig => ({
   display: show,
   position: "top",
   align: "start",

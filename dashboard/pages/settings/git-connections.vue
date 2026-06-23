@@ -220,6 +220,11 @@ import {
   Settings,
 } from "lucide-vue-next";
 import { Hay } from "@/utils/api";
+import type { RouterOutputs } from "@/types/trpc";
+
+type GitConnection = RouterOutputs["gitConnections"]["list"][number];
+type GitRepo = RouterOutputs["gitConnections"]["listRepos"][number];
+type GitPlugin = RouterOutputs["plugins"]["getAll"][number];
 
 const { t } = useI18n();
 const toast = useToast();
@@ -229,14 +234,14 @@ const { formatDate } = useOrgDateTime();
 const loading = ref(true);
 const connecting = ref(false);
 const isConfigured = ref(false);
-const connections = ref<any[]>([]);
-const gitPlugins = ref<any[]>([]);
+const connections = ref<GitConnection[]>([]);
+const gitPlugins = ref<GitPlugin[]>([]);
 const syncingPlugins = ref<Record<string, boolean>>({});
 
 // Repo dialog
 const repoDialogOpen = ref(false);
 const loadingRepos = ref(false);
-const repos = ref<any[]>([]);
+const repos = ref<GitRepo[]>([]);
 const selectedConnectionId = ref("");
 const installingRepo = ref("");
 
@@ -264,7 +269,7 @@ const loadData = async () => {
 const loadGitPlugins = async () => {
   try {
     const allPlugins = await Hay.plugins.getAll.query();
-    gitPlugins.value = allPlugins.filter((p: any) => p.sourceType === "git");
+    gitPlugins.value = allPlugins.filter((p) => p.sourceType === "git");
   } catch {
     // Plugins may fail to load if not configured
   }
@@ -284,7 +289,7 @@ const connectGitHub = async () => {
   }
 };
 
-const manageInstallation = (connection: any) => {
+const manageInstallation = (connection: GitConnection) => {
   // GitHub uses different URL paths for org vs personal installations
   const base =
     connection.accountType === "Organization"
@@ -293,7 +298,7 @@ const manageInstallation = (connection: any) => {
   window.open(base, "_blank");
 };
 
-const disconnectConnection = async (connection: any) => {
+const disconnectConnection = async (connection: GitConnection) => {
   if (!confirm(t("gitConnections.disconnectConfirm"))) return;
 
   try {
@@ -308,7 +313,7 @@ const disconnectConnection = async (connection: any) => {
   }
 };
 
-const openRepoDialog = async (connection: any) => {
+const openRepoDialog = async (connection: GitConnection) => {
   selectedConnectionId.value = connection.id;
   repoDialogOpen.value = true;
   loadingRepos.value = true;
@@ -325,7 +330,7 @@ const openRepoDialog = async (connection: any) => {
   }
 };
 
-const installFromRepo = async (repo: any) => {
+const installFromRepo = async (repo: GitRepo) => {
   installingRepo.value = repo.fullName;
   try {
     await Hay.gitConnections.installPlugin.mutate({
@@ -343,7 +348,7 @@ const installFromRepo = async (repo: any) => {
   }
 };
 
-const syncPlugin = async (plugin: any) => {
+const syncPlugin = async (plugin: GitPlugin) => {
   syncingPlugins.value[plugin.id] = true;
   try {
     const result = await Hay.gitConnections.syncPlugin.mutate({

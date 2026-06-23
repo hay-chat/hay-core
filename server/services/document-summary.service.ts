@@ -1,7 +1,7 @@
 /**
  * Document Summary Service
  *
- * Generates 1-2 sentence summaries for documents using gpt-4.1-nano.
+ * Generates 1-2 sentence summaries for documents using the "easy" model tier.
  * Summaries are stored in the document.description field.
  *
  * This is a reusable hay-core feature — triggered on document import
@@ -14,12 +14,11 @@ import { documentRepository } from "@server/repositories/document.repository";
 import { LLMService } from "@server/services/core/llm.service";
 import { Document } from "@server/entities/document.entity";
 import { createLogger } from "@server/lib/logger";
-import { IsNull } from "typeorm";
+import { IsNull, type FindOptionsWhere } from "typeorm";
 import { AppDataSource } from "@server/database/data-source";
 
 const logger = createLogger("document-summary");
 
-const SUMMARY_MODEL = "gpt-4.1-nano";
 const MAX_CONCURRENCY = 5;
 
 class DocumentSummaryService {
@@ -69,7 +68,7 @@ ${content}`;
       const responseText = await this.llm.invoke({
         prompt,
         jsonSchema: schema,
-        model: SUMMARY_MODEL,
+        tier: "easy",
         temperature: 0.3,
         max_tokens: 200,
       });
@@ -145,7 +144,7 @@ ${content}`;
       where: {
         organizationId,
         description: IsNull(),
-      } as any,
+      } as FindOptionsWhere<Document>,
     });
   }
 }

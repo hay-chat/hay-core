@@ -9,10 +9,18 @@ import {
   Timezone,
   DEFAULT_CONFIDENCE_GUARDRAIL_CONFIG,
 } from "@server/types/organization-settings.types";
+import type { DeepPartial } from "typeorm";
 import { AppDataSource } from "@server/database/data-source";
 import { Organization } from "@server/entities/organization.entity";
+import { llmProviderFactory } from "@server/services/llm/llm-provider.factory";
+import { encryptValue } from "@server/lib/auth/utils/encryption";
+import type { OrgLlmConfig } from "@server/services/llm/provider.types";
+import {
+  CHAT_MODEL_CATALOG,
+  EMBEDDING_MODEL_CATALOG,
+  DEFAULT_TIER_MAP,
+} from "@server/services/llm/model-catalog";
 import { UserOrganization } from "@server/entities/user-organization.entity";
-import { User } from "@server/entities/user.entity";
 import { RESOURCES, ACTIONS } from "@server/types/scopes";
 import { auditLogService } from "@server/services/audit-log.service";
 import { handleUpload } from "@server/lib/upload-helper";
@@ -48,6 +56,26 @@ const confidenceGuardrailSchema = z.object({
       similarityThreshold: z.number().min(0).max(1).optional(),
     })
     .optional(),
+});
+
+const tierModelSchema = z.object({
+  easy: z.string().min(1),
+  medium: z.string().min(1),
+  hard: z.string().min(1),
+});
+
+const updateLlmConfigSchema = z.object({
+  chat: z.object({
+    provider: z.enum(["openai-compatible", "anthropic", "gemini"]),
+    vendor: z.enum(["openai", "mistral", "grok", "custom"]).optional(),
+    baseUrl: z.union([z.string().url(), z.literal("")]).optional(),
+    // Plaintext key, only sent when the user enters/changes it; encrypted server-side.
+    apiKey: z.string().optional(),
+    // Explicitly drop the stored BYO key (revert to managed/env key).
+    clearApiKey: z.boolean().optional(),
+    tiers: tierModelSchema,
+  }),
+  embedding: z.object({ model: z.string().min(1) }),
 });
 
 const updateSettingsSchema = z.object({
@@ -210,6 +238,66 @@ export const organizationsRouter = t.router({
     },
   ),
 
+  // Static model presets + default tier maps for the settings UI (single source of
+  // truth lives in services/llm/model-catalog.ts).
+  getModelCatalog: authenticatedProcedure.query(() => ({
+    chatModels: CHAT_MODEL_CATALOG,
+    embeddingModels: EMBEDDING_MODEL_CATALOG,
+    defaultTiers: DEFAULT_TIER_MAP,
+  })),
+
+  // Read the org's LLM provider config. The encrypted BYO key is never returned —
+  // only whether one is set.
+  getLlmConfig: scopedProcedure(RESOURCES.ORGANIZATION_SETTINGS, ACTIONS.READ).query(
+    async ({ ctx }) => {
+      const organization = await organizationService.findOne(ctx.organizationId!);
+      if (!organization) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Organization not found" });
+      }
+      const llm = organization.settings?.llm;
+      if (!llm) return null;
+      const { apiKeyEncrypted, ...chat } = llm.chat;
+      return { chat: { ...chat, hasApiKey: !!apiKeyEncrypted }, embedding: llm.embedding };
+    },
+  ),
+
+  // Write the org's LLM provider config. A new plaintext key is encrypted here;
+  // an omitted key preserves the existing one; clearApiKey reverts to the managed key.
+  updateLlmConfig: scopedProcedure(RESOURCES.ORGANIZATION_SETTINGS, ACTIONS.UPDATE)
+    .input(updateLlmConfigSchema)
+    .mutation(async ({ ctx, input }) => {
+      const organization = await organizationService.findOne(ctx.organizationId!);
+      if (!organization) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Organization not found" });
+      }
+
+      const existing = organization.settings?.llm;
+      let apiKeyEncrypted = existing?.chat.apiKeyEncrypted;
+      if (input.chat.apiKey && input.chat.apiKey.trim()) {
+        apiKeyEncrypted = encryptValue(input.chat.apiKey.trim());
+      } else if (input.chat.clearApiKey) {
+        apiKeyEncrypted = undefined;
+      }
+
+      const llm: OrgLlmConfig = {
+        chat: {
+          provider: input.chat.provider,
+          vendor: input.chat.provider === "openai-compatible" ? input.chat.vendor : undefined,
+          baseUrl: input.chat.baseUrl || undefined,
+          apiKeyEncrypted,
+          tiers: input.chat.tiers,
+        },
+        embedding: { provider: "openai-compatible", model: input.embedding.model },
+      };
+
+      await organizationService.update(ctx.organizationId!, {
+        settings: { ...(organization.settings || {}), llm },
+      });
+      llmProviderFactory.invalidate(ctx.organizationId!);
+
+      return { success: true };
+    }),
+
   updateSettings: scopedProcedure(RESOURCES.ORGANIZATION_SETTINGS, ACTIONS.UPDATE)
     .input(updateSettingsSchema)
     .mutation(async ({ ctx, input }) => {
@@ -226,7 +314,7 @@ export const organizationsRouter = t.router({
       const { testModeDefault, confidenceGuardrail, retentionDays, ...topLevelFields } = input;
 
       // Prepare update payload
-      const updatePayload: any = {
+      const updatePayload: DeepPartial<Organization> = {
         ...topLevelFields,
       };
 
@@ -257,6 +345,9 @@ export const organizationsRouter = t.router({
       }
 
       const updatedOrg = await organizationService.update(ctx.organizationId!, updatePayload);
+
+      // Drop any cached LLM provider bundle so settings changes take effect immediately.
+      llmProviderFactory.invalidate(ctx.organizationId!);
 
       return {
         success: true,
@@ -347,6 +438,7 @@ export const organizationsRouter = t.router({
         email: userOrg.user.email,
         firstName: userOrg.user.firstName,
         lastName: userOrg.user.lastName,
+        avatarUrl: userOrg.user.avatarUrl,
         role: userOrg.role,
         permissions: userOrg.permissions,
         isActive: userOrg.isActive,

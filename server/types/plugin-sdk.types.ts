@@ -5,6 +5,8 @@
  * The SDK uses a minimal manifest approach where metadata is fetched at runtime.
  */
 
+import type { ChildProcess } from "child_process";
+
 // ============================================================================
 // Manifest Types (Minimal - from package.json)
 // ============================================================================
@@ -61,6 +63,24 @@ export interface PluginMetadata {
     local: LocalMcpDescriptor[];
     external: ExternalMcpDescriptor[];
   };
+  /** Plugin-declared cron jobs (from register.cron). Optional for older plugins. */
+  crons?: CronJobDescriptor[];
+}
+
+/**
+ * Cron job descriptor (from /metadata endpoint).
+ *
+ * Mirrors the SDK's CronJobDescriptor — the schedule + retry policy Hay Core
+ * needs to register the job per enabled org. The handler itself lives in the
+ * plugin worker and is invoked via POST /cron/:name.
+ */
+export interface CronJobDescriptor {
+  name: string;
+  schedule: string;
+  retryPolicy?: {
+    maxRetries?: number;
+    backoff?: "fixed" | "exponential";
+  };
 }
 
 // ============================================================================
@@ -87,7 +107,7 @@ export interface AuthState {
   methodId: string;
 
   /** Credentials (e.g., { apiKey: "..." } or { accessToken: "...", refreshToken: "..." }) */
-  credentials: Record<string, any>;
+  credentials: Record<string, unknown>;
 }
 
 // ============================================================================
@@ -104,13 +124,13 @@ export interface ConfigFieldDescriptor {
   placeholder?: string; // Placeholder text for input field in UI
   required?: boolean;
   encrypted?: boolean;
-  default?: any;
+  default?: unknown;
   env?: string; // Environment variable fallback
   validation?: {
     min?: number;
     max?: number;
     pattern?: string;
-    enum?: any[];
+    enum?: unknown[];
   };
 }
 
@@ -162,7 +182,7 @@ export interface UIExtensionDescriptor {
   id: string;
   slot: string; // e.g., "plugin-settings", "conversation-sidebar"
   component: string; // Vue component path
-  props?: Record<string, any>;
+  props?: Record<string, unknown>;
 }
 
 /**
@@ -241,6 +261,12 @@ export interface DocumentImporterContract {
   discover(input: { instanceId: string; rootId: string; cursor?: string }): Promise<{
     pages: DocumentImporterExternalPage[];
     nextCursor?: string;
+    /**
+     * Optional hint: total number of pages the importer expects to enumerate
+     * for this root. Lets the sync engine report "X of Y" progress. Importers
+     * that can't know this up front (e.g. cursor-only APIs) may omit it.
+     */
+    total?: number;
   }>;
   fetchPage(input: {
     instanceId: string;
@@ -268,7 +294,7 @@ export interface MCPTool {
   serverId: string;
   name: string;
   description: string;
-  input_schema: Record<string, any>;
+  input_schema: Record<string, unknown>;
   organizationId: string;
   pluginId: string;
 }
@@ -281,12 +307,12 @@ export interface MCPTool {
  * Worker process information
  */
 export interface WorkerInfo {
-  process: any; // ChildProcess
+  process: ChildProcess;
   port: number;
   startedAt: Date;
   lastActivity: Date;
   organizationId: string;
   pluginId: string;
   instanceId: string;
-  metadata?: any; // Plugin registry metadata (for compatibility with legacy code)
+  metadata?: PluginMetadata; // Plugin registry metadata
 }

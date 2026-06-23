@@ -7,6 +7,51 @@
       </Button>
     </template>
 
+    <!-- Connection details (for embedding Hay elsewhere, e.g. the Shopify widget) -->
+    <Card class="mb-6">
+      <CardHeader>
+        <CardTitle>{{ $t("apiTokens.connectionDetails") }}</CardTitle>
+        <CardDescription>{{ $t("apiTokens.connectionDetailsDescription") }}</CardDescription>
+      </CardHeader>
+      <CardContent class="space-y-4">
+        <div>
+          <Label>{{ $t("apiTokens.serverUrl") }}</Label>
+          <div class="relative mt-1">
+            <Input :value="serverUrl" readonly class="font-mono pr-24" @click="selectOnClick" />
+            <Button
+              variant="ghost"
+              size="sm"
+              class="absolute right-1 top-1"
+              @click="copyValue(serverUrl, 'serverUrl')"
+            >
+              <Copy class="h-4 w-4 mr-1" />
+              {{ copiedKey === "serverUrl" ? $t("apiTokens.copied") : $t("apiTokens.copy") }}
+            </Button>
+          </div>
+        </div>
+        <div>
+          <Label>{{ $t("apiTokens.organizationId") }}</Label>
+          <div class="relative mt-1">
+            <Input
+              :value="organizationId"
+              readonly
+              class="font-mono pr-24"
+              @click="selectOnClick"
+            />
+            <Button
+              variant="ghost"
+              size="sm"
+              class="absolute right-1 top-1"
+              @click="copyValue(organizationId, 'organizationId')"
+            >
+              <Copy class="h-4 w-4 mr-1" />
+              {{ copiedKey === "organizationId" ? $t("apiTokens.copied") : $t("apiTokens.copy") }}
+            </Button>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+
     <!-- Tokens List -->
     <Card>
       <CardHeader>
@@ -282,7 +327,11 @@
 
 <script setup lang="ts">
 import { Plus, Key, Edit, Trash2, Ban, Copy, AlertTriangle } from "lucide-vue-next";
+import type { RouterInputs, RouterOutputs } from "@/types/trpc";
 import { Hay } from "@/utils/api";
+
+type ApiToken = RouterOutputs["apiTokens"]["list"][number];
+type EditingToken = Pick<ApiToken, "id" | "name" | "scopes">;
 
 const { t } = useI18n();
 const { formatDate } = useOrgDateTime();
@@ -291,7 +340,7 @@ const { formatDate } = useOrgDateTime();
 const loading = ref(false);
 const creating = ref(false);
 const updating = ref(false);
-const tokens = ref<any[]>([]);
+const tokens = ref<ApiToken[]>([]);
 const createDialogOpen = ref(false);
 const showTokenDialogOpen = ref(false);
 const editDialogOpen = ref(false);
@@ -300,13 +349,36 @@ const createdTokenScopes = ref<string[]>([]);
 const copied = ref(false);
 const tokenInput = ref<HTMLInputElement | null>(null);
 
+// Connection details (server URL + organization id) for embedding Hay elsewhere.
+const runtimeConfig = useRuntimeConfig();
+const userStore = useUserStore();
+const serverUrl = computed(() => String(runtimeConfig.public.apiBaseUrl ?? ""));
+const organizationId = computed(() => userStore.activeOrganizationId ?? "");
+const copiedKey = ref<string | null>(null);
+
+const selectOnClick = (event: MouseEvent) => {
+  (event.target as HTMLInputElement | null)?.select?.();
+};
+
+const copyValue = async (text: string, key: string) => {
+  try {
+    await navigator.clipboard.writeText(text);
+    copiedKey.value = key;
+    setTimeout(() => {
+      if (copiedKey.value === key) copiedKey.value = null;
+    }, 2000);
+  } catch (error) {
+    console.error("Failed to copy value:", error);
+  }
+};
+
 const newToken = ref({
   name: "",
   scopes: [] as string[],
   expiresAt: "",
 });
 
-const editingToken = ref<any>({
+const editingToken = ref<EditingToken>({
   id: "",
   name: "",
   scopes: [] as string[],
@@ -391,7 +463,7 @@ const createToken = async () => {
   try {
     const result = await Hay.apiTokens.create.mutate({
       name: newToken.value.name,
-      scopes: newToken.value.scopes as any,
+      scopes: newToken.value.scopes as RouterInputs["apiTokens"]["create"]["scopes"],
       expiresAt: newToken.value.expiresAt ? new Date(newToken.value.expiresAt) : undefined,
     });
 
@@ -432,7 +504,7 @@ const closeTokenDialog = () => {
   copied.value = false;
 };
 
-const openEditDialog = (token: any) => {
+const openEditDialog = (token: ApiToken) => {
   editingToken.value = {
     id: token.id,
     name: token.name,
@@ -447,7 +519,7 @@ const updateToken = async () => {
     await Hay.apiTokens.update.mutate({
       id: editingToken.value.id,
       name: editingToken.value.name,
-      scopes: editingToken.value.scopes as any,
+      scopes: editingToken.value.scopes as RouterInputs["apiTokens"]["update"]["scopes"],
     });
 
     editDialogOpen.value = false;
@@ -485,7 +557,7 @@ const deleteToken = async (id: string) => {
   }
 };
 
-const isExpired = (token: any) => {
+const isExpired = (token: ApiToken) => {
   if (!token.expiresAt) return false;
   return new Date(token.expiresAt) < new Date();
 };

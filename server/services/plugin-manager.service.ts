@@ -5,12 +5,57 @@ import { execSync } from "child_process";
 import { pluginRegistryRepository } from "@server/repositories/plugin-registry.repository";
 import { pluginInstanceRepository } from "@server/repositories/plugin-instance.repository";
 import { PluginRegistry, PluginStatus } from "@server/entities/plugin-registry.entity";
-import type { HayPluginManifest } from "@server/types/plugin.types";
+import type { HayPluginManifest, PluginLocale } from "@server/types/plugin.types";
 import { getPluginRunnerService } from "./plugin-runner.service";
 import type { WorkerInfo } from "@server/types/plugin-sdk.types";
 import { createLogger } from "@server/lib/logger";
 
 const logger = createLogger("plugin-manager");
+
+type PluginType = HayPluginManifest["type"][number];
+
+/**
+ * The `hay-plugin` block embedded in a plugin's package.json. Richer than the
+ * SDK's minimal manifest: it also carries Hay-specific extension fields used to
+ * build the {@link HayPluginManifest} stored in the registry.
+ */
+interface HayPluginBlock {
+  displayName?: string;
+  category?: PluginType;
+  entry?: string;
+  capabilities?: string[];
+  config?: HayPluginManifest["configSchema"];
+  env?: string[];
+  auth?: HayPluginManifest["auth"];
+  channel?: string;
+  autoActivate?: boolean;
+  trpcRouter?: string;
+  documentImporter?: boolean;
+}
+
+/**
+ * Minimal shape of a plugin's package.json that this service reads.
+ */
+interface PluginPackageJson {
+  name?: string;
+  version?: string;
+  description?: string;
+  author?: string;
+  dependencies?: Record<string, string>;
+  devDependencies?: Record<string, string>;
+  scripts?: Record<string, string>;
+  "hay-plugin"?: HayPluginBlock;
+}
+
+/**
+ * Manifest as persisted in the plugin registry. Identical to
+ * {@link HayPluginManifest} except `capabilities` is stored as the flat
+ * string-array form sourced from package.json `hay-plugin.capabilities`.
+ * Consumers branch on `Array.isArray(manifest.capabilities)` to read it.
+ */
+type RegistryManifest = Omit<HayPluginManifest, "capabilities"> & {
+  capabilities: string[];
+};
 
 export class PluginManagerService {
   private pluginsDir: string;
@@ -146,7 +191,7 @@ export class PluginManagerService {
       }
 
       const packageContent = await fs.readFile(packagePath, "utf-8");
-      const packageJson = JSON.parse(packageContent);
+      const packageJson = JSON.parse(packageContent) as PluginPackageJson;
 
       // Check if this is a Hay plugin
       if (!packageJson["hay-plugin"]) {
@@ -167,32 +212,29 @@ export class PluginManagerService {
       // Display name from hay-plugin or parse from package name
       const displayName = hayPlugin.displayName || this.parseDisplayName(pluginId);
 
-      // Build full manifest from package.json
-      const manifest: any = {
+      // Build full manifest from package.json.
+      // Primary type from category, plus any extra types inferred from
+      // capabilities (e.g. a document_importer plugin that ALSO exposes MCP
+      // tools — like Atlassian, where Confluence is the importer and Jira
+      // is served over MCP from the same connection).
+      const type = Array.from(
+        new Set<PluginType>([
+          ...(hayPlugin.category ? [hayPlugin.category] : []),
+          ...this.inferTypeFromCapabilities(hayPlugin.capabilities || []),
+          // Hay-specific extension: hay-plugin.documentImporter=true marks
+          // a plugin as a document_importer without using SDK capability
+          // names that the worker bootstrap doesn't recognize.
+          ...(hayPlugin.documentImporter === true ? (["document_importer"] as const) : []),
+        ]),
+      );
+
+      const manifest: RegistryManifest = {
         id: pluginId,
         name: displayName,
         version: packageJson.version || "1.0.0",
         description: packageJson.description || "",
-        author: packageJson.author,
-        category: hayPlugin.category,
-        icon: "./thumbnail.jpg", // Convention: always thumbnail.jpg
-        // Primary type from category, plus any extra types inferred from
-        // capabilities (e.g. a document_importer plugin that ALSO exposes MCP
-        // tools — like Atlassian, where Confluence is the importer and Jira
-        // is served over MCP from the same connection).
-        type: Array.from(
-          new Set(
-            [
-              ...(hayPlugin.category ? [hayPlugin.category] : []),
-              ...this.inferTypeFromCapabilities(hayPlugin.capabilities || []),
-              // Hay-specific extension: hay-plugin.documentImporter=true marks
-              // a plugin as a document_importer without using SDK capability
-              // names that the worker bootstrap doesn't recognize.
-              ...(hayPlugin.documentImporter === true ? ["document_importer"] : []),
-            ].filter(Boolean),
-          ),
-        ),
-        entry: hayPlugin.entry,
+        type,
+        entry: hayPlugin.entry || "",
         capabilities: hayPlugin.capabilities || [],
         configSchema: hayPlugin.config || {},
         permissions: {
@@ -207,14 +249,14 @@ export class PluginManagerService {
 
       // Load i18n translations from plugin's i18n/ directory
       const i18nDir = path.join(pluginPath, "i18n");
-      const i18n: Record<string, any> = {};
+      const i18n: Record<string, PluginLocale> = {};
       try {
         const i18nFiles = await fs.readdir(i18nDir);
         for (const file of i18nFiles) {
           if (file.endsWith(".json")) {
             const locale = file.replace(".json", "");
             const content = await fs.readFile(path.join(i18nDir, file), "utf-8");
-            i18n[locale] = JSON.parse(content);
+            i18n[locale] = JSON.parse(content) as PluginLocale;
           }
         }
       } catch {
@@ -236,7 +278,10 @@ export class PluginManagerService {
         name: manifest.name,
         version: manifest.version,
         pluginPath: relativePath, // e.g., "core/stripe" or "custom/{organizationId}/{pluginId}"
-        manifest: manifest as any,
+        // The registry stores capabilities as the flat string-array form
+        // (see RegistryManifest); the jsonb column is typed with the structured
+        // HayPluginManifest, and consumers branch on Array.isArray() to read it.
+        manifest: manifest as HayPluginManifest,
         checksum,
         sourceType,
         organizationId: organizationId || undefined,
@@ -269,8 +314,8 @@ export class PluginManagerService {
   /**
    * Infer plugin type from capabilities
    */
-  private inferTypeFromCapabilities(capabilities: string[]): string[] {
-    const types: string[] = [];
+  private inferTypeFromCapabilities(capabilities: string[]): PluginType[] {
+    const types: PluginType[] = [];
 
     if (capabilities.includes("mcp")) {
       types.push("mcp-connector");
@@ -458,7 +503,7 @@ export class PluginManagerService {
     let installCommand: string | undefined;
     try {
       const packageJsonPath = path.join(pluginPath, "package.json");
-      const packageJson = JSON.parse(readFileSync(packageJsonPath, "utf-8"));
+      const packageJson = JSON.parse(readFileSync(packageJsonPath, "utf-8")) as PluginPackageJson;
 
       // For custom/git plugins, fix @hay/plugin-sdk dependency path.
       // External plugins reference the SDK with a file: path relative to their
@@ -481,24 +526,25 @@ export class PluginManagerService {
       // Ignore - package.json might not exist
     }
 
-    if (!installCommand) {
-      logger.debug({ pluginName: plugin.name }, "No install command for plugin");
-      await pluginRegistryRepository.updateInstallStatus(plugin.id, true);
-      return;
-    }
-
     try {
-      logger.info({ pluginName: plugin.name }, "Installing plugin");
+      // Install the plugin's own (root) dependencies, if it declares any. A
+      // plugin may have none at the root and still ship a bundled mcp/ server
+      // with its own deps, so this must NOT short-circuit the MCP install below.
+      if (installCommand) {
+        logger.info({ pluginName: plugin.name }, "Installing plugin");
 
-      // For workspace plugins, run from root directory; otherwise run from plugin directory
-      const rootDir = path.join(this.pluginsDir, "..");
-      const execDir = isWorkspacePlugin ? rootDir : pluginPath;
+        // For workspace plugins, run from root directory; otherwise run from plugin directory
+        const rootDir = path.join(this.pluginsDir, "..");
+        const execDir = isWorkspacePlugin ? rootDir : pluginPath;
 
-      execSync(installCommand, {
-        cwd: execDir,
-        stdio: "inherit",
-        env: this.buildMinimalEnv(),
-      });
+        execSync(installCommand, {
+          cwd: execDir,
+          stdio: "inherit",
+          env: this.buildMinimalEnv(),
+        });
+      } else {
+        logger.debug({ pluginName: plugin.name }, "No root install command for plugin");
+      }
 
       // Install bundled MCP server dependencies, if any. The mcp/ server is plain
       // runtime JS spawned over stdio and is NOT part of the npm workspace, so its
@@ -542,7 +588,7 @@ export class PluginManagerService {
     let buildCommand: string | undefined;
     try {
       const packageJsonPath = path.join(pluginPath, "package.json");
-      const packageJson = JSON.parse(readFileSync(packageJsonPath, "utf-8"));
+      const packageJson = JSON.parse(readFileSync(packageJsonPath, "utf-8")) as PluginPackageJson;
 
       if (packageJson.scripts?.build) {
         if (isWorkspacePlugin) {
@@ -610,7 +656,20 @@ export class PluginManagerService {
    */
   needsInstallation(pluginId: string): boolean {
     const plugin = this.registry.get(pluginId);
-    return plugin ? !plugin.installed : true;
+    if (!plugin) return true;
+    if (!plugin.installed) return true;
+
+    // Even when bookkeeping says "installed", the bundled mcp/ node_modules may
+    // be missing: it's gitignored and lives outside the npm workspace, so it
+    // desyncs from the persisted flag on fresh clones, CI, or `git clean`.
+    // Re-install if a bundled server's deps aren't actually present on disk.
+    const pluginPath = path.join(this.pluginsDir, plugin.pluginPath);
+    const hasMcpServer = existsSync(path.join(pluginPath, "mcp", "package.json"));
+    if (hasMcpServer && !existsSync(path.join(pluginPath, "mcp", "node_modules"))) {
+      return true;
+    }
+
+    return false;
   }
 
   /**
@@ -642,39 +701,74 @@ export class PluginManagerService {
    * Initialize auto-activated plugins
    */
   private async initializeAutoActivatedPlugins(): Promise<void> {
-    const { pluginRouterRegistry } = await import("./plugin-router-registry.service");
-
     for (const plugin of this.registry.values()) {
       const manifest = plugin.manifest as HayPluginManifest;
 
       if (manifest.autoActivate && manifest.trpcRouter) {
-        try {
-          // Dynamically load the plugin's router using the stored plugin path.
-          // For .ts files we go through CommonJS require() because dynamic
-          // ESM import() rejects unknown file extensions under ts-node — but
-          // require() is hooked by ts-node (and tsconfig-paths) so @server/*
-          // aliases inside the plugin's router resolve correctly.
-          const routerPath = path.join(this.pluginsDir, plugin.pluginPath, manifest.trpcRouter);
-          logger.debug({ routerPath }, "Loading router");
-          const routerModule = routerPath.endsWith(".ts")
-            ? // eslint-disable-next-line @typescript-eslint/no-require-imports
-              require(routerPath)
-            : await import(routerPath);
-          const pluginRouter = routerModule.default || routerModule.router;
-
-          if (pluginRouter) {
-            // Register with the manifest ID, not the directory name
-            const registerId = manifest.id || plugin.pluginId;
-            pluginRouterRegistry.registerRouter(registerId, pluginRouter);
-            logger.info(
-              { pluginName: plugin.name, registerId },
-              "Auto-activated router for plugin",
-            );
-          }
-        } catch (error) {
-          logger.warn({ err: error, pluginName: plugin.name }, "Could not load router for plugin");
-        }
+        await this.ensurePluginRouterRegistered(plugin.pluginId);
       }
+    }
+  }
+
+  /**
+   * Idempotently load and register a plugin's tRPC router with the
+   * pluginRouterRegistry.
+   *
+   * Registration used to happen only here at boot, so a plugin that was built,
+   * installed, or enabled while the server was already running had no router
+   * registered until the next restart — making document-source listRoots/sync
+   * fail with "does not expose a router". Callers that resolve a plugin router
+   * on demand invoke this first so registration is self-healing.
+   *
+   * Returns true if a router is registered for the plugin after this call.
+   */
+  async ensurePluginRouterRegistered(pluginId: string): Promise<boolean> {
+    const { pluginRouterRegistry } = await import("./plugin-router-registry.service");
+
+    if (pluginRouterRegistry.hasRouter(pluginId)) {
+      return true;
+    }
+
+    const plugin = this.registry.get(pluginId);
+    if (!plugin) {
+      return false;
+    }
+
+    const manifest = plugin.manifest as HayPluginManifest;
+    if (!manifest.trpcRouter) {
+      return false;
+    }
+
+    try {
+      // Dynamically load the plugin's router using the stored plugin path.
+      // For .ts files we go through CommonJS require() because dynamic
+      // ESM import() rejects unknown file extensions under ts-node — but
+      // require() is hooked by ts-node (and tsconfig-paths) so @server/*
+      // aliases inside the plugin's router resolve correctly.
+      const routerPath = path.join(this.pluginsDir, plugin.pluginPath, manifest.trpcRouter);
+      logger.debug({ routerPath }, "Loading router");
+      const routerModule = routerPath.endsWith(".ts")
+        ? // eslint-disable-next-line @typescript-eslint/no-require-imports
+          require(routerPath)
+        : await import(routerPath);
+      const pluginRouter = routerModule.default || routerModule.router;
+
+      if (!pluginRouter) {
+        logger.warn(
+          { pluginName: plugin.name },
+          "Plugin router module has no default/router export",
+        );
+        return false;
+      }
+
+      // Register with the manifest ID, not the directory name
+      const registerId = manifest.id || plugin.pluginId;
+      pluginRouterRegistry.registerRouter(registerId, pluginRouter);
+      logger.info({ pluginName: plugin.name, registerId }, "Registered router for plugin");
+      return true;
+    } catch (error) {
+      logger.warn({ err: error, pluginName: plugin.name }, "Could not load router for plugin");
+      return false;
     }
   }
 
@@ -876,8 +970,7 @@ export class PluginManagerService {
    */
   findPluginIdByChannel(channel: string): string | null {
     for (const [pluginId, plugin] of this.registry) {
-      const manifest = plugin.manifest as any;
-      if (manifest?.channel === channel) {
+      if (plugin.manifest?.channel === channel) {
         return pluginId;
       }
     }
@@ -898,7 +991,7 @@ export class PluginManagerService {
    * External plugins reference the SDK with a relative path that only works
    * in their own repo. We rewrite it to the correct path within the monorepo.
    */
-  private fixPluginSdkPath(pluginPath: string, packageJson: any): void {
+  private fixPluginSdkPath(pluginPath: string, packageJson: PluginPackageJson): void {
     const sdkAbsPath = path.join(this.pluginsDir, "..", "packages", "plugin-sdk");
     const sdkRelPath = path.relative(pluginPath, sdkAbsPath);
     let modified = false;

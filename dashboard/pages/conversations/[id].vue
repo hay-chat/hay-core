@@ -159,7 +159,7 @@
             <ChatMessage
               v-for="message in messages"
               :key="message.id"
-              :message="message"
+              :message="message as Message"
               :inverted="true"
               :show-feedback="true"
               @retry="retryMessage"
@@ -233,7 +233,7 @@
               <ChatMessage
                 v-for="message in conversation?.messages"
                 :key="message.id"
-                :message="message"
+                :message="message as Message"
                 :show-feedback="true"
                 :show-approval="isTestMode"
                 @message-approved="handleMessageApproved"
@@ -728,12 +728,90 @@ import {
   FileText,
   FileSpreadsheet,
 } from "lucide-vue-next";
+import { TRPCClientError } from "@trpc/client";
 import { HayApi } from "@/utils/api";
-import { MessageType } from "~/types/message";
+import { MessageType, type Message } from "~/types/message";
+import type { AssignedUser } from "@/composables/useConversationTakeover";
+import type { RouterOutputs } from "@/types/trpc";
 
 // i18n
 const { t } = useI18n();
 const { formatDateTime } = useOrgDateTime();
+
+/** Raw conversation payload as returned by the conversations.get / create procedures. */
+type ConversationGetOutput = RouterOutputs["conversations"]["get"];
+/** A message element as returned by the server. */
+type ServerMessage = NonNullable<ConversationGetOutput["messages"]>[number];
+
+/**
+ * Message shape used for rendering in this page. It is a superset of the server
+ * message (so API results assign directly) plus the client-only optimistic
+ * fields (`deliveryState`, `errorMessage`, `timestamp`) used to show pending /
+ * failed bubbles before the server confirms delivery.
+ */
+interface DisplayMessage {
+  id: string;
+  content: string;
+  type: MessageType | string;
+  sender?: string | null;
+  created_at?: string | Date;
+  updated_at?: string | Date;
+  conversation_id?: string;
+  status?: string;
+  deliveryState?: "pending" | "sent" | "failed" | "queued" | "blocked";
+  errorMessage?: string;
+  /** Duplicate of `created_at`; retained for compatibility with older payloads. */
+  timestamp?: string | Date;
+  metadata?: ServerMessage["metadata"];
+  attachments?: ServerMessage["attachments"];
+}
+
+/** Full conversation as consumed by this page (messages widened to {@link DisplayMessage}). */
+type ConversationDetail = Omit<ConversationGetOutput, "messages"> & {
+  messages?: DisplayMessage[];
+};
+
+/** Payload received over the WebSocket `message` event. */
+interface MessageEventPayload {
+  data?: {
+    id: string;
+    content: string;
+    type: MessageType | string;
+    timestamp?: string;
+    metadata?: ServerMessage["metadata"];
+    status?: string;
+  };
+}
+
+/** Payload received over conversation status / approval / block WebSocket events. */
+interface ConversationEventPayload {
+  conversationId?: string;
+  processingPhase?: string;
+}
+
+const isMessageEventPayload = (value: unknown): value is MessageEventPayload =>
+  typeof value === "object" && value !== null;
+
+const isConversationEventPayload = (value: unknown): value is ConversationEventPayload =>
+  typeof value === "object" && value !== null;
+
+/** Extract a human-readable error message from an unknown thrown value. */
+const getErrorMessage = (error: unknown, fallback: string): string => {
+  if (error instanceof TRPCClientError) {
+    const data: unknown = error.data;
+    const dataMessage =
+      typeof data === "object" &&
+      data !== null &&
+      typeof (data as Record<string, unknown>).message === "string"
+        ? ((data as Record<string, unknown>).message as string)
+        : undefined;
+    return error.message || dataMessage || fallback;
+  }
+  if (error instanceof Error) {
+    return error.message || fallback;
+  }
+  return fallback;
+};
 
 interface PreviousConversation {
   id: string;
@@ -778,10 +856,10 @@ const isAgentTyping = ref(false);
 const orchestratorStatus = ref("idle");
 const lastOrchestratorCheck = ref("");
 const processingCount = ref(0);
-const messages = ref<any[]>([]);
+const messages = ref<DisplayMessage[]>([]);
 
-// Data from API - Use any to handle multiple possible response formats
-const conversation = ref<any>(null);
+// Full conversation returned by the API (get / create procedures share this shape)
+const conversation = ref<ConversationDetail | null>(null);
 
 const previousConversations = ref<PreviousConversation[]>([]);
 const relatedDocuments = ref<RelatedDocument[]>([]);
@@ -790,7 +868,7 @@ const relatedDocuments = ref<RelatedDocument[]>([]);
 const { useUserStore } = await import("@/stores/user");
 const userStore = useUserStore();
 const currentUserId = computed(() => userStore.user?.id);
-const assignedUser = ref<any>(null);
+const assignedUser = ref<AssignedUser | null>(null);
 const showReleaseDialog = ref(false);
 const showCloseDialog = ref(false);
 const releaseMode = ref<"ai" | "queue">("queue");
@@ -993,10 +1071,9 @@ const takeOverConversation = async () => {
     assignedUser.value = await HayApi.conversations.getAssignedUser.query({
       conversationId: conversationId.value,
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Failed to take over conversation:", error);
-    const errorMessage =
-      error?.message || error?.data?.message || "Failed to take over conversation";
+    const errorMessage = getErrorMessage(error, "Failed to take over conversation");
     toast.error(t("conversations.toast.takeoverFailed"), errorMessage);
   }
 };
@@ -1025,9 +1102,9 @@ const confirmRelease = async () => {
     toast.success(t("conversations.toast.released"), message);
     // Refresh conversation to get updated status
     await fetchConversation();
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Failed to release conversation:", error);
-    const errorMessage = error?.message || error?.data?.message || "Failed to release conversation";
+    const errorMessage = getErrorMessage(error, "Failed to release conversation");
     toast.error(t("conversations.toast.releaseFailed"), errorMessage);
   }
 };
@@ -1044,9 +1121,9 @@ const confirmClose = async () => {
     toast.success(t("conversations.toast.closed"), t("conversations.toast.closedMessage"));
     // Refresh conversation to get updated status
     await fetchConversation();
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Failed to close conversation:", error);
-    const errorMessage = error?.message || error?.data?.message || "Failed to close conversation";
+    const errorMessage = getErrorMessage(error, "Failed to close conversation");
     toast.error(t("conversations.toast.closeFailed"), errorMessage);
   }
 };
@@ -1069,7 +1146,7 @@ const sendMessage = async () => {
     : MessageType.CUSTOMER;
 
   // Create optimistic message
-  const optimisticMessage: any = {
+  const optimisticMessage: DisplayMessage = {
     id: tempId,
     content: messageContent,
     type: messageType,
@@ -1104,7 +1181,7 @@ const sendMessage = async () => {
     // Update optimistic message with real ID and mark as sent
     const messagesList = isPlaygroundMode.value ? messages.value : conversation.value?.messages;
     if (messagesList) {
-      const messageIndex = messagesList.findIndex((m: any) => m.id === tempId);
+      const messageIndex = messagesList.findIndex((m) => m.id === tempId);
       if (messageIndex !== -1) {
         // Update the message with real ID and mark as sent
         messagesList[messageIndex] = {
@@ -1126,18 +1203,18 @@ const sendMessage = async () => {
     if (!isPlaygroundMode.value && !isTakenOverByCurrentUser.value) {
       setTimeout(() => fetchConversation(), 2000);
     }
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Failed to send message:", error);
 
     // Mark optimistic message as failed
     const messagesList = isPlaygroundMode.value ? messages.value : conversation.value?.messages;
     if (messagesList) {
-      const messageIndex = messagesList.findIndex((m: any) => m.id === tempId);
+      const messageIndex = messagesList.findIndex((m) => m.id === tempId);
       if (messageIndex !== -1) {
         messagesList[messageIndex] = {
           ...messagesList[messageIndex],
           deliveryState: "failed",
-          errorMessage: error?.message || error?.data?.message || "Failed to send message",
+          errorMessage: getErrorMessage(error, "Failed to send message"),
         };
       }
     }
@@ -1156,7 +1233,7 @@ const retryMessage = async (messageId: string) => {
   const messagesList = isPlaygroundMode.value ? messages.value : conversation.value?.messages;
   if (!messagesList) return;
 
-  const messageIndex = messagesList.findIndex((m: any) => m.id === messageId);
+  const messageIndex = messagesList.findIndex((m) => m.id === messageId);
   if (messageIndex === -1) return;
 
   const failedMessage = messagesList[messageIndex];
@@ -1252,7 +1329,7 @@ const fetchConversation = async () => {
     conversation.value = result;
 
     // Populate related articles from conversation's linked documents
-    const documentIds = (result as any).document_ids as string[] | null | undefined;
+    const documentIds = result.document_ids;
     if (documentIds && documentIds.length > 0) {
       try {
         const docs = await Promise.all(
@@ -1278,13 +1355,9 @@ const fetchConversation = async () => {
       const allMessages = result.messages || [];
 
       // Transform messages to match the component format
-      const transformedMessages = allMessages.map((msg: any) => {
+      const transformedMessages: DisplayMessage[] = allMessages.map((msg) => {
         let sender = "system";
-        if (msg.type === "AIMessage" || msg.type === "AI_MESSAGE") {
-          sender = "agent";
-        } else if (msg.type === "HumanMessage" || msg.type === "HUMAN_MESSAGE") {
-          sender = "customer";
-        } else if (msg.sender) {
+        if (msg.sender) {
           sender =
             msg.sender === "assistant" ? "agent" : msg.sender === "user" ? "customer" : msg.sender;
         }
@@ -1374,9 +1447,9 @@ onMounted(async () => {
   });
 
   // Listen for new messages (full message data)
-  unsubscribeMessage = websocket.on("message", async (payload: any) => {
+  unsubscribeMessage = websocket.on("message", async (payload: unknown) => {
     console.log("[WebSocket] Received message event with full data", payload);
-    if (payload.data) {
+    if (isMessageEventPayload(payload) && payload.data) {
       const messageData = payload.data;
 
       // Check if this message belongs to the current conversation
@@ -1384,7 +1457,7 @@ onMounted(async () => {
       if (isPlaygroundMode.value) {
         // First, try to find and replace optimistic message (pending message with matching content)
         const optimisticIndex = messages.value.findIndex(
-          (m: any) =>
+          (m) =>
             m.deliveryState === "pending" &&
             m.content === messageData.content &&
             m.type === messageData.type,
@@ -1411,7 +1484,7 @@ onMounted(async () => {
         }
 
         // Check if message already exists - if so, update it (for tool call responses)
-        const existingMessageIndex = messages.value.findIndex((m: any) => m.id === messageData.id);
+        const existingMessageIndex = messages.value.findIndex((m) => m.id === messageData.id);
         if (existingMessageIndex !== -1) {
           console.log("[WebSocket] Updating existing message:", messageData.id);
           messages.value[existingMessageIndex] = {
@@ -1450,7 +1523,7 @@ onMounted(async () => {
       } else if (conversation.value && conversation.value.messages) {
         // First, try to find and replace optimistic message (pending message with matching content)
         const optimisticIndex = conversation.value.messages.findIndex(
-          (m: any) =>
+          (m) =>
             m.deliveryState === "pending" &&
             m.content === messageData.content &&
             m.type === messageData.type,
@@ -1478,7 +1551,7 @@ onMounted(async () => {
 
         // Check if message already exists - if so, update it (for tool call responses)
         const existingMessageIndex = conversation.value.messages.findIndex(
-          (m: any) => m.id === messageData.id,
+          (m) => m.id === messageData.id,
         );
         if (existingMessageIndex !== -1) {
           console.log("[WebSocket] Updating existing message:", messageData.id);
@@ -1543,29 +1616,33 @@ onMounted(async () => {
   };
 
   // Listen for status changes
-  unsubscribeStatusChanged = websocket.on("conversation_status_changed", async (payload: any) => {
-    if (payload.conversationId === conversationId.value) {
-      console.log("[WebSocket] Conversation status changed", payload);
+  unsubscribeStatusChanged = websocket.on(
+    "conversation_status_changed",
+    async (payload: unknown) => {
+      if (!isConversationEventPayload(payload)) return;
+      if (payload.conversationId === conversationId.value) {
+        console.log("[WebSocket] Conversation status changed", payload);
 
-      // Handle processing phase for typing indicator
-      if (payload.processingPhase) {
-        const isProcessing = payload.processingPhase !== "idle";
+        // Handle processing phase for typing indicator
+        if (payload.processingPhase) {
+          const isProcessing = payload.processingPhase !== "idle";
 
-        if (isPlaygroundMode.value) {
-          isAgentTyping.value = isProcessing;
-        } else {
-          isTyping.value = isProcessing;
+          if (isPlaygroundMode.value) {
+            isAgentTyping.value = isProcessing;
+          } else {
+            isTyping.value = isProcessing;
+          }
         }
-      }
 
-      await debouncedRefreshConversation("status_changed");
-    }
-  });
+        await debouncedRefreshConversation("status_changed");
+      }
+    },
+  );
 
   // Listen for message approval events
-  unsubscribeMessageApproved = websocket.on("message_approved", async (payload: any) => {
+  unsubscribeMessageApproved = websocket.on("message_approved", async (payload: unknown) => {
     console.log("[WebSocket] Received message_approved event", payload);
-    if (payload.conversationId === conversationId.value) {
+    if (isConversationEventPayload(payload) && payload.conversationId === conversationId.value) {
       console.log("[WebSocket] Message approved in current conversation");
       await debouncedRefreshConversation("message_approved");
       // Scroll will happen after refresh completes
@@ -1574,9 +1651,9 @@ onMounted(async () => {
   });
 
   // Listen for message block events
-  unsubscribeMessageBlocked = websocket.on("message_blocked", async (payload: any) => {
+  unsubscribeMessageBlocked = websocket.on("message_blocked", async (payload: unknown) => {
     console.log("[WebSocket] Received message_blocked event", payload);
-    if (payload.conversationId === conversationId.value) {
+    if (isConversationEventPayload(payload) && payload.conversationId === conversationId.value) {
       console.log("[WebSocket] Message blocked in current conversation");
       await debouncedRefreshConversation("message_blocked");
     }

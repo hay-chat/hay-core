@@ -140,7 +140,7 @@ export class CompanyInterestGuardrailService {
         prompt: evaluationPrompt,
         jsonSchema: schema,
         temperature: 0.2, // Low temperature for consistent evaluation
-        model: "gpt-4o",
+        tier: "hard",
       });
 
       const parsed = JSON.parse(result);

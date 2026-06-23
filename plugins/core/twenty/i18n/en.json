@@ -1,0 +1,15 @@
+{
+  "name": "Twenty CRM",
+  "description": "Connect your Twenty CRM workspace to manage people, companies, notes, tasks, and any custom object",
+  "tools": {},
+  "config": {
+    "baseUrl": {
+      "label": "Twenty API URL",
+      "description": "Your Twenty workspace API URL. Twenty Cloud: https://api.twenty.com. Self-hosted: your instance URL. Do not include the /rest path."
+    },
+    "apiKey": {
+      "label": "API Key",
+      "description": "Twenty API key. Generate one under Settings → APIs & Webhooks → Generate API Key."
+    }
+  }
+}

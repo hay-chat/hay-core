@@ -204,7 +204,7 @@ watch(
 
   h1 {
     font-size: 1.5rem;
-    border-bottom: 1px solid var(--border);
+    border-bottom: 1px solid var(--color-border);
     padding-bottom: 0.5rem;
   }
 
@@ -312,20 +312,50 @@ watch(
   /* Tables */
   table {
     width: 100%;
-    border-collapse: collapse;
-    margin-bottom: 1rem;
+    border-collapse: separate;
+    border-spacing: 0;
+    margin: 0.5rem 0 1.25rem;
+    font-size: 0.875rem;
+    border: 1px solid var(--color-border);
+    border-radius: 0.5rem;
+    overflow: hidden;
   }
 
   th,
   td {
-    border: 1px solid var(--border);
     padding: 0.5rem 0.75rem;
-    text-align: left;
+    border-bottom: 1px solid var(--color-border);
+    vertical-align: top;
+  }
+
+  th + th,
+  td + td {
+    border-left: 1px solid var(--color-border);
+  }
+
+  tbody tr:last-child td {
+    border-bottom: none;
   }
 
   th {
-    background-color: var(--background-secondary);
+    background-color: var(--color-background-secondary);
     font-weight: 600;
+    text-align: left;
+  }
+
+  tbody tr:nth-child(even) {
+    background-color: var(--color-background-secondary);
+  }
+
+  /* Honor GFM column alignment (align attr emitted by marked) */
+  th[align="center"],
+  td[align="center"] {
+    text-align: center;
+  }
+
+  th[align="right"],
+  td[align="right"] {
+    text-align: right;
   }
 }
 </style>

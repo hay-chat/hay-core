@@ -78,7 +78,7 @@
     </div> -->
 
     <!-- Loading State -->
-    <div v-if="loading" class="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+    <div v-if="loading" class="grid gap-4 lg:grid-cols-2 xl:grid-cols-3">
       <div v-for="i in 6" :key="i" class="animate-pulse">
         <Card>
           <CardHeader>
@@ -105,7 +105,7 @@
     </div>
 
     <!-- Plugins Grid -->
-    <div v-else class="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+    <div v-else class="grid gap-4 lg:grid-cols-2 xl:grid-cols-3">
       <Card
         v-for="plugin in filteredPlugins"
         :key="plugin.id"
@@ -212,13 +212,20 @@ import { useAuthStore } from "@/stores/auth";
 import { useUserStore } from "@/stores/user";
 import { useToast } from "@/composables/useToast";
 import { useDomain } from "@/composables/useDomain";
+import type { RouterOutputs } from "@/types/trpc";
+
+// Plugin type category, derived from the tRPC plugin contract so the
+// marketplace filter stays in sync with the server's plugin type union.
+type PluginCategory = RouterOutputs["plugins"]["getAll"][number]["type"][number];
+// `"all"` is the unfiltered sentinel; otherwise a concrete plugin category.
+type CategoryFilter = "all" | PluginCategory;
 
 const { t } = useI18n();
 
 // Reactive state
 const loading = ref(true);
 const searchQuery = ref("");
-const selectedCategory = ref("all");
+const selectedCategory = ref<CategoryFilter>("all");
 const enablingPlugin = ref<string | null>(null);
 const disablingPlugin = ref<string | null>(null);
 const deletingPlugin = ref<string | null>(null);
@@ -255,8 +262,9 @@ const filteredPlugins = computed(() => {
   let filtered = availablePlugins.value || [];
 
   // Filter by category
-  if (selectedCategory.value !== "all") {
-    filtered = filtered.filter((p) => p.type.includes(selectedCategory.value));
+  const category = selectedCategory.value;
+  if (category !== "all") {
+    filtered = filtered.filter((p) => p.type.includes(category));
   }
 
   // Filter by search
@@ -272,6 +280,21 @@ const filteredPlugins = computed(() => {
 
   return filtered;
 });
+
+// Extract a human-readable message from an unknown error.
+// tRPC client errors expose `message` and may also carry `data.message`.
+const extractErrorMessage = (error: unknown): string | undefined => {
+  if (typeof error === "object" && error !== null) {
+    const record = error as { message?: unknown; data?: { message?: unknown } };
+    if (typeof record.message === "string") {
+      return record.message;
+    }
+    if (typeof record.data?.message === "string") {
+      return record.data.message;
+    }
+  }
+  return undefined;
+};
 
 const getPluginThumbnail = (pluginId: string) => {
   const { getApiUrl } = useDomain();
@@ -327,10 +350,7 @@ const enablePlugin = async (pluginId: string) => {
 
     // Show error toast with details
     // TRPCError messages are in error.message for client errors
-    const errorMessage =
-      (error as any)?.message ||
-      (error as any)?.data?.message ||
-      t("marketplace.toast.enableFailed");
+    const errorMessage = extractErrorMessage(error) || t("marketplace.toast.enableFailed");
 
     // Clean up the plugin name in the error message for better readability
     const cleanMessage = errorMessage.replace(/hay-plugin-/g, "");
@@ -354,10 +374,7 @@ const disablePlugin = async (pluginId: string) => {
     console.error("Failed to disable plugin:", error);
 
     // Show error toast with details
-    const errorMessage =
-      (error as any)?.message ||
-      (error as any)?.data?.message ||
-      t("marketplace.toast.disableFailed");
+    const errorMessage = extractErrorMessage(error) || t("marketplace.toast.disableFailed");
     const cleanMessage = errorMessage.replace(/hay-plugin-/g, "");
     toast.error(cleanMessage, undefined, 10000); // Show error for 10 seconds
   } finally {
@@ -406,7 +423,7 @@ const deletePlugin = async (pluginId: string) => {
     await appStore.fetchPlugins();
   } catch (error: unknown) {
     console.error("Failed to delete plugin:", error);
-    const errorMessage = (error as any)?.message || t("marketplace.toast.deleteFailed");
+    const errorMessage = extractErrorMessage(error) || t("marketplace.toast.deleteFailed");
     toast.error(errorMessage);
   } finally {
     deletingPlugin.value = null;

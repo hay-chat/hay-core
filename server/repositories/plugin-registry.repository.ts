@@ -1,5 +1,33 @@
+import type { DeepPartial, Repository } from "typeorm";
 import { BaseRepository } from "./base.repository";
 import { PluginRegistry, PluginStatus } from "@server/entities/plugin-registry.entity";
+import type { HayPluginManifest } from "@server/types/plugin.types";
+import type { PluginMetadata, PluginMetadataState } from "@server/types/plugin-sdk.types";
+
+/**
+ * The partial-entity shape accepted by TypeORM's `Repository.update`. Derived
+ * from the public `Repository` API so we don't reach into TypeORM's internal
+ * `query-builder/QueryPartialEntity` module (not exported in the package
+ * `exports` map).
+ */
+type PluginRegistryUpdate = Parameters<Repository<PluginRegistry>["update"]>[1];
+
+/**
+ * Narrow an entity-shaped partial to TypeORM's update payload type.
+ *
+ * TypeORM's `QueryDeepPartialEntity` recursively deep-partials nested objects
+ * and unions every leaf with `(() => string)`. That mangles the structured
+ * `jsonb` columns (`manifest`, `metadata`) — e.g. it rejects a complete,
+ * valid `HayPluginManifest` because a nested `Record<string, unknown>` field
+ * doesn't match the deep-partialed leaf shape. `DeepPartial<PluginRegistry>`
+ * is the type that actually describes our update payloads (it keeps jsonb
+ * values whole), so we accept that and assert across to the update type at a
+ * single, documented boundary. The two types describe partial column writes of
+ * the same entity, so the runtime object is identical — the cast is safe.
+ */
+function toUpdatePayload(fields: DeepPartial<PluginRegistry>): PluginRegistryUpdate {
+  return fields as PluginRegistryUpdate;
+}
 
 export class PluginRegistryRepository extends BaseRepository<PluginRegistry> {
   constructor() {
@@ -36,7 +64,7 @@ export class PluginRegistryRepository extends BaseRepository<PluginRegistry> {
       installed,
       installedAt: installed ? new Date() : undefined,
       lastInstallError: error,
-    } as any);
+    });
   }
 
   async updateBuildStatus(id: string, built: boolean, error?: string): Promise<void> {
@@ -44,11 +72,11 @@ export class PluginRegistryRepository extends BaseRepository<PluginRegistry> {
       built,
       builtAt: built ? new Date() : undefined,
       lastBuildError: error,
-    } as any);
+    });
   }
 
   async updateChecksum(id: string, checksum: string): Promise<void> {
-    await this.getRepository().update(id, { checksum } as any);
+    await this.getRepository().update(id, { checksum });
   }
 
   async upsertPlugin(plugin: Partial<PluginRegistry>): Promise<PluginRegistry> {
@@ -58,7 +86,7 @@ export class PluginRegistryRepository extends BaseRepository<PluginRegistry> {
       // Preserve sourceType — it's set at installation time and shouldn't be
       // overwritten by filesystem re-discovery (which always passes "custom"
       // for plugins under the custom/ directory, even if they're git-sourced)
-      const { sourceType, ...updateFields } = plugin;
+      const { sourceType: _sourceType, ...updateFields } = plugin;
 
       // Repair: if the record has git metadata, ensure sourceType is "git"
       const resolvedSourceType = existing.gitConnectionId ? "git" : existing.sourceType;
@@ -67,13 +95,14 @@ export class PluginRegistryRepository extends BaseRepository<PluginRegistry> {
       // so dependencies get reinstalled and code gets rebuilt
       const checksumChanged = updateFields.checksum && updateFields.checksum !== existing.checksum;
 
-      await this.getRepository().update(existing.id, {
+      const fields: DeepPartial<PluginRegistry> = {
         ...updateFields,
         sourceType: resolvedSourceType,
         status: PluginStatus.AVAILABLE, // Plugin exists on filesystem
         ...(checksumChanged ? { installed: false, built: false } : {}),
         updatedAt: new Date(),
-      } as any);
+      };
+      await this.getRepository().update(existing.id, toUpdatePayload(fields));
       return (await this.getRepository().findOne({ where: { id: existing.id } }))!;
     } else {
       const entity = this.getRepository().create({
@@ -143,7 +172,7 @@ export class PluginRegistryRepository extends BaseRepository<PluginRegistry> {
    * Update plugin status
    */
   async updateStatus(id: string, status: PluginStatus): Promise<void> {
-    await this.getRepository().update(id, { status } as any);
+    await this.getRepository().update(id, { status });
   }
 
   /**
@@ -168,16 +197,17 @@ export class PluginRegistryRepository extends BaseRepository<PluginRegistry> {
   /**
    * Update plugin manifest (runtime metadata from worker)
    */
-  async updateManifest(pluginId: string, manifest: any): Promise<void> {
+  async updateManifest(pluginId: string, manifest: HayPluginManifest): Promise<void> {
     const plugin = await this.findByPluginId(pluginId);
     if (!plugin) {
       throw new Error(`Plugin ${pluginId} not found`);
     }
 
-    await this.getRepository().update(plugin.id, {
+    const fields: DeepPartial<PluginRegistry> = {
       manifest,
       updatedAt: new Date(),
-    } as any);
+    };
+    await this.getRepository().update(plugin.id, toUpdatePayload(fields));
   }
 
   /**
@@ -186,9 +216,9 @@ export class PluginRegistryRepository extends BaseRepository<PluginRegistry> {
   async updateMetadata(
     pluginId: string,
     data: {
-      metadata: any;
+      metadata: PluginMetadata;
       metadataFetchedAt: Date;
-      metadataState: "missing" | "fresh" | "stale" | "error";
+      metadataState: PluginMetadataState;
     },
   ): Promise<void> {
     const plugin = await this.findByPluginId(pluginId);
@@ -196,25 +226,23 @@ export class PluginRegistryRepository extends BaseRepository<PluginRegistry> {
       throw new Error(`Plugin ${pluginId} not found`);
     }
 
-    await this.getRepository().update(plugin.id, {
+    const fields: DeepPartial<PluginRegistry> = {
       metadata: data.metadata,
       metadataFetchedAt: data.metadataFetchedAt,
       metadataState: data.metadataState,
       updatedAt: new Date(),
-    } as any);
+    };
+    await this.getRepository().update(plugin.id, toUpdatePayload(fields));
   }
 
   /**
    * Update metadata state only
    */
-  async updateMetadataState(
-    id: string,
-    metadataState: "missing" | "fresh" | "stale" | "error",
-  ): Promise<void> {
+  async updateMetadataState(id: string, metadataState: PluginMetadataState): Promise<void> {
     await this.getRepository().update(id, {
       metadataState,
       updatedAt: new Date(),
-    } as any);
+    });
   }
 }
 

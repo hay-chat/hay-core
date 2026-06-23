@@ -59,13 +59,13 @@ export class User extends BaseEntity {
 
   // Email verification fields
   @Column({ type: "varchar", length: 255, nullable: true })
-  pendingEmail?: string;
+  pendingEmail?: string | null;
 
   @Column({ type: "varchar", length: 255, nullable: true })
-  emailVerificationTokenHash?: string;
+  emailVerificationTokenHash?: string | null;
 
   @Column({ type: "timestamptz", nullable: true })
-  emailVerificationExpiresAt?: Date;
+  emailVerificationExpiresAt?: Date | null;
 
   // Token revocation: increment on password change/reset to invalidate all refresh tokens
   @Column({ type: "int", default: 0 })
@@ -73,10 +73,10 @@ export class User extends BaseEntity {
 
   // Password reset fields
   @Column({ type: "varchar", length: 255, nullable: true })
-  passwordResetTokenHash?: string;
+  passwordResetTokenHash?: string | null;
 
   @Column({ type: "timestamptz", nullable: true })
-  passwordResetExpiresAt?: Date;
+  passwordResetExpiresAt?: Date | null;
 
   // Relationships
   @ManyToOne(() => Organization, (organization) => organization.users, {
@@ -90,7 +90,7 @@ export class User extends BaseEntity {
   userOrganizations!: UserOrganization[];
 
   // Helper methods
-  toJSON(): any {
+  toJSON() {
     const {
       password: _password,
       passwordResetTokenHash: _prth,
@@ -198,9 +198,9 @@ export class User extends BaseEntity {
    * Clear email verification fields
    */
   clearEmailVerification(): void {
-    this.pendingEmail = null as any;
-    this.emailVerificationTokenHash = null as any;
-    this.emailVerificationExpiresAt = null as any;
+    this.pendingEmail = null;
+    this.emailVerificationTokenHash = null;
+    this.emailVerificationExpiresAt = null;
   }
 
   /**
@@ -218,8 +218,8 @@ export class User extends BaseEntity {
    * Clear password reset fields
    */
   clearPasswordReset(): void {
-    this.passwordResetTokenHash = null as any;
-    this.passwordResetExpiresAt = null as any;
+    this.passwordResetTokenHash = null;
+    this.passwordResetExpiresAt = null;
   }
 
   /**

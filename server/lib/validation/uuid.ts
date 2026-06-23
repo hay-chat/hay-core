@@ -68,7 +68,7 @@ export function validateUuid(
  */
 export function validateUuidArray(
   values: string[],
-  paramName: string = "UUID array",
+  _paramName: string = "UUID array",
   strict: boolean = false,
 ): string[] {
   const regex = strict ? UUID_V4_REGEX : UUID_REGEX;

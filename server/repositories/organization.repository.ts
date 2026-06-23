@@ -1,4 +1,5 @@
 import { Repository } from "typeorm";
+import type { QueryDeepPartialEntity } from "typeorm";
 import { Organization } from "../entities/organization.entity";
 import { AppDataSource } from "../database/data-source";
 
@@ -31,7 +32,7 @@ export class OrganizationRepository {
       return null;
     }
 
-    await this.getRepository().update({ id }, data as any);
+    await this.getRepository().update({ id }, data as QueryDeepPartialEntity<Organization>);
 
     return await this.findById(id);
   }

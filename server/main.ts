@@ -1,5 +1,6 @@
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
 import express from "express";
+import type { FileFilterCallback } from "multer";
 import cors from "cors";
 import { createServer } from "http";
 import { config, validateProductionConfig } from "@server/config/env";
@@ -131,14 +132,18 @@ async function startServer() {
     res.send("Welcome to Hay");
   });
 
-  // Health check endpoint
-  server.get("/health", (req, res) => {
+  // Health check endpoint.
+  // Registered at both `/health` (internal — used by deploy.sh) and `/v1/health`
+  // (externally reachable via the nginx `/v1` proxy; `/health` is not proxied).
+  const healthHandler = (_req: express.Request, res: express.Response): void => {
     res.json({
       status: "ok",
       redis: redisService.isConnected(),
       rabbitmq: rabbitmqService.isConnected(),
     });
-  });
+  };
+  server.get("/health", healthHandler);
+  server.get("/v1/health", healthHandler);
 
   // Serve uploaded files from local storage
   const uploadDir = require("path").resolve(config.storage.local.uploadDir);
@@ -151,7 +156,7 @@ async function startServer() {
       maxAge: "7d",
       etag: true,
       lastModified: true,
-      setHeaders: (res, filePath) => {
+      setHeaders: (res, _filePath) => {
         // Security headers
         res.setHeader("X-Content-Type-Options", "nosniff");
       },
@@ -185,7 +190,7 @@ async function startServer() {
 
   // Plugin routes — plugin IDs are plain strings without slashes (e.g., hay-channel-whatsapp-twilio).
 
-  // Plugin thumbnail route - serve thumbnail.jpg files
+  // Plugin thumbnail route - serves the plugin's thumbnail (svg > png > jpg)
   server.get(/^\/plugins\/thumbnails\/([^/]+)$/, (req, res) => {
     req.params = { pluginName: req.params[0] };
     pluginAssetService.serveThumbnail(req, res).catch((error) => {
@@ -351,6 +356,11 @@ async function startServer() {
   try {
     await pluginManagerService.initialize();
     logger.info("Plugin manager initialized");
+
+    // Register plugin-declared cron jobs for enabled orgs (depends on plugin
+    // metadata populated by the manager above).
+    const { pluginCronService } = await import("@server/services/plugin-cron.service");
+    await pluginCronService.initialize();
   } catch (error) {
     logger.error({ err: error }, "Failed to initialize plugin system");
   }
@@ -367,7 +377,7 @@ async function startServer() {
       fileSize: config.plugins.maxUploadSizeMB * 1024 * 1024,
       files: 1,
     },
-    fileFilter: (req: any, file: any, cb: any) => {
+    fileFilter: (_req: express.Request, file: Express.Multer.File, cb: FileFilterCallback) => {
       if (file.mimetype === "application/zip" || file.mimetype === "application/x-zip-compressed") {
         cb(null, true);
       } else {

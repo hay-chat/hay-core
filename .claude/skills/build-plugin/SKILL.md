@@ -49,6 +49,7 @@ Answer these before writing code:
 - `channel.ts.tmpl` — entry for archetype C.
 - `mcp-server.js.tmpl` — the `mcp/index.js` for archetype A.
 - `vite.config.ui.ts.tmpl` — only if you ship a settings UI (`capability "ui"`).
+- `i18n.en.json.tmpl` — **always.** Copy to `i18n/en.json` (drop the `.tmpl`) and add `i18n/pt.json`.
 
 Replace every `<placeholder>`, strip the trailing NOTES comments, and delete templates for
 archetypes you're not using.
@@ -64,6 +65,10 @@ archetypes you're not using.
 - Channel inbound: verify signature over **raw bytes** with replay window + `timingSafeEqual`,
   filter bot/echo/empty, **dedupe on provider message id**, always `200` on success (chatwoot).
 - Channel outbound: non-retryable provider errors → `200 { success:false }` (no retry storms).
+- **Translations (`i18n/`)**: ship `i18n/en.json` (+ `pt.json`) with a `tools.<toolName>.label`/`description`
+  for **every** MCP tool and a `config.<field>` for every config field. Keys must be the exact tool
+  names. Without them the UI humanizes raw names (`list_event_types` → "List Event Types") and only
+  serves English — translated playbook chips, the tool picker, and plugin settings all read from here.
 
 ### 5. Check against the anti-patterns
 
@@ -96,6 +101,7 @@ npm run typecheck:server   # plugin types compile against the SDK
 - [ ] (Archetype A) `mcp/` uses `@modelcontextprotocol/sdk`, real zod schemas, `console.error` logging, and a documented dependency-install approach.
 - [ ] (Channel) signature verified, inbound deduped, non-retryable errors return `200 {success:false}`.
 - [ ] No committed cruft: no `.git`/vendored repos, `node_modules` bloat, `test-results/`, design `.md` TODOs, or creds in fixtures.
+- [ ] `i18n/en.json` (+ `pt.json`) exists with a `label`/`description` for every MCP tool and config field; tool keys match the exact tool names.
 - [ ] `npm run build` + `typecheck` pass; tools appear in `/mcp/list-tools`.
 
 ## Reference map

@@ -125,10 +125,13 @@
 
 <script setup lang="ts">
 import { Loader2, Shield, Download, Trash2, Edit, Eye, Clock } from "lucide-vue-next";
+import type { RouterOutputs } from "@/types/trpc";
+
+type PrivacyRequest = RouterOutputs["customerPrivacy"]["listRequests"]["requests"][number];
 
 // Props
 interface Props {
-  requests: any[];
+  requests: PrivacyRequest[];
   loading?: boolean;
 }
 

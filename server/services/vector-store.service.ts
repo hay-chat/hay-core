@@ -7,11 +7,13 @@
  * @module services/vector-store
  */
 
-import OpenAI from "openai";
 import { AppDataSource } from "../database/data-source";
 import { config } from "../config/env";
 import type { EntityManager } from "typeorm";
 import { createLogger } from "@server/lib/logger";
+import { llmProviderFactory } from "@server/services/llm/llm-provider.factory";
+import { emitUsage } from "@server/services/llm/usage-sink";
+import type { EmbeddingProvider } from "@server/services/llm/provider.types";
 
 const logger = createLogger("vector-store");
 
@@ -38,15 +40,31 @@ export interface SearchResult {
 }
 
 export class VectorStoreService {
-  private openai: OpenAI;
   private readonly model: string;
   private readonly dimensions: number;
   private _initialized: boolean = false;
 
   constructor() {
-    this.openai = new OpenAI({ apiKey: config.openai.apiKey });
     this.model = config.openai.models.embedding.model || "text-embedding-3-small";
     this.dimensions = parseInt(process.env.EMBEDDING_DIM || "1536");
+  }
+
+  /** Managed embedding provider (env/Hay key); embeddings are org-agnostic. */
+  private async getEmbeddingProvider(): Promise<EmbeddingProvider> {
+    return (await llmProviderFactory.forOrganization()).embedding;
+  }
+
+  /**
+   * Guard against a misconfigured embedding model silently writing wrong-dimension
+   * vectors, which would corrupt the pgvector(1536) + HNSW index. Fail loudly instead.
+   */
+  private assertDimensions(actual: number): void {
+    if (actual !== this.dimensions) {
+      throw new Error(
+        `Embedding dimension mismatch: provider returned ${actual}, expected ${this.dimensions}. ` +
+          `Embeddings are pinned to ${this.dimensions} dims (pgvector + HNSW index).`,
+      );
+    }
   }
 
   get initialized(): boolean {
@@ -99,6 +117,7 @@ export class VectorStoreService {
       "Embedding texts",
     );
 
+    const provider = await this.getEmbeddingProvider();
     const allVectors: number[][] = [];
 
     for (let i = 0; i < batches.length; i++) {
@@ -108,15 +127,20 @@ export class VectorStoreService {
         { batch: i + 1, totalBatches: batches.length, textCount: batch.length, batchChars },
         "Processing batch",
       );
-      const response = await this.openai.embeddings.create({
+      const result = await provider.embed({
         model: this.model,
         input: batch,
         dimensions: this.dimensions,
       });
 
-      // OpenAI returns embeddings sorted by index, but sort to be safe
-      const sorted = response.data.sort((a, b) => a.index - b.index);
-      allVectors.push(...sorted.map((item) => item.embedding));
+      this.assertDimensions(result.dimensions);
+      emitUsage({
+        kind: "embedding",
+        usage: result.usage,
+        model: result.model,
+        provider: result.provider,
+      });
+      allVectors.push(...result.embeddings);
     }
 
     return allVectors;
@@ -126,13 +150,21 @@ export class VectorStoreService {
    * Embed a single query string.
    */
   private async embedQuery(text: string): Promise<number[]> {
-    const response = await this.openai.embeddings.create({
+    const provider = await this.getEmbeddingProvider();
+    const result = await provider.embed({
       model: this.model,
       input: text,
       dimensions: this.dimensions,
     });
 
-    return response.data[0].embedding;
+    this.assertDimensions(result.dimensions);
+    emitUsage({
+      kind: "embedding",
+      usage: result.usage,
+      model: result.model,
+      provider: result.provider,
+    });
+    return result.embeddings[0];
   }
 
   /**

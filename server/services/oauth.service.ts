@@ -14,6 +14,37 @@ import { createLogger } from "@server/lib/logger";
 
 const logger = createLogger("oauth");
 
+/**
+ * Coerce a resolved config/credential value (typed `unknown`) to a string,
+ * or null if it is absent or not a string. OAuth client credentials are
+ * always stored as strings, but the config resolver and authState typings
+ * surface them as `unknown`.
+ */
+function asCredentialString(value: unknown): string | null {
+  return typeof value === "string" && value.length > 0 ? value : null;
+}
+
+/**
+ * Substitute a per-tenant `{shop}` placeholder in an OAuth URL.
+ *
+ * Some providers (notably Shopify) host the authorize/token endpoints on a
+ * per-merchant domain — `https://{shop}/admin/oauth/...`. SDK oauth2 methods
+ * declare these URLs as static strings, so we resolve `{shop}` from the
+ * instance's `shopDomain` config at flow time. Generic + safe: URLs without
+ * `{shop}` are returned untouched.
+ */
+function substituteShopPlaceholder(url: string, shopDomain: unknown): string {
+  if (!url || !url.includes("{shop}")) return url;
+  const shop = String(shopDomain ?? "")
+    .trim()
+    .replace(/^https?:\/\//i, "")
+    .replace(/\/+$/, "");
+  if (!shop) {
+    throw new Error("This connection requires a store domain to be saved before connecting.");
+  }
+  return url.replace(/\{shop\}/g, shop);
+}
+
 export class OAuthService {
   /**
    * Get OAuth redirect URI
@@ -163,13 +194,11 @@ export class OAuthService {
 
     // Check resolved metadata for values (includes env fallback)
     const clientId =
-      resolved.metadata[clientIdFieldName]?.value ||
-      instance.authState?.credentials?.[clientIdFieldName] ||
-      null;
+      asCredentialString(resolved.metadata[clientIdFieldName]?.value) ||
+      asCredentialString(instance.authState?.credentials?.[clientIdFieldName]);
     const clientSecret =
-      resolved.metadata[clientSecretFieldName]?.value ||
-      instance.authState?.credentials?.[clientSecretFieldName] ||
-      null;
+      asCredentialString(resolved.metadata[clientSecretFieldName]?.value) ||
+      asCredentialString(instance.authState?.credentials?.[clientSecretFieldName]);
 
     logger.debug(
       { clientIdSet: !!clientId, clientSecretSet: !!clientSecret },
@@ -212,6 +241,12 @@ export class OAuthService {
       createdAt: Date.now(),
     });
     logger.debug("OAuth state stored in Redis");
+
+    // Resolve per-tenant {shop} placeholder (e.g. Shopify) in the authorize URL.
+    oauthConfig.authorizationUrl = substituteShopPlaceholder(
+      oauthConfig.authorizationUrl,
+      resolved.values.shopDomain,
+    );
 
     // Build authorization URL
     const redirectUri = this.getRedirectUri();
@@ -361,13 +396,11 @@ export class OAuthService {
       );
 
       const clientId =
-        resolved.metadata[clientIdFieldName]?.value ||
-        instance.authState?.credentials?.[clientIdFieldName] ||
-        null;
+        asCredentialString(resolved.metadata[clientIdFieldName]?.value) ||
+        asCredentialString(instance.authState?.credentials?.[clientIdFieldName]);
       const clientSecret =
-        resolved.metadata[clientSecretFieldName]?.value ||
-        instance.authState?.credentials?.[clientSecretFieldName] ||
-        null;
+        asCredentialString(resolved.metadata[clientSecretFieldName]?.value) ||
+        asCredentialString(instance.authState?.credentials?.[clientSecretFieldName]);
 
       if (!clientId) {
         throw new Error("OAuth client ID not configured");
@@ -377,6 +410,12 @@ export class OAuthService {
         clientId,
         clientSecret,
       };
+
+      // Resolve per-tenant {shop} placeholder (e.g. Shopify) in the token URL.
+      oauthConfig.tokenUrl = substituteShopPlaceholder(
+        oauthConfig.tokenUrl,
+        resolved.values.shopDomain,
+      );
 
       logger.info("Exchanging authorization code for tokens");
       // Exchange code for tokens
@@ -607,11 +646,10 @@ export class OAuthService {
       throw new Error(`Plugin instance not found`);
     }
 
-    // Clear authState and authMethod
-    await pluginInstanceRepository.update(instance.id, organizationId, {
-      authMethod: undefined,
-      authState: undefined,
-    });
+    // Clear authState + authMethod. Must use an explicit NULL clear: TypeORM's
+    // .update() ignores `undefined`, so the previous code was a silent no-op and
+    // the connection never actually disconnected.
+    await pluginInstanceRepository.clearAuthState(instance.id, organizationId);
 
     logger.debug({ organizationId }, `OAuth revoked for plugin ${pluginId}`);
   }
@@ -719,13 +757,11 @@ export class OAuthService {
     );
 
     const clientId =
-      resolved.metadata[clientIdFieldName]?.value ||
-      instance.authState?.credentials?.[clientIdFieldName] ||
-      null;
+      asCredentialString(resolved.metadata[clientIdFieldName]?.value) ||
+      asCredentialString(instance.authState?.credentials?.[clientIdFieldName]);
     const clientSecret =
-      resolved.metadata[clientSecretFieldName]?.value ||
-      instance.authState?.credentials?.[clientSecretFieldName] ||
-      null;
+      asCredentialString(resolved.metadata[clientSecretFieldName]?.value) ||
+      asCredentialString(instance.authState?.credentials?.[clientSecretFieldName]);
 
     if (!clientId) {
       throw new Error("OAuth client ID not configured");

@@ -31,7 +31,8 @@ export type PluginCapability =
   | "messages"
   | "customers"
   | "sources"
-  | "products";
+  | "products"
+  | "cron";
 
 /**
  * Hay plugin manifest structure.

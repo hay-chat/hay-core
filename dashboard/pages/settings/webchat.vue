@@ -143,9 +143,12 @@
 import { ref, computed, onMounted } from "vue";
 import { Save, Copy, Check } from "lucide-vue-next";
 import { Hay } from "@/utils/api";
+import type { RouterInputs } from "@/types/trpc";
 import { useToast } from "@/composables/useToast";
 import { useUserStore } from "@/stores/user";
 import { useDomain } from "@/composables/useDomain";
+
+type UpdateSettingsInput = RouterInputs["webchat"]["updateSettings"];
 
 const { t } = useI18n();
 const toast = useToast();
@@ -157,15 +160,19 @@ const apiBaseUrl = getApiUrl();
 const settingsForm = ref({
   widgetTitle: "Chat with us",
   widgetSubtitle: "We typically reply within minutes",
-  position: "right" as "left" | "right",
-  theme: "blue" as "blue" | "green" | "purple" | "black",
+  position: "right" as NonNullable<UpdateSettingsInput["position"]>,
+  theme: "blue" as NonNullable<UpdateSettingsInput["theme"]>,
   showGreeting: true,
   greetingMessage: "Hello! How can we help you today?",
   isEnabled: true,
 });
 
 const allowedDomainsText = ref("*");
-const originalSettings = ref<any>({ ...settingsForm.value, allowedDomains: ["*"] });
+type WebchatSettingsSnapshot = (typeof settingsForm)["value"] & { allowedDomains: string[] };
+const originalSettings = ref<WebchatSettingsSnapshot>({
+  ...settingsForm.value,
+  allowedDomains: ["*"],
+});
 const isSaving = ref(false);
 const copied = ref(false);
 
@@ -233,8 +240,8 @@ async function saveSettings() {
     await Hay.webchat.updateSettings.mutate({
       widgetTitle: settingsForm.value.widgetTitle,
       widgetSubtitle: settingsForm.value.widgetSubtitle || null,
-      position: settingsForm.value.position as any,
-      theme: settingsForm.value.theme as any,
+      position: settingsForm.value.position,
+      theme: settingsForm.value.theme,
       showGreeting: settingsForm.value.showGreeting,
       greetingMessage: settingsForm.value.greetingMessage || null,
       allowedDomains: allowedDomainsArray.value,

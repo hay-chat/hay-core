@@ -275,12 +275,37 @@
 import { ref, onMounted, computed } from "vue";
 import { useRouter, useRoute } from "vue-router";
 import { useI18n } from "vue-i18n";
+import type { JSONContent } from "@tiptap/vue-3";
 import { ArrowLeft, Trash2, Star, FastForward, Hand, CornerDownRight } from "lucide-vue-next";
 import type { Agent } from "~/types/playbook";
+import type { RouterInputs, RouterOutputs } from "@/types/trpc";
 import { useToast } from "~/composables/useToast";
 import { useUnsavedChanges } from "~/composables/useUnsavedChanges";
 import { HayApi, Hay } from "@/utils/api";
 import { useOrganizationStore } from "~/stores/organization";
+
+// Editor instruction blocks are stored as Tiptap JSON content.
+type InstructionContent = JSONContent | null;
+// The agent select returns a language code that maps to the create-agent input shape.
+type AgentLanguage = RouterInputs["agents"]["create"]["language"];
+// Organization settings include the default agent id (not present on the store type).
+type OrganizationSettings = RouterOutputs["organizations"]["getSettings"];
+
+// Stored instruction data (jsonb) is opaque; coerce a non-null object into editor JSON content.
+const toInstructionContent = (value: unknown): JSONContent =>
+  value && typeof value === "object" ? (value as JSONContent) : { blocks: [] };
+
+// The create-agent input shape for the non-nullable handoff instruction fields (jsonb columns).
+// Excludes null so the result also satisfies the nullable `instructions` slot.
+type InstructionsInput = NonNullable<
+  RouterInputs["agents"]["create"]["humanHandoffAvailableInstructions"]
+>;
+
+// Editor JSON content is persisted verbatim into the jsonb instructions column;
+// the mutation input types the opaque jsonb slot, so reuse it for the boundary.
+// Always returns a non-null object so it assigns to both nullable and non-nullable slots.
+const toInstructionsInput = (value: JSONContent | null | undefined): InstructionsInput =>
+  (value ?? { blocks: [] }) as unknown as InstructionsInput;
 
 const router = useRouter();
 const route = useRoute();
@@ -295,15 +320,15 @@ const settingAsDefault = ref(false);
 const initialForm = ref({
   name: "",
   description: "",
-  instructions: [] as any,
+  instructions: null as InstructionContent,
   tone: "",
   avoid: "",
   trigger: "",
   enabled: true,
   testMode: null as boolean | null,
   language: "",
-  humanHandoffAvailableInstructions: [] as any,
-  humanHandoffUnavailableInstructions: [] as any,
+  humanHandoffAvailableInstructions: null as InstructionContent,
+  humanHandoffUnavailableInstructions: null as InstructionContent,
 });
 
 // Determine if we're in edit mode based on route
@@ -356,7 +381,7 @@ const languageOptions = [
 const form = ref({
   name: "",
   description: "",
-  instructions: { blocks: [] } as any,
+  instructions: { blocks: [] } as JSONContent,
   initialGreeting: "",
   tone: "",
   avoid: "",
@@ -364,8 +389,8 @@ const form = ref({
   enabled: true,
   testMode: null as boolean | null,
   language: "",
-  humanHandoffAvailableInstructions: { blocks: [] } as any,
-  humanHandoffUnavailableInstructions: { blocks: [] } as any,
+  humanHandoffAvailableInstructions: { blocks: [] } as JSONContent,
+  humanHandoffUnavailableInstructions: { blocks: [] } as JSONContent,
 });
 
 // UI state
@@ -374,16 +399,17 @@ const isSubmitting = ref(false);
 const agent = ref<Agent | null>(null);
 const errors = ref<Record<string, string>>({});
 
-// Editor refs
-const instructionsEditorRef = ref<{ save: () => Promise<unknown> } | null>(null);
-const handoffAvailableEditorRef = ref<{ save: () => Promise<unknown> } | null>(null);
-const handoffUnavailableEditorRef = ref<{ save: () => Promise<unknown> } | null>(null);
+// Editor refs. The Tiptap editor exposes a synchronous save() returning JSON content.
+const instructionsEditorRef = ref<{ save: () => InstructionContent } | null>(null);
+const handoffAvailableEditorRef = ref<{ save: () => InstructionContent } | null>(null);
+const handoffUnavailableEditorRef = ref<{ save: () => InstructionContent } | null>(null);
 const selectedTone = ref<string | null>(null);
 
 // Check if this agent is the default agent for the organization
 const isDefaultAgent = computed(() => {
   if (!agent.value || !organizationStore.current) return false;
-  return (organizationStore.current as any).defaultAgentId === agent.value.id;
+  const current = organizationStore.current as Partial<OrganizationSettings>;
+  return current.defaultAgentId === agent.value.id;
 });
 
 // Unsaved changes detection
@@ -419,33 +445,24 @@ onMounted(async () => {
 
       agent.value = agentResponse;
 
-      // Populate form
-      // Normalize testMode: handle null, true, false, or undefined
-      let testModeValue: boolean | null = null;
-      const testModeRaw = (agentResponse as any).testMode;
-      if (testModeRaw === true || testModeRaw === "true") {
-        testModeValue = true;
-      } else if (testModeRaw === false || testModeRaw === "false") {
-        testModeValue = false;
-      } else {
-        testModeValue = null; // null or undefined defaults to null (inherit)
-      }
-
+      // Populate form. testMode is boolean | null; null/undefined means "inherit".
       const formData = {
         name: agentResponse.name,
         description: agentResponse.description || "",
-        instructions: agentResponse.instructions || { blocks: [] },
-        initialGreeting: (agentResponse as any).initialGreeting || "",
+        instructions: toInstructionContent(agentResponse.instructions),
+        initialGreeting: agentResponse.initialGreeting || "",
         tone: agentResponse.tone || "",
         avoid: agentResponse.avoid || "",
         trigger: agentResponse.trigger || "",
-        testMode: testModeValue,
-        language: (agentResponse as any).language || "",
+        testMode: agentResponse.testMode ?? null,
+        language: agentResponse.language || "",
         enabled: agentResponse.enabled ?? true,
-        humanHandoffAvailableInstructions: (agentResponse as any)
-          .human_handoff_available_instructions || { blocks: [] },
-        humanHandoffUnavailableInstructions: (agentResponse as any)
-          .human_handoff_unavailable_instructions || { blocks: [] },
+        humanHandoffAvailableInstructions: toInstructionContent(
+          agentResponse.human_handoff_available_instructions,
+        ),
+        humanHandoffUnavailableInstructions: toInstructionContent(
+          agentResponse.human_handoff_unavailable_instructions,
+        ),
       };
 
       form.value = { ...formData };
@@ -506,30 +523,20 @@ const handleSubmit = async () => {
     const savedHandoffAvailable = await handoffAvailableEditorRef.value?.save();
     const savedHandoffUnavailable = await handoffUnavailableEditorRef.value?.save();
 
-    // Convert testMode to proper type (null | boolean) since select returns strings
-    let testModeValue: boolean | null = null;
-    const testModeRaw = form.value.testMode as any;
-    if (testModeRaw === true || testModeRaw === "true") {
-      testModeValue = true;
-    } else if (testModeRaw === false || testModeRaw === "false") {
-      testModeValue = false;
-    } else {
-      testModeValue = null;
-    }
-
     const payload = {
       name: form.value.name,
       description: form.value.description || undefined,
-      instructions: savedInstructions || { blocks: [] },
+      instructions: toInstructionsInput(savedInstructions),
       initialGreeting: form.value.initialGreeting || undefined,
       tone: form.value.tone || undefined,
       avoid: form.value.avoid || undefined,
       trigger: form.value.trigger || undefined,
       enabled: form.value.enabled,
-      testMode: testModeValue,
-      language: (form.value.language || null) as any,
-      humanHandoffAvailableInstructions: savedHandoffAvailable || { blocks: [] },
-      humanHandoffUnavailableInstructions: savedHandoffUnavailable || { blocks: [] },
+      testMode: form.value.testMode,
+      // The language select is constrained to supported codes; empty string means inherit (null).
+      language: (form.value.language || null) as AgentLanguage,
+      humanHandoffAvailableInstructions: toInstructionsInput(savedHandoffAvailable),
+      humanHandoffUnavailableInstructions: toInstructionsInput(savedHandoffUnavailable),
     };
 
     if (isEditMode.value && agentId.value) {
@@ -611,8 +618,8 @@ const setAsDefaultAgent = async () => {
 
     // Refresh organization data to update defaultAgentId
     const updatedOrg = await Hay.organizations.getSettings.query();
-    if (updatedOrg) {
-      organizationStore.setCurrent({ ...organizationStore.current, ...updatedOrg } as any);
+    if (updatedOrg && organizationStore.current) {
+      organizationStore.setCurrent({ ...organizationStore.current, ...updatedOrg });
     }
 
     toast.success(t("agents.toast.setAsDefaultSuccess"));

@@ -1,0 +1,60 @@
+{
+  "name": "Wix Stores",
+  "description": "Conecte sua loja Wix Stores para consultar pedidos, ler transações e fulfilment, emitir reembolsos e navegar pelo catálogo",
+  "tools": {
+    "search_orders": {
+      "label": "Buscar pedidos",
+      "description": "Encontre pedidos por número, e-mail do comprador, status ou data para obter o ID do pedido."
+    },
+    "get_order": {
+      "label": "Obter pedido",
+      "description": "Obtenha um pedido completo por ID, incluindo itens, totais, status de pagamento e de fulfilment."
+    },
+    "get_order_transactions": {
+      "label": "Obter transações do pedido",
+      "description": "Liste todos os pagamentos e reembolsos de um pedido, com IDs de transação e valores."
+    },
+    "get_order_refundability": {
+      "label": "Verificar reembolsabilidade",
+      "description": "Verifique se cada pagamento pode ser reembolsado via API da Wix antes de reembolsar."
+    },
+    "refund_order": {
+      "label": "Reembolsar pedido",
+      "description": "Emita um reembolso total ou parcial, ou registre um reembolso externo quando o provedor não permitir reembolso via API."
+    },
+    "get_order_fulfillments": {
+      "label": "Obter fulfilments do pedido",
+      "description": "Liste os fulfilments de um pedido — itens enviados e dados de rastreamento."
+    },
+    "create_fulfillment": {
+      "label": "Criar fulfilment",
+      "description": "Marque itens do pedido como enviados, opcionalmente com transportadora e código de rastreio."
+    },
+    "update_fulfillment": {
+      "label": "Atualizar fulfilment",
+      "description": "Atualize os dados de rastreamento de um fulfilment existente."
+    },
+    "delete_fulfillment": {
+      "label": "Excluir fulfilment",
+      "description": "Remova um fulfilment de um pedido, revertendo seus itens para não enviados."
+    },
+    "search_products": {
+      "label": "Buscar produtos",
+      "description": "Pesquise no catálogo por texto ou filtro para encontrar produtos."
+    },
+    "get_product": {
+      "label": "Obter produto",
+      "description": "Obtenha um produto por ID, incluindo variações, preços e estoque."
+    }
+  },
+  "config": {
+    "apiKey": {
+      "label": "Chave de API",
+      "description": "Chave de API da Wix em Settings → API Keys, com escopo de Pedidos (ler e gerenciar), Order Billing (reembolsos), Order Fulfillments (gerenciar) e Catálogo (ler). Tratada como segredo."
+    },
+    "siteId": {
+      "label": "ID do site",
+      "description": "O ID do site Wix ao qual esta chave está vinculada (da URL do painel ou da API Query Sites)."
+    }
+  }
+}

@@ -328,6 +328,26 @@ import { useUserStore } from "@/stores/user";
 import { Hay } from "@/utils/api";
 import { useToast } from "@/composables/useToast";
 import Avatar from "@/components/ui/Avatar.vue";
+import type { RouterOutputs, RouterInputs } from "@/types/trpc";
+
+type OrganizationMember = RouterOutputs["organizations"]["listMembers"]["items"][number];
+type Invitation = RouterOutputs["invitations"]["listInvitations"][number];
+
+// Roles selectable in the invite / change-role forms. Mirrors the
+// updateMemberRole / sendInvitation mutation inputs, which do not accept "agent".
+type AssignableRole = RouterInputs["organizations"]["updateMemberRole"]["role"];
+const ASSIGNABLE_ROLES: readonly AssignableRole[] = [
+  "owner",
+  "admin",
+  "contributor",
+  "member",
+  "viewer",
+];
+const isAssignableRole = (role: OrganizationMember["role"]): role is AssignableRole =>
+  (ASSIGNABLE_ROLES as readonly string[]).includes(role);
+
+const getErrorMessage = (error: unknown, fallback: string): string =>
+  error instanceof Error ? error.message : fallback;
 
 const { t } = useI18n();
 const userStore = useUserStore();
@@ -336,8 +356,8 @@ const { formatDate } = useOrgDateTime();
 
 const loading = ref(false);
 const loadingInvitations = ref(false);
-const members = ref<any[]>([]);
-const invitations = ref<any[]>([]);
+const members = ref<OrganizationMember[]>([]);
+const invitations = ref<Invitation[]>([]);
 
 // Pagination and filtering
 const currentPage = ref(1);
@@ -352,18 +372,18 @@ const inviteDialogOpen = ref(false);
 const roleDialogOpen = ref(false);
 const sendingInvite = ref(false);
 const updatingRole = ref(false);
-const selectedMember = ref<any>(null);
+const selectedMember = ref<OrganizationMember | null>(null);
 const removeMemberDialogOpen = ref(false);
-const memberToRemove = ref<any>(null);
+const memberToRemove = ref<OrganizationMember | null>(null);
 
-const inviteForm = ref({
+const inviteForm = ref<{ email: string; role: AssignableRole; message: string }>({
   email: "",
-  role: "member" as "owner" | "admin" | "member" | "viewer" | "contributor",
+  role: "member",
   message: "",
 });
 
-const roleForm = ref({
-  role: "member" as "owner" | "admin" | "member" | "viewer" | "contributor",
+const roleForm = ref<{ role: AssignableRole }>({
+  role: "member",
 });
 
 const resendingInvitation = ref<string | null>(null);
@@ -387,10 +407,10 @@ const loadMembers = async (resetPage = false) => {
     members.value = response.items;
     totalItems.value = response.pagination.total;
     totalPages.value = response.pagination.totalPages;
-  } catch (error: any) {
+  } catch (error: unknown) {
     toastService.error(
       t("users.loadMembersFailed"),
-      error.message || t("users.loadMembersFailedDescription"),
+      getErrorMessage(error, t("users.loadMembersFailedDescription")),
     );
   } finally {
     loading.value = false;
@@ -470,10 +490,10 @@ const loadInvitations = async () => {
   try {
     const response = await Hay.invitations.listInvitations.query();
     invitations.value = response;
-  } catch (error: any) {
+  } catch (error: unknown) {
     toastService.error(
       t("users.loadInvitationsFailed"),
-      error.message || t("users.loadInvitationsFailedDescription"),
+      getErrorMessage(error, t("users.loadInvitationsFailedDescription")),
     );
   } finally {
     loadingInvitations.value = false;
@@ -502,10 +522,10 @@ const sendInvitation = async () => {
     inviteDialogOpen.value = false;
     inviteForm.value = { email: "", role: "member", message: "" };
     await loadInvitations();
-  } catch (error: any) {
+  } catch (error: unknown) {
     toastService.error(
       t("users.sendInvitationFailed"),
-      error.message || t("users.sendInvitationFailedDescription"),
+      getErrorMessage(error, t("users.sendInvitationFailedDescription")),
     );
   } finally {
     sendingInvite.value = false;
@@ -517,10 +537,10 @@ const cancelInvitation = async (invitationId: string) => {
     await Hay.invitations.cancelInvitation.mutate({ invitationId });
     toastService.success(t("users.invitationCancelled"), t("users.invitationCancelledDescription"));
     await loadInvitations();
-  } catch (error: any) {
+  } catch (error: unknown) {
     toastService.error(
       t("users.cancelInvitationFailed"),
-      error.message || t("users.cancelInvitationFailedDescription"),
+      getErrorMessage(error, t("users.cancelInvitationFailedDescription")),
     );
   }
 };
@@ -531,19 +551,21 @@ const resendInvitation = async (invitationId: string) => {
     await Hay.invitations.resendInvitation.mutate({ invitationId });
     toastService.success(t("users.invitationResent"), t("users.invitationResentDescription"));
     await loadInvitations();
-  } catch (error: any) {
+  } catch (error: unknown) {
     toastService.error(
       t("users.resendInvitationFailed"),
-      error.message || t("users.resendInvitationFailedDescription"),
+      getErrorMessage(error, t("users.resendInvitationFailedDescription")),
     );
   } finally {
     resendingInvitation.value = null;
   }
 };
 
-const openRoleDialog = (member: any) => {
+const openRoleDialog = (member: OrganizationMember) => {
   selectedMember.value = member;
-  roleForm.value.role = member.role;
+  // "agent" members cannot be reassigned via this dialog (mutation rejects it);
+  // default the selector to "member" so the form stays valid.
+  roleForm.value.role = isAssignableRole(member.role) ? member.role : "member";
   roleDialogOpen.value = true;
 };
 
@@ -567,17 +589,17 @@ const updateMemberRole = async () => {
 
     roleDialogOpen.value = false;
     await loadMembers();
-  } catch (error: any) {
+  } catch (error: unknown) {
     toastService.error(
       t("users.updateRoleFailed"),
-      error.message || t("users.updateRoleFailedDescription"),
+      getErrorMessage(error, t("users.updateRoleFailedDescription")),
     );
   } finally {
     updatingRole.value = false;
   }
 };
 
-const openRemoveMemberDialog = (member: any) => {
+const openRemoveMemberDialog = (member: OrganizationMember) => {
   memberToRemove.value = member;
   removeMemberDialogOpen.value = true;
 };
@@ -592,10 +614,10 @@ const confirmRemoveMember = async () => {
       t("users.memberRemovedDescription", { email: memberToRemove.value.email }),
     );
     await loadMembers();
-  } catch (error: any) {
+  } catch (error: unknown) {
     toastService.error(
       t("users.removeMemberFailed"),
-      error.message || t("users.removeMemberFailedDescription"),
+      getErrorMessage(error, t("users.removeMemberFailedDescription")),
     );
   } finally {
     memberToRemove.value = null;

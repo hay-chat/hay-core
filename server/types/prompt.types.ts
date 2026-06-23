@@ -15,7 +15,7 @@ export interface PromptOptions {
   organizationId?: string;
   conversationId?: string;
   language?: string;
-  variables: Record<string, any>;
+  variables: Record<string, PromptVariableType>;
 }
 
 export interface PromptCache {
@@ -27,8 +27,8 @@ export type PromptVariableType =
   | string
   | number
   | boolean
-  | any[]
-  | Record<string, any>
+  | PromptVariableType[]
+  | { [key: string]: PromptVariableType }
   | null
   | undefined;
 

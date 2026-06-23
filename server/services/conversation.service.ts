@@ -5,9 +5,16 @@ import { Conversation } from "../database/entities/conversation.entity";
 import { Message, MessageType } from "../database/entities/message.entity";
 import { getUTCNow } from "../utils/date.utils";
 import { hookManager } from "./hooks/hook-manager";
+import { SupportedLanguage } from "../types/language.types";
 import { createLogger } from "@server/lib/logger";
 
 const logger = createLogger("conversation");
+
+const SUPPORTED_LANGUAGE_VALUES = new Set<string>(Object.values(SupportedLanguage));
+
+function toSupportedLanguage(value: string | null | undefined): SupportedLanguage | null {
+  return value && SUPPORTED_LANGUAGE_VALUES.has(value) ? (value as SupportedLanguage) : null;
+}
 
 export class ConversationService {
   private conversationRepository: ConversationRepository;
@@ -66,7 +73,7 @@ export class ConversationService {
       metadata: data.metadata || {},
       needs_processing: data.status === "open" || data.status === "processing",
       customer_id: customerId,
-      language: (data.language as any) || null,
+      language: toSupportedLanguage(data.language),
     });
 
     // Trigger hook for conversation created

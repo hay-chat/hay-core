@@ -331,7 +331,14 @@ const showSuccessDialog = ref(false);
 const deleteConfirmation = ref("");
 const successTitle = ref("");
 const successMessage = ref("");
-const activeRequests = ref<any[]>([]);
+interface PrivacyRequest {
+  id: string;
+  type: "export" | "deletion";
+  status: string;
+  createdAt: string | Date;
+}
+
+const activeRequests = ref<PrivacyRequest[]>([]);
 
 // Error state management
 const errorState = ref<{

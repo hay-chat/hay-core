@@ -111,9 +111,9 @@ const handleCreate = async () => {
       // Close the dialog
       handleClose();
     }
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("Failed to create organization:", err);
-    error.value = err.message || t("createOrganization.createFailed");
+    error.value = (err instanceof Error && err.message) || t("createOrganization.createFailed");
     toast.error(t("createOrganization.createFailed"), error.value);
   } finally {
     isCreating.value = false;

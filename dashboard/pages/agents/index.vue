@@ -318,7 +318,12 @@ import { useRouter } from "vue-router";
 import { useI18n } from "vue-i18n";
 import { useToast } from "@/composables/useToast";
 import { useOrganizationStore } from "@/stores/organization";
+import type { Organization } from "@/stores/user";
 import { HayApi, Hay } from "@/utils/api";
+
+// Organization settings include the default agent reference, which is not part
+// of the base Organization shape stored in the user store.
+type OrganizationWithSettings = Organization & { defaultAgentId?: string | null };
 
 interface AgentData {
   id: string;
@@ -361,8 +366,7 @@ const toast = useToast();
 const { t } = useI18n();
 const organizationStore = useOrganizationStore();
 const { formatDateTime } = useOrgDateTime();
-const currentPage = ref(1);
-const pageSize = ref(10);
+const { page: currentPage, pageSize, setPage, setPageSize } = usePagination();
 
 // Agents data from API
 const agents = ref<AgentData[]>([]);
@@ -492,7 +496,7 @@ const viewAgent = (id: string) => {
 
 // Check if agent is the default agent
 const isDefaultAgent = (agentId: string) => {
-  return (organizationStore.current as any)?.defaultAgentId === agentId;
+  return (organizationStore.current as OrganizationWithSettings | null)?.defaultAgentId === agentId;
 };
 
 // Set agent as default
@@ -502,8 +506,12 @@ const setAgentAsDefault = async (agentId: string) => {
 
     // Refresh organization data to update defaultAgentId
     const updatedOrg = await Hay.organizations.getSettings.query();
-    if (updatedOrg) {
-      organizationStore.setCurrent({ ...organizationStore.current, ...updatedOrg } as any);
+    if (updatedOrg && organizationStore.current) {
+      const merged: OrganizationWithSettings = {
+        ...organizationStore.current,
+        ...updatedOrg,
+      };
+      organizationStore.setCurrent(merged);
     }
 
     toast.success(t("agents.toast.setAsDefaultSuccess"));
@@ -652,12 +660,11 @@ const performBulkDelete = async () => {
 
 // Pagination handlers
 const handlePageChange = (page: number) => {
-  currentPage.value = page;
+  setPage(page);
 };
 
 const handleItemsPerPageChange = (itemsPerPage: number) => {
-  pageSize.value = itemsPerPage;
-  currentPage.value = 1; // Reset to first page when changing page size
+  setPageSize(itemsPerPage); // Resets to page 1, persists the preference, syncs the URL
 };
 
 // Lifecycle

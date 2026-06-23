@@ -23,6 +23,39 @@ const logger = createLogger("channel-delivery");
 const messageRepository = new MessageRepository();
 const conversationRepository = new ConversationRepository();
 
+/**
+ * Payload carried by Redis "websocket:events" messages.
+ * Untrusted, so every field is optional and narrowed before use.
+ */
+interface ChannelEventPayload {
+  type?: string;
+  id?: string;
+  content?: string;
+  status?: string;
+  deliveryState?: string;
+  metadata?: { externalOrigin?: boolean; [key: string]: unknown } | null;
+  [key: string]: unknown;
+}
+
+/**
+ * Event broadcast over the Redis "websocket:events" channel that this
+ * service consumes (message delivery + escalation).
+ */
+interface ChannelDeliveryEvent {
+  type?: string;
+  conversationId?: string;
+  payload?: ChannelEventPayload;
+}
+
+/**
+ * Response returned by a channel plugin's /deliver endpoint.
+ */
+interface PluginDeliverResponse {
+  success?: boolean;
+  providerMessageId?: string;
+  error?: string;
+}
+
 class ChannelDeliveryService {
   private initialized = false;
 
@@ -51,8 +84,9 @@ class ChannelDeliveryService {
   /**
    * Dispatch Redis events to the right handler.
    */
-  private async handleRedisEvent(event: any): Promise<void> {
-    const { type, conversationId } = event;
+  private async handleRedisEvent(event: unknown): Promise<void> {
+    if (typeof event !== "object" || event === null) return;
+    const { type, conversationId } = event as ChannelDeliveryEvent;
     if (!conversationId) return;
 
     if (type === "message_received") {
@@ -69,12 +103,13 @@ class ChannelDeliveryService {
   /**
    * Outbound message path — only processes bot/agent messages on non-web channels.
    */
-  private async handleOutboundMessage(event: any): Promise<void> {
+  private async handleOutboundMessage(event: ChannelDeliveryEvent): Promise<void> {
     const { conversationId, payload } = event;
+    if (!conversationId || !payload) return;
 
     // Only deliver bot or human-agent messages (not customer messages, system, etc.)
     const outboundTypes = ["BotAgent", "HumanAgent"];
-    if (!outboundTypes.includes(payload?.type)) return;
+    if (!payload.type || !outboundTypes.includes(payload.type)) return;
 
     // Skip messages that originated from the external channel itself — these
     // arrive via the plugin webhook (e.g. a Chatwoot agent replies) and must
@@ -105,11 +140,17 @@ class ChannelDeliveryService {
         return;
       }
 
+      const { id: messageId, content } = payload;
+      if (!messageId || content === undefined) {
+        logger.warn({ conversationId, channel }, "Message id or content missing for delivery");
+        return;
+      }
+
       logger.info(
         {
           conversationId,
           channel,
-          messageId: payload.id,
+          messageId,
           to: customer.external_id,
         },
         "Delivering message via channel plugin",
@@ -119,8 +160,8 @@ class ChannelDeliveryService {
         organizationId,
         channel,
         to: customer.external_id,
-        content: payload.content,
-        messageId: payload.id,
+        content,
+        messageId,
         conversationId,
         conversationMetadata: (conversation.metadata ?? null) as Record<string, unknown> | null,
         messageMetadata: (payload.metadata ?? null) as Record<string, unknown> | null,
@@ -135,8 +176,9 @@ class ChannelDeliveryService {
    * on a non-web channel, notify the owning plugin so it can perform provider-side
    * handoff (Chatwoot: toggle_status=open + optional assign + private note).
    */
-  private async handleStatusChange(event: any): Promise<void> {
+  private async handleStatusChange(event: ChannelDeliveryEvent): Promise<void> {
     const { conversationId, payload } = event;
+    if (!conversationId) return;
     if (payload?.status !== "pending-human") return;
 
     try {
@@ -267,7 +309,7 @@ class ChannelDeliveryService {
         }),
       });
 
-      const result: any = await response.json();
+      const result = (await response.json()) as PluginDeliverResponse;
 
       if (result.success && result.providerMessageId) {
         // Store the provider's message ID (e.g., Twilio SID, Chatwoot message id)

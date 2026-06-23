@@ -15,6 +15,7 @@ import type { HayPluginDefinition } from "../types/plugin.js";
 import { executeOnValidateAuth, executeOnConfigUpdate, executeOnDisable } from "./hook-executor.js";
 import { createConfigRuntimeAPI } from "../sdk/config-runtime.js";
 import { createAuthRuntimeAPI } from "../sdk/auth-runtime.js";
+import { createCronAuthAPI } from "../sdk/cron-runtime.js";
 
 /**
  * Plugin HTTP server instance.
@@ -57,6 +58,7 @@ export class PluginHttpServer {
     this.setupHealthEndpoint();
     this.setupMetadataEndpoint();
     this.setupLifecycleEndpoints();
+    this.setupCronEndpoint();
     this.setupMcpEndpoints();
     this.setupPluginRoutes();
     this.setupErrorHandler();
@@ -204,6 +206,7 @@ export class PluginHttpServer {
             local: [], // Populated dynamically when MCPs start
             external: [], // Populated dynamically when MCPs start
           },
+          crons: this.registry.getCronJobDescriptors(),
         };
 
         res.json(metadata);
@@ -395,6 +398,81 @@ export class PluginHttpServer {
           success: false,
           error: errorMsg,
         });
+      }
+    });
+  }
+
+  /**
+   * Setup the cron execution endpoint.
+   *
+   * `POST /cron/:name` is invoked by Hay Core's scheduler when a plugin-declared
+   * cron job fires. Core sends the current org config + auth state in the body so
+   * the handler runs with fresh credentials. If the handler calls
+   * `ctx.auth.update()`, the buffered credentials are returned so Core can persist
+   * them and restart the worker.
+   */
+  private setupCronEndpoint(): void {
+    this.app.post("/cron/:name", async (req: Request, res: Response): Promise<void> => {
+      const jobName = req.params.name;
+      try {
+        if (!jobName) {
+          res.status(400).json({ success: false, error: "Cron job name is required" });
+          return;
+        }
+
+        const job = this.registry.getCronJob(jobName);
+        if (!job) {
+          res.status(404).json({ success: false, error: `Cron job not found: ${jobName}` });
+          return;
+        }
+
+        if (!this.orgId || !this.manifest) {
+          res.status(400).json({ success: false, error: "Runtime data not set" });
+          return;
+        }
+
+        const { config, authState } = req.body ?? {};
+
+        // Merge stored org config with any fresh config Core sent for this run.
+        const mergedConfig = {
+          ...(this.orgConfig ?? {}),
+          ...(config ?? {}),
+        };
+
+        const configAPI = createConfigRuntimeAPI({
+          orgConfig: mergedConfig,
+          registry: this.registry,
+          manifest: { env: this.manifest.env },
+          logger: this.logger,
+        });
+
+        const { api: authAPI, getPendingUpdate } = createCronAuthAPI({
+          authState: authState ?? null,
+          logger: this.logger,
+        });
+
+        const cronCtx = {
+          org: { id: this.orgId },
+          config: configAPI,
+          auth: authAPI,
+          logger: this.logger,
+        };
+
+        this.logger.info(`Executing cron job: ${jobName}`);
+        await job.handler(cronCtx as any);
+
+        const credentialsUpdated = getPendingUpdate();
+        res.json({
+          success: true,
+          ...(credentialsUpdated ? { credentialsUpdated } : {}),
+        });
+        this.logger.info(`Cron job completed: ${jobName}`, {
+          credentialsUpdated: !!credentialsUpdated,
+        });
+      } catch (err) {
+        const errorMsg = err instanceof Error ? err.message : String(err);
+        this.logger.error(`Error in cron job ${jobName}`, { error: errorMsg });
+        res.status(500).json({ success: false, error: errorMsg });
       }
     });
   }

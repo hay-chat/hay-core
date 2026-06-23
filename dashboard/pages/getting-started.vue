@@ -492,9 +492,10 @@ const fetchProgress = async () => {
   try {
     loading.value = true;
 
-    // Skip API call if onboarding is already marked as completed
+    // Skip API call and redirect if onboarding is already completed
     if (appStore.onboardingCompleted) {
       loading.value = false;
+      router.replace("/dashboard");
       return;
     }
 
@@ -517,6 +518,8 @@ watch(
   (allCompleted) => {
     if (allCompleted) {
       appStore.setOnboardingCompleted(true);
+      // Briefly show the completion banner, then move on to the dashboard
+      setTimeout(() => router.replace("/dashboard"), 1500);
     }
   },
 );

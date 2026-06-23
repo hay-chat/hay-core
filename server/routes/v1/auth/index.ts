@@ -5,7 +5,6 @@ import { AppDataSource } from "@server/database/data-source";
 import { User } from "@server/entities/user.entity";
 import { Organization } from "@server/entities/organization.entity";
 import { UserOrganization } from "@server/entities/user-organization.entity";
-import { Not, IsNull } from "typeorm";
 import { AuthCode } from "@server/entities/auth-code.entity";
 import {
   hashPassword,
@@ -835,7 +834,7 @@ export const authRouter = t.router({
         });
       }
 
-      const changes: Record<string, any> = {};
+      const changes: Record<string, { old?: string; new?: string }> = {};
 
       if (input.firstName !== undefined && input.firstName !== user.firstName) {
         changes.firstName = { old: user.firstName, new: input.firstName };
@@ -960,8 +959,7 @@ export const authRouter = t.router({
       }
 
       // Clear avatar URL from user
-      user.avatarUrl = null as any;
-      await userRepository.save(user);
+      await userRepository.update(user.id, { avatarUrl: () => "NULL" });
 
       return {
         success: true,
@@ -1091,9 +1089,9 @@ export const authRouter = t.router({
         logger.error({ err: error }, "Failed to send verification emails");
         // Rollback the pending email change
         await userRepository.update(user.id, {
-          pendingEmail: null as any,
-          emailVerificationTokenHash: null as any,
-          emailVerificationExpiresAt: null as any,
+          pendingEmail: () => "NULL",
+          emailVerificationTokenHash: () => "NULL",
+          emailVerificationExpiresAt: () => "NULL",
         });
         logger.warn("Rolled back pending email change due to email send failure");
         throw new TRPCError({
@@ -1149,9 +1147,9 @@ export const authRouter = t.router({
       // Check if token has expired
       if (!user.emailVerificationExpiresAt || user.emailVerificationExpiresAt < new Date()) {
         await userRepository.update(user.id, {
-          pendingEmail: null as any,
-          emailVerificationTokenHash: null as any,
-          emailVerificationExpiresAt: null as any,
+          pendingEmail: () => "NULL",
+          emailVerificationTokenHash: () => "NULL",
+          emailVerificationExpiresAt: () => "NULL",
         });
         throw new TRPCError({
           code: "BAD_REQUEST",
@@ -1172,9 +1170,9 @@ export const authRouter = t.router({
 
       await userRepository.update(user.id, {
         email: newEmail,
-        pendingEmail: null as any,
-        emailVerificationTokenHash: null as any,
-        emailVerificationExpiresAt: null as any,
+        pendingEmail: () => "NULL",
+        emailVerificationTokenHash: () => "NULL",
+        emailVerificationExpiresAt: () => "NULL",
       });
 
       // Reload user to get updated data
@@ -1259,9 +1257,9 @@ export const authRouter = t.router({
 
     // Clear pending email change
     await userRepository.update(user.id, {
-      pendingEmail: null as any,
-      emailVerificationTokenHash: null as any,
-      emailVerificationExpiresAt: null as any,
+      pendingEmail: () => "NULL",
+      emailVerificationTokenHash: () => "NULL",
+      emailVerificationExpiresAt: () => "NULL",
     });
 
     return {
@@ -1524,6 +1522,60 @@ export const authRouter = t.router({
       expiresAt: authCode.expiresAt,
     };
   }),
+
+  // Issue a single-use auth code bound to an allowlisted external redirect URI.
+  // Powers the "Connect to Hay" handshake for external apps (e.g. the Shopify
+  // embedded app): the app sends the merchant to the dashboard /connect/authorize
+  // page, which (once the merchant is logged in) calls this and redirects back to
+  // `redirectUri?code=...&state=...`. The external app then calls exchangeAuthCode.
+  //
+  // Security: the redirect origin is validated SERVER-SIDE against the
+  // CONNECT_ALLOWED_REDIRECT_ORIGINS allowlist (comma-separated origins).
+  // Deny-by-default: if the env var is unset/empty, no redirect is permitted.
+  generateConnectAuthCode: protectedProcedureWithoutOrg
+    .input(
+      z.object({
+        redirectUri: z.string().url(),
+        state: z.string().max(512).optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const allowed = (process.env.CONNECT_ALLOWED_REDIRECT_ORIGINS || "")
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean);
+
+      let redirectUrl: URL;
+      try {
+        redirectUrl = new URL(input.redirectUri);
+      } catch {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Invalid redirect_uri" });
+      }
+
+      if (!allowed.includes(redirectUrl.origin)) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "redirect_uri origin is not allowlisted for connect handshakes",
+        });
+      }
+
+      const rawCode = generateSecureToken(32);
+      const codeHash = await hashApiKey(rawCode);
+
+      const authCodeRepo = AppDataSource.getRepository(AuthCode);
+      const authCode = authCodeRepo.create({
+        userId: ctx.user!.id,
+        codeHash,
+        expiresAt: new Date(Date.now() + 10 * 60 * 1000), // 10 minutes
+        used: false,
+      });
+      await authCodeRepo.save(authCode);
+
+      redirectUrl.searchParams.set("code", rawCode);
+      if (input.state) redirectUrl.searchParams.set("state", input.state);
+
+      return { redirectUrl: redirectUrl.toString() };
+    }),
 
   exchangeAuthCode: publicProcedure
     .input(z.object({ code: z.string().min(1) }))

@@ -90,14 +90,14 @@
         <!-- Line Chart -->
         <LineChart
           v-if="chartType === 'line' && chartData"
-          :data="chartData"
+          :data="chartData as LineChartData"
           v-bind="chartConfig"
         />
 
         <!-- Bar Chart -->
         <BarChart
           v-else-if="chartType === 'bar' && chartData"
-          :data="chartData"
+          :data="chartData as BarChartData"
           v-bind="chartConfig"
         />
 
@@ -133,8 +133,8 @@ import DropdownMenuTrigger from "./DropdownMenuTrigger.vue";
 import DropdownMenuContent from "./DropdownMenuContent.vue";
 import DropdownMenuItem from "./DropdownMenuItem.vue";
 import DropdownMenuSeparator from "./DropdownMenuSeparator.vue";
-import LineChart from "./LineChart.vue";
-import BarChart from "./BarChart.vue";
+import LineChart, { type LineChartData } from "./LineChart.vue";
+import BarChart, { type BarChartData } from "./BarChart.vue";
 import SentimentGauge from "./SentimentGauge.vue";
 import Loading from "./Loading.vue";
 import Error from "./Error.vue";
@@ -150,8 +150,8 @@ export interface WidgetProps {
   title: string;
   subtitle?: string;
   chartType?: "line" | "bar" | "gauge" | "custom";
-  chartConfig?: Record<string, any>;
-  dataFetcher?: () => Promise<any>;
+  chartConfig?: Record<string, unknown>;
+  dataFetcher?: () => Promise<unknown>;
   refreshInterval?: number;
   ttl?: number;
   emptyStateMessage?: string;
@@ -174,7 +174,7 @@ const props = withDefaults(defineProps<WidgetProps>(), {
 });
 
 const emit = defineEmits<{
-  "data-fetched": [data: any];
+  "data-fetched": [data: unknown];
   error: [error: Error];
   refresh: [];
 }>();
@@ -189,10 +189,13 @@ const isLoading = computed(() => analyticsStore.isWidgetLoading(props.widgetId))
 const isRefreshing = computed(() => analyticsStore.isWidgetRefreshing(props.widgetId));
 const hasData = computed(() => widgetData.value !== undefined && widgetData.value !== null);
 
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null;
+
 const isEmpty = computed(() => {
   if (!hasData.value) return true;
   if (Array.isArray(widgetData.value)) return widgetData.value.length === 0;
-  if (typeof widgetData.value === "object") return Object.keys(widgetData.value).length === 0;
+  if (isRecord(widgetData.value)) return Object.keys(widgetData.value).length === 0;
   return false;
 });
 
@@ -211,7 +214,7 @@ const chartData = computed(() => {
   }
 
   // If data has a specific structure, try to extract it
-  if (widgetData.value.data && Array.isArray(widgetData.value.data)) {
+  if (isRecord(widgetData.value) && Array.isArray(widgetData.value.data)) {
     return widgetData.value.data;
   }
 

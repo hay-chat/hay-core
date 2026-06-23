@@ -4,6 +4,14 @@ import { createLogger } from "@server/lib/logger";
 
 const logger = createLogger("local-http-mcp");
 
+/** Raw tool descriptor returned by the SDK worker's /mcp/list-tools endpoint. */
+interface RawWorkerTool {
+  name: string;
+  description?: string;
+  input_schema?: Record<string, unknown>;
+  inputSchema?: Record<string, unknown>;
+}
+
 /**
  * Local HTTP MCP Client
  * Communicates with local SDK plugin workers via HTTP
@@ -56,7 +64,7 @@ export class LocalHTTPMCPClient implements MCPClient {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
 
-      const data = (await response.json()) as { tools: any[] };
+      const data = (await response.json()) as { tools?: RawWorkerTool[] };
       const tools: MCPTool[] = (data.tools || []).map((tool) => ({
         name: tool.name,
         description: tool.description,

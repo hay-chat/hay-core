@@ -11,13 +11,13 @@ const createAgentSchema = z.object({
   name: z.string().min(1).max(255),
   description: z.string().optional(),
   enabled: z.boolean().optional().default(true),
-  instructions: z.any().optional(),
+  instructions: z.array(z.unknown()).nullable().optional(),
   tone: z.string().optional(),
   avoid: z.string().optional(),
   trigger: z.string().optional(),
   initialGreeting: z.string().optional(),
-  humanHandoffAvailableInstructions: z.any().optional(),
-  humanHandoffUnavailableInstructions: z.any().optional(),
+  humanHandoffAvailableInstructions: z.array(z.unknown()).optional(),
+  humanHandoffUnavailableInstructions: z.array(z.unknown()).optional(),
   testMode: z.boolean().nullable().optional(),
   language: z.nativeEnum(SupportedLanguage).nullable().optional(),
 });
@@ -26,13 +26,13 @@ const updateAgentSchema = z.object({
   name: z.string().min(1).max(255).optional(),
   description: z.string().optional(),
   enabled: z.boolean().optional(),
-  instructions: z.any().optional(),
+  instructions: z.array(z.unknown()).nullable().optional(),
   tone: z.string().optional(),
   avoid: z.string().optional(),
   trigger: z.string().optional(),
   initialGreeting: z.string().optional(),
-  humanHandoffAvailableInstructions: z.any().optional(),
-  humanHandoffUnavailableInstructions: z.any().optional(),
+  humanHandoffAvailableInstructions: z.array(z.unknown()).optional(),
+  humanHandoffUnavailableInstructions: z.array(z.unknown()).optional(),
   testMode: z.boolean().nullable().optional(),
   language: z.nativeEnum(SupportedLanguage).nullable().optional(),
 });
@@ -66,7 +66,7 @@ export const agentsRouter = t.router({
   create: scopedProcedure(RESOURCES.AGENTS, ACTIONS.CREATE)
     .input(createAgentSchema)
     .mutation(async ({ ctx, input }) => {
-      const agent = await agentService.createAgent(ctx.organizationId!, input as any);
+      const agent = await agentService.createAgent(ctx.organizationId!, input);
 
       // Auto-set as default agent if this is the first agent for the organization
       const { organizationRepository } =
@@ -76,7 +76,7 @@ export const agentsRouter = t.router({
       if (organization && !organization.defaultAgentId) {
         await organizationRepository.update(ctx.organizationId!, {
           defaultAgentId: agent.id,
-        } as any);
+        });
       }
 
       return agent;
@@ -154,7 +154,7 @@ export const agentsRouter = t.router({
 
       await organizationRepository.update(ctx.organizationId!, {
         defaultAgentId: input.agentId,
-      } as any);
+      });
 
       return {
         success: true,

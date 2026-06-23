@@ -1,5 +1,41 @@
 import { MigrationInterface, QueryRunner } from "typeorm";
 
+/**
+ * Minimal Tiptap document model used by this migration. Only the node shapes
+ * produced here are represented; this is intentionally not the full Tiptap schema.
+ */
+interface TiptapNode {
+  type: string;
+  attrs?: Record<string, unknown>;
+  content?: TiptapNode[];
+  text?: string;
+}
+
+interface TiptapDoc {
+  type: "doc";
+  content: TiptapNode[];
+}
+
+/** Editor.js block as stored in legacy instruction columns. */
+interface EditorJsBlock {
+  type: string;
+  data: {
+    level?: number;
+    text?: string;
+    style?: string;
+    items?: string[];
+  };
+}
+
+/** Legacy array-of-instructions format (id, level, instructions). */
+interface LegacyInstructionItem {
+  instructions?: string;
+}
+
+function isObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
 export class MigrateInstructionsToTiptap1760880508000 implements MigrationInterface {
   name = "MigrateInstructionsToTiptap1760880508000";
 
@@ -16,7 +52,7 @@ export class MigrateInstructionsToTiptap1760880508000 implements MigrationInterf
     console.log("Migration complete!");
   }
 
-  public async down(queryRunner: QueryRunner): Promise<void> {
+  public async down(_queryRunner: QueryRunner): Promise<void> {
     // This migration is not reversible since we're converting formats
     console.log(
       "WARNING: This migration cannot be reversed. Tiptap format cannot be converted back to Editor.js.",
@@ -25,7 +61,7 @@ export class MigrateInstructionsToTiptap1760880508000 implements MigrationInterf
 
   private async convertPlaybookInstructions(queryRunner: QueryRunner): Promise<void> {
     // Get all playbooks with instructions
-    const playbooks = await queryRunner.query(
+    const playbooks: Array<{ id: string; instructions: unknown }> = await queryRunner.query(
       `SELECT id, instructions FROM playbooks WHERE instructions IS NOT NULL`,
     );
 
@@ -45,7 +81,12 @@ export class MigrateInstructionsToTiptap1760880508000 implements MigrationInterf
 
   private async convertAgentInstructions(queryRunner: QueryRunner): Promise<void> {
     // Get all agents with instructions
-    const agents = await queryRunner.query(
+    const agents: Array<{
+      id: string;
+      instructions: unknown;
+      human_handoff_available_instructions: unknown;
+      human_handoff_unavailable_instructions: unknown;
+    }> = await queryRunner.query(
       `SELECT id, instructions, human_handoff_available_instructions, human_handoff_unavailable_instructions FROM agents
        WHERE instructions IS NOT NULL
           OR human_handoff_available_instructions IS NOT NULL
@@ -96,17 +137,17 @@ export class MigrateInstructionsToTiptap1760880508000 implements MigrationInterf
     console.log(`Converted ${agents.length} agent(s)`);
   }
 
-  private convertEditorJsToTiptap(instructions: any): any | null {
+  private convertEditorJsToTiptap(instructions: unknown): TiptapDoc | null {
     // If it's already Tiptap format (has type: "doc"), return as-is
-    if (instructions && typeof instructions === "object" && instructions.type === "doc") {
-      return instructions;
+    if (isObject(instructions) && instructions.type === "doc") {
+      return instructions as unknown as TiptapDoc;
     }
 
     // If it's Editor.js format (has blocks array)
-    if (instructions && typeof instructions === "object" && Array.isArray(instructions.blocks)) {
-      const content: any[] = [];
+    if (isObject(instructions) && Array.isArray(instructions.blocks)) {
+      const content: TiptapNode[] = [];
 
-      for (const block of instructions.blocks) {
+      for (const block of instructions.blocks as EditorJsBlock[]) {
         const tiptapNode = this.convertEditorJsBlockToTiptap(block);
         if (tiptapNode) {
           content.push(tiptapNode);
@@ -139,9 +180,9 @@ export class MigrateInstructionsToTiptap1760880508000 implements MigrationInterf
 
     // If it's the legacy array format with id, level, instructions
     if (Array.isArray(instructions) && instructions.length > 0) {
-      const content: any[] = [];
+      const content: TiptapNode[] = [];
 
-      for (const item of instructions) {
+      for (const item of instructions as LegacyInstructionItem[]) {
         if (!item.instructions) continue;
 
         const text = item.instructions;
@@ -151,7 +192,7 @@ export class MigrateInstructionsToTiptap1760880508000 implements MigrationInterf
         const documentMatches = text.matchAll(/\[document\]\(([^)]+)\)/g);
 
         // Build content array with text and merge fields
-        const paragraphContent: any[] = [];
+        const paragraphContent: TiptapNode[] = [];
         let lastIndex = 0;
 
         // Process actions
@@ -225,7 +266,7 @@ export class MigrateInstructionsToTiptap1760880508000 implements MigrationInterf
     return null;
   }
 
-  private convertEditorJsBlockToTiptap(block: any): any | null {
+  private convertEditorJsBlockToTiptap(block: EditorJsBlock): TiptapNode | null {
     switch (block.type) {
       case "header": {
         const level = block.data.level || 1;
@@ -286,15 +327,15 @@ export class MigrateInstructionsToTiptap1760880508000 implements MigrationInterf
     return html.replace(/<[^>]*>/g, "");
   }
 
-  private parseInlineContent(text: string): any[] {
-    const content: any[] = [];
+  private parseInlineContent(text: string): TiptapNode[] {
+    const content: TiptapNode[] = [];
 
     // Check for action and document tags
     const actionRegex = /<action[^>]*id=["']([^"']+)["'][^>]*>([^<]*)<\/action>/gi;
     const documentRegex = /<document[^>]*id=["']([^"']+)["'][^>]*>([^<]*)<\/document>/gi;
 
     let lastIndex = 0;
-    const matches: Array<{ index: number; length: number; node: any }> = [];
+    const matches: Array<{ index: number; length: number; node: TiptapNode }> = [];
 
     // Find all action matches
     let match;

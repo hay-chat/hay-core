@@ -24,38 +24,45 @@
       </div>
       <div class="flex items-center space-x-2">
         <Label for="type-filter" class="text-sm">Type:</Label>
-        <select id="type-filter" v-model="selectedType" class="px-3 py-1 text-sm border rounded-md">
-          <option value="">All Types</option>
-          <option value="new-playbook">New Playbook</option>
-          <option value="improvement">Improvement</option>
-          <option value="pattern">Pattern</option>
-          <option value="performance">Performance</option>
-        </select>
+        <Select v-model="selectedType">
+          <SelectTrigger id="type-filter" class="w-40">
+            <SelectValue placeholder="All Types" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Types</SelectItem>
+            <SelectItem value="new-playbook">New Playbook</SelectItem>
+            <SelectItem value="improvement">Improvement</SelectItem>
+            <SelectItem value="pattern">Pattern</SelectItem>
+            <SelectItem value="performance">Performance</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
       <div class="flex items-center space-x-2">
         <Label for="agent-filter" class="text-sm">Agent:</Label>
-        <select
-          id="agent-filter"
-          v-model="selectedAgent"
-          class="px-3 py-1 text-sm border rounded-md"
-        >
-          <option value="">All Agents</option>
-          <option v-for="agent in agents" :key="agent.id" :value="agent.id">
-            {{ agent.name }}
-          </option>
-        </select>
+        <Select v-model="selectedAgent">
+          <SelectTrigger id="agent-filter" class="w-40">
+            <SelectValue placeholder="All Agents" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Agents</SelectItem>
+            <SelectItem v-for="agent in agents" :key="agent.id" :value="agent.id">
+              {{ agent.name }}
+            </SelectItem>
+          </SelectContent>
+        </Select>
       </div>
       <div class="flex items-center space-x-2">
         <Label for="date-filter" class="text-sm">Date:</Label>
-        <select
-          id="date-filter"
-          v-model="selectedDateRange"
-          class="px-3 py-1 text-sm border rounded-md"
-        >
-          <option value="7d">Last 7 days</option>
-          <option value="30d">Last 30 days</option>
-          <option value="90d">Last 90 days</option>
-        </select>
+        <Select v-model="selectedDateRange">
+          <SelectTrigger id="date-filter" class="w-40">
+            <SelectValue placeholder="Last 30 days" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="7d">Last 7 days</SelectItem>
+            <SelectItem value="30d">Last 30 days</SelectItem>
+            <SelectItem value="90d">Last 90 days</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
     </div>
 
@@ -231,8 +238,8 @@ const { formatDateTime } = useOrgDateTime();
 
 // Reactive state
 const loading = ref(true);
-const selectedType = ref("");
-const selectedAgent = ref("");
+const selectedType = ref("all");
+const selectedAgent = ref("all");
 const selectedDateRange = ref("30d");
 
 // Mock data - TODO: Replace with actual API calls
@@ -326,8 +333,8 @@ const acceptedInsights = ref<AcceptedInsight[]>([
 // Computed properties
 const filteredPendingInsights = computed(() => {
   return pendingInsights.value.filter((insight) => {
-    if (selectedType.value && insight.type !== selectedType.value) return false;
-    if (selectedAgent.value && insight.agentId !== selectedAgent.value) return false;
+    if (selectedType.value !== "all" && insight.type !== selectedType.value) return false;
+    if (selectedAgent.value !== "all" && insight.agentId !== selectedAgent.value) return false;
     return true;
   });
 });

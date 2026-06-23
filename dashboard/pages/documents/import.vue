@@ -307,360 +307,12 @@
             {{ $t("documents.import.fileSelection.back") }}
           </Button>
           <Button
-            :loading="isDiscovering"
+            :loading="isProcessing"
             :disabled="!isValidUrl(websiteUrl)"
-            @click="discoverPages"
+            @click="connectWebsite"
           >
-            {{ $t("documents.import.webUrl.discoverPages") }}
+            {{ $t("documents.import.webUrl.connectWebsite") }}
             <ChevronRight class="ml-2 h-4 w-4" />
-          </Button>
-        </div>
-      </CardContent>
-    </Card>
-
-    <!-- Step 3: Page Discovery/Selection (for Web Import) -->
-    <Card v-if="currentStep === 3 && importType === 'web'">
-      <CardHeader>
-        <CardTitle>
-          {{
-            isDiscovering
-              ? $t("documents.import.discovery.titleDiscovering")
-              : $t("documents.import.discovery.titleSelect")
-          }}
-        </CardTitle>
-        <CardDescription>
-          {{
-            isDiscovering
-              ? $t("documents.import.discovery.descriptionDiscovering")
-              : $t("documents.import.discovery.descriptionSelect", {
-                  count: discoveredPages.length,
-                })
-          }}
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        <!-- Loading State -->
-        <div v-if="isDiscovering" class="space-y-6 py-8">
-          <div class="flex flex-col items-center justify-center">
-            <div class="relative">
-              <!-- Pulsing background circle -->
-              <div class="absolute inset-0 w-20 h-20 bg-primary/20 rounded-full animate-pulse" />
-              <!-- Static outer ring -->
-              <div class="w-20 h-20 border-4 border-muted rounded-full" />
-              <!-- Spinning ring -->
-              <div
-                class="absolute top-0 left-0 w-20 h-20 border-4 border-primary border-t-transparent rounded-full animate-spin"
-              />
-              <!-- Globe icon with subtle bounce -->
-              <Globe
-                class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 h-8 w-8 text-primary animate-pulse"
-              />
-            </div>
-
-            <div class="mt-6 text-center space-y-2">
-              <p class="text-lg font-medium">
-                {{ getDiscoveryStatusText() }}
-              </p>
-
-              <!-- Total URLs found (main info) -->
-              <p class="text-base font-medium text-foreground">
-                {{
-                  discoveryProgress && discoveryProgress.found > 0
-                    ? $t("documents.import.discovery.foundUrls", { count: discoveryProgress.found })
-                    : $t("documents.import.discovery.startingDiscovery")
-                }}
-              </p>
-
-              <!-- Successfully processed pages (in green below) -->
-              <div
-                v-if="discoveryProgress && discoveryProgress.processed > 0"
-                class="flex items-center justify-center gap-1 mt-2"
-              >
-                <CheckCircle class="h-4 w-4 text-green-600" />
-                <span class="text-sm text-green-600 font-medium">{{
-                  $t("documents.import.discovery.pagesValidated", {
-                    count: discoveryProgress.processed,
-                  })
-                }}</span>
-              </div>
-            </div>
-
-            <div class="mt-6 w-full max-w-md">
-              <Progress
-                :value="
-                  discoveryProgress
-                    ? (discoveryProgress.processed / Math.max(discoveryProgress.total, 1)) * 100
-                    : 0
-                "
-                class="h-2"
-              />
-              <div class="mt-2 flex items-center justify-between text-xs text-neutral-muted">
-                <p v-if="discoveryProgress?.currentUrl" class="truncate flex-1 text-center">
-                  {{
-                    $t("documents.import.discovery.scanning", {
-                      url: discoveryProgress.currentUrl,
-                    })
-                  }}
-                </p>
-                <p v-if="discoveryEta" class="shrink-0 ml-2 font-medium">
-                  {{ discoveryEta }}
-                </p>
-              </div>
-            </div>
-
-            <Alert class="mt-6 max-w-md">
-              <AlertTitle>{{ $t("documents.import.discovery.pleaseWait") }}</AlertTitle>
-              <AlertDescription>
-                <ul class="list-disc list-inside mt-2 space-y-1 text-sm">
-                  <li>{{ $t("documents.import.discovery.pleaseWaitList.stayOnPage") }}</li>
-                  <li>{{ $t("documents.import.discovery.pleaseWaitList.typicalTime") }}</li>
-                  <li>{{ $t("documents.import.discovery.pleaseWaitList.checkingSitemaps") }}</li>
-                </ul>
-              </AlertDescription>
-            </Alert>
-
-            <Button variant="outline" class="mt-4" @click="cancelDiscovery">
-              {{ $t("documents.import.discovery.cancelDiscovery") }}
-            </Button>
-          </div>
-        </div>
-
-        <!-- Empty State (no pages found) -->
-        <div
-          v-else-if="discoveredPages.length === 0"
-          class="flex flex-col items-center justify-center py-12 space-y-4"
-        >
-          <div class="w-16 h-16 rounded-full bg-muted flex items-center justify-center">
-            <Globe class="h-8 w-8 text-muted-foreground" />
-          </div>
-          <div class="text-center space-y-2 max-w-md">
-            <p class="text-lg font-medium">{{ $t("documents.import.discovery.noPagesFound") }}</p>
-            <p class="text-sm text-muted-foreground">
-              {{ $t("documents.import.discovery.noPagesFoundDescription") }}
-            </p>
-          </div>
-          <Button variant="outline" @click="currentStep = 2">
-            <ChevronLeft class="mr-2 h-4 w-4" />
-            {{ $t("documents.import.discovery.tryDifferentUrl") }}
-          </Button>
-        </div>
-
-        <!-- Page Selection (shown after discovery) -->
-        <div v-else class="space-y-4">
-          <!-- Select/Deselect All -->
-          <div class="flex items-center justify-between p-3 bg-background-tertiary rounded-lg">
-            <div class="flex items-center space-x-2">
-              <Checkbox
-                :checked="filteredDiscoveredPages.every((p) => p.selected)"
-                @update:checked="toggleSelectAll"
-              />
-              <Label class="text-sm font-medium">
-                {{
-                  $t("documents.import.discovery.selectAll", {
-                    count: filteredDiscoveredPages.filter((p) => p.selected).length,
-                  })
-                }}
-              </Label>
-            </div>
-            <Badge variant="outline">
-              {{
-                $t("documents.import.discovery.pagesCount", {
-                  selected: discoveredPages.filter((p) => p.selected).length,
-                  total: discoveredPages.length,
-                })
-              }}
-            </Badge>
-          </div>
-
-          <!-- URL Filter -->
-          <div class="flex items-center gap-2">
-            <Input
-              v-model="pageFilterType"
-              type="select"
-              :options="[
-                { label: $t('documents.import.discovery.filter.contains'), value: 'contains' },
-                {
-                  label: $t('documents.import.discovery.filter.notContains'),
-                  value: 'not_contains',
-                },
-                { label: $t('documents.import.discovery.filter.startsWith'), value: 'starts_with' },
-                {
-                  label: $t('documents.import.discovery.filter.notStartsWith'),
-                  value: 'not_starts_with',
-                },
-                { label: $t('documents.import.discovery.filter.endsWith'), value: 'ends_with' },
-                {
-                  label: $t('documents.import.discovery.filter.notEndsWith'),
-                  value: 'not_ends_with',
-                },
-              ]"
-              class="w-52 shrink-0"
-            />
-            <Input
-              v-model="pageFilterValue"
-              type="search"
-              :placeholder="$t('documents.import.discovery.filter.placeholder')"
-              class="flex-1"
-            />
-            <Badge v-if="pageFilterValue.trim()" variant="secondary">
-              {{
-                $t("documents.import.discovery.filter.showing", {
-                  filtered: filteredDiscoveredPages.length,
-                  total: discoveredPages.length,
-                })
-              }}
-            </Badge>
-          </div>
-
-          <!-- Page List -->
-          <div class="max-h-96 overflow-y-auto space-y-2 border rounded-lg p-2">
-            <div
-              v-for="page in filteredDiscoveredPages"
-              :key="page.url"
-              class="flex items-start gap-3 p-3 hover:bg-background-secondary rounded-lg transition-colors"
-            >
-              <Checkbox
-                :checked="page.selected"
-                class="mt-1"
-                @update:checked="(checked: boolean) => togglePageSelection(page.url, checked)"
-              />
-              <div class="flex-1 min-w-0">
-                <p class="font-medium text-sm truncate max-w-[100ch]">
-                  {{ page.title || $t("documents.import.discovery.untitledPage") }}
-                </p>
-                <p class="text-xs text-neutral-muted truncate max-w-[100ch]">
-                  {{ page.url }}
-                </p>
-                <p
-                  v-if="page.description"
-                  class="text-xs text-neutral-muted mt-1 line-clamp-2 max-w-[100ch]"
-                >
-                  {{ page.description }}
-                </p>
-              </div>
-              <Button variant="ghost" size="sm" @click="() => openExternalLink(page.url)">
-                <ExternalLink class="h-3 w-3" />
-              </Button>
-            </div>
-
-            <!-- Empty filter result -->
-            <div
-              v-if="filteredDiscoveredPages.length === 0 && pageFilterValue.trim()"
-              class="flex flex-col items-center justify-center py-8 text-center"
-            >
-              <p class="text-sm text-muted-foreground">
-                {{ $t("documents.import.discovery.filter.noResults") }}
-              </p>
-            </div>
-          </div>
-
-          <Alert>
-            <AlertTitle>{{ $t("documents.import.discovery.tip") }}</AlertTitle>
-            <AlertDescription>
-              {{ $t("documents.import.discovery.tipDescription") }}
-            </AlertDescription>
-          </Alert>
-        </div>
-        <!-- End of page selection div -->
-
-        <div class="mt-6 flex justify-between">
-          <Button variant="outline" @click="currentStep = 2">
-            <ChevronLeft class="mr-2 h-4 w-4" />
-            {{ $t("documents.import.fileSelection.back") }}
-          </Button>
-          <Button :disabled="!discoveredPages.some((p) => p.selected)" @click="currentStep = 4">
-            {{ $t("documents.import.discovery.nextAddMetadata") }}
-            <ChevronRight class="ml-2 h-4 w-4" />
-          </Button>
-        </div>
-      </CardContent>
-    </Card>
-
-    <!-- Step 4: Metadata (for Web Import) -->
-    <Card v-if="currentStep === 4 && importType === 'web'">
-      <CardHeader>
-        <CardTitle>{{ $t("documents.import.metadata.title") }}</CardTitle>
-        <CardDescription>
-          {{
-            $t("documents.import.metadata.description", {
-              count: discoveredPages.filter((p) => p.selected).length,
-            })
-          }}
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        <div class="space-y-6">
-          <div>
-            <Label for="web-doc-type">{{ $t("documents.import.metadata.documentType") }}</Label>
-            <select
-              id="web-doc-type"
-              v-model="webMetadata.type"
-              class="w-full mt-2 px-3 py-2 border border-input bg-background rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-            >
-              <option value="article">{{ $t("documents.filters.article") }}</option>
-              <option value="guide">{{ $t("documents.filters.guide") }}</option>
-              <option value="faq">{{ $t("documents.filters.faq") }}</option>
-              <option value="tutorial">{{ $t("documents.filters.tutorial") }}</option>
-              <option value="reference">{{ $t("documents.filters.reference") }}</option>
-              <option value="policy">{{ $t("documents.filters.policy") }}</option>
-            </select>
-          </div>
-
-          <div>
-            <Label for="web-doc-status">{{ $t("documents.import.metadata.status") }}</Label>
-            <select
-              id="web-doc-status"
-              v-model="webMetadata.status"
-              class="w-full mt-2 px-3 py-2 border border-input bg-background rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-            >
-              <option value="published">{{ $t("documents.filters.published") }}</option>
-              <option value="draft">{{ $t("documents.filters.draft") }}</option>
-              <option value="under_review">
-                {{ $t("documents.import.metadata.underReview") }}
-              </option>
-            </select>
-          </div>
-
-          <div>
-            <Label for="web-doc-visibility">{{ $t("documents.import.metadata.visibility") }}</Label>
-            <select
-              id="web-doc-visibility"
-              v-model="webMetadata.visibility"
-              class="w-full mt-2 px-3 py-2 border border-input bg-background rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-            >
-              <option value="private">{{ $t("documents.import.metadata.private") }}</option>
-              <option value="internal">{{ $t("documents.import.metadata.internal") }}</option>
-              <option value="public">{{ $t("documents.import.metadata.public") }}</option>
-            </select>
-          </div>
-
-          <!-- Preview of selected pages -->
-          <div class="border-t pt-4">
-            <h4 class="text-sm font-medium mb-2">
-              {{ $t("documents.import.metadata.selectedPagesSummary") }}
-            </h4>
-            <div class="text-sm text-neutral-muted space-y-1">
-              <p>
-                {{
-                  $t("documents.import.metadata.pagesWillBeImported", {
-                    count: discoveredPages.filter((p) => p.selected).length,
-                  })
-                }}
-              </p>
-              <p>{{ $t("documents.import.metadata.convertedToMarkdown") }}</p>
-              <p>{{ $t("documents.import.metadata.chunkedAndVectorized") }}</p>
-            </div>
-          </div>
-        </div>
-
-        <div class="mt-6 flex justify-between">
-          <Button variant="outline" @click="currentStep = 3">
-            <ChevronLeft class="mr-2 h-4 w-4" />
-            {{ $t("documents.import.fileSelection.back") }}
-          </Button>
-          <Button :loading="isProcessing" @click="startWebImport">
-            <Upload class="mr-2 h-4 w-4" />
-            {{ $t("documents.import.metadata.startImport") }}
           </Button>
         </div>
       </CardContent>
@@ -706,30 +358,34 @@
                 <Label :for="`category-${index}`">{{
                   $t("documents.import.details.category")
                 }}</Label>
-                <select
-                  :id="`category-${index}`"
-                  v-model="file.category"
-                  class="w-full px-3 py-2 border border-input bg-background rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-                >
-                  <option value="">{{ $t("documents.import.details.selectCategory") }}</option>
-                  <option value="product">
-                    {{ $t("documents.import.details.categories.product") }}
-                  </option>
-                  <option value="api">{{ $t("documents.import.details.categories.api") }}</option>
-                  <option value="faq">{{ $t("documents.import.details.categories.faq") }}</option>
-                  <option value="legal">
-                    {{ $t("documents.import.details.categories.legal") }}
-                  </option>
-                  <option value="training">
-                    {{ $t("documents.import.details.categories.training") }}
-                  </option>
-                  <option value="technical">
-                    {{ $t("documents.import.details.categories.technical") }}
-                  </option>
-                  <option value="other">
-                    {{ $t("documents.import.details.categories.other") }}
-                  </option>
-                </select>
+                <Select v-model="file.category">
+                  <SelectTrigger :id="`category-${index}`" class="w-full">
+                    <SelectValue :placeholder="$t('documents.import.details.selectCategory')" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="product">
+                      {{ $t("documents.import.details.categories.product") }}
+                    </SelectItem>
+                    <SelectItem value="api">{{
+                      $t("documents.import.details.categories.api")
+                    }}</SelectItem>
+                    <SelectItem value="faq">{{
+                      $t("documents.import.details.categories.faq")
+                    }}</SelectItem>
+                    <SelectItem value="legal">
+                      {{ $t("documents.import.details.categories.legal") }}
+                    </SelectItem>
+                    <SelectItem value="training">
+                      {{ $t("documents.import.details.categories.training") }}
+                    </SelectItem>
+                    <SelectItem value="technical">
+                      {{ $t("documents.import.details.categories.technical") }}
+                    </SelectItem>
+                    <SelectItem value="other">
+                      {{ $t("documents.import.details.categories.other") }}
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
 
               <div>
@@ -817,137 +473,17 @@
       </CardContent>
     </Card>
 
-    <!-- Step 5/4: Processing -->
-    <Card
-      v-if="
-        (currentStep === 5 && importType === 'web') ||
-        (currentStep === 4 && importType === 'upload')
-      "
-    >
+    <!-- Step 4: Processing (Upload) -->
+    <Card v-if="currentStep === 4 && importType === 'upload'">
       <CardHeader>
-        <CardTitle>
-          {{
-            importType === "web"
-              ? $t("documents.import.processing.importingFromWebsite")
-              : $t("documents.import.processing.uploadingDocuments")
-          }}
-        </CardTitle>
+        <CardTitle>{{ $t("documents.import.processing.uploadingDocuments") }}</CardTitle>
         <CardDescription>
-          {{
-            importType === "web"
-              ? $t("documents.import.processing.websiteBeingCrawled")
-              : $t("documents.import.processing.documentsBeingProcessed")
-          }}
+          {{ $t("documents.import.processing.documentsBeingProcessed") }}
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <!-- Web Import Progress -->
-        <div v-if="importType === 'web' && webImportJob" class="space-y-4">
-          <div class="p-4 bg-background-tertiary rounded-lg">
-            <div class="flex items-center justify-between mb-2">
-              <span class="text-sm font-medium">{{
-                $t("documents.import.processing.importStatus")
-              }}</span>
-              <Badge
-                v-if="webImportJob.status === 'completed'"
-                variant="default"
-                class="bg-green-600"
-              >
-                <CheckCircle class="mr-1 h-3 w-3" />
-                {{ $t("documents.import.processing.completed") }}
-              </Badge>
-              <Badge v-else-if="webImportJob.status === 'processing'" variant="secondary">
-                <Loader2 class="mr-1 h-3 w-3 animate-spin" />
-                {{ $t("documents.filters.processing") }}
-              </Badge>
-              <Badge v-else-if="webImportJob.status === 'failed'" variant="destructive">
-                <AlertCircle class="mr-1 h-3 w-3" />
-                {{ $t("documents.import.processing.failed") }}
-              </Badge>
-              <Badge v-else variant="outline">
-                {{ $t("documents.import.processing.queued") }}
-              </Badge>
-            </div>
-
-            <div v-if="webImportProgress" class="space-y-2">
-              <div class="flex justify-between text-sm">
-                <span>{{ $t("documents.import.processing.progress") }}</span>
-                <span>{{
-                  $t("documents.import.processing.pages", {
-                    processed: webImportProgress?.processedPages,
-                    total: webImportProgress?.totalPages,
-                  })
-                }}</span>
-              </div>
-              <Progress
-                :value="
-                  ((webImportProgress?.processedPages || 0) /
-                    Math.max(webImportProgress?.totalPages || 1, 1)) *
-                  100
-                "
-                class="h-2"
-              />
-              <p v-if="webImportProgress?.currentUrl" class="text-xs text-neutral-muted truncate">
-                {{
-                  $t("documents.import.processing.processingUrl", {
-                    url: webImportProgress.currentUrl,
-                  })
-                }}
-              </p>
-              <!-- Show success/failure stats if available -->
-              <div
-                v-if="
-                  webImportProgress?.successfulPages !== undefined ||
-                  webImportProgress?.failedPages !== undefined
-                "
-                class="flex gap-4 text-xs mt-2"
-              >
-                <span v-if="webImportProgress.successfulPages" class="text-green-600">
-                  ✓
-                  {{
-                    $t("documents.import.processing.successful", {
-                      count: webImportProgress.successfulPages,
-                    })
-                  }}
-                </span>
-                <span v-if="webImportProgress.failedPages" class="text-red-600">
-                  ✗
-                  {{
-                    $t("documents.import.processing.failedCount", {
-                      count: webImportProgress.failedPages,
-                    })
-                  }}
-                </span>
-              </div>
-            </div>
-          </div>
-
-          <!-- Helpful message for user -->
-          <Alert v-if="webImportJob.status === 'processing'">
-            <AlertTitle class="flex items-center gap-2">
-              <Loader2 class="h-4 w-4 animate-spin" />
-              {{ $t("documents.import.processing.processingInProgress") }}
-            </AlertTitle>
-            <AlertDescription class="space-y-3">
-              <p>
-                {{ $t("documents.import.processing.processingMessage") }}
-              </p>
-              <div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  class="text-destructive hover:text-destructive"
-                  @click="cancelImport"
-                >
-                  {{ $t("documents.import.processing.cancelImport") }}
-                </Button>
-              </div>
-            </AlertDescription>
-          </Alert>
-        </div>
-
         <!-- Upload Progress -->
-        <div v-else class="space-y-4">
+        <div class="space-y-4">
           <!-- Overall Progress -->
           <div class="mb-6">
             <div class="flex justify-between text-sm mb-2">
@@ -1059,17 +595,11 @@ import {
   Loader2,
   Globe,
   Package,
-  ExternalLink,
   HelpCircle,
 } from "lucide-vue-next";
 import { Hay } from "@/utils/api";
 import { useDocumentImportTour } from "@/composables/useDocumentImportTour";
 import { useToast } from "@/composables/useToast";
-import {
-  createAuthenticatedWebSocket,
-  parseWebSocketMessage,
-  type WebSocketMessage,
-} from "@/utils/websocket";
 
 const router = useRouter();
 const route = useRoute();
@@ -1095,18 +625,6 @@ const isDragging = ref(false);
 const isProcessing = ref(false);
 const uploadedCount = ref(0);
 const websiteUrl = ref("");
-interface WebImportJob {
-  id: string;
-  status: string;
-}
-
-interface WebImportProgress {
-  processedPages: number;
-  totalPages: number;
-  currentUrl?: string;
-  successfulPages?: number;
-  failedPages?: number;
-}
 
 interface PluginImporter {
   id: string;
@@ -1120,78 +638,12 @@ interface PluginImporter {
   supportedFormats?: string[];
 }
 
-interface DiscoveredPage {
-  url: string;
-  title?: string;
-  description?: string;
-  selected: boolean;
-}
-
-const webImportJob = ref<WebImportJob | null>(null);
-const webImportProgress = ref<WebImportProgress | null>(null);
 const pluginImporters = ref<PluginImporter[]>([]);
 const pluginThumbFailed = reactive<Record<string, boolean>>({});
 const { getApiUrl: getApiBase } = useDomain();
 const pluginThumbUrl = (pluginId: string) =>
   `${getApiBase()}/plugins/thumbnails/${encodeURIComponent(pluginId)}`;
-const discoveredPages = ref<DiscoveredPage[]>([]);
-const pageFilterType = ref<
-  "contains" | "not_contains" | "starts_with" | "not_starts_with" | "ends_with" | "not_ends_with"
->("contains");
-const pageFilterValue = ref("");
-const filteredDiscoveredPages = computed(() => {
-  const query = pageFilterValue.value.trim().toLowerCase();
-  if (!query) return discoveredPages.value;
 
-  return discoveredPages.value.filter((page) => {
-    const url = page.url.toLowerCase();
-    switch (pageFilterType.value) {
-      case "contains":
-        return url.includes(query);
-      case "not_contains":
-        return !url.includes(query);
-      case "starts_with":
-        return new URL(url).pathname.startsWith(query);
-      case "not_starts_with":
-        return !new URL(url).pathname.startsWith(query);
-      case "ends_with":
-        return url.endsWith(query);
-      case "not_ends_with":
-        return !url.endsWith(query);
-      default:
-        return true;
-    }
-  });
-});
-const isDiscovering = ref(false);
-const discoveryStartedAt = ref<number | null>(null);
-const discoveryProgress = ref<{
-  status?: string;
-  found: number;
-  processed: number;
-  total: number;
-  currentUrl?: string;
-} | null>(null);
-const discoveryEta = computed(() => {
-  if (!discoveryProgress.value || !discoveryStartedAt.value) return null;
-  const { processed, total } = discoveryProgress.value;
-  if (processed < 3 || total <= 0) return null; // Need a few samples for a reliable estimate
-
-  const elapsedMs = Date.now() - discoveryStartedAt.value;
-  const rate = processed / elapsedMs; // pages per ms
-  const remaining = total - processed;
-  if (remaining <= 0) return null;
-
-  const remainingMs = remaining / rate;
-  const remainingSec = Math.ceil(remainingMs / 1000);
-
-  if (remainingSec < 5) return null; // Don't show for very short times
-  if (remainingSec < 60) {
-    return t("documents.import.discovery.eta.seconds", { seconds: remainingSec });
-  }
-  const minutes = Math.ceil(remainingSec / 60);
-  return t("documents.import.discovery.eta.minutes", { minutes });
-});
 // Import from server types (these would normally come from generated tRPC types)
 enum DocumentationType {
   ARTICLE = "article",
@@ -1215,32 +667,10 @@ enum DocumentVisibility {
   INTERNAL = "internal",
 }
 
-const webMetadata = ref({
-  type: DocumentationType.ARTICLE,
-  status: DocumentationStatus.PUBLISHED,
-  visibility: DocumentVisibility.PUBLIC,
-  tags: [] as string[],
-  categories: [] as string[],
-  tagsString: "",
-  categoriesString: "",
-});
-
-// WebSocket connection
-const ws = ref<WebSocket | null>(null);
-const currentJobId = ref<string | null>(null);
-const wsConnected = ref(false);
-const pollInterval = ref<ReturnType<typeof setInterval> | null>(null);
-
 // Computed steps based on import type
 const steps = computed(() => {
   if (importType.value === "web") {
-    return [
-      t("documents.import.steps.selectSource"),
-      t("documents.import.steps.enterUrl"),
-      t("documents.import.steps.selectPages"),
-      t("documents.import.steps.addMetadata"),
-      t("documents.import.steps.processing"),
-    ];
+    return [t("documents.import.steps.selectSource"), t("documents.import.steps.enterUrl")];
   } else if (importType.value === "upload") {
     return [
       t("documents.import.steps.selectSource"),
@@ -1304,218 +734,17 @@ onMounted(async () => {
   if (shouldShowTour()) {
     setTimeout(() => startTour(), 500);
   }
-
-  // Initialize WebSocket connection
-  setupWebSocket();
 });
 
 // Clean up on unmount
 onBeforeUnmount(async () => {
-  // NOTE: We DO NOT cancel the job here anymore - we want processing to continue in the background
-  // The retry service will handle any stuck jobs, and the user can see progress on the documents page
-
-  // Clear polling interval
-  if (pollInterval.value) {
-    clearInterval(pollInterval.value);
-    pollInterval.value = null;
-  }
-
   // Remove global drag and drop listeners
   document.removeEventListener("dragover", handleGlobalDragOver);
   document.removeEventListener("dragleave", handleGlobalDragLeave);
   document.removeEventListener("drop", handleGlobalDrop);
-
-  // Close WebSocket connection (but keep the job running)
-  if (ws.value) {
-    ws.value.close();
-    ws.value = null;
-  }
 });
 
 // Methods
-
-// Setup WebSocket connection for real-time updates
-const setupWebSocket = () => {
-  const socket = createAuthenticatedWebSocket();
-  if (!socket) {
-    wsConnected.value = false;
-    return;
-  }
-
-  ws.value = socket;
-
-  socket.onopen = () => {
-    console.log("WebSocket connected");
-    wsConnected.value = true;
-  };
-
-  socket.onmessage = (event) => {
-    const message = parseWebSocketMessage(event.data);
-    if (!message) return;
-
-    handleWebSocketMessage(message);
-  };
-
-  socket.onerror = () => {
-    wsConnected.value = false;
-  };
-
-  socket.onclose = () => {
-    wsConnected.value = false;
-  };
-};
-
-// Handle incoming WebSocket messages
-const handleWebSocketMessage = (message: WebSocketMessage) => {
-  // Handle job progress updates
-  if (message.type === "job:progress" && message.jobId === currentJobId.value) {
-    const progress = message.progress as Record<string, unknown>;
-    const status = message.status as string;
-
-    // Update discovery progress
-    if (progress?.pagesFound !== undefined && isDiscovering.value) {
-      discoveryProgress.value = {
-        found: (progress.pagesFound as number) || 0,
-        processed: (progress.pagesProcessed as number) || 0,
-        total: (progress.totalEstimated as number) || 0,
-        status: (progress.status as string) || status,
-        currentUrl: progress.currentUrl as string,
-      };
-
-      // Update discovered pages if available
-      if (progress.discoveredPages) {
-        discoveredPages.value = progress.discoveredPages as DiscoveredPage[];
-      }
-
-      // Check if discovery completed
-      if (status === "completed" && message.result) {
-        const result = message.result as Record<string, unknown>;
-        if (result.pages) {
-          discoveredPages.value = result.pages as DiscoveredPage[];
-        }
-        isDiscovering.value = false;
-        discoveryProgress.value = null;
-      }
-    }
-
-    // Update import progress
-    if (progress?.processedPages !== undefined && webImportJob.value) {
-      webImportProgress.value = {
-        processedPages: (progress.processedPages as number) || 0,
-        totalPages: (progress.totalPages as number) || 0,
-        currentUrl: progress.currentUrl as string,
-      };
-
-      webImportJob.value.status = status || "processing";
-
-      // Check if import completed
-      if (status === "completed") {
-        isProcessing.value = false;
-      } else if (status === "failed") {
-        isProcessing.value = false;
-        webImportJob.value.status = "failed";
-      }
-    }
-  }
-};
-
-// Polling fallback for when WebSocket is not connected
-const startPollingFallback = async (jobId: string) => {
-  // Clear any existing interval
-  if (pollInterval.value) {
-    clearInterval(pollInterval.value);
-  }
-
-  console.log("Starting polling fallback for job:", jobId);
-
-  const pollJobStatus = async () => {
-    try {
-      const jobStatus = await Hay.documents.getDiscoveryJob.query({ jobId });
-
-      // Update progress based on job status
-      if (jobStatus.progress) {
-        const progress = jobStatus.progress as Record<string, unknown>;
-
-        // Update discovery progress
-        if (progress?.pagesFound !== undefined && isDiscovering.value) {
-          discoveryProgress.value = {
-            found: (progress.pagesFound as number) || 0,
-            processed: (progress.pagesProcessed as number) || 0,
-            total: (progress.totalEstimated as number) || 0,
-            status: (progress.status as string) || "discovering",
-            currentUrl: progress.currentUrl as string,
-          };
-
-          if (progress.discoveredPages) {
-            discoveredPages.value = progress.discoveredPages as DiscoveredPage[];
-          }
-        }
-
-        // Update import progress
-        if (progress?.processedPages !== undefined && webImportJob.value) {
-          webImportProgress.value = {
-            processedPages: (progress.processedPages as number) || 0,
-            totalPages: (progress.totalPages as number) || 0,
-            currentUrl: progress.currentUrl as string,
-          };
-        }
-      }
-
-      // Check if job completed or failed
-      if (jobStatus.status === "completed") {
-        if (pollInterval.value) {
-          clearInterval(pollInterval.value);
-          pollInterval.value = null;
-        }
-
-        // Handle discovery completion
-        if (isDiscovering.value && jobStatus.result) {
-          const result = jobStatus.result as Record<string, unknown>;
-          if (result.pages) {
-            discoveredPages.value = (result.pages as DiscoveredPage[]).map((page) => ({
-              ...page,
-              selected: page.selected !== false,
-            }));
-          }
-          isDiscovering.value = false;
-          discoveryProgress.value = null;
-        }
-
-        // Handle import completion
-        if (webImportJob.value) {
-          webImportJob.value.status = "completed";
-          isProcessing.value = false;
-        }
-      } else if (jobStatus.status === "failed") {
-        if (pollInterval.value) {
-          clearInterval(pollInterval.value);
-          pollInterval.value = null;
-        }
-
-        console.error("Job failed:", jobStatus.error);
-
-        if (isDiscovering.value) {
-          isDiscovering.value = false;
-          discoveryProgress.value = null;
-          currentStep.value = 2;
-        }
-
-        if (webImportJob.value) {
-          webImportJob.value.status = "failed";
-          isProcessing.value = false;
-        }
-      }
-    } catch (error) {
-      console.error("Failed to poll job status:", error);
-    }
-  };
-
-  // Initial poll
-  await pollJobStatus();
-
-  // Poll every 10 seconds
-  pollInterval.value = setInterval(pollJobStatus, 10000);
-};
 
 const selectImportType = (type: string) => {
   importType.value = type;
@@ -1575,135 +804,30 @@ const normalizeWebsiteUrl = () => {
   }
 };
 
-const discoverPages = async () => {
+/**
+ * Connect a website as a document source. Replaces the old discover→select→
+ * import wizard: we create a `website` DocumentSource (built-in importer) and
+ * land on its detail page, which polls sync status and shows pages appearing
+ * as the importer crawls — same UX as plugin sources.
+ */
+const connectWebsite = async () => {
   if (!isValidUrl(websiteUrl.value)) return;
 
-  isDiscovering.value = true;
-  discoveryStartedAt.value = Date.now();
-  currentStep.value = 3;
-  discoveryProgress.value = {
-    found: 0,
-    processed: 0,
-    total: 0,
-    status: "starting",
-  };
-
-  try {
-    // Start the discovery job
-    const { jobId } = await Hay.documents.discoverWebPages.mutate({
-      url: websiteUrl.value,
-    });
-
-    // Store job ID for WebSocket updates
-    currentJobId.value = jobId;
-
-    // Use WebSocket for real-time updates if connected, otherwise fall back to polling
-    if (wsConnected.value) {
-      console.log("Using WebSocket for real-time updates");
-    } else {
-      console.log("WebSocket not connected, using polling fallback");
-      await startPollingFallback(jobId);
-    }
-  } catch (error) {
-    console.error("Failed to start page discovery:", error);
-    isDiscovering.value = false;
-    discoveryProgress.value = null;
-    currentStep.value = 2;
-    currentJobId.value = null;
-  }
-};
-
-const cancelDiscovery = () => {
-  // Clear polling interval
-  if (pollInterval.value) {
-    clearInterval(pollInterval.value);
-    pollInterval.value = null;
-  }
-
-  isDiscovering.value = false;
-  discoveryProgress.value = null;
-  currentJobId.value = null;
-  currentStep.value = 2; // Go back to URL input
-};
-
-const startWebImport = async () => {
-  currentStep.value = 5; // Processing step
   isProcessing.value = true;
-
-  // Log metadata being sent
-  console.log("Starting import with metadata:", webMetadata.value);
-
   try {
-    const response = await Hay.documents.importFromWeb.mutate({
+    const source = await Hay.documentSources.createWebsite.mutate({
       url: websiteUrl.value,
-      pages: discoveredPages.value,
-      metadata: webMetadata.value,
     });
 
-    webImportJob.value = {
-      id: response.jobId,
-      status: "processing",
-    };
-
-    // Store job ID for WebSocket updates
-    currentJobId.value = response.jobId;
-
-    // Initialize progress
-    webImportProgress.value = {
-      totalPages: discoveredPages.value.filter((p) => p.selected).length,
-      processedPages: 0,
-    };
-
-    // Use WebSocket for real-time updates if connected, otherwise fall back to polling
-    if (wsConnected.value) {
-      console.log("Using WebSocket for real-time import updates");
-    } else {
-      console.log("WebSocket not connected, using polling fallback for import");
-      await startPollingFallback(response.jobId);
-    }
+    const redirectPath = route.query.redirect as string;
+    router.push(redirectPath || `/documents/sources/${source.id}`);
   } catch (error) {
-    console.error("Failed to start web import:", error);
-    webImportJob.value = { id: "", status: "failed" };
-    isProcessing.value = false;
-    currentJobId.value = null;
-  }
-};
-
-const cancelImport = async () => {
-  if (!currentJobId.value) return;
-
-  try {
-    await Hay.documents.cancelJob.mutate({ jobId: currentJobId.value });
-
-    // Update UI state
-    if (webImportJob.value) {
-      webImportJob.value.status = "cancelled";
-    }
-    isProcessing.value = false;
-    isDiscovering.value = false;
-
-    // Clear polling interval
-    if (pollInterval.value) {
-      clearInterval(pollInterval.value);
-      pollInterval.value = null;
-    }
-
-    // Show success message
-    toast.success(
-      t("documents.import.toast.cancelSuccess"),
-      t("documents.import.toast.cancelSuccessMessage"),
-    );
-
-    // Navigate back to documents
-    setTimeout(() => {
-      router.push("/documents");
-    }, 2000);
-  } catch (error) {
-    console.error("Failed to cancel import:", error);
+    console.error("Failed to connect website:", error);
     toast.error(
-      t("documents.import.toast.cancelFailed"),
-      t("documents.import.toast.cancelFailedMessage"),
+      t("documents.import.toast.webConnectFailed"),
+      t("documents.import.toast.webConnectFailedMessage"),
     );
+    isProcessing.value = false;
   }
 };
 
@@ -1959,61 +1083,12 @@ const mapCategoryToDocumentType = (category: string): DocumentationType => {
   return mapping[category] || DocumentationType.ARTICLE;
 };
 
-const getDiscoveryStatusText = () => {
-  if (!discoveryProgress.value) return t("documents.import.discovery.statusMessages.initializing");
-
-  const messages = [
-    t("documents.import.discovery.statusMessages.discovering"),
-    t("documents.import.discovery.statusMessages.scanning"),
-    t("documents.import.discovery.statusMessages.following"),
-    t("documents.import.discovery.statusMessages.analyzing"),
-    t("documents.import.discovery.statusMessages.building"),
-  ];
-
-  // Cycle through messages based on progress
-  const index = Math.min(
-    Math.floor(
-      (discoveryProgress.value.processed / Math.max(discoveryProgress.value.total, 1)) *
-        messages.length,
-    ),
-    messages.length - 1,
-  );
-
-  return messages[index];
-};
-
-const openExternalLink = (url: string) => {
-  if (typeof window !== "undefined") {
-    window.open(url, "_blank");
-  }
-};
-
 const resetImport = () => {
   currentStep.value = 1;
   importType.value = "";
   selectedFiles.value = [];
   uploadedCount.value = 0;
   websiteUrl.value = "";
-  webImportJob.value = null;
-  webImportProgress.value = null;
-};
-
-const toggleSelectAll = (checked: boolean) => {
-  const filteredUrls = new Set(filteredDiscoveredPages.value.map((p) => p.url));
-  discoveredPages.value = discoveredPages.value.map((page) => ({
-    ...page,
-    selected: filteredUrls.has(page.url) ? checked : page.selected,
-  }));
-};
-
-const togglePageSelection = (url: string, checked: boolean) => {
-  const idx = discoveredPages.value.findIndex((p) => p.url === url);
-  if (idx === -1) return;
-  discoveredPages.value = [
-    ...discoveredPages.value.slice(0, idx),
-    { ...discoveredPages.value[idx], selected: checked },
-    ...discoveredPages.value.slice(idx + 1),
-  ];
 };
 
 const startTutorial = () => {

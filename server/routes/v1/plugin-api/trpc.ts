@@ -1,19 +1,12 @@
 import { router } from "@server/trpc";
-import {
-  pluginProcedure,
-  requireCapability,
-  type PluginAuthContext,
-} from "@server/trpc/middleware/plugin-auth";
+import { pluginProcedure, requireCapability } from "@server/trpc/middleware/plugin-auth";
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { CustomerRepository } from "@server/repositories/customer.repository";
 import { ConversationRepository } from "@server/repositories/conversation.repository";
 import { MessageRepository } from "@server/repositories/message.repository";
 import { AgentRepository } from "@server/repositories/agent.repository";
-import {
-  OrganizationRepository,
-  organizationRepository,
-} from "@server/repositories/organization.repository";
+import { organizationRepository } from "@server/repositories/organization.repository";
 import { pluginInstanceRepository } from "@server/repositories/plugin-instance.repository";
 import { MessageType } from "@server/database/entities/message.entity";
 import { mcpRegistryService } from "@server/services/mcp-registry.service";
@@ -21,9 +14,51 @@ import { productSyncService } from "@server/services/product-sync.service";
 import { ProductSource, ProductStatus } from "@server/entities/product.entity";
 import { VariantAvailability } from "@server/entities/product-variant.entity";
 import type { CanonicalProduct } from "@server/types/canonical-product";
+import type {
+  PluginInstanceConfig,
+  LocalMCPServerConfig,
+  RemoteMCPServerConfig,
+} from "@server/types/plugin.types";
 import { createLogger } from "@server/lib/logger";
 
 const logger = createLogger("plugin-api-trpc");
+
+/**
+ * Auth configuration accepted for remote MCP servers.
+ *
+ * Mirrors the discriminated union validated by the `mcp.registerRemote` input
+ * schema. The shared {@link RemoteMCPServerConfig} only models bearer/apiKey
+ * auth, but this route also persists the OAuth2 variant, so the persisted
+ * remote-server shape widens `auth` to the full schema-backed union.
+ */
+type RemoteMCPServerAuth =
+  | { type: "bearer"; token: string }
+  | { type: "apiKey"; apiKey: string }
+  | {
+      type: "oauth2";
+      authorizationUrl: string;
+      tokenUrl: string;
+      scopes: string[];
+      optionalScopes?: string[];
+      pkce?: boolean;
+      clientIdEnvVar: string;
+      clientSecretEnvVar: string;
+    };
+
+/** Remote MCP server entry as persisted by `mcp.registerRemote`. */
+type PersistedRemoteMCPServer = Omit<RemoteMCPServerConfig, "auth"> & {
+  auth?: RemoteMCPServerAuth;
+};
+
+/** Plugin instance config with the persisted MCP server shapes used here. */
+type MCPServersConfigState = {
+  local?: LocalMCPServerConfig[];
+  remote?: PersistedRemoteMCPServer[];
+};
+
+type PluginInstanceConfigState = Omit<PluginInstanceConfig, "mcpServers"> & {
+  mcpServers?: MCPServersConfigState;
+};
 
 // Initialize repositories
 const customerRepository = new CustomerRepository();
@@ -158,7 +193,7 @@ export const pluginApiTrpcRouter = router({
           // Conversation already exists — merge the externalConversationId into
           // its metadata if it's not already stored there. We intentionally do
           // not broadcast this metadata-only change because it's internal state.
-          const existing = (conversation.metadata ?? {}) as Record<string, any>;
+          const existing = conversation.metadata ?? {};
           const existingChannel = (existing[channel] ?? {}) as Record<string, unknown>;
           if (existingChannel.conversationId !== externalConversationId) {
             const merged = {
@@ -569,16 +604,16 @@ export const pluginApiTrpcRouter = router({
       }
 
       // 2. Update config with MCP server definition
-      const config = instance.config || {};
+      const config: PluginInstanceConfigState = instance.config || {};
       if (!config.mcpServers) {
         config.mcpServers = { local: [], remote: [] };
       }
 
-      const mcpServers = config.mcpServers as any;
+      const mcpServers = config.mcpServers;
       mcpServers.local = mcpServers.local || [];
 
       // Check for duplicate serverId
-      if (mcpServers.local.some((s: any) => s.serverId === serverId)) {
+      if (mcpServers.local.some((s: LocalMCPServerConfig) => s.serverId === serverId)) {
         throw new TRPCError({
           code: "BAD_REQUEST",
           message: `MCP server with ID ${serverId} already exists`,
@@ -683,16 +718,16 @@ export const pluginApiTrpcRouter = router({
       }
 
       // 2. Update config with MCP server definition
-      const config = instance.config || {};
+      const config: PluginInstanceConfigState = instance.config || {};
       if (!config.mcpServers) {
         config.mcpServers = { local: [], remote: [] };
       }
 
-      const mcpServers = config.mcpServers as any;
+      const mcpServers = config.mcpServers;
       mcpServers.remote = mcpServers.remote || [];
 
       // Check for duplicate serverId
-      if (mcpServers.remote.some((s: any) => s.serverId === serverId)) {
+      if (mcpServers.remote.some((s: PersistedRemoteMCPServer) => s.serverId === serverId)) {
         throw new TRPCError({
           code: "BAD_REQUEST",
           message: `MCP server with ID ${serverId} already exists`,

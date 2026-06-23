@@ -35,14 +35,14 @@
         <!-- Select with options -->
         <template v-if="field.options && field.options.length > 0">
           <Input
-            :model-value="formValues[key] as string | undefined"
+            :model-value="asStringValue(formValues[key])"
             type="select"
             :label="field.label || key"
             :options="field.options"
             :placeholder="field.placeholder"
             :hint="field.helpText"
             :data-testid="`${plugin.id}-${key}`"
-            @update:model-value="(value) => (formValues[key] = value)"
+            @update:model-value="(value: string | number | boolean) => (formValues[key] = value)"
           />
         </template>
 
@@ -55,7 +55,7 @@
             :placeholder="field.placeholder"
             :hint="field.helpText"
             :data-testid="`${plugin.id}-${key}`"
-            @update:model-value="(value) => (formValues[key] = value)"
+            @update:model-value="(value: string | number | boolean) => (formValues[key] = value)"
           />
         </template>
 
@@ -68,7 +68,7 @@
             :placeholder="field.placeholder"
             :hint="field.helpText"
             :data-testid="`${plugin.id}-${key}`"
-            @update:model-value="(value) => (formValues[key] = value)"
+            @update:model-value="(value: string | number | boolean) => (formValues[key] = value)"
           />
         </template>
       </div>
@@ -128,6 +128,10 @@ interface FieldSchema {
   default?: unknown;
   options?: Array<{ label: string; value: string | number }>;
   showWhen?: ShowWhen;
+}
+
+function asStringValue(value: unknown): string | undefined {
+  return value === undefined || value === null ? undefined : String(value);
 }
 
 function evaluateShowWhen(rule: ShowWhen | undefined, values: Record<string, unknown>): boolean {

@@ -202,6 +202,7 @@ export function loadManifest(pluginPath: string): ValidatedManifest {
     "customers",
     "sources",
     "products",
+    "cron",
   ];
   for (const cap of manifest.capabilities) {
     if (!validCapabilities.includes(cap)) {

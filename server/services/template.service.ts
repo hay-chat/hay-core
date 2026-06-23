@@ -214,7 +214,7 @@ export class TemplateService {
    */
   private replaceVariables(
     content: string,
-    variables: Record<string, any>,
+    variables: Record<string, unknown>,
     stripUnmatched: boolean = true,
   ): string {
     let result = content;
@@ -256,7 +256,7 @@ export class TemplateService {
   /**
    * Process conditional blocks in templates
    */
-  private processConditionals(content: string, variables: Record<string, any>): string {
+  private processConditionals(content: string, variables: Record<string, unknown>): string {
     const conditionalPattern = /\{\{#if\s+([^}]+)\}\}([\s\S]*?)\{\{\/if\}\}/g;
     let matchCount = 0;
 
@@ -280,7 +280,7 @@ export class TemplateService {
   /**
    * Process loops in templates
    */
-  private processLoops(content: string, variables: Record<string, any>): string {
+  private processLoops(content: string, variables: Record<string, unknown>): string {
     const loopPattern = /\{\{#each\s+([^}]+)\}\}([\s\S]*?)\{\{\/each\}\}/g;
 
     return content.replace(loopPattern, (_match, arrayPath, block) => {
@@ -306,14 +306,19 @@ export class TemplateService {
   /**
    * Get nested value from object
    */
-  private getNestedValue(obj: any, path: string): any {
-    return path.split(".").reduce((current, key) => current?.[key], obj);
+  private getNestedValue(obj: unknown, path: string): unknown {
+    return path.split(".").reduce<unknown>((current, key) => {
+      if (current && typeof current === "object") {
+        return (current as Record<string, unknown>)[key];
+      }
+      return undefined;
+    }, obj);
   }
 
   /**
    * Format value for display
    */
-  private formatValue(value: any): string {
+  private formatValue(value: unknown): string {
     if (value === null || value === undefined) {
       return "";
     }

@@ -209,6 +209,9 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from "vue";
 import { Hay } from "@/utils/api";
+import type { RouterOutputs } from "@/types/trpc";
+
+type PrivacyRequest = RouterOutputs["customerPrivacy"]["listRequests"]["requests"][number];
 import {
   Download,
   Trash2,
@@ -244,7 +247,7 @@ const errorState = ref<{
 }>({ type: null, message: "" });
 
 // Table state
-const requests = ref<unknown[]>([]);
+const requests = ref<PrivacyRequest[]>([]);
 const tableLoading = ref(false);
 
 // Extract retry time from error message

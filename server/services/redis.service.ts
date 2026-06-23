@@ -12,7 +12,7 @@ export class RedisService {
   private publisher: Redis | null = null;
   private subscriber: Redis | null = null;
   private isInitialized = false;
-  private eventHandlers = new Map<string, Set<(data: any) => void>>();
+  private eventHandlers = new Map<string, Set<(data: unknown) => void>>();
 
   /**
    * Initialize Redis connections
@@ -109,7 +109,7 @@ export class RedisService {
   /**
    * Publish a message to a channel
    */
-  async publish(channel: string, data: any): Promise<void> {
+  async publish(channel: string, data: unknown): Promise<void> {
     if (!this.publisher) {
       logger.error("Publisher not initialized");
       return;
@@ -117,8 +117,14 @@ export class RedisService {
 
     try {
       const message = JSON.stringify(data);
+      const dataRecord =
+        typeof data === "object" && data !== null ? (data as Record<string, unknown>) : undefined;
       logger.debug(
-        { channel, dataType: data.type, dataKeys: Object.keys(data) },
+        {
+          channel,
+          dataType: dataRecord?.type,
+          dataKeys: dataRecord ? Object.keys(dataRecord) : undefined,
+        },
         "Publishing message to channel",
       );
       await this.publisher.publish(channel, message);
@@ -132,7 +138,7 @@ export class RedisService {
   /**
    * Subscribe to a channel
    */
-  async subscribe(channel: string, handler: (data: any) => void): Promise<void> {
+  async subscribe(channel: string, handler: (data: unknown) => void): Promise<void> {
     if (!this.subscriber) {
       logger.error("Subscriber not initialized");
       return;
@@ -164,7 +170,7 @@ export class RedisService {
   /**
    * Unsubscribe from a channel
    */
-  async unsubscribe(channel: string, handler?: (data: any) => void): Promise<void> {
+  async unsubscribe(channel: string, handler?: (data: unknown) => void): Promise<void> {
     if (!this.subscriber) {
       return;
     }
@@ -203,14 +209,15 @@ export class RedisService {
     try {
       logger.debug({ channel, messageLength: message.length }, "Received message on channel");
 
-      const data = JSON.parse(message);
+      const data: unknown = JSON.parse(message);
+      const dataType =
+        typeof data === "object" && data !== null
+          ? (data as Record<string, unknown>).type
+          : undefined;
       const handlers = this.eventHandlers.get(channel);
 
       if (handlers) {
-        logger.debug(
-          { channel, handlerCount: handlers.size, dataType: data.type },
-          "Dispatching to handlers",
-        );
+        logger.debug({ channel, handlerCount: handlers.size, dataType }, "Dispatching to handlers");
 
         handlers.forEach((handler) => {
           try {

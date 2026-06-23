@@ -84,7 +84,7 @@ function buildFakeImporter(
   const listRoots = jest.fn(async () => [{ id: "root", label: "Root" }]);
 
   const discover = jest.fn(
-    async (input: { instanceId: string; rootId: string; cursor?: string }) => {
+    async (_input: { instanceId: string; rootId: string; cursor?: string }) => {
       // Single-page discovery for simplicity. Tests that need budget-exhaust
       // behavior install their own discover override on the returned mock.
       const all: DocumentImporterExternalPage[] = Array.from(pages.values()).map((p) => ({
@@ -364,6 +364,30 @@ describe("DocumentSourceSyncService", () => {
     const after = await documentSourceRepository.findByIdInternal(source.id);
     expect(after?.lastSyncStatus).toBe(DocumentSourceSyncStatus.SUCCESS);
     expect(after?.lastFullSweepAt).toBeTruthy();
+  });
+
+  // -------------------------------------------------------------------------
+
+  it("enqueueSync is idempotent — re-enqueue while one is in flight reuses the job", async () => {
+    const jobRepo = AppDataSource.getRepository(Job);
+    await jobRepo.delete({ organizationId: TEST_ORG_ID });
+
+    // First enqueue creates a queued job (the create/connect flow does this).
+    const first = await service.enqueueSync(source.id, { forceFullSweep: true });
+
+    // A second enqueue — e.g. the 60s dispatcher tick firing before the first
+    // job has recorded a result — must NOT pile up a duplicate. This is the
+    // regression: a brand-new source has no lastSyncedAt, so it kept matching
+    // "due" every tick and a new job was queued each minute.
+    const second = await service.enqueueSync(source.id);
+
+    expect(second.jobId).toBe(first.jobId);
+
+    const jobs = await jobRepo.find({ where: { organizationId: TEST_ORG_ID } });
+    const syncJobs = jobs.filter((j) => j.data?.type === "document_source_sync");
+    expect(syncJobs).toHaveLength(1);
+
+    await jobRepo.delete({ organizationId: TEST_ORG_ID });
   });
 
   // -------------------------------------------------------------------------

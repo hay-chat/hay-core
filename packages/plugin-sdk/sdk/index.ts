@@ -84,6 +84,14 @@ export type {
   ExternalMcpOptions,
   HayMcpRuntimeAPI,
 
+  // Cron
+  CronRetryPolicy,
+  HayCronAuthAPI,
+  HayCronContext,
+  CronJobHandler,
+  CronJobOptions,
+  CronJobDescriptor,
+
   // Other
   HayLogger,
   HayOrg,

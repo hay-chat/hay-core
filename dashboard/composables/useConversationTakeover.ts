@@ -1,5 +1,6 @@
 import { ref } from "vue";
 import { useI18n } from "vue-i18n";
+import { TRPCClientError } from "@trpc/client";
 import { HayApi } from "@/utils/api";
 import { useToast } from "@/composables/useToast";
 import { useRouter } from "vue-router";
@@ -10,6 +11,22 @@ export interface AssignedUser {
   email: string;
   assignedAt: Date | string | null;
 }
+
+/**
+ * Owner info attached to the `cause` of a CONFLICT error thrown by the
+ * takeover procedure when another user already owns the conversation.
+ */
+type TakeoverConflictOwner = Pick<AssignedUser, "id" | "name" | "email">;
+
+const getConflictOwner = (cause: unknown): TakeoverConflictOwner | null => {
+  if (cause && typeof cause === "object" && "currentOwner" in cause) {
+    const owner = (cause as { currentOwner: unknown }).currentOwner;
+    if (owner && typeof owner === "object" && "id" in owner) {
+      return owner as TakeoverConflictOwner;
+    }
+  }
+  return null;
+};
 
 export function useConversationTakeover() {
   const toast = useToast();
@@ -35,19 +52,20 @@ export function useConversationTakeover() {
 
       toast.success(t("conversations.toast.takenOver"), t("conversations.toast.takenOverMessage"));
       return true;
-    } catch (error: any) {
+    } catch (error: unknown) {
       // Handle conflict - another user has already taken over
-      if (error?.data?.code === "CONFLICT") {
-        const ownerInfo = error?.cause?.currentOwner;
+      if (error instanceof TRPCClientError && error.data?.code === "CONFLICT") {
+        const ownerInfo = getConflictOwner(error.cause);
         if (ownerInfo) {
-          currentOwner.value = ownerInfo;
+          currentOwner.value = { ...ownerInfo, assignedAt: null };
           showTakeoverDialog.value = true;
           return false;
         }
       }
 
       // Handle other errors
-      const errorMessage = error?.message || t("conversations.toast.takeoverFailedMessage");
+      const errorMessage =
+        (error instanceof Error && error.message) || t("conversations.toast.takeoverFailedMessage");
       toast.error(t("conversations.toast.takeoverFailed"), errorMessage);
       return false;
     } finally {
@@ -100,8 +118,9 @@ export function useConversationTakeover() {
       // Navigate back to conversations list
       router.push("/conversations");
       return true;
-    } catch (error: any) {
-      const errorMessage = error?.message || t("conversations.toast.releaseFailedMessage");
+    } catch (error: unknown) {
+      const errorMessage =
+        (error instanceof Error && error.message) || t("conversations.toast.releaseFailedMessage");
       toast.error(t("conversations.toast.releaseFailed"), errorMessage);
       return false;
     } finally {

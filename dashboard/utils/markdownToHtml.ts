@@ -1,76 +1,64 @@
+import { Marked, type Tokens } from "marked";
+import { get as getEmoji } from "node-emoji";
+import { sanitizeHtml } from "@/utils/sanitize";
+
+/**
+ * Isolated marked instance so our options (GFM tables, line breaks, link
+ * renderer) don't leak into the global `marked` used by markdownToTiptap.ts.
+ *
+ * GFM is enabled, which gives us pipe-table support out of the box.
+ */
+const md = new Marked({ gfm: true, breaks: true });
+
+interface EmojiToken extends Tokens.Generic {
+  type: "emoji";
+  emoji: string;
+}
+
+md.use({
+  renderer: {
+    // Open links in a new tab; sanitizeHtml enforces rel="noopener noreferrer".
+    link(token) {
+      const text = this.parser.parseInline(token.tokens);
+      const title = token.title ? ` title="${token.title}"` : "";
+      return `<a href="${token.href}"${title} target="_blank" rel="noopener noreferrer">${text}</a>`;
+    },
+  },
+  // Expand GitHub-style emoji shortcodes (e.g. :clipboard: -> 📋). As an inline
+  // tokenizer it only fires on text, so shortcodes inside code stay literal.
+  extensions: [
+    {
+      name: "emoji",
+      level: "inline",
+      start(src: string) {
+        return src.indexOf(":");
+      },
+      tokenizer(src: string): EmojiToken | undefined {
+        const match = /^:([a-z0-9_+-]+):/.exec(src);
+        if (!match) return undefined;
+        const emoji = getEmoji(match[1]);
+        if (!emoji) return undefined; // unknown shortcode: leave as plain text
+        return { type: "emoji", raw: match[0], emoji };
+      },
+      renderer(token) {
+        return (token as EmojiToken).emoji;
+      },
+    },
+  ],
+});
+
+/**
+ * Render a markdown string to sanitized HTML.
+ *
+ * Uses `marked` (GFM) for correct parsing — including tables, blockquotes,
+ * nested lists and code fences — then runs the result through sanitizeHtml
+ * to strip scripts, event handlers and dangerous protocols.
+ */
 export function markdownToHtml(markdown: string): string {
-  // Basic markdown to HTML conversion
-  let html = markdown.replace(/\s+$/, "");
-
-  // Escape HTML entities first (for security)
-  html = html.replace(/&/g, "&amp;");
-  html = html.replace(/</g, "&lt;");
-  html = html.replace(/>/g, "&gt;");
-
-  // Convert code blocks (must come before line breaks)
-  html = html.replace(/```(\w*)\n([\s\S]*?)```/g, '<pre><code class="language-$1">$2</code></pre>');
-
-  // Convert inline code
-  html = html.replace(/`([^`]+)`/g, "<code>$1</code>");
-
-  // Convert headers (must come before line breaks)
-  html = html.replace(/^#### (.*$)/gim, "<h4>$1</h4>");
-  html = html.replace(/^### (.*$)/gim, "<h3>$1</h3>");
-  html = html.replace(/^## (.*$)/gim, "<h2>$1</h2>");
-  html = html.replace(/^# (.*$)/gim, "<h1>$1</h1>");
-
-  // Convert horizontal rules (must come before bold/italic to avoid * * * being eaten)
-  html = html.replace(/^---$/gim, "<hr>");
-  html = html.replace(/^\*\*\*$/gim, "<hr>");
-  html = html.replace(/^\* \* \*$/gim, "<hr>");
-  html = html.replace(/^___$/gim, "<hr>");
-
-  // Convert bold (* and _ variants, double must come before single)
-  html = html.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
-  html = html.replace(/__(.+?)__/g, "<strong>$1</strong>");
-
-  // Convert italic (* and _ variants)
-  html = html.replace(/\*(.+?)\*/g, "<em>$1</em>");
-  html = html.replace(/(?<!\w)_(.+?)_(?!\w)/g, "<em>$1</em>");
-
-  // Convert strikethrough
-  html = html.replace(/~~(.+?)~~/g, "<del>$1</del>");
-
-  // Convert images (must come before links since ![alt](url) would match [alt](url))
-  html = html.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, (_match, alt, src) => {
-    // Fix protocol-relative URLs (//example.com → https://example.com)
-    const fixedSrc = src.startsWith("//") ? `https:${src}` : src;
-    return `<img src="${fixedSrc}" alt="${alt}" loading="lazy" style="max-width: 100%; height: auto; border-radius: 0.375rem; margin: 0.5rem 0;" />`;
-  });
-
-  // Convert links
-  html = html.replace(
-    /\[([^\]]+)\]\(([^)]+)\)/g,
-    '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>',
-  );
-
-  // Convert unordered lists (simple version)
-  html = html.replace(/^\s*[-*]\s+(.*)$/gim, "<li>$1</li>");
-
-  // Convert ordered lists (simple version)
-  html = html.replace(/^\s*\d+\.\s+(.*)$/gim, "<li>$1</li>");
-
-  // Wrap consecutive list items and strip newlines between tags
-  html = html.replace(/(<li>.*<\/li>\n?)+/g, (match) => {
-    return "<ul>" + match.replace(/\n/g, "") + "</ul>";
-  });
-
-  // Convert blockquotes
-  html = html.replace(/^&gt;\s*(.*)$/gim, "<blockquote>$1</blockquote>");
-
-  // Convert line breaks (for remaining newlines)
-  html = html.replace(/\n\n/g, "</p><p>");
-  html = html.replace(/\n/g, "<br>");
-
-  // Wrap in paragraph if not already wrapped
-  if (!html.startsWith("<")) {
-    html = "<p>" + html + "</p>";
+  if (!markdown || typeof markdown !== "string") {
+    return "";
   }
 
-  return html;
+  const html = md.parse(markdown, { async: false }) as string;
+  return sanitizeHtml(html);
 }

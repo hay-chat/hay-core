@@ -1,5 +1,19 @@
 import { MigrationInterface, QueryRunner } from "typeorm";
 
+interface EditorJsBlock {
+  type: string;
+  data: Record<string, unknown>;
+}
+
+interface EditorJsDocument {
+  blocks: EditorJsBlock[];
+}
+
+interface LegacyInstructionItem {
+  level?: number;
+  instructions?: string;
+}
+
 export class MigrateInstructionsToEditorJs1760800000000 implements MigrationInterface {
   name = "MigrateInstructionsToEditorJs1760800000000";
 
@@ -16,7 +30,7 @@ export class MigrateInstructionsToEditorJs1760800000000 implements MigrationInte
     console.log("Migration complete!");
   }
 
-  public async down(queryRunner: QueryRunner): Promise<void> {
+  public async down(_queryRunner: QueryRunner): Promise<void> {
     // This migration is not reversible since we're removing the legacy format
     console.log(
       "WARNING: This migration cannot be reversed. Legacy format is no longer supported.",
@@ -25,7 +39,7 @@ export class MigrateInstructionsToEditorJs1760800000000 implements MigrationInte
 
   private async convertPlaybookInstructions(queryRunner: QueryRunner): Promise<void> {
     // Get all playbooks with instructions
-    const playbooks = await queryRunner.query(
+    const playbooks: { id: string; instructions: unknown }[] = await queryRunner.query(
       `SELECT id, instructions FROM playbooks WHERE instructions IS NOT NULL`,
     );
 
@@ -45,7 +59,12 @@ export class MigrateInstructionsToEditorJs1760800000000 implements MigrationInte
 
   private async convertAgentInstructions(queryRunner: QueryRunner): Promise<void> {
     // Get all agents with instructions
-    const agents = await queryRunner.query(
+    const agents: {
+      id: string;
+      instructions: unknown;
+      human_handoff_available_instructions: unknown;
+      human_handoff_unavailable_instructions: unknown;
+    }[] = await queryRunner.query(
       `SELECT id, instructions, human_handoff_available_instructions, human_handoff_unavailable_instructions FROM agents
        WHERE instructions IS NOT NULL
           OR human_handoff_available_instructions IS NOT NULL
@@ -94,10 +113,14 @@ export class MigrateInstructionsToEditorJs1760800000000 implements MigrationInte
     console.log(`Converted ${agents.length} agent(s)`);
   }
 
-  private convertToEditorJs(instructions: any): any | null {
+  private convertToEditorJs(instructions: unknown): EditorJsDocument | null {
     // If it's already Editor.js format (has blocks array), return as-is
-    if (instructions && typeof instructions === "object" && Array.isArray(instructions.blocks)) {
-      return instructions;
+    if (
+      instructions &&
+      typeof instructions === "object" &&
+      Array.isArray((instructions as { blocks?: unknown }).blocks)
+    ) {
+      return instructions as EditorJsDocument;
     }
 
     // If it's a string, convert to a simple paragraph
@@ -117,11 +140,11 @@ export class MigrateInstructionsToEditorJs1760800000000 implements MigrationInte
     // If it's the legacy array format with id, level, instructions
     if (Array.isArray(instructions) && instructions.length > 0) {
       // Group items by level to create a hierarchical structure
-      const blocks: any[] = [];
+      const blocks: EditorJsBlock[] = [];
       let currentListItems: string[] = [];
       let currentLevel = 0;
 
-      for (const item of instructions) {
+      for (const item of instructions as LegacyInstructionItem[]) {
         if (!item.instructions) continue;
 
         const level = item.level || 0;
