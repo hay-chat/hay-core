@@ -164,7 +164,6 @@ export default defineHayPlugin((globalCtx) => ({
         "read_products",
         "read_inventory",
         "read_fulfillments",
-        "write_fulfillments",
       ],
       clientId: ctx.config.field("clientId"),
       clientSecret: ctx.config.field("clientSecret"),
@@ -248,22 +247,30 @@ export default defineHayPlugin((globalCtx) => ({
         return;
       }
     } else {
-      // Self-hosted: run the client-credentials grant for a fresh token.
-      const creds = readSelfHostedCredentials(ctx);
-      if (!creds) {
-        ctx.logger.info("Shopify self-hosted: credentials missing — MCP not started.");
-        return;
-      }
-      try {
-        const token = await clientCredentialsGrant(
-          creds.shopDomain,
-          creds.clientId,
-          creds.clientSecret,
-        );
-        accessToken = token.accessToken;
-      } catch (error) {
-        ctx.logger.error("Failed to obtain Shopify access token on start", error);
-        return; // Stay installed but degraded; the cron will retry.
+      // Self-hosted: an OAuth connect stores a non-expiring offline token in
+      // authState (which Core merges into config) — and that connect clobbers
+      // the stored clientSecret, so prefer the token when it exists. Fall back
+      // to the client-credentials grant for secret-only setups.
+      accessToken = ctx.config.getOptional<string>("accessToken");
+      if (!accessToken) {
+        const creds = readSelfHostedCredentials(ctx);
+        if (!creds) {
+          ctx.logger.info(
+            "Shopify self-hosted: no access token and credentials missing — MCP not started.",
+          );
+          return;
+        }
+        try {
+          const token = await clientCredentialsGrant(
+            creds.shopDomain,
+            creds.clientId,
+            creds.clientSecret,
+          );
+          accessToken = token.accessToken;
+        } catch (error) {
+          ctx.logger.error("Failed to obtain Shopify access token on start", error);
+          return; // Stay installed but degraded; the cron will retry.
+        }
       }
     }
 

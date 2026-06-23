@@ -211,6 +211,42 @@ export async function storeToolsInConfig(instanceId: string, tools: MCPTool[]): 
 }
 
 /**
+ * Read the raw tool descriptors persisted in a plugin instance's config (the
+ * durable cache written by storeToolsInConfig when a worker last ran), grouped
+ * by their MCP serverId.
+ *
+ * Listing/enabling tools must not depend on a live worker: the inactivity
+ * reaper stops idle workers, and a freshly-started worker writes its tool cache
+ * asynchronously. Reading the cache decouples tool discovery from worker state.
+ * The worker is only required to actually EXECUTE a tool.
+ */
+export function getCachedToolDescriptors(
+  config: Record<string, unknown> | null | undefined,
+): Array<{ serverId: string; name: string; description: string; input_schema: unknown }> {
+  const localServers = (config as PluginToolsConfig | null | undefined)?.mcpServers?.local ?? [];
+  const descriptors: Array<{
+    serverId: string;
+    name: string;
+    description: string;
+    input_schema: unknown;
+  }> = [];
+
+  for (const server of localServers) {
+    const serverId = server.serverId || "default";
+    for (const tool of server.tools ?? []) {
+      descriptors.push({
+        serverId,
+        name: tool.name,
+        description: tool.description,
+        input_schema: tool.input_schema,
+      });
+    }
+  }
+
+  return descriptors;
+}
+
+/**
  * Fetch and store tools from a running plugin worker
  *
  * Main entry point - fetches tools from worker and stores in database.
