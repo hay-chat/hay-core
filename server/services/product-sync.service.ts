@@ -106,7 +106,6 @@ export class ProductSyncService {
 
     return AppDataSource.transaction(async (manager) => {
       const productRepo = manager.getRepository(Product);
-      const variantRepo = manager.getRepository(ProductVariant);
 
       const existing = await productRepo.findOne({
         where: { organizationId, source, externalId: canonical.externalId },

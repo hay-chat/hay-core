@@ -729,8 +729,8 @@ export class AuditLogService {
     userId: string | undefined,
     organizationId: string,
     productId: string,
-    data: Record<string, any>,
-    metadata?: Record<string, any>,
+    data: Record<string, unknown>,
+    metadata?: Record<string, unknown>,
   ): Promise<AuditLog> {
     return this.log({
       userId,
@@ -748,7 +748,7 @@ export class AuditLogService {
     userId: string | undefined,
     organizationId: string,
     productId: string,
-    metadata?: Record<string, any>,
+    metadata?: Record<string, unknown>,
   ): Promise<AuditLog> {
     return this.log({
       userId,
@@ -767,7 +767,7 @@ export class AuditLogService {
     organizationId: string,
     source: string,
     counts: { upserted: number; errors: number },
-    metadata?: Record<string, any>,
+    metadata?: Record<string, unknown>,
   ): Promise<AuditLog> {
     return this.log({
       userId,
