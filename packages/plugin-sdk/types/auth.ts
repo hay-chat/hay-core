@@ -6,7 +6,7 @@
  * @module @hay/plugin-sdk/types/auth
  */
 
-import type { ConfigFieldReference } from './config';
+import type { ConfigFieldReference } from "./config";
 
 /**
  * API Key authentication options.
@@ -158,7 +158,19 @@ export interface OAuth2AuthOptions {
    */
   clientSecret: ConfigFieldReference;
 
-  // Future: PKCE, redirect paths, custom parameters, etc.
+  /**
+   * Extra static query parameters to append to the authorization URL (optional).
+   *
+   * @remarks
+   * Merged into the authorize URL by the platform. Reserved security parameters
+   * (client_id, redirect_uri, response_type, state, scope, optional_scope,
+   * code_challenge, code_challenge_method) cannot be overridden and are skipped.
+   *
+   * @example { config_id: "123456789" }
+   */
+  authorizationParams?: Record<string, string>;
+
+  // Future: PKCE, redirect paths, etc.
 }
 
 /**

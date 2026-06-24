@@ -1,5 +1,7 @@
 import { pluginInstanceRepository } from "../repositories/plugin-instance.repository";
 import { pluginRegistryRepository } from "../repositories/plugin-registry.repository";
+import { pluginWebhookRouteRepository } from "../repositories/plugin-webhook-route.repository";
+import { pluginManagerService } from "./plugin-manager.service";
 import { oauthStateService } from "./oauth-state.service";
 import { resolveConfigWithEnv } from "../lib/config-resolver";
 import { getApiUrl } from "../config/env";
@@ -171,6 +173,7 @@ export class OAuthService {
       scopes: oauth2Method.scopes || [],
       optionalScopes: oauth2Method.optionalScopes,
       pkce: true, // Always use PKCE for security
+      authorizationParams: oauth2Method.authorizationParams,
     };
 
     // Get client credentials from plugin instance using config resolver with env fallback
@@ -270,6 +273,31 @@ export class OAuthService {
     if (codeChallenge) {
       params.append("code_challenge", codeChallenge);
       params.append("code_challenge_method", "S256");
+    }
+
+    // Merge plugin-declared extra authorize params (e.g. config_id), skipping any
+    // reserved security keys so a plugin cannot override them.
+    if (oauthConfig.authorizationParams) {
+      const reservedParams = new Set([
+        "client_id",
+        "redirect_uri",
+        "response_type",
+        "state",
+        "scope",
+        "optional_scope",
+        "code_challenge",
+        "code_challenge_method",
+      ]);
+      for (const [key, value] of Object.entries(oauthConfig.authorizationParams)) {
+        if (reservedParams.has(key) || params.has(key)) {
+          logger.warn(
+            { pluginId, param: key },
+            "Skipping reserved/duplicate authorizationParam from plugin",
+          );
+          continue;
+        }
+        params.append(key, value);
+      }
     }
 
     // Convert to string and replace + with %20 for proper URL encoding (RFC 3986)
@@ -449,6 +477,12 @@ export class OAuthService {
       logger.debug({ scopes: allScopes }, "Storing tokens in database");
       await this.storeTokens(organizationId, pluginId, tokens, allScopes);
       logger.info("Tokens stored successfully");
+
+      // Run the plugin's optional onConnected lifecycle hook. The plugin (not
+      // core) performs any provider call it needs with the fresh credentials and
+      // returns opaque routing keys for core to persist. Failures here must NOT
+      // fail the OAuth callback — log and continue.
+      await this.runOnConnected(organizationId, pluginId);
 
       logger.debug({ organizationId }, `OAuth callback successful for plugin ${pluginId}`);
 
@@ -630,6 +664,80 @@ export class OAuthService {
       logger.debug("New plugin instance created");
     }
     logger.info({ pluginId, organizationId }, "OAuth tokens stored successfully");
+  }
+
+  /**
+   * Run the plugin's optional `onConnected` lifecycle hook and persist any
+   * routing keys it returns.
+   *
+   * Core stays plugin-agnostic: it starts the worker, POSTs the freshly-stored
+   * auth state to the worker's `/on-connected` endpoint, and persists whatever
+   * opaque strings the plugin returns. Any failure is swallowed (logged) so the
+   * OAuth callback always succeeds.
+   */
+  private async runOnConnected(organizationId: string, pluginId: string): Promise<void> {
+    try {
+      // Reload the instance to get its id + freshly-stored (decrypted) auth state.
+      const instance = await pluginInstanceRepository.findByOrgAndPlugin(organizationId, pluginId);
+      if (!instance || !instance.authState) {
+        logger.debug(
+          { pluginId, organizationId },
+          "No instance/authState for onConnected, skipping",
+        );
+        return;
+      }
+
+      const worker = await pluginManagerService.startPluginWorker(organizationId, pluginId);
+
+      const response = await fetch(`http://localhost:${worker.port}/on-connected`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          config: instance.config ?? {},
+          authState: instance.authState,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        logger.warn(
+          { pluginId, organizationId, status: response.status, errorText },
+          "onConnected hook returned non-OK status, skipping route persistence",
+        );
+        return;
+      }
+
+      const result = (await response.json()) as { routingKeys?: unknown };
+      const routingKeys = Array.isArray(result?.routingKeys)
+        ? result.routingKeys.filter((k): k is string => typeof k === "string" && k.length > 0)
+        : [];
+
+      if (routingKeys.length === 0) {
+        logger.debug({ pluginId, organizationId }, "onConnected returned no routing keys");
+        return;
+      }
+
+      await pluginWebhookRouteRepository.upsertRoutes(
+        pluginId,
+        organizationId,
+        instance.id,
+        routingKeys,
+      );
+
+      logger.info(
+        { pluginId, organizationId, routingKeyCount: routingKeys.length },
+        "Persisted routing keys from onConnected hook",
+      );
+    } catch (error) {
+      logger.warn(
+        {
+          err: error instanceof Error ? error : new Error(String(error)),
+          pluginId,
+          organizationId,
+        },
+        "onConnected hook failed; continuing OAuth callback without routing keys",
+      );
+    }
   }
 
   /**

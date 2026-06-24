@@ -31,6 +31,7 @@ export interface OAuthManifestConfig {
   pkce?: boolean;
   clientIdEnvVar?: string; // Defaults to {PLUGIN_ID}_OAUTH_CLIENT_ID
   clientSecretEnvVar?: string; // Defaults to {PLUGIN_ID}_OAUTH_CLIENT_SECRET (optional for CIMD)
+  authorizationParams?: Record<string, string>; // Extra static query params merged into the authorize URL (reserved keys skipped)
 }
 
 export interface OAuthConnectionStatus {

@@ -16,6 +16,7 @@ export type { HayPluginDefinition, HayPluginFactory } from "./plugin";
 export type {
   OnInitializeHook,
   OnStartHook,
+  OnConnectedHook,
   OnValidateAuthHook,
   OnConfigUpdateHook,
   OnDisableHook,
@@ -29,6 +30,7 @@ export type {
 export type {
   HayGlobalContext,
   HayStartContext,
+  HayConnectedContext,
   HayAuthValidationContext,
   HayConfigUpdateContext,
   HayDisableContext,
@@ -93,6 +95,17 @@ export type { UIExtensionDescriptor, PluginPage } from "./ui";
 // ============================================================================
 
 export type { HayRegisterAPI, UIRegistrationAPI } from "./register";
+
+// ============================================================================
+// Webhook Routing (shared-app fan-out)
+// ============================================================================
+
+export type {
+  WebhookSignatureDescriptor,
+  WebhookVerificationChallengeDescriptor,
+  WebhookRouteKeyPathDescriptor,
+  WebhookRoutingDescriptor,
+} from "./webhook-routing";
 
 // ============================================================================
 // Cron Jobs (HAY-221)
