@@ -285,6 +285,25 @@ const jobRegistry: CronJobConfig[] = [
   },
 
   // ============================================================
+  // PRODUCT SOURCE SYNC
+  // ============================================================
+  {
+    name: "product-source-sync",
+    description: "Keep product-source plugin workers alive so they re-sync catalogs",
+    schedule: 900000, // Every 15 minutes
+    handler: async () => {
+      const { productSourceCoordinator } = await import("./product-source-coordinator.service");
+      await productSourceCoordinator.syncAllOrgs();
+    },
+    singleton: true,
+    enabled: true,
+    timeout: 600000, // 10 minutes max
+    retryOnFailure: true,
+    maxRetries: 2,
+    skipDatabaseLogging: true,
+  },
+
+  // ============================================================
   // FUTURE JOBS (Disabled for now)
   // ============================================================
   // {

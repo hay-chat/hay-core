@@ -1,0 +1,27 @@
+{
+  "products": {
+    "title": "Products",
+    "description": "Catalog mirrored from your ecommerce platforms. The agent recommends from these in shopping conversations.",
+    "browseMarketplace": "Browse Marketplace",
+    "loading": "Loading products…",
+    "loadMore": "Load more",
+    "inStock": "In stock",
+    "outOfStock": "Out of stock",
+    "summary": "{total} product(s) · {embeddings} embedding(s)",
+    "search": {
+      "label": "Search catalog",
+      "placeholder": "Search by title or handle",
+      "apply": "Apply"
+    },
+    "filters": {
+      "source": "Source",
+      "availability": "Availability",
+      "allSources": "All sources",
+      "any": "Any"
+    },
+    "empty": {
+      "title": "No products yet",
+      "description": "Enable a product-source plugin (e.g. Shopify) or POST to the public ingestion API to mirror your catalog."
+    }
+  }
+}

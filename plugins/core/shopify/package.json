@@ -2,7 +2,7 @@
   "name": "hay-plugin-shopify",
   "version": "1.0.0",
   "type": "module",
-  "description": "Connect your Shopify store (self-hosted Dev Dashboard app) — Hay handles the 24h access-token refresh automatically",
+  "description": "Connect your Shopify store — Hay handles auth (managed OAuth or self-hosted), exposes Admin API tools via MCP, and syncs your catalog so the agent can recommend real products.",
   "author": "Hay",
   "main": "dist/index.js",
   "hay-plugin": {
@@ -12,7 +12,8 @@
     "capabilities": [
       "mcp",
       "auth",
-      "cron"
+      "cron",
+      "products"
     ],
     "env": [
       "SHOPIFY_OAUTH_CLIENT_ID",

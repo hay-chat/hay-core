@@ -6,7 +6,12 @@ import { createLogger } from "@server/lib/logger";
 const logger = createLogger("audit-log");
 
 export interface AuditLogOptions {
-  userId: string;
+  /**
+   * User performing the action. Optional for system-driven events
+   * (e.g. scheduled syncs, plugin workers) — the audit log row stores
+   * a nullable user reference.
+   */
+  userId?: string;
   organizationId?: string;
   action: AuditAction;
   resource?: string;
@@ -714,6 +719,62 @@ export class AuditLogService {
       changes: {
         documentId,
       },
+      metadata,
+      status: "success",
+    });
+  }
+
+  /** Log product upsert (create or update — pass `created` in metadata to disambiguate). */
+  async logProductUpsert(
+    userId: string | undefined,
+    organizationId: string,
+    productId: string,
+    data: Record<string, unknown>,
+    metadata?: Record<string, unknown>,
+  ): Promise<AuditLog> {
+    return this.log({
+      userId,
+      organizationId,
+      action: metadata?.created ? "product.create" : "product.update",
+      resource: "product",
+      changes: { productId, ...data },
+      metadata,
+      status: "success",
+    });
+  }
+
+  /** Log product deletion. */
+  async logProductDelete(
+    userId: string | undefined,
+    organizationId: string,
+    productId: string,
+    metadata?: Record<string, unknown>,
+  ): Promise<AuditLog> {
+    return this.log({
+      userId,
+      organizationId,
+      action: "product.delete",
+      resource: "product",
+      changes: { productId },
+      metadata,
+      status: "success",
+    });
+  }
+
+  /** Log a bulk sync run (initial bulk import or scheduled re-sync). */
+  async logProductSync(
+    userId: string | undefined,
+    organizationId: string,
+    source: string,
+    counts: { upserted: number; errors: number },
+    metadata?: Record<string, unknown>,
+  ): Promise<AuditLog> {
+    return this.log({
+      userId,
+      organizationId,
+      action: "product.sync",
+      resource: "product",
+      changes: { source, ...counts },
       metadata,
       status: "success",
     });

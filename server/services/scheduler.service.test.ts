@@ -343,8 +343,13 @@ describe("SchedulerService", () => {
     });
 
     it("should force shutdown after timeout", async () => {
+      // Force-shutdown abandons the running job, so its timer would outlive the
+      // test and leak an open handle. Keep the id to clear it after asserting.
+      let jobTimer: NodeJS.Timeout | undefined;
       const handler = jest.fn().mockImplementation(async () => {
-        await new Promise((resolve) => setTimeout(resolve, 5000)); // Takes 5 seconds
+        await new Promise((resolve) => {
+          jobTimer = setTimeout(resolve, 5000); // Takes 5 seconds
+        });
       });
 
       scheduler.registerJob({
@@ -364,6 +369,9 @@ describe("SchedulerService", () => {
 
       // Shutdown should not wait the full 5 seconds
       expect(duration).toBeLessThan(1000);
+
+      // Clear the abandoned timer so it doesn't keep the event loop alive.
+      if (jobTimer) clearTimeout(jobTimer);
     });
   });
 

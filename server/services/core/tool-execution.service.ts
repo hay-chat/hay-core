@@ -211,7 +211,15 @@ export class ToolExecutionService {
   ): Promise<unknown> {
     const { tool_name: fullToolName, arguments: toolArgs } = toolCall;
 
-    logger.debug({ fullToolName, toolArgs }, "Executing MCP tool");
+    logger.debug({ fullToolName, toolArgs }, "Executing tool");
+
+    // Core tools — unprefixed names handled in-process. The absence of a
+    // colon is the natural dispatch fork between core and plugin/MCP tools.
+    const { coreToolRegistry } = await import("./core-tools");
+    if (coreToolRegistry.has(fullToolName)) {
+      logger.debug({ fullToolName }, "Dispatching to core tool");
+      return coreToolRegistry.execute(fullToolName, conversation, toolArgs ?? {});
+    }
 
     // Parse the tool name to extract plugin and tool parts
     // Expected format: "{pluginId}:{toolName}"

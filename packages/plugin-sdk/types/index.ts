@@ -124,3 +124,19 @@ export type {
   PluginCategory,
   PluginCapability,
 } from "./manifest";
+
+// ============================================================================
+// Products / Catalog Sync
+// ============================================================================
+
+export type {
+  ProductStatusName,
+  VariantAvailabilityName,
+  CanonicalCategory,
+  CanonicalOption,
+  CanonicalImage,
+  CanonicalSelectedOption,
+  CanonicalVariant,
+  CanonicalProduct,
+  HayProductSourceRuntimeAPI,
+} from "./products";

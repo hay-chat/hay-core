@@ -493,7 +493,12 @@ export class ConversationRepository extends BaseRepository<Conversation> {
     return await messageRepository.find({
       where: {
         conversation_id: conversationId,
-        type: In([MessageType.CUSTOMER, MessageType.BOT_AGENT, MessageType.HUMAN_AGENT]),
+        type: In([
+          MessageType.CUSTOMER,
+          MessageType.BOT_AGENT,
+          MessageType.HUMAN_AGENT,
+          MessageType.PRODUCT_RECOMMENDATION,
+        ]),
         deliveryState: DeliveryState.SENT, // Only include approved/sent messages
       },
       order: { created_at: "ASC" },

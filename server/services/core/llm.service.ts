@@ -335,6 +335,7 @@ export class LLMService {
         case MessageType.HUMAN_AGENT:
         case MessageType.BOT_AGENT:
         case MessageType.TOOL:
+        case MessageType.PRODUCT_RECOMMENDATION:
         default:
           role = "assistant";
           break;

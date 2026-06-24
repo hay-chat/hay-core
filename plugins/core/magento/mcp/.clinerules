@@ -1,0 +1,81 @@
+# Cline Rules for Magento 2 MCP Server
+
+## Project Structure
+- The main server implementation is in `mcp-server.js`
+- The test client is in `test-mcp-server.js`
+- Memory Bank files are stored in the `memory-bank` directory
+
+## Coding Patterns
+- Use camelCase for variable and function names
+- Use PascalCase for class names
+- Use UPPER_SNAKE_CASE for constants
+- Use async/await for asynchronous operations
+- Use try/catch blocks for error handling
+- Use the zod library for input validation
+- Use the axios library for HTTP requests
+- Use the dotenv library for environment variables
+
+## MCP Tool Implementation Pattern
+When implementing a new MCP tool, follow this pattern:
+```javascript
+server.tool(
+  "tool_name",
+  "Tool description",
+  {
+    param1: z.string().describe("Parameter 1 description"),
+    param2: z.number().optional().describe("Parameter 2 description")
+  },
+  async ({ param1, param2 }) => {
+    try {
+      // Implementation
+      return {
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify(result, null, 2)
+          }
+        ]
+      };
+    } catch (error) {
+      return {
+        content: [
+          {
+            type: "text",
+            text: `Error: ${error.message}`
+          }
+        ],
+        isError: true
+      };
+    }
+  }
+);
+```
+
+## Date Handling
+- Use ISO 8601 format (YYYY-MM-DD) for date representation
+- Implement a date parser that can handle relative date expressions
+- Use the date-fns library for date manipulation
+
+## Error Handling
+- Always wrap API calls in try/catch blocks
+- Return detailed error messages to the client
+- Log errors to the console for debugging
+- Include the original error message in the response
+
+## Response Formatting
+- Use JSON.stringify with null, 2 for pretty-printing JSON responses
+- Include metadata about the query in the response
+- Format numbers with appropriate precision
+- Format dates in a human-readable format
+
+## Testing
+- Use the test client to verify tool functionality
+- Test with various input parameters
+- Test error handling
+- Test with edge cases
+
+## Documentation
+- Document all tools with clear descriptions
+- Document all parameters with descriptions
+- Document the expected response format
+- Document any error conditions

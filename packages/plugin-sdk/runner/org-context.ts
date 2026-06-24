@@ -18,6 +18,7 @@ import { PluginRegistry } from "../sdk/registry.js";
 import { createConfigRuntimeAPI } from "../sdk/config-runtime.js";
 import { createAuthRuntimeAPI } from "../sdk/auth-runtime.js";
 import { createMcpRuntimeAPI } from "../sdk/mcp-runtime.js";
+import { createProductSourceRuntime } from "../sdk/product-source-runtime.js";
 import type { HayLogger } from "../types/index.js";
 import type { HayPluginManifest } from "../types/index.js";
 
@@ -88,11 +89,26 @@ export function createStartContext(
     },
   });
 
+  // Inject the product-source runtime API only when the plugin declares the
+  // `products` capability. The HAY_API_URL + HAY_API_TOKEN envs are already
+  // injected by core's plugin-runner.service.
+  const declaresProducts =
+    Array.isArray(manifest.capabilities) && manifest.capabilities.includes("products");
+  const productSourceAPI =
+    declaresProducts && process.env.HAY_API_URL && process.env.HAY_API_TOKEN
+      ? createProductSourceRuntime({
+          apiUrl: process.env.HAY_API_URL,
+          apiToken: process.env.HAY_API_TOKEN,
+          logger,
+        })
+      : undefined;
+
   return {
     org: orgData.org,
     config: configAPI,
     auth: authAPI,
     mcp: mcpAPI,
+    productSource: productSourceAPI,
     logger,
   };
 }

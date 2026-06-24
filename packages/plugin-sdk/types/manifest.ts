@@ -11,12 +11,16 @@
  *
  * Determines how the plugin is classified in the Hay marketplace.
  */
-export type PluginCategory = "integration" | "channel" | "tool" | "analytics";
+export type PluginCategory = "integration" | "channel" | "tool" | "analytics" | "products";
 
 /**
  * Plugin capabilities.
  *
  * Declares what features the plugin uses.
+ *
+ * - `products`: plugin ingests a merchant catalog (e.g. Shopify, Woo).
+ *   It receives a `HayProductSourceRuntimeAPI` on `HayStartContext` to
+ *   push CanonicalProduct payloads to core.
  */
 export type PluginCapability =
   | "routes"
@@ -27,6 +31,7 @@ export type PluginCapability =
   | "messages"
   | "customers"
   | "sources"
+  | "products"
   | "cron";
 
 /**

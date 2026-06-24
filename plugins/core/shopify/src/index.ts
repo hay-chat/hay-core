@@ -1,5 +1,6 @@
 /**
- * Shopify Plugin — HAY-219 (managed OAuth) + HAY-221 (self-hosted cron)
+ * Shopify Plugin — HAY-219 (managed OAuth) + HAY-221 (self-hosted cron) +
+ * presales catalog sync (product recommendations).
  *
  * Supports TWO connection modes, selected by the `authMode` config field:
  *
@@ -7,7 +8,7 @@
  *   hay.chat's Shopify App Store app with one click. Hay Core runs the
  *   authorization_code OAuth flow using the shared SHOPIFY_OAUTH_CLIENT_ID /
  *   SHOPIFY_OAUTH_CLIENT_SECRET server env credentials and stores a long-lived
- *   offline access token. `onStart` reads that token from `ctx.auth.get()`.
+ *   offline access token. `onStart` reads that token from config.
  *
  * - **Self-hosted** (`authMode = "self_hosted"`): the merchant creates their own
  *   Shopify Dev Dashboard app and pastes its Client ID + secret. The plugin runs
@@ -16,10 +17,22 @@
  * Both modes feed the same Shopify Admin GraphQL MCP server (`./mcp`), which only
  * ever sees SHOPIFY_SHOP + SHOPIFY_ACCESS_TOKEN + SHOPIFY_API_VERSION.
  *
+ * When the `products` capability is enabled, `onStart` also runs a background
+ * bulk catalog sync — paging Admin GraphQL Products and pushing CanonicalProduct
+ * batches to core via `ctx.productSource.upsert(...)` — so the agent's
+ * `recommend_products` tool can search the merchant's real catalog. Re-sync is
+ * driven by core's product-source coordinator, which keeps this worker alive and
+ * re-invokes `onStart` on its schedule.
+ *
  * @see https://shopify.dev/docs/apps/build/authentication-authorization
  */
 
 import { defineHayPlugin, type HayCronContext } from "@hay/plugin-sdk";
+import type {
+  CanonicalProduct,
+  CanonicalVariant,
+  HayProductSourceRuntimeAPI,
+} from "@hay/plugin-sdk";
 
 type AuthMode = "oauth" | "self_hosted";
 
@@ -93,6 +106,247 @@ function getAuthMode(ctx: {
   config: { getOptional: <T = unknown>(key: string) => T | undefined };
 }): AuthMode {
   return ctx.config.getOptional<AuthMode>("authMode") === "self_hosted" ? "self_hosted" : "oauth";
+}
+
+// ============================================================================
+// Catalog sync (products capability) — Admin GraphQL → CanonicalProduct
+// ============================================================================
+
+interface ShopifyVariantNode {
+  id: string;
+  title: string;
+  sku?: string | null;
+  barcode?: string | null;
+  price: string;
+  compareAtPrice?: string | null;
+  position?: number;
+  inventoryQuantity?: number | null;
+  inventoryPolicy?: string;
+  availableForSale?: boolean;
+  // Weight moved off ProductVariant in recent Admin API versions; it now lives
+  // under the variant's inventory item measurement.
+  inventoryItem?: {
+    measurement?: { weight?: { value?: number | null; unit?: string | null } | null } | null;
+  } | null;
+  selectedOptions?: Array<{ name: string; value: string }>;
+  image?: { url?: string } | null;
+}
+
+interface ShopifyProductNode {
+  id: string;
+  handle: string;
+  title: string;
+  descriptionHtml?: string | null;
+  vendor?: string | null;
+  productType?: string | null;
+  status?: "ACTIVE" | "DRAFT" | "ARCHIVED";
+  tags?: string[];
+  totalInventory?: number;
+  onlineStoreUrl?: string | null;
+  options?: Array<{ name: string; position: number; values: string[] }>;
+  images?: { edges: Array<{ node: { url: string; altText?: string | null } }> };
+  variants?: { edges: Array<{ node: ShopifyVariantNode }> };
+}
+
+const PRODUCTS_QUERY = /* GraphQL */ `
+  query Products($cursor: String) {
+    products(first: 50, after: $cursor) {
+      pageInfo {
+        hasNextPage
+        endCursor
+      }
+      edges {
+        node {
+          id
+          handle
+          title
+          descriptionHtml
+          vendor
+          productType
+          status
+          tags
+          totalInventory
+          onlineStoreUrl
+          options {
+            name
+            position
+            values
+          }
+          images(first: 10) {
+            edges {
+              node {
+                url
+                altText
+              }
+            }
+          }
+          variants(first: 100) {
+            edges {
+              node {
+                id
+                title
+                sku
+                barcode
+                price
+                compareAtPrice
+                position
+                inventoryQuantity
+                inventoryPolicy
+                availableForSale
+                inventoryItem {
+                  measurement {
+                    weight {
+                      value
+                      unit
+                    }
+                  }
+                }
+                selectedOptions {
+                  name
+                  value
+                }
+                image {
+                  url
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+`;
+
+async function shopifyGraphql<T>(
+  shop: string,
+  accessToken: string,
+  apiVersion: string,
+  query: string,
+  variables?: Record<string, unknown>,
+): Promise<T> {
+  const url = `https://${shop}/admin/api/${apiVersion}/graphql.json`;
+  const res = await fetch(url, {
+    method: "POST",
+    headers: {
+      "X-Shopify-Access-Token": accessToken,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ query, variables: variables ?? {} }),
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(`Shopify GraphQL HTTP ${res.status}: ${text || res.statusText}`);
+  }
+  const json = (await res.json()) as { data?: T; errors?: Array<{ message: string }> };
+  if (json.errors?.length) {
+    throw new Error(`Shopify GraphQL: ${json.errors.map((e) => e.message).join("; ")}`);
+  }
+  if (!json.data) throw new Error("Shopify GraphQL returned no data");
+  return json.data;
+}
+
+function mapVariant(node: ShopifyVariantNode): CanonicalVariant {
+  return {
+    externalId: node.id,
+    sku: node.sku ?? undefined,
+    barcode: node.barcode ?? undefined,
+    title: node.title || "Default",
+    selectedOptions: node.selectedOptions?.map((o) => ({ name: o.name, value: o.value })),
+    position: node.position,
+    price: node.price !== undefined ? parseFloat(node.price) : undefined,
+    compareAtPrice:
+      node.compareAtPrice !== undefined && node.compareAtPrice !== null
+        ? parseFloat(node.compareAtPrice)
+        : undefined,
+    inventoryQuantity: node.inventoryQuantity ?? undefined,
+    inventoryTracked: node.inventoryPolicy !== undefined && node.inventoryPolicy !== "deny",
+    availability:
+      node.availableForSale === false
+        ? "out_of_stock"
+        : node.inventoryQuantity !== undefined &&
+            node.inventoryQuantity !== null &&
+            node.inventoryQuantity <= 0
+          ? "out_of_stock"
+          : "in_stock",
+    weightValue: node.inventoryItem?.measurement?.weight?.value ?? undefined,
+    weightUnit: node.inventoryItem?.measurement?.weight?.unit ?? undefined,
+    imageSrc: node.image?.url ?? undefined,
+  };
+}
+
+function mapProduct(node: ShopifyProductNode): CanonicalProduct {
+  const variants = (node.variants?.edges ?? []).map((e) => mapVariant(e.node));
+  if (!variants.length) {
+    // Defensive fallback — Shopify products always have at least one variant in
+    // practice, but guard so the core's "variants required" contract holds.
+    variants.push({
+      externalId: `${node.id}::default`,
+      title: "Default",
+    });
+  }
+
+  return {
+    externalId: node.id,
+    // `source` is stamped by core from the authenticated plugin id — not set here.
+    handle: node.handle,
+    title: node.title,
+    descriptionHtml: node.descriptionHtml ?? undefined,
+    vendor: node.vendor ?? undefined,
+    productType: node.productType ?? undefined,
+    status:
+      node.status === "ACTIVE"
+        ? "active"
+        : node.status === "DRAFT"
+          ? "draft"
+          : node.status === "ARCHIVED"
+            ? "archived"
+            : "active",
+    tags: node.tags ?? [],
+    options: node.options?.map((o) => ({ name: o.name, position: o.position, values: o.values })),
+    images: (node.images?.edges ?? []).map((e, i) => ({
+      src: e.node.url,
+      alt: e.node.altText ?? undefined,
+      position: i,
+    })),
+    sourceUrl: node.onlineStoreUrl ?? undefined,
+    variants,
+  };
+}
+
+async function bulkSync(
+  shop: string,
+  accessToken: string,
+  apiVersion: string,
+  productSource: HayProductSourceRuntimeAPI,
+  logger: {
+    info: (msg: string, ctx?: Record<string, unknown>) => void;
+    error: (msg: string, ctx?: unknown) => void;
+  },
+): Promise<void> {
+  let cursor: string | undefined;
+  let total = 0;
+
+  do {
+    const data = await shopifyGraphql<{
+      products: {
+        pageInfo: { hasNextPage: boolean; endCursor: string };
+        edges: Array<{ node: ShopifyProductNode }>;
+      };
+    }>(shop, accessToken, apiVersion, PRODUCTS_QUERY, { cursor });
+
+    const batch = data.products.edges.map((e) => mapProduct(e.node));
+    if (batch.length) {
+      const result = await productSource.upsert(batch);
+      total += result.upserted;
+      if (result.errors > 0) {
+        logger.info("Shopify batch had errors", { errors: result.errors });
+      }
+    }
+
+    cursor = data.products.pageInfo.hasNextPage ? data.products.pageInfo.endCursor : undefined;
+  } while (cursor);
+
+  logger.info("Shopify bulk sync complete", { total });
 }
 
 export default defineHayPlugin((globalCtx) => ({
@@ -290,6 +544,23 @@ export default defineHayPlugin((globalCtx) => ({
     } catch (error) {
       ctx.logger.error("Failed to start Shopify MCP server", error);
       throw error;
+    }
+
+    // Products capability: mirror the catalog into core for `recommend_products`.
+    // Injected only when the manifest declares `products` and core supplied the
+    // plugin-api credentials. Runs in the background so it never blocks startup;
+    // core's product-source coordinator re-invokes onStart on its schedule.
+    if (ctx.productSource) {
+      const productSource = ctx.productSource;
+      void bulkSync(shop, accessToken, apiVersion, productSource, {
+        info: (msg, c) => ctx.logger.info(msg, c),
+        error: (msg, c) => ctx.logger.error(msg, c as Record<string, unknown> | undefined),
+      }).catch((err) => ctx.logger.error("Shopify catalog sync failed", err));
+    } else {
+      ctx.logger.info(
+        "Shopify: productSource runtime not available — skipping catalog sync " +
+          "(capability not negotiated or plugin-api credentials missing).",
+      );
     }
   },
 

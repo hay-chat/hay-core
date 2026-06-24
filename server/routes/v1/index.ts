@@ -24,6 +24,7 @@ import { pluginRouterRegistry } from "@server/services/plugin-router-registry.se
 import { pluginApiTrpcRouter } from "./plugin-api/trpc";
 import { gitConnectionsRouter } from "./git-connections";
 import { docsAuditRouter } from "./docs-audit";
+import { productsRouter } from "./products";
 
 // Core routers - always available
 const coreRouters = {
@@ -51,6 +52,7 @@ const coreRouters = {
   pluginApi: pluginApiTrpcRouter,
   gitConnections: gitConnectionsRouter,
   docsAudit: docsAuditRouter,
+  products: productsRouter,
 };
 
 // Create v1Router with core + plugin routers

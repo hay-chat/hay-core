@@ -14,3 +14,6 @@ export * from "./scheduled-job.entity";
 export * from "./scheduled-job-history.entity";
 export * from "./upload.entity";
 export * from "./auth-code.entity";
+export * from "./product.entity";
+export * from "./product-variant.entity";
+export * from "./product-embedding.entity";

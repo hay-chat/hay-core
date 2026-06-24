@@ -169,12 +169,31 @@ export class ExecutionLayer {
 
       const messages = await conversation.getMessages();
 
+      // Always-available core tools (e.g. recommend_products) get merged with
+      // the playbook-allowed tools. The planner sees the combined name list;
+      // the enabled_tools gate in run.ts exempts core tools so playbooks
+      // don't have to opt in.
+      const { coreToolRegistry } = await import("@server/services/core/core-tools");
+      const coreTools = coreToolRegistry.list();
+      const enabledTools = conversation.enabled_tools ?? [];
+      const allToolNames = [...enabledTools, ...coreTools.map((t) => t.name)];
+      const hasTools = allToolNames.length > 0;
+      const toolsDetail = coreTools.length
+        ? coreTools
+            .map(
+              (t) =>
+                `- ${t.name}: ${t.description}\n  input schema: ${JSON.stringify(t.inputSchema)}`,
+            )
+            .join("\n")
+        : "";
+
       // Get the prompt from PromptService
       const responsePrompt = await this.promptService.getPrompt(
         "execution/planner",
         {
-          hasTools: conversation.enabled_tools && conversation.enabled_tools.length > 0,
-          tools: conversation.enabled_tools?.join(", "),
+          hasTools,
+          tools: allToolNames.join(", "),
+          toolsDetail,
         },
         { conversationId: conversation.id, organizationId: conversation.organization_id },
       );
@@ -236,7 +255,7 @@ export class ExecutionLayer {
       const response = await this.llmService.invoke({
         history: messages, // Pass Message[] directly instead of converting to string
         prompt: finalPrompt,
-        jsonSchema: this.buildPlannerSchema(conversation.enabled_tools),
+        jsonSchema: this.buildPlannerSchema(allToolNames),
       });
 
       const result = JSON.parse(response) as ExecutionResult;
@@ -302,17 +321,19 @@ export class ExecutionLayer {
         }
 
         // Safety net behind the schema enum: a CALL_TOOL is only valid if the
-        // chosen name is in the conversation's enabled tools. Catches both
-        // malformed names the model may emit (e.g. a bare plugin id
+        // chosen name is in the allowed set — the conversation's enabled tools
+        // PLUS always-available core tools (e.g. recommend_products), which are
+        // built into core and never part of a playbook's enabled_tools. This
+        // mirrors the prompt's tool list and the enabled_tools gate in run.ts.
+        // Catches malformed names the model may emit (e.g. a bare plugin id
         // `hay-plugin-shopify` with the `:shopify_get_product` suffix dropped)
         // and the case where NO tools are enabled at all (e.g. the plugin's MCP
         // worker isn't running, so its tools never registered). Either way the
         // name would reach tool execution and surface as a hard 500; returning
         // null triggers a planner retry instead.
-        const enabledTools = conversation.enabled_tools ?? [];
-        if (!enabledTools.includes(result.tool.name)) {
+        if (!allToolNames.includes(result.tool.name)) {
           log.warn(
-            { toolName: result.tool.name, enabledTools },
+            { toolName: result.tool.name, allowedTools: allToolNames },
             "Invalid CALL_TOOL: tool name not in enabled tools — triggering retry",
           );
           return null; // Trigger retry

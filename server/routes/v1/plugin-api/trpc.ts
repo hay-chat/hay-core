@@ -10,6 +10,10 @@ import { organizationRepository } from "@server/repositories/organization.reposi
 import { pluginInstanceRepository } from "@server/repositories/plugin-instance.repository";
 import { MessageType } from "@server/database/entities/message.entity";
 import { mcpRegistryService } from "@server/services/mcp-registry.service";
+import { productSyncService } from "@server/services/product-sync.service";
+import { ProductStatus } from "@server/entities/product.entity";
+import { VariantAvailability } from "@server/entities/product-variant.entity";
+import type { CanonicalProduct } from "@server/types/canonical-product";
 import type {
   PluginInstanceConfig,
   LocalMCPServerConfig,
@@ -751,6 +755,100 @@ export const pluginApiTrpcRouter = router({
         serverId,
         toolsRegistered: input.tools.length,
       };
+    }),
+
+  /**
+   * Products Capability - Bulk upsert canonical products from a plugin adapter
+   *
+   * Called by product-source plugins (e.g. Shopify) from their `onStart` /
+   * webhook handlers via `ctx.productSource.upsert(...)`. Idempotent on
+   * (source, externalId). Returns counts so the worker can log progress.
+   */
+  "products.upsertMany": pluginProcedure
+    .input(
+      z.object({
+        products: z
+          .array(
+            z.object({
+              externalId: z.string().min(1),
+              handle: z.string().min(1),
+              title: z.string().min(1),
+              descriptionHtml: z.string().optional(),
+              descriptionShortHtml: z.string().optional(),
+              vendor: z.string().optional(),
+              productType: z.string().optional(),
+              status: z.nativeEnum(ProductStatus).optional(),
+              tags: z.array(z.string()).optional(),
+              categories: z.array(z.record(z.any())).optional(),
+              options: z.array(z.record(z.any())).optional(),
+              images: z.array(z.record(z.any())).optional(),
+              currency: z.string().optional(),
+              sourceUrl: z.string().optional(),
+              attributes: z.record(z.any()).optional(),
+              variants: z
+                .array(
+                  z.object({
+                    externalId: z.string().min(1),
+                    sku: z.string().optional(),
+                    barcode: z.string().optional(),
+                    title: z.string(),
+                    selectedOptions: z.array(z.record(z.any())).optional(),
+                    position: z.number().int().optional(),
+                    price: z.number().nonnegative().optional(),
+                    compareAtPrice: z.number().nonnegative().optional(),
+                    currency: z.string().optional(),
+                    inventoryQuantity: z.number().int().optional(),
+                    inventoryTracked: z.boolean().optional(),
+                    availability: z.nativeEnum(VariantAvailability).optional(),
+                    weightValue: z.number().optional(),
+                    weightUnit: z.string().optional(),
+                    imageSrc: z.string().optional(),
+                    attributes: z.record(z.any()).optional(),
+                  }),
+                )
+                .min(1),
+            }),
+          )
+          .min(1)
+          .max(500),
+      }),
+    )
+    .mutation(async ({ input, ctx }) => {
+      requireCapability(ctx, "products");
+      const { organizationId, pluginId } = ctx.pluginAuth;
+      // Core stamps the source from the authenticated plugin identity — the
+      // adapter never names itself, so it can't impersonate another source.
+      const result = await productSyncService.upsertProducts(
+        organizationId,
+        input.products as unknown as CanonicalProduct[],
+        pluginId,
+      );
+      return result;
+    }),
+
+  /**
+   * Products Capability - Delete a product by (source, externalId)
+   *
+   * Called from a plugin webhook handler when the upstream platform reports
+   * a deletion. Cascades to variants and product_embeddings via FK.
+   */
+  "products.delete": pluginProcedure
+    .input(
+      z.object({
+        externalId: z.string().min(1),
+      }),
+    )
+    .mutation(async ({ input, ctx }) => {
+      requireCapability(ctx, "products");
+      const { organizationId, pluginId } = ctx.pluginAuth;
+      // Source is the authenticated plugin id — a plugin can only delete its own
+      // products.
+      const removed = await productSyncService.deleteProductByExternalId(
+        organizationId,
+        pluginId,
+        input.externalId,
+      );
+      return { removed };
     }),
 });
 

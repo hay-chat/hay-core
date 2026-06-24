@@ -99,6 +99,17 @@ export type {
   UIExtensionDescriptor,
   HttpMethod,
   RouteHandler,
+
+  // Products
+  ProductStatusName,
+  VariantAvailabilityName,
+  CanonicalCategory,
+  CanonicalOption,
+  CanonicalImage,
+  CanonicalSelectedOption,
+  CanonicalVariant,
+  CanonicalProduct,
+  HayProductSourceRuntimeAPI,
 } from "../types/index.js";
 
 // ============================================================================

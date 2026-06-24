@@ -38,7 +38,25 @@
           </Badge>
         </div>
       </div>
+      <!-- Segmented layout: one bubble per image (text runs become bubbles too) -->
+      <template v-if="isSegmented">
+        <div
+          v-for="(segment, segmentIndex) in contentSegments"
+          :key="segmentIndex"
+          :class="[
+            'chat-message__bubble',
+            {
+              'chat-message__bubble--image': isImageSegment(segment),
+              'chat-message__bubble--pending': message.deliveryState === 'pending',
+              'chat-message__bubble--failed': message.deliveryState === 'failed',
+            },
+          ]"
+        >
+          <div class="chat-message__text" v-html="markdownToHtml(segment)" />
+        </div>
+      </template>
       <div
+        v-else
         :class="[
           'chat-message__bubble',
           {
@@ -83,6 +101,12 @@
             :http-status="message.metadata?.httpStatus"
             :latency="message.metadata?.toolLatencyMs"
             :executed-at="message.metadata?.toolExecutedAt"
+          />
+        </div>
+        <div v-else-if="message.type === 'ProductRecommendation'">
+          <ProductRecommendationCard
+            :products="message.metadata?.productRecommendation?.products || []"
+            :query="message.metadata?.productRecommendation?.query"
           />
         </div>
         <div v-else-if="message.type === 'System'">
@@ -439,6 +463,7 @@ import {
   MoreVertical,
 } from "lucide-vue-next";
 import { markdownToHtml } from "@/utils/markdownToHtml";
+import { splitMarkdownImages } from "@/utils/splitMarkdownImages";
 import { MessageStatus, type Message, MessageSentiment } from "@/types/message";
 
 interface Props {
@@ -462,6 +487,22 @@ const emit = defineEmits<{
   messageBlocked: [messageId: string];
   retry: [messageId: string];
 }>();
+
+// Split plain agent/customer text into one bubble per image. Only regular text
+// messages qualify — never the special types (Playbook/Document/Tool/System/
+// ProductRecommendation), the low-confidence fallback viewer, or messages
+// pending approval, so those keep their single-bubble layout.
+const SPLIT_EXCLUDED_TYPES = ["Playbook", "Document", "Tool", "ProductRecommendation", "System"];
+const contentSegments = computed(() => splitMarkdownImages(props.message.content || ""));
+const isImageSegment = (segment: string): boolean =>
+  /^!\[[^\]]*\]\([^)]*\)\s*$/.test(segment.trim());
+const isSegmented = computed(
+  () =>
+    !SPLIT_EXCLUDED_TYPES.includes(props.message.type) &&
+    !props.message.metadata?.originalMessage &&
+    props.message.status !== MessageStatus.PENDING &&
+    contentSegments.value.length > 1,
+);
 
 // Approval dialog state
 const showApprovalDialog = ref(false);
@@ -664,6 +705,42 @@ const getConfidenceIcon = (tier: string | undefined) => {
   padding: 0.5rem 1rem;
 }
 
+/* Stacked segment bubbles (one per image) read as separate messages. */
+.chat-message__bubble + .chat-message__bubble {
+  margin-top: 0.375rem;
+}
+
+/* Image-only bubbles: no padding, a 4px blue border, blue background.
+   Capped at 2/3 of the normal message max-width (60ch). */
+.chat-message__bubble--image {
+  padding: 0;
+  border: 4px solid var(--color-blue-700);
+  background-color: var(--color-blue-700);
+  max-width: 40ch;
+  /* Follow the message's side (mirrors the flex-direction rules above).
+     Default (agent) messages are right-aligned, so push the narrower image
+     bubble to the right. */
+  margin-left: auto;
+  margin-right: 0;
+}
+
+/* Left-aligned messages (Customer, or inverted) → image bubble to the left. */
+.chat-message--Customer .chat-message__bubble--image,
+.chat-message--inverted .chat-message__bubble--image {
+  margin-left: 0;
+  margin-right: auto;
+}
+
+/* Inverted Customer flips back to right-aligned. */
+.chat-message--inverted.chat-message--Customer .chat-message__bubble--image {
+  margin-left: auto;
+  margin-right: 0;
+}
+
+.chat-message__bubble--image img {
+  border-radius: 0;
+}
+
 .chat-message__bubble--collapsed {
   max-height: 10rem;
   overflow: hidden;
@@ -776,6 +853,17 @@ const getConfidenceIcon = (tier: string | undefined) => {
   --bubble-fg: var(--color-red-700);
 }
 
+/* Product recommendation cards bring their own layout/colors — the bubble must
+   not paint a background or tint the inherited text (cards use color: inherit). */
+.chat-message--ProductRecommendation {
+  --bubble-bg: transparent;
+  --bubble-fg: var(--foreground);
+}
+
+.chat-message--ProductRecommendation .chat-message__bubble {
+  padding: 0;
+}
+
 /* Avatar */
 .chat-message__avatar {
   min-width: 2rem;
@@ -880,6 +968,14 @@ const getConfidenceIcon = (tier: string | undefined) => {
 
 .chat-message__text p:last-child {
   margin-bottom: 0;
+}
+
+/* Markdown images render as their own block, sized to the bubble. */
+.chat-message__text img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  border-radius: var(--border-radius-md);
 }
 
 .confidence-fallback-section__text {

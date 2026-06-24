@@ -1,0 +1,27 @@
+{
+  "products": {
+    "title": "Produtos",
+    "description": "Catálogo espelhado a partir das suas plataformas de e-commerce. O agente recomenda a partir destes em conversas de pré-venda.",
+    "browseMarketplace": "Ver Marketplace",
+    "loading": "Carregando produtos…",
+    "loadMore": "Carregar mais",
+    "inStock": "Em estoque",
+    "outOfStock": "Fora de estoque",
+    "summary": "{total} produto(s) · {embeddings} embedding(s)",
+    "search": {
+      "label": "Buscar catálogo",
+      "placeholder": "Buscar por título ou handle",
+      "apply": "Aplicar"
+    },
+    "filters": {
+      "source": "Origem",
+      "availability": "Disponibilidade",
+      "allSources": "Todas as origens",
+      "any": "Qualquer"
+    },
+    "empty": {
+      "title": "Sem produtos ainda",
+      "description": "Habilite um plugin de catálogo (ex.: Shopify) ou faça POST na API pública de ingestão para espelhar seu catálogo."
+    }
+  }
+}
