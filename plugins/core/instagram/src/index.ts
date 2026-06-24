@@ -11,12 +11,11 @@ import { deliverHandler } from "./deliver.js";
  *
  * Shared-app model: a single Hay-owned Meta app serves every org. App-level
  * values come from the CORE process environment (one app for all tenants):
- *   META_APP_ID, META_APP_SECRET   — OAuth client credentials
- *   META_LOGIN_CONFIG_ID           — Facebook Login for Business config_id
+ *   META_APP_ID, META_APP_SECRET   — Instagram app OAuth client credentials
  *   META_VERIFY_TOKEN              — webhook GET-challenge verify token
  *
  * Per-org config is essentially empty — an org just clicks "Connect Instagram"
- * and completes the Facebook Login for Business OAuth flow.
+ * and completes the Instagram Business Login OAuth flow.
  *
  * Routing: every org's events arrive at ONE shared webhook URL with no org id.
  * The plugin DECLARES (via `register.webhookRouting`) how Core should verify the
@@ -64,20 +63,21 @@ export default defineHayPlugin((globalCtx) => {
         },
       });
 
-      // OAuth via Facebook Login for Business. The `config_id` is REQUIRED by
-      // Login for Business and is passed as an extra authorize-URL param using
-      // the generic `authorizationParams` primitive added in Workstream A.
+      // OAuth via "Instagram API with Instagram Login" (Instagram Business
+      // Login). The authorize + token endpoints live on instagram.com /
+      // api.instagram.com (NOT facebook.com), no Facebook Page or config_id is
+      // involved, and scopes must be COMMA-separated (declared via the generic
+      // `scopeSeparator` primitive). The token exchange returns a short-lived IG
+      // user token; long-lived-token exchange/refresh is a follow-up.
       register.auth.oauth2({
         id: "instagram-oauth",
         label: "Connect Instagram",
-        authorizationUrl: "https://www.facebook.com/v21.0/dialog/oauth",
-        tokenUrl: "https://graph.facebook.com/v21.0/oauth/access_token",
+        authorizationUrl: "https://www.instagram.com/oauth/authorize",
+        tokenUrl: "https://api.instagram.com/oauth/access_token",
         scopes: ["instagram_business_basic", "instagram_business_manage_messages"],
+        scopeSeparator: ",",
         clientId: config.field("clientId"),
         clientSecret: config.field("clientSecret"),
-        authorizationParams: {
-          config_id: process.env.META_LOGIN_CONFIG_ID ?? "",
-        },
       });
 
       // Declare how Core should route the single shared webhook. Core verifies
@@ -173,6 +173,16 @@ export default defineHayPlugin((globalCtx) => {
       accessToken = token;
       graphClient = new GraphClient({ logger: ctx.logger });
 
+      // Ensure the connected account is subscribed to this app's webhooks.
+      // App-level field subscription alone does not deliver messages — the
+      // account must be subscribed via /me/subscribed_apps. Idempotent; failures
+      // are non-fatal (logged) so a transient Graph error never crashes startup.
+      void graphClient.subscribeToWebhooks(token).catch((error: unknown) => {
+        ctx.logger.warn("Instagram webhook subscription failed on start", {
+          error: error instanceof Error ? error.message : String(error),
+        });
+      });
+
       ctx.logger.info("Instagram plugin started", { orgId: ctx.org.id });
     },
 
@@ -209,6 +219,17 @@ export default defineHayPlugin((globalCtx) => {
       }
 
       const client = new GraphClient({ logger: ctx.logger });
+
+      // Subscribe the account to this app's webhooks so inbound DMs are
+      // delivered (separate from the dashboard field subscription). Non-fatal.
+      try {
+        await client.subscribeToWebhooks(token);
+      } catch (error: unknown) {
+        ctx.logger.warn("Instagram webhook subscription failed on connect", {
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+
       const routingKeys = await client.getConnectedAccountIds(token);
 
       ctx.logger.info("Instagram onConnected — resolved routing keys", {

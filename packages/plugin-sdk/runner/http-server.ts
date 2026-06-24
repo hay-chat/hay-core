@@ -199,6 +199,7 @@ export class PluginHttpServer {
                 clientId: method.clientId.name,
                 clientSecret: method.clientSecret.name,
                 authorizationParams: method.authorizationParams ?? {},
+                scopeSeparator: method.scopeSeparator,
               };
             }
           }),

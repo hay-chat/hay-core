@@ -37,10 +37,41 @@ interface MetaMessagingEvent {
   reaction?: unknown;
 }
 
+interface MetaChange {
+  field?: string;
+  value?: MetaMessagingEvent;
+}
+
 interface MetaEntry {
   id?: string;
   time?: number;
+  /** Messenger-style delivery (real-time IG DMs). */
   messaging?: MetaMessagingEvent[];
+  /** Field-subscription-style delivery (some IG-Login deliveries + Meta's test tool). */
+  changes?: MetaChange[];
+}
+
+/**
+ * Normalize an entry's events into a single list, tolerating BOTH shapes Meta
+ * uses for the `messages` field:
+ *   - `entry.messaging[]`              (Messenger-style real-time DMs)
+ *   - `entry.changes[].value` where    (field-subscription style; this is what
+ *     `field === "messages"`            Meta's webhook "Test" button sends)
+ * Either way we end up with `{ sender, recipient, message }` events.
+ */
+function collectMessagingEvents(entry: MetaEntry): MetaMessagingEvent[] {
+  const events: MetaMessagingEvent[] = [];
+  if (Array.isArray(entry.messaging)) {
+    events.push(...entry.messaging);
+  }
+  if (Array.isArray(entry.changes)) {
+    for (const change of entry.changes) {
+      if (change.field === "messages" && change.value && typeof change.value === "object") {
+        events.push(change.value);
+      }
+    }
+  }
+  return events;
 }
 
 /**
@@ -99,7 +130,7 @@ export async function webhookHandler(
 
     for (const entry of entries) {
       const igAccountId = entry.id;
-      const events: MetaMessagingEvent[] = Array.isArray(entry.messaging) ? entry.messaging : [];
+      const events = collectMessagingEvents(entry);
 
       for (const event of events) {
         const message = event.message;

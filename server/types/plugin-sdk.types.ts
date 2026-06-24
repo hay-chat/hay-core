@@ -235,6 +235,9 @@ export interface AuthMethodDescriptor {
 
   /** For OAuth2 auth: extra static query params appended to the authorize URL */
   authorizationParams?: Record<string, string>;
+
+  /** For OAuth2 auth: delimiter used to join scopes in the authorize URL (defaults to a space) */
+  scopeSeparator?: string;
 }
 
 /**

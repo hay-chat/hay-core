@@ -565,6 +565,11 @@ function validateOAuth2AuthOptions(options: OAuth2AuthOptions, registry: PluginR
       }
     }
   }
+
+  // Validate scopeSeparator (if provided)
+  if (options.scopeSeparator !== undefined && typeof options.scopeSeparator !== "string") {
+    throw new Error("OAuth2 auth scopeSeparator must be a string");
+  }
 }
 
 /**

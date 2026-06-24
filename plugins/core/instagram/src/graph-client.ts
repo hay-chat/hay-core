@@ -1,16 +1,17 @@
 import type { HayLogger } from "@hay/plugin-sdk/types";
 
 /**
- * Meta Graph API client for Instagram messaging (v21.0).
+ * Instagram Graph API client (Instagram API with Instagram Login, v21.0).
  *
- * Thin native-fetch wrapper around the handful of Graph endpoints this channel
- * needs:
- *   - getProfile        — resolve an Instagram-scoped sender id (PSID) to a
+ * This channel uses the Instagram Business Login flow, so all calls target
+ * `graph.instagram.com` (NOT `graph.facebook.com`) with the IG user access
+ * token. Thin native-fetch wrapper around the handful of endpoints we need:
+ *   - getProfile        — resolve an Instagram-scoped sender id (IGSID) to a
  *                         display name / username / avatar for the customer record.
  *   - sendText          — deliver an outbound text DM via /me/messages.
- *   - getConnectedAccountIds — resolve the IG business account id(s) backing the
- *                         freshly-stored access token, used as opaque webhook
- *                         routing keys in `onConnected`.
+ *   - getConnectedAccountIds — resolve the IG account id(s) backing the freshly
+ *                         stored access token, used as opaque webhook routing
+ *                         keys in `onConnected`.
  *
  * All calls go through a single `request` helper that throws a typed
  * `GraphApiError` carrying the HTTP status plus Meta's structured error
@@ -19,7 +20,7 @@ import type { HayLogger } from "@hay/plugin-sdk/types";
  */
 
 const GRAPH_VERSION = "v21.0";
-const GRAPH_BASE = `https://graph.facebook.com/${GRAPH_VERSION}`;
+const GRAPH_BASE = `https://graph.instagram.com/${GRAPH_VERSION}`;
 
 /**
  * Structured Meta Graph API error.
@@ -156,6 +157,8 @@ export class GraphClient {
    * Returns the provider message id.
    */
   async sendText(recipientPsid: string, text: string, accessToken: string): Promise<string> {
+    // Instagram messaging send: { recipient:{id}, message:{text} }. Unlike the
+    // Messenger Platform, Instagram does not use `messaging_type`.
     const data = await this.request<{ message_id?: string; recipient_id?: string }>(
       "POST",
       "/me/messages",
@@ -164,7 +167,6 @@ export class GraphClient {
         body: {
           recipient: { id: recipientPsid },
           message: { text },
-          messaging_type: "RESPONSE",
         },
       },
     );
@@ -177,60 +179,52 @@ export class GraphClient {
   }
 
   /**
-   * Resolve the Instagram business account id(s) backing the access token.
+   * Subscribe the connected Instagram account to this app's webhooks.
    *
-   * Two account shapes exist depending on how the org connected:
-   *   - Facebook Login for Business: the token is a Page token chain; each
-   *     managed Page may expose `instagram_business_account.id`. We page
-   *     /me/accounts and collect those ids.
-   *   - Instagram API with Instagram Login: GET /me?fields=user_id returns the
-   *     IG-scoped account id directly.
+   * REQUIRED for inbound messaging: subscribing the `messages` field at the app
+   * level (Meta dashboard) is NOT sufficient — each connected account must also
+   * be subscribed via `POST /me/subscribed_apps`, or Meta delivers nothing.
+   * Idempotent; safe to call on every connect/start.
+   */
+  async subscribeToWebhooks(accessToken: string): Promise<void> {
+    await this.request<{ success?: boolean }>("POST", "/me/subscribed_apps", accessToken, {
+      query: { subscribed_fields: "messages" },
+    });
+    this.logger.info("Instagram account subscribed to app webhooks (messages)");
+  }
+
+  /**
+   * Resolve the Instagram account id(s) backing the access token, used as
+   * opaque webhook routing keys.
    *
-   * Both are attempted defensively; any resolved ids are de-duplicated. Failures
-   * are logged and yield an empty array (callers must tolerate zero keys — the
-   * instance is reconciled later rather than failing the OAuth flow).
+   * `GET /me?fields=user_id,username` returns the connected IG account. We
+   * capture BOTH the node `id` and `user_id` because inbound messaging webhooks
+   * key `entry[].id` on the account id, and the two values can differ across IG
+   * id surfaces — storing both guarantees the inbound lookup matches whichever
+   * Meta sends. Failures are logged and yield an empty array (callers must
+   * tolerate zero keys — the instance is reconciled later rather than failing
+   * the OAuth flow).
    */
   async getConnectedAccountIds(accessToken: string): Promise<string[]> {
     const ids = new Set<string>();
 
-    // Path 1: Pages → instagram_business_account.id
     try {
-      const pages = await this.request<{
-        data?: Array<{ id?: string; instagram_business_account?: { id?: string } }>;
-      }>("GET", "/me/accounts", accessToken, {
-        query: { fields: "instagram_business_account" },
-      });
-
-      for (const page of pages.data ?? []) {
-        const igId = page.instagram_business_account?.id;
-        if (igId) {
-          ids.add(String(igId));
-        }
+      const me = await this.request<{ user_id?: string | number; id?: string | number }>(
+        "GET",
+        "/me",
+        accessToken,
+        { query: { fields: "user_id,username" } },
+      );
+      if (me.user_id !== undefined && me.user_id !== null) {
+        ids.add(String(me.user_id));
+      }
+      if (me.id !== undefined && me.id !== null) {
+        ids.add(String(me.id));
       }
     } catch (error: any) {
-      this.logger.warn("getConnectedAccountIds: /me/accounts lookup failed", {
+      this.logger.warn("getConnectedAccountIds: /me lookup failed", {
         error: error?.message,
       });
-    }
-
-    // Path 2: IG Login → /me?fields=user_id
-    if (ids.size === 0) {
-      try {
-        const me = await this.request<{ user_id?: string; id?: string }>(
-          "GET",
-          "/me",
-          accessToken,
-          { query: { fields: "user_id" } },
-        );
-        const userId = me.user_id ?? me.id;
-        if (userId) {
-          ids.add(String(userId));
-        }
-      } catch (error: any) {
-        this.logger.warn("getConnectedAccountIds: /me lookup failed", {
-          error: error?.message,
-        });
-      }
     }
 
     return Array.from(ids);

@@ -32,6 +32,7 @@ export interface OAuthManifestConfig {
   clientIdEnvVar?: string; // Defaults to {PLUGIN_ID}_OAUTH_CLIENT_ID
   clientSecretEnvVar?: string; // Defaults to {PLUGIN_ID}_OAUTH_CLIENT_SECRET (optional for CIMD)
   authorizationParams?: Record<string, string>; // Extra static query params merged into the authorize URL (reserved keys skipped)
+  scopeSeparator?: string; // Delimiter used to join scopes in the authorize URL (defaults to a space)
 }
 
 export interface OAuthConnectionStatus {

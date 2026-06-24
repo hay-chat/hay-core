@@ -174,6 +174,7 @@ export class OAuthService {
       optionalScopes: oauth2Method.optionalScopes,
       pkce: true, // Always use PKCE for security
       authorizationParams: oauth2Method.authorizationParams,
+      scopeSeparator: oauth2Method.scopeSeparator,
     };
 
     // Get client credentials from plugin instance using config resolver with env fallback
@@ -260,14 +261,16 @@ export class OAuthService {
       state: nonce,
     });
 
-    // Add required scopes
+    // Add required scopes. Most providers use a space delimiter (OAuth 2.0
+    // standard); some (e.g. Instagram Business Login) require a comma.
+    const scopeSeparator = oauthConfig.scopeSeparator ?? " ";
     if (oauthConfig.scopes && oauthConfig.scopes.length > 0) {
-      params.append("scope", oauthConfig.scopes.join(" "));
+      params.append("scope", oauthConfig.scopes.join(scopeSeparator));
     }
 
     // Add optional scopes as a separate parameter
     if (oauthConfig.optionalScopes && oauthConfig.optionalScopes.length > 0) {
-      params.append("optional_scope", oauthConfig.optionalScopes.join(" "));
+      params.append("optional_scope", oauthConfig.optionalScopes.join(scopeSeparator));
     }
 
     if (codeChallenge) {

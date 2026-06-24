@@ -170,6 +170,17 @@ export interface OAuth2AuthOptions {
    */
   authorizationParams?: Record<string, string>;
 
+  /**
+   * Delimiter used to join `scopes` in the authorization URL (optional).
+   *
+   * @remarks
+   * Defaults to a space (the OAuth 2.0 standard). Some providers require a
+   * comma instead — e.g. Instagram Business Login.
+   *
+   * @example ","
+   */
+  scopeSeparator?: string;
+
   // Future: PKCE, redirect paths, etc.
 }
 
