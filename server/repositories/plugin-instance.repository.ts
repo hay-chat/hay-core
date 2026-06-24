@@ -100,7 +100,12 @@ export class PluginInstanceRepository extends BaseRepository<PluginInstance> {
       relations: ["plugin", "organization"],
     });
     return rows.filter((instance) => {
-      const manifest = instance.plugin?.manifest as { capabilities?: string[] } | undefined;
+      // Stored manifests use the flat registry form where `capabilities` is a
+      // string[] (see RegistryManifest), which doesn't overlap the structured
+      // HayPluginManifest type on the entity — cast through unknown.
+      const manifest = instance.plugin?.manifest as unknown as
+        | { capabilities?: string[] }
+        | undefined;
       return Array.isArray(manifest?.capabilities) && manifest!.capabilities!.includes(capability);
     });
   }
