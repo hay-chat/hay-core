@@ -1,0 +1,29 @@
+{
+  "name": "Instagram",
+  "description": "Conecte uma conta profissional do Instagram e troque mensagens diretas pela IA da Hay",
+  "tools": {},
+  "config": {},
+  "setup": {
+    "title": "Guia de Configuração do Instagram",
+    "intro": "Conecte sua conta profissional do Instagram à Hay. Uma vez conectada, as mensagens diretas enviadas para sua conta são processadas pela IA da Hay, e as respostas são entregues diretamente na conversa do Instagram.",
+    "step1": {
+      "title": "Conecte sua conta do Instagram",
+      "body": "Clique no botão <strong>Conectar</strong> acima para entrar com o Login do Facebook para Empresas. Escolha a Página do Facebook e a conta profissional do Instagram vinculada que você deseja que a Hay gerencie e aprove as permissões solicitadas. A Hay armazena a conexão com segurança — sem tokens para copiar ou colar.",
+      "hint": "Você precisa de uma conta profissional do Instagram (Comercial ou Criador de conteúdo) vinculada a uma Página do Facebook que você administra."
+    },
+    "step2": {
+      "title": "Apenas mensagens de texto (MVP)",
+      "body": "Nesta primeira versão, a Hay processa apenas mensagens diretas de <strong>texto</strong>. Mídias recebidas (imagens, stories, reações) são ignoradas, e as respostas da Hay são enviadas como texto simples. O suporte a conteúdo rico chegará em uma atualização futura."
+    },
+    "step3": {
+      "title": "Responda em até 24 horas",
+      "body": "O Instagram só permite que empresas enviem uma resposta livre dentro de <strong>24 horas</strong> após a última mensagem do cliente. Após esse período, o cliente precisa enviar uma nova mensagem antes que a Hay possa responder."
+    },
+    "step4": {
+      "title": "Onde as mensagens aparecem",
+      "body": "Uma vez conectado, novas DMs do Instagram aparecem como conversas na sua caixa de entrada da Hay. O agente de IA atribuído ao canal do Instagram responde automaticamente.",
+      "hint": "Para atribuir um agente, vá em <strong>Configurações &rarr; Canais</strong> e selecione um agente para o canal do Instagram."
+    },
+    "windowNote": "<strong>Janela de mensagens de 24 horas:</strong> O Instagram exige que as empresas respondam dentro de 24 horas após a última mensagem do cliente. Após 24 horas, você deve aguardar o cliente enviar uma nova mensagem antes de responder."
+  }
+}
