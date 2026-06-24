@@ -19,18 +19,15 @@
       <div v-if="message.metadata?.isClosureMessage" class="hay-message__closure-badge">
         {{ t("chat.conversationClosed") }}
       </div>
-      <div
-        class="hay-message__content"
-        :class="{ 'hay-message__content--rich': message.sender === 'agent' }"
+      <!-- Product recommendation cards -->
+      <template
+        v-if="
+          message.agentType === 'ProductRecommendation' &&
+          message.metadata &&
+          Array.isArray((message.metadata as any).productRecommendation?.products)
+        "
       >
-        <!-- Product recommendation cards -->
-        <template
-          v-if="
-            message.agentType === 'ProductRecommendation' &&
-            message.metadata &&
-            Array.isArray((message.metadata as any).productRecommendation?.products)
-          "
-        >
+        <div class="hay-message__content hay-message__content--rich">
           <div class="hay-product-recs">
             <a
               v-for="p in (message.metadata as any).productRecommendation.products as any[]"
@@ -52,15 +49,28 @@
               </div>
             </a>
           </div>
-        </template>
-        <!-- Agent messages: animated word reveal or static markdown -->
-        <template v-else-if="message.sender === 'agent'">
-          <div v-if="animatingIds.has(message.id)" v-html="getAnimatedHtml(message.content)"></div>
-          <div v-else v-html="renderMarkdown(message.content)"></div>
-        </template>
-        <!-- User messages: plain text -->
-        <template v-else>{{ message.content }}</template>
-      </div>
+        </div>
+      </template>
+      <!-- Agent messages: one bubble per image segment (word-reveal only when a
+           single, image-free segment). -->
+      <template v-else-if="message.sender === 'agent'">
+        <div
+          v-for="(segment, i) in splitMarkdownImages(message.content)"
+          :key="i"
+          class="hay-message__content hay-message__content--rich"
+          :class="{ 'hay-message__content--image': isImageSegment(segment) }"
+        >
+          <div
+            v-if="animatingIds.has(message.id) && splitMarkdownImages(message.content).length === 1"
+            v-html="getAnimatedHtml(segment)"
+          ></div>
+          <div v-else v-html="renderMarkdown(segment)"></div>
+        </div>
+      </template>
+      <!-- User messages: plain text -->
+      <template v-else>
+        <div class="hay-message__content">{{ message.content }}</div>
+      </template>
       <div class="hay-message__time">
         {{ formatTime(message.timestamp) }}
       </div>
@@ -79,7 +89,7 @@
 <script setup lang="ts">
 import { ref, watch, nextTick, type Directive } from "vue";
 import type { Message } from "@/types";
-import { parseMarkdown, wrapWordsForAnimation } from "@/utils/markdown";
+import { parseMarkdown, wrapWordsForAnimation, splitMarkdownImages } from "@/utils/markdown";
 import { useI18n } from "@/i18n";
 
 const t = useI18n();
@@ -134,6 +144,9 @@ const vHeightAnimate: Directive<HTMLElement, boolean> = {
 const renderMarkdown = (content: string): string => {
   return parseMarkdown(content);
 };
+
+const isImageSegment = (segment: string): boolean =>
+  /^!\[[^\]]*\]\([^)]*\)\s*$/.test(segment.trim());
 
 const getAnimatedHtml = (content: string): string => {
   const parsed = parseMarkdown(content);
@@ -268,6 +281,31 @@ watch(
 .hay-message--agent .hay-message__content {
   color: var(--color-neutral-800);
   border-bottom-left-radius: 4px;
+}
+
+/* Stacked segment bubbles (one per image) read as separate messages. */
+.hay-message__content + .hay-message__content {
+  margin-top: 6px;
+}
+
+/* Markdown images render as their own block, sized to the bubble. */
+.hay-message__content--rich img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  border-radius: 8px;
+}
+
+/* Image-only bubbles: no padding, a 4px blue border, blue background. */
+.hay-message__content--image {
+  padding: 0;
+  border: 4px solid var(--hay-primary);
+  background: var(--hay-primary);
+  overflow: hidden;
+}
+
+.hay-message__content--image img {
+  border-radius: 0;
 }
 
 /* Markdown content styles (using since v-html bypasses scoped styles) */

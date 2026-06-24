@@ -24,6 +24,14 @@ export function parseMarkdown(text: string): string {
   // Italic *text* (not inside bold markers)
   html = html.replace(/(?<![*\\])\*([^*]+)\*(?!\*)/g, "<em>$1</em>");
 
+  // Images ![alt](url) — must run BEFORE links (an image contains link syntax).
+  // Only allow http/https; drop anything else.
+  html = html.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, (_, alt, url) => {
+    const safeUrl = url.replace(/&amp;/g, "&");
+    if (!/^https?:\/\//i.test(safeUrl)) return "";
+    return `<img src="${safeUrl}" alt="${alt}" loading="lazy" />`;
+  });
+
   // Links [text](url) — only allow http/https
   html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_, label, url) => {
     const safeUrl = url.replace(/&amp;/g, "&");
@@ -35,6 +43,36 @@ export function parseMarkdown(text: string): string {
   html = processBlocks(html);
 
   return html;
+}
+
+/**
+ * Split a markdown string into chunks so each image (`![alt](url)`) stands
+ * alone. Text runs between images become their own chunks. Lets the message
+ * list render an agent reply as multiple bubbles — one per image — instead of
+ * inlining images inside a single text bubble. Returns the original string as a
+ * single chunk when there are no images.
+ */
+const IMAGE_RE = /!\[[^\]]*\]\([^)]*\)/g;
+
+export function splitMarkdownImages(markdown: string): string[] {
+  if (!markdown) return [markdown];
+
+  const chunks: string[] = [];
+  let lastIndex = 0;
+  let match: RegExpExecArray | null;
+
+  IMAGE_RE.lastIndex = 0;
+  while ((match = IMAGE_RE.exec(markdown)) !== null) {
+    const before = markdown.slice(lastIndex, match.index).trim();
+    if (before) chunks.push(before);
+    chunks.push(match[0]);
+    lastIndex = match.index + match[0].length;
+  }
+
+  const tail = markdown.slice(lastIndex).trim();
+  if (tail) chunks.push(tail);
+
+  return chunks.length ? chunks : [markdown];
 }
 
 function processBlocks(html: string): string {
