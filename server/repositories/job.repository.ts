@@ -47,6 +47,26 @@ export class JobRepository {
       .getOne();
   }
 
+  /**
+   * Cancel every not-yet-terminal sync job for a document source. Called when
+   * the source is deleted so the 60s dispatcher / worker doesn't later pick up
+   * an orphaned job, fail to find the source, and log "DocumentSource not found".
+   * Returns the number of jobs cancelled.
+   */
+  async cancelSyncJobsForSource(documentSourceId: string): Promise<number> {
+    const result = await this.getRepository()
+      .createQueryBuilder()
+      .update(Job)
+      .set({ status: JobStatus.CANCELLED })
+      .where("data->>'type' = :type", { type: "document_source_sync" })
+      .andWhere("data->>'documentSourceId' = :id", { id: documentSourceId })
+      .andWhere("status IN (:...statuses)", {
+        statuses: [JobStatus.PENDING, JobStatus.QUEUED, JobStatus.PROCESSING],
+      })
+      .execute();
+    return result.affected ?? 0;
+  }
+
   async findByOrganization(organizationId: string): Promise<Job[]> {
     return await this.getRepository().find({
       where: { organizationId },
