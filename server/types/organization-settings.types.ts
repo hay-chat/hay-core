@@ -309,7 +309,6 @@ export interface OrganizationSettings {
   companyDomain?: string; // Company's business domain/industry for context
   companyInterestGuardrail?: CompanyInterestGuardrailConfig; // Stage 1: Company interest protection
   confidenceGuardrail?: ConfidenceGuardrailConfig; // Stage 2: Fact grounding
-  channelAgents?: Record<string, string>; // Channel-specific agent assignments (channel -> agentId)
   retentionDays?: number | null; // Data retention period in days (null = disabled/forever)
   isPlayground?: boolean; // Enables playground mode for public conversations (demo orgs only)
   llm?: OrgLlmConfig; // Per-org LLM chat provider + tier→model map (embeddings stay managed)

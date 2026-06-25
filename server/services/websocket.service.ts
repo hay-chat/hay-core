@@ -171,6 +171,10 @@ export class WebSocketService {
     if (type === "message_received" && conversationId) {
       const messagePayload = {
         type: "message",
+        // Include the conversation id so dashboard clients (which receive ALL
+        // org messages for sidebar/visibility) can tell which open conversation
+        // a message belongs to and avoid rendering it in the wrong thread.
+        conversationId,
         data: payload,
       };
 

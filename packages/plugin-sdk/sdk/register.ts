@@ -17,6 +17,7 @@ import type {
   RouteHandler,
   PluginPage,
   CronJobOptions,
+  WebhookRoutingDescriptor,
 } from "../types/index.js";
 import { PluginRegistry } from "./registry.js";
 import type { HayLogger } from "../types/index.js";
@@ -144,6 +145,17 @@ export function createRegisterAPI(options: RegisterAPIOptions): HayRegisterAPI {
         schedule: cronOptions.schedule,
       });
     },
+
+    webhookRouting(descriptor: WebhookRoutingDescriptor): void {
+      validateWebhookRouting(descriptor);
+
+      registry.registerWebhookRouting(descriptor);
+
+      logger.debug("Registered webhook routing strategy", {
+        signatureHeader: descriptor.signature.header,
+        itemsPath: descriptor.routeKeyPath.itemsPath,
+      });
+    },
   };
 
   return registerAPI;
@@ -193,6 +205,79 @@ function validateCronOptions(options: CronJobOptions): void {
     }
     if (backoff !== undefined && backoff !== "fixed" && backoff !== "exponential") {
       throw new Error('Cron job retryPolicy.backoff must be "fixed" or "exponential"');
+    }
+  }
+}
+
+/**
+ * Validate a webhook routing descriptor.
+ *
+ * @param descriptor - Webhook routing descriptor to validate
+ * @throws {Error} If the descriptor is invalid
+ *
+ * @internal
+ */
+function validateWebhookRouting(descriptor: WebhookRoutingDescriptor): void {
+  if (!descriptor || typeof descriptor !== "object") {
+    throw new Error("Webhook routing descriptor must be an object");
+  }
+
+  const { signature, verificationChallenge, routeKeyPath } = descriptor;
+
+  if (!signature || typeof signature !== "object") {
+    throw new Error("Webhook routing signature must be an object");
+  }
+  if (!signature.header || typeof signature.header !== "string") {
+    throw new Error("Webhook routing signature.header must be a non-empty string");
+  }
+  if (signature.format !== "sha256-hmac") {
+    throw new Error('Webhook routing signature.format must be "sha256-hmac"');
+  }
+  if (!signature.secretEnv || typeof signature.secretEnv !== "string") {
+    throw new Error("Webhook routing signature.secretEnv must be a non-empty string");
+  }
+
+  if (!routeKeyPath || typeof routeKeyPath !== "object") {
+    throw new Error("Webhook routing routeKeyPath must be an object");
+  }
+  if (!routeKeyPath.itemsPath || typeof routeKeyPath.itemsPath !== "string") {
+    throw new Error("Webhook routing routeKeyPath.itemsPath must be a non-empty string");
+  }
+  if (!routeKeyPath.keyPath || typeof routeKeyPath.keyPath !== "string") {
+    throw new Error("Webhook routing routeKeyPath.keyPath must be a non-empty string");
+  }
+
+  if (verificationChallenge !== undefined) {
+    if (typeof verificationChallenge !== "object" || verificationChallenge === null) {
+      throw new Error("Webhook routing verificationChallenge must be an object");
+    }
+    const { modeParam, verifyTokenParam, challengeParam, verifyTokenConfigField, verifyTokenEnv } =
+      verificationChallenge;
+    if (!modeParam || typeof modeParam !== "string") {
+      throw new Error("Webhook routing verificationChallenge.modeParam must be a non-empty string");
+    }
+    if (!verifyTokenParam || typeof verifyTokenParam !== "string") {
+      throw new Error(
+        "Webhook routing verificationChallenge.verifyTokenParam must be a non-empty string",
+      );
+    }
+    if (!challengeParam || typeof challengeParam !== "string") {
+      throw new Error(
+        "Webhook routing verificationChallenge.challengeParam must be a non-empty string",
+      );
+    }
+    if (verifyTokenConfigField !== undefined && typeof verifyTokenConfigField !== "string") {
+      throw new Error(
+        "Webhook routing verificationChallenge.verifyTokenConfigField must be a string",
+      );
+    }
+    if (verifyTokenEnv !== undefined && typeof verifyTokenEnv !== "string") {
+      throw new Error("Webhook routing verificationChallenge.verifyTokenEnv must be a string");
+    }
+    if (!verifyTokenConfigField && !verifyTokenEnv) {
+      throw new Error(
+        "Webhook routing verificationChallenge requires verifyTokenConfigField or verifyTokenEnv",
+      );
     }
   }
 }
@@ -461,6 +546,48 @@ function validateOAuth2AuthOptions(options: OAuth2AuthOptions, registry: PluginR
       if (typeof scope !== "string") {
         throw new Error("OAuth2 auth scopes must be an array of strings");
       }
+    }
+  }
+
+  // Validate authorizationParams (if provided)
+  if (options.authorizationParams !== undefined) {
+    if (
+      typeof options.authorizationParams !== "object" ||
+      options.authorizationParams === null ||
+      Array.isArray(options.authorizationParams)
+    ) {
+      throw new Error("OAuth2 auth authorizationParams must be a plain object");
+    }
+
+    for (const value of Object.values(options.authorizationParams)) {
+      if (typeof value !== "string") {
+        throw new Error("OAuth2 auth authorizationParams values must all be strings");
+      }
+    }
+  }
+
+  // Validate scopeSeparator (if provided)
+  if (options.scopeSeparator !== undefined && typeof options.scopeSeparator !== "string") {
+    throw new Error("OAuth2 auth scopeSeparator must be a string");
+  }
+
+  // Validate tokenExchange / tokenRefresh declarative token ops (if provided)
+  for (const [key, op] of [
+    ["tokenExchange", options.tokenExchange],
+    ["tokenRefresh", options.tokenRefresh],
+  ] as const) {
+    if (op === undefined) continue;
+    if (typeof op !== "object" || op === null) {
+      throw new Error(`OAuth2 auth ${key} must be an object`);
+    }
+    if (typeof op.url !== "string" || !op.url) {
+      throw new Error(`OAuth2 auth ${key}.url must be a non-empty string`);
+    }
+    if (typeof op.grantType !== "string" || !op.grantType) {
+      throw new Error(`OAuth2 auth ${key}.grantType must be a non-empty string`);
+    }
+    if (typeof op.tokenParam !== "string" || !op.tokenParam) {
+      throw new Error(`OAuth2 auth ${key}.tokenParam must be a non-empty string`);
     }
   }
 }

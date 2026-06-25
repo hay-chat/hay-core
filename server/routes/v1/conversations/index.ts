@@ -40,6 +40,19 @@ interface ActiveConversationRow {
   last_message_at: Date | string | null;
 }
 
+/**
+ * Raw row shape returned by the by-customer SQL query below.
+ */
+interface CustomerConversationRow {
+  id: string;
+  title: string | null;
+  status: string;
+  channel: string | null;
+  created_at: Date | string | null;
+  last_message_at: Date | string | null;
+  message_count: number | string | null;
+}
+
 const createConversationSchema = z.object({
   title: z.string().min(1).max(255).optional(),
   agentId: z.string().uuid().optional(),
@@ -147,6 +160,59 @@ export const conversationsRouter = t.router({
       };
     });
   }),
+
+  /**
+   * All conversations for a given customer, newest activity first.
+   * Powers the "Previous Conversations" panel and the customer profile page.
+   */
+  byCustomer: scopedProcedure(RESOURCES.CONVERSATIONS, ACTIONS.READ)
+    .input(
+      z.object({ customerId: z.string().uuid(), limit: z.number().min(1).max(100).default(50) }),
+    )
+    .query(async ({ ctx, input }) => {
+      const organizationId = ctx.organizationId;
+      if (!organizationId) {
+        throw new TRPCError({ code: "UNAUTHORIZED", message: "Organization context required" });
+      }
+
+      const rows = await AppDataSource.query(
+        `
+          SELECT
+            c.id,
+            c.title,
+            c.status,
+            c.channel,
+            c.created_at,
+            (
+              SELECT MAX(m.created_at)
+              FROM messages m
+              WHERE m.conversation_id = c.id
+            ) AS last_message_at,
+            (
+              SELECT COUNT(*)
+              FROM messages m
+              WHERE m.conversation_id = c.id
+            ) AS message_count
+          FROM conversations c
+          WHERE c.organization_id = $1
+            AND c.customer_id = $2
+            AND c.deleted_at IS NULL
+          ORDER BY last_message_at DESC NULLS LAST, c.created_at DESC
+          LIMIT $3
+        `,
+        [organizationId, input.customerId, input.limit],
+      );
+
+      return ((rows as CustomerConversationRow[]) || []).map((r) => ({
+        id: r.id,
+        title: r.title || null,
+        status: r.status,
+        channel: r.channel || null,
+        createdAt: r.created_at ? new Date(r.created_at).toISOString() : null,
+        lastMessageAt: r.last_message_at ? new Date(r.last_message_at).toISOString() : null,
+        messageCount: r.message_count != null ? Number(r.message_count) : 0,
+      }));
+    }),
 
   /**
    * Escalation (takeover) counts for dashboard widgets.
@@ -711,6 +777,7 @@ export const conversationsRouter = t.router({
         id: user.id,
         name: user.getFullName(),
         email: user.email,
+        avatarUrl: user.avatarUrl ?? null,
         assignedAt: conversation.assigned_at,
       };
     }),

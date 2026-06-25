@@ -11,6 +11,7 @@ import type { RegisterAuthAPI } from "./auth";
 import type { HttpMethod, RouteHandler } from "./route";
 import type { PluginPage } from "./ui";
 import type { CronJobOptions } from "./cron";
+import type { WebhookRoutingDescriptor } from "./webhook-routing";
 
 /**
  * UI registration API.
@@ -235,6 +236,38 @@ export interface HayRegisterAPI {
    * ```
    */
   cron(options: CronJobOptions): void;
+
+  /**
+   * Declare a generic webhook routing strategy for a shared webhook URL.
+   *
+   * Some providers deliver every org's events to a SINGLE shared webhook URL
+   * with no org identifier. This declaration tells Hay Core — as plain data —
+   * how to verify the request signature, answer the verification handshake, and
+   * extract per-event routing keys. Core executes the strategy blindly and fans
+   * the single webhook out to the right per-org workers; it never learns which
+   * provider this is.
+   *
+   * @param descriptor - Webhook routing descriptor
+   *
+   * @example
+   * ```typescript
+   * register.webhookRouting({
+   *   signature: {
+   *     header: 'x-hub-signature-256',
+   *     format: 'sha256-hmac',
+   *     secretEnv: 'META_APP_SECRET',
+   *   },
+   *   verificationChallenge: {
+   *     modeParam: 'hub.mode',
+   *     verifyTokenParam: 'hub.verify_token',
+   *     challengeParam: 'hub.challenge',
+   *     verifyTokenEnv: 'META_VERIFY_TOKEN',
+   *   },
+   *   routeKeyPath: { itemsPath: 'entry', keyPath: 'id' },
+   * });
+   * ```
+   */
+  webhookRouting(descriptor: WebhookRoutingDescriptor): void;
 
   // Future: mcp descriptor registration (optional)
   // mcp?: RegisterMcpDescriptorAPI;

@@ -1,5 +1,6 @@
 {
   "conversations": {
+    "untitled": "Untitled conversation",
     "page": {
       "title": "Conversations",
       "description": "Monitor and manage all customer conversations",
@@ -38,6 +39,7 @@
     },
     "table": {
       "conversation": "Conversation",
+      "channel": "Channel",
       "status": "Status",
       "assignedTo": "Assigned To",
       "duration": "Duration",
@@ -127,6 +129,10 @@
       "title": "Customer Information",
       "customer": "Customer",
       "conversationId": "Conversation ID:",
+      "channel": "Channel:",
+      "email": "Email:",
+      "phone": "Phone:",
+      "firstSeen": "First seen:",
       "status": "Status:",
       "created": "Created:"
     },

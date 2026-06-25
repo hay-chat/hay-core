@@ -184,10 +184,13 @@
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">All Channels</SelectItem>
-                    <SelectItem value="web">Web Chat</SelectItem>
-                    <SelectItem value="email">Email</SelectItem>
-                    <SelectItem value="slack">Slack</SelectItem>
-                    <SelectItem value="whatsapp">WhatsApp</SelectItem>
+                    <SelectItem
+                      v-for="opt in channelFilterOptions"
+                      :key="opt.value"
+                      :value="opt.value"
+                    >
+                      {{ opt.label }}
+                    </SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -383,8 +386,22 @@ import {
   Clock,
   TrendingUp,
 } from "lucide-vue-next";
+import { useAppStore } from "@/stores/app";
+import { getEnabledChannelPlugins, getChannelLabel } from "@/utils/channel";
 
 const { formatDateTime } = useOrgDateTime();
+const appStore = useAppStore();
+
+// Channel filter options come from the org's enabled channel plugins (plus the
+// built-in web channel). Core never hardcodes channel names.
+const channelFilterOptions = computed(() => [
+  { value: "web", label: getChannelLabel("web") },
+  ...getEnabledChannelPlugins().map((p) => ({ value: p.channel as string, label: p.name })),
+]);
+
+onMounted(() => {
+  appStore.fetchPlugins();
+});
 
 // Reactive state
 const reportConfig = ref({

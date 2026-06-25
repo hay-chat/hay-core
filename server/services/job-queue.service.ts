@@ -150,7 +150,11 @@ export class JobQueueService {
     if (!AppDataSource.isInitialized) {
       return null;
     }
-    const rows: Array<{ id: string }> = await AppDataSource.query(
+    // TypeORM's postgres driver returns `[rows, affectedCount]` for
+    // UPDATE ... RETURNING, not a flat rows array. Destructure the rows half;
+    // treating the whole tuple as the rows array makes `.length` always 2 and
+    // `rows[0].id` undefined, which then claims an arbitrary job via findById.
+    const [claimedRows]: [Array<{ id: string }>, number] = await AppDataSource.query(
       `UPDATE jobs
        SET status = 'processing', updated_at = now()
        WHERE id = (
@@ -164,10 +168,10 @@ export class JobQueueService {
        RETURNING id`,
       [BACKGROUND_JOB_TYPES],
     );
-    if (rows.length === 0) {
+    if (!claimedRows || claimedRows.length === 0) {
       return null;
     }
-    return jobRepository.findById(rows[0].id);
+    return jobRepository.findById(claimedRows[0].id);
   }
 
   /**

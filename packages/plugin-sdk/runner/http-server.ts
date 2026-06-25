@@ -12,7 +12,12 @@ import type { Server } from "http";
 import type { HayLogger, HayMcpRuntimeAPI } from "../types/index.js";
 import { PluginRegistry } from "../sdk/registry.js";
 import type { HayPluginDefinition } from "../types/plugin.js";
-import { executeOnValidateAuth, executeOnConfigUpdate, executeOnDisable } from "./hook-executor.js";
+import {
+  executeOnValidateAuth,
+  executeOnConfigUpdate,
+  executeOnDisable,
+  executeOnConnected,
+} from "./hook-executor.js";
 import { createConfigRuntimeAPI } from "../sdk/config-runtime.js";
 import { createAuthRuntimeAPI } from "../sdk/auth-runtime.js";
 import { createCronAuthAPI } from "../sdk/cron-runtime.js";
@@ -193,6 +198,10 @@ export class PluginHttpServer {
                 scopes: method.scopes || [],
                 clientId: method.clientId.name,
                 clientSecret: method.clientSecret.name,
+                authorizationParams: method.authorizationParams ?? {},
+                scopeSeparator: method.scopeSeparator,
+                tokenExchange: method.tokenExchange,
+                tokenRefresh: method.tokenRefresh,
               };
             }
           }),
@@ -207,6 +216,7 @@ export class PluginHttpServer {
             external: [], // Populated dynamically when MCPs start
           },
           crons: this.registry.getCronJobDescriptors(),
+          webhookRouting: this.registry.getWebhookRouting(),
         };
 
         res.json(metadata);
@@ -299,6 +309,69 @@ export class PluginHttpServer {
           valid: false,
           error: errorMsg,
         });
+      }
+    });
+
+    // POST /on-connected
+    // Fired by Hay Core right after OAuth tokens are stored. Builds the runtime
+    // context from the freshly-stored auth state (sent in the body) and runs the
+    // plugin's onConnected hook, returning opaque routing keys for Core to persist.
+    this.app.post("/on-connected", async (req: Request, res: Response): Promise<void> => {
+      try {
+        if (!this.plugin) {
+          res.status(500).json({ routingKeys: [], error: "Plugin not initialized" });
+          return;
+        }
+
+        if (!this.orgId || !this.manifest || this.orgConfig === null) {
+          res.status(400).json({ routingKeys: [], error: "Runtime data not set" });
+          return;
+        }
+
+        const { config, authState } = req.body ?? {};
+
+        if (!authState || !authState.methodId || !authState.credentials) {
+          res.status(400).json({ routingKeys: [], error: "Invalid auth state format" });
+          return;
+        }
+
+        // Merge stored org config with any fresh config + auth credentials so the
+        // hook can read everything via ctx.config.get().
+        const mergedConfig = {
+          ...this.orgConfig,
+          ...(config || {}),
+          ...authState.credentials,
+        };
+
+        const configAPI = createConfigRuntimeAPI({
+          orgConfig: mergedConfig,
+          registry: this.registry,
+          manifest: { env: this.manifest.env },
+          logger: this.logger,
+        });
+
+        const authAPI = createAuthRuntimeAPI({
+          authState,
+          logger: this.logger,
+        });
+
+        const connectedCtx = {
+          org: { id: this.orgId },
+          config: configAPI,
+          auth: authAPI,
+          logger: this.logger,
+        };
+
+        const result = await executeOnConnected(this.plugin, connectedCtx as any, this.logger);
+
+        res.json({ routingKeys: result?.routingKeys ?? [] });
+        this.logger.debug("Handled /on-connected", {
+          routingKeyCount: result?.routingKeys?.length ?? 0,
+        });
+      } catch (err) {
+        const errorMsg = err instanceof Error ? err.message : String(err);
+        this.logger.error("Error in /on-connected endpoint", { error: errorMsg });
+        res.status(500).json({ routingKeys: [], error: errorMsg });
       }
     });
 

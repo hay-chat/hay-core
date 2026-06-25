@@ -19,6 +19,7 @@ import { Source } from "./entities/source.entity";
 import { MessageFeedback } from "./entities/message-feedback.entity";
 import { PluginRegistry } from "../entities/plugin-registry.entity";
 import { PluginInstance } from "../entities/plugin-instance.entity";
+import { PluginWebhookRoute } from "../entities/plugin-webhook-route.entity";
 import { AuditLog } from "../entities/audit-log.entity";
 import { PrivacyRequest } from "../entities/privacy-request.entity";
 import { Upload } from "../entities/upload.entity";
@@ -75,6 +76,7 @@ export const AppDataSource = new DataSource({
     MessageFeedback,
     PluginRegistry,
     PluginInstance,
+    PluginWebhookRoute,
     AuditLog,
     PrivacyRequest,
     Upload,

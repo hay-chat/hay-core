@@ -120,15 +120,10 @@
       </CardHeader>
       <CardContent>
         <div class="relative">
-          <pre
-            class="bg-muted p-4 rounded-lg text-sm overflow-x-auto"
-          ><code>{{ installationCode }}</code></pre>
-          <Button
-            variant="outline"
-            size="sm"
-            class="absolute top-2 right-2"
-            @click="copyInstallationCode"
-          >
+          <pre class="bg-muted p-4 rounded-lg text-sm overflow-x-auto mb-2">{{
+            installationCode
+          }}</pre>
+          <Button variant="outline" size="sm" @click="copyInstallationCode">
             <Copy v-if="!copied" class="h-3 w-3 mr-1" />
             <Check v-else class="h-3 w-3 mr-1" />
             {{ copied ? $t("apiTokens.copied") : $t("apiTokens.copy") }}

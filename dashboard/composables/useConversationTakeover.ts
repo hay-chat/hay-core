@@ -9,6 +9,7 @@ export interface AssignedUser {
   id: string;
   name: string;
   email: string;
+  avatarUrl?: string | null;
   assignedAt: Date | string | null;
 }
 

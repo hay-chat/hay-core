@@ -10,6 +10,7 @@ import { organizationRepository } from "@server/repositories/organization.reposi
 import { pluginInstanceRepository } from "@server/repositories/plugin-instance.repository";
 import { MessageType } from "@server/database/entities/message.entity";
 import { mcpRegistryService } from "@server/services/mcp-registry.service";
+import { redisService } from "@server/services/redis.service";
 import { productSyncService } from "@server/services/product-sync.service";
 import { ProductStatus } from "@server/entities/product.entity";
 import { VariantAvailability } from "@server/entities/product-variant.entity";
@@ -119,7 +120,10 @@ export const pluginApiTrpcRouter = router({
             organization_id: organizationId,
             external_id: from,
             name: metadata?.profileName as string | undefined,
-            phone: from,
+            // Only store a real phone number if the channel provides one.
+            // `from` is a channel-scoped identity (e.g. "instagram:<psid>") and
+            // belongs in external_id, never the phone field.
+            phone: (metadata?.phone as string | undefined) ?? undefined,
             external_metadata: {
               [channel]: {
                 id: from,
@@ -136,8 +140,8 @@ export const pluginApiTrpcRouter = router({
           if (!customer.name && metadata?.profileName) {
             updates.name = metadata.profileName;
           }
-          if (!customer.phone) {
-            updates.phone = from;
+          if (!customer.phone && metadata?.phone) {
+            updates.phone = metadata.phone as string;
           }
           if (metadata) {
             updates.external_metadata = {
@@ -217,6 +221,30 @@ export const pluginApiTrpcRouter = router({
         const enrichedMetadata =
           senderType === "human_agent" ? { ...(metadata ?? {}), externalOrigin: true } : metadata;
 
+        // Inbound idempotency: providers may redeliver the same message (e.g.
+        // Meta retries unacked webhooks). When a plugin passes a provider-side
+        // message id in metadata.mid, claim it atomically with Redis SETNX. If
+        // the key already exists this is a duplicate — short-circuit without
+        // creating a second message. Channels that don't pass `mid` skip dedupe.
+        const providerMessageId =
+          typeof metadata?.mid === "string" && metadata.mid.length > 0 ? metadata.mid : undefined;
+
+        if (providerMessageId) {
+          const claimed = await claimProviderMessage(organizationId, channel, providerMessageId);
+          if (!claimed) {
+            logger.debug(
+              { organizationId, channel, mid: providerMessageId },
+              "Duplicate inbound message ignored (mid already seen)",
+            );
+            return {
+              messageId: null,
+              conversationId: conversation.id,
+              processed: false,
+              deduped: true,
+            };
+          }
+        }
+
         const message = await conversation.addMessage({
           content,
           type: messageType,
@@ -239,9 +267,10 @@ export const pluginApiTrpcRouter = router({
         }
 
         return {
-          messageId: message.id,
+          messageId: message.id as string | null,
           conversationId: conversation.id,
           processed: true,
+          deduped: false,
         };
       } catch (error) {
         logger.error({ err: error }, "messages.receive error");
@@ -852,29 +881,75 @@ export const pluginApiTrpcRouter = router({
     }),
 });
 
+/** TTL for inbound message dedupe keys — long enough to cover provider retries. */
+const INBOUND_DEDUPE_TTL_SECONDS = 24 * 60 * 60; // 24h
+
+/**
+ * Helper: Atomically claim a provider message id for dedupe.
+ *
+ * Generic across channels — the key is namespaced by org + channel + provider
+ * message id so two channels (or two orgs) never collide. Uses Redis SETNX with
+ * a short TTL: returns `true` when this call set the key (first time we've seen
+ * the message), `false` when the key already existed (duplicate delivery).
+ *
+ * If Redis is unavailable we fail open (return `true`) so message processing is
+ * never blocked by a cache outage — at-least-once is preferable to dropping.
+ */
+async function claimProviderMessage(
+  organizationId: string,
+  channel: string,
+  mid: string,
+): Promise<boolean> {
+  const client = redisService.getClient();
+  if (!client) {
+    return true;
+  }
+
+  const key = `dedupe:msg:${organizationId}:${channel}:${mid}`;
+
+  try {
+    const result = await client.set(key, "1", "EX", INBOUND_DEDUPE_TTL_SECONDS, "NX");
+    return result === "OK";
+  } catch (error) {
+    logger.error({ err: error, organizationId, channel, mid }, "Inbound dedupe check failed");
+    return true;
+  }
+}
+
 /**
  * Helper: Get agent for channel
  *
- * Determines which agent should handle conversations for a given channel.
- * Priority:
- * 1. Channel-specific agent (organization.settings.channelAgents[channel])
- * 2. Default agent (organization.defaultAgentId)
- * 3. First available agent
+ * Determines which single agent should handle conversations for a given channel.
+ * Agent<->channel is many-to-many (agent.channels), but each incoming message must
+ * resolve to exactly one responder. Priority:
+ * 1. Agents assigned to this channel. If more than one claims it, prefer the org
+ *    default agent if it is among them, otherwise the earliest-created (deterministic).
+ *    TODO: replace this tiebreaker once multi-agent-per-channel selection is defined.
+ * 2. Organization default agent.
+ * 3. First available agent.
  */
 async function getAgentForChannel(organizationId: string, channel: string): Promise<string | null> {
-  const org = await organizationRepository.findById(organizationId);
+  const [agents, org] = await Promise.all([
+    agentRepository.findByOrganization(organizationId),
+    organizationRepository.findById(organizationId),
+  ]);
 
-  // 1. Channel-specific agent (using the new channelAgents field)
-  if (org?.settings?.channelAgents?.[channel]) {
-    return org.settings.channelAgents[channel];
+  // 1. Agents explicitly assigned to this channel.
+  const assigned = agents.filter((a) => a.channels?.includes(channel));
+  if (assigned.length > 0) {
+    if (org?.defaultAgentId) {
+      const preferred = assigned.find((a) => a.id === org.defaultAgentId);
+      if (preferred) return preferred.id;
+    }
+    // findByOrganization orders by created_at DESC, so the last entry is earliest.
+    return assigned[assigned.length - 1].id;
   }
 
-  // 2. Default agent
+  // 2. Organization default agent.
   if (org?.defaultAgentId) {
     return org.defaultAgentId;
   }
 
-  // 3. First available agent
-  const agents = await agentRepository.findByOrganization(organizationId);
+  // 3. First available agent.
   return agents[0]?.id || null;
 }

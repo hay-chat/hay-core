@@ -1,0 +1,29 @@
+{
+  "name": "Instagram",
+  "description": "Connect an Instagram Professional account and exchange direct messages through Hay's AI",
+  "tools": {},
+  "config": {},
+  "setup": {
+    "title": "Instagram Setup Guide",
+    "intro": "Connect your Instagram Professional account to Hay. Once connected, direct messages sent to your account are routed through Hay's AI, and replies are delivered straight back to the Instagram thread.",
+    "step1": {
+      "title": "Connect your Instagram account",
+      "body": "Click the <strong>Connect</strong> button above to sign in with Facebook Login for Business. Choose the Facebook Page and the linked Instagram Professional account you want Hay to manage, then approve the requested permissions. Hay stores the connection securely — no tokens to copy or paste.",
+      "hint": "You need an Instagram Professional account (Business or Creator) that is linked to a Facebook Page you manage."
+    },
+    "step2": {
+      "title": "Text-only messages (MVP)",
+      "body": "In this first release, Hay handles <strong>text</strong> direct messages only. Inbound media (images, stories, reactions) is ignored, and Hay's replies are sent as plain text. Rich content support is coming in a later update."
+    },
+    "step3": {
+      "title": "Reply within 24 hours",
+      "body": "Instagram only lets businesses send a free-form reply within <strong>24 hours</strong> of the customer's last message. After that window closes, the customer must message you again before Hay can respond."
+    },
+    "step4": {
+      "title": "Where messages appear",
+      "body": "Once connected, new Instagram DMs show up as conversations in your Hay inbox. The AI agent assigned to the Instagram channel responds automatically.",
+      "hint": "To assign an agent, go to <strong>Settings &rarr; Channels</strong> and select an agent for the Instagram channel."
+    },
+    "windowNote": "<strong>24-hour messaging window:</strong> Instagram requires businesses to respond within 24 hours of the customer's last message. After 24 hours, you must wait for the customer to send a new message before replying."
+  }
+}

@@ -186,6 +186,75 @@ export interface HayStartContext {
 }
 
 /**
+ * Context provided to onConnected hook.
+ *
+ * Fired by Hay Core immediately after OAuth tokens have been stored for an
+ * organization, before (or alongside) the normal `onStart` runtime. The auth
+ * runtime API already resolves to the freshly-stored credentials.
+ *
+ * @remarks
+ * Use this hook to perform a one-time provider call that depends on the new
+ * credentials and that yields opaque **routing keys** Core should persist (for
+ * example, an external account id used to route a shared inbound webhook to
+ * this organization). Core treats the returned keys as opaque strings — it has
+ * no knowledge of what they mean.
+ *
+ * **Hook behavior**:
+ * - Returning `{ routingKeys }` asks Core to persist those keys for this
+ *   instance. Returning nothing (or omitting `routingKeys`) persists nothing.
+ * - If the hook throws, Core logs a warning and continues; the OAuth flow is
+ *   never failed by this hook.
+ * - The hook must NOT crash the worker; errors should be logged via `logger`.
+ *
+ * @example
+ * ```typescript
+ * async onConnected(ctx: HayConnectedContext) {
+ *   const { auth, logger } = ctx;
+ *
+ *   const authState = auth.get();
+ *   if (!authState) return { routingKeys: [] };
+ *
+ *   const accessToken = String(authState.credentials.accessToken);
+ *   const accountId = await fetchAccountId(accessToken);
+ *
+ *   logger.info(`Connected account: ${accountId}`);
+ *   return { routingKeys: [accountId] };
+ * }
+ * ```
+ */
+export interface HayConnectedContext {
+  /**
+   * Organization information.
+   *
+   * Contains org ID and optional name.
+   */
+  org: HayOrg;
+
+  /**
+   * Config runtime API.
+   *
+   * Used to read configuration values for this organization.
+   * Supports org config → env var fallback.
+   */
+  config: HayConfigRuntimeAPI;
+
+  /**
+   * Auth runtime API.
+   *
+   * Resolves to the freshly-stored authentication credentials for this
+   * organization.
+   */
+  auth: HayAuthRuntimeAPI;
+
+  /**
+   * Logger for plugin messages.
+   *
+   * Logs are automatically tagged with org and plugin context.
+   */
+  logger: HayLogger;
+}
+
+/**
  * Context provided to onValidateAuth hook.
  *
  * Used to validate authentication credentials for an organization.

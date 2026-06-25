@@ -98,30 +98,9 @@ import {
   getWaitTimeBadgeVariant,
   getFullName,
 } from "@/utils/conversation";
-import {
-  MessageCircle,
-  Globe,
-  Phone,
-  Mail,
-  CheckCircle,
-  ChevronRight,
-  RefreshCw,
-} from "lucide-vue-next";
-// UI components are auto-imported by Nuxt
-
-// Icons for different channels
-const channelIcons = {
-  web: Globe,
-  whatsapp: MessageCircle,
-  instagram: MessageCircle,
-  telegram: MessageCircle,
-  sms: Phone,
-  email: Mail,
-};
-
-const getChannelIcon = (channel: string) => {
-  return channelIcons[channel as keyof typeof channelIcons] || MessageCircle;
-};
+import { CheckCircle, ChevronRight, RefreshCw } from "lucide-vue-next";
+// getChannelIcon is auto-imported from @/utils/channel (plugin-driven, no
+// hardcoded channel list). UI components are auto-imported by Nuxt.
 
 // State
 const router = useRouter();

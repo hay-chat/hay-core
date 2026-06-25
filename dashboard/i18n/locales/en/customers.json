@@ -1,0 +1,42 @@
+{
+  "customers": {
+    "title": "Customers",
+    "description": "People who have contacted you across your channels",
+    "refresh": "Refresh",
+    "search": {
+      "label": "Search",
+      "placeholder": "Search by name, email or ID",
+      "apply": "Search"
+    },
+    "summary": "{total} customers",
+    "columns": {
+      "customer": "Customer",
+      "channels": "Channels",
+      "email": "Email",
+      "phone": "Phone",
+      "created": "Created"
+    },
+    "empty": {
+      "title": "No customers yet",
+      "description": "Customers appear here once they message you on a connected channel."
+    },
+    "pagination": "Page {page} of {totalPages}",
+    "fields": {
+      "email": "Email",
+      "phone": "Phone",
+      "externalId": "External ID",
+      "created": "Created",
+      "notes": "Notes"
+    },
+    "profile": {
+      "description": "Customer profile and conversation history",
+      "back": "Back to customers",
+      "notFound": "Customer not found"
+    },
+    "conversations": {
+      "title": "Conversations",
+      "none": "No conversations yet",
+      "messageCount": "{count} messages"
+    }
+  }
+}

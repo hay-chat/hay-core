@@ -1,0 +1,40 @@
+{
+  "name": "hay-channel-instagram-meta",
+  "version": "1.0.0",
+  "description": "Connect Instagram as a communication channel — exchange Instagram DMs through Hay's AI orchestrator using a shared Hay-owned Meta app (Instagram Business Login)",
+  "author": "Hay",
+  "type": "module",
+  "main": "dist/index.js",
+  "hay-plugin": {
+    "entry": "./dist/index.js",
+    "displayName": "Instagram",
+    "category": "channel",
+    "channel": "instagram",
+    "capabilities": [
+      "messages",
+      "customers"
+    ],
+    "env": [
+      "META_APP_ID",
+      "META_APP_SECRET",
+      "META_VERIFY_TOKEN"
+    ]
+  },
+  "scripts": {
+    "build": "npm run build:ui && tsc",
+    "build:ui": "vite build --config vite.config.ui.ts",
+    "start": "node dist/index.js",
+    "dev": "npm run build:ui && tsc",
+    "dev:ui": "vite build --watch --config vite.config.ui.ts"
+  },
+  "dependencies": {
+    "@hay/plugin-sdk": "file:../../../packages/plugin-sdk"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "@vitejs/plugin-vue": "^5.0.0",
+    "typescript": "^5.3.3",
+    "vite": "^5.0.0",
+    "vue": "^3.4.0"
+  }
+}

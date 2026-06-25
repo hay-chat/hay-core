@@ -67,6 +67,39 @@ export function formatRelativeTime(date: Date | string | null | undefined): stri
 }
 
 /**
+ * Format a date as long-form relative time (e.g., "Just now", "3 minutes ago",
+ * "1 hour ago", "2 days ago"). Returns `null` when the date is older than
+ * {@link RELATIVE_TIME_MAX_DAYS} days so callers can fall back to an absolute
+ * date+time, or when the date is invalid.
+ *
+ * @param date - Date to format
+ * @param now - Reference "now" (pass a reactive clock to keep output live)
+ */
+export const RELATIVE_TIME_MAX_DAYS = 7;
+
+export function formatRelativeTimeLong(
+  date: Date | string | null | undefined,
+  now: Date = new Date(),
+): string | null {
+  const parsedDate = parseUTCDate(date);
+  if (!parsedDate) return null;
+
+  const diff = now.getTime() - parsedDate.getTime();
+  const seconds = Math.floor(diff / 1000);
+  const minutes = Math.floor(seconds / 60);
+  const hours = Math.floor(minutes / 60);
+  const days = Math.floor(hours / 24);
+
+  // Older than the relative window → caller shows absolute date+time.
+  if (days > RELATIVE_TIME_MAX_DAYS) return null;
+
+  if (days >= 1) return `${days} day${days === 1 ? "" : "s"} ago`;
+  if (hours >= 1) return `${hours} hour${hours === 1 ? "" : "s"} ago`;
+  if (minutes >= 1) return `${minutes} minute${minutes === 1 ? "" : "s"} ago`;
+  return "Just now";
+}
+
+/**
  * Format a date as absolute date+time respecting org settings
  * @param date - Date to format
  * @returns Formatted string

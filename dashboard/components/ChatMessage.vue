@@ -12,14 +12,16 @@
       '',
     ]"
   >
-    <div v-if="message.type !== 'System'" class="chat-message__avatar">
-      <component :is="avatarIcon" class="chat-message__avatar-icon" />
+    <div
+      v-if="message.type !== 'System'"
+      :class="['chat-message__avatar', { 'chat-message__avatar--empty': isAvatarEmpty }]"
+    >
+      <img v-if="avatarImageUrl" :src="avatarImageUrl" class="chat-message__avatar-image" alt="" />
+      <component :is="avatarIcon" v-else-if="avatarIcon" class="chat-message__avatar-icon" />
     </div>
     <div class="chat-message__content">
       <div
-        v-if="
-          message.type == 'BotAgent' || message.type == 'HumanAgent' || message.type == 'Customer'
-        "
+        v-if="showsHeader && ((isQueued && showApproval) || message.metadata?.isPlaybook)"
         class="chat-message__header"
       >
         <div v-if="isQueued && showApproval" class="mb-2 flex-1">
@@ -29,8 +31,6 @@
           </Badge>
         </div>
 
-        <span v-else class="chat-message__sender">{{ message.sender }}</span>
-        <span class="chat-message__time">{{ formattedTime }}</span>
         <div v-if="message.metadata?.isPlaybook" class="chat-message__playbook-badge">
           <Badge variant="outline" class="text-xs">
             <Zap class="h-2 w-2 mr-1" />
@@ -160,6 +160,26 @@
           />
         </div>
       </div>
+      <!-- Timestamp below the bubble. Hidden for grouped same-minute messages.
+           For sent BotAgent messages the timestamp moves inline next to the
+           feedback/debug controls instead (see metadata row below). -->
+      <div v-if="showsHeader && showTimestamp && !showsInlineMeta" class="chat-message__footer">
+        <TooltipProvider :delay-duration="200">
+          <TooltipRoot>
+            <TooltipTrigger as-child>
+              <span class="chat-message__time">{{ formattedTime }}</span>
+            </TooltipTrigger>
+            <TooltipPortal>
+              <TooltipContent
+                :side-offset="4"
+                class="z-50 rounded-md border bg-background px-2 py-1 text-xs font-medium text-foreground shadow-md"
+              >
+                {{ fullDateTime }}
+              </TooltipContent>
+            </TooltipPortal>
+          </TooltipRoot>
+        </TooltipProvider>
+      </div>
       <div
         v-if="isCollapsibleVariant && isSystemExpandable"
         class="chat-message__expand-button"
@@ -241,16 +261,27 @@
             />
           </div>
 
-          <!-- Right side: Debug button -->
-          <Button
-            v-if="hasDebugData"
-            variant="ghost"
-            size="sm"
-            class="ml-auto"
-            @click="showDebugDialog = true"
-          >
-            <MoreVertical class="h-4 w-4" />
-          </Button>
+          <!-- Right side: timestamp + debug button -->
+          <div class="ml-auto flex items-center gap-2">
+            <TooltipProvider v-if="showTimestamp" :delay-duration="200">
+              <TooltipRoot>
+                <TooltipTrigger as-child>
+                  <span class="chat-message__time">{{ formattedTime }}</span>
+                </TooltipTrigger>
+                <TooltipPortal>
+                  <TooltipContent
+                    :side-offset="4"
+                    class="z-50 rounded-md border bg-background px-2 py-1 text-xs font-medium text-foreground shadow-md"
+                  >
+                    {{ fullDateTime }}
+                  </TooltipContent>
+                </TooltipPortal>
+              </TooltipRoot>
+            </TooltipProvider>
+            <Button v-if="hasDebugData" variant="ghost" size="sm" @click="showDebugDialog = true">
+              <MoreVertical class="h-4 w-4" />
+            </Button>
+          </div>
         </div>
       </div>
     </div>
@@ -444,7 +475,6 @@
 import { computed, ref, onMounted, nextTick, watch } from "vue";
 import {
   User,
-  Bot,
   Paperclip,
   Check,
   ChevronDown,
@@ -462,8 +492,17 @@ import {
   RotateCcw,
   MoreVertical,
 } from "lucide-vue-next";
+import {
+  TooltipProvider,
+  TooltipRoot,
+  TooltipTrigger,
+  TooltipPortal,
+  TooltipContent,
+} from "reka-ui";
 import { markdownToHtml } from "@/utils/markdownToHtml";
 import { splitMarkdownImages } from "@/utils/splitMarkdownImages";
+import { formatRelativeTimeLong } from "@/utils/date";
+import { useNow } from "@/composables/useNow";
 import { MessageStatus, type Message, MessageSentiment } from "@/types/message";
 
 interface Props {
@@ -471,11 +510,23 @@ interface Props {
   inverted?: boolean;
   showFeedback?: boolean;
   showApproval?: boolean;
+  /**
+   * Whether to render this message's timestamp. The parent hides it for all but
+   * the last of a run of consecutive same-author messages within the same minute.
+   */
+  showTimestamp?: boolean;
+  /** Avatar URL of the conversation's AI agent (used for BotAgent messages). */
+  botAvatarUrl?: string | null;
+  /** Avatar URL of the assigned human agent (used for HumanAgent messages). */
+  humanAvatarUrl?: string | null;
 }
 
 const props = withDefaults(defineProps<Props>(), {
   showFeedback: false,
   showApproval: false,
+  showTimestamp: true,
+  botAvatarUrl: null,
+  humanAvatarUrl: null,
 });
 
 const emit = defineEmits<{
@@ -523,6 +574,10 @@ const hasDebugData = computed(() => {
 const isQueued = computed(() => {
   return props.message.deliveryState === "queued" || props.message.delivery_state === "queued";
 });
+
+// Sent BotAgent messages render an inline metadata row (feedback + debug). The
+// timestamp lives in that row instead of the standalone footer below the bubble.
+const showsInlineMeta = computed(() => props.message.type === "BotAgent" && !isQueued.value);
 
 const handleApproveClick = () => {
   showApprovalDialog.value = true;
@@ -597,12 +652,30 @@ watch(
   },
 );
 
-const { formatTime } = useOrgDateTime();
+const { formatDateTime } = useOrgDateTime();
+const now = useNow();
 
+// Long-form relative time ("3 minutes ago"), falling back to an absolute
+// date+time once the message is older than the relative window. Re-evaluates
+// as the shared `now` clock ticks so it stays accurate.
 const formattedTime = computed(() => {
-  return formatTime(props.message.created_at);
+  const relative = formatRelativeTimeLong(props.message.created_at, now.value);
+  return relative ?? formatDateTime(props.message.created_at);
 });
 
+// Absolute date + time, shown as a tooltip when hovering the timestamp.
+const fullDateTime = computed(() => formatDateTime(props.message.created_at));
+
+// Image avatar: the AI agent's avatar for bot messages, the assigned human's
+// avatar for human-agent messages. Null → fall back to an icon (or nothing).
+const avatarImageUrl = computed<string | null>(() => {
+  if (props.message.type === "HumanAgent") return props.humanAvatarUrl ?? null;
+  if (props.message.type === "BotAgent") return props.botAvatarUrl ?? null;
+  return null;
+});
+
+// Icon fallback when there is no avatar image. BotAgent intentionally returns
+// null: with no configured agent avatar we show nothing rather than a robot.
 const avatarIcon = computed(() => {
   if (props.message.type === "Customer") {
     const sentimentIcon = {
@@ -613,9 +686,18 @@ const avatarIcon = computed(() => {
     return sentimentIcon[props.message.sentiment as MessageSentiment] || User;
   }
 
-  if (props.message.type === "BotAgent" || props.message.type === "HumanAgent") return Bot;
+  if (props.message.type === "BotAgent") return null;
+  if (props.message.type === "HumanAgent") return User;
   return User;
 });
+
+// True when the avatar slot has nothing to render (used to drop its background).
+const isAvatarEmpty = computed(() => !avatarImageUrl.value && !avatarIcon.value);
+
+// Only the three "authored" message types render a sender header + timestamp.
+const showsHeader = computed(() =>
+  ["BotAgent", "HumanAgent", "Customer"].includes(props.message.type),
+);
 
 // Confidence display helpers
 const getConfidenceBadgeVariant = (tier: string | undefined) => {
@@ -685,6 +767,25 @@ const getConfidenceIcon = (tier: string | undefined) => {
 
 .chat-message--Customer .chat-message__header {
   justify-content: flex-start;
+}
+
+/* Timestamp row below the bubble, aligned to the message's side. */
+.chat-message__footer {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 0.25rem;
+}
+
+.chat-message--Customer .chat-message__footer {
+  justify-content: flex-start;
+}
+
+.chat-message--inverted .chat-message__footer {
+  justify-content: flex-start;
+}
+
+.chat-message--inverted.chat-message--Customer .chat-message__footer {
+  justify-content: flex-end;
 }
 
 .chat-message--no-header,
@@ -875,11 +976,18 @@ const getConfidenceIcon = (tier: string | undefined) => {
   align-items: center;
   justify-content: center;
   font-size: 1rem;
+  overflow: hidden;
 
   svg {
     height: 1em;
     width: 1em;
   }
+}
+
+.chat-message__avatar-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
 .chat-message--Customer .chat-message__avatar {
@@ -891,9 +999,11 @@ const getConfidenceIcon = (tier: string | undefined) => {
   @apply bg-blue-100 text-blue-600;
 }
 
-.chat-message__sender {
-  font-weight: bold;
-  margin-right: 0.5rem;
+/* No avatar to show (e.g. agent without a configured avatar): keep the slot for
+   alignment but render nothing — no background, no icon. Specificity matches the
+   per-type avatar rules above so it reliably wins. */
+.chat-message__avatar.chat-message__avatar--empty {
+  background-color: transparent;
 }
 
 .chat-message__time {

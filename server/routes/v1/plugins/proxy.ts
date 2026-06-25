@@ -1,6 +1,7 @@
 import { Router, type Request, type Response } from "express";
 import { pluginManagerService } from "@server/services/plugin-manager.service";
 import { pluginInstanceManagerService } from "@server/services/plugin-instance-manager.service";
+import { webhookRouterService } from "@server/services/webhook-router.service";
 import { organizationRepository } from "@server/repositories/organization.repository";
 import { isValidUuid } from "@server/lib/validation/uuid";
 import { createLogger } from "@server/lib/logger";
@@ -22,6 +23,20 @@ router.all(/^\/([^/]+)\/(.*)?$/, async (req: Request, res: Response) => {
     const path = req.params[1] ? `/${req.params[1]}` : "";
 
     logger.debug({ method: req.method, path: req.path, pluginId }, "Proxying request to plugin");
+
+    // Generic shared-webhook fan-out: when a plugin DECLARES a webhook routing
+    // strategy (in its metadata) and the request carries no org id, core resolves
+    // the org(s) from the payload and fans the single shared webhook URL out to
+    // the right per-org workers. Core stays plugin-agnostic — it only executes
+    // the declared strategy as data. Anything else falls through to the existing
+    // per-org proxy behavior unchanged.
+    if (path === "/webhook" && !hasOrgIdentifier(req)) {
+      const routing = await webhookRouterService.getRoutingDescriptor(pluginId);
+      if (routing) {
+        await webhookRouterService.handle(req, res, pluginId, routing);
+        return;
+      }
+    }
 
     // Extract organization ID (from auth, subdomain, or query param)
     const organizationId = await extractorganizationId(req);
@@ -132,6 +147,19 @@ router.all(/^\/([^/]+)\/(.*)?$/, async (req: Request, res: Response) => {
     });
   }
 });
+
+/**
+ * Whether the request supplies an org identifier (query param or header).
+ * A shared webhook (no org in the URL) supplies neither — that's the signal to
+ * route it through the generic webhook router instead of org extraction.
+ */
+function hasOrgIdentifier(req: Request): boolean {
+  if (typeof req.query.organizationId === "string" && req.query.organizationId.length > 0) {
+    return true;
+  }
+  const headerOrgId = req.headers["x-organization-id"];
+  return typeof headerOrgId === "string" && headerOrgId.length > 0;
+}
 
 /**
  * Extract organization ID from request

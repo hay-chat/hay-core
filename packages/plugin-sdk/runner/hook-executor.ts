@@ -10,11 +10,12 @@ import type {
   HayPluginDefinition,
   HayGlobalContext,
   HayStartContext,
+  HayConnectedContext,
   HayAuthValidationContext,
   HayConfigUpdateContext,
   HayDisableContext,
-} from '../types/index.js';
-import type { HayLogger } from '../types/index.js';
+} from "../types/index.js";
+import type { HayLogger } from "../types/index.js";
 
 /**
  * Execute the onInitialize hook.
@@ -33,27 +34,27 @@ import type { HayLogger } from '../types/index.js';
 export async function executeOnInitialize(
   plugin: HayPluginDefinition,
   globalCtx: HayGlobalContext,
-  logger: HayLogger
+  logger: HayLogger,
 ): Promise<void> {
   if (!plugin.onInitialize) {
-    logger.debug('Plugin has no onInitialize hook, skipping');
+    logger.debug("Plugin has no onInitialize hook, skipping");
     return;
   }
 
-  logger.info('Executing onInitialize hook');
+  logger.info("Executing onInitialize hook");
 
   try {
     const result = plugin.onInitialize(globalCtx);
 
     // Handle both sync and async hooks
-    if (result && typeof result === 'object' && 'then' in result) {
+    if (result && typeof result === "object" && "then" in result) {
       await result;
     }
 
-    logger.info('onInitialize hook completed successfully');
+    logger.info("onInitialize hook completed successfully");
   } catch (err) {
     const errorMsg = err instanceof Error ? err.message : String(err);
-    logger.error('onInitialize hook failed', { error: errorMsg });
+    logger.error("onInitialize hook failed", { error: errorMsg });
     throw new Error(`onInitialize hook failed: ${errorMsg}`);
   }
 }
@@ -76,30 +77,75 @@ export async function executeOnInitialize(
 export async function executeOnStart(
   plugin: HayPluginDefinition,
   startCtx: HayStartContext,
-  logger: HayLogger
+  logger: HayLogger,
 ): Promise<boolean> {
   if (!plugin.onStart) {
-    logger.debug('Plugin has no onStart hook, skipping');
+    logger.debug("Plugin has no onStart hook, skipping");
     return true;
   }
 
-  logger.info('Executing onStart hook', { orgId: startCtx.org.id });
+  logger.info("Executing onStart hook", { orgId: startCtx.org.id });
 
   try {
     const result = plugin.onStart(startCtx);
 
     // Handle both sync and async hooks
-    if (result && typeof result === 'object' && 'then' in result) {
+    if (result && typeof result === "object" && "then" in result) {
       await result;
     }
 
-    logger.info('onStart hook completed successfully');
+    logger.info("onStart hook completed successfully");
     return true;
   } catch (err) {
     const errorMsg = err instanceof Error ? err.message : String(err);
-    logger.error('onStart hook failed', { error: errorMsg });
+    logger.error("onStart hook failed", { error: errorMsg });
     // Don't throw - just return false to indicate failure
     return false;
+  }
+}
+
+/**
+ * Execute the onConnected hook.
+ *
+ * @param plugin - Plugin definition
+ * @param connectedCtx - Connected context (with freshly-stored credentials)
+ * @param logger - Logger instance
+ * @returns The routing keys returned by the hook (empty array if undefined/failed)
+ *
+ * @remarks
+ * Called once after OAuth tokens are stored. If the hook is not defined,
+ * returns an empty array. If the hook throws, logs a warning and returns an
+ * empty array — the OAuth flow must never be failed by this hook.
+ */
+export async function executeOnConnected(
+  plugin: HayPluginDefinition,
+  connectedCtx: HayConnectedContext,
+  logger: HayLogger,
+): Promise<{ routingKeys: string[] }> {
+  if (!plugin.onConnected) {
+    logger.debug("Plugin has no onConnected hook, skipping");
+    return { routingKeys: [] };
+  }
+
+  logger.info("Executing onConnected hook", { orgId: connectedCtx.org.id });
+
+  try {
+    const result = plugin.onConnected(connectedCtx);
+
+    // Handle both sync and async hooks
+    const resolved =
+      result && typeof result === "object" && "then" in result ? await result : result;
+
+    const routingKeys = Array.isArray(resolved?.routingKeys) ? resolved.routingKeys : [];
+
+    logger.info("onConnected hook completed", { routingKeyCount: routingKeys.length });
+    return { routingKeys };
+  } catch (err) {
+    const errorMsg = err instanceof Error ? err.message : String(err);
+    logger.warn("onConnected hook threw error, returning no routing keys", {
+      error: errorMsg,
+    });
+    return { routingKeys: [] };
   }
 }
 
@@ -120,29 +166,27 @@ export async function executeOnStart(
 export async function executeOnValidateAuth(
   plugin: HayPluginDefinition,
   authCtx: HayAuthValidationContext,
-  logger: HayLogger
+  logger: HayLogger,
 ): Promise<boolean> {
   if (!plugin.onValidateAuth) {
-    logger.debug('Plugin has no onValidateAuth hook, assuming auth is valid');
+    logger.debug("Plugin has no onValidateAuth hook, assuming auth is valid");
     return true;
   }
 
-  logger.info('Executing onValidateAuth hook', { orgId: authCtx.org.id });
+  logger.info("Executing onValidateAuth hook", { orgId: authCtx.org.id });
 
   try {
     const result = plugin.onValidateAuth(authCtx);
 
     // Handle both sync and async hooks
     const isValid =
-      result && typeof result === 'object' && 'then' in result
-        ? await result
-        : result;
+      result && typeof result === "object" && "then" in result ? await result : result;
 
-    logger.info('onValidateAuth hook completed', { isValid });
+    logger.info("onValidateAuth hook completed", { isValid });
     return Boolean(isValid);
   } catch (err) {
     const errorMsg = err instanceof Error ? err.message : String(err);
-    logger.warn('onValidateAuth hook threw error, treating as invalid', {
+    logger.warn("onValidateAuth hook threw error, treating as invalid", {
       error: errorMsg,
     });
     return false;
@@ -165,27 +209,27 @@ export async function executeOnValidateAuth(
 export async function executeOnConfigUpdate(
   plugin: HayPluginDefinition,
   configCtx: HayConfigUpdateContext,
-  logger: HayLogger
+  logger: HayLogger,
 ): Promise<void> {
   if (!plugin.onConfigUpdate) {
-    logger.debug('Plugin has no onConfigUpdate hook, skipping');
+    logger.debug("Plugin has no onConfigUpdate hook, skipping");
     return;
   }
 
-  logger.info('Executing onConfigUpdate hook', { orgId: configCtx.org.id });
+  logger.info("Executing onConfigUpdate hook", { orgId: configCtx.org.id });
 
   try {
     const result = plugin.onConfigUpdate(configCtx);
 
     // Handle both sync and async hooks
-    if (result && typeof result === 'object' && 'then' in result) {
+    if (result && typeof result === "object" && "then" in result) {
       await result;
     }
 
-    logger.info('onConfigUpdate hook completed successfully');
+    logger.info("onConfigUpdate hook completed successfully");
   } catch (err) {
     const errorMsg = err instanceof Error ? err.message : String(err);
-    logger.error('onConfigUpdate hook failed', { error: errorMsg });
+    logger.error("onConfigUpdate hook failed", { error: errorMsg });
     // Don't throw - just log the error
   }
 }
@@ -206,27 +250,27 @@ export async function executeOnConfigUpdate(
 export async function executeOnDisable(
   plugin: HayPluginDefinition,
   disableCtx: HayDisableContext,
-  logger: HayLogger
+  logger: HayLogger,
 ): Promise<void> {
   if (!plugin.onDisable) {
-    logger.debug('Plugin has no onDisable hook, skipping');
+    logger.debug("Plugin has no onDisable hook, skipping");
     return;
   }
 
-  logger.info('Executing onDisable hook', { orgId: disableCtx.org.id });
+  logger.info("Executing onDisable hook", { orgId: disableCtx.org.id });
 
   try {
     const result = plugin.onDisable(disableCtx);
 
     // Handle both sync and async hooks
-    if (result && typeof result === 'object' && 'then' in result) {
+    if (result && typeof result === "object" && "then" in result) {
       await result;
     }
 
-    logger.info('onDisable hook completed successfully');
+    logger.info("onDisable hook completed successfully");
   } catch (err) {
     const errorMsg = err instanceof Error ? err.message : String(err);
-    logger.error('onDisable hook failed', { error: errorMsg });
+    logger.error("onDisable hook failed", { error: errorMsg });
     // Don't throw - just log the error
   }
 }

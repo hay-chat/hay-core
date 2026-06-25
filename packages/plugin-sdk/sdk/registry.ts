@@ -17,6 +17,7 @@ import type {
   PluginPage,
   CronJobOptions,
   CronJobDescriptor,
+  WebhookRoutingDescriptor,
 } from "../types/index.js";
 
 /**
@@ -87,6 +88,11 @@ export class PluginRegistry {
    * Array of cron job options (includes handler functions).
    */
   private cronJobs: CronJobOptions[] = [];
+
+  /**
+   * Declared webhook routing strategy (shared-app fan-out), or undefined.
+   */
+  private webhookRouting: WebhookRoutingDescriptor | undefined;
 
   /**
    * Register config schema.
@@ -177,6 +183,28 @@ export class PluginRegistry {
    */
   getCronJob(name: string): CronJobOptions | undefined {
     return this.cronJobs.find((c) => c.name === name);
+  }
+
+  /**
+   * Register the webhook routing strategy (shared-app fan-out).
+   *
+   * @param descriptor - Webhook routing descriptor
+   */
+  registerWebhookRouting(descriptor: WebhookRoutingDescriptor): void {
+    if (this.webhookRouting) {
+      throw new Error("Webhook routing strategy is already registered");
+    }
+
+    this.webhookRouting = descriptor;
+  }
+
+  /**
+   * Get the declared webhook routing strategy for the `/metadata` endpoint.
+   *
+   * @returns Webhook routing descriptor or undefined
+   */
+  getWebhookRouting(): WebhookRoutingDescriptor | undefined {
+    return this.webhookRouting;
   }
 
   /**

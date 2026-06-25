@@ -65,6 +65,65 @@ export interface PluginMetadata {
   };
   /** Plugin-declared cron jobs (from register.cron). Optional for older plugins. */
   crons?: CronJobDescriptor[];
+  /**
+   * Plugin-declared webhook routing strategy (from register.webhookRouting).
+   * Present only for plugins that fan a single shared webhook URL out to
+   * per-org workers. Absent for normal per-org webhooks.
+   */
+  webhookRouting?: WebhookRoutingDescriptor;
+}
+
+// ============================================================================
+// Webhook Routing Descriptor (shared-app fan-out)
+// ============================================================================
+
+/**
+ * Signature verification descriptor.
+ *
+ * Mirrors the SDK's WebhookSignatureDescriptor. Core verifies an HMAC-SHA256
+ * over the exact raw request bytes using `process.env[secretEnv]` and
+ * timing-safe compares against the named header.
+ */
+export interface WebhookSignatureDescriptor {
+  header: string;
+  format: "sha256-hmac";
+  secretEnv: string;
+}
+
+/**
+ * Verification-challenge (GET handshake) descriptor.
+ *
+ * Mirrors the SDK's WebhookVerificationChallengeDescriptor.
+ */
+export interface WebhookVerificationChallengeDescriptor {
+  modeParam: string;
+  verifyTokenParam: string;
+  challengeParam: string;
+  verifyTokenConfigField?: string;
+  verifyTokenEnv?: string;
+}
+
+/**
+ * Route-key extraction descriptor (minimal, no-eval dot-paths).
+ *
+ * Mirrors the SDK's WebhookRouteKeyPathDescriptor.
+ */
+export interface WebhookRouteKeyPathDescriptor {
+  itemsPath: string;
+  keyPath: string;
+}
+
+/**
+ * Full webhook routing strategy a plugin declares.
+ *
+ * Mirrors the SDK's WebhookRoutingDescriptor. Read from plugin metadata and
+ * executed blindly by the generic webhook router; Core gains no provider
+ * knowledge.
+ */
+export interface WebhookRoutingDescriptor {
+  signature: WebhookSignatureDescriptor;
+  verificationChallenge?: WebhookVerificationChallengeDescriptor;
+  routeKeyPath: WebhookRouteKeyPathDescriptor;
 }
 
 /**
@@ -173,6 +232,26 @@ export interface AuthMethodDescriptor {
 
   /** For OAuth2 auth: client secret env var */
   clientSecretEnv?: string;
+
+  /** For OAuth2 auth: extra static query params appended to the authorize URL */
+  authorizationParams?: Record<string, string>;
+
+  /** For OAuth2 auth: delimiter used to join scopes in the authorize URL (defaults to a space) */
+  scopeSeparator?: string;
+
+  /** For OAuth2 auth: one-time token transform run after the code exchange (e.g. short→long). */
+  tokenExchange?: OAuthTokenOpDescriptor;
+
+  /** For OAuth2 auth: custom refresh strategy used instead of the standard refresh_token grant. */
+  tokenRefresh?: OAuthTokenOpDescriptor;
+}
+
+/** Declarative token operation (exchange/refresh) executed as a single GET request. */
+export interface OAuthTokenOpDescriptor {
+  url: string;
+  grantType: string;
+  tokenParam: string;
+  includeClientSecret?: boolean;
 }
 
 /**

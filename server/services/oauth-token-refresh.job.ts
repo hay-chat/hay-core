@@ -26,9 +26,18 @@ export async function refreshOAuthTokens(): Promise<void> {
         const rawExpiresAt = instance.authState?.credentials?.expiresAt;
         const expiresAt = typeof rawExpiresAt === "number" ? rawExpiresAt : undefined;
         const hasRefreshToken = !!instance.authState?.credentials?.refreshToken;
+        // Plugins can declare a custom refresh strategy (e.g. Instagram's
+        // ig_refresh_token) that re-issues from the access token without a
+        // refresh_token. Those must still be refreshed before expiry.
+        const authMethods = (instance.plugin?.metadata?.authMethods ?? []) as Array<{
+          type?: string;
+          tokenRefresh?: unknown;
+        }>;
+        const hasCustomRefresh = authMethods.some((m) => m?.type === "oauth2" && !!m?.tokenRefresh);
 
-        // Skip if no expiry info or no refresh token
-        if (!expiresAt || !hasRefreshToken) {
+        // Skip if no expiry info, or no way to refresh (neither a refresh token
+        // nor a declared custom strategy).
+        if (!expiresAt || (!hasRefreshToken && !hasCustomRefresh)) {
           continue;
         }
 

@@ -1,0 +1,42 @@
+{
+  "customers": {
+    "title": "Clientes",
+    "description": "Pessoas que entraram em contato pelos seus canais",
+    "refresh": "Atualizar",
+    "search": {
+      "label": "Buscar",
+      "placeholder": "Buscar por nome, e-mail ou ID",
+      "apply": "Buscar"
+    },
+    "summary": "{total} clientes",
+    "columns": {
+      "customer": "Cliente",
+      "channels": "Canais",
+      "email": "E-mail",
+      "phone": "Telefone",
+      "created": "Criado em"
+    },
+    "empty": {
+      "title": "Nenhum cliente ainda",
+      "description": "Os clientes aparecem aqui assim que enviam mensagem por um canal conectado."
+    },
+    "pagination": "Página {page} de {totalPages}",
+    "fields": {
+      "email": "E-mail",
+      "phone": "Telefone",
+      "externalId": "ID externo",
+      "created": "Criado em",
+      "notes": "Notas"
+    },
+    "profile": {
+      "description": "Perfil do cliente e histórico de conversas",
+      "back": "Voltar para clientes",
+      "notFound": "Cliente não encontrado"
+    },
+    "conversations": {
+      "title": "Conversas",
+      "none": "Nenhuma conversa ainda",
+      "messageCount": "{count} mensagens"
+    }
+  }
+}

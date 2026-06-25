@@ -1,5 +1,6 @@
 {
   "conversations": {
+    "untitled": "Conversa sem título",
     "page": {
       "title": "Conversas",
       "description": "Monitore e gerencie todas as conversas com clientes",
@@ -38,6 +39,7 @@
     },
     "table": {
       "conversation": "Conversa",
+      "channel": "Canal",
       "status": "Status",
       "assignedTo": "Atribuído a",
       "duration": "Duração",
@@ -127,6 +129,10 @@
       "title": "Informações do Cliente",
       "customer": "Cliente",
       "conversationId": "ID da Conversa:",
+      "channel": "Canal:",
+      "email": "E-mail:",
+      "phone": "Telefone:",
+      "firstSeen": "Visto pela primeira vez:",
       "status": "Status:",
       "created": "Criada em:"
     },

@@ -144,6 +144,9 @@
                 />
               </TableHead>
               <TableHead>{{ $t("conversations.table.conversation") }}</TableHead>
+              <TableHead v-if="showChannelColumn">
+                {{ $t("conversations.table.channel") }}
+              </TableHead>
               <TableHead>{{ $t("conversations.table.status") }}</TableHead>
               <TableHead>{{ $t("conversations.table.assignedTo") }}</TableHead>
               <TableHead>{{ $t("conversations.table.duration") }}</TableHead>
@@ -181,6 +184,15 @@
                       }}
                     </div>
                   </div>
+                </div>
+              </TableCell>
+              <TableCell v-if="showChannelColumn">
+                <div class="flex items-center gap-2">
+                  <component
+                    :is="getChannelIcon(conversation.channel)"
+                    class="h-4 w-4 text-neutral-muted shrink-0"
+                  />
+                  <span class="text-sm">{{ getChannelLabel(conversation.channel) }}</span>
                 </div>
               </TableCell>
               <TableCell>
@@ -255,6 +267,7 @@ import { useRouter } from "vue-router";
 import { useAppStore } from "@/stores/app";
 import { formatRelativeTime, formatDuration } from "~/utils/date";
 import { getWaitTime, formatWaitTime, getWaitTimeClass } from "@/utils/conversation";
+import { getEnabledChannelPlugins } from "@/utils/channel";
 import Avatar from "@/components/ui/Avatar.vue";
 
 // i18n
@@ -291,6 +304,7 @@ interface Conversation {
   id: string;
   title?: string;
   status: string;
+  channel?: string;
   agent_id?: string;
   created_at: string;
   updated_at: string;
@@ -340,6 +354,12 @@ const escalationsPeriod = ref<"today" | "week" | null>(null);
 
 // Computed total pages
 const totalPages = computed(() => Math.ceil(totalConversations.value / pageSize.value));
+
+// Show the channel column only when the org has more than one channel in play.
+// "web" is always available, so a single enabled channel plugin already means 2+.
+// Channel labels/icons are resolved from the plugin registry via @/utils/channel
+// (getChannelIcon / getChannelLabel) — core never hardcodes channel names.
+const showChannelColumn = computed(() => getEnabledChannelPlugins().length >= 1);
 
 // Computed stats based on real conversations
 const stats = computed(() => {
@@ -566,7 +586,11 @@ onMounted(async () => {
     }
   }
 
-  await Promise.all([fetchConversations(), appStore.refreshConversationsCount()]);
+  await Promise.all([
+    fetchConversations(),
+    appStore.refreshConversationsCount(),
+    appStore.fetchPlugins(),
+  ]);
 
   // Setup WebSocket connection for real-time updates
   websocket.connect();

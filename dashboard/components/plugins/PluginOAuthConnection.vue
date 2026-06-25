@@ -14,15 +14,23 @@
       v-if="oauthStatus"
       class="p-4 rounded-lg border"
       :class="
-        oauthStatus.connected
-          ? 'bg-green-50 border-green-200 dark:bg-green-950/20 dark:border-green-800'
-          : 'bg-neutral-50 border-border dark:bg-neutral-900/20'
+        !oauthStatus.connected
+          ? 'bg-neutral-50 border-border dark:bg-neutral-900/20'
+          : oauthStatus.expired
+            ? 'bg-amber-50 border-amber-200 dark:bg-amber-950/20 dark:border-amber-800'
+            : 'bg-green-50 border-green-200 dark:bg-green-950/20 dark:border-green-800'
       "
     >
       <div class="flex items-start justify-between">
         <div class="flex items-center space-x-3">
           <div
-            v-if="oauthStatus.connected"
+            v-if="oauthStatus.connected && oauthStatus.expired"
+            class="w-10 h-10 rounded-full bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center"
+          >
+            <AlertTriangle class="h-5 w-5 text-amber-600 dark:text-amber-400" />
+          </div>
+          <div
+            v-else-if="oauthStatus.connected"
             class="w-10 h-10 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center"
           >
             <CheckCircle class="h-5 w-5 text-green-600 dark:text-green-400" />
@@ -36,7 +44,13 @@
 
           <div class="space-y-1">
             <p class="font-medium">
-              {{ oauthStatus.connected ? "Connected via OAuth" : "Not connected" }}
+              {{
+                !oauthStatus.connected
+                  ? "Not connected"
+                  : oauthStatus.expired
+                    ? "Connection expired"
+                    : "Connected via OAuth"
+              }}
             </p>
             <p
               v-if="oauthStatus.connected && oauthStatus.connectedAt"
@@ -45,7 +59,16 @@
               Connected {{ formatDate(oauthStatus.connectedAt) }}
             </p>
             <p
-              v-if="oauthStatus.connected && oauthStatus.expiresAt"
+              v-if="oauthStatus.connected && oauthStatus.expired"
+              class="text-xs text-amber-700 dark:text-amber-400"
+            >
+              Token expired{{
+                oauthStatus.expiresAt ? ` ${formatDate(oauthStatus.expiresAt)}` : ""
+              }}
+              — reconnect to keep this channel active
+            </p>
+            <p
+              v-else-if="oauthStatus.connected && oauthStatus.expiresAt"
               class="text-xs text-muted-foreground"
             >
               Token expires {{ formatDate(oauthStatus.expiresAt) }}
@@ -63,6 +86,15 @@
             size="sm"
           >
             Connect to {{ pluginName }}
+          </Button>
+          <Button
+            v-if="oauthStatus.connected && oauthStatus.expired"
+            @click="handleConnect"
+            :disabled="connecting"
+            :loading="connecting"
+            size="sm"
+          >
+            Reconnect
           </Button>
           <Button
             v-if="oauthStatus.connected"
@@ -99,11 +131,12 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from "vue";
 import { useI18n } from "vue-i18n";
-import { CheckCircle, Link2, Info } from "lucide-vue-next";
+import { CheckCircle, Link2, Info, AlertTriangle } from "lucide-vue-next";
 import type { PluginDisplay, PluginConfig } from "@/types/plugin.types";
 
 interface OAuthStatus {
   connected: boolean;
+  expired?: boolean;
   expiresAt?: number;
   connectedAt?: number;
   error?: string;

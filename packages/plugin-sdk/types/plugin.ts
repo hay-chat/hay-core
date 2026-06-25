@@ -10,6 +10,7 @@ import type { HayGlobalContext } from "./contexts";
 import type {
   OnInitializeHook,
   OnStartHook,
+  OnConnectedHook,
   OnValidateAuthHook,
   OnConfigUpdateHook,
   OnDisableHook,
@@ -87,6 +88,17 @@ export interface HayPluginDefinition {
    * @see {@link OnStartHook}
    */
   onStart?: OnStartHook;
+
+  /**
+   * Connection lifecycle hook (optional).
+   *
+   * Called once after OAuth tokens are stored for an org.
+   * Use this to perform a provider call with the fresh credentials and return
+   * opaque routing keys for Core to persist.
+   *
+   * @see {@link OnConnectedHook}
+   */
+  onConnected?: OnConnectedHook;
 
   /**
    * Authentication validation hook (optional).

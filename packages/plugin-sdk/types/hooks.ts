@@ -9,6 +9,7 @@
 import type {
   HayGlobalContext,
   HayStartContext,
+  HayConnectedContext,
   HayAuthValidationContext,
   HayConfigUpdateContext,
   HayDisableContext,
@@ -65,6 +66,28 @@ export type OnInitializeHook = (ctx: HayGlobalContext) => Promise<void> | void;
  * @see PLUGIN.md Section 4.2 (lines 195-223)
  */
 export type OnStartHook = (ctx: HayStartContext) => Promise<void> | void;
+
+/**
+ * Connection lifecycle hook.
+ *
+ * Called once by Hay Core immediately after OAuth tokens have been stored for
+ * an org. Used to perform a provider call that depends on the new credentials
+ * and to return opaque **routing keys** for Core to persist (e.g. an external
+ * account id used to route a shared inbound webhook back to this org).
+ *
+ * @param ctx - Connected context with org, config, auth (fresh tokens), and logger
+ * @returns Promise resolving to `{ routingKeys?: string[] }`. Omitting
+ *   `routingKeys` (or returning nothing) persists no keys.
+ *
+ * @remarks
+ * Core treats `routingKeys` as opaque strings. If this hook throws, Core logs a
+ * warning and continues — the OAuth flow is never failed by this hook.
+ *
+ * @see {@link HayConnectedContext}
+ */
+export type OnConnectedHook = (
+  ctx: HayConnectedContext,
+) => Promise<{ routingKeys?: string[] }> | { routingKeys?: string[] };
 
 /**
  * Authentication validation hook.

@@ -16,6 +16,7 @@ import {
 import { validateUrlForSSRF } from "@server/utils/ssrf";
 import { AppDataSource } from "@server/database/data-source";
 import { Job } from "@server/entities/job.entity";
+import { jobRepository } from "@server/repositories/job.repository";
 import { DocumentSource } from "@server/entities/document-source.entity";
 import { createLogger } from "@server/lib/logger";
 
@@ -343,6 +344,17 @@ export const documentSourcesRouter = t.router({
             );
           }
         }
+      }
+
+      // Cancel any queued/running sync jobs for this source before removing the
+      // row, otherwise the dispatcher/worker later picks up an orphaned job and
+      // logs "DocumentSource not found".
+      const cancelledJobs = await jobRepository.cancelSyncJobsForSource(existing.id);
+      if (cancelledJobs > 0) {
+        logger.debug(
+          { documentSourceId: existing.id, cancelledJobs },
+          "Cancelled in-flight sync jobs for deleted document source",
+        );
       }
 
       const deleted = await documentSourceRepository.delete(existing.id, ctx.organizationId!);
