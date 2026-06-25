@@ -175,6 +175,8 @@ export class OAuthService {
       pkce: true, // Always use PKCE for security
       authorizationParams: oauth2Method.authorizationParams,
       scopeSeparator: oauth2Method.scopeSeparator,
+      tokenExchange: oauth2Method.tokenExchange,
+      tokenRefresh: oauth2Method.tokenRefresh,
     };
 
     // Get client credentials from plugin instance using config resolver with env fallback
@@ -467,6 +469,34 @@ export class OAuthService {
         "Tokens received from provider",
       );
 
+      // Optional one-time token transform (e.g. Instagram short-lived → long-lived).
+      // Done here, server-side, because it may need the client secret. Failure is
+      // non-fatal: keep the original token so the connection still works (degraded).
+      if (oauthConfig.tokenExchange && tokens.access_token) {
+        try {
+          const exchanged = await this.performTokenOp(
+            oauthConfig.tokenExchange,
+            tokens.access_token,
+            validCredentials.clientSecret,
+          );
+          tokens.access_token = exchanged.access_token;
+          tokens.expires_in = exchanged.expires_in;
+          tokens.expires_at = exchanged.expires_in
+            ? Math.floor(Date.now() / 1000) + exchanged.expires_in
+            : undefined;
+          tokens.token_type = exchanged.token_type || tokens.token_type;
+          logger.info(
+            { expiresIn: tokens.expires_in },
+            "Token exchange transform applied (long-lived token obtained)",
+          );
+        } catch (error) {
+          logger.warn(
+            { err: error instanceof Error ? error.message : String(error), pluginId },
+            "Token exchange transform failed — keeping original token",
+          );
+        }
+      }
+
       // Combine required and optional scopes for storage
       const allScopes: string[] = [];
       if (oauthConfig.scopes && oauthConfig.scopes.length > 0) {
@@ -518,6 +548,42 @@ export class OAuthService {
   /**
    * Exchange authorization code for access token
    */
+  /**
+   * Execute a declarative token operation (exchange or refresh) as a single GET:
+   *   {url}?grant_type={grantType}&[client_secret=…&]{tokenParam}={accessToken}
+   * Returns the new access token (and optional expiry/type) from the JSON body.
+   * Used for non-standard provider flows like Instagram's ig_exchange_token /
+   * ig_refresh_token, which don't fit the OAuth2 refresh_token grant.
+   */
+  private async performTokenOp(
+    op: { url: string; grantType: string; tokenParam: string; includeClientSecret?: boolean },
+    accessToken: string,
+    clientSecret: string | null,
+  ): Promise<{ access_token: string; expires_in?: number; token_type?: string }> {
+    const url = new URL(op.url);
+    url.searchParams.set("grant_type", op.grantType);
+    url.searchParams.set(op.tokenParam, accessToken);
+    if (op.includeClientSecret && clientSecret) {
+      url.searchParams.set("client_secret", clientSecret);
+    }
+
+    const response = await fetch(url.toString(), { method: "GET" });
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Token op (${op.grantType}) failed: ${response.status} ${errorText}`);
+    }
+
+    const data = await response.json();
+    if (!data.access_token) {
+      throw new Error(`Token op (${op.grantType}) returned no access_token`);
+    }
+    return {
+      access_token: data.access_token,
+      expires_in: typeof data.expires_in === "number" ? data.expires_in : undefined,
+      token_type: data.token_type,
+    };
+  }
+
   private async exchangeCodeForTokens(
     code: string,
     oauthConfig: OAuthManifestConfig,
@@ -818,11 +884,6 @@ export class OAuthService {
       throw new Error("Plugin instance not found");
     }
 
-    // Check for OAuth credentials in authState
-    if (!instance.authState?.credentials?.refreshToken) {
-      throw new Error("OAuth not configured for this plugin instance");
-    }
-
     // Check metadata.authMethods for OAuth2 registration
     if (!plugin.metadata?.authMethods) {
       throw new Error(`Plugin ${pluginId} does not have metadata`);
@@ -836,7 +897,17 @@ export class OAuthService {
       throw new Error(`Plugin ${pluginId} does not support OAuth`);
     }
 
-    if (!oauth2Method.tokenUrl) {
+    // A plugin may declare a custom refresh strategy (e.g. Instagram's
+    // ig_refresh_token) for providers that don't issue a standard refresh_token.
+    const customRefresh = oauth2Method.tokenRefresh;
+
+    // The standard refresh_token grant needs a refresh_token; a custom strategy
+    // re-issues from the current access token instead.
+    if (!customRefresh && !instance.authState?.credentials?.refreshToken) {
+      throw new Error("OAuth not configured for this plugin instance");
+    }
+
+    if (!customRefresh && !oauth2Method.tokenUrl) {
       throw new Error(`OAuth2 method missing tokenUrl`);
     }
 
@@ -844,9 +915,7 @@ export class OAuthService {
       tokenUrl: oauth2Method.tokenUrl,
     };
 
-    // Get refresh token from authState (already decrypted by TypeORM transformer)
-    const refreshToken = instance.authState.credentials.refreshToken as string;
-    const oldScope = instance.authState.credentials.scope;
+    const oldScope = instance.authState?.credentials?.scope;
 
     // Get client credentials from plugin instance using config resolver with env fallback
     const clientIdFieldName = oauth2Method.clientId;
@@ -884,6 +953,49 @@ export class OAuthService {
       clientId: credentials.clientId,
       clientSecret: credentials.clientSecret,
     };
+
+    // Custom refresh strategy (declarative): a single GET that re-issues from the
+    // current access token. No refresh_token involved (e.g. Instagram).
+    if (customRefresh) {
+      const currentAccessToken = instance.authState?.credentials?.accessToken as string | undefined;
+      if (!currentAccessToken) {
+        throw new Error("No access token available for custom refresh");
+      }
+      const result = await this.performTokenOp(
+        customRefresh,
+        currentAccessToken,
+        validCredentials.clientSecret,
+      );
+      const expiresAt = result.expires_in
+        ? Math.floor(Date.now() / 1000) + result.expires_in
+        : undefined;
+      const newTokens: OAuthTokenData = {
+        access_token: result.access_token,
+        refresh_token: undefined,
+        expires_in: result.expires_in,
+        expires_at: expiresAt,
+        token_type: result.token_type || "Bearer",
+        scope: oldScope as string | undefined,
+      };
+      await pluginInstanceRepository.updateAuthState(instance.id, instance.organizationId, {
+        methodId: `${pluginId}-oauth`,
+        credentials: {
+          accessToken: newTokens.access_token,
+          expiresAt: newTokens.expires_at,
+          tokenType: newTokens.token_type,
+          scope: newTokens.scope,
+        },
+      });
+      logger.debug({ organizationId, expiresAt }, `Custom token refresh for plugin ${pluginId}`);
+      return newTokens;
+    }
+
+    // --- Standard OAuth2 refresh_token grant ---
+    if (!oauthConfig.tokenUrl) {
+      throw new Error(`OAuth2 method missing tokenUrl`);
+    }
+    // Get refresh token from authState (already decrypted by TypeORM transformer)
+    const refreshToken = instance.authState!.credentials!.refreshToken as string;
 
     // Refresh token
     const body = new URLSearchParams({

@@ -33,6 +33,16 @@ export interface OAuthManifestConfig {
   clientSecretEnvVar?: string; // Defaults to {PLUGIN_ID}_OAUTH_CLIENT_SECRET (optional for CIMD)
   authorizationParams?: Record<string, string>; // Extra static query params merged into the authorize URL (reserved keys skipped)
   scopeSeparator?: string; // Delimiter used to join scopes in the authorize URL (defaults to a space)
+  tokenExchange?: OAuthTokenOpConfig; // One-time post-callback token transform (e.g. short→long)
+  tokenRefresh?: OAuthTokenOpConfig; // Custom refresh strategy (non-standard, e.g. Instagram)
+}
+
+/** Declarative token op executed as a GET request; see OAuthTokenOpDescriptor. */
+export interface OAuthTokenOpConfig {
+  url: string;
+  grantType: string;
+  tokenParam: string;
+  includeClientSecret?: boolean;
 }
 
 export interface OAuthConnectionStatus {

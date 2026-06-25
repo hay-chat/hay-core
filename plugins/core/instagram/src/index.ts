@@ -78,6 +78,21 @@ export default defineHayPlugin((globalCtx) => {
         scopeSeparator: ",",
         clientId: config.field("clientId"),
         clientSecret: config.field("clientSecret"),
+        // Instagram issues a short-lived (~1h) token. Core swaps it for a
+        // long-lived (~60d) token right after connect (needs the app secret,
+        // which only core has), then the platform's auto-refresh job renews it
+        // via the non-standard ig_refresh_token endpoint (no refresh_token).
+        tokenExchange: {
+          url: "https://graph.instagram.com/access_token",
+          grantType: "ig_exchange_token",
+          tokenParam: "access_token",
+          includeClientSecret: true,
+        },
+        tokenRefresh: {
+          url: "https://graph.instagram.com/refresh_access_token",
+          grantType: "ig_refresh_token",
+          tokenParam: "access_token",
+        },
       });
 
       // Declare how Core should route the single shared webhook. Core verifies

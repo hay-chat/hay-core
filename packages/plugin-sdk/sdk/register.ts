@@ -570,6 +570,26 @@ function validateOAuth2AuthOptions(options: OAuth2AuthOptions, registry: PluginR
   if (options.scopeSeparator !== undefined && typeof options.scopeSeparator !== "string") {
     throw new Error("OAuth2 auth scopeSeparator must be a string");
   }
+
+  // Validate tokenExchange / tokenRefresh declarative token ops (if provided)
+  for (const [key, op] of [
+    ["tokenExchange", options.tokenExchange],
+    ["tokenRefresh", options.tokenRefresh],
+  ] as const) {
+    if (op === undefined) continue;
+    if (typeof op !== "object" || op === null) {
+      throw new Error(`OAuth2 auth ${key} must be an object`);
+    }
+    if (typeof op.url !== "string" || !op.url) {
+      throw new Error(`OAuth2 auth ${key}.url must be a non-empty string`);
+    }
+    if (typeof op.grantType !== "string" || !op.grantType) {
+      throw new Error(`OAuth2 auth ${key}.grantType must be a non-empty string`);
+    }
+    if (typeof op.tokenParam !== "string" || !op.tokenParam) {
+      throw new Error(`OAuth2 auth ${key}.tokenParam must be a non-empty string`);
+    }
+  }
 }
 
 /**

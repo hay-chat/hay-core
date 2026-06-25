@@ -238,6 +238,20 @@ export interface AuthMethodDescriptor {
 
   /** For OAuth2 auth: delimiter used to join scopes in the authorize URL (defaults to a space) */
   scopeSeparator?: string;
+
+  /** For OAuth2 auth: one-time token transform run after the code exchange (e.g. short→long). */
+  tokenExchange?: OAuthTokenOpDescriptor;
+
+  /** For OAuth2 auth: custom refresh strategy used instead of the standard refresh_token grant. */
+  tokenRefresh?: OAuthTokenOpDescriptor;
+}
+
+/** Declarative token operation (exchange/refresh) executed as a single GET request. */
+export interface OAuthTokenOpDescriptor {
+  url: string;
+  grantType: string;
+  tokenParam: string;
+  includeClientSecret?: boolean;
 }
 
 /**

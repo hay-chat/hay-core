@@ -200,6 +200,8 @@ export class PluginHttpServer {
                 clientSecret: method.clientSecret.name,
                 authorizationParams: method.authorizationParams ?? {},
                 scopeSeparator: method.scopeSeparator,
+                tokenExchange: method.tokenExchange,
+                tokenRefresh: method.tokenRefresh,
               };
             }
           }),

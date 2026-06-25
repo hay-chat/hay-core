@@ -181,7 +181,40 @@ export interface OAuth2AuthOptions {
    */
   scopeSeparator?: string;
 
+  /**
+   * Optional one-time token transform run by the platform immediately after the
+   * authorization-code exchange (e.g. swap a short-lived token for a long-lived
+   * one). Performed server-side because it may need the client secret. Instagram
+   * Business Login uses this for `ig_exchange_token`.
+   */
+  tokenExchange?: OAuthTokenOp;
+
+  /**
+   * Optional custom token-refresh strategy. When set, the platform's automatic
+   * OAuth refresh uses this instead of the standard `refresh_token` grant —
+   * required by providers that don't issue a refresh_token (e.g. Instagram's
+   * `ig_refresh_token`, which re-issues using the access token itself).
+   */
+  tokenRefresh?: OAuthTokenOp;
+
   // Future: PKCE, redirect paths, etc.
+}
+
+/**
+ * A declarative token operation the platform executes as a single GET request:
+ * `{url}?grant_type={grantType}&[client_secret=…&]{tokenParam}={accessToken}`.
+ * The JSON response must include `access_token` (optionally `expires_in`,
+ * `token_type`). Used for short→long exchange and non-standard refresh.
+ */
+export interface OAuthTokenOp {
+  /** Endpoint to call. */
+  url: string;
+  /** Value for the `grant_type` query param. */
+  grantType: string;
+  /** Query-param name carrying the current access token (e.g. "access_token"). */
+  tokenParam: string;
+  /** Append the client secret as `client_secret` (needed by token exchange). */
+  includeClientSecret?: boolean;
 }
 
 /**
