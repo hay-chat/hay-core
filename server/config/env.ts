@@ -16,6 +16,16 @@ for (let i = 1; i <= 4; i++) {
 // Fallback to .env at project root even if not found, for backward compatibility
 dotenv.config({ path: envPath || path.resolve(__dirname, "../../../../.env") });
 
+/**
+ * Normalize a configured domain to host[:port] form by stripping any leading
+ * URL scheme. Domains are stored scheme-less because the protocol is applied
+ * separately (getApiUrl/getProtocol); accepting a full URL here would otherwise
+ * yield doubled schemes like "http://http://localhost:3001".
+ */
+function stripScheme(value: string): string {
+  return value.replace(/^[a-z][a-z0-9+.-]*:\/\//i, "");
+}
+
 export const config = {
   env: process.env.NODE_ENV || "development",
   isDevelopment: process.env.NODE_ENV === "development",
@@ -29,14 +39,22 @@ export const config = {
   },
 
   domain: {
-    base: process.env.BASE_DOMAIN || (process.env.NODE_ENV === "development" ? "localhost" : ""),
+    // Service domains are host[:port] only — the protocol is applied separately
+    // by getApiUrl()/getProtocol(). Strip a leading scheme so a value like
+    // "http://localhost:3001" doesn't produce a doubled "http://http://..." URL.
+    base: stripScheme(
+      process.env.BASE_DOMAIN || (process.env.NODE_ENV === "development" ? "localhost" : ""),
+    ),
     protocol: process.env.APP_PROTOCOL || "http",
     // Service-specific domains - required in production
-    api: process.env.API_DOMAIN || (process.env.NODE_ENV === "development" ? "localhost:3001" : ""),
-    dashboard:
+    api: stripScheme(
+      process.env.API_DOMAIN || (process.env.NODE_ENV === "development" ? "localhost:3001" : ""),
+    ),
+    dashboard: stripScheme(
       process.env.DASHBOARD_DOMAIN ||
-      (process.env.NODE_ENV === "development" ? "localhost:3000" : ""),
-    cdn: process.env.CDN_DOMAIN || "",
+        (process.env.NODE_ENV === "development" ? "localhost:3000" : ""),
+    ),
+    cdn: stripScheme(process.env.CDN_DOMAIN || ""),
     useSSL: process.env.USE_SSL === "true" || process.env.NODE_ENV === "production",
   },
 

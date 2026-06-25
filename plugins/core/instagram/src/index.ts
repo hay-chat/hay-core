@@ -220,6 +220,14 @@ export default defineHayPlugin((globalCtx) => {
 
       const client = new GraphClient({ logger: ctx.logger });
 
+      // Refresh the LIVE worker state with the freshly-minted token. onConnected
+      // runs in the already-running worker after a (re)connect, but onStart —
+      // which seeds the closure token used by the webhook/deliver handlers — does
+      // NOT re-run on reconnect. Without this, handlers keep using the previous
+      // (now stale/expired) token until the next worker restart.
+      accessToken = token;
+      graphClient = client;
+
       // Subscribe the account to this app's webhooks so inbound DMs are
       // delivered (separate from the dashboard field subscription). Non-fatal.
       try {
