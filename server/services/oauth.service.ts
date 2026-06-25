@@ -857,9 +857,16 @@ export class OAuthService {
         return { connected: false };
       }
 
+      // expiresAt is epoch seconds. A token whose expiry has already passed
+      // could not be refreshed (e.g. revoked on the provider, or the refresh
+      // job hasn't run) — surface it so the UI can prompt a reconnect.
+      const expiresAt = credentials.expiresAt as number | undefined;
+      const expired = typeof expiresAt === "number" && expiresAt < Math.floor(Date.now() / 1000);
+
       return {
         connected: true,
-        expiresAt: credentials.expiresAt as number | undefined,
+        expired,
+        expiresAt,
         connectedAt: credentials.connectedAt as number | undefined,
       };
     } catch (error) {

@@ -47,6 +47,9 @@ export interface OAuthTokenOpConfig {
 
 export interface OAuthConnectionStatus {
   connected: boolean;
+  /** True when credentials exist but the access token's expiry has passed and
+   * it could not be (or has not yet been) refreshed — the user must reconnect. */
+  expired?: boolean;
   expiresAt?: number;
   connectedAt?: number;
   error?: string;
