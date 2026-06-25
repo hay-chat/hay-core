@@ -773,6 +773,9 @@ type ConversationDetail = Omit<ConversationGetOutput, "messages"> & {
 
 /** Payload received over the WebSocket `message` event. */
 interface MessageEventPayload {
+  /** Conversation this message belongs to. Dashboard clients receive messages
+   * for ALL org conversations, so this is used to filter to the open thread. */
+  conversationId?: string;
   data?: {
     id: string;
     content: string;
@@ -1451,6 +1454,18 @@ onMounted(async () => {
     console.log("[WebSocket] Received message event with full data", payload);
     if (isMessageEventPayload(payload) && payload.data) {
       const messageData = payload.data;
+
+      // Dashboard clients receive messages for EVERY conversation in the org
+      // (for sidebar/visibility). In regular mode, ignore any message that does
+      // not belong to the conversation currently open, otherwise it leaks into
+      // the wrong thread. Playground mode has no persisted conversation id.
+      if (
+        !isPlaygroundMode.value &&
+        payload.conversationId &&
+        payload.conversationId !== conversationId.value
+      ) {
+        return;
+      }
 
       // Check if this message belongs to the current conversation
       // In playground mode, check messages array, in regular mode check conversation
