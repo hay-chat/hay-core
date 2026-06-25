@@ -1,0 +1,120 @@
+{
+  "name": "Spacebring",
+  "description": "Conecte seu espaço de coworking Spacebring para que o assistente responda dúvidas dos membros e gerencie reservas de salas, eventos, visitantes e chamados de suporte.",
+  "tools": {
+    "list_locations": {
+      "label": "Listar Unidades",
+      "description": "Lista as unidades de coworking que sua conta Spacebring pode acessar."
+    },
+    "find_membership": {
+      "label": "Buscar Membro",
+      "description": "Localiza um membro (por e-mail) para identificar quem você está atendendo."
+    },
+    "get_membership": {
+      "label": "Obter Associação",
+      "description": "Obtém o perfil e o saldo de créditos de um membro pelo id."
+    },
+    "list_resources": {
+      "label": "Listar Salas e Mesas",
+      "description": "Lista salas de reunião, mesas, escritórios e vagas reserváveis."
+    },
+    "get_resource": {
+      "label": "Obter Sala/Mesa",
+      "description": "Obtém os detalhes de um recurso reservável, incluindo o horário."
+    },
+    "list_bookings": {
+      "label": "Listar Reservas",
+      "description": "Verifica a disponibilidade de salas ou lista as reservas de um membro."
+    },
+    "create_booking": {
+      "label": "Reservar Sala",
+      "description": "Reserva uma sala de reunião ou mesa para um horário."
+    },
+    "get_booking": {
+      "label": "Obter Reserva",
+      "description": "Obtém os detalhes de uma reserva."
+    },
+    "cancel_booking": {
+      "label": "Cancelar Reserva",
+      "description": "Cancela uma reserva e libera o horário."
+    },
+    "list_guides": {
+      "label": "Listar Guias",
+      "description": "Lista guias e dúvidas frequentes (Wi‑Fi, regras, instruções)."
+    },
+    "get_guide": {
+      "label": "Obter Guia",
+      "description": "Lê o conteúdo completo de um guia, ex.: o artigo de Wi‑Fi."
+    },
+    "list_feed_posts": {
+      "label": "Listar Avisos",
+      "description": "Lista publicações e avisos do feed da comunidade."
+    },
+    "get_feed_post": {
+      "label": "Obter Aviso",
+      "description": "Lê uma publicação do feed da comunidade."
+    },
+    "list_events": {
+      "label": "Listar Eventos",
+      "description": "Lista os próximos eventos da comunidade."
+    },
+    "get_event": {
+      "label": "Obter Evento",
+      "description": "Obtém os detalhes de um evento."
+    },
+    "list_benefits": {
+      "label": "Listar Benefícios",
+      "description": "Lista benefícios para membros e parcerias."
+    },
+    "get_benefit": {
+      "label": "Obter Benefício",
+      "description": "Obtém um benefício e como resgatá-lo."
+    },
+    "list_plans": {
+      "label": "Listar Planos",
+      "description": "Lista os planos de associação e preços."
+    },
+    "list_visits": {
+      "label": "Listar Visitas",
+      "description": "Lista visitas de convidados, opcionalmente por anfitrião."
+    },
+    "create_visit": {
+      "label": "Registrar Convidado",
+      "description": "Registra ou convida um visitante."
+    },
+    "get_visit": {
+      "label": "Obter Visita",
+      "description": "Obtém uma visita, incluindo o código de acesso."
+    },
+    "cancel_visit": {
+      "label": "Cancelar Visita",
+      "description": "Cancela uma visita registrada."
+    },
+    "list_support_tickets": {
+      "label": "Listar Chamados",
+      "description": "Lista os chamados de suporte abertos pelos membros."
+    },
+    "create_support_ticket": {
+      "label": "Relatar Problema",
+      "description": "Abre um chamado de suporte (ar-condicionado, impressora, Wi‑Fi, etc.)."
+    },
+    "get_support_ticket": {
+      "label": "Obter Chamado",
+      "description": "Obtém um chamado de suporte e seu status."
+    }
+  },
+  "config": {
+    "apiKeyId": {
+      "label": "ID da Chave de API",
+      "description": "ID da chave de API do Spacebring (o usuário do Basic auth). Gere as credenciais no Spacebring em Settings → Integrations → API."
+    },
+    "apiKeySecret": {
+      "label": "Segredo da Chave de API",
+      "description": "Segredo da chave de API do Spacebring (a senha do Basic auth). Armazenado de forma criptografada."
+    },
+    "locationRef": {
+      "label": "ID da Unidade Padrão",
+      "description": "UUID da unidade que este assistente atende. Usado como padrão em todas as ferramentas. Encontre-o com a ferramenta Listar Unidades ou na URL do seu painel Spacebring."
+    }
+  }
+}
