@@ -66,11 +66,28 @@ export class Agent {
   @Column({ type: "uuid", nullable: true })
   avatarUploadId?: string | null;
 
+  /**
+   * Public URL for {@link avatarUpload}, derived on read (not a column).
+   * Populated by the conversation service so the dashboard can render the
+   * agent's avatar without knowing storage internals.
+   */
+  avatarUrl?: string | null;
+
   @Column({ type: "boolean", nullable: true })
   testMode!: boolean | null;
 
   @Column({ type: "varchar", length: 10, nullable: true })
   language!: string | null;
+
+  /**
+   * Channels this agent is assigned to (many-to-many: a channel id can appear on
+   * multiple agents, an agent can hold multiple channels). Channel ids are the
+   * canonical plugin `manifest.channel` strings (e.g. "instagram") plus the
+   * built-in "web". An incoming message still resolves to a single responder per
+   * channel — see getAgentForChannel in plugin-api/trpc.ts.
+   */
+  @Column({ type: "text", array: true, default: () => "'{}'" })
+  channels!: string[];
 
   @CreateDateColumn()
   created_at!: Date;

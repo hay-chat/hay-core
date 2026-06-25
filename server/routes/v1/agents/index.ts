@@ -20,6 +20,7 @@ const createAgentSchema = z.object({
   humanHandoffUnavailableInstructions: z.array(z.unknown()).optional(),
   testMode: z.boolean().nullable().optional(),
   language: z.nativeEnum(SupportedLanguage).nullable().optional(),
+  channels: z.array(z.string()).optional(),
 });
 
 const updateAgentSchema = z.object({
@@ -35,6 +36,7 @@ const updateAgentSchema = z.object({
   humanHandoffUnavailableInstructions: z.array(z.unknown()).optional(),
   testMode: z.boolean().nullable().optional(),
   language: z.nativeEnum(SupportedLanguage).nullable().optional(),
+  channels: z.array(z.string()).optional(),
 });
 
 export const agentsRouter = t.router({

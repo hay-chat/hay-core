@@ -69,6 +69,7 @@ export const getAllPlugins = authenticatedProcedure.query(async ({ ctx }) => {
         name: plugin.name,
         version: plugin.version,
         type: manifest.type,
+        channel: manifest.channel, // Channel identifier for channel-type plugins (undefined otherwise)
         description: configSchema
           ? Object.values(configSchema)[0]?.description
           : `${plugin.name} plugin`,

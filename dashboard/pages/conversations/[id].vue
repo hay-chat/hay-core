@@ -157,11 +157,14 @@
             enter-to-class="opacity-100 translate-y-0"
           >
             <ChatMessage
-              v-for="message in messages"
+              v-for="(message, index) in messages"
               :key="message.id"
               :message="message as Message"
               :inverted="true"
               :show-feedback="true"
+              :show-timestamp="shouldShowTimestamp(messages, index)"
+              :bot-avatar-url="botAvatarUrl"
+              :human-avatar-url="humanAvatarUrl"
               @retry="retryMessage"
             />
           </TransitionGroup>
@@ -231,11 +234,14 @@
               enter-to-class="opacity-100 translate-y-0"
             >
               <ChatMessage
-                v-for="message in conversation?.messages"
+                v-for="(message, index) in conversation?.messages"
                 :key="message.id"
                 :message="message as Message"
                 :show-feedback="true"
                 :show-approval="isTestMode"
+                :show-timestamp="shouldShowTimestamp(conversation?.messages, index)"
+                :bot-avatar-url="botAvatarUrl"
+                :human-avatar-url="humanAvatarUrl"
                 @message-approved="handleMessageApproved"
                 @message-blocked="handleMessageBlocked"
                 @feedback-submitted="handleFeedbackSubmitted"
@@ -480,37 +486,68 @@
                 </CardTitle>
               </CardHeader>
               <CardContent class="space-y-3">
-                <div class="flex items-center space-x-3">
+                <button
+                  type="button"
+                  class="flex items-center space-x-3 w-full text-left rounded-md -m-1 p-1 hover:bg-background-secondary transition-colors disabled:cursor-default disabled:hover:bg-transparent"
+                  :disabled="!customerDisplay.id"
+                  @click="viewCustomer"
+                >
                   <div
-                    class="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center"
+                    class="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center overflow-hidden flex-shrink-0"
                   >
-                    <User class="h-5 w-5 text-primary" />
+                    <img
+                      v-if="customerDisplay.avatarUrl"
+                      :src="customerDisplay.avatarUrl"
+                      :alt="customerDisplay.name"
+                      class="w-full h-full object-cover"
+                    />
+                    <span v-else class="text-sm font-medium text-primary">{{
+                      customerDisplay.initial
+                    }}</span>
                   </div>
-                  <div>
-                    <div class="font-medium">{{ $t("conversations.customerInfo.customer") }}</div>
-                    <div class="text-sm text-neutral-muted">
-                      {{ conversation?.id?.slice(0, 8) }}
+                  <div class="min-w-0">
+                    <div class="font-medium truncate">{{ customerDisplay.name }}</div>
+                    <div v-if="customerDisplay.handle" class="text-sm text-neutral-muted truncate">
+                      {{ customerDisplay.handle }}
                     </div>
                   </div>
-                </div>
+                </button>
                 <div class="space-y-2 text-sm">
-                  <div class="flex justify-between">
+                  <div class="flex justify-between gap-2">
                     <span class="text-neutral-muted">{{
-                      $t("conversations.customerInfo.conversationId")
+                      $t("conversations.customerInfo.channel")
                     }}</span>
-                    <span class="font-mono text-xs">{{ conversation?.id?.slice(0, 8) }}</span>
+                    <span class="flex items-center gap-1.5 min-w-0">
+                      <component
+                        :is="getChannelIcon(conversation?.channel)"
+                        class="h-3.5 w-3.5 flex-shrink-0"
+                      />
+                      <span class="truncate">{{ getChannelLabel(conversation?.channel) }}</span>
+                    </span>
                   </div>
-                  <div class="flex justify-between">
+                  <div v-if="customerDisplay.email" class="flex justify-between gap-2">
+                    <span class="text-neutral-muted">{{
+                      $t("conversations.customerInfo.email")
+                    }}</span>
+                    <span class="truncate">{{ customerDisplay.email }}</span>
+                  </div>
+                  <div v-if="customerDisplay.phone" class="flex justify-between gap-2">
+                    <span class="text-neutral-muted">{{
+                      $t("conversations.customerInfo.phone")
+                    }}</span>
+                    <span class="truncate">{{ customerDisplay.phone }}</span>
+                  </div>
+                  <div v-if="customerDisplay.firstSeenAt" class="flex justify-between gap-2">
+                    <span class="text-neutral-muted">{{
+                      $t("conversations.customerInfo.firstSeen")
+                    }}</span>
+                    <span>{{ formatDateTime(customerDisplay.firstSeenAt) }}</span>
+                  </div>
+                  <div class="flex justify-between gap-2">
                     <span class="text-neutral-muted">{{
                       $t("conversations.customerInfo.status")
                     }}</span>
                     <span>{{ conversation?.status }}</span>
-                  </div>
-                  <div class="flex justify-between">
-                    <span class="text-neutral-muted">{{
-                      $t("conversations.customerInfo.created")
-                    }}</span>
-                    <span>{{ formatDateTime(conversation?.created_at) }}</span>
                   </div>
                 </div>
               </CardContent>
@@ -712,7 +749,6 @@ import {
   Circle,
   CheckCircle,
   XCircle,
-  User,
   ShieldAlert,
   X,
   RefreshCw,
@@ -730,7 +766,14 @@ import {
 } from "lucide-vue-next";
 import { TRPCClientError } from "@trpc/client";
 import { HayApi } from "@/utils/api";
+import {
+  getCustomerChannelInfo,
+  getCustomerDisplayName,
+  getCustomerInitial,
+} from "@/utils/customer";
+import { getChannelIcon, getChannelLabel } from "@/utils/channel";
 import { MessageType, type Message } from "~/types/message";
+import { parseUTCDate } from "~/utils/date";
 import type { AssignedUser } from "@/composables/useConversationTakeover";
 import type { RouterOutputs } from "@/types/trpc";
 
@@ -867,6 +910,56 @@ const conversation = ref<ConversationDetail | null>(null);
 const previousConversations = ref<PreviousConversation[]>([]);
 const relatedDocuments = ref<RelatedDocument[]>([]);
 
+// Derived customer info for the "Customer Information" panel. The conversation
+// payload already includes the full customer; we just surface it nicely.
+const customer = computed(() => conversation.value?.customer ?? null);
+
+const customerChannelInfo = computed(() =>
+  getCustomerChannelInfo(customer.value, conversation.value?.channel),
+);
+
+const customerDisplay = computed(() => {
+  const c = customer.value;
+  const channel = conversation.value?.channel ?? null;
+  const info = customerChannelInfo.value;
+  return {
+    id: c?.id ?? null,
+    name: getCustomerDisplayName(c, channel),
+    initial: getCustomerInitial(c, channel),
+    handle: info.handle ? `@${info.handle}` : null,
+    avatarUrl: info.avatarUrl,
+    email: c?.email ?? null,
+    phone: c?.phone ?? null,
+    firstSeenAt: info.firstSeenAt,
+  };
+});
+
+// Navigate to the (unlisted) customer profile page.
+const viewCustomer = () => {
+  if (customerDisplay.value.id) {
+    navigateTo(`/customers/${customerDisplay.value.id}`);
+  }
+};
+
+// Load the customer's other conversations for the "Previous Conversations" panel.
+const fetchPreviousConversations = async (customerId: string) => {
+  try {
+    const rows = await HayApi.conversations.byCustomer.query({ customerId });
+    previousConversations.value = rows
+      .filter((r) => r.id !== conversationId.value)
+      .map((r) => ({
+        id: r.id,
+        title: r.title || t("conversations.untitled"),
+        subject: r.title || t("conversations.untitled"),
+        date: r.lastMessageAt || r.createdAt || "",
+        createdAt: r.createdAt || undefined,
+        status: r.status,
+      }));
+  } catch {
+    previousConversations.value = [];
+  }
+};
+
 // Takeover state
 const { useUserStore } = await import("@/stores/user");
 const userStore = useUserStore();
@@ -902,6 +995,49 @@ const isTestMode = computed(() => {
 const isPendingHuman = computed(() => {
   return conversation.value?.status === "pending-human";
 });
+
+// Avatar URLs passed to message bubbles: the AI agent avatar for BotAgent
+// messages, the assigned human's avatar for HumanAgent messages.
+const botAvatarUrl = computed<string | null>(() => conversation.value?.agent?.avatarUrl ?? null);
+const humanAvatarUrl = computed<string | null>(() => assignedUser.value?.avatarUrl ?? null);
+
+// Message types that render a sender header + timestamp.
+const TIMESTAMP_GROUP_TYPES: string[] = [
+  MessageType.CUSTOMER,
+  MessageType.BOT_AGENT,
+  MessageType.HUMAN_AGENT,
+];
+
+const isSameMinute = (
+  a: DisplayMessage["created_at"],
+  b: DisplayMessage["created_at"],
+): boolean => {
+  const da = parseUTCDate(a);
+  const db = parseUTCDate(b);
+  if (!da || !db) return false;
+  return Math.floor(da.getTime() / 60000) === Math.floor(db.getTime() / 60000);
+};
+
+/**
+ * Whether a message should render its timestamp. Consecutive messages from the
+ * same author within the same minute are collapsed so only the LAST one shows a
+ * timestamp; a different author or a new minute starts a fresh timestamp.
+ */
+const shouldShowTimestamp = (list: DisplayMessage[] | undefined, index: number): boolean => {
+  if (!list) return true;
+  const current = list[index];
+  if (!current || !TIMESTAMP_GROUP_TYPES.includes(current.type as string)) return true;
+
+  // Look ahead to the next message that also renders a header.
+  for (let i = index + 1; i < list.length; i++) {
+    const next = list[i];
+    if (!TIMESTAMP_GROUP_TYPES.includes(next.type as string)) continue;
+    // A later message in the same author+minute run will carry the timestamp.
+    return !(next.type === current.type && isSameMinute(current.created_at, next.created_at));
+  }
+
+  return true;
+};
 
 // Legal hold toggle handler
 const toggleLegalHold = async (newValue: boolean) => {
@@ -1330,6 +1466,12 @@ const fetchConversation = async () => {
     previousMessageCount.value = currentMessageCount;
 
     conversation.value = result;
+
+    // Populate the customer's other conversations (skip in playground mode,
+    // which has no real customer).
+    if (result.customer?.id && !isPlaygroundMode.value) {
+      void fetchPreviousConversations(result.customer.id);
+    }
 
     // Populate related articles from conversation's linked documents
     const documentIds = result.document_ids;

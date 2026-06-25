@@ -135,6 +135,44 @@
           </CardContent>
         </Card>
 
+        <!-- Channels Field (only shown when the org has at least one channel) -->
+        <Card v-if="availableChannels.length > 0">
+          <CardHeader>
+            <CardTitle>Channels</CardTitle>
+            <CardDescription>
+              Choose which channels this agent handles. A channel can be assigned to more than one
+              agent; if it is, the default agent responds.
+            </CardDescription>
+          </CardHeader>
+          <CardContent class="space-y-4">
+            <div
+              v-for="ch in availableChannels"
+              :key="ch.channel"
+              class="flex items-center space-x-3"
+            >
+              <div
+                class="w-9 h-9 rounded-lg overflow-hidden bg-neutral-muted flex items-center justify-center shrink-0"
+              >
+                <img
+                  v-if="ch.thumbnail"
+                  :src="ch.thumbnail"
+                  :alt="`${ch.name} icon`"
+                  class="w-full h-full object-cover"
+                  @error="handleChannelIconError($event)"
+                />
+                <Radio class="h-5 w-5 text-neutral-muted" :class="ch.thumbnail ? 'hidden' : ''" />
+              </div>
+              <Input
+                :id="`channel-${ch.channel}`"
+                :model-value="form.channels.includes(ch.channel)"
+                type="switch"
+                :label="ch.name"
+                @update:model-value="toggleChannel(ch.channel, $event)"
+              />
+            </div>
+          </CardContent>
+        </Card>
+
         <!-- Message Approval Field -->
         <Card>
           <CardHeader>
@@ -276,13 +314,23 @@ import { ref, onMounted, computed } from "vue";
 import { useRouter, useRoute } from "vue-router";
 import { useI18n } from "vue-i18n";
 import type { JSONContent } from "@tiptap/vue-3";
-import { ArrowLeft, Trash2, Star, FastForward, Hand, CornerDownRight } from "lucide-vue-next";
+import {
+  ArrowLeft,
+  Trash2,
+  Star,
+  FastForward,
+  Hand,
+  CornerDownRight,
+  Radio,
+} from "lucide-vue-next";
 import type { Agent } from "~/types/playbook";
 import type { RouterInputs, RouterOutputs } from "@/types/trpc";
 import { useToast } from "~/composables/useToast";
 import { useUnsavedChanges } from "~/composables/useUnsavedChanges";
 import { HayApi, Hay } from "@/utils/api";
 import { useOrganizationStore } from "~/stores/organization";
+import { useAppStore } from "@/stores/app";
+import { useDomain } from "@/composables/useDomain";
 
 // Editor instruction blocks are stored as Tiptap JSON content.
 type InstructionContent = JSONContent | null;
@@ -312,6 +360,8 @@ const route = useRoute();
 const toast = useToast();
 const { t } = useI18n();
 const organizationStore = useOrganizationStore();
+const appStore = useAppStore();
+const { getApiUrl } = useDomain();
 const { formatDateTime } = useOrgDateTime();
 const loadingInstructions = ref(false);
 const settingAsDefault = ref(false);
@@ -327,6 +377,7 @@ const initialForm = ref({
   enabled: true,
   testMode: null as boolean | null,
   language: "",
+  channels: [] as string[],
   humanHandoffAvailableInstructions: null as InstructionContent,
   humanHandoffUnavailableInstructions: null as InstructionContent,
 });
@@ -389,6 +440,7 @@ const form = ref({
   enabled: true,
   testMode: null as boolean | null,
   language: "",
+  channels: [] as string[],
   humanHandoffAvailableInstructions: { blocks: [] } as JSONContent,
   humanHandoffUnavailableInstructions: { blocks: [] } as JSONContent,
 });
@@ -404,6 +456,37 @@ const instructionsEditorRef = ref<{ save: () => InstructionContent } | null>(nul
 const handoffAvailableEditorRef = ref<{ save: () => InstructionContent } | null>(null);
 const handoffUnavailableEditorRef = ref<{ save: () => InstructionContent } | null>(null);
 const selectedTone = ref<string | null>(null);
+
+// Channels the agent can be assigned to: enabled channel plugins + the built-in
+// Web Chat channel. The Channels card is hidden when this list is empty.
+const availableChannels = computed(() => {
+  const pluginChannels = appStore.plugins
+    .filter((p) => p.enabled && p.type?.includes("channel") && p.channel)
+    .map((p) => ({
+      channel: p.channel as string,
+      name: p.name,
+      thumbnail: getApiUrl(`/plugins/thumbnails/${encodeURIComponent(p.id)}`),
+    }));
+
+  return [{ channel: "web", name: "Web Chat", thumbnail: "" }, ...pluginChannels];
+});
+
+const toggleChannel = (channel: string, enabled: string | number | boolean) => {
+  const set = new Set(form.value.channels);
+  if (enabled) {
+    set.add(channel);
+  } else {
+    set.delete(channel);
+  }
+  form.value.channels = [...set];
+};
+
+const handleChannelIconError = (event: Event) => {
+  const img = event.target as HTMLImageElement;
+  const fallback = img.nextElementSibling as HTMLElement | null;
+  img.style.display = "none";
+  if (fallback) fallback.classList.remove("hidden");
+};
 
 // Check if this agent is the default agent for the organization
 const isDefaultAgent = computed(() => {
@@ -429,6 +512,9 @@ const {
 // Load data on mount
 onMounted(async () => {
   try {
+    // Load enabled plugins so the Channels card can list channel plugins.
+    await appStore.fetchPlugins();
+
     // Load agent if in edit mode
     if (isEditMode.value && agentId.value) {
       loading.value = true;
@@ -456,6 +542,7 @@ onMounted(async () => {
         trigger: agentResponse.trigger || "",
         testMode: agentResponse.testMode ?? null,
         language: agentResponse.language || "",
+        channels: agentResponse.channels ?? [],
         enabled: agentResponse.enabled ?? true,
         humanHandoffAvailableInstructions: toInstructionContent(
           agentResponse.human_handoff_available_instructions,
@@ -535,6 +622,7 @@ const handleSubmit = async () => {
       testMode: form.value.testMode,
       // The language select is constrained to supported codes; empty string means inherit (null).
       language: (form.value.language || null) as AgentLanguage,
+      channels: form.value.channels,
       humanHandoffAvailableInstructions: toInstructionsInput(savedHandoffAvailable),
       humanHandoffUnavailableInstructions: toInstructionsInput(savedHandoffUnavailable),
     };

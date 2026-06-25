@@ -120,7 +120,10 @@ export const pluginApiTrpcRouter = router({
             organization_id: organizationId,
             external_id: from,
             name: metadata?.profileName as string | undefined,
-            phone: from,
+            // Only store a real phone number if the channel provides one.
+            // `from` is a channel-scoped identity (e.g. "instagram:<psid>") and
+            // belongs in external_id, never the phone field.
+            phone: (metadata?.phone as string | undefined) ?? undefined,
             external_metadata: {
               [channel]: {
                 id: from,
@@ -137,8 +140,8 @@ export const pluginApiTrpcRouter = router({
           if (!customer.name && metadata?.profileName) {
             updates.name = metadata.profileName;
           }
-          if (!customer.phone) {
-            updates.phone = from;
+          if (!customer.phone && metadata?.phone) {
+            updates.phone = metadata.phone as string;
           }
           if (metadata) {
             updates.external_metadata = {
@@ -916,26 +919,37 @@ async function claimProviderMessage(
 /**
  * Helper: Get agent for channel
  *
- * Determines which agent should handle conversations for a given channel.
- * Priority:
- * 1. Channel-specific agent (organization.settings.channelAgents[channel])
- * 2. Default agent (organization.defaultAgentId)
- * 3. First available agent
+ * Determines which single agent should handle conversations for a given channel.
+ * Agent<->channel is many-to-many (agent.channels), but each incoming message must
+ * resolve to exactly one responder. Priority:
+ * 1. Agents assigned to this channel. If more than one claims it, prefer the org
+ *    default agent if it is among them, otherwise the earliest-created (deterministic).
+ *    TODO: replace this tiebreaker once multi-agent-per-channel selection is defined.
+ * 2. Organization default agent.
+ * 3. First available agent.
  */
 async function getAgentForChannel(organizationId: string, channel: string): Promise<string | null> {
-  const org = await organizationRepository.findById(organizationId);
+  const [agents, org] = await Promise.all([
+    agentRepository.findByOrganization(organizationId),
+    organizationRepository.findById(organizationId),
+  ]);
 
-  // 1. Channel-specific agent (using the new channelAgents field)
-  if (org?.settings?.channelAgents?.[channel]) {
-    return org.settings.channelAgents[channel];
+  // 1. Agents explicitly assigned to this channel.
+  const assigned = agents.filter((a) => a.channels?.includes(channel));
+  if (assigned.length > 0) {
+    if (org?.defaultAgentId) {
+      const preferred = assigned.find((a) => a.id === org.defaultAgentId);
+      if (preferred) return preferred.id;
+    }
+    // findByOrganization orders by created_at DESC, so the last entry is earliest.
+    return assigned[assigned.length - 1].id;
   }
 
-  // 2. Default agent
+  // 2. Organization default agent.
   if (org?.defaultAgentId) {
     return org.defaultAgentId;
   }
 
-  // 3. First available agent
-  const agents = await agentRepository.findByOrganization(organizationId);
+  // 3. First available agent.
   return agents[0]?.id || null;
 }

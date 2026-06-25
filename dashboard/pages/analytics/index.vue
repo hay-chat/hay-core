@@ -345,10 +345,11 @@ import {
   BarChart3,
   Bot,
   Star,
-  Globe,
-  MessageCircle,
-  Mail,
 } from "lucide-vue-next";
+import { useAppStore } from "@/stores/app";
+import { getEnabledChannelPlugins, getChannelIcon, getChannelLabel } from "@/utils/channel";
+
+const appStore = useAppStore();
 
 // Reactive state
 const selectedTimeframe = ref("30d");
@@ -434,40 +435,24 @@ const agentPerformance = ref([
   },
 ]);
 
-const channelPerformance = ref([
-  {
-    name: "Web Chat",
-    icon: Globe,
-    messages: 8945,
-    resolutionRate: 89.2,
-    avgResponseTime: 3.8,
-    satisfaction: 4.6,
-  },
-  {
-    name: "Email",
-    icon: Mail,
-    messages: 2341,
-    resolutionRate: 92.7,
-    avgResponseTime: 1847,
-    satisfaction: 4.5,
-  },
-  {
-    name: "Slack",
-    icon: MessageSquare,
-    messages: 1456,
-    resolutionRate: 85.4,
-    avgResponseTime: 5.2,
-    satisfaction: 4.7,
-  },
-  {
-    name: "WhatsApp",
-    icon: MessageCircle,
-    messages: 567,
-    resolutionRate: 78.3,
-    avgResponseTime: 8.1,
-    satisfaction: 4.3,
-  },
-]);
+// Demo metrics until per-channel analytics exist (TODO: replace with API data).
+// Channel identity (name + icon) is resolved from the plugin registry so core
+// stays plugin-agnostic — no hardcoded channel list here.
+const DEMO_CHANNEL_METRICS = [
+  { messages: 8945, resolutionRate: 89.2, avgResponseTime: 3.8, satisfaction: 4.6 },
+  { messages: 2341, resolutionRate: 92.7, avgResponseTime: 4.1, satisfaction: 4.5 },
+  { messages: 1456, resolutionRate: 85.4, avgResponseTime: 5.2, satisfaction: 4.7 },
+  { messages: 567, resolutionRate: 78.3, avgResponseTime: 8.1, satisfaction: 4.3 },
+];
+
+const channelPerformance = computed(() => {
+  const channels = ["web", ...getEnabledChannelPlugins().map((p) => p.channel as string)];
+  return channels.map((channel, i) => ({
+    name: getChannelLabel(channel),
+    icon: getChannelIcon(channel),
+    ...DEMO_CHANNEL_METRICS[i % DEMO_CHANNEL_METRICS.length],
+  }));
+});
 
 // Methods
 const formatNumber = (num: number) => {
@@ -491,6 +476,7 @@ const refreshData = () => {
 
 // Lifecycle
 onMounted(() => {
+  appStore.fetchPlugins();
   // TODO: Fetch analytics data from API
   // await fetchAnalyticsData(selectedTimeframe.value)
 });

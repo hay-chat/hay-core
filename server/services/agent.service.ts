@@ -23,6 +23,7 @@ export class AgentService {
       humanHandoffUnavailableInstructions?: unknown[];
       initialGreeting?: string;
       language?: string | null;
+      channels?: string[];
     },
   ): Promise<Agent> {
     return await this.agentRepository.create({
@@ -38,6 +39,7 @@ export class AgentService {
       human_handoff_unavailable_instructions: data.humanHandoffUnavailableInstructions,
       initialGreeting: data.initialGreeting,
       language: data.language,
+      channels: data.channels,
       organization_id: organizationId,
     });
   }
@@ -70,6 +72,7 @@ export class AgentService {
       humanHandoffUnavailableInstructions?: unknown[];
       initialGreeting?: string;
       language?: string | null;
+      channels?: string[];
     },
   ): Promise<Agent | null> {
     return await this.agentRepository.update(agentId, organizationId, {
@@ -85,6 +88,7 @@ export class AgentService {
       human_handoff_unavailable_instructions: data.humanHandoffUnavailableInstructions,
       initialGreeting: data.initialGreeting,
       language: data.language,
+      channels: data.channels,
     });
   }
 

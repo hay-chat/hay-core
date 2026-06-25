@@ -7,6 +7,7 @@ import { getUTCNow } from "../utils/date.utils";
 import { hookManager } from "./hooks/hook-manager";
 import { SupportedLanguage } from "../types/language.types";
 import { createLogger } from "@server/lib/logger";
+import { StorageService } from "./storage.service";
 
 const logger = createLogger("conversation");
 
@@ -112,6 +113,13 @@ export class ConversationService {
     const conversation = await this.conversationRepository.findById(conversationId);
     if (!conversation || conversation.organization_id !== organizationId) {
       return null;
+    }
+    // Surface a usable avatar URL for the conversation's agent (the entity only
+    // carries the raw upload record). Lets the dashboard render the agent avatar.
+    if (conversation.agent?.avatarUpload) {
+      conversation.agent.avatarUrl = new StorageService().getPublicUrl(
+        conversation.agent.avatarUpload,
+      );
     }
     return conversation;
   }
