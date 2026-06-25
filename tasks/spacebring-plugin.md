@@ -86,14 +86,29 @@ Support: list_support_tickets, create_support_ticket, get_support_ticket
 ## Checklist
 
 - [x] Parse spec, group by tag, decide include/exclude
-- [ ] Confirm exact SDK API + klaviyo dependency/build approach (background workflow)
-- [ ] package.json (hay-plugin block) + tsconfig.json
-- [ ] src/index.ts (config: apiKeyId/apiKeySecret/locationRef; Basic auth; onValidateAuth round-trip; onStart → startLocalStdio)
-- [ ] mcp/index.js (api() Basic-auth helper, ok/fail, 25 tools with zod schemas + cross-tool hints)
-- [ ] mcp/package.json + dependency-gap strategy (match klaviyo)
-- [ ] i18n/en.json + pt.json (label/description per tool + config field)
-- [ ] Build + typecheck:server, confirm tools list
-- [ ] Commit + push to claude/spacebring-mcp-integration-2vsw46, open draft PR
+- [x] Confirm exact SDK API + klaviyo dependency/build approach (background workflow)
+- [x] package.json (hay-plugin block) + tsconfig.json
+- [x] src/index.ts (config: apiKeyId/apiKeySecret/locationRef; Basic auth; onValidateAuth round-trip; onStart → startLocalStdio)
+- [x] mcp/index.js (api() Basic-auth helper, ok/fail, 25 tools with zod schemas + cross-tool hints)
+- [x] mcp/package.json + dependency-gap strategy (match klaviyo: commit package-lock, gitignore node_modules)
+- [x] i18n/en.json + pt-BR.json (label/description per tool + config field)
+- [x] Build (strict tsc) + MCP smoke test (25 tools listed over stdio)
+- [ ] Commit + push to claude/spacebring-mcp-integration-2vsw46 (PR #58, draft)
+
+## Results
+
+- Plugin `plugins/core/spacebring/` (Archetype A): `package.json` (category `integration`,
+  capabilities `["mcp","auth"]`), `tsconfig.json`, `src/index.ts`, `mcp/index.js` (25 tools),
+  `mcp/package.json` + committed `mcp/package-lock.json`, `i18n/en.json` + `i18n/pt-BR.json`, README.
+- Auth: HTTP Basic via two config fields (`apiKeyId` + encrypted `apiKeySecret`) + `register.auth.apiKey`
+  pointing at the secret (SDK has no `basic()` method). `locationRef` config default + per-tool override.
+- Verification: `@hay/plugin-sdk` had no `dist/` in this fresh clone — built it, then the plugin
+  compiled clean under `strict:true` (`tsc` → `dist/index.js`). MCP server boots over stdio and a
+  real MCP client enumerated all **25 tools**. `mcp/` deps install cleanly (93 pkgs).
+- `npm run typecheck:server` is NOT runnable here: `server/node_modules` is absent (fresh clone) and
+  the root `npm install` that would bootstrap it aborts on the dashboard's `nuxt prepare` postinstall
+  (`nuxt: not found`). This is an environment-bootstrap gap, independent of the plugin; the server
+  tsconfig does not include `plugins/`, so the plugin's own strict build is the meaningful type check.
 
 ## Working notes
 
