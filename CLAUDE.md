@@ -740,7 +740,9 @@ graph_add_memory(type="decision|task|next|fact|blocker", content="one sentence m
 
 ## Session End
 
-When the user signals they are done (e.g. "bye", "done", "wrap up", "end session"), proactively update `CONTEXT.md` in the project root with:
+Do NOT wait for a "done" signal — sessions here typically end mid-task, so
+checkpoint proactively: after completing any major task chunk, and whenever a
+debugging thread concludes, update `CONTEXT.md` in the project root with:
 - **Current Task**: one sentence on what was being worked on
 - **Key Decisions**: bullet list, max 3 items
 - **Next Steps**: bullet list, max 3 items
