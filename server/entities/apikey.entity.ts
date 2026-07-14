@@ -8,7 +8,9 @@ import { Organization } from "./organization.entity";
 @Index("idx_api_keys_key_hash", ["keyHash"])
 @Index("idx_api_keys_is_active", ["isActive"])
 export class ApiKey extends OrganizationScopedEntity {
-  @ManyToOne(() => Organization, (organization) => organization.apiKeys)
+  @ManyToOne(() => Organization, (organization) => organization.apiKeys, {
+    onDelete: "CASCADE",
+  })
   @JoinColumn()
   organization!: Organization;
 

@@ -150,7 +150,7 @@ export class PrivacyRequest extends TypeOrmBaseEntity {
   @JoinColumn()
   customer?: Customer;
 
-  @ManyToOne(() => Organization, { nullable: true })
+  @ManyToOne(() => Organization, { nullable: true, onDelete: "CASCADE" })
   @JoinColumn()
   organization?: Organization;
 

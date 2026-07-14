@@ -15,7 +15,7 @@ export class PluginInstance extends OrganizationScopedEntity {
   @JoinColumn()
   plugin!: PluginRegistry;
 
-  @ManyToOne(() => Organization)
+  @ManyToOne(() => Organization, { onDelete: "CASCADE" })
   @JoinColumn()
   organization!: Organization;
 

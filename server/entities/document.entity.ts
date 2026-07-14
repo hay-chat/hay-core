@@ -133,7 +133,9 @@ export class Document extends OrganizationScopedEntity {
   excludedFromSync!: boolean;
 
   // Relationships - organizationId is inherited from OrganizationScopedEntity
-  @ManyToOne(() => Organization, (organization) => organization.documents)
+  @ManyToOne(() => Organization, (organization) => organization.documents, {
+    onDelete: "CASCADE",
+  })
   @JoinColumn()
   organization!: Organization;
 }

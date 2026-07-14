@@ -40,7 +40,9 @@ export class Job extends OrganizationScopedEntity {
   result?: Record<string, unknown>;
 
   // Relationships - organizationId is inherited from OrganizationScopedEntity
-  @ManyToOne(() => Organization, (organization) => organization.jobs)
+  @ManyToOne(() => Organization, (organization) => organization.jobs, {
+    onDelete: "CASCADE",
+  })
   @JoinColumn()
   organization!: Organization;
 }

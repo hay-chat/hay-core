@@ -81,6 +81,7 @@ export class User extends BaseEntity {
   // Relationships
   @ManyToOne(() => Organization, (organization) => organization.users, {
     nullable: true,
+    onDelete: "SET NULL",
   })
   @JoinColumn()
   organization?: Organization;
