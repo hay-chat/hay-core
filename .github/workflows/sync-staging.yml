@@ -1,0 +1,23 @@
+name: Sync staging with master
+
+on:
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # Fast-forward staging to master. A plain push is rejected if staging
+      # has commits master doesn't, so divergence fails the run instead of
+      # being merged silently — resolve it manually if that ever happens.
+      - name: Fast-forward staging
+        run: git push origin master:staging
