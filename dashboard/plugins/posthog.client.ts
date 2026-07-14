@@ -12,6 +12,10 @@ export default defineNuxtPlugin(() => {
 
   posthog.init(key, {
     api_host: config.public.posthogHost,
+    // Always point UI links at PostHog itself — POSTHOG_HOST may be a reverse proxy
+    ui_host: "https://eu.posthog.com",
+    defaults: "2026-01-30",
+    person_profiles: "identified_only",
     capture_pageview: false,
     capture_pageleave: true,
     autocapture: true,
