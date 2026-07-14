@@ -15,6 +15,9 @@ export default defineNuxtConfig({
   // In development, uses separate origin (CORS). In production, uses same-origin via App Platform routing.
   runtimeConfig: {
     public: {
+      // PostHog telemetry — only enabled when a project API key is provided
+      posthogKey: process.env["POSTHOG_KEY"] || "",
+      posthogHost: process.env["POSTHOG_HOST"] || "https://eu.i.posthog.com",
       baseDomain:
         process.env["BASE_DOMAIN"] ||
         (process.env["NODE_ENV"] === "development" ? "localhost:3000" : ""),
