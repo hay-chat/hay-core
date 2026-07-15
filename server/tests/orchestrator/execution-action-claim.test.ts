@@ -108,7 +108,7 @@ describe("ExecutionLayer action-claim guardrail (Stage 0)", () => {
     anyLayer.getConfidenceConfig = jest.fn(async () => ({
       fallbackMessage: "Let me connect you with a team member.",
     }));
-    anyLayer.getTranslatedFallbackMessage = jest.fn(
+    anyLayer.composeContextualFallbackMessage = jest.fn(
       async (_conv: unknown, message: string) => message,
     );
     anyLayer.execute = executeSpy;
