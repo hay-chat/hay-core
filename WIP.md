@@ -1,5 +1,17 @@
 # WIP
 
+## 2026-07-15 — master — Playbook grounding + contextual fallback IMPLEMENTED, uncommitted
+
+Correct playbook-driven answers were flagged low-confidence: Stage 2 fact-check never
+saw the playbook, so its policy claims looked fabricated. assessResponseConfidence now
+injects the active Playbook message as an authoritative doc (0.95) and skips
+toolStatus=ERROR tool messages; confidence-grounding.md (en/es/pt) updated to match.
+Also replaced static fallback: composeContextualFallbackMessage (new prompt
+execution/contextual-fallback en/es/pt) writes a context-aware handoff msg from
+customer-visible history only (blocked response never shown to composer).
+Verified: typecheck, new execution-confidence-context.test.ts (3), action-claim (7).
+Next: commit; live-test a playbook conversation to confirm no more false flags.
+
 ## 2026-07-15 — master — Shopify tool rework IMPLEMENTED, uncommitted
 
 Reworked plugins/core/shopify/mcp around support flows: cut search_orders /

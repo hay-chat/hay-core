@@ -510,7 +510,7 @@ export class ExecutionLayer {
       );
 
       const config = await this.getConfidenceConfig(conversation);
-      const fallbackMessage = await this.getTranslatedFallbackMessage(
+      const fallbackMessage = await this.composeContextualFallbackMessage(
         conversation,
         config.fallbackMessage,
         customerLanguage,
@@ -592,7 +592,7 @@ export class ExecutionLayer {
         log.debug("Stage 2: Low confidence detected, applying fallback/escalation");
 
         const config = await this.getConfidenceConfig(conversation);
-        const fallbackMessage = await this.getTranslatedFallbackMessage(
+        const fallbackMessage = await this.composeContextualFallbackMessage(
           conversation,
           config.fallbackMessage,
           customerLanguage,
@@ -725,7 +725,7 @@ export class ExecutionLayer {
     }
 
     const confidenceConfig = await this.getConfidenceConfig(conversation);
-    const fallbackMessage = await this.getTranslatedFallbackMessage(
+    const fallbackMessage = await this.composeContextualFallbackMessage(
       conversation,
       confidenceConfig.fallbackMessage,
       customerLanguage,
@@ -819,8 +819,12 @@ export class ExecutionLayer {
     // Get conversation history first to check for tool results
     const conversationHistory = await conversation.getMessages();
 
-    // Check if there are recent tool call results
-    const recentToolMessages = conversationHistory.filter((msg) => msg.type === "Tool").slice(-3); // Get last 3 tool messages
+    // Check if there are recent tool call results. Failed calls are excluded:
+    // their error payloads aren't grounding evidence and would crowd out real
+    // results from the 3-message window.
+    const recentToolMessages = conversationHistory
+      .filter((msg) => msg.type === "Tool" && msg.metadata?.toolStatus !== "ERROR")
+      .slice(-3);
 
     // Get retrieved documents with full content
     const retrievedDocs: Array<{ document: ConfidenceDocument; similarity: number }> = [];
@@ -904,6 +908,31 @@ export class ExecutionLayer {
         },
         similarity: 0.95, // High similarity since tool results are authoritative
       });
+    }
+
+    // The active playbook is a grounding source too: policy/process statements
+    // in the response ("unfulfilled orders are cancelled rather than refunded")
+    // come from its instructions, not from KB documents or tool results.
+    // Without it the fact-checker flags playbook-driven responses as
+    // ungrounded company claims. The rendered instructions live in the
+    // conversation's Playbook message, so no re-fetch/re-render is needed.
+    if (conversation.playbook_id) {
+      const playbookMessage = conversationHistory
+        .filter(
+          (msg) => msg.type === "Playbook" && msg.metadata?.playbookId === conversation.playbook_id,
+        )
+        .pop();
+
+      if (playbookMessage) {
+        retrievedDocs.push({
+          document: {
+            id: `playbook-${conversation.playbook_id}`,
+            title: `Active Playbook: ${playbookMessage.metadata?.playbookTitle || "Untitled"}`,
+            content: playbookMessage.content,
+          },
+          similarity: 0.95, // Authoritative: the agent is instructed to follow it
+        });
+      }
     }
 
     // Get last customer message
@@ -1246,9 +1275,14 @@ export class ExecutionLayer {
   }
 
   /**
-   * Translate fallback message to match conversation language
+   * Compose the low-confidence/handoff fallback message from the conversation
+   * context, so the customer gets an acknowledgement of their actual request
+   * instead of a canned line. The blocked response is deliberately NOT given
+   * to the composer — only messages the customer has already seen — so
+   * unverified claims cannot leak through the fallback. Falls back to the
+   * static configured message on any error or empty output.
    */
-  private async getTranslatedFallbackMessage(
+  private async composeContextualFallbackMessage(
     conversation: Conversation,
     fallbackMessage: string,
     customerLanguage?: string,
@@ -1256,23 +1290,26 @@ export class ExecutionLayer {
     try {
       const targetLanguage = customerLanguage || conversation.organization?.defaultLanguage || "en";
 
-      if (targetLanguage === "en") {
-        return fallbackMessage;
-      }
+      const messages = await conversation.getMessages();
+      const customerVisibleTypes = ["Customer", "BotAgent", "HumanAgent"];
+      const conversationHistory = messages
+        .filter((msg) => customerVisibleTypes.includes(msg.type) && msg.content)
+        .slice(-6)
+        .map((msg) => `${msg.type === "Customer" ? "Customer" : "Assistant"}: ${msg.content}`)
+        .join("\n");
 
-      const translationPrompt = `Translate the following customer service message to ${targetLanguage}.
-Keep the tone professional, empathetic, and appropriate for a customer service context.
-Only return the translated text, nothing else.
-
-Original message: "${fallbackMessage}"
-
-Translated message:`;
-
-      const translated = await this.llmService.invoke({
-        prompt: translationPrompt,
+      const prompt = await this.promptService.getPrompt("execution/contextual-fallback", {
+        conversationHistory,
+        targetLanguage,
       });
 
-      return translated.trim();
+      const composed = await this.llmService.invoke<string>({
+        prompt,
+        temperature: 0.3,
+      });
+
+      const trimmed = composed.trim();
+      return trimmed.length > 0 ? trimmed : fallbackMessage;
     } catch (error) {
       logger.warn(
         {
@@ -1280,7 +1317,7 @@ Translated message:`;
           organizationId: conversation.organization_id,
           conversationId: conversation.id,
         },
-        "Error translating fallback message, using original",
+        "Error composing contextual fallback message, using configured default",
       );
       return fallbackMessage;
     }
