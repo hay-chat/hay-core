@@ -222,13 +222,28 @@ export class CompanyInterestGuardrailService {
    * Format conversation history for prompt
    */
   private formatConversationHistory(messages: Message[]): string {
-    // Get last 5 messages for context
-    const recentMessages = messages.slice(-5);
+    // Mirror Stage 2's context rules: failed tool calls are noise, not evidence.
+    // A successful retry must not be "contradicted" by its own failed first
+    // attempt (e.g. a zod validation error before the real cancel succeeded).
+    const relevant = messages.filter(
+      (msg) => !(msg.type === "Tool" && msg.metadata?.toolStatus === "ERROR"),
+    );
 
-    return recentMessages
+    // Get last 5 messages for context
+    return relevant
+      .slice(-5)
       .map((msg) => {
-        const role = msg.type === "Customer" ? "Customer" : "Assistant";
-        return `${role}: ${msg.content}`;
+        if (msg.type === "Customer") return `Customer: ${msg.content}`;
+        if (msg.type === "Tool") {
+          // Label tool results honestly (not as "Assistant") and include their
+          // output — it's the evidence the checker verifies claims against.
+          const output =
+            msg.metadata?.toolOutput !== undefined
+              ? ` → ${JSON.stringify(msg.metadata.toolOutput).slice(0, 1000)}`
+              : "";
+          return `Tool result (${msg.metadata?.toolName ?? "unknown"}): ${msg.content}${output}`;
+        }
+        return `Assistant: ${msg.content}`;
       })
       .join("\n");
   }

@@ -783,7 +783,9 @@ export class ExecutionLayer {
     const hasRetrievedDocuments = !!(
       conversation.document_ids && conversation.document_ids.length > 0
     );
-    const recentToolMessages = conversationHistory.filter((msg) => msg.type === "Tool").slice(-3);
+    const recentToolMessages = conversationHistory
+      .filter((msg) => msg.type === "Tool" && msg.metadata?.toolStatus !== "ERROR")
+      .slice(-3);
     const hasToolResults = recentToolMessages.length > 0;
 
     // Build company interest context

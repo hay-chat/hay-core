@@ -451,7 +451,16 @@ function registerOrderTools(server) {
         const data = await shopifyGql(MUTATION, variables);
         assertNoUserErrors(data.orderCancel, "orderCancelUserErrors");
         assertNoUserErrors(data.orderCancel);
-        return ok(data.orderCancel);
+        // orderCancel is async: no userErrors means the cancellation was accepted
+        // and WILL complete; job.done=false only means Shopify is still processing.
+        // Say so explicitly, or the raw job payload reads as "not done yet".
+        return ok({
+          status: "CANCELLATION_ACCEPTED",
+          detail:
+            "Shopify accepted the cancellation and is processing it (async job). " +
+            "It is safe to tell the customer the order has been cancelled.",
+          ...data.orderCancel,
+        });
       } catch (err) {
         return fail(err);
       }
