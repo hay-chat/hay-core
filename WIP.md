@@ -1,9 +1,32 @@
 # WIP
 
+## 2026-07-15 — master — Shopify tool rework IMPLEMENTED, uncommitted
+
+Reworked plugins/core/shopify/mcp around support flows: cut search_orders /
+create_customer_address / get_order_status; merged 3 customer lookups into
+find_customer + enriched get_customer (recentOrders); get_order(+by_name) now
+returns supportSummary (isCancellable/remainingRefundable/deliveredAt). New:
+update_order_shipping_address (pre-dispatch guard), calculate_refund
+(suggestedRefund), returns.js (get_returnable_items/create_return); create_refund
+now bounded server-side vs netPaymentSet. Scopes +read/write_returns → existing
+stores must RECONNECT. Verified vs shopify.dev 2026-04; MCP boots, 20 tools.
+Next: commit/PR; dev-store test of cancel/refund-on-cancel (TODO HAY-219 §8).
+
+## 2026-07-15 — master — Action-claim guardrail (Stage 0) IMPLEMENTED, uncommitted
+
+Agent claimed "I've initiated the cancellation" with no tool call; nothing caught it.
+Added Stage 0 to applyConfidenceGuardrails: LLM check of RESPOND claims vs per-turn
+tool ledger (run.ts), 1 corrective re-plan w/ plannerFeedback, then HANDOFF.
+New: action-claim-guardrail.service.ts, prompts {en,pt,es}/execution/action-claim-check.md
+(generic tool names), ActionClaimGuardrailConfig in org settings, 17 tests passing.
+Typecheck+lint+orchestrator suite green. NOT committed. Next: commit/PR, manual e2e
+(cancel flow w/o cancel tool enabled). Follow-ups: get_order_by_name schema drift
+(orderName vs name); playbook "follow cancellation playbook" can't chain.
+
 ## 2026-07-15 — prod ops — Shopify OAuth fixed on eu.hay.chat (no code change)
 
 Root cause: /etc/hay/infisical-credentials was root:600, deploy.sh:130 silently
-skipped Infisical export since Mar 27 → SHOPIFY*OAUTH*_ (+META\__, POSTHOG\_\*,
+skipped Infisical export since Mar 27 → SHOPIFY*OAUTH*\_ (+META\_\_, POSTHOG\_\*,
 OAUTH_REDIRECT_URI) never reached /opt/hay/.env → oauthConfigured=false → no
 Connect button. Fixed: chmod 640 root:hay on creds, fresh export installed
 (backup at /opt/hay/.env.bak-20260715), hay-server restarted, health green.

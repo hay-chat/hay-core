@@ -140,7 +140,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, watch } from "vue";
+import { ref, shallowRef, onMounted, onUnmounted, watch } from "vue";
 import { Editor, EditorContent } from "@tiptap/vue-3";
 import type { JSONContent, ChainedCommands } from "@tiptap/vue-3";
 import StarterKit from "@tiptap/starter-kit";
@@ -183,7 +183,9 @@ const emit = defineEmits<{
   update: [payload: { json: JSONContent; html: string }];
 }>();
 
-const editor = ref<Editor>();
+// Must be shallow: a deep ref proxies the Editor and breaks Vue's ref-owner
+// tracking ("Missing ref owner context" warning). Matches tiptap's useEditor.
+const editor = shallowRef<Editor>();
 const fileInputRef = ref<HTMLInputElement | null>(null);
 const uploadingImage = ref(false);
 

@@ -1,0 +1,86 @@
+{
+  "name": "Shopify",
+  "description": "Conecte sua loja Shopify para que o agente possa consultar pedidos, clientes e produtos, rastrear entregas e cuidar de cancelamentos, reembolsos e devoluções.",
+  "tools": {
+    "shopify_get_shop": {
+      "label": "Ver Dados da Loja",
+      "description": "Obtém informações básicas da loja conectada (nome, domínio, plano, moeda)."
+    },
+    "shopify_get_order": {
+      "label": "Ver Pedido",
+      "description": "Obtém os itens, totais, endereço de entrega, rastreamento e elegibilidade de suporte de um pedido."
+    },
+    "shopify_get_order_by_name": {
+      "label": "Ver Pedido por Número",
+      "description": "Localiza um pedido pelo número (ex.: #1001)."
+    },
+    "shopify_list_customer_orders": {
+      "label": "Listar Pedidos do Cliente",
+      "description": "Lista os pedidos de um cliente, do mais recente para o mais antigo."
+    },
+    "shopify_get_order_tracking": {
+      "label": "Rastrear Pedido",
+      "description": "Consulta o status de separação e rastreamento de entrega de um pedido."
+    },
+    "shopify_update_order_shipping_address": {
+      "label": "Alterar Endereço de Entrega do Pedido",
+      "description": "Altera o destino de um pedido ainda não despachado. Recusa se a separação já começou."
+    },
+    "shopify_add_order_note": {
+      "label": "Adicionar Nota ao Pedido",
+      "description": "Adiciona ou substitui a nota interna de um pedido."
+    },
+    "shopify_calculate_refund": {
+      "label": "Calcular Reembolso",
+      "description": "Simula os valores corretos de reembolso de um pedido antes de executá-lo."
+    },
+    "shopify_create_refund": {
+      "label": "Criar Reembolso",
+      "description": "Executa um reembolso para um pedido, limitado ao valor máximo reembolsável do Shopify."
+    },
+    "shopify_cancel_order": {
+      "label": "Cancelar Pedido",
+      "description": "Cancela um pedido, com opção de repor estoque, reembolsar e notificar o cliente."
+    },
+    "shopify_get_returnable_items": {
+      "label": "Ver Itens Devolvíveis",
+      "description": "Lista os itens enviados de um pedido que são elegíveis para devolução."
+    },
+    "shopify_create_return": {
+      "label": "Criar Devolução",
+      "description": "Abre uma devolução para itens enviados de um pedido. O reembolso é tratado separadamente."
+    },
+    "shopify_find_customer": {
+      "label": "Buscar Cliente",
+      "description": "Busca clientes por e-mail e/ou telefone."
+    },
+    "shopify_get_customer": {
+      "label": "Ver Cliente",
+      "description": "Obtém os dados de um cliente, incluindo seus pedidos mais recentes."
+    },
+    "shopify_update_customer": {
+      "label": "Atualizar Cliente",
+      "description": "Atualiza os dados básicos do perfil de um cliente."
+    },
+    "shopify_update_customer_address": {
+      "label": "Atualizar Endereço do Cliente",
+      "description": "Atualiza um endereço salvo no perfil do cliente (não altera pedidos existentes)."
+    },
+    "shopify_get_product": {
+      "label": "Ver Produto",
+      "description": "Obtém um produto pelo id, incluindo suas variantes."
+    },
+    "shopify_get_product_by_handle": {
+      "label": "Ver Produto por Handle",
+      "description": "Obtém um produto pelo handle da URL, incluindo suas variantes."
+    },
+    "shopify_search_products": {
+      "label": "Buscar Produtos",
+      "description": "Pesquisa os produtos da loja pelo título."
+    },
+    "shopify_check_inventory": {
+      "label": "Consultar Estoque",
+      "description": "Consulta o estoque de uma variante por id ou SKU em todos os locais."
+    }
+  }
+}

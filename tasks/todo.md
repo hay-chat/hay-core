@@ -1,52 +1,50 @@
-# Per-channel agent routing (many-to-many)
+# Shopify plugin tool rework — DONE
 
-## Goal / acceptance criteria
+Goal: reshape the MCP toolset around Solo/Starter support tickets — rich reads,
+narrow writes, no back-office surface exposed to the customer-facing agent.
 
-- An agent can be assigned to multiple channels; a channel can list multiple agents (M2M).
-- At runtime each incoming message still resolves to exactly ONE agent for its channel.
-- Agent settings page shows a "Channels" card listing the org's enabled channels (incl. built-in Web Chat) as toggles.
-- The Channels card is hidden when the org has zero enabled channels.
-- `channelAgents` org-setting scaffolding removed (alpha, no back-compat).
+## Cuts / merges
 
-## Data model decision
+- [x] Merged the three customer lookups into `shopify_find_customer` (email/phone → list) + `shopify_get_customer` (by id, enriched)
+- [x] Removed `shopify_search_orders` (data-exposure; comment explains why)
+- [x] Removed `shopify_create_customer_address`
+- [x] Removed `shopify_get_order_status` (subsumed by enriched get_order/get_order_by_name)
+- [x] Kept `shopify_get_shop` with TODO — SDK has no session-context injection yet
 
-- Add `channels: string[]` (text[] , default `{}`) to Agent. This IS many-to-many: a channel id can appear on many agents, an agent can have many channels.
-- Channel ids are the canonical `manifest.channel` strings (e.g. "instagram") + built-in "web".
+## Enriched reads
 
-## Runtime resolution (temporary rule, documented as TODO)
+- [x] `shopify_get_customer`: embeds 5 most recent orders as `recentOrders`
+- [x] `shopify_get_order` + `shopify_get_order_by_name`: shared ORDER_SUPPORT_FIELDS +
+      derived `supportSummary` (isCancellable, isRefundable, remainingRefundable,
+      deliveredAt, addressChangeable)
+- [x] `shopify_get_order_tracking`: added `deliveredAt`
 
-For a given channel, `getAgentForChannel`:
+## New tools
 
-1. Agents whose `channels` include the channel -> if multiple, prefer org default agent if among them, else deterministic (earliest created_at).
-2. Else org `defaultAgentId`.
-3. Else first agent.
+- [x] `shopify_update_order_shipping_address` — orderUpdate; refuses unless
+      fulfillment status is UNFULFILLED/SCHEDULED/ON_HOLD
+- [x] `shopify_calculate_refund` — Order.suggestedRefund (amounts + transactions)
+- [x] `shopify_get_returnable_items` + `shopify_create_return` (returns.js)
+- [x] `shopify_create_refund` server-side bounds: rejects non-refundable orders and
+      amounts > netPaymentSet remaining balance
 
-## Tasks
+## Plumbing / verification
 
-- [ ] Agent entity: add `channels` text[] column
-- [ ] Migration: add `channels` to agent
-- [ ] Remove `channelAgents` from organization-settings.types.ts (+ doc migration ref)
-- [ ] Rewrite `getAgentForChannel` (plugin-api/trpc.ts) to use agent.channels
-- [ ] agents create/update routes: accept `channels: string[]`
-- [ ] New tRPC procedure: list org enabled channels (id, name, thumbnail) incl. Web Chat
-- [ ] Dashboard: Channels card on agents/[id].vue bound to agent.channels; hidden when no channels
-- [ ] Regenerate tRPC types
-- [ ] Verify: typecheck server + dashboard; manual routing check
+- [x] Scopes: +read_returns +write_returns (existing connections must reconnect!)
+- [x] returns.js registered in mcp/index.js
+- [x] Docs-verified against shopify.dev 2026-04: no Order.cancelable (derived instead),
+      @idempotent(key:) is real and MANDATORY for refunds in 2026-04, returnCreate's
+      notifyCustomer/returnReason deprecated, MailingAddressInput wants code fields
+- [x] node --check all mcp files; tsc --noEmit clean; MCP server boots, tools/list
+      returns the intended 20 tools; no stale tool-name refs in live code
 
-## Results
+## Not built (logged, deliberate)
 
-- Agent entity: added `channels text[]` (migration 1782000000004, applied).
-- Removed `channelAgents` from organization-settings types; rewrote `getAgentForChannel`
-  to resolve via `agent.channels` (assigned → prefer default → earliest; else org default; else first).
-- agents create/update accept `channels: string[]`; service passes through.
-- `plugins.getAll` now returns `channel` (manifest.channel) per plugin.
-- agents/[id].vue: "Channels" card (switches for Web Chat + enabled channel plugins),
-  hidden when org has zero channels; bound to `form.channels`.
-- Verified: server typecheck clean; dashboard typecheck clean for agents page
-  (4 pre-existing unrelated errors in conversations/customers remain). Migration applied OK.
+- Discount code lookup/creation (ranked 4th — next slice; cap value server-side)
+- Order editing (swap item/qty) — complex on Shopify's side, deferred
+- Session-start context injection for shop info — needs core/SDK support first
 
-## Working notes
+## Follow-up
 
-- channelAgents was unused scaffolding (types + getAgentForChannel + doc-only migration 1764863000000).
-- Enabled channel plugins: filter plugins by `enabled && type.includes("channel")`; channel id from manifest.channel (not currently surfaced by getAll - must add).
-- Web Chat / "web" is always-on built-in (no plugin instance).
+- Verify orderCancel + refund-on-cancel and the new mutations against a dev store
+  (remaining TODO(HAY-219 §8) markers)

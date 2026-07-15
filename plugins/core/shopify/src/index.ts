@@ -418,6 +418,10 @@ export default defineHayPlugin((globalCtx) => ({
         "read_products",
         "read_inventory",
         "read_fulfillments",
+        // Returns tools (mcp/tools/returns.js). Added after initial release: stores
+        // connected before this change must reconnect to grant the new scopes.
+        "read_returns",
+        "write_returns",
       ],
       clientId: ctx.config.field("clientId"),
       clientSecret: ctx.config.field("clientSecret"),

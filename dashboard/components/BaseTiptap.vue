@@ -5,7 +5,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, watch } from "vue";
+import { ref, shallowRef, onMounted, onUnmounted, watch } from "vue";
 import { Editor, EditorContent } from "@tiptap/vue-3";
 import type { JSONContent } from "@tiptap/vue-3";
 import type { AnyExtension } from "@tiptap/core";
@@ -33,7 +33,10 @@ const emit = defineEmits<{
 }>();
 
 const editorContainer = ref<HTMLElement | null>(null);
-const editor = ref<Editor>();
+// Must be shallow: a deep ref wraps the Editor (and the component instances /
+// vnodes tiptap stores on it) in a reactive proxy, breaking Vue's ref-owner
+// tracking ("Missing ref owner context" warning). Matches tiptap's useEditor.
+const editor = shallowRef<Editor>();
 
 const initializeEditor = () => {
   const extensions = [
