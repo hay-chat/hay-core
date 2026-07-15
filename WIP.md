@@ -22,6 +22,10 @@ update_order_shipping_address (pre-dispatch guard), calculate_refund
 (suggestedRefund), returns.js (get_returnable_items/create_return); create_refund
 now bounded server-side vs netPaymentSet. Scopes +read/write_returns → existing
 stores must RECONNECT. Verified vs shopify.dev 2026-04; MCP boots, 20 tools.
+Hardened after live test: find_customer now embeds recentOrders(5) per match;
+all not-found lookups now hard-error with recovery hints (order lookup probes
+whether the bad id is a Customer id — the exact live failure); returnable-items
+disambiguates empty-vs-missing-order. Re-verified: node --check + MCP boot.
 Next: commit/PR; dev-store test of cancel/refund-on-cancel (TODO HAY-219 §8).
 
 ## 2026-07-15 — master — Action-claim guardrail (Stage 0) IMPLEMENTED, uncommitted

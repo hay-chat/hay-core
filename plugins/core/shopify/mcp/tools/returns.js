@@ -53,6 +53,19 @@ function registerReturnTools(server) {
           }
         `;
         const data = await shopifyGql(QUERY, { orderId });
+        // Empty is ambiguous: bad order id vs. genuinely nothing returnable.
+        // Probe the order so the agent gets the right signal for each case.
+        if (unwrapConnection(data.returnableFulfillments).length === 0) {
+          const probe = await shopifyGql(`query ProbeOrder($id: ID!) { order(id: $id) { id } }`, {
+            id: orderId,
+          });
+          if (!probe.order) {
+            throw new Error(
+              `Order ${args.order_id} not found. Get a valid order id from the recentOrders ` +
+                "field of shopify_find_customer / shopify_get_customer.",
+            );
+          }
+        }
         const fulfillments = unwrapConnection(data.returnableFulfillments).map((f) => ({
           id: f.id,
           fulfillment: f.fulfillment,
