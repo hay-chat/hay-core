@@ -91,6 +91,35 @@ function enrichOrder(order) {
   };
 }
 
+/**
+ * Build an actionable not-found error for an order lookup. The most common
+ * mistake is passing a Customer id where an Order id belongs (both are bare
+ * numbers), so probe for that and name it explicitly — a bare "not found"
+ * strands the agent with no recovery path.
+ */
+async function orderNotFound(rawId) {
+  const probeId = toGid("Customer", String(rawId).split("/").pop());
+  try {
+    const probe = await shopifyGql(
+      `query ProbeCustomer($id: ID!) { customer(id: $id) { id displayName } }`,
+      { id: probeId },
+    );
+    if (probe.customer) {
+      return new Error(
+        `No order with id ${rawId} — that id belongs to customer ` +
+          `"${probe.customer.displayName}". Their recent orders (with order ids) are in the ` +
+          "recentOrders field of shopify_find_customer / shopify_get_customer.",
+      );
+    }
+  } catch {
+    // Probe is best-effort; fall through to the generic message.
+  }
+  return new Error(
+    `Order ${rawId} not found. Get a valid order id from the recentOrders field of ` +
+      'shopify_find_customer / shopify_get_customer, or use shopify_get_order_by_name ("#1001").',
+  );
+}
+
 function registerOrderTools(server) {
   server.tool(
     "shopify_get_order",
@@ -108,6 +137,7 @@ function registerOrderTools(server) {
           }
         `;
         const data = await shopifyGql(QUERY, { id });
+        if (!data.order) throw await orderNotFound(args.order_id);
         return ok(enrichOrder(data.order));
       } catch (err) {
         return fail(err);
@@ -135,7 +165,13 @@ function registerOrderTools(server) {
         `;
         const data = await shopifyGql(QUERY, { query: `name:"${args.name}"` });
         const first = unwrapConnection(data.orders)[0];
-        return ok(enrichOrder(first || null));
+        if (!first) {
+          throw new Error(
+            `No order named "${args.name}" found. Order names usually include the "#" prefix ` +
+              '(e.g. "#1001"); or find the order via the customer\'s recentOrders.',
+          );
+        }
+        return ok(enrichOrder(first));
       } catch (err) {
         return fail(err);
       }
@@ -172,7 +208,13 @@ function registerOrderTools(server) {
           }
         `;
         const data = await shopifyGql(QUERY, { id, first });
-        const conn = data.customer ? data.customer.orders : null;
+        if (!data.customer) {
+          throw new Error(
+            `Customer ${args.customer_id} not found; get a valid customer id from ` +
+              "shopify_find_customer (email/phone).",
+          );
+        }
+        const conn = data.customer.orders;
         return ok({ items: unwrapConnection(conn), pageInfo: pageInfo(conn) });
       } catch (err) {
         return fail(err);
@@ -224,7 +266,7 @@ function registerOrderTools(server) {
           }
         `;
         const check = await shopifyGql(CHECK, { id });
-        if (!check.order) return ok(null);
+        if (!check.order) throw await orderNotFound(args.order_id);
         if (check.order.cancelledAt) {
           throw new Error(`Order ${check.order.name} is cancelled; cannot change its address.`);
         }
@@ -332,6 +374,7 @@ function registerOrderTools(server) {
           refundShipping: args.refund_shipping ?? null,
           suggestFullRefund: args.suggest_full_refund ?? null,
         });
+        if (!data.order) throw await orderNotFound(args.order_id);
         return ok(data.order);
       } catch (err) {
         return fail(err);

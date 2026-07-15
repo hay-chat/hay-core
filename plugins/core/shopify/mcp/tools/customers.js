@@ -20,8 +20,9 @@ function registerCustomerTools(server) {
   server.tool(
     "shopify_find_customer",
     "Find customers by email address and/or phone number. Returns a list (may be empty or " +
-      "contain several matches — disambiguate with the customer before acting). Follow up " +
-      "with shopify_get_customer for full detail and recent orders.",
+      "contain several matches — disambiguate with the customer before acting), each with " +
+      "their 5 most recent orders (recentOrders) so order ids are available immediately. " +
+      "Follow up with shopify_get_customer for full customer detail.",
     {
       email: z.string().optional().describe("Email address to search for."),
       phone: z
@@ -54,6 +55,18 @@ function registerCustomerTools(server) {
                   defaultEmailAddress { emailAddress }
                   defaultPhoneNumber { phoneNumber }
                   numberOfOrders
+                  orders(first: 5, sortKey: CREATED_AT, reverse: true) {
+                    edges {
+                      node {
+                        id
+                        name
+                        createdAt
+                        displayFinancialStatus
+                        displayFulfillmentStatus
+                        totalPriceSet { shopMoney { amount currencyCode } }
+                      }
+                    }
+                  }
                 }
               }
               pageInfo { hasNextPage endCursor }
@@ -67,7 +80,10 @@ function registerCustomerTools(server) {
         const data = await shopifyGql(query, variables);
         const conn = data.customers;
         return ok({
-          items: unwrapConnection(conn),
+          items: unwrapConnection(conn).map(({ orders, ...rest }) => ({
+            ...rest,
+            recentOrders: unwrapConnection(orders),
+          })),
           pageInfo: pageInfo(conn),
         });
       } catch (err) {
@@ -131,7 +147,13 @@ function registerCustomerTools(server) {
         `; // TODO(HAY-219 §8): verify defaultEmailAddress.marketingState exists in 2026-04 against a real dev store.
         const data = await shopifyGql(query, { id: toGid("Customer", args.customerId) });
         const customer = data.customer;
-        if (!customer) return ok(null);
+        if (!customer) {
+          throw new Error(
+            `Customer ${args.customerId} not found. If this id came from an order, it is an ` +
+              "Order id, not a Customer id — get a valid customer id from shopify_find_customer " +
+              "(email/phone).",
+          );
+        }
         const { orders, ...rest } = customer;
         return ok({ ...rest, recentOrders: unwrapConnection(orders) });
       } catch (err) {
