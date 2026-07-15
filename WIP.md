@@ -10,7 +10,12 @@ Also replaced static fallback: composeContextualFallbackMessage (new prompt
 execution/contextual-fallback en/es/pt) writes a context-aware handoff msg from
 customer-visible history only (blocked response never shown to composer).
 Verified: typecheck, new execution-confidence-context.test.ts (3), action-claim (7).
-Next: commit; live-test a playbook conversation to confirm no more false flags.
+Live test caught Stage 1 with the SAME bug: company-interest history included
+failed tool calls as "Assistant" lines → successful cancel flagged fabricated_policy.
+Fixed formatConversationHistory (skip toolStatus=ERROR, label tool results w/
+output) + hasToolResults; cancel tool now returns status:CANCELLATION_ACCEPTED
+(async job.done:false read as failure). New company-interest-history.test.ts (2).
+Next: commit; re-run the live cancel flow to confirm no more false flags.
 
 ## 2026-07-15 — master — Shopify tool rework IMPLEMENTED, uncommitted
 
