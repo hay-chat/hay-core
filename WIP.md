@@ -1,5 +1,25 @@
 # WIP
 
+## 2026-07-15 — prod ops — Shopify OAuth fixed on eu.hay.chat (no code change)
+
+Root cause: /etc/hay/infisical-credentials was root:600, deploy.sh:130 silently
+skipped Infisical export since Mar 27 → SHOPIFY*OAUTH*_ (+META\__, POSTHOG\_\*,
+OAUTH_REDIRECT_URI) never reached /opt/hay/.env → oauthConfigured=false → no
+Connect button. Fixed: chmod 640 root:hay on creds, fresh export installed
+(backup at /opt/hay/.env.bak-20260715), hay-server restarted, health green.
+Next: make deploy.sh warn/fail on unreadable creds file; set dedicated
+PLUGIN_ENCRYPTION_KEY in Infisical; Roger to click Connect + verify tools load.
+
+## 2026-07-14 — master — PostHog telemetry SHIPPED (no PR — see warning)
+
+Opt-in PostHog on dashboard: POSTHOG_KEY (build-time) + POSTHOG_HOST (proxy OK,
+ui_host hardcoded eu.posthog.com) in posthog.client.ts; unset key = no-op.
+On master as 1bd1ff7 + 44a4f68. Worktree, feature branch, and old research
+branch all deleted. WARNING: something on this machine auto-pushed both
+commits to origin/master ~15s after each commit (actor rgrjnr, from the
+worktree, HEAD:master) — bypasses PR flow entirely; not a git hook/cron.
+Next: find the auto-pusher; smoke-test telemetry with a real phc key.
+
 ## 2026-07-14 — master — org deletion FK fix (uncommitted)
 
 Org delete failed: documents FK lacked ON DELETE CASCADE (route comment promised

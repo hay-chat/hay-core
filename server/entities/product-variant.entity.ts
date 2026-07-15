@@ -14,7 +14,9 @@ export type { VariantSelectedOption } from "./product.enums";
 @Index("idx_product_variants_sku", ["sku"])
 @Index("idx_product_variants_price", ["price"])
 @Index("idx_product_variants_availability", ["availability"])
-@Index("idx_product_variants_source_external_id", ["source", "externalId"], { unique: true })
+@Index("idx_product_variants_source_external_id", ["organizationId", "source", "externalId"], {
+  unique: true,
+})
 export class ProductVariant extends OrganizationScopedEntity {
   @Column({ type: "uuid" })
   productId!: string;

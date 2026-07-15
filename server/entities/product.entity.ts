@@ -14,7 +14,9 @@ export type { ProductCategoryRef, ProductImage, ProductOptionDef } from "./produ
 @Index("idx_products_external_id", ["externalId"])
 @Index("idx_products_price_min", ["priceMin"])
 @Index("idx_products_available", ["available"])
-@Index("idx_products_source_external_id", ["source", "externalId"], { unique: true })
+@Index("idx_products_source_external_id", ["organizationId", "source", "externalId"], {
+  unique: true,
+})
 export class Product extends OrganizationScopedEntity {
   @Column({ type: "text" })
   externalId!: string;
