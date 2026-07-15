@@ -1572,6 +1572,20 @@ export const validateAuth = authenticatedProcedure
   });
 
 /**
+ * Resolve a locale against a plugin's available i18n keys, tolerating region
+ * mismatches: "pt-BR" matches a plugin's "pt" file and vice versa. Falls back
+ * to "en" when the language has no match at all.
+ */
+function resolvePluginLocale<T>(i18n: Record<string, T>, locale: string): T | undefined {
+  if (i18n[locale]) return i18n[locale];
+  const language = locale.split("-")[0];
+  if (i18n[language]) return i18n[language];
+  const regionalVariant = Object.keys(i18n).find((key) => key.split("-")[0] === language);
+  if (regionalVariant) return i18n[regionalVariant];
+  return i18n["en"];
+}
+
+/**
  * Get plugin translations for a given locale
  *
  * Returns i18n data for all plugins that have translations available.
@@ -1598,7 +1612,7 @@ export const getPluginTranslations = authenticatedProcedure
       if (!enabledPluginIds.has(plugin.pluginId)) continue;
       const manifest = plugin.manifest as HayPluginManifest;
       if (!manifest.i18n) continue;
-      const localeData = manifest.i18n[input.locale] || manifest.i18n["en"];
+      const localeData = resolvePluginLocale(manifest.i18n, input.locale);
       if (localeData) {
         translations[plugin.pluginId] = localeData;
       }

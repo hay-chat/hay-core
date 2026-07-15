@@ -274,6 +274,17 @@ export interface ConfidenceGuardrailConfig {
 }
 
 /**
+ * Action Claim Guardrail Configuration (Stage 0)
+ * Blocks responses that claim a state-changing action was performed
+ * without a backing tool call in the same turn
+ */
+export interface ActionClaimGuardrailConfig {
+  enabled: boolean; // Default: true
+  maxRetries: number; // Default: 1 (corrective re-plans per turn before escalating)
+  escalateOnFailure: boolean; // Default: true (HANDOFF vs fallback message when retries exhausted)
+}
+
+/**
  * Default company interest guardrail configuration
  */
 export const DEFAULT_COMPANY_INTEREST_GUARDRAIL_CONFIG: CompanyInterestGuardrailConfig = {
@@ -301,6 +312,15 @@ export const DEFAULT_CONFIDENCE_GUARDRAIL_CONFIG: ConfidenceGuardrailConfig = {
 };
 
 /**
+ * Default action claim guardrail configuration
+ */
+export const DEFAULT_ACTION_CLAIM_GUARDRAIL_CONFIG: ActionClaimGuardrailConfig = {
+  enabled: true,
+  maxRetries: 1,
+  escalateOnFailure: true,
+};
+
+/**
  * Organization Settings JSONB structure
  * This type defines the complete structure of the settings field in the Organization entity
  */
@@ -309,6 +329,7 @@ export interface OrganizationSettings {
   companyDomain?: string; // Company's business domain/industry for context
   companyInterestGuardrail?: CompanyInterestGuardrailConfig; // Stage 1: Company interest protection
   confidenceGuardrail?: ConfidenceGuardrailConfig; // Stage 2: Fact grounding
+  actionClaimGuardrail?: ActionClaimGuardrailConfig; // Stage 0: Action-claim vs tool-call consistency
   retentionDays?: number | null; // Data retention period in days (null = disabled/forever)
   isPlayground?: boolean; // Enables playground mode for public conversations (demo orgs only)
   llm?: OrgLlmConfig; // Per-org LLM chat provider + tier→model map (embeddings stay managed)

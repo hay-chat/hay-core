@@ -1,24 +1,50 @@
 // tools/customers.js — Shopify Admin GraphQL MCP tools for customers (API 2026-04)
 // Read side uses defaultEmailAddress/defaultPhoneNumber (top-level email/phone are
-// deprecated on Customer in 2026-04).
+// deprecated on Customer in 2026-04). Exactly two lookups on purpose: find (email or
+// phone → list for disambiguation) and get (by id, enriched) — overlapping lookup
+// tools waste an agent decision and get picked wrong.
 
 const { z } = require("zod");
 const { shopifyGql } = require("../lib/client");
-const { ok, fail, unwrapConnection, pageInfo, toGid, assertNoUserErrors } = require("../lib/format");
+const {
+  ok,
+  fail,
+  unwrapConnection,
+  pageInfo,
+  toGid,
+  assertNoUserErrors,
+} = require("../lib/format");
 
 function registerCustomerTools(server) {
-  // 1. Find customers by email
+  // 1. Find customers by email and/or phone
   server.tool(
-    "shopify_find_customer_by_email",
-    "Find customers matching an email address. Returns a list with pagination.",
+    "shopify_find_customer",
+    "Find customers by email address and/or phone number. Returns a list (may be empty or " +
+      "contain several matches — disambiguate with the customer before acting). Follow up " +
+      "with shopify_get_customer for full detail and recent orders.",
     {
-      email: z.string().describe("Email address to search for."),
-      first: z.number().int().optional().describe("Max number of customers to return (default 10)."),
+      email: z.string().optional().describe("Email address to search for."),
+      phone: z
+        .string()
+        .optional()
+        .describe("Phone number to search for, ideally E.164 (e.g. +15551234567)."),
+      first: z
+        .number()
+        .int()
+        .optional()
+        .describe("Max number of customers to return (default 10)."),
     },
     async (args) => {
       try {
+        if (!args.email && !args.phone) {
+          throw new Error("Provide an email and/or a phone number to search for.");
+        }
+        // Shopify search syntax: `email:` and `phone:` filters, uppercase OR.
+        const parts = [];
+        if (args.email) parts.push(`email:"${args.email}"`);
+        if (args.phone) parts.push(`phone:"${args.phone}"`);
         const query = `
-          query FindCustomerByEmail($first: Int!, $query: String!) {
+          query FindCustomer($first: Int!, $query: String!) {
             customers(first: $first, query: $query) {
               edges {
                 node {
@@ -36,7 +62,7 @@ function registerCustomerTools(server) {
         `;
         const variables = {
           first: args.first ?? 10,
-          query: `email:"${args.email}"`,
+          query: parts.join(" OR "),
         };
         const data = await shopifyGql(query, variables);
         const conn = data.customers;
@@ -47,51 +73,21 @@ function registerCustomerTools(server) {
       } catch (err) {
         return fail(err);
       }
-    }
-  );
-
-  // 2. Get a single customer by email or phone identifier
-  server.tool(
-    "shopify_get_customer_by_identifier",
-    "Get a single customer by a unique identifier (email address or E.164 phone number).",
-    {
-      emailAddress: z.string().optional().describe("Email address identifier."),
-      phoneNumber: z.string().optional().describe("Phone number identifier in E.164 format."),
     },
-    async (args) => {
-      try {
-        const query = `
-          query CustomerByIdentifier($identifier: CustomerIdentifierInput!) {
-            customerByIdentifier(identifier: $identifier) {
-              id
-              firstName
-              lastName
-              defaultEmailAddress { emailAddress }
-              defaultPhoneNumber { phoneNumber }
-              numberOfOrders
-            }
-          }
-        `;
-        const identifier = {};
-        if (args.emailAddress) identifier.emailAddress = args.emailAddress;
-        if (args.phoneNumber) identifier.phoneNumber = args.phoneNumber;
-        const data = await shopifyGql(query, { identifier });
-        return ok(data.customerByIdentifier);
-      } catch (err) {
-        return fail(err);
-      }
-    }
   );
 
-  // 3. Get a customer by id (full detail)
+  // 2. Get a customer by id (full detail + recent orders)
   server.tool(
     "shopify_get_customer",
-    "Get full details for a customer by id (accepts a GID or bare numeric id).",
+    "Get full details for a customer by id, including their 5 most recent orders " +
+      "(name, status, date, total) — usually no separate order-list call is needed.",
     {
       customerId: z.string().describe("Customer GID or bare numeric id."),
     },
     async (args) => {
       try {
+        // recentOrders capped at 5: enough to collapse the email→customer→orders
+        // flow into one call without blowing up context for long-tenured customers.
         const query = `
           query GetCustomer($id: ID!) {
             customer(id: $id) {
@@ -110,9 +106,7 @@ function registerCustomerTools(server) {
                 address1
                 address2
                 city
-                province
                 provinceCode
-                country
                 countryCode
                 zip
                 firstName
@@ -120,18 +114,33 @@ function registerCustomerTools(server) {
                 phone
                 company
               }
+              orders(first: 5, sortKey: CREATED_AT, reverse: true) {
+                edges {
+                  node {
+                    id
+                    name
+                    createdAt
+                    displayFinancialStatus
+                    displayFulfillmentStatus
+                    totalPriceSet { shopMoney { amount currencyCode } }
+                  }
+                }
+              }
             }
           }
         `; // TODO(HAY-219 §8): verify defaultEmailAddress.marketingState exists in 2026-04 against a real dev store.
         const data = await shopifyGql(query, { id: toGid("Customer", args.customerId) });
-        return ok(data.customer);
+        const customer = data.customer;
+        if (!customer) return ok(null);
+        const { orders, ...rest } = customer;
+        return ok({ ...rest, recentOrders: unwrapConnection(orders) });
       } catch (err) {
         return fail(err);
       }
-    }
+    },
   );
 
-  // 4. Update a customer (WRITE)
+  // 3. Update a customer (WRITE)
   server.tool(
     "shopify_update_customer",
     "Update a customer's basic fields (WRITE).",
@@ -175,61 +184,18 @@ function registerCustomerTools(server) {
       } catch (err) {
         return fail(err);
       }
-    }
-  );
-
-  // 5. Create a customer address (WRITE)
-  server.tool(
-    "shopify_create_customer_address",
-    "Create a new address for a customer (WRITE).",
-    {
-      customerId: z.string().describe("Customer GID or bare numeric id."),
-      address: z
-        .object({
-          address1: z.string().optional(),
-          address2: z.string().optional(),
-          city: z.string().optional(),
-          province: z.string().optional(),
-          provinceCode: z.string().optional(),
-          country: z.string().optional(),
-          countryCode: z.string().optional(),
-          zip: z.string().optional(),
-          firstName: z.string().optional(),
-          lastName: z.string().optional(),
-          phone: z.string().optional(),
-          company: z.string().optional(),
-        })
-        .describe("Address fields."),
-      setAsDefault: z.boolean().optional().describe("Set this address as the customer's default."),
     },
-    async (args) => {
-      try {
-        const mutation = `
-          mutation CreateCustomerAddress($customerId: ID!, $address: MailingAddressInput!, $setAsDefault: Boolean) {
-            customerAddressCreate(customerId: $customerId, address: $address, setAsDefault: $setAsDefault) {
-              address { id address1 city province country zip }
-              userErrors { field message }
-            }
-          }
-        `;
-        const variables = {
-          customerId: toGid("Customer", args.customerId),
-          address: args.address,
-          setAsDefault: args.setAsDefault,
-        };
-        const data = await shopifyGql(mutation, variables);
-        assertNoUserErrors(data.customerAddressCreate);
-        return ok(data.customerAddressCreate.address);
-      } catch (err) {
-        return fail(err);
-      }
-    }
   );
 
-  // 6. Update a customer address (WRITE)
+  // NOTE: no customer-address-create tool on purpose. Adding a profile address does
+  // not change where an existing order ships — the flow customers actually ask for
+  // is shopify_update_order_shipping_address (orders.js).
+
+  // 4. Update a customer address (WRITE)
   server.tool(
     "shopify_update_customer_address",
-    "Update an existing customer address (WRITE).",
+    "Update an existing customer PROFILE address (WRITE). This does NOT change where an " +
+      "existing order ships — use shopify_update_order_shipping_address for that.",
     {
       customerId: z.string().describe("Customer GID or bare numeric id."),
       addressId: z.string().describe("Address GID — pass through verbatim, do not hand-construct."),
@@ -238,10 +204,14 @@ function registerCustomerTools(server) {
           address1: z.string().optional(),
           address2: z.string().optional(),
           city: z.string().optional(),
-          province: z.string().optional(),
-          provinceCode: z.string().optional(),
-          country: z.string().optional(),
-          countryCode: z.string().optional(),
+          provinceCode: z
+            .string()
+            .optional()
+            .describe('Province/state code, e.g. "CA". (province by name is deprecated).'),
+          countryCode: z
+            .string()
+            .optional()
+            .describe('ISO country code, e.g. "US". (country by name is deprecated).'),
           zip: z.string().optional(),
           firstName: z.string().optional(),
           lastName: z.string().optional(),
@@ -256,7 +226,7 @@ function registerCustomerTools(server) {
         const mutation = `
           mutation UpdateCustomerAddress($customerId: ID!, $addressId: ID!, $address: MailingAddressInput!, $setAsDefault: Boolean) {
             customerAddressUpdate(customerId: $customerId, addressId: $addressId, address: $address, setAsDefault: $setAsDefault) {
-              address { id address1 city province country zip }
+              address { id address1 city provinceCode countryCode zip }
               userErrors { field message }
             }
           }
@@ -274,7 +244,7 @@ function registerCustomerTools(server) {
       } catch (err) {
         return fail(err);
       }
-    }
+    },
   );
 }
 

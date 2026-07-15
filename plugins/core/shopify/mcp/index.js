@@ -16,6 +16,7 @@ const { registerShopTools } = require("./tools/shop");
 const { registerOrderTools } = require("./tools/orders");
 const { registerFulfillmentTools } = require("./tools/fulfillments");
 const { registerCustomerTools } = require("./tools/customers");
+const { registerReturnTools } = require("./tools/returns");
 const { registerProductTools } = require("./tools/products");
 const { registerInventoryTools } = require("./tools/inventory");
 
@@ -25,6 +26,7 @@ registerShopTools(server);
 registerOrderTools(server);
 registerFulfillmentTools(server);
 registerCustomerTools(server);
+registerReturnTools(server);
 registerProductTools(server);
 registerInventoryTools(server);
 

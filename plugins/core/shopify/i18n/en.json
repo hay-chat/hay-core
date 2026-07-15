@@ -1,0 +1,86 @@
+{
+  "name": "Shopify",
+  "description": "Connect your Shopify store so the agent can look up orders, customers, and products, track shipments, and handle cancellations, refunds, and returns.",
+  "tools": {
+    "shopify_get_shop": {
+      "label": "Get Store Info",
+      "description": "Get basic information about the connected store (name, domain, plan, currency)."
+    },
+    "shopify_get_order": {
+      "label": "Get Order",
+      "description": "Get an order's items, totals, shipping address, tracking, and support eligibility."
+    },
+    "shopify_get_order_by_name": {
+      "label": "Get Order by Number",
+      "description": "Look up an order by its order number (e.g. #1001)."
+    },
+    "shopify_list_customer_orders": {
+      "label": "List Customer Orders",
+      "description": "List a customer's orders, most recent first."
+    },
+    "shopify_get_order_tracking": {
+      "label": "Get Order Tracking",
+      "description": "Get an order's fulfillment and shipment tracking status."
+    },
+    "shopify_update_order_shipping_address": {
+      "label": "Update Order Shipping Address",
+      "description": "Change where an undispatched order will ship. Refuses once fulfillment has started."
+    },
+    "shopify_add_order_note": {
+      "label": "Add Order Note",
+      "description": "Add or replace the internal note on an order."
+    },
+    "shopify_calculate_refund": {
+      "label": "Calculate Refund",
+      "description": "Preview the correct refund amounts for an order before executing it."
+    },
+    "shopify_create_refund": {
+      "label": "Create Refund",
+      "description": "Execute a refund for an order, bounded by Shopify's maximum refundable amount."
+    },
+    "shopify_cancel_order": {
+      "label": "Cancel Order",
+      "description": "Cancel an order, optionally restocking items, refunding, and notifying the customer."
+    },
+    "shopify_get_returnable_items": {
+      "label": "Get Returnable Items",
+      "description": "List the fulfilled items on an order that are eligible for a return."
+    },
+    "shopify_create_return": {
+      "label": "Create Return",
+      "description": "Open a return for fulfilled items on an order. Refunds are handled separately."
+    },
+    "shopify_find_customer": {
+      "label": "Find Customer",
+      "description": "Find customers by email address and/or phone number."
+    },
+    "shopify_get_customer": {
+      "label": "Get Customer",
+      "description": "Get a customer's details including their most recent orders."
+    },
+    "shopify_update_customer": {
+      "label": "Update Customer",
+      "description": "Update a customer's basic profile fields."
+    },
+    "shopify_update_customer_address": {
+      "label": "Update Customer Address",
+      "description": "Update a saved address on the customer's profile (does not change existing orders)."
+    },
+    "shopify_get_product": {
+      "label": "Get Product",
+      "description": "Get a single product by id, including its variants."
+    },
+    "shopify_get_product_by_handle": {
+      "label": "Get Product by Handle",
+      "description": "Get a single product by its URL handle, including its variants."
+    },
+    "shopify_search_products": {
+      "label": "Search Products",
+      "description": "Search the store's products by title."
+    },
+    "shopify_check_inventory": {
+      "label": "Check Inventory",
+      "description": "Check stock levels for a product variant by id or SKU across all locations."
+    }
+  }
+}

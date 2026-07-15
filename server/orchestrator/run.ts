@@ -15,6 +15,7 @@ import { LLMService } from "@server/services/core/llm.service";
 import { PromptService } from "@server/services/prompt.service";
 import { createLogger } from "@server/lib/logger";
 import type { ExecutionResult } from "./execution.layer";
+import type { ToolLedgerEntry } from "@server/services/core/action-claim-guardrail.service";
 import type { Message } from "@server/database/entities/message.entity";
 import type pino from "pino";
 
@@ -771,6 +772,12 @@ async function handleExecutionLoop(
   let emptyRetries = 0; // Track consecutive retries without valid response
   let handoffProcessed = false; // Track if handoff has been processed
   let hasToolCallBeenMade = false; // Track if we've sent the initial processing message
+  // Ledger of tool calls made during THIS turn (conversation history is not
+  // turn-scoped). The action-claim guardrail compares RESPOND claims against it.
+  const toolsCalledThisTurn: ToolLedgerEntry[] = [];
+  // Shared (by reference) with the execution layer so corrective re-plans are
+  // budgeted per turn, not per execute() call.
+  const turnGuardrailState = { actionClaimRetries: 0 };
 
   while (iterations < MAX_ITERATIONS) {
     iterations++;
@@ -780,6 +787,7 @@ async function handleExecutionLoop(
     const executionResult: ExecutionResult | null = await executionLayer.execute(
       conversation,
       customerLanguage,
+      { toolsCalledThisTurn, turnGuardrailState },
     );
 
     if (!executionResult) {
@@ -851,6 +859,7 @@ async function handleExecutionLoop(
           // Don't count blocked tool calls toward the iteration limit —
           // feed an error back to the LLM so it can adjust instead of silently looping.
           iterations--;
+          toolsCalledThisTurn.push({ name: executionResult.tool.name, success: false });
           await conversation.addMessage({
             content: `Tool "${executionResult.tool.name}" is not available in this conversation. Available tools: ${enabledTools.join(", ")}`,
             type: MessageType.TOOL,
@@ -902,6 +911,10 @@ async function handleExecutionLoop(
         executionResult.tool,
         toolMessageId?.id,
       );
+      toolsCalledThisTurn.push({
+        name: executionResult.tool.name,
+        success: toolExecResult1.success,
+      });
       await maybeEmitProductRecommendation(
         conversation,
         executionResult.tool.name,
@@ -928,6 +941,10 @@ async function handleExecutionLoop(
         executionResult.tool,
         toolMessageId?.id,
       );
+      toolsCalledThisTurn.push({
+        name: executionResult.tool.name,
+        success: toolExecResult2.success,
+      });
       await maybeEmitProductRecommendation(
         conversation,
         executionResult.tool.name,

@@ -1,5 +1,10 @@
 /**
  * Shop tool — basic store info. Doubles as a connectivity check for the token.
+ *
+ * TODO: this is config, not a tool — store name/domain/currency don't change
+ * mid-conversation. Once the plugin SDK supports injecting static context into
+ * the agent at session start, move this data there and drop the tool (saves one
+ * call and one decision per conversation). No such SDK hook exists today.
  */
 
 const { shopifyGql } = require("../lib/client");

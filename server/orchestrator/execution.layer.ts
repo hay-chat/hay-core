@@ -14,6 +14,11 @@ import {
   CompanyInterestGuardrailService,
   type CompanyInterestAssessment,
 } from "@server/services/core/company-interest-guardrail.service";
+import {
+  ActionClaimGuardrailService,
+  type ActionClaimAssessment,
+  type ToolLedgerEntry,
+} from "@server/services/core/action-claim-guardrail.service";
 import { MessageIntent, Message } from "@server/database/entities/message.entity";
 import { Document } from "@server/entities/document.entity";
 
@@ -36,6 +41,19 @@ interface OrchestrationRagStatus {
   };
 }
 
+/**
+ * Per-call options threaded from the run.ts execution loop.
+ * `toolsCalledThisTurn` and `turnGuardrailState` are owned by the loop and
+ * shared (by reference) across every execute() call within a turn, so retry
+ * budgets survive re-plans. `plannerFeedback` injects corrective feedback into
+ * the planner prompt on guardrail-triggered retries.
+ */
+export interface ExecuteOptions {
+  toolsCalledThisTurn?: ToolLedgerEntry[];
+  turnGuardrailState?: { actionClaimRetries: number };
+  plannerFeedback?: string;
+}
+
 export interface ExecutionResult {
   step: "ASK" | "RESPOND" | "CALL_TOOL" | "HANDOFF" | "CLOSE";
   userMessage?: string | null;
@@ -45,6 +63,8 @@ export interface ExecutionResult {
   closeReason?: string | null;
   rationale?: string;
   // Guardrail fields
+  actionClaim?: ActionClaimAssessment; // Stage 0: Action-claim vs tool-call consistency
+  actionClaimRetryAttempted?: boolean;
   companyInterest?: CompanyInterestAssessment; // Stage 1: Company interest protection
   confidence?: ConfidenceAssessment; // Stage 2: Fact grounding
   recheckAttempted?: boolean;
@@ -70,6 +90,7 @@ export class ExecutionLayer {
   private promptService: PromptService;
   private companyInterestService: CompanyInterestGuardrailService;
   private confidenceService: ConfidenceGuardrailService;
+  private actionClaimService: ActionClaimGuardrailService;
   // Per-instance memo for organization settings — both guardrail config
   // helpers read the same row. ExecutionLayer is constructed per turn so this
   // is naturally short-lived.
@@ -80,6 +101,7 @@ export class ExecutionLayer {
     this.promptService = PromptService.getInstance();
     this.companyInterestService = new CompanyInterestGuardrailService();
     this.confidenceService = new ConfidenceGuardrailService();
+    this.actionClaimService = new ActionClaimGuardrailService();
     logger.debug("ExecutionLayer initialized");
   }
 
@@ -151,6 +173,7 @@ export class ExecutionLayer {
   async execute(
     conversation: Conversation,
     customerLanguage?: string,
+    options: ExecuteOptions = {},
   ): Promise<ExecutionResult | null> {
     const log = logger.child({
       organizationId: conversation.organization_id,
@@ -239,6 +262,16 @@ export class ExecutionLayer {
       const knowledgeBlock = await this.buildKnowledgePrompt(conversation);
       if (knowledgeBlock) {
         finalPrompt = finalPrompt + knowledgeBlock;
+      }
+
+      // Corrective feedback from a guardrail-triggered retry (e.g. the previous
+      // plan claimed an action without calling a tool). Appended last so it
+      // reads as the most recent instruction.
+      if (options.plannerFeedback) {
+        finalPrompt +=
+          "\n\n---CORRECTIVE FEEDBACK (your previous attempt was rejected)---\n" +
+          options.plannerFeedback +
+          "\n---END CORRECTIVE FEEDBACK---";
       }
 
       log.debug(
@@ -373,7 +406,12 @@ export class ExecutionLayer {
 
       // Apply confidence guardrails to RESPOND steps
       if (result.step === "RESPOND" && result.userMessage) {
-        return await this.applyConfidenceGuardrails(result, conversation, customerLanguage);
+        return await this.applyConfidenceGuardrails(
+          result,
+          conversation,
+          customerLanguage,
+          options,
+        );
       }
 
       return result;
@@ -396,12 +434,26 @@ export class ExecutionLayer {
     result: ExecutionResult,
     conversation: Conversation,
     customerLanguage?: string,
+    options: ExecuteOptions = {},
   ): Promise<ExecutionResult> {
     const log = logger.child({
       organizationId: conversation.organization_id,
       conversationId: conversation.id,
     });
     log.debug("Applying two-stage guardrails to RESPOND step");
+
+    // STAGE 0: Action-claim consistency. Runs BEFORE the intent exemption below
+    // so a false "I've cancelled it, glad I could help!" on a closing intent is
+    // still caught. May return a re-planned result (retry) or a HANDOFF.
+    const stageZeroResult = await this.applyActionClaimGuardrail(
+      result,
+      conversation,
+      customerLanguage,
+      options,
+    );
+    if (stageZeroResult) {
+      return stageZeroResult;
+    }
 
     // Check if we should skip guardrail checks based on user intent
     const lastCustomerMessage = await conversation.getLastCustomerMessage();
@@ -509,7 +561,12 @@ export class ExecutionLayer {
       if (confidenceAssessment.shouldRecheck) {
         log.debug("Medium confidence detected, triggering recheck");
 
-        const recheckResult = await this.performRecheck(result, conversation, customerLanguage);
+        const recheckResult = await this.performRecheck(
+          result,
+          conversation,
+          customerLanguage,
+          options,
+        );
 
         if (recheckResult) {
           result.userMessage = recheckResult.userMessage;
@@ -573,6 +630,138 @@ export class ExecutionLayer {
       log.debug("Stage 2 SKIPPED: No fact checking required (no company claims)");
     }
 
+    return result;
+  }
+
+  /**
+   * Stage 0: Block RESPOND messages that claim a state-changing action without
+   * a backing tool call this turn. On the first violation the planner gets one
+   * corrective retry (call the tool or rephrase); if the retry still can't back
+   * its claim, escalate to HANDOFF (or swap in the fallback message when
+   * escalation is disabled).
+   *
+   * Returns null when the response passes — the caller continues with the
+   * existing Stage 1/2 flow. Returns an ExecutionResult to short-circuit.
+   */
+  private async applyActionClaimGuardrail(
+    result: ExecutionResult,
+    conversation: Conversation,
+    customerLanguage?: string,
+    options: ExecuteOptions = {},
+  ): Promise<ExecutionResult | null> {
+    const log = logger.child({
+      organizationId: conversation.organization_id,
+      conversationId: conversation.id,
+    });
+
+    const config = await this.getActionClaimConfig(conversation);
+    if (!config.enabled) {
+      return null;
+    }
+
+    const conversationHistory = await conversation.getMessages();
+    const lastCustomerMessage = await conversation.getLastCustomerMessage();
+
+    const assessment = await this.actionClaimService.assessActionClaim(
+      {
+        response: result.userMessage!,
+        customerQuery: lastCustomerMessage?.content ?? "",
+        conversationHistory,
+        toolsCalledThisTurn: options.toolsCalledThisTurn ?? [],
+      },
+      config,
+    );
+
+    result.actionClaim = assessment;
+
+    if (assessment.passed) {
+      return null;
+    }
+
+    log.warn(
+      {
+        claimedActions: assessment.claimedActions,
+        toolsCalledThisTurn: options.toolsCalledThisTurn ?? [],
+        reasoning: assessment.reasoning,
+      },
+      "Stage 0: Response claims action without backing tool call",
+    );
+
+    // Give the planner a corrective retry while the turn's budget allows. The
+    // counter lives in run.ts loop scope (shared by reference), so the budget
+    // is per turn even across recursive re-plans.
+    const retriesUsed = options.turnGuardrailState?.actionClaimRetries ?? 0;
+    if (options.turnGuardrailState && retriesUsed < config.maxRetries) {
+      options.turnGuardrailState.actionClaimRetries++;
+
+      const plannerFeedback =
+        `Your previous response claimed the following action(s) were performed or initiated: ` +
+        `${assessment.claimedActions.join("; ")}. ` +
+        `No tool call backs this claim in the current turn. You MUST NOT tell the customer an ` +
+        `action happened when it did not. Either use CALL_TOOL now with the appropriate tool to ` +
+        `actually perform the action, or RESPOND rephrased without claiming the action was done ` +
+        `(e.g. ask for confirmation or explain the next step). If no available tool can perform ` +
+        `the action, use HANDOFF to escalate to a human agent.`;
+
+      log.debug(
+        { retriesUsed: retriesUsed + 1, maxRetries: config.maxRetries },
+        "Stage 0: Re-planning with corrective feedback",
+      );
+
+      const retryResult = await this.execute(conversation, customerLanguage, {
+        ...options,
+        plannerFeedback,
+      });
+
+      if (retryResult) {
+        // A RESPOND retry already went through the full guardrail pipeline
+        // inside the recursive execute(); a CALL_TOOL returns to the run.ts
+        // loop for normal execution.
+        retryResult.actionClaimRetryAttempted = true;
+        return retryResult;
+      }
+      // Retry produced nothing usable — fall through to escalation rather than
+      // propagating null (which would trigger a blind re-plan without feedback).
+    }
+
+    const confidenceConfig = await this.getConfidenceConfig(conversation);
+    const fallbackMessage = await this.getTranslatedFallbackMessage(
+      conversation,
+      confidenceConfig.fallbackMessage,
+      customerLanguage,
+    );
+    const originalMessage = result.userMessage;
+
+    if (config.escalateOnFailure) {
+      log.warn(
+        { claimedActions: assessment.claimedActions },
+        "Stage 0: Retries exhausted, escalating to human handoff",
+      );
+      return {
+        step: "HANDOFF",
+        userMessage: fallbackMessage,
+        handoff: {
+          reason: "Claimed action without tool execution",
+          fields: {
+            claimedActions: assessment.claimedActions,
+            toolsCalledThisTurn: options.toolsCalledThisTurn ?? [],
+          },
+        },
+        actionClaim: assessment,
+        actionClaimRetryAttempted: true,
+        originalMessage: originalMessage || undefined,
+      };
+    }
+
+    // Escalation disabled: replace the false claim with the safe fallback text.
+    // The canned fallback needs no further guardrail stages.
+    log.warn(
+      { claimedActions: assessment.claimedActions },
+      "Stage 0: Retries exhausted, replacing message with fallback (escalation disabled)",
+    );
+    result.originalMessage = originalMessage || undefined;
+    result.userMessage = fallbackMessage;
+    result.actionClaimRetryAttempted = true;
     return result;
   }
 
@@ -747,6 +936,7 @@ export class ExecutionLayer {
     originalResult: ExecutionResult,
     conversation: Conversation,
     customerLanguage?: string,
+    options: ExecuteOptions = {},
   ): Promise<{ userMessage: string; confidence?: ConfidenceAssessment } | null> {
     const log = logger.child({
       organizationId: conversation.organization_id,
@@ -780,8 +970,9 @@ export class ExecutionLayer {
         }
       }
 
-      // Re-execute with new documents
-      const recheckResult = await this.execute(conversation, customerLanguage);
+      // Re-execute with new documents. Forward options so the recheck's re-plan
+      // sees the same turn tool ledger / retry budget as the original plan.
+      const recheckResult = await this.execute(conversation, customerLanguage, options);
 
       if (!recheckResult || recheckResult.step !== "RESPOND" || !recheckResult.userMessage) {
         // Recheck failed, restore original documents
@@ -1014,6 +1205,23 @@ export class ExecutionLayer {
         "Error loading company interest config, using defaults",
       );
       return CompanyInterestGuardrailService.getDefaultConfig();
+    }
+  }
+
+  private async getActionClaimConfig(conversation: Conversation) {
+    try {
+      const settings = await this.getOrganizationSettings(conversation.organization_id);
+      return ActionClaimGuardrailService.mergeConfig(settings, undefined);
+    } catch (error) {
+      logger.warn(
+        {
+          err: error,
+          organizationId: conversation.organization_id,
+          conversationId: conversation.id,
+        },
+        "Error loading action claim config, using defaults",
+      );
+      return ActionClaimGuardrailService.getDefaultConfig();
     }
   }
 

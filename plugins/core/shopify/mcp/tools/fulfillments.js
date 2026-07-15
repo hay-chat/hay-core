@@ -32,6 +32,7 @@ function registerFulfillmentTools(server) {
               fulfillments(first: 10) { # Verified 2026-04: Order.fulfillments is a plain [Fulfillment!]! list accepting first:; select fields directly (no edges/node).
                 status
                 displayStatus
+                deliveredAt
                 estimatedDeliveryAt
                 trackingInfo {
                   number
@@ -56,6 +57,7 @@ function registerFulfillmentTools(server) {
             tracking.push({
               status: fulfillment.status,
               displayStatus: fulfillment.displayStatus,
+              deliveredAt: fulfillment.deliveredAt,
               estimatedDeliveryAt: fulfillment.estimatedDeliveryAt,
               number: info.number,
               url: info.url,
