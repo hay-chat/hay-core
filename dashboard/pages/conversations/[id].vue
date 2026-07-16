@@ -30,6 +30,19 @@
             </div>
           </div>
           <div class="flex items-center space-x-2">
+            <Button v-if="isLocalhost" variant="outline" size="sm" @click="copyConversationJson">
+              <Braces class="h-4 w-4 mr-2" />
+              Copy JSON
+            </Button>
+            <Button
+              v-if="conversation?.playbook_id"
+              variant="outline"
+              size="sm"
+              @click="showSuggestDialog = true"
+            >
+              <Sparkles class="h-4 w-4 mr-2" />
+              {{ $t("suggest.improveFromConversation") }}
+            </Button>
             <Button variant="outline" size="sm" :disabled="isResetting" @click="resetConversation">
               <RefreshCw class="h-4 w-4 mr-2" />
               {{ $t("conversations.detail.newTest") }}
@@ -76,6 +89,19 @@
                 })
               }}
             </Badge>
+            <Button v-if="isLocalhost" variant="outline" size="sm" @click="copyConversationJson">
+              <Braces class="h-4 w-4 mr-2" />
+              Copy JSON
+            </Button>
+            <Button
+              v-if="conversation?.playbook_id"
+              variant="outline"
+              size="sm"
+              @click="showSuggestDialog = true"
+            >
+              <Sparkles class="h-4 w-4 mr-2" />
+              {{ $t("suggest.improveFromConversation") }}
+            </Button>
             <DropdownMenu>
               <DropdownMenuTrigger as-child>
                 <Button variant="outline" size="sm" :loading="isExporting">
@@ -328,6 +354,27 @@
                 {{ $t("conversations.pendingHuman.editPlaybooks") }}
               </Button>
             </div>
+          </div>
+        </div>
+
+        <!-- Pending Human Panel: handoff summary + take over -->
+        <div v-if="!isPlaygroundMode && isPendingHuman" class="border-t bg-amber-50 p-4">
+          <div class="flex items-center justify-between gap-4">
+            <div class="flex items-start space-x-3 min-w-0">
+              <AlertCircle class="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" />
+              <div class="min-w-0">
+                <p class="text-sm font-medium text-amber-900">
+                  {{ $t("conversations.pendingHuman.needsHuman") }}
+                </p>
+                <p class="text-sm text-amber-700 mt-1">
+                  {{ conversation?.summary || $t("conversations.pendingHuman.summaryPending") }}
+                </p>
+              </div>
+            </div>
+            <Button size="sm" class="flex-shrink-0" @click="takeOverConversation">
+              <UserCheck class="h-4 w-4 mr-2" />
+              {{ $t("conversations.detail.takeOver") }}
+            </Button>
           </div>
         </div>
 
@@ -732,6 +779,15 @@
         </DialogFooter>
       </DialogContent>
     </Dialog>
+
+    <!-- AI Suggest Playbook Edits Dialog -->
+    <SuggestEditsDialog
+      v-if="conversation?.playbook_id"
+      v-model:open="showSuggestDialog"
+      :playbook-id="conversation.playbook_id"
+      :conversation-id="conversation.id"
+      @applied="handleSuggestionApplied"
+    />
   </div>
 </template>
 
@@ -763,6 +819,8 @@ import {
   Lock,
   FileText,
   FileSpreadsheet,
+  Braces,
+  Sparkles,
 } from "lucide-vue-next";
 import { TRPCClientError } from "@trpc/client";
 import { HayApi } from "@/utils/api";
@@ -906,6 +964,29 @@ const messages = ref<DisplayMessage[]>([]);
 
 // Full conversation returned by the API (get / create procedures share this shape)
 const conversation = ref<ConversationDetail | null>(null);
+
+// Dev-only: copy the raw conversation payload (messages incl. metadata) as JSON.
+// Hidden outside localhost — it exposes internal diagnostics wholesale.
+const isLocalhost = computed(
+  () => import.meta.client && ["localhost", "127.0.0.1"].includes(window.location.hostname),
+);
+
+const copyConversationJson = async () => {
+  const toast = useToast();
+  const payload = {
+    conversationId: conversationId.value,
+    conversation: conversation.value,
+    // Playground mode accumulates messages locally; regular mode keeps them on
+    // the conversation object. Include both views so the dump is always complete.
+    messages: isPlaygroundMode.value ? messages.value : conversation.value?.messages,
+  };
+  try {
+    await navigator.clipboard.writeText(JSON.stringify(payload, null, 2));
+    toast.success(t("common.success"), "Conversation JSON copied to clipboard");
+  } catch {
+    toast.error(t("common.error"), "Could not copy to clipboard");
+  }
+};
 
 const previousConversations = ref<PreviousConversation[]>([]);
 const relatedDocuments = ref<RelatedDocument[]>([]);
@@ -1097,6 +1178,18 @@ const navigateToPlaybook = () => {
     router.push(`/playbooks/${conversation.value.playbook_id}`);
   } else {
     router.push("/playbooks");
+  }
+};
+
+// AI suggest-edits: propose playbook improvements based on this conversation
+const showSuggestDialog = ref(false);
+
+const handleSuggestionApplied = () => {
+  const toast = useToast();
+  toast.success(t("suggest.appliedToast"));
+  const router = useRouter();
+  if (conversation.value?.playbook_id) {
+    router.push(`/playbooks/${conversation.value.playbook_id}`);
   }
 };
 

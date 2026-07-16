@@ -10,6 +10,12 @@ export interface MentionReferences {
 
 const MENTION_TOKEN_REGEX = /<<(action|document):([^>]+)>>/g;
 
+// Inert placeholder used while running markdown→HTML→JSON: `<<action:...>>`
+// would otherwise be parsed by marked as an autolink (`<scheme:...>`) and the
+// token destroyed before mention injection. Tokens are swapped to this form
+// before parsing and matched in text nodes afterwards.
+const PROTECTED_TOKEN_REGEX = /%%(action|document):([^%]+)%%/g;
+
 /**
  * Converts a markdown string into TipTap-compatible ProseMirror JSON.
  *
@@ -23,7 +29,8 @@ export function markdownToTiptapJSON(
   markdown: string,
   references?: MentionReferences,
 ): JSONContent {
-  const html = marked.parse(markdown, { async: false }) as string;
+  const protectedMarkdown = markdown.replace(MENTION_TOKEN_REGEX, "%%$1:$2%%");
+  const html = marked.parse(protectedMarkdown, { async: false }) as string;
   const doc = generateJSON(html, [
     StarterKit.configure({
       heading: { levels: [1, 2] },
@@ -60,9 +67,9 @@ function walkAndReplace(
   const newContent: JSONContent[] = [];
 
   for (const child of node.content) {
-    if (child.type === "text" && child.text && MENTION_TOKEN_REGEX.test(child.text)) {
+    if (child.type === "text" && child.text && PROTECTED_TOKEN_REGEX.test(child.text)) {
       // Reset regex lastIndex since we used .test()
-      MENTION_TOKEN_REGEX.lastIndex = 0;
+      PROTECTED_TOKEN_REGEX.lastIndex = 0;
       const expanded = splitTextNode(child, actionMap, documentMap);
       newContent.push(...expanded);
     } else if (child.content) {
@@ -89,7 +96,7 @@ function splitTextNode(
   const result: JSONContent[] = [];
 
   let lastIndex = 0;
-  const regex = /<<(action|document):([^>]+)>>/g;
+  const regex = /%%(action|document):([^%]+)%%/g;
   let match;
 
   while ((match = regex.exec(text)) !== null) {

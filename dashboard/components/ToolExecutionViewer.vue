@@ -373,10 +373,6 @@ const formattedExecutedAt = computed(() => {
   }
 }
 
-.tool-section__content--error {
-  border-left: 3px solid var(--color-red-500);
-}
-
 :deep(.vjs-value-string) {
   color: var(--color-green-600);
 }

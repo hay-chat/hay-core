@@ -160,13 +160,18 @@ export class ConversationService {
       updateData,
     );
 
-    // Generate conversation title when status changes to pending-human
+    // Generate conversation title and handoff summary when status changes to pending-human
     if (data.status === "pending-human") {
-      import("../orchestrator/conversation-utils").then(({ generateConversationTitle }) => {
-        generateConversationTitle(conversationId, organizationId, false).catch((error) => {
-          logger.error({ err: error }, "Error generating title for pending-human conversation");
-        });
-      });
+      import("../orchestrator/conversation-utils").then(
+        ({ generateConversationTitle, generateHandoffSummary }) => {
+          generateConversationTitle(conversationId, organizationId, false).catch((error) => {
+            logger.error({ err: error }, "Error generating title for pending-human conversation");
+          });
+          generateHandoffSummary(conversationId, organizationId, true).catch((error) => {
+            logger.error({ err: error }, "Error generating handoff summary");
+          });
+        },
+      );
     }
 
     return result;

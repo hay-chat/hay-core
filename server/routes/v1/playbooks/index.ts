@@ -6,6 +6,7 @@ import { TRPCError } from "@trpc/server";
 import { RESOURCES, ACTIONS } from "@server/types/scopes";
 import { LLMService } from "../../../services/core/llm.service";
 import { PromptService } from "../../../services/prompt.service";
+import { PlaybookSuggestionService } from "../../../services/playbook-suggestion.service";
 import { documentRepository } from "../../../repositories/document.repository";
 import { In } from "typeorm";
 
@@ -316,6 +317,24 @@ export const playbooksRouter = t.router({
         }
       }),
 
+    discardDraft: scopedProcedure(RESOURCES.PLAYBOOKS, ACTIONS.UPDATE)
+      .input(
+        z.object({
+          playbookId: z.string().uuid(),
+        }),
+      )
+      .mutation(async ({ ctx, input }) => {
+        try {
+          const discarded = await playbookService.discardDraft(
+            ctx.organizationId!,
+            input.playbookId,
+          );
+          return { discarded };
+        } catch {
+          throw new TRPCError({ code: "NOT_FOUND", message: "Playbook not found" });
+        }
+      }),
+
     publish: scopedProcedure(RESOURCES.PLAYBOOKS, ACTIONS.UPDATE)
       .input(
         z.object({
@@ -374,6 +393,51 @@ export const playbooksRouter = t.router({
         }
       }),
   }),
+
+  suggestEdits: scopedProcedure(RESOURCES.PLAYBOOKS, ACTIONS.UPDATE)
+    .input(
+      z
+        .object({
+          playbookId: z.string().uuid(),
+          conversationId: z.string().uuid().optional(),
+          feedback: z.string().max(4000).optional(),
+          selection: z.string().max(8000).optional(),
+        })
+        .refine((i) => i.conversationId || i.feedback, {
+          message: "Provide a conversationId or feedback",
+        }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const suggestionService = new PlaybookSuggestionService();
+      try {
+        return await suggestionService.suggestEdits({
+          organizationId: ctx.organizationId!,
+          playbookId: input.playbookId,
+          conversationId: input.conversationId,
+          feedback: input.feedback,
+          selection: input.selection,
+        });
+      } catch (error) {
+        if (error instanceof Error) {
+          if (
+            error.message === "Playbook not found" ||
+            error.message === "Conversation not found"
+          ) {
+            throw new TRPCError({ code: "NOT_FOUND", message: error.message });
+          }
+          if (error.message === "Playbook has no instructions") {
+            throw new TRPCError({ code: "BAD_REQUEST", message: error.message });
+          }
+          if (error instanceof SyntaxError) {
+            throw new TRPCError({
+              code: "INTERNAL_SERVER_ERROR",
+              message: "Failed to parse suggested edits",
+            });
+          }
+        }
+        throw error;
+      }
+    }),
 
   generateInstructions: scopedProcedure(RESOURCES.PLAYBOOKS, ACTIONS.CREATE)
     .input(

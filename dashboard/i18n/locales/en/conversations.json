@@ -98,6 +98,8 @@
       "closeConversation": "Close Conversation"
     },
     "pendingHuman": {
+      "needsHuman": "This conversation was handed off to a human agent",
+      "summaryPending": "Generating conversation summary…",
       "notConfident": "Hay wasn't confident about answering this question",
       "handedOff": "Hay decided to hand this conversation to a human agent. Providing more context in the playbooks can be a good place to start to provide more information so Hay can handle similar conversations next time.",
       "startNew": "Start New Conversation",

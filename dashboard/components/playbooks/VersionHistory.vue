@@ -51,6 +51,17 @@
               <RotateCcw class="h-3 w-3 mr-1.5" />
               {{ t("versioning.history.rollback") }}
             </Button>
+
+            <!-- Discard button (only for the draft) -->
+            <Button
+              v-if="version.status === 'draft'"
+              variant="outline"
+              size="sm"
+              @click="showDiscardDialog = true"
+            >
+              <Trash2 class="h-3 w-3 mr-1.5" />
+              {{ t("versioning.history.discard") }}
+            </Button>
           </div>
 
           <!-- Author & timestamp -->
@@ -107,11 +118,22 @@
       />
     </div>
   </ConfirmDialog>
+
+  <!-- Discard Draft Confirmation Dialog -->
+  <ConfirmDialog
+    v-model:open="showDiscardDialog"
+    :title="t('versioning.history.discardTitle')"
+    :description="t('versioning.history.discardDescription')"
+    :confirm-text="t('versioning.history.discardConfirm')"
+    :loading="isDiscarding"
+    destructive
+    @confirm="confirmDiscard"
+  />
 </template>
 
 <script setup lang="ts">
 import { ref, watch } from "vue";
-import { RotateCcw, User2, Clock } from "lucide-vue-next";
+import { RotateCcw, User2, Clock, Trash2 } from "lucide-vue-next";
 import type { PlaybookVersion } from "~/types/playbook";
 import { useToast } from "~/composables/useToast";
 import { HayApi } from "@/utils/api";
@@ -124,6 +146,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   "update:open": [value: boolean];
   rollback: [];
+  discarded: [];
 }>();
 
 const { t } = useI18n();
@@ -176,6 +199,30 @@ const handleRollbackClick = (version: PlaybookVersion) => {
 };
 
 const isRestoring = ref(false);
+
+// Discard-draft state
+const showDiscardDialog = ref(false);
+const isDiscarding = ref(false);
+
+const confirmDiscard = async () => {
+  try {
+    isDiscarding.value = true;
+
+    await HayApi.playbooks.versions.discardDraft.mutate({
+      playbookId: props.playbookId,
+    });
+
+    toast.success(t("versioning.history.discardSuccess"));
+    showDiscardDialog.value = false;
+    emit("update:open", false);
+    emit("discarded");
+  } catch (error) {
+    console.error("Failed to discard draft:", error);
+    toast.error(t("versioning.history.discardFailed"));
+  } finally {
+    isDiscarding.value = false;
+  }
+};
 
 const confirmRollback = async () => {
   if (!rollbackTarget.value) return;

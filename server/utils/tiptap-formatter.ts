@@ -266,6 +266,17 @@ export function analyzeTiptapInstructions(
 }
 
 /**
+ * Convert the formatter's `[action](id)` / `[document](id)` mention links into
+ * the `<<action:id>>` / `<<document:id>>` token form consumed by the dashboard's
+ * markdownToTiptap converter and used as the LLM-facing reference format.
+ */
+export function normalizeMentionTokens(markdown: string): string {
+  return markdown
+    .replace(/\[action\]\(([^)\s]+)\)/g, "<<action:$1>>")
+    .replace(/\[document\]\(([^)\s]+)\)/g, "<<document:$1>>");
+}
+
+/**
  * Format instructions for display - handles Tiptap format
  *
  * @param instructions - Instructions in Tiptap format or null

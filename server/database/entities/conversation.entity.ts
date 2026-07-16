@@ -59,6 +59,11 @@ export class Conversation {
   @Column({ type: "varchar", length: 255 })
   title!: string;
 
+  // AI-generated handoff summary: what the customer wants, what the AI tried,
+  // and why it handed off. Populated when status flips to pending-human.
+  @Column({ type: "text", nullable: true })
+  summary!: string | null;
+
   // Channel identifier — a loose string so new channel plugins can register
   // without a schema migration. Validation happens at plugin registration and
   // at API boundaries.

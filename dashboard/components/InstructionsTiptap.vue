@@ -219,6 +219,16 @@ defineExpose({
   getJSON: () => {
     return currentContent.value || editorRef.value?.getJSON() || null;
   },
+  setContent: (content: JSONContent) => {
+    editorRef.value?.setContent(content);
+    currentContent.value = content;
+  },
+  getSelectedText: () => {
+    const editor = editorRef.value?.getEditor();
+    if (!editor) return "";
+    const { from, to } = editor.state.selection;
+    return editor.state.doc.textBetween(from, to, "\n");
+  },
 });
 </script>
 
