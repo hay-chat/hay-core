@@ -238,7 +238,9 @@ export function getCachedToolDescriptors(
         serverId,
         name: tool.name,
         description: tool.description,
-        input_schema: tool.input_schema,
+        // MCP-spec `inputSchema` (what workers return and what gets cached
+        // verbatim) with `input_schema` as the legacy-cache fallback.
+        input_schema: tool.inputSchema ?? tool.input_schema,
       });
     }
   }

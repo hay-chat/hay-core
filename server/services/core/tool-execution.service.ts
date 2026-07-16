@@ -93,10 +93,14 @@ export class ToolExecutionService {
 
         try {
           logger.debug({ toolCall }, "Executing tool call");
-          const result = await this.executeToolCall(conversation, {
-            tool_name: toolCall.name,
-            arguments: toolCall.args,
-          });
+          const result = await this.executeToolCall(
+            conversation,
+            {
+              tool_name: toolCall.name,
+              arguments: toolCall.args,
+            },
+            toolLogEntry.idempotencyKey,
+          );
           logger.debug({ result }, "Tool call result");
 
           toolLogEntry.ok = true;
@@ -208,6 +212,7 @@ export class ToolExecutionService {
   private async executeToolCall(
     conversation: Conversation,
     toolCall: ToolCallData,
+    idempotencyKey?: string,
   ): Promise<unknown> {
     const { tool_name: fullToolName, arguments: toolArgs } = toolCall;
 
@@ -342,6 +347,19 @@ export class ToolExecutionService {
       toolSchema as Record<string, unknown> | null,
     );
 
+    // Inject the core-generated idempotency key. The LLM must never invent
+    // this value — a made-up key defeats retry deduplication on the provider
+    // side, so core's per-execution UUID always overrides whatever was sent.
+    if (idempotencyKey) {
+      await this.injectIdempotencyKey(
+        organizationId,
+        matchingPlugin.pluginId,
+        actualToolName,
+        enrichedArgs,
+        idempotencyKey,
+      );
+    }
+
     // Execute the MCP tool via the running process
     return await this.executeMCPTool(
       organizationId,
@@ -349,6 +367,42 @@ export class ToolExecutionService {
       actualToolName,
       enrichedArgs,
     );
+  }
+
+  /**
+   * Fill the tool's `idempotency_key` argument with the core-generated UUID.
+   *
+   * Gated on the tool's cached input schema actually declaring an
+   * `idempotency_key` property — MCP servers using strict schemas reject
+   * unknown arguments, so blind injection is not safe. Mutates `args` in
+   * place, overriding any LLM-provided value. Failure to resolve the schema
+   * is non-fatal: the call proceeds with the args as-is.
+   */
+  private async injectIdempotencyKey(
+    organizationId: string,
+    pluginId: string,
+    toolName: string,
+    args: Record<string, unknown>,
+    idempotencyKey: string,
+  ): Promise<void> {
+    try {
+      const { mcpRegistryService } = await import("@server/services/mcp-registry.service");
+      const tools = await mcpRegistryService.getToolsForOrg(organizationId);
+      const tool = tools.find((t) => t.pluginId === pluginId && t.name === toolName);
+      const properties = (
+        tool?.input_schema as { properties?: Record<string, unknown> } | undefined
+      )?.properties;
+
+      if (properties && "idempotency_key" in properties) {
+        args.idempotency_key = idempotencyKey;
+        logger.debug({ pluginId, toolName, idempotencyKey }, "Injected idempotency key");
+      }
+    } catch (error) {
+      logger.warn(
+        { err: error, pluginId, toolName },
+        "Failed to resolve tool schema for idempotency key injection",
+      );
+    }
   }
 
   private validateToolArguments(
