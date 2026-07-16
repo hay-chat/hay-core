@@ -37,6 +37,7 @@ export interface CompanyInterestConfig {
   blockCompetitorInfo: boolean; // Default: true
   blockFabrications: boolean; // Default: true
   allowClarifications: boolean; // Allow AI to clarify its own terms/questions (Default: true)
+  maxRetries: number; // Corrective re-plans before escalating a block (Default: 1)
 }
 
 /**
@@ -74,6 +75,7 @@ export class CompanyInterestGuardrailService {
     blockCompetitorInfo: true,
     blockFabrications: true,
     allowClarifications: true,
+    maxRetries: 1,
   };
 
   constructor() {

@@ -165,6 +165,7 @@ function buildMessageMetadata(
       shouldBlock: executionResult.companyInterest.shouldBlock,
       requiresFactCheck: executionResult.companyInterest.requiresFactCheck,
       reasoning: executionResult.companyInterest.reasoning,
+      retryAttempted: executionResult.companyInterestRetryAttempted || false,
     };
   }
 
@@ -777,7 +778,7 @@ async function handleExecutionLoop(
   const toolsCalledThisTurn: ToolLedgerEntry[] = [];
   // Shared (by reference) with the execution layer so corrective re-plans are
   // budgeted per turn, not per execute() call.
-  const turnGuardrailState = { actionClaimRetries: 0 };
+  const turnGuardrailState = { actionClaimRetries: 0, companyInterestRetries: 0 };
 
   while (iterations < MAX_ITERATIONS) {
     iterations++;

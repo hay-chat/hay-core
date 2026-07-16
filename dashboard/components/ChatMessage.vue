@@ -278,9 +278,23 @@
                 </TooltipPortal>
               </TooltipRoot>
             </TooltipProvider>
-            <Button v-if="hasDebugData" variant="ghost" size="sm" @click="showDebugDialog = true">
-              <MoreVertical class="h-4 w-4" />
-            </Button>
+            <TooltipProvider v-if="hasDebugData" :delay-duration="200">
+              <TooltipRoot>
+                <TooltipTrigger as-child>
+                  <Button variant="ghost" size="sm" @click="showDebugDialog = true">
+                    <Sparkles class="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipPortal>
+                  <TooltipContent
+                    :side-offset="4"
+                    class="z-50 rounded-md border bg-background px-2 py-1 text-xs font-medium text-foreground shadow-md"
+                  >
+                    See Reasoning
+                  </TooltipContent>
+                </TooltipPortal>
+              </TooltipRoot>
+            </TooltipProvider>
           </div>
         </div>
       </div>
@@ -490,7 +504,7 @@ import {
   Ban,
   AlertCircle,
   RotateCcw,
-  MoreVertical,
+  Sparkles,
 } from "lucide-vue-next";
 import {
   TooltipProvider,

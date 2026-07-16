@@ -120,7 +120,7 @@ describe("ExecutionLayer action-claim guardrail (Stage 0)", () => {
 
     const outcome = await invokeStageZero(result, {
       toolsCalledThisTurn: [],
-      turnGuardrailState: { actionClaimRetries: 0 },
+      turnGuardrailState: { actionClaimRetries: 0, companyInterestRetries: 0 },
     });
 
     expect(outcome).toBeNull();
@@ -136,7 +136,7 @@ describe("ExecutionLayer action-claim guardrail (Stage 0)", () => {
     }));
 
     const outcome = await invokeStageZero(respondResult(), {
-      turnGuardrailState: { actionClaimRetries: 0 },
+      turnGuardrailState: { actionClaimRetries: 0, companyInterestRetries: 0 },
     });
 
     expect(outcome).toBeNull();
@@ -150,7 +150,7 @@ describe("ExecutionLayer action-claim guardrail (Stage 0)", () => {
       tool: { name: "shopify_cancel_order", args: { orderId: "1001" } },
     };
     executeSpy.mockResolvedValue(retryResult);
-    const turnGuardrailState = { actionClaimRetries: 0 };
+    const turnGuardrailState = { actionClaimRetries: 0, companyInterestRetries: 0 };
 
     const outcome = await invokeStageZero(respondResult(), {
       toolsCalledThisTurn: [],
@@ -173,7 +173,7 @@ describe("ExecutionLayer action-claim guardrail (Stage 0)", () => {
 
     const outcome = await invokeStageZero(original, {
       toolsCalledThisTurn: [],
-      turnGuardrailState: { actionClaimRetries: 1 }, // budget already spent
+      turnGuardrailState: { actionClaimRetries: 1, companyInterestRetries: 0 }, // budget already spent
     });
 
     expect(executeSpy).not.toHaveBeenCalled();
@@ -190,7 +190,7 @@ describe("ExecutionLayer action-claim guardrail (Stage 0)", () => {
 
     const outcome = await invokeStageZero(respondResult(), {
       toolsCalledThisTurn: [],
-      turnGuardrailState: { actionClaimRetries: 0 },
+      turnGuardrailState: { actionClaimRetries: 0, companyInterestRetries: 0 },
     });
 
     expect(executeSpy).toHaveBeenCalledTimes(1);
@@ -210,7 +210,7 @@ describe("ExecutionLayer action-claim guardrail (Stage 0)", () => {
 
     const outcome = await invokeStageZero(original, {
       toolsCalledThisTurn: [],
-      turnGuardrailState: { actionClaimRetries: 0 },
+      turnGuardrailState: { actionClaimRetries: 0, companyInterestRetries: 0 },
     });
 
     expect(outcome?.step).toBe("RESPOND");
@@ -224,7 +224,7 @@ describe("ExecutionLayer action-claim guardrail (Stage 0)", () => {
 
     await invokeStageZero(respondResult(), {
       toolsCalledThisTurn: ledger,
-      turnGuardrailState: { actionClaimRetries: 0 },
+      turnGuardrailState: { actionClaimRetries: 0, companyInterestRetries: 0 },
     });
 
     const context = assessActionClaim.mock.calls[0][0] as { toolsCalledThisTurn: unknown };
