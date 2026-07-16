@@ -5,12 +5,14 @@ export type ServerStatus = "online" | "offline" | "recovered";
 const POLL_ONLINE = 15_000;
 const POLL_OFFLINE = 4_000;
 const REQUEST_TIMEOUT = 5_000;
+const RECOVERED_BANNER_MS = 5_000;
 
 // Module-level singleton state (shared across all callers), same pattern as useHeartbeat.
 const status = ref<ServerStatus>("online");
 
 let healthUrl: string | null = null;
 let timeoutHandle: NodeJS.Timeout | null = null;
+let recoveredHandle: NodeJS.Timeout | null = null;
 let visibilityHandler: (() => void) | null = null;
 let started = false;
 let inFlight = false;
@@ -30,12 +32,14 @@ async function checkHealth(): Promise<void> {
   try {
     const res = await fetch(healthUrl, { signal: controller.signal, cache: "no-store" });
     if (res.ok) {
-      // A successful check after an outage surfaces the "back online" banner.
-      // We stay in "recovered" until the user reloads, even if checks keep passing.
+      // A successful check after an outage surfaces the "back online" banner,
+      // which dismisses itself after a few seconds.
       if (status.value === "offline") {
         status.value = "recovered";
-      } else if (status.value === "online") {
-        status.value = "online";
+        if (recoveredHandle) clearTimeout(recoveredHandle);
+        recoveredHandle = setTimeout(() => {
+          if (status.value === "recovered") status.value = "online";
+        }, RECOVERED_BANNER_MS);
       }
     } else {
       status.value = "offline";
@@ -93,6 +97,10 @@ function startMonitoring(): void {
 function stopMonitoring(): void {
   started = false;
   pause();
+  if (recoveredHandle) {
+    clearTimeout(recoveredHandle);
+    recoveredHandle = null;
+  }
   if (visibilityHandler && typeof document !== "undefined") {
     document.removeEventListener("visibilitychange", visibilityHandler);
     visibilityHandler = null;

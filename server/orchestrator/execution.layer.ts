@@ -50,7 +50,7 @@ interface OrchestrationRagStatus {
  */
 export interface ExecuteOptions {
   toolsCalledThisTurn?: ToolLedgerEntry[];
-  turnGuardrailState?: { actionClaimRetries: number };
+  turnGuardrailState?: { actionClaimRetries: number; companyInterestRetries: number };
   plannerFeedback?: string;
 }
 
@@ -66,6 +66,7 @@ export interface ExecutionResult {
   actionClaim?: ActionClaimAssessment; // Stage 0: Action-claim vs tool-call consistency
   actionClaimRetryAttempted?: boolean;
   companyInterest?: CompanyInterestAssessment; // Stage 1: Company interest protection
+  companyInterestRetryAttempted?: boolean;
   confidence?: ConfidenceAssessment; // Stage 2: Fact grounding
   recheckAttempted?: boolean;
   recheckCount?: number;
@@ -509,6 +510,42 @@ export class ExecutionLayer {
         "Stage 1 BLOCKED: Response violates company interests",
       );
 
+      // The reviewer's reasoning usually names exactly what was wrong (e.g.
+      // "the playbook says unfulfilled orders are cancellations, not refunds"),
+      // so give the planner one corrective re-plan with that reasoning before
+      // escalating — same philosophy as the Stage 0 action-claim retry.
+      const ciConfig = await this.getCompanyInterestConfig(conversation);
+      const ciRetriesUsed = options.turnGuardrailState?.companyInterestRetries ?? 0;
+      if (options.turnGuardrailState && ciRetriesUsed < ciConfig.maxRetries) {
+        options.turnGuardrailState.companyInterestRetries++;
+
+        const plannerFeedback =
+          `Your previous response was blocked by a company-policy review ` +
+          `(violation: ${companyInterestAssessment.violationType}). Reviewer reasoning: ` +
+          `${companyInterestAssessment.reasoning} ` +
+          `Re-plan with this feedback: only state policies, eligibility, or facts that are ` +
+          `backed by the active playbook, retrieved documents, or tool results in this ` +
+          `conversation. If the request cannot be answered within policy, use HANDOFF.`;
+
+        log.debug(
+          { retriesUsed: ciRetriesUsed + 1, maxRetries: ciConfig.maxRetries },
+          "Stage 1: Re-planning with reviewer feedback",
+        );
+
+        const retryResult = await this.execute(conversation, customerLanguage, {
+          ...options,
+          plannerFeedback,
+        });
+
+        if (retryResult) {
+          // A RESPOND retry re-enters the full guardrail pipeline inside the
+          // recursive execute(); a CALL_TOOL returns to the run.ts loop.
+          retryResult.companyInterestRetryAttempted = true;
+          return retryResult;
+        }
+        // Retry produced nothing usable — fall through to escalation.
+      }
+
       const config = await this.getConfidenceConfig(conversation);
       const fallbackMessage = await this.composeContextualFallbackMessage(
         conversation,
@@ -530,6 +567,7 @@ export class ExecutionLayer {
           },
         },
         companyInterest: companyInterestAssessment,
+        companyInterestRetryAttempted: ciRetriesUsed > 0 || undefined,
         originalMessage: originalMessage || undefined,
       };
     }

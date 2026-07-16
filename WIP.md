@@ -1,5 +1,16 @@
 # WIP
 
+## 2026-07-16 — master — Stage 1 corrective retry + UI polish, uncommitted
+
+Stage 1 (company-interest) block now gives the planner ONE re-plan with the
+reviewer's reasoning as plannerFeedback before HANDOFF (mirrors Stage 0 pattern;
+maxRetries in CompanyInterestConfig, default 1; turnGuardrailState grew
+companyInterestRetries; retryAttempted persisted in metadata.companyInterest).
+UI: ChatMessage debug trigger MoreVertical → Sparkles + "See Reasoning" tooltip;
+back-online banner auto-dismisses after 5s (useServerStatus recovered→online).
+Verified: 19 orchestrator tests (3 new in execution-company-interest-retry),
+server+dashboard typecheck clean. Next: commit; live-test retry on refund flow.
+
 ## 2026-07-15 — master — Playbook grounding + contextual fallback IMPLEMENTED, uncommitted
 
 Correct playbook-driven answers were flagged low-confidence: Stage 2 fact-check never
