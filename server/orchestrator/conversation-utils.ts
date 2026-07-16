@@ -73,6 +73,63 @@ export async function generateConversationTitle(
 }
 
 /**
+ * Generate a handoff summary for a human agent taking over the conversation.
+ * Called when a conversation flips to pending-human.
+ */
+export async function generateHandoffSummary(
+  conversationId: string,
+  organizationId: string,
+  force: boolean = false,
+): Promise<void> {
+  const log = logger.child({ organizationId, conversationId });
+  try {
+    const conversation = await conversationRepository.findById(conversationId);
+    if (!conversation || conversation.organization_id !== organizationId) {
+      throw new Error("Conversation not found");
+    }
+
+    if (!force && conversation.summary && conversation.summary.trim() !== "") {
+      return;
+    }
+
+    const messages = await conversation.getMessages();
+    const publicMessages = messages.filter(
+      (m) => m.type === MessageType.CUSTOMER || m.type === MessageType.BOT_AGENT,
+    );
+
+    if (publicMessages.length === 0) {
+      return;
+    }
+
+    const conversationContext = publicMessages
+      .slice(-15) // Most recent messages carry the handoff context
+      .map((m) => `${m.type === MessageType.CUSTOMER ? "Customer" : "Assistant"}: ${m.content}`)
+      .join("\n");
+
+    const prompt = await promptService.getPrompt(
+      "conversation/handoff-summary",
+      { conversationContext },
+      { conversationId, organizationId },
+    );
+
+    const response = await llmService.invoke({
+      prompt,
+    });
+
+    const summary = response.trim().replace(/^["']|["']$/g, "");
+
+    await conversationRepository.update(conversationId, organizationId, {
+      summary,
+    });
+
+    log.debug({ summary }, "Generated handoff summary");
+  } catch (error) {
+    log.error({ err: error }, "Error generating handoff summary");
+    // Don't throw - summary generation is not critical
+  }
+}
+
+/**
  * Send a contextual inactivity warning message to the user
  */
 export async function sendInactivityWarning(

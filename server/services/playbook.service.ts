@@ -289,6 +289,25 @@ export class PlaybookService {
     return updated;
   }
 
+  async discardDraft(organizationId: string, playbookId: string): Promise<boolean> {
+    const playbook = await this.playbookRepository.findById(playbookId);
+    if (!playbook || playbook.organization_id !== organizationId) {
+      throw new Error("Playbook not found");
+    }
+
+    const draft = await this.playbookVersionRepository.findDraftByPlaybookId(playbookId);
+    if (!draft) {
+      return false;
+    }
+
+    await this.playbookVersionRepository.deleteDraftByPlaybookId(playbookId);
+    await this.playbookRepository.update(playbookId, organizationId, {
+      draft_version_id: null,
+    } as Partial<Playbook>);
+
+    return true;
+  }
+
   async publishDraft(
     organizationId: string,
     playbookId: string,

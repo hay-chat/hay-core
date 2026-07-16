@@ -975,6 +975,15 @@ async function handleExecutionLoop(
       // Save confidence log if this is a confidence-related handoff
       await saveConfidenceLog(conversation, executionResult);
 
+      // Generate the handoff summary for the human agent (fire-and-forget)
+      import("./conversation-utils").then(({ generateHandoffSummary }) => {
+        generateHandoffSummary(conversation.id, conversation.organization_id, true).catch(
+          (error) => {
+            log.error({ err: error }, "Error generating handoff summary");
+          },
+        );
+      });
+
       // Get agent configuration
       const agent = await agentRepository.findById(conversation.agent_id!);
       if (!agent) {

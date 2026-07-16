@@ -142,7 +142,13 @@
       "rollbackReasonPlaceholder": "ex: Revertendo devido a instruções incorretas...",
       "restoring": "Restaurando versão...",
       "rollbackSuccess": "Versão restaurada com sucesso",
-      "rollbackFailed": "Falha ao restaurar versão"
+      "rollbackFailed": "Falha ao restaurar versão",
+      "discard": "Descartar",
+      "discardTitle": "Descartar rascunho",
+      "discardDescription": "Isso vai excluir permanentemente o rascunho atual e reverter o editor para a versão ativa. Essa ação não pode ser desfeita.",
+      "discardConfirm": "Descartar rascunho",
+      "discardSuccess": "Rascunho descartado",
+      "discardFailed": "Falha ao descartar o rascunho"
     }
   },
   "loading": {
@@ -255,5 +261,39 @@
     "actionsNoDescription": "Nenhuma descrição disponível.",
     "metadataSection": "Sobre",
     "dangerSection": "Zona de perigo"
+  },
+  "suggest": {
+    "title": "Melhorar playbook com IA",
+    "descriptionConversation": "Analise esta conversa e sugira melhorias para o playbook. Você pode adicionar feedback opcional para orientar a sugestão.",
+    "descriptionFeedback": "Descreva o que você quer mudar e a IA vai propor uma versão revisada das instruções.",
+    "feedbackLabel": "Feedback",
+    "feedbackPlaceholderOptional": "Opcional: algo específico que você quer melhorar…",
+    "feedbackPlaceholderRequired": "Descreva o que você quer mudar…",
+    "selectionLabel": "Texto selecionado (as mudanças serão limitadas a ele)",
+    "loadingConversation": "Analisando a conversa e preparando melhorias…",
+    "loadingFeedback": "Reescrevendo as instruções…",
+    "analysisLabel": "Análise",
+    "changesLabel": "Mudanças propostas",
+    "changeType": {
+      "added": "Adicionado",
+      "modified": "Modificado",
+      "removed": "Removido"
+    },
+    "noChangesTitle": "Nenhuma mudança recomendada",
+    "noChangesText": "As instruções atuais já cobrem bem esse cenário.",
+    "staleWarning": "O rascunho mudou desde que esta sugestão foi gerada. Aplicar vai sobrescrever o rascunho atual — clique em Aplicar novamente para confirmar.",
+    "generate": "Gerar sugestão",
+    "regenerate": "Gerar novamente",
+    "discard": "Descartar",
+    "applyToDraft": "Aplicar ao rascunho",
+    "appliedToast": "Sugestão aplicada ao rascunho",
+    "generateError": "Falha ao gerar a sugestão. Tente novamente.",
+    "applyError": "Falha ao aplicar a sugestão.",
+    "improveButton": "Melhorar com IA",
+    "improveFromConversation": "Melhorar playbook",
+    "openPlaybook": "Abrir playbook",
+    "diff": {
+      "showHidden": "Mostrar {count} linhas ocultas"
+    }
   }
 }

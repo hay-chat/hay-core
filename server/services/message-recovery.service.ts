@@ -273,6 +273,13 @@ export class MessageRecoveryService {
       },
     });
 
+    // Generate the handoff summary for the human agent (fire-and-forget)
+    import("../orchestrator/conversation-utils").then(({ generateHandoffSummary }) => {
+      generateHandoffSummary(conversation.id, conversation.organization_id, true).catch((error) => {
+        logger.error({ err: error }, "Error generating handoff summary");
+      });
+    });
+
     // Broadcast alert to organization
     await this.publishStuckConversationAlert(conversation);
 

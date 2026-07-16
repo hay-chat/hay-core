@@ -98,6 +98,8 @@
       "closeConversation": "Encerrar Conversa"
     },
     "pendingHuman": {
+      "needsHuman": "Esta conversa foi encaminhada para um agente humano",
+      "summaryPending": "Gerando resumo da conversa…",
       "notConfident": "Hay não teve confiança para responder esta pergunta",
       "handedOff": "Hay decidiu encaminhar esta conversa para um agente humano. Fornecer mais contexto nos playbooks pode ser um bom ponto de partida para dar mais informações para que Hay consiga lidar com conversas semelhantes no futuro.",
       "startNew": "Iniciar Nova Conversa",

@@ -142,7 +142,13 @@
       "rollbackReasonPlaceholder": "e.g., Reverting due to incorrect instructions...",
       "restoring": "Restoring version...",
       "rollbackSuccess": "Version restored successfully",
-      "rollbackFailed": "Failed to restore version"
+      "rollbackFailed": "Failed to restore version",
+      "discard": "Discard",
+      "discardTitle": "Discard draft",
+      "discardDescription": "This will permanently delete the current draft and revert the editor to the active version. This cannot be undone.",
+      "discardConfirm": "Discard draft",
+      "discardSuccess": "Draft discarded",
+      "discardFailed": "Failed to discard draft"
     }
   },
   "loading": {
@@ -255,5 +261,39 @@
     "actionsNoDescription": "No description available.",
     "metadataSection": "About",
     "dangerSection": "Danger zone"
+  },
+  "suggest": {
+    "title": "Improve playbook with AI",
+    "descriptionConversation": "Analyze this conversation and suggest improvements to the playbook. You can add optional feedback to guide the suggestion.",
+    "descriptionFeedback": "Describe what you want to change and the AI will propose a revised version of the instructions.",
+    "feedbackLabel": "Feedback",
+    "feedbackPlaceholderOptional": "Optional: anything specific you want improved…",
+    "feedbackPlaceholderRequired": "Describe what you want to change…",
+    "selectionLabel": "Selected text (changes will be scoped to this)",
+    "loadingConversation": "Analyzing conversation and drafting improvements…",
+    "loadingFeedback": "Rewriting instructions…",
+    "analysisLabel": "Analysis",
+    "changesLabel": "Proposed changes",
+    "changeType": {
+      "added": "Added",
+      "modified": "Modified",
+      "removed": "Removed"
+    },
+    "noChangesTitle": "No changes recommended",
+    "noChangesText": "The current instructions already cover this scenario well.",
+    "staleWarning": "The draft changed since this suggestion was generated. Applying will overwrite the current draft — click Apply again to confirm.",
+    "generate": "Generate suggestion",
+    "regenerate": "Regenerate",
+    "discard": "Discard",
+    "applyToDraft": "Apply to draft",
+    "appliedToast": "Suggestion applied to draft",
+    "generateError": "Failed to generate a suggestion. Please try again.",
+    "applyError": "Failed to apply the suggestion.",
+    "improveButton": "Improve with AI",
+    "improveFromConversation": "Improve playbook",
+    "openPlaybook": "Open playbook",
+    "diff": {
+      "showHidden": "Show {count} hidden lines"
+    }
   }
 }

@@ -1,5 +1,28 @@
 # WIP
 
+## 2026-07-16 — master — AI playbook suggest-edits (diff+approve), uncommitted
+
+playbooks.suggestEdits mutation → playbook-suggestion.service.ts: transcript
+(tool errors flagged) + feedback + selection → LLM full-rewrite in markdown,
+deterministic client diff (diff pkg, InstructionsDiff.vue), apply = saveDraft
+via SuggestEditsDialog.vue; entry points: playbook editor + conversation page.
+Prompt server/prompts/en/playbook/suggest-edits.md. Fixed: model echoed prompt
+scaffolding into output → BEGIN/END_PLAYBOOK sentinels + sanitizeRevisedMarkdown
+(tested, 5 unit tests pass). Server+dashboard typecheck green.
+Next: retest the refund conversation end-to-end; pt prompt translation missing.
+
+## 2026-07-16 — master — Handoff summary + footer takeover bar, uncommitted
+
+New `summary` text column on conversations (migration 1784200000000, ran locally).
+generateHandoffSummary in orchestrator/conversation-utils.ts (prompt
+conversation/handoff-summary, en+pt), fired from run.ts HANDOFF branch,
+message-recovery escalateToHuman, and conversation.service pending-human hook.
+[id].vue: new amber footer bar for real pending-human convos — summary left
+(fallback "Generating…"), Take Over button right (reuses takeOverConversation).
+Header Take Over button kept (consolidation onto composable deferred).
+Verified: server+dashboard typecheck, eslint, conversation-service tests pass.
+Next: live-test a low-confidence handoff to see summary populate in footer.
+
 ## 2026-07-16 — master — Stage 1 corrective retry + UI polish, uncommitted
 
 Stage 1 (company-interest) block now gives the planner ONE re-plan with the
@@ -7,7 +30,9 @@ reviewer's reasoning as plannerFeedback before HANDOFF (mirrors Stage 0 pattern;
 maxRetries in CompanyInterestConfig, default 1; turnGuardrailState grew
 companyInterestRetries; retryAttempted persisted in metadata.companyInterest).
 UI: ChatMessage debug trigger MoreVertical → Sparkles + "See Reasoning" tooltip;
-back-online banner auto-dismisses after 5s (useServerStatus recovered→online).
+back-online banner auto-dismisses after 5s (useServerStatus recovered→online);
+conversations/[id].vue: localhost-only "Copy JSON" button (both headers) copies
+{conversationId, conversation, messages} to clipboard.
 Verified: 19 orchestrator tests (3 new in execution-company-interest-retry),
 server+dashboard typecheck clean. Next: commit; live-test retry on refund flow.
 

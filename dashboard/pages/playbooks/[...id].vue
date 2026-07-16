@@ -57,6 +57,16 @@
             v-if="isEditMode && playbook"
             variant="outline"
             size="sm"
+            @click="openSuggestDialog"
+          >
+            <Sparkles class="h-4 w-4 mr-2" />
+            {{ t("suggest.improveButton") }}
+          </Button>
+
+          <Button
+            v-if="isEditMode && playbook"
+            variant="outline"
+            size="sm"
             @click="showVersionHistory = true"
           >
             <History class="h-4 w-4 mr-2" />
@@ -315,6 +325,16 @@
       v-model:open="showVersionHistory"
       :playbook-id="playbookId"
       @rollback="handleRollback"
+      @discarded="handleRollback"
+    />
+
+    <!-- AI Suggest Edits Dialog -->
+    <SuggestEditsDialog
+      v-if="isEditMode && playbookId"
+      v-model:open="showSuggestDialog"
+      :playbook-id="playbookId"
+      :initial-selection="suggestSelection || undefined"
+      @applied="handleSuggestionApplied"
     />
   </div>
 </template>
@@ -331,6 +351,7 @@ import {
   AlertCircle,
   Circle,
   History,
+  Sparkles,
 } from "lucide-vue-next";
 import type { JSONContent } from "@tiptap/vue-3";
 import type { MCPTool } from "@/components/tiptap/MentionExtension";
@@ -395,6 +416,8 @@ const instructionsEditorRef = ref<{
   save: () => JSONContent | null;
   getJSON: () => JSONContent | null;
   insertAction: (tool: MCPTool) => void;
+  setContent: (content: JSONContent) => void;
+  getSelectedText: () => string;
 } | null>(null);
 
 // Insert an action chip into the instructions editor from the actions panel.
@@ -414,6 +437,25 @@ const draftVersion = ref<PlaybookVersion | null>(null);
 const showPublishDialog = ref(false);
 const publishNote = ref("");
 const showVersionHistory = ref(false);
+
+// AI suggest-edits state
+const showSuggestDialog = ref(false);
+const suggestSelection = ref("");
+
+const openSuggestDialog = () => {
+  suggestSelection.value = instructionsEditorRef.value?.getSelectedText() || "";
+  showSuggestDialog.value = true;
+};
+
+const handleSuggestionApplied = async (instructions: JSONContent) => {
+  instructionsEditorRef.value?.setContent(instructions);
+  form.value.instructions = instructions;
+  if (playbookId.value) {
+    draftVersion.value = await HayApi.playbooks.versions.getDraft.query({
+      playbookId: playbookId.value,
+    });
+  }
+};
 
 // Auto-save setup — only active in edit mode
 const {
@@ -653,7 +695,8 @@ const handlePublish = async () => {
   }
 };
 
-// Handle rollback (triggered from VersionHistory component)
+// Handle rollback / draft discard (triggered from VersionHistory component):
+// reload the playbook so the editor reflects the active version.
 const handleRollback = async () => {
   if (!playbookId.value) return;
 
