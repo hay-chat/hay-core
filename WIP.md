@@ -1,5 +1,17 @@
 # WIP
 
+## 2026-07-16 — master — Empty tool schemas + idempotency injection + playbook action validation, uncommitted
+
+Root-caused refund-convo failure: getCachedToolDescriptors read `input_schema`
+but cache stores MCP-wire `inputSchema` → every playbook rendered `Input Schema: {}`.
+Fixed reader (plugin-tools.service.ts:241, + 3 unit tests) and toResolvedInputSchema
+fallback. tool-execution.service: core now injects its per-execution UUID as
+`idempotency_key` when the tool schema declares it (overrides LLM-invented keys).
+playbook.service.validateReferencedActions + routes: create/update/publish return
+`actionWarnings`, new playbooks.validateActions query; trpc types regenerated.
+Verified: server+dashboard typecheck green, 15 service suites / 124 tests pass.
+Next: dashboard UI to surface actionWarnings; retest refund convo end-to-end.
+
 ## 2026-07-16 — master — AI playbook suggest-edits (diff+approve), uncommitted
 
 playbooks.suggestEdits mutation → playbook-suggestion.service.ts: transcript

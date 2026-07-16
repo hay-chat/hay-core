@@ -1,14 +1,15 @@
 # CONTEXT
 
-**Current Task**: Handoff summary + footer takeover bar on conversation page — implemented, uncommitted on master.
+**Current Task**: Fixed empty tool schemas in playbook prompts, core-side idempotency_key injection, and playbook action validation — implemented, uncommitted on master.
 
 **Key Decisions**:
 
-- New `summary` text column on conversations (migration ran); LLM-generated (prompt conversation/handoff-summary) whenever status flips to pending-human (run.ts HANDOFF, message-recovery escalation, service hook).
-- Footer bar in conversations/[id].vue for real pending-human convos: summary left, Take Over right (reuses existing handler); playground panel untouched.
-- Header Take Over button kept; consolidating [id].vue inline takeover logic onto useConversationTakeover deferred.
+- getCachedToolDescriptors now reads MCP-wire `inputSchema` (with `input_schema` legacy fallback) — root cause of `Input Schema: {}` in playbook messages and the failed refund conversation.
+- Core injects its per-execution UUID as `idempotency_key` only when the tool's cached schema declares that property (schema-gated; overrides LLM-invented keys).
+- playbooks create/update/publish return additive `actionWarnings`; new validateActions query for future dashboard linting.
 
 **Next Steps**:
 
-- Live-test a low-confidence handoff to see the summary populate in the footer.
+- Surface actionWarnings in the playbook editor UI.
+- Retest the Karine Ruby refund conversation end-to-end (needs `shopify_calculate_refund` referenced in the playbook).
 - Commit + PR when asked (older uncommitted work also on master, see WIP.md).
