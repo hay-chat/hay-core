@@ -26,12 +26,13 @@ const logger = createLogger("conversation-entity");
 type ToolSchemaEntry = Record<string, unknown>;
 
 /**
- * Resolve a tool's JSON input schema from either the plugin manifest format
- * (`input_schema`) or the alternative `parameters` format. The underlying jsonb
- * is dynamic, so it is narrowed to a plain object map for safe property access.
+ * Resolve a tool's JSON input schema from the plugin manifest format
+ * (`input_schema`), the MCP wire format (`inputSchema`), or the alternative
+ * `parameters` format. The underlying jsonb is dynamic, so it is narrowed to a
+ * plain object map for safe property access.
  */
 function toResolvedInputSchema(toolSchema: ToolSchemaEntry): Record<string, unknown> {
-  const candidate = toolSchema.input_schema ?? toolSchema.parameters;
+  const candidate = toolSchema.input_schema ?? toolSchema.inputSchema ?? toolSchema.parameters;
   return candidate && typeof candidate === "object" ? (candidate as Record<string, unknown>) : {};
 }
 

@@ -10,6 +10,20 @@ import {
 import type { PlaybookInstructions } from "../database/entities/playbook.entity";
 import { Agent } from "../database/entities/agent.entity";
 import { AppDataSource } from "../database/data-source";
+import { analyzeTiptapInstructions } from "../utils/tiptap-formatter";
+import { createLogger } from "@server/lib/logger";
+
+const logger = createLogger("playbook-service");
+
+type TiptapInstructionInput = Parameters<typeof analyzeTiptapInstructions>[0];
+
+/** Narrow dynamic jsonb instructions to the Tiptap doc shape the analyzer consumes. */
+function toTiptapInstructions(value: unknown): TiptapInstructionInput {
+  if (value && typeof value === "object" && (value as { type?: unknown }).type === "doc") {
+    return value as unknown as TiptapInstructionInput;
+  }
+  return undefined;
+}
 
 export class PlaybookService {
   private playbookRepository: PlaybookRepository;
@@ -85,6 +99,57 @@ export class PlaybookService {
     await this.playbookRepository.update(playbook.id, organizationId, pointerUpdate);
 
     return playbook;
+  }
+
+  /**
+   * Validate the `[action](pluginId:tool)` references in a playbook's
+   * instructions against the organization's actually-available tools.
+   *
+   * A referenced action that resolves to nothing renders as "Action not found
+   * in available tools" in the conversation prompt and silently never lands in
+   * enabled_tools — the agent then cannot call it at runtime. Returns one
+   * human-readable warning per unresolvable action (empty when all resolve).
+   * Uses the same matching rules as the conversation playbook renderer:
+   * exact name, bare tool name, and `:toolName` suffix.
+   */
+  async validateReferencedActions(
+    organizationId: string,
+    instructions: PlaybookInstructions | null | undefined,
+  ): Promise<string[]> {
+    const analysis = analyzeTiptapInstructions(toTiptapInstructions(instructions));
+    if (analysis.actions.length === 0) {
+      return [];
+    }
+
+    let toolNames: string[] = [];
+    try {
+      const { mcpRegistryService } = await import("./mcp-registry.service");
+      const tools = await mcpRegistryService.getToolsForOrg(organizationId);
+      toolNames = tools.map((t) => `${t.pluginId}:${t.name}`);
+    } catch (error) {
+      // Validation must never block a save — without the registry we cannot
+      // tell valid from invalid, so report nothing rather than false alarms.
+      logger.warn({ err: error, organizationId }, "Could not load tools for action validation");
+      return [];
+    }
+
+    const warnings: string[] = [];
+    for (const action of analysis.actions) {
+      const bareName = action.includes(":") ? action.slice(action.lastIndexOf(":") + 1) : action;
+      const resolves = toolNames.some(
+        (name) => name === action || name === bareName || name.endsWith(`:${bareName}`),
+      );
+      if (!resolves) {
+        warnings.push(
+          `Referenced action "${action}" does not match any available tool — the agent will not be able to call it.`,
+        );
+      }
+    }
+
+    if (warnings.length > 0) {
+      logger.warn({ organizationId, warnings }, "Playbook references unavailable actions");
+    }
+    return warnings;
   }
 
   async getPlaybooks(organizationId: string): Promise<Playbook[]> {

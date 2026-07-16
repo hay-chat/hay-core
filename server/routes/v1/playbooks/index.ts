@@ -116,7 +116,11 @@ export const playbooksRouter = t.router({
     .input(createPlaybookSchema)
     .mutation(async ({ ctx, input }) => {
       const playbook = await playbookService.createPlaybook(ctx.organizationId!, input);
-      return playbook;
+      const actionWarnings = await playbookService.validateReferencedActions(
+        ctx.organizationId!,
+        playbook.instructions,
+      );
+      return { ...playbook, actionWarnings };
     }),
 
   update: scopedProcedure(RESOURCES.PLAYBOOKS, ACTIONS.UPDATE)
@@ -140,7 +144,21 @@ export const playbooksRouter = t.router({
         });
       }
 
-      return playbook;
+      const actionWarnings = await playbookService.validateReferencedActions(
+        ctx.organizationId!,
+        playbook.instructions,
+      );
+      return { ...playbook, actionWarnings };
+    }),
+
+  validateActions: scopedProcedure(RESOURCES.PLAYBOOKS, ACTIONS.READ)
+    .input(z.object({ instructions: instructionsSchema }))
+    .query(async ({ ctx, input }) => {
+      const warnings = await playbookService.validateReferencedActions(
+        ctx.organizationId!,
+        input.instructions as Parameters<typeof playbookService.validateReferencedActions>[1],
+      );
+      return { warnings };
     }),
 
   delete: scopedProcedure(RESOURCES.PLAYBOOKS, ACTIONS.DELETE)
@@ -344,12 +362,17 @@ export const playbooksRouter = t.router({
       )
       .mutation(async ({ ctx, input }) => {
         try {
-          return await playbookService.publishDraft(
+          const version = await playbookService.publishDraft(
             ctx.organizationId!,
             input.playbookId,
             ctx.user!.id,
             input.note,
           );
+          const actionWarnings = await playbookService.validateReferencedActions(
+            ctx.organizationId!,
+            version.instructions,
+          );
+          return { ...version, actionWarnings };
         } catch (error) {
           if (error instanceof Error) {
             if (error.message === "Playbook not found") {
