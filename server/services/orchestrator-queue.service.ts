@@ -21,7 +21,8 @@ export type OrchestratorTrigger =
   | "recovery"
   | "inactivity"
   | "creation"
-  | "sweep";
+  | "sweep"
+  | "form_submission";
 
 export interface OrchestratorMessage {
   messageId: string;

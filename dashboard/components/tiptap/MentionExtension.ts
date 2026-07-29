@@ -29,9 +29,11 @@ export interface DocumentItem {
 export interface MentionItem {
   id: string;
   label: string;
-  type: "action" | "document";
+  type: "action" | "document" | "form";
   meta?: string;
   pluginId?: string;
+  // For type === "form": serialized FormSchema JSON
+  schema?: string;
 }
 
 export interface MentionConfig {
@@ -106,6 +108,21 @@ export const configureMentionExtension = (config: MentionConfig) => {
             };
           },
         },
+        // Form chips persist their FormSchema JSON in this attribute. Stored
+        // as a string so it round-trips through Tiptap's HTML-based storage
+        // without losing structure to attribute serialization.
+        schema: {
+          default: null,
+          parseHTML: (element) => element.getAttribute("data-schema"),
+          renderHTML: (attributes) => {
+            if (!attributes.schema) {
+              return {};
+            }
+            return {
+              "data-schema": attributes.schema,
+            };
+          },
+        },
       };
     },
   }).configure({
@@ -139,6 +156,8 @@ export const configureMentionExtension = (config: MentionConfig) => {
         classes.push("mention-action");
       } else if (type === "document") {
         classes.push("mention-document");
+      } else if (type === "form") {
+        classes.push("mention-form");
       }
 
       // Build the content array
@@ -160,6 +179,14 @@ export const configureMentionExtension = (config: MentionConfig) => {
           "span",
           {
             class: "mention-icon mention-icon-document",
+          },
+        ]);
+      } else if (type === "form") {
+        // Form-icon glyph; styled in CSS alongside mention-icon-document
+        content.push([
+          "span",
+          {
+            class: "mention-icon mention-icon-form",
           },
         ]);
       }
@@ -186,6 +213,7 @@ export const configureMentionExtension = (config: MentionConfig) => {
           "data-label": node.attrs.label,
           "data-type": node.attrs.type,
           "data-plugin-id": node.attrs.pluginId || null,
+          "data-schema": node.attrs.schema || null,
         },
         ...content,
       ];

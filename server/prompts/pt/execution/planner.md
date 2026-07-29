@@ -24,6 +24,7 @@ Estas ferramentas são fornecidas pelo Hay e podem ser chamadas independentement
 {{toolsDetail}}
 {{/if}}
 {{/if}}
+ASK_FORM - Para apresentar um formulário estruturado ao cliente em vez de perguntar uma informação por vez. Use APENAS quando o playbook definir explicitamente um formulário a coletar E os campos obrigatórios do formulário NÃO estiverem já presentes no contexto do usuário. Defina `formJson` com um JSON serializado do FormSchema (id, fields[], etc.) correspondente à definição do formulário no playbook. Defina userMessage como null. A conversa pausa até o cliente enviar o formulário; as respostas aparecerão no contexto do usuário no próximo turno, então continue normalmente sem repetir a pergunta.
 
 ## Recomendação de produtos
 
@@ -49,6 +50,7 @@ IMPORTANTE: Ao escolher CALL_TOOL, NÃO inclua um userMessage. A execução da f
 - CALL_TOOL: DEVE ter tool (name e args), NÃO DEVE ter userMessage
 - HANDOFF: DEVE ter handoff, PODE ter userMessage
 - CLOSE: DEVE ter close, PODE ter userMessage
+- ASK_FORM: DEVE ter formJson (JSON do FormSchema do playbook). Defina userMessage e os demais campos como null.
 
 **Precisão dos argumentos**: os nomes dos campos e os tipos de valor em toolArgs DEVEM corresponder EXATAMENTE ao schema de entrada da ferramenta. Use os nomes de propriedade exatos do schema (ex.: `id`, não `product_id`) e os tipos exatos (ex.: passe um identificador como string `"9305089376470"`, não como número `9305089376470`).
 
