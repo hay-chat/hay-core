@@ -1,0 +1,72 @@
+{
+  "name": "Tiendanube",
+  "description": "Conectá tu tienda Tiendanube / Nuvemshop para que el agente consulte productos, pedidos y clientes, cancele pedidos y siga el estado de los reembolsos.",
+  "tools": {
+    "nuvemshop_get_store": {
+      "label": "Ver Datos de la Tienda",
+      "description": "Obtiene información básica de la tienda, como nombre, dominio, idioma y moneda."
+    },
+    "nuvemshop_search_products": {
+      "label": "Buscar Productos",
+      "description": "Busca productos por nombre, descripción o SKU, opcionalmente dentro de una categoría."
+    },
+    "nuvemshop_get_product": {
+      "label": "Ver Producto",
+      "description": "Obtiene los detalles, variantes, precios, stock e imágenes de un producto por ID."
+    },
+    "nuvemshop_get_product_by_sku": {
+      "label": "Ver Producto por SKU",
+      "description": "Encuentra el producto que tiene una variante con el SKU indicado."
+    },
+    "nuvemshop_list_categories": {
+      "label": "Listar Categorías",
+      "description": "Lista las categorías de productos de la tienda."
+    },
+    "nuvemshop_get_order": {
+      "label": "Ver Pedido",
+      "description": "Obtiene los ítems, totales, estado de pago y envío de un pedido, y la elegibilidad de soporte."
+    },
+    "nuvemshop_get_order_by_number": {
+      "label": "Ver Pedido por Número",
+      "description": "Encuentra un pedido por el número que ve el cliente (p. ej. #101)."
+    },
+    "nuvemshop_list_customer_orders": {
+      "label": "Listar Pedidos del Cliente",
+      "description": "Lista los pedidos de un cliente, del más reciente al más antiguo."
+    },
+    "nuvemshop_check_refund_status": {
+      "label": "Verificar Reembolso",
+      "description": "Verifica el estado de reembolso de un pedido, el medio de pago y cómo puede ejecutarse el reembolso."
+    },
+    "nuvemshop_cancel_order": {
+      "label": "Cancelar Pedido",
+      "description": "Cancela un pedido con reposición de stock y notificación opcionales. No mueve dinero."
+    },
+    "nuvemshop_add_order_note": {
+      "label": "Agregar Nota al Pedido",
+      "description": "Agrega una nota interna al pedido como registro de las acciones de soporte."
+    },
+    "nuvemshop_find_customer": {
+      "label": "Buscar Cliente",
+      "description": "Encuentra clientes por email o por texto de nombre/documento."
+    },
+    "nuvemshop_get_customer": {
+      "label": "Ver Cliente",
+      "description": "Obtiene los detalles completos, direcciones y totales de compra de un cliente por ID."
+    }
+  },
+  "config": {
+    "storeId": {
+      "label": "ID de la tienda",
+      "description": "El ID numérico de tu tienda (el user_id de la tienda, visible al crear la aplicación a medida)."
+    },
+    "accessToken": {
+      "label": "Token de acceso",
+      "description": "Token de acceso de una aplicación a medida creada en el admin de la tienda. Otorgá permisos de productos, pedidos y clientes."
+    },
+    "apiVersion": {
+      "label": "Versión de la API",
+      "description": "Versión de la API de Tiendanube a utilizar."
+    }
+  }
+}

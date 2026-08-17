@@ -1,15 +1,20 @@
-# CONTEXT
+# CONTEXT.md
 
-**Current Task**: Fixed empty tool schemas in playbook prompts, core-side idempotency_key injection, and playbook action validation — implemented, uncommitted on master.
+## Current Task
 
-**Key Decisions**:
+Nuvemshop/Tiendanube plugin (`plugins/core/nuvemshop`) on branch
+`claude/nuven-shop-integration-suwzch`, PR #71 — implemented + verified, awaiting
+review-workflow findings, then commit/push.
 
-- getCachedToolDescriptors now reads MCP-wire `inputSchema` (with `input_schema` legacy fallback) — root cause of `Input Schema: {}` in playbook messages and the failed refund conversation.
-- Core injects its per-execution UUID as `idempotency_key` only when the tool's cached schema declares that property (schema-gated; overrides LLM-invented keys).
-- playbooks create/update/publish return additive `actionWarnings`; new validateActions query for future dashboard linting.
+## Key Decisions
 
-**Next Steps**:
+- Archetype A (bundled MCP, 13 tools) + `products` catalog sync; custom-app token auth
+  (no OAuth — Tiendanube's flow is nonstandard; TODO in src/index.ts).
+- Refund honesty: Nuvemshop API cannot move money → check_refund_status +
+  guarded cancel_order instead of a fake refund tool.
+- i18n en/pt/es; `Authentication: bearer` header quirk lives in mcp/lib/client.js.
 
-- Surface actionWarnings in the playbook editor UI.
-- Retest the Karine Ruby refund conversation end-to-end (needs `shopify_calculate_refund` referenced in the playbook).
-- Commit + PR when asked (older uncommitted work also on master, see WIP.md).
+## Next Steps
+
+- Apply confirmed findings from review workflow wf_6760c0aa-39b.
+- Commit, push, flip PR #71 body from "planned" to "implemented".
