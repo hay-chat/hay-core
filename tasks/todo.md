@@ -1,50 +1,40 @@
-# Shopify plugin tool rework — DONE
+# Nuvemshop (Nuven Shop) Plugin — tasks/todo.md
 
-Goal: reshape the MCP toolset around Solo/Starter support tickets — rich reads,
-narrow writes, no back-office surface exposed to the customer-facing agent.
+## Goal + acceptance criteria
 
-## Cuts / merges
+Build a Hay plugin for Nuvemshop/Tiendanube (LatAm e-commerce), modeled on the Shopify plugin:
 
-- [x] Merged the three customer lookups into `shopify_find_customer` (email/phone → list) + `shopify_get_customer` (by id, enriched)
-- [x] Removed `shopify_search_orders` (data-exposure; comment explains why)
-- [x] Removed `shopify_create_customer_address`
-- [x] Removed `shopify_get_order_status` (subsumed by enriched get_order/get_order_by_name)
-- [x] Kept `shopify_get_shop` with TODO — SDK has no session-context injection yet
+- [ ] Agent can look up/import product information (list/search products, get product, categories)
+- [ ] Agent can work orders and issue refunds (list/get orders, refund workflow per what the
+      Nuvemshop API actually supports)
+- [ ] Plugin follows the build-plugin skill contract: `package.json` `hay-plugin` block, no
+      manifest.json, ESM, strict TS, `defineHayPlugin` default export
+- [ ] i18n en.json + pt.json with every tool + config field
+- [ ] Builds (`npm run build --workspace=plugins/core/nuvemshop`) + `npm run typecheck:server` pass
+- [ ] Committed + pushed to `claude/nuven-shop-integration-suwzch`, draft PR opened
 
-## Enriched reads
+## Checklist
 
-- [x] `shopify_get_customer`: embeds 5 most recent orders as `recentOrders`
-- [x] `shopify_get_order` + `shopify_get_order_by_name`: shared ORDER_SUPPORT_FIELDS +
-      derived `supportSummary` (isCancellable, isRefundable, remainingRefundable,
-      deliveredAt, addressChangeable)
-- [x] `shopify_get_order_tracking`: added `deliveredAt`
+- [x] Load build-plugin skill; read contract/archetypes/anti-patterns/templates
+- [ ] Research (workflow wf_a2b0911a-c3b): shopify + klaviyo dissection; Nuvemshop API
+      (auth/products; orders/refunds)
+- [ ] Design: archetype choice, auth method, tool list (document refund mechanism decision)
+- [ ] Scaffold plugin (package.json, tsconfig, src/index.ts, mcp/, i18n/)
+- [ ] Implement MCP tools (products, orders, refunds, customers)
+- [ ] Handle mcp/ dependency gap (klaviyo approach: committed pruned mcp/node_modules)
+- [ ] Verify: build + typecheck + spawn mcp server smoke test
+- [ ] Commit, push, draft PR
+- [ ] Results section below
 
-## New tools
+## Working notes
 
-- [x] `shopify_update_order_shipping_address` — orderUpdate; refuses unless
-      fulfillment status is UNFULFILLED/SCHEDULED/ON_HOLD
-- [x] `shopify_calculate_refund` — Order.suggestedRefund (amounts + transactions)
-- [x] `shopify_get_returnable_items` + `shopify_create_return` (returns.js)
-- [x] `shopify_create_refund` server-side bounds: rejects non-refundable orders and
-      amounts > netPaymentSet remaining balance
+- Archetype A (local bundled MCP) — Nuvemshop has REST API, no hosted MCP.
+- Plugin ID: `hay-plugin-nuvemshop`; dir `plugins/core/nuvemshop`.
+- Tiendanube API quirk to confirm: `Authentication: bearer <token>` header (nonstandard),
+  mandatory User-Agent, store_id in URL path.
+- Refund mechanism is the risky unknown — research agent to confirm what the public API
+  actually supports; prefer safe/explicit behavior over pretending.
 
-## Plumbing / verification
+## Results
 
-- [x] Scopes: +read_returns +write_returns (existing connections must reconnect!)
-- [x] returns.js registered in mcp/index.js
-- [x] Docs-verified against shopify.dev 2026-04: no Order.cancelable (derived instead),
-      @idempotent(key:) is real and MANDATORY for refunds in 2026-04, returnCreate's
-      notifyCustomer/returnReason deprecated, MailingAddressInput wants code fields
-- [x] node --check all mcp files; tsc --noEmit clean; MCP server boots, tools/list
-      returns the intended 20 tools; no stale tool-name refs in live code
-
-## Not built (logged, deliberate)
-
-- Discount code lookup/creation (ranked 4th — next slice; cap value server-side)
-- Order editing (swap item/qty) — complex on Shopify's side, deferred
-- Session-start context injection for shop info — needs core/SDK support first
-
-## Follow-up
-
-- Verify orderCancel + refund-on-cancel and the new mutations against a dev store
-  (remaining TODO(HAY-219 §8) markers)
+(to fill when done)
