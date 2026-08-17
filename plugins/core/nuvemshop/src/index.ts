@@ -72,6 +72,17 @@ function readCredentials(ctx: {
  * Note the nonstandard auth header: `Authentication: bearer <token>` (lowercase
  * "bearer") — the standard `Authorization` header is rejected with a 401.
  */
+class NuvemshopHttpError extends Error {
+  constructor(
+    message: string,
+    readonly status: number,
+    /** X-Rate-Limit-Reset (milliseconds until the leaky bucket drains), when sent. */
+    readonly rateLimitResetMs?: number,
+  ) {
+    super(message);
+  }
+}
+
 async function nuvemshopFetch<T>(
   creds: NuvemshopCredentials,
   apiVersion: string,
@@ -87,9 +98,44 @@ async function nuvemshopFetch<T>(
   });
   if (!res.ok) {
     const text = await res.text().catch(() => "");
-    throw new Error(`Nuvemshop GET ${path} failed (HTTP ${res.status}): ${text.slice(0, 200)}`);
+    const reset = Number(res.headers.get("x-rate-limit-reset"));
+    throw new NuvemshopHttpError(
+      `Nuvemshop GET ${path} failed (HTTP ${res.status}): ${text.slice(0, 200)}`,
+      res.status,
+      Number.isFinite(reset) && reset > 0 ? reset : undefined,
+    );
   }
   return (await res.json()) as T;
+}
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+/**
+ * Retrying GET for the catalog sync: the leaky bucket (~2 req/s, burst 40) is
+ * shared with live MCP tool traffic on the same token, so 429s mid-sync are
+ * routine — without retries one throttle would abort the sync and leave a
+ * silently partial catalog. GETs are safe to replay.
+ */
+async function nuvemshopFetchWithRetry<T>(
+  creds: NuvemshopCredentials,
+  apiVersion: string,
+  path: string,
+): Promise<T> {
+  const maxAttempts = 4;
+  for (let attempt = 1; ; attempt++) {
+    try {
+      return await nuvemshopFetch<T>(creds, apiVersion, path);
+    } catch (error) {
+      const retryable =
+        error instanceof NuvemshopHttpError && (error.status === 429 || error.status >= 500);
+      if (!retryable || attempt >= maxAttempts) throw error;
+      const wait =
+        error.status === 429 && error.rateLimitResetMs !== undefined
+          ? Math.min(error.rateLimitResetMs, 20_000)
+          : attempt * 1_000;
+      await sleep(wait);
+    }
+  }
 }
 
 interface NuvemshopStore {
@@ -299,7 +345,7 @@ async function bulkSync(
   for (;;) {
     let batch: NuvemshopProduct[];
     try {
-      batch = await nuvemshopFetch<NuvemshopProduct[]>(
+      batch = await nuvemshopFetchWithRetry<NuvemshopProduct[]>(
         creds,
         apiVersion,
         `/products?per_page=${perPage}&page=${page}`,
@@ -307,7 +353,7 @@ async function bulkSync(
     } catch (error) {
       // Past the last page Nuvemshop 404s ("Last page is N") instead of
       // returning an empty array — treat that as end-of-catalog.
-      if (page > 1 && error instanceof Error && error.message.includes("HTTP 404")) break;
+      if (page > 1 && error instanceof NuvemshopHttpError && error.status === 404) break;
       throw error;
     }
     if (!batch.length) break;

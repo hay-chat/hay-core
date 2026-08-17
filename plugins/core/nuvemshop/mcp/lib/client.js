@@ -52,6 +52,10 @@ async function nuvemshopApi(method, path, { query, body, withMeta } = {}) {
   };
   if (body !== undefined) headers["Content-Type"] = "application/json; charset=utf-8";
 
+  // Replay policy: transport errors and 5xx may have been applied server-side,
+  // so only GETs are replayed (a re-POSTed /orders/{id}/cancel would hit an
+  // already-cancelled order and report a false failure). 429 means the server
+  // refused the request, so any method may retry.
   const maxAttempts = 3;
   let lastError;
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
@@ -64,14 +68,14 @@ async function nuvemshopApi(method, path, { query, body, withMeta } = {}) {
       });
     } catch (err) {
       lastError = err;
-      if (attempt < maxAttempts) {
+      if (method === "GET" && attempt < maxAttempts) {
         await sleep(attempt * 500);
         continue;
       }
       throw new Error(`Nuvemshop request failed: ${err.message || err}`);
     }
 
-    if (res.status === 429 || res.status >= 500) {
+    if (res.status === 429 || (res.status >= 500 && method === "GET")) {
       if (attempt < maxAttempts) {
         // X-Rate-Limit-Reset is milliseconds until the bucket drains.
         const reset = Number(res.headers.get("x-rate-limit-reset"));
@@ -86,18 +90,19 @@ async function nuvemshopApi(method, path, { query, body, withMeta } = {}) {
 
     if (!res.ok) {
       const text = await res.text().catch(() => "");
+      let err;
       if (res.status === 402) {
-        throw new Error("Nuvemshop API suspended (HTTP 402): the store's subscription is unpaid.");
-      }
-      if (res.status === 401) {
-        throw new Error(
+        err = new Error("Nuvemshop API suspended (HTTP 402): the store's subscription is unpaid.");
+      } else if (res.status === 401) {
+        err = new Error(
           "Nuvemshop rejected the access token (HTTP 401). The token may have been " +
             "re-issued or the app uninstalled — reconnect the plugin.",
         );
+      } else {
+        err = new Error(
+          `Nuvemshop ${method} ${path} failed (HTTP ${res.status}): ${text.slice(0, 300)}`,
+        );
       }
-      const err = new Error(
-        `Nuvemshop ${method} ${path} failed (HTTP ${res.status}): ${text.slice(0, 300)}`,
-      );
       err.status = res.status;
       throw err;
     }
@@ -105,7 +110,9 @@ async function nuvemshopApi(method, path, { query, body, withMeta } = {}) {
     const text = await res.text();
     const data = text ? JSON.parse(text) : null;
     if (withMeta) {
-      const total = Number(res.headers.get("x-total-count"));
+      // Absent header must yield undefined, not 0 (Number(null) === 0 trap).
+      const rawTotal = res.headers.get("x-total-count");
+      const total = rawTotal === null || rawTotal === "" ? undefined : Number(rawTotal);
       return { data, total: Number.isFinite(total) ? total : undefined };
     }
     return data;

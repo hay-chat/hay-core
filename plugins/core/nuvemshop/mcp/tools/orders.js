@@ -18,6 +18,10 @@ const { z } = require("zod");
 const { nuvemshopApi } = require("../lib/client");
 const { ok, fail, slimOrder, orderSupportSummary } = require("../lib/format");
 
+// Payment states where the customer's money is still in play: captured (paid),
+// partially returned, or held on the card (authorized).
+const MONEY_IN_PLAY = new Set(["paid", "partially_refunded", "authorized"]);
+
 const HOW_TO_REFUND =
   "Money movement cannot be triggered through the Nuvemshop API. To actually refund: " +
   "the merchant refunds from the payment provider — for Nuvem Pago, admin → order → " +
@@ -63,21 +67,31 @@ function registerOrderTools(server) {
     },
     async (args) => {
       try {
-        // The list endpoint's `q` matches order numbers; confirm exactly, since
-        // q also matches customer names/emails containing the digits.
-        const results = await nuvemshopApi("GET", "/orders", {
-          query: { q: args.number, per_page: 30 },
-        });
-        const order = (results ?? []).find((candidate) => candidate.number === args.number);
-        if (!order) {
-          return fail(
-            new Error(
-              `No order with number #${args.number}. Double-check the number with the ` +
-                "customer, or find their orders with nuvemshop_list_customer_orders.",
-            ),
-          );
+        // The list endpoint's `q` is a contains-match over order numbers AND
+        // customer names/emails, so #101 also surfaces #1010, #2101 and every
+        // customer like joao101@… — page through ALL matches (status any, so
+        // closed/cancelled orders are findable too) and confirm exactly. Only
+        // report not-found once the match set is exhausted.
+        const perPage = 50;
+        const maxPages = 10; // 500 q-matches; beyond that the number is wrong anyway
+        for (let page = 1; page <= maxPages; page++) {
+          const { data, total } = await nuvemshopApi("GET", "/orders", {
+            query: { q: args.number, status: "any", per_page: perPage, page },
+            withMeta: true,
+          });
+          const results = data ?? [];
+          const order = results.find((candidate) => Number(candidate.number) === args.number);
+          if (order) return ok(slimOrder(order));
+          const exhausted =
+            results.length < perPage || (total !== undefined && page * perPage >= total);
+          if (exhausted) break;
         }
-        return ok(slimOrder(order));
+        return fail(
+          new Error(
+            `No order with number #${args.number}. Double-check the number with the ` +
+              "customer, or find their orders with nuvemshop_list_customer_orders.",
+          ),
+        );
       } catch (err) {
         return fail(err);
       }
@@ -171,8 +185,9 @@ function registerOrderTools(server) {
   server.tool(
     "nuvemshop_cancel_order",
     "Cancel an order (sets status to cancelled, optionally restocks items and emails the " +
-      "customer). IMPORTANT: cancelling does NOT refund any payment — for a paid order you must " +
-      "pass confirm_paid_cancellation=true and the merchant still refunds via the payment " +
+      "customer). IMPORTANT: cancelling does NOT refund payments or release card holds — when " +
+      "the order is paid, partially refunded or authorized you must pass " +
+      "confirm_paid_cancellation=true, and the merchant still handles the money via the payment " +
       "provider (see nuvemshop_check_refund_status). Refuses orders that already shipped.",
     {
       order_id: z.number().int().describe("Internal numeric order ID"),
@@ -188,8 +203,9 @@ function registerOrderTools(server) {
         .boolean()
         .optional()
         .describe(
-          "Required (true) when the order is already paid: acknowledges that cancelling " +
-            "does not refund the payment and the refund will be handled via the payment provider",
+          "Required (true) when the customer's money is involved (order paid, partially " +
+            "refunded, or an authorization hold active): acknowledges that cancelling does " +
+            "not refund or release anything — the payment provider handles the money",
         ),
     },
     async (args) => {
@@ -213,12 +229,23 @@ function registerOrderTools(server) {
               "Escalate to the merchant instead.",
           );
         }
-        if (order.payment_status === "paid" && args.confirm_paid_cancellation !== true) {
+        // Money guard: any state where the customer's money is still in play —
+        // captured (paid), partially returned (partially_refunded: the remainder
+        // is still with the merchant), or held (authorized: the card hold must
+        // be voided/released by the provider).
+        if (MONEY_IN_PLAY.has(order.payment_status) && args.confirm_paid_cancellation !== true) {
+          const moneyDetail =
+            order.payment_status === "authorized"
+              ? "has an active authorization hold that cancelling will NOT void or release"
+              : order.payment_status === "partially_refunded"
+                ? "was only PARTIALLY refunded — the remainder stays with the merchant; " +
+                  "cancelling will NOT refund it"
+                : "is PAID; cancelling will NOT refund the payment";
           throw new Error(
-            `Order #${order.number} is PAID (${order.total} ${order.currency} via ` +
-              `${summary.paymentProvider}). Cancelling will NOT refund this payment. ` +
-              "Tell the customer the refund is handled separately by the payment provider, " +
-              "then retry with confirm_paid_cancellation=true.",
+            `Order #${order.number} (${order.total} ${order.currency} via ` +
+              `${summary.paymentProvider}) ${moneyDetail}. Tell the customer the money ` +
+              "is handled separately by the payment provider, then retry with " +
+              "confirm_paid_cancellation=true.",
           );
         }
 
@@ -230,16 +257,31 @@ function registerOrderTools(server) {
           },
         });
 
+        const restockDetail =
+          "Order cancelled and items " + (args.restock === false ? "NOT restocked" : "restocked");
+        let moneyOutcome;
+        if (order.payment_status === "authorized") {
+          moneyOutcome =
+            ". The card authorization hold was NOT released — the payment provider must " +
+            "void it (otherwise it sits on the customer's card until it expires).";
+        } else if (
+          order.payment_status === "paid" ||
+          order.payment_status === "partially_refunded"
+        ) {
+          moneyOutcome =
+            ". No money was moved — the " +
+            (order.payment_status === "partially_refunded" ? "remaining balance" : "payment") +
+            " must still be refunded by the payment provider. " +
+            HOW_TO_REFUND;
+        } else if (order.payment_status === "refunded" || order.payment_status === "voided") {
+          moneyOutcome = `. The payment was already ${order.payment_status} — nothing left to return.`;
+        } else {
+          moneyOutcome = ". No payment had been captured, so nothing needs refunding.";
+        }
+
         return ok({
           status: "CANCELLED",
-          detail:
-            order.payment_status === "paid"
-              ? "Order cancelled and items " +
-                (args.restock === false ? "NOT restocked" : "restocked") +
-                ". No money was moved — the payment must still be refunded by the " +
-                "payment provider. " +
-                HOW_TO_REFUND
-              : "Order cancelled. No payment had been captured, so nothing needs refunding.",
+          detail: restockDetail + moneyOutcome,
           order: slimOrder(cancelled),
         });
       } catch (err) {

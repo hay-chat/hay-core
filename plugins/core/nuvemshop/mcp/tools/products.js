@@ -16,6 +16,18 @@ const languageParam = z
     "Language code for localized fields (e.g. 'pt', 'es', 'en'). Defaults to the store's main language.",
   );
 
+const pageParam = z.number().int().min(1).optional().describe("1-based page number (default 1)");
+
+function perPageParam(dflt) {
+  return z
+    .number()
+    .int()
+    .min(1)
+    .max(200)
+    .optional()
+    .describe(`Results per page, max 200 (default ${dflt})`);
+}
+
 function registerProductTools(server) {
   server.tool(
     "nuvemshop_search_products",
@@ -27,8 +39,8 @@ function registerProductTools(server) {
       q: z.string().optional().describe("Free-text search over names, descriptions and SKUs"),
       category_id: z.number().int().optional().describe("Only products in this category"),
       published: z.boolean().optional().describe("Filter by published (visible in storefront)"),
-      page: z.number().int().optional().describe("1-based page number (default 1)"),
-      per_page: z.number().int().optional().describe("Results per page, max 200 (default 25)"),
+      page: pageParam,
+      per_page: perPageParam(25),
       language: languageParam,
     },
     async (args) => {
@@ -39,7 +51,7 @@ function registerProductTools(server) {
             category_id: args.category_id,
             published: args.published,
             page: args.page ?? 1,
-            per_page: args.per_page ?? 25,
+            per_page: Math.min(args.per_page ?? 25, 200),
           },
           withMeta: true,
         });
@@ -111,8 +123,8 @@ function registerProductTools(server) {
       "with nuvemshop_search_products to browse a category's products.",
     {
       parent_id: z.number().int().optional().describe("Only direct children of this category"),
-      page: z.number().int().optional().describe("1-based page number (default 1)"),
-      per_page: z.number().int().optional().describe("Results per page, max 200 (default 50)"),
+      page: pageParam,
+      per_page: perPageParam(50),
       language: languageParam,
     },
     async (args) => {
@@ -121,7 +133,7 @@ function registerProductTools(server) {
           query: {
             parent_id: args.parent_id,
             page: args.page ?? 1,
-            per_page: args.per_page ?? 50,
+            per_page: Math.min(args.per_page ?? 50, 200),
           },
           withMeta: true,
         });

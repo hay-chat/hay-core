@@ -39,7 +39,10 @@ function registerCustomerTools(server) {
     },
     async (args) => {
       try {
-        const term = args.email ?? args.query;
+        // Normalize first: LLMs routinely send optional params as "" — an empty
+        // email must not mask a usable query (?? only skips null/undefined).
+        const email = args.email?.trim().toLowerCase() || undefined;
+        const term = email ?? args.query?.trim();
         if (!term) {
           throw new Error("Provide email or query.");
         }
@@ -47,12 +50,11 @@ function registerCustomerTools(server) {
           query: { q: term, per_page: Math.min(args.first ?? 10, 200) },
         });
         let customers = results ?? [];
-        if (args.email) {
+        if (email) {
           // `q` is a contains-match; enforce exactness for email lookups so the
           // agent never acts on a lookalike account.
-          const wanted = args.email.trim().toLowerCase();
           customers = customers.filter(
-            (customer) => (customer.email || "").toLowerCase() === wanted,
+            (customer) => (customer.email || "").toLowerCase() === email,
           );
         }
         return ok(customers.map(slimCustomer));
