@@ -12,8 +12,8 @@ Build a Hay plugin for Nuvemshop/Tiendanube (LatAm e-commerce), modeled on the S
       ESM, strict TS, `defineHayPlugin` default export
 - [x] i18n en.json + pt.json + es.json with every tool + config field
 - [x] Builds (`npm run build --workspace=plugins/core/nuvemshop`) pass
-- [ ] Adversarial review findings addressed
-- [ ] Committed + pushed to `claude/nuven-shop-integration-suwzch`, draft PR #71 updated
+- [x] Adversarial review findings addressed (13 confirmed → fixed in adb5d10)
+- [x] Committed + pushed to `claude/nuven-shop-integration-suwzch`, draft PR #71 updated
 
 ## Checklist
 
@@ -24,8 +24,14 @@ Build a Hay plugin for Nuvemshop/Tiendanube (LatAm e-commerce), modeled on the S
 - [x] Verify: SDK build + plugin build pass; MCP stdio smoke test lists 13 tools with schemas;
       9 handler-level tests with mocked API pass (guardrails, i18n flattening, stock resolution);
       compiled entry loads with correct hooks; i18n keys match tool names in all 3 locales
-- [ ] Review workflow (wf_6760c0aa-39b) → fix confirmed findings
-- [ ] Commit, push, update PR #71
+- [x] Review workflow (wf_6760c0aa-39b) → 13 confirmed findings fixed: paginated
+      order-by-number (status=any, exhaustion before not-found), money guard covers
+      partially_refunded/authorized with truthful per-state messaging, GET-only replay on
+      5xx/transport errors (429 retryable for all), total header null/empty → undefined,
+      err.status on 401/402, bulkSync bounded retry honoring X-Rate-Limit-Reset, zod
+      bounds/clamps on pagination, find_customer email/query normalization
+- [x] Round-2 handler tests (12 scenarios) + round-1 (9) + stdio smoke re-pass
+- [x] Commit (74805fc feat, adb5d10 fix), push, update PR #71
 
 ## Working notes
 
