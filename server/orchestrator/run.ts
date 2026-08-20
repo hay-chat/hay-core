@@ -5,6 +5,8 @@ import { PerceptionLayer } from "./perception.layer";
 import { RetrievalLayer } from "./retrieval.layer";
 import { ExecutionLayer } from "./execution.layer";
 import { PlaybookStatus } from "@server/database/entities/playbook.entity";
+import type { Playbook } from "@server/database/entities/playbook.entity";
+import { shouldReselectPlaybook } from "./playbook-gate";
 import { agentRepository } from "@server/repositories/agent.repository";
 import { MessageType } from "@server/database/entities/message.entity";
 import { ToolExecutionService } from "@server/services/core/tool-execution.service";
@@ -488,6 +490,8 @@ export const runConversation = async (conversationId: string) => {
         closingMessage = await llmService.invoke({
           history: messages,
           prompt,
+          // Short closing line; falls back to a hardcoded string on error.
+          tier: "easy",
         });
       } catch (error) {
         log.debug({ err: error }, "Error generating closing message, using fallback");
@@ -571,44 +575,16 @@ export const runConversation = async (conversationId: string) => {
       "Retrieved active playbooks",
     );
 
-    const playbookCandidate = await retrievalLayer.getPlaybookCandidate(
-      publicMessages,
-      activePlaybooks,
-      conversation.organization_id,
-    );
-
-    if (playbookCandidate && playbookCandidate.id !== currentPlaybook) {
-      log.debug(
-        {
-          oldPlaybookId: currentPlaybook,
-          newPlaybookId: playbookCandidate.id,
-          newPlaybookTitle: playbookCandidate.title,
-        },
-        "Playbook candidate differs from current, updating conversation",
-      );
-      await conversation.updatePlaybook(playbookCandidate.id);
-    } else if (playbookCandidate) {
-      // Check if enabled_tools is null despite having a playbook - this means tools were never fetched
-      if (!conversation.enabled_tools || conversation.enabled_tools.length === 0) {
-        log.debug(
-          {
-            playbookId: currentPlaybook,
-            enabledTools: conversation.enabled_tools,
-          },
-          "Playbook is set but enabled_tools is null, refreshing tools",
-        );
-        await conversation.updatePlaybook(playbookCandidate.id);
-      } else {
-        log.debug(
-          {
-            playbookId: currentPlaybook,
-            enabledToolsCount: conversation.enabled_tools.length,
-          },
-          "Playbook candidate matches current playbook, no update needed",
-        );
-      }
+    // Gated: the selector re-scores every active playbook against the whole
+    // transcript, and on most turns re-picks the one already set. Skip it while the
+    // planner keeps confirming the current playbook fits (see selectPlaybook below).
+    if (shouldReselectPlaybook(conversation, activePlaybooks.length)) {
+      await selectPlaybook(conversation, retrievalLayer, publicMessages, activePlaybooks, log);
     } else {
-      log.debug({ currentPlaybookId: currentPlaybook }, "No playbook candidate selected");
+      log.debug(
+        { currentPlaybookId: currentPlaybook },
+        "Skipping playbook selection — planner confirmed the current playbook last turn",
+      );
     }
 
     // 02.2. Document Candidates (already fetched in parallel above)
@@ -756,6 +732,62 @@ export const runConversation = async (conversationId: string) => {
  * Handle iterative execution loop with tool calls
  * This allows the LLM to call tools, analyze results, and continue the conversation
  */
+
+/** Run the selector and apply its result to the conversation. */
+async function selectPlaybook(
+  conversation: Conversation,
+  retrievalLayer: RetrievalLayer,
+  publicMessages: Message[],
+  activePlaybooks: Playbook[],
+  log: pino.Logger,
+): Promise<void> {
+  const currentPlaybook = conversation.playbook_id;
+  const playbookCandidate = await retrievalLayer.getPlaybookCandidate(
+    publicMessages,
+    activePlaybooks,
+    conversation.organization_id,
+  );
+
+  if (playbookCandidate && playbookCandidate.id !== currentPlaybook) {
+    log.debug(
+      {
+        oldPlaybookId: currentPlaybook,
+        newPlaybookId: playbookCandidate.id,
+        newPlaybookTitle: playbookCandidate.title,
+      },
+      "Playbook candidate differs from current, updating conversation",
+    );
+    await conversation.updatePlaybook(playbookCandidate.id);
+  } else if (playbookCandidate) {
+    if (!conversation.enabled_tools || conversation.enabled_tools.length === 0) {
+      log.debug(
+        { playbookId: currentPlaybook, enabledTools: conversation.enabled_tools },
+        "Playbook is set but enabled_tools is null, refreshing tools",
+      );
+      await conversation.updatePlaybook(playbookCandidate.id);
+    } else {
+      log.debug(
+        { playbookId: currentPlaybook, enabledToolsCount: conversation.enabled_tools.length },
+        "Playbook candidate matches current playbook, no update needed",
+      );
+    }
+  } else {
+    log.debug({ currentPlaybookId: currentPlaybook }, "No playbook candidate selected");
+  }
+
+  // A fresh selection is trusted until the planner says otherwise.
+  await recordPlaybookFit(conversation, true);
+}
+
+/** Persist the planner's playbook verdict so the next turn can gate on it. */
+async function recordPlaybookFit(conversation: Conversation, fits: boolean): Promise<void> {
+  if (conversation.metadata?.playbookFits === fits) return;
+  const { conversationRepository } = await import("../repositories/conversation.repository");
+  const metadata = { ...(conversation.metadata ?? {}), playbookFits: fits };
+  conversation.metadata = metadata;
+  await conversationRepository.update(conversation.id, conversation.organization_id, { metadata });
+}
+
 async function handleExecutionLoop(
   conversation: Conversation,
   processingStartedAt: number,
@@ -779,6 +811,9 @@ async function handleExecutionLoop(
   // Shared (by reference) with the execution layer so corrective re-plans are
   // budgeted per turn, not per execute() call.
   const turnGuardrailState = { actionClaimRetries: 0, companyInterestRetries: 0 };
+  // One playbook re-selection per turn, so a planner that keeps saying "doesn't fit"
+  // can't ping-pong between playbooks.
+  let playbookReselected = false;
 
   while (iterations < MAX_ITERATIONS) {
     iterations++;
@@ -838,6 +873,35 @@ async function handleExecutionLoop(
       },
       "Processing execution result",
     );
+
+    // The planner is the only call that actually reads the playbook, so it is the
+    // one that can tell whether it still fits. `false` means the customer moved on
+    // (order status -> refund) and this plan was made against the wrong playbook:
+    // re-select and re-plan once, rather than shipping a stale answer and fixing it
+    // on the next turn. Bounded to one attempt per turn, like the guardrail retries.
+    if (executionResult.playbookFits === false && !playbookReselected) {
+      playbookReselected = true;
+      log.debug(
+        { playbookId: conversation.playbook_id, rationale: executionResult.rationale },
+        "Planner reported the active playbook no longer fits — re-selecting and re-planning",
+      );
+      await recordPlaybookFit(conversation, false);
+
+      const retrievalLayer = new RetrievalLayer();
+      const activePlaybooks = await playbookRepository.findByStatus(
+        conversation.organization_id,
+        PlaybookStatus.ACTIVE,
+      );
+      if (activePlaybooks.length > 0) {
+        const publicMessages = await conversation.getPublicMessages();
+        await selectPlaybook(conversation, retrievalLayer, publicMessages, activePlaybooks, log);
+        // Don't spend an iteration on a plan we're discarding.
+        iterations--;
+        continue;
+      }
+    } else if (executionResult.playbookFits === true) {
+      await recordPlaybookFit(conversation, true);
+    }
 
     // Enforce enabled_tools: reject tool calls not in the conversation's allowed list.
     // Policy: when enabled_tools is null/empty (no playbook), all tools are allowed.
@@ -1067,6 +1131,8 @@ async function handleExecutionLoop(
                 history: messages,
                 prompt:
                   "Based on the conversation context, generate a brief, natural message informing the customer that a human agent will be joining the conversation shortly. Keep it friendly and reassuring. Maximum 2 sentences.",
+                // Two-sentence handoff notice; falls back to a hardcoded string on error.
+                tier: "easy",
               });
             } catch (error) {
               log.error({ err: error }, "Error generating handoff message");

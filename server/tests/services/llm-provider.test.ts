@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, jest } from "@jest/globals";
+import { OPENAI_COMPATIBLE_CAPABILITIES } from "../../services/llm/openai-compatible.provider";
 
 /**
  * Slice 1 characterization test — the "provably unchanged" gate.
@@ -107,7 +108,13 @@ describe("LLM provider adapter — Slice 1 characterization", () => {
     const meta = await llm.invokeWithMeta({ history: "hi" });
     expect(meta).toEqual({
       content: '{"ok":true}',
-      usage: { promptTokens: 10, completionTokens: 5, totalTokens: 15, estimated: false },
+      usage: {
+        promptTokens: 10,
+        cachedPromptTokens: 0,
+        completionTokens: 5,
+        totalTokens: 15,
+        estimated: false,
+      },
       model: "gpt-4o",
       provider: "openai-compatible",
     });
@@ -146,5 +153,22 @@ describe("LLM provider adapter — Slice 1 characterization", () => {
     expect(vec).toEqual([0.1, 0.2, 0.3]);
     const [body] = mockEmbeddingsCreate.mock.calls[0] as [Record<string, unknown>];
     expect(body).toEqual({ model: "text-embedding-3-small", input: "embed me" });
+  });
+});
+
+describe("custom-tools vendor profile", () => {
+  it("reaches the forced-tool rung, unlike the generic custom profile", () => {
+    expect(OPENAI_COMPATIBLE_CAPABILITIES["custom-tools"].toolForcedJson).toBe(true);
+    expect(OPENAI_COMPATIBLE_CAPABILITIES.custom.toolForcedJson).toBe(false);
+  });
+
+  it("stays conservative everywhere else — only the tool rung differs", () => {
+    const { toolForcedJson: _a, ...tools } = OPENAI_COMPATIBLE_CAPABILITIES["custom-tools"];
+    const { toolForcedJson: _b, ...plain } = OPENAI_COMPATIBLE_CAPABILITIES.custom;
+    expect(tools).toEqual(plain);
+  });
+
+  it("does not claim strict JSON schema", () => {
+    expect(OPENAI_COMPATIBLE_CAPABILITIES["custom-tools"].strictJsonSchema).toBe(false);
   });
 });

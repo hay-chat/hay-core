@@ -609,6 +609,7 @@
       "vendorHelper": "Seleciona o formato de requisição e o tratamento de saída estruturada corretos.",
       "vendorCustom": "Personalizado (compatível com OpenAI)",
       "providerCustom": "Personalizado (compatível com OpenAI)",
+      "providerCustomTools": "Personalizado — com tool calling (compatível com OpenAI)",
       "baseUrl": "URL Base",
       "baseUrlHelper": "A URL base da API compatível com OpenAI do provedor.",
       "byo": "Usar minha própria chave de API",

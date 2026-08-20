@@ -25,7 +25,14 @@ import type {
 } from "./provider.types";
 
 function anthropicUsage(usage: Anthropic.Usage | undefined): UsageRecord {
-  if (!usage) return { promptTokens: 0, completionTokens: 0, totalTokens: 0, estimated: true };
+  if (!usage)
+    return {
+      promptTokens: 0,
+      cachedPromptTokens: 0,
+      completionTokens: 0,
+      totalTokens: 0,
+      estimated: true,
+    };
   // input_tokens is the UNCACHED remainder — sum the cache fields or metering undercounts.
   const promptTokens =
     usage.input_tokens +
@@ -34,11 +41,27 @@ function anthropicUsage(usage: Anthropic.Usage | undefined): UsageRecord {
   const completionTokens = usage.output_tokens;
   return {
     promptTokens,
+    cachedPromptTokens: usage.cache_read_input_tokens ?? 0,
     completionTokens,
     totalTokens: promptTokens + completionTokens,
     estimated: false,
   };
 }
+
+/**
+ * Anthropic caches nothing unless a `cache_control` breakpoint is set, and the
+ * minimum cacheable prefix is ~1024 tokens on most models. Below that a breakpoint
+ * is silently ignored, so gate on an approximate length to keep intent explicit.
+ */
+const MIN_CACHEABLE_CHARS = 4096;
+
+/**
+ * Separate threshold for the transcript breakpoint. Every history-aware call
+ * re-sends the whole conversation, so without this the transcript is re-processed
+ * at full price on every turn and cost grows with the square of conversation
+ * length. Caching the tail lets turn N read turns 1..N-1.
+ */
+const MIN_CACHEABLE_HISTORY_CHARS = 4096;
 
 export const ANTHROPIC_CAPABILITIES: ProviderCapabilities = {
   // Forced tool-use yields schema-shaped JSON, but we keep validate-and-repair on as
@@ -110,23 +133,58 @@ export class AnthropicChatProvider implements ChatProvider {
       .filter((m) => m.role === "system")
       .map((m) => m.content)
       .join("\n\n");
-    const messages = mergeConsecutive(req.messages.filter((m) => m.role !== "system"));
+    const merged = mergeConsecutive(req.messages.filter((m) => m.role !== "system"));
+
+    // Third breakpoint, on the last turn: each request caches the transcript up to
+    // now, and the next turn reads it instead of re-paying for the whole history.
+    // Anthropic allows 4 breakpoints; tools + system + this leaves one spare.
+    const historyChars = merged.reduce((n, m) => n + m.content.length, 0);
+    const messages: Anthropic.MessageParam[] =
+      merged.length > 0 && historyChars >= MIN_CACHEABLE_HISTORY_CHARS
+        ? merged.map((m, i) =>
+            i === merged.length - 1
+              ? {
+                  role: m.role,
+                  content: [
+                    {
+                      type: "text" as const,
+                      text: m.content,
+                      cache_control: { type: "ephemeral" as const },
+                    },
+                  ],
+                }
+              : m,
+          )
+        : merged;
 
     const params: Anthropic.MessageCreateParamsNonStreaming = {
       model: req.model,
       max_tokens: req.maxTokens,
       messages,
     };
-    if (system) params.system = system;
+    // Cache the system block — it carries the static planner instructions, the
+    // playbook and the tool detail, and is byte-identical across every turn of a
+    // conversation. Volatile content (knowledge block, corrective feedback) is
+    // appended after it by the caller, and history follows in `messages`, so the
+    // cached prefix stays stable as the conversation grows.
+    if (system) {
+      params.system =
+        system.length >= MIN_CACHEABLE_CHARS
+          ? [{ type: "text", text: system, cache_control: { type: "ephemeral" } }]
+          : system;
+    }
     if (allowsSampling && req.temperature !== undefined) params.temperature = req.temperature;
 
     if (req.structured) {
       const name = req.structured.name ?? "structured_response";
+      // Tools render before `system` in the cache prefix, so the breakpoint has to
+      // sit here too — otherwise the schema is re-processed uncached every call.
       params.tools = [
         {
           name,
           description: "Return the result as the structured object defined by the input schema.",
           input_schema: req.structured.schema as Anthropic.Tool.InputSchema,
+          cache_control: { type: "ephemeral" },
         },
       ];
       params.tool_choice = { type: "tool", name };

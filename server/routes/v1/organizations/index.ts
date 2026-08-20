@@ -67,7 +67,7 @@ const tierModelSchema = z.object({
 const updateLlmConfigSchema = z.object({
   chat: z.object({
     provider: z.enum(["openai-compatible", "anthropic", "gemini"]),
-    vendor: z.enum(["openai", "mistral", "grok", "custom"]).optional(),
+    vendor: z.enum(["openai", "mistral", "grok", "custom", "custom-tools"]).optional(),
     baseUrl: z.union([z.string().url(), z.literal("")]).optional(),
     // Plaintext key, only sent when the user enters/changes it; encrypted server-side.
     apiKey: z.string().optional(),

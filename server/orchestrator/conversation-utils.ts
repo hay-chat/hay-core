@@ -57,6 +57,8 @@ export async function generateConversationTitle(
 
     const response = await llmService.invoke({
       prompt,
+      // Title generation is a short summarisation with no downstream decision.
+      tier: "easy",
     });
 
     const title = response.trim().replace(/^["']|["']$/g, ""); // Remove quotes if present
@@ -114,6 +116,8 @@ export async function generateHandoffSummary(
 
     const response = await llmService.invoke({
       prompt,
+      // Summarising a transcript for a human agent — no tool use, no planning.
+      tier: "medium",
     });
 
     const summary = response.trim().replace(/^["']|["']$/g, "");
@@ -165,6 +169,8 @@ export async function sendInactivityWarning(
 
     const response = await llmService.invoke({
       prompt,
+      // Short inactivity nudge from the last 5 messages.
+      tier: "easy",
     });
 
     // Add the warning message to the conversation
@@ -236,6 +242,8 @@ export async function closeInactiveConversation(
 
         closureMessage = await llmService.invoke({
           prompt,
+          // One-line sign-off; the alternative branch is a hardcoded string.
+          tier: "easy",
         });
       }
 
@@ -339,6 +347,9 @@ export async function validateConversationClosure(
 
     const response = await llmService.invoke({
       prompt: validationPrompt,
+      // A shouldClose boolean over a transcript. Medium rather than easy: getting
+      // this wrong closes a live conversation.
+      tier: "medium",
       jsonSchema: {
         type: "object",
         properties: {

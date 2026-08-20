@@ -1,3 +1,44 @@
+## 2026-08-20 — claude/nuven-shop-integration-suwzch — custom-tools vendor + env default provider, uncommitted
+
+New `custom-tools` OpenAI-compatible vendor profile (toolForcedJson:true, else
+identical to `custom`) so hosts advertising tool calling — DigitalOcean Gradient,
+Moonshot, Together — reach structured-output rung 3 instead of falling back to
+validate-and-repair. ~14% cheaper on DO in the cost model. Touches provider.types,
+openai-compatible.provider, organizations zod enum, dashboard llm.vue + en/pt-BR.
+getDefaultBundle() now honours LLM_BASE_URL / LLM_VENDOR / LLM_API_KEY (was
+hardcoded to OpenAI), so a global default can point anywhere without touching the
+DB; embeddings deliberately stay on OPENAI_API_KEY (EMBEDDING_DIM pin). Documented
+in .env.example. Server 514 tests pass, typecheck clean (dashboard vitest failures
+are pre-existing Playwright-under-vitest config, unrelated).
+Next: trial deepseek-3.2 on one org, measure tool-call validity + handoff rate.
+
+## 2026-08-19 — claude/nuven-shop-integration-suwzch — LLM cost reduction, uncommitted
+
+Cost/resolution $0.393 → $0.222 (43%) at calculator defaults; ~66% with caching hits.
+1) DEFAULT_TIER_MAP openai.hard gpt-4o → gpt-4.1 (cheaper + better; env-overridable
+   via LLM_TIER_HARD). medium deliberately left on gpt-4o-mini (4.1-mini ~2.6x input).
+2) Tier routing: 4 guardrails + handoff summary + closure validation + greeting
+   translation + fallback composition → medium; title, inactivity, closure msg,
+   closing msg, handoff msg → easy. Planner stays hard.
+3) Anthropic had zero caching — added 3 cache_control breakpoints (tools, system,
+   transcript tail) in anthropic.provider.ts, each gated at 4096 chars. OpenAI/Gemini
+   cache prefixes automatically and prompt assembly was already stable-first.
+4) UsageRecord.cachedPromptTokens across all 3 providers + hit-rate in the LLM debug log.
+Full server suite 505 pass. HELD BACK: perception + playbook selection hard→medium —
+biggest remaining win but needs an eval first (mis-routing is user-visible).
+Next: read real cache hit rates from logs, then build that eval.
+
+## 2026-08-19 — claude/nuven-shop-integration-suwzch — AI cost/margin calculator (artifact, no code changes)
+
+Built an interactive token-economics calculator (artifact, not in repo) modelling
+per-conversation inference cost from the real orchestrator call graph. Two findings
+worth acting on: (1) every orchestrator llmService.invoke() runs on tier "hard"
+(llm.service.ts:94 default, no call site overrides) — perception, playbook selection,
+title, closing message all hit the flagship model; (2) no prompt caching anywhere in
+server/services/llm, and input is ~90% of spend. At defaults (gpt-4o, 6 turns, 2 tool
+calls) cost/resolution ≈ $0.30 vs Growth plan revenue of ~$0.04/included resolution.
+Next: verify token counts against real invokeWithMeta usage, then decide tier routing.
+
 # WIP
 
 ## 2026-07-16 — master — Empty tool schemas + idempotency injection + playbook action validation, uncommitted

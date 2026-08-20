@@ -94,7 +94,10 @@ export const EMBEDDING_MODEL_CATALOG: string[] = [
 
 /** Default tier → model map per family, used as the starting point in the UI/factory. */
 export const DEFAULT_TIER_MAP: Record<ModelFamily, TierModelMap> = {
-  openai: { hard: "gpt-4o", medium: "gpt-4o-mini", easy: "gpt-4.1-nano" },
+  // hard=4.1 over 4o: newer, better instruction-following, 1M context, and cheaper.
+  // medium stays 4o-mini — 4.1-mini is better but ~2.6x the input price, which would
+  // eat most of the saving from moving the per-turn guardrails onto this tier.
+  openai: { hard: "gpt-4.1", medium: "gpt-4o-mini", easy: "gpt-4.1-nano" },
   anthropic: { hard: "claude-opus-4-8", medium: "claude-sonnet-4-6", easy: "claude-haiku-4-5" },
   gemini: { hard: "gemini-2.5-pro", medium: "gemini-2.5-flash", easy: "gemini-2.5-flash-lite" },
   mistral: {

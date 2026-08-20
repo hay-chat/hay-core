@@ -80,6 +80,7 @@ describe("GeminiChatProvider", () => {
     expect(res.content).toBe("hi");
     expect(res.usage).toEqual({
       promptTokens: 12,
+      cachedPromptTokens: 0,
       completionTokens: 4,
       totalTokens: 16,
       estimated: false,

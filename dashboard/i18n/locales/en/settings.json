@@ -609,6 +609,7 @@
       "vendorHelper": "Selects the right request format and structured-output handling.",
       "vendorCustom": "Custom (OpenAI-compatible)",
       "providerCustom": "Custom (OpenAI-compatible)",
+      "providerCustomTools": "Custom — supports tool calling (OpenAI-compatible)",
       "baseUrl": "Base URL",
       "baseUrlHelper": "The provider's OpenAI-compatible API base URL.",
       "byo": "Use my own API key",

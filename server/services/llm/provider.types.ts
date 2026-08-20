@@ -30,6 +30,13 @@ export interface ChatMessage {
 /** Normalized token usage, returned on EVERY chat + embedding result. */
 export interface UsageRecord {
   promptTokens: number;
+  /**
+   * Subset of `promptTokens` served from the provider's prompt cache at reduced
+   * rates. Anthropic requires explicit `cache_control` breakpoints; OpenAI and
+   * Gemini cache stable prefixes automatically. 0 when the provider reports
+   * nothing, so a persistently-zero value is the signal that caching is broken.
+   */
+  cachedPromptTokens: number;
   /** 0 for embeddings. */
   completionTokens: number;
   totalTokens: number;
@@ -194,7 +201,18 @@ export interface TierModelMap {
 export type ChatProviderId = "openai-compatible" | "anthropic" | "gemini";
 
 /** Which OpenAI-compatible vendor (selects a capability profile). */
-export type OpenAICompatibleVendor = "openai" | "mistral" | "grok" | "custom";
+export type OpenAICompatibleVendor =
+  | "openai"
+  | "mistral"
+  | "grok"
+  | "custom"
+  /**
+   * An OpenAI-compatible host that supports forced tool choice — DigitalOcean
+   * Gradient, Moonshot, Together, Fireworks and friends. Named by capability
+   * rather than by vendor because the only thing that differs from `custom` is
+   * `toolForcedJson`, and that is true of every host advertising tool calling.
+   */
+  | "custom-tools";
 
 export interface OrgLlmConfig {
   chat: {

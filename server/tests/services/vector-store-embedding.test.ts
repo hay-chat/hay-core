@@ -34,7 +34,13 @@ import { VectorStoreService } from "../../services/vector-store.service";
 function embeddingResult(dimensions: number): EmbeddingResult {
   return {
     embeddings: [[0.1, 0.2, 0.3]],
-    usage: { promptTokens: 4, completionTokens: 0, totalTokens: 4, estimated: false },
+    usage: {
+      promptTokens: 4,
+      cachedPromptTokens: 0,
+      completionTokens: 0,
+      totalTokens: 4,
+      estimated: false,
+    },
     model: "text-embedding-3-small",
     provider: "openai-compatible",
     dimensions,

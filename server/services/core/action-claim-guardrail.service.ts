@@ -109,7 +109,7 @@ export class ActionClaimGuardrailService {
         prompt: evaluationPrompt,
         jsonSchema: schema,
         temperature: 0.2, // Low temperature for consistent evaluation
-        tier: "hard",
+        tier: "medium",
       });
 
       const parsed = JSON.parse(result) as {
