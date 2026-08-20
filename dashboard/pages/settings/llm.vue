@@ -150,9 +150,10 @@ interface ModelCatalog {
 }
 
 // A single, flat provider choice in the UI; mapped to the backend's {provider, vendor}.
-type ProviderChoice = ModelFamily | "custom";
+type ProviderChoice = ModelFamily | "custom" | "custom-tools";
 type Provider = "openai-compatible" | "anthropic" | "gemini";
-type Vendor = "openai" | "mistral" | "grok" | "custom";
+// Mirrors OpenAICompatibleVendor in server/services/llm/provider.types.ts.
+type Vendor = "openai" | "mistral" | "grok" | "custom" | "custom-tools";
 
 interface LlmForm {
   selection: ProviderChoice;
@@ -179,13 +180,14 @@ const EMPTY_TIERS: TierMap = { hard: "", medium: "", easy: "" };
 
 /** Tier defaults for a UI choice; "custom" has no presets. */
 function tierDefaultsFor(choice: ProviderChoice): TierMap {
-  if (choice === "custom" || !catalog.value) return { ...EMPTY_TIERS };
+  if (choice === "custom" || choice === "custom-tools" || !catalog.value)
+    return { ...EMPTY_TIERS };
   return { ...catalog.value.defaultTiers[choice] };
 }
 
 /** Preset chat models for a UI choice ("custom" offers none — free text only). */
 function chatModelsFor(choice: ProviderChoice): string[] {
-  if (choice === "custom" || !catalog.value) return [];
+  if (choice === "custom" || choice === "custom-tools" || !catalog.value) return [];
   return catalog.value.chatModels[choice];
 }
 
@@ -210,6 +212,7 @@ const providerOptions = computed(() => [
   { label: "Mistral", value: "mistral" },
   { label: "xAI Grok", value: "grok" },
   { label: t("llmSettings.chat.providerCustom"), value: "custom" },
+  { label: t("llmSettings.chat.providerCustomTools"), value: "custom-tools" },
 ]);
 
 // Bound to the select. The setter resets tier models to the new provider's defaults;
@@ -223,7 +226,9 @@ const providerChoice = computed<ProviderChoice>({
 });
 
 // Custom and OpenAI-compatible non-OpenAI vendors expose a base URL.
-const showBaseUrl = computed(() => ["mistral", "grok", "custom"].includes(form.value.selection));
+const showBaseUrl = computed(() =>
+  ["mistral", "grok", "custom", "custom-tools"].includes(form.value.selection),
+);
 
 const chatModelOptions = computed(() => chatModelsFor(form.value.selection));
 const embeddingOptions = computed(() => catalog.value?.embeddingModels ?? []);

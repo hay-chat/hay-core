@@ -31,15 +31,25 @@ interface GeminiUsageMeta {
   candidatesTokenCount?: number;
   thoughtsTokenCount?: number;
   totalTokenCount?: number;
+  cachedContentTokenCount?: number;
 }
 
 function geminiUsage(meta: GeminiUsageMeta | undefined): UsageRecord {
-  if (!meta) return { promptTokens: 0, completionTokens: 0, totalTokens: 0, estimated: true };
+  if (!meta)
+    return {
+      promptTokens: 0,
+      cachedPromptTokens: 0,
+      completionTokens: 0,
+      totalTokens: 0,
+      estimated: true,
+    };
   const promptTokens = meta.promptTokenCount ?? 0;
   // thinking models bill thoughts as output tokens.
   const completionTokens = (meta.candidatesTokenCount ?? 0) + (meta.thoughtsTokenCount ?? 0);
   return {
     promptTokens,
+    // 2.5-family models cache stable prefixes implicitly and report the hit here.
+    cachedPromptTokens: meta.cachedContentTokenCount ?? 0,
     completionTokens,
     totalTokens: meta.totalTokenCount ?? promptTokens + completionTokens,
     estimated: false,

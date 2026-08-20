@@ -58,6 +58,18 @@ export const OPENAI_COMPATIBLE_CAPABILITIES: Record<string, ProviderCapabilities
     systemRole: "message",
     supportedTiers: ["easy", "medium", "hard"],
   },
+  // Same conservative posture as `custom`, except the host advertises tool
+  // calling — so structured output can use the forced-tool rung (3) instead of
+  // falling back to loose JSON + validate-and-repair (rung 2).
+  "custom-tools": {
+    strictJsonSchema: false,
+    jsonObjectMode: true,
+    toolForcedJson: true,
+    streaming: true,
+    reportsUsage: true,
+    systemRole: "message",
+    supportedTiers: ["easy", "medium", "hard"],
+  },
   custom: {
     strictJsonSchema: false,
     jsonObjectMode: true,
@@ -98,7 +110,7 @@ function mapFinishReason(reason: string | null | undefined): FinishReason {
 }
 
 function emptyUsage(estimated: boolean): UsageRecord {
-  return { promptTokens: 0, completionTokens: 0, totalTokens: 0, estimated };
+  return { promptTokens: 0, cachedPromptTokens: 0, completionTokens: 0, totalTokens: 0, estimated };
 }
 
 export class OpenAICompatibleProvider implements ChatProvider, EmbeddingProvider {
@@ -192,6 +204,9 @@ export class OpenAICompatibleProvider implements ChatProvider, EmbeddingProvider
     const usage = response.usage
       ? {
           promptTokens: response.usage.prompt_tokens,
+          // OpenAI caches stable prefixes >=1024 tokens automatically; this is the
+          // only way to confirm it is actually happening.
+          cachedPromptTokens: response.usage.prompt_tokens_details?.cached_tokens ?? 0,
           completionTokens: response.usage.completion_tokens,
           totalTokens: response.usage.total_tokens,
           estimated: false,
@@ -230,6 +245,7 @@ export class OpenAICompatibleProvider implements ChatProvider, EmbeddingProvider
         if (chunk.usage) {
           usage = {
             promptTokens: chunk.usage.prompt_tokens,
+            cachedPromptTokens: chunk.usage.prompt_tokens_details?.cached_tokens ?? 0,
             completionTokens: chunk.usage.completion_tokens,
             totalTokens: chunk.usage.total_tokens,
             estimated: false,
@@ -261,6 +277,7 @@ export class OpenAICompatibleProvider implements ChatProvider, EmbeddingProvider
       embeddings,
       usage: {
         promptTokens: response.usage?.prompt_tokens ?? 0,
+        cachedPromptTokens: 0, // embeddings are never cached
         completionTokens: 0,
         totalTokens: response.usage?.total_tokens ?? 0,
         estimated: !response.usage,

@@ -23,6 +23,7 @@ import type {
 function sumUsage(a: UsageRecord, b: UsageRecord): UsageRecord {
   return {
     promptTokens: a.promptTokens + b.promptTokens,
+    cachedPromptTokens: a.cachedPromptTokens + b.cachedPromptTokens,
     completionTokens: a.completionTokens + b.completionTokens,
     totalTokens: a.totalTokens + b.totalTokens,
     estimated: a.estimated || b.estimated,
@@ -399,6 +400,9 @@ export class LLMService {
     this.writeToLog(`Finish reason: ${result.finishReason}`);
     this.writeToLog("--- TOKEN USAGE ---");
     this.writeToLog(`Prompt tokens: ${result.usage.promptTokens}`);
+    const cached = result.usage.cachedPromptTokens;
+    const hitRate = result.usage.promptTokens > 0 ? (cached / result.usage.promptTokens) * 100 : 0;
+    this.writeToLog(`Cached prompt tokens: ${cached} (${hitRate.toFixed(1)}% hit)`);
     this.writeToLog(`Completion tokens: ${result.usage.completionTokens}`);
     this.writeToLog(
       `Total tokens: ${result.usage.totalTokens}${result.usage.estimated ? " (estimated)" : ""}`,

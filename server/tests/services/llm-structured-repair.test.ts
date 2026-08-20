@@ -65,7 +65,13 @@ const SCHEMA = {
 function result(content: string, finishReason: ChatResult["finishReason"] = "stop"): ChatResult {
   return {
     content,
-    usage: { promptTokens: 5, completionTokens: 5, totalTokens: 10, estimated: false },
+    usage: {
+      promptTokens: 5,
+      cachedPromptTokens: 0,
+      completionTokens: 5,
+      totalTokens: 10,
+      estimated: false,
+    },
     model: "m-hard",
     provider: "fake-nonstrict",
     finishReason,

@@ -85,6 +85,7 @@ describe("AnthropicChatProvider", () => {
     expect(res.content).toBe("hi there");
     expect(res.usage).toEqual({
       promptTokens: 10,
+      cachedPromptTokens: 0,
       completionTokens: 5,
       totalTokens: 15,
       estimated: false,
@@ -123,6 +124,99 @@ describe("AnthropicChatProvider", () => {
     const res = await provider.chat(req());
     expect(res.usage.promptTokens).toBe(15); // 10 + 3 + 2
     expect(res.usage.totalTokens).toBe(19);
+  });
+
+  it("reports cache_read_input_tokens as cachedPromptTokens", async () => {
+    mockCreate.mockResolvedValue({
+      model: "claude-sonnet-4-6",
+      content: [{ type: "text", text: "x" }],
+      stop_reason: "end_turn",
+      usage: { input_tokens: 10, output_tokens: 4, cache_read_input_tokens: 90 },
+    });
+    const res = await provider.chat(req());
+    expect(res.usage.cachedPromptTokens).toBe(90);
+    expect(res.usage.promptTokens).toBe(100); // cached tokens are part of the prompt
+  });
+
+  it("sets a cache_control breakpoint on a system prompt long enough to cache", async () => {
+    mockCreate.mockResolvedValue({
+      model: "claude-sonnet-4-6",
+      content: [{ type: "text", text: "ok" }],
+      stop_reason: "end_turn",
+      usage: { input_tokens: 10, output_tokens: 2 },
+    });
+
+    const longSystem = "x".repeat(5000);
+    await provider.chat(
+      req({ messages: [{ role: "system", content: longSystem }, { role: "user", content: "hi" }] }),
+    );
+    const [params] = mockCreate.mock.calls[0] as [Record<string, unknown>];
+    expect(params.system).toEqual([
+      { type: "text", text: longSystem, cache_control: { type: "ephemeral" } },
+    ]);
+  });
+
+  it("leaves a short system prompt as a plain string (below the cacheable minimum)", async () => {
+    mockCreate.mockResolvedValue({
+      model: "claude-sonnet-4-6",
+      content: [{ type: "text", text: "ok" }],
+      stop_reason: "end_turn",
+      usage: { input_tokens: 10, output_tokens: 2 },
+    });
+
+    await provider.chat(req());
+    const [params] = mockCreate.mock.calls[0] as [Record<string, unknown>];
+    expect(params.system).toBe("be helpful");
+  });
+
+  it("caches the transcript tail once history is long enough", async () => {
+    mockCreate.mockResolvedValue({
+      model: "claude-sonnet-4-6",
+      content: [{ type: "text", text: "ok" }],
+      stop_reason: "end_turn",
+      usage: { input_tokens: 10, output_tokens: 2 },
+    });
+
+    const longTurn = "y".repeat(5000);
+    await provider.chat(
+      req({
+        messages: [
+          { role: "system", content: "be helpful" },
+          { role: "user", content: longTurn },
+        ],
+      }),
+    );
+    const [params] = mockCreate.mock.calls[0] as [{ messages: Array<Record<string, unknown>> }];
+    expect(params.messages[params.messages.length - 1].content).toEqual([
+      { type: "text", text: longTurn, cache_control: { type: "ephemeral" } },
+    ]);
+  });
+
+  it("leaves a short transcript as plain strings", async () => {
+    mockCreate.mockResolvedValue({
+      model: "claude-sonnet-4-6",
+      content: [{ type: "text", text: "ok" }],
+      stop_reason: "end_turn",
+      usage: { input_tokens: 10, output_tokens: 2 },
+    });
+
+    await provider.chat(req());
+    const [params] = mockCreate.mock.calls[0] as [{ messages: unknown[] }];
+    expect(params.messages).toEqual([{ role: "user", content: "hello" }]);
+  });
+
+  it("puts a cache_control breakpoint on the structured-output tool", async () => {
+    mockCreate.mockResolvedValue({
+      model: "claude-sonnet-4-6",
+      content: [{ type: "tool_use", name: "structured_response", input: { ok: true } }],
+      stop_reason: "tool_use",
+      usage: { input_tokens: 8, output_tokens: 3 },
+    });
+
+    const schema = { type: "object", properties: { ok: { type: "boolean" } } };
+    await provider.chat(req({ structured: { schema } }));
+    const [params] = mockCreate.mock.calls[0] as [{ tools: Array<Record<string, unknown>> }];
+    expect(params.tools[0].cache_control).toEqual({ type: "ephemeral" });
   });
 
   it("strips temperature for opus (reasoning) models but keeps it otherwise", async () => {

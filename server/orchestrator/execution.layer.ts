@@ -62,6 +62,14 @@ export interface ExecutionResult {
   handoffReason?: string | null;
   closeReason?: string | null;
   rationale?: string;
+  /**
+   * Planner's verdict on whether the conversation's current playbook still fits
+   * this turn. `false` triggers one re-selection + re-plan in the execution loop;
+   * `null` when the conversation has no playbook to judge. Gating the per-turn
+   * playbook selector on this is what keeps it from re-scoring every playbook on
+   * every turn.
+   */
+  playbookFits?: boolean | null;
   // Guardrail fields
   actionClaim?: ActionClaimAssessment; // Stage 0: Action-claim vs tool-call consistency
   actionClaimRetryAttempted?: boolean;
@@ -157,6 +165,11 @@ export class ExecutionLayer {
           type: "string",
           description: "Explanation of why this step was chosen",
         },
+        playbookFits: {
+          type: ["boolean", "null"],
+          description:
+            "True if the active playbook still fits what the customer is asking for on this turn. False if the customer has moved to a different topic and another playbook (or none) would suit better. Null when no playbook is active.",
+        },
       },
       required: [
         "step",
@@ -166,6 +179,7 @@ export class ExecutionLayer {
         "toolArgs",
         "handoffReason",
         "closeReason",
+        "playbookFits",
       ],
       additionalProperties: false,
     };
@@ -1346,6 +1360,9 @@ export class ExecutionLayer {
       const composed = await this.llmService.invoke<string>({
         prompt,
         temperature: 0.3,
+        // Composing a fallback reply from recent history; falls back to a
+        // hardcoded message when this returns empty.
+        tier: "medium",
       });
 
       const trimmed = composed.trim();

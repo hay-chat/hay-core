@@ -181,6 +181,29 @@ export const config = {
     },
   },
 
+  /**
+   * Process-wide chat defaults, used by the bundle the factory serves when a call
+   * has no organizationId (crons, system tasks) and by any org that has not
+   * configured its own provider. Leave unset to stay on OpenAI with OPENAI_API_KEY.
+   *
+   * Set all three to move every default call to another OpenAI-compatible host,
+   * e.g. DigitalOcean Gradient:
+   *   LLM_BASE_URL=https://inference.do-ai.run/v1
+   *   LLM_VENDOR=custom-tools
+   *   LLM_API_KEY=<DO model access key>
+   *   LLM_TIER_HARD=deepseek-3.2
+   *   LLM_TIER_MEDIUM=deepseek-4-flash
+   *   LLM_TIER_EASY=deepseek-4-flash
+   *
+   * Embeddings deliberately ignore these — they stay on OPENAI_API_KEY, because
+   * the vector column and HNSW index are pinned to EMBEDDING_DIM.
+   */
+  llm: {
+    baseUrl: process.env.LLM_BASE_URL || "",
+    vendor: process.env.LLM_VENDOR || "",
+    apiKey: process.env.LLM_API_KEY || "",
+  },
+
   smtp: {
     host: process.env.SMTP_HOST || "localhost",
     port: parseInt(process.env.SMTP_PORT || "587", 10),

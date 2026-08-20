@@ -1123,6 +1123,8 @@ Translated message:`;
     try {
       const translated = await llmService.invoke({
         prompt: translationPrompt,
+        // Translating a one-line greeting; falls back to the original on error.
+        tier: "medium",
       });
       return translated.trim();
     } catch (error) {

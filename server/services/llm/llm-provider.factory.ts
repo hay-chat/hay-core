@@ -28,7 +28,13 @@ import {
 import { AnthropicChatProvider } from "./anthropic.provider";
 import { GeminiChatProvider } from "./gemini.provider";
 import { PROVIDER_TIER_DEFAULTS } from "./tier-maps";
-import type { ChatProvider, EmbeddingProvider, OrgLlmConfig, TierModelMap } from "./provider.types";
+import type {
+  ChatProvider,
+  EmbeddingProvider,
+  OpenAICompatibleVendor,
+  OrgLlmConfig,
+  TierModelMap,
+} from "./provider.types";
 
 const logger = createLogger("llm-factory");
 
@@ -68,16 +74,42 @@ class LLMProviderFactory {
     });
   }
 
+  /**
+   * The bundle served when a call has no organizationId, and the fallback for orgs
+   * that have not configured a provider. Honours LLM_BASE_URL / LLM_VENDOR /
+   * LLM_API_KEY so an operator can move every default call to another
+   * OpenAI-compatible host without touching the database.
+   *
+   * Embeddings stay on the OpenAI key regardless: the pgvector column and HNSW
+   * index are pinned to EMBEDDING_DIM, so a host returning a different dimension
+   * would fail `assertDimensions` at write time.
+   */
   private getDefaultBundle(): ResolvedLlmBundle {
     if (!this.defaultBundle) {
-      const provider = new OpenAICompatibleProvider({
+      const embedding = this.buildManagedEmbeddingProvider();
+      const vendor = config.llm.vendor as OpenAICompatibleVendor | "";
+      const capabilities = vendor
+        ? OPENAI_COMPATIBLE_CAPABILITIES[vendor]
+        : OPENAI_COMPATIBLE_CAPABILITIES.openai;
+
+      if (vendor && !capabilities) {
+        throw new Error(
+          `LLM_VENDOR="${vendor}" is not a known OpenAI-compatible vendor. ` +
+            `Expected one of: ${Object.keys(OPENAI_COMPATIBLE_CAPABILITIES).join(", ")}.`,
+        );
+      }
+
+      const chat = new OpenAICompatibleProvider({
         id: "openai-compatible",
-        apiKey: config.openai.apiKey,
+        apiKey: config.llm.apiKey || config.openai.apiKey,
+        baseURL: config.llm.baseUrl || undefined,
+        capabilities,
         embeddingDimensions: config.openai.models.embedding.dimensions,
       });
+
       this.defaultBundle = {
-        chat: provider,
-        embedding: provider,
+        chat,
+        embedding,
         tiers: PROVIDER_TIER_DEFAULTS["openai-compatible"],
       };
     }

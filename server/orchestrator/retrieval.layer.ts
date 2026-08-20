@@ -84,6 +84,10 @@ export class RetrievalLayer {
     const result = await this.llmService.invoke({
       prompt: candidatePrompt,
       jsonSchema: candidateSchema,
+      // Scoring pre-fetched playbooks against a strict schema. The 0.7 threshold
+      // below is the real safety net, and the planner now re-checks fit each turn
+      // (see playbook-gate.ts), so a hard-tier model buys nothing here.
+      tier: "medium",
     });
 
     const parsed = JSON.parse(result) as {
