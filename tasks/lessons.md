@@ -43,3 +43,18 @@
 - **Failure mode**: A plugin built/installed/enabled while the server was running had no router in `pluginRouterRegistry` until an unrelated restart. `documentSources.listRoots` and the sync engine failed with "does not expose a router". nodemon only watches `server/**/*.ts`, so plugin `dist/*.cjs` builds never triggered a restart.
 - **Detection signal**: tRPC BAD_REQUEST "Plugin 'X' does not expose a router with listRoots" despite the manifest having `autoActivate`+`trpcRouter` and `dist/router.cjs` existing on disk.
 - **Prevention**: Registration must be self-healing, not boot-only. Added idempotent `pluginManagerService.ensurePluginRouterRegistered(pluginId)`; on-demand router consumers (listRoots, sync `resolveImporter`) call it before `getRouter`.
+
+### `as unknown as` cast hid a broken client/server contract
+- **Failure mode**: Agent create/update rejected every payload for ~3 months. Commit 561f3fd ("eliminate all eslint any") retyped Tiptap instruction fields from `z.any()` to `z.array(z.unknown())`, but the editor sends a document object `{type:"doc",content:[]}`. The dashboard's `toInstructionsInput` used `(value ?? {blocks:[]}) as unknown as InstructionsInput`, so the double cast silenced the type error that would have caught it at build time.
+- **Detection signal**: tRPC BAD_REQUEST with no server-side log line; the UI showed only a generic "please try again" toast.
+- **Prevention**: When replacing `any` with a concrete type, derive the type from the actual runtime payload (check the producer), don't guess from the column name — `instructions` sounds plural but is a single document. Never bridge a client/server shape mismatch with `as unknown as`; if a cast is needed, narrow with a runtime check first (`value?.type === "doc"`). Declare the shape once in a shared module and let both sides infer from it.
+
+### Silent tRPC failures — no onError handler
+- **Failure mode**: `createExpressMiddleware` was mounted without `onError`, so every failed procedure (validation, auth, unhandled throw) went back to the client and was never written to the logs. A production incident had zero server-side evidence.
+- **Detection signal**: grepping `hay-server-out.log` for the failing procedure name returns nothing at all, while the client clearly receives an error.
+- **Prevention**: Always attach `onError` when mounting a tRPC adapter. Log `path`, `type`, `code` and the error; omit `input`, which can carry customer data.
+
+### Type-guessing a jsonb column duplicated the bug downstream
+- **Failure mode**: The same wrong "instructions is an array" assumption appeared in `orchestrator/run.ts`, which gated both human-handoff branches on `Array.isArray(instructions) && length > 0`. Always false for a Tiptap doc, so agents' configured escalation instructions silently never ran and the default handoff always fired — no error, just missing behaviour.
+- **Detection signal**: A configured feature that never takes effect, with no log line, and a truthiness/shape check sitting between the config and the behaviour.
+- **Prevention**: When you fix a shape mismatch, grep for every consumer of that column before closing. Encode the "is this populated" question as one shared predicate (`hasTiptapContent`) rather than re-deriving it per call site.

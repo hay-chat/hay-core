@@ -1,15 +1,15 @@
 # CONTEXT
 
-**Current Task**: Fixed empty tool schemas in playbook prompts, core-side idempotency_key injection, and playbook action validation — implemented, uncommitted on master.
+**Current Task**: Fixed production agent create/update failure (Klevie) — Tiptap instruction payload rejected by the zod schema. Implemented, uncommitted on master.
 
 **Key Decisions**:
 
-- getCachedToolDescriptors now reads MCP-wire `inputSchema` (with `input_schema` legacy fallback) — root cause of `Input Schema: {}` in playbook messages and the failed refund conversation.
-- Core injects its per-execution UUID as `idempotency_key` only when the tool's cached schema declares that property (schema-gated; overrides LLM-invented keys).
-- playbooks create/update/publish return additive `actionWarnings`; new validateActions query for future dashboard linting.
+- `server/types/tiptap.types.ts` is the single contract for rich-text instruction jsonb columns (`tiptapDocSchema` + `hasTiptapContent`); route, service, entity and dashboard all derive from it instead of redeclaring the shape.
+- Added `onError` to the tRPC express middleware (logger module `trpc`) — failed procedures were never logged, which is why this was undiagnosable from prod.
+- Namespaced `dashboard/i18n/locales/*/agents.json` under an `agents` key; it was flat and collided with `playbooks.json`'s `toast` block.
 
 **Next Steps**:
 
-- Surface actionWarnings in the playbook editor UI.
-- Retest the Karine Ruby refund conversation end-to-end (needs `shopify_calculate_refund` referenced in the playbook).
+- Deploy, then confirm with Klevie that agent creation and custom human-handoff escalation both work.
+- Consider auditing other routes for the same `z.array(z.unknown())`-vs-Tiptap-doc mismatch introduced by 561f3fd.
 - Commit + PR when asked (older uncommitted work also on master, see WIP.md).

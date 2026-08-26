@@ -1,3 +1,17 @@
+## 2026-08-26 — master — agent create/update broken in prod (Klevie), fixed, uncommitted
+
+Prod bug: `agents.create`/`update` rejected every payload. Commit 561f3fd (2026-06-03,
+"eliminate any") retyped the Tiptap instruction fields as `z.array(z.unknown())`, but the
+editor sends a doc object `{type:"doc",content:[]}` — a `as unknown as` cast in
+pages/agents/[id].vue hid the mismatch. New server/types/tiptap.types.ts (tiptapDocSchema
++ hasTiptapContent) is now the single contract; entity/service/route/dashboard follow it.
+Same root cause killed custom human-handoff instructions: orchestrator/run.ts gated both
+branches on Array.isArray → always false, so escalation config never ran. Also: tRPC
+middleware had no onError, so none of this was ever logged (added, module "trpc"); and
+i18n agents.json was unnamespaced so `t("agents.toast.*")` rendered raw keys.
+Typecheck + lint clean, 10 new tests in server/tests/routes/agents.test.ts pass.
+Next: deploy, then confirm with Klevie that agent creation + escalation both work.
+
 ## 2026-08-20 — claude/nuven-shop-integration-suwzch — custom-tools vendor + env default provider, uncommitted
 
 New `custom-tools` OpenAI-compatible vendor profile (toolForcedJson:true, else
