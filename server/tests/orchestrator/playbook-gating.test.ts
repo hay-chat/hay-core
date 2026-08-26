@@ -41,10 +41,7 @@ describe("shouldReselectPlaybook", () => {
 
   it("ignores unrelated metadata already on the conversation", () => {
     expect(
-      shouldReselectPlaybook(
-        conv({ playbook_id: "pb-1", metadata: { somethingElse: true } }),
-        3,
-      ),
+      shouldReselectPlaybook(conv({ playbook_id: "pb-1", metadata: { somethingElse: true } }), 3),
     ).toBe(true);
   });
 });
