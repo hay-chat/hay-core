@@ -62,9 +62,9 @@
               id="language"
               v-model="form.language"
               type="select"
-              :label="$t('language.label')"
+              :label="$t('agents.language.label')"
               :options="languageOptions"
-              :helper-text="$t('language.helperText')"
+              :helper-text="$t('agents.language.helperText')"
             />
             <!-- Tone Field -->
             <div>
@@ -339,21 +339,25 @@ type AgentLanguage = RouterInputs["agents"]["create"]["language"];
 // Organization settings include the default agent id (not present on the store type).
 type OrganizationSettings = RouterOutputs["organizations"]["getSettings"];
 
-// Stored instruction data (jsonb) is opaque; coerce a non-null object into editor JSON content.
-const toInstructionContent = (value: unknown): JSONContent =>
-  value && typeof value === "object" ? (value as JSONContent) : { blocks: [] };
-
 // The create-agent input shape for the non-nullable handoff instruction fields (jsonb columns).
 // Excludes null so the result also satisfies the nullable `instructions` slot.
 type InstructionsInput = NonNullable<
   RouterInputs["agents"]["create"]["humanHandoffAvailableInstructions"]
 >;
 
-// Editor JSON content is persisted verbatim into the jsonb instructions column;
-// the mutation input types the opaque jsonb slot, so reuse it for the boundary.
-// Always returns a non-null object so it assigns to both nullable and non-nullable slots.
+const EMPTY_INSTRUCTIONS: JSONContent = { type: "doc", content: [] };
+
+// Stored instruction data (jsonb) is opaque; coerce a non-null object into editor JSON content.
+const toInstructionContent = (value: unknown): JSONContent =>
+  value && typeof value === "object" ? (value as JSONContent) : EMPTY_INSTRUCTIONS;
+
+// Editor JSON content is persisted verbatim into the jsonb instructions column, which the
+// API types as a Tiptap document (`{ type: "doc", ... }`). Tiptap's own JSONContent types
+// `type` as an optional string, so narrow it here: anything that is not a document envelope
+// (an untouched editor, legacy Editor.js `{ blocks: [] }` data) becomes an empty document
+// rather than a payload the server rejects.
 const toInstructionsInput = (value: JSONContent | null | undefined): InstructionsInput =>
-  (value ?? { blocks: [] }) as unknown as InstructionsInput;
+  (value?.type === "doc" ? value : EMPTY_INSTRUCTIONS) as InstructionsInput;
 
 const router = useRouter();
 const route = useRoute();
@@ -411,7 +415,7 @@ Example: "Great question! Let's get this sorted out right away 🎉 I just need 
 // Language options for the agent language select
 // null = inherit from organization (shown as first option)
 const languageOptions = [
-  { label: "Inherit from Organization", value: "" },
+  { label: t("agents.language.placeholder"), value: "" },
   { label: "English", value: "en" },
   { label: "Português", value: "pt" },
   { label: "Español", value: "es" },
@@ -656,7 +660,12 @@ const handleSubmit = async () => {
     await router.push("/agents");
   } catch (error) {
     console.error("Failed to save agent:", error);
-    toast.error(isEditMode.value ? t("agents.toast.updateFailed") : t("agents.toast.createFailed"));
+    // Surface the server's message as the toast detail -- a bare "please try again" gives
+    // neither the customer nor support anything to act on.
+    toast.error(
+      isEditMode.value ? t("agents.toast.updateFailed") : t("agents.toast.createFailed"),
+      error instanceof Error ? error.message : undefined,
+    );
   } finally {
     isSubmitting.value = false;
   }

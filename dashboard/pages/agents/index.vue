@@ -320,6 +320,7 @@ import { useToast } from "@/composables/useToast";
 import { useOrganizationStore } from "@/stores/organization";
 import type { Organization } from "@/stores/user";
 import { HayApi, Hay } from "@/utils/api";
+import type { RouterOutputs } from "@/types/trpc";
 
 // Organization settings include the default agent reference, which is not part
 // of the base Organization shape stored in the user store.
@@ -338,18 +339,11 @@ interface AgentData {
   lastActivity: Date;
   createdAt: Date;
   enabled: boolean;
-  instructions?: unknown[] | string | null;
 }
 
-interface AgentApiResponse {
-  id: string;
-  name: string;
-  description?: string | null;
-  enabled: boolean;
-  instructions?: unknown[] | string | null;
-  created_at: string;
-  updated_at: string;
-}
+// Derived from the API rather than hand-declared, so a change to the agents router
+// surfaces here as a type error instead of a silent shape mismatch.
+type AgentApiResponse = RouterOutputs["agents"]["list"][number];
 
 definePageMeta({
   // Auth is handled by global middleware
@@ -450,7 +444,6 @@ const refreshData = async () => {
       lastActivity: new Date(agent.updated_at),
       createdAt: new Date(agent.created_at),
       enabled: agent.enabled,
-      instructions: agent.instructions,
     }));
   } catch (error) {
     console.error("Error refreshing data:", error);
