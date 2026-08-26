@@ -1,3 +1,17 @@
+## 2026-08-26 — claude/agent-instructions-contract — PostHog server telemetry + user identify, committed
+
+Server now reports errors to PostHog: server/lib/telemetry.ts (posthog-node)
+wired into the tRPC onError added earlier. Skips UNAUTHORIZED/FORBIDDEN/
+TOO_MANY_REQUESTS as client-driven noise; never sends request input (PII).
+Dashboard identifies users + groups by organization from stores/user.ts via the
+new useTelemetry composable — was fully anonymous before (person_profiles is
+"identified_only", so replays had null person). Everything gates on POSTHOG_KEY:
+unset means no client, no script, no outbound calls; tests pin that.
+Deliberately NOT done: client-side capture_exceptions + enabling error tracking
+in the PostHog project (needs an account-level toggle) — Roger deferred the
+project split, this one is still open. 448 tests pass, typecheck + lint clean.
+Next: deploy branch, verify $exception events land via the b.hay.chat proxy.
+
 ## 2026-08-26 — master — agent create/update broken in prod (Klevie), fixed, uncommitted
 
 Prod bug: `agents.create`/`update` rejected every payload. Commit 561f3fd (2026-06-03,
