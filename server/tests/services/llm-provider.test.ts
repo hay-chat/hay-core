@@ -1,11 +1,12 @@
 import { describe, it, expect, beforeEach, jest } from "@jest/globals";
 import { OPENAI_COMPATIBLE_CAPABILITIES } from "../../services/llm/openai-compatible.provider";
+import { PROVIDER_TIER_DEFAULTS } from "../../services/llm/tier-maps";
 
 /**
  * Slice 1 characterization test — the "provably unchanged" gate.
  *
  * Proves that routing through the new provider adapter + factory builds the EXACT
- * same OpenAI request the old inline LLMService built (default bundle: gpt-4o,
+ * same OpenAI request the old inline LLMService built (default bundle's hard tier,
  * temperature 0.7, max_tokens 2000, identical response_format branches) and that
  * prepareMessages/serializeMessages still produce the same messages. The `openai`
  * SDK is mocked so no network is touched.
@@ -35,6 +36,11 @@ jest.mock("@server/lib/logger", () => ({
 import { LLMService } from "../../services/core/llm.service";
 import { setUsageSink, type UsageEvent } from "../../services/llm/usage-sink";
 
+const DEFAULT_TIERS = PROVIDER_TIER_DEFAULTS["openai-compatible"];
+
+// Deliberately a fixed literal, not the tier default: the usage sink must report the
+// model the API echoed back, so a fixture that matched the requested model would pass
+// even if the code reported the request instead of the response.
 const CHAT_RESPONSE = {
   model: "gpt-4o",
   choices: [{ message: { content: '{"ok":true}' }, finish_reason: "stop" }],
@@ -57,7 +63,7 @@ describe("LLM provider adapter — Slice 1 characterization", () => {
 
     const [body] = mockChatCreate.mock.calls[0] as [Record<string, unknown>];
     expect(body).toEqual({
-      model: "gpt-4o",
+      model: DEFAULT_TIERS.hard,
       messages: [
         { role: "system", content: "system text" },
         { role: "user", content: "hello" },
@@ -85,15 +91,15 @@ describe("LLM provider adapter — Slice 1 characterization", () => {
     await llm.invoke({ history: "hi" });
     const [body] = mockChatCreate.mock.calls[0] as [Record<string, unknown>];
     expect(body.response_format).toBeUndefined();
-    expect(body.model).toBe("gpt-4o");
+    expect(body.model).toBe(DEFAULT_TIERS.hard);
   });
 
-  it("resolves tier → model (default hard=gpt-4o, easy=gpt-4.1-nano) and honors model override", async () => {
+  it("resolves tier → model from the default bundle and honors model override", async () => {
     await llm.invoke({ history: "a" });
-    expect((mockChatCreate.mock.calls[0][0] as { model: string }).model).toBe("gpt-4o");
+    expect((mockChatCreate.mock.calls[0][0] as { model: string }).model).toBe(DEFAULT_TIERS.hard);
 
     await llm.invoke({ history: "b", tier: "easy" });
-    expect((mockChatCreate.mock.calls[1][0] as { model: string }).model).toBe("gpt-4.1-nano");
+    expect((mockChatCreate.mock.calls[1][0] as { model: string }).model).toBe(DEFAULT_TIERS.easy);
 
     await llm.invoke({ history: "c", model: "custom-model-x" });
     expect((mockChatCreate.mock.calls[2][0] as { model: string }).model).toBe("custom-model-x");
