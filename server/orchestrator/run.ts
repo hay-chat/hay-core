@@ -16,6 +16,7 @@ import { userRepository } from "@server/repositories/user.repository";
 import { LLMService } from "@server/services/core/llm.service";
 import { PromptService } from "@server/services/prompt.service";
 import { createLogger } from "@server/lib/logger";
+import { hasTiptapContent } from "@server/types/tiptap.types";
 import type { ExecutionResult } from "./execution.layer";
 import type { ToolLedgerEntry } from "@server/services/core/action-claim-guardrail.service";
 import type { Message } from "@server/database/entities/message.entity";
@@ -1094,11 +1095,7 @@ async function handleExecutionLoop(
         // Humans are available
         const availableInstructions = agent.human_handoff_available_instructions;
 
-        if (
-          availableInstructions &&
-          Array.isArray(availableInstructions) &&
-          availableInstructions.length > 0
-        ) {
+        if (hasTiptapContent(availableInstructions)) {
           // Execute custom instructions for when humans are available
           log.debug("Executing handoff instructions for available humans");
           await conversation.addHandoffInstructions(availableInstructions, "available");
@@ -1189,11 +1186,7 @@ async function handleExecutionLoop(
 
         const unavailableInstructions = agent.human_handoff_unavailable_instructions;
 
-        if (
-          unavailableInstructions &&
-          Array.isArray(unavailableInstructions) &&
-          unavailableInstructions.length > 0
-        ) {
+        if (hasTiptapContent(unavailableInstructions)) {
           // Execute custom instructions for when humans are not available
           log.debug("Executing handoff instructions for unavailable humans");
           await conversation.addHandoffInstructions(unavailableInstructions, "unavailable");
