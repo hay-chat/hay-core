@@ -1,30 +1,16 @@
-## 2026-08-26 — claude/agent-instructions-contract — PostHog server telemetry + user identify, committed
+## 2026-08-26 — claude/agent-instructions-contract
 
-Server now reports errors to PostHog: server/lib/telemetry.ts (posthog-node)
-wired into the tRPC onError added earlier. Skips UNAUTHORIZED/FORBIDDEN/
-TOO_MANY_REQUESTS as client-driven noise; never sends request input (PII).
-Dashboard identifies users + groups by organization from stores/user.ts via the
-new useTelemetry composable — was fully anonymous before (person_profiles is
-"identified_only", so replays had null person). Everything gates on POSTHOG_KEY:
-unset means no client, no script, no outbound calls; tests pin that.
-Deliberately NOT done: client-side capture_exceptions + enabling error tracking
-in the PostHog project (needs an account-level toggle) — Roger deferred the
-project split, this one is still open. 448 tests pass, typecheck + lint clean.
-Next: deploy branch, verify $exception events land via the b.hay.chat proxy.
-
-## 2026-08-26 — master — agent create/update broken in prod (Klevie), fixed, uncommitted
-
-Prod bug: `agents.create`/`update` rejected every payload. Commit 561f3fd (2026-06-03,
-"eliminate any") retyped the Tiptap instruction fields as `z.array(z.unknown())`, but the
-editor sends a doc object `{type:"doc",content:[]}` — a `as unknown as` cast in
-pages/agents/[id].vue hid the mismatch. New server/types/tiptap.types.ts (tiptapDocSchema
-+ hasTiptapContent) is now the single contract; entity/service/route/dashboard follow it.
-Same root cause killed custom human-handoff instructions: orchestrator/run.ts gated both
-branches on Array.isArray → always false, so escalation config never ran. Also: tRPC
-middleware had no onError, so none of this was ever logged (added, module "trpc"); and
-i18n agents.json was unnamespaced so `t("agents.toast.*")` rendered raw keys.
-Typecheck + lint clean, 10 new tests in server/tests/routes/agents.test.ts pass.
-Next: deploy, then confirm with Klevie that agent creation + escalation both work.
+**Works:** Agent create/update fixed — `z.array(z.unknown())` never matched the Tiptap
+doc object the editor sends (broken since 561f3fd, Jun 3); shape now declared once in
+`server/types/tiptap.types.ts`. Same bug killed custom human-handoff instructions
+(`Array.isArray` gate in orchestrator/run.ts) — also fixed. tRPC `onError` added (was
+silently swallowing every failure), plus posthog-node server error reporting and
+user/org identify in the dashboard, all gated on POSTHOG_KEY. i18n `agents.json`
+namespaced so toasts stop rendering raw keys. PR #73, 448 tests green, no migration.
+**Half-built:** Nothing — branch is clean and pushed.
+**Next:** Merge #73 and deploy, then confirm with Klevie that agent creation AND custom
+escalation work. Verify `$exception` reaches PostHog through the b.hay.chat proxy (may
+not forward `/batch`). Still open: client `capture_exceptions` + error tracking toggle.
 
 ## 2026-08-20 — claude/nuven-shop-integration-suwzch — custom-tools vendor + env default provider, uncommitted
 
@@ -200,15 +186,3 @@ orchestrator → 3-layer RabbitMQ, analytics/settings → real features only).
 ~630 claims adversarially verified against hay-core, 34 residual errors fixed.
 Shipped as hay-docs PR #6 (net −2,494 lines). Next step: human skim + merge PR #6;
 docs submodule in hay-core still points at old main (bump after merge).
-
-## 2026-07-14 — master — branch cleanup + PR tracking
-
-Pruned 64 branches → 8 on origin: deleted all merged/squash-merged/superseded
-(incl. HAY-239 Instagram, merged via PR #56; wix worktree removed). Local master
-fast-forwarded 13 commits. Every surviving work branch now has a tracking PR:
-#52 CSAT, #57 Salesforce, #58 Spacebring, #61 forms, #62 email channel,
-#63 metering design doc, #64 telemetry research doc — each with status + next steps.
-All 7 branches rebased onto master (0 behind) + force-pushed; form/email-channel
-conflicts resolved semantically, typecheck clean. Staging auto-sync workflow: PR #65.
-Next step: triage those 7 PRs (merge the two doc-only ones, decide roadmap on the rest).
-Uncommitted on master: CLAUDE.md edit + docs submodule bump (pre-existing, untouched).
