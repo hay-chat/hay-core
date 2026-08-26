@@ -180,8 +180,7 @@ const EMPTY_TIERS: TierMap = { hard: "", medium: "", easy: "" };
 
 /** Tier defaults for a UI choice; "custom" has no presets. */
 function tierDefaultsFor(choice: ProviderChoice): TierMap {
-  if (choice === "custom" || choice === "custom-tools" || !catalog.value)
-    return { ...EMPTY_TIERS };
+  if (choice === "custom" || choice === "custom-tools" || !catalog.value) return { ...EMPTY_TIERS };
   return { ...catalog.value.defaultTiers[choice] };
 }
 
