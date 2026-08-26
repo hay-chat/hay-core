@@ -7,11 +7,15 @@ import { config, validateProductionConfig } from "@server/config/env";
 import { createContext } from "@server/trpc/context";
 import { initializeDatabase } from "@server/database/data-source";
 import { createLogger } from "@server/lib/logger";
+import { initTelemetry, captureException, shutdownTelemetry } from "@server/lib/telemetry";
 import "reflect-metadata";
 import "dotenv/config";
 
 const logger = createLogger("server");
 const trpcLogger = createLogger("trpc");
+
+// Client-driven outcomes that say nothing about the health of the server.
+const EXPECTED_TRPC_ERROR_CODES = new Set(["UNAUTHORIZED", "FORBIDDEN", "TOO_MANY_REQUESTS"]);
 
 async function startServer() {
   // Validate required environment variables in production
@@ -19,6 +23,9 @@ async function startServer() {
 
   // Set server timezone to UTC for consistent timestamp handling
   process.env.TZ = "UTC";
+
+  // No-op unless POSTHOG_KEY is set.
+  initTelemetry();
 
   // Initialize database connection (required - will retry 3 times with 2s delay)
   await initializeDatabase();
@@ -428,11 +435,24 @@ async function startServer() {
       // Without this, every failed procedure (validation, auth, unhandled throw) is
       // returned to the client and never written to the logs, leaving production
       // incidents undiagnosable. Input is omitted -- it can carry customer data.
-      onError({ error, path, type }) {
+      onError({ error, path, type, ctx }) {
         trpcLogger.error(
           { err: error, cause: error.cause, path, type, code: error.code },
           "tRPC procedure failed",
         );
+
+        // Expected outcomes rather than defects -- expired tokens, permission
+        // checks and rate limits are high-volume and would drown real errors.
+        if (EXPECTED_TRPC_ERROR_CODES.has(error.code)) {
+          return;
+        }
+
+        captureException(error.cause ?? error, {
+          userId: ctx?.user?.id,
+          organizationId: ctx?.organizationId,
+          // No `input` -- it can carry customer data.
+          properties: { trpc_path: path, trpc_type: type, trpc_code: error.code },
+        });
       },
     }),
   );
@@ -500,6 +520,7 @@ async function startServer() {
     websocketService.shutdown();
     await rabbitmqService.shutdown();
     await getPluginRunnerService().stopAllWorkers();
+    await shutdownTelemetry();
     process.exit(0);
   });
 
@@ -510,6 +531,7 @@ async function startServer() {
     websocketService.shutdown();
     await rabbitmqService.shutdown();
     await getPluginRunnerService().stopAllWorkers();
+    await shutdownTelemetry();
     process.exit(0);
   });
 }
