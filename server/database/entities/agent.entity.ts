@@ -12,6 +12,7 @@ import {
 import { Organization } from "../../entities/organization.entity";
 import { Upload } from "../../entities/upload.entity";
 import { Playbook } from "./playbook.entity";
+import type { TiptapDoc } from "../../types/tiptap.types";
 
 @Entity("agents")
 export class Agent {
@@ -28,7 +29,7 @@ export class Agent {
   enabled!: boolean;
 
   @Column({ type: "jsonb", nullable: true })
-  instructions!: unknown[] | null;
+  instructions!: TiptapDoc | null;
 
   @Column({ type: "text", nullable: true })
   tone!: string | null;
@@ -43,10 +44,10 @@ export class Agent {
   initialGreeting!: string | null;
 
   @Column({ type: "jsonb", nullable: true })
-  human_handoff_available_instructions!: unknown[] | null;
+  human_handoff_available_instructions!: TiptapDoc | null;
 
   @Column({ type: "jsonb", nullable: true })
-  human_handoff_unavailable_instructions!: unknown[] | null;
+  human_handoff_unavailable_instructions!: TiptapDoc | null;
 
   @Column({ type: "uuid" })
   organization_id!: string;

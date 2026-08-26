@@ -241,6 +241,31 @@ export const useUserStore = defineStore("user", {
         // Default to first organization if no active one is set
         this.activeOrganizationId = this.organizations[0].id;
       }
+
+      // Every sign-in path funnels through here (login, token exchange, session
+      // restore), so this is the one place that keeps telemetry identity in sync.
+      this.syncTelemetryIdentity();
+    },
+
+    /**
+     * Attach the current user and organization to the telemetry session, so an
+     * error or session replay can be traced back to the customer who hit it.
+     * A no-op when PostHog is not configured.
+     */
+    syncTelemetryIdentity() {
+      if (!this.user) {
+        return;
+      }
+
+      const { identify, setOrganization } = useTelemetry();
+      const name = [this.user.firstName, this.user.lastName].filter(Boolean).join(" ");
+
+      identify({ id: this.user.id, email: this.user.email, name: name || null });
+
+      const organization = this.organizations.find((org) => org.id === this.activeOrganizationId);
+      if (organization) {
+        setOrganization({ id: organization.id, name: organization.name });
+      }
     },
 
     updateStatus(status: "available" | "away") {
@@ -257,8 +282,10 @@ export const useUserStore = defineStore("user", {
     },
 
     setActiveOrganization(organizationId: string) {
-      if (this.organizations.find((org) => org.id === organizationId)) {
+      const organization = this.organizations.find((org) => org.id === organizationId);
+      if (organization) {
         this.activeOrganizationId = organizationId;
+        useTelemetry().setOrganization({ id: organization.id, name: organization.name });
       }
     },
 
@@ -275,6 +302,7 @@ export const useUserStore = defineStore("user", {
       // Update the active organization ID
       // This will cause the tRPC client to use the new org ID in the x-organization-id header
       this.activeOrganizationId = organizationId;
+      useTelemetry().setOrganization({ id: targetOrg.id, name: targetOrg.name });
 
       return targetOrg;
     },
@@ -283,6 +311,9 @@ export const useUserStore = defineStore("user", {
       this.user = null;
       this.activeOrganizationId = null;
       this.organizations = [];
+      // Drop the identity so the next user on this browser is not merged into
+      // the person who just logged out.
+      useTelemetry().reset();
     },
   },
   persist: true,

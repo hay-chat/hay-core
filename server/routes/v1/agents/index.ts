@@ -4,36 +4,37 @@ import { AgentService } from "../../../services/agent.service";
 import { TRPCError } from "@trpc/server";
 import { RESOURCES, ACTIONS } from "@server/types/scopes";
 import { SupportedLanguage } from "@server/types/language.types";
+import { tiptapDocSchema } from "@server/types/tiptap.types";
 
 const agentService = new AgentService();
 
-const createAgentSchema = z.object({
+export const createAgentSchema = z.object({
   name: z.string().min(1).max(255),
   description: z.string().optional(),
   enabled: z.boolean().optional().default(true),
-  instructions: z.array(z.unknown()).nullable().optional(),
+  instructions: tiptapDocSchema.nullable().optional(),
   tone: z.string().optional(),
   avoid: z.string().optional(),
   trigger: z.string().optional(),
   initialGreeting: z.string().optional(),
-  humanHandoffAvailableInstructions: z.array(z.unknown()).optional(),
-  humanHandoffUnavailableInstructions: z.array(z.unknown()).optional(),
+  humanHandoffAvailableInstructions: tiptapDocSchema.optional(),
+  humanHandoffUnavailableInstructions: tiptapDocSchema.optional(),
   testMode: z.boolean().nullable().optional(),
   language: z.nativeEnum(SupportedLanguage).nullable().optional(),
   channels: z.array(z.string()).optional(),
 });
 
-const updateAgentSchema = z.object({
+export const updateAgentSchema = z.object({
   name: z.string().min(1).max(255).optional(),
   description: z.string().optional(),
   enabled: z.boolean().optional(),
-  instructions: z.array(z.unknown()).nullable().optional(),
+  instructions: tiptapDocSchema.nullable().optional(),
   tone: z.string().optional(),
   avoid: z.string().optional(),
   trigger: z.string().optional(),
   initialGreeting: z.string().optional(),
-  humanHandoffAvailableInstructions: z.array(z.unknown()).optional(),
-  humanHandoffUnavailableInstructions: z.array(z.unknown()).optional(),
+  humanHandoffAvailableInstructions: tiptapDocSchema.optional(),
+  humanHandoffUnavailableInstructions: tiptapDocSchema.optional(),
   testMode: z.boolean().nullable().optional(),
   language: z.nativeEnum(SupportedLanguage).nullable().optional(),
   channels: z.array(z.string()).optional(),
