@@ -1,4 +1,5 @@
 import { AgentRepository } from "../repositories/agent.repository";
+import type { TiptapDoc } from "@server/types/tiptap.types";
 import { Agent } from "../database/entities/agent.entity";
 
 export class AgentService {
@@ -14,13 +15,13 @@ export class AgentService {
       name: string;
       description?: string;
       enabled?: boolean;
-      instructions?: unknown[] | null;
+      instructions?: TiptapDoc | null;
       tone?: string;
       avoid?: string;
       trigger?: string;
       testMode?: boolean | null;
-      humanHandoffAvailableInstructions?: unknown[];
-      humanHandoffUnavailableInstructions?: unknown[];
+      humanHandoffAvailableInstructions?: TiptapDoc;
+      humanHandoffUnavailableInstructions?: TiptapDoc;
       initialGreeting?: string;
       language?: string | null;
       channels?: string[];
@@ -63,13 +64,13 @@ export class AgentService {
       name?: string;
       description?: string;
       enabled?: boolean;
-      instructions?: unknown[] | null;
+      instructions?: TiptapDoc | null;
       tone?: string;
       avoid?: string;
       trigger?: string;
       testMode?: boolean | null;
-      humanHandoffAvailableInstructions?: unknown[];
-      humanHandoffUnavailableInstructions?: unknown[];
+      humanHandoffAvailableInstructions?: TiptapDoc;
+      humanHandoffUnavailableInstructions?: TiptapDoc;
       initialGreeting?: string;
       language?: string | null;
       channels?: string[];

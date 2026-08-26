@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, jest } from "@jest/globals";
 import type { OrgLlmConfig } from "../../services/llm/provider.types";
+import { PROVIDER_TIER_DEFAULTS } from "../../services/llm/tier-maps";
 
 /**
  * Slice 5 — factory resolves the per-org bundle (DB → env → default), decrypts BYO
@@ -47,14 +48,17 @@ describe("LLMProviderFactory.forOrganization", () => {
   it("returns the default openai-compatible bundle when no orgId is given", async () => {
     const bundle = await llmProviderFactory.forOrganization();
     expect(bundle.chat.id).toBe("openai-compatible");
-    expect(bundle.tiers.hard).toBe("gpt-4o");
+    // The hard-tier default is env-overridable (OPENAI_CHAT_MODEL / LLM_TIER_HARD), so
+    // assert against the resolved provider default rather than a literal that only
+    // holds on machines whose .env happens to match.
+    expect(bundle.tiers).toEqual(PROVIDER_TIER_DEFAULTS["openai-compatible"]);
     expect(findById).not.toHaveBeenCalled();
   });
 
   it("falls back to the default bundle when the org has no llm config", async () => {
     findById.mockResolvedValue({ settings: {} });
     const bundle = await llmProviderFactory.forOrganization("org-nodll");
-    expect(bundle.tiers.hard).toBe("gpt-4o");
+    expect(bundle.tiers).toEqual(PROVIDER_TIER_DEFAULTS["openai-compatible"]);
   });
 
   it("builds a BYO openai-compatible provider, decrypting the key inside the factory", async () => {

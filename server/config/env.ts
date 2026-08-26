@@ -252,6 +252,14 @@ export const config = {
     allowCustomPlugins: process.env.ALLOW_CUSTOM_PLUGINS !== "false",
   },
 
+  // Telemetry is entirely optional: with no key the client is never constructed
+  // and every capture call is a no-op, so local and self-hosted installs run
+  // without PostHog and without network calls.
+  posthog: {
+    key: process.env.POSTHOG_KEY || "",
+    host: process.env.POSTHOG_HOST || "https://eu.i.posthog.com",
+  },
+
   github: {
     appId: process.env.GITHUB_APP_ID || "",
     appPrivateKey: (process.env.GITHUB_APP_PRIVATE_KEY || "").replace(/\\n/g, "\n"),

@@ -148,7 +148,12 @@ describe("AnthropicChatProvider", () => {
 
     const longSystem = "x".repeat(5000);
     await provider.chat(
-      req({ messages: [{ role: "system", content: longSystem }, { role: "user", content: "hi" }] }),
+      req({
+        messages: [
+          { role: "system", content: longSystem },
+          { role: "user", content: "hi" },
+        ],
+      }),
     );
     const [params] = mockCreate.mock.calls[0] as [Record<string, unknown>];
     expect(params.system).toEqual([

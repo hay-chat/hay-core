@@ -15,6 +15,7 @@ import { Message } from "./message.entity";
 import { Customer } from "./customer.entity";
 import { MessageType, MessageStatus } from "./message.entity";
 import { DeliveryState } from "../../types/message-feedback.types";
+import type { TiptapDoc } from "../../types/tiptap.types";
 import { analyzeTiptapInstructions } from "../../utils/tiptap-formatter";
 import { documentRepository } from "../../repositories/document.repository";
 import { createLogger } from "@server/lib/logger";
@@ -618,7 +619,7 @@ The following tools are available for you to use. You MUST return only valid JSO
   }
 
   async addHandoffInstructions(
-    instructions: unknown[],
+    instructions: TiptapDoc,
     handoffType: "available" | "unavailable",
   ): Promise<void> {
     const { conversationRepository } = await import("../../repositories/conversation.repository");
