@@ -11,6 +11,7 @@ import "reflect-metadata";
 import "dotenv/config";
 
 const logger = createLogger("server");
+const trpcLogger = createLogger("trpc");
 
 async function startServer() {
   // Validate required environment variables in production
@@ -424,6 +425,15 @@ async function startServer() {
     createExpressMiddleware({
       router: dynamicRouter,
       createContext,
+      // Without this, every failed procedure (validation, auth, unhandled throw) is
+      // returned to the client and never written to the logs, leaving production
+      // incidents undiagnosable. Input is omitted -- it can carry customer data.
+      onError({ error, path, type }) {
+        trpcLogger.error(
+          { err: error, cause: error.cause, path, type, code: error.code },
+          "tRPC procedure failed",
+        );
+      },
     }),
   );
 
