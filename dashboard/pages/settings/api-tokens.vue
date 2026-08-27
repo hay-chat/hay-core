@@ -7,6 +7,32 @@
       </Button>
     </template>
 
+    <!-- External connect flow (e.g. WordPress plugin "Connect with Hay.chat" button) -->
+    <Card v-if="connectRequest" class="mb-6 border-primary">
+      <CardHeader>
+        <CardTitle>{{
+          $t("apiTokens.connect.title", { platform: connectRequest.platformLabel })
+        }}</CardTitle>
+        <CardDescription>
+          {{
+            $t("apiTokens.connect.description", {
+              site: connectRequest.siteName || connectRequest.siteHost,
+              organization: userStore.activeOrganization?.name ?? "",
+            })
+          }}
+        </CardDescription>
+      </CardHeader>
+      <CardContent class="flex flex-wrap items-center gap-3">
+        <Button @click="completeConnect">
+          <Link2 class="h-4 w-4 mr-2" />
+          {{ $t("apiTokens.connect.confirm", { site: connectRequest.siteHost }) }}
+        </Button>
+        <span class="text-sm text-muted-foreground">
+          {{ $t("apiTokens.connect.switchHint") }}
+        </span>
+      </CardContent>
+    </Card>
+
     <!-- Connection details (for embedding Hay elsewhere, e.g. the Shopify widget) -->
     <Card class="mb-6">
       <CardHeader>
@@ -326,7 +352,7 @@
 </template>
 
 <script setup lang="ts">
-import { Plus, Key, Edit, Trash2, Ban, Copy, AlertTriangle } from "lucide-vue-next";
+import { Plus, Key, Edit, Trash2, Ban, Copy, AlertTriangle, Link2 } from "lucide-vue-next";
 import type { RouterInputs, RouterOutputs } from "@/types/trpc";
 import { Hay } from "@/utils/api";
 import { useUserStore } from "@/stores/user";
@@ -356,6 +382,44 @@ const userStore = useUserStore();
 const serverUrl = computed(() => String(runtimeConfig.public.apiBaseUrl ?? ""));
 const organizationId = computed(() => userStore.activeOrganizationId ?? "");
 const copiedKey = ref<string | null>(null);
+
+// External connect flow: a third-party plugin sends the user here with
+// ?connect=<platform>&return_url=<url>&state=<opaque>&site_name=&site_url=
+// We redirect back to return_url with the organization id + state appended.
+const route = useRoute();
+const CONNECT_PLATFORMS: Record<string, string> = { wordpress: "WordPress" };
+
+const connectRequest = computed(() => {
+  const platform = String(route.query.connect ?? "");
+  const returnUrl = String(route.query.return_url ?? "");
+  const label = CONNECT_PLATFORMS[platform];
+  if (!label || !returnUrl) return null;
+
+  let parsed: URL;
+  try {
+    parsed = new URL(returnUrl);
+  } catch {
+    return null;
+  }
+  if (!["http:", "https:"].includes(parsed.protocol)) return null;
+
+  return {
+    platform,
+    platformLabel: label,
+    returnUrl: parsed,
+    state: String(route.query.state ?? ""),
+    siteName: String(route.query.site_name ?? ""),
+    siteHost: parsed.host,
+  };
+});
+
+const completeConnect = () => {
+  if (!connectRequest.value || !organizationId.value) return;
+  const target = new URL(connectRequest.value.returnUrl.toString());
+  target.searchParams.set("hay_org_id", organizationId.value);
+  if (connectRequest.value.state) target.searchParams.set("state", connectRequest.value.state);
+  window.location.assign(target.toString());
+};
 
 const selectOnClick = (event: MouseEvent) => {
   (event.target as HTMLInputElement | null)?.select?.();

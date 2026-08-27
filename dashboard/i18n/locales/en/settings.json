@@ -286,7 +286,13 @@
     "revokeConfirm": "Are you sure you want to revoke this token? It will stop working immediately.",
     "deleteConfirm": "Are you sure you want to permanently delete this token? This action cannot be undone.",
     "headTitle": "API Tokens - Settings",
-    "headDescription": "Manage API tokens for organization-level access"
+    "headDescription": "Manage API tokens for organization-level access",
+    "connect": {
+      "title": "Connect {platform}",
+      "description": "\"{site}\" wants to connect to the organization {organization}. Confirm to send your Organization ID back to the site.",
+      "confirm": "Connect {site} to this organization",
+      "switchHint": "Wrong organization? Switch it in the sidebar first."
+    }
   },
   "webchat": {
     "title": "Webchat Settings",
