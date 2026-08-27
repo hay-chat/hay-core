@@ -286,7 +286,13 @@
     "revokeConfirm": "Tem certeza de que deseja revogar este token? Ele deixará de funcionar imediatamente.",
     "deleteConfirm": "Tem certeza de que deseja excluir permanentemente este token? Esta ação não pode ser desfeita.",
     "headTitle": "Tokens de API - Configurações",
-    "headDescription": "Gerencie tokens de API para acesso no nível da organização"
+    "headDescription": "Gerencie tokens de API para acesso no nível da organização",
+    "connect": {
+      "title": "Conectar {platform}",
+      "description": "\"{site}\" quer se conectar à organização {organization}. Confirme para enviar seu ID da organização de volta ao site.",
+      "confirm": "Conectar {site} a esta organização",
+      "switchHint": "Organização errada? Troque na barra lateral primeiro."
+    }
   },
   "webchat": {
     "title": "Configurações do Webchat",

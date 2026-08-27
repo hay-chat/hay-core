@@ -165,7 +165,7 @@ export default defineNuxtRouteMiddleware(
       // but immediately redirect if we know there's no token
       if (!authStore.tokens?.accessToken) {
         console.log("[Auth Middleware] No token and not initialized, redirecting to login");
-        return navigateTo("/login");
+        return navigateTo({ path: "/login", query: { redirect: to.fullPath } });
       }
       console.log("[Auth Middleware] Auth not initialized yet but has token, waiting");
       return; // Let AuthProvider handle the loading state
@@ -182,7 +182,7 @@ export default defineNuxtRouteMiddleware(
         return;
       }
 
-      return navigateTo("/login");
+      return navigateTo({ path: "/login", query: { redirect: to.fullPath } });
     }
 
     // Role-based route protection
