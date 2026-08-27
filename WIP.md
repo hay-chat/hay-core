@@ -1,3 +1,14 @@
+## 2026-08-27 — claude/wp-connect (worktree .claude/worktrees/wp-connect) — PR #74 open
+
+**Works:** /settings/api-tokens?connect=wordpress&return_url=&state=&site_name= shows a "Connect
+WordPress" banner; confirm redirects to return_url?hay_org_id=<org>&state=<state>. auth.global.ts
+now passes ?redirect=fullPath to /login so the params survive a logged-out visit. i18n en + pt-BR.
+Lint + vue-tsc clean. Counterpart is the WP plugin "Connect with Hay.chat" button
+(hay-woocommerce-demo/hay-wordpress, commit fa0710d).
+**Half-built:** Not tested in a running dashboard — only lint/typecheck.
+**Next:** run dashboard on this branch, click Connect from http://localhost:8085/wp-admin/admin.php?page=hay-chat
+(set plugin base_url to the local dashboard URL), confirm round-trip, then merge #74.
+
 ## 2026-08-26 — claude/agent-instructions-contract
 
 **Works:** Agent create/update fixed — `z.array(z.unknown())` never matched the Tiptap
