@@ -1,0 +1,28 @@
+{
+  "name": "hay-plugin-spacebring",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Connect your Spacebring co-working space so the assistant can answer member FAQs and manage room bookings, events, visitors and support tickets",
+  "author": "Hay",
+  "main": "dist/index.js",
+  "hay-plugin": {
+    "entry": "./dist/index.js",
+    "displayName": "Spacebring",
+    "category": "integration",
+    "capabilities": [
+      "mcp",
+      "auth"
+    ]
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch"
+  },
+  "dependencies": {
+    "@hay/plugin-sdk": "file:../../../packages/plugin-sdk"
+  },
+  "devDependencies": {
+    "typescript": "^5.3.3",
+    "@types/node": "^20.10.0"
+  }
+}
