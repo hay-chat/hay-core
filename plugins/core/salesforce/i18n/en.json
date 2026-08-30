@@ -1,0 +1,48 @@
+{
+  "name": "Salesforce",
+  "description": "Read and update Salesforce Contacts, Cases and any other sObject to keep CRM data in sync with automated conversations.",
+  "tools": {
+    "soql_query": {
+      "label": "Run SOQL Query",
+      "description": "Search Salesforce for Contacts, Cases or any records using a SOQL query."
+    },
+    "query_more": {
+      "label": "Get More Results",
+      "description": "Fetch the next page of a large query result."
+    },
+    "list_sobjects": {
+      "label": "List Objects",
+      "description": "List the objects available in the Salesforce org, such as Contact and Case."
+    },
+    "describe_sobject": {
+      "label": "Describe Object",
+      "description": "Show an object's fields, types and required values before reading or writing it."
+    },
+    "get_record": {
+      "label": "Get Record",
+      "description": "Get a single Salesforce record by object type and id."
+    },
+    "create_record": {
+      "label": "Create Record",
+      "description": "Create a new Salesforce record such as a Contact or Case."
+    },
+    "update_record": {
+      "label": "Update Record",
+      "description": "Update fields on an existing Salesforce record."
+    }
+  },
+  "config": {
+    "instanceUrl": {
+      "label": "Instance URL",
+      "description": "Your Salesforce My Domain URL, e.g. https://your-domain.my.salesforce.com (Setup → My Domain)."
+    },
+    "clientId": {
+      "label": "Consumer Key",
+      "description": "The Connected App's Consumer Key (OAuth client_id) with the Client Credentials Flow enabled."
+    },
+    "clientSecret": {
+      "label": "Consumer Secret",
+      "description": "The Connected App's Consumer Secret (OAuth client_secret). Stored encrypted."
+    }
+  }
+}
