@@ -1,3 +1,14 @@
+## 2026-08-31 — claude/error-tracking-noise — PostHog error noise fix
+
+**Works:** Root cause of 321 "No procedure found: widget.css" errors: vite inline-css
+plugin deletes widget.css from webchat build, but embed snippets still `<link>` it →
+404 → tRPC. Fixed: empty-css compat route in `server/main.ts`, `<link>` removed from
+snippets (webchat.vue, web-embed.vue, webchat-test.html, consent spec, hay-website
+njk×2). Also: NOT_FOUND/BAD_REQUEST now expected tRPC codes (no PostHog capture);
+oauth store-domain error → TRPCError BAD_REQUEST. 3 PostHog issues resolved.
+**Half-built:** hay-website `<link>` removals committed separately in that repo.
+**Next:** Merge + deploy; widget.css issue may reopen in PostHog until deploy lands.
+
 ## 2026-08-27 — claude/wp-connect (worktree .claude/worktrees/wp-connect) — PR #74 open
 
 **Works:** /settings/api-tokens?connect=wordpress&return_url=&state=&site_name= shows a "Connect
@@ -40,18 +51,19 @@ Next: trial deepseek-3.2 on one org, measure tool-call validity + handoff rate.
 ## 2026-08-19 — claude/nuven-shop-integration-suwzch — LLM cost reduction, uncommitted
 
 Cost/resolution $0.393 → $0.222 (43%) at calculator defaults; ~66% with caching hits.
-1) DEFAULT_TIER_MAP openai.hard gpt-4o → gpt-4.1 (cheaper + better; env-overridable
+
+1. DEFAULT_TIER_MAP openai.hard gpt-4o → gpt-4.1 (cheaper + better; env-overridable
    via LLM_TIER_HARD). medium deliberately left on gpt-4o-mini (4.1-mini ~2.6x input).
-2) Tier routing: 4 guardrails + handoff summary + closure validation + greeting
+2. Tier routing: 4 guardrails + handoff summary + closure validation + greeting
    translation + fallback composition → medium; title, inactivity, closure msg,
    closing msg, handoff msg → easy. Planner stays hard.
-3) Anthropic had zero caching — added 3 cache_control breakpoints (tools, system,
+3. Anthropic had zero caching — added 3 cache_control breakpoints (tools, system,
    transcript tail) in anthropic.provider.ts, each gated at 4096 chars. OpenAI/Gemini
    cache prefixes automatically and prompt assembly was already stable-first.
-4) UsageRecord.cachedPromptTokens across all 3 providers + hit-rate in the LLM debug log.
-Full server suite 505 pass. HELD BACK: perception + playbook selection hard→medium —
-biggest remaining win but needs an eval first (mis-routing is user-visible).
-Next: read real cache hit rates from logs, then build that eval.
+4. UsageRecord.cachedPromptTokens across all 3 providers + hit-rate in the LLM debug log.
+   Full server suite 505 pass. HELD BACK: perception + playbook selection hard→medium —
+   biggest remaining win but needs an eval first (mis-routing is user-visible).
+   Next: read real cache hit rates from logs, then build that eval.
 
 ## 2026-08-19 — claude/nuven-shop-integration-suwzch — AI cost/margin calculator (artifact, no code changes)
 

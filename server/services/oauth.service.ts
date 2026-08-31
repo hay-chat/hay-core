@@ -13,6 +13,7 @@ import type {
 import type { HayPluginManifest } from "../types/plugin.types";
 import type { AuthMethodDescriptor, ConfigFieldDescriptor } from "../types/plugin-sdk.types";
 import { createLogger } from "@server/lib/logger";
+import { TRPCError } from "@trpc/server";
 
 const logger = createLogger("oauth");
 
@@ -42,7 +43,11 @@ function substituteShopPlaceholder(url: string, shopDomain: unknown): string {
     .replace(/^https?:\/\//i, "")
     .replace(/\/+$/, "");
   if (!shop) {
-    throw new Error("This connection requires a store domain to be saved before connecting.");
+    // BAD_REQUEST: missing user config, not a server defect (keeps it out of error tracking).
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message: "This connection requires a store domain to be saved before connecting.",
+    });
   }
   return url.replace(/\{shop\}/g, shop);
 }

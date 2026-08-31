@@ -15,7 +15,15 @@ const logger = createLogger("server");
 const trpcLogger = createLogger("trpc");
 
 // Client-driven outcomes that say nothing about the health of the server.
-const EXPECTED_TRPC_ERROR_CODES = new Set(["UNAUTHORIZED", "FORBIDDEN", "TOO_MANY_REQUESTS"]);
+// NOT_FOUND covers bots/scanners probing nonexistent procedure paths (e.g. "/v1/.env"),
+// BAD_REQUEST covers input validation and precondition failures.
+const EXPECTED_TRPC_ERROR_CODES = new Set([
+  "UNAUTHORIZED",
+  "FORBIDDEN",
+  "TOO_MANY_REQUESTS",
+  "NOT_FOUND",
+  "BAD_REQUEST",
+]);
 
 async function startServer() {
   // Validate required environment variables in production
