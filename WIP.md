@@ -1,13 +1,13 @@
-## 2026-08-31 — claude/error-tracking-noise — PostHog error noise fix
+## 2026-08-31 — claude/error-tracking-noise — PR #77 open (+ hay-website PR #28)
 
 **Works:** Root cause of 321 "No procedure found: widget.css" errors: vite inline-css
 plugin deletes widget.css from webchat build, but embed snippets still `<link>` it →
 404 → tRPC. Fixed: empty-css compat route in `server/main.ts`, `<link>` removed from
-snippets (webchat.vue, web-embed.vue, webchat-test.html, consent spec, hay-website
-njk×2). Also: NOT_FOUND/BAD_REQUEST now expected tRPC codes (no PostHog capture);
-oauth store-domain error → TRPCError BAD_REQUEST. 3 PostHog issues resolved.
-**Half-built:** hay-website `<link>` removals committed separately in that repo.
-**Next:** Merge + deploy; widget.css issue may reopen in PostHog until deploy lands.
+snippets (webchat.vue, web-embed.vue, webchat-test.html, consent spec) + hay-website
+njk×2 (PR #28). NOT_FOUND/BAD_REQUEST now expected tRPC codes (no PostHog capture);
+oauth store-domain error → TRPCError BAD_REQUEST. 3 PostHog issues marked resolved.
+Both typechecks + telemetry tests green; consent Playwright spec not run (needs server).
+**Next:** Merge #77 + website #28, deploy; widget.css issue may reopen until deploy.
 
 ## 2026-08-27 — claude/wp-connect (worktree .claude/worktrees/wp-connect) — PR #74 open
 
@@ -190,22 +190,3 @@ commits to origin/master ~15s after each commit (actor rgrjnr, from the
 worktree, HEAD:master) — bypasses PR flow entirely; not a git hook/cron.
 Next: find the auto-pusher; smoke-test telemetry with a real phc key.
 
-## 2026-07-14 — master — org deletion FK fix (uncommitted)
-
-Org delete failed: documents FK lacked ON DELETE CASCADE (route comment promised
-cascades never added). Fixed 6 entities (documents/api_keys/jobs/plugin_instances/
-privacy_requests → CASCADE; users.organization_id → SET NULL) + hand-written
-migration 1784050841643-FixOrganizationFkCascades (drops FKs by lookup — api_keys
-had 2 dupes). Migration run locally, cascade verified via psql, typecheck passes.
-NOTE: local DB has drifted heavily from entities (migration:generate diff is huge,
-wants to drop pgvector cols) — needs a separate reconciliation pass someday.
-Next: commit + PR.
-
-## 2026-07-14 — hay-docs claude/major-rewrites — docs pipeline cleaned + rewrites shipped
-
-Closed stale hay-docs audit PRs #1/#2/#4 (superseded by merged #5). Then ultracode
-workflow rewrote all 9 MAJOR_REWRITE docs (5 plugin docs → real defineHayPlugin SDK,
-orchestrator → 3-layer RabbitMQ, analytics/settings → real features only).
-~630 claims adversarially verified against hay-core, 34 residual errors fixed.
-Shipped as hay-docs PR #6 (net −2,494 lines). Next step: human skim + merge PR #6;
-docs submodule in hay-core still points at old main (bump after merge).
