@@ -15,7 +15,15 @@ const logger = createLogger("server");
 const trpcLogger = createLogger("trpc");
 
 // Client-driven outcomes that say nothing about the health of the server.
-const EXPECTED_TRPC_ERROR_CODES = new Set(["UNAUTHORIZED", "FORBIDDEN", "TOO_MANY_REQUESTS"]);
+// NOT_FOUND covers bots/scanners probing nonexistent procedure paths (e.g. "/v1/.env"),
+// BAD_REQUEST covers input validation and precondition failures.
+const EXPECTED_TRPC_ERROR_CODES = new Set([
+  "UNAUTHORIZED",
+  "FORBIDDEN",
+  "TOO_MANY_REQUESTS",
+  "NOT_FOUND",
+  "BAD_REQUEST",
+]);
 
 async function startServer() {
   // Validate required environment variables in production
@@ -181,6 +189,18 @@ async function startServer() {
   }
   const webchatDir = path.join(projectRoot, "webchat", "dist");
   logger.debug({ webchatDir }, "Serving webchat files");
+  // The widget CSS is inlined into widget.js at build time, but embed snippets in the
+  // wild still <link> to widget.css. Serve an empty stylesheet so those requests don't
+  // fall through to the tRPC router as NOT_FOUND errors.
+  server.get("/v1/webchat/widget.css", (_req, res) => {
+    res
+      .set({
+        "Content-Type": "text/css",
+        "Cache-Control": "public, max-age=604800",
+        "Access-Control-Allow-Origin": "*",
+      })
+      .send("/* Widget styles are bundled into widget.js */\n");
+  });
   server.use(
     "/v1/webchat",
     express.static(webchatDir, {
