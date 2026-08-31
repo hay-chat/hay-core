@@ -181,6 +181,18 @@ async function startServer() {
   }
   const webchatDir = path.join(projectRoot, "webchat", "dist");
   logger.debug({ webchatDir }, "Serving webchat files");
+  // The widget CSS is inlined into widget.js at build time, but embed snippets in the
+  // wild still <link> to widget.css. Serve an empty stylesheet so those requests don't
+  // fall through to the tRPC router as NOT_FOUND errors.
+  server.get("/v1/webchat/widget.css", (_req, res) => {
+    res
+      .set({
+        "Content-Type": "text/css",
+        "Cache-Control": "public, max-age=604800",
+        "Access-Control-Allow-Origin": "*",
+      })
+      .send("/* Widget styles are bundled into widget.js */\n");
+  });
   server.use(
     "/v1/webchat",
     express.static(webchatDir, {

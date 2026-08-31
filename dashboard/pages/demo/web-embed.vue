@@ -302,11 +302,7 @@ const implementationExample = `<!-- Hay Webchat Widget -->
 <${"script"}
   src="https://api.your-domain.com/v1/webchat/widget.js"
   async>
-</${"script"}>
-<link
-  rel="stylesheet"
-  href="https://api.your-domain.com/v1/webchat/widget.css"
-/>`;
+</${"script"}>`;
 
 // Initialize the widget on this page
 onMounted(() => {
@@ -333,12 +329,6 @@ onMounted(() => {
   script.src = `${apiBaseUrl}/v1/webchat/widget.js?v=${Date.now()}`;
   script.async = true;
   document.body.appendChild(script);
-
-  // Load the widget styles
-  const link = document.createElement("link");
-  link.rel = "stylesheet";
-  link.href = `${apiBaseUrl}/v1/webchat/widget.css`;
-  document.head.appendChild(link);
 
   // Start polling for session changes
   startPolling();

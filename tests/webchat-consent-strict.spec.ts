@@ -38,10 +38,6 @@ test.describe("Webchat ePrivacy consent strict", () => {
       `,
     });
 
-    await page.addStyleTag({
-      url: "http://localhost:3001/v1/webchat/widget.css",
-    });
-
     await page.addScriptTag({
       url: "http://localhost:3001/v1/webchat/widget.js",
     });
