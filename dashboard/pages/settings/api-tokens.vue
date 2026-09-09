@@ -377,9 +377,9 @@ const copied = ref(false);
 const tokenInput = ref<HTMLInputElement | null>(null);
 
 // Connection details (server URL + organization id) for embedding Hay elsewhere.
-const runtimeConfig = useRuntimeConfig();
 const userStore = useUserStore();
-const serverUrl = computed(() => String(runtimeConfig.public.apiBaseUrl ?? ""));
+const { getApiUrl } = useDomain();
+const serverUrl = computed(() => getApiUrl());
 const organizationId = computed(() => userStore.activeOrganizationId ?? "");
 const copiedKey = ref<string | null>(null);
 
