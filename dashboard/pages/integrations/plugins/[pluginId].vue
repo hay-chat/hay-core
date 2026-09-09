@@ -1366,7 +1366,7 @@ const handleOAuthCallback = () => {
 // Prefill the given (non-secret) config fields, save — which also enables the
 // plugin — and start the OAuth flow, so the merchant never types identifiers.
 const handleConnectIntent = async (): Promise<boolean> => {
-  if (route.query.connect !== "1" || !oauthAvailable.value) return false;
+  if (route.query.connect !== "1") return false;
 
   const configuration: Record<string, string> = {};
   for (const [key, value] of Object.entries(route.query)) {
@@ -1379,7 +1379,13 @@ const handleConnectIntent = async (): Promise<boolean> => {
   }
 
   try {
+    // Creates + enables the instance when the plugin was never installed.
     await Hay.plugins.configure.mutate({ pluginId: pluginId.value, configuration });
+    // OAuth availability is only reported once an instance exists.
+    if (!oauthAvailable.value) await fetchPlugin();
+    if (!oauthAvailable.value) {
+      throw new Error("This integration does not support one-click connect");
+    }
     const { authorizationUrl } = await Hay.plugins.oauth.initiate.mutate({
       pluginId: pluginId.value,
     });
