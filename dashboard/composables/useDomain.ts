@@ -67,7 +67,10 @@ export const useDomain = () => {
    * Get API URL with proper organization context
    */
   const getApiUrl = (endpoint: string = "", organization?: string): string => {
-    let apiUrl = config.public.apiBaseUrl;
+    // apiBaseUrl is resolved from API_DOMAIN at BUILD time; a Docker build has no
+    // .env, so in production it comes out empty. The API is served from the same
+    // origin as the dashboard there, so fall back to the page origin.
+    let apiUrl = config.public.apiBaseUrl || (process.client ? window.location.origin : "");
 
     // If organization is provided and we're in development, use organization subdomain
     if (organization && process.env["NODE_ENV"] === "development") {
