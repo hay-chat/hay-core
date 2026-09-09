@@ -21,6 +21,8 @@ export interface OAuthState {
   nonce: string;
   codeVerifier?: string; // For PKCE
   createdAt: number; // Unix timestamp
+  /** Allowlisted external URL to send the user to after a successful callback. */
+  returnTo?: string;
 }
 
 export interface OAuthManifestConfig {

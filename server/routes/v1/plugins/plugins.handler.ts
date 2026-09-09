@@ -1408,13 +1408,30 @@ export const initiateOAuth = authenticatedProcedure
   .input(
     z.object({
       pluginId: z.string(),
+      // External page to land on after the callback (e.g. the Shopify admin app
+      // page that started the connect). Origin must be allowlisted, deny by default.
+      returnTo: z.string().url().max(2048).optional(),
     }),
   )
   .mutation(async ({ ctx, input }) => {
+    if (input.returnTo) {
+      const allowed = (process.env.CONNECT_ALLOWED_REDIRECT_ORIGINS || "")
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean);
+      if (!allowed.includes(new URL(input.returnTo).origin)) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "returnTo origin is not allowlisted for connect handshakes",
+        });
+      }
+    }
+
     const { authorizationUrl, state } = await oauthService.initiateOAuth(
       input.pluginId,
       ctx.organizationId!,
       ctx.user!.id,
+      input.returnTo,
     );
 
     return {
