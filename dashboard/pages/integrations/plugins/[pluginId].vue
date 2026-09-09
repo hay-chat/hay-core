@@ -1361,14 +1361,53 @@ const handleOAuthCallback = () => {
   }
 };
 
+// External connect handoff, e.g. the Shopify App Store app deep-links here as
+// /integrations/plugins/<id>?connect=1&config.shopDomain=<shop>
+// Prefill the given (non-secret) config fields, save — which also enables the
+// plugin — and start the OAuth flow, so the merchant never types identifiers.
+const handleConnectIntent = async (): Promise<boolean> => {
+  if (route.query.connect !== "1" || !oauthAvailable.value) return false;
+
+  const configuration: Record<string, string> = {};
+  for (const [key, value] of Object.entries(route.query)) {
+    if (!key.startsWith("config.") || typeof value !== "string" || !value) continue;
+    const field = key.slice("config.".length);
+    const schema = configSchema.value[field];
+    // Only plain, declared fields can be set from a link (never secrets).
+    if (!schema || schema.encrypted) continue;
+    configuration[field] = value;
+  }
+
+  try {
+    await Hay.plugins.configure.mutate({ pluginId: pluginId.value, configuration });
+    const { authorizationUrl } = await Hay.plugins.oauth.initiate.mutate({
+      pluginId: pluginId.value,
+    });
+    window.location.href = authorizationUrl;
+    return true;
+  } catch (err: any) {
+    console.error("Failed to auto-connect plugin:", err);
+    toast.error(
+      err?.message ||
+        err?.data?.message ||
+        t("pluginSettings.toast.oauthConnectFailed", {
+          name: plugin.value?.name ?? pluginId.value,
+        }),
+    );
+    router.replace({ path: route.path, query: {} });
+    return false;
+  }
+};
+
 // Lifecycle
-onMounted(() => {
+onMounted(async () => {
   // Check for OAuth callback first
   handleOAuthCallback();
 
   // Then fetch plugin normally
   if (!route.query.oauth) {
-    fetchPlugin();
+    await fetchPlugin();
+    if (await handleConnectIntent()) return;
   }
 });
 
