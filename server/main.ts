@@ -310,10 +310,13 @@ async function startServer() {
       );
 
       if (result.success) {
-        // Redirect to dashboard plugin settings page with success message
+        // Back to the external page that started the connect (origin was
+        // allowlisted at initiate time), else the dashboard plugin settings page.
         const dashboardUrl = getDashboardUrl();
         const encodedPluginId = encodeURIComponent(result.pluginId!);
-        const redirectUrl = `${dashboardUrl}/integrations/plugins/${encodedPluginId}?oauth=success`;
+        const redirectUrl =
+          result.returnTo ??
+          `${dashboardUrl}/integrations/plugins/${encodedPluginId}?oauth=success`;
         logger.info({ pluginId: result.pluginId }, "OAuth callback successful");
         return res.redirect(redirectUrl);
       } else {

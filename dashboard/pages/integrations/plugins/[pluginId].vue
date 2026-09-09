@@ -1362,7 +1362,7 @@ const handleOAuthCallback = () => {
 };
 
 // External connect handoff, e.g. the Shopify App Store app deep-links here as
-// /integrations/plugins/<id>?connect=1&config.shopDomain=<shop>
+// /integrations/plugins/<id>?connect=1&config.shopDomain=<shop>[&return_to=<allowlisted url>]
 // Prefill the given (non-secret) config fields, save — which also enables the
 // plugin — and start the OAuth flow, so the merchant never types identifiers.
 const handleConnectIntent = async (): Promise<boolean> => {
@@ -1387,8 +1387,10 @@ const handleConnectIntent = async (): Promise<boolean> => {
     if (!oauthAvailable.value) {
       throw new Error("This integration does not support one-click connect");
     }
+    const returnTo = typeof route.query.return_to === "string" ? route.query.return_to : undefined;
     const { authorizationUrl } = await Hay.plugins.oauth.initiate.mutate({
       pluginId: pluginId.value,
+      returnTo,
     });
     window.location.href = authorizationUrl;
     return true;

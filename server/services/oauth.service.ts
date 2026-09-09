@@ -136,6 +136,7 @@ export class OAuthService {
     pluginId: string,
     organizationId: string,
     userId: string,
+    returnTo?: string,
   ): Promise<{ authorizationUrl: string; state: string }> {
     logger.info({ pluginId, organizationId, userId }, "OAuth initiate started");
 
@@ -250,6 +251,7 @@ export class OAuthService {
       nonce,
       codeVerifier,
       createdAt: Date.now(),
+      returnTo,
     });
     logger.debug("OAuth state stored in Redis");
 
@@ -334,7 +336,13 @@ export class OAuthService {
     code: string,
     state: string,
     error?: string,
-  ): Promise<{ success: boolean; pluginId?: string; organizationId?: string; error?: string }> {
+  ): Promise<{
+    success: boolean;
+    pluginId?: string;
+    organizationId?: string;
+    error?: string;
+    returnTo?: string;
+  }> {
     logger.info(
       { codeProvided: !!code, stateProvided: !!state, hasError: !!error },
       "OAuth callback received",
@@ -525,7 +533,7 @@ export class OAuthService {
       logger.debug({ organizationId }, `OAuth callback successful for plugin ${pluginId}`);
 
       logger.info({ pluginId, organizationId }, "OAuth callback completed successfully");
-      return { success: true, pluginId, organizationId };
+      return { success: true, pluginId, organizationId, returnTo: oauthState.returnTo };
     } catch (error) {
       logger.error(
         {
