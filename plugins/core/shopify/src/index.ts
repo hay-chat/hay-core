@@ -349,234 +349,349 @@ async function bulkSync(
   logger.info("Shopify bulk sync complete", { total });
 }
 
-export default defineHayPlugin((globalCtx) => ({
-  name: "Shopify",
+// ============================================================================
+// App-data metafields — bridge to the hay.chat Shopify App Store app
+// ============================================================================
+//
+// Managed mode only. The App Store app (hay-chat/hay-shopify-app) and this
+// plugin share one Shopify app, so metafields written on the app installation
+// are readable by the embedded app home (onboarding status) and by the theme
+// app embed (`app.metafields.hay.*`), which renders the widget only when an
+// organization id is present. Nothing here is visible to merchants or other apps.
 
-  onInitialize(ctx) {
-    globalCtx.logger.info("Initializing Shopify plugin");
+const APP_METAFIELD_NAMESPACE = "hay";
 
-    ctx.register.config({
-      authMode: {
-        type: "string",
-        label: "Connection mode",
-        description:
-          "Managed: connect in one click via hay.chat's Shopify app. " +
-          "Self-hosted: use your own Shopify app's Client ID and secret.",
-        options: [
-          { label: "Managed (recommended)", value: "oauth" },
-          { label: "Self-hosted (own app)", value: "self_hosted" },
+async function getAppInstallationId(
+  shop: string,
+  accessToken: string,
+  apiVersion: string,
+): Promise<string> {
+  const data = await shopifyGraphql<{ currentAppInstallation: { id: string } }>(
+    shop,
+    accessToken,
+    apiVersion,
+    `query { currentAppInstallation { id } }`,
+  );
+  return data.currentAppInstallation.id;
+}
+
+async function writeAppMetafields(
+  shop: string,
+  accessToken: string,
+  apiVersion: string,
+  values: Record<string, string>,
+): Promise<void> {
+  const ownerId = await getAppInstallationId(shop, accessToken, apiVersion);
+  const metafields = Object.entries(values).map(([key, value]) => ({
+    ownerId,
+    namespace: APP_METAFIELD_NAMESPACE,
+    key,
+    type: "single_line_text_field",
+    value,
+  }));
+  const data = await shopifyGraphql<{
+    metafieldsSet: { userErrors: Array<{ field?: string[]; message: string }> };
+  }>(
+    shop,
+    accessToken,
+    apiVersion,
+    `mutation SetHayMetafields($metafields: [MetafieldsSetInput!]!) {
+      metafieldsSet(metafields: $metafields) { userErrors { field message } }
+    }`,
+    { metafields },
+  );
+  const errors = data.metafieldsSet.userErrors;
+  if (errors.length) {
+    throw new Error(`metafieldsSet: ${errors.map((e) => e.message).join("; ")}`);
+  }
+}
+
+async function deleteAppMetafields(
+  shop: string,
+  accessToken: string,
+  apiVersion: string,
+  keys: string[],
+): Promise<void> {
+  const ownerId = await getAppInstallationId(shop, accessToken, apiVersion);
+  const data = await shopifyGraphql<{
+    metafieldsDelete: { userErrors: Array<{ field?: string[]; message: string }> };
+  }>(
+    shop,
+    accessToken,
+    apiVersion,
+    `mutation DeleteHayMetafields($metafields: [MetafieldIdentifierInput!]!) {
+      metafieldsDelete(metafields: $metafields) { userErrors { field message } }
+    }`,
+    { metafields: keys.map((key) => ({ ownerId, namespace: APP_METAFIELD_NAMESPACE, key })) },
+  );
+  const errors = data.metafieldsDelete.userErrors;
+  if (errors.length) {
+    throw new Error(`metafieldsDelete: ${errors.map((e) => e.message).join("; ")}`);
+  }
+}
+
+/** Keys this plugin owns on the app installation. */
+const HAY_METAFIELD_KEYS = ["mode", "organization_id", "server_url"];
+
+export default defineHayPlugin((globalCtx) => {
+  // Managed-mode session captured in onStart so onDisable (which has no config
+  // access) can clear the app metafields.
+  let managedSession: { shop: string; accessToken: string; apiVersion: string } | null = null;
+
+  return {
+    name: "Shopify",
+
+    onInitialize(ctx) {
+      globalCtx.logger.info("Initializing Shopify plugin");
+
+      ctx.register.config({
+        authMode: {
+          type: "string",
+          label: "Connection mode",
+          description:
+            "Managed: connect in one click via hay.chat's Shopify app. " +
+            "Self-hosted: use your own Shopify app's Client ID and secret.",
+          options: [
+            { label: "Managed (recommended)", value: "oauth" },
+            { label: "Self-hosted (own app)", value: "self_hosted" },
+          ],
+          default: "oauth",
+          required: true,
+        },
+        shopDomain: {
+          type: "string",
+          label: "Store domain",
+          description: "Your myshopify.com domain, e.g. mystore.myshopify.com (without https://).",
+          placeholder: "mystore.myshopify.com",
+          required: true,
+        },
+        clientId: {
+          type: "string",
+          label: "Client ID",
+          description:
+            "Self-hosted mode only. Your Shopify app's Client ID. " +
+            "Managed mode resolves this from server configuration.",
+          required: false,
+          env: "SHOPIFY_OAUTH_CLIENT_ID",
+          showWhen: { field: "authMode", equals: "self_hosted" },
+        },
+        clientSecret: {
+          type: "string",
+          label: "Client secret",
+          description: "Self-hosted mode only. Your Shopify app's Client secret.",
+          required: false,
+          encrypted: true,
+          env: "SHOPIFY_OAUTH_CLIENT_SECRET",
+          showWhen: { field: "authMode", equals: "self_hosted" },
+        },
+        apiVersion: {
+          type: "string",
+          label: "Admin API version",
+          description: "Shopify Admin API version to use.",
+          default: "2026-04",
+        },
+      });
+
+      // Managed: one-click OAuth. Hay Core substitutes {shop} from shopDomain and
+      // resolves client id/secret from the SHOPIFY_OAUTH_CLIENT_* server env vars.
+      ctx.register.auth.oauth2({
+        id: "shopify-oauth",
+        label: "Connect with Shopify",
+        authorizationUrl: "https://{shop}/admin/oauth/authorize",
+        tokenUrl: "https://{shop}/admin/oauth/access_token",
+        scopes: [
+          "read_orders",
+          "write_orders",
+          "read_customers",
+          "write_customers",
+          "read_products",
+          "read_inventory",
+          "read_fulfillments",
+          // Returns tools (mcp/tools/returns.js). Added after initial release: stores
+          // connected before this change must reconnect to grant the new scopes.
+          "read_returns",
+          "write_returns",
         ],
-        default: "oauth",
-        required: true,
-      },
-      shopDomain: {
-        type: "string",
-        label: "Store domain",
-        description: "Your myshopify.com domain, e.g. mystore.myshopify.com (without https://).",
-        placeholder: "mystore.myshopify.com",
-        required: true,
-      },
-      clientId: {
-        type: "string",
-        label: "Client ID",
-        description:
-          "Self-hosted mode only. Your Shopify app's Client ID. " +
-          "Managed mode resolves this from server configuration.",
-        required: false,
-        env: "SHOPIFY_OAUTH_CLIENT_ID",
-        showWhen: { field: "authMode", equals: "self_hosted" },
-      },
-      clientSecret: {
-        type: "string",
-        label: "Client secret",
-        description: "Self-hosted mode only. Your Shopify app's Client secret.",
-        required: false,
-        encrypted: true,
-        env: "SHOPIFY_OAUTH_CLIENT_SECRET",
-        showWhen: { field: "authMode", equals: "self_hosted" },
-      },
-      apiVersion: {
-        type: "string",
-        label: "Admin API version",
-        description: "Shopify Admin API version to use.",
-        default: "2026-04",
-      },
-    });
+        clientId: ctx.config.field("clientId"),
+        clientSecret: ctx.config.field("clientSecret"),
+      });
 
-    // Managed: one-click OAuth. Hay Core substitutes {shop} from shopDomain and
-    // resolves client id/secret from the SHOPIFY_OAUTH_CLIENT_* server env vars.
-    ctx.register.auth.oauth2({
-      id: "shopify-oauth",
-      label: "Connect with Shopify",
-      authorizationUrl: "https://{shop}/admin/oauth/authorize",
-      tokenUrl: "https://{shop}/admin/oauth/access_token",
-      scopes: [
-        "read_orders",
-        "write_orders",
-        "read_customers",
-        "write_customers",
-        "read_products",
-        "read_inventory",
-        "read_fulfillments",
-        // Returns tools (mcp/tools/returns.js). Added after initial release: stores
-        // connected before this change must reconnect to grant the new scopes.
-        "read_returns",
-        "write_returns",
-      ],
-      clientId: ctx.config.field("clientId"),
-      clientSecret: ctx.config.field("clientSecret"),
-    });
+      // Self-hosted: client-credentials path. Validating the secret runs the grant.
+      ctx.register.auth.apiKey({
+        id: "shopify-credentials",
+        label: "Self-hosted app credentials",
+        configField: "clientSecret",
+      });
 
-    // Self-hosted: client-credentials path. Validating the secret runs the grant.
-    ctx.register.auth.apiKey({
-      id: "shopify-credentials",
-      label: "Self-hosted app credentials",
-      configField: "clientSecret",
-    });
+      // HAY-221: refresh the 24h self-hosted token every 20h (no-op in managed mode).
+      ctx.register.cron({
+        name: "refresh_shopify_token",
+        schedule: "0 */20 * * *",
+        handler: refreshTokenHandler,
+        retryPolicy: { maxRetries: 3, backoff: "exponential" },
+      });
 
-    // HAY-221: refresh the 24h self-hosted token every 20h (no-op in managed mode).
-    ctx.register.cron({
-      name: "refresh_shopify_token",
-      schedule: "0 */20 * * *",
-      handler: refreshTokenHandler,
-      retryPolicy: { maxRetries: 3, backoff: "exponential" },
-    });
+      globalCtx.logger.info("Shopify plugin config, auth and cron registered");
+    },
 
-    globalCtx.logger.info("Shopify plugin config, auth and cron registered");
-  },
+    async onValidateAuth(ctx) {
+      const mode = getAuthMode(ctx);
+      ctx.logger.info("Validating Shopify credentials", { authMode: mode });
 
-  async onValidateAuth(ctx) {
-    const mode = getAuthMode(ctx);
-    ctx.logger.info("Validating Shopify credentials", { authMode: mode });
+      const shopDomain = ctx.config.getOptional<string>("shopDomain");
+      if (!shopDomain) {
+        throw new Error("Store domain is required");
+      }
 
-    const shopDomain = ctx.config.getOptional<string>("shopDomain");
-    if (!shopDomain) {
-      throw new Error("Store domain is required");
-    }
+      if (mode === "oauth") {
+        // Managed: the OAuth flow proves credentials. Here we only require the
+        // store domain so Hay can build the per-shop authorize URL.
+        return true;
+      }
 
-    if (mode === "oauth") {
-      // Managed: the OAuth flow proves credentials. Here we only require the
-      // store domain so Hay can build the per-shop authorize URL.
-      return true;
-    }
+      // Self-hosted: actually run the grant to prove the Client ID/secret work.
+      const creds = readSelfHostedCredentials(ctx);
+      if (!creds) {
+        throw new Error("Self-hosted mode requires Store domain, Client ID and Client secret");
+      }
+      try {
+        await clientCredentialsGrant(creds.shopDomain, creds.clientId, creds.clientSecret);
+        ctx.logger.info("Shopify self-hosted credentials validated");
+        return true;
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        ctx.logger.error("Failed to validate Shopify credentials", { error: message });
+        throw new Error(`Could not authenticate with Shopify: ${message}`);
+      }
+    },
 
-    // Self-hosted: actually run the grant to prove the Client ID/secret work.
-    const creds = readSelfHostedCredentials(ctx);
-    if (!creds) {
-      throw new Error("Self-hosted mode requires Store domain, Client ID and Client secret");
-    }
-    try {
-      await clientCredentialsGrant(creds.shopDomain, creds.clientId, creds.clientSecret);
-      ctx.logger.info("Shopify self-hosted credentials validated");
-      return true;
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      ctx.logger.error("Failed to validate Shopify credentials", { error: message });
-      throw new Error(`Could not authenticate with Shopify: ${message}`);
-    }
-  },
+    async onStart(ctx) {
+      const mode = getAuthMode(ctx);
+      ctx.logger.info("Starting Shopify plugin for org", { orgId: ctx.org.id, authMode: mode });
 
-  async onStart(ctx) {
-    const mode = getAuthMode(ctx);
-    ctx.logger.info("Starting Shopify plugin for org", { orgId: ctx.org.id, authMode: mode });
-
-    const shopRaw = ctx.config.getOptional<string>("shopDomain");
-    if (!shopRaw) {
-      ctx.logger.info("Shopify: no store domain configured yet — MCP not started.");
-      return;
-    }
-    const shop = normalizeShopDomain(shopRaw);
-    const apiVersion = ctx.config.getOptional<string>("apiVersion") || "2026-04";
-
-    let accessToken: string | undefined;
-
-    if (mode === "oauth") {
-      // Managed: the offline access token was minted by Core's OAuth exchange and
-      // stored in authState. Core merges the DECRYPTED credentials into config, so
-      // read the token via config — `ctx.auth.get()` returns the still-encrypted
-      // credentials in the worker, and its methodId is Core's "${pluginId}-oauth"
-      // convention rather than this plugin's registered method id.
-      accessToken = ctx.config.getOptional<string>("accessToken");
-      if (!accessToken) {
-        ctx.logger.info(
-          "Shopify managed mode: not connected yet (no access token). " +
-            "Click Connect in the plugin settings. MCP not started.",
-        );
+      const shopRaw = ctx.config.getOptional<string>("shopDomain");
+      if (!shopRaw) {
+        ctx.logger.info("Shopify: no store domain configured yet — MCP not started.");
         return;
       }
-    } else {
-      // Self-hosted: an OAuth connect stores a non-expiring offline token in
-      // authState (which Core merges into config) — and that connect clobbers
-      // the stored clientSecret, so prefer the token when it exists. Fall back
-      // to the client-credentials grant for secret-only setups.
-      accessToken = ctx.config.getOptional<string>("accessToken");
-      if (!accessToken) {
-        const creds = readSelfHostedCredentials(ctx);
-        if (!creds) {
+      const shop = normalizeShopDomain(shopRaw);
+      const apiVersion = ctx.config.getOptional<string>("apiVersion") || "2026-04";
+
+      let accessToken: string | undefined;
+
+      if (mode === "oauth") {
+        // Managed: the offline access token was minted by Core's OAuth exchange and
+        // stored in authState. Core merges the DECRYPTED credentials into config, so
+        // read the token via config — `ctx.auth.get()` returns the still-encrypted
+        // credentials in the worker, and its methodId is Core's "${pluginId}-oauth"
+        // convention rather than this plugin's registered method id.
+        accessToken = ctx.config.getOptional<string>("accessToken");
+        if (!accessToken) {
           ctx.logger.info(
-            "Shopify self-hosted: no access token and credentials missing — MCP not started.",
+            "Shopify managed mode: not connected yet (no access token). " +
+              "Click Connect in the plugin settings. MCP not started.",
           );
           return;
         }
-        try {
-          const token = await clientCredentialsGrant(
-            creds.shopDomain,
-            creds.clientId,
-            creds.clientSecret,
-          );
-          accessToken = token.accessToken;
-        } catch (error) {
-          ctx.logger.error("Failed to obtain Shopify access token on start", error);
-          return; // Stay installed but degraded; the cron will retry.
+      } else {
+        // Self-hosted: an OAuth connect stores a non-expiring offline token in
+        // authState (which Core merges into config) — and that connect clobbers
+        // the stored clientSecret, so prefer the token when it exists. Fall back
+        // to the client-credentials grant for secret-only setups.
+        accessToken = ctx.config.getOptional<string>("accessToken");
+        if (!accessToken) {
+          const creds = readSelfHostedCredentials(ctx);
+          if (!creds) {
+            ctx.logger.info(
+              "Shopify self-hosted: no access token and credentials missing — MCP not started.",
+            );
+            return;
+          }
+          try {
+            const token = await clientCredentialsGrant(
+              creds.shopDomain,
+              creds.clientId,
+              creds.clientSecret,
+            );
+            accessToken = token.accessToken;
+          } catch (error) {
+            ctx.logger.error("Failed to obtain Shopify access token on start", error);
+            return; // Stay installed but degraded; the cron will retry.
+          }
         }
       }
-    }
 
-    try {
-      await ctx.mcp.startLocalStdio({
-        id: "shopify-mcp",
-        command: "node",
-        args: ["index.js"],
-        cwd: "./mcp",
-        env: {
-          SHOPIFY_SHOP: shop,
-          SHOPIFY_ACCESS_TOKEN: accessToken,
-          SHOPIFY_API_VERSION: apiVersion,
-        },
-      });
-      ctx.logger.info("Shopify MCP server started successfully");
-    } catch (error) {
-      ctx.logger.error("Failed to start Shopify MCP server", error);
-      throw error;
-    }
+      if (mode === "oauth") {
+        // Tell the App Store app + theme embed which Hay org this store belongs to.
+        // Idempotent and non-blocking: the MCP server must start even if this fails.
+        const serverUrl = process.env.HAY_API_URL || "";
+        managedSession = { shop, accessToken, apiVersion };
+        void writeAppMetafields(shop, accessToken, apiVersion, {
+          mode: "managed",
+          organization_id: ctx.org.id,
+          server_url: serverUrl,
+        })
+          .then(() => ctx.logger.info("Shopify app metafields written", { serverUrl }))
+          .catch((err) => ctx.logger.error("Failed to write Shopify app metafields", err));
+      }
 
-    // Products capability: mirror the catalog into core for `recommend_products`.
-    // Injected only when the manifest declares `products` and core supplied the
-    // plugin-api credentials. Runs in the background so it never blocks startup;
-    // core's product-source coordinator re-invokes onStart on its schedule.
-    if (ctx.productSource) {
-      const productSource = ctx.productSource;
-      void bulkSync(shop, accessToken, apiVersion, productSource, {
-        info: (msg, c) => ctx.logger.info(msg, c),
-        error: (msg, c) => ctx.logger.error(msg, c as Record<string, unknown> | undefined),
-      }).catch((err) => ctx.logger.error("Shopify catalog sync failed", err));
-    } else {
-      ctx.logger.info(
-        "Shopify: productSource runtime not available — skipping catalog sync " +
-          "(capability not negotiated or plugin-api credentials missing).",
-      );
-    }
-  },
+      try {
+        await ctx.mcp.startLocalStdio({
+          id: "shopify-mcp",
+          command: "node",
+          args: ["index.js"],
+          cwd: "./mcp",
+          env: {
+            SHOPIFY_SHOP: shop,
+            SHOPIFY_ACCESS_TOKEN: accessToken,
+            SHOPIFY_API_VERSION: apiVersion,
+          },
+        });
+        ctx.logger.info("Shopify MCP server started successfully");
+      } catch (error) {
+        ctx.logger.error("Failed to start Shopify MCP server", error);
+        throw error;
+      }
 
-  async onConfigUpdate(ctx) {
-    // The platform restarts the stdio MCP server with fresh env after this hook.
-    ctx.logger.info("Shopify plugin config updated");
-  },
+      // Products capability: mirror the catalog into core for `recommend_products`.
+      // Injected only when the manifest declares `products` and core supplied the
+      // plugin-api credentials. Runs in the background so it never blocks startup;
+      // core's product-source coordinator re-invokes onStart on its schedule.
+      if (ctx.productSource) {
+        const productSource = ctx.productSource;
+        void bulkSync(shop, accessToken, apiVersion, productSource, {
+          info: (msg, c) => ctx.logger.info(msg, c),
+          error: (msg, c) => ctx.logger.error(msg, c as Record<string, unknown> | undefined),
+        }).catch((err) => ctx.logger.error("Shopify catalog sync failed", err));
+      } else {
+        ctx.logger.info(
+          "Shopify: productSource runtime not available — skipping catalog sync " +
+            "(capability not negotiated or plugin-api credentials missing).",
+        );
+      }
+    },
 
-  async onDisable(ctx) {
-    ctx.logger.info("Shopify plugin disabled for org", { orgId: ctx.org.id });
-  },
-}));
+    async onConfigUpdate(ctx) {
+      // The platform restarts the stdio MCP server with fresh env after this hook.
+      ctx.logger.info("Shopify plugin config updated");
+    },
+
+    async onDisable(ctx) {
+      ctx.logger.info("Shopify plugin disabled for org", { orgId: ctx.org.id });
+
+      // Managed mode: detach the storefront widget by clearing the app metafields
+      // the App Store app and theme embed read. Best effort — the token may be gone.
+      if (!managedSession) return;
+      const { shop, accessToken, apiVersion } = managedSession;
+      try {
+        await deleteAppMetafields(shop, accessToken, apiVersion, HAY_METAFIELD_KEYS);
+        ctx.logger.info("Shopify app metafields cleared");
+      } catch (err) {
+        ctx.logger.error("Failed to clear Shopify app metafields", err);
+      }
+    },
+  };
+});
 
 /**
  * Cron handler (self-hosted only): mint a fresh 24h access token via the client
