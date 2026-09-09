@@ -1379,9 +1379,10 @@ const handleConnectIntent = async (): Promise<boolean> => {
   }
 
   try {
-    // Creates + enables the instance when the plugin was never installed.
-    await Hay.plugins.configure.mutate({ pluginId: pluginId.value, configuration });
-    // OAuth availability is only reported once an instance exists.
+    // `enable` (not `configure`) so a never-installed or previously disabled
+    // instance is created/re-enabled, installed, and its worker started.
+    await Hay.plugins.enable.mutate({ pluginId: pluginId.value, configuration });
+    // OAuth availability is only reported once an enabled instance exists.
     if (!oauthAvailable.value) await fetchPlugin();
     if (!oauthAvailable.value) {
       throw new Error("This integration does not support one-click connect");
