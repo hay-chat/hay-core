@@ -8,8 +8,15 @@ export function getWebSocketUrl(): string {
   if (typeof window !== "undefined") {
     // Client-side: use runtime config
     const config = useRuntimeConfig();
-    const protocol = config.public.useSSL ? "wss" : "ws";
+    // apiDomain is resolved from API_DOMAIN at BUILD time and comes out empty in a
+    // Docker build. The WS server shares the API's origin, which in production is
+    // the dashboard's own origin, so fall back to the page host and protocol.
     const apiDomain = config.public.apiDomain;
+    if (!apiDomain) {
+      const protocol = window.location.protocol === "https:" ? "wss" : "ws";
+      return `${protocol}://${window.location.host}/ws`;
+    }
+    const protocol = config.public.useSSL ? "wss" : "ws";
     return `${protocol}://${apiDomain}/ws`;
   }
   // Server-side fallback (shouldn't be used since SSR is disabled)
