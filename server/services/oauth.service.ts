@@ -12,6 +12,7 @@ import type {
 } from "../types/oauth.types";
 import type { HayPluginManifest } from "../types/plugin.types";
 import type { AuthMethodDescriptor, ConfigFieldDescriptor } from "../types/plugin-sdk.types";
+import { parseConnectedAccount } from "../lib/connected-account";
 import { createLogger } from "@server/lib/logger";
 import { TRPCError } from "@trpc/server";
 
@@ -789,10 +790,18 @@ export class OAuthService {
         return;
       }
 
-      const result = (await response.json()) as { routingKeys?: unknown };
+      const result = (await response.json()) as { routingKeys?: unknown; account?: unknown };
       const routingKeys = Array.isArray(result?.routingKeys)
         ? result.routingKeys.filter((k): k is string => typeof k === "string" && k.length > 0)
         : [];
+
+      const account = parseConnectedAccount(result?.account);
+      if (account) {
+        await pluginInstanceRepository.updateAuthState(instance.id, instance.organizationId, {
+          ...instance.authState,
+          account,
+        });
+      }
 
       if (routingKeys.length === 0) {
         logger.debug({ pluginId, organizationId }, "onConnected returned no routing keys");
@@ -881,6 +890,7 @@ export class OAuthService {
         expired,
         expiresAt,
         connectedAt: credentials.connectedAt as number | undefined,
+        account: instance.authState.account,
       };
     } catch (error) {
       return {
@@ -1002,9 +1012,11 @@ export class OAuthService {
         credentials: {
           accessToken: newTokens.access_token,
           expiresAt: newTokens.expires_at,
+          connectedAt: instance.authState?.credentials?.connectedAt,
           tokenType: newTokens.token_type,
           scope: newTokens.scope,
         },
+        account: instance.authState?.account,
       });
       logger.debug({ organizationId, expiresAt }, `Custom token refresh for plugin ${pluginId}`);
       return newTokens;
@@ -1068,9 +1080,11 @@ export class OAuthService {
         accessToken: newTokens.access_token, // Plain text - transformer will encrypt
         refreshToken: newTokens.refresh_token || undefined, // Plain text - transformer will encrypt
         expiresAt: newTokens.expires_at,
+        connectedAt: instance.authState?.credentials?.connectedAt,
         tokenType: newTokens.token_type || "Bearer",
         scope: newTokens.scope,
       },
+      account: instance.authState?.account,
     };
 
     await pluginInstanceRepository.updateAuthState(instance.id, instance.organizationId, authState);

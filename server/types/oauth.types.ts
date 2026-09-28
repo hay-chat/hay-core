@@ -1,3 +1,5 @@
+import type { ConnectedAccount } from "./plugin-sdk.types";
+
 /**
  * OAuth types and interfaces for plugin authentication
  *
@@ -54,5 +56,7 @@ export interface OAuthConnectionStatus {
   expired?: boolean;
   expiresAt?: number;
   connectedAt?: number;
+  /** Connected external account, when the plugin reports one from onConnected. */
+  account?: ConnectedAccount;
   error?: string;
 }

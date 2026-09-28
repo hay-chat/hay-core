@@ -17,6 +17,8 @@ export type {
   OnInitializeHook,
   OnStartHook,
   OnConnectedHook,
+  OnConnectedResult,
+  ConnectedAccount,
   OnValidateAuthHook,
   OnConfigUpdateHook,
   OnDisableHook,

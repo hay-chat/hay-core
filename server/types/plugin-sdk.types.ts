@@ -180,6 +180,15 @@ export interface AuthState {
 
   /** Credentials (e.g., { apiKey: "..." } or { accessToken: "...", refreshToken: "..." }) */
   credentials: Record<string, unknown>;
+
+  /** Connected external account reported by the plugin's onConnected hook (display only, not encrypted). */
+  account?: ConnectedAccount;
+}
+
+/** External account an OAuth connection belongs to, as reported by the plugin. */
+export interface ConnectedAccount {
+  label: string;
+  avatarUrl?: string;
 }
 
 // ============================================================================

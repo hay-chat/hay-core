@@ -29,6 +29,14 @@
           >
             <AlertTriangle class="h-5 w-5 text-amber-600 dark:text-amber-400" />
           </div>
+          <img
+            v-else-if="oauthStatus.connected && oauthStatus.account?.avatarUrl && !avatarFailed"
+            :src="oauthStatus.account.avatarUrl"
+            :alt="oauthStatus.account.label"
+            class="w-10 h-10 rounded-full object-cover"
+            referrerpolicy="no-referrer"
+            @error="avatarFailed = true"
+          />
           <div
             v-else-if="oauthStatus.connected"
             class="w-10 h-10 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center"
@@ -49,7 +57,9 @@
                   ? "Not connected"
                   : oauthStatus.expired
                     ? "Connection expired"
-                    : "Connected via OAuth"
+                    : oauthStatus.account
+                      ? `Connected as ${oauthStatus.account.label}`
+                      : "Connected via OAuth"
               }}
             </p>
             <p
@@ -139,6 +149,7 @@ interface OAuthStatus {
   expired?: boolean;
   expiresAt?: number;
   connectedAt?: number;
+  account?: { label: string; avatarUrl?: string };
   error?: string;
 }
 
@@ -158,6 +169,8 @@ const { t } = useI18n();
 
 const oauthStatus = ref<OAuthStatus | null>(null);
 const connecting = ref(false);
+// Provider avatar URLs are often signed/expiring; fall back to the status icon.
+const avatarFailed = ref(false);
 const disconnecting = ref(false);
 
 // Compute plugin name from plugin data
