@@ -114,6 +114,18 @@ export interface WebhookRouteKeyPathDescriptor {
 }
 
 /**
+ * Deauthorization / data-deletion callback descriptor (signed request).
+ *
+ * Mirrors the SDK's WebhookDeauthorizationDescriptor.
+ */
+export interface WebhookDeauthorizationDescriptor {
+  format: "signed-request";
+  param: string;
+  secretEnv: string;
+  keyPath: string;
+}
+
+/**
  * Full webhook routing strategy a plugin declares.
  *
  * Mirrors the SDK's WebhookRoutingDescriptor. Read from plugin metadata and
@@ -124,6 +136,7 @@ export interface WebhookRoutingDescriptor {
   signature: WebhookSignatureDescriptor;
   verificationChallenge?: WebhookVerificationChallengeDescriptor;
   routeKeyPath: WebhookRouteKeyPathDescriptor;
+  deauthorization?: WebhookDeauthorizationDescriptor;
 }
 
 /**
