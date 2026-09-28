@@ -1,3 +1,14 @@
+## 2026-09-28 — claude/instagram-app-review — pushed, no PR yet
+
+**Works:** Meta Deauthorize + Data Deletion callbacks, generic via new optional
+`webhookRouting.deauthorization` (signed*request, HMAC-SHA256). Core serves POST
+/v1/plugins/hay-channel-instagram-meta/{deauthorize,data-deletion} + GET data-deletion?code=
+status page; resolves org by routing key (IG user_id), clears auth + routes, stops worker.
+META*\* vars documented in .env.example. Server/SDK/plugin typecheck clean, 160 server tests green.
+**Half-built:** Handler not hit end-to-end (no running server); SDK register.test.ts has 5
+pre-existing `registerAPI.ui` failures (unrelated).
+**Next:** Open PR, deploy, paste the 2 URLs into Meta console, use Meta's test tool to POST one.
+
 ## 2026-08-31 — claude/error-tracking-noise — PR #77 open (+ hay-website PR #28)
 
 **Works:** Root cause of 321 "No procedure found: widget.css" errors: vite inline-css
@@ -189,4 +200,3 @@ branch all deleted. WARNING: something on this machine auto-pushed both
 commits to origin/master ~15s after each commit (actor rgrjnr, from the
 worktree, HEAD:master) — bypasses PR flow entirely; not a git hook/cron.
 Next: find the auto-pusher; smoke-test telemetry with a real phc key.
-
