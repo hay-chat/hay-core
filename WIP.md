@@ -1,3 +1,10 @@
+## 2026-09-28 — claude/instagram-app-review (worktree .claude/worktrees/agent-a924070e3a47add59) — pushed, no PR
+
+**Works:** Meta deauthorize + data-deletion callbacks (`/v1/plugins/hay-channel-instagram-meta/{deauthorize,data-deletion}`), META_* in .env.example.
+**Prod bug found:** registry metadata for Instagram lacks `webhookRouting` → Meta webhooks 401 "Organization ID required". Metadata was never marked stale. Fixed in 59b5b7c: stale on checksum change + lazy refresh via an enabled org's worker.
+**Meta console (read-only so far):** app Live, Business Verification done, basic settings filled. Review draft has 9 perms; basic + manage_messages show 0 API calls, so they can't be submitted yet.
+**Next:** open the PR, merge, and deploy to the homeserver. Connect IG in the dashboard, send a test DM (to generate API calls), trim the review draft to 2 perms, then paste the callback URLs and submit with a screencast.
+
 ## 2026-09-28 — claude/instagram-app-review — pushed, no PR yet
 
 **Works:** Meta Deauthorize + Data Deletion callbacks, generic via new optional
