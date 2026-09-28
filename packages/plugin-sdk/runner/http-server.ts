@@ -364,7 +364,7 @@ export class PluginHttpServer {
 
         const result = await executeOnConnected(this.plugin, connectedCtx as any, this.logger);
 
-        res.json({ routingKeys: result?.routingKeys ?? [] });
+        res.json({ routingKeys: result?.routingKeys ?? [], account: result?.account });
         this.logger.debug("Handled /on-connected", {
           routingKeyCount: result?.routingKeys?.length ?? 0,
         });

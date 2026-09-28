@@ -76,8 +76,9 @@ export type OnStartHook = (ctx: HayStartContext) => Promise<void> | void;
  * account id used to route a shared inbound webhook back to this org).
  *
  * @param ctx - Connected context with org, config, auth (fresh tokens), and logger
- * @returns Promise resolving to `{ routingKeys?: string[] }`. Omitting
- *   `routingKeys` (or returning nothing) persists no keys.
+ * @returns Promise resolving to {@link OnConnectedResult}. Omitting
+ *   `routingKeys` (or returning nothing) persists no keys; `account`, when
+ *   returned, is shown in the dashboard as the connected account.
  *
  * @remarks
  * Core treats `routingKeys` as opaque strings. If this hook throws, Core logs a
@@ -87,7 +88,21 @@ export type OnStartHook = (ctx: HayStartContext) => Promise<void> | void;
  */
 export type OnConnectedHook = (
   ctx: HayConnectedContext,
-) => Promise<{ routingKeys?: string[] }> | { routingKeys?: string[] };
+) => Promise<OnConnectedResult> | OnConnectedResult;
+
+/** The external account an OAuth connection belongs to, for display only. */
+export interface ConnectedAccount {
+  /** Human-readable account name, e.g. "@haydotchat". */
+  label: string;
+  /** Optional avatar/profile picture URL. */
+  avatarUrl?: string;
+}
+
+/** What an {@link OnConnectedHook} may return to Core. */
+export interface OnConnectedResult {
+  routingKeys?: string[];
+  account?: ConnectedAccount;
+}
 
 /**
  * Authentication validation hook.

@@ -263,14 +263,19 @@ export default defineHayPlugin((globalCtx) => {
         });
       }
 
-      const routingKeys = await client.getConnectedAccountIds(token);
+      const connected = await client.getConnectedAccount(token);
 
       ctx.logger.info("Instagram onConnected — resolved routing keys", {
         orgId: ctx.org.id,
-        count: routingKeys.length,
+        count: connected.ids.length,
       });
 
-      return { routingKeys };
+      return {
+        routingKeys: connected.ids,
+        account: connected.username
+          ? { label: `@${connected.username}`, avatarUrl: connected.profilePictureUrl }
+          : undefined,
+      };
     },
   };
 });

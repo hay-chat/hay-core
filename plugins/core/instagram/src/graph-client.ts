@@ -9,7 +9,7 @@ import type { HayLogger } from "@hay/plugin-sdk/types";
  *   - getProfile        — resolve an Instagram-scoped sender id (IGSID) to a
  *                         display name / username / avatar for the customer record.
  *   - sendText          — deliver an outbound text DM via /me/messages.
- *   - getConnectedAccountIds — resolve the IG account id(s) backing the freshly
+ *   - getConnectedAccount — resolve the IG account (ids + username) backing the freshly
  *                         stored access token, used as opaque webhook routing
  *                         keys in `onConnected`.
  *
@@ -194,39 +194,47 @@ export class GraphClient {
   }
 
   /**
-   * Resolve the Instagram account id(s) backing the access token, used as
-   * opaque webhook routing keys.
+   * Resolve the Instagram account backing the access token.
    *
-   * `GET /me?fields=user_id,username` returns the connected IG account. We
-   * capture BOTH the node `id` and `user_id` because inbound messaging webhooks
-   * key `entry[].id` on the account id, and the two values can differ across IG
-   * id surfaces — storing both guarantees the inbound lookup matches whichever
-   * Meta sends. Failures are logged and yield an empty array (callers must
-   * tolerate zero keys — the instance is reconciled later rather than failing
-   * the OAuth flow).
+   * `GET /me?fields=user_id,username,profile_picture_url` returns the connected
+   * IG account. `ids` holds BOTH the node `id` and `user_id` (used as opaque
+   * webhook routing keys) because inbound messaging webhooks key `entry[].id`
+   * on the account id, and the two values can differ across IG id surfaces —
+   * storing both guarantees the inbound lookup matches whichever Meta sends.
+   * `username` / `profilePictureUrl` are shown in the dashboard as the
+   * connected account. Failures are logged and yield empty ids (callers must
+   * tolerate zero keys — the OAuth flow is never failed by this lookup).
    */
-  async getConnectedAccountIds(accessToken: string): Promise<string[]> {
+  async getConnectedAccount(
+    accessToken: string,
+  ): Promise<{ ids: string[]; username?: string; profilePictureUrl?: string }> {
     const ids = new Set<string>();
 
     try {
-      const me = await this.request<{ user_id?: string | number; id?: string | number }>(
-        "GET",
-        "/me",
-        accessToken,
-        { query: { fields: "user_id,username" } },
-      );
+      const me = await this.request<{
+        user_id?: string | number;
+        id?: string | number;
+        username?: string;
+        profile_picture_url?: string;
+      }>("GET", "/me", accessToken, {
+        query: { fields: "user_id,username,profile_picture_url" },
+      });
       if (me.user_id !== undefined && me.user_id !== null) {
         ids.add(String(me.user_id));
       }
       if (me.id !== undefined && me.id !== null) {
         ids.add(String(me.id));
       }
+      return {
+        ids: Array.from(ids),
+        username: me.username,
+        profilePictureUrl: me.profile_picture_url,
+      };
     } catch (error: any) {
-      this.logger.warn("getConnectedAccountIds: /me lookup failed", {
+      this.logger.warn("getConnectedAccount: /me lookup failed", {
         error: error?.message,
       });
+      return { ids: [] };
     }
-
-    return Array.from(ids);
   }
 }

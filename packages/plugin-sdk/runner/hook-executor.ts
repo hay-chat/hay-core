@@ -11,6 +11,7 @@ import type {
   HayGlobalContext,
   HayStartContext,
   HayConnectedContext,
+  ConnectedAccount,
   HayAuthValidationContext,
   HayConfigUpdateContext,
   HayDisableContext,
@@ -121,7 +122,7 @@ export async function executeOnConnected(
   plugin: HayPluginDefinition,
   connectedCtx: HayConnectedContext,
   logger: HayLogger,
-): Promise<{ routingKeys: string[] }> {
+): Promise<{ routingKeys: string[]; account?: ConnectedAccount }> {
   if (!plugin.onConnected) {
     logger.debug("Plugin has no onConnected hook, skipping");
     return { routingKeys: [] };
@@ -138,8 +139,13 @@ export async function executeOnConnected(
 
     const routingKeys = Array.isArray(resolved?.routingKeys) ? resolved.routingKeys : [];
 
+    const account =
+      resolved?.account && typeof resolved.account.label === "string"
+        ? resolved.account
+        : undefined;
+
     logger.info("onConnected hook completed", { routingKeyCount: routingKeys.length });
-    return { routingKeys };
+    return { routingKeys, account };
   } catch (err) {
     const errorMsg = err instanceof Error ? err.message : String(err);
     logger.warn("onConnected hook threw error, returning no routing keys", {
