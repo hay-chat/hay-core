@@ -88,10 +88,46 @@ export interface WebhookRouteKeyPathDescriptor {
 }
 
 /**
+ * Deauthorization / data-deletion callback descriptor.
+ *
+ * Some providers notify the app when a user removes it (deauthorize) or asks
+ * for their data to be deleted by POSTing a form field that holds a signed
+ * request: `<base64url HMAC-SHA256 signature>.<base64url JSON payload>`, signed
+ * with the shared app secret. When declared, Core serves these no-org
+ * endpoints on the plugin's URL space:
+ *
+ *   POST /v1/plugins/:pluginId/deauthorize
+ *   POST /v1/plugins/:pluginId/data-deletion        → `{ url, confirmation_code }`
+ *   GET  /v1/plugins/:pluginId/data-deletion?code=  → deletion status page
+ *
+ * Core verifies the signed request, reads the routing key from the decoded
+ * payload at `keyPath`, resolves the owning org from the keys returned by
+ * `onConnected`, and disconnects that org's instance (clears its credentials
+ * and routing keys).
+ */
+export interface WebhookDeauthorizationDescriptor {
+  /** Signed-request encoding. Only `<sig>.<payload>` HMAC-SHA256 is supported. */
+  format: "signed-request";
+
+  /** Form/body field carrying the signed request (e.g. "signed_request"). */
+  param: string;
+
+  /**
+   * Environment variable holding the signing secret. Must be present in the
+   * plugin manifest `env` allowlist.
+   */
+  secretEnv: string;
+
+  /** Dot-path to the routing key on the decoded payload (e.g. "user_id"). */
+  keyPath: string;
+}
+
+/**
  * Full webhook routing strategy a plugin declares via `register.webhookRouting`.
  */
 export interface WebhookRoutingDescriptor {
   signature: WebhookSignatureDescriptor;
   verificationChallenge?: WebhookVerificationChallengeDescriptor;
   routeKeyPath: WebhookRouteKeyPathDescriptor;
+  deauthorization?: WebhookDeauthorizationDescriptor;
 }
