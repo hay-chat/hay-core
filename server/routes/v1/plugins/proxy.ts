@@ -38,6 +38,27 @@ router.all(/^\/([^/]+)\/(.*)?$/, async (req: Request, res: Response) => {
       }
     }
 
+    // Provider deauthorize / data-deletion callbacks for the same shared app,
+    // served by core when the plugin declares `webhookRouting.deauthorization`.
+    if ((path === "/deauthorize" || path === "/data-deletion") && !hasOrgIdentifier(req)) {
+      const deauthorization = (await webhookRouterService.getRoutingDescriptor(pluginId))
+        ?.deauthorization;
+      if (deauthorization) {
+        if (path === "/data-deletion" && req.method === "GET") {
+          webhookRouterService.handleDataDeletionStatus(req, res);
+          return;
+        }
+        await webhookRouterService.handleDeauthorization(
+          req,
+          res,
+          pluginId,
+          deauthorization,
+          path === "/deauthorize" ? "deauthorize" : "data-deletion",
+        );
+        return;
+      }
+    }
+
     // Extract organization ID (from auth, subdomain, or query param)
     const organizationId = await extractorganizationId(req);
 
