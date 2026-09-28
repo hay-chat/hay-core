@@ -116,6 +116,16 @@ export default defineHayPlugin((globalCtx) => {
           itemsPath: "entry",
           keyPath: "id",
         },
+        // Meta's Deauthorize + Data Deletion callbacks (required for App
+        // Review). Meta POSTs `signed_request` whose payload carries the IG
+        // `user_id`, one of the routing keys returned from onConnected. Core
+        // serves them at /v1/plugins/<pluginId>/deauthorize and /data-deletion.
+        deauthorization: {
+          format: "signed-request",
+          param: "signed_request",
+          secretEnv: "META_APP_SECRET",
+          keyPath: "user_id",
+        },
       });
 
       // Setup guide surfaced in plugin settings.

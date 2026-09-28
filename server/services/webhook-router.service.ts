@@ -1,11 +1,19 @@
+import crypto from "crypto";
 import type { Request, Response } from "express";
 import { pluginManagerService } from "./plugin-manager.service";
 import { pluginInstanceManagerService } from "./plugin-instance-manager.service";
 import { pluginRegistryRepository } from "../repositories/plugin-registry.repository";
+import { pluginInstanceRepository } from "../repositories/plugin-instance.repository";
 import { pluginWebhookRouteRepository } from "../repositories/plugin-webhook-route.repository";
 import { verifyHmacSha256 } from "./plugin-route.service";
-import type { WebhookRoutingDescriptor } from "../types/plugin-sdk.types";
+import type {
+  WebhookDeauthorizationDescriptor,
+  WebhookRoutingDescriptor,
+} from "../types/plugin-sdk.types";
 import { createLogger } from "@server/lib/logger";
+import { parseSignedRequest } from "@server/lib/signed-request";
+import { isValidUuid } from "@server/lib/validation/uuid";
+import { getApiUrl } from "@server/config/env";
 
 const logger = createLogger("webhook-router");
 
@@ -120,6 +128,107 @@ export class WebhookRouterService {
     void this.dispatch(pluginId, routing, body, req).catch((err) => {
       logger.error({ err, pluginId }, "Unexpected error during shared webhook dispatch");
     });
+  }
+
+  /**
+   * Handle a provider deauthorize / data-deletion callback for a plugin that
+   * declares `webhookRouting.deauthorization`. Verifies the signed request,
+   * resolves the owning org from the routing key in its payload, and
+   * disconnects that org's instance: clears its credentials and routing keys
+   * and stops its worker so no cached token survives.
+   *
+   * Data deletion answers `{ url, confirmation_code }` as the provider
+   * requires; `url` is the status page served by `handleDataDeletionStatus`.
+   * The deletion runs synchronously, so a returned code means it is done.
+   * Conversations and customers stay with the org: they are the business's
+   * records, not the connecting account's.
+   */
+  async handleDeauthorization(
+    req: Request,
+    res: Response,
+    pluginId: string,
+    descriptor: WebhookDeauthorizationDescriptor,
+    kind: "deauthorize" | "data-deletion",
+  ): Promise<void> {
+    if (req.method !== "POST") {
+      res.status(405).json({ error: "Method not allowed" });
+      return;
+    }
+
+    const secret = process.env[descriptor.secretEnv];
+    if (!secret) {
+      logger.error(
+        { pluginId, secretEnv: descriptor.secretEnv },
+        "Deauthorization signing secret not configured",
+      );
+      res.status(500).json({ error: "Signing secret not configured" });
+      return;
+    }
+
+    const body = (req.body ?? {}) as Record<string, unknown>;
+    const payload = parseSignedRequest(body[descriptor.param], secret);
+    if (!payload) {
+      logger.warn({ pluginId, kind }, "Deauthorization signed request invalid");
+      res.status(400).json({ error: "Invalid signed request" });
+      return;
+    }
+
+    const keyValue = getPath(payload, descriptor.keyPath);
+    if (keyValue === undefined || keyValue === null) {
+      res.status(400).json({ error: "Signed request missing routing key" });
+      return;
+    }
+
+    const owner = await pluginWebhookRouteRepository.findByKey(pluginId, String(keyValue));
+    if (owner) {
+      await pluginInstanceRepository.clearAuthState(owner.pluginInstanceId, owner.organizationId);
+      await pluginWebhookRouteRepository.clearForInstance(owner.pluginInstanceId);
+      await pluginManagerService
+        .stopPluginWorker(owner.organizationId, pluginId)
+        .catch((err) => logger.warn({ err, pluginId }, "Failed to stop worker on deauthorize"));
+      logger.info(
+        { pluginId, organizationId: owner.organizationId, kind },
+        "Plugin instance disconnected by provider callback",
+      );
+    } else {
+      // Nothing stored for this key (never connected, or already removed).
+      logger.info({ pluginId, kind }, "Deauthorization for unknown routing key; nothing to remove");
+    }
+
+    if (kind === "deauthorize") {
+      res.status(200).json({ success: true });
+      return;
+    }
+
+    const confirmationCode = crypto.randomUUID();
+    logger.info({ pluginId, confirmationCode }, "Data deletion request completed");
+    res.status(200).json({
+      url: `${getApiUrl()}/v1/plugins/${encodeURIComponent(pluginId)}/data-deletion?code=${confirmationCode}`,
+      confirmation_code: confirmationCode,
+    });
+  }
+
+  /**
+   * Public status page for a data-deletion confirmation code. Deletion runs
+   * synchronously when the request is received, so any issued code is complete.
+   */
+  handleDataDeletionStatus(req: Request, res: Response): void {
+    const code = req.query.code;
+    if (typeof code !== "string" || !isValidUuid(code)) {
+      res.status(400).send("Invalid confirmation code");
+      return;
+    }
+
+    res
+      .status(200)
+      .type("html")
+      .send(
+        `<html><head><title>Data deletion status</title></head><body>` +
+          `<h1>Data deletion completed</h1>` +
+          `<p>Confirmation code: <code>${code}</code></p>` +
+          `<p>Hay removed the access token and account identifiers it stored for this connection.</p>` +
+          `</body></html>`,
+      );
   }
 
   /**
