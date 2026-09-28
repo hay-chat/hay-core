@@ -1,21 +1,3 @@
-## 2026-09-28 — claude/instagram-app-review (worktree .claude/worktrees/agent-a924070e3a47add59) — pushed, no PR
-
-**Works:** Meta deauthorize + data-deletion callbacks (`/v1/plugins/hay-channel-instagram-meta/{deauthorize,data-deletion}`), META_* in .env.example.
-**Prod bug found:** registry metadata for Instagram lacks `webhookRouting` → Meta webhooks 401 "Organization ID required". Metadata was never marked stale. Fixed in 59b5b7c: stale on checksum change + lazy refresh via an enabled org's worker.
-**Meta console (read-only so far):** app Live, Business Verification done, basic settings filled. Review draft has 9 perms; basic + manage_messages show 0 API calls, so they can't be submitted yet.
-**Next:** open the PR, merge, and deploy to the homeserver. Connect IG in the dashboard, send a test DM (to generate API calls), trim the review draft to 2 perms, then paste the callback URLs and submit with a screencast.
-
-## 2026-09-28 — claude/instagram-app-review — pushed, no PR yet
-
-**Works:** Meta Deauthorize + Data Deletion callbacks, generic via new optional
-`webhookRouting.deauthorization` (signed*request, HMAC-SHA256). Core serves POST
-/v1/plugins/hay-channel-instagram-meta/{deauthorize,data-deletion} + GET data-deletion?code=
-status page; resolves org by routing key (IG user_id), clears auth + routes, stops worker.
-META*\* vars documented in .env.example. Server/SDK/plugin typecheck clean, 160 server tests green.
-**Half-built:** Handler not hit end-to-end (no running server); SDK register.test.ts has 5
-pre-existing `registerAPI.ui` failures (unrelated).
-**Next:** Open PR, deploy, paste the 2 URLs into Meta console, use Meta's test tool to POST one.
-
 ## 2026-08-31 — claude/error-tracking-noise — PR #77 open (+ hay-website PR #28)
 
 **Works:** Root cause of 321 "No procedure found: widget.css" errors: vite inline-css
@@ -207,3 +189,4 @@ branch all deleted. WARNING: something on this machine auto-pushed both
 commits to origin/master ~15s after each commit (actor rgrjnr, from the
 worktree, HEAD:master) — bypasses PR flow entirely; not a git hook/cron.
 Next: find the auto-pusher; smoke-test telemetry with a real phc key.
+
