@@ -280,6 +280,21 @@ function validateWebhookRouting(descriptor: WebhookRoutingDescriptor): void {
       );
     }
   }
+
+  const { deauthorization } = descriptor;
+  if (deauthorization !== undefined) {
+    if (typeof deauthorization !== "object" || deauthorization === null) {
+      throw new Error("Webhook routing deauthorization must be an object");
+    }
+    if (deauthorization.format !== "signed-request") {
+      throw new Error('Webhook routing deauthorization.format must be "signed-request"');
+    }
+    for (const field of ["param", "secretEnv", "keyPath"] as const) {
+      if (!deauthorization[field] || typeof deauthorization[field] !== "string") {
+        throw new Error(`Webhook routing deauthorization.${field} must be a non-empty string`);
+      }
+    }
+  }
 }
 
 // ============================================================================
