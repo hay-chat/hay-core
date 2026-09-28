@@ -59,7 +59,24 @@ export class WebhookRouterService {
     if (!plugin) {
       return null;
     }
-    return plugin.metadata?.webhookRouting ?? null;
+    if (plugin.metadataState === "fresh") {
+      return plugin.metadata?.webhookRouting ?? null;
+    }
+
+    // Metadata is only (re)fetched when a worker starts, and a shared webhook
+    // carries no org to start one for. Borrow any org that has the plugin
+    // enabled: starting its worker refreshes the plugin-global metadata.
+    const instances = await pluginInstanceRepository.findByPlugin(plugin.id);
+    const enabled = instances.find((instance) => instance.enabled);
+    if (enabled) {
+      try {
+        await pluginManagerService.startPluginWorker(enabled.organizationId, pluginId);
+      } catch (err) {
+        logger.warn({ err, pluginId }, "Metadata refresh for webhook routing failed");
+      }
+    }
+    const refreshed = pluginManagerService.getPlugin(pluginId) ?? plugin;
+    return refreshed.metadata?.webhookRouting ?? null;
   }
 
   /**
