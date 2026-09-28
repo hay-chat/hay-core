@@ -92,14 +92,15 @@ export class PluginRegistryRepository extends BaseRepository<PluginRegistry> {
       const resolvedSourceType = existing.gitConnectionId ? "git" : existing.sourceType;
 
       // If plugin source changed (checksum differs), reset install/build flags
-      // so dependencies get reinstalled and code gets rebuilt
+      // so dependencies get reinstalled and code gets rebuilt, and mark the
+      // cached worker metadata stale so the next worker start re-fetches it
       const checksumChanged = updateFields.checksum && updateFields.checksum !== existing.checksum;
 
       const fields: DeepPartial<PluginRegistry> = {
         ...updateFields,
         sourceType: resolvedSourceType,
         status: PluginStatus.AVAILABLE, // Plugin exists on filesystem
-        ...(checksumChanged ? { installed: false, built: false } : {}),
+        ...(checksumChanged ? { installed: false, built: false, metadataState: "stale" } : {}),
         updatedAt: new Date(),
       };
       await this.getRepository().update(existing.id, toUpdatePayload(fields));
