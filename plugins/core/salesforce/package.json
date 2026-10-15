@@ -1,0 +1,28 @@
+{
+  "name": "hay-plugin-salesforce",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Connect your Salesforce org to read and update Contacts, Cases, and any other sObject — keep CRM data in sync with automated conversations",
+  "author": "Hay",
+  "main": "dist/index.js",
+  "hay-plugin": {
+    "entry": "./dist/index.js",
+    "displayName": "Salesforce",
+    "category": "integration",
+    "capabilities": [
+      "mcp",
+      "auth"
+    ]
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch"
+  },
+  "dependencies": {
+    "@hay/plugin-sdk": "file:../../../packages/plugin-sdk"
+  },
+  "devDependencies": {
+    "typescript": "^5.3.3",
+    "@types/node": "^20.10.0"
+  }
+}

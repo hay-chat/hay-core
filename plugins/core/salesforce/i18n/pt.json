@@ -1,0 +1,48 @@
+{
+  "name": "Salesforce",
+  "description": "Leia e atualize Contatos, Casos e qualquer outro objeto do Salesforce para manter os dados do CRM sincronizados com as conversas automatizadas.",
+  "tools": {
+    "soql_query": {
+      "label": "Executar consulta SOQL",
+      "description": "Pesquise Contatos, Casos ou qualquer registro do Salesforce usando uma consulta SOQL."
+    },
+    "query_more": {
+      "label": "Obter mais resultados",
+      "description": "Busca a próxima página de um resultado de consulta grande."
+    },
+    "list_sobjects": {
+      "label": "Listar objetos",
+      "description": "Lista os objetos disponíveis na organização do Salesforce, como Contato e Caso."
+    },
+    "describe_sobject": {
+      "label": "Descrever objeto",
+      "description": "Mostra os campos, tipos e valores obrigatórios de um objeto antes de lê-lo ou gravá-lo."
+    },
+    "get_record": {
+      "label": "Obter registro",
+      "description": "Obtém um único registro do Salesforce pelo tipo de objeto e id."
+    },
+    "create_record": {
+      "label": "Criar registro",
+      "description": "Cria um novo registro no Salesforce, como um Contato ou Caso."
+    },
+    "update_record": {
+      "label": "Atualizar registro",
+      "description": "Atualiza campos de um registro existente do Salesforce."
+    }
+  },
+  "config": {
+    "instanceUrl": {
+      "label": "URL da instância",
+      "description": "A URL do seu My Domain do Salesforce, ex.: https://seu-dominio.my.salesforce.com (Configuração → My Domain)."
+    },
+    "clientId": {
+      "label": "Consumer Key",
+      "description": "O Consumer Key (client_id OAuth) do Connected App com o Client Credentials Flow habilitado."
+    },
+    "clientSecret": {
+      "label": "Consumer Secret",
+      "description": "O Consumer Secret (client_secret OAuth) do Connected App. Armazenado de forma criptografada."
+    }
+  }
+}
