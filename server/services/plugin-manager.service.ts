@@ -28,6 +28,7 @@ interface HayPluginBlock {
   env?: string[];
   auth?: HayPluginManifest["auth"];
   channel?: string;
+  keepAlive?: boolean;
   autoActivate?: boolean;
   trpcRouter?: string;
   documentImporter?: boolean;
@@ -245,6 +246,7 @@ export class PluginManagerService {
         channel: hayPlugin.channel || undefined, // For channel-type plugins
         autoActivate: hayPlugin.autoActivate === true, // Eagerly load router at boot
         trpcRouter: hayPlugin.trpcRouter || undefined, // Optional plugin-side tRPC router file
+        keepAlive: hayPlugin.keepAlive || false, // For always-on plugins (e.g., IMAP polling)
       };
 
       // Load i18n translations from plugin's i18n/ directory
@@ -773,6 +775,41 @@ export class PluginManagerService {
   }
 
   /**
+   * Boot keepAlive plugins for all organizations that have enabled instances.
+   * Called once at server startup to ensure polling-based plugins (e.g., IMAP email)
+   * start immediately without waiting for an incoming request.
+   */
+  async bootKeepAlivePlugins(): Promise<void> {
+    const keepAlivePlugins = Array.from(this.registry.values()).filter((plugin) => {
+      const manifest = plugin.manifest as HayPluginManifest;
+      return manifest.keepAlive === true;
+    });
+
+    if (keepAlivePlugins.length === 0) return;
+
+    logger.info({ count: keepAlivePlugins.length }, "Booting keepAlive plugins");
+
+    for (const plugin of keepAlivePlugins) {
+      const instances = await pluginInstanceRepository.findEnabledByPluginRegistryId(plugin.id);
+
+      for (const instance of instances) {
+        try {
+          await this.getOrStartWorker(instance.organizationId, plugin.pluginId);
+          logger.info(
+            { pluginId: plugin.pluginId, orgId: instance.organizationId },
+            "keepAlive plugin booted",
+          );
+        } catch (error) {
+          logger.error(
+            { err: error, pluginId: plugin.pluginId, orgId: instance.organizationId },
+            "Failed to boot keepAlive plugin",
+          );
+        }
+      }
+    }
+  }
+
+  /**
    * Get the actual folder name for a plugin by scanning the filesystem
    */
   async getPluginFolderName(pluginId: string): Promise<string | null> {
@@ -1039,6 +1076,13 @@ export class PluginManagerService {
     const allWorkers = this.runnerService.getAllWorkers();
 
     for (const worker of allWorkers) {
+      // Skip keepAlive plugins — they should never be cleaned up for inactivity
+      const plugin = this.registry.get(worker.pluginId);
+      const manifest = plugin?.manifest as HayPluginManifest;
+      if (manifest?.keepAlive) {
+        continue;
+      }
+
       const TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes
       const inactiveTime = now.getTime() - worker.lastActivity.getTime();
 

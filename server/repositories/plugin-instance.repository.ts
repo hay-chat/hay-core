@@ -74,6 +74,13 @@ export class PluginInstanceRepository extends BaseRepository<PluginInstance> {
     });
   }
 
+  async findEnabledByPluginRegistryId(pluginRegistryId: string): Promise<PluginInstance[]> {
+    return this.getRepository().find({
+      where: { pluginId: pluginRegistryId, enabled: true },
+      relations: ["plugin"],
+    });
+  }
+
   async findRunningInstances(): Promise<PluginInstance[]> {
     return this.getRepository().find({
       where: { running: true },
