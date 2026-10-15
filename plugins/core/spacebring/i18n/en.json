@@ -1,0 +1,120 @@
+{
+  "name": "Spacebring",
+  "description": "Connect your Spacebring co-working space so the assistant can answer member FAQs and manage room bookings, events, visitors and support tickets.",
+  "tools": {
+    "list_locations": {
+      "label": "List Locations",
+      "description": "List the co-working locations your Spacebring account can access."
+    },
+    "find_membership": {
+      "label": "Find Member",
+      "description": "Look up a member (by email) to resolve who you're helping."
+    },
+    "get_membership": {
+      "label": "Get Membership",
+      "description": "Get a member's profile and credit balance by id."
+    },
+    "list_resources": {
+      "label": "List Rooms & Desks",
+      "description": "List bookable meeting rooms, desks, offices and parking."
+    },
+    "get_resource": {
+      "label": "Get Room/Desk",
+      "description": "Get details for one bookable resource, including its schedule."
+    },
+    "list_bookings": {
+      "label": "List Bookings",
+      "description": "Check room availability or list a member's reservations."
+    },
+    "create_booking": {
+      "label": "Book a Room",
+      "description": "Reserve a meeting room or desk for a time slot."
+    },
+    "get_booking": {
+      "label": "Get Booking",
+      "description": "Get the details of a single booking."
+    },
+    "cancel_booking": {
+      "label": "Cancel Booking",
+      "description": "Cancel a reservation and free the slot."
+    },
+    "list_guides": {
+      "label": "List Guides",
+      "description": "List house guides and FAQs (Wi‑Fi, rules, how-tos)."
+    },
+    "get_guide": {
+      "label": "Get Guide",
+      "description": "Read the full content of a guide, e.g. the Wi‑Fi article."
+    },
+    "list_feed_posts": {
+      "label": "List Announcements",
+      "description": "List community feed posts and announcements."
+    },
+    "get_feed_post": {
+      "label": "Get Announcement",
+      "description": "Read a single community feed post."
+    },
+    "list_events": {
+      "label": "List Events",
+      "description": "List upcoming community events."
+    },
+    "get_event": {
+      "label": "Get Event",
+      "description": "Get the details of a single event."
+    },
+    "list_benefits": {
+      "label": "List Perks",
+      "description": "List member perks and partner benefits."
+    },
+    "get_benefit": {
+      "label": "Get Perk",
+      "description": "Get a single perk and how to redeem it."
+    },
+    "list_plans": {
+      "label": "List Plans",
+      "description": "List membership plans and pricing."
+    },
+    "list_visits": {
+      "label": "List Guest Visits",
+      "description": "List guest visits, optionally for a specific host."
+    },
+    "create_visit": {
+      "label": "Register Guest",
+      "description": "Register or invite a guest for a visit."
+    },
+    "get_visit": {
+      "label": "Get Guest Visit",
+      "description": "Get a guest visit, including its access code."
+    },
+    "cancel_visit": {
+      "label": "Cancel Guest Visit",
+      "description": "Cancel a registered guest visit."
+    },
+    "list_support_tickets": {
+      "label": "List Support Tickets",
+      "description": "List member-reported support tickets."
+    },
+    "create_support_ticket": {
+      "label": "Report a Problem",
+      "description": "File a support ticket (broken AC, printer, Wi‑Fi, etc.)."
+    },
+    "get_support_ticket": {
+      "label": "Get Support Ticket",
+      "description": "Get a support ticket and its status."
+    }
+  },
+  "config": {
+    "apiKeyId": {
+      "label": "API Key ID",
+      "description": "Spacebring API key ID (the username for Basic auth). Generate API credentials in Spacebring under Settings → Integrations → API."
+    },
+    "apiKeySecret": {
+      "label": "API Key Secret",
+      "description": "Spacebring API key secret (the password for Basic auth). Stored encrypted."
+    },
+    "locationRef": {
+      "label": "Default Location ID",
+      "description": "UUID of the location this assistant serves. Used as the default for every tool. Find it with the List Locations tool or in your Spacebring dashboard URL."
+    }
+  }
+}
