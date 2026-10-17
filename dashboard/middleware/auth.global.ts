@@ -1,7 +1,8 @@
 import type { RouteLocationNormalized } from "vue-router";
 import { useAuthStore } from "@/stores/auth";
-import { useUserStore } from "@/stores/user";
+import { useUserStore, type User } from "@/stores/user";
 import { redirectForSuspension, SUSPENDED_ROUTE } from "@/composables/useSuspension";
+import { HayAuthApi } from "@/utils/api";
 
 // Define role-protected routes
 // Map route paths to required roles
@@ -188,7 +189,18 @@ export default defineNuxtRouteMiddleware(
 
     // Suspended organization: owners/admins may be sent to the operator's page,
     // everyone else is locked to /suspended until access is restored.
-    const currentOrganization = userStore.currentOrganization;
+    let currentOrganization = userStore.currentOrganization;
+    if (currentOrganization?.suspendedAt && to.path !== SUSPENDED_ROUTE) {
+      // The store is persisted, so confirm with the server before locking anyone
+      // out: a suspension lifted since the last visit must not bounce the user.
+      try {
+        const user = await HayAuthApi.auth.me.query();
+        userStore.setUser(user as User);
+        currentOrganization = userStore.currentOrganization;
+      } catch (error) {
+        console.warn("[Auth Middleware] Could not refresh access state:", error);
+      }
+    }
     if (currentOrganization?.suspendedAt) {
       if (to.path === SUSPENDED_ROUTE) {
         return;
