@@ -1,6 +1,7 @@
 import { router, scopedProcedure, publicProcedure } from "@server/trpc";
 import { z } from "zod";
 import { webchatSettingsService } from "@server/services/webchat/webchat-settings.service";
+import { organizationRepository } from "@server/repositories/organization.repository";
 import { WebchatPosition, WebchatTheme } from "@server/database/entities/webchat-settings.entity";
 
 export const webchatRouter = router({
@@ -43,13 +44,18 @@ export const webchatRouter = router({
       }),
     )
     .query(async ({ input }) => {
-      // Check if webchat is enabled
-      const isEnabled = await webchatSettingsService.isEnabled(input.organizationId);
+      // A disabled webchat or a suspended organization is not an error for the
+      // widget: it answers `{ enabled: false }` and the widget renders nothing.
+      const [isEnabled, organization] = await Promise.all([
+        webchatSettingsService.isEnabled(input.organizationId),
+        organizationRepository.findById(input.organizationId),
+      ]);
 
-      if (!isEnabled) {
-        throw new Error("Webchat is disabled for this organization");
+      if (!isEnabled || !organization || organization.suspendedAt) {
+        return { enabled: false as const };
       }
 
-      return await webchatSettingsService.getPublicConfig(input.organizationId);
+      const config = await webchatSettingsService.getPublicConfig(input.organizationId);
+      return { enabled: true as const, ...config };
     }),
 });
