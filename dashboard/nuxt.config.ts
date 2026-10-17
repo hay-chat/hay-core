@@ -101,6 +101,7 @@ export default defineNuxtConfig({
           "en/organizations.json",
           "en/products.json",
           "en/customers.json",
+          "en/access.json",
         ],
       },
       {
@@ -121,6 +122,7 @@ export default defineNuxtConfig({
           "pt-BR/organizations.json",
           "pt-BR/products.json",
           "pt-BR/customers.json",
+          "pt-BR/access.json",
         ],
       },
     ],

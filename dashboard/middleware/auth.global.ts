@@ -1,6 +1,7 @@
 import type { RouteLocationNormalized } from "vue-router";
 import { useAuthStore } from "@/stores/auth";
 import { useUserStore } from "@/stores/user";
+import { redirectForSuspension, SUSPENDED_ROUTE } from "@/composables/useSuspension";
 
 // Define role-protected routes
 // Map route paths to required roles
@@ -185,8 +186,23 @@ export default defineNuxtRouteMiddleware(
       return navigateTo({ path: "/login", query: { redirect: to.fullPath } });
     }
 
-    // Role-based route protection
+    // Suspended organization: owners/admins may be sent to the operator's page,
+    // everyone else is locked to /suspended until access is restored.
     const currentOrganization = userStore.currentOrganization;
+    if (currentOrganization?.suspendedAt) {
+      if (to.path === SUSPENDED_ROUTE) {
+        return;
+      }
+      if (await redirectForSuspension(currentOrganization)) {
+        return abortNavigation();
+      }
+      return navigateTo(SUSPENDED_ROUTE);
+    }
+    if (to.path === SUSPENDED_ROUTE) {
+      return navigateTo("/dashboard");
+    }
+
+    // Role-based route protection
     const userRole = currentOrganization?.role;
 
     console.log("[Auth Middleware] User role:", userRole);

@@ -4,6 +4,8 @@
       <AppSidebar />
       <div class="flex-1 flex flex-col">
         <!-- <SidebarTrigger class="md:hidden" /> -->
+        <!-- Operator notice (e.g. trial ending, payment failed) -->
+        <AccessNoticeBanner />
         <main class="flex-1 overflow-y-auto bg-neutral-50">
           <slot />
         </main>
