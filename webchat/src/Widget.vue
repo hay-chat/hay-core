@@ -1,5 +1,5 @@
 <template>
-  <div class="hay-webchat-widget">
+  <div v-if="!hidden" class="hay-webchat-widget">
     <!-- Chat Window -->
     <Transition name="fade">
       <ChatWindow
@@ -58,6 +58,9 @@ const toggleExpand = () => {
   isExpanded.value = !isExpanded.value;
 };
 
+// Set when the backend reports the widget must not render (disabled/suspended)
+const hidden = ref(false);
+
 // Fetched config from the backend (fills in values not provided by the host)
 const fetchedConfig = ref<{
   agentName?: string | null;
@@ -73,13 +76,23 @@ const fetchPublicConfig = async () => {
 
     const response = await fetch(url);
     if (!response.ok) {
-      console.warn("[Hay Webchat] Public config fetch failed:", response.status, response.statusText);
+      console.warn(
+        "[Hay Webchat] Public config fetch failed:",
+        response.status,
+        response.statusText,
+      );
       return;
     }
 
     const data = await response.json();
     const result = data?.result?.data;
     console.log("[Hay Webchat] Public config received:", result);
+
+    // Webchat disabled or organization suspended: render nothing at all.
+    if (result?.enabled === false) {
+      hidden.value = true;
+      return;
+    }
 
     if (result) {
       fetchedConfig.value = {
