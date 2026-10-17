@@ -316,6 +316,22 @@ export const runConversation = async (conversationId: string) => {
     conversationId: conversation.id,
   });
 
+  // Suspended organizations keep receiving (and storing) messages but get no
+  // AI reply. Clear the flag so the sweep stops re-enqueuing this conversation
+  // and the stale-message recovery never escalates it to a human.
+  if (conversation.organization?.suspendedAt) {
+    log.info(
+      { reason: conversation.organization.suspensionReason },
+      "Skipping - organization suspended",
+    );
+    if (conversation.needs_processing) {
+      await conversationRepository.update(conversation.id, conversation.organization_id, {
+        needs_processing: false,
+      });
+    }
+    return;
+  }
+
   // Skip processing for conversations taken over by humans
   // Check both status and assigned_user_id to handle race conditions
   if (conversation.status === "human-took-over" || conversation.assigned_user_id) {

@@ -1,6 +1,7 @@
 import { t, authenticatedProcedure, scopedProcedure } from "@server/trpc";
 import { z } from "zod";
 import { organizationService } from "@server/services/organization.service";
+import { toAccessState } from "@server/services/organization-access.service";
 import { TRPCError } from "@trpc/server";
 import { SupportedLanguage } from "@server/types/language.types";
 import {
@@ -25,7 +26,6 @@ import { RESOURCES, ACTIONS } from "@server/types/scopes";
 import { auditLogService } from "@server/services/audit-log.service";
 import { handleUpload } from "@server/lib/upload-helper";
 import { StorageService } from "@server/services/storage.service";
-import { vectorStoreService } from "@server/services/vector-store.service";
 import { createLogger } from "@server/lib/logger";
 
 const logger = createLogger("organizations");
@@ -788,60 +788,8 @@ export const organizationsRouter = t.router({
       });
     }
 
-    const orgName = organization.name;
-    const orgId = organization.id;
-
-    // Use transaction to ensure all related data is deleted
-    await AppDataSource.transaction(async (manager) => {
-      // Delete organization logo from storage if exists
-      if (organization.logoUploadId) {
-        try {
-          const storageService = new StorageService();
-          await storageService.delete(organization.logoUploadId);
-        } catch (error) {
-          logger.error({ err: error }, "Failed to delete organization logo");
-          // Continue with deletion even if logo deletion fails
-        }
-      }
-
-      // Delete embeddings from vector store within the transaction
-      await vectorStoreService.deleteByOrganizationId(ctx.organizationId!, manager);
-
-      // Product embeddings live in a separate table (product_embeddings) and
-      // are NOT FK-cascaded onto organizations through the entity layer, so
-      // delete them explicitly here in the same transaction.
-      const { productVectorStoreService } =
-        await import("@server/services/product-vector-store.service");
-      await productVectorStoreService.deleteByOrganizationId(ctx.organizationId!, manager);
-
-      // Delete organization - CASCADE will handle most related entities:
-      // - Agents (onDelete: CASCADE)
-      // - Conversations (onDelete: CASCADE) -> Messages (onDelete: CASCADE)
-      // - Documents (onDelete: CASCADE) -> Embeddings (onDelete: CASCADE)
-      // - Customers (onDelete: CASCADE)
-      // - Playbooks (onDelete: CASCADE)
-      // - Sources (onDelete: CASCADE)
-      // - WebchatSettings (onDelete: CASCADE)
-      // - UserOrganizations (onDelete: CASCADE)
-      // - OrganizationInvitations (onDelete: CASCADE)
-      // - ApiKeys (onDelete: CASCADE)
-      // - Jobs (onDelete: CASCADE)
-      // - Uploads (onDelete: CASCADE)
-      // - PluginInstances (onDelete: CASCADE)
-      // - ScheduledJobs (onDelete: CASCADE)
-      // - AuditLogs (onDelete: CASCADE)
-      // - PrivacyRequests (onDelete: CASCADE)
-      // - Products / ProductVariants (onDelete: CASCADE; product_embeddings
-      //   handled above because it's a raw-SQL table without an entity FK)
-
-      const orgRepository = manager.getRepository(Organization);
-      await orgRepository.delete({ id: orgId });
-    });
-
-    // Log deletion event (after transaction completes)
-    // Note: Can't log to audit_logs since the org is deleted
-    // TODO: Log to external audit service for compliance tracking
-    logger.info({ orgName, orgId, userId: ctx.user!.id }, "Organization deleted");
+    await organizationService.deleteWithData(organization);
+    logger.info({ orgId: organization.id, userId: ctx.user!.id }, "Organization deleted by owner");
 
     return {
       success: true,
@@ -904,6 +852,7 @@ export const organizationsRouter = t.router({
           logo: logoUrl,
           role: userOrg.role,
           permissions: userOrg.permissions,
+          ...toAccessState(userOrg.organization),
         },
       };
     }),

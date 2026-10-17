@@ -1,0 +1,28 @@
+{
+  "suspended": {
+    "title": {
+      "trial_expired": "Your trial has ended",
+      "payment_failed": "Your agent is paused",
+      "cancelled": "Your subscription was cancelled",
+      "manual": "This workspace is suspended"
+    },
+    "description": {
+      "trial_expired": "Your free trial is over and the AI agent has stopped replying to customers.",
+      "payment_failed": "We couldn't collect your last payment, so the AI agent has stopped replying to customers.",
+      "cancelled": "The subscription for this workspace ended, so the AI agent has stopped replying to customers.",
+      "manual": "Access to this workspace has been suspended."
+    },
+    "ownerHint": "Incoming messages are still being stored. Restore access to pick up where you left off.",
+    "memberHint": "Incoming messages are still being stored. Ask a workspace owner or admin to restore access.",
+    "openBilling": "Restore access",
+    "checkAgain": "Check again",
+    "switchOrg": "Switch to another workspace",
+    "logout": "Log out"
+  },
+  "accessNotice": {
+    "trial_ending": "Your free trial ends on {date}. Choose a plan to keep your agent running.",
+    "payment_failed": "Your last payment failed. Update your payment method before {lockDate} to avoid an interruption.",
+    "defaultCta": "Manage billing",
+    "dismiss": "Dismiss"
+  }
+}

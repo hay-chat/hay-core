@@ -1,0 +1,28 @@
+{
+  "suspended": {
+    "title": {
+      "trial_expired": "Seu período de teste terminou",
+      "payment_failed": "Seu agente está pausado",
+      "cancelled": "Sua assinatura foi cancelada",
+      "manual": "Este workspace está suspenso"
+    },
+    "description": {
+      "trial_expired": "Seu teste gratuito acabou e o agente de IA parou de responder aos clientes.",
+      "payment_failed": "Não conseguimos cobrar seu último pagamento, então o agente de IA parou de responder aos clientes.",
+      "cancelled": "A assinatura deste workspace terminou, então o agente de IA parou de responder aos clientes.",
+      "manual": "O acesso a este workspace foi suspenso."
+    },
+    "ownerHint": "As mensagens recebidas continuam sendo armazenadas. Restaure o acesso para continuar de onde parou.",
+    "memberHint": "As mensagens recebidas continuam sendo armazenadas. Peça a um proprietário ou administrador do workspace para restaurar o acesso.",
+    "openBilling": "Restaurar acesso",
+    "checkAgain": "Verificar novamente",
+    "switchOrg": "Trocar para outro workspace",
+    "logout": "Sair"
+  },
+  "accessNotice": {
+    "trial_ending": "Seu teste gratuito termina em {date}. Escolha um plano para manter seu agente funcionando.",
+    "payment_failed": "Seu último pagamento falhou. Atualize a forma de pagamento antes de {lockDate} para evitar interrupções.",
+    "defaultCta": "Gerenciar cobrança",
+    "dismiss": "Fechar"
+  }
+}

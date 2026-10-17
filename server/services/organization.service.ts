@@ -2,6 +2,10 @@ import { AppDataSource } from "@server/database/data-source";
 import { Organization } from "@server/entities/organization.entity";
 import type { DeepPartial, QueryDeepPartialEntity } from "typeorm";
 import { StorageService } from "./storage.service";
+import { vectorStoreService } from "./vector-store.service";
+import { createLogger } from "@server/lib/logger";
+
+const logger = createLogger("organization-service");
 
 class OrganizationService {
   private repository = AppDataSource.getRepository(Organization);
@@ -86,8 +90,61 @@ class OrganizationService {
     return updated;
   }
 
-  async delete(id: string): Promise<void> {
-    await this.repository.delete(id);
+  /**
+   * Delete an organization and every piece of data that belongs to it.
+   * Shared by the owner-facing `organizations.delete` procedure and the
+   * operator-facing `internal.organizations.delete`.
+   */
+  async deleteWithData(organization: Organization): Promise<void> {
+    const orgId = organization.id;
+
+    // Use transaction to ensure all related data is deleted
+    await AppDataSource.transaction(async (manager) => {
+      // Delete organization logo from storage if exists
+      if (organization.logoUploadId) {
+        try {
+          await this.storageService.delete(organization.logoUploadId);
+        } catch (error) {
+          logger.error({ err: error, orgId }, "Failed to delete organization logo");
+          // Continue with deletion even if logo deletion fails
+        }
+      }
+
+      // Delete embeddings from vector store within the transaction
+      await vectorStoreService.deleteByOrganizationId(orgId, manager);
+
+      // Product embeddings live in a separate table (product_embeddings) and
+      // are NOT FK-cascaded onto organizations through the entity layer, so
+      // delete them explicitly here in the same transaction.
+      const { productVectorStoreService } =
+        await import("@server/services/product-vector-store.service");
+      await productVectorStoreService.deleteByOrganizationId(orgId, manager);
+
+      // Delete organization - CASCADE will handle most related entities:
+      // - Agents (onDelete: CASCADE)
+      // - Conversations (onDelete: CASCADE) -> Messages (onDelete: CASCADE)
+      // - Documents (onDelete: CASCADE) -> Embeddings (onDelete: CASCADE)
+      // - Customers (onDelete: CASCADE)
+      // - Playbooks (onDelete: CASCADE)
+      // - Sources (onDelete: CASCADE)
+      // - WebchatSettings (onDelete: CASCADE)
+      // - UserOrganizations (onDelete: CASCADE)
+      // - OrganizationInvitations (onDelete: CASCADE)
+      // - ApiKeys (onDelete: CASCADE)
+      // - Jobs (onDelete: CASCADE)
+      // - Uploads (onDelete: CASCADE)
+      // - PluginInstances (onDelete: CASCADE)
+      // - ScheduledJobs (onDelete: CASCADE)
+      // - AuditLogs (onDelete: CASCADE)
+      // - PrivacyRequests (onDelete: CASCADE)
+      // - Products / ProductVariants (onDelete: CASCADE; product_embeddings
+      //   handled above because it's a raw-SQL table without an entity FK)
+      await manager.getRepository(Organization).delete({ id: orgId });
+    });
+
+    // Note: Can't log to audit_logs since the org is deleted
+    // TODO: Log to external audit service for compliance tracking
+    logger.info({ orgName: organization.name, orgId }, "Organization deleted");
   }
 
   async list(options?: {
