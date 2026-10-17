@@ -25,10 +25,12 @@ import { pluginApiTrpcRouter } from "./plugin-api/trpc";
 import { gitConnectionsRouter } from "./git-connections";
 import { docsAuditRouter } from "./docs-audit";
 import { productsRouter } from "./products";
+import { internalRouter } from "./internal";
 
 // Core routers - always available
 const coreRouters = {
   auth: authRouter,
+  internal: internalRouter,
   documents: documentsRouter,
   documentSources: documentSourcesRouter,
   agents: agentsRouter,

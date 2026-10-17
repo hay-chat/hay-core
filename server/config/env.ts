@@ -260,6 +260,13 @@ export const config = {
     host: process.env.POSTHOG_HOST || "https://eu.i.posthog.com",
   },
 
+  // Server-to-server secret for the `internal.*` tRPC procedures (used by an
+  // external operator, e.g. a hosted-plan backoffice, to suspend organizations).
+  // Empty disables those procedures entirely — the default for self-hosting.
+  internal: {
+    apiSecret: process.env.INTERNAL_API_SECRET || "",
+  },
+
   github: {
     appId: process.env.GITHUB_APP_ID || "",
     appPrivateKey: (process.env.GITHUB_APP_PRIVATE_KEY || "").replace(/\\n/g, "\n"),

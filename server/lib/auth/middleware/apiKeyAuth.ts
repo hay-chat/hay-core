@@ -68,6 +68,10 @@ export async function authenticateApiKeyAuth(authHeader?: string): Promise<AuthU
     throw new Error("Associated organization is deactivated");
   }
 
+  if (matchedApiKey.organization.suspendedAt) {
+    throw new Error("Associated organization is suspended");
+  }
+
   // Update last used timestamp
   matchedApiKey.lastUsedAt = new Date();
   await apiKeyRepository.save(matchedApiKey);
