@@ -6,6 +6,7 @@ import { observable } from "@trpc/server/observable";
 import { useAuthStore } from "@/stores/auth";
 import { useUserStore } from "@/stores/user";
 import { reportServerError } from "@/composables/useServerStatus";
+import { redirectForSuspension, SUSPENDED_ROUTE } from "@/composables/useSuspension";
 
 // Helper function to get auth cookie
 function getAuthToken(): string {
@@ -114,6 +115,29 @@ const errorLink: TRPCLink<AppRouter> = () => {
               httpStatus: data?.httpStatus,
               fullData: data,
             });
+
+            // The organization was suspended by the operator: lock the dashboard.
+            // FORBIDDEN never matches the auth heuristics below, so no logout.
+            if (data?.code === "FORBIDDEN" && data?.type === "ORGANIZATION_SUSPENDED") {
+              const userStore = useUserStore();
+              userStore.markActiveOrganizationSuspended(data.reason ?? null);
+
+              if (
+                typeof window !== "undefined" &&
+                !window.location.pathname.startsWith(SUSPENDED_ROUTE)
+              ) {
+                const organization = userStore.activeOrganization;
+                setTimeout(async () => {
+                  const redirected = organization
+                    ? await redirectForSuspension(organization)
+                    : false;
+                  if (!redirected) navigateTo(SUSPENDED_ROUTE);
+                }, 0);
+              }
+
+              observer.error(err);
+              return;
+            }
 
             // Check for authentication errors in various formats
             if (

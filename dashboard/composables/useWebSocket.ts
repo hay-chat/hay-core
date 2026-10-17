@@ -5,6 +5,7 @@ import {
   type WebSocketMessage,
 } from "@/utils/websocket";
 import { useNotifications } from "@/composables/useNotifications";
+import type { OrganizationAccessState } from "@/stores/user";
 
 type WebSocketEventHandler = (data: unknown) => void;
 
@@ -195,6 +196,10 @@ export function useWebSocket() {
         // Could handle new message notifications here
         break;
 
+      case "organization_access_changed":
+        void handleOrganizationAccessChanged(message.payload);
+        break;
+
       case "connected":
         break;
 
@@ -236,6 +241,25 @@ export function useWebSocket() {
         `${payload.userName} has taken over the conversation you were handling`,
         10000,
       );
+    }
+  };
+
+  /**
+   * The operator changed this organization's access state (suspension lifted
+   * or applied, notice updated). Update the store; when the org just got
+   * suspended, reload so the auth middleware applies the lock/redirect.
+   */
+  const handleOrganizationAccessChanged = async (payload: unknown) => {
+    const { useUserStore } = await import("@/stores/user");
+    const userStore = useUserStore();
+    const organizationId = userStore.activeOrganizationId;
+    if (!organizationId || typeof payload !== "object" || payload === null) return;
+
+    const wasSuspended = userStore.isSuspended;
+    userStore.applyAccessState(organizationId, payload as OrganizationAccessState);
+
+    if (!wasSuspended && userStore.isSuspended) {
+      window.location.reload();
     }
   };
 

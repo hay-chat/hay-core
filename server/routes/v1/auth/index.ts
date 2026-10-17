@@ -28,6 +28,8 @@ import { getDashboardUrl } from "@server/config/env";
 import { StorageService } from "@server/services/storage.service";
 import { handleUpload } from "@server/lib/upload-helper";
 import { rateLimitService } from "@server/services/rate-limit.service";
+import { toAccessState } from "@server/services/organization-access.service";
+import { SUSPENSION_REASONS, accessNoticeSchema } from "@server/types/organization-access.types";
 import { createLogger } from "@server/lib/logger";
 
 const logger = createLogger("auth");
@@ -56,6 +58,7 @@ async function getUserOrganizations(userId: string) {
     permissions: userOrg.permissions,
     joinedAt: userOrg.joinedAt,
     lastAccessedAt: userOrg.lastAccessedAt,
+    ...toAccessState(userOrg.organization),
   }));
 }
 
@@ -638,6 +641,10 @@ export const authRouter = t.router({
             permissions: z.array(z.string()).nullable().optional(),
             joinedAt: z.union([z.date(), z.string()]).optional(),
             lastAccessedAt: z.union([z.date(), z.string()]).nullable().optional(),
+            suspendedAt: z.union([z.date(), z.string()]).nullable(),
+            suspensionReason: z.enum(SUSPENSION_REASONS).nullable(),
+            suspensionRedirectUrl: z.string().nullable(),
+            accessNotice: accessNoticeSchema.nullable(),
           }),
         ),
         activeOrganizationId: z.string().optional(),

@@ -40,6 +40,7 @@ export type AuditAction =
   | "organization.invitation.resend"
   | "organization.member.role_change"
   | "organization.member.remove"
+  | "organization.access_state_changed"
   | "agent.create"
   | "agent.update"
   | "agent.delete"

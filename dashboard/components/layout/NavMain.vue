@@ -59,7 +59,7 @@
 <script setup lang="ts">
 import { reactive, watchEffect, type Component } from "vue";
 import { ChevronRight, ExternalLink } from "lucide-vue-next";
-import { Hay } from "@/utils/api";
+import { useExternalLink } from "@/composables/useExternalLink";
 
 interface NavItem {
   title: string;
@@ -99,14 +99,9 @@ const toggleExpanded = (title: string) => {
   expanded[title] = !expanded[title];
 };
 
-async function handleExternalClick(url: string) {
-  try {
-    const result = await Hay.auth.generateAuthCode.mutate();
-    const separator = url.includes("?") ? "&" : "?";
-    window.open(`${url}${separator}code=${result.code}`, "_blank");
-  } catch (error) {
-    console.error("Failed to generate auth code:", error);
-    window.open(url, "_blank");
-  }
+const { open: openExternalLink } = useExternalLink();
+
+function handleExternalClick(url: string) {
+  void openExternalLink(url);
 }
 </script>

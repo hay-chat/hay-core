@@ -17,6 +17,7 @@ import {
   DEFAULT_TIMEZONE,
   type OrganizationSettings,
 } from "../types/organization-settings.types";
+import type { AccessNotice, SuspensionReason } from "../types/organization-access.types";
 
 @Entity("organizations")
 @Index("idx_organizations_slug", ["slug"])
@@ -36,6 +37,21 @@ export class Organization extends BaseEntity {
 
   @Column({ type: "boolean", default: true })
   isActive!: boolean;
+
+  // Access state driven by an external operator through internal.organizations.*
+  // (see types/organization-access.types.ts). Distinct from isActive, which
+  // hard-disables the org and hides it from listings.
+  @Column({ type: "timestamptz", nullable: true })
+  suspendedAt?: Date | null;
+
+  @Column({ type: "varchar", length: 50, nullable: true })
+  suspensionReason?: SuspensionReason | null;
+
+  @Column({ type: "varchar", length: 2048, nullable: true })
+  suspensionRedirectUrl?: string | null;
+
+  @Column({ type: "jsonb", nullable: true })
+  accessNotice?: AccessNotice | null;
 
   @Column({ type: "varchar", length: 255, nullable: true })
   website?: string;

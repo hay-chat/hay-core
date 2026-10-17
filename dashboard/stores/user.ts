@@ -1,6 +1,31 @@
 import { defineStore } from "pinia";
 
-export interface Organization {
+const SUSPENSION_REASONS = ["trial_expired", "payment_failed", "cancelled", "manual"] as const;
+export type SuspensionReason = (typeof SUSPENSION_REASONS)[number];
+
+export function isSuspensionReason(value: unknown): value is SuspensionReason {
+  return typeof value === "string" && (SUSPENSION_REASONS as readonly string[]).includes(value);
+}
+
+export interface AccessNotice {
+  key: string;
+  level: "info" | "warning" | "critical";
+  params?: Record<string, string | number>;
+  text?: string;
+  ctaUrl?: string;
+  ctaLabel?: string;
+  expiresAt?: string;
+}
+
+/** Access state set by the operator (see server/types/organization-access.types.ts). */
+export interface OrganizationAccessState {
+  suspendedAt?: Date | string | null;
+  suspensionReason?: SuspensionReason | null;
+  suspensionRedirectUrl?: string | null;
+  accessNotice?: AccessNotice | null;
+}
+
+export interface Organization extends OrganizationAccessState {
   id: string;
   name: string;
   slug: string;
@@ -57,6 +82,20 @@ export const useUserStore = defineStore("user", {
     isAgent: (state) => {
       const activeOrg = state.organizations.find((org) => org.id === state.activeOrganizationId);
       return activeOrg?.role === "agent";
+    },
+
+    isSuspended: (state) => {
+      const activeOrg = state.organizations.find((org) => org.id === state.activeOrganizationId);
+      return !!activeOrg?.suspendedAt;
+    },
+
+    /** The active organization's notice, or null once it has expired. */
+    activeAccessNotice: (state): AccessNotice | null => {
+      const activeOrg = state.organizations.find((org) => org.id === state.activeOrganizationId);
+      const notice = activeOrg?.accessNotice;
+      if (!notice) return null;
+      if (notice.expiresAt && new Date(notice.expiresAt).getTime() < Date.now()) return null;
+      return notice;
     },
 
     // Helper to check if user has a specific scope
@@ -279,6 +318,27 @@ export const useUserStore = defineStore("user", {
           this.user.onlineStatus = "online";
         }
       }
+    },
+
+    /**
+     * Apply an access state pushed by the server (WebSocket event, suspension
+     * error) to one of the user's organizations.
+     */
+    applyAccessState(organizationId: string, state: OrganizationAccessState) {
+      const organization = this.organizations.find((org) => org.id === organizationId);
+      if (!organization) return;
+      organization.suspendedAt = state.suspendedAt ?? null;
+      organization.suspensionReason = state.suspensionReason ?? null;
+      organization.suspensionRedirectUrl = state.suspensionRedirectUrl ?? null;
+      organization.accessNotice = state.accessNotice ?? null;
+    },
+
+    /** Mark the active organization suspended after the API refused a call. */
+    markActiveOrganizationSuspended(reason: string | null) {
+      const organization = this.organizations.find((org) => org.id === this.activeOrganizationId);
+      if (!organization || organization.suspendedAt) return;
+      organization.suspendedAt = new Date();
+      organization.suspensionReason = isSuspensionReason(reason) ? reason : null;
     },
 
     setActiveOrganization(organizationId: string) {
