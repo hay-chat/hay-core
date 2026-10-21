@@ -57,6 +57,20 @@ jest.mock("@server/services/storage.service", () => ({
   storageService: { upload: mockUpload },
 }));
 
+const mockTranscribe =
+  jest.fn<
+    (input: {
+      buffer: Buffer;
+      mimeType: string;
+      filename: string;
+      organizationId: string;
+    }) => Promise<string | null>
+  >();
+jest.mock("@server/services/transcription.service", () => ({
+  transcriptionService: { transcribe: mockTranscribe },
+}));
+jest.mock("@server/services/oauth.service", () => ({ oauthService: {} }));
+
 import { pluginApiTrpcRouter } from "@server/routes/v1/plugin-api/trpc";
 import type { PluginAuthContext } from "@server/trpc/middleware/plugin-auth";
 
@@ -148,6 +162,62 @@ describe("pluginApi.media.upload", () => {
         filename: "a.png",
       }),
     ).rejects.toMatchObject({ code: "FORBIDDEN" });
+  });
+});
+
+describe("pluginApi.media.upload transcription", () => {
+  const audio = Buffer.from("OggS fake voice note");
+  const upload = (input: { mimeType: string; filename: string; transcribe?: boolean }) =>
+    caller()["media.upload"]({ data: audio.toString("base64"), ...input });
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockUpload.mockResolvedValue({ upload: { id: "upload-1" }, url: "http://localhost/u/x" });
+  });
+
+  it("returns the transcript for audio when transcribe is true", async () => {
+    mockTranscribe.mockResolvedValue("hello there");
+
+    const result = await upload({ mimeType: "audio/ogg", filename: "voice", transcribe: true });
+
+    expect(mockTranscribe).toHaveBeenCalledWith({
+      buffer: audio,
+      mimeType: "audio/ogg",
+      filename: "voice",
+      organizationId: ORG_ID,
+    });
+    expect(result).toEqual({
+      id: "upload-1",
+      name: "voice",
+      url: "http://localhost/u/x",
+      type: "audio/ogg",
+      size: audio.length,
+      transcript: "hello there",
+    });
+  });
+
+  it("does not transcribe non-audio media", async () => {
+    const result = await upload({ mimeType: "image/png", filename: "a.png", transcribe: true });
+
+    expect(mockTranscribe).not.toHaveBeenCalled();
+    expect(result).not.toHaveProperty("transcript");
+  });
+
+  it("omits transcript when STT returns null", async () => {
+    mockTranscribe.mockResolvedValue(null);
+
+    const result = await upload({ mimeType: "audio/ogg", filename: "v.ogg", transcribe: true });
+
+    expect(mockTranscribe).toHaveBeenCalledTimes(1);
+    expect(result).not.toHaveProperty("transcript");
+    expect(result).toMatchObject({ id: "upload-1", type: "audio/ogg" });
+  });
+
+  it("does not transcribe when transcribe is omitted", async () => {
+    const result = await upload({ mimeType: "audio/ogg", filename: "v.ogg" });
+
+    expect(mockTranscribe).not.toHaveBeenCalled();
+    expect(result).not.toHaveProperty("transcript");
   });
 });
 

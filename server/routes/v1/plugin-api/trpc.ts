@@ -17,6 +17,8 @@ import {
 import { mcpRegistryService } from "@server/services/mcp-registry.service";
 import { redisService } from "@server/services/redis.service";
 import { storageService } from "@server/services/storage.service";
+import { transcriptionService } from "@server/services/transcription.service";
+import { oauthService } from "@server/services/oauth.service";
 import { randomUUID } from "crypto";
 import { productSyncService } from "@server/services/product-sync.service";
 import { ProductStatus } from "@server/entities/product.entity";
@@ -497,6 +499,9 @@ export const pluginApiTrpcRouter = router({
    * Plugins download provider media (e.g. Meta's short-lived media URLs) and
    * push the bytes here so the message's attachment points at Hay storage.
    * Returns the attachment shape expected by `messages.receive`.
+   *
+   * With `transcribe` on audio, also returns `transcript` (speech-to-text).
+   * Transcription is best effort: absent when unavailable, never fails the upload.
    */
   "media.upload": pluginProcedure
     .input(
@@ -504,6 +509,7 @@ export const pluginApiTrpcRouter = router({
         data: z.string().min(1),
         mimeType: z.string().min(1),
         filename: z.string().min(1).max(255),
+        transcribe: z.boolean().optional(),
       }),
     )
     .mutation(async ({ input, ctx }) => {
@@ -514,22 +520,16 @@ export const pluginApiTrpcRouter = router({
         throw new TRPCError({ code: "BAD_REQUEST", message: "Invalid base64 payload" });
       }
 
+      const organizationId = ctx.pluginAuth.organizationId;
+      let stored: Awaited<ReturnType<typeof storageService.upload>>;
       try {
-        const { upload, url } = await storageService.upload({
+        stored = await storageService.upload({
           buffer,
           originalName: input.filename,
           mimeType: input.mimeType,
           folder: "conversation-media",
-          organizationId: ctx.pluginAuth.organizationId,
+          organizationId,
         });
-
-        return {
-          id: upload.id,
-          name: input.filename,
-          url,
-          type: input.mimeType,
-          size: buffer.length,
-        };
       } catch (error) {
         // Storage rejects disallowed mime types and oversized files with plain
         // errors — those are caller mistakes, not server faults.
@@ -538,6 +538,48 @@ export const pluginApiTrpcRouter = router({
           message: error instanceof Error ? error.message : "Upload failed",
         });
       }
+
+      const attachment = {
+        id: stored.upload.id,
+        name: input.filename,
+        url: stored.url,
+        type: input.mimeType,
+        size: buffer.length,
+      };
+
+      if (!input.transcribe || !input.mimeType.toLowerCase().startsWith("audio/")) {
+        return attachment;
+      }
+
+      const transcript = await transcriptionService.transcribe({
+        buffer,
+        mimeType: input.mimeType,
+        filename: input.filename,
+        organizationId,
+      });
+      return transcript ? { ...attachment, transcript } : attachment;
+    }),
+
+  /**
+   * Messages Capability - Report that the provider revoked this plugin's credentials.
+   *
+   * Channel plugins call this when the provider signals the connection is gone
+   * (e.g. app uninstalled, token invalidated). Core disconnects the instance
+   * after responding, because the revoke stops the calling worker.
+   */
+  "connection.revoke": pluginProcedure
+    .input(z.object({ reason: z.string().min(1).max(200) }))
+    .mutation(({ input, ctx }) => {
+      requireCapability(ctx, "messages");
+
+      const { organizationId, pluginId } = ctx.pluginAuth;
+      logger.warn(
+        { organizationId, pluginId, reason: input.reason },
+        "Plugin reported revoked connection",
+      );
+      scheduleConnectionRevoke(organizationId, pluginId);
+
+      return { revoked: true as const };
     }),
 
   /**
@@ -1125,4 +1167,16 @@ async function getAgentForChannel(organizationId: string, channel: string): Prom
 
   // 3. First available agent.
   return agents[0]?.id || null;
+}
+
+/**
+ * Run `oauthService.revokeOAuth` on the next tick, after the plugin's
+ * `connection.revoke` call has been answered — the revoke stops that worker.
+ */
+export function scheduleConnectionRevoke(organizationId: string, pluginId: string): void {
+  setImmediate(() => {
+    oauthService.revokeOAuth(organizationId, pluginId).catch((error: unknown) => {
+      logger.error({ err: error, organizationId, pluginId }, "Failed to revoke plugin connection");
+    });
+  });
 }
