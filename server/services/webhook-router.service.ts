@@ -456,9 +456,6 @@ export class WebhookRouterService {
     // not match. Core already verified the shared signature over the raw bytes,
     // so tell the worker to trust this request.
     headers["x-hay-webhook-verified"] = "true";
-    // Pass the reconstructed (per-org) body as the raw body too, so a worker
-    // that reads x-original-body-base64 sees exactly what it is being given.
-    headers["x-original-body-base64"] = Buffer.from(serialized, "utf8").toString("base64");
 
     const workerUrl = `http://localhost:${worker.port}/webhook`;
 
@@ -475,22 +472,14 @@ export class WebhookRouterService {
   }
 
   /**
-   * Read the exact raw request bytes captured upstream. The body-parser
-   * `verify` hook in main.ts populates `req.rawBody`; the proxy also forwards
-   * it as base64 in `x-original-body-base64`.
+   * Read the exact raw request bytes captured by the body-parser `verify`
+   * hook in main.ts (`req.rawBody`).
    */
   private getRawBody(req: Request): Buffer | null {
     const rawBody = (req as Request & { rawBody?: string }).rawBody;
     if (typeof rawBody === "string" && rawBody.length > 0) {
       return Buffer.from(rawBody, "utf8");
     }
-
-    const encoded = req.headers["x-original-body-base64"];
-    const value = Array.isArray(encoded) ? encoded[0] : encoded;
-    if (typeof value === "string" && value.length > 0) {
-      return Buffer.from(value, "base64");
-    }
-
     return null;
   }
 }

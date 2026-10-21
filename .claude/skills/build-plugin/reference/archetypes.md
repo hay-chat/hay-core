@@ -77,7 +77,7 @@ core. The inbound contract is `messages.receive({ from, content, channel, sender
 externalConversationId?, metadata })`.
 
 **Reference (best signature verification): `chatwoot`.** `src/webhook.ts` does HMAC-SHA256 over
-**raw bytes** (`x-original-body-base64`), with a 300s **replay window** and
+**raw bytes** (`req.rawBody`), with a 300s **replay window** and
 `crypto.timingSafeEqual`. It also filters bot echoes/private notes/templates and syncs
 conversation status. Prefer this over validating a re-encoded body with a provider SDK, which is
 more fragile.

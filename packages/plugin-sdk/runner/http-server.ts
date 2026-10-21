@@ -35,6 +35,14 @@ interface RegisteredMcpServer {
   options?: any; // ExternalMcpOptions for external servers
 }
 
+export const WORKER_BODY_LIMIT = "5mb";
+
+function captureRawBody(req: Request, _res: Response, buf: Buffer): void {
+  if (buf?.length) {
+    (req as Request & { rawBody?: string }).rawBody = buf.toString("utf8");
+  }
+}
+
 export class PluginHttpServer {
   private app: Express;
   private server: Server | null = null;
@@ -55,9 +63,13 @@ export class PluginHttpServer {
     this.registry = registry;
     this.app = express();
 
-    // Middleware
-    this.app.use(express.json());
-    this.app.use(express.urlencoded({ extended: true }));
+    // Middleware. Core forwards provider webhooks byte-for-byte (Meta payloads
+    // reach 3 MB), and plugins verifying HMAC signatures need the exact bytes,
+    // which `verify` exposes as `req.rawBody`.
+    this.app.use(express.json({ limit: WORKER_BODY_LIMIT, verify: captureRawBody }));
+    this.app.use(
+      express.urlencoded({ extended: true, limit: WORKER_BODY_LIMIT, verify: captureRawBody }),
+    );
 
     // Setup routes
     this.setupHealthEndpoint();
@@ -913,10 +925,13 @@ export class PluginHttpServer {
   private setupErrorHandler(): void {
     this.app.use((err: any, _req: Request, res: Response, _next: any) => {
       const errorMsg = err instanceof Error ? err.message : String(err);
-      this.logger.error("Unhandled error in HTTP server", { error: errorMsg });
+      // body-parser errors (413 too large, 400 malformed) carry their own status.
+      const status =
+        typeof err?.status === "number" && err.status >= 400 && err.status < 600 ? err.status : 500;
+      this.logger.error("Unhandled error in HTTP server", { error: errorMsg, status });
 
       if (!res.headersSent) {
-        res.status(500).json({ error: "Internal server error" });
+        res.status(status).json({ error: status === 500 ? "Internal server error" : errorMsg });
       }
     });
   }
