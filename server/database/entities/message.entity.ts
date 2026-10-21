@@ -6,6 +6,7 @@ import {
   UpdateDateColumn,
   ManyToOne,
   JoinColumn,
+  Index,
 } from "typeorm";
 import { Conversation } from "./conversation.entity";
 import { Source } from "./source.entity";
@@ -52,6 +53,22 @@ export enum MessageStatus {
   EDITED = "edited",
 }
 
+export type MessageProviderStatus = "sent" | "delivered" | "read" | "failed";
+
+export interface MessageProviderError {
+  code?: string | number;
+  title?: string;
+  message?: string;
+}
+
+export interface MessageAttachment {
+  id: string;
+  name: string;
+  url: string;
+  type: string;
+  size: number;
+}
+
 @Entity("messages")
 export class Message {
   @PrimaryGeneratedColumn("uuid")
@@ -82,8 +99,20 @@ export class Message {
   })
   direction!: MessageDirection;
 
+  @Index("idx_messages_provider_message_id")
   @Column({ type: "varchar", length: 255, nullable: true })
   providerMessageId!: string | null;
+
+  /**
+   * Delivery status reported by the channel provider (e.g. Meta WhatsApp
+   * status webhooks). Independent from `deliveryState`, which is the
+   * test-mode approval gate and must never carry provider statuses.
+   */
+  @Column({ type: "varchar", length: 20, nullable: true })
+  providerStatus!: MessageProviderStatus | null;
+
+  @Column({ type: "jsonb", nullable: true })
+  providerError!: MessageProviderError | null;
 
   @Column({ type: "jsonb", nullable: true })
   usage_metadata!: Record<string, unknown> | null;
@@ -160,13 +189,7 @@ export class Message {
   updated_at!: Date;
 
   @Column({ type: "jsonb", nullable: true })
-  attachments!: Array<{
-    id: string;
-    name: string;
-    url: string;
-    type: string;
-    size: number;
-  }>;
+  attachments!: MessageAttachment[];
 
   @Column({
     type: "enum",

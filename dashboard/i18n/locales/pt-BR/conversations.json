@@ -1,6 +1,10 @@
 {
   "conversations": {
     "untitled": "Conversa sem título",
+    "delivery": {
+      "failed": "Falha na entrega",
+      "windowExpired": "Fora da janela de 24 horas — o cliente precisa enviar uma mensagem primeiro"
+    },
     "page": {
       "title": "Conversas",
       "description": "Monitore e gerencie todas as conversas com clientes",

@@ -52,6 +52,22 @@ export class MessageRepository {
       .getOne();
   }
 
+  /**
+   * Find message by the channel provider's message id (e.g. Meta wamid),
+   * scoped to the organization through the parent conversation.
+   */
+  async findByProviderMessageIdAndOrganization(
+    providerMessageId: string,
+    organizationId: string,
+  ): Promise<Message | null> {
+    return await this.getRepository()
+      .createQueryBuilder("message")
+      .innerJoin("message.conversation", "conversation")
+      .where("message.provider_message_id = :providerMessageId", { providerMessageId })
+      .andWhere("conversation.organization_id = :organizationId", { organizationId })
+      .getOne();
+  }
+
   async findByConversation(conversationId: string): Promise<Message[]> {
     return await this.getRepository().find({
       where: { conversation_id: conversationId },
