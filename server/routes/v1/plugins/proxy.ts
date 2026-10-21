@@ -14,7 +14,7 @@ const router = Router();
  * Proxy all requests to plugin workers
  * URL pattern: /v1/plugins/:pluginId/*
  *
- * Plugin IDs are plain strings without slashes (e.g., hay-channel-whatsapp-twilio).
+ * Plugin IDs are plain strings without slashes (e.g., hay-channel-instagram-meta).
  * Match groups: [1] = pluginId, [2] = remaining path
  */
 router.all(/^\/([^/]+)\/(.*)?$/, async (req: Request, res: Response) => {

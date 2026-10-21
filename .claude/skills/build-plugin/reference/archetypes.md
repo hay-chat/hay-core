@@ -79,8 +79,8 @@ externalConversationId?, metadata })`.
 **Reference (best signature verification): `chatwoot`.** `src/webhook.ts` does HMAC-SHA256 over
 **raw bytes** (`x-original-body-base64`), with a 300s **replay window** and
 `crypto.timingSafeEqual`. It also filters bot echoes/private notes/templates and syncs
-conversation status. Prefer this over WhatsApp's approach (which delegates to the Twilio lib over
-a re-encoded body and is more fragile).
+conversation status. Prefer this over validating a re-encoded body with a provider SDK, which is
+more fragile.
 
 **Reference (best inbound/outbound semantics): `email-imap`** (read `dist/` — see note below).
 Marks an IMAP message `\Seen` **only after** successful processing (at-least-once), wraps each
