@@ -46,11 +46,11 @@ Sizes are rough build-session estimates (one focused Claude session ≈ half a d
 ### Phase 0 — Meta console (Roger, manual, start now)
 
 - [ ] Open the "pending review" alerts in WhatsApp Manager; fix the missing payment method on Hay's own WABA (needed for demo/App Review videos).
-- [ ] Facebook Login for Business → Configurations → **new** config, login variation "Embedded Signup", products: Cloud API (v4 auto) → note `config_id`. Token expiry: never.
+- [x] Facebook Login for Business → Configurations → config "Hay.chat Wpp Embedded Signup", login variation Embedded Signup, product WhatsApp Cloud API only, token never expires, permissions `whatsapp_business_messaging` + `whatsapp_business_management` → `config_id` **1666846881828080** (done 2026-10-21).
 - [ ] WhatsApp → Configuration: set callback URL `https://<prod-api>/v1/plugins/<pluginId>/webhook` + verify token (`META_VERIFY_TOKEN`); subscribe fields `messages, account_update, account_alerts, phone_number_quality_update, phone_number_name_update, message_template_status_update, template_category_update, business_capability_update, history, smb_app_state_sync, smb_message_echoes`. (Can only be finished once Phase 2 is deployed — the GET handshake must answer.)
 - [ ] Enable 2FA on the admin account, add a second admin.
 - [ ] Open the "Tech Provider Integration" tab; complete Tech Provider onboarding.
-- [ ] Add `META_VERIFY_TOKEN` + ES `config_id` to prod env (Infisical).
+- [ ] Add `META_VERIFY_TOKEN` to prod env (Infisical). `META_WHATSAPP_ES_CONFIG_ID` already saved 2026-10-21.
 
 ### Phase 1 — Core enablers (1 PR, ~1 session)
 
