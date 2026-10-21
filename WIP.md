@@ -1,12 +1,12 @@
-## 2026-10-21 — claude/whatsapp-cloud (worktree ../hay-core-whatsapp-cloud) — Phase 1 core enablers, in progress
+## 2026-10-21 — claude/whatsapp-cloud (worktree ../hay-core-whatsapp-cloud) — Phase 1 DONE, PR open
 
-**Works (committed):** item 1 org-aware findPluginIdByChannel; item 5 revokeOAuth clears routes + stops worker;
-item 2 nested routeKeyPath + per-org changes[] filtering (docs submodule branch claude/whatsapp-cloud);
-item 8 Twilio plugin deleted (lockfile, env, docs, skills). Baseline: 5 integration suites need a live DB (pre-existing).
-**Half-built:** agents implementing item 3 (plugins.oauth.completeWithCode + serverOnly config flag — Instagram
-leaked META_APP_SECRET to its worker via env-backed config) and items 4+7 (messages.updateStatus, media.upload,
-attachments). Item 6 pending: raw body travels in x-original-body-base64 header → Node 16 KB header cap; must move to body.
-**Next:** commit 3, 4+7; implement 6 (proxy.ts, webhook-router forwardToOrg, SDK runner, chatwoot reader); typecheck + test:server; PR.
+**Works:** all 8 Phase 1 core enablers from `.claude/plans/whatsapp-cloud/PLAN.md` §3, one commit each
+(org-aware findPluginIdByChannel, nested routeKeyPath + per-org changes[] split, plugins.oauth.completeWithCode
++ serverOnly config, messages.updateStatus + attachments + media.upload, revoke clears routes/stops worker,
+raw body forwarded as worker body (5 MB), Twilio plugin deleted). Typecheck + lint clean; server tests = baseline
+(5 DB-only integration suites fail on master too). Docs submodule branch `claude/whatsapp-cloud` pushed to hay-docs.
+**Half-built:** nothing. Migration 1784400000000 (provider_status) not yet run anywhere.
+**Next:** merge PR → Phase 2 plugin build in a new session (needs META_WHATSAPP_ES_CONFIG_ID from Roger's Phase 0).
 
 ## 2026-08-31 — claude/error-tracking-noise — PR #77 open (+ hay-website PR #28)
 
