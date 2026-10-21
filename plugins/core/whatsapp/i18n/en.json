@@ -1,0 +1,132 @@
+{
+  "name": "WhatsApp",
+  "description": "Connect a WhatsApp Business number and exchange messages, media and voice notes through Hay's AI",
+  "tools": {},
+  "config": {},
+  "ui": {
+    "title": "Connect WhatsApp",
+    "intro": "Connect a WhatsApp Business number so Hay's AI can answer your customers on WhatsApp — text, media and voice notes.",
+    "loadingStatus": "Loading WhatsApp status…",
+    "statusError": {
+      "title": "Couldn't load the WhatsApp status",
+      "body": "Make sure the plugin is enabled and its settings are saved, then try again.",
+      "detail": "Details: {message}",
+      "noApi": "This dashboard version can't talk to the WhatsApp plugin. Reload the page.",
+      "retry": "Try again"
+    },
+    "tabs": {
+      "label": "How to connect",
+      "embedded": "Embedded Signup",
+      "manual": "Manual token",
+      "active": "active"
+    },
+    "embedded": {
+      "intro": "Connect your WhatsApp Business number in a Meta popup — no tokens to copy or paste.",
+      "notConfigured": "Embedded Signup isn't configured on this Hay server (META_APP_ID and META_WHATSAPP_ES_CONFIG_ID are not set). Use the Manual token tab instead.",
+      "notActive": "Embedded Signup isn't the active connection method. Choose \"Embedded Signup\" under Connection method above and save before connecting.",
+      "connect": "Connect WhatsApp",
+      "continue": "Open the Meta popup",
+      "tryAgain": "Try again",
+      "connectedHint": "Your number is connected through Embedded Signup. To connect a different number, disconnect above and connect again.",
+      "httpsHint": "Meta's popup only works over https. For local testing, expose the dashboard through a tunnel (ngrok or cloudflared) and add that origin to your Meta app's allowed domains.",
+      "stage": {
+        "loadingSdk": "Loading Meta…",
+        "ready": "Meta is ready. Click \"Open the Meta popup\" to continue.",
+        "popup": "Waiting for you to finish in the Meta popup…",
+        "finishing": "Finishing setup — checking your number with Meta…",
+        "connected": "WhatsApp connected.",
+        "cancelled": "Signup was cancelled. You can start again whenever you're ready.",
+        "cancelledAt": "Signup was cancelled at step \"{step}\". You can start again whenever you're ready.",
+        "error": "Something went wrong: {message}",
+        "unverified": "Connected, but Hay could not verify the phone number — try again or contact support.",
+        "sdkFailed": "Couldn't load Meta's sign-in script. Check that your browser or an extension isn't blocking connect.facebook.net."
+      },
+      "explainer": {
+        "title": "Good to know",
+        "ownership": "Your number stays yours — Hay connects to it through Meta, and you can disconnect at any time.",
+        "coexistence": "Already using the WhatsApp Business app on your phone? The popup offers to keep it (coexistence), so you can still reply from the app.",
+        "billing": "Meta bills WhatsApp messages to your business directly — Hay adds no fee. Each number gets 1,000 free service messages per month."
+      }
+    },
+    "manual": {
+      "intro": "For self-hosted Hay, or to connect a number from your own Meta app. You'll copy a few values from Meta into the form above.",
+      "active": "Manual token is the active connection method.",
+      "notActive": "Manual token isn't the active method yet — choose it under Connection method above and save.",
+      "steps": {
+        "app": {
+          "title": "Create a Meta app",
+          "body": "In <strong>Meta for Developers</strong>, create a <strong>Business</strong> type app and add the <strong>WhatsApp</strong> product. Connecting your own number this way makes you a Direct Integrator — no App Review needed."
+        },
+        "token": {
+          "title": "Generate a permanent token",
+          "body": "In <strong>Business Settings → Users → System users</strong>, create a system user, give it access to your app and WhatsApp account, and generate a token that <strong>never expires</strong> with the <code>whatsapp_business_messaging</code> and <code>whatsapp_business_management</code> permissions."
+        },
+        "ids": {
+          "title": "Copy your IDs",
+          "body": "In your app, open <strong>WhatsApp → API Setup</strong> and copy the <strong>Phone number ID</strong> and the <strong>WhatsApp Business Account ID</strong>."
+        },
+        "form": {
+          "title": "Fill in the form above",
+          "body": "Choose <strong>Manual token</strong> under Connection method, then paste the token, both IDs, your app secret (<strong>App settings → Basic</strong>) and a verify token of your choice. Save."
+        },
+        "webhook": {
+          "title": "Point Meta's webhook at Hay",
+          "body": "In your Meta app, open <strong>WhatsApp → Configuration</strong> and set this callback URL, with the same verify token you saved in Hay. Then subscribe to the <strong>messages</strong> webhook field.",
+          "copy": "Copy callback URL",
+          "copied": "Copied"
+        },
+        "register": {
+          "title": "Register the number",
+          "body": "If the number isn't registered for the Cloud API yet, register it in <strong>WhatsApp → API Setup</strong>."
+        }
+      }
+    },
+    "health": {
+      "title": "Connected number",
+      "refresh": "Refresh",
+      "number": "Number",
+      "displayName": "Display name",
+      "sending": "Sending",
+      "quality": "Quality rating",
+      "limit": "Messaging limit",
+      "coexistence": "WhatsApp Business app (coexistence)",
+      "coexistenceValue": "Also in use on the phone",
+      "sandbox": "This is a sandbox (test) number — it can only message recipients added in your Meta app.",
+      "lookupError": "Couldn't read the number's details from Meta: {message}",
+      "solution": "How to fix: {solution}",
+      "unknown": "Unknown",
+      "canSend": {
+        "AVAILABLE": "Available",
+        "LIMITED": "Limited",
+        "BLOCKED": "Blocked"
+      },
+      "qualityRating": {
+        "GREEN": "High",
+        "YELLOW": "Medium",
+        "RED": "Low",
+        "UNKNOWN": "Unknown"
+      },
+      "nameStatus": {
+        "APPROVED": "Approved",
+        "AVAILABLE_WITHOUT_REVIEW": "Available without review",
+        "PENDING_REVIEW": "Pending review",
+        "DECLINED": "Declined",
+        "EXPIRED": "Expired",
+        "NONE": "Not submitted"
+      },
+      "limits": {
+        "tier": "{count} customers / 24h",
+        "unlimited": "Unlimited"
+      }
+    },
+    "payment": {
+      "title": "Payment method",
+      "missing": "Meta bills you directly for WhatsApp messages. Add a payment method in WhatsApp Manager — without one, replies stop after the free 1,000 service messages per number per month.",
+      "open": "Add payment method in WhatsApp Manager",
+      "newTab": "opens in a new tab",
+      "recheck": "I've added it — check again",
+      "stillMissing": "No payment method found yet. It can take a minute to show up after you add it.",
+      "onFile": "Payment method on file"
+    }
+  }
+}
