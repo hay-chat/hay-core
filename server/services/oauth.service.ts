@@ -3,7 +3,7 @@ import { pluginRegistryRepository } from "../repositories/plugin-registry.reposi
 import { pluginWebhookRouteRepository } from "../repositories/plugin-webhook-route.repository";
 import { pluginManagerService } from "./plugin-manager.service";
 import { oauthStateService } from "./oauth-state.service";
-import { resolveConfigWithEnv } from "../lib/config-resolver";
+import { resolveConfigWithEnv, stripServerOnlyFields } from "../lib/config-resolver";
 import { getApiUrl } from "../config/env";
 import type {
   OAuthTokenData,
@@ -131,6 +131,187 @@ export class OAuthService {
   }
 
   /**
+   * Load everything an OAuth flow needs for one org + plugin: the registry
+   * entry, the org's instance, the plugin's oauth2 auth method and the client
+   * credentials resolved from instance config (with .env fallback) or the
+   * stored authState. Shared by initiate, callback, code-exchange and refresh.
+   *
+   * Throws TRPCError so tRPC callers surface a meaningful code; the callback
+   * path catches it and reports `error.message` as before.
+   */
+  private async resolveOAuthContext(
+    organizationId: string,
+    pluginId: string,
+  ): Promise<{
+    plugin: NonNullable<Awaited<ReturnType<typeof pluginRegistryRepository.findByPluginId>>>;
+    instance: NonNullable<Awaited<ReturnType<typeof pluginInstanceRepository.findByOrgAndPlugin>>>;
+    oauth2Method: AuthMethodDescriptor;
+    clientId: string;
+    clientSecret: string | null;
+    resolved: ReturnType<typeof resolveConfigWithEnv>;
+  }> {
+    const plugin = await pluginRegistryRepository.findByPluginId(pluginId);
+    if (!plugin) {
+      throw new TRPCError({ code: "NOT_FOUND", message: `Plugin ${pluginId} not found` });
+    }
+
+    const instance = await pluginInstanceRepository.findByOrgAndPlugin(organizationId, pluginId);
+    if (!instance) {
+      throw new TRPCError({
+        code: "NOT_FOUND",
+        message: `Plugin ${pluginId} not configured for this organization`,
+      });
+    }
+
+    if (!plugin.metadata?.authMethods) {
+      throw new TRPCError({
+        code: "BAD_REQUEST",
+        message: `Plugin ${pluginId} does not have metadata`,
+      });
+    }
+
+    const oauth2Method = plugin.metadata.authMethods.find(
+      (method: AuthMethodDescriptor) => method.type === "oauth2",
+    );
+    if (!oauth2Method) {
+      throw new TRPCError({
+        code: "BAD_REQUEST",
+        message: `Plugin ${pluginId} does not support OAuth`,
+      });
+    }
+    logger.debug({ methodId: oauth2Method.id }, "OAuth2 method found in metadata");
+
+    const clientIdFieldName = oauth2Method.clientId;
+    const clientSecretFieldName = oauth2Method.clientSecret;
+    if (!clientIdFieldName || !clientSecretFieldName) {
+      throw new TRPCError({
+        code: "BAD_REQUEST",
+        message: `OAuth2 method missing clientId or clientSecret field references`,
+      });
+    }
+
+    // Config resolver gives decrypted values with .env fallback; authState
+    // credentials are the legacy fallback for instances configured before
+    // config-backed OAuth fields existed.
+    const configSchema = plugin.metadata?.configSchema || {};
+    const resolved = resolveConfigWithEnv(
+      instance.config,
+      configSchema as Record<string, ConfigFieldDescriptor>,
+      {
+        decrypt: true,
+        maskSecrets: false, // We need actual values for OAuth flow
+      },
+    );
+
+    const clientId =
+      asCredentialString(resolved.metadata[clientIdFieldName]?.value) ||
+      asCredentialString(instance.authState?.credentials?.[clientIdFieldName]);
+    const clientSecret =
+      asCredentialString(resolved.metadata[clientSecretFieldName]?.value) ||
+      asCredentialString(instance.authState?.credentials?.[clientSecretFieldName]);
+
+    logger.debug(
+      { clientIdSet: !!clientId, clientSecretSet: !!clientSecret },
+      "OAuth client credentials resolved",
+    );
+
+    // Note: client_secret is optional (for CIMD, client_id is the redirect URI itself)
+    if (!clientId) {
+      throw new TRPCError({
+        code: "PRECONDITION_FAILED",
+        message: `OAuth client ID not configured for plugin ${pluginId}`,
+      });
+    }
+
+    return { plugin, instance, oauth2Method, clientId, clientSecret, resolved };
+  }
+
+  /**
+   * Complete an OAuth connection from a code the client obtained out-of-band
+   * (Meta Embedded Signup: the FB JS SDK pops up the signup dialog and hands a
+   * short-lived code to the dashboard, which posts it here).
+   *
+   * The exchange is `GET {tokenUrl}?client_id&client_secret&code` — no
+   * redirect_uri, no grant_type — per Meta's business-token exchange. The code
+   * has a 30 s TTL, so the exchange runs synchronously in this request.
+   *
+   * `extras` are client-supplied, untrusted values (e.g. `waba_id`,
+   * `phone_number_id` from the signup dialog). They are forwarded verbatim to
+   * the plugin's `onConnected` hook, which must verify them against the
+   * provider with the stored token before trusting them.
+   */
+  async completeWithCode(
+    organizationId: string,
+    pluginId: string,
+    code: string,
+    extras?: Record<string, unknown>,
+  ): Promise<{ success: true; onConnected: { ok: boolean; routingKeyCount: number } }> {
+    logger.info({ pluginId, organizationId }, "OAuth code exchange started");
+
+    const { oauth2Method, clientId, clientSecret } = await this.resolveOAuthContext(
+      organizationId,
+      pluginId,
+    );
+
+    if (!oauth2Method.tokenUrl) {
+      throw new TRPCError({ code: "BAD_REQUEST", message: `OAuth2 method missing tokenUrl` });
+    }
+    if (!clientSecret) {
+      throw new TRPCError({
+        code: "PRECONDITION_FAILED",
+        message: `OAuth client secret not configured for plugin ${pluginId}`,
+      });
+    }
+
+    const url = new URL(oauth2Method.tokenUrl);
+    url.searchParams.set("client_id", clientId);
+    url.searchParams.set("client_secret", clientSecret);
+    url.searchParams.set("code", code);
+
+    // Never log `url` — it carries the client secret.
+    const response = await fetch(url.toString(), { method: "GET" });
+    if (!response.ok) {
+      const errorText = await response.text();
+      logger.warn(
+        { pluginId, organizationId, status: response.status, errorText },
+        "OAuth code exchange failed",
+      );
+      throw new TRPCError({ code: "BAD_REQUEST", message: "OAuth code exchange failed" });
+    }
+
+    const data = (await response.json()) as {
+      access_token?: unknown;
+      token_type?: unknown;
+      expires_in?: unknown;
+      scope?: unknown;
+    };
+    const accessToken = asCredentialString(data.access_token);
+    if (!accessToken) {
+      logger.warn({ pluginId, organizationId }, "OAuth code exchange returned no access_token");
+      throw new TRPCError({
+        code: "BAD_REQUEST",
+        message: "OAuth code exchange returned no access token",
+      });
+    }
+
+    // Meta business tokens have no expiry; only compute expires_at when given.
+    const expiresIn = typeof data.expires_in === "number" ? data.expires_in : undefined;
+    const tokens: OAuthTokenData = {
+      access_token: accessToken,
+      token_type: asCredentialString(data.token_type) ?? "Bearer",
+      expires_in: expiresIn,
+      expires_at: expiresIn ? Math.floor(Date.now() / 1000) + expiresIn : undefined,
+      scope: asCredentialString(data.scope) ?? undefined,
+    };
+
+    await this.storeTokens(organizationId, pluginId, tokens, oauth2Method.scopes);
+    logger.info({ pluginId, organizationId }, "OAuth code exchange completed, tokens stored");
+
+    const onConnected = await this.runOnConnected(organizationId, pluginId, extras);
+    return { success: true, onConnected };
+  }
+
+  /**
    * Generate authorization URL for OAuth flow
    */
   async initiateOAuth(
@@ -141,36 +322,17 @@ export class OAuthService {
   ): Promise<{ authorizationUrl: string; state: string }> {
     logger.info({ pluginId, organizationId, userId }, "OAuth initiate started");
 
-    const plugin = await pluginRegistryRepository.findByPluginId(pluginId);
-    if (!plugin) {
-      throw new Error(`Plugin ${pluginId} not found`);
-    }
-
-    // Get plugin instance
-    const instance = await pluginInstanceRepository.findByOrgAndPlugin(organizationId, pluginId);
-    if (!instance) {
-      throw new Error(`Plugin ${pluginId} not configured for this organization`);
-    }
-
-    // Check metadata.authMethods for OAuth2 registration
-    if (!plugin.metadata?.authMethods) {
-      throw new Error(`Plugin ${pluginId} does not have metadata (metadata required)`);
-    }
-
-    logger.debug("Checking metadata.authMethods for OAuth2");
-    const oauth2Method = plugin.metadata.authMethods.find(
-      (method: AuthMethodDescriptor) => method.type === "oauth2",
+    const { oauth2Method, clientId, clientSecret, resolved } = await this.resolveOAuthContext(
+      organizationId,
+      pluginId,
     );
-
-    if (!oauth2Method) {
-      throw new Error(`Plugin ${pluginId} does not support OAuth`);
-    }
-
-    logger.debug({ methodId: oauth2Method.id }, "OAuth2 method found in metadata");
 
     // Validate required OAuth fields
     if (!oauth2Method.authorizationUrl || !oauth2Method.tokenUrl) {
-      throw new Error(`OAuth2 method missing required fields (authorizationUrl or tokenUrl)`);
+      throw new TRPCError({
+        code: "BAD_REQUEST",
+        message: `OAuth2 method missing required fields (authorizationUrl or tokenUrl)`,
+      });
     }
 
     // Extract OAuth configuration from metadata
@@ -186,49 +348,8 @@ export class OAuthService {
       tokenRefresh: oauth2Method.tokenRefresh,
     };
 
-    // Get client credentials from plugin instance using config resolver with env fallback
-    const clientIdFieldName = oauth2Method.clientId;
-    const clientSecretFieldName = oauth2Method.clientSecret;
-
-    if (!clientIdFieldName || !clientSecretFieldName) {
-      throw new Error(`OAuth2 method missing clientId or clientSecret field references`);
-    }
-
-    // Use config resolver to get values with .env fallback
-    const configSchema = plugin.metadata?.configSchema || {};
-    const resolved = resolveConfigWithEnv(
-      instance.config,
-      configSchema as Record<string, ConfigFieldDescriptor>,
-      {
-        decrypt: true,
-        maskSecrets: false, // We need actual values for OAuth flow
-      },
-    );
-
-    // Check resolved metadata for values (includes env fallback)
-    const clientId =
-      asCredentialString(resolved.metadata[clientIdFieldName]?.value) ||
-      asCredentialString(instance.authState?.credentials?.[clientIdFieldName]);
-    const clientSecret =
-      asCredentialString(resolved.metadata[clientSecretFieldName]?.value) ||
-      asCredentialString(instance.authState?.credentials?.[clientSecretFieldName]);
-
-    logger.debug(
-      { clientIdSet: !!clientId, clientSecretSet: !!clientSecret },
-      "OAuth client credentials resolved",
-    );
-
-    if (!clientId) {
-      throw new Error(`OAuth client ID not configured for plugin ${pluginId}`);
-    }
-
-    const credentials = { clientId, clientSecret };
-
     // Note: client_secret is optional (for CIMD, client_id is the redirect URI itself)
-    const validCredentials = {
-      clientId: credentials.clientId,
-      clientSecret: credentials.clientSecret,
-    };
+    const validCredentials = { clientId, clientSecret };
 
     // Generate state nonce
     const nonce = oauthStateService.generateNonce();
@@ -378,85 +499,31 @@ export class OAuthService {
     const { pluginId, organizationId, codeVerifier } = oauthState;
 
     try {
-      // Get plugin
       logger.debug({ pluginId }, "Loading plugin for OAuth callback");
-      const plugin = await pluginRegistryRepository.findByPluginId(pluginId);
-      if (!plugin) {
-        throw new Error(`Plugin ${pluginId} not found`);
-      }
-
-      // Get plugin instance
-      const instance = await pluginInstanceRepository.findByOrgAndPlugin(organizationId, pluginId);
-      if (!instance) {
-        throw new Error(`Plugin ${pluginId} not configured for this organization`);
-      }
-
-      // Check metadata.authMethods for OAuth2 registration
-      if (!plugin.metadata?.authMethods) {
-        throw new Error(`Plugin ${pluginId} does not have metadata`);
-      }
-
-      logger.debug("Checking metadata.authMethods for OAuth2");
-      const oauth2Method = plugin.metadata.authMethods.find(
-        (method: AuthMethodDescriptor) => method.type === "oauth2",
+      const { oauth2Method, clientId, clientSecret, resolved } = await this.resolveOAuthContext(
+        organizationId,
+        pluginId,
       );
-
-      if (!oauth2Method) {
-        throw new Error(`Plugin ${pluginId} does not support OAuth`);
-      }
-
-      logger.debug({ methodId: oauth2Method.id }, "OAuth2 method found in metadata");
 
       // Validate required OAuth fields
       if (!oauth2Method.tokenUrl) {
-        throw new Error(`OAuth2 method missing tokenUrl`);
+        throw new TRPCError({ code: "BAD_REQUEST", message: `OAuth2 method missing tokenUrl` });
       }
 
-      // Extract OAuth configuration from metadata
+      // Extract OAuth configuration from metadata. tokenExchange must be carried
+      // over: it is the post-callback transform (e.g. Instagram short → long-lived).
       const oauthConfig: OAuthManifestConfig = {
         authorizationUrl: oauth2Method.authorizationUrl || "",
         tokenUrl: oauth2Method.tokenUrl,
         scopes: oauth2Method.scopes || [],
         optionalScopes: oauth2Method.optionalScopes,
         pkce: true,
+        tokenExchange: oauth2Method.tokenExchange,
       };
 
       logger.debug({ tokenUrl: oauthConfig.tokenUrl }, "OAuth token URL resolved");
 
-      // Get client credentials from plugin instance using config resolver with env fallback
-      const clientIdFieldName = oauth2Method.clientId;
-      const clientSecretFieldName = oauth2Method.clientSecret;
-
-      if (!clientIdFieldName || !clientSecretFieldName) {
-        throw new Error(`OAuth2 method missing clientId or clientSecret field references`);
-      }
-
-      // Use config resolver to get values with .env fallback
-      const configSchema = plugin.metadata?.configSchema || {};
-      const resolved = resolveConfigWithEnv(
-        instance.config,
-        configSchema as Record<string, ConfigFieldDescriptor>,
-        {
-          decrypt: true,
-          maskSecrets: false, // We need actual values for OAuth flow
-        },
-      );
-
-      const clientId =
-        asCredentialString(resolved.metadata[clientIdFieldName]?.value) ||
-        asCredentialString(instance.authState?.credentials?.[clientIdFieldName]);
-      const clientSecret =
-        asCredentialString(resolved.metadata[clientSecretFieldName]?.value) ||
-        asCredentialString(instance.authState?.credentials?.[clientSecretFieldName]);
-
-      if (!clientId) {
-        throw new Error("OAuth client ID not configured");
-      }
-
-      const validCredentials = {
-        clientId,
-        clientSecret,
-      };
+      const validCredentials = { clientId, clientSecret };
 
       // Resolve per-tenant {shop} placeholder (e.g. Shopify) in the token URL.
       oauthConfig.tokenUrl = substituteShopPlaceholder(
@@ -756,9 +823,16 @@ export class OAuthService {
    * Core stays plugin-agnostic: it starts the worker, POSTs the freshly-stored
    * auth state to the worker's `/on-connected` endpoint, and persists whatever
    * opaque strings the plugin returns. Any failure is swallowed (logged) so the
-   * OAuth callback always succeeds.
+   * OAuth flow always succeeds; the returned `ok` lets callers surface a
+   * connected-but-not-routable state.
+   *
+   * `extras` are untrusted client-supplied values (see `completeWithCode`).
    */
-  private async runOnConnected(organizationId: string, pluginId: string): Promise<void> {
+  private async runOnConnected(
+    organizationId: string,
+    pluginId: string,
+    extras?: Record<string, unknown>,
+  ): Promise<{ ok: boolean; routingKeyCount: number }> {
     try {
       // Reload the instance to get its id + freshly-stored (decrypted) auth state.
       const instance = await pluginInstanceRepository.findByOrgAndPlugin(organizationId, pluginId);
@@ -767,8 +841,16 @@ export class OAuthService {
           { pluginId, organizationId },
           "No instance/authState for onConnected, skipping",
         );
-        return;
+        return { ok: false, routingKeyCount: 0 };
       }
+
+      // Server-only config fields (e.g. OAuth client secrets) never leave core.
+      const plugin = await pluginRegistryRepository.findByPluginId(pluginId);
+      const configSchema = (plugin?.metadata?.configSchema ?? {}) as Record<
+        string,
+        ConfigFieldDescriptor
+      >;
+      const config = stripServerOnlyFields(instance.config ?? {}, configSchema);
 
       const worker = await pluginManagerService.startPluginWorker(organizationId, pluginId);
 
@@ -776,8 +858,9 @@ export class OAuthService {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          config: instance.config ?? {},
+          config,
           authState: instance.authState,
+          extras,
         }),
       });
 
@@ -787,7 +870,7 @@ export class OAuthService {
           { pluginId, organizationId, status: response.status, errorText },
           "onConnected hook returned non-OK status, skipping route persistence",
         );
-        return;
+        return { ok: false, routingKeyCount: 0 };
       }
 
       const result = (await response.json()) as { routingKeys?: unknown; account?: unknown };
@@ -805,9 +888,11 @@ export class OAuthService {
 
       if (routingKeys.length === 0) {
         logger.debug({ pluginId, organizationId }, "onConnected returned no routing keys");
-        return;
+        return { ok: true, routingKeyCount: 0 };
       }
 
+      // Reconnecting with a different account must drop the previous account's keys.
+      await pluginWebhookRouteRepository.clearForInstance(instance.id);
       await pluginWebhookRouteRepository.upsertRoutes(
         pluginId,
         organizationId,
@@ -819,6 +904,7 @@ export class OAuthService {
         { pluginId, organizationId, routingKeyCount: routingKeys.length },
         "Persisted routing keys from onConnected hook",
       );
+      return { ok: true, routingKeyCount: routingKeys.length };
     } catch (error) {
       logger.warn(
         {
@@ -828,6 +914,7 @@ export class OAuthService {
         },
         "onConnected hook failed; continuing OAuth callback without routing keys",
       );
+      return { ok: false, routingKeyCount: 0 };
     }
   }
 
@@ -850,7 +937,16 @@ export class OAuthService {
     // the connection never actually disconnected.
     await pluginInstanceRepository.clearAuthState(instance.id, organizationId);
 
-    logger.debug({ organizationId }, `OAuth revoked for plugin ${pluginId}`);
+    // Provider webhooks for this instance's accounts must stop reaching the org,
+    // and the running worker still holds the revoked token in memory.
+    await pluginWebhookRouteRepository.clearForInstance(instance.id);
+    await pluginManagerService
+      .stopPluginWorker(organizationId, pluginId)
+      .catch((err) =>
+        logger.warn({ err, organizationId, pluginId }, "Failed to stop worker on revoke"),
+      );
+
+    logger.info({ organizationId, pluginId }, "OAuth revoked");
   }
 
   /**
@@ -904,28 +1000,10 @@ export class OAuthService {
    * Refresh OAuth access token
    */
   async refreshToken(organizationId: string, pluginId: string): Promise<OAuthTokenData | null> {
-    const plugin = await pluginRegistryRepository.findByPluginId(pluginId);
-    if (!plugin) {
-      throw new Error(`Plugin ${pluginId} not found`);
-    }
-
-    const instance = await pluginInstanceRepository.findByOrgAndPlugin(organizationId, pluginId);
-    if (!instance) {
-      throw new Error("Plugin instance not found");
-    }
-
-    // Check metadata.authMethods for OAuth2 registration
-    if (!plugin.metadata?.authMethods) {
-      throw new Error(`Plugin ${pluginId} does not have metadata`);
-    }
-
-    const oauth2Method = plugin.metadata.authMethods.find(
-      (method: AuthMethodDescriptor) => method.type === "oauth2",
+    const { instance, oauth2Method, clientId, clientSecret } = await this.resolveOAuthContext(
+      organizationId,
+      pluginId,
     );
-
-    if (!oauth2Method) {
-      throw new Error(`Plugin ${pluginId} does not support OAuth`);
-    }
 
     // A plugin may declare a custom refresh strategy (e.g. Instagram's
     // ig_refresh_token) for providers that don't issue a standard refresh_token.
@@ -947,42 +1025,7 @@ export class OAuthService {
 
     const oldScope = instance.authState?.credentials?.scope;
 
-    // Get client credentials from plugin instance using config resolver with env fallback
-    const clientIdFieldName = oauth2Method.clientId;
-    const clientSecretFieldName = oauth2Method.clientSecret;
-
-    if (!clientIdFieldName || !clientSecretFieldName) {
-      throw new Error(`OAuth2 method missing clientId or clientSecret field references`);
-    }
-
-    // Use config resolver to get values with .env fallback
-    const configSchema = plugin.metadata?.configSchema || {};
-    const resolved = resolveConfigWithEnv(
-      instance.config,
-      configSchema as Record<string, ConfigFieldDescriptor>,
-      {
-        decrypt: true,
-        maskSecrets: false, // We need actual values for OAuth flow
-      },
-    );
-
-    const clientId =
-      asCredentialString(resolved.metadata[clientIdFieldName]?.value) ||
-      asCredentialString(instance.authState?.credentials?.[clientIdFieldName]);
-    const clientSecret =
-      asCredentialString(resolved.metadata[clientSecretFieldName]?.value) ||
-      asCredentialString(instance.authState?.credentials?.[clientSecretFieldName]);
-
-    if (!clientId) {
-      throw new Error("OAuth client ID not configured");
-    }
-
-    const credentials = { clientId, clientSecret };
-
-    const validCredentials = {
-      clientId: credentials.clientId,
-      clientSecret: credentials.clientSecret,
-    };
+    const validCredentials = { clientId, clientSecret };
 
     // Custom refresh strategy (declarative): a single GET that re-issues from the
     // current access token. No refresh_token involved (e.g. Instagram).

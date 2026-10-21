@@ -13,6 +13,7 @@ import {
   getMenuItems,
   testConnection,
   initiateOAuth,
+  completeOAuthWithCode,
   isOAuthAvailable,
   getOAuthStatus,
   revokeOAuth,
@@ -38,6 +39,7 @@ export const pluginsRouter = t.router({
   // Note: Plugin UI assets are served via HTTP endpoint at /plugins/ui/:pluginName/:assetPath
   oauth: {
     initiate: initiateOAuth,
+    completeWithCode: completeOAuthWithCode,
     isAvailable: isOAuthAvailable,
     status: getOAuthStatus,
     revoke: revokeOAuth,

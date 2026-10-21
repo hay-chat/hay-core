@@ -122,6 +122,18 @@ export interface ConfigFieldDescriptor<T = any> {
   encrypted?: boolean;
 
   /**
+   * Resolved only inside the Hay server (e.g. OAuth client secrets used for
+   * token exchange); never delivered to the plugin worker.
+   *
+   * @remarks
+   * `ctx.config.get()` returns `undefined` for such a field in the worker.
+   * Use it for credentials that only core needs — the plugin must not read them.
+   *
+   * @defaultValue false
+   */
+  serverOnly?: boolean;
+
+  /**
    * Default value if not configured.
    */
   default?: T;

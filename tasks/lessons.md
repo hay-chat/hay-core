@@ -58,3 +58,13 @@
 - **Failure mode**: The same wrong "instructions is an array" assumption appeared in `orchestrator/run.ts`, which gated both human-handoff branches on `Array.isArray(instructions) && length > 0`. Always false for a Tiptap doc, so agents' configured escalation instructions silently never ran and the default handoff always fired — no error, just missing behaviour.
 - **Detection signal**: A configured feature that never takes effect, with no log line, and a truthiness/shape check sitting between the config and the behaviour.
 - **Prevention**: When you fix a shape mismatch, grep for every consumer of that column before closing. Encode the "is this populated" question as one shared predicate (`hasTiptapContent`) rather than re-deriving it per call site.
+
+### Env-backed config secrets leaked into plugin workers
+- **Failure mode**: `DENIED_ENV_PATTERNS` in plugin-runner only filters the `manifest.permissions.env` passthrough. A config field with `env: "META_APP_SECRET"` is resolved by `resolveConfigForWorker` and serialised into `HAY_ORG_CONFIG`, so the Meta app secret reached every Instagram worker even though the plugin never reads it — only core needs it for token exchange/refresh.
+- **Detection signal**: a config field whose only consumer is core (`register.auth.oauth2({ clientSecret: config.field(...) })`) with no `ctx.config.get()` of that key in the plugin, yet it appears in the worker's `HAY_ORG_CONFIG` / `/on-connected` body.
+- **Prevention**: Mark such fields `serverOnly: true`; `stripServerOnlyFields` is applied to every payload that leaves core for a worker (`resolveConfigForWorker`, `/on-connected`). Treat "the deny list covers env vars" as insufficient — config resolution is a second channel to the worker and must be filtered independently.
+
+### Raw webhook body forwarded inside an HTTP header
+- **Failure mode**: The plugin proxy and webhook router passed the original request bytes to workers as `x-original-body-base64`. Node's default `maxHeaderSize` is 16 KB, so any webhook above ~12 KB got a 431 from the worker — well below Meta's 3 MB payloads — while every body-parser limit looked generous.
+- **Detection signal**: "Raise the body limit" did nothing; the worker answered 431/413 before parsing.
+- **Prevention**: Transport bulk data as the request body, never as a header. Raw bytes now go to the worker verbatim under the original content type and the SDK runner captures them with a parser `verify` hook (`req.rawBody`). When a limit seems to be in the wrong place, trace the whole hop chain (core → proxy → worker) before changing numbers.

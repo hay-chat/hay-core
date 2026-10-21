@@ -246,6 +246,18 @@ function validateWebhookRouting(descriptor: WebhookRoutingDescriptor): void {
   if (!routeKeyPath.keyPath || typeof routeKeyPath.keyPath !== "string") {
     throw new Error("Webhook routing routeKeyPath.keyPath must be a non-empty string");
   }
+  if (routeKeyPath.nested !== undefined) {
+    const { nested } = routeKeyPath;
+    if (typeof nested !== "object" || nested === null) {
+      throw new Error("Webhook routing routeKeyPath.nested must be an object");
+    }
+    if (!nested.itemsPath || typeof nested.itemsPath !== "string") {
+      throw new Error("Webhook routing routeKeyPath.nested.itemsPath must be a non-empty string");
+    }
+    if (!nested.keyPath || typeof nested.keyPath !== "string") {
+      throw new Error("Webhook routing routeKeyPath.nested.keyPath must be a non-empty string");
+    }
+  }
 
   if (verificationChallenge !== undefined) {
     if (typeof verificationChallenge !== "object" || verificationChallenge === null) {

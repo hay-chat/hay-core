@@ -13,7 +13,7 @@ import { User } from "../../entities/user.entity";
 import { Agent } from "./agent.entity";
 import { Message } from "./message.entity";
 import { Customer } from "./customer.entity";
-import { MessageType, MessageStatus } from "./message.entity";
+import { MessageType, MessageStatus, type MessageAttachment } from "./message.entity";
 import { DeliveryState } from "../../types/message-feedback.types";
 import type { TiptapDoc } from "../../types/tiptap.types";
 import { analyzeTiptapInstructions } from "../../utils/tiptap-formatter";
@@ -870,13 +870,19 @@ The following tools are available for you to use. You MUST return only valid JSO
     type: string;
     metadata?: Record<string, unknown>;
     sender?: string;
+    attachments?: MessageAttachment[];
+    /** Channel provider's message id (e.g. Meta wamid) for inbound messages. */
+    providerMessageId?: string;
   }): Promise<Message> {
     const { messageRepository } = await import("../../repositories/message.repository");
     const { conversationRepository } = await import("../../repositories/conversation.repository");
 
-    // Check if the last message has the same content to prevent duplicates
+    // Check if the last message has the same content to prevent duplicates.
+    // Attachment-only messages legitimately repeat (same empty content), so
+    // they are exempt — provider-id dedupe covers real redeliveries.
+    const hasAttachments = (messageData.attachments?.length ?? 0) > 0;
     const messages = await this.getMessages();
-    if (messages.length > 0) {
+    if (messages.length > 0 && !hasAttachments) {
       const lastMessage = messages[messages.length - 1];
       if (lastMessage.content === messageData.content && lastMessage.type === messageData.type) {
         logger.debug(
@@ -983,6 +989,8 @@ The following tools are available for you to use. You MUST return only valid JSO
       type: messageData.type as MessageType,
       metadata: messageData.metadata,
       sender: messageData.sender,
+      attachments: messageData.attachments,
+      providerMessageId: messageData.providerMessageId ?? null,
       status: messageStatus,
       reviewRequired,
       deliveryState,
@@ -1018,6 +1026,7 @@ The following tools are available for you to use. You MUST return only valid JSO
               sender: message.sender,
               timestamp: message.created_at,
               metadata: message.metadata,
+              attachments: message.attachments ?? [],
               status: message.status,
               deliveryState: message.deliveryState,
               isPlayground: this.metadata?.isPlayground === true,

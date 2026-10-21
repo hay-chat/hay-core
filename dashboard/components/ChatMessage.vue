@@ -212,6 +212,13 @@
           </Button>
         </div>
       </div>
+      <!-- Provider-side failure (e.g. WhatsApp rejected the message) -->
+      <div v-else-if="message.providerStatus === 'failed'" class="chat-message__status">
+        <div class="flex items-center gap-2 text-xs text-red-600">
+          <AlertCircle class="h-3 w-3" />
+          <span>{{ providerErrorText }}</span>
+        </div>
+      </div>
 
       <div v-if="message.attachments?.length" class="chat-message__attachments">
         <div
@@ -219,8 +226,35 @@
           :key="attachment.id"
           class="chat-message__attachment"
         >
-          <Paperclip class="chat-message__attachment-icon" />
-          <span>{{ attachment.name }}</span>
+          <img
+            v-if="attachment.type.startsWith('image/')"
+            :src="attachment.url"
+            :alt="attachment.name"
+            class="chat-message__attachment-media"
+          />
+          <audio
+            v-else-if="attachment.type.startsWith('audio/')"
+            :src="attachment.url"
+            controls
+            class="chat-message__attachment-media"
+          />
+          <video
+            v-else-if="attachment.type.startsWith('video/')"
+            :src="attachment.url"
+            controls
+            class="chat-message__attachment-media"
+          />
+          <a
+            v-else
+            :href="attachment.url"
+            target="_blank"
+            rel="noopener"
+            class="chat-message__attachment-file"
+          >
+            <Paperclip class="chat-message__attachment-icon" />
+            <span>{{ attachment.name }}</span>
+            <span class="opacity-70">({{ formatFileSize(attachment.size) }})</span>
+          </a>
         </div>
       </div>
       <!-- Queued Message Actions (Test Mode) -->
@@ -518,6 +552,12 @@ import { splitMarkdownImages } from "@/utils/splitMarkdownImages";
 import { formatRelativeTimeLong } from "@/utils/date";
 import { useNow } from "@/composables/useNow";
 import { MessageStatus, type Message, MessageSentiment } from "@/types/message";
+import { useI18n } from "vue-i18n";
+
+const { t } = useI18n();
+
+/** Provider error codes that mean "outside the 24h customer service window". */
+const WINDOW_EXPIRED_CODES = new Set(["24h_window_expired", "131047", 131047]);
 
 interface Props {
   message: Message;
@@ -592,6 +632,21 @@ const isQueued = computed(() => {
 // Sent BotAgent messages render an inline metadata row (feedback + debug). The
 // timestamp lives in that row instead of the standalone footer below the bubble.
 const showsInlineMeta = computed(() => props.message.type === "BotAgent" && !isQueued.value);
+
+const providerErrorText = computed(() => {
+  const error = props.message.providerError;
+  if (error?.code !== undefined && WINDOW_EXPIRED_CODES.has(error.code)) {
+    return t("conversations.delivery.windowExpired");
+  }
+  const text = error?.title ?? error?.message ?? error?.code;
+  return text !== undefined && text !== "" ? String(text) : t("conversations.delivery.failed");
+});
+
+const formatFileSize = (bytes: number): string => {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+};
 
 const handleApproveClick = () => {
   showApprovalDialog.value = true;
@@ -919,6 +974,34 @@ const getConfidenceIcon = (tier: string | undefined) => {
 .chat-message__status {
   margin-top: 0.25rem;
   padding: 0.25rem 0;
+}
+
+.chat-message__attachments {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+  max-width: 20rem;
+}
+
+.chat-message__attachment-media {
+  display: block;
+  max-width: 100%;
+  border-radius: 0.5rem;
+}
+
+.chat-message__attachment-file {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  font-size: 0.75rem;
+  text-decoration: underline;
+}
+
+.chat-message__attachment-icon {
+  width: 0.75rem;
+  height: 0.75rem;
+  flex-shrink: 0;
 }
 
 .chat-message__expand-button {

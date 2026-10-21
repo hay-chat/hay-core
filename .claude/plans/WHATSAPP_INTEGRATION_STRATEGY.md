@@ -1,4 +1,4 @@
-> **⚠️ PAUSED — February 2026**: This plan describes a direct Meta Graph API integration approach. We've decided to go with **Twilio** as the WhatsApp provider instead for faster time-to-market. This direct Meta approach will be revisited in the future. See the Twilio-based implementation in `plugins/core/whatsapp/`.
+> **⚠️ SUPERSEDED — October 2026**: replaced by `.claude/plans/whatsapp-cloud/PLAN.md` (direct Meta Cloud API as Tech Provider). The interim Twilio plugin was removed in Phase 1. Kept for history only.
 
 # WhatsApp Integration Strategy for Hay Cloud
 

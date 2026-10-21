@@ -18,6 +18,10 @@ import { createLogger } from "@server/lib/logger";
 import { pluginManagerService } from "./plugin-manager.service";
 import { MessageRepository } from "@server/repositories/message.repository";
 import { ConversationRepository } from "@server/repositories/conversation.repository";
+import type {
+  MessageAttachment,
+  MessageProviderError,
+} from "@server/database/entities/message.entity";
 
 const logger = createLogger("channel-delivery");
 const messageRepository = new MessageRepository();
@@ -34,6 +38,7 @@ interface ChannelEventPayload {
   status?: string;
   deliveryState?: string;
   metadata?: { externalOrigin?: boolean; [key: string]: unknown } | null;
+  attachments?: MessageAttachment[] | null;
   [key: string]: unknown;
 }
 
@@ -140,6 +145,8 @@ class ChannelDeliveryService {
         return;
       }
 
+      // Attachment-only messages carry an empty string content and must still
+      // be delivered — only a missing id/content aborts.
       const { id: messageId, content } = payload;
       if (!messageId || content === undefined) {
         logger.warn({ conversationId, channel }, "Message id or content missing for delivery");
@@ -165,6 +172,7 @@ class ChannelDeliveryService {
         conversationId,
         conversationMetadata: (conversation.metadata ?? null) as Record<string, unknown> | null,
         messageMetadata: (payload.metadata ?? null) as Record<string, unknown> | null,
+        attachments: payload.attachments ?? [],
       });
     } catch (error) {
       logger.error({ err: error, conversationId }, "Channel delivery failed");
@@ -186,7 +194,10 @@ class ChannelDeliveryService {
       if (!conversation) return;
       if (conversation.channel === "web") return;
 
-      const pluginId = pluginManagerService.findPluginIdByChannel(conversation.channel);
+      const pluginId = await pluginManagerService.findPluginIdByChannel(
+        conversation.organization_id,
+        conversation.channel,
+      );
       if (!pluginId) return;
 
       logger.info(
@@ -251,8 +262,8 @@ class ChannelDeliveryService {
   /**
    * Find the appropriate plugin worker for this channel and POST to its /deliver endpoint.
    *
-   * Looks up which plugin handles the given channel via the plugin registry's
-   * manifest `channel` field (set in the plugin's package.json `hay-plugin.channel`).
+   * Resolves the org's enabled plugin instance whose manifest `channel` field
+   * (package.json `hay-plugin.channel`) matches the conversation channel.
    */
   private async deliverViaPlugin(args: {
     organizationId: string;
@@ -263,6 +274,7 @@ class ChannelDeliveryService {
     conversationId: string;
     conversationMetadata: Record<string, unknown> | null;
     messageMetadata: Record<string, unknown> | null;
+    attachments: MessageAttachment[];
   }): Promise<void> {
     const {
       organizationId,
@@ -273,12 +285,13 @@ class ChannelDeliveryService {
       conversationId,
       conversationMetadata,
       messageMetadata,
+      attachments,
     } = args;
 
-    const pluginId = pluginManagerService.findPluginIdByChannel(channel);
+    const pluginId = await pluginManagerService.findPluginIdByChannel(organizationId, channel);
 
     if (!pluginId) {
-      logger.warn({ channel, organizationId }, "No plugin registered for channel");
+      logger.warn({ channel, organizationId }, "No enabled plugin for channel in organization");
       return;
     }
 
@@ -306,13 +319,15 @@ class ChannelDeliveryService {
           conversationId,
           conversationMetadata,
           messageMetadata,
+          attachments,
         }),
       });
 
       const result = (await response.json()) as PluginDeliverResponse;
 
       if (result.success && result.providerMessageId) {
-        // Store the provider's message ID (e.g., Twilio SID, Chatwoot message id)
+        // Store the provider's message id (e.g. Meta wamid, Chatwoot message id)
+        // so later status webhooks can be matched back to this message.
         await messageRepository.updateProviderMessageId(messageId, result.providerMessageId);
         logger.info(
           {
@@ -322,19 +337,61 @@ class ChannelDeliveryService {
           },
           "Channel delivery successful",
         );
-      } else if (result.error === "24h_window_expired") {
-        logger.warn({ messageId, channel, conversationId }, "24h session window expired");
-      } else {
-        logger.error(
-          { messageId, channel, error: result.error },
-          "Channel delivery returned failure",
-        );
+      } else if (!result.success) {
+        if (result.error === "24h_window_expired") {
+          logger.warn({ messageId, channel, conversationId }, "24h session window expired");
+        } else {
+          logger.error(
+            { messageId, channel, error: result.error },
+            "Channel delivery returned failure",
+          );
+        }
+        await this.markDeliveryFailed({
+          messageId,
+          conversationId,
+          organizationId,
+          error: { code: result.error ?? "delivery_failed" },
+        });
       }
     } catch (error) {
       logger.error(
         { err: error, deliverUrl, messageId },
         "Failed to deliver message to plugin worker",
       );
+    }
+  }
+
+  /**
+   * Persist a provider-side failure on the message and tell dashboard clients.
+   * Publishes `message_status_updated` — never `message_received`, which would
+   * re-trigger delivery.
+   */
+  private async markDeliveryFailed(args: {
+    messageId: string;
+    conversationId: string;
+    organizationId: string;
+    error: MessageProviderError;
+  }): Promise<void> {
+    const { messageId, conversationId, organizationId, error } = args;
+    try {
+      await messageRepository.update(messageId, {
+        providerStatus: "failed",
+        providerError: error,
+      });
+
+      const { redisService } = await import("./redis.service");
+      await redisService.publish("websocket:events", {
+        type: "message_status_updated",
+        organizationId,
+        payload: {
+          conversationId,
+          messageId,
+          providerStatus: "failed",
+          providerError: error,
+        },
+      });
+    } catch (err) {
+      logger.error({ err, messageId }, "Failed to persist delivery failure");
     }
   }
 }

@@ -1,15 +1,13 @@
-# CONTEXT
+# CONTEXT.md
 
-**Current Task**: Agent create/update prod fix (Klevie) plus PostHog server telemetry and user identification. Six commits on `claude/agent-instructions-contract`, not pushed.
+**Current Task**: WhatsApp Cloud API Phase 1 (core enablers) complete on `claude/whatsapp-cloud`; PR open. Phase 2 (plugin `plugins/core/whatsapp`, npm `hay-channel-whatsapp-meta`) is next.
 
-**Key Decisions**:
+**Key Decisions**
+- Raw webhook bytes are forwarded as the worker request body (`req.rawBody` in the SDK runner); the base64 header is gone.
+- Config fields can be `serverOnly` so OAuth client secrets never reach workers; Embedded Signup code exchange runs in core via `plugins.oauth.completeWithCode`.
+- Provider statuses live in `messages.provider_status/provider_error`, never in `delivery_state` (test-mode gate).
 
-- `server/types/tiptap.types.ts` is the single contract for rich-text instruction jsonb columns; route, service, entity and dashboard all derive from it.
-- All telemetry gates on `POSTHOG_KEY`: unset means no PostHog client, no browser script, no outbound calls. `server/lib/telemetry.ts` and `useTelemetry()` both no-op.
-- App and marketing site deliberately share one PostHog project for now (id 99235); split later if signal gets noisy.
-
-**Next Steps**:
-
-- Push branch and deploy; confirm agent creation, custom escalation, and that `$exception` events reach PostHog through the `b.hay.chat` proxy.
-- Still open: client-side `capture_exceptions: true` plus enabling error tracking in the PostHog project (account-level toggle, not done).
-- Older uncommitted work also on master, see WIP.md.
+**Next Steps**
+- Merge PR; run migration 1784400000000 in prod.
+- Phase 2 needs `META_WHATSAPP_ES_CONFIG_ID` (Roger, Phase 0) and Advanced Access for the two whatsapp_business_* permissions (Phase A).
+- Build the plugin per PLAN.md §3 Phase 2 (graph-client, webhook normaliser, deliver, ES popup UI, manual-token mode).

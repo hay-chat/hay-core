@@ -110,6 +110,7 @@ export function resolveConfigForWorker(
     decrypt: true,
     maskSecrets: false, // Worker needs real values
   });
+  resolved.values = stripServerOnlyFields(resolved.values, configSchema);
 
   // Merge with auth credentials (from authState)
   // Auth credentials are stored as encrypted strings — decrypt before merging
@@ -129,6 +130,23 @@ export function resolveConfigForWorker(
   }
 
   return resolved.values;
+}
+
+/**
+ * Drop config fields flagged `serverOnly` in the schema (e.g. OAuth client
+ * secrets core uses for token exchange). Applied to every payload that leaves
+ * core for a plugin worker: HAY_ORG_CONFIG, cron config and /on-connected.
+ */
+export function stripServerOnlyFields(
+  config: Record<string, unknown>,
+  schema: Record<string, ConfigFieldDescriptor>,
+): Record<string, unknown> {
+  const stripped: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(config)) {
+    if (schema[key]?.serverOnly) continue;
+    stripped[key] = value;
+  }
+  return stripped;
 }
 
 /**

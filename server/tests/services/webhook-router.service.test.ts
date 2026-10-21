@@ -2,6 +2,8 @@ const findByPluginId = jest.fn();
 const findByPlugin = jest.fn();
 const startPluginWorker = jest.fn();
 const getPlugin = jest.fn();
+const findByKey = jest.fn();
+const updateActivityTimestamp = jest.fn();
 
 jest.mock("@server/repositories/plugin-registry.repository", () => ({
   pluginRegistryRepository: { findByPluginId },
@@ -10,19 +12,22 @@ jest.mock("@server/repositories/plugin-instance.repository", () => ({
   pluginInstanceRepository: { findByPlugin },
 }));
 jest.mock("@server/repositories/plugin-webhook-route.repository", () => ({
-  pluginWebhookRouteRepository: {},
+  pluginWebhookRouteRepository: { findByKey },
 }));
 jest.mock("@server/services/plugin-manager.service", () => ({
   pluginManagerService: { startPluginWorker, getPlugin },
 }));
 jest.mock("@server/services/plugin-instance-manager.service", () => ({
-  pluginInstanceManagerService: {},
+  pluginInstanceManagerService: { updateActivityTimestamp },
 }));
 jest.mock("@server/services/plugin-route.service", () => ({
   verifyHmacSha256: jest.fn(),
 }));
 
-import { webhookRouterService } from "../../services/webhook-router.service";
+import {
+  webhookRouterService,
+  __webhookRouterInternals,
+} from "../../services/webhook-router.service";
 
 const routing = { strategy: "shared" };
 
@@ -63,5 +68,222 @@ describe("webhookRouterService.getRoutingDescriptor", () => {
 
     await expect(webhookRouterService.getRoutingDescriptor("p")).resolves.toBeNull();
     expect(startPluginWorker).not.toHaveBeenCalled();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// dispatch (shared-webhook fan-out)
+// ---------------------------------------------------------------------------
+
+type RouteKeyPath = {
+  itemsPath: string;
+  keyPath: string;
+  nested?: { itemsPath: string; keyPath: string };
+};
+
+type Dispatch = (
+  pluginId: string,
+  routing: { routeKeyPath: RouteKeyPath },
+  body: Record<string, unknown>,
+  req: unknown,
+) => Promise<void>;
+
+const dispatch: Dispatch = (pluginId, routingDescriptor, body, req) =>
+  (webhookRouterService as unknown as { dispatch: Dispatch }).dispatch(
+    pluginId,
+    routingDescriptor,
+    body,
+    req,
+  );
+
+const fakeReq = {
+  headers: {},
+  get: () => "host",
+  protocol: "https",
+  originalUrl: "/v1/plugins/p/webhook",
+};
+
+const instagramRouting = { routeKeyPath: { itemsPath: "entry", keyPath: "id" } };
+const whatsappRouting = {
+  routeKeyPath: {
+    itemsPath: "entry",
+    keyPath: "id",
+    nested: { itemsPath: "changes", keyPath: "value.metadata.phone_number_id" },
+  },
+};
+
+/** Build a WhatsApp `messages` change for the given phone number id. */
+function messagesChange(phoneNumberId: string, messageId: string) {
+  return {
+    field: "messages",
+    value: {
+      messaging_product: "whatsapp",
+      metadata: { display_phone_number: "1", phone_number_id: phoneNumberId },
+      messages: [{ id: messageId }],
+    },
+  };
+}
+
+function whatsappBody(entry: unknown[]) {
+  return { object: "whatsapp_business_account", entry };
+}
+
+/** Map routing keys to their owning org for `findByKey`. */
+function setOwners(owners: Record<string, string>) {
+  findByKey.mockImplementation(async (_pluginId: string, key: string) =>
+    owners[key] ? { organizationId: owners[key], pluginInstanceId: `inst-${owners[key]}` } : null,
+  );
+}
+
+/** Collect the bodies forwarded to workers, keyed by the org that was started. */
+function forwardedBodies(): Record<string, Record<string, unknown>> {
+  const fetchMock = global.fetch as jest.Mock;
+  const result: Record<string, Record<string, unknown>> = {};
+  fetchMock.mock.calls.forEach((call, index) => {
+    const organizationId = startPluginWorker.mock.calls[index][0] as string;
+    result[organizationId] = JSON.parse(call[1].body as string);
+  });
+  return result;
+}
+
+describe("webhookRouterService.dispatch", () => {
+  beforeEach(() => {
+    jest.resetAllMocks();
+    startPluginWorker.mockResolvedValue({ port: 1234, instanceId: "inst" });
+    updateActivityTimestamp.mockResolvedValue(undefined);
+    global.fetch = jest.fn().mockResolvedValue({ ok: true });
+  });
+
+  it("routes whole entries by entry.id when no nested descriptor is declared", async () => {
+    setOwners({ IG1: "org-a", IG2: "org-b" });
+    const entryA = { id: "IG1", messaging: [{ text: "a" }] };
+    const entryB = { id: "IG2", messaging: [{ text: "b" }] };
+
+    await dispatch(
+      "p",
+      instagramRouting,
+      { object: "instagram", entry: [entryA, entryB] },
+      fakeReq,
+    );
+
+    expect(global.fetch).toHaveBeenCalledTimes(2);
+    const bodies = forwardedBodies();
+    expect(bodies["org-a"]).toEqual({ object: "instagram", entry: [entryA] });
+    expect(bodies["org-b"]).toEqual({ object: "instagram", entry: [entryB] });
+  });
+
+  it("routes a WhatsApp change by its nested phone_number_id", async () => {
+    setOwners({ WABA1: "org-waba", PN1: "org-a" });
+    const body = whatsappBody([{ id: "WABA1", changes: [messagesChange("PN1", "wamid.1")] }]);
+
+    await dispatch("p", whatsappRouting, body, fakeReq);
+
+    expect(startPluginWorker).toHaveBeenCalledTimes(1);
+    expect(startPluginWorker).toHaveBeenCalledWith("org-a", "p");
+    expect(forwardedBodies()["org-a"]).toEqual(body);
+  });
+
+  it("splits one entry's changes between two orgs without mutating the original body", async () => {
+    setOwners({ WABA1: "org-waba", PN1: "org-a", PN2: "org-b" });
+    const changeA = messagesChange("PN1", "wamid.1");
+    const changeB = messagesChange("PN2", "wamid.2");
+    const body = whatsappBody([{ id: "WABA1", changes: [changeA, changeB] }]);
+    const snapshot = JSON.parse(JSON.stringify(body));
+
+    await dispatch("p", whatsappRouting, body, fakeReq);
+
+    const bodies = forwardedBodies();
+    expect(Object.keys(bodies).sort()).toEqual(["org-a", "org-b"]);
+    expect(bodies["org-a"]).toEqual(whatsappBody([{ id: "WABA1", changes: [changeA] }]));
+    expect(bodies["org-b"]).toEqual(whatsappBody([{ id: "WABA1", changes: [changeB] }]));
+    expect(body).toEqual(snapshot);
+  });
+
+  it("routes an account_update change (no phone_number_id) by entry.id", async () => {
+    setOwners({ WABA1: "org-waba", PN1: "org-a" });
+    const accountUpdate = { field: "account_update", value: { event: "VERIFIED_ACCOUNT" } };
+    const body = whatsappBody([{ id: "WABA1", changes: [accountUpdate] }]);
+
+    await dispatch("p", whatsappRouting, body, fakeReq);
+
+    expect(startPluginWorker).toHaveBeenCalledTimes(1);
+    expect(forwardedBodies()["org-waba"]).toEqual(body);
+  });
+
+  it("drops a change with an unknown phone_number_id instead of sending it to the WABA owner", async () => {
+    setOwners({ WABA1: "org-waba" });
+    const body = whatsappBody([
+      { id: "WABA1", changes: [messagesChange("PN-unknown", "wamid.1")] },
+    ]);
+
+    await dispatch("p", whatsappRouting, body, fakeReq);
+
+    expect(startPluginWorker).not.toHaveBeenCalled();
+    expect(global.fetch).not.toHaveBeenCalled();
+  });
+
+  it("sends exactly one copy when the same org owns entry.id and phone_number_id", async () => {
+    setOwners({ WABA1: "org-a", PN1: "org-a" });
+    const accountUpdate = { field: "account_update", value: { event: "VERIFIED_ACCOUNT" } };
+    const change = messagesChange("PN1", "wamid.1");
+    const body = whatsappBody([{ id: "WABA1", changes: [change, accountUpdate] }]);
+
+    await dispatch("p", whatsappRouting, body, fakeReq);
+
+    expect(global.fetch).toHaveBeenCalledTimes(1);
+    expect(forwardedBodies()["org-a"]).toEqual(
+      whatsappBody([{ id: "WABA1", changes: [change, accountUpdate] }]),
+    );
+  });
+
+  it("falls back to item-level routing when the item has no nested array", async () => {
+    setOwners({ WABA1: "org-waba" });
+    const body = whatsappBody([{ id: "WABA1", time: 123 }]);
+
+    await dispatch("p", whatsappRouting, body, fakeReq);
+
+    expect(startPluginWorker).toHaveBeenCalledWith("org-waba", "p");
+    expect(forwardedBodies()["org-waba"]).toEqual(body);
+  });
+
+  it("looks up each distinct routing key once per dispatch", async () => {
+    setOwners({ WABA1: "org-waba", PN1: "org-a" });
+    const body = whatsappBody([
+      {
+        id: "WABA1",
+        changes: [messagesChange("PN1", "wamid.1"), messagesChange("PN1", "wamid.2")],
+      },
+      { id: "WABA1", changes: [messagesChange("PN1", "wamid.3")] },
+    ]);
+
+    await dispatch("p", whatsappRouting, body, fakeReq);
+
+    expect(findByKey).toHaveBeenCalledTimes(2);
+    expect(findByKey).toHaveBeenCalledWith("p", "WABA1");
+    expect(findByKey).toHaveBeenCalledWith("p", "PN1");
+  });
+});
+
+describe("__webhookRouterInternals", () => {
+  const { getPath, withPath } = __webhookRouterInternals;
+
+  it("getPath walks dot-paths and returns undefined for missing segments", () => {
+    const source = { a: { b: { c: 1 } }, list: [1] };
+    expect(getPath(source, "a.b.c")).toBe(1);
+    expect(getPath(source, "a.x.c")).toBeUndefined();
+    expect(getPath(source, "list.0")).toBe(1);
+    expect(getPath(null, "a")).toBeUndefined();
+  });
+
+  it("withPath returns a copy with the value set and leaves the input untouched", () => {
+    const source = { id: "x", meta: { keep: true, changes: [1, 2] } };
+    const snapshot = JSON.parse(JSON.stringify(source));
+
+    const copy = withPath(source, "meta.changes", [1]);
+
+    expect(copy).toEqual({ id: "x", meta: { keep: true, changes: [1] } });
+    expect(source).toEqual(snapshot);
+    expect(copy.meta).not.toBe(source.meta);
+    expect(withPath({ a: 1 }, "b.c", 2)).toEqual({ a: 1, b: { c: 2 } });
   });
 });
