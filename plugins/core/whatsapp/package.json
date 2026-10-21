@@ -15,8 +15,8 @@
       "customers"
     ],
     "env": [
-      "META_APP_ID",
-      "META_APP_SECRET",
+      "META_WHATSAPP_APP_ID",
+      "META_WHATSAPP_APP_SECRET",
       "META_VERIFY_TOKEN",
       "META_WHATSAPP_ES_CONFIG_ID"
     ]

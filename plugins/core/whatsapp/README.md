@@ -53,7 +53,7 @@ The org clicks **Connect WhatsApp** on the plugin's settings page:
    in the auth state.
 
 Webhooks for every org arrive on one URL. Core verifies `X-Hub-Signature-256` with
-`META_APP_SECRET` and answers the GET handshake with `META_VERIFY_TOKEN`. It routes each
+`META_WHATSAPP_APP_SECRET` and answers the GET handshake with `META_VERIFY_TOKEN`. It routes each
 `changes[]` item by `value.metadata.phone_number_id`, and account-level events by `entry[].id`.
 
 ```
@@ -101,18 +101,21 @@ registers the phone number id and WABA id as routing keys through
 
 | Variable                     | Used for                                                                                                |
 | ---------------------------- | ------------------------------------------------------------------------------------------------------- |
-| `META_APP_ID`                | Embedded Signup: `FB.init` app id and code exchange `client_id`                                         |
-| `META_APP_SECRET`            | Embedded Signup: code exchange and shared-webhook signature checks. Core only, never sent to the worker |
+| `META_WHATSAPP_APP_ID`       | Embedded Signup: `FB.init` app id and code exchange `client_id`                                         |
+| `META_WHATSAPP_APP_SECRET`   | Embedded Signup: code exchange and shared-webhook signature checks. Core only, never sent to the worker |
 | `META_VERIFY_TOKEN`          | Shared webhook GET handshake (core only)                                                                |
 | `META_WHATSAPP_ES_CONFIG_ID` | Facebook Login for Business configuration of type "Embedded Signup" (v4)                                |
 | `OPENAI_API_KEY`             | Voice-note transcription in core (`OPENAI_TRANSCRIPTION_MODEL`, default `gpt-4o-mini-transcribe`)       |
 
-The Meta variables are shared with the Instagram plugin, which uses the same app. Manual mode
-needs none of them.
+`META_VERIFY_TOKEN` is shared with the Instagram plugin. The app id and secret are **not**: Instagram
+Business Login has its own Instagram app id/secret (`META_APP_ID` / `META_APP_SECRET`), while
+WhatsApp webhooks are signed with, and Embedded Signup codes issued for, the Meta app itself
+(App settings → Basic). Manual mode needs none of them.
 
 ### Running your own Tech Provider (self-hosted Embedded Signup)
 
-Set all four `META_*` variables to your own app. In that app:
+Set `META_WHATSAPP_APP_ID`, `META_WHATSAPP_APP_SECRET`, `META_WHATSAPP_ES_CONFIG_ID` and
+`META_VERIFY_TOKEN` for your own Meta app. In that app:
 
 1. Add Facebook Login for Business and create a configuration with login variation
    **Embedded Signup** and product Cloud API. This puts it on v4. Set the token expiry to
