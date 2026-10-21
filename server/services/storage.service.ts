@@ -35,7 +35,21 @@ const ALLOWED_MIME_TYPES: Record<string, string[]> = {
   // Archives
   "application/zip": [".zip"],
   "application/x-zip-compressed": [".zip"],
+
+  // Audio / video (conversation media from messaging channels)
+  "audio/ogg": [".ogg", ".oga"],
+  "audio/mpeg": [".mp3"],
+  "audio/aac": [".aac"],
+  "audio/amr": [".amr"],
+  "audio/mp4": [".m4a"],
+  "video/mp4": [".mp4"],
+  "video/3gpp": [".3gp"],
 };
+
+/** Whether the storage service accepts uploads with this MIME type. */
+export function isAllowedMimeType(mimeType: string): boolean {
+  return Boolean(ALLOWED_MIME_TYPES[mimeType]);
+}
 
 export interface UploadOptions {
   buffer: Buffer;

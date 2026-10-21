@@ -865,6 +865,8 @@ interface DisplayMessage {
   timestamp?: string | Date;
   metadata?: ServerMessage["metadata"];
   attachments?: ServerMessage["attachments"];
+  providerStatus?: ServerMessage["providerStatus"];
+  providerError?: ServerMessage["providerError"];
 }
 
 /** Full conversation as consumed by this page (messages widened to {@link DisplayMessage}). */
@@ -883,6 +885,7 @@ interface MessageEventPayload {
     type: MessageType | string;
     timestamp?: string;
     metadata?: ServerMessage["metadata"];
+    attachments?: ServerMessage["attachments"];
     status?: string;
   };
 }
@@ -893,10 +896,21 @@ interface ConversationEventPayload {
   processingPhase?: string;
 }
 
+/** Payload received over the `message_status_updated` WebSocket event. */
+interface MessageStatusEventPayload {
+  conversationId?: string;
+  messageId?: string;
+  providerStatus?: ServerMessage["providerStatus"];
+  providerError?: ServerMessage["providerError"];
+}
+
 const isMessageEventPayload = (value: unknown): value is MessageEventPayload =>
   typeof value === "object" && value !== null;
 
 const isConversationEventPayload = (value: unknown): value is ConversationEventPayload =>
+  typeof value === "object" && value !== null;
+
+const isMessageStatusEventPayload = (value: unknown): value is MessageStatusEventPayload =>
   typeof value === "object" && value !== null;
 
 /** Extract a human-readable error message from an unknown thrown value. */
@@ -1610,6 +1624,8 @@ const fetchConversation = async () => {
           metadata: msg.metadata,
           attachments: msg.attachments,
           status: msg.status,
+          providerStatus: msg.providerStatus,
+          providerError: msg.providerError,
         };
       });
 
@@ -1663,6 +1679,7 @@ let unsubscribeMessage: (() => void) | null = null;
 let unsubscribeStatusChanged: (() => void) | null = null;
 let unsubscribeMessageApproved: (() => void) | null = null;
 let unsubscribeMessageBlocked: (() => void) | null = null;
+let unsubscribeMessageStatus: (() => void) | null = null;
 
 // Lifecycle
 onMounted(async () => {
@@ -1829,6 +1846,7 @@ onMounted(async () => {
           updated_at: messageData.timestamp,
           status: messageData.status || "approved",
           metadata: messageData.metadata,
+          attachments: messageData.attachments,
           deliveryState: "sent",
         });
 
@@ -1908,6 +1926,16 @@ onMounted(async () => {
       await debouncedRefreshConversation("message_blocked");
     }
   });
+
+  // Provider delivery status (sent/delivered/read/failed) — patch the message in place
+  unsubscribeMessageStatus = websocket.on("message_status_updated", (payload: unknown) => {
+    if (!isMessageStatusEventPayload(payload)) return;
+    if (payload.conversationId !== conversationId.value || !payload.messageId) return;
+    const target = conversation.value?.messages?.find((m) => m.id === payload.messageId);
+    if (!target) return;
+    target.providerStatus = payload.providerStatus ?? null;
+    target.providerError = payload.providerError ?? null;
+  });
 });
 
 // eslint-disable-next-line no-undef
@@ -1917,6 +1945,7 @@ onUnmounted(() => {
   if (unsubscribeStatusChanged) unsubscribeStatusChanged();
   if (unsubscribeMessageApproved) unsubscribeMessageApproved();
   if (unsubscribeMessageBlocked) unsubscribeMessageBlocked();
+  if (unsubscribeMessageStatus) unsubscribeMessageStatus();
 
   // Close test conversation in playground mode
   if (isPlaygroundMode.value && conversation.value) {

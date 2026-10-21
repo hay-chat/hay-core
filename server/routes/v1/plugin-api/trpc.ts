@@ -8,9 +8,16 @@ import { MessageRepository } from "@server/repositories/message.repository";
 import { AgentRepository } from "@server/repositories/agent.repository";
 import { organizationRepository } from "@server/repositories/organization.repository";
 import { pluginInstanceRepository } from "@server/repositories/plugin-instance.repository";
-import { MessageType } from "@server/database/entities/message.entity";
+import {
+  MessageType,
+  type MessageAttachment,
+  type MessageProviderError,
+  type MessageProviderStatus,
+} from "@server/database/entities/message.entity";
 import { mcpRegistryService } from "@server/services/mcp-registry.service";
 import { redisService } from "@server/services/redis.service";
+import { storageService } from "@server/services/storage.service";
+import { randomUUID } from "crypto";
 import { productSyncService } from "@server/services/product-sync.service";
 import { ProductStatus } from "@server/entities/product.entity";
 import { VariantAvailability } from "@server/entities/product-variant.entity";
@@ -102,12 +109,30 @@ export const pluginApiTrpcRouter = router({
         // Stored in conversation.metadata[channel].conversationId so outbound
         // delivery can reuse it without extra lookups.
         externalConversationId: z.string().optional(),
+        // Media already uploaded to Hay storage (see `media.upload`). Attachment-only
+        // messages pass an empty `content`.
+        attachments: z
+          .array(
+            z.object({
+              id: z.string().optional(),
+              name: z.string(),
+              url: z.string().url(),
+              type: z.string(),
+              size: z.number().int().nonnegative(),
+            }),
+          )
+          .max(10)
+          .optional(),
       }),
     )
     .mutation(async ({ input, ctx }) => {
       requireCapability(ctx, "messages");
 
       const { from, content, channel, metadata, externalConversationId } = input;
+      const attachments: MessageAttachment[] | undefined = input.attachments?.map((attachment) => ({
+        ...attachment,
+        id: attachment.id ?? randomUUID(),
+      }));
       const senderType = input.senderType ?? "customer";
       const organizationId = ctx.pluginAuth.organizationId;
 
@@ -249,6 +274,8 @@ export const pluginApiTrpcRouter = router({
           content,
           type: messageType,
           metadata: enrichedMetadata,
+          attachments,
+          providerMessageId,
         });
 
         // When a human agent replies on the external system, flip Hay's
@@ -385,6 +412,130 @@ export const pluginApiTrpcRouter = router({
         throw new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
           message: error instanceof Error ? error.message : "Failed to send message",
+        });
+      }
+    }),
+
+  /**
+   * Messages Capability - Provider delivery status for an outbound message.
+   *
+   * Channel plugins call this from their status webhooks (e.g. Meta WhatsApp
+   * sent/delivered/read/failed). The message is matched by the provider's
+   * message id stored at delivery time. Statuses are monotonic
+   * (sent < delivered < read) and never downgraded; `failed` always applies.
+   *
+   * Not-found is a soft result, not an error: the provider's `sent` status can
+   * race the /deliver response that stores the provider id.
+   */
+  "messages.updateStatus": pluginProcedure
+    .input(
+      z.object({
+        providerMessageId: z.string().min(1),
+        status: z.enum(["sent", "delivered", "read", "failed"]),
+        error: z
+          .object({
+            code: z.union([z.string(), z.number()]).optional(),
+            title: z.string().optional(),
+            message: z.string().optional(),
+          })
+          .optional(),
+      }),
+    )
+    .mutation(async ({ input, ctx }) => {
+      requireCapability(ctx, "messages");
+
+      const organizationId = ctx.pluginAuth.organizationId;
+      const message = await messageRepository.findByProviderMessageIdAndOrganization(
+        input.providerMessageId,
+        organizationId,
+      );
+
+      if (!message) {
+        return { updated: false, reason: "message_not_found" as const };
+      }
+
+      const current = message.providerStatus;
+      const isFailure = input.status === "failed";
+      if (
+        !isFailure &&
+        current !== null &&
+        PROVIDER_STATUS_RANK[current] >= PROVIDER_STATUS_RANK[input.status]
+      ) {
+        return { updated: false, reason: "status_not_newer" as const };
+      }
+
+      const providerError: MessageProviderError | null = isFailure ? (input.error ?? {}) : null;
+
+      await messageRepository.update(message.id, {
+        providerStatus: input.status,
+        providerError,
+      });
+
+      // Status-only event: never `message_received`, which channel-delivery
+      // would treat as a new outbound message and re-deliver.
+      try {
+        await redisService.publish("websocket:events", {
+          type: "message_status_updated",
+          organizationId,
+          payload: {
+            conversationId: message.conversation_id,
+            messageId: message.id,
+            providerStatus: input.status,
+            providerError,
+          },
+        });
+      } catch (error) {
+        logger.warn({ err: error, messageId: message.id }, "Failed to publish status update");
+      }
+
+      return { updated: true as const };
+    }),
+
+  /**
+   * Messages Capability - Upload media received from a channel.
+   *
+   * Plugins download provider media (e.g. Meta's short-lived media URLs) and
+   * push the bytes here so the message's attachment points at Hay storage.
+   * Returns the attachment shape expected by `messages.receive`.
+   */
+  "media.upload": pluginProcedure
+    .input(
+      z.object({
+        data: z.string().min(1),
+        mimeType: z.string().min(1),
+        filename: z.string().min(1).max(255),
+      }),
+    )
+    .mutation(async ({ input, ctx }) => {
+      requireCapability(ctx, "messages");
+
+      const buffer = decodeBase64(input.data);
+      if (!buffer) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Invalid base64 payload" });
+      }
+
+      try {
+        const { upload, url } = await storageService.upload({
+          buffer,
+          originalName: input.filename,
+          mimeType: input.mimeType,
+          folder: "conversation-media",
+          organizationId: ctx.pluginAuth.organizationId,
+        });
+
+        return {
+          id: upload.id,
+          name: input.filename,
+          url,
+          type: input.mimeType,
+          size: buffer.length,
+        };
+      } catch (error) {
+        // Storage rejects disallowed mime types and oversized files with plain
+        // errors — those are caller mistakes, not server faults.
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: error instanceof Error ? error.message : "Upload failed",
         });
       }
     }),
@@ -880,6 +1031,28 @@ export const pluginApiTrpcRouter = router({
       return { removed };
     }),
 });
+
+/** Ordering for monotonic provider status updates. `failed` is handled separately. */
+const PROVIDER_STATUS_RANK: Record<MessageProviderStatus, number> = {
+  sent: 1,
+  delivered: 2,
+  read: 3,
+  failed: 4,
+};
+
+const BASE64_PATTERN = /^[A-Za-z0-9+/]+={0,2}$/;
+
+/**
+ * Decode a base64 string strictly. `Buffer.from` silently drops invalid
+ * characters, so validate the alphabet and round-trip length first.
+ */
+function decodeBase64(data: string): Buffer | null {
+  const normalized = data.replace(/\s+/g, "");
+  if (normalized.length === 0 || normalized.length % 4 !== 0) return null;
+  if (!BASE64_PATTERN.test(normalized)) return null;
+  const buffer = Buffer.from(normalized, "base64");
+  return buffer.length > 0 ? buffer : null;
+}
 
 /** TTL for inbound message dedupe keys — long enough to cover provider retries. */
 const INBOUND_DEDUPE_TTL_SECONDS = 24 * 60 * 60; // 24h

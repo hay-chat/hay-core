@@ -1,6 +1,10 @@
 {
   "conversations": {
     "untitled": "Untitled conversation",
+    "delivery": {
+      "failed": "Delivery failed",
+      "windowExpired": "Outside the 24-hour window — the customer must message first"
+    },
     "page": {
       "title": "Conversations",
       "description": "Monitor and manage all customer conversations",
