@@ -126,7 +126,9 @@
       "newTab": "opens in a new tab",
       "recheck": "I've added it — check again",
       "stillMissing": "No payment method found yet. It can take a minute to show up after you add it.",
-      "onFile": "Payment method on file"
+      "onFile": "Payment method on file",
+      "unknown": "Meta bills you directly for WhatsApp messages. Meta doesn't let Hay read your payment method, so check it in WhatsApp Manager — without one, replies stop after the free 1,000 service messages per number per month.",
+      "check": "Check payment method in WhatsApp Manager"
     }
   }
 }

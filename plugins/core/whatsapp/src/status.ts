@@ -1,6 +1,6 @@
 import type { ChannelContext } from "./context.js";
 import type { ConnectionMode } from "./connection.js";
-import type { PhoneNumberInfo, WabaInfo } from "./graph-client.js";
+import { GraphApiError, type PhoneNumberInfo, type WabaInfo } from "./graph-client.js";
 
 /**
  * GET /ui/status — what the settings page shows (PLAN.md Phase 2 onboarding UI).
@@ -21,7 +21,18 @@ const PHONE_FIELDS = [
   "whatsapp_business_manager_messaging_limit",
 ];
 
+const PHONE_FIELDS_BASIC = ["display_phone_number", "verified_name", "quality_rating", "status"];
+
+// `primary_funding_id` is refused (Graph code 10, "requires … Business Solution
+// Provider") for Tech Providers such as Hay's own app; the basic set is the
+// fallback, and the payment method is then reported as unknown.
 const WABA_FIELDS = ["name", "primary_funding_id", "owner_business_info"];
+const WABA_FIELDS_BASIC = ["name"];
+
+/** Graph code 10: the app may not read one of the requested fields. */
+function isPermissionError(error: unknown): boolean {
+  return error instanceof GraphApiError && (error.code === 10 || error.code === 200);
+}
 
 export interface ChannelStatus {
   mode: ConnectionMode;
@@ -29,7 +40,8 @@ export interface ChannelStatus {
   /** Values the Embedded Signup popup needs (public identifiers, not secrets). */
   embeddedSignup: { appId: string | null; configId: string | null };
   phone?: PhoneNumberInfo;
-  waba?: { id: string; name?: string; hasPaymentMethod: boolean; businessId?: string };
+  /** `hasPaymentMethod` is null when Meta does not let this app read it. */
+  waba?: { id: string; name?: string; hasPaymentMethod: boolean | null; businessId?: string };
   /** WhatsApp Manager page where the org adds a card (Meta has no API for it). */
   paymentSettingsUrl?: string;
   error?: string;
@@ -62,19 +74,24 @@ export async function getChannelStatus(
   }
 
   try {
+    const { accessToken } = connection;
     const [phone, waba] = await Promise.all([
-      ctx.graph.getPhone(connection.phoneNumberId, connection.accessToken, PHONE_FIELDS),
-      ctx.graph.getWaba(connection.wabaId, connection.accessToken, WABA_FIELDS) as Promise<WabaInfo>,
+      withFieldFallback(ctx, "phone", PHONE_FIELDS, PHONE_FIELDS_BASIC, (fields) =>
+        ctx.graph.getPhone(connection.phoneNumberId, accessToken, fields),
+      ),
+      withFieldFallback(ctx, "waba", WABA_FIELDS, WABA_FIELDS_BASIC, (fields) =>
+        ctx.graph.getWaba(connection.wabaId, accessToken, fields),
+      ),
     ]);
-    const businessId = connection.businessId ?? waba.owner_business_info?.id;
+    const businessId = connection.businessId ?? waba.value.owner_business_info?.id;
     return {
       ...base,
       connected: true,
-      phone,
+      phone: phone.value,
       waba: {
         id: connection.wabaId,
-        name: waba.name,
-        hasPaymentMethod: Boolean(waba.primary_funding_id),
+        name: waba.value.name,
+        hasPaymentMethod: waba.reduced ? null : Boolean(waba.value.primary_funding_id),
         businessId,
       },
       paymentSettingsUrl: paymentSettingsUrl(connection.wabaId, businessId),
@@ -88,5 +105,30 @@ export async function getChannelStatus(
       connected: true,
       error: error instanceof Error ? error.message : "Status lookup failed",
     };
+  }
+}
+
+/**
+ * Read with the full field list; if Meta refuses one of the fields for this
+ * app, retry once with the basic set. `reduced` tells the caller which it got.
+ */
+async function withFieldFallback<T>(
+  ctx: ChannelContext,
+  target: "phone" | "waba",
+  fields: string[],
+  basicFields: string[],
+  read: (fields: string[]) => Promise<T>,
+): Promise<{ value: T; reduced: boolean }> {
+  try {
+    return { value: await read(fields), reduced: false };
+  } catch (error: unknown) {
+    if (!isPermissionError(error)) {
+      throw error;
+    }
+    ctx.logger.info("WhatsApp status — Meta refused some fields, retrying with the basic set", {
+      target,
+      dropped: fields.filter((field) => !basicFields.includes(field)),
+    });
+    return { value: await read(basicFields), reduced: true };
   }
 }

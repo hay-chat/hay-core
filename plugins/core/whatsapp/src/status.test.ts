@@ -4,7 +4,12 @@ import { GraphClient } from "./graph-client.js";
 import type { WhatsAppConnection } from "./connection.js";
 import { fakeLogger, queuedFetch } from "./test/fakes.js";
 
-const connection: WhatsAppConnection = { mode: "embedded-signup", accessToken: "t", phoneNumberId: "1", wabaId: "2" };
+const connection: WhatsAppConnection = {
+  mode: "embedded-signup",
+  accessToken: "t",
+  phoneNumberId: "1",
+  wabaId: "2",
+};
 
 function ctx(responses: Array<[number, unknown]>, current: WhatsAppConnection | null) {
   const fetch = queuedFetch(responses);
@@ -31,7 +36,14 @@ describe("getChannelStatus", () => {
     const status = await getChannelStatus(
       ctx(
         [
-          [200, { id: "1", display_phone_number: "+1 555-0100", health_status: { can_send_message: "LIMITED" } }],
+          [
+            200,
+            {
+              id: "1",
+              display_phone_number: "+1 555-0100",
+              health_status: { can_send_message: "LIMITED" },
+            },
+          ],
           [200, { id: "2", name: "Acme", owner_business_info: { id: "99" } }],
         ],
         connection,
@@ -41,18 +53,77 @@ describe("getChannelStatus", () => {
 
     expect(status.connected).toBe(true);
     expect(status.phone?.health_status?.can_send_message).toBe("LIMITED");
-    expect(status.waba).toEqual({ id: "2", name: "Acme", hasPaymentMethod: false, businessId: "99" });
+    expect(status.waba).toEqual({
+      id: "2",
+      name: "Acme",
+      hasPaymentMethod: false,
+      businessId: "99",
+    });
     expect(status.paymentSettingsUrl).toBe(paymentSettingsUrl("2", "99"));
   });
 
   it("does not leak the token and degrades on Graph errors", async () => {
     const status = await getChannelStatus(
-      ctx([[400, { error: { message: "boom", code: 100 } }], [200, {}]], connection),
+      ctx(
+        [
+          [400, { error: { message: "boom", code: 100 } }],
+          [200, {}],
+        ],
+        connection,
+      ),
       settings,
     );
 
     expect(status).toMatchObject({ connected: true, error: "boom" });
     expect(JSON.stringify(status)).not.toContain('"t"');
+  });
+});
+
+describe("getChannelStatus field fallback", () => {
+  const refused = [
+    400,
+    { error: { message: "requires a Business Solution Provider", code: 10 } },
+  ] as [number, unknown];
+
+  it("reports the payment method as unknown when Meta refuses primary_funding_id", async () => {
+    const status = await getChannelStatus(
+      ctx(
+        [
+          [200, { id: "1", display_phone_number: "+1 555-0100" }],
+          refused,
+          [200, { id: "2", name: "Acme" }],
+        ],
+        { ...connection, businessId: "99" },
+      ),
+      settings,
+    );
+
+    expect(status.error).toBeUndefined();
+    expect(status.phone?.display_phone_number).toBe("+1 555-0100");
+    expect(status.waba).toEqual({
+      id: "2",
+      name: "Acme",
+      hasPaymentMethod: null,
+      businessId: "99",
+    });
+    expect(status.paymentSettingsUrl).toBe(paymentSettingsUrl("2", "99"));
+  });
+
+  it("retries the phone with basic fields when a health field is refused", async () => {
+    const status = await getChannelStatus(
+      ctx(
+        [
+          refused,
+          [200, { id: "2", name: "Acme", primary_funding_id: "f1" }],
+          [200, { id: "1", display_phone_number: "+1 555-0100", quality_rating: "GREEN" }],
+        ],
+        connection,
+      ),
+      settings,
+    );
+
+    expect(status.phone?.quality_rating).toBe("GREEN");
+    expect(status.waba?.hasPaymentMethod).toBe(true);
   });
 });
 

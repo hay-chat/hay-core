@@ -126,7 +126,9 @@
       "newTab": "abre em uma nova aba",
       "recheck": "Já adicionei — verificar de novo",
       "stillMissing": "Nenhuma forma de pagamento encontrada ainda. Pode levar um minuto para aparecer depois de adicionada.",
-      "onFile": "Forma de pagamento cadastrada"
+      "onFile": "Forma de pagamento cadastrada",
+      "unknown": "A Meta cobra as mensagens do WhatsApp diretamente de você. A Meta não permite que o Hay veja sua forma de pagamento, então confira no Gerenciador do WhatsApp — sem uma, as respostas param depois das 1.000 mensagens de serviço gratuitas por número por mês.",
+      "check": "Conferir forma de pagamento no Gerenciador do WhatsApp"
     }
   }
 }
