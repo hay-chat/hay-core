@@ -85,6 +85,27 @@ export interface WebhookRouteKeyPathDescriptor {
 
   /** Dot-path to the routing key on each event item (e.g. "id"). */
   keyPath: string;
+
+  /**
+   * Optional sub-array inside each item, routed (and filtered) per element.
+   *
+   * `itemsPath` is a dot-path on each item to a sub-array (e.g. "changes");
+   * `keyPath` is a dot-path on each sub-item to its own routing key (e.g.
+   * "value.metadata.phone_number_id"). When declared, Core splits each item
+   * by sub-item owner:
+   *
+   *   - sub-items whose nested key resolves to an org go to that org;
+   *   - sub-items whose nested key is UNKNOWN are dropped — they never fall
+   *     back to the item-level owner;
+   *   - sub-items with NO nested key (account-level events) go to the
+   *     item-level (`keyPath`) owner;
+   *   - each org receives one clone of the item containing only its own
+   *     sub-items.
+   *
+   * Items whose sub-array is missing or not an array are routed whole by the
+   * item-level key, exactly as if `nested` were not declared.
+   */
+  nested?: { itemsPath: string; keyPath: string };
 }
 
 /**

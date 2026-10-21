@@ -111,6 +111,8 @@ export interface WebhookVerificationChallengeDescriptor {
 export interface WebhookRouteKeyPathDescriptor {
   itemsPath: string;
   keyPath: string;
+  /** Optional sub-array inside each item, routed (and filtered) per element. */
+  nested?: { itemsPath: string; keyPath: string };
 }
 
 /**
