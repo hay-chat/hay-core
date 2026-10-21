@@ -30,11 +30,7 @@ const STRIPPED_HEADERS = new Set([
   "content-length",
 ]);
 
-interface ResolvedItem {
-  routingKey: string;
-  rawItem: unknown;
-  organizationId: string;
-}
+type RouteOwner = { organizationId: string; pluginInstanceId: string } | null;
 
 /**
  * Generic, plugin-declared webhook router.
@@ -302,6 +298,13 @@ export class WebhookRouterService {
   /**
    * Resolve routing keys to orgs, group items per org, and forward each org's
    * reconstructed body to its worker.
+   *
+   * Without `routeKeyPath.nested`, every item goes whole to the org owning its
+   * item-level key. With `nested`, each item's sub-array is split per sub-item
+   * owner: known nested keys route to their org, unknown nested keys are
+   * dropped (never falling back to the item owner), and sub-items without a
+   * nested key go to the item-level owner. Each org receives one clone of the
+   * item holding only its own sub-items.
    */
   private async dispatch(
     pluginId: string,
@@ -309,7 +312,7 @@ export class WebhookRouterService {
     body: Record<string, unknown>,
     req: Request,
   ): Promise<void> {
-    const { itemsPath, keyPath } = routing.routeKeyPath;
+    const { itemsPath, keyPath, nested } = routing.routeKeyPath;
 
     const items = getPath(body, itemsPath);
     if (!Array.isArray(items)) {
@@ -317,35 +320,83 @@ export class WebhookRouterService {
       return;
     }
 
-    // Resolve each item's routing key → owning org.
-    const resolved: ResolvedItem[] = [];
-    for (const rawItem of items) {
-      const keyValue = getPath(rawItem, keyPath);
-      if (keyValue === undefined || keyValue === null) {
-        logger.debug({ pluginId, keyPath }, "Shared webhook item missing routing key; dropping");
-        continue;
+    // One repository lookup per distinct key within this dispatch.
+    const ownerCache = new Map<string, Promise<RouteOwner>>();
+    const resolveOwner = (routingKey: string): Promise<RouteOwner> => {
+      let pending = ownerCache.get(routingKey);
+      if (!pending) {
+        pending = pluginWebhookRouteRepository.findByKey(pluginId, routingKey);
+        ownerCache.set(routingKey, pending);
       }
-      const routingKey = String(keyValue);
-
-      const owner = await pluginWebhookRouteRepository.findByKey(pluginId, routingKey);
-      if (!owner) {
-        logger.info({ pluginId, routingKey }, "Unknown routing key for shared webhook; dropping");
-        continue;
-      }
-
-      resolved.push({ routingKey, rawItem, organizationId: owner.organizationId });
-    }
-
-    if (resolved.length === 0) {
-      return;
-    }
+      return pending;
+    };
 
     // Group items by org, preserving the original top-level fields.
     const byOrg = new Map<string, unknown[]>();
-    for (const item of resolved) {
-      const list = byOrg.get(item.organizationId) ?? [];
-      list.push(item.rawItem);
-      byOrg.set(item.organizationId, list);
+    const addToOrg = (organizationId: string, item: unknown): void => {
+      const list = byOrg.get(organizationId) ?? [];
+      list.push(item);
+      byOrg.set(organizationId, list);
+    };
+
+    for (const rawItem of items) {
+      const itemKey = getPath(rawItem, keyPath);
+      let itemOwner: RouteOwner = null;
+      if (itemKey === undefined || itemKey === null) {
+        logger.debug({ pluginId, keyPath }, "Shared webhook item missing routing key");
+      } else {
+        itemOwner = await resolveOwner(String(itemKey));
+        if (!itemOwner) {
+          logger.info(
+            { pluginId, routingKey: String(itemKey) },
+            "Unknown routing key for shared webhook",
+          );
+        }
+      }
+
+      const subItems = nested ? getPath(rawItem, nested.itemsPath) : undefined;
+      if (!nested || !Array.isArray(subItems)) {
+        // No nested routing: the whole item goes to its item-level owner.
+        if (itemOwner) {
+          addToOrg(itemOwner.organizationId, rawItem);
+        } else {
+          logger.debug({ pluginId }, "Shared webhook item has no owner; dropping");
+        }
+        continue;
+      }
+
+      // Nested routing: split the sub-array by sub-item owner.
+      const subItemsByOrg = new Map<string, unknown[]>();
+      for (const subItem of subItems) {
+        const subKey = getPath(subItem, nested.keyPath);
+        let owner: RouteOwner;
+        if (subKey === undefined || subKey === null) {
+          // Account-level sub-item: belongs to the item-level owner.
+          owner = itemOwner;
+        } else {
+          owner = await resolveOwner(String(subKey));
+          if (!owner) {
+            logger.info(
+              { pluginId, routingKey: String(subKey) },
+              "Unknown nested routing key for shared webhook; dropping sub-item",
+            );
+          }
+        }
+        if (!owner) {
+          continue;
+        }
+        const list = subItemsByOrg.get(owner.organizationId) ?? [];
+        list.push(subItem);
+        subItemsByOrg.set(owner.organizationId, list);
+      }
+
+      for (const [organizationId, orgSubItems] of subItemsByOrg) {
+        addToOrg(organizationId, withPath(rawItem, nested.itemsPath, orgSubItems));
+      }
+    }
+
+    if (byOrg.size === 0) {
+      return;
     }
 
     const results = await Promise.allSettled(
@@ -367,7 +418,8 @@ export class WebhookRouterService {
 
   /**
    * Start the org's worker and POST the reconstructed body (only that org's
-   * items under `itemsPath`) to the worker's `/webhook` route. Reuses the
+   * items under `itemsPath`; with nested routing those items are already
+   * filtered to the org's sub-items) to the worker's `/webhook` route. Reuses the
    * header-forwarding rules from proxy.ts and marks the request as already
    * signature-verified via an internal header.
    */
@@ -404,9 +456,6 @@ export class WebhookRouterService {
     // not match. Core already verified the shared signature over the raw bytes,
     // so tell the worker to trust this request.
     headers["x-hay-webhook-verified"] = "true";
-    // Pass the reconstructed (per-org) body as the raw body too, so a worker
-    // that reads x-original-body-base64 sees exactly what it is being given.
-    headers["x-original-body-base64"] = Buffer.from(serialized, "utf8").toString("base64");
 
     const workerUrl = `http://localhost:${worker.port}/webhook`;
 
@@ -423,22 +472,14 @@ export class WebhookRouterService {
   }
 
   /**
-   * Read the exact raw request bytes captured upstream. The body-parser
-   * `verify` hook in main.ts populates `req.rawBody`; the proxy also forwards
-   * it as base64 in `x-original-body-base64`.
+   * Read the exact raw request bytes captured by the body-parser `verify`
+   * hook in main.ts (`req.rawBody`).
    */
   private getRawBody(req: Request): Buffer | null {
     const rawBody = (req as Request & { rawBody?: string }).rawBody;
     if (typeof rawBody === "string" && rawBody.length > 0) {
       return Buffer.from(rawBody, "utf8");
     }
-
-    const encoded = req.headers["x-original-body-base64"];
-    const value = Array.isArray(encoded) ? encoded[0] : encoded;
-    if (typeof value === "string" && value.length > 0) {
-      return Buffer.from(value, "base64");
-    }
-
     return null;
   }
 }
@@ -489,7 +530,24 @@ function setPath(
   return target;
 }
 
+/**
+ * Immutable dot-path setter: returns a copy of `source` with `value` placed at
+ * `path`, cloning every object along the path. Neither `source` nor any of its
+ * nested objects is mutated, so per-org copies of the same item never share
+ * the array that was replaced. Non-object segments are replaced by a fresh
+ * object.
+ */
+function withPath(source: unknown, path: string, value: unknown): Record<string, unknown> {
+  const [head, ...rest] = path.split(".");
+  const base: Record<string, unknown> =
+    typeof source === "object" && source !== null && !Array.isArray(source)
+      ? { ...(source as Record<string, unknown>) }
+      : {};
+  base[head] = rest.length === 0 ? value : withPath(base[head], rest.join("."), value);
+  return base;
+}
+
 export const webhookRouterService = new WebhookRouterService();
 
 // Exported for unit tests of the no-eval path extractor / body reconstruction.
-export const __webhookRouterInternals = { getPath, setPath };
+export const __webhookRouterInternals = { getPath, setPath, withPath };

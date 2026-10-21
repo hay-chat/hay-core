@@ -1441,6 +1441,30 @@ export const initiateOAuth = authenticatedProcedure
   });
 
 /**
+ * Complete an OAuth connection from a code obtained client-side (Meta Embedded
+ * Signup). The code is exchanged synchronously (30 s TTL); `extras` are
+ * untrusted hints forwarded to the plugin's onConnected hook.
+ */
+export const completeOAuthWithCode = authenticatedProcedure
+  .input(
+    z.object({
+      pluginId: z.string(),
+      code: z.string().min(1).max(2048),
+      extras: z
+        .record(z.string(), z.union([z.string().max(512), z.number(), z.boolean(), z.null()]))
+        .optional(),
+    }),
+  )
+  .mutation(async ({ ctx, input }) => {
+    return oauthService.completeWithCode(
+      ctx.organizationId!,
+      input.pluginId,
+      input.code,
+      input.extras,
+    );
+  });
+
+/**
  * Check if OAuth is available for a plugin
  */
 export const isOAuthAvailable = authenticatedProcedure

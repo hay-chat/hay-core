@@ -26,8 +26,8 @@ const REPLAY_WINDOW_SECONDS = 300;
  * — Stripe's convention, which blocks replay attacks that swap timestamps.
  *
  * We must verify against the *exact* original bytes Chatwoot signed. Hay's
- * plugin proxy parses and re-serializes JSON bodies, so we rely on the
- * `x-original-body-base64` header the proxy forwards for this purpose.
+ * plugin proxy forwards them unchanged and the SDK runner exposes them as
+ * `req.rawBody`.
  */
 function verifyChatwootSignature(
   secret: string,
@@ -85,7 +85,7 @@ function verifyChatwootSignature(
  * human-took-over and the orchestrator stops running on it.
  */
 export async function webhookHandler(
-  req: Request,
+  req: Request & { rawBody?: string },
   res: Response,
   ctx: WebhookContext,
 ): Promise<void> {
@@ -93,7 +93,7 @@ export async function webhookHandler(
 
   try {
     logger.info("Chatwoot webhook entered", {
-      hasRawBodyHeader: typeof req.headers["x-original-body-base64"] === "string",
+      hasRawBody: typeof req.rawBody === "string",
       hasTsHeader: typeof req.headers["x-chatwoot-timestamp"] === "string",
       hasSigHeader: typeof req.headers["x-chatwoot-signature"] === "string",
       event: (req.body ?? {}).event,
@@ -109,16 +109,13 @@ export async function webhookHandler(
       return;
     }
 
-    // The plugin proxy forwards the exact original request body as a
-    // base64-encoded header so we can verify HMAC against the bytes Chatwoot
-    // actually signed (re-serializing the parsed body loses whitespace and
-    // key order).
-    const rawBodyB64 = req.headers["x-original-body-base64"];
-    const rawBody =
-      typeof rawBodyB64 === "string" ? Buffer.from(rawBodyB64, "base64").toString("utf8") : "";
+    // The SDK runner captures the exact original request bytes so we can
+    // verify HMAC against what Chatwoot actually signed (re-serializing the
+    // parsed body loses whitespace and key order).
+    const rawBody = typeof req.rawBody === "string" ? req.rawBody : "";
 
     if (!rawBody) {
-      logger.warn("Chatwoot webhook rejected — missing x-original-body-base64 header");
+      logger.warn("Chatwoot webhook rejected — missing raw request body");
       res.status(400).json({ error: "Missing raw body for signature verification" });
       return;
     }

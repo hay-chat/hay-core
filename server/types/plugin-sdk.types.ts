@@ -111,6 +111,8 @@ export interface WebhookVerificationChallengeDescriptor {
 export interface WebhookRouteKeyPathDescriptor {
   itemsPath: string;
   keyPath: string;
+  /** Optional sub-array inside each item, routed (and filtered) per element. */
+  nested?: { itemsPath: string; keyPath: string };
 }
 
 /**
@@ -205,6 +207,11 @@ export interface ConfigFieldDescriptor {
   placeholder?: string; // Placeholder text for input field in UI
   required?: boolean;
   encrypted?: boolean;
+  /**
+   * Resolved only inside the Hay server (e.g. OAuth client secrets used for
+   * token exchange); never delivered to the plugin worker.
+   */
+  serverOnly?: boolean;
   default?: unknown;
   env?: string; // Environment variable fallback
   validation?: {

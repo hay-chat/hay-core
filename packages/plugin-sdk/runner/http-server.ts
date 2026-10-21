@@ -35,6 +35,14 @@ interface RegisteredMcpServer {
   options?: any; // ExternalMcpOptions for external servers
 }
 
+export const WORKER_BODY_LIMIT = "5mb";
+
+function captureRawBody(req: Request, _res: Response, buf: Buffer): void {
+  if (buf?.length) {
+    (req as Request & { rawBody?: string }).rawBody = buf.toString("utf8");
+  }
+}
+
 export class PluginHttpServer {
   private app: Express;
   private server: Server | null = null;
@@ -55,9 +63,13 @@ export class PluginHttpServer {
     this.registry = registry;
     this.app = express();
 
-    // Middleware
-    this.app.use(express.json());
-    this.app.use(express.urlencoded({ extended: true }));
+    // Middleware. Core forwards provider webhooks byte-for-byte (Meta payloads
+    // reach 3 MB), and plugins verifying HMAC signatures need the exact bytes,
+    // which `verify` exposes as `req.rawBody`.
+    this.app.use(express.json({ limit: WORKER_BODY_LIMIT, verify: captureRawBody }));
+    this.app.use(
+      express.urlencoded({ extended: true, limit: WORKER_BODY_LIMIT, verify: captureRawBody }),
+    );
 
     // Setup routes
     this.setupHealthEndpoint();
@@ -328,12 +340,19 @@ export class PluginHttpServer {
           return;
         }
 
-        const { config, authState } = req.body ?? {};
+        const { config, authState, extras: rawExtras } = req.body ?? {};
 
         if (!authState || !authState.methodId || !authState.credentials) {
           res.status(400).json({ routingKeys: [], error: "Invalid auth state format" });
           return;
         }
+
+        // Untrusted client-supplied values (e.g. Embedded Signup ids). Forward
+        // only a plain object; anything else is dropped.
+        const extras: Record<string, unknown> | undefined =
+          rawExtras && typeof rawExtras === "object" && !Array.isArray(rawExtras)
+            ? (rawExtras as Record<string, unknown>)
+            : undefined;
 
         // Merge stored org config with any fresh config + auth credentials so the
         // hook can read everything via ctx.config.get().
@@ -362,7 +381,12 @@ export class PluginHttpServer {
           logger: this.logger,
         };
 
-        const result = await executeOnConnected(this.plugin, connectedCtx as any, this.logger);
+        const result = await executeOnConnected(
+          this.plugin,
+          connectedCtx as any,
+          this.logger,
+          extras,
+        );
 
         res.json({ routingKeys: result?.routingKeys ?? [], account: result?.account });
         this.logger.debug("Handled /on-connected", {
@@ -901,10 +925,13 @@ export class PluginHttpServer {
   private setupErrorHandler(): void {
     this.app.use((err: any, _req: Request, res: Response, _next: any) => {
       const errorMsg = err instanceof Error ? err.message : String(err);
-      this.logger.error("Unhandled error in HTTP server", { error: errorMsg });
+      // body-parser errors (413 too large, 400 malformed) carry their own status.
+      const status =
+        typeof err?.status === "number" && err.status >= 400 && err.status < 600 ? err.status : 500;
+      this.logger.error("Unhandled error in HTTP server", { error: errorMsg, status });
 
       if (!res.headersSent) {
-        res.status(500).json({ error: "Internal server error" });
+        res.status(status).json({ error: status === 500 ? "Internal server error" : errorMsg });
       }
     });
   }

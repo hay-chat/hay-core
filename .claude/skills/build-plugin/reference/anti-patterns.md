@@ -82,13 +82,13 @@ Either way: **no vendored bloat** (see next).
 
 ## Lifecycle & correctness
 
-- **`onConfigUpdate` that only logs = config edits silently need a restart.** Both `whatsapp` and
-  `chatwoot` do this with their own clients. If you hold client/state in closure vars,
+- **`onConfigUpdate` that only logs = config edits silently need a restart.** `chatwoot` does this
+  with its own client. If you hold client/state in closure vars,
   re-initialize them in `onConfigUpdate`. (Pure `startLocalStdio`/`startExternal` plugins are
   fine — the platform restarts those.)
 - **`onDisable` must fully tear down.** `email-imap` nulls its SMTP sender but never `.close()`s
   the nodemailer transport. Stop pollers, close sockets/transports/clients.
-- **Webhooks need idempotency.** Channel platforms retry webhooks; `whatsapp`/`chatwoot` capture
+- **Webhooks need idempotency.** Channel platforms retry webhooks; `chatwoot` captures
   the provider message id only as metadata with no dedup, so a retried webhook double-posts. Pass
   the provider message id and dedupe on it.
 - **Suppress retry storms on non-retryable failures.** Return `200 { success: false, error }` for

@@ -76,6 +76,17 @@ export interface Message {
     size: number;
   }>;
   status: MessageStatus;
+  /** Delivery status reported by the channel provider (e.g. WhatsApp). */
+  providerStatus?: MessageProviderStatus | null;
+  providerError?: MessageProviderError | null;
+}
+
+export type MessageProviderStatus = "sent" | "delivered" | "read" | "failed";
+
+export interface MessageProviderError {
+  code?: string | number;
+  title?: string;
+  message?: string;
 }
 
 export enum MessageStatus {

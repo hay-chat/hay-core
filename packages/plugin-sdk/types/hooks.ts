@@ -76,6 +76,11 @@ export type OnStartHook = (ctx: HayStartContext) => Promise<void> | void;
  * account id used to route a shared inbound webhook back to this org).
  *
  * @param ctx - Connected context with org, config, auth (fresh tokens), and logger
+ * @param extras - Client-supplied, **untrusted** values forwarded from the
+ *   connect request (e.g. Embedded Signup's `waba_id` / `phone_number_id`).
+ *   Absent for redirect-based OAuth. A plugin must verify them against the
+ *   provider with the stored token before trusting them (e.g. confirm the
+ *   phone number actually belongs to the WABA the token can access).
  * @returns Promise resolving to {@link OnConnectedResult}. Omitting
  *   `routingKeys` (or returning nothing) persists no keys; `account`, when
  *   returned, is shown in the dashboard as the connected account.
@@ -88,6 +93,7 @@ export type OnStartHook = (ctx: HayStartContext) => Promise<void> | void;
  */
 export type OnConnectedHook = (
   ctx: HayConnectedContext,
+  extras?: Record<string, unknown>,
 ) => Promise<OnConnectedResult> | OnConnectedResult;
 
 /** The external account an OAuth connection belongs to, for display only. */
