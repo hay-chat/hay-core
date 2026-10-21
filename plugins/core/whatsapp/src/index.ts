@@ -3,7 +3,7 @@ import type { HayConfigRuntimeAPI } from "@hay/plugin-sdk/types";
 import { GraphClient } from "./graph-client.js";
 import { PluginApiClient } from "./plugin-api.js";
 import { resolveConnection, type ConnectionMode, type WhatsAppConnection } from "./connection.js";
-import { connectEmbeddedSignup } from "./connect.js";
+import { connectEmbeddedSignup, registerManualRoutes } from "./connect.js";
 import { isTrustedWebhook, verificationChallenge } from "./signature.js";
 import { getChannelStatus } from "./status.js";
 import { handleWebhook } from "./webhook.js";
@@ -75,11 +75,17 @@ export default defineHayPlugin((globalCtx) => {
     logger,
   });
 
-  /** Make sure Meta delivers this WABA's webhooks to our app. Idempotent, non-fatal. */
+  /**
+   * Make sure Meta delivers this WABA's webhooks to our app, and in manual mode
+   * claim the shared-URL routing keys. Idempotent, non-fatal.
+   */
   const subscribe = (current: WhatsAppConnection): void => {
     void graph.subscribeApp(current.wabaId, current.accessToken).catch((error: unknown) => {
       logger.warn("WhatsApp webhook subscription failed", { error: errorMessage(error) });
     });
+    if (current.mode === "manual") {
+      void registerManualRoutes(current, { graph, api: new PluginApiClient(logger), logger });
+    }
   };
 
   return {

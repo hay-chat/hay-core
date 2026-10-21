@@ -2,6 +2,7 @@ import crypto from "node:crypto";
 import type { HayLogger } from "@hay/plugin-sdk/types";
 import type { GraphClient } from "./graph-client.js";
 import type { WhatsAppConnection } from "./connection.js";
+import type { PluginApi } from "./plugin-api.js";
 
 /**
  * Finish an Embedded Signup connection (PLAN.md D5/D8).
@@ -177,5 +178,41 @@ async function registerWithPin(
       phoneNumberId,
       error: error instanceof Error ? error.message : String(error),
     });
+  }
+}
+
+/**
+ * Manual mode: claim the shared-webhook routing keys for a pasted token.
+ *
+ * When the token comes from the same Meta app whose callback is Hay's shared
+ * webhook URL (self-hosters using META_* env for their own app, or Hay's own
+ * test number), Meta posts to the shared URL and core needs routing keys —
+ * which only OAuth's onConnected would otherwise provide. Keys are claimed only
+ * after the token proves it can see the number on that WABA. Returns whether
+ * routing keys were registered. Never throws.
+ */
+export async function registerManualRoutes(
+  connection: WhatsAppConnection,
+  deps: { graph: GraphClient; api: PluginApi; logger: HayLogger },
+): Promise<boolean> {
+  const { graph, api, logger } = deps;
+  try {
+    const numbers = await graph.listPhoneNumbers(connection.wabaId, connection.accessToken);
+    if (!numbers.some((candidate) => candidate.id === connection.phoneNumberId)) {
+      logger.warn("WhatsApp manual mode — phone number is not on the WABA the token can access", {
+        wabaId: connection.wabaId,
+        phoneNumberId: connection.phoneNumberId,
+      });
+      return false;
+    }
+    await api.mutation("webhooks.setRoutingKeys", {
+      routingKeys: [connection.phoneNumberId, connection.wabaId],
+    });
+    return true;
+  } catch (error: unknown) {
+    logger.warn("WhatsApp manual mode — could not register webhook routing keys", {
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return false;
   }
 }
