@@ -139,7 +139,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, computed } from "vue";
+import { ref, onMounted, onBeforeUnmount, computed } from "vue";
 import { useI18n } from "vue-i18n";
 import { CheckCircle, Link2, Info, AlertTriangle } from "lucide-vue-next";
 import type { PluginDisplay, PluginConfig } from "@/types/plugin.types";
@@ -257,8 +257,22 @@ const formatDate = (timestamp: number) => {
   return orgFormatDate(date);
 };
 
+// Plugins that connect from their own settings UI (oauth2 connectFlow "client")
+// dispatch this window event once the connection changed.
+const onPluginConnectionChanged = (event: Event) => {
+  const detail = (event as CustomEvent<{ pluginId?: string }>).detail;
+  if (detail?.pluginId === props.plugin.id) {
+    void fetchOAuthStatus();
+  }
+};
+
+onBeforeUnmount(() => {
+  window.removeEventListener("hay:plugin-connection-changed", onPluginConnectionChanged);
+});
+
 // Load status on mount
 onMounted(async () => {
+  window.addEventListener("hay:plugin-connection-changed", onPluginConnectionChanged);
   // Only fetch status if OAuth is available
   if (oauthAvailable.value) {
     await fetchOAuthStatus();
