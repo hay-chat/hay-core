@@ -1,3 +1,13 @@
+## 2026-10-21 — claude/whatsapp-cloud (worktree ../hay-core-whatsapp-cloud) — Phase 1 core enablers, in progress
+
+**Works (committed):** item 1 org-aware findPluginIdByChannel; item 5 revokeOAuth clears routes + stops worker;
+item 2 nested routeKeyPath + per-org changes[] filtering (docs submodule branch claude/whatsapp-cloud);
+item 8 Twilio plugin deleted (lockfile, env, docs, skills). Baseline: 5 integration suites need a live DB (pre-existing).
+**Half-built:** agents implementing item 3 (plugins.oauth.completeWithCode + serverOnly config flag — Instagram
+leaked META_APP_SECRET to its worker via env-backed config) and items 4+7 (messages.updateStatus, media.upload,
+attachments). Item 6 pending: raw body travels in x-original-body-base64 header → Node 16 KB header cap; must move to body.
+**Next:** commit 3, 4+7; implement 6 (proxy.ts, webhook-router forwardToOrg, SDK runner, chatwoot reader); typecheck + test:server; PR.
+
 ## 2026-08-31 — claude/error-tracking-noise — PR #77 open (+ hay-website PR #28)
 
 **Works:** Root cause of 321 "No procedure found: widget.css" errors: vite inline-css
