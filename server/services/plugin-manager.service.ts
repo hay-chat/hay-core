@@ -965,16 +965,34 @@ export class PluginManagerService {
   }
 
   /**
-   * Find the plugin ID that handles a given conversation channel.
-   * Looks up the in-memory registry for a plugin with matching `channel` field.
+   * Find the plugin that handles a conversation channel for one organization.
+   *
+   * Resolution is per org: the enabled plugin instance whose manifest declares
+   * this `channel` slug wins. Two plugins may share a slug across the platform
+   * (e.g. two WhatsApp providers) as long as an org enables only one of them.
    */
-  findPluginIdByChannel(channel: string): string | null {
-    for (const [pluginId, plugin] of this.registry) {
-      if (plugin.manifest?.channel === channel) {
-        return pluginId;
-      }
+  async findPluginIdByChannel(organizationId: string, channel: string): Promise<string | null> {
+    const instances = await pluginInstanceRepository.findEnabledByOrganization(organizationId);
+
+    const matches = instances
+      .map((instance) => instance.plugin?.pluginId)
+      .filter((pluginId): pluginId is string => Boolean(pluginId))
+      .filter((pluginId) => {
+        const manifest =
+          this.registry.get(pluginId)?.manifest ??
+          instances.find((i) => i.plugin?.pluginId === pluginId)?.plugin?.manifest;
+        return manifest?.channel === channel;
+      })
+      .sort();
+
+    if (matches.length > 1) {
+      logger.warn(
+        { organizationId, channel, pluginIds: matches },
+        "Multiple enabled plugins claim the same channel; using the first by id",
+      );
     }
-    return null;
+
+    return matches[0] ?? null;
   }
 
   /**

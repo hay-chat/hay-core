@@ -186,7 +186,10 @@ class ChannelDeliveryService {
       if (!conversation) return;
       if (conversation.channel === "web") return;
 
-      const pluginId = pluginManagerService.findPluginIdByChannel(conversation.channel);
+      const pluginId = await pluginManagerService.findPluginIdByChannel(
+        conversation.organization_id,
+        conversation.channel,
+      );
       if (!pluginId) return;
 
       logger.info(
@@ -251,8 +254,8 @@ class ChannelDeliveryService {
   /**
    * Find the appropriate plugin worker for this channel and POST to its /deliver endpoint.
    *
-   * Looks up which plugin handles the given channel via the plugin registry's
-   * manifest `channel` field (set in the plugin's package.json `hay-plugin.channel`).
+   * Resolves the org's enabled plugin instance whose manifest `channel` field
+   * (package.json `hay-plugin.channel`) matches the conversation channel.
    */
   private async deliverViaPlugin(args: {
     organizationId: string;
@@ -275,10 +278,10 @@ class ChannelDeliveryService {
       messageMetadata,
     } = args;
 
-    const pluginId = pluginManagerService.findPluginIdByChannel(channel);
+    const pluginId = await pluginManagerService.findPluginIdByChannel(organizationId, channel);
 
     if (!pluginId) {
-      logger.warn({ channel, organizationId }, "No plugin registered for channel");
+      logger.warn({ channel, organizationId }, "No enabled plugin for channel in organization");
       return;
     }
 

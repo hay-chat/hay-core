@@ -1,46 +1,35 @@
-# Billing lock — core side (branch claude/billing-lock)
+# WhatsApp Cloud API — Phase 1 core enablers (branch claude/whatsapp-cloud)
 
-Plan: /home/home/.claude/plans/vast-munching-brooks.md (Part B). Backoffice + website work happens in
-/srv/hay/wt-billing-lock and /srv/hay/wt-website-billing on the same branch name.
+Plan: `.claude/plans/whatsapp-cloud/PLAN.md` §3 Phase 1 (decisions D1–D14 final). Codebase map:
+`.claude/plans/whatsapp-cloud/research/03-codebase-channel-plugins.md`.
 
-## Checklist
+## Checklist (one commit per item)
 
-- [x] B1 entity columns + migration 1784300000000-AddOrganizationSuspension (timestamp follows the latest existing migration, not the plan's 1782…)
-- [x] B2 INTERNAL_API_SECRET, internalProcedure, internal.organizations.{setAccessState,getAccessState,delete}
-- [x] B3 errorFormatter, suspension middleware in isAuthed, apiKeyAuth, orchestrator run.ts early return, webchat getPublicConfig {enabled:false} + widget hides
-- [x] B4 auth.me/switchOrganization expose fields, store getters, errorLink detection, auth.global redirect/lock, useExternalLink, pages/suspended.vue, AccessNoticeBanner, i18n en+pt-BR
-- [x] B5 Jest tests (internal-auth, suspension, internal router, orchestrator skip) + webchat vitest
-- [x] Verify: npm run typecheck, npm run lint, server + dashboard + webchat tests
-- [ ] WIP.md + CONTEXT.md checkpoint
-
-## Contract deviations
-- None in names/shapes. Two additions the other sides may use: `setAccessState` also returns `suspensionRedirectUrl`, and the WebSocket event `organization_access_changed` carries the same state object.
-- Migration file is `1784300000000-AddOrganizationSuspension.ts` (the plan said 1782…; TypeORM orders by timestamp and 1784200000000 already exists).
-
-## Contract (shared with backoffice/website — do not drift)
-
-- Header `x-hay-internal-secret` == core env `INTERNAL_API_SECRET` (backoffice env `HAY_INTERNAL_API_SECRET`). Empty → internal.\* returns FORBIDDEN.
-- `internal.organizations.setAccessState({ organizationId: uuid, suspension: { reason: "trial_expired"|"payment_failed"|"cancelled"|"manual", redirectUrl?: url } | null, notice: AccessNotice | null })`
-  → `{ suspendedAt, suspensionReason, suspensionRedirectUrl, accessNotice }`. Idempotent; keeps original suspendedAt.
-- `internal.organizations.getAccessState({ organizationId })` → same shape.
-- `internal.organizations.delete({ organizationId })` → `{ success: true }` (reuses organizations.delete logic).
-- `AccessNotice = { key: string; level: "info"|"warning"|"critical"; params?: Record<string,string|number>; text?: string; ctaUrl?: string; ctaLabel?: string; expiresAt?: ISO }`.
-  Dashboard i18n keys the backoffice will use: `accessNotice.trial_ending` {date, daysLeft}, `accessNotice.payment_failed` {lockDate}.
-- Suspended + redirectUrl + owner/admin → dashboard does `auth.generateAuthCode` and navigates to `redirectUrl?code=<code>&reason=<reason>` (same tab). Otherwise `/suspended` page.
-- Suspended tRPC calls fail with FORBIDDEN, `data.type = "ORGANIZATION_SUSPENDED"`, `data.reason`. Exempt: `auth.*`, `internal.*`, `organizations.switchOrganization`, `organizations.getSettings`, `organizations.delete`, `plugins.getMenuItems`.
-- `webchat.getPublicConfig` returns `{ enabled: false }` (no throw) when webchat disabled or org suspended; widget renders nothing.
+- [ ] 1. `findPluginIdByChannel` org-aware (D2) + callers in `channel-delivery.service.ts`
+  - AC: given org A with plugin X enabled and org B with plugin Y enabled, both `channel:"whatsapp"`, delivery for org A resolves X, org B resolves Y; no enabled instance → undefined. Unit tests.
+- [ ] 2. Nested `routeKeyPath` + multi-key descriptors in `webhook-router.service.ts` / SDK `types/webhook-routing.ts`; per-org filtering of `changes[]` in `forwardToOrg` (D4)
+  - AC: a Meta WhatsApp payload with two `changes[]` for two orgs' `phone_number_id`s is split so each worker receives only its own `changes[]`; `entry[].id` (WABA) still routes account-level events; Instagram descriptor (`entry`/`id`) behaves exactly as today. Tests in `webhook-router.service.test.ts`.
+- [ ] 3. `oauth.completeWithCode` tRPC procedure (D5): exchange ES code (`GET /oauth/access_token`, no `redirect_uri`) in core → `storeTokens` → `runOnConnected(extras)`; SDK `onConnected` gains `extras`
+  - AC: procedure requires an enabled instance + oauth2 plugin; token exchange uses `META_APP_SECRET` only in core; extras reach the worker `/on-connected` and the plugin hook; errors map to TRPCError. Unit tests for the service path.
+- [ ] 4. `pluginApi.messages.updateStatus({providerMessageId, status, error?})` (D10)
+  - AC: updates the `Message` by `provider_message_id` scoped to org; unknown id → no-op result; emits the WebSocket/Redis event the dashboard already uses for delivery state. Tests.
+- [ ] 5. `revokeOAuth` clears `plugin_webhook_routes` + stops the worker (D7)
+  - AC: after revoke, `findByKey` for that instance's keys returns nothing and the worker is stopped. Tests.
+- [ ] 6. ≥3 MB body limit on `/v1/plugins/*/webhook`
+  - AC: a 2.5 MB JSON webhook POST is accepted (raw body kept for HMAC); default limit elsewhere unchanged. Test.
+- [ ] 7. `attachments[]` on `pluginApi.messages.receive` + `pluginApi.media.upload` (storageService) + `attachments` on `/deliver` payload (D9)
+  - AC: receive persists `Message.attachments`; media.upload accepts base64 + mime + filename, stores via storageService, returns `{id,url,name,type,size}` shape; delivery payload carries `message.attachments`. Tests.
+- [ ] 8. Delete `plugins/core/whatsapp` (Twilio) + every reference (env vars, `.env.example`, docs, i18n, docker, scripts)
+  - AC: `grep -ri twilio` returns only plan/research files and historical migrations; typecheck + tests green.
+- [ ] Verify: `npm run typecheck`, `npm run test:server`; Instagram router tests unchanged.
+- [ ] WIP.md + CONTEXT.md checkpoint after each item; push + PR referencing PLAN.md.
 
 ## Working notes
 
-- Organization entity is already on `ctx.user.userOrganization.organization` (loadUserOrganization relations: ["organization"]) → no extra query in middleware.
-- `runConversation()` in server/orchestrator/run.ts is the single funnel; `findById` joins organization. Must clear needs_processing or the 30s sweep re-enqueues forever.
-- tRPC `cause` is not serialized → errorFormatter in server/trpc/init.ts.
-- Dashboard logout heuristic in utils/api.ts matches "unauthorized" in messages → keep suspension message free of it.
+- `META_APP_SECRET` must never reach a worker (DENIED_ENV_PATTERNS) — code exchange lives in core.
+- No backwards-compat shims; no new dependencies; no plugin ids hardcoded in core.
+- Worktree: `../hay-core-whatsapp-cloud` (branch `claude/whatsapp-cloud`).
 
-## Results (core, branch claude/billing-lock)
-Commits: da2b409 (server), d40809b (dashboard + widget), 82457dd (tests).
-- Server: `types/organization-access.types.ts`, 4 new org columns + migration, `trpc/middleware/internal.ts` (`x-hay-internal-secret`, INTERNAL_API_SECRET), `routes/v1/internal` (setAccessState/getAccessState/delete), `trpc/middleware/suspension.ts` wired into `isAuthed`, errorFormatter exposes `data.type/reason`, apiKeyAuth rejects suspended orgs, `runConversation` early return, `webchat.getPublicConfig` → `{enabled:false}`, `organizationService.deleteWithData` shared by owner + internal delete, auth.me/switchOrganization expose the access state.
-- Dashboard: `composables/useExternalLink.ts`, `composables/useSuspension.ts`, `pages/suspended.vue`, `components/AccessNoticeBanner.vue`, store fields/getters/actions, errorLink + auth.global redirect-or-lock, WS `organization_access_changed`, i18n en/pt-BR `access.json`.
-- Webchat: widget hides on `enabled:false` (+ `@vue/test-utils` devDep, `src/__tests__/Widget.spec.ts`).
-- Verified: `npm run lint` clean, `npm run typecheck` (plugin-sdk, server-sdk, dashboard, server) clean, server jest 44/49 suites green — the 5 failing suites are DB integration tests that need a Postgres (`Driver not Connected`; the worktree has no .env — main repo resolves /srv/hay-core/.env four levels up), webchat vitest 15/15.
-- Not done: migration not executed anywhere yet (no local DB); runs on prod boot. `.env` for INTERNAL_API_SECRET not set in /srv/hay-core/.env.
+## Results
+
+(pending)
