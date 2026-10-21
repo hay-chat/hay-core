@@ -45,4 +45,36 @@ describe("executeOnConnected", () => {
     expect(onConnected.mock.calls[0][0]).toBe(ctx);
     expect(onConnected.mock.calls[0][1]).toBeUndefined();
   });
+
+  it("returns account and credentials from onConnected", async () => {
+    const plugin = {
+      name: "p",
+      onInitialize: vi.fn(),
+      onConnected: vi.fn().mockResolvedValue({
+        routingKeys: ["WABA1"],
+        account: { label: "+1 555" },
+        credentials: { wabaId: "WABA1", pin: "123456" },
+      }),
+    } as unknown as HayPluginDefinition;
+
+    const result = await executeOnConnected(plugin, ctx, logger);
+
+    expect(result).toEqual({
+      routingKeys: ["WABA1"],
+      account: { label: "+1 555" },
+      credentials: { wabaId: "WABA1", pin: "123456" },
+    });
+  });
+
+  it("drops non-object credentials", async () => {
+    const plugin = {
+      name: "p",
+      onInitialize: vi.fn(),
+      onConnected: vi.fn().mockResolvedValue({ credentials: ["nope"] }),
+    } as unknown as HayPluginDefinition;
+
+    const result = await executeOnConnected(plugin, ctx, logger);
+
+    expect(result.credentials).toBeUndefined();
+  });
 });

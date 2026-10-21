@@ -24,6 +24,14 @@ router.all(/^\/([^/]+)\/(.*)?$/, async (req: Request, res: Response): Promise<vo
 
     logger.debug({ method: req.method, path: req.path, pluginId }, "Proxying request to plugin");
 
+    // Worker control endpoints and channel delivery routes are called by core
+    // over localhost only. Exposing them here would let anyone who knows an org
+    // id run MCP tools, send channel messages or swap the worker's credentials.
+    if (isWorkerInternalPath(path)) {
+      res.status(404).json({ error: "Not found" });
+      return;
+    }
+
     // Generic shared-webhook fan-out: when a plugin DECLARES a webhook routing
     // strategy (in its metadata) and the request carries no org id, core resolves
     // the org(s) from the payload and fans the single shared webhook URL out to
@@ -124,8 +132,40 @@ router.all(/^\/([^/]+)\/(.*)?$/, async (req: Request, res: Response): Promise<vo
   }
 });
 
+/**
+ * First path segments only core may call on a worker (over localhost): the SDK
+ * runner's control endpoints, the channel `/deliver` + `/escalate` contract, and
+ * `/ui/*` (settings UI routes, reachable only via the authenticated, org-scoped
+ * `plugins.callUiRoute`).
+ */
+const WORKER_INTERNAL_SEGMENTS = new Set([
+  "health",
+  "metadata",
+  "validate-auth",
+  "on-connected",
+  "config-update",
+  "disable",
+  "cron",
+  "mcp",
+  "deliver",
+  "escalate",
+  "ui",
+]);
+
+/**
+ * Whether a proxied path targets a worker-internal endpoint. Matches the way
+ * the worker's Express router resolves paths: case-insensitive, ignoring empty
+ * segments and a trailing slash.
+ */
+export function isWorkerInternalPath(path: string): boolean {
+  const firstSegment = path.split("/").find((segment) => segment.length > 0);
+  return firstSegment !== undefined && WORKER_INTERNAL_SEGMENTS.has(firstSegment.toLowerCase());
+}
+
 // Stripped to prevent credential leakage to plugin workers. content-length is
-// recomputed by fetch for the forwarded body.
+// recomputed by fetch for the forwarded body. x-hay-webhook-verified is set only
+// by the webhook router after it checks the provider signature; a caller must
+// never be able to supply it.
 const STRIPPED_HEADERS = new Set([
   "authorization",
   "cookie",
@@ -133,6 +173,7 @@ const STRIPPED_HEADERS = new Set([
   "x-real-ip",
   "proxy-authorization",
   "content-length",
+  "x-hay-webhook-verified",
 ]);
 
 /**

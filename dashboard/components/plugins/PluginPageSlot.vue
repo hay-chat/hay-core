@@ -5,6 +5,18 @@
  * Dynamically loads and renders plugin UI components from built bundles.
  * Handles prop passing, event emitting, loading states, and error boundaries.
  *
+ * Props every plugin component receives:
+ * - `plugin`: plugin metadata object
+ * - `config`: current plugin configuration (form data)
+ * - `apiBaseUrl`: API base URL for plain HTTP calls
+ * - `api`: the dashboard tRPC client (`Hay`), authenticated and scoped to the
+ *   logged-in user's organization, e.g. `api.plugins.oauth.status.query(...)` or
+ *   `api.plugins.callUiRoute.mutate({ pluginId, method: "GET", path: "/ui/status" })`
+ *   to reach the plugin worker's own `/ui/*` routes (a mutation for GET and POST)
+ * - `locale`: current dashboard locale (e.g. "en", "pt-BR")
+ *
+ * Plugin components may emit `update:config` with a partial config object.
+ *
  * @example
  * ```vue
  * <PluginPageSlot
@@ -20,6 +32,8 @@
 import { ref, onErrorCaptured, Suspense } from "vue";
 import { usePluginRegistry } from "@/composables/usePluginRegistry";
 import { Loader2, AlertCircle } from "lucide-vue-next";
+import { useI18n } from "vue-i18n";
+import { Hay } from "@/utils/api";
 
 interface Props {
   /** Plugin identifier (e.g., 'zendesk', 'shopify') */
@@ -50,6 +64,7 @@ const emit = defineEmits<{
 }>();
 
 const pluginRegistry = usePluginRegistry();
+const { locale } = useI18n({ useScope: "global" });
 
 // Error state
 const hasError = ref(false);
@@ -106,6 +121,8 @@ const refreshPage = () => {
           :plugin="plugin"
           :config="config"
           :api-base-url="apiBaseUrl"
+          :api="Hay"
+          :locale="locale"
           @update:config="emit('update:config', $event)"
         />
         <Alert v-else variant="destructive">

@@ -113,7 +113,8 @@ export async function executeOnStart(
  * @param logger - Logger instance
  * @param extras - Untrusted client-supplied values forwarded by Core (see
  *   {@link OnConnectedHook}); omitted for redirect-based OAuth
- * @returns The routing keys returned by the hook (empty array if undefined/failed)
+ * @returns The routing keys returned by the hook (empty array if undefined/failed),
+ *   plus the optional `account` and `credentials` (Core sanitizes the latter)
  *
  * @remarks
  * Called once after OAuth tokens are stored. If the hook is not defined,
@@ -125,7 +126,11 @@ export async function executeOnConnected(
   connectedCtx: HayConnectedContext,
   logger: HayLogger,
   extras?: Record<string, unknown>,
-): Promise<{ routingKeys: string[]; account?: ConnectedAccount }> {
+): Promise<{
+  routingKeys: string[];
+  account?: ConnectedAccount;
+  credentials?: Record<string, string>;
+}> {
   if (!plugin.onConnected) {
     logger.debug("Plugin has no onConnected hook, skipping");
     return { routingKeys: [] };
@@ -147,8 +152,15 @@ export async function executeOnConnected(
         ? resolved.account
         : undefined;
 
+    const credentials =
+      resolved?.credentials &&
+      typeof resolved.credentials === "object" &&
+      !Array.isArray(resolved.credentials)
+        ? resolved.credentials
+        : undefined;
+
     logger.info("onConnected hook completed", { routingKeyCount: routingKeys.length });
-    return { routingKeys, account };
+    return { routingKeys, account, credentials };
   } catch (err) {
     const errorMsg = err instanceof Error ? err.message : String(err);
     logger.warn("onConnected hook threw error, returning no routing keys", {

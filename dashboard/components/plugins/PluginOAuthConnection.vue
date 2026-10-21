@@ -89,7 +89,7 @@
         <!-- Action Buttons -->
         <div class="flex items-center space-x-2">
           <Button
-            v-if="!oauthStatus.connected"
+            v-if="!oauthStatus.connected && !isClientFlow"
             @click="handleConnect"
             :disabled="connecting"
             :loading="connecting"
@@ -98,7 +98,7 @@
             Connect to {{ pluginName }}
           </Button>
           <Button
-            v-if="oauthStatus.connected && oauthStatus.expired"
+            v-if="oauthStatus.connected && oauthStatus.expired && !isClientFlow"
             @click="handleConnect"
             :disabled="connecting"
             :loading="connecting"
@@ -139,7 +139,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, computed } from "vue";
+import { ref, onMounted, onBeforeUnmount, computed } from "vue";
 import { useI18n } from "vue-i18n";
 import { CheckCircle, Link2, Info, AlertTriangle } from "lucide-vue-next";
 import type { PluginDisplay, PluginConfig } from "@/types/plugin.types";
@@ -175,6 +175,13 @@ const disconnecting = ref(false);
 
 // Compute plugin name from plugin data
 const pluginName = computed(() => props.plugin?.name || props.plugin?.id || "Service");
+
+// "client" flow plugins obtain the code in their own settings UI, so the
+// platform's redirect Connect/Reconnect buttons are hidden.
+const isClientFlow = computed(() => {
+  const oauth2 = props.plugin?.metadata?.authMethods?.find((method) => method.type === "oauth2");
+  return oauth2?.connectFlow === "client";
+});
 
 // Use OAuth availability from props (already checked by parent)
 const oauthAvailable = computed(() => props.oauthAvailable && props.oauthConfigured);
@@ -250,8 +257,22 @@ const formatDate = (timestamp: number) => {
   return orgFormatDate(date);
 };
 
+// Plugins that connect from their own settings UI (oauth2 connectFlow "client")
+// dispatch this window event once the connection changed.
+const onPluginConnectionChanged = (event: Event) => {
+  const detail = (event as CustomEvent<{ pluginId?: string }>).detail;
+  if (detail?.pluginId === props.plugin.id) {
+    void fetchOAuthStatus();
+  }
+};
+
+onBeforeUnmount(() => {
+  window.removeEventListener("hay:plugin-connection-changed", onPluginConnectionChanged);
+});
+
 // Load status on mount
 onMounted(async () => {
+  window.addEventListener("hay:plugin-connection-changed", onPluginConnectionChanged);
   // Only fetch status if OAuth is available
   if (oauthAvailable.value) {
     await fetchOAuthStatus();

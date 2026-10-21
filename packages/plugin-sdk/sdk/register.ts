@@ -593,6 +593,15 @@ function validateOAuth2AuthOptions(options: OAuth2AuthOptions, registry: PluginR
     }
   }
 
+  // Validate connectFlow (if provided)
+  if (
+    options.connectFlow !== undefined &&
+    options.connectFlow !== "redirect" &&
+    options.connectFlow !== "client"
+  ) {
+    throw new Error('OAuth2 auth connectFlow must be "redirect" or "client"');
+  }
+
   // Validate scopeSeparator (if provided)
   if (options.scopeSeparator !== undefined && typeof options.scopeSeparator !== "string") {
     throw new Error("OAuth2 auth scopeSeparator must be a string");

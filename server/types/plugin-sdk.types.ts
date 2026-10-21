@@ -265,6 +265,9 @@ export interface AuthMethodDescriptor {
   /** For OAuth2 auth: extra static query params appended to the authorize URL */
   authorizationParams?: Record<string, string>;
 
+  /** For OAuth2 auth: "client" = code obtained by the plugin's own UI and posted to completeWithCode (redirect initiate disabled). Defaults to "redirect". */
+  connectFlow?: "redirect" | "client";
+
   /** For OAuth2 auth: delimiter used to join scopes in the authorize URL (defaults to a space) */
   scopeSeparator?: string;
 

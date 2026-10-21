@@ -1,0 +1,132 @@
+{
+  "name": "WhatsApp",
+  "description": "Conecte um número do WhatsApp Business e troque mensagens, mídias e áudios pela IA do Hay",
+  "tools": {},
+  "config": {},
+  "ui": {
+    "title": "Conectar WhatsApp",
+    "intro": "Conecte um número do WhatsApp Business para que a IA do Hay atenda seus clientes no WhatsApp — texto, mídias e áudios.",
+    "loadingStatus": "Carregando status do WhatsApp…",
+    "statusError": {
+      "title": "Não foi possível carregar o status do WhatsApp",
+      "body": "Verifique se o plugin está ativado e se as configurações foram salvas, depois tente novamente.",
+      "detail": "Detalhes: {message}",
+      "noApi": "Esta versão do painel não consegue se comunicar com o plugin do WhatsApp. Recarregue a página.",
+      "retry": "Tentar novamente"
+    },
+    "tabs": {
+      "label": "Como conectar",
+      "embedded": "Cadastro incorporado",
+      "manual": "Token manual",
+      "active": "ativo"
+    },
+    "embedded": {
+      "intro": "Conecte seu número do WhatsApp Business em uma janela da Meta — sem tokens para copiar e colar.",
+      "notConfigured": "O cadastro incorporado não está configurado neste servidor do Hay (META_APP_ID e META_WHATSAPP_ES_CONFIG_ID não estão definidos). Use a aba Token manual.",
+      "notActive": "O cadastro incorporado não é o método de conexão ativo. Escolha \"Embedded Signup\" em Método de conexão acima e salve antes de conectar.",
+      "connect": "Conectar WhatsApp",
+      "continue": "Abrir janela da Meta",
+      "tryAgain": "Tentar novamente",
+      "connectedHint": "Seu número está conectado pelo cadastro incorporado. Para conectar outro número, desconecte acima e conecte novamente.",
+      "httpsHint": "A janela da Meta só funciona em https. Para testes locais, exponha o painel por um túnel (ngrok ou cloudflared) e adicione essa origem aos domínios permitidos do seu app da Meta.",
+      "stage": {
+        "loadingSdk": "Carregando a Meta…",
+        "ready": "A Meta está pronta. Clique em \"Abrir janela da Meta\" para continuar.",
+        "popup": "Aguardando você concluir na janela da Meta…",
+        "finishing": "Finalizando — verificando seu número com a Meta…",
+        "connected": "WhatsApp conectado.",
+        "cancelled": "O cadastro foi cancelado. Você pode recomeçar quando quiser.",
+        "cancelledAt": "O cadastro foi cancelado na etapa \"{step}\". Você pode recomeçar quando quiser.",
+        "error": "Algo deu errado: {message}",
+        "unverified": "Conectado, mas o Hay não conseguiu verificar o número de telefone — tente novamente ou fale com o suporte.",
+        "sdkFailed": "Não foi possível carregar o script de login da Meta. Verifique se o navegador ou alguma extensão está bloqueando connect.facebook.net."
+      },
+      "explainer": {
+        "title": "Bom saber",
+        "ownership": "O número continua sendo seu — o Hay se conecta a ele pela Meta, e você pode desconectar quando quiser.",
+        "coexistence": "Já usa o app WhatsApp Business no celular? A janela oferece mantê-lo (coexistência), para você continuar respondendo pelo app.",
+        "billing": "A Meta cobra as mensagens do WhatsApp diretamente da sua empresa — o Hay não cobra taxa. Cada número tem 1.000 mensagens de atendimento gratuitas por mês."
+      }
+    },
+    "manual": {
+      "intro": "Para o Hay auto-hospedado ou para conectar um número do seu próprio app da Meta. Você vai copiar alguns valores da Meta para o formulário acima.",
+      "active": "Token manual é o método de conexão ativo.",
+      "notActive": "Token manual ainda não é o método ativo — escolha-o em Método de conexão acima e salve.",
+      "steps": {
+        "app": {
+          "title": "Crie um app na Meta",
+          "body": "No <strong>Meta for Developers</strong>, crie um app do tipo <strong>Empresa</strong> e adicione o produto <strong>WhatsApp</strong>. Conectando seu próprio número dessa forma, você é um Direct Integrator — não precisa de App Review."
+        },
+        "token": {
+          "title": "Gere um token permanente",
+          "body": "Em <strong>Configurações do negócio → Usuários → Usuários do sistema</strong>, crie um usuário do sistema, dê acesso ao seu app e à sua conta do WhatsApp e gere um token que <strong>nunca expira</strong> com as permissões <code>whatsapp_business_messaging</code> e <code>whatsapp_business_management</code>."
+        },
+        "ids": {
+          "title": "Copie seus IDs",
+          "body": "No seu app, abra <strong>WhatsApp → Configuração da API</strong> e copie o <strong>ID do número de telefone</strong> e o <strong>ID da conta do WhatsApp Business</strong>."
+        },
+        "form": {
+          "title": "Preencha o formulário acima",
+          "body": "Escolha <strong>Manual token</strong> em Método de conexão e cole o token, os dois IDs, a chave secreta do app (<strong>Configurações do app → Básico</strong>) e um token de verificação à sua escolha. Salve."
+        },
+        "webhook": {
+          "title": "Aponte o webhook da Meta para o Hay",
+          "body": "No seu app da Meta, abra <strong>WhatsApp → Configuração</strong> e defina esta URL de callback, com o mesmo token de verificação salvo no Hay. Depois assine o campo de webhook <strong>messages</strong>.",
+          "copy": "Copiar URL de callback",
+          "copied": "Copiado"
+        },
+        "register": {
+          "title": "Registre o número",
+          "body": "Se o número ainda não estiver registrado na Cloud API, registre-o em <strong>WhatsApp → Configuração da API</strong>."
+        }
+      }
+    },
+    "health": {
+      "title": "Número conectado",
+      "refresh": "Atualizar",
+      "number": "Número",
+      "displayName": "Nome de exibição",
+      "sending": "Envio",
+      "quality": "Classificação de qualidade",
+      "limit": "Limite de mensagens",
+      "coexistence": "App WhatsApp Business (coexistência)",
+      "coexistenceValue": "Também em uso no celular",
+      "sandbox": "Este é um número de teste (sandbox) — ele só envia mensagens para destinatários cadastrados no seu app da Meta.",
+      "lookupError": "Não foi possível ler os dados do número na Meta: {message}",
+      "solution": "Como resolver: {solution}",
+      "unknown": "Desconhecido",
+      "canSend": {
+        "AVAILABLE": "Disponível",
+        "LIMITED": "Limitado",
+        "BLOCKED": "Bloqueado"
+      },
+      "qualityRating": {
+        "GREEN": "Alta",
+        "YELLOW": "Média",
+        "RED": "Baixa",
+        "UNKNOWN": "Desconhecida"
+      },
+      "nameStatus": {
+        "APPROVED": "Aprovado",
+        "AVAILABLE_WITHOUT_REVIEW": "Disponível sem análise",
+        "PENDING_REVIEW": "Em análise",
+        "DECLINED": "Recusado",
+        "EXPIRED": "Expirado",
+        "NONE": "Não enviado"
+      },
+      "limits": {
+        "tier": "{count} clientes / 24h",
+        "unlimited": "Ilimitado"
+      }
+    },
+    "payment": {
+      "title": "Forma de pagamento",
+      "missing": "A Meta cobra as mensagens do WhatsApp diretamente de você. Adicione uma forma de pagamento no WhatsApp Manager — sem ela, as respostas param depois das 1.000 mensagens de atendimento gratuitas por número por mês.",
+      "open": "Adicionar forma de pagamento no WhatsApp Manager",
+      "newTab": "abre em uma nova aba",
+      "recheck": "Já adicionei — verificar de novo",
+      "stillMissing": "Nenhuma forma de pagamento encontrada ainda. Pode levar um minuto para aparecer depois de adicionada.",
+      "onFile": "Forma de pagamento cadastrada"
+    }
+  }
+}

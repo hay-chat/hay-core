@@ -1,0 +1,44 @@
+{
+  "name": "hay-channel-whatsapp-meta",
+  "version": "1.0.0",
+  "description": "Connect WhatsApp as a communication channel — exchange WhatsApp messages, media and voice notes through Hay's AI orchestrator using the Meta WhatsApp Cloud API (Embedded Signup or a pasted system-user token)",
+  "author": "Hay",
+  "type": "module",
+  "main": "dist/index.js",
+  "hay-plugin": {
+    "entry": "./dist/index.js",
+    "displayName": "WhatsApp",
+    "category": "channel",
+    "channel": "whatsapp",
+    "capabilities": [
+      "messages",
+      "customers"
+    ],
+    "env": [
+      "META_APP_ID",
+      "META_APP_SECRET",
+      "META_VERIFY_TOKEN",
+      "META_WHATSAPP_ES_CONFIG_ID"
+    ]
+  },
+  "scripts": {
+    "build": "npm run build:ui && tsc",
+    "build:ui": "vite build --config vite.config.ui.ts",
+    "start": "node dist/index.js",
+    "dev": "npm run build:ui && tsc",
+    "dev:ui": "vite build --watch --config vite.config.ui.ts",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@hay/plugin-sdk": "file:../../../packages/plugin-sdk"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "@vitejs/plugin-vue": "^5.0.0",
+    "typescript": "^5.3.3",
+    "vite": "^5.0.0",
+    "vitest": "^1.1.0",
+    "vue": "^3.4.0"
+  }
+}
