@@ -1,15 +1,13 @@
-## 2026-10-21 — claude/whatsapp-cloud (worktree ../hay-core-whatsapp-cloud) — Phase 1 DONE, PR open
+## 2026-10-21 — claude/whatsapp-plugin (worktree ../hay-core-whatsapp-plugin) — Phase 2 DONE, PR open
 
-**Works:** all 8 Phase 1 core enablers from `.claude/plans/whatsapp-cloud/PLAN.md` §3, one commit each
-(org-aware findPluginIdByChannel, nested routeKeyPath + per-org changes[] split, plugins.oauth.completeWithCode
-+ serverOnly config, messages.updateStatus + attachments + media.upload, revoke clears routes/stops worker,
-raw body forwarded as worker body (5 MB), Twilio plugin deleted). Typecheck + lint clean; server tests = baseline
-(5 DB-only integration suites fail on master too). Docs submodule branch `claude/whatsapp-cloud` pushed to hay-docs.
-**Half-built:** nothing. Migration 1784400000000 (provider_status) not yet run anywhere.
-**Also:** Meta console Phase 0 done except payment method + App Review: ES config_id 1666846881828080, JS SDK on, eu.hay.chat allowlisted,
-deauth/data-deletion → /v1/plugins/hay-channel-whatsapp-meta/*. Prod env now comes from Infisical (cutover 2026-10-21 16:02 via /srv/hay-core/deploy.sh --env-only;
-META_WHATSAPP_ES_CONFIG_ID live on the server; never hand-edit /srv/hay-core/.env again).
-**Next:** merge PR → Phase 2 plugin build in a new session; optionally move /srv/hay and /srv/hay-shopify to the same Infisical flow.
+**Works:** plugins/core/whatsapp (hay-channel-whatsapp-meta): ES v4 + manual mode, nested routing, inbound text/
+interactive/location/contacts/orders/media/voice (transcribed), statuses, account_update revoke, deliver w/ attachments +
+error map, settings UI (ES popup, manual guide, health + payment cards, en/pt-BR), README, docs. Core: proxy security fix
+(PR #100, ship first), onConnected credentials, connectFlow client, callUiRoute, connection.revoke, media transcribe,
+webhooks.setRoutingKeys. Typecheck/lint 0, plugin 104 tests, server = baseline. Results + follow-ups in tasks/todo.md.
+**Half-built:** nothing coded is pending; never run against real Meta or in a browser.
+**Next:** merge #100 → merge Phase 2 PR + docs PR → deploy → Meta console webhook URL/verify token + fields → E2E on test
+number (manual mode, Hay app token) → ES with an app-role tester (https) → App Review videos.
 
 ## 2026-08-31 — claude/error-tracking-noise — PR #77 open (+ hay-website PR #28)
 

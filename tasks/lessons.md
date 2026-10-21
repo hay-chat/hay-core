@@ -68,3 +68,8 @@
 - **Failure mode**: The plugin proxy and webhook router passed the original request bytes to workers as `x-original-body-base64`. Node's default `maxHeaderSize` is 16 KB, so any webhook above ~12 KB got a 431 from the worker — well below Meta's 3 MB payloads — while every body-parser limit looked generous.
 - **Detection signal**: "Raise the body limit" did nothing; the worker answered 431/413 before parsing.
 - **Prevention**: Transport bulk data as the request body, never as a header. Raw bytes now go to the worker verbatim under the original content type and the SDK runner captures them with a parser `verify` hook (`req.rawBody`). When a limit seems to be in the wrong place, trace the whole hop chain (core → proxy → worker) before changing numbers.
+
+### Public plugin proxy forwarded worker-internal routes
+- **Failure mode**: `/v1/plugins/:pluginId/*` forwarded every path to the org's worker given only `?organizationId=` (org ids are public in widget embeds), so `/mcp/call-tool`, `/deliver`, `/on-connected` and other runner control endpoints were callable from the internet, and a caller-supplied `x-hay-webhook-verified: true` made channel workers trust unsigned webhooks.
+- **Detection signal**: a route that core only ever calls over `localhost:<port>` (channel-delivery, oauth.service) but whose path is also reachable through a generic proxy with no auth; a "trust me" header that the proxy does not strip.
+- **Prevention**: the public proxy denies the runner's control segments, the channel contract routes and `/ui/*` (`isWorkerInternalPath`), and strips internal trust headers. Any new worker-internal route or header must be added there; plugin UI calls go through the authenticated `plugins.callUiRoute`.

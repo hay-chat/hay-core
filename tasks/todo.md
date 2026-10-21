@@ -1,46 +1,68 @@
-# WhatsApp Cloud API — Phase 1 core enablers (branch claude/whatsapp-cloud)
+# WhatsApp Cloud API — Phase 2 plugin (branch claude/whatsapp-plugin)
 
-Plan: `.claude/plans/whatsapp-cloud/PLAN.md` §3 Phase 1 (decisions D1–D14 final). Codebase map:
-`.claude/plans/whatsapp-cloud/research/03-codebase-channel-plugins.md`.
+Spec: `.claude/plans/whatsapp-cloud/PLAN.md` §3 Phase 2 (D1–D14 final, §5 answers, §6 self-hosting).
+Plugin: `plugins/core/whatsapp`, npm + plugin id `hay-channel-whatsapp-meta`, channel `whatsapp`,
+UMD global `WhatsappMetaPlugin`, Graph `https://graph.facebook.com/v26.0`.
 
-## Checklist (one commit per item)
+## Checklist (one commit each)
 
-- [x] 1. `findPluginIdByChannel` org-aware (D2) + callers in `channel-delivery.service.ts`
-  - AC: given org A with plugin X enabled and org B with plugin Y enabled, both `channel:"whatsapp"`, delivery for org A resolves X, org B resolves Y; no enabled instance → undefined. Unit tests.
-- [x] 2. Nested `routeKeyPath` + multi-key descriptors in `webhook-router.service.ts` / SDK `types/webhook-routing.ts`; per-org filtering of `changes[]` in `forwardToOrg` (D4)
-  - AC: a Meta WhatsApp payload with two `changes[]` for two orgs' `phone_number_id`s is split so each worker receives only its own `changes[]`; `entry[].id` (WABA) still routes account-level events; Instagram descriptor (`entry`/`id`) behaves exactly as today. Tests in `webhook-router.service.test.ts`.
-- [x] 3. `oauth.completeWithCode` tRPC procedure (D5): exchange ES code (`GET /oauth/access_token`, no `redirect_uri`) in core → `storeTokens` → `runOnConnected(extras)`; SDK `onConnected` gains `extras`
-  - AC: procedure requires an enabled instance + oauth2 plugin; token exchange uses `META_APP_SECRET` only in core; extras reach the worker `/on-connected` and the plugin hook; errors map to TRPCError. Unit tests for the service path.
-- [x] 4. `pluginApi.messages.updateStatus({providerMessageId, status, error?})` (D10)
-  - AC: updates the `Message` by `provider_message_id` scoped to org; unknown id → no-op result; emits the WebSocket/Redis event the dashboard already uses for delivery state. Tests.
-- [x] 5. `revokeOAuth` clears `plugin_webhook_routes` + stops the worker (D7)
-  - AC: after revoke, `findByKey` for that instance's keys returns nothing and the worker is stopped. Tests.
-- [x] 6. ≥3 MB body limit on `/v1/plugins/*/webhook`
-  - AC: a 2.5 MB JSON webhook POST is accepted (raw body kept for HMAC); default limit elsewhere unchanged. Test.
-- [x] 7. `attachments[]` on `pluginApi.messages.receive` + `pluginApi.media.upload` (storageService) + `attachments` on `/deliver` payload (D9)
-  - AC: receive persists `Message.attachments`; media.upload accepts base64 + mime + filename, stores via storageService, returns `{id,url,name,type,size}` shape; delivery payload carries `message.attachments`. Tests.
-- [x] 8. Delete `plugins/core/whatsapp` (Twilio) + every reference (env vars, `.env.example`, docs, i18n, docker, scripts)
-  - AC: `grep -ri twilio` returns only plan/research files and historical migrations; typecheck + tests green.
-- [x] Verify: `npm run typecheck`, `npm run test:server`; Instagram router tests unchanged.
-- [x] WIP.md + CONTEXT.md checkpoint after each item; push + PR referencing PLAN.md.
+- [x] 0. Security: public proxy blocks worker-internal paths + strips `x-hay-webhook-verified` (also PR #100)
+- [x] C1. Core: `onConnected` may return `credentials` (merged into encrypted authState) + `oauth2.connectFlow: "client"`
+- [x] C2. Core: authenticated `plugins.callUiRoute` → worker `/ui/*` (public proxy blocks `ui`); plugin UI props `api` + `locale`
+- [x] C3. Core: `pluginApi.connection.revoke` + `pluginApi.media.upload({ transcribe })` (OpenAI STT in core)
+- [x] 1. Plugin skeleton: manifest, config, webhookRouting (nested), graph-client, manual-mode signature/handshake, onStart/onConnected
+- [x] 2. Inbound normaliser: text/interactive/button/location/contacts/reaction/request_welcome/context/referral, statuses → updateStatus, account_update → revoke
+- [x] 3. Media inbound: GET /{media_id} → download → media.upload (voice → transcribe) → attachments[]
+- [x] 4. deliver.ts: text + attachments, error mapping (131047 / 131056 / 130429 / 190)
+- [x] 5. Onboarding UI: ES v4 popup, manual tab, health card, payment card, en + pt-BR
+- [x] 6. README + docs/user-guide/integrations/whatsapp.md (docs submodule)
+- [x] Verify: `npm run typecheck`, `npm run lint`, `npm run test:server`, plugin `npm test`, plugin build loads
+
+Acceptance: plugin builds + loads; Instagram unchanged; unit tests for normaliser, signature path, deliver
+error mapping, onConnected extras verification; PR open referencing PLAN.md.
+
+## Contracts (agents: build against these exactly)
+
+- **onConnected result** `{ routingKeys?, account?, credentials?: Record<string,string> }`. Core merges
+  `credentials` into `authState.credentials` (encrypted). Reserved keys core ignores: `accessToken`,
+  `refreshToken`, `expiresAt`, `connectedAt`, `tokenType`, `scope`. Worker reads them back via
+  `ctx.auth.get().credentials` on every start.
+- **`oauth2.connectFlow?: "redirect" | "client"`** (default redirect). `"client"`: dashboard OAuth card hides
+  Connect/Reconnect (status + Disconnect stay); `plugins.oauth.initiate` rejects with BAD_REQUEST.
+- **`plugins.callUiRoute`** (authenticated): `{ pluginId, method: "GET"|"POST", path, body? }`,
+  `path` matches `^/ui/[a-z0-9/-]*$`; instance must exist + be enabled for the caller's org; starts the
+  worker, forwards JSON, returns `{ status: number, data: unknown }`. Public proxy 404s first segment `ui`.
+- **Plugin UI props**: `plugin, config, apiBaseUrl, api` (the dashboard `Hay` tRPC client), `locale` (string).
+- **`pluginApi.connection.revoke({ reason })`** → `{ revoked: true }`; core runs `oauthService.revokeOAuth`
+  after responding (the call stops the calling worker).
+- **`pluginApi.media.upload({ data, mimeType, filename, transcribe? })`** → attachment `{id,name,url,type,size}`
+  plus `transcript?: string` when `transcribe` and STT succeeded (absent otherwise, never throws for STT).
+  `mimeType` must be bare (strip `; codecs=opus`).
 
 ## Working notes
 
-- `META_APP_SECRET` must never reach a worker (DENIED_ENV_PATTERNS) — code exchange lives in core.
-- No backwards-compat shims; no new dependencies; no plugin ids hardcoded in core.
-- Worktree: `../hay-core-whatsapp-cloud` (branch `claude/whatsapp-cloud`).
+- `META_APP_SECRET`/`OPENAI_*`/`*TOKEN*` env never reach workers (DENIED_ENV_PATTERNS).
+- Manual mode (D6/§6) = config fields (showWhen `connectionMode === "manual"`): token, phoneNumberId, wabaId,
+  appSecret, verifyToken. Webhook = per-org URL `/v1/plugins/hay-channel-whatsapp-meta/webhook?organizationId=<org>`;
+  worker answers the GET handshake and verifies `x-hub-signature-256` over `req.rawBody` itself. No routing keys,
+  no Hay config_id needed. ES mode = shared URL, core verifies, worker trusts `x-hay-webhook-verified`.
+- Customer identity (D3): `from = "+<wa_id>"`; no wa_id → `whatsapp:bsuid:<user_id>`; BSUID + profile name in metadata.
+- Agents share one worktree: never run git, never `npm install`; only edit files you own.
 
 ## Results
 
-All 8 items landed on `claude/whatsapp-cloud` as one commit each (items 4+7 share a commit — same files):
-1. `1f988bd` org-aware `findPluginIdByChannel(organizationId, channel)` (async) + callers; 5 tests.
-2. `004bced` `routeKeyPath.nested` + per-org `changes[]` filtering, key cache, immutable `withPath`; 10 new router tests; docs (submodule).
-3. `3f5ddfc` `plugins.oauth.completeWithCode` (GET code exchange in core, extras → worker `/on-connected` → SDK `onConnected(ctx, extras)`), `serverOnly` config flag stripping secrets from worker config, `handleCallback` tokenExchange bug fixed, OAuth lookup deduped; 10 tests (server + SDK).
-4+7. `cfff239` `messages.updateStatus` (provider_status/provider_error columns, migration 1784400000000, monotonic, `message_status_updated` event), `attachments[]` on receive/addMessage/broadcast, `media.upload` via storageService (audio/video mimes), attachments on `/deliver`, dashboard rendering + failed state + i18n; 22 tests.
-5. `76e739e` `revokeOAuth` clears routes + stops worker; reconnect replaces stale keys; 4 tests.
-6. `5e38f41` raw bytes forwarded as worker body (not a header — Node 16 KB cap), SDK runner 5 MB + `req.rawBody`, body-parser status preserved, chatwoot reads `req.rawBody`; 9 tests (server + SDK).
-8. `7c2d57d` Twilio plugin deleted with lockfile/env/docs/skills references; user guide rewritten for Cloud API.
+Commits on `claude/whatsapp-plugin` (one per slice): proxy security fix (also PR #100); C1 onConnected credentials +
+connectFlow; C2 plugins.callUiRoute + UI props; C3 connection.revoke + media.upload transcribe; plugin skeleton;
+webhooks.setRoutingKeys (core) + manual-mode route claim (plugin) — added after finding that a manual token from the
+app whose callback is the shared URL (Hay's test number) would never route; deliver; media; inbound normaliser + README;
+OAuth card refresh event; settings UI; docs submodule (hay-docs branch claude/whatsapp-plugin).
 
-Verification: `npm run typecheck` 0 errors; `npm run lint` clean; `npm run test:server` 566 passed, 73 failed — the failing set is byte-identical to the master baseline (5 integration suites needing a live Postgres); SDK vitest 121 passed, 5 failed in `sdk/register.test.ts` (fails identically on master: `registerAPI.ui is not a function`). Migration not run against a DB. Dashboard has no unit-test script; vue-tsc clean.
+Verification: `npm run typecheck` exit 0; `npm run lint` exit 0; `npm run test:server` 635 passed / 73 failed — the
+same 5 DB-only integration suites as master; plugin vitest 104/104; SDK vitest 123 passed / 5 failed (known
+sdk/register.test.ts baseline); plugin + Instagram build; worker smoke (runner boots, manual handshake 200/403,
+signed POST 200, unsigned 403, /ui/status). NOT done: anything against real Meta (needs deploy + console webhook),
+browser run of the ES popup (needs https origin), migration 1784400000000 still unrun.
 
-Plan deviations (see tasks/lessons.md): item 6 needed a transport change, not a limit bump; item 3 needed `serverOnly` because Instagram's env-backed `clientSecret` already reached its worker.
+Follow-ups: core has no delivery retry (503 rate_limited just fails the reply); typing indicator / read receipts (D10)
+need a core "processing started" hook; config option labels not translated (plugin `config` i18n); BSUID re-keying on
+`user_changed_user_id`; STT uses the platform OpenAI key, not the org provider (HAY-251).
