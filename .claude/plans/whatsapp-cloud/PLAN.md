@@ -50,7 +50,8 @@ Sizes are rough build-session estimates (one focused Claude session ≈ half a d
 - [ ] WhatsApp → Configuration: set callback URL `https://<prod-api>/v1/plugins/<pluginId>/webhook` + verify token (`META_VERIFY_TOKEN`); subscribe fields `messages, account_update, account_alerts, phone_number_quality_update, phone_number_name_update, message_template_status_update, template_category_update, business_capability_update, history, smb_app_state_sync, smb_message_echoes`. (Can only be finished once Phase 2 is deployed — the GET handshake must answer.)
 - [ ] Enable 2FA on the admin account, add a second admin.
 - [ ] Open the "Tech Provider Integration" tab; complete Tech Provider onboarding.
-- [ ] Add `META_VERIFY_TOKEN` to prod env (Infisical). `META_WHATSAPP_ES_CONFIG_ID` already saved 2026-10-21.
+- [x] Facebook Login for Business → Settings (2026-10-21): "Login with the JavaScript SDK" ON; allowed JS SDK domain `https://eu.hay.chat`; deauthorize callback `https://eu.hay.chat/v1/plugins/hay-channel-whatsapp-meta/deauthorize`; data deletion `https://eu.hay.chat/v1/plugins/hay-channel-whatsapp-meta/data-deletion`. **Phase 2 plugin id must therefore be `hay-channel-whatsapp-meta`.** Local dev needs an https origin (ngrok/cloudflared) added to the allowlist when testing the popup.
+- [ ] Add `META_VERIFY_TOKEN` + `META_WHATSAPP_ES_CONFIG_ID` to the prod compose env `/srv/hay-core/.env` on homeserver (Roger saved the config id in Infisical on 2026-10-21, but prod reads the compose `.env`, not Infisical).
 
 ### Phase 1 — Core enablers (1 PR, ~1 session)
 
