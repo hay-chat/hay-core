@@ -8,6 +8,7 @@ import { MessageRepository } from "@server/repositories/message.repository";
 import { AgentRepository } from "@server/repositories/agent.repository";
 import { organizationRepository } from "@server/repositories/organization.repository";
 import { pluginInstanceRepository } from "@server/repositories/plugin-instance.repository";
+import { pluginWebhookRouteRepository } from "@server/repositories/plugin-webhook-route.repository";
 import {
   MessageType,
   type MessageAttachment,
@@ -580,6 +581,42 @@ export const pluginApiTrpcRouter = router({
       scheduleConnectionRevoke(organizationId, pluginId);
 
       return { revoked: true as const };
+    }),
+
+  /**
+   * Replace the shared-webhook routing keys owned by the calling plugin instance.
+   *
+   * OAuth connections get their keys from `onConnected`. Connections configured
+   * without OAuth (WhatsApp manual mode with a pasted token) register them here
+   * once the plugin has confirmed its credentials can access those provider
+   * accounts. An empty list removes the instance's keys. Last writer wins per
+   * key, exactly like a reconnect.
+   */
+  "webhooks.setRoutingKeys": pluginProcedure
+    .input(z.object({ routingKeys: z.array(z.string().min(1).max(256)).max(20) }))
+    .mutation(async ({ input, ctx }) => {
+      requireCapability(ctx, "messages");
+
+      const { organizationId, pluginId } = ctx.pluginAuth;
+      const instance = await pluginInstanceRepository.findByOrgAndPlugin(organizationId, pluginId);
+      if (!instance) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Plugin instance not found" });
+      }
+
+      const routingKeys = [...new Set(input.routingKeys)];
+      await pluginWebhookRouteRepository.clearForInstance(instance.id);
+      await pluginWebhookRouteRepository.upsertRoutes(
+        pluginId,
+        organizationId,
+        instance.id,
+        routingKeys,
+      );
+
+      logger.info(
+        { organizationId, pluginId, routingKeyCount: routingKeys.length },
+        "Plugin replaced its webhook routing keys",
+      );
+      return { routingKeyCount: routingKeys.length };
     }),
 
   /**
