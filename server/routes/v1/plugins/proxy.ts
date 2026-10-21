@@ -17,7 +17,7 @@ const router = Router();
  * Plugin IDs are plain strings without slashes (e.g., hay-channel-instagram-meta).
  * Match groups: [1] = pluginId, [2] = remaining path
  */
-router.all(/^\/([^/]+)\/(.*)?$/, async (req: Request, res: Response) => {
+router.all(/^\/([^/]+)\/(.*)?$/, async (req: Request, res: Response): Promise<void> => {
   try {
     const pluginId = req.params[0];
     const path = req.params[1] ? `/${req.params[1]}` : "";
@@ -63,10 +63,11 @@ router.all(/^\/([^/]+)\/(.*)?$/, async (req: Request, res: Response) => {
     const organizationId = await extractorganizationId(req);
 
     if (!organizationId) {
-      return res.status(401).json({
+      res.status(401).json({
         error: "Organization ID required",
         message: "Could not determine organization from request",
       });
+      return;
     }
 
     // Get or start worker for this org+plugin combination
@@ -79,10 +80,11 @@ router.all(/^\/([^/]+)\/(.*)?$/, async (req: Request, res: Response) => {
         .catch(() => {});
     } catch (error) {
       logger.error({ err: error, organizationId, pluginId }, "Failed to start worker");
-      return res.status(503).json({
+      res.status(503).json({
         error: "Plugin unavailable",
         message: "Failed to start plugin worker",
       });
+      return;
     }
 
     // Proxy request to worker
@@ -91,56 +93,9 @@ router.all(/^\/([^/]+)\/(.*)?$/, async (req: Request, res: Response) => {
     logger.debug({ workerUrl }, "Forwarding request to worker");
 
     try {
-      // Convert Express headers to fetch-compatible headers
-      // Strip sensitive headers to prevent credential leakage to plugin workers
-      const STRIPPED_HEADERS = new Set([
-        "authorization",
-        "cookie",
-        "x-forwarded-for",
-        "x-real-ip",
-        "proxy-authorization",
-        "content-length", // Removed: proxy re-encodes body as JSON, so original content-length is wrong
-      ]);
-      const headers: Record<string, string> = {};
-      Object.entries(req.headers).forEach(([key, value]) => {
-        if (STRIPPED_HEADERS.has(key.toLowerCase())) return;
-        if (typeof value === "string") {
-          headers[key] = value;
-        } else if (Array.isArray(value)) {
-          headers[key] = value[0]; // Take first value for array headers
-        }
-      });
-      headers.host = `localhost:${worker.port}`; // Override host header
+      const { headers, body } = buildWorkerForward(req, worker.port);
 
-      // When forwarding, we JSON.stringify the body (Express already parsed it).
-      // Set Content-Type to match and pass original request info for signature validation.
-      if (req.method !== "GET" && req.method !== "HEAD") {
-        const originalContentType = headers["content-type"];
-        headers["content-type"] = "application/json";
-        if (originalContentType) {
-          headers["x-original-content-type"] = originalContentType;
-        }
-        // Pass the original URL so plugins can reconstruct it for webhook signature validation.
-        // Behind a load balancer / reverse proxy, req.protocol is "http" (internal hop),
-        // but the external-facing protocol is in X-Forwarded-Proto.
-        const externalProto = req.get("x-forwarded-proto") || req.protocol;
-        headers["x-original-url"] = `${externalProto}://${req.get("host")}${req.originalUrl}`;
-
-        // Forward the raw request body (base64-encoded to survive non-ASCII in
-        // JSON payloads such as emoji) so plugins can verify HMAC signatures
-        // computed over the exact original bytes. The body-parser `verify`
-        // hook in main.ts populates req.rawBody.
-        const rawBody = (req as Request & { rawBody?: string }).rawBody;
-        if (typeof rawBody === "string" && rawBody.length > 0) {
-          headers["x-original-body-base64"] = Buffer.from(rawBody, "utf8").toString("base64");
-        }
-      }
-
-      const response = await fetch(workerUrl, {
-        method: req.method,
-        headers,
-        body: req.method !== "GET" && req.method !== "HEAD" ? JSON.stringify(req.body) : undefined,
-      });
+      const response = await fetch(workerUrl, { method: req.method, headers, body });
 
       // Copy status
       res.status(response.status);
@@ -152,22 +107,77 @@ router.all(/^\/([^/]+)\/(.*)?$/, async (req: Request, res: Response) => {
 
       // Stream body
       const data = await response.text();
-      return res.send(data);
+      res.send(data);
     } catch (error) {
       logger.error({ err: error }, "Error forwarding to worker");
-      return res.status(502).json({
+      res.status(502).json({
         error: "Bad gateway",
         message: "Failed to communicate with plugin worker",
       });
     }
   } catch (error) {
     logger.error({ err: error }, "Unexpected error in plugin proxy");
-    return res.status(500).json({
+    res.status(500).json({
       error: "Internal server error",
       message: "An unexpected error occurred",
     });
   }
 });
+
+// Stripped to prevent credential leakage to plugin workers. content-length is
+// recomputed by fetch for the forwarded body.
+const STRIPPED_HEADERS = new Set([
+  "authorization",
+  "cookie",
+  "x-forwarded-for",
+  "x-real-ip",
+  "proxy-authorization",
+  "content-length",
+]);
+
+/**
+ * Build the headers and body to forward to a worker.
+ *
+ * The original raw bytes (captured by the body-parser `verify` hook in main.ts
+ * as `req.rawBody`) are forwarded as the request body under the original
+ * content type, so the worker can parse them normally and plugins can verify
+ * HMAC signatures over exactly what the provider signed. Only when no raw body
+ * was captured do we fall back to re-encoding the parsed body as JSON.
+ * `x-original-url` carries the external-facing URL for signature schemes that
+ * include it.
+ */
+export function buildWorkerForward(
+  req: Request,
+  workerPort: number,
+): { headers: Record<string, string>; body: string | undefined } {
+  const headers: Record<string, string> = {};
+  Object.entries(req.headers).forEach(([key, value]) => {
+    if (STRIPPED_HEADERS.has(key.toLowerCase())) return;
+    if (typeof value === "string") {
+      headers[key] = value;
+    } else if (Array.isArray(value)) {
+      headers[key] = value[0];
+    }
+  });
+  headers.host = `localhost:${workerPort}`;
+
+  if (req.method === "GET" || req.method === "HEAD") {
+    return { headers, body: undefined };
+  }
+
+  // Behind a reverse proxy req.protocol is the internal hop; the external
+  // protocol is in X-Forwarded-Proto.
+  const externalProto = req.get("x-forwarded-proto") || req.protocol;
+  headers["x-original-url"] = `${externalProto}://${req.get("host")}${req.originalUrl}`;
+
+  const rawBody = (req as Request & { rawBody?: string }).rawBody;
+  if (typeof rawBody === "string" && rawBody.length > 0) {
+    return { headers, body: rawBody };
+  }
+
+  headers["content-type"] = "application/json";
+  return { headers, body: JSON.stringify(req.body ?? {}) };
+}
 
 /**
  * Whether the request supplies an org identifier (query param or header).
