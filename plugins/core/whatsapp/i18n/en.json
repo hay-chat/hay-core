@@ -22,7 +22,7 @@
     },
     "embedded": {
       "intro": "Connect your WhatsApp Business number in a Meta popup — no tokens to copy or paste.",
-      "notConfigured": "Embedded Signup isn't configured on this Hay server (META_APP_ID and META_WHATSAPP_ES_CONFIG_ID are not set). Use the Manual token tab instead.",
+      "notConfigured": "Embedded Signup isn't configured on this Hay server (META_WHATSAPP_APP_ID and META_WHATSAPP_ES_CONFIG_ID are not set). Use the Manual token tab instead.",
       "notActive": "Embedded Signup isn't the active connection method. Choose \"Embedded Signup\" under Connection method above and save before connecting.",
       "connect": "Connect WhatsApp",
       "continue": "Open the Meta popup",

@@ -22,7 +22,7 @@
     },
     "embedded": {
       "intro": "Conecte seu número do WhatsApp Business em uma janela da Meta — sem tokens para copiar e colar.",
-      "notConfigured": "O cadastro incorporado não está configurado neste servidor do Hay (META_APP_ID e META_WHATSAPP_ES_CONFIG_ID não estão definidos). Use a aba Token manual.",
+      "notConfigured": "O cadastro incorporado não está configurado neste servidor do Hay (META_WHATSAPP_APP_ID e META_WHATSAPP_ES_CONFIG_ID não estão definidos). Use a aba Token manual.",
       "notActive": "O cadastro incorporado não é o método de conexão ativo. Escolha \"Embedded Signup\" em Método de conexão acima e salve antes de conectar.",
       "connect": "Conectar WhatsApp",
       "continue": "Abrir janela da Meta",

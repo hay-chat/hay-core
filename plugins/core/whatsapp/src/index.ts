@@ -114,7 +114,7 @@ export default defineHayPlugin((globalCtx) => {
           description: "Meta app used for Embedded Signup (configured by the platform)",
           required: false,
           encrypted: false,
-          env: "META_APP_ID",
+          env: "META_WHATSAPP_APP_ID",
           showWhen: { field: "connectionMode", notEquals: "manual" },
         },
         clientSecret: {
@@ -125,7 +125,7 @@ export default defineHayPlugin((globalCtx) => {
           encrypted: true,
           // Only core needs it (code exchange); never sent to the worker.
           serverOnly: true,
-          env: "META_APP_SECRET",
+          env: "META_WHATSAPP_APP_SECRET",
           showWhen: { field: "connectionMode", notEquals: "manual" },
         },
         esConfigId: {
@@ -197,7 +197,7 @@ export default defineHayPlugin((globalCtx) => {
         signature: {
           header: "x-hub-signature-256",
           format: "sha256-hmac",
-          secretEnv: "META_APP_SECRET",
+          secretEnv: "META_WHATSAPP_APP_SECRET",
         },
         verificationChallenge: {
           modeParam: "hub.mode",
@@ -217,7 +217,7 @@ export default defineHayPlugin((globalCtx) => {
         deauthorization: {
           format: "signed-request",
           param: "signed_request",
-          secretEnv: "META_APP_SECRET",
+          secretEnv: "META_WHATSAPP_APP_SECRET",
           keyPath: "user_id",
         },
       });
