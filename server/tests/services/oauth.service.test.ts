@@ -237,3 +237,86 @@ describe("oauthService.handleCallback", () => {
     );
   });
 });
+
+describe("oauthService onConnected credentials", () => {
+  it("merges sanitized credentials and account into authState in one write", async () => {
+    fetchMock
+      .mockResolvedValueOnce(jsonResponse({ access_token: "biz-token" }))
+      .mockResolvedValueOnce(
+        jsonResponse({
+          routingKeys: [],
+          account: { label: "+1 555 0100" },
+          credentials: {
+            wabaId: "WABA1",
+            registrationPin: "123456",
+            accessToken: "evil",
+            refreshToken: "evil",
+            expiresAt: "evil",
+            connectedAt: "evil",
+            tokenType: "evil",
+            scope: "evil",
+            numeric: 42,
+            "bad-key": "x",
+            tooLong: "x".repeat(4097),
+          },
+        }),
+      );
+
+    await oauthService.completeWithCode("org-1", "p", "the-code");
+
+    // Call 1 stores tokens; call 2 is the onConnected merge.
+    expect(updateAuthState).toHaveBeenCalledTimes(2);
+    expect(updateAuthState).toHaveBeenLastCalledWith("inst-1", "org-1", {
+      methodId: "p-oauth",
+      account: { label: "+1 555 0100", avatarUrl: undefined },
+      credentials: { accessToken: "stored-token", wabaId: "WABA1", registrationPin: "123456" },
+    });
+  });
+
+  it("caps credentials at 20 keys", async () => {
+    const many = Object.fromEntries(Array.from({ length: 25 }, (_, i) => [`k${i}`, "v"]));
+    fetchMock
+      .mockResolvedValueOnce(jsonResponse({ access_token: "biz-token" }))
+      .mockResolvedValueOnce(jsonResponse({ credentials: many }));
+
+    await oauthService.completeWithCode("org-1", "p", "the-code");
+
+    const stored = updateAuthState.mock.calls[1][2].credentials as Record<string, string>;
+    expect(Object.keys(stored)).toHaveLength(21); // 20 plugin keys + stored accessToken
+  });
+
+  it("still persists account-only results", async () => {
+    fetchMock
+      .mockResolvedValueOnce(jsonResponse({ access_token: "biz-token" }))
+      .mockResolvedValueOnce(jsonResponse({ account: { label: "@hay" } }));
+
+    await oauthService.completeWithCode("org-1", "p", "the-code");
+
+    expect(updateAuthState).toHaveBeenLastCalledWith("inst-1", "org-1", {
+      methodId: "p-oauth",
+      account: { label: "@hay", avatarUrl: undefined },
+      credentials: { accessToken: "stored-token" },
+    });
+  });
+
+  it("does not write authState when neither account nor valid credentials are returned", async () => {
+    fetchMock
+      .mockResolvedValueOnce(jsonResponse({ access_token: "biz-token" }))
+      .mockResolvedValueOnce(jsonResponse({ credentials: { accessToken: "evil", n: 1 } }));
+
+    await oauthService.completeWithCode("org-1", "p", "the-code");
+
+    expect(updateAuthState).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("oauthService.initiateOAuth", () => {
+  it("rejects plugins whose oauth2 connectFlow is client", async () => {
+    findByPluginId.mockResolvedValue(registryPlugin({ connectFlow: "client" }));
+
+    await expect(oauthService.initiateOAuth("p", "org-1", "u-1")).rejects.toMatchObject({
+      code: "BAD_REQUEST",
+      message: "This plugin connects from its settings page",
+    });
+  });
+});

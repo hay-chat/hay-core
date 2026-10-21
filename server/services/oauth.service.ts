@@ -12,7 +12,7 @@ import type {
 } from "../types/oauth.types";
 import type { HayPluginManifest } from "../types/plugin.types";
 import type { AuthMethodDescriptor, ConfigFieldDescriptor } from "../types/plugin-sdk.types";
-import { parseConnectedAccount } from "../lib/connected-account";
+import { parseConnectedAccount, parseConnectedCredentials } from "../lib/connected-account";
 import { createLogger } from "@server/lib/logger";
 import { TRPCError } from "@trpc/server";
 
@@ -326,6 +326,14 @@ export class OAuthService {
       organizationId,
       pluginId,
     );
+
+    // Client-flow plugins obtain the code in their own UI (completeWithCode).
+    if (oauth2Method.connectFlow === "client") {
+      throw new TRPCError({
+        code: "BAD_REQUEST",
+        message: "This plugin connects from its settings page",
+      });
+    }
 
     // Validate required OAuth fields
     if (!oauth2Method.authorizationUrl || !oauth2Method.tokenUrl) {
@@ -873,16 +881,23 @@ export class OAuthService {
         return { ok: false, routingKeyCount: 0 };
       }
 
-      const result = (await response.json()) as { routingKeys?: unknown; account?: unknown };
+      const result = (await response.json()) as {
+        routingKeys?: unknown;
+        account?: unknown;
+        credentials?: unknown;
+      };
       const routingKeys = Array.isArray(result?.routingKeys)
         ? result.routingKeys.filter((k): k is string => typeof k === "string" && k.length > 0)
         : [];
 
+      // Account + plugin-derived credentials are persisted together in one write.
       const account = parseConnectedAccount(result?.account);
-      if (account) {
+      const credentials = parseConnectedCredentials(result?.credentials);
+      if (account || credentials) {
         await pluginInstanceRepository.updateAuthState(instance.id, instance.organizationId, {
           ...instance.authState,
-          account,
+          ...(account ? { account } : {}),
+          credentials: { ...instance.authState.credentials, ...credentials },
         });
       }
 
