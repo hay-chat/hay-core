@@ -89,7 +89,7 @@
         <!-- Action Buttons -->
         <div class="flex items-center space-x-2">
           <Button
-            v-if="!oauthStatus.connected"
+            v-if="!oauthStatus.connected && !isClientFlow"
             @click="handleConnect"
             :disabled="connecting"
             :loading="connecting"
@@ -98,7 +98,7 @@
             Connect to {{ pluginName }}
           </Button>
           <Button
-            v-if="oauthStatus.connected && oauthStatus.expired"
+            v-if="oauthStatus.connected && oauthStatus.expired && !isClientFlow"
             @click="handleConnect"
             :disabled="connecting"
             :loading="connecting"
@@ -175,6 +175,13 @@ const disconnecting = ref(false);
 
 // Compute plugin name from plugin data
 const pluginName = computed(() => props.plugin?.name || props.plugin?.id || "Service");
+
+// "client" flow plugins obtain the code in their own settings UI, so the
+// platform's redirect Connect/Reconnect buttons are hidden.
+const isClientFlow = computed(() => {
+  const oauth2 = props.plugin?.metadata?.authMethods?.find((method) => method.type === "oauth2");
+  return oauth2?.connectFlow === "client";
+});
 
 // Use OAuth availability from props (already checked by parent)
 const oauthAvailable = computed(() => props.oauthAvailable && props.oauthConfigured);

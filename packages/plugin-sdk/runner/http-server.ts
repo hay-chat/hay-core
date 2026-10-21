@@ -214,6 +214,7 @@ export class PluginHttpServer {
                 scopeSeparator: method.scopeSeparator,
                 tokenExchange: method.tokenExchange,
                 tokenRefresh: method.tokenRefresh,
+                connectFlow: method.connectFlow,
               };
             }
           }),
@@ -388,7 +389,11 @@ export class PluginHttpServer {
           extras,
         );
 
-        res.json({ routingKeys: result?.routingKeys ?? [], account: result?.account });
+        res.json({
+          routingKeys: result?.routingKeys ?? [],
+          account: result?.account,
+          credentials: result?.credentials,
+        });
         this.logger.debug("Handled /on-connected", {
           routingKeyCount: result?.routingKeys?.length ?? 0,
         });

@@ -83,7 +83,9 @@ export type OnStartHook = (ctx: HayStartContext) => Promise<void> | void;
  *   phone number actually belongs to the WABA the token can access).
  * @returns Promise resolving to {@link OnConnectedResult}. Omitting
  *   `routingKeys` (or returning nothing) persists no keys; `account`, when
- *   returned, is shown in the dashboard as the connected account.
+ *   returned, is shown in the dashboard as the connected account;
+ *   `credentials`, when returned, are merged into the stored (encrypted) auth
+ *   credentials and readable via `ctx.auth.get().credentials` on every start.
  *
  * @remarks
  * Core treats `routingKeys` as opaque strings. If this hook throws, Core logs a
@@ -108,6 +110,18 @@ export interface ConnectedAccount {
 export interface OnConnectedResult {
   routingKeys?: string[];
   account?: ConnectedAccount;
+  /**
+   * Connection data the plugin derives during connect (e.g. provider account
+   * ids, a generated registration PIN) that must survive worker restarts.
+   *
+   * @remarks
+   * Core merges these into the stored auth credentials, which are encrypted at
+   * rest. Reserved keys (`accessToken`, `refreshToken`, `expiresAt`,
+   * `connectedAt`, `tokenType`, `scope`) are ignored. Only string values are
+   * kept; keys must match `/^[a-zA-Z][a-zA-Z0-9_]{0,63}$/`, values are capped at
+   * 4096 characters, and at most 20 keys are stored.
+   */
+  credentials?: Record<string, string>;
 }
 
 /**
