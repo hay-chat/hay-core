@@ -17,7 +17,8 @@
     "openBilling": "Restore access",
     "checkAgain": "Check again",
     "switchOrg": "Switch to another workspace",
-    "logout": "Log out"
+    "logout": "Log out",
+    "loggingOut": "Logging out…"
   },
   "accessNotice": {
     "trial_ending": "Your free trial ends on {date}. Choose a plan to keep your agent running.",
