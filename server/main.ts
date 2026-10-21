@@ -216,7 +216,7 @@ async function startServer() {
     }),
   );
 
-  // Plugin routes — plugin IDs are plain strings without slashes (e.g., hay-channel-whatsapp-twilio).
+  // Plugin routes — plugin IDs are plain strings without slashes (e.g., hay-channel-instagram-meta).
 
   // Plugin thumbnail route - serves the plugin's thumbnail (svg > png > jpg)
   server.get(/^\/plugins\/thumbnails\/([^/]+)$/, (req, res) => {

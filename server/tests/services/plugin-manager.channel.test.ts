@@ -39,12 +39,12 @@ describe("pluginManagerService.findPluginIdByChannel", () => {
   it("resolves different plugins for the same channel in different orgs", async () => {
     findEnabledByOrganization.mockImplementation(async (orgId: string) =>
       orgId === "org-a"
-        ? [instance("hay-channel-whatsapp-twilio", "whatsapp")]
+        ? [instance("hay-channel-whatsapp-other", "whatsapp")]
         : [instance("hay-channel-whatsapp-meta", "whatsapp")],
     );
 
     await expect(pluginManagerService.findPluginIdByChannel("org-a", "whatsapp")).resolves.toBe(
-      "hay-channel-whatsapp-twilio",
+      "hay-channel-whatsapp-other",
     );
     await expect(pluginManagerService.findPluginIdByChannel("org-b", "whatsapp")).resolves.toBe(
       "hay-channel-whatsapp-meta",
@@ -76,7 +76,7 @@ describe("pluginManagerService.findPluginIdByChannel", () => {
 
   it("picks deterministically when two enabled plugins share a slug", async () => {
     findEnabledByOrganization.mockResolvedValue([
-      instance("hay-channel-whatsapp-twilio", "whatsapp"),
+      instance("hay-channel-whatsapp-other", "whatsapp"),
       instance("hay-channel-whatsapp-meta", "whatsapp"),
     ]);
 
