@@ -266,6 +266,21 @@ export interface HayRegisterAPI {
    *   routeKeyPath: { itemsPath: 'entry', keyPath: 'id' },
    * });
    * ```
+   *
+   * @example Nested routing — each sub-item carries its own key (WhatsApp
+   * phone numbers under a WABA). Sub-items are filtered per org; sub-items
+   * without a nested key fall back to the item-level owner, and sub-items
+   * with an unknown nested key are dropped.
+   * ```typescript
+   * register.webhookRouting({
+   *   // ...signature / verificationChallenge as above
+   *   routeKeyPath: {
+   *     itemsPath: 'entry',
+   *     keyPath: 'id',
+   *     nested: { itemsPath: 'changes', keyPath: 'value.metadata.phone_number_id' },
+   *   },
+   * });
+   * ```
    */
   webhookRouting(descriptor: WebhookRoutingDescriptor): void;
 
