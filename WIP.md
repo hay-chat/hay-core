@@ -1,3 +1,13 @@
+## 2026-10-21 — master @7448cad — WhatsApp live in prod, Meta webhook configured
+
+**Works:** prod deployed (Phase 2 + proxy fix + /logout). Meta console: callback eu.hay.chat/v1/plugins/hay-channel-whatsapp-meta/webhook
+verified (META_VERIFY_TOKEN), 11 Phase 0 fields subscribed at v26.0. Signed "Teste" webhook passes core signature + routing
+(sample ids unknown → dropped, as expected). Fix: WhatsApp uses META_WHATSAPP_APP_ID/SECRET (Meta app), not META_APP_* (Instagram app).
+WhatsApp enabled in the Hay org (468ccc89-…).
+**Next:** E2E on test number 976350592236691 — Hay org WhatsApp settings → Connection method: Manual token, paste a system-user
+token from Hay's Meta app + phone id + WABA id → send image + voice note both ways. Then ES as app-role tester; App Review videos.
+Follow-up: on a fresh deploy the shared handshake 401s until some org enables the plugin (metadata only fetched on worker start).
+
 ## 2026-10-21 — claude/billing-lock-logout (worktree ../hay-core-billing-lock-logout) — PR #102 + hay-website #41
 
 **Works:** owners of a suspended org were stuck in a dashboard ↔ hay.chat/billing/locked redirect loop. Public
