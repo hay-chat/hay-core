@@ -111,6 +111,8 @@ export async function executeOnStart(
  * @param plugin - Plugin definition
  * @param connectedCtx - Connected context (with freshly-stored credentials)
  * @param logger - Logger instance
+ * @param extras - Untrusted client-supplied values forwarded by Core (see
+ *   {@link OnConnectedHook}); omitted for redirect-based OAuth
  * @returns The routing keys returned by the hook (empty array if undefined/failed)
  *
  * @remarks
@@ -122,6 +124,7 @@ export async function executeOnConnected(
   plugin: HayPluginDefinition,
   connectedCtx: HayConnectedContext,
   logger: HayLogger,
+  extras?: Record<string, unknown>,
 ): Promise<{ routingKeys: string[]; account?: ConnectedAccount }> {
   if (!plugin.onConnected) {
     logger.debug("Plugin has no onConnected hook, skipping");
@@ -131,7 +134,7 @@ export async function executeOnConnected(
   logger.info("Executing onConnected hook", { orgId: connectedCtx.org.id });
 
   try {
-    const result = plugin.onConnected(connectedCtx);
+    const result = plugin.onConnected(connectedCtx, extras);
 
     // Handle both sync and async hooks
     const resolved =
