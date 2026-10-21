@@ -1,3 +1,11 @@
+## 2026-10-21 — claude/billing-lock-logout (worktree ../hay-core-billing-lock-logout) — PR #102 + hay-website #41
+
+**Works:** owners of a suspended org were stuck in a dashboard ↔ hay.chat/billing/locked redirect loop. Public
+`/logout` page (auth middleware + suspension redirect skipped) + billing page links Switch workspace (/suspended) + Log out.
+**Half-built:** WhatsApp Meta console setup paused here: prod deployed (Phase 2 live, proxy fix live), but WhatsApp
+plugin not enabled in any org → no metadata → shared webhook handshake 401. Chrome extension lacks eu.hay.chat access.
+**Next:** merge #102 + website #41, deploy both; enable WhatsApp in Hay's org; Meta console callback + verify token + fields.
+
 ## 2026-10-21 — claude/whatsapp-plugin (worktree ../hay-core-whatsapp-plugin) — Phase 2 DONE, PR open
 
 **Works:** plugins/core/whatsapp (hay-channel-whatsapp-meta): ES v4 + manual mode, nested routing, inbound text/
