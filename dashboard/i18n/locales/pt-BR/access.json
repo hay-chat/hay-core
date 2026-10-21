@@ -17,7 +17,8 @@
     "openBilling": "Restaurar acesso",
     "checkAgain": "Verificar novamente",
     "switchOrg": "Trocar para outro workspace",
-    "logout": "Sair"
+    "logout": "Sair",
+    "loggingOut": "Saindo…"
   },
   "accessNotice": {
     "trial_ending": "Seu teste gratuito termina em {date}. Escolha um plano para manter seu agente funcionando.",
