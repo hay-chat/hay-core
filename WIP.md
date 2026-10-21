@@ -6,7 +6,10 @@
 raw body forwarded as worker body (5 MB), Twilio plugin deleted). Typecheck + lint clean; server tests = baseline
 (5 DB-only integration suites fail on master too). Docs submodule branch `claude/whatsapp-cloud` pushed to hay-docs.
 **Half-built:** nothing. Migration 1784400000000 (provider_status) not yet run anywhere.
-**Next:** merge PR → Phase 2 plugin build in a new session (needs META_WHATSAPP_ES_CONFIG_ID from Roger's Phase 0).
+**Also:** Meta console Phase 0 done except payment method + App Review: ES config_id 1666846881828080, JS SDK on, eu.hay.chat allowlisted,
+deauth/data-deletion → /v1/plugins/hay-channel-whatsapp-meta/*. Prod env migration to Infisical in flight (homeserver:
+~/bin/infisical-env.py + /srv/hay-core/deploy.sh; blocked on a read machine identity in /srv/hay-core/.infisical-credentials).
+**Next:** merge PR → Phase 2 plugin build in a new session; finish Infisical cutover (check → push-file → import → deploy.sh --env-only).
 
 ## 2026-08-31 — claude/error-tracking-noise — PR #77 open (+ hay-website PR #28)
 
