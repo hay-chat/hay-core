@@ -178,6 +178,10 @@ export const config = {
         maxTokens: parseInt(process.env.OPENAI_CHAT_MAX_TOKENS || "2000"),
         organizationId: process.env.OPENAI_CHAT_ORG_ID || "",
       },
+      // Speech-to-text for inbound channel voice notes (`media.upload` with `transcribe`).
+      transcription: {
+        model: process.env.OPENAI_TRANSCRIPTION_MODEL || "gpt-4o-mini-transcribe",
+      },
     },
   },
 

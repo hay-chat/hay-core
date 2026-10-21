@@ -8,7 +8,7 @@ jest.mock("@server/repositories/organization.repository", () => ({
 }));
 
 import type { Request } from "express";
-import { buildWorkerForward } from "../../routes/v1/plugins/proxy";
+import { buildWorkerForward, isWorkerInternalPath } from "../../routes/v1/plugins/proxy";
 
 type FakeRequest = {
   method?: string;
@@ -98,5 +98,43 @@ describe("buildWorkerForward", () => {
 
     expect(body).toBeUndefined();
     expect(headers["x-original-url"]).toBeUndefined();
+  });
+});
+
+describe("buildWorkerForward header hygiene", () => {
+  it("never forwards a caller-supplied x-hay-webhook-verified header", () => {
+    const { headers } = buildWorkerForward(
+      fakeRequest({ rawBody: "{}", headers: { "x-hay-webhook-verified": "true" } }),
+      1,
+    );
+
+    expect(headers["x-hay-webhook-verified"]).toBeUndefined();
+  });
+});
+
+describe("isWorkerInternalPath", () => {
+  it.each([
+    "/mcp/call-tool",
+    "/mcp/list-tools",
+    "/deliver",
+    "/escalate",
+    "/on-connected",
+    "/validate-auth",
+    "/config-update",
+    "/disable",
+    "/cron/refresh-token",
+    "/metadata",
+    "/health",
+    "/MCP/call-tool",
+    "//deliver",
+    "/deliver/",
+    "/ui/status",
+    "/UI/status",
+  ])("blocks %s", (path) => {
+    expect(isWorkerInternalPath(path)).toBe(true);
+  });
+
+  it.each(["/webhook", "/messages", "/status", "", "/deliveries"])("allows %s", (path) => {
+    expect(isWorkerInternalPath(path)).toBe(false);
   });
 });

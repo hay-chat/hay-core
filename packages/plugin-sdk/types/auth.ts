@@ -197,6 +197,19 @@ export interface OAuth2AuthOptions {
    */
   tokenRefresh?: OAuthTokenOp;
 
+  /**
+   * How the authorization code is obtained (optional, defaults to `"redirect"`).
+   *
+   * @remarks
+   * - `"redirect"`: the platform builds the authorize URL and the dashboard's
+   *   OAuth card redirects the user (standard flow).
+   * - `"client"`: the plugin's own settings UI obtains the code (e.g. Meta
+   *   Embedded Signup via the FB JS SDK popup) and posts it to
+   *   `plugins.oauth.completeWithCode`. The platform's redirect initiate is
+   *   disabled and the OAuth card hides its Connect/Reconnect buttons.
+   */
+  connectFlow?: "redirect" | "client";
+
   // Future: PKCE, redirect paths, etc.
 }
 
