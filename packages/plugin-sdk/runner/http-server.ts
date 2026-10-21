@@ -328,12 +328,19 @@ export class PluginHttpServer {
           return;
         }
 
-        const { config, authState } = req.body ?? {};
+        const { config, authState, extras: rawExtras } = req.body ?? {};
 
         if (!authState || !authState.methodId || !authState.credentials) {
           res.status(400).json({ routingKeys: [], error: "Invalid auth state format" });
           return;
         }
+
+        // Untrusted client-supplied values (e.g. Embedded Signup ids). Forward
+        // only a plain object; anything else is dropped.
+        const extras: Record<string, unknown> | undefined =
+          rawExtras && typeof rawExtras === "object" && !Array.isArray(rawExtras)
+            ? (rawExtras as Record<string, unknown>)
+            : undefined;
 
         // Merge stored org config with any fresh config + auth credentials so the
         // hook can read everything via ctx.config.get().
@@ -362,7 +369,12 @@ export class PluginHttpServer {
           logger: this.logger,
         };
 
-        const result = await executeOnConnected(this.plugin, connectedCtx as any, this.logger);
+        const result = await executeOnConnected(
+          this.plugin,
+          connectedCtx as any,
+          this.logger,
+          extras,
+        );
 
         res.json({ routingKeys: result?.routingKeys ?? [], account: result?.account });
         this.logger.debug("Handled /on-connected", {

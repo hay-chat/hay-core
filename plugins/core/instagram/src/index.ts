@@ -59,6 +59,8 @@ export default defineHayPlugin((globalCtx) => {
           description: "Hay-managed Meta app secret (configured by the platform)",
           required: false,
           encrypted: true,
+          // Only core needs this (token exchange/refresh); keep it out of the worker.
+          serverOnly: true,
           env: "META_APP_SECRET",
         },
       });
