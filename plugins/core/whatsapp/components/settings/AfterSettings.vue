@@ -102,7 +102,7 @@
         <div class="card-header">
           <h4 id="wa-pay-title">{{ t("payment.title") }}</h4>
         </div>
-        <p v-if="status.waba.hasPaymentMethod" class="success-line">
+        <p v-if="status.waba.hasPaymentMethod === true" class="success-line">
           <svg
             class="icon"
             viewBox="0 0 24 24"
@@ -119,6 +119,21 @@
           </svg>
           {{ t("payment.onFile") }}
         </p>
+        <template v-else-if="status.waba.hasPaymentMethod === null">
+          <p class="body">{{ t("payment.unknown") }}</p>
+          <div class="actions">
+            <a
+              v-if="status.paymentSettingsUrl"
+              class="btn btn-outline"
+              :href="status.paymentSettingsUrl"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              {{ t("payment.check") }}
+              <span class="sr-only">({{ t("payment.newTab") }})</span>
+            </a>
+          </div>
+        </template>
         <template v-else>
           <p class="body">{{ t("payment.missing") }}</p>
           <div class="actions">
