@@ -1464,6 +1464,119 @@ export const completeOAuthWithCode = authenticatedProcedure
     );
   });
 
+const PLUGIN_UI_PATH_PATTERN = /^\/ui\/[a-z0-9/-]*$/;
+const PLUGIN_UI_ROUTE_TIMEOUT_MS = 15000;
+
+/**
+ * Whether `path` is a worker `/ui/*` route a plugin settings UI may call.
+ * Lowercase only, no traversal and no empty segments.
+ */
+export function isPluginUiPath(path: string): boolean {
+  return PLUGIN_UI_PATH_PATTERN.test(path) && !path.includes("..") && !path.includes("//");
+}
+
+export interface PluginUiRouteInput {
+  pluginId: string;
+  method: "GET" | "POST";
+  path: string;
+  body?: Record<string, unknown>;
+}
+
+/**
+ * Forward a plugin settings UI call to the org's own worker. The instance must
+ * exist and be enabled for `organizationId`; the worker is started on demand.
+ */
+export async function forwardPluginUiRoute(
+  organizationId: string,
+  input: PluginUiRouteInput,
+): Promise<{ status: number; data: unknown }> {
+  if (!isPluginUiPath(input.path)) {
+    throw new TRPCError({ code: "BAD_REQUEST", message: "Invalid plugin UI path" });
+  }
+
+  const instance = await pluginInstanceRepository.findByOrgAndPlugin(
+    organizationId,
+    input.pluginId,
+  );
+  if (!instance) {
+    throw new TRPCError({
+      code: "NOT_FOUND",
+      message: `Plugin ${input.pluginId} is not configured for this organization`,
+    });
+  }
+  if (!instance.enabled) {
+    throw new TRPCError({
+      code: "PRECONDITION_FAILED",
+      message: `Plugin ${input.pluginId} is disabled`,
+    });
+  }
+
+  const worker = await pluginManagerService.startPluginWorker(organizationId, input.pluginId);
+
+  const abortController = new AbortController();
+  const timeoutId = setTimeout(() => abortController.abort(), PLUGIN_UI_ROUTE_TIMEOUT_MS);
+  let response: Response;
+  try {
+    response = await fetch(`http://localhost:${worker.port}${input.path}`, {
+      method: input.method,
+      headers: input.method === "POST" ? { "Content-Type": "application/json" } : undefined,
+      body: input.method === "POST" ? JSON.stringify(input.body ?? {}) : undefined,
+      signal: abortController.signal,
+    });
+  } catch (error: unknown) {
+    clearTimeout(timeoutId);
+    const isTimeout = error instanceof Error && error.name === "AbortError";
+    logger.warn(
+      { pluginId: input.pluginId, path: input.path, timeout: isTimeout },
+      "Plugin UI route request failed",
+    );
+    if (isTimeout) {
+      throw new TRPCError({
+        code: "TIMEOUT",
+        message: `Plugin UI route timed out (>${PLUGIN_UI_ROUTE_TIMEOUT_MS / 1000}s)`,
+      });
+    }
+    throw new TRPCError({
+      code: "INTERNAL_SERVER_ERROR",
+      message: "Plugin worker is unreachable",
+    });
+  }
+
+  let data: unknown = null;
+  try {
+    const text = await response.text();
+    data = text ? JSON.parse(text) : null;
+  } catch {
+    data = null;
+  } finally {
+    clearTimeout(timeoutId);
+  }
+
+  logger.debug(
+    { pluginId: input.pluginId, path: input.path, status: response.status },
+    "Plugin UI route forwarded",
+  );
+  return { status: response.status, data };
+}
+
+/**
+ * Let a plugin settings UI call its own worker's `/ui/*` routes, scoped to the
+ * caller's organization. A mutation even for GET so it is never cached/batched
+ * as a query. The public plugin proxy refuses `/ui/*`.
+ */
+export const callPluginUiRoute = authenticatedProcedure
+  .input(
+    z.object({
+      pluginId: z.string(),
+      method: z.enum(["GET", "POST"]),
+      path: z.string().max(256).refine(isPluginUiPath, "Invalid plugin UI path"),
+      body: z.record(z.string(), z.unknown()).optional(),
+    }),
+  )
+  .mutation(async ({ ctx, input }) => {
+    return forwardPluginUiRoute(ctx.organizationId!, input);
+  });
+
 /**
  * Check if OAuth is available for a plugin
  */

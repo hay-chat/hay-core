@@ -128,6 +128,8 @@ describe("isWorkerInternalPath", () => {
     "/MCP/call-tool",
     "//deliver",
     "/deliver/",
+    "/ui/status",
+    "/UI/status",
   ])("blocks %s", (path) => {
     expect(isWorkerInternalPath(path)).toBe(true);
   });

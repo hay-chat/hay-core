@@ -456,6 +456,8 @@
                   organizationId: userStore.activeOrganizationId,
                 }"
                 :api-base-url="apiBaseUrl"
+                :api="Hay"
+                :locale="locale"
                 @update:config="
                   (newConfig: any) => {
                     formData = { ...formData, ...newConfig };
@@ -639,6 +641,7 @@ import McpToolInputSchema from "@/components/plugins/McpToolInputSchema.vue";
 import { useToolLabel } from "@/composables/useToolLabel";
 
 const { t } = useI18n();
+const { locale } = useI18n({ useScope: "global" });
 const { getToolLabel, getToolDescription } = useToolLabel();
 
 // Constants
