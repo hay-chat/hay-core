@@ -808,6 +808,8 @@ export class OAuthService {
         return;
       }
 
+      // Reconnecting with a different account must drop the previous account's keys.
+      await pluginWebhookRouteRepository.clearForInstance(instance.id);
       await pluginWebhookRouteRepository.upsertRoutes(
         pluginId,
         organizationId,
@@ -850,7 +852,16 @@ export class OAuthService {
     // the connection never actually disconnected.
     await pluginInstanceRepository.clearAuthState(instance.id, organizationId);
 
-    logger.debug({ organizationId }, `OAuth revoked for plugin ${pluginId}`);
+    // Provider webhooks for this instance's accounts must stop reaching the org,
+    // and the running worker still holds the revoked token in memory.
+    await pluginWebhookRouteRepository.clearForInstance(instance.id);
+    await pluginManagerService
+      .stopPluginWorker(organizationId, pluginId)
+      .catch((err) =>
+        logger.warn({ err, organizationId, pluginId }, "Failed to stop worker on revoke"),
+      );
+
+    logger.info({ organizationId, pluginId }, "OAuth revoked");
   }
 
   /**
