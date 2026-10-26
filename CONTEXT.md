@@ -1,13 +1,13 @@
 # CONTEXT
 
-**Current Task**: WhatsApp Cloud API Phase 2 plugin (plugins/core/whatsapp) built on branch claude/whatsapp-plugin; PR open.
+**Current Task**: Inbound email channel — strategy written (exploration, no code). See `tasks/email-channel-strategy-2026-10-26.md`.
 
-**Key Decisions**
-- Manual mode = config fields; per-org URL (worker verifies) or shared URL (worker claims routing keys via webhooks.setRoutingKeys).
-- STT lives in core (`media.upload({transcribe})`) because workers never see OPENAI_*; plugin UI talks to its worker only via authenticated `plugins.callUiRoute` (/ui/*).
-- Public proxy now blocks worker-internal paths (PR #100) — ship before anything else.
+**Key Decisions** (proposed defaults, not yet confirmed by Roger)
+- Stay on Resend: receiving on `inbound.hay.chat`, merchants forward support@ to `<org>@inbound.hay.chat` first; custom-domain sending (Resend multi-tenant Option A) in phase 2; Gmail/M365 APIs only on demand (CASA cost).
+- Threading: Reply-To token → In-Reply-To/References → subject heuristic; new plugin `email-channel`, existing `plugins/core/email` tool untouched.
+- Core needs: svix webhook signature format, routeKey transform, `messages.receive` honours externalConversationId, send-email passthrough + honest failures.
 
 **Next Steps**
-- Merge #100, then the Phase 2 PR + hay-docs claude/whatsapp-plugin; deploy.
-- Meta console: callback URL + verify token, subscribe webhook fields; E2E on test number.
-- App Review videos (Phase A).
+- Roger confirms §7 defaults in the strategy doc.
+- Phase 0 spike: enable Resend receiving, dump headers of a Gmail-forwarded mail, check Message-ID control via SMTP vs API.
+- Then plan Phase 1 in a `claude/email-channel` worktree.

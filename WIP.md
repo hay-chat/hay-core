@@ -1,3 +1,21 @@
+## 2026-10-26 — master (no code changes) — Inbound email channel: strategy written
+
+**Works:** exploration only. Code audit (channel plugin infra, email.service, plugin-api) + Resend receiving / multi-tenant
+research → `tasks/email-channel-strategy-2026-10-26.md`: 3 ingress options (forwarding first, MX subdomain, Gmail/M365 API),
+stay on Resend, threading model (Reply-To token → In-Reply-To/References → subject heuristic), 5 small core changes
+(svix webhook signature, routeKey transform, messages.receive honours externalConversationId, send-email passthrough +
+honest failures, title=subject), phased plan 0–3, 5 parked decisions with defaults.
+**Half-built:** nothing. **Next:** Roger picks defaults in §7 → Phase 0 spike (enable receiving on inbound.hay.chat in Resend,
+dump headers of a Gmail-forwarded mail, confirm In-Reply-To/References + Message-ID control). Uncommitted: WIP.md, docs, tasks/*.
+
+## 2026-10-26 — master (no code changes) — Prospect FAQ answers for Damien
+
+**Works:** 14 prospect questions answered from code (5 parallel explores over hay-core, backoffice, website, shopify app);
+full write-up with file:line evidence in `tasks/prospect-faq-answers-2026-10-26.md`. Headline findings: abandoned/unhappy
+convos count as billable resolutions (pricing page says otherwise); annual plans mis-metered; "Change plan" double-subscribes;
+agent Enabled switch is a no-op; approval-mode delivery is a TODO; no email channel; no mobile/push; no business hours.
+**Half-built:** nothing. **Next:** Roger to decide which items become tickets (see "Fix or stop claiming" list in the tasks file).
+
 ## 2026-10-21 — master @7448cad — WhatsApp live in prod, Meta webhook configured
 
 **Works:** prod deployed (Phase 2 + proxy fix + /logout). Meta console: callback eu.hay.chat/v1/plugins/hay-channel-whatsapp-meta/webhook
