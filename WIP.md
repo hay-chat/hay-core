@@ -72,6 +72,17 @@ Docs submodule branch `claude/agent-pause` @e9f19de (agents/conversations/settin
 **Next:** reviewer findings → push branch, open PR vs master (list website `src/docs/content/user-guide/*` mirror lines),
 push docs branch + PR, bump submodule pointer. Run the spec on a machine with `npm run dev`.
 
+## 2026-10-26 — claude/approval-delivery (worktree .claude/worktrees/claude+approval-delivery) — DONE, PR pending
+
+**Works:** "Require Approval" now delivers on every channel: approve/block live in
+`server/services/message-approval.service.ts`; approval republishes `message_received` (deliveryState sent)
+through the shared `conversationEventsService.broadcastMessageReceived`, so channel-delivery posts to
+WhatsApp/Instagram/Chatwoot workers and webchat gets it over the socket. Release is a conditional update
+(queued→sent) so double approvals fail cleanly. Jest 16 new tests, tsc/eslint 0, Playwright
+`tests/message-approval.spec.ts` green (ran in the Playwright Docker image against an isolated compose stack;
+host Chromium lacks libs). Docs submodule branch `claude/approval-delivery` pushed to hay-docs.
+**Next:** open PR against master (no gh CLI on this host — compare URL in the session summary); merge docs PR
+first; website lines to update are listed in tasks/todo.md Results.
 ## 2026-10-21 — master @7448cad — WhatsApp live in prod, Meta webhook configured
 
 **Works:** prod deployed (Phase 2 + proxy fix + /logout). Meta console: callback eu.hay.chat/v1/plugins/hay-channel-whatsapp-meta/webhook

@@ -505,6 +505,9 @@ export class ToolExecutionService {
   /**
    * Broadcast a message update via WebSocket/Redis
    * This ensures the frontend receives real-time updates when tool calls complete
+   *
+   * TODO: route through conversationEventsService.broadcastMessageReceived
+   * (shared payload builder, includes attachments and the Redis-down gate).
    */
   private async broadcastMessageUpdate(
     conversation: Conversation,
