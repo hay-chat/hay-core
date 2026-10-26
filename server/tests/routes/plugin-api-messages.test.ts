@@ -35,7 +35,7 @@ const mockConversationRepo = {
   findByExternalConversationId: jest.fn<(...args: unknown[]) => Promise<unknown>>(),
   findByIdAndOrganization: jest.fn<(...args: unknown[]) => Promise<unknown>>(),
   create: jest.fn<(...args: unknown[]) => Promise<unknown>>(),
-  update: jest.fn<() => Promise<unknown>>(),
+  update: jest.fn<(...args: unknown[]) => Promise<unknown>>(),
   updateById: jest.fn<() => Promise<unknown>>(),
   getMessages: jest.fn<() => Promise<unknown[]>>(),
 };
@@ -336,6 +336,64 @@ describe("pluginApi.messages.receive conversation lookup", () => {
       ORG_ID,
       expect.objectContaining({ email: "ana@shopper.com" }),
     );
+  });
+});
+
+describe("pluginApi.messages.receive holdForHuman", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockCustomerRepo.findByExternalId.mockResolvedValue({
+      id: "cust-1",
+      name: "Ana",
+      phone: null,
+      email: null,
+      external_metadata: {},
+    });
+    mockAgentRepo.findByOrganization.mockResolvedValue([{ id: "agent-1", channels: ["email"] }]);
+    mockConversationRepo.findByIdAndOrganization.mockResolvedValue(null);
+    mockConversationRepo.findByExternalConversationId.mockResolvedValue(null);
+    const conversation = makeConversation();
+    conversation.channel = "email";
+    mockConversationRepo.findActiveByCustomerAndChannel.mockResolvedValue(conversation);
+    mockConversationRepo.getMessages.mockResolvedValue([]);
+    mockMessageRepo.create.mockImplementation(async (data) => ({ id: "msg-new", ...data }));
+  });
+
+  it("stores the message and parks the conversation as pending-human", async () => {
+    const result = await caller()["messages.receive"]({
+      from: "ana@shopper.com",
+      content: "suspicious",
+      channel: "email",
+      holdForHuman: true,
+    });
+
+    expect(result.processed).toBe(true);
+    expect(mockMessageRepo.create).toHaveBeenCalled();
+    expect(mockConversationRepo.update).toHaveBeenLastCalledWith(
+      CONVERSATION_ID,
+      ORG_ID,
+      expect.objectContaining({ status: "pending-human", needs_processing: false }),
+    );
+  });
+
+  it("leaves a conversation a human already took over alone", async () => {
+    const conversation = makeConversation();
+    conversation.channel = "email";
+    conversation.status = "human-took-over";
+    mockConversationRepo.findActiveByCustomerAndChannel.mockResolvedValue(conversation);
+    mockConversationRepo.getMessages.mockResolvedValue([{ type: "HumanAgent" }]);
+
+    await caller()["messages.receive"]({
+      from: "ana@shopper.com",
+      content: "follow-up",
+      channel: "email",
+      holdForHuman: true,
+    });
+
+    const statuses = mockConversationRepo.update.mock.calls.map(
+      (call) => (call[2] as { status?: string } | undefined)?.status,
+    );
+    expect(statuses).not.toContain("pending-human");
   });
 });
 
