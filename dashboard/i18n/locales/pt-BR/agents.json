@@ -5,11 +5,26 @@
       "placeholder": "Herdar da Organização",
       "helperText": "O idioma que o agente usará para responder. Se não definido, herda o idioma padrão da organização."
     },
+    "status": {
+      "all": "Todos os status",
+      "active": "Ativo",
+      "inactive": "Pausado",
+      "training": "Treinando",
+      "error": "Erro"
+    },
+    "actions": {
+      "pause": "Pausar",
+      "resume": "Retomar"
+    },
+    "enabled": {
+      "label": "Agente ativo",
+      "helperText": "Desligue para pausar o agente em um passo. Ele para de responder em todos os canais e as novas mensagens de clientes aguardam sua equipe em Precisa de Atenção."
+    },
     "toast": {
       "setAsDefaultSuccess": "Agente definido como padrão com sucesso",
       "setAsDefaultFailed": "Falha ao definir o agente como padrão. Tente novamente.",
-      "enabledSuccess": "Agente ativado com sucesso",
-      "disabledSuccess": "Agente desativado com sucesso",
+      "enabledSuccess": "Agente retomado. Ele volta a responder aos clientes.",
+      "disabledSuccess": "Agente pausado. Novas mensagens de clientes aguardam em Precisa de Atenção.",
       "toggleStatusFailed": "Falha ao alternar o status do agente",
       "deletedSuccess": "Agente excluído com sucesso",
       "deleteFailed": "Falha ao excluir o agente. Tente novamente.",

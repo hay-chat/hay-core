@@ -33,11 +33,11 @@
           type="select"
           placeholder="All Status"
           :options="[
-            { label: 'All Status', value: '' },
-            { label: 'Active', value: 'active' },
-            { label: 'Inactive', value: 'inactive' },
-            { label: 'Training', value: 'training' },
-            { label: 'Error', value: 'error' },
+            { label: $t('agents.status.all'), value: '' },
+            { label: $t('agents.status.active'), value: 'active' },
+            { label: $t('agents.status.inactive'), value: 'inactive' },
+            { label: $t('agents.status.training'), value: 'training' },
+            { label: $t('agents.status.error'), value: 'error' },
           ]"
           @update:model-value="applyFilters"
         />
@@ -85,6 +85,8 @@
       <Card
         v-for="agent in paginatedAgents"
         :key="agent.id"
+        data-testid="agent-card"
+        :data-agent-id="agent.id"
         :class="[
           'hover:shadow-md transition-shadow',
           selectedAgents.includes(agent.id) ? 'ring-2 ring-primary' : '',
@@ -138,7 +140,11 @@
                 </DropdownMenuItem>
                 <DropdownMenuItem @click="toggleAgentStatus(agent)">
                   <Power class="mr-2 h-4 w-4" />
-                  {{ agent.status === "active" ? "Disable" : "Enable" }}
+                  {{
+                    agent.status === "active"
+                      ? $t("agents.actions.pause")
+                      : $t("agents.actions.resume")
+                  }}
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem class="text-destructive" @click="() => deleteAgent(agent)">
@@ -154,6 +160,7 @@
             <!-- Status and Type -->
             <div class="flex items-center justify-between">
               <div
+                data-testid="agent-status"
                 :class="[
                   'inline-flex items-center px-2 py-1 rounded-full text-xs font-medium',
                   agent.status === 'active'
@@ -177,7 +184,7 @@
                           : 'bg-red-600',
                   ]"
                 />
-                {{ agent.status }}
+                {{ $t(`agents.status.${agent.status}`) }}
               </div>
               <span class="text-xs text-neutral-muted bg-background-tertiary px-2 py-1 rounded">
                 {{ agent.type }}
@@ -221,9 +228,19 @@
 
             <!-- Quick Actions -->
             <div class="flex space-x-2 pt-2">
-              <Button variant="outline" size="sm" class="flex-1" @click="toggleAgentStatus(agent)">
+              <Button
+                variant="outline"
+                size="sm"
+                class="flex-1"
+                data-testid="agent-toggle"
+                @click="toggleAgentStatus(agent)"
+              >
                 <Power class="mr-1 h-3 w-3" />
-                {{ agent.status === "active" ? "Disable" : "Enable" }}
+                {{
+                  agent.status === "active"
+                    ? $t("agents.actions.pause")
+                    : $t("agents.actions.resume")
+                }}
               </Button>
               <Button variant="outline" size="sm" class="flex-1" @click="viewAgent(agent.id)">
                 <Settings class="mr-1 h-3 w-3" />
