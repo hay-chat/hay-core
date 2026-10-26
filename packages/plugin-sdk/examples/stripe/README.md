@@ -175,7 +175,7 @@ Expected response:
       "configField": "apiKey"
     }
   ],
-  "uiExtensions": [...],
+  "pages": [...],
   "routes": [
     { "method": "POST", "path": "/webhook" },
     { "method": "GET", "path": "/health" }
@@ -284,10 +284,12 @@ onInitialize() {
   // 3. Register HTTP routes
   register.route("POST", "/webhook", async (req, res) => { /* ... */ });
 
-  // 4. Register UI extensions
-  register.ui({
-    slot: "plugin-settings",
-    component: "components/StripeSettings.vue",
+  // 4. Register UI pages
+  register.ui.page({
+    id: "settings",
+    title: "Stripe Settings",
+    component: "./components/StripeSettings.vue",
+    slot: "after-settings",
   });
 }
 ```

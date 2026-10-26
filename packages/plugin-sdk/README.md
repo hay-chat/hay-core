@@ -281,15 +281,16 @@ ctx.register.route("/webhook", "POST", async (req, res) => {
 });
 ```
 
-#### register.ui(extension)
+#### register.ui.page(page)
 
-Register a UI extension:
+Register a UI page (a Vue component built into the plugin's UI bundle):
 
 ```typescript
-ctx.register.ui({
-  id: "settings-panel",
-  location: "plugin-settings",
-  component: "SettingsPanel.vue",
+ctx.register.ui.page({
+  id: "setup-guide",
+  title: "Setup Guide",
+  component: "./components/settings/AfterSettings.vue",
+  slot: "after-settings",
 });
 ```
 
@@ -553,26 +554,26 @@ Routes are accessible at:
 http://localhost:<port>/<path>
 ```
 
-## UI Extensions
+## UI Pages
 
-Register Vue components to extend the Hay dashboard:
+Register Vue components to extend the Hay dashboard. Components are built into the
+plugin's UI bundle (`vite.config.ui.ts`) and loaded dynamically by the dashboard:
 
 ```typescript
-ctx.register.ui({
-  id: "custom-settings",
-  location: "plugin-settings",
-  component: "CustomSettings.vue",
-  props: {
-    theme: "dark",
-  },
+ctx.register.ui.page({
+  id: "setup-guide",
+  title: "Setup Guide",
+  component: "./components/settings/AfterSettings.vue",
+  slot: "after-settings",
+  icon: "book",
 });
 ```
 
-Supported locations:
+Supported slots:
 
-- `plugin-settings` - Plugin settings page
-- `conversation-sidebar` - Conversation sidebar
-- `agent-toolbar` - Agent toolbar
+- `after-settings` - Below the plugin settings form
+- `before-settings` - Above the plugin settings form
+- `standalone` - Own route/page (default)
 
 ## Runner Usage
 
@@ -644,7 +645,7 @@ Response:
   "routes": [
     { "path": "/webhook", "method": "POST" }
   ],
-  "uiExtensions": [...],
+  "pages": [...],
   "mcp": {
     "local": [...],
     "external": [...]

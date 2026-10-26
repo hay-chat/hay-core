@@ -83,15 +83,19 @@ export default defineHayPlugin((globalCtx) => ({
       res.status(200).json({ status: "ok", plugin: "stripe" });
     });
 
-    // 4. DECLARE UI EXTENSIONS
-    register.ui({
-      slot: "plugin-settings",
-      component: "components/StripeSettings.vue",
+    // 4. DECLARE UI PAGES
+    register.ui.page({
+      id: "settings",
+      title: "Stripe Settings",
+      component: "./components/StripeSettings.vue",
+      slot: "after-settings",
     });
 
-    register.ui({
-      slot: "dashboard-widgets",
-      component: "components/StripeRevenueWidget.vue",
+    register.ui.page({
+      id: "revenue",
+      title: "Revenue",
+      component: "./components/StripeRevenueWidget.vue",
+      slot: "standalone",
     });
 
     logger.info("Stripe plugin initialized");
@@ -161,7 +165,9 @@ export default defineHayPlugin((globalCtx) => ({
         const isValid = await client.verify();
 
         if (!isValid) {
-          logger.warn("Stripe API key validation failed", { keyPrefix: apiKey.substring(0, 10) + "..." });
+          logger.warn("Stripe API key validation failed", {
+            keyPrefix: apiKey.substring(0, 10) + "...",
+          });
           return false;
         }
 

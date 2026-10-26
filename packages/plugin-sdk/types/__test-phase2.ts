@@ -34,10 +34,10 @@ import type {
   ExternalMcpOptions,
 
   // UI & Routes
-  UIExtensionDescriptor,
+  PluginPage,
   HttpMethod,
   RouteHandler,
-} from './index';
+} from "./index";
 
 // Test comprehensive plugin definition
 const testPlugin: HayPluginFactory = (globalCtx: HayGlobalContext) => {
@@ -46,63 +46,65 @@ const testPlugin: HayPluginFactory = (globalCtx: HayGlobalContext) => {
   // Test config registration
   const configSchema: Record<string, ConfigFieldDescriptor> = {
     apiKey: {
-      type: 'string',
+      type: "string",
       required: false,
-      env: 'TEST_API_KEY',
+      env: "TEST_API_KEY",
       encrypted: true,
-      label: 'API Key',
+      label: "API Key",
     },
     maxRetries: {
-      type: 'number',
+      type: "number",
       default: 3,
     },
     enabled: {
-      type: 'boolean',
+      type: "boolean",
       default: true,
     },
     metadata: {
-      type: 'json',
+      type: "json",
     },
   };
 
   // Test field references
-  const clientIdRef: ConfigFieldReference = config.field('clientId');
-  const clientSecretRef: ConfigFieldReference = config.field('clientSecret');
+  const clientIdRef: ConfigFieldReference = config.field("clientId");
+  const clientSecretRef: ConfigFieldReference = config.field("clientSecret");
 
   // Test route handler
   const webhookHandler: RouteHandler = async (req, res) => {
-    logger.info('Webhook received');
+    logger.info("Webhook received");
     res.status(200).json({ ok: true });
   };
 
-  // Test UI extension
-  const uiExtension: UIExtensionDescriptor = {
-    slot: 'after-settings',
-    component: 'components/Settings.vue',
+  // Test UI page
+  const uiPage: PluginPage = {
+    id: "settings",
+    title: "Settings",
+    component: "./components/Settings.vue",
+    slot: "after-settings",
   };
 
   // Test auth options
   const apiKeyAuth: ApiKeyAuthOptions = {
-    id: 'apiKey',
-    label: 'API Key',
-    configField: 'apiKey',
+    id: "apiKey",
+    label: "API Key",
+    configField: "apiKey",
   };
 
   const oauth2Auth: OAuth2AuthOptions = {
-    id: 'oauth',
-    label: 'OAuth 2.0',
-    authorizationUrl: 'https://example.com/oauth/authorize',
-    tokenUrl: 'https://example.com/oauth/token',
-    scopes: ['read', 'write'],
+    id: "oauth",
+    label: "OAuth 2.0",
+    authorizationUrl: "https://example.com/oauth/authorize",
+    tokenUrl: "https://example.com/oauth/token",
+    scopes: ["read", "write"],
     clientId: clientIdRef,
     clientSecret: clientSecretRef,
   };
 
   // Test HTTP methods
-  const methods: HttpMethod[] = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'];
+  const methods: HttpMethod[] = ["GET", "POST", "PUT", "PATCH", "DELETE"];
 
   return {
-    name: 'Test Plugin',
+    name: "Test Plugin",
 
     onInitialize(ctx: HayGlobalContext) {
       const { register, config, logger } = ctx;
@@ -115,13 +117,13 @@ const testPlugin: HayPluginFactory = (globalCtx: HayGlobalContext) => {
       register.auth.oauth2(oauth2Auth);
 
       // Register routes
-      register.route('POST', '/webhook', webhookHandler);
-      register.route('GET', '/health', (req, res) => res.json({ status: 'ok' }));
+      register.route("POST", "/webhook", webhookHandler);
+      register.route("GET", "/health", (req, res) => res.json({ status: "ok" }));
 
       // Register UI
-      register.ui(uiExtension);
+      register.ui.page(uiPage);
 
-      logger.info('Plugin initialized');
+      logger.info("Plugin initialized");
     },
 
     async onStart(ctx: HayStartContext) {
@@ -130,8 +132,8 @@ const testPlugin: HayPluginFactory = (globalCtx: HayGlobalContext) => {
       logger.info(`Starting for org: ${org.id}`);
 
       // Test config runtime API
-      const apiKey = config.get<string>('apiKey');
-      const maxRetries = config.getOptional<number>('maxRetries');
+      const apiKey = config.get<string>("apiKey");
+      const maxRetries = config.getOptional<number>("maxRetries");
       const keys = config.keys();
 
       // Test auth runtime API
@@ -140,24 +142,24 @@ const testPlugin: HayPluginFactory = (globalCtx: HayGlobalContext) => {
       if (authState) {
         const { methodId, credentials } = authState;
 
-        if (methodId === 'apiKey') {
+        if (methodId === "apiKey") {
           const key = String(credentials.apiKey);
           // Use key...
-        } else if (methodId === 'oauth') {
+        } else if (methodId === "oauth") {
           const token = String(credentials.accessToken);
           // Use token...
         }
       }
 
       // Test MCP local server
-      await mcp.startLocal('test-mcp', (mcpCtx) => {
-        const mcpApiKey = mcpCtx.config.get<string>('apiKey');
+      await mcp.startLocal("test-mcp", (mcpCtx) => {
+        const mcpApiKey = mcpCtx.config.get<string>("apiKey");
         const mcpAuth = mcpCtx.auth.get();
 
         // Return MCP instance
         const instance: McpServerInstance = {
           async stop() {
-            mcpCtx.logger.info('MCP stopped');
+            mcpCtx.logger.info("MCP stopped");
           },
         };
 
@@ -166,8 +168,8 @@ const testPlugin: HayPluginFactory = (globalCtx: HayGlobalContext) => {
 
       // Test MCP external server
       const externalOpts: ExternalMcpOptions = {
-        id: 'external-mcp',
-        url: 'https://mcp.example.com',
+        id: "external-mcp",
+        url: "https://mcp.example.com",
         authHeaders: {
           Authorization: `Bearer ${apiKey}`,
         },
@@ -175,7 +177,7 @@ const testPlugin: HayPluginFactory = (globalCtx: HayGlobalContext) => {
 
       await mcp.startExternal(externalOpts);
 
-      logger.info('Plugin started');
+      logger.info("Plugin started");
     },
 
     async onValidateAuth(ctx: HayAuthValidationContext) {
@@ -190,7 +192,7 @@ const testPlugin: HayPluginFactory = (globalCtx: HayGlobalContext) => {
         // Validate credentials...
         return true;
       } catch (err) {
-        logger.error('Validation failed', err);
+        logger.error("Validation failed", err);
         return false;
       }
     },
@@ -209,10 +211,10 @@ const testPlugin: HayPluginFactory = (globalCtx: HayGlobalContext) => {
 
 // Test that logger works independently
 const testLogger: HayLogger = {
-  debug: (msg, meta) => console.log('[DEBUG]', msg, meta),
-  info: (msg, meta) => console.log('[INFO]', msg, meta),
-  warn: (msg, meta) => console.warn('[WARN]', msg, meta),
-  error: (msg, meta) => console.error('[ERROR]', msg, meta),
+  debug: (msg, meta) => console.log("[DEBUG]", msg, meta),
+  info: (msg, meta) => console.log("[INFO]", msg, meta),
+  warn: (msg, meta) => console.warn("[WARN]", msg, meta),
+  error: (msg, meta) => console.error("[ERROR]", msg, meta),
 };
 
 // Verify definition type
