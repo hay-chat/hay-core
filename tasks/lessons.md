@@ -78,3 +78,26 @@
 - **Failure mode**: PLAN.md and the WhatsApp plugin assumed `META_APP_ID`/`META_APP_SECRET` were the Meta app (1869497150332050). They hold the Instagram Business Login app id/secret (1478077373981180), which Instagram OAuth needs. Every WhatsApp webhook failed core's signature check, and Embedded Signup would have exchanged codes with the wrong client.
 - **Detection signal**: Meta's dashboard "Test" webhook logs `Shared webhook signature verification failed` while the GET handshake (verify token only) passes; the env app id differs from the app id in the dashboard URL.
 - **Prevention**: Before reusing provider credentials across plugins, compare the env value with the app id the provider console shows for that product. WhatsApp now reads `META_WHATSAPP_APP_ID`/`META_WHATSAPP_APP_SECRET`.
+### Playwright specs cannot import TypeORM entities directly
+
+- **Failure mode**: A spec that imported `server/entities/*` through a helper died in `PrimaryGeneratedColumn` with `Cannot read properties of undefined (reading 'constructor')`. Playwright 1.57's own TypeScript transform does not run legacy decorators, so entity metadata never registers.
+- **Detection signal**: Decorator-related TypeError on the first entity import, only under `npx playwright test`, while the same helper works under tsx/jest.
+- **Prevention**: Load DB helpers the way `tests/global-setup.js` does: `register()` from `tsx/cjs/api`, then `require("./helpers/x.ts")`. Keep the register active for the worker's lifetime because TypeORM loads files lazily.
+
+### The e2e auth helper had drifted from the dashboard's persisted-store shape
+
+- **Failure mode**: `tests/helpers/auth.ts` wrote localStorage keys `pinia:auth`/`pinia:user` and nested `organizations` inside `user`. pinia-plugin-persistedstate v4 keys by bare store id and the user store keeps `organizations`/`activeOrganizationId` at the top level, so every spec started logged out, then hit `/unauthorized` once the keys were fixed.
+- **Detection signal**: Playwright lands on `/login` or on "Access Denied … your current role is owner" although the JWT is valid.
+- **Prevention**: When seeding browser state, copy the shape from `dashboard/stores/<store>.ts` state() and the persist plugin's key format, and assert one authenticated page load in the spec before anything else. Grep for other consumers of the helper when changing it.
+
+### `cd x && …` moves the session shell for every later command
+
+- **Failure mode**: After `cd docs && git …` the shell stayed in `docs/`, so later `npm`/`git` commands ran against the submodule or failed with missing files, and the worktree guard rejected commands as "outside the worktree".
+- **Detection signal**: An "Environment update: Primary working directory" notice, or a command that cannot find `package.json`.
+- **Prevention**: Start every command with `cd <worktree-root> &&` and prefer `git -C` only when the guard allows it. Treat the cwd as untrusted between calls.
+
+### Compose overrides append `ports`, they do not replace them
+
+- **Failure mode**: An override file meant to move the e2e Postgres/Redis/RabbitMQ to free ports merged with the base `ports:` list, so the stack still tried to bind the production ports (and the LAN-bound 5672) and failed to start.
+- **Detection signal**: "address already in use" for a port the override never mentions.
+- **Prevention**: Use `ports: !override` in the override file and run with a distinct `-p <project>` so container names, networks and volumes cannot collide with another session's stack. Tear down with `docker compose -p <project> down -v`.
