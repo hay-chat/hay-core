@@ -1,9 +1,9 @@
 ## 2026-10-26 — master — fact-fix branches MERGED straight to master + DEPLOYED (merge-gate session)
 
-**Merged + deployed to eu.hay.chat:** approval-delivery (75a3c7d), mobile-attention (ea408fe, migration push*subscriptions run), commerce-semantic-actions (d46636c). email-channel merged (2d005cd), deploying. hay-docs: each docs branch merged into main (ec343d6), submodule pointer on main.
-**Live-verified in Chrome:** queued reply hidden from widget → Approve & Send → widget receives it; Home lists 20 waiting, Take over works, phone layout OK (390px); WooCommerce page shows new copy.
-**Half-built / follow-ups:** billing-usage-limits next (local rebase in worktree claude+billing-usage, migration renumbered to 1784600000000, force-push blocked → merge local branch). `/integrations/plugins/manage` 500s: pre-existing `middleware: "auth"` (no such named middleware). Home wait label shows "489579m 4s" for old threads (formatWaitTime needs h/d units). Playground "paused" banner copy. Prod env still needs VAPID*\* (push), RESEND_API_KEY/RESEND_WEBHOOK_SECRET/EMAIL_INBOUND_DOMAIN (email). plugin-sdk register.test.ts has 5 pre-existing failures (`registerAPI.ui`). Website line lists live in each branch's tasks/todo.md (`git show origin/claude/<branch>:tasks/todo.md`).
-**Next:** merge billing → checks → deploy → run migration 1784600000000 → Chrome check access notice.
+**Merged + deployed to eu.hay.chat (all done):** approval-delivery (75a3c7d), mobile-attention (ea408fe, migration push_subscriptions run), commerce-semantic-actions (d46636c), email-channel (2d005cd + lockfile sync 2aa22d0), billing-usage-limits (d55b0cb, migration AddOrganizationAgentPause1784500000000 run, file renamed back in eabe270), Inbox routing follow-up (a83be48). hay-docs main 14a7a36 holds every docs branch; submodule pointer on main.
+**Live-verified in Chrome:** queued reply hidden from widget → Approve & Send → widget receives it; Inbox lists waiting conversations, Take over works; `/` → /dashboard on desktop, /inbox at 390px; WooCommerce page shows new copy; auth.me returns agentPausedAt/agentPauseReason.
+**Follow-ups:** prod env needs VAPID_PUBLIC_KEY/VAPID_PRIVATE_KEY/VAPID_SUBJECT (push) and RESEND_API_KEY/RESEND_WEBHOOK_SECRET/EMAIL_INBOUND_DOMAIN (email); backoffice billing branches (claude/overage-billing then claude/billing-currencies-usage-alerts) still unmerged. Pre-existing: `/integrations/plugins/manage` 500 (`middleware: "auth"` missing), Inbox wait label "489579m 4s" (formatWaitTime lacks h/d), plugin-sdk register.test.ts 5 failures (`registerAPI.ui`), playground "paused" banner copy. Playwright specs from the branches remain unrun here except the agents' own runs. Website line lists: `git show origin/claude/<branch>:tasks/todo.md`.
+**Next:** nothing pending on hay-core from this session; remote `claude/billing-usage-limits` is stale (local rebase merged instead) and can be deleted.
 
 ## 2026-10-26 — claude/email-channel — review fixes committed (c1bfdfd), branch pushed, PR to open manually (no gh)
 
@@ -15,6 +15,7 @@ branch claude/email-channel (d953f8b, rebased onto 807a263); submodule pointer b
 `/srv/hay-core/.env`, see lessons). Phase 0 spike S1–S5 still blocked on a Resend API key from Roger.
 **Next:** merge PR → set RESEND_API_KEY / RESEND_WEBHOOK_SECRET / EMAIL_INBOUND_DOMAIN in prod (Coolify) → run spike: confirm
 Gmail-forwarded mail lands with the alias in `data.to`, custom Message-ID honoured → Phase 2 (custom-domain sending, idle resolve).
+
 ## 2026-10-26 — claude/billing-usage-limits (worktree .claude/worktrees/claude+billing-usage, off master, agent-pause already merged) — hay-core side of billing slice 2
 
 **Works:** organizations.agent_paused_at/agent_pause_reason (migration 1784500000000), `internal.organizations.setAccessState`

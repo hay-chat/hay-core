@@ -1,13 +1,15 @@
-# CONTEXT
+# Context
 
-**Current Task**: Inbound email channel — Phase 1 built on branch `claude/email-channel` (worktree `.claude/worktrees/claude+email-channel`), pushed; PR not yet opened (no `gh` here). PR body: scratchpad `pr-body-email-channel.md`; compare URL https://github.com/hay-chat/hay-core/compare/master...claude/email-channel?expand=1
+**Current Task**: Merge-gate session: all five fact-fix branches (approval-delivery, mobile-attention, commerce-semantic-actions, email-channel, billing-usage-limits) plus the Inbox routing follow-up are merged to master and deployed to eu.hay.chat; hay-docs main carries the docs.
 
-**Key Decisions**
-- Resend receiving + forwarding to per-org alias `in-<10hex>@EMAIL_INBOUND_DOMAIN`; route only on the alias (typed support address never routes mail).
-- Threading: Reply-To token → References root → new thread; `messages.receive` binds both hints to the customer; stored root never overwritten.
-- Docs guide on hay-docs branch `claude/email-channel` (d953f8b), submodule pointer bumped on the branch.
+**Key Decisions**:
 
-**Next Steps**
-- Roger: open PR from the compare URL (body in scratchpad), provide a Resend API key for the Phase 0 spike.
-- After merge: set RESEND_API_KEY / RESEND_WEBHOOK_SECRET / EMAIL_INBOUND_DOMAIN in prod, run spike (alias in `data.to`? Message-ID honoured?).
-- Run Playwright `tests/email-channel-setup.spec.ts` against a dev server; Phase 2: custom-domain sending, idle auto-resolve.
+- Merge straight to master (no PRs), deploy with `/srv/hay-core/deploy.sh`, verify live in Chrome; migrations run manually with `cd server && npm run migration:run`.
+- `/` redirects by viewport: phones → `/inbox` (attention list), desktops → `/dashboard`; the sidebar entry is "Inbox".
+- The agent-pause migration keeps class/name/DB row at 1784500000000 (same timestamp as push_subscriptions; both applied).
+
+**Next Steps**:
+
+- Set prod env: VAPID_PUBLIC_KEY/VAPID_PRIVATE_KEY/VAPID_SUBJECT (push alerts), RESEND_API_KEY/RESEND_WEBHOOK_SECRET/EMAIL_INBOUND_DOMAIN (email channel); then the backoffice side of billing (claude/overage-billing → claude/billing-currencies-usage-alerts, stripe:sync, migrations).
+- Fix pre-existing `/integrations/plugins/manage` 500 (`middleware: "auth"` does not exist) and formatWaitTime for day-long waits on the Inbox.
+- Website copy fixes listed in each branch's `tasks/todo.md` (`git show origin/claude/<branch>:tasks/todo.md`).
