@@ -144,10 +144,11 @@ export function generateAuthState(
     cookies: [],
     origins: [
       {
-        origin: "http://localhost:3000",
+        origin: process.env.PLAYWRIGHT_DASHBOARD_URL ?? "http://localhost:3000",
         localStorage: [
           {
-            name: "pinia:auth",
+            // pinia-plugin-persistedstate keys each store by its bare id (dashboard/plugins/00-pinia-persist.client.ts)
+            name: "auth",
             value: JSON.stringify({
               tokens: {
                 accessToken: tokens.accessToken,
@@ -161,7 +162,10 @@ export function generateAuthState(
             }),
           },
           {
-            name: "pinia:user",
+            name: "user",
+            // Mirrors the user store's state shape (dashboard/stores/user.ts): the
+            // organizations list and active id live next to `user`, not inside it,
+            // and the role guard reads the membership role from that list.
             value: JSON.stringify({
               user: {
                 id: user.id,
@@ -170,17 +174,18 @@ export function generateAuthState(
                 lastName: user.lastName,
                 isActive: user.isActive,
                 role: user.role,
-                organizations: [
-                  {
-                    id: organization.id,
-                    name: organization.name,
-                    slug: organization.slug,
-                    role: "owner",
-                    joinedAt: new Date().toISOString(),
-                  },
-                ],
-                activeOrganizationId: organization.id,
               },
+              activeOrganizationId: organization.id,
+              organizations: [
+                {
+                  id: organization.id,
+                  name: organization.name,
+                  slug: organization.slug,
+                  role: "owner",
+                  permissions: null,
+                  joinedAt: new Date().toISOString(),
+                },
+              ],
             }),
           },
         ],

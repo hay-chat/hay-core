@@ -1,12 +1,91 @@
 import { createLogger } from "@server/lib/logger";
 import type { Conversation } from "@server/database/entities/conversation.entity";
+import type { Message } from "@server/database/entities/message.entity";
 
 const logger = createLogger("websocket");
+
+/** The subset of a conversation a message broadcast needs. */
+type MessageBroadcastConversation = Pick<Conversation, "id" | "organization_id" | "metadata">;
 
 /**
  * Service for broadcasting conversation-related events to WebSocket clients
  */
 class ConversationEventsService {
+  /**
+   * Broadcast a message to everyone who should see it, as a `message_received`
+   * event on the Redis "websocket:events" channel. Downstream:
+   *   - websocketService forwards it to dashboard clients (all messages) and to
+   *     webchat clients (public types with `deliveryState: "sent"`).
+   *   - channelDeliveryService POSTs `sent` bot/agent messages on non-web
+   *     channels to the channel plugin's /deliver.
+   *
+   * Call it when a message is created and again when a queued (approval-mode)
+   * message becomes `sent`, so the approved reply actually reaches the customer.
+   * Without Redis only webchat clients are notified, directly over WebSocket.
+   */
+  async broadcastMessageReceived(
+    conversation: MessageBroadcastConversation,
+    message: Message,
+  ): Promise<void> {
+    try {
+      const { redisService } = await import("./redis.service");
+
+      if (redisService.isConnected()) {
+        await redisService.publish("websocket:events", {
+          type: "message_received",
+          organizationId: conversation.organization_id,
+          conversationId: conversation.id,
+          payload: {
+            id: message.id,
+            content: message.content,
+            type: message.type,
+            sender: message.sender,
+            timestamp: message.created_at,
+            metadata: message.metadata,
+            attachments: message.attachments ?? [],
+            status: message.status,
+            deliveryState: message.deliveryState,
+            isPlayground: conversation.metadata?.isPlayground === true,
+          },
+        });
+        logger.debug(`Message ${message.id} published to Redis for broadcast`);
+        return;
+      }
+
+      // Same gate websocketService applies on the Redis path: the customer only
+      // ever sees public, released messages (or everything in the playground).
+      const isPublic = ["Customer", "BotAgent", "HumanAgent"].includes(message.type);
+      const isPlayground = conversation.metadata?.isPlayground === true;
+      if (!isPlayground && !(isPublic && message.deliveryState === "sent")) {
+        logger.debug({ messageId: message.id }, "Redis unavailable; message kept off webchat");
+        return;
+      }
+
+      const { websocketService } = await import("./websocket.service");
+      const sent = websocketService.sendToConversation(conversation.id, {
+        type: "message",
+        data: {
+          id: message.id,
+          content: message.content,
+          type: message.type,
+          sender: message.sender,
+          timestamp: message.created_at,
+          metadata: message.metadata,
+        },
+      });
+      logger.debug(
+        { messageId: message.id, conversationId: conversation.id, clientCount: sent },
+        "Sent message to clients (Redis not available)",
+      );
+    } catch (error) {
+      // The message is already persisted; clients will see it on refresh.
+      logger.warn(
+        { err: error, messageId: message.id, conversationId: conversation.id },
+        "Message saved but broadcast failed - clients will see it on refresh",
+      );
+    }
+  }
+
   /**
    * Broadcast conversation created event
    */

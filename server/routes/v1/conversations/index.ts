@@ -3,15 +3,14 @@ import { RESOURCES, ACTIONS } from "@server/types/scopes";
 import { conversationSecretService } from "../../../services/conversation-secret.service";
 import { z } from "zod";
 import { ConversationService } from "../../../services/conversation.service";
-import { MessageType, MessageStatus } from "../../../database/entities/message.entity";
+import { MessageType } from "../../../database/entities/message.entity";
 import { Conversation } from "../../../database/entities/conversation.entity";
 import { TRPCError } from "@trpc/server";
 import { generateConversationTitle } from "../../../orchestrator/conversation-utils";
 import { conversationListInputSchema } from "@server/types/entity-list-inputs";
 import { createListProcedure } from "@server/trpc/procedures/list";
 import { ConversationRepository } from "@server/repositories/conversation.repository";
-import { MessageRepository } from "@server/repositories/message.repository";
-import { DeliveryState } from "@server/types/message-feedback.types";
+import { messageApprovalService } from "../../../services/message-approval.service";
 import { createLogger } from "@server/lib/logger";
 import { ConversationExportService } from "../../../services/conversation-export.service";
 import { AppDataSource } from "../../../database/data-source";
@@ -21,7 +20,6 @@ const conversationExportService = new ConversationExportService();
 
 const conversationService = new ConversationService();
 const conversationRepository = new ConversationRepository();
-const messageRepository = new MessageRepository();
 
 /**
  * Raw row shape returned by the active-conversations SQL query below.
@@ -846,92 +844,25 @@ export const conversationsRouter = t.router({
       return conversation;
     }),
 
+  /**
+   * Release a reply held by approval mode. Delivery to the customer (webchat,
+   * WhatsApp, Instagram, ...) happens inside the service.
+   */
   approveMessage: authenticatedProcedure
     .input(
       z.object({
         messageId: z.string().uuid(),
-        editedContent: z.string().optional(),
+        // An empty edit would be delivered as an empty bubble; reject it here.
+        editedContent: z.string().trim().min(1).optional(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      const message = await messageRepository.findById(input.messageId);
-
-      if (!message) {
-        throw new TRPCError({
-          code: "NOT_FOUND",
-          message: "Message not found",
-        });
-      }
-
-      // Verify organization access through conversation
-      const conversation = await conversationRepository.findById(message.conversation_id);
-      if (!conversation || conversation.organization_id !== ctx.organizationId) {
-        throw new TRPCError({
-          code: "NOT_FOUND",
-          message: "Message not found",
-        });
-      }
-
-      // Verify message is in queued state
-      if (message.deliveryState !== DeliveryState.QUEUED) {
-        throw new TRPCError({
-          code: "BAD_REQUEST",
-          message: "Message is not in queued state",
-        });
-      }
-
-      // If content was edited, store original content
-      const wasEdited = input.editedContent && input.editedContent !== message.content;
-      const updates: Partial<typeof message> = {
-        status: wasEdited ? MessageStatus.EDITED : MessageStatus.APPROVED,
-        deliveryState: DeliveryState.SENT,
-        approvedBy: ctx.user!.id,
-        approvedAt: new Date(),
-      };
-
-      if (wasEdited) {
-        updates.originalContent = message.content;
-        updates.content = input.editedContent;
-      }
-
-      const updatedMessage = await messageRepository.update(message.id, updates);
-
-      // Broadcast message approval to WebSocket clients
-      try {
-        const { redisService } = await import("../../../services/redis.service");
-
-        if (redisService.isConnected()) {
-          await redisService.publish("websocket:events", {
-            type: "message_approved",
-            organizationId: conversation.organization_id,
-            payload: {
-              conversationId: message.conversation_id,
-              messageId: message.id,
-              messageType: message.type,
-              editedContent: input.editedContent,
-            },
-          });
-        } else {
-          // Fallback to direct WebSocket if Redis not available
-          const { websocketService } = await import("../../../services/websocket.service");
-          websocketService.sendToOrganization(conversation.organization_id, {
-            type: "message_approved",
-            payload: {
-              conversationId: message.conversation_id,
-              messageId: message.id,
-              messageType: message.type,
-              editedContent: input.editedContent,
-            },
-          });
-        }
-      } catch (error) {
-        logger.error({ err: error }, "Failed to publish approval event");
-      }
-
-      // TODO: Trigger actual message delivery to customer via WebSocket/plugin
-      // This would be handled by the orchestrator or messaging service
-
-      return updatedMessage;
+      return messageApprovalService.approve({
+        messageId: input.messageId,
+        organizationId: ctx.organizationId!,
+        userId: ctx.user!.id,
+        editedContent: input.editedContent,
+      });
     }),
 
   blockMessage: authenticatedProcedure
@@ -942,77 +873,12 @@ export const conversationsRouter = t.router({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      const message = await messageRepository.findById(input.messageId);
-
-      if (!message) {
-        throw new TRPCError({
-          code: "NOT_FOUND",
-          message: "Message not found",
-        });
-      }
-
-      // Verify organization access through conversation
-      const conversation = await conversationRepository.findById(message.conversation_id);
-      if (!conversation || conversation.organization_id !== ctx.organizationId) {
-        throw new TRPCError({
-          code: "NOT_FOUND",
-          message: "Message not found",
-        });
-      }
-
-      // Verify message is in queued state
-      if (message.deliveryState !== DeliveryState.QUEUED) {
-        throw new TRPCError({
-          code: "BAD_REQUEST",
-          message: "Message is not in queued state",
-        });
-      }
-
-      // Update message to blocked state
-      const updatedMessage = await messageRepository.update(message.id, {
-        status: MessageStatus.REJECTED,
-        deliveryState: DeliveryState.BLOCKED,
-        approvedBy: ctx.user!.id,
-        approvedAt: new Date(),
-        metadata: {
-          ...(message.metadata || {}),
-          blockReason: input.reason,
-        },
+      return messageApprovalService.block({
+        messageId: input.messageId,
+        organizationId: ctx.organizationId!,
+        userId: ctx.user!.id,
+        reason: input.reason,
       });
-
-      // Broadcast message block to WebSocket clients
-      try {
-        const { redisService } = await import("../../../services/redis.service");
-
-        if (redisService.isConnected()) {
-          await redisService.publish("websocket:events", {
-            type: "message_blocked",
-            organizationId: conversation.organization_id,
-            payload: {
-              conversationId: message.conversation_id,
-              messageId: message.id,
-              messageType: message.type,
-              reason: input.reason,
-            },
-          });
-        } else {
-          // Fallback to direct WebSocket if Redis not available
-          const { websocketService } = await import("../../../services/websocket.service");
-          websocketService.sendToOrganization(conversation.organization_id, {
-            type: "message_blocked",
-            payload: {
-              conversationId: message.conversation_id,
-              messageId: message.id,
-              messageType: message.type,
-              reason: input.reason,
-            },
-          });
-        }
-      } catch (error) {
-        logger.error({ err: error }, "Failed to publish block event");
-      }
-
-      return updatedMessage;
     }),
 
   /**
