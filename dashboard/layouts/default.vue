@@ -35,6 +35,8 @@ import { usePluginTranslations } from "@/composables/usePluginTranslations";
 import { useToast } from "@/composables/useToast";
 import { useServerStatus } from "@/composables/useServerStatus";
 import { useAppStore } from "@/stores/app";
+import { useAuthStore } from "@/stores/auth";
+import { useUserStore } from "@/stores/user";
 import { onMounted, onUnmounted, ref, watch } from "vue";
 
 // Initialize WebSocket connection for real-time updates
@@ -45,6 +47,8 @@ const { loadTranslations: loadPluginTranslations } = usePluginTranslations();
 const { toast } = useToast();
 const serverStatus = useServerStatus();
 const appStore = useAppStore();
+const authStore = useAuthStore();
+const userStore = useUserStore();
 const route = useRoute();
 
 const menuOpen = ref(false);
@@ -57,11 +61,14 @@ watch(
 );
 
 // Keep the "waiting for a human" badge current without polling
-let unsubscribeStatusChanged: (() => void) | null = null;
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === "object" && value !== null;
-const handleStatusChanged = (payload: unknown) => {
-  if (!isRecord(payload) || typeof payload.status !== "string") return;
+const BADGE_EVENTS = [
+  "conversation_status_changed",
+  "conversation_taken_over",
+  "conversation_released",
+  "conversation_created",
+];
+const unsubscribers: Array<() => void> = [];
+const refreshBadge = () => {
   void appStore.fetchPendingHumanCount();
 };
 
@@ -71,10 +78,19 @@ onMounted(() => {
 
   // Connect to WebSocket
   websocket.connect();
-  unsubscribeStatusChanged = websocket.on("conversation_status_changed", handleStatusChanged);
+  for (const event of BADGE_EVENTS) {
+    unsubscribers.push(websocket.on(event, refreshBadge));
+  }
 
-  // Re-attach this device's push subscription to the current user/org
-  void pushNotifications.sync();
+  // Sidebar/top-bar data (counts, plugin menu entries)
+  if (authStore.isAuthenticated) {
+    void appStore.getOpenConversationsCount();
+    void appStore.fetchPendingHumanCount();
+    void appStore.getPlugins();
+  }
+
+  // Re-attach this device's push subscription when the active org changed
+  void pushNotifications.sync(userStore.activeOrganization?.id);
 
   // Start polling /v1/health so we can surface a banner when the server is down
   serverStatus.startMonitoring();
@@ -98,6 +114,6 @@ onMounted(() => {
 
 onUnmounted(() => {
   serverStatus.stopMonitoring();
-  unsubscribeStatusChanged?.();
+  unsubscribers.forEach((off) => off());
 });
 </script>

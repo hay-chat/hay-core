@@ -48,7 +48,8 @@
       "unsupported": "Este navegador não recebe alertas push. No iPhone, adicione a Hay à Tela de Início e abra por lá.",
       "unavailable": "Os alertas push ainda não foram configurados neste servidor da Hay. Peça ao administrador para adicionar as chaves VAPID.",
       "denied": "As notificações estão bloqueadas para este site nas configurações do navegador. Permita e recarregue a página.",
-      "failed": "Não foi possível ativar os alertas"
+      "failed": "Não foi possível ativar os alertas",
+      "blocked": "Alertas desativados"
     }
   }
 }

@@ -965,7 +965,7 @@ import {
   MoreHorizontal,
   PanelRight,
 } from "lucide-vue-next";
-import { createReusableTemplate } from "@vueuse/core";
+import { createReusableTemplate, useMediaQuery } from "@vueuse/core";
 import { TRPCClientError } from "@trpc/client";
 import { HayApi } from "@/utils/api";
 import {
@@ -1113,6 +1113,11 @@ const messagesContainer = ref<HTMLElement>();
 // Context panel: one template, rendered inline on lg+ and inside a Sheet below lg
 const [DefinePanel, ReusePanel] = createReusableTemplate();
 const showDetailsSheet = ref(false);
+// The inline panel returns at lg; a sheet left open would duplicate it
+const isDesktopPanel = useMediaQuery("(min-width: 1024px)");
+watch(isDesktopPanel, (desktop) => {
+  if (desktop) showDetailsSheet.value = false;
+});
 
 // Playground-specific state
 const isResetting = ref(false);

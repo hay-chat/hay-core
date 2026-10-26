@@ -59,12 +59,6 @@ class ConversationEventsService {
     conversation: Conversation,
     changedFields?: string[],
   ): Promise<void> {
-    // Push alerts do not depend on Redis or on an open dashboard tab, so they
-    // go out before the WebSocket fan-out below and regardless of its outcome.
-    if (changedFields?.includes("status")) {
-      await this.notifyDevices(conversation);
-    }
-
     try {
       const { redisService } = await import("./redis.service");
 
@@ -135,15 +129,6 @@ class ConversationEventsService {
       }
     } catch (error) {
       logger.debug({ err: error }, "Failed to broadcast conversation_updated:");
-    }
-  }
-
-  private async notifyDevices(conversation: Conversation): Promise<void> {
-    try {
-      const { pushNotificationService } = await import("./push-notification.service");
-      await pushNotificationService.onConversationStatusChanged(conversation);
-    } catch (error) {
-      logger.warn({ err: error }, "Push notification for status change failed");
     }
   }
 

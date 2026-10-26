@@ -133,7 +133,10 @@ export async function createTestUser(): Promise<{
 }
 
 /**
- * Generate Playwright storage state from tokens and user
+ * Generate Playwright storage state from tokens and user.
+ * Keys are the Pinia store ids: pinia-plugin-persistedstate (see
+ * dashboard/plugins/00-pinia-persist.client.ts) persists each store under its
+ * plain id, so "auth"/"user", not "pinia:auth".
  */
 export function generateAuthState(
   tokens: { accessToken: string; refreshToken: string; expiresIn: number },
@@ -147,7 +150,7 @@ export function generateAuthState(
         origin: "http://localhost:3000",
         localStorage: [
           {
-            name: "pinia:auth",
+            name: "auth",
             value: JSON.stringify({
               tokens: {
                 accessToken: tokens.accessToken,
@@ -161,7 +164,9 @@ export function generateAuthState(
             }),
           },
           {
-            name: "pinia:user",
+            // Mirrors the user store's state shape: organizations and the
+            // active org live at the top level, not inside `user`.
+            name: "user",
             value: JSON.stringify({
               user: {
                 id: user.id,
@@ -170,17 +175,17 @@ export function generateAuthState(
                 lastName: user.lastName,
                 isActive: user.isActive,
                 role: user.role,
-                organizations: [
-                  {
-                    id: organization.id,
-                    name: organization.name,
-                    slug: organization.slug,
-                    role: "owner",
-                    joinedAt: new Date().toISOString(),
-                  },
-                ],
-                activeOrganizationId: organization.id,
               },
+              organizations: [
+                {
+                  id: organization.id,
+                  name: organization.name,
+                  slug: organization.slug,
+                  role: "owner",
+                  joinedAt: new Date().toISOString(),
+                },
+              ],
+              activeOrganizationId: organization.id,
             }),
           },
         ],

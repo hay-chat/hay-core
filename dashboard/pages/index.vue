@@ -128,7 +128,6 @@
 import { ref, computed, onMounted, onUnmounted } from "vue";
 import { RefreshCw, CheckCircle2, ChevronRight } from "lucide-vue-next";
 import { Hay } from "@/utils/api";
-import type { RouterOutputs } from "@/types/trpc";
 import { useAppStore } from "@/stores/app";
 import { useUserStore } from "@/stores/user";
 import { useWebSocket } from "@/composables/useWebSocket";
@@ -147,7 +146,10 @@ const takeoverApi = useConversationTakeover();
 const toast = useToast();
 const now = useNow();
 
-type ListItem = RouterOutputs["conversations"]["list"]["items"][number];
+// First-time setup comes before the inbox: nothing can be waiting yet.
+if (!appStore.onboardingCompleted) {
+  router.replace("/getting-started");
+}
 
 const loading = ref(true);
 const error = ref<string | null>(null);
@@ -155,46 +157,13 @@ const takingOver = ref<string | null>(null);
 const pending = ref<AttentionConversation[]>([]);
 const handled = ref<AttentionConversation[]>([]);
 
-const toView = (item: ListItem): AttentionConversation => {
-  const assigned = item.assignedUser;
-  const handlerName = assigned
-    ? `${assigned.firstName ?? ""} ${assigned.lastName ?? ""}`.trim() || assigned.email || null
-    : null;
-  return {
-    id: item.id,
-    title: item.title ?? null,
-    customerName: item.customer?.name ?? null,
-    channel: item.channel,
-    summary: item.summary ?? null,
-    waitingSince: String(item.lastMessageAt ?? item.updated_at),
-    handlerName,
-    assignedUserId: item.assigned_user_id ?? null,
-  };
-};
-
-const fetchByStatus = async (status: "pending-human" | "human-took-over") => {
-  const result = await Hay.conversations.list.query({
-    filters: { status },
-    pagination: { page: 1, limit: 50 },
-    sorting: { orderBy: "updated_at", orderDirection: "asc" },
-    include: ["customer", "assignedUser"],
-  });
-  return (result.items as ListItem[]).map(toView);
-};
-
 const load = async (showSpinner = false) => {
   if (showSpinner) loading.value = true;
   try {
-    const [waiting, inProgress] = await Promise.all([
-      fetchByStatus("pending-human"),
-      fetchByStatus("human-took-over"),
-    ]);
-    // Longest wait first
-    pending.value = waiting.sort(
-      (a, b) => new Date(a.waitingSince).getTime() - new Date(b.waitingSince).getTime(),
-    );
-    handled.value = inProgress;
-    appStore.pendingHumanCount = waiting.length;
+    const result = await Hay.conversations.attention.query();
+    pending.value = result.waiting;
+    handled.value = result.handling;
+    appStore.pendingHumanCount = result.waiting.length;
     error.value = null;
   } catch (err) {
     error.value = err instanceof Error ? err.message : t("home.error.title");
@@ -263,7 +232,6 @@ const unsubscribers: Array<() => void> = [];
 
 onMounted(async () => {
   await Promise.all([load(true), appStore.getOpenConversationsCount()]);
-  websocket.connect();
   for (const event of [
     "conversation_status_changed",
     "conversation_updated",

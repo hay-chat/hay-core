@@ -24,20 +24,29 @@ export interface SubscribeInput {
   userAgent?: string | null;
 }
 
-/** Copy for the "needs a human" alert, by organization locale (falls back to en). */
-const ATTENTION_COPY: Record<string, { title: string; untitled: string; summaryPending: string }> =
-  {
-    en: {
-      title: "A customer needs a human",
-      untitled: "New conversation",
-      summaryPending: "Tap to open the conversation and take over.",
-    },
-    "pt-BR": {
-      title: "Um cliente precisa de um humano",
-      untitled: "Nova conversa",
-      summaryPending: "Toque para abrir a conversa e assumir.",
-    },
-  };
+/** Notification copy by organization locale (falls back to en). */
+const COPY = {
+  en: {
+    title: "A customer needs a human",
+    untitled: "New conversation",
+    summaryPending: "Tap to open the conversation and take over.",
+    testTitle: "Hay alerts are on",
+    testBody: "You will be notified here when a conversation needs a human.",
+  },
+  "pt-BR": {
+    title: "Um cliente precisa de um humano",
+    untitled: "Nova conversa",
+    summaryPending: "Toque para abrir a conversa e assumir.",
+    testTitle: "Alertas do Hay ativados",
+    testBody: "Você será avisado aqui quando uma conversa precisar de um humano.",
+  },
+} as const;
+
+async function copyFor(organizationId: string): Promise<(typeof COPY)[keyof typeof COPY]> {
+  const { getOrganizationLocale } = await import("./email.service");
+  const locale = await getOrganizationLocale(organizationId);
+  return COPY[locale as keyof typeof COPY] ?? COPY.en;
+}
 
 /** Endpoint is gone (expired/unsubscribed): the row must be deleted. */
 const GONE_STATUS_CODES = new Set([404, 410]);
@@ -74,20 +83,18 @@ class PushNotificationService {
    * profile, so re-subscribing from the same device under another user or
    * organization moves the row instead of duplicating it.
    */
-  async subscribe(
-    userId: string,
-    organizationId: string,
-    input: SubscribeInput,
-  ): Promise<PushSubscription> {
-    const repo = this.repo();
-    const existing = await repo.findOne({ where: { endpoint: input.endpoint } });
-    const row = existing ?? repo.create({ endpoint: input.endpoint });
-    row.user_id = userId;
-    row.organization_id = organizationId;
-    row.p256dh = input.keys.p256dh;
-    row.auth = input.keys.auth;
-    row.user_agent = input.userAgent ? input.userAgent.slice(0, 255) : null;
-    return repo.save(row);
+  async subscribe(userId: string, organizationId: string, input: SubscribeInput): Promise<void> {
+    await this.repo().upsert(
+      {
+        endpoint: input.endpoint,
+        user_id: userId,
+        organization_id: organizationId,
+        p256dh: input.keys.p256dh,
+        auth: input.keys.auth,
+        user_agent: input.userAgent ? input.userAgent.slice(0, 255) : null,
+      },
+      ["endpoint"],
+    );
   }
 
   /** Remove a device. Scoped to the caller so one user cannot drop another's. */
@@ -96,18 +103,17 @@ class PushNotificationService {
     return (result.affected ?? 0) > 0;
   }
 
-  async listForUser(userId: string): Promise<PushSubscription[]> {
-    return this.repo().find({ where: { user_id: userId }, order: { created_at: "ASC" } });
+  /** A member who left must stop receiving the organization's alerts. */
+  async removeForMember(userId: string, organizationId: string): Promise<void> {
+    await this.repo().delete({ user_id: userId, organization_id: organizationId });
   }
 
-  /** Called by conversation-events on every status change; only pending-human alerts. */
+  /** Called by the conversation repository on a status transition; only pending-human alerts. */
   async onConversationStatusChanged(conversation: Conversation): Promise<void> {
     if (conversation.status !== "pending-human") return;
     if (!this.isConfigured()) return;
 
-    const { getOrganizationLocale } = await import("./email.service");
-    const locale = await getOrganizationLocale(conversation.organization_id);
-    const copy = ATTENTION_COPY[locale] ?? ATTENTION_COPY.en;
+    const copy = await copyFor(conversation.organization_id);
 
     const who = conversation.customer?.name || conversation.title || copy.untitled;
     const body = conversation.summary
@@ -123,22 +129,41 @@ class PushNotificationService {
     });
   }
 
-  /** Fan out to every opted-in device of the organization. Never throws. */
+  /**
+   * Fan out to every opted-in device of the organization's active members.
+   * Devices of users who lost access keep their row until the next delivery
+   * attempt prunes them; the membership join keeps them silent meanwhile.
+   */
   async sendToOrganization(
     organizationId: string,
     payload: PushPayload,
   ): Promise<{ sent: number; removed: number }> {
-    const subscriptions = await this.repo().find({ where: { organization_id: organizationId } });
+    const subscriptions = await this.repo()
+      .createQueryBuilder("s")
+      .innerJoin(
+        "user_organizations",
+        "uo",
+        "uo.user_id = s.user_id AND uo.organization_id = s.organization_id AND uo.is_active = true",
+      )
+      .where("s.organization_id = :organizationId", { organizationId })
+      .getMany();
     return this.deliver(subscriptions, payload);
   }
 
-  /** Fan out to one user's devices (used by the "send a test" button). */
-  async sendToUser(
+  /** The "send a test" button: the caller's own devices only. */
+  async sendTest(
     userId: string,
-    payload: PushPayload,
+    organizationId: string,
   ): Promise<{ sent: number; removed: number }> {
-    const subscriptions = await this.listForUser(userId);
-    return this.deliver(subscriptions, payload);
+    const copy = await copyFor(organizationId);
+    const subscriptions = await this.repo().find({ where: { user_id: userId } });
+    return this.deliver(subscriptions, {
+      kind: "test",
+      title: copy.testTitle,
+      body: copy.testBody,
+      url: "/",
+      tag: "test",
+    });
   }
 
   private async deliver(

@@ -23,6 +23,17 @@
       <BellRing class="mr-2 h-4 w-4 text-green-600" />
       {{ $t("home.push.enabled") }}
     </Button>
+    <!-- Blocked or unsupported here: the Profile card explains what to do -->
+    <Button
+      v-else-if="push.status.value === 'denied' || push.status.value === 'unsupported'"
+      variant="ghost"
+      class="min-h-11 text-neutral-muted sm:min-h-0"
+      data-testid="push-blocked"
+      @click="router.push('/settings/profile')"
+    >
+      <BellOff class="mr-2 h-4 w-4" />
+      {{ $t("home.push.blocked") }}
+    </Button>
   </template>
 
   <!-- Full: the settings card body -->
@@ -49,15 +60,14 @@
     </p>
 
     <div v-else class="flex flex-wrap items-center justify-between gap-3">
-      <label class="flex items-center gap-3 text-sm font-medium text-foreground">
-        <Switch
-          :model-value="push.status.value === 'on'"
-          :disabled="push.busy.value || push.status.value === 'loading'"
-          data-testid="push-switch"
-          @update:model-value="toggle"
-        />
-        {{ push.status.value === "on" ? $t("home.push.statusOn") : $t("home.push.statusOff") }}
-      </label>
+      <Input
+        type="switch"
+        :label="push.status.value === 'on' ? $t('home.push.statusOn') : $t('home.push.statusOff')"
+        :model-value="push.status.value === 'on'"
+        :disabled="push.busy.value || push.status.value === 'loading'"
+        data-testid="push-switch"
+        @update:model-value="toggle($event === true)"
+      />
       <Button
         v-if="push.status.value === 'on'"
         variant="outline"
@@ -77,7 +87,7 @@
 
 <script setup lang="ts">
 import { onMounted } from "vue";
-import { Bell, BellRing, Send } from "lucide-vue-next";
+import { Bell, BellRing, BellOff, Send } from "lucide-vue-next";
 import { usePushNotifications } from "@/composables/usePushNotifications";
 import { useToast } from "@/composables/useToast";
 
