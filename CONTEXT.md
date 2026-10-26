@@ -1,6 +1,6 @@
 # Context
 
-**Current Task**: Merge-gate session: all five fact-fix branches (approval-delivery, mobile-attention, commerce-semantic-actions, email-channel, billing-usage-limits) plus the Inbox routing follow-up and the three fix branches (wait-time units, manage-page middleware, SDK register tests) are merged to master and deployed to eu.hay.chat; hay-docs main carries the docs.
+**Current Task**: Merge-gate session: fact-fix branches, three follow-up fixes, prod env keys, backoffice billing/Snov.io/admin-controls and the email-channel boot fixes are all merged and deployed; the email inbox end-to-end test waits on Resend receiving + MX for inbound.hay.chat.
 
 **Key Decisions**:
 
@@ -12,4 +12,4 @@
 
 - Done 2026-10-26: VAPID_*/RESEND_*/EMAIL_INBOUND_DOMAIN live in prod (deploy.sh --env-only); backoffice billing branches merged, migrated, Stripe live catalog synced, deployed (see /srv/hay/WIP.md).
 - Dashboard still has no `test` script/vitest config (run `npx vitest run` from `dashboard/`); server `PluginMetadata` lacks the `pages` field the SDK emits.
-- Website copy fixes listed in each branch's `tasks/todo.md` (`git show origin/claude/<branch>:tasks/todo.md`).
+- Email inbox live test: Roger enables receiving on inbound.hay.chat in Resend, publishes the MX in Cloudflare, creates the email.received webhook to /v1/plugins/hay-channel-email/webhook, then `deploy.sh --env-only`, save support address, send a test mail. Website copy fixes still in each branch's `tasks/todo.md`.

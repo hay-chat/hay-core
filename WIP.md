@@ -1,3 +1,11 @@
+## 2026-10-26 — master @e67e295 — Email inbox channel unblocked in prod (worker boots, settings page complete)
+
+**Fixed + deployed:** SDK runner now accepts the `email` capability (7cbf7b2; it rejected both core email plugins' manifests), host env filter hands plugins SMTP_FROM_EMAIL/SMTP_FROM_NAME via `server/lib/plugin-env.ts` (tested), and the email-channel plugin no longer lists RESEND_WEBHOOK_SECRET as required (e67e295; core verifies svix, never passes secrets). Docs api-reference lists `email` (hay-docs 208faa1).
+**Live-verified (Roger's Chrome, org 468ccc89…):** /integrations/plugins/hay-channel-email renders config form, forwarding alias in-1abd51c0ea@inbound.hay.chat, replies as Support <support@updates.hay.chat>, setup steps, status; only "Save your support address first" remains. Push alerts offered on the Inbox.
+**Blocked outside the repo (Roger):** inbound.hay.chat has NO MX at Cloudflare's authoritative NS; Resend has it as a sending domain only (no receiving MX record, no `email.received` webhook; the only webhook targets backoffice and is disabled). Needs: enable receiving on inbound.hay.chat in Resend → publish its MX in Cloudflare → webhook email.received → https://eu.hay.chat/v1/plugins/hay-channel-email/webhook → secret into Infisical → `deploy.sh --env-only` → save support address → send a test mail.
+**Prod env:** VAPID_*/RESEND_*/EMAIL_INBOUND_DOMAIN all live (two `deploy.sh --env-only` runs today; the Resend key was upgraded from send-only to full access by Roger).
+**Next:** nothing pending in hay-core; see /srv/hay/WIP.md for backoffice (Snov.io removed, admin billing controls, one migration for Roger to run).
+
 ## 2026-10-26 — master — three follow-up fixes merged + deployed (merge-gate session, part 2)
 
 **Merged to master:** fix-wait-time-units (82a04f2: formatWaitTime shows two largest units, "3d 4h"; 6 vitest), fix-manage-middleware (b626a21: dropped dangling `middleware: ["auth"]` on /integrations/plugins/manage; `dashboard/tests/route-middleware.test.ts` guards every named middleware), fix-sdk-register-tests (removed legacy `register.ui()` / `uiExtensions` from plugin-sdk + server metadata; SDK suite 134/134, was 5 failing).
