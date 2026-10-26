@@ -483,6 +483,7 @@ export class ConversationRepository extends BaseRepository<Conversation> {
   async findAllOpenConversations(): Promise<Conversation[]> {
     return await this.getRepository().find({
       where: { status: "open", deleted_at: IsNull() },
+      relations: { agent: true },
       order: { created_at: "DESC" },
     });
   }

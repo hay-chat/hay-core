@@ -31,13 +31,11 @@
         <Input
           v-model="statusFilter"
           type="select"
-          placeholder="All Status"
+          :placeholder="$t('agents.status.all')"
           :options="[
             { label: $t('agents.status.all'), value: '' },
             { label: $t('agents.status.active'), value: 'active' },
             { label: $t('agents.status.inactive'), value: 'inactive' },
-            { label: $t('agents.status.training'), value: 'training' },
-            { label: $t('agents.status.error'), value: 'error' },
           ]"
           @update:model-value="applyFilters"
         />
@@ -165,23 +163,13 @@
                   'inline-flex items-center px-2 py-1 rounded-full text-xs font-medium',
                   agent.status === 'active'
                     ? 'bg-green-100 text-green-800'
-                    : agent.status === 'inactive'
-                      ? 'bg-gray-100 text-gray-800'
-                      : agent.status === 'training'
-                        ? 'bg-blue-100 text-blue-800'
-                        : 'bg-red-100 text-red-800',
+                    : 'bg-gray-100 text-gray-800',
                 ]"
               >
                 <div
                   :class="[
                     'w-2 h-2 rounded-full mr-2',
-                    agent.status === 'active'
-                      ? 'bg-green-600'
-                      : agent.status === 'inactive'
-                        ? 'bg-gray-600'
-                        : agent.status === 'training'
-                          ? 'bg-blue-600'
-                          : 'bg-red-600',
+                    agent.status === 'active' ? 'bg-green-600' : 'bg-gray-600',
                   ]"
                 />
                 {{ $t(`agents.status.${agent.status}`) }}
@@ -347,7 +335,7 @@ interface AgentData {
   id: string;
   name: string;
   description: string;
-  status: "active" | "inactive" | "training" | "error";
+  status: "active" | "inactive";
   type: string;
   conversationCount: number;
   resolutionRate: number;
