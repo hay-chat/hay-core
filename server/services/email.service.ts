@@ -17,6 +17,11 @@ import { DEFAULT_LANGUAGE } from "@server/types/language.types";
 
 const logger = createLogger("email");
 
+/** Display names come from merchant config; keep them from breaking the quoted From phrase. */
+function sanitizeDisplayName(name: string): string {
+  return name.replace(/["\\\r\n]/g, "").trim() || "Support";
+}
+
 export class EmailService {
   private transporter: Transporter | null = null;
   private templateService: TemplateService;
@@ -126,7 +131,7 @@ export class EmailService {
 
     // Build the 'from' address with fallback
     const fromAddress = options.from
-      ? `"${options.from.name || options.from.email}" <${options.from.email}>`
+      ? `"${sanitizeDisplayName(options.from.name || options.from.email)}" <${options.from.email}>`
       : `"${config.smtp.from.name}" <${config.smtp.from.email}>`;
 
     logger.debug(

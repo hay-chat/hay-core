@@ -17,7 +17,6 @@
  */
 
 // In-process API implementations (for plugins running in same process)
-export { EmailAPIImpl } from "./email.api";
 
 // HTTP-based Plugin API (for external MCP plugins)
 export { PluginAPIService } from "./plugin-api.service";

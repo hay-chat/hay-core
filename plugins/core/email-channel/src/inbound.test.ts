@@ -266,8 +266,7 @@ describe("looksLikeMerchantReply", () => {
     expect(looksLikeMerchantReply("<abc@shopper.com>", known, "acme.com")).toBe(false);
     expect(looksLikeMerchantReply("<hay-1@updates.hay.test>", known, "acme.com")).toBe(false);
     expect(looksLikeMerchantReply("<rewritten@resend.dev>", known, "acme.com")).toBe(false);
-    expect(
-      looksLikeMerchantReply("<x@mail.gmail.com>", known, settings.supportAddress && null),
-    ).toBe(true);
+    // Without a configured support address any unknown Gmail id is still suspicious.
+    expect(looksLikeMerchantReply("<x@mail.gmail.com>", known, null)).toBe(true);
   });
 });

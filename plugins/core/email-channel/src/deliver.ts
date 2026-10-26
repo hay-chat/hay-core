@@ -11,8 +11,10 @@ import { outboundMessageId, replySubject, splitAddress, tokenAddress } from "./t
  * an `X-Hay-Conversation` header so a forwarded copy of our own mail is
  * recognised as an echo, and our own Message-ID so later replies thread back.
  *
- * Error semantics: a refused send → 200 `{success:false, error}` (core marks
- * the message failed); Hay unreachable → 503 so core may retry.
+ * Error semantics mirror the WhatsApp channel: a refused send → 200
+ * `{success:false, error}`; Hay's own API unreachable → 503. Core marks the
+ * message failed in both cases today (no delivery retry exists yet); the
+ * status split keeps the two causes apart in logs.
  */
 
 export interface DeliverResult {
@@ -145,8 +147,11 @@ export async function deliver(
   const fromDomain = splitAddress(settings.fromAddress).domain;
   const ourMessageId = outboundMessageId(parsed.messageId, fromDomain);
 
+  // RFC 3834 + the Exchange equivalent: tell the shopper's auto-responders
+  // (vacation, ticketing systems) not to answer this mail and start a loop.
   const headers: Record<string, string> = {
     "X-Hay-Conversation": parsed.conversationId,
+    "Auto-Submitted": "auto-replied",
     "X-Auto-Response-Suppress": "OOF, AutoReply",
   };
   if (threading.inReplyTo) {

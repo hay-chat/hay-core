@@ -224,11 +224,14 @@ export async function handleInbound(event: unknown, ctx: ChannelContext): Promis
   const sender = parseAddress(email.from);
   const text = (email.text ?? "").trim() || htmlToText(email.html ?? "");
 
+  const messageId = normalizeMessageId(email.message_id ?? headerValue(headers, "message-id"));
   const classification = classifyInbound({
     from: email.from,
     subject,
     headers,
     authentication: email.authentication,
+    ownAddress: settings.fromAddress,
+    messageId,
   });
 
   if (classification.kind === "forwarding-confirmation") {
@@ -260,7 +263,6 @@ export async function handleInbound(event: unknown, ctx: ChannelContext): Promis
   ];
   const tokenConversationId = conversationIdFromRecipients(recipients, settings.alias);
 
-  const messageId = normalizeMessageId(email.message_id ?? headerValue(headers, "message-id"));
   const inReplyTo = parseMessageIds(headerValue(headers, "in-reply-to"))[0];
   const references = parseMessageIds(headerValue(headers, "references"));
   const rootId = threadRootId({ messageId, inReplyTo, references });

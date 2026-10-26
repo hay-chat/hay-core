@@ -81,13 +81,18 @@ export default defineHayPlugin((globalCtx) => {
     state,
   });
 
-  /** Claim the shared-webhook routing keys: the alias and the merchant's support address. */
+  /**
+   * Claim the shared-webhook routing key. Only the alias: it is derived from
+   * the org id and is the envelope recipient of every mail Resend receives for
+   * this org (`data.to`). The merchant's support address is free-text config
+   * with no proof of control, so it must never route mail — another org could
+   * type the same address and receive their customers' email.
+   */
   const registerRoutingKeys = async (current: ChannelSettings, log: HayLogger): Promise<void> => {
-    const routingKeys = [current.alias, current.supportAddress].filter(
-      (key): key is string => typeof key === "string" && key.length > 0,
-    );
     try {
-      await new PluginApiClient(log).mutation("webhooks.setRoutingKeys", { routingKeys });
+      await new PluginApiClient(log).mutation("webhooks.setRoutingKeys", {
+        routingKeys: [current.alias],
+      });
     } catch (error: unknown) {
       log.warn("Could not register email routing keys", { error: errorMessage(error) });
     }

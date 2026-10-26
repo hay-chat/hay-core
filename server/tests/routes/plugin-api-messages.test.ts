@@ -36,7 +36,7 @@ const mockConversationRepo = {
   findByIdAndOrganization: jest.fn<(...args: unknown[]) => Promise<unknown>>(),
   create: jest.fn<(...args: unknown[]) => Promise<unknown>>(),
   update: jest.fn<(...args: unknown[]) => Promise<unknown>>(),
-  updateById: jest.fn<() => Promise<unknown>>(),
+  updateById: jest.fn<(...args: unknown[]) => Promise<unknown>>(),
   getMessages: jest.fn<() => Promise<unknown[]>>(),
 };
 jest.mock("@server/repositories/conversation.repository", () => ({
@@ -244,11 +244,16 @@ describe("pluginApi.messages.receive conversation lookup", () => {
     mockMessageRepo.create.mockImplementation(async (data) => ({ id: "msg-new", ...data }));
   });
 
-  const emailConversation = (id: string, status: Conversation["status"] = "resolved") => {
+  const emailConversation = (
+    id: string,
+    status: Conversation["status"] = "resolved",
+    customerId = "cust-1",
+  ) => {
     const conversation = makeConversation();
     conversation.id = id;
     conversation.channel = "email";
     conversation.status = status;
+    conversation.customer_id = customerId;
     conversation.metadata = { email: { conversationId: "<root@shopper.com>" } };
     return conversation;
   };
@@ -272,6 +277,72 @@ describe("pluginApi.messages.receive conversation lookup", () => {
     expect(mockConversationRepo.findByExternalConversationId).not.toHaveBeenCalled();
     expect(mockConversationRepo.findActiveByCustomerAndChannel).not.toHaveBeenCalled();
     expect(mockConversationRepo.create).not.toHaveBeenCalled();
+  });
+
+  it("ignores a Hay conversation id that belongs to another customer", async () => {
+    // The id travels in the Reply-To of every outbound email; a third party who
+    // was forwarded one must not be able to write into the shopper's thread.
+    mockConversationRepo.findByIdAndOrganization.mockResolvedValue(
+      emailConversation(THREAD_ID, "open", "cust-other"),
+    );
+    mockConversationRepo.findByExternalConversationId.mockResolvedValue(
+      emailConversation(THREAD_ID, "open", "cust-other"),
+    );
+
+    const result = await caller()["messages.receive"]({
+      from: "ana@shopper.com",
+      content: "I am not the shopper",
+      channel: "email",
+      conversationId: THREAD_ID,
+      externalConversationId: "<root@shopper.com>",
+      holdForHuman: true,
+    });
+
+    expect(result.conversationId).toBe(CONVERSATION_ID);
+    expect(mockConversationRepo.create).toHaveBeenCalled();
+    expect(mockConversationRepo.update).toHaveBeenCalledWith(
+      CONVERSATION_ID,
+      ORG_ID,
+      expect.objectContaining({ status: "pending-human" }),
+    );
+  });
+
+  it("starts a new thread when the external id is unknown instead of merging into the active conversation", async () => {
+    mockConversationRepo.findActiveByCustomerAndChannel.mockResolvedValue(
+      emailConversation(THREAD_ID, "open"),
+    );
+
+    const result = await caller()["messages.receive"]({
+      from: "ana@shopper.com",
+      content: "Unrelated second question",
+      channel: "email",
+      externalConversationId: "<second@shopper.com>",
+    });
+
+    expect(result.conversationId).toBe(CONVERSATION_ID);
+    expect(mockConversationRepo.findActiveByCustomerAndChannel).not.toHaveBeenCalled();
+    expect(mockConversationRepo.create).toHaveBeenCalledWith(
+      expect.objectContaining({ metadata: { email: { conversationId: "<second@shopper.com>" } } }),
+    );
+  });
+
+  it("keeps the stored thread root when a reply references only our own message", async () => {
+    mockConversationRepo.findByIdAndOrganization.mockResolvedValue(
+      emailConversation(THREAD_ID, "open"),
+    );
+
+    await caller()["messages.receive"]({
+      from: "ana@shopper.com",
+      content: "reply via token",
+      channel: "email",
+      conversationId: THREAD_ID,
+      externalConversationId: "<hay-1@updates.hay.chat>",
+    });
+
+    expect(mockConversationRepo.updateById).not.toHaveBeenCalledWith(
+      THREAD_ID,
+      expect.objectContaining({ metadata: expect.anything() }),
+    );
   });
 
   it("ignores a Hay conversation id that belongs to another channel", async () => {

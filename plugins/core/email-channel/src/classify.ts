@@ -1,9 +1,11 @@
 import { headerValue, parseAddress, type HeaderMap } from "./mime.js";
+import { isHayMessageId } from "./thread.js";
 
 /**
  * Decide what an inbound email is before it reaches the orchestrator.
  *
- *   - echo: our own outbound copy forwarded back (X-Hay-Conversation header)
+ *   - echo: our own outbound copy forwarded back (X-Hay-Conversation header,
+ *     our From address, or a Message-ID we stamped)
  *   - forwarding-confirmation: Gmail's "confirm forwarding" mail — surfaced in
  *     the setup UI, never a conversation
  *   - bounce / auto-reply / bulk: stored nowhere, logged — answering them
@@ -38,6 +40,10 @@ export interface ClassifyInput {
   subject: string;
   headers: HeaderMap;
   authentication?: AuthenticationResults | null;
+  /** Our own From address; mail from it is an echo (e.g. the BCC archive copy forwarded back). */
+  ownAddress?: string | null;
+  /** Normalised Message-ID of the mail; one we stamped ourselves is an echo. */
+  messageId?: string;
 }
 
 const GOOGLE_FORWARDING_SENDER = "forwarding-noreply@google.com";
@@ -52,6 +58,12 @@ export function classifyInbound(input: ClassifyInput): Classification {
 
   if (headerValue(headers, "x-hay-conversation")) {
     return { kind: "echo", hold: false, reason: "x-hay-conversation" };
+  }
+  if (input.ownAddress && sender === input.ownAddress.toLowerCase()) {
+    return { kind: "echo", hold: false, reason: "own-address" };
+  }
+  if (input.messageId && isHayMessageId(input.messageId)) {
+    return { kind: "echo", hold: false, reason: "own-message-id" };
   }
 
   if (sender === GOOGLE_FORWARDING_SENDER) {
