@@ -1,56 +1,48 @@
 {
   "name": "Wix Stores",
-  "description": "Connect your Wix Stores site to look up orders, read transactions and fulfilment, issue refunds, and browse your catalog",
+  "description": "Connect your Wix Stores site so the agent can look up a customer's orders, track shipments, cancel or re-route undispatched orders, issue refunds, and answer product questions.",
   "tools": {
-    "search_orders": {
-      "label": "Search orders",
-      "description": "Find orders by number, buyer email, status or date to resolve an order ID."
+    "wix_find_customer": {
+      "label": "Find Customer",
+      "description": "Find a customer by email, with their most recent orders."
     },
-    "get_order": {
-      "label": "Get order",
-      "description": "Get a full order by ID, including items, totals, payment and fulfilment status."
+    "wix_list_customer_orders": {
+      "label": "List Customer Orders",
+      "description": "List a customer's orders by email, most recent first."
     },
-    "get_order_transactions": {
-      "label": "Get order transactions",
-      "description": "List every payment and refund on an order, with transaction IDs and amounts."
+    "wix_get_order": {
+      "label": "Get Order",
+      "description": "Get an order by id or number: items, totals, address, payments, tracking and support eligibility."
     },
-    "get_order_refundability": {
-      "label": "Check refundability",
-      "description": "Check whether each payment can be refunded via the Wix API before refunding."
+    "wix_get_order_tracking": {
+      "label": "Get Order Tracking",
+      "description": "Get an order's fulfilment status and shipment tracking."
     },
-    "refund_order": {
-      "label": "Refund order",
-      "description": "Issue a full or partial refund, or record an external refund when the provider can't be refunded via API."
+    "wix_cancel_order": {
+      "label": "Cancel Order",
+      "description": "Cancel an order that has not been dispatched, optionally restocking and emailing the buyer."
     },
-    "get_order_fulfillments": {
-      "label": "Get order fulfilments",
-      "description": "List an order's fulfilments — shipped items and tracking info."
+    "wix_create_refund": {
+      "label": "Create Refund",
+      "description": "Refund an order in full or in part, capped at the remaining refundable balance."
     },
-    "create_fulfillment": {
-      "label": "Create fulfilment",
-      "description": "Mark order items as shipped, optionally with carrier and tracking number."
+    "wix_update_order_shipping_address": {
+      "label": "Update Order Shipping Address",
+      "description": "Change where an undispatched order will ship. Refuses once fulfilment has started."
     },
-    "update_fulfillment": {
-      "label": "Update fulfilment",
-      "description": "Update an existing fulfilment's tracking information."
+    "wix_search_products": {
+      "label": "Search Products",
+      "description": "Search the catalog by name or description."
     },
-    "delete_fulfillment": {
-      "label": "Delete fulfilment",
-      "description": "Remove a fulfilment from an order, reverting its items to not-fulfilled."
-    },
-    "search_products": {
-      "label": "Search products",
-      "description": "Search the catalog by text or filter to find products."
-    },
-    "get_product": {
-      "label": "Get product",
-      "description": "Get a product by ID, including variants, pricing and inventory."
+    "wix_get_product": {
+      "label": "Get Product",
+      "description": "Get a product with its variants, pricing and stock status."
     }
   },
   "config": {
     "apiKey": {
       "label": "API Key",
-      "description": "Wix API key from Settings → API Keys, scoped to Orders (read & manage), Order Billing (refunds), Order Fulfillments (manage) and Catalog (read). Treated as a secret."
+      "description": "Wix API key from Settings → API Keys, scoped to Orders (read & manage), Order Billing (refunds), Order Fulfillments (read) and Catalog (read). Treated as a secret."
     },
     "siteId": {
       "label": "Site ID",

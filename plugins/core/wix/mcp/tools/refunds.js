@@ -1,69 +1,24 @@
 /**
- * Refund tools — the Wix eCommerce Order Billing API (`/ecom/v1/order-billing`).
+ * Refund tool — one semantic action over three Wix endpoints:
  *
- * Implements the refund half of the HAY-240 acceptance criteria:
- *   - Full or partial refunds where the payment provider supports API refunds.
- *   - A clear, non-silent fallback when it does NOT: the merchant refunds the
- *     customer manually and we record it as an *external* refund so the order's
- *     transaction records stay accurate.
+ *   GET  /ecom/v1/orders/{id}/transactions                 which payments exist + what is left
+ *   POST /ecom/v1/order-billing/get-order-refundability    can the provider refund via API?
+ *   POST /ecom/v1/order-billing/refund-payments            the refund itself
  *
- * The agent should normally call get_order_transactions (for transaction IDs)
- * and may call get_order_refundability first; refund_order also self-checks
- * refundability so it never fires a doomed provider call.
+ * Bounded server-side: never more than the order's remaining refundable
+ * balance, never against a payment the provider cannot refund (unless the
+ * merchant explicitly records an external refund), never silently "record
+ * only" — the fallback is spelled out in the result.
  */
 
 const { z } = require("zod");
 const { wixApi } = require("../lib/client");
-const { ok, fail, money } = require("../lib/format");
+const { ok, fail, money, round2 } = require("../lib/format");
+const { resolveOrder, getTransactions, paymentBalances } = require("../lib/orders");
 
 const REFUNDABLE = "REFUNDABLE";
 const MANUALLY_REFUNDABLE = "MANUALLY_REFUNDABLE";
 const NON_REFUNDABLE = "NON_REFUNDABLE";
-
-/**
- * Tolerantly read Wix's refundability assessment into
- * `{ [transactionId]: { state, reason } }`. Wix has shipped slightly different
- * shapes for this payload, so we look for any array of objects that carry a
- * transaction id plus a refundability-like string and normalise the state.
- * If nothing parseable is found we return `null` → callers should not block.
- */
-function parseRefundabilities(res) {
-  if (!res || typeof res !== "object") return null;
-
-  const candidates = [];
-  const visit = (node) => {
-    if (Array.isArray(node)) {
-      node.forEach(visit);
-    } else if (node && typeof node === "object") {
-      const txId = node.transactionId || node.paymentId || node.id;
-      const rawState =
-        node.refundability ??
-        node.refundabilityStatus ??
-        node.status ??
-        node.state ??
-        (typeof node.refundable === "boolean"
-          ? node.refundable
-            ? REFUNDABLE
-            : NON_REFUNDABLE
-          : undefined);
-      const stateStr = typeof rawState === "object" ? rawState?.status : rawState;
-      if (txId && typeof stateStr === "string") {
-        candidates.push({
-          transactionId: txId,
-          state: normalizeState(stateStr),
-          reason: node.nonRefundableReason || node.reason || rawState?.reason || null,
-        });
-      }
-      Object.values(node).forEach(visit);
-    }
-  };
-  visit(res);
-
-  if (!candidates.length) return null;
-  const map = {};
-  for (const c of candidates) map[c.transactionId] = { state: c.state, reason: c.reason };
-  return map;
-}
 
 function normalizeState(raw) {
   const s = String(raw).toUpperCase();
@@ -73,115 +28,174 @@ function normalizeState(raw) {
   return s;
 }
 
+/**
+ * Tolerantly read Wix's refundability assessment into
+ * `{ [transactionId]: { state, reason } }`. Wix has shipped slightly different
+ * shapes for this payload, so we look for any object carrying a transaction
+ * id plus a refundability-like string. `null` when nothing parseable.
+ */
+function parseRefundabilities(res) {
+  if (!res || typeof res !== "object") return null;
+  const map = {};
+  const visit = (node) => {
+    if (Array.isArray(node)) {
+      node.forEach(visit);
+      return;
+    }
+    if (!node || typeof node !== "object") return;
+    const txId = node.transactionId || node.paymentId;
+    const rawState =
+      node.refundability ??
+      node.refundabilityStatus ??
+      node.status ??
+      node.state ??
+      (typeof node.refundable === "boolean"
+        ? node.refundable
+          ? REFUNDABLE
+          : NON_REFUNDABLE
+        : undefined);
+    const stateStr = typeof rawState === "object" ? rawState?.status : rawState;
+    if (txId && typeof stateStr === "string") {
+      map[txId] = {
+        state: normalizeState(stateStr),
+        reason: node.nonRefundableReason || node.reason || rawState?.reason || null,
+      };
+    }
+    Object.values(node).forEach(visit);
+  };
+  visit(res);
+  return Object.keys(map).length ? map : null;
+}
+
+/**
+ * Allocate `amount` across refundable payments (largest remaining first);
+ * `null` amount means everything that is left. Returns `[{ paymentId, amount }]`.
+ */
+function allocateRefund(payments, amount) {
+  const candidates = payments
+    .filter((p) => p.remaining > 0 && !p.refundDisabled)
+    .sort((a, b) => b.remaining - a.remaining);
+  if (amount === null) {
+    return candidates.map((p) => ({ paymentId: p.paymentId, amount: p.remaining }));
+  }
+  const plan = [];
+  let left = round2(amount);
+  for (const p of candidates) {
+    if (left <= 0) break;
+    const take = round2(Math.min(p.remaining, left));
+    plan.push({ paymentId: p.paymentId, amount: take });
+    left = round2(left - take);
+  }
+  return plan;
+}
+
 function registerRefundTools(server) {
   server.tool(
-    "get_order_refundability",
-    "Check whether an order's payments can be refunded through the Wix API before attempting a " +
-      "refund. Each payment is REFUNDABLE (the provider supports an API refund), " +
-      "MANUALLY_REFUNDABLE (refund the customer outside Wix, then record it with " +
-      "refund_order externalRefund=true), or NON_REFUNDABLE (e.g. already fully refunded).",
-    { orderId: z.string().describe("Wix order ID.") },
-    async ({ orderId }) => {
-      try {
-        const res = await wixApi("POST", "/ecom/v1/order-billing/get-order-refundability", {
-          body: { orderId },
-        });
-        return ok(res);
-      } catch (err) {
-        return fail(err);
-      }
-    },
-  );
-
-  server.tool(
-    "refund_order",
-    "Refund one or more payments on a Wix order. For a full refund of a payment, pass just its " +
-      "transactionId; for a partial refund also pass `amount`. If the payment provider can't be " +
-      "refunded via API, this returns a clear fallback (refunded=false) telling you to refund the " +
-      "customer manually and re-call with externalRefund=true to record it — it never fails " +
-      "silently. Get transaction IDs from get_order_transactions.",
+    "wix_create_refund",
+    "Refund an order (WRITE): full refund when `amount` is omitted, partial otherwise. Picks the " +
+      "right payment transactions itself and refuses amounts above the remaining refundable " +
+      "balance. If the payment provider cannot be refunded through Wix, nothing is sent and the " +
+      "result says so (refunded=false) — refund the buyer in the provider, then re-run with " +
+      "external_refund=true to record it on the order.",
     {
-      orderId: z.string().describe("Wix order ID."),
-      refunds: z
-        .array(
-          z.object({
-            transactionId: z
-              .string()
-              .describe("Payment transaction ID from get_order_transactions."),
-            amount: z
-              .string()
-              .optional()
-              .describe(
-                'Partial-refund amount in major units as a decimal string (e.g. "10.50"). ' +
-                  "Omit to refund the payment's full remaining amount.",
-              ),
-          }),
-        )
-        .min(1)
-        .describe("The payments to refund."),
-      externalRefund: z
+      order_id: z.string().optional().describe("Wix order id."),
+      order_number: z.string().optional().describe("The order number the buyer sees."),
+      amount: z
+        .string()
+        .optional()
+        .describe(
+          'Partial amount in major units as a decimal string (e.g. "10.50"). Omit for full.',
+        ),
+      reason: z.string().optional().describe("Why the refund is issued (stored on the refund)."),
+      restock: z.boolean().optional().describe("Restock the refunded items (default false)."),
+      notify_customer: z
+        .boolean()
+        .optional()
+        .describe("Send Wix's order-refunded email to the buyer (default false)."),
+      external_refund: z
         .boolean()
         .optional()
         .describe(
-          "Set true when you have ALREADY refunded the customer outside Wix (provider not " +
-            "API-refundable). Records the refund against the order without calling the provider.",
+          "Set true ONLY when the buyer has already been refunded outside Wix; records the refund " +
+            "without calling the payment provider.",
         ),
-      restockItems: z
-        .boolean()
-        .optional()
-        .describe("Also restock the refunded items into inventory (default false)."),
-      sendEmail: z
-        .boolean()
-        .optional()
-        .describe("Send the buyer Wix's order-refunded email (default false)."),
     },
-    async ({ orderId, refunds, externalRefund, restockItems, sendEmail }) => {
+    async (args) => {
       try {
-        const targetIds = refunds.map((r) => r.transactionId);
+        const order = await resolveOrder(args);
+        const ref = order.number ? `#${order.number}` : order.id;
+        const transactions = await getTransactions(order.id);
+        const payments = paymentBalances(transactions);
+        const remaining = round2(payments.reduce((s, p) => s + p.remaining, 0));
 
-        // When this isn't already a manual/external refund, check refundability so
-        // we surface a clear fallback instead of firing a provider call that will fail.
-        if (!externalRefund) {
+        if (remaining <= 0) {
+          throw new Error(
+            `Order ${ref} has nothing left to refund (paid ${payments
+              .reduce((s, p) => s + p.paid, 0)
+              .toFixed(2)}, already refunded in full or never paid).`,
+          );
+        }
+
+        let amount = null;
+        if (args.amount !== undefined) {
+          amount = Number(args.amount);
+          if (!Number.isFinite(amount) || amount <= 0) {
+            throw new Error(`Invalid refund amount "${args.amount}".`);
+          }
+          if (amount > remaining + 0.001) {
+            throw new Error(
+              `Refund of ${amount.toFixed(2)} exceeds the remaining refundable balance of ` +
+                `${remaining.toFixed(2)} ${order.currency || ""} for order ${ref}.`,
+            );
+          }
+        }
+
+        const plan = allocateRefund(payments, amount);
+        if (!plan.length) {
+          throw new Error(
+            `Order ${ref} has no payment that can be refunded (payments are disabled for refunds).`,
+          );
+        }
+
+        if (!args.external_refund) {
           let refundability = null;
           try {
             const check = await wixApi("POST", "/ecom/v1/order-billing/get-order-refundability", {
-              body: { orderId },
+              body: { orderId: order.id },
             });
             refundability = parseRefundabilities(check);
           } catch (checkErr) {
-            // Best-effort: if the check itself fails, fall through and let the
-            // refund attempt produce the authoritative error.
+            // Best effort: let the refund call produce the authoritative error.
             console.error(`[wix] refundability check failed, proceeding: ${checkErr.message}`);
           }
-
           if (refundability) {
-            const blocked = targetIds
-              .map((id) => ({ id, ...(refundability[id] || {}) }))
-              .filter((t) => t.state && t.state !== REFUNDABLE);
-
+            const blocked = plan
+              .map((p) => ({ ...p, ...(refundability[p.paymentId] || {}) }))
+              .filter((p) => p.state && p.state !== REFUNDABLE);
             if (blocked.length) {
-              const manual = blocked.filter((t) => t.state === MANUALLY_REFUNDABLE);
-              const none = blocked.filter((t) => t.state === NON_REFUNDABLE);
+              const manual = blocked.filter((p) => p.state === MANUALLY_REFUNDABLE);
+              const none = blocked.filter((p) => p.state === NON_REFUNDABLE);
               const lines = [];
               if (manual.length) {
                 lines.push(
-                  `This order's payment provider does not support API refunds for ` +
-                    `transaction(s) ${manual.map((t) => t.id).join(", ")}. Refund the customer ` +
-                    `manually in your payment provider, then call refund_order again with ` +
-                    `externalRefund=true to record it against the order.`,
+                  "This order's payment provider does not support refunds through Wix. Refund the " +
+                    "buyer in the provider's dashboard, then call wix_create_refund again with " +
+                    "external_refund=true to record it on the order.",
                 );
               }
               if (none.length) {
                 lines.push(
-                  `Transaction(s) ${none
-                    .map((t) => (t.reason ? `${t.id} (${t.reason})` : t.id))
-                    .join(", ")} cannot be refunded (e.g. already fully refunded).`,
+                  `Payment(s) ${none
+                    .map((p) => (p.reason ? `${p.paymentId} (${p.reason})` : p.paymentId))
+                    .join(", ")} cannot be refunded.`,
                 );
               }
               return ok({
                 refunded: false,
                 reason: "provider_not_api_refundable",
-                refundability: blocked,
+                orderId: order.id,
+                number: order.number,
+                blocked,
                 message: lines.join(" "),
               });
             }
@@ -189,37 +203,39 @@ function registerRefundTools(server) {
         }
 
         const body = {
-          orderId,
-          paymentRefunds: refunds.map((r) => ({
-            transactionId: r.transactionId,
-            ...(r.amount ? { amount: money(r.amount) } : {}),
-            ...(externalRefund ? { externalRefund: true } : {}),
+          orderId: order.id,
+          paymentRefunds: plan.map((p) => ({
+            transactionId: p.paymentId,
+            amount: money(p.amount.toFixed(2)),
+            ...(args.external_refund ? { externalRefund: true } : {}),
           })),
           sideEffects: {
-            restockAllItems: Boolean(restockItems),
-            sendOrderRefundedEmail: Boolean(sendEmail),
+            restockAllItems: Boolean(args.restock),
+            sendOrderRefundedEmail: Boolean(args.notify_customer),
           },
         };
+        if (args.reason) body.reason = args.reason;
 
         const res = await wixApi("POST", "/ecom/v1/order-billing/refund-payments", { body });
+        const refundedTotal = round2(plan.reduce((s, p) => s + p.amount, 0));
         return ok({
           refunded: true,
-          external: Boolean(externalRefund),
+          external: Boolean(args.external_refund),
+          orderId: order.id,
+          number: order.number,
+          amount: { amount: refundedTotal.toFixed(2), currency: order.currency ?? null },
+          remainingRefundable: {
+            amount: round2(remaining - refundedTotal).toFixed(2),
+            currency: order.currency ?? null,
+          },
+          payments: plan,
           result: res,
         });
       } catch (err) {
-        // Don't fail silently: append the external-refund fallback hint so the
-        // playbook has an actionable next step on a provider/permission error.
-        const base = err?.message || String(err);
-        return fail(
-          new Error(
-            `${base}. If this payment provider does not support API refunds, refund the ` +
-              `customer manually and re-call refund_order with externalRefund=true to record it.`,
-          ),
-        );
+        return fail(err);
       }
     },
   );
 }
 
-module.exports = { registerRefundTools };
+module.exports = { registerRefundTools, parseRefundabilities, allocateRefund };

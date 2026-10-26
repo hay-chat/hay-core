@@ -1,10 +1,10 @@
 /**
  * Wix eCommerce REST API client.
  *
- * Native `fetch` (no axios), one shared `wixApi()` helper that centralises the
- * Wix auth headers + query serialization, with retry on 429 / 5xx. Reads
- * WIX_API_KEY and WIX_SITE_ID from the environment (injected by the plugin
- * worker).
+ * Native `fetch`, one shared `wixApi()` helper that centralises the Wix auth
+ * headers + query serialization, with retry on 429 / 5xx. Reads WIX_API_KEY
+ * and WIX_SITE_ID from the environment (injected by the plugin worker) at call
+ * time, so the module can be required without credentials (tests).
  *
  * Wix API-key auth: the key goes RAW in the `Authorization` header (no "Bearer"
  * prefix), and every site-level call must carry the `wix-site-id` header.
@@ -17,12 +17,13 @@ const DEFAULT_TIMEOUT_MS = 30000;
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-const API_KEY = process.env.WIX_API_KEY;
-const SITE_ID = process.env.WIX_SITE_ID;
-
-if (!API_KEY || !SITE_ID) {
-  console.error("ERROR: WIX_API_KEY and WIX_SITE_ID environment variables are required");
-  process.exit(1);
+function credentials() {
+  const apiKey = process.env.WIX_API_KEY;
+  const siteId = process.env.WIX_SITE_ID;
+  if (!apiKey || !siteId) {
+    throw new Error("Wix MCP server is missing WIX_API_KEY or WIX_SITE_ID");
+  }
+  return { apiKey, siteId };
 }
 
 /**
@@ -31,12 +32,12 @@ if (!API_KEY || !SITE_ID) {
  * @param {string} method - HTTP method (GET, POST, PATCH, DELETE).
  * @param {string} path - Path beginning with "/", relative to https://www.wixapis.com.
  * @param {object} [options]
- * @param {object} [options.query] - Query params. Values may be strings/numbers/booleans/arrays
- *   (arrays become comma-separated).
+ * @param {object} [options.query] - Query params (arrays become comma-separated).
  * @param {object} [options.body] - Optional JSON request body.
  * @returns {Promise<any>} Parsed JSON response body (or `null` for 204).
  */
 async function wixApi(method, path, { query, body } = {}) {
+  const { apiKey, siteId } = credentials();
   const url = new URL(BASE_URL + path);
 
   if (query) {
@@ -52,8 +53,8 @@ async function wixApi(method, path, { query, body } = {}) {
   }
 
   const headers = {
-    Authorization: API_KEY,
-    "wix-site-id": SITE_ID,
+    Authorization: apiKey,
+    "wix-site-id": siteId,
     Accept: "application/json",
   };
   if (body !== undefined) {
@@ -73,7 +74,6 @@ async function wixApi(method, path, { query, body } = {}) {
         signal: AbortSignal.timeout(DEFAULT_TIMEOUT_MS),
       });
     } catch (err) {
-      // Network/timeout error — retry a couple of times then give up.
       if (attempt < MAX_RETRIES) {
         const wait = Math.pow(2, attempt) * 500;
         console.error(`[wix] network error, retry ${attempt + 1}/${MAX_RETRIES} after ${wait}ms`);

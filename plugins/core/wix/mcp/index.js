@@ -2,11 +2,10 @@
 /**
  * Local Node MCP server for Wix Stores.
  *
- * Calls the Wix eCommerce REST API directly (https://www.wixapis.com) using a
- * site-scoped API key. Exposes the eCommerce surface an AI support agent needs:
- * order lookup + status, transaction history, refunds (with an external-refund
- * fallback when the provider can't be refunded via API), fulfilment management,
- * and read-only catalog browsing.
+ * Exposes the semantic support actions a customer-facing agent needs — not
+ * one tool per Wix endpoint. Reads merge several endpoints (order +
+ * transactions + fulfilments), writes are bounded server-side (pre-dispatch
+ * only, refund capped at the remaining balance).
  *
  * Env (injected by the plugin worker):
  *   WIX_API_KEY   site-scoped Wix API key (sent raw in the Authorization header)
@@ -16,25 +15,35 @@
 const { McpServer } = require("@modelcontextprotocol/sdk/server/mcp.js");
 const { StdioServerTransport } = require("@modelcontextprotocol/sdk/server/stdio.js");
 
+const { registerCustomerTools } = require("./tools/customers");
 const { registerOrderTools } = require("./tools/orders");
 const { registerRefundTools } = require("./tools/refunds");
-const { registerFulfillmentTools } = require("./tools/fulfillments");
 const { registerProductTools } = require("./tools/products");
 
-const server = new McpServer({ name: "wix-stores", version: "1.0.0" });
-
-registerOrderTools(server);
-registerRefundTools(server);
-registerFulfillmentTools(server);
-registerProductTools(server);
+function createServer() {
+  const server = new McpServer({ name: "wix-stores", version: "2.0.0" });
+  registerCustomerTools(server);
+  registerOrderTools(server);
+  registerRefundTools(server);
+  registerProductTools(server);
+  return server;
+}
 
 async function main() {
+  if (!process.env.WIX_API_KEY || !process.env.WIX_SITE_ID) {
+    console.error("ERROR: WIX_API_KEY and WIX_SITE_ID environment variables are required");
+    process.exit(1);
+  }
   const transport = new StdioServerTransport();
-  await server.connect(transport);
+  await createServer().connect(transport);
   console.error("[wix] MCP server started");
 }
 
-main().catch((err) => {
-  console.error("Wix Stores MCP server failed to start:", err);
-  process.exit(1);
-});
+if (require.main === module) {
+  main().catch((err) => {
+    console.error("Wix Stores MCP server failed to start:", err);
+    process.exit(1);
+  });
+}
+
+module.exports = { createServer };
