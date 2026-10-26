@@ -1,0 +1,73 @@
+{
+  "name": "E-mail",
+  "description": "Conecte sua caixa de suporte: encaminhe os e-mails de support@ para a Hay e deixe a IA responder por e-mail, na mesma conversa",
+  "tools": {},
+  "config": {},
+  "ui": {
+    "title": "Conecte sua caixa de entrada",
+    "intro": "Mantenha seu endereço de suporte. Encaminhe-o para a Hay e a IA responde por e-mail — cada resposta fica na mesma conversa, e você pode assumir qualquer atendimento pelo painel.",
+    "loadingStatus": "Carregando status do canal de e-mail…",
+    "statusError": {
+      "title": "Não foi possível carregar o status do canal de e-mail",
+      "body": "Verifique se o plugin está ativado e as configurações foram salvas, depois tente de novo.",
+      "detail": "Detalhes: {message}",
+      "noApi": "A API do painel não está disponível nesta tela.",
+      "retry": "Tentar de novo"
+    },
+    "notReady": {
+      "title": "O canal de e-mail ainda não está disponível nesta instalação da Hay",
+      "body": "Falta no servidor: {missing}. Peça ao administrador da Hay para configurar o recebimento de e-mail."
+    },
+    "needsAddress": {
+      "title": "Salve seu endereço de suporte primeiro",
+      "body": "Informe acima o endereço para o qual seus clientes escrevem e salve. A Hay usa esse endereço para reconhecer os e-mails encaminhados e enviar o Reply-To correto."
+    },
+    "address": {
+      "title": "Seu endereço de encaminhamento na Hay",
+      "intro": "Encaminhe sua caixa de suporte para este endereço. Ele é exclusivo do seu workspace.",
+      "copy": "Copiar endereço",
+      "copied": "Copiado",
+      "from": "As respostas são enviadas como",
+      "replyTo": "As respostas pedem para ser respondidas em",
+      "archive": "Cópias na sua caixa",
+      "archiveOn": "Ativado — toda resposta vai em cópia oculta para {address}",
+      "archiveOff": "Desativado — ative \"Manter uma cópia na minha caixa\" acima se quiser recebê-las"
+    },
+    "steps": {
+      "title": "Configure o encaminhamento",
+      "gmail": {
+        "title": "Gmail ou Google Workspace",
+        "body": "Abra o Gmail com a conta de suporte → Configurações → Ver todas as configurações → Encaminhamento e POP/IMAP → Adicionar um endereço de encaminhamento → cole o endereço da Hay → Avançar. O Google envia à Hay um código de confirmação; ele aparece abaixo em até um minuto. Digite-o no Gmail, escolha \"Encaminhar uma cópia dos e-mails recebidos\" e salve."
+      },
+      "outlook": {
+        "title": "Outlook ou Microsoft 365",
+        "body": "Abra o Outlook na web com a conta de suporte → Configurações → E-mail → Encaminhamento → Ativar encaminhamento → cole o endereço da Hay → marque \"Manter uma cópia das mensagens encaminhadas\" → Salvar. Alguns tenants do Microsoft 365 exigem que um administrador permita encaminhamento externo."
+      },
+      "other": {
+        "title": "Outros provedores",
+        "body": "Qualquer caixa que faça encaminhamento automático funciona. Encaminhe uma cópia (não redirecione e apague) para que sua caixa mantenha o original."
+      },
+      "test": {
+        "title": "Faça um teste",
+        "body": "Envie um e-mail para o seu endereço de suporte a partir de uma conta pessoal. A mensagem aparece em Conversas como uma conversa por e-mail e a IA responde para você por e-mail."
+      }
+    },
+    "confirmation": {
+      "title": "Código de confirmação do Gmail",
+      "waiting": "Aguardando o e-mail de confirmação do Google… Ele aparece aqui assim que você adicionar o endereço de encaminhamento no Gmail.",
+      "received": "O Google enviou uma confirmação em {time}.",
+      "code": "Código de confirmação",
+      "copyCode": "Copiar código",
+      "link": "Ou abra o link de confirmação do Google",
+      "noCode": "A Hay recebeu a mensagem do Google, mas não conseguiu ler o código. Abra o link abaixo."
+    },
+    "health": {
+      "title": "Status",
+      "refresh": "Atualizar",
+      "lastInbound": "Último e-mail recebido",
+      "never": "Nada recebido ainda",
+      "count": "E-mails recebidos desde o início",
+      "lastError": "Último erro"
+    }
+  }
+}
