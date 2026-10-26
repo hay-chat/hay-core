@@ -44,7 +44,7 @@ test.describe("Message approval", () => {
     await expect(queuedBadge).toBeVisible({ timeout: 15000 });
     await expect(page.getByText(ORIGINAL_REPLY)).toBeVisible();
 
-    await page.getByRole("button", { name: "Approve & Send" }).first().click();
+    await page.getByRole("button", { name: "Approve & Send", exact: true }).click();
 
     const dialog = page.getByRole("dialog");
     await expect(dialog.getByText("Review AI Message")).toBeVisible();
@@ -73,6 +73,6 @@ test.describe("Message approval", () => {
     await page.waitForLoadState("networkidle");
     await expect(page.getByText(EDITED_REPLY)).toBeVisible({ timeout: 15000 });
     await expect(page.getByText("Queued for Approval")).toHaveCount(0);
-    await expect(page.getByRole("button", { name: "Approve & Send" })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Approve & Send", exact: true })).toHaveCount(0);
   });
 });

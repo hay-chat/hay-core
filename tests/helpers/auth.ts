@@ -144,7 +144,7 @@ export function generateAuthState(
     cookies: [],
     origins: [
       {
-        origin: "http://localhost:3000",
+        origin: process.env.PLAYWRIGHT_DASHBOARD_URL ?? "http://localhost:3000",
         localStorage: [
           {
             name: "pinia:auth",

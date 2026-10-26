@@ -49,10 +49,15 @@ type MessageRow = Record<string, unknown> & { id: string; content: string };
 let storedMessage: MessageRow | null;
 const mockMessageRepo = {
   findByIdAndOrganization: jest.fn<(id: string, orgId: string) => Promise<MessageRow | null>>(),
-  update: jest.fn(async (_id: string, data: Record<string, unknown>) => {
-    storedMessage = { ...(storedMessage as MessageRow), ...data };
-    return storedMessage;
-  }),
+  /** Conditional update, like the real repository: no-op unless still in `from`. */
+  transitionDeliveryState: jest.fn(
+    async (_id: string, from: string, data: Record<string, unknown>) => {
+      if (storedMessage?.deliveryState !== from) return null;
+      storedMessage = { ...(storedMessage as MessageRow), ...data };
+      return storedMessage;
+    },
+  ),
+  update: jest.fn<(id: string, data: Record<string, unknown>) => Promise<unknown>>(),
   updateProviderMessageId: jest.fn<(id: string, providerMessageId: string) => Promise<void>>(),
 };
 jest.mock("@server/repositories/message.repository", () => ({
@@ -118,8 +123,9 @@ describe("messageApprovalService", () => {
       });
 
       expect(mockMessageRepo.findByIdAndOrganization).toHaveBeenCalledWith(MESSAGE_ID, ORG_ID);
-      expect(mockMessageRepo.update).toHaveBeenCalledWith(
+      expect(mockMessageRepo.transitionDeliveryState).toHaveBeenCalledWith(
         MESSAGE_ID,
+        "queued",
         expect.objectContaining({
           status: "approved",
           deliveryState: "sent",
@@ -165,8 +171,9 @@ describe("messageApprovalService", () => {
         editedContent: "Your order ships on Tuesday.",
       });
 
-      expect(mockMessageRepo.update).toHaveBeenCalledWith(
+      expect(mockMessageRepo.transitionDeliveryState).toHaveBeenCalledWith(
         MESSAGE_ID,
+        "queued",
         expect.objectContaining({
           status: "edited",
           content: "Your order ships on Tuesday.",
@@ -191,9 +198,27 @@ describe("messageApprovalService", () => {
         editedContent: "Your order ships tomorrow.",
       });
 
-      const [, updates] = mockMessageRepo.update.mock.calls[0];
+      const [, , updates] = mockMessageRepo.transitionDeliveryState.mock.calls[0];
       expect(updates.status).toBe("approved");
       expect(updates).not.toHaveProperty("originalContent");
+    });
+
+    it("lets only one of two concurrent approvals through, so the reply is delivered once", async () => {
+      const approve = () =>
+        messageApprovalService.approve({
+          messageId: MESSAGE_ID,
+          organizationId: ORG_ID,
+          userId: USER_ID,
+        });
+
+      // Both callers read the row while it is still queued; the conditional
+      // update lets the first one through and the second finds nothing to move.
+      const [first, second] = await Promise.allSettled([approve(), approve()]);
+
+      expect(first.status).toBe("fulfilled");
+      expect(second.status).toBe("rejected");
+      expect((second as PromiseRejectedResult).reason).toMatchObject({ code: "BAD_REQUEST" });
+      expect(publishedTypes().filter((type) => type === "message_received")).toHaveLength(1);
     });
 
     it("rejects a message that is not queued and publishes nothing", async () => {
@@ -207,7 +232,7 @@ describe("messageApprovalService", () => {
         }),
       ).rejects.toMatchObject({ code: "BAD_REQUEST" });
 
-      expect(mockMessageRepo.update).not.toHaveBeenCalled();
+      expect(mockMessageRepo.transitionDeliveryState).not.toHaveBeenCalled();
       expect(mockPublish).not.toHaveBeenCalled();
     });
 
@@ -319,8 +344,9 @@ describe("messageApprovalService", () => {
         reason: "Wrong shipping date",
       });
 
-      expect(mockMessageRepo.update).toHaveBeenCalledWith(
+      expect(mockMessageRepo.transitionDeliveryState).toHaveBeenCalledWith(
         MESSAGE_ID,
+        "queued",
         expect.objectContaining({
           status: "rejected",
           deliveryState: "blocked",

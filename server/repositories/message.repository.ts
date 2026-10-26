@@ -2,6 +2,7 @@ import { Repository } from "typeorm";
 import type { QueryDeepPartialEntity } from "typeorm";
 import { Message, MessageType, MessageSentiment } from "../database/entities/message.entity";
 import { AppDataSource } from "../database/data-source";
+import type { DeliveryState } from "../types/message-feedback.types";
 
 export class MessageRepository {
   private repository!: Repository<Message>;
@@ -92,6 +93,24 @@ export class MessageRepository {
 
   async update(id: string, data: Partial<Message>): Promise<Message | null> {
     await this.getRepository().update(id, data as QueryDeepPartialEntity<Message>);
+    return await this.findById(id);
+  }
+
+  /**
+   * Apply `data` only while the message is still in the `from` delivery state.
+   * Returns null when another writer moved it first, so two concurrent
+   * approvals of the same reply cannot both succeed and deliver it twice.
+   */
+  async transitionDeliveryState(
+    id: string,
+    from: DeliveryState,
+    data: Partial<Message>,
+  ): Promise<Message | null> {
+    const result = await this.getRepository().update(
+      { id, deliveryState: from },
+      data as QueryDeepPartialEntity<Message>,
+    );
+    if (!result.affected) return null;
     return await this.findById(id);
   }
 

@@ -852,7 +852,8 @@ export const conversationsRouter = t.router({
     .input(
       z.object({
         messageId: z.string().uuid(),
-        editedContent: z.string().optional(),
+        // An empty edit would be delivered as an empty bubble; reject it here.
+        editedContent: z.string().trim().min(1).optional(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
