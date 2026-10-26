@@ -7,6 +7,11 @@ import type {
 import { emailService } from "../email.service";
 import { createLogger } from "../../lib/logger";
 import { config } from "../../config/env";
+import {
+  mintPluginApiToken,
+  PLUGIN_API_TOKEN_AUDIENCE,
+  PLUGIN_API_TOKEN_ISSUER,
+} from "@server/lib/plugin-api-token";
 
 const logger = createLogger("plugin-api");
 
@@ -75,17 +80,7 @@ export class PluginAPIService {
    * @returns JWT token string
    */
   generateToken(pluginId: string, organizationId: string, capabilities: string[]): string {
-    const payload: PluginAPITokenPayload = {
-      pluginId,
-      organizationId,
-      capabilities,
-    };
-
-    const token = jwt.sign(payload, config.jwt.secret, {
-      expiresIn: "24h", // Token expires after 24 hours
-      issuer: "hay-plugin-api",
-      audience: "plugin",
-    });
+    const token = mintPluginApiToken(organizationId, pluginId, capabilities);
 
     logger.debug({ pluginId, organizationId, capabilities }, "Generated token for plugin");
 
@@ -101,8 +96,8 @@ export class PluginAPIService {
   validateToken(token: string): PluginAPITokenPayload | null {
     try {
       const decoded = jwt.verify(token, config.jwt.secret, {
-        issuer: "hay-plugin-api",
-        audience: "plugin",
+        issuer: PLUGIN_API_TOKEN_ISSUER,
+        audience: PLUGIN_API_TOKEN_AUDIENCE,
       }) as PluginAPITokenPayload;
 
       return decoded;
