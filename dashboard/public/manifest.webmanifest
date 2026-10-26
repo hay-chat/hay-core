@@ -2,7 +2,7 @@
   "name": "Hay",
   "short_name": "Hay",
   "description": "See which customer conversations need a human and take over from your phone.",
-  "start_url": "/",
+  "start_url": "/inbox",
   "scope": "/",
   "display": "standalone",
   "background_color": "#ffffff",

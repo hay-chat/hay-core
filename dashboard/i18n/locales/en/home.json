@@ -1,7 +1,7 @@
 {
   "home": {
-    "title": "Home",
-    "headTitle": "Home - Hay",
+    "title": "Inbox",
+    "headTitle": "Inbox - Hay",
     "headline": {
       "loading": "Checking who is waiting…",
       "waiting": "Nothing is waiting for a human | 1 conversation is waiting for a human | {count} conversations are waiting for a human"

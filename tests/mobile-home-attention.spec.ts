@@ -111,7 +111,7 @@ test.beforeAll(async ({ browser }) => {
     baseURL: BASE_URL,
     storageState: MOBILE_AUTH_STATE,
   });
-  for (const url of ["/", `/conversations/${conversationId}`, "/"]) {
+  for (const url of ["/inbox", `/conversations/${conversationId}`, "/inbox"]) {
     await warm.goto(url, { waitUntil: "networkidle", timeout: 120000 }).catch(() => undefined);
     await warm.waitForTimeout(2000);
   }
@@ -132,9 +132,9 @@ test.afterAll(async () => {
 // One worker: both tests share the seeded conversation created in beforeAll
 test.describe.configure({ mode: "serial" });
 
-test.describe("Home on a phone", () => {
+test.describe("Inbox on a phone", () => {
   test("shows who is waiting and takes the conversation over in one tap", async ({ page }) => {
-    await page.goto("/");
+    await page.goto("/inbox");
 
     // Headline is the count of conversations waiting for a human
     const headline = page.getByTestId("home-headline");
@@ -187,14 +187,14 @@ test.describe("Home on a phone", () => {
     await expect(page.getByTestId("conversation-details-toggle")).toBeVisible();
 
     // Back on Home, it moved from "waiting" to "you're handling"
-    await page.goto("/");
+    await page.goto("/inbox");
     await expect(
       page.getByTestId("home-mine-list").locator("li", { hasText: CUSTOMER_NAME }),
     ).toBeVisible({ timeout: 15000 });
   });
 
   test("opens the navigation drawer from the top bar", async ({ page }) => {
-    await page.goto("/");
+    await page.goto("/inbox");
     await page.getByTestId("mobile-menu-button").tap();
 
     const drawerLink = page.getByRole("link", { name: "Conversations" });
