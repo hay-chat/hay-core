@@ -94,7 +94,7 @@ const requiredRole = computed(() => {
 });
 
 const goToDashboard = () => {
-  router.push("/dashboard");
+  router.push("/");
 };
 
 const goBack = () => {

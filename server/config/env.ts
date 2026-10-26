@@ -150,6 +150,14 @@ export const config = {
     interval: parseInt(process.env.ORCHESTRATOR_INTERVAL || "5000", 10),
   },
 
+  // Web Push (VAPID). All three must be set for push alerts to be enabled;
+  // otherwise `notifications.pushPublicKey` returns null and nothing is sent.
+  push: {
+    vapidPublicKey: process.env.VAPID_PUBLIC_KEY || "",
+    vapidPrivateKey: process.env.VAPID_PRIVATE_KEY || "",
+    vapidSubject: process.env.VAPID_SUBJECT || "",
+  },
+
   conversation: {
     cooldownInterval: parseInt(process.env.CONVERSATION_COOLDOWN_INTERVAL || "10000", 10),
     inactivityInterval: parseInt(process.env.CONVERSATION_INACTIVITY_INTERVAL || "1800000", 10),

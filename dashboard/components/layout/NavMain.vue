@@ -4,7 +4,7 @@
       <a
         v-if="!item.items && item.url && item.external"
         href="#"
-        class="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground"
+        class="flex min-h-11 items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground md:min-h-0"
         @click.prevent="handleExternalClick(item.url!)"
       >
         <component :is="item.icon" class="h-4 w-4" />
@@ -14,7 +14,7 @@
       <NuxtLink
         v-else-if="!item.items && item.url"
         :to="item.url"
-        class="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground"
+        class="flex min-h-11 items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground md:min-h-0"
         :class="{
           'bg-accent text-accent-foreground': item.isActive,
         }"
@@ -28,7 +28,7 @@
 
       <div v-else>
         <button
-          class="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground"
+          class="flex min-h-11 w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground md:min-h-0"
           @click="toggleExpanded(item.title)"
         >
           <component :is="item.icon" class="h-4 w-4" />
@@ -43,7 +43,7 @@
             v-for="subItem in item.items"
             :key="subItem.title"
             :to="subItem.url"
-            class="block rounded-lg px-3 py-2 text-sm text-neutral-muted transition-colors hover:bg-accent hover:text-accent-foreground"
+            class="flex min-h-11 items-center rounded-lg px-3 py-2 text-sm text-neutral-muted transition-colors hover:bg-accent hover:text-accent-foreground md:min-h-0"
             :class="{
               'bg-accent text-accent-foreground': subItem.isActive,
             }"

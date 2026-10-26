@@ -531,7 +531,11 @@
     "passwordChanged": "Senha alterada com sucesso. Um email de confirmação foi enviado.",
     "passwordChangeFailed": "Falha ao alterar senha",
     "headTitle": "Configurações do Perfil - Hay Dashboard",
-    "headDescription": "Gerencie suas informações de perfil e segurança da conta"
+    "headDescription": "Gerencie suas informações de perfil e segurança da conta",
+    "notifications": {
+      "title": "Alertas neste dispositivo",
+      "description": "Notificações push quando uma conversa precisar de um humano. A configuração é por dispositivo: ative em cada celular ou computador que você usa."
+    }
   },
   "gitConnections": {
     "title": "Conexões Git",

@@ -211,7 +211,7 @@ export default defineNuxtRouteMiddleware(
       return navigateTo(SUSPENDED_ROUTE);
     }
     if (to.path === SUSPENDED_ROUTE) {
-      return navigateTo("/dashboard");
+      return navigateTo("/");
     }
 
     // Role-based route protection

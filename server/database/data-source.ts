@@ -32,6 +32,7 @@ import { Product } from "../entities/product.entity";
 import { ProductVariant } from "../entities/product-variant.entity";
 import { ProductEmbedding } from "../entities/product-embedding.entity";
 import { ConversationTakeoverEvent } from "./entities/conversation-takeover-event.entity";
+import { PushSubscription } from "./entities/push-subscription.entity";
 import { SnakeNamingStrategy } from "./naming-strategy";
 import { config } from "../config/env";
 import { createLogger } from "@server/lib/logger";
@@ -89,6 +90,7 @@ export const AppDataSource = new DataSource({
     ProductVariant,
     ProductEmbedding,
     ConversationTakeoverEvent,
+    PushSubscription,
   ],
   migrations: __filename.includes("dist")
     ? [__dirname + "/migrations/*.js"] // Production: compiled JS files in same relative location

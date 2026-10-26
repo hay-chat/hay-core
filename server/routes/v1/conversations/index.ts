@@ -25,6 +25,21 @@ const conversationRepository = new ConversationRepository();
  * Raw row shape returned by the active-conversations SQL query below.
  * Column names are snake_case because the query bypasses TypeORM mapping.
  */
+interface AttentionConversationRow {
+  id: string;
+  title: string | null;
+  status: "pending-human" | "human-took-over";
+  channel: string;
+  summary: string | null;
+  assigned_user_id: string | null;
+  updated_at: Date | string;
+  last_message_at: Date | string | null;
+  customer_name: string | null;
+  handler_first_name: string | null;
+  handler_last_name: string | null;
+  handler_email: string | null;
+}
+
 interface ActiveConversationRow {
   id: string;
   title: string | null;
@@ -91,6 +106,59 @@ const sendMessageSchema = z.object({
 
 export const conversationsRouter = t.router({
   list: createListProcedure(conversationListInputSchema, conversationRepository),
+
+  /**
+   * What the Home screen shows: conversations waiting for a human (longest wait
+   * first) and the ones a human is currently handling. One query, no paging:
+   * both sets are small by nature (a backlog here is the problem to surface).
+   */
+  attention: authenticatedProcedure.query(async ({ ctx }) => {
+    const rows = (await AppDataSource.query(
+      `
+        SELECT
+          c.id,
+          c.title,
+          c.status,
+          c.channel,
+          c.summary,
+          c.assigned_user_id,
+          c.updated_at,
+          c.last_message_at,
+          cust.name AS customer_name,
+          u.first_name AS handler_first_name,
+          u.last_name AS handler_last_name,
+          u.email AS handler_email
+        FROM conversations c
+        LEFT JOIN customers cust ON cust.id = c.customer_id
+        LEFT JOIN users u ON u.id = c.assigned_user_id
+        WHERE c.organization_id = $1
+          AND c.deleted_at IS NULL
+          AND c.status IN ('pending-human', 'human-took-over')
+        ORDER BY COALESCE(c.last_message_at, c.updated_at) ASC
+        LIMIT 200
+      `,
+      [ctx.organizationId],
+    )) as AttentionConversationRow[];
+
+    const toView = (r: AttentionConversationRow) => ({
+      id: r.id,
+      title: r.title,
+      customerName: r.customer_name,
+      channel: r.channel,
+      summary: r.summary,
+      waitingSince: new Date(r.last_message_at ?? r.updated_at).toISOString(),
+      assignedUserId: r.assigned_user_id,
+      handlerName:
+        r.handler_first_name || r.handler_last_name
+          ? `${r.handler_first_name ?? ""} ${r.handler_last_name ?? ""}`.trim()
+          : r.handler_email,
+    });
+
+    return {
+      waiting: rows.filter((r) => r.status === "pending-human").map(toView),
+      handling: rows.filter((r) => r.status === "human-took-over").map(toView),
+    };
+  }),
 
   /**
    * Active conversations for dashboard widgets.

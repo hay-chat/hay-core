@@ -83,6 +83,17 @@ WhatsApp/Instagram/Chatwoot workers and webchat gets it over the socket. Release
 host Chromium lacks libs). Docs submodule branch `claude/approval-delivery` pushed to hay-docs.
 **Next:** open PR against master (no gh CLI on this host — compare URL in the session summary); merge docs PR
 first; website lines to update are listed in tasks/todo.md Results.
+## 2026-10-26 — claude/mobile-attention (worktree .claude/worktrees/mobile-attention) — Home inbox + mobile + push
+
+**Works (all committed):** `/` = attention-first Home via new `conversations.attention` procedure (waiting + handling, one-tap
+Take over, live via WS); phone layout (top bar + drawer); conversation pages responsive; Web Push end-to-end (push_subscriptions
++ migration, VAPID env, `notifications.*`, hook in conversationRepository on real status transition, sw.js + manifest,
+"Alerts on this device" on Home + Profile); docs submodule branch `claude/mobile-attention` (faq/dashboard/conversations/troubleshooting).
+**Verified:** server tsc + nuxi typecheck clean, eslint clean, 11 Jest tests, Playwright `tests/mobile-home-attention.spec.ts` 2/2
+green on the alt-port stack (dashboard 3100 / API 3101 / docker pg 55432, redis 56379, browser server 3200).
+Fixed e2e auth helper: storage keys are store ids (`auth`/`user`), org list at store top level.
+**Next:** push + PR (main + hay-docs); tear down `hay-e2e-*` docker containers and the two background dev servers.
+
 ## 2026-10-21 — master @7448cad — WhatsApp live in prod, Meta webhook configured
 
 **Works:** prod deployed (Phase 2 + proxy fix + /logout). Meta console: callback eu.hay.chat/v1/plugins/hay-channel-whatsapp-meta/webhook

@@ -150,7 +150,7 @@ const switchOrganization = async (organizationId: string) => {
       );
 
       // Force a full page reload to refresh all data with the new organization context
-      window.location.href = "/dashboard";
+      window.location.href = "/";
     }
   } catch (error) {
     console.error("Failed to switch organization:", error);

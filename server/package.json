@@ -135,6 +135,7 @@
     "vue-chartjs": "^5.3.2",
     "vue-router": "^4.2.5",
     "vue-tsc": "^3.0.5",
+    "web-push": "^3.6.7",
     "word-extractor": "^1.0.4",
     "ws": "^8.14.2",
     "xml2js": "^0.6.2",
@@ -143,6 +144,8 @@
   "devDependencies": {
     "@modelcontextprotocol/sdk": "^1.25.2",
     "@types/pdfkit": "^0.17.5",
+    "@types/pg": "^8.11.10",
+    "@types/web-push": "^3.6.4",
     "pino-pretty": "^13.1.3"
   }
 }

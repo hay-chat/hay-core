@@ -276,6 +276,16 @@
 
     <!-- Re-authentication Modal -->
     <ReauthModal v-model:open="showReauthModal" @confirmed="handleReauthConfirmed" />
+    <!-- Push alerts on this device -->
+    <Card>
+      <CardHeader>
+        <CardTitle>{{ $t("profile.notifications.title") }}</CardTitle>
+        <CardDescription>{{ $t("profile.notifications.description") }}</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <PushAlertsToggle variant="full" />
+      </CardContent>
+    </Card>
   </Page>
 </template>
 

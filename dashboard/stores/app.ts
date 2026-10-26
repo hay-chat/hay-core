@@ -8,6 +8,8 @@ type Plugin = RouterOutputs["plugins"]["getAll"][number];
 
 interface AppState {
   openConversationsCount: number;
+  /** Conversations waiting for a human (status pending-human). Drives the Home badge. */
+  pendingHumanCount: number;
   lastUpdated: number | null;
   isLoading: boolean;
   plugins: Plugin[];
@@ -20,6 +22,7 @@ interface AppState {
 export const useAppStore = defineStore("app", {
   state: (): AppState => ({
     openConversationsCount: 0,
+    pendingHumanCount: 0,
     lastUpdated: null,
     isLoading: false,
     plugins: [],
@@ -79,6 +82,20 @@ export const useAppStore = defineStore("app", {
         return this.openConversationsCount;
       } finally {
         this.isLoading = false;
+      }
+    },
+
+    async fetchPendingHumanCount() {
+      try {
+        const result = await Hay.conversations.list.query({
+          filters: { status: "pending-human" },
+          pagination: { page: 1, limit: 1 },
+        });
+        this.pendingHumanCount = result.pagination.total;
+        return this.pendingHumanCount;
+      } catch (error) {
+        console.error("[AppStore] Failed to fetch pending-human count:", error);
+        return this.pendingHumanCount;
       }
     },
 

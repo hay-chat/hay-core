@@ -130,3 +130,23 @@
 - **Failure mode**: An override file meant to move the e2e Postgres/Redis/RabbitMQ to free ports merged with the base `ports:` list, so the stack still tried to bind the production ports (and the LAN-bound 5672) and failed to start.
 - **Detection signal**: "address already in use" for a port the override never mentions.
 - **Prevention**: Use `ports: !override` in the override file and run with a distinct `-p <project>` so container names, networks and volumes cannot collide with another session's stack. Tear down with `docker compose -p <project> down -v`.
+## 2026-10-26: Mobile Home + Web Push (claude/mobile-attention)
+
+### Playwright specs cannot import TypeORM entities
+- **Failure mode**: A spec that imported `server/entities/*` to seed data crashed in `PrimaryGeneratedColumn` ("Cannot read properties of undefined (reading 'constructor')"): Playwright's transpiler emits no decorator metadata.
+- **Detection signal**: The error is in the entity module, not the test body, and only appears under `npx playwright test` (global-setup runs through `tsx`, so it works there).
+- **Prevention**: Seed and assert from specs with raw SQL via `pg` (dotenv from `../.env`); keep TypeORM in `tests/global-setup.ts` only.
+
+### Side effects in the repository, not the event broadcaster
+- **Failure mode**: The first push hook sat in `conversationEventsService.broadcastConversationUpdated` and fired whenever `changedFields` contained "status", including re-saves of the same status, and awaited remote HTTPS calls inside the orchestrator's save path.
+- **Detection signal**: A hook keyed on "field was in the update payload" instead of "value actually changed"; an `await` on a network fan-out inside a DB write path.
+- **Prevention**: Put transition hooks where the previous value is known (`conversationRepository.update/updateById`), compare previous vs new, and fire-and-forget with a caught promise.
+
+### Python edit scripts: assert before writing, and no `"\\n"` in quoted heredocs
+- **Failure mode**: One multi-file edit script aborted mid-way on a later assertion, leaving the earlier files written and a later rewrite silently missing; another wrote a literal backslash-n to a JSON file, which 500'd the Nuxt dev server ("Could not parse JSON file").
+- **Detection signal**: `git status` disagreeing with what you believe you changed; a dev server 500 right after an i18n edit.
+- **Prevention**: One file per script, or compute every replacement before the first `write`; re-validate JSON with `json.loads` after editing it.
+
+### `npm run lint` from a workspace directory runs the workspace's (missing) script
+- **Failure mode**: Running `npm run lint` with cwd inside `dashboard/` fails with "Missing script: lint" because the dashboard package has none; the root script is the one that lints everything.
+- **Prevention**: Run root scripts from the repo root, or call `npx eslint "server/**/*.{js,ts}" "dashboard/**/*.{js,ts,vue}" --cache --max-warnings 0` directly.

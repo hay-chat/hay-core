@@ -105,7 +105,7 @@ const checkAgain = async () => {
     const user = await HayAuthApi.auth.me.query();
     userStore.setUser(user as User);
     if (!userStore.isSuspended) {
-      window.location.href = "/dashboard";
+      window.location.href = "/";
     }
   } catch (error) {
     console.error("Failed to refresh access state:", error);
@@ -120,7 +120,7 @@ const switchTo = async (organizationId: string) => {
   try {
     await Hay.organizations.switchOrganization.mutate({ organizationId });
     await userStore.switchOrganization(organizationId);
-    window.location.href = "/dashboard";
+    window.location.href = "/";
   } catch (error) {
     console.error("Failed to switch organization:", error);
     switchingTo.value = null;
