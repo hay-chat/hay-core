@@ -1,6 +1,6 @@
 # Context
 
-**Current Task**: Merge-gate session: all five fact-fix branches (approval-delivery, mobile-attention, commerce-semantic-actions, email-channel, billing-usage-limits) plus the Inbox routing follow-up are merged to master and deployed to eu.hay.chat; hay-docs main carries the docs.
+**Current Task**: Merge-gate session: all five fact-fix branches (approval-delivery, mobile-attention, commerce-semantic-actions, email-channel, billing-usage-limits) plus the Inbox routing follow-up and the three fix branches (wait-time units, manage-page middleware, SDK register tests) are merged to master and deployed to eu.hay.chat; hay-docs main carries the docs.
 
 **Key Decisions**:
 
@@ -11,5 +11,5 @@
 **Next Steps**:
 
 - Set prod env: VAPID_PUBLIC_KEY/VAPID_PRIVATE_KEY/VAPID_SUBJECT (push alerts), RESEND_API_KEY/RESEND_WEBHOOK_SECRET/EMAIL_INBOUND_DOMAIN (email channel); then the backoffice side of billing (claude/overage-billing → claude/billing-currencies-usage-alerts, stripe:sync, migrations).
-- Fix pre-existing `/integrations/plugins/manage` 500 (`middleware: "auth"` does not exist) and formatWaitTime for day-long waits on the Inbox.
+- Dashboard still has no `test` script/vitest config (run `npx vitest run` from `dashboard/`); server `PluginMetadata` lacks the `pages` field the SDK emits.
 - Website copy fixes listed in each branch's `tasks/todo.md` (`git show origin/claude/<branch>:tasks/todo.md`).

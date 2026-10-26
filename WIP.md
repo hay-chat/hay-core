@@ -1,3 +1,11 @@
+## 2026-10-26 — master — three follow-up fixes merged + deployed (merge-gate session, part 2)
+
+**Merged to master:** fix-wait-time-units (82a04f2: formatWaitTime shows two largest units, "3d 4h"; 6 vitest), fix-manage-middleware (b626a21: dropped dangling `middleware: ["auth"]` on /integrations/plugins/manage; `dashboard/tests/route-middleware.test.ts` guards every named middleware), fix-sdk-register-tests (removed legacy `register.ui()` / `uiExtensions` from plugin-sdk + server metadata; SDK suite 134/134, was 5 failing).
+**Checks on master:** dashboard nuxt typecheck, server tsc, eslint on changed files, SDK build: all clean.
+**Live-verified in Chrome after deploy (b626a21):** manage page renders, no "Unknown route middleware"; Inbox shows "Longest wait: 336d 21h" and rows "Waiting for 336d 21h".
+**Follow-ups:** dashboard has no `test` script / vitest config (new tests run via `npx vitest run` from dashboard/); `PluginMetadata` on the server lacks a `pages` field the SDK emits; prod env VAPID_*/RESEND_* still unset; backoffice billing branches still unmerged; worktrees under .claude/worktrees/ for the three fix branches can be removed.
+**Next:** nothing pending on hay-core from this session.
+
 ## 2026-10-26 — master — fact-fix branches MERGED straight to master + DEPLOYED (merge-gate session)
 
 **Merged + deployed to eu.hay.chat (all done):** approval-delivery (75a3c7d), mobile-attention (ea408fe, migration push_subscriptions run), commerce-semantic-actions (d46636c), email-channel (2d005cd + lockfile sync 2aa22d0), billing-usage-limits (d55b0cb, migration AddOrganizationAgentPause1784500000000 run, file renamed back in eabe270), Inbox routing follow-up (a83be48). hay-docs main 14a7a36 holds every docs branch; submodule pointer on main.
