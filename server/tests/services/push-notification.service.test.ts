@@ -159,7 +159,11 @@ describe("onConversationStatusChanged", () => {
 describe("dead subscriptions", () => {
   it("deletes subscriptions the push service reports as gone and keeps the rest", async () => {
     configure();
-    mockRepo.find.mockResolvedValue([subscription("alive"), subscription("gone"), subscription("flaky")]);
+    mockRepo.find.mockResolvedValue([
+      subscription("alive"),
+      subscription("gone"),
+      subscription("flaky"),
+    ]);
     mockSendNotification
       .mockResolvedValueOnce({ statusCode: 201 })
       .mockRejectedValueOnce(Object.assign(new Error("Gone"), { statusCode: 410 }))
@@ -182,7 +186,11 @@ describe("dead subscriptions", () => {
 
 describe("subscribe / unsubscribe", () => {
   it("re-points an existing endpoint to the current user and organization instead of duplicating it", async () => {
-    const existing = { ...subscription("a"), user_id: "someone-else", organization_id: "other-org" };
+    const existing = {
+      ...subscription("a"),
+      user_id: "someone-else",
+      organization_id: "other-org",
+    };
     mockRepo.findOne.mockResolvedValue(existing);
 
     const row = await pushNotificationService.subscribe(USER_ID, ORG_ID, {
@@ -213,7 +221,10 @@ describe("subscribe / unsubscribe", () => {
 
   it("only removes the caller's own subscription", async () => {
     mockRepo.delete.mockResolvedValue({ affected: 0 });
-    const removed = await pushNotificationService.unsubscribe(USER_ID, "https://push.example.com/a");
+    const removed = await pushNotificationService.unsubscribe(
+      USER_ID,
+      "https://push.example.com/a",
+    );
     expect(mockRepo.delete).toHaveBeenCalledWith({
       endpoint: "https://push.example.com/a",
       user_id: USER_ID,
