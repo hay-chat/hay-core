@@ -37,7 +37,10 @@ withDefaults(
   @apply p-4 md:p-6 mx-auto;
 }
 .page-header {
-  @apply flex mb-4 justify-between gap-4;
+  @apply flex flex-col mb-4 gap-3 sm:flex-row sm:justify-between sm:gap-4;
+}
+.page-header-end {
+  @apply flex flex-wrap items-center gap-2;
 }
 
 .page-content {

@@ -1,6 +1,7 @@
 {
   "nav": {
     "gettingStarted": "Getting Started",
+    "home": "Home",
     "dashboard": "Dashboard",
     "conversations": "Conversations",
     "documents": "Documents",
@@ -19,7 +20,8 @@
     "gitConnections": "Git Connections",
     "llmProviders": "AI Models",
     "customerPrivacy": "Customer Privacy",
-    "myProfile": "My Profile"
+    "myProfile": "My Profile",
+    "openMenu": "Open menu"
   },
   "user": {
     "status": "Status",

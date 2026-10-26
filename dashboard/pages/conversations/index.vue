@@ -2,7 +2,7 @@
   <Page :title="$t('conversations.page.title')" :description="$t('conversations.page.description')">
     <!-- Header -->
     <template #header>
-      <div class="flex items-center space-x-2">
+      <div class="flex flex-wrap items-center gap-2">
         <Button @click="openPlayground">
           <Plus class="h-4 w-4 mr-2" />
           {{ $t("conversations.actions.playground") }}
@@ -50,9 +50,9 @@
     </div>
 
     <!-- Filters and Search -->
-    <div class="flex items-center justify-between">
-      <div class="flex items-center space-x-4">
-        <div class="min-w-[300px]">
+    <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+      <div class="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
+        <div class="w-full sm:min-w-[300px]">
           <Input
             v-model="searchQuery"
             :placeholder="$t('conversations.filters.searchPlaceholder')"
@@ -131,105 +131,124 @@
     <!-- Conversations Table -->
     <Card v-else>
       <CardContent class="!p-0">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead v-if="bulkMode" class="w-12">
-                <Checkbox
-                  :checked="
-                    selectedConversations.length > 0 &&
-                    selectedConversations.length === paginatedConversations.length
-                  "
-                  @update:checked="toggleSelectAll"
-                />
-              </TableHead>
-              <TableHead>{{ $t("conversations.table.conversation") }}</TableHead>
-              <TableHead v-if="showChannelColumn">
-                {{ $t("conversations.table.channel") }}
-              </TableHead>
-              <TableHead>{{ $t("conversations.table.status") }}</TableHead>
-              <TableHead>{{ $t("conversations.table.assignedTo") }}</TableHead>
-              <TableHead>{{ $t("conversations.table.duration") }}</TableHead>
-              <TableHead>{{ $t("conversations.table.satisfaction") }}</TableHead>
-              <TableHead>{{ $t("conversations.table.updated") }}</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            <TableRow
-              v-for="conversation in paginatedConversations"
-              :key="conversation.id"
-              :class="['cursor-pointer', getWaitTimeClass(getWaitTime(conversation))]"
-              @click="!bulkMode && viewConversation(conversation.id)"
-            >
-              <TableCell v-if="bulkMode" @click.stop>
-                <Checkbox
-                  :checked="selectedConversations.includes(conversation.id)"
-                  @update:checked="toggleConversationSelection(conversation.id)"
-                />
-              </TableCell>
-              <TableCell>
-                <div class="flex items-center space-x-3">
-                  <div>
-                    <div class="font-medium">
-                      {{ conversation.title || $t("conversations.table.newConversation") }}
-                    </div>
-                    <div class="text-xs text-neutral-muted">
-                      {{ conversation.id.slice(0, 8) }}...
-                    </div>
-                    <div v-if="getWaitTime(conversation)" class="text-xs font-medium mt-1">
-                      {{
-                        $t("conversations.table.waiting", {
-                          time: formatWaitTime(getWaitTime(conversation)!),
-                        })
-                      }}
+        <div class="overflow-x-auto">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead v-if="bulkMode" class="w-12">
+                  <Checkbox
+                    :checked="
+                      selectedConversations.length > 0 &&
+                      selectedConversations.length === paginatedConversations.length
+                    "
+                    @update:checked="toggleSelectAll"
+                  />
+                </TableHead>
+                <TableHead>{{ $t("conversations.table.conversation") }}</TableHead>
+                <TableHead v-if="showChannelColumn">
+                  {{ $t("conversations.table.channel") }}
+                </TableHead>
+                <TableHead>{{ $t("conversations.table.status") }}</TableHead>
+                <TableHead class="hidden md:table-cell">
+                  {{ $t("conversations.table.assignedTo") }}
+                </TableHead>
+                <TableHead class="hidden lg:table-cell">
+                  {{ $t("conversations.table.duration") }}
+                </TableHead>
+                <TableHead class="hidden lg:table-cell">
+                  {{ $t("conversations.table.satisfaction") }}
+                </TableHead>
+                <TableHead class="hidden lg:table-cell">
+                  {{ $t("conversations.table.updated") }}
+                </TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              <TableRow
+                v-for="conversation in paginatedConversations"
+                :key="conversation.id"
+                :class="['cursor-pointer', getWaitTimeClass(getWaitTime(conversation))]"
+                @click="!bulkMode && viewConversation(conversation.id)"
+              >
+                <TableCell v-if="bulkMode" @click.stop>
+                  <Checkbox
+                    :checked="selectedConversations.includes(conversation.id)"
+                    @update:checked="toggleConversationSelection(conversation.id)"
+                  />
+                </TableCell>
+                <TableCell>
+                  <div class="flex items-center space-x-3">
+                    <div>
+                      <div class="font-medium">
+                        {{ conversation.title || $t("conversations.table.newConversation") }}
+                      </div>
+                      <div class="text-xs text-neutral-muted">
+                        {{ conversation.id.slice(0, 8) }}...
+                      </div>
+                      <div v-if="getWaitTime(conversation)" class="text-xs font-medium mt-1">
+                        {{
+                          $t("conversations.table.waiting", {
+                            time: formatWaitTime(getWaitTime(conversation)!),
+                          })
+                        }}
+                      </div>
+                      <div class="md:hidden text-xs text-neutral-muted mt-1">
+                        <template v-if="conversation.assignedUser">
+                          {{ getFullName(conversation.assignedUser) }} &middot;
+                        </template>
+                        {{ formatRelativeTime(conversation.updated_at) }}
+                      </div>
                     </div>
                   </div>
-                </div>
-              </TableCell>
-              <TableCell v-if="showChannelColumn">
-                <div class="flex items-center gap-2">
-                  <component
-                    :is="getChannelIcon(conversation.channel)"
-                    class="h-4 w-4 text-neutral-muted shrink-0"
-                  />
-                  <span class="text-sm">{{ getChannelLabel(conversation.channel) }}</span>
-                </div>
-              </TableCell>
-              <TableCell>
-                <Badge :variant="getStatusVariant(conversation?.status)">
-                  <component :is="getStatusIcon(conversation?.status)" class="h-3 w-3 mr-1" />
-                  {{ formatStatus(conversation?.status) }}
-                </Badge>
-              </TableCell>
-              <TableCell class="text-sm">
-                <div v-if="conversation.assignedUser" class="flex items-center space-x-2">
-                  <Avatar
-                    :name="getFullName(conversation.assignedUser)"
-                    :url="conversation.assignedUser.avatarUrl"
-                    size="xs"
-                  />
-                  <span>{{ getFullName(conversation.assignedUser) }}</span>
-                </div>
-                <span v-else class="text-neutral-muted">-</span>
-              </TableCell>
-              <TableCell class="text-sm">
-                {{ formatDuration(conversation.created_at, conversation.ended_at || new Date()) }}
-              </TableCell>
-              <TableCell>
-                <div v-if="conversation.metadata?.satisfaction" class="flex items-center space-x-1">
-                  <Star class="h-4 w-4 text-yellow-500 fill-current" />
-                  <span class="text-sm">{{ conversation.metadata.satisfaction }}/5</span>
-                </div>
-                <span v-else class="text-xs text-neutral-muted">{{
-                  $t("conversations.table.notRated")
-                }}</span>
-              </TableCell>
-              <TableCell class="text-sm text-neutral-muted">
-                {{ formatRelativeTime(conversation.updated_at) }}
-              </TableCell>
-            </TableRow>
-          </TableBody>
-        </Table>
+                </TableCell>
+                <TableCell v-if="showChannelColumn">
+                  <div class="flex items-center gap-2">
+                    <component
+                      :is="getChannelIcon(conversation.channel)"
+                      class="h-4 w-4 text-neutral-muted shrink-0"
+                    />
+                    <span class="text-sm">{{ getChannelLabel(conversation.channel) }}</span>
+                  </div>
+                </TableCell>
+                <TableCell>
+                  <Badge :variant="getStatusVariant(conversation?.status)">
+                    <component :is="getStatusIcon(conversation?.status)" class="h-3 w-3 mr-1" />
+                    {{ formatStatus(conversation?.status) }}
+                  </Badge>
+                </TableCell>
+                <TableCell class="hidden md:table-cell text-sm">
+                  <div v-if="conversation.assignedUser" class="flex items-center space-x-2">
+                    <Avatar
+                      :name="getFullName(conversation.assignedUser)"
+                      :url="conversation.assignedUser.avatarUrl"
+                      size="xs"
+                    />
+                    <span>{{ getFullName(conversation.assignedUser) }}</span>
+                  </div>
+                  <span v-else class="text-neutral-muted">-</span>
+                </TableCell>
+                <TableCell class="hidden lg:table-cell text-sm">
+                  {{ formatDuration(conversation.created_at, conversation.ended_at || new Date()) }}
+                </TableCell>
+                <TableCell class="hidden lg:table-cell">
+                  <div
+                    v-if="conversation.metadata?.satisfaction"
+                    class="flex items-center space-x-1"
+                  >
+                    <Star class="h-4 w-4 text-yellow-500 fill-current" />
+                    <span class="text-sm">{{ conversation.metadata.satisfaction }}/5</span>
+                  </div>
+                  <span v-else class="text-xs text-neutral-muted">{{
+                    $t("conversations.table.notRated")
+                  }}</span>
+                </TableCell>
+                <TableCell class="hidden lg:table-cell text-sm text-neutral-muted">
+                  {{ formatRelativeTime(conversation.updated_at) }}
+                </TableCell>
+              </TableRow>
+            </TableBody>
+          </Table>
+        </div>
       </CardContent>
     </Card>
 

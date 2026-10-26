@@ -1,0 +1,55 @@
+{
+  "home": {
+    "title": "Início",
+    "headTitle": "Início - Hay",
+    "headline": {
+      "loading": "Verificando quem está esperando…",
+      "waiting": "Nenhuma conversa esperando por um humano | 1 conversa esperando por um humano | {count} conversas esperando por um humano"
+    },
+    "subline": {
+      "longestWait": "Maior espera: {time}.",
+      "aiHandling": "A Hay está cuidando de {count} conversa aberta. | A Hay está cuidando de {count} conversas abertas.",
+      "allQuiet": "Nenhuma conversa aberta no momento."
+    },
+    "waitingCount": "{count} esperando por um humano",
+    "sections": {
+      "waiting": "Esperando por um humano",
+      "mine": "Você está atendendo",
+      "team": "Colegas estão atendendo"
+    },
+    "row": {
+      "noSummary": "Resumo ainda não está pronto. Abra a conversa para ler.",
+      "waitingFor": "Esperando há {time}",
+      "since": "Há {time}",
+      "unknownCustomer": "Cliente",
+      "takeOver": "Assumir",
+      "open": "Abrir",
+      "handledBy": "Atendida por {name}"
+    },
+    "empty": {
+      "title": "Tudo tranquilo",
+      "description": "Quando a Hay passa uma conversa para uma pessoa, ela aparece aqui primeiro. Ative os alertas para ser avisado neste dispositivo."
+    },
+    "error": {
+      "title": "Não foi possível carregar as conversas",
+      "retry": "Tentar novamente"
+    },
+    "metrics": "Métricas e relatórios",
+    "push": {
+      "enable": "Alertas neste dispositivo",
+      "enabled": "Alertas ativados",
+      "description": "Receba uma notificação neste dispositivo sempre que uma conversa precisar de um humano, mesmo com a Hay fechada.",
+      "statusOn": "Este dispositivo recebe alertas",
+      "statusOff": "Este dispositivo não recebe alertas",
+      "sendTest": "Enviar alerta de teste",
+      "testSent": "Alerta de teste enviado",
+      "testSentBody": "Ele deve aparecer neste dispositivo em alguns segundos.",
+      "testNone": "Nenhum dispositivo inscrito",
+      "unsupported": "Este navegador não recebe alertas push. No iPhone, adicione a Hay à Tela de Início e abra por lá.",
+      "unavailable": "Os alertas push ainda não foram configurados neste servidor da Hay. Peça ao administrador para adicionar as chaves VAPID.",
+      "denied": "As notificações estão bloqueadas para este site nas configurações do navegador. Permita e recarregue a página.",
+      "failed": "Não foi possível ativar os alertas",
+      "blocked": "Alertas desativados"
+    }
+  }
+}

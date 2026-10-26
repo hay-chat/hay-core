@@ -1,0 +1,13 @@
+{
+  "name": "Hay",
+  "short_name": "Hay",
+  "description": "See which customer conversations need a human and take over from your phone.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#001df5",
+  "icons": [
+    { "src": "/favicon.png", "sizes": "512x512", "type": "image/png", "purpose": "any" }
+  ]
+}

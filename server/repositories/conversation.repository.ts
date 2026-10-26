@@ -123,9 +123,26 @@ export class ConversationRepository extends BaseRepository<Conversation> {
         updatedConversation,
         changedFields,
       );
+      this.notifyDevicesOnTransition(conversation.status, updatedConversation);
     }
 
     return updatedConversation;
+  }
+
+  /**
+   * Push alerts fire only on a real status transition (not on re-saves of the
+   * same status) and never block the caller: the orchestrator loop, takeover
+   * and release all await update(), and push endpoints are remote HTTPS calls.
+   */
+  private notifyDevicesOnTransition(previousStatus: string, updated: Conversation): void {
+    if (updated.status === previousStatus) return;
+    void import("../services/push-notification.service")
+      .then(({ pushNotificationService }) =>
+        pushNotificationService.onConversationStatusChanged(updated),
+      )
+      .catch((error) => {
+        logger.warn({ err: error, conversationId: updated.id }, "Push alert failed");
+      });
   }
 
   // Simple update method for internal use (orchestrator, etc.)
@@ -147,6 +164,7 @@ export class ConversationRepository extends BaseRepository<Conversation> {
         updatedConversation,
         changedFields,
       );
+      this.notifyDevicesOnTransition(conversation.status, updatedConversation);
     }
 
     return updatedConversation;

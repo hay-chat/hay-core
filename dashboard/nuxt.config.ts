@@ -102,6 +102,7 @@ export default defineNuxtConfig({
           "en/products.json",
           "en/customers.json",
           "en/access.json",
+          "en/home.json",
         ],
       },
       {
@@ -123,6 +124,7 @@ export default defineNuxtConfig({
           "pt-BR/products.json",
           "pt-BR/customers.json",
           "pt-BR/access.json",
+          "pt-BR/home.json",
         ],
       },
     ],
@@ -226,15 +228,26 @@ export default defineNuxtConfig({
       title: "Hay Dashboard",
       meta: [
         { charset: "utf-8" },
-        { name: "viewport", content: "width=device-width, initial-scale=1" },
+        {
+          name: "viewport",
+          content: "width=device-width, initial-scale=1, viewport-fit=cover",
+        },
         { name: "description", content: "Hay platform dashboard application" },
         { name: "robots", content: "noindex, nofollow" },
+        // Installable on phones (Add to Home Screen); iOS needs this to allow Web Push
+        { name: "theme-color", content: "#001df5" },
+        { name: "mobile-web-app-capable", content: "yes" },
+        { name: "apple-mobile-web-app-capable", content: "yes" },
+        { name: "apple-mobile-web-app-title", content: "Hay" },
+        { name: "apple-mobile-web-app-status-bar-style", content: "default" },
       ],
       script: [
         // TEMPORARY: Figma capture script - remove after capture
         { src: "https://mcp.figma.com/mcp/html-to-design/capture.js", async: true },
       ],
       link: [
+        { rel: "manifest", href: "/manifest.webmanifest" },
+        { rel: "apple-touch-icon", href: "/favicon.png" },
         { rel: "preconnect", href: "https://fonts.googleapis.com" },
         { rel: "preconnect", href: "https://fonts.gstatic.com", crossorigin: "" },
         {

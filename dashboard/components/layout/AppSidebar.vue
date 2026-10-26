@@ -1,5 +1,18 @@
 <template>
+  <!-- Drawer variant: same navigation, rendered inside the mobile Sheet -->
+  <div v-if="variant === 'drawer'" class="flex h-full flex-col gap-2 p-2">
+    <div class="pb-2">
+      <OrgSwitcher />
+    </div>
+    <div class="flex min-h-0 flex-1 flex-col overflow-y-auto">
+      <NavMain :items="navMain" />
+    </div>
+    <div class="pb-[max(0.5rem,env(safe-area-inset-bottom))]">
+      <NavUser :user="user" />
+    </div>
+  </div>
   <Sidebar
+    v-else
     collapsible="icon"
     v-bind="$attrs"
     class="border-r border-border bg-background text-lg mb-2"
@@ -21,6 +34,7 @@
 import { computed, onMounted, ref } from "vue";
 import {
   Sparkles,
+  Inbox,
   MessageSquare,
   FileText,
   AreaChart,
@@ -47,6 +61,8 @@ import { roleProtectedRoutes } from "@/middleware/auth.global";
 import type { RouterOutputs } from "@/types/trpc";
 
 type PluginMenuItem = RouterOutputs["plugins"]["getMenuItems"]["items"][number];
+
+withDefaults(defineProps<{ variant?: "sidebar" | "drawer" }>(), { variant: "sidebar" });
 
 const { t } = useI18n();
 const userStore = useUserStore();
@@ -98,8 +114,8 @@ const user = computed(() => {
 
 // Helper function to check if a path is active
 const isPathActive = (path: string): boolean => {
-  if (path === "/dashboard") {
-    return route.path === "/" || route.path === "/dashboard";
+  if (path === "/") {
+    return route.path === "/";
   }
   return route.path.startsWith(path);
 };
@@ -110,12 +126,10 @@ const conversationsBadge = computed(() => {
   return count > 0 ? count.toString() : undefined;
 });
 
-// Initialize data on component mount
-onMounted(async () => {
-  if (authStore.isAuthenticated) {
-    await appStore.getOpenConversationsCount();
-    await appStore.getPlugins(); // Load plugins for sidebar
-  }
+// Conversations waiting for a human: the number that matters most on Home
+const homeBadge = computed(() => {
+  const count = appStore.pendingHumanCount;
+  return count > 0 ? count.toString() : undefined;
 });
 
 // Make navMain reactive to route changes
@@ -137,10 +151,11 @@ const navMain = computed(() => {
 
   items.push(
     {
-      title: t("nav.dashboard"),
-      url: "/dashboard",
-      icon: AreaChart,
-      isActive: isPathActive("/dashboard"),
+      title: t("nav.home"),
+      url: "/",
+      icon: Inbox,
+      badge: homeBadge.value,
+      isActive: isPathActive("/"),
     },
     {
       title: t("nav.conversations"),
@@ -160,6 +175,12 @@ const navMain = computed(() => {
       url: "/playbooks",
       icon: BookOpen,
       isActive: isPathActive("/playbooks"),
+    },
+    {
+      title: t("nav.dashboard"),
+      url: "/dashboard",
+      icon: AreaChart,
+      isActive: isPathActive("/dashboard"),
     },
     // {
     //   title: "Insights",

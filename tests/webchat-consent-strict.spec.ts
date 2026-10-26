@@ -13,7 +13,7 @@ test.describe("Webchat ePrivacy consent strict", () => {
         session: Object.keys(window.sessionStorage),
         orgId: (() => {
           try {
-            const raw = window.localStorage.getItem("pinia:user");
+            const raw = window.localStorage.getItem("user");
             if (!raw) return null;
             const parsed = JSON.parse(raw);
             return parsed?.user?.activeOrganizationId ?? null;
