@@ -1,96 +1,68 @@
 {
   "name": "WooCommerce",
-  "description": "Conecte sua loja WooCommerce para gerenciar produtos, pedidos, clientes e fluxos de e-commerce",
+  "description": "Conecte sua loja WooCommerce para que o agente consulte os pedidos de um cliente, acompanhe envios, cancele ou redirecione pedidos ainda não despachados, emita reembolsos e responda perguntas sobre produtos e estoque.",
   "tools": {
-    "get_products": {
-      "label": "Buscar Produtos",
-      "description": "Recuperar uma lista de produtos do WooCommerce"
+    "woocommerce_get_store": {
+      "label": "Informações da loja",
+      "description": "Consulta informações básicas da loja conectada (URL, moeda, versões)."
     },
-    "get_product": {
-      "label": "Buscar Produto",
-      "description": "Buscar um produto específico do WooCommerce pelo ID"
+    "woocommerce_find_customer": {
+      "label": "Localizar cliente",
+      "description": "Localiza um cliente por e-mail ou telefone (contas e compras como visitante), com seus pedidos mais recentes."
     },
-    "create_product": {
-      "label": "Criar Produto",
-      "description": "Criar um novo produto no WooCommerce"
+    "woocommerce_list_customer_orders": {
+      "label": "Listar pedidos do cliente",
+      "description": "Lista os pedidos de um cliente pelo e-mail, do mais recente ao mais antigo."
     },
-    "update_product": {
-      "label": "Atualizar Produto",
-      "description": "Atualizar um produto existente no WooCommerce"
+    "woocommerce_get_order": {
+      "label": "Consultar pedido",
+      "description": "Consulta um pedido por id ou número: itens, totais, endereços, reembolsos, rastreio e o que o suporte pode fazer."
     },
-    "delete_product": {
-      "label": "Excluir Produto",
-      "description": "Excluir um produto do WooCommerce"
+    "woocommerce_get_order_tracking": {
+      "label": "Rastrear pedido",
+      "description": "Consulta o rastreio de envio a partir do plugin de rastreio da loja ou dos dados do pedido."
     },
-    "get_orders": {
-      "label": "Buscar Pedidos",
-      "description": "Recuperar uma lista de pedidos do WooCommerce"
+    "woocommerce_cancel_order": {
+      "label": "Cancelar pedido",
+      "description": "Cancela um pedido ainda não despachado (pendente, em espera ou processando)."
     },
-    "get_order": {
-      "label": "Buscar Pedido",
-      "description": "Buscar um pedido específico do WooCommerce pelo ID"
+    "woocommerce_create_refund": {
+      "label": "Reembolsar",
+      "description": "Reembolsa um pedido total, por item ou por valor, limitado ao saldo reembolsável."
     },
-    "create_order": {
-      "label": "Criar Pedido",
-      "description": "Criar um novo pedido no WooCommerce"
+    "woocommerce_update_order_shipping_address": {
+      "label": "Alterar endereço de entrega",
+      "description": "Altera o endereço de entrega de um pedido ainda não despachado. Recusa após a conclusão do pedido."
     },
-    "update_order": {
-      "label": "Atualizar Pedido",
-      "description": "Atualizar um pedido existente no WooCommerce"
+    "woocommerce_add_order_note": {
+      "label": "Adicionar nota ao pedido",
+      "description": "Adiciona uma nota interna ao pedido, com opção de enviá-la ao cliente."
     },
-    "get_customers": {
-      "label": "Buscar Clientes",
-      "description": "Recuperar uma lista de clientes do WooCommerce"
+    "woocommerce_search_products": {
+      "label": "Buscar produtos",
+      "description": "Busca produtos publicados por nome ou descrição."
     },
-    "get_customer": {
-      "label": "Buscar Cliente",
-      "description": "Buscar um cliente específico do WooCommerce pelo ID"
+    "woocommerce_get_product": {
+      "label": "Consultar produto",
+      "description": "Consulta um produto com preço, estoque e suas variações."
     },
-    "create_customer": {
-      "label": "Criar Cliente",
-      "description": "Criar um novo cliente no WooCommerce"
-    },
-    "update_customer": {
-      "label": "Atualizar Cliente",
-      "description": "Atualizar um cliente existente no WooCommerce"
-    },
-    "get_product_categories": {
-      "label": "Buscar Categorias de Produtos",
-      "description": "Recuperar categorias de produtos do WooCommerce"
-    },
-    "create_product_category": {
-      "label": "Criar Categoria de Produto",
-      "description": "Criar uma nova categoria de produto no WooCommerce"
-    },
-    "get_coupons": {
-      "label": "Buscar Cupons",
-      "description": "Recuperar cupons do WooCommerce"
-    },
-    "create_coupon": {
-      "label": "Criar Cupom",
-      "description": "Criar um novo cupom no WooCommerce"
+    "woocommerce_check_inventory": {
+      "label": "Verificar estoque",
+      "description": "Verifica o status e a quantidade em estoque de um SKU de produto ou variação."
     }
   },
   "config": {
     "siteUrl": {
-      "label": "URL do Site WordPress",
-      "description": "URL do seu site WordPress/WooCommerce (ex: https://minhaloja.com)"
+      "label": "URL do site WordPress",
+      "description": "A URL do seu site WordPress/WooCommerce (ex.: https://minhaloja.com)"
     },
     "consumerKey": {
-      "label": "Chave do Consumidor",
-      "description": "Chave do Consumidor da API REST do WooCommerce"
+      "label": "Consumer Key",
+      "description": "Consumer Key da API REST do WooCommerce (WooCommerce → Configurações → Avançado → API REST, leitura/escrita)"
     },
     "consumerSecret": {
-      "label": "Segredo do Consumidor",
-      "description": "Segredo do Consumidor da API REST do WooCommerce"
-    },
-    "username": {
-      "label": "Usuário WordPress (Opcional)",
-      "description": "Nome de usuário admin do WordPress para endpoints da API REST"
-    },
-    "password": {
-      "label": "Senha WordPress (Opcional)",
-      "description": "Senha admin do WordPress para endpoints da API REST"
+      "label": "Consumer Secret",
+      "description": "Consumer Secret da API REST do WooCommerce"
     }
   }
 }

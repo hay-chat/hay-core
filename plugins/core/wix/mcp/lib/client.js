@@ -84,7 +84,11 @@ async function wixApi(method, path, { query, body } = {}) {
       throw new Error(`Wix API ${method} ${path} failed: ${err.message || String(err)}`);
     }
 
-    if ((response.status === 429 || response.status >= 500) && attempt < MAX_RETRIES) {
+    // 429 was never processed, so any request may be retried. A 5xx may have
+    // been processed (a refund POST that times out server-side still refunds),
+    // so only idempotent GETs are retried on it.
+    const retryable = response.status === 429 || (response.status >= 500 && method === "GET");
+    if (retryable && attempt < MAX_RETRIES) {
       const retryAfterHeader = Number(response.headers.get("retry-after"));
       const wait =
         response.status === 429 && retryAfterHeader

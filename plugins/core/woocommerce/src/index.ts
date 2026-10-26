@@ -3,18 +3,20 @@ import { defineHayPlugin } from "@hay/plugin-sdk";
 /**
  * WooCommerce Plugin
  *
- * Connect your WooCommerce store to manage products, orders, customers, and e-commerce workflows
+ * Connects a WooCommerce store so the agent can find a customer's orders,
+ * track shipments, cancel or re-route undispatched orders, issue refunds and
+ * answer product/stock questions — one semantic tool per support action (see
+ * mcp/README.md), not one tool per REST endpoint.
+ *
+ * Spawns a local Node MCP server (./mcp/index.js) that calls the WooCommerce
+ * REST API (wc/v3) with the store's consumer key + secret.
  */
 export default defineHayPlugin((globalCtx) => ({
   name: "WooCommerce",
 
-  /**
-   * Global initialization - register config and auth methods
-   */
   onInitialize(ctx) {
     globalCtx.logger.info("Initializing WooCommerce plugin");
 
-    // Register configuration fields
     ctx.register.config({
       siteUrl: {
         type: "string",
@@ -26,7 +28,8 @@ export default defineHayPlugin((globalCtx) => ({
       consumerKey: {
         type: "string",
         label: "Consumer Key",
-        description: "WooCommerce REST API Consumer Key",
+        description:
+          "WooCommerce REST API Consumer Key (WooCommerce → Settings → Advanced → REST API, Read/Write)",
         required: true,
         encrypted: true,
       },
@@ -37,23 +40,8 @@ export default defineHayPlugin((globalCtx) => ({
         required: true,
         encrypted: true,
       },
-      username: {
-        type: "string",
-        label: "WordPress Username (Optional)",
-        description: "WordPress admin username for WordPress REST API endpoints",
-        required: false,
-        encrypted: false,
-      },
-      password: {
-        type: "string",
-        label: "WordPress Password (Optional)",
-        description: "WordPress admin password for WordPress REST API endpoints",
-        required: false,
-        encrypted: true,
-      },
     });
 
-    // Register API Key authentication (uses consumerKey field as primary auth)
     ctx.register.auth.apiKey({
       id: "woocommerce-apikey",
       label: "WooCommerce API Key",
@@ -63,9 +51,6 @@ export default defineHayPlugin((globalCtx) => ({
     globalCtx.logger.info("WooCommerce plugin config and auth methods registered");
   },
 
-  /**
-   * Validate authentication credentials
-   */
   async onValidateAuth(ctx) {
     ctx.logger.info("Validating WooCommerce credentials");
 
@@ -73,29 +58,24 @@ export default defineHayPlugin((globalCtx) => ({
     const consumerKey = ctx.config.get<string>("consumerKey");
     const consumerSecret = ctx.config.get<string>("consumerSecret");
 
-    // Basic validation
     if (!siteUrl || !consumerKey || !consumerSecret) {
       throw new Error("Site URL, consumer key, and consumer secret are required");
     }
 
-    // Validate site URL format
     try {
       new URL(siteUrl);
     } catch {
       throw new Error("Invalid site URL format - must be a valid URL (e.g., https://mystore.com)");
     }
 
-    // Test actual WooCommerce API connection
     try {
-      const testUrl = `${siteUrl}/wp-json/wc/v3/system_status?consumer_key=${encodeURIComponent(
+      const testUrl = `${siteUrl.replace(/\/+$/, "")}/wp-json/wc/v3/system_status?consumer_key=${encodeURIComponent(
         consumerKey,
       )}&consumer_secret=${encodeURIComponent(consumerSecret)}`;
 
       const response = await fetch(testUrl, {
         method: "GET",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
       });
 
       if (!response.ok) {
@@ -118,35 +98,27 @@ export default defineHayPlugin((globalCtx) => ({
 
       ctx.logger.info("WooCommerce credentials validated successfully");
       return true;
-    } catch (error: any) {
-      ctx.logger.error("Failed to validate WooCommerce credentials", { error: error.message });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      ctx.logger.error("Failed to validate WooCommerce credentials", { error: message });
 
-      // Re-throw validation errors as-is
       if (
-        error.message.includes("credentials") ||
-        error.message.includes("not found") ||
-        error.message.includes("API request failed")
+        message.includes("credentials") ||
+        message.includes("not found") ||
+        message.includes("API request failed")
       ) {
         throw error;
       }
-
-      // Network or other errors
-      throw new Error(`Failed to connect to WooCommerce: ${error.message}`);
+      throw new Error(`Failed to connect to WooCommerce: ${message}`);
     }
   },
 
-  /**
-   * Org runtime initialization - start local MCP server
-   */
   async onStart(ctx) {
     ctx.logger.info("Starting WooCommerce plugin for org", { orgId: ctx.org.id });
 
-    // Check if credentials are configured before starting MCP server
     const siteUrl = ctx.config.getOptional<string>("siteUrl");
     const consumerKey = ctx.config.getOptional<string>("consumerKey");
     const consumerSecret = ctx.config.getOptional<string>("consumerSecret");
-    const username = ctx.config.getOptional<string>("username");
-    const password = ctx.config.getOptional<string>("password");
 
     if (!siteUrl || !consumerKey || !consumerSecret) {
       ctx.logger.info(
@@ -157,7 +129,6 @@ export default defineHayPlugin((globalCtx) => ({
     }
 
     try {
-      // Start local MCP server using SDK's stdio method
       await ctx.mcp.startLocalStdio({
         id: "woocommerce-mcp",
         command: "node",
@@ -167,8 +138,6 @@ export default defineHayPlugin((globalCtx) => ({
           WORDPRESS_SITE_URL: siteUrl,
           WOOCOMMERCE_CONSUMER_KEY: consumerKey,
           WOOCOMMERCE_CONSUMER_SECRET: consumerSecret,
-          WORDPRESS_USERNAME: username || "",
-          WORDPRESS_PASSWORD: password || "",
         },
       });
 
@@ -179,27 +148,12 @@ export default defineHayPlugin((globalCtx) => ({
     }
   },
 
-  /**
-   * Config update handler
-   */
   async onConfigUpdate(ctx) {
+    // The platform restarts the stdio MCP server with the new env after this hook.
     ctx.logger.info("WooCommerce plugin config updated");
-    // Config changes will take effect on next restart
   },
 
-  /**
-   * Disable handler - cleanup
-   */
   async onDisable(ctx) {
     ctx.logger.info("WooCommerce plugin disabled for org", { orgId: ctx.org.id });
-    // MCP servers are stopped automatically by the SDK
-  },
-
-  /**
-   * Enable handler
-   */
-  async onEnable(ctx) {
-    ctx.logger.info("WooCommerce plugin enabled");
-    // Plugin will be restarted via onStart automatically for each org
   },
 }));
