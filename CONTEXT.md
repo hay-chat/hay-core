@@ -1,13 +1,15 @@
 # CONTEXT
 
-**Current Task**: WhatsApp Cloud API Phase 2 plugin (plugins/core/whatsapp) built on branch claude/whatsapp-plugin; PR open.
+**Current Task**: Commerce plugins (WooCommerce, Wix, Magento) rewritten to one prefixed semantic action set each on branch claude/commerce-semantic-actions; code + docs committed, PRs still to open.
 
 **Key Decisions**
-- Manual mode = config fields; per-org URL (worker verifies) or shared URL (worker claims routing keys via webhooks.setRoutingKeys).
-- STT lives in core (`media.upload({transcribe})`) because workers never see OPENAI_*; plugin UI talks to its worker only via authenticated `plugins.callUiRoute` (/ui/*).
-- Public proxy now blocks worker-internal paths (PR #100) — ship before anything else.
+
+- Tool names are global per org, so every tool is platform-prefixed; the surface mirrors Shopify (rich reads, bounded writes, refund never silently "record only").
+- Clients never retry a non-GET after a timeout or 5xx (double-refund risk); search hits are verified server-side (Wix ignores malformed filter bodies).
+- Docs live on hay-docs branch claude/commerce-semantic-actions (separate PR); the `docs/` submodule pointer is deliberately not bumped in hay-core.
 
 **Next Steps**
-- Merge #100, then the Phase 2 PR + hay-docs claude/whatsapp-plugin; deploy.
-- Meta console: callback URL + verify token, subscribe webhook fields; E2E on test number.
-- App Review videos (Phase A).
+
+- Push both branches and open the hay-core + hay-docs PRs (PR body in tasks/todo.md; no `gh` here, use compare URLs).
+- Website PR for the lines listed in tasks/todo.md (action counts, "Works with Stripe", Wix fulfilment-write copy).
+- Verify the Wix refund / address PATCH and Magento address PUT against a live store before relying on them.

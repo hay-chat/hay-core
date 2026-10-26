@@ -78,3 +78,18 @@
 - **Failure mode**: PLAN.md and the WhatsApp plugin assumed `META_APP_ID`/`META_APP_SECRET` were the Meta app (1869497150332050). They hold the Instagram Business Login app id/secret (1478077373981180), which Instagram OAuth needs. Every WhatsApp webhook failed core's signature check, and Embedded Signup would have exchanged codes with the wrong client.
 - **Detection signal**: Meta's dashboard "Test" webhook logs `Shared webhook signature verification failed` while the GET handshake (verify token only) passes; the env app id differs from the app id in the dashboard URL.
 - **Prevention**: Before reusing provider credentials across plugins, compare the env value with the app id the provider console shows for that product. WhatsApp now reads `META_WHATSAPP_APP_ID`/`META_WHATSAPP_APP_SECRET`.
+
+### Retry loops that only looked at HTTP status retried timed-out writes
+- **Failure mode**: The commerce MCP clients skipped 5xx retries for non-GET requests but the `catch` around `fetch()` retried every method, so a refund POST that hit the 30s `AbortSignal.timeout` was sent again after the store had already processed it (double refund). Spotted by the independent reviewer, not by the tests.
+- **Detection signal**: Two retry decisions in one loop (status branch and exception branch) with different method rules; a timeout test for POST was missing while the 5xx-POST test passed.
+- **Prevention**: Decide idempotency once per request and apply it to both branches. Every client ships a "POST that throws TimeoutError is called exactly once" test.
+
+### Trusting a search API's first hit without verifying the filter was honoured
+- **Failure mode**: Wix ignores unknown top-level keys, so a bare `{ filter }` body (instead of `{ search: { filter } }`) silently returned the store's newest orders for any order number or email. The code returned `orders[0]`, which would have read, cancelled or refunded someone else's order. Masked in tests by a mock that honoured the bare key.
+- **Detection signal**: A search whose request shape was never checked against the vendor's reference, plus a mock that mirrors the code's own assumption rather than the documented payload.
+- **Prevention**: Fetch the vendor reference (`dev.wix.com/docs/...md` serves markdown) before writing a request body, assert the exact body in tests, and post-verify every hit (number must match, email filtered case-insensitively) so a wrong envelope fails loudly instead of returning the wrong record.
+
+### Worktree guard refuses shell variables in commands
+- **Failure mode**: The worktree-isolation hook rejects any Bash command where a path or value comes from a shell variable or a `for` loop, so heredoc chains and loops over plugin dirs were silently dropped and early file rewrites never landed.
+- **Detection signal**: "Refusing to run it … cannot be shown not to be git" errors; a file you believed rewritten still has the old content.
+- **Prevention**: Use the Write/Edit tools for file content and spell out absolute paths literally, one plain command per plugin; always pass `--root <abs plugin dir>` to vitest because the shell cwd drifts between calls.

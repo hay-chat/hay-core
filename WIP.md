@@ -1,11 +1,13 @@
-## 2026-10-26 — claude/commerce-semantic-actions (worktree .claude/worktrees/claude+commerce-semantic-actions)
+## 2026-10-26 — claude/commerce-semantic-actions (worktree .claude/worktrees/claude+commerce-semantic-actions) — DONE, needs PRs opened
 
-**Goal:** one bounded semantic action set per store plugin (Shopify-style) instead of per-endpoint tools; plan + table in
-`tasks/todo.md`. **Works:** Wix done + committed: 9 `wix_*` tools (find_customer, list_customer_orders, get_order merged
-order+transactions+fulfilments, tracking, cancel, create_refund with cap + fallback, address change, products), 25 vitest
-tests incl. stdio list-tools smoke (`npm test -w plugins/core/wix`), tsc clean. **Half-built:** WooCommerce (120 raw tools →
-12) and Magento (analytics → 12 support tools) not started. **Next:** rewrite `plugins/core/woocommerce/mcp` (CJS, native
-fetch, lib/client+format+orders, tools/*, tests) → Magento → i18n → docs submodule branch → review agent → PR.
+**Works:** Wix 9 / WooCommerce 12 / Magento 12 prefixed semantic tools, 103 vitest tests green, three plugin tsc builds,
+`typecheck:server`, root lint, dashboard `nuxt typecheck` (run from main checkout with `API_DOMAIN=localhost`; the
+worktree's symlinked `dashboard/node_modules` can't resolve `@types/node`). Reviewer findings (H1 POST-timeout retry,
+H2 Wix search envelope + unverified hits, M1–M5, L1–L7) fixed in d504c6a; outcome in `tasks/todo.md`. Docs pages
+committed on hay-docs branch `claude/commerce-semantic-actions` (949ee4e) inside `docs/`; submodule pointer NOT bumped.
+**Half-built:** nothing. **Next:** push both branches (`git push -u origin claude/commerce-semantic-actions` here and in
+`docs/`), open hay-core PR vs master with the body in `tasks/todo.md` ("PR body"), open hay-docs PR, then fix the website
+lines listed in `tasks/todo.md` in a hay-website PR. No `gh` on this box; use the GitHub compare URLs.
 
 ## 2026-10-21 — master @7448cad — WhatsApp live in prod, Meta webhook configured
 
