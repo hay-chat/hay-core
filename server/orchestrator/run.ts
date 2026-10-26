@@ -300,6 +300,41 @@ async function saveConfidenceLog(
   }
 }
 
+/**
+ * A paused agent never replies. A conversation that already holds a shopper
+ * message goes to "pending-human" (Needs Attention) so a human picks it up; a
+ * conversation with no shopper message yet (widget just opened) only has its
+ * needs_processing flag cleared, so no greeting is sent and the sweep stops.
+ */
+async function parkForPausedAgent(conversation: Conversation, log: pino.Logger): Promise<void> {
+  const lastCustomerMessage = await conversation.getLastCustomerMessage();
+  const shouldQueue = !!lastCustomerMessage && conversation.status !== "pending-human";
+
+  log.info(
+    { agentId: conversation.agent_id, queued: shouldQueue },
+    "Skipping - agent paused",
+  );
+
+  if (!conversation.needs_processing && !shouldQueue) {
+    return;
+  }
+
+  const updates: Partial<Conversation> = { needs_processing: false };
+  if (shouldQueue) {
+    updates.status = "pending-human";
+  }
+  await conversationRepository.update(conversation.id, conversation.organization_id, updates);
+
+  if (shouldQueue) {
+    await publishStatusChange(
+      conversation.organization_id,
+      conversation.id,
+      "pending-human",
+      conversation.title,
+    );
+  }
+}
+
 export const runConversation = async (conversationId: string) => {
   // Note: findById is used here because this is called from the internal message queue
   // with trusted conversation IDs (not user input). We validate org context below.
@@ -342,6 +377,15 @@ export const runConversation = async (conversationId: string) => {
       },
       "Skipping - conversation taken over by human",
     );
+    return;
+  }
+
+  // A paused agent (agents.enabled = false) never replies. Shopper messages
+  // are still stored; the conversation is parked in the queue as
+  // pending-human so the team sees it, and needs_processing is cleared so the
+  // sweep stops re-enqueuing it.
+  if (conversation.agent && !conversation.agent.enabled) {
+    await parkForPausedAgent(conversation, log);
     return;
   }
 
