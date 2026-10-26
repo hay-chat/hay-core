@@ -53,31 +53,55 @@ Three repos, three stacked branches, land one at a time:
 
 - [x] Read WIP, FAQ sheet, backoffice billing code, website billing.js, hay-core access state
 - [x] Worktrees created, node_modules linked
-- [ ] Backoffice: billing-plans.json + PLAN_CONFIG + planPricing/includedResolutionsFor
-- [ ] Backoffice: sync script currency_options; verifyStripeCatalog currency check
-- [ ] Backoffice: migrations (subscriptions.currency, accounts.overage_enabled, accounts.agent_paused_reason,
-      usage_records.alerted_threshold)
-- [ ] Backoffice: checkout currency + changeSubscriptionPlan + route branches + /settings
-- [ ] Backoffice: usage thresholds (email template, send log, notice) + overage cap + access sync with agentPause
-- [ ] Backoffice: tests green (`npm test`), `tsc --noEmit`, prettier
-- [ ] hay-core: types/entity/migration/service/router/run.ts/auth.me/store/i18n
-- [ ] hay-core: jest tests, typecheck, lint; Playwright spec written (run if a dev stack is available)
-- [ ] hay-core: docs/user-guide updates
-- [ ] Website: billing.js currency, change-plan flow, overage toggle; `node --check`
-- [ ] Reviewer agent on the three diffs; findings addressed
-- [ ] WIP.md entries in all three repos; push; PR bodies with verification story + website copy list
+- [x] Backoffice: billing-plans.json + PLAN_CONFIG + planPricing/includedResolutionsFor
+- [x] Backoffice: sync script currency_options; verifyStripeCatalog currency check
+- [x] Backoffice: migration 1785000000000 (subscriptions.currency, accounts.overage_enabled, accounts.agent_paused_reason,
+      usage_records.alerted_threshold + included_resolutions)
+- [x] Backoffice: checkout currency + changeSubscriptionPlan + route branches + /settings
+- [x] Backoffice: usage thresholds (email template, send log, notice) + overage cap + access sync with agentPause
+- [x] Backoffice: tests green (`npx vitest run` 11 files / 138 tests), `tsc --noEmit`, prettier
+- [x] hay-core: types/entity/migration/service/router/run.ts/auth.me/store/i18n
+- [x] hay-core: jest (49 tests in orchestrator/access/internal), typecheck, lint; Playwright spec written (not run: no stack)
+- [x] hay-core: docs/user-guide updates (hay-docs `claude/billing-usage-docs`, submodule pointer bumped)
+- [x] Website: billing.js currency, change-plan flow, overage toggle; `node --check` + prettier
+- [x] Reviewer agent on the four diffs; findings addressed (see Results)
+- [x] WIP.md entries in all three repos; branches pushed; PR bodies in `tasks/prompts/pr-billing-slice-2.md`
+- [ ] Roger: force-push `claude/billing-usage-limits` (rebased onto master; the classifier blocked `--force-with-lease`),
+      open the four PRs, `npm run stripe:sync` (test + live), both `migration:run`
 
 ## Working notes
 
-- Backoffice `main` is at 27247d1; `claude/overage-billing` (6 commits) is unmerged and holds the overage item code.
+- Backoffice `main` is at 8c171fe; `claude/overage-billing` (7 commits) is unmerged and holds the overage item code.
+- hay-core `claude/agent-pause` was merged into master during this session → branch rebased onto origin/master
+  (`git rebase --onto origin/master 7a98494`; conflicts in run.ts log shape and the shared note files).
 - hay-core dev stack is not running locally (ports 3000/3001 are other apps; hay-core runs in Docker on 8088/8089).
 - `gh` is not installed on this machine: PRs are opened from the compare URL with the body files in `tasks/prompts/`.
+- hay-docs remote is https (no credentials); push with the ssh URL: `git push git@github.com:hay-chat/hay-docs.git <branch>`.
 - Stripe SDK v20: `prices.create/update` take `currency_options`; `checkout.sessions.create` takes `currency`;
   `subscriptions.update` items take `{ id, price }` and `proration_behavior`.
 
 ## Results
 
-(filled in when done)
+Independent review (general-purpose agent, four diffs + task + acceptance criteria): 5 should-fix, 7 nits, 0 blockers.
+
+| # | Finding | Outcome |
+| - | ------- | ------- |
+| 1 | Currency selectable again after a cancelled subscription; Stripe fixes the customer currency → checkout 500 | Fixed: `/plans` + `/checkout` lock to any previous subscription's currency; FAQ says contact support to change currency; tests |
+| 2 | `pending-human` made sticky for every org (from the already-merged agent-pause branch) | Out of scope (shipped deliberately in agent-pause); FAQ now says parked conversations stay in Needs Attention until Return to AI |
+| 3 | Renewal: `subscription.updated` moved the period but kept the counter → pause lingers until `invoice.paid` | Fixed: counter resets when the period start moves forward; tests |
+| 4 | `alertedThreshold` never lowered when the allowance grows → no 80/100 % email after an upgrade | Fixed: `usage_records.included_resolutions` + reset to the threshold the new allowance reached; tests (upgrade + downgrade) |
+| 5 | Past-due subscription lifted the usage pause | Fixed: sync loads ACTIVE + PAST_DUE, grace branch keeps `agentPause`; tests |
+| 6 | Locked page ignored the region cookie | Fixed |
+| 7 | Stale `Account` write after `subscriptions.update` | Fixed: account reloaded before `recordActiveSubscription` |
+| 8 | Email sent before the dedup row | Fixed: send-log row claimed first, removed on failure; tests |
+| 9 | FAQ copy not backed by code; month↔year switch invoiced immediately | Fixed in FAQ + website confirm copy |
+| 10 | Dead code: unused `isAgentPaused`, exported `isCurrency`, duplicate `AgentPauseReason` | Removed / reused |
+| 11 | `resetButton` innerHTML | Now `textContent` |
+| 12 | Stale `overageRate` product metadata | `stripe:sync` deletes it |
+
+Verification after fixes: backoffice `tsc` clean, vitest 11 files / 138 tests; hay-core server `tsc` clean, eslint clean,
+Jest 49/49 in the touched suites (full run: 57 suites pass, 5 DB-backed integration suites fail with
+`Driver not Connected`, no Postgres here); website `node --check` + prettier; dashboard `nuxt typecheck` clean.
 
 # Inbound email channel — Phase 0 spike + Phase 1 MVP (branch claude/email-channel)
 

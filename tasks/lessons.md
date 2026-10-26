@@ -107,3 +107,14 @@
 - **Failure mode**: `dashboard/tests/*.spec.ts` are Playwright specs but match Vitest's default include, so `npx vitest run` reports 3 failed files / 0 tests ("Playwright Test did not expect test.describe()") even on a clean tree.
 - **Detection signal**: every failing file is under `dashboard/tests/` and the error names Playwright, not an assertion.
 - **Prevention**: treat that output as pre-existing noise, not a regression; the real fix is excluding `tests/**` in the dashboard Vitest config (TODO, out of scope for the pause-switch PR).
+
+### Stacked a branch on a base that had already merged
+- **Failure mode**: `claude/billing-usage-limits` was created off the local `claude/agent-pause` branch while a parallel session merged agent-pause into master with different SHAs. `git rebase origin/master` then tried to replay the base's commits and conflicted on code this branch never touched.
+- **Detection signal**: `git merge-base --is-ancestor <base> origin/master` is false although the base's work is in master; `git log origin/master` shows a "Merge branch '<base>'" commit.
+- **Prevention**: Before stacking, `git fetch` and check whether the base already landed; if the base merges mid-task, rebase with `git rebase --onto origin/master <old-base-sha>` so only this branch's own commits replay.
+
+### Stripe fixes a customer's currency with the first subscription
+- **Failure mode**: the plans page offered the currency selector whenever no *live* subscription existed, so a cancelled EUR customer could pick USD and Checkout failed with a Stripe error on every retry.
+- **Detection signal**: any flow that reuses `stripeCustomerId` and lets the user choose a currency.
+- **Prevention**: lock the currency as soon as the account has ever had a subscription (or read `customer.currency`); changing currency needs a new Stripe customer.
+
