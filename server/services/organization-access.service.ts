@@ -2,6 +2,7 @@ import { AppDataSource } from "@server/database/data-source";
 import { Organization } from "@server/entities/organization.entity";
 import type {
   AccessNotice,
+  AgentPauseReason,
   OrganizationAccessState,
   SuspensionReason,
 } from "@server/types/organization-access.types";
@@ -15,6 +16,8 @@ export interface SetAccessStateInput {
   organizationId: string;
   /** `null` lifts the suspension. */
   suspension: { reason: SuspensionReason; redirectUrl?: string } | null;
+  /** `null` resumes the AI agent. */
+  agentPause: { reason: AgentPauseReason } | null;
   /** `null` clears the dashboard notice. */
   notice: AccessNotice | null;
 }
@@ -27,6 +30,8 @@ export function toAccessState(organization: Organization): OrganizationAccessSta
     suspendedAt: organization.suspendedAt ?? null,
     suspensionReason: organization.suspensionReason ?? null,
     suspensionRedirectUrl: organization.suspensionRedirectUrl ?? null,
+    agentPausedAt: organization.agentPausedAt ?? null,
+    agentPauseReason: organization.agentPauseReason ?? null,
     accessNotice: organization.accessNotice ?? null,
   };
 }
@@ -43,8 +48,8 @@ class OrganizationAccessService {
 
   /**
    * Write the whole access state in one go. Idempotent: an already-suspended
-   * organization keeps its original `suspendedAt` so the suspension age is
-   * preserved across repeated syncs from the operator.
+   * (or already-paused) organization keeps its original timestamp so the age
+   * is preserved across repeated syncs from the operator.
    */
   async setAccessState(input: SetAccessStateInput): Promise<OrganizationAccessState | null> {
     const organization = await this.repository.findOneBy({ id: input.organizationId });
@@ -53,6 +58,7 @@ class OrganizationAccessService {
     }
 
     const wasSuspended = !!organization.suspendedAt;
+    const wasPaused = !!organization.agentPausedAt;
 
     if (input.suspension) {
       organization.suspendedAt = organization.suspendedAt ?? new Date();
@@ -62,6 +68,13 @@ class OrganizationAccessService {
       organization.suspendedAt = null;
       organization.suspensionReason = null;
       organization.suspensionRedirectUrl = null;
+    }
+    if (input.agentPause) {
+      organization.agentPausedAt = organization.agentPausedAt ?? new Date();
+      organization.agentPauseReason = input.agentPause.reason;
+    } else {
+      organization.agentPausedAt = null;
+      organization.agentPauseReason = null;
     }
     organization.accessNotice = input.notice;
 
@@ -76,6 +89,8 @@ class OrganizationAccessService {
           source: "internal",
           suspended: !!state.suspendedAt,
           reason: state.suspensionReason,
+          agentPaused: !!state.agentPausedAt,
+          agentPauseReason: state.agentPauseReason,
           noticeKey: state.accessNotice?.key ?? null,
         },
       });
@@ -96,7 +111,9 @@ class OrganizationAccessService {
         organizationId: organization.id,
         suspended: !!state.suspendedAt,
         reason: state.suspensionReason,
-        changed: wasSuspended !== !!state.suspendedAt,
+        agentPaused: !!state.agentPausedAt,
+        agentPauseReason: state.agentPauseReason,
+        changed: wasSuspended !== !!state.suspendedAt || wasPaused !== !!state.agentPausedAt,
       },
       "Organization access state updated",
     );
