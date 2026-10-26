@@ -5,11 +5,26 @@
       "placeholder": "Inherit from Organization",
       "helperText": "The language the agent will use to respond. If not set, it inherits from the organization's default language."
     },
+    "status": {
+      "all": "All statuses",
+      "active": "Active",
+      "inactive": "Paused",
+      "training": "Training",
+      "error": "Error"
+    },
+    "actions": {
+      "pause": "Pause",
+      "resume": "Resume"
+    },
+    "enabled": {
+      "label": "Agent active",
+      "helperText": "Switch off to pause the agent in one step. It stops replying on every channel and new customer messages wait for your team under Needs Attention."
+    },
     "toast": {
       "setAsDefaultSuccess": "Agent set as default successfully",
       "setAsDefaultFailed": "Failed to set agent as default. Please try again.",
-      "enabledSuccess": "Agent enabled successfully",
-      "disabledSuccess": "Agent disabled successfully",
+      "enabledSuccess": "Agent resumed. It replies to customers again.",
+      "disabledSuccess": "Agent paused. New customer messages wait in Needs Attention.",
       "toggleStatusFailed": "Failed to toggle agent status",
       "deletedSuccess": "Agent deleted successfully",
       "deleteFailed": "Failed to delete agent. Please try again.",

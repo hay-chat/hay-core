@@ -119,8 +119,8 @@
                   id="enabled"
                   v-model="form.enabled"
                   type="switch"
-                  label="Enable agent"
-                  helper-text="Enable the agent to start receiving messages from customers."
+                  :label="$t('agents.enabled.label')"
+                  :helper-text="$t('agents.enabled.helperText')"
                 />
               </div>
             </div>

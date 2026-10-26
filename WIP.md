@@ -27,12 +27,22 @@ full write-up with file:line evidence in `tasks/prospect-faq-answers-2026-10-26.
 convos count as billable resolutions (pricing page says otherwise); annual plans mis-metered; "Change plan" double-subscribes;
 agent Enabled switch is a no-op; approval-mode delivery is a TODO; no email channel; no mobile/push; no business hours.
 **Half-built:** nothing. **Next:** Roger to decide which items become tickets (see "Fix or stop claiming" list in the tasks file).
+## 2026-10-26 — claude/agent-pause (worktree .claude/worktrees/claude+agent-pause) — agent pause switch
+
+**Works:** `agents.enabled=false` now pauses the AI: `runConversation` parks conversations with a shopper message as
+pending-human (no lock, no greeting, websocket status event) and `addMessage` keeps pending-human sticky (no re-enqueue).
+Dashboard copy Pause/Resume/Paused via i18n en+pt-BR, test ids. Jest: 9 new tests green. Typecheck + lint green.
+Docs submodule branch `claude/agent-pause` @e9f19de (agents/conversations/settings.md) — push + PR in hay-docs still to do.
+**Half-built:** Playwright `tests/agent-pause.spec.ts` written + type-clean but NOT run: no Hay dev servers on this host
+(3000=AdGuard, 3001=unrelated Next app; Hay runs in Docker from master, no .env for a local stack).
+**Next:** reviewer findings → push branch, open PR vs master (list website `src/docs/content/user-guide/*` mirror lines),
+push docs branch + PR, bump submodule pointer. Run the spec on a machine with `npm run dev`.
 
 ## 2026-10-21 — master @7448cad — WhatsApp live in prod, Meta webhook configured
 
 **Works:** prod deployed (Phase 2 + proxy fix + /logout). Meta console: callback eu.hay.chat/v1/plugins/hay-channel-whatsapp-meta/webhook
-verified (META_VERIFY_TOKEN), 11 Phase 0 fields subscribed at v26.0. Signed "Teste" webhook passes core signature + routing
-(sample ids unknown → dropped, as expected). Fix: WhatsApp uses META_WHATSAPP_APP_ID/SECRET (Meta app), not META_APP_* (Instagram app).
+verified (META*VERIFY_TOKEN), 11 Phase 0 fields subscribed at v26.0. Signed "Teste" webhook passes core signature + routing
+(sample ids unknown → dropped, as expected). Fix: WhatsApp uses META_WHATSAPP_APP_ID/SECRET (Meta app), not META_APP*\* (Instagram app).
 WhatsApp enabled in the Hay org (468ccc89-…).
 **Next:** E2E on test number 976350592236691 — Hay org WhatsApp settings → Connection method: Manual token, paste a system-user
 token from Hay's Meta app + phone id + WABA id → send image + voice note both ways. Then ES as app-role tester; App Review videos.
@@ -248,4 +258,3 @@ branch all deleted. WARNING: something on this machine auto-pushed both
 commits to origin/master ~15s after each commit (actor rgrjnr, from the
 worktree, HEAD:master) — bypasses PR flow entirely; not a git hook/cron.
 Next: find the auto-pusher; smoke-test telemetry with a real phc key.
-
