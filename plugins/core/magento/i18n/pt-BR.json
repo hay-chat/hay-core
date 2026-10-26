@@ -1,72 +1,64 @@
 {
   "name": "Magento",
-  "description": "Conecte sua loja Magento para gerenciar produtos, pedidos, clientes e operações de e-commerce",
+  "description": "Conecte sua loja Magento 2 para que o agente consulte os pedidos de um cliente, acompanhe envios, cancele ou redirecione pedidos ainda não enviados, emita reembolsos e responda perguntas sobre produtos e estoque.",
   "tools": {
-    "get_product_by_sku": {
-      "label": "Buscar Produto por SKU",
-      "description": "Obter informações detalhadas de um produto pelo SKU (Unidade de Manutenção de Estoque)"
+    "magento_get_store": {
+      "label": "Informações da loja",
+      "description": "Consulta informações básicas da loja conectada (código, URL, moeda, idioma)."
     },
-    "get_product_by_id": {
-      "label": "Buscar Produto por ID",
-      "description": "Obter informações detalhadas de um produto pelo seu ID numérico"
+    "magento_find_customer": {
+      "label": "Localizar cliente",
+      "description": "Localiza um cliente pelo e-mail (contas e compras como visitante), com seus pedidos mais recentes."
     },
-    "search_products": {
-      "label": "Pesquisar Produtos",
-      "description": "Pesquisar produtos usando um termo de busca com suporte a paginação"
+    "magento_list_customer_orders": {
+      "label": "Listar pedidos do cliente",
+      "description": "Lista os pedidos de um cliente pelo e-mail, do mais recente ao mais antigo."
     },
-    "advanced_product_search": {
-      "label": "Pesquisa Avançada de Produtos",
-      "description": "Pesquisar produtos com opções avançadas de filtro e critérios por campos personalizados"
+    "magento_get_order": {
+      "label": "Consultar pedido",
+      "description": "Consulta um pedido por id ou número: itens, totais, endereço, faturas, rastreio e o que o suporte pode fazer."
     },
-    "get_product_categories": {
-      "label": "Buscar Categorias do Produto",
-      "description": "Obter todas as categorias de um produto específico pelo SKU"
+    "magento_get_order_tracking": {
+      "label": "Rastrear pedido",
+      "description": "Consulta os envios e códigos de rastreio de um pedido."
     },
-    "get_related_products": {
-      "label": "Buscar Produtos Relacionados",
-      "description": "Obter produtos relacionados a um produto específico pelo SKU"
+    "magento_cancel_order": {
+      "label": "Cancelar pedido",
+      "description": "Cancela um pedido novo ou aguardando pagamento que ainda não foi faturado nem enviado."
     },
-    "get_product_stock": {
-      "label": "Buscar Estoque do Produto",
-      "description": "Obter informações de estoque de um produto pelo SKU"
+    "magento_create_refund": {
+      "label": "Reembolsar",
+      "description": "Reembolsa um pedido por nota de crédito, total, por item ou por valor, limitado ao saldo reembolsável."
     },
-    "get_product_attributes": {
-      "label": "Buscar Atributos do Produto",
-      "description": "Obter todos os atributos (base e personalizados) de um produto pelo SKU"
+    "magento_update_order_shipping_address": {
+      "label": "Alterar endereço de entrega",
+      "description": "Altera o endereço de entrega de um pedido ainda não enviado. Recusa quando já existe um envio."
     },
-    "update_product_attribute": {
-      "label": "Atualizar Atributo do Produto",
-      "description": "Atualizar um atributo específico de um produto pelo SKU"
+    "magento_add_order_note": {
+      "label": "Adicionar nota ao pedido",
+      "description": "Adiciona um comentário interno ao pedido, com opção de mostrá-lo e enviá-lo ao cliente."
     },
-    "get_revenue": {
-      "label": "Buscar Faturamento",
-      "description": "Obter o faturamento total para um período com filtro por status"
+    "magento_search_products": {
+      "label": "Buscar produtos",
+      "description": "Busca produtos ativos pelo nome."
     },
-    "get_revenue_by_country": {
-      "label": "Buscar Faturamento por País",
-      "description": "Obter faturamento filtrado por país para um período"
+    "magento_get_product": {
+      "label": "Consultar produto",
+      "description": "Consulta um produto pelo SKU com preço, estoque, descrição e suas variantes."
     },
-    "get_order_count": {
-      "label": "Buscar Quantidade de Pedidos",
-      "description": "Obter o número de pedidos para um período com filtro por status"
-    },
-    "get_product_sales": {
-      "label": "Buscar Vendas de Produtos",
-      "description": "Obter estatísticas de quantidade de produtos vendidos em um período com filtros por país e status"
-    },
-    "get_customer_ordered_products_by_email": {
-      "label": "Buscar Produtos Pedidos por E-mail do Cliente",
-      "description": "Obter todos os produtos pedidos por um cliente através do endereço de e-mail com informações detalhadas"
+    "magento_check_inventory": {
+      "label": "Verificar estoque",
+      "description": "Verifica o status e a quantidade em estoque de um SKU."
     }
   },
   "config": {
     "baseUrl": {
-      "label": "URL Base do Magento",
-      "description": "URL base da API REST do Magento 2 (ex: https://seudominio.com/rest/V1)"
+      "label": "URL base do Magento",
+      "description": "URL base da API REST do Magento 2 (ex.: https://seudominio.com/rest/V1)"
     },
     "apiToken": {
       "label": "Token da API",
-      "description": "Token da API do Magento (crie em Sistema > Integrações)"
+      "description": "Token de acesso da integração Magento (Sistema → Integrações) com acesso a Vendas, Catálogo e Clientes"
     }
   }
 }

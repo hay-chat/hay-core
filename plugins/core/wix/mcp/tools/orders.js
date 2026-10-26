@@ -1,77 +1,125 @@
 /**
- * Order tools — the Wix eCommerce Orders API (`/ecom/v1/orders`).
+ * Order tools — reads are rich (one call merges order + transactions +
+ * fulfilments), writes are narrow with server-side bounds.
  *
- * Covers finding an order by reference (number / buyer email / status), reading
- * a full order with its status, and reading its transaction history (payments
- * and refunds). These are the read side of the HAY-240 acceptance criteria.
+ *   wix_get_order                     GET order (+ transactions + fulfillments)
+ *   wix_get_order_tracking            GET fulfillments
+ *   wix_cancel_order                  POST /ecom/v1/orders/{id}/cancel     (pre-dispatch only)
+ *   wix_update_order_shipping_address PATCH /ecom/v1/orders/{id}           (pre-dispatch only)
  */
 
 const { z } = require("zod");
 const { wixApi } = require("../lib/client");
-const { ok, fail, cursorInfo } = require("../lib/format");
+const { ok, fail } = require("../lib/format");
+const {
+  resolveOrder,
+  loadEnrichedOrder,
+  getFulfillments,
+  trackingSummary,
+  balanceRemaining,
+} = require("../lib/orders");
 
-/** Wix order statuses, payment statuses and fulfilment statuses, for the agent. */
-const ORDER_STATUS = ["INITIALIZED", "APPROVED", "CANCELED"];
-const PAYMENT_STATUS = [
-  "NOT_PAID",
-  "PAID",
-  "PARTIALLY_PAID",
-  "PARTIALLY_REFUNDED",
-  "FULLY_REFUNDED",
-  "PENDING",
-];
-const FULFILLMENT_STATUS = ["NOT_FULFILLED", "PARTIALLY_FULFILLED", "FULFILLED"];
+const ORDER_REF = {
+  order_id: z.string().optional().describe("Wix order id (the `id` field)."),
+  order_number: z
+    .string()
+    .optional()
+    .describe("The order number the buyer sees (e.g. 10042). Use when you have no id."),
+};
+
+/** Shared pre-dispatch guard for cancel / address change. */
+function assertPreDispatch(order, action) {
+  const ref = order.number ? `#${order.number}` : order.id;
+  if (order.status === "CANCELED") {
+    throw new Error(`Order ${ref} is already cancelled; cannot ${action}.`);
+  }
+  if ((order.fulfillmentStatus || "NOT_FULFILLED") !== "NOT_FULFILLED") {
+    throw new Error(
+      `Order ${ref} has fulfilment status ${order.fulfillmentStatus}; you can only ${action} before ` +
+        "dispatch. Escalate to the merchant/carrier instead.",
+    );
+  }
+}
 
 function registerOrderTools(server) {
   server.tool(
-    "search_orders",
-    "Find Wix orders by reference. Use this first to resolve an order number, buyer email " +
-      "or status into an order ID, then call get_order / get_order_transactions / " +
-      "get_order_fulfillments with that ID. Returns one page of orders, newest first.",
+    "wix_get_order",
+    "Get an order by id or order number, with line items, totals, shipping address, payments, " +
+      "tracking and a supportSummary (isCancellable, isRefundable, remainingRefundable, " +
+      "addressChangeable). One call answers status, refund and cancellation questions.",
+    ORDER_REF,
+    async (args) => {
+      try {
+        const order = await resolveOrder(args);
+        return ok(await loadEnrichedOrder(order));
+      } catch (err) {
+        return fail(err);
+      }
+    },
+  );
+
+  server.tool(
+    "wix_get_order_tracking",
+    "Get an order's shipment tracking (where-is-my-order): fulfilment status plus one row per " +
+      "shipment with carrier, tracking number and tracking link.",
+    ORDER_REF,
+    async (args) => {
+      try {
+        const order = await resolveOrder(args);
+        const fulfillments = await getFulfillments(order.id);
+        return ok({
+          id: order.id,
+          number: order.number,
+          fulfillmentStatus: order.fulfillmentStatus,
+          tracking: trackingSummary(fulfillments),
+        });
+      } catch (err) {
+        return fail(err);
+      }
+    },
+  );
+
+  server.tool(
+    "wix_cancel_order",
+    "Cancel an order that has not been dispatched (WRITE). Refuses once any item is fulfilled. " +
+      "Optionally restocks items and emails the buyer. Cancelling does not refund — call " +
+      "wix_create_refund for the money.",
     {
-      orderNumber: z
-        .string()
+      ...ORDER_REF,
+      restock: z.boolean().optional().describe("Restock all items (default true)."),
+      notify_customer: z
+        .boolean()
         .optional()
-        .describe("The human-facing order number the buyer sees (e.g. 10042)."),
-      buyerEmail: z.string().optional().describe("Filter to orders placed by this email address."),
-      status: z.enum(ORDER_STATUS).optional().describe("Order status."),
-      paymentStatus: z.enum(PAYMENT_STATUS).optional().describe("Payment status."),
-      fulfillmentStatus: z.enum(FULFILLMENT_STATUS).optional().describe("Fulfilment status."),
-      createdAfter: z
-        .string()
-        .optional()
-        .describe("ISO 8601 date/time; only orders created at or after this moment."),
-      filter: z
-        .record(z.any())
-        .optional()
-        .describe(
-          "Raw Wix filter object (MongoDB-style), merged with the above. " +
-            'Example: {"createdDate": {"$lte": "2024-12-31T23:59:59.000Z"}}.',
-        ),
-      limit: z.number().optional().describe("Max orders per page (default 20, Wix max 100)."),
-      cursor: z
-        .string()
-        .optional()
-        .describe("Cursor from a previous response's nextCursor to fetch the next page."),
+        .describe("Send Wix's order-cancelled email to the buyer (default false)."),
+      message: z.string().optional().describe("Custom message included in the cancellation email."),
     },
     async (args) => {
       try {
-        const filter = { ...(args.filter || {}) };
-        if (args.orderNumber) filter.number = args.orderNumber;
-        if (args.buyerEmail) filter["buyerInfo.email"] = args.buyerEmail;
-        if (args.status) filter.status = args.status;
-        if (args.paymentStatus) filter.paymentStatus = args.paymentStatus;
-        if (args.fulfillmentStatus) filter.fulfillmentStatus = args.fulfillmentStatus;
-        if (args.createdAfter) filter.createdDate = { $gte: args.createdAfter };
-
+        const order = await resolveOrder(args);
+        assertPreDispatch(order, "cancel");
         const body = {
-          filter: Object.keys(filter).length ? filter : undefined,
-          sort: [{ fieldName: "createdDate", order: "DESC" }],
-          cursorPaging: { limit: args.limit ?? 20, cursor: args.cursor },
+          restockAllItems: args.restock ?? true,
+          sendOrderCanceledEmail: Boolean(args.notify_customer),
         };
-
-        const res = await wixApi("POST", "/ecom/v1/orders/search", { body });
-        return ok({ orders: res?.orders ?? [], ...cursorInfo(res) });
+        if (args.message) body.customMessage = args.message;
+        const res = await wixApi("POST", `/ecom/v1/orders/${encodeURIComponent(order.id)}/cancel`, {
+          body,
+        });
+        const updated = res?.order ?? {};
+        const remaining = balanceRemaining(order);
+        return ok({
+          status: "CANCELLED",
+          id: order.id,
+          number: order.number,
+          orderStatus: updated.status ?? "CANCELED",
+          remainingRefundable:
+            remaining === null
+              ? null
+              : { amount: remaining.toFixed(2), currency: order.currency ?? null },
+          detail:
+            "The order is cancelled. If the buyer paid, refund them with wix_create_refund — " +
+            "cancelling alone does not move money.",
+        });
       } catch (err) {
         return fail(err);
       }
@@ -79,34 +127,73 @@ function registerOrderTools(server) {
   );
 
   server.tool(
-    "get_order",
-    "Get a single Wix order by its ID, including line items, totals, buyer info, " +
-      "payment status and fulfilment status. Use search_orders first if you only have an " +
-      "order number or buyer email.",
-    { orderId: z.string().describe("Wix order ID (the `id` field, not the order number).") },
-    async ({ orderId }) => {
-      try {
-        const res = await wixApi("GET", `/ecom/v1/orders/${encodeURIComponent(orderId)}`);
-        return ok(res?.order ?? res);
-      } catch (err) {
-        return fail(err);
-      }
+    "wix_update_order_shipping_address",
+    "Change where an undispatched order ships (WRITE). Refuses once fulfilment has started. " +
+      "Only the fields you pass change; the rest of the address is kept.",
+    {
+      ...ORDER_REF,
+      address: z
+        .object({
+          addressLine1: z.string().optional(),
+          addressLine2: z.string().optional(),
+          city: z.string().optional(),
+          subdivision: z.string().optional().describe('ISO 3166-2 subdivision code, e.g. "US-CA".'),
+          postalCode: z.string().optional(),
+          country: z.string().optional().describe('ISO 3166-1 alpha-2 country code, e.g. "US".'),
+          firstName: z.string().optional(),
+          lastName: z.string().optional(),
+          phone: z.string().optional(),
+          company: z.string().optional(),
+        })
+        .describe("Fields to change on the shipping destination."),
     },
-  );
-
-  server.tool(
-    "get_order_transactions",
-    "Get the full transaction history for an order — every payment and every refund, with " +
-      "their transaction IDs, amounts and statuses. Call this before refund_order so you have " +
-      "the real transactionId(s) to refund against.",
-    { orderId: z.string().describe("Wix order ID.") },
-    async ({ orderId }) => {
+    async (args) => {
       try {
-        const res = await wixApi(
-          "GET",
-          `/ecom/v1/orders/${encodeURIComponent(orderId)}/transactions`,
-        );
-        return ok(res?.orderTransactions ?? res);
+        const order = await resolveOrder(args);
+        assertPreDispatch(order, "change the shipping address");
+
+        const current = order.shippingInfo?.logistics?.shippingDestination || {};
+        const address = { ...(current.address || {}) };
+        const contact = { ...(current.contactDetails || {}) };
+        const a = args.address;
+        // Wix address objects spell the first line either `addressLine` or
+        // `addressLine1` depending on the API that wrote them — keep whichever
+        // the order already uses.
+        const line1Key = "addressLine" in address ? "addressLine" : "addressLine1";
+        if (a.addressLine1 !== undefined) address[line1Key] = a.addressLine1;
+        if (a.addressLine2 !== undefined) address.addressLine2 = a.addressLine2;
+        if (a.city !== undefined) address.city = a.city;
+        if (a.subdivision !== undefined) address.subdivision = a.subdivision;
+        if (a.postalCode !== undefined) address.postalCode = a.postalCode;
+        if (a.country !== undefined) address.country = a.country;
+        if (a.firstName !== undefined) contact.firstName = a.firstName;
+        if (a.lastName !== undefined) contact.lastName = a.lastName;
+        if (a.phone !== undefined) contact.phone = a.phone;
+        if (a.company !== undefined) contact.company = a.company;
+
+        // TODO(verify against a live site): Update Order accepts
+        // shippingInfo.logistics.shippingDestination; the request shape below
+        // follows the eCom Orders API docs (order object + field mask).
+        const res = await wixApi("PATCH", `/ecom/v1/orders/${encodeURIComponent(order.id)}`, {
+          body: {
+            order: {
+              id: order.id,
+              shippingInfo: {
+                logistics: { shippingDestination: { address, contactDetails: contact } },
+              },
+            },
+            fieldMask: ["shippingInfo.logistics.shippingDestination"],
+          },
+        });
+        const updated = res?.order ?? {};
+        return ok({
+          id: order.id,
+          number: order.number,
+          shippingDestination: updated.shippingInfo?.logistics?.shippingDestination ?? {
+            address,
+            contactDetails: contact,
+          },
+        });
       } catch (err) {
         return fail(err);
       }
@@ -114,4 +201,4 @@ function registerOrderTools(server) {
   );
 }
 
-module.exports = { registerOrderTools };
+module.exports = { registerOrderTools, assertPreDispatch };

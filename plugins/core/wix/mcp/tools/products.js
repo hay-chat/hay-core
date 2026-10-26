@@ -1,41 +1,83 @@
 /**
- * Product tools — the Wix Stores Catalog V3 Products API (`/stores/v3/products`).
+ * Product tools — Wix Stores Catalog V3 (`/stores/v3/products`), read-only.
+ * Answers "is X in stock / what does Y cost" and resolves a product the buyer
+ * mentions. Search returns a compact list; get_product carries variants with
+ * their stock status, so there is no separate inventory tool.
  *
- * Read-only catalog browsing so the agent can answer "is X in stock / what does
- * Y cost" and resolve a product the buyer mentions into an order line. Search
- * does not return variant data; get_product does.
+ *   POST /stores/v3/products/search   body { search: { search: { expression, fields }, cursorPaging } }
+ *   GET  /stores/v3/products/{id}
  */
 
 const { z } = require("zod");
 const { wixApi } = require("../lib/client");
 const { ok, fail, cursorInfo } = require("../lib/format");
 
+function summarizeProduct(p) {
+  return {
+    id: p.id,
+    name: p.name,
+    slug: p.slug ?? null,
+    visible: p.visible ?? null,
+    price: p.actualPriceRange?.minValue ?? p.priceData?.price ?? null,
+    inStock: p.inventory?.availabilityStatus ?? p.stock?.inStock ?? null,
+  };
+}
+
+function summarizeVariants(product) {
+  const variants = product?.variantsInfo?.variants ?? product?.variants ?? [];
+  return variants.map((v) => ({
+    id: v.id,
+    sku: v.sku ?? v.physicalProperties?.sku ?? null,
+    choices: v.choices ?? null,
+    price:
+      v.price?.actualPrice?.amount ??
+      v.price?.basePrice?.amount ??
+      v.variant?.priceData?.price ??
+      null,
+    inStock: v.inventoryStatus?.inStock ?? v.stock?.inStock ?? null,
+    preorderEnabled: v.inventoryStatus?.preorderEnabled ?? null,
+  }));
+}
+
+/** The fields a support answer needs; the raw product carries media, SEO and rich text. */
+function productDetail(p) {
+  return {
+    ...summarizeProduct(p),
+    productType: p.productType ?? null,
+    description: p.plainDescription ?? null,
+    priceRange: p.actualPriceRange ?? null,
+    compareAtPriceRange: p.compareAtPriceRange ?? null,
+    options: (p.options || []).map((o) => ({
+      name: o.name ?? null,
+      choices: (o.choicesSettings?.choices || o.choices || []).map(
+        (c) => c.name ?? c.description ?? c.value ?? null,
+      ),
+    })),
+    imageUrl: p.media?.main?.image?.url ?? p.media?.main?.url ?? null,
+    variants: summarizeVariants(p),
+  };
+}
+
 function registerProductTools(server) {
   server.tool(
-    "search_products",
-    "Search the Wix Stores catalog by free text and/or a filter. Returns one page of products " +
-      "(without variant detail — call get_product for variants, pricing and inventory).",
+    "wix_search_products",
+    "Search the catalog by free text (name/description). Returns one page of compact products; " +
+      "call wix_get_product for variants, pricing and stock.",
     {
       query: z.string().optional().describe("Free-text search across product name/description."),
-      filter: z
-        .record(z.any())
-        .optional()
-        .describe(
-          'Raw Wix filter object (MongoDB-style), e.g. {"visible": true} or ' +
-            '{"name": {"$startsWith": "Hat"}}.',
-        ),
-      limit: z.number().optional().describe("Max products per page (default 20, Wix max 100)."),
-      cursor: z.string().optional().describe("Cursor from a previous response's nextCursor."),
+      limit: z.number().int().optional().describe("Max products per page (default 20, max 100)."),
+      cursor: z.string().optional().describe("nextCursor from a previous page."),
     },
     async (args) => {
       try {
-        const body = {
-          ...(args.query ? { search: { expression: args.query } } : {}),
-          filter: args.filter,
-          cursorPaging: { limit: args.limit ?? 20, cursor: args.cursor },
+        const search = {
+          cursorPaging: { limit: Math.min(args.limit ?? 20, 100), cursor: args.cursor },
         };
-        const res = await wixApi("POST", "/stores/v3/products/search", { body });
-        return ok({ products: res?.products ?? [], ...cursorInfo(res) });
+        if (args.query) {
+          search.search = { expression: args.query, fields: ["name", "description"] };
+        }
+        const res = await wixApi("POST", "/stores/v3/products/search", { body: { search } });
+        return ok({ items: (res?.products ?? []).map(summarizeProduct), ...cursorInfo(res) });
       } catch (err) {
         return fail(err);
       }
@@ -43,13 +85,17 @@ function registerProductTools(server) {
   );
 
   server.tool(
-    "get_product",
-    "Get a single catalog product by ID, including its variants, pricing and inventory.",
-    { productId: z.string().describe("Wix Stores product ID.") },
-    async ({ productId }) => {
+    "wix_get_product",
+    "Get a product by id with its options and variants (sku, choices, price, in-stock flag).",
+    { product_id: z.string().describe("Wix Stores product id.") },
+    async ({ product_id: productId }) => {
       try {
         const res = await wixApi("GET", `/stores/v3/products/${encodeURIComponent(productId)}`);
-        return ok(res?.product ?? res);
+        const product = res?.product ?? res;
+        if (!product || !product.id) {
+          throw new Error(`Product ${productId} not found. Find the id with wix_search_products.`);
+        }
+        return ok(productDetail(product));
       } catch (err) {
         return fail(err);
       }
