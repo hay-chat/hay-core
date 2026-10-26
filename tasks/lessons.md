@@ -150,3 +150,17 @@
 ### `npm run lint` from a workspace directory runs the workspace's (missing) script
 - **Failure mode**: Running `npm run lint` with cwd inside `dashboard/` fails with "Missing script: lint" because the dashboard package has none; the root script is the one that lints everything.
 - **Prevention**: Run root scripts from the repo root, or call `npx eslint "server/**/*.{js,ts}" "dashboard/**/*.{js,ts,vue}" --cache --max-warnings 0` directly.
+### Retry loops that only looked at HTTP status retried timed-out writes
+- **Failure mode**: The commerce MCP clients skipped 5xx retries for non-GET requests but the `catch` around `fetch()` retried every method, so a refund POST that hit the 30s `AbortSignal.timeout` was sent again after the store had already processed it (double refund). Spotted by the independent reviewer, not by the tests.
+- **Detection signal**: Two retry decisions in one loop (status branch and exception branch) with different method rules; a timeout test for POST was missing while the 5xx-POST test passed.
+- **Prevention**: Decide idempotency once per request and apply it to both branches. Every client ships a "POST that throws TimeoutError is called exactly once" test.
+
+### Trusting a search API's first hit without verifying the filter was honoured
+- **Failure mode**: Wix ignores unknown top-level keys, so a bare `{ filter }` body (instead of `{ search: { filter } }`) silently returned the store's newest orders for any order number or email. The code returned `orders[0]`, which would have read, cancelled or refunded someone else's order. Masked in tests by a mock that honoured the bare key.
+- **Detection signal**: A search whose request shape was never checked against the vendor's reference, plus a mock that mirrors the code's own assumption rather than the documented payload.
+- **Prevention**: Fetch the vendor reference (`dev.wix.com/docs/...md` serves markdown) before writing a request body, assert the exact body in tests, and post-verify every hit (number must match, email filtered case-insensitively) so a wrong envelope fails loudly instead of returning the wrong record.
+
+### Worktree guard refuses shell variables in commands
+- **Failure mode**: The worktree-isolation hook rejects any Bash command where a path or value comes from a shell variable or a `for` loop, so heredoc chains and loops over plugin dirs were silently dropped and early file rewrites never landed.
+- **Detection signal**: "Refusing to run it … cannot be shown not to be git" errors; a file you believed rewritten still has the old content.
+- **Prevention**: Use the Write/Edit tools for file content and spell out absolute paths literally, one plain command per plugin; always pass `--root <abs plugin dir>` to vitest because the shell cwd drifts between calls.

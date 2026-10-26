@@ -93,6 +93,16 @@ Take over, live via WS); phone layout (top bar + drawer); conversation pages res
 green on the alt-port stack (dashboard 3100 / API 3101 / docker pg 55432, redis 56379, browser server 3200).
 Fixed e2e auth helper: storage keys are store ids (`auth`/`user`), org list at store top level.
 **Next:** push + PR (main + hay-docs); tear down `hay-e2e-*` docker containers and the two background dev servers.
+## 2026-10-26 — claude/commerce-semantic-actions (worktree .claude/worktrees/claude+commerce-semantic-actions) — DONE, needs PRs opened
+
+**Works:** Wix 9 / WooCommerce 12 / Magento 12 prefixed semantic tools, 103 vitest tests green, three plugin tsc builds,
+`typecheck:server`, root lint, dashboard `nuxt typecheck` (run from main checkout with `API_DOMAIN=localhost`; the
+worktree's symlinked `dashboard/node_modules` can't resolve `@types/node`). Reviewer findings (H1 POST-timeout retry,
+H2 Wix search envelope + unverified hits, M1–M5, L1–L7) fixed in d504c6a; outcome in `tasks/todo.md`. Docs pages
+committed on hay-docs branch `claude/commerce-semantic-actions` (949ee4e) inside `docs/`; submodule pointer NOT bumped.
+**Half-built:** nothing. **Next:** push both branches (`git push -u origin claude/commerce-semantic-actions` here and in
+`docs/`), open hay-core PR vs master with the body in `tasks/todo.md` ("PR body"), open hay-docs PR, then fix the website
+lines listed in `tasks/todo.md` in a hay-website PR. No `gh` on this box; use the GitHub compare URLs.
 
 ## 2026-10-21 — master @7448cad — WhatsApp live in prod, Meta webhook configured
 

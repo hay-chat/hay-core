@@ -26,9 +26,10 @@ references point at the offending code so you can see the smell.
 ## The `mcp/` dependency gap (read this before shipping Archetype A)
 
 The runtime spawns your `mcp/index.js` but **never runs `npm install` inside `mcp/`**, and
-`scripts/build-plugins.sh` only installs at the plugin root. Today **only `klaviyo` actually
-runs** — because it commits `mcp/node_modules/`. `magento` and `woocommerce` are **broken as
-shipped** (no `node_modules`, so `require("axios")`/`import express` fail on spawn).
+`scripts/build-plugins.sh` only installs at the plugin root. `klaviyo` works around it by
+committing `mcp/node_modules/`; `magento`, `woocommerce` and `wix` declare only
+`@modelcontextprotocol/sdk` + `zod` in `mcp/package.json` and use native `fetch` (no axios), so
+they need that install step too.
 
 This is an **unresolved framework gap**, not a settled convention. Until the build is fixed, pick
 one and state it in your plugin's README:
@@ -43,27 +44,33 @@ Either way: **no vendored bloat** (see next).
 
 ## MCP server quality
 
-- **Use `@modelcontextprotocol/sdk`. Don't hand-roll JSON-RPC.** `woocommerce/mcp/index.js`
-  reinvents the protocol over raw `readline` — no `initialize` handshake, inconsistent with every
-  other plugin.
-- **Give every tool a real schema.** `woocommerce` auto-generates ~90 tools with
-  `input_schema: { properties: {}, required: [] }` and even the **wrong key** (`input_schema`
-  instead of `inputSchema`). The agent gets zero parameter guidance. Use zod schemas with
-  `.describe()` on each param (klaviyo/zendesk style).
+- **Use `@modelcontextprotocol/sdk`. Don't hand-roll JSON-RPC.** An earlier `woocommerce/mcp`
+  reinvented the protocol over raw `readline` — no `initialize` handshake, inconsistent with every
+  other plugin. (Replaced; see `woocommerce/mcp/index.js` for the McpServer + stdio form.)
+- **Give every tool a real schema — and one tool per support task, not per endpoint.** The old
+  `woocommerce` auto-generated ~120 tools with `input_schema: { properties: {}, required: [] }`
+  and even the **wrong key** (`input_schema` instead of `inputSchema`). The agent got zero
+  parameter guidance and a tool list it could not pick from. Use zod schemas with `.describe()`
+  on each param, and expose a prefixed semantic surface (`<platform>_get_order`,
+  `<platform>_create_refund`, …) that composes several endpoints — shopify, woocommerce, wix and
+  magento all follow this shape now.
 - **Return MCP content envelopes.** `{ content: [{ type: "text", text }] }`, `isError: true` on
   failure — not bare payloads.
 - **stdout is for JSON-RPC only.** Log to `console.error`. Writing logs to stdout corrupts the
   protocol stream.
-- **Don't vendor a third-party repo wholesale.** `magento/mcp/` is a live clone of
-  `boldcommerce/magento2-mcp` with `.git/`, a 35KB `LICENSE`, `memory-bank/` (Cline AI context),
-  `mcp-instructions/`, `.clinerules`, and a test script all committed. Vendor only the server
-  code you run.
+- **Don't vendor a third-party repo wholesale.** `magento/mcp/` used to be a live clone of
+  `boldcommerce/magento2-mcp` with `.git/`, a 35KB GPL `LICENSE`, `memory-bank/` (Cline AI
+  context), `mcp-instructions/`, `.clinerules`, and a test script all committed. It was replaced
+  by an original implementation. Vendor only the server code you run — and check the licence.
 
 ## Security
 
-- **Never disable TLS verification.** `magento/mcp/mcp-server.js` ships
+- **Never disable TLS verification.** The vendored `magento/mcp/mcp-server.js` shipped
   `new https.Agent({ rejectUnauthorized: false })` ("for development"). This is MITM-exploitable
-  in production.
+  in production. (Removed with the rewrite.)
+- **Never retry a non-idempotent request after a timeout or 5xx.** A refund POST that times out
+  may still have been processed; retrying it refunds twice. Retry 429 for any method, 5xx and
+  network errors for GET only (see `woocommerce/mcp/lib/client.js`).
 - **Never commit secrets** — including in test fixtures. `chatwoot/test/widget.html` committed a
   real-looking live Chatwoot `websiteToken` + account id. (This file is being removed.)
 - **Don't log credentials.** `hubspot/src/index.ts` logs a token preview + length and dumps

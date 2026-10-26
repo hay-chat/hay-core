@@ -2,9 +2,10 @@
  * Wix Stores Plugin (phase one — API key)
  *
  * Connects a Wix Stores site to Hay using a site-scoped API key, so the agent
- * can look up orders, read their transaction history and fulfilment, issue full
- * or partial refunds (falling back to recording an external refund when the
- * payment provider can't be refunded via the API), and browse the catalog.
+ * can find a customer's orders, track shipments, cancel or re-route undispatched
+ * orders, issue full or partial refunds (falling back to recording an external
+ * refund when the payment provider can't be refunded via the API), and browse
+ * the catalog — one semantic tool per support action (see mcp/README).
  *
  * Authentication is a pasted Wix API key (generated in the Wix API Key Manager)
  * plus the site ID it is scoped to. Wix API keys are long-lived, so there is no
@@ -33,10 +34,9 @@ export default defineHayPlugin((globalCtx) => ({
         label: "API Key",
         description:
           "Wix API key. In your Wix account open Settings → API Keys, create a key, and " +
-          "grant it (and no more than) these permission scopes so it stays in line with " +
-          "the Shopify/WooCommerce connectors: Stores - Orders (read & manage), " +
+          "grant it (and no more than) these permission scopes: Stores - Orders (read & manage), " +
           "Stores - Order Transactions / Order Billing (for refunds), " +
-          "Stores - Order Fulfillments (manage), and Stores - Catalog (read). Treated as a secret.",
+          "Stores - Order Fulfillments (read), and Stores - Catalog (read). Treated as a secret.",
         required: true,
         encrypted: true,
       },
