@@ -1,5 +1,11 @@
+## 2026-10-26 — master — fact-fix branches MERGED straight to master + DEPLOYED (merge-gate session)
+
+**Merged + deployed to eu.hay.chat:** approval-delivery (75a3c7d), mobile-attention (ea408fe, migration push*subscriptions run), commerce-semantic-actions (d46636c). email-channel merged (2d005cd), deploying. hay-docs: each docs branch merged into main (ec343d6), submodule pointer on main.
+**Live-verified in Chrome:** queued reply hidden from widget → Approve & Send → widget receives it; Home lists 20 waiting, Take over works, phone layout OK (390px); WooCommerce page shows new copy.
+**Half-built / follow-ups:** billing-usage-limits next (local rebase in worktree claude+billing-usage, migration renumbered to 1784600000000, force-push blocked → merge local branch). `/integrations/plugins/manage` 500s: pre-existing `middleware: "auth"` (no such named middleware). Home wait label shows "489579m 4s" for old threads (formatWaitTime needs h/d units). Playground "paused" banner copy. Prod env still needs VAPID*\* (push), RESEND_API_KEY/RESEND_WEBHOOK_SECRET/EMAIL_INBOUND_DOMAIN (email). plugin-sdk register.test.ts has 5 pre-existing failures (`registerAPI.ui`). Website line lists live in each branch's tasks/todo.md (`git show origin/claude/<branch>:tasks/todo.md`).
+**Next:** merge billing → checks → deploy → run migration 1784600000000 → Chrome check access notice.
+
 ## 2026-10-26 — claude/email-channel — review fixes committed (c1bfdfd), branch pushed, PR to open manually (no gh)
-## 2026-10-26 — claude/email-channel — review fixes committed (c1bfdfd), PR opening
 
 **Works:** 8 commits on branch. Reviewer's 2 HIGHs fixed (alias-only routing; conversationId/external id bound to customer),
 mediums fixed (new-thread rule, root never overwritten, echo by From/Message-ID, Resend retry, header allow-list, From-name
@@ -53,7 +59,7 @@ stay on Resend, threading model (Reply-To token → In-Reply-To/References → s
 (svix webhook signature, routeKey transform, messages.receive honours externalConversationId, send-email passthrough +
 honest failures, title=subject), phased plan 0–3, 5 parked decisions with defaults.
 **Half-built:** nothing. **Next:** Roger picks defaults in §7 → Phase 0 spike (enable receiving on inbound.hay.chat in Resend,
-dump headers of a Gmail-forwarded mail, confirm In-Reply-To/References + Message-ID control). Uncommitted: WIP.md, docs, tasks/*.
+dump headers of a Gmail-forwarded mail, confirm In-Reply-To/References + Message-ID control). Uncommitted: WIP.md, docs, tasks/\*.
 
 ## 2026-10-26 — master (no code changes) — Prospect FAQ answers for Damien
 
@@ -62,6 +68,7 @@ full write-up with file:line evidence in `tasks/prospect-faq-answers-2026-10-26.
 convos count as billable resolutions (pricing page says otherwise); annual plans mis-metered; "Change plan" double-subscribes;
 agent Enabled switch is a no-op; approval-mode delivery is a TODO; no email channel; no mobile/push; no business hours.
 **Half-built:** nothing. **Next:** Roger to decide which items become tickets (see "Fix or stop claiming" list in the tasks file).
+
 ## 2026-10-26 — claude/agent-pause (worktree .claude/worktrees/claude+agent-pause) — agent pause switch
 
 **Works:** `agents.enabled=false` now pauses the AI: `runConversation` parks conversations with a shopper message as
@@ -84,16 +91,19 @@ WhatsApp/Instagram/Chatwoot workers and webchat gets it over the socket. Release
 host Chromium lacks libs). Docs submodule branch `claude/approval-delivery` pushed to hay-docs.
 **Next:** open PR against master (no gh CLI on this host — compare URL in the session summary); merge docs PR
 first; website lines to update are listed in tasks/todo.md Results.
+
 ## 2026-10-26 — claude/mobile-attention (worktree .claude/worktrees/mobile-attention) — Home inbox + mobile + push
 
 **Works (all committed):** `/` = attention-first Home via new `conversations.attention` procedure (waiting + handling, one-tap
 Take over, live via WS); phone layout (top bar + drawer); conversation pages responsive; Web Push end-to-end (push_subscriptions
-+ migration, VAPID env, `notifications.*`, hook in conversationRepository on real status transition, sw.js + manifest,
-"Alerts on this device" on Home + Profile); docs submodule branch `claude/mobile-attention` (faq/dashboard/conversations/troubleshooting).
-**Verified:** server tsc + nuxi typecheck clean, eslint clean, 11 Jest tests, Playwright `tests/mobile-home-attention.spec.ts` 2/2
-green on the alt-port stack (dashboard 3100 / API 3101 / docker pg 55432, redis 56379, browser server 3200).
-Fixed e2e auth helper: storage keys are store ids (`auth`/`user`), org list at store top level.
-**Next:** push + PR (main + hay-docs); tear down `hay-e2e-*` docker containers and the two background dev servers.
+
+- migration, VAPID env, `notifications.*`, hook in conversationRepository on real status transition, sw.js + manifest,
+  "Alerts on this device" on Home + Profile); docs submodule branch `claude/mobile-attention` (faq/dashboard/conversations/troubleshooting).
+  **Verified:** server tsc + nuxi typecheck clean, eslint clean, 11 Jest tests, Playwright `tests/mobile-home-attention.spec.ts` 2/2
+  green on the alt-port stack (dashboard 3100 / API 3101 / docker pg 55432, redis 56379, browser server 3200).
+  Fixed e2e auth helper: storage keys are store ids (`auth`/`user`), org list at store top level.
+  **Next:** push + PR (main + hay-docs); tear down `hay-e2e-*` docker containers and the two background dev servers.
+
 ## 2026-10-26 — claude/commerce-semantic-actions (worktree .claude/worktrees/claude+commerce-semantic-actions) — DONE, needs PRs opened
 
 **Works:** Wix 9 / WooCommerce 12 / Magento 12 prefixed semantic tools, 103 vitest tests green, three plugin tsc builds,
