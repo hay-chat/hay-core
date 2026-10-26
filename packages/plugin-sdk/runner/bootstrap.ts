@@ -203,6 +203,7 @@ export function loadManifest(pluginPath: string): ValidatedManifest {
     "sources",
     "products",
     "cron",
+    "email",
   ];
   for (const cap of manifest.capabilities) {
     if (!validCapabilities.includes(cap)) {
