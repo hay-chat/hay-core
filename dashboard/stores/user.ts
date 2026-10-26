@@ -94,12 +94,6 @@ export const useUserStore = defineStore("user", {
       return !!activeOrg?.suspendedAt;
     },
 
-    /** The operator paused the AI agent for the active organization (e.g. usage limit). */
-    isAgentPaused: (state) => {
-      const activeOrg = state.organizations.find((org) => org.id === state.activeOrganizationId);
-      return !!activeOrg?.agentPausedAt;
-    },
-
     /** The active organization's notice, or null once it has expired. */
     activeAccessNotice: (state): AccessNotice | null => {
       const activeOrg = state.organizations.find((org) => org.id === state.activeOrganizationId);
