@@ -106,6 +106,12 @@ router.post("/send-email", authenticatePlugin, async (req: AuthenticatedRequest,
       html: emailRequest.html,
       cc: emailRequest.cc,
       bcc: emailRequest.bcc,
+      from: emailRequest.from,
+      replyTo: emailRequest.replyTo,
+      headers: emailRequest.headers,
+      messageId: emailRequest.messageId,
+      attachments: emailRequest.attachments,
+      retry: emailRequest.retry,
     });
 
     if (!result.success) {
