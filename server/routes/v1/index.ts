@@ -26,6 +26,7 @@ import { gitConnectionsRouter } from "./git-connections";
 import { docsAuditRouter } from "./docs-audit";
 import { productsRouter } from "./products";
 import { internalRouter } from "./internal";
+import { notificationsRouter } from "./notifications";
 
 // Core routers - always available
 const coreRouters = {
@@ -55,6 +56,7 @@ const coreRouters = {
   gitConnections: gitConnectionsRouter,
   docsAudit: docsAuditRouter,
   products: productsRouter,
+  notifications: notificationsRouter,
 };
 
 // Create v1Router with core + plugin routers
