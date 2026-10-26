@@ -1,13 +1,13 @@
 {
   "name": "hay-channel-email",
   "version": "1.0.0",
-  "description": "Connect your support inbox as a channel — forward support@ emails to Hay and let the AI reply by email, threaded like a normal conversation",
+  "description": "Connect your support inbox as a channel \u2014 forward support@ emails to Hay and let the AI reply by email, threaded like a normal conversation",
   "author": "Hay",
   "type": "module",
   "main": "dist/index.js",
   "hay-plugin": {
     "entry": "./dist/index.js",
-    "displayName": "Email",
+    "displayName": "Email inbox",
     "category": "channel",
     "channel": "email",
     "capabilities": [

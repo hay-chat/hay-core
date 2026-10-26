@@ -121,7 +121,7 @@ export default defineHayPlugin((globalCtx) => {
   };
 
   return {
-    name: "Email",
+    name: "Email inbox",
 
     onInitialize(ctx) {
       const { register } = ctx;

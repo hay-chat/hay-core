@@ -1,5 +1,5 @@
 {
-  "name": "Email",
+  "name": "Email inbox",
   "description": "Connect your support inbox: forward support@ emails to Hay and let the AI reply by email, threaded like a normal conversation",
   "tools": {},
   "config": {},
