@@ -1,3 +1,12 @@
+## 2026-10-26 — claude/commerce-semantic-actions (worktree .claude/worktrees/claude+commerce-semantic-actions)
+
+**Goal:** one bounded semantic action set per store plugin (Shopify-style) instead of per-endpoint tools; plan + table in
+`tasks/todo.md`. **Works:** Wix done + committed: 9 `wix_*` tools (find_customer, list_customer_orders, get_order merged
+order+transactions+fulfilments, tracking, cancel, create_refund with cap + fallback, address change, products), 25 vitest
+tests incl. stdio list-tools smoke (`npm test -w plugins/core/wix`), tsc clean. **Half-built:** WooCommerce (120 raw tools →
+12) and Magento (analytics → 12 support tools) not started. **Next:** rewrite `plugins/core/woocommerce/mcp` (CJS, native
+fetch, lib/client+format+orders, tools/*, tests) → Magento → i18n → docs submodule branch → review agent → PR.
+
 ## 2026-10-21 — master @7448cad — WhatsApp live in prod, Meta webhook configured
 
 **Works:** prod deployed (Phase 2 + proxy fix + /logout). Meta console: callback eu.hay.chat/v1/plugins/hay-channel-whatsapp-meta/webhook
