@@ -998,8 +998,8 @@ The following tools are available for you to use. You MUST return only valid JSO
 
     // The message is committed before anyone is told about it, so clients that
     // react to the broadcast by fetching the conversation will find it.
-    // Dashboard clients receive every message; webchat only `sent` public ones
-    // (queued approval-mode replies stay dashboard-only until approved).
+    // Webchat only ever receives `sent` public messages (queued approval-mode
+    // replies stay dashboard-only until approved).
     const { conversationEventsService } =
       await import("../../services/conversation-events.service");
     await conversationEventsService.broadcastMessageReceived(this, message);

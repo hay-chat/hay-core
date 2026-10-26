@@ -1,4 +1,5 @@
 import "reflect-metadata";
+import { randomUUID } from "crypto";
 import { AppDataSource } from "../../server/database/data-source";
 import { User } from "../../server/entities/user.entity";
 import { Agent } from "../../server/database/entities/agent.entity";
@@ -52,9 +53,10 @@ export async function seedQueuedReply(originalReply: string): Promise<QueuedRepl
     channels: ["whatsapp"],
   });
 
+  // (organization_id, external_id) is unique; parallel projects/workers seed concurrently.
   const customer = await AppDataSource.getRepository(Customer).save({
     organization_id: organizationId,
-    external_id: "5511999990000",
+    external_id: `e2e-${randomUUID()}`,
     name: "E2E WhatsApp customer",
   });
 
@@ -103,4 +105,6 @@ export async function cleanupQueuedReply(seed: QueuedReplySeed): Promise<void> {
   await AppDataSource.getRepository(Conversation).delete(seed.conversationId);
   await AppDataSource.getRepository(Customer).delete(seed.customerId);
   await AppDataSource.getRepository(Agent).delete(seed.agentId);
+  // Release the pool so the worker can exit promptly.
+  await AppDataSource.destroy();
 }

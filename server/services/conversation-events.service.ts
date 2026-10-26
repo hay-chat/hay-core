@@ -52,6 +52,15 @@ class ConversationEventsService {
         return;
       }
 
+      // Same gate websocketService applies on the Redis path: the customer only
+      // ever sees public, released messages (or everything in the playground).
+      const isPublic = ["Customer", "BotAgent", "HumanAgent"].includes(message.type);
+      const isPlayground = conversation.metadata?.isPlayground === true;
+      if (!isPlayground && !(isPublic && message.deliveryState === "sent")) {
+        logger.debug({ messageId: message.id }, "Redis unavailable; message kept off webchat");
+        return;
+      }
+
       const { websocketService } = await import("./websocket.service");
       const sent = websocketService.sendToConversation(conversation.id, {
         type: "message",

@@ -8,6 +8,12 @@ import path from "path";
  */
 dotenv.config({ path: path.resolve(__dirname, ".env.test") });
 
+// Where the dashboard and API listen. Override both when the default ports are
+// taken on the machine running the suite (tests/helpers/auth.ts reads the same
+// dashboard URL so the saved login state lands on the right origin).
+const DASHBOARD_URL = process.env.PLAYWRIGHT_DASHBOARD_URL ?? "http://localhost:3000";
+const SERVER_URL = process.env.PLAYWRIGHT_SERVER_URL ?? "http://localhost:3001";
+
 /**
  * See https://playwright.dev/docs/test-configuration.
  */
@@ -30,7 +36,7 @@ export default defineConfig({
   /* Shared settings for all the projects below. See https://playwright.dev/docs/api/class-testoptions. */
   use: {
     /* Base URL to use in actions like `await page.goto('/')`. */
-    baseURL: "http://localhost:3000",
+    baseURL: DASHBOARD_URL,
 
     /* Collect trace when retrying the failed test. See https://playwright.dev/docs/trace-viewer */
     trace: "on-first-retry",
@@ -87,13 +93,13 @@ export default defineConfig({
   webServer: [
     {
       command: "cd server && npm run dev",
-      url: "http://localhost:3001",
+      url: SERVER_URL,
       reuseExistingServer: !process.env.CI,
       timeout: 120000,
     },
     {
       command: "cd dashboard && PORT=3000 npm run dev",
-      url: "http://localhost:3000",
+      url: DASHBOARD_URL,
       reuseExistingServer: !process.env.CI,
       timeout: 120000,
     },

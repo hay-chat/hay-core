@@ -54,17 +54,25 @@ export class MessageApprovalService {
       updates.content = editedContent;
     }
 
-    const updated = await this.messageRepository.update(message.id, updates);
-    if (!updated) {
-      throw new TRPCError({ code: "NOT_FOUND", message: "Message not found" });
-    }
+    const updated = await this.release(message.id, updates);
 
     logger.info(
       { messageId: message.id, conversationId: conversation.id, channel: conversation.channel },
       "Queued message approved, releasing to customer",
     );
 
-    // Delivery: the `sent` re-broadcast is what reaches the customer on every channel.
+    // Delivery: the `sent` re-broadcast is what reaches the customer on every
+    // channel. Channel plugins only hear it through Redis, so without Redis a
+    // non-web reply is marked sent but never leaves the platform.
+    if (conversation.channel !== "web") {
+      const { redisService } = await import("./redis.service");
+      if (!redisService.isConnected()) {
+        logger.warn(
+          { messageId: message.id, conversationId: conversation.id, channel: conversation.channel },
+          "Redis unavailable: approved reply will not be delivered to the channel plugin",
+        );
+      }
+    }
     await conversationEventsService.broadcastMessageReceived(conversation, updated);
 
     await this.publishOrganizationEvent(conversation.organization_id, "message_approved", {
@@ -89,16 +97,13 @@ export class MessageApprovalService {
     const { messageId, organizationId, userId, reason } = args;
     const { message, conversation } = await this.loadQueuedMessage(messageId, organizationId);
 
-    const updated = await this.messageRepository.update(message.id, {
+    const updated = await this.release(message.id, {
       status: MessageStatus.REJECTED,
       deliveryState: DeliveryState.BLOCKED,
       approvedBy: userId,
       approvedAt: new Date(),
       metadata: { ...(message.metadata || {}), blockReason: reason },
     });
-    if (!updated) {
-      throw new TRPCError({ code: "NOT_FOUND", message: "Message not found" });
-    }
 
     await this.publishOrganizationEvent(conversation.organization_id, "message_blocked", {
       conversationId: conversation.id,
@@ -118,13 +123,30 @@ export class MessageApprovalService {
     const conversation = message
       ? await this.conversationRepository.findById(message.conversation_id)
       : null;
-    if (!message || !conversation || conversation.organization_id !== organizationId) {
+    if (!message || !conversation) {
       throw new TRPCError({ code: "NOT_FOUND", message: "Message not found" });
     }
     if (message.deliveryState !== DeliveryState.QUEUED) {
       throw new TRPCError({ code: "BAD_REQUEST", message: "Message is not in queued state" });
     }
     return { message, conversation };
+  }
+
+  /**
+   * Leave the queue atomically: the update only applies while the row is still
+   * queued, so a double click or a second reviewer gets a BAD_REQUEST instead
+   * of a second delivery.
+   */
+  private async release(messageId: string, updates: Partial<Message>): Promise<Message> {
+    const updated = await this.messageRepository.transitionDeliveryState(
+      messageId,
+      DeliveryState.QUEUED,
+      updates,
+    );
+    if (!updated) {
+      throw new TRPCError({ code: "BAD_REQUEST", message: "Message is not in queued state" });
+    }
+    return updated;
   }
 
   /**
