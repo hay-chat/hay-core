@@ -10,6 +10,8 @@ type OrgRow = {
   suspendedAt: Date | null;
   suspensionReason: string | null;
   suspensionRedirectUrl: string | null;
+  agentPausedAt: Date | null;
+  agentPauseReason: string | null;
   accessNotice: Record<string, unknown> | null;
 };
 
@@ -53,6 +55,8 @@ describe("organizationAccessService.setAccessState", () => {
       suspendedAt: null,
       suspensionReason: null,
       suspensionRedirectUrl: null,
+      agentPausedAt: null,
+      agentPauseReason: null,
       accessNotice: null,
     });
     jest.clearAllMocks();
@@ -62,6 +66,7 @@ describe("organizationAccessService.setAccessState", () => {
     const result = await organizationAccessService.setAccessState({
       organizationId: "22222222-2222-4222-8222-222222222222",
       suspension: { reason: "manual" },
+      agentPause: null,
       notice: null,
     });
     expect(result).toBeNull();
@@ -72,6 +77,7 @@ describe("organizationAccessService.setAccessState", () => {
     const result = await organizationAccessService.setAccessState({
       organizationId: ORG_ID,
       suspension: { reason: "trial_expired", redirectUrl: "https://hay.chat/billing/locked/" },
+      agentPause: null,
       notice: { key: "trial_expired", level: "critical" },
     });
 
@@ -96,12 +102,14 @@ describe("organizationAccessService.setAccessState", () => {
     const first = await organizationAccessService.setAccessState({
       organizationId: ORG_ID,
       suspension: { reason: "trial_expired" },
+      agentPause: null,
       notice: null,
     });
     await new Promise((resolve) => setTimeout(resolve, 5));
     const second = await organizationAccessService.setAccessState({
       organizationId: ORG_ID,
       suspension: { reason: "payment_failed" },
+      agentPause: null,
       notice: null,
     });
 
@@ -113,11 +121,13 @@ describe("organizationAccessService.setAccessState", () => {
     await organizationAccessService.setAccessState({
       organizationId: ORG_ID,
       suspension: { reason: "manual", redirectUrl: "https://example.com/locked" },
+      agentPause: null,
       notice: { key: "x", level: "info" },
     });
     const result = await organizationAccessService.setAccessState({
       organizationId: ORG_ID,
       suspension: null,
+      agentPause: null,
       notice: null,
     });
 
@@ -125,6 +135,8 @@ describe("organizationAccessService.setAccessState", () => {
       suspendedAt: null,
       suspensionReason: null,
       suspensionRedirectUrl: null,
+      agentPausedAt: null,
+      agentPauseReason: null,
       accessNotice: null,
     });
   });
@@ -133,6 +145,7 @@ describe("organizationAccessService.setAccessState", () => {
     const result = await organizationAccessService.setAccessState({
       organizationId: ORG_ID,
       suspension: null,
+      agentPause: null,
       notice: { key: "trial_ending", level: "warning", params: { date: "31 Oct 2026" } },
     });
     expect(result?.suspendedAt).toBeNull();
@@ -144,9 +157,44 @@ describe("organizationAccessService.setAccessState", () => {
     const result = await organizationAccessService.setAccessState({
       organizationId: ORG_ID,
       suspension: { reason: "manual" },
+      agentPause: null,
       notice: null,
     });
     expect(result?.suspensionReason).toBe("manual");
     expect(mockLogger.error).toHaveBeenCalled();
+  });
+
+  it("pauses the AI agent without suspending, keeps the original agentPausedAt and resumes on null", async () => {
+    const first = await organizationAccessService.setAccessState({
+      organizationId: ORG_ID,
+      suspension: null,
+      agentPause: { reason: "usage_limit" },
+      notice: { key: "usage_paused", level: "critical" },
+    });
+    expect(first?.agentPausedAt).toBeInstanceOf(Date);
+    expect(first?.agentPauseReason).toBe("usage_limit");
+    expect(first?.suspendedAt).toBeNull();
+
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    const second = await organizationAccessService.setAccessState({
+      organizationId: ORG_ID,
+      suspension: null,
+      agentPause: { reason: "usage_limit" },
+      notice: null,
+    });
+    expect(second?.agentPausedAt?.getTime()).toBe(first?.agentPausedAt?.getTime());
+
+    const resumed = await organizationAccessService.setAccessState({
+      organizationId: ORG_ID,
+      suspension: null,
+      agentPause: null,
+      notice: null,
+    });
+    expect(resumed?.agentPausedAt).toBeNull();
+    expect(resumed?.agentPauseReason).toBeNull();
+    expect(mockSendToOrganization).toHaveBeenLastCalledWith(ORG_ID, {
+      type: ORGANIZATION_ACCESS_CHANGED_EVENT,
+      payload: resumed,
+    });
   });
 });

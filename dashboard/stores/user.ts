@@ -3,6 +3,9 @@ import { defineStore } from "pinia";
 const SUSPENSION_REASONS = ["trial_expired", "payment_failed", "cancelled", "manual"] as const;
 export type SuspensionReason = (typeof SUSPENSION_REASONS)[number];
 
+/** The operator paused the AI (dashboard keeps working); mirrors server AGENT_PAUSE_REASONS. */
+export type AgentPauseReason = "usage_limit";
+
 export function isSuspensionReason(value: unknown): value is SuspensionReason {
   return typeof value === "string" && (SUSPENSION_REASONS as readonly string[]).includes(value);
 }
@@ -22,6 +25,8 @@ export interface OrganizationAccessState {
   suspendedAt?: Date | string | null;
   suspensionReason?: SuspensionReason | null;
   suspensionRedirectUrl?: string | null;
+  agentPausedAt?: Date | string | null;
+  agentPauseReason?: AgentPauseReason | null;
   accessNotice?: AccessNotice | null;
 }
 
@@ -330,6 +335,8 @@ export const useUserStore = defineStore("user", {
       organization.suspendedAt = state.suspendedAt ?? null;
       organization.suspensionReason = state.suspensionReason ?? null;
       organization.suspensionRedirectUrl = state.suspensionRedirectUrl ?? null;
+      organization.agentPausedAt = state.agentPausedAt ?? null;
+      organization.agentPauseReason = state.agentPauseReason ?? null;
       organization.accessNotice = state.accessNotice ?? null;
     },
 

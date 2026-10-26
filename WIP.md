@@ -15,6 +15,17 @@ branch claude/email-channel (d953f8b, rebased onto 807a263); submodule pointer b
 `/srv/hay-core/.env`, see lessons). Phase 0 spike S1–S5 still blocked on a Resend API key from Roger.
 **Next:** merge PR → set RESEND_API_KEY / RESEND_WEBHOOK_SECRET / EMAIL_INBOUND_DOMAIN in prod (Coolify) → run spike: confirm
 Gmail-forwarded mail lands with the alias in `data.to`, custom Message-ID honoured → Phase 2 (custom-domain sending, idle resolve).
+## 2026-10-26 — claude/billing-usage-limits (worktree .claude/worktrees/claude+billing-usage, off master, agent-pause already merged) — hay-core side of billing slice 2
+
+**Works:** organizations.agent_paused_at/agent_pause_reason (migration 1784500000000), `internal.organizations.setAccessState`
+takes `agentPause: { reason: "usage_limit" } | null`, orchestrator parks conversations of a paused org via `parkForPausedAgent`,
+`auth.me` + dashboard store expose the fields, en/pt-BR `accessNotice.usage_warning|usage_exceeded|usage_paused`. Jest green
+(paused-agent-skip, access service, internal router), typecheck + eslint clean. Playwright `tests/billing-usage-notice.spec.ts`
+written, NOT run (needs INTERNAL_API_SECRET + dev stack). Docs submodule → hay-docs `claude/billing-usage-docs` (FAQ + settings).
+**Sibling branches:** hay-backoffice `claude/billing-currencies-usage-alerts` (off claude/overage-billing), hay-website
+`claude/billing-change-plan`, hay-docs `claude/billing-usage-docs` (off main). Land order: overage-billing → backoffice branch.
+**Next:** reviewer findings → fix → push all four → open PRs (gh missing: compare URLs). Roger: `npm run stripe:sync` (test+live),
+backoffice + core `migration:run`.
 
 ## 2026-10-26 — master @28eea98 — agent pause switch MERGED + DEPLOYED to eu.hay.chat
 
