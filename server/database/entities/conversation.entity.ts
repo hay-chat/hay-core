@@ -920,6 +920,11 @@ The following tools are available for you to use. You MUST return only valid JSO
 
         // Only keep it as human-took-over if a human agent has actually responded
         newStatus = hasHumanAgentMessages ? "human-took-over" : "open";
+      } else if (this.status === "pending-human") {
+        // "Needs attention" is sticky: once the AI handed off, or a paused agent
+        // parked the conversation, a new shopper message must not hand it back
+        // to the AI. Only Take Over / Return to AI leave this state.
+        newStatus = "pending-human";
       }
 
       // Update conversation with cooldown and processing status
