@@ -1,60 +1,52 @@
 {
   "name": "Wix Stores",
-  "description": "Conecte sua loja Wix Stores para consultar pedidos, ler transações e fulfilment, emitir reembolsos e navegar pelo catálogo",
+  "description": "Conecte sua loja Wix Stores para que o agente consulte os pedidos de um cliente, acompanhe envios, cancele ou redirecione pedidos ainda não despachados, emita reembolsos e responda perguntas sobre produtos.",
   "tools": {
-    "search_orders": {
-      "label": "Buscar pedidos",
-      "description": "Encontre pedidos por número, e-mail do comprador, status ou data para obter o ID do pedido."
+    "wix_find_customer": {
+      "label": "Localizar cliente",
+      "description": "Localiza um cliente pelo e-mail, com seus pedidos mais recentes."
     },
-    "get_order": {
-      "label": "Obter pedido",
-      "description": "Obtenha um pedido completo por ID, incluindo itens, totais, status de pagamento e de fulfilment."
+    "wix_list_customer_orders": {
+      "label": "Listar pedidos do cliente",
+      "description": "Lista os pedidos de um cliente pelo e-mail, do mais recente ao mais antigo."
     },
-    "get_order_transactions": {
-      "label": "Obter transações do pedido",
-      "description": "Liste todos os pagamentos e reembolsos de um pedido, com IDs de transação e valores."
+    "wix_get_order": {
+      "label": "Consultar pedido",
+      "description": "Consulta um pedido por id ou número: itens, totais, endereço, pagamentos, rastreio e o que o suporte pode fazer."
     },
-    "get_order_refundability": {
-      "label": "Verificar reembolsabilidade",
-      "description": "Verifique se cada pagamento pode ser reembolsado via API da Wix antes de reembolsar."
+    "wix_get_order_tracking": {
+      "label": "Rastrear pedido",
+      "description": "Consulta o status de envio e o rastreio de um pedido."
     },
-    "refund_order": {
-      "label": "Reembolsar pedido",
-      "description": "Emita um reembolso total ou parcial, ou registre um reembolso externo quando o provedor não permitir reembolso via API."
+    "wix_cancel_order": {
+      "label": "Cancelar pedido",
+      "description": "Cancela um pedido ainda não despachado, com opção de repor estoque e avisar o comprador."
     },
-    "get_order_fulfillments": {
-      "label": "Obter fulfilments do pedido",
-      "description": "Liste os fulfilments de um pedido — itens enviados e dados de rastreamento."
+    "wix_create_refund": {
+      "label": "Reembolsar",
+      "description": "Reembolsa um pedido total ou parcialmente, limitado ao saldo reembolsável."
     },
-    "create_fulfillment": {
-      "label": "Criar fulfilment",
-      "description": "Marque itens do pedido como enviados, opcionalmente com transportadora e código de rastreio."
+    "wix_update_order_shipping_address": {
+      "label": "Alterar endereço de entrega",
+      "description": "Altera o endereço de entrega de um pedido ainda não despachado. Recusa após o início do envio."
     },
-    "update_fulfillment": {
-      "label": "Atualizar fulfilment",
-      "description": "Atualize os dados de rastreamento de um fulfilment existente."
-    },
-    "delete_fulfillment": {
-      "label": "Excluir fulfilment",
-      "description": "Remova um fulfilment de um pedido, revertendo seus itens para não enviados."
-    },
-    "search_products": {
+    "wix_search_products": {
       "label": "Buscar produtos",
-      "description": "Pesquise no catálogo por texto ou filtro para encontrar produtos."
+      "description": "Busca produtos no catálogo por nome ou descrição."
     },
-    "get_product": {
-      "label": "Obter produto",
-      "description": "Obtenha um produto por ID, incluindo variações, preços e estoque."
+    "wix_get_product": {
+      "label": "Consultar produto",
+      "description": "Consulta um produto com suas variantes, preços e disponibilidade."
     }
   },
   "config": {
     "apiKey": {
       "label": "Chave de API",
-      "description": "Chave de API da Wix em Settings → API Keys, com escopo de Pedidos (ler e gerenciar), Order Billing (reembolsos), Order Fulfillments (gerenciar) e Catálogo (ler). Tratada como segredo."
+      "description": "Chave de API do Wix (Configurações → Chaves de API), com os escopos Pedidos (leitura e gestão), Faturamento de pedidos (reembolsos), Fulfillment de pedidos (leitura) e Catálogo (leitura). Tratada como segredo."
     },
     "siteId": {
       "label": "ID do site",
-      "description": "O ID do site Wix ao qual esta chave está vinculada (da URL do painel ou da API Query Sites)."
+      "description": "O ID do site Wix ao qual a chave está vinculada (na URL do painel ou via API Query Sites)."
     }
   }
 }

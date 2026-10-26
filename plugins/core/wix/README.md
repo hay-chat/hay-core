@@ -1,8 +1,9 @@
 # Wix Stores plugin
 
-Connects a [Wix Stores](https://www.wix.com/) site to Hay so the agent can look up orders,
-read their transaction history and fulfilment, issue refunds (with an external-refund fallback),
-and browse the catalog — the Wix equivalent of the Shopify and WooCommerce connectors.
+Connects a [Wix Stores](https://www.wix.com/) site to Hay so the agent can find a customer's
+orders, track shipments, cancel or re-route undispatched orders, issue refunds (with an
+external-refund fallback), and browse the catalog — the same semantic action set as the Shopify,
+WooCommerce and Magento connectors.
 
 Implements **HAY-240, phase one (API key)**.
 
@@ -18,7 +19,7 @@ Two settings:
   scopes so it stays in line with the Shopify/WooCommerce connectors:
   - Stores - **Orders** (read & manage)
   - Stores - **Order Transactions / Order Billing** (for refunds)
-  - Stores - **Order Fulfillments** (manage)
+  - Stores - **Order Fulfillments** (read)
   - Stores - **Catalog** (read)
 - **Site ID** — the site the key is scoped to (from your dashboard URL `.../dashboard/<SITE_ID>/...`
   or Wix's Query Sites API). Wix routes site-level calls by the `wix-site-id` header.
@@ -35,27 +36,39 @@ implemented here.
 
 ## Tools
 
-| Tool                      | What it does                                                                                    |
-| ------------------------- | ----------------------------------------------------------------------------------------------- |
-| `search_orders`           | Find orders by number, buyer email, status or date → order ID                                   |
-| `get_order`               | Full order incl. items, totals, payment & fulfilment status                                     |
-| `get_order_transactions`  | Every payment and refund on an order (transaction IDs/amounts)                                  |
-| `get_order_refundability` | Whether each payment is API-refundable before refunding                                         |
-| `refund_order`            | Full/partial refund; records an **external** refund when the provider can't be refunded via API |
-| `get_order_fulfillments`  | An order's fulfilments — shipped items and tracking                                             |
-| `create_fulfillment`      | Mark items shipped, with carrier + tracking                                                     |
-| `update_fulfillment`      | Update a fulfilment's tracking                                                                  |
-| `delete_fulfillment`      | Remove a fulfilment                                                                             |
-| `search_products`         | Search the catalog                                                                              |
-| `get_product`             | Product with variants, pricing and inventory                                                    |
+One tool per support action, not per Wix endpoint. Reads merge several endpoints into one call;
+writes are bounded server-side. All names are prefixed `wix_` so they never collide with another
+store plugin installed in the same organisation.
 
-### Refund fallback (HAY-240)
+| Tool                                | What it does                                                                                                                   |
+| ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| `wix_find_customer`                 | Email → customer (derived from their orders) + 5 most recent orders                                                            |
+| `wix_list_customer_orders`          | Paged order history for an email                                                                                               |
+| `wix_get_order`                     | Order by id **or** number, merged with transactions + fulfilments; `supportSummary` (cancellable, refundable, remaining, address) |
+| `wix_get_order_tracking`            | Fulfilment status + one row per shipment (carrier, number, link)                                                               |
+| `wix_cancel_order`                  | Cancel before dispatch only; optional restock + buyer email. Does **not** refund                                                |
+| `wix_create_refund`                 | Full/partial refund: picks payments, checks refundability, caps at the remaining balance; external-refund fallback            |
+| `wix_update_order_shipping_address` | Change the shipping destination before dispatch only; merges with the existing address                                        |
+| `wix_search_products`               | Free-text catalog search                                                                                                       |
+| `wix_get_product`                   | Product with variants (sku, choices, price, in-stock)                                                                          |
 
-`refund_order` first checks `get_order_refundability`. If a payment provider can't be refunded via
+There is deliberately **no store-wide order search** (a customer-facing agent must only see the
+verified customer's orders) and **no fulfilment create/update/delete** (warehouse actions, not
+support actions).
+
+### Refund fallback
+
+`wix_create_refund` reads the order's transactions, allocates the amount across refundable
+payments and checks Wix's refundability assessment. If a payment provider can't be refunded via
 the Wix API, it returns `{ refunded: false, reason: "provider_not_api_refundable", message: … }`
-with a clear instruction to refund the customer manually and re-call with `externalRefund: true` —
-it never fails silently. `externalRefund: true` records the manual refund against the order so the
-transaction history stays accurate.
+with a clear instruction to refund the customer in the provider and re-call with
+`external_refund: true` — it never fails silently and never silently "records only".
+
+## Tests
+
+```bash
+npm test --workspace=plugins/core/wix   # vitest: mocked-fetch unit tests + stdio list-tools smoke
+```
 
 ## Build
 
@@ -77,5 +90,7 @@ npm run build  --workspace=plugins/core/wix
 - The refund money shape is sent as `paymentRefunds[].amount = { amount: "<decimal-string>" }`
   (major units; currency comes from the order). It's encapsulated in `mcp/lib/format.js → money()`
   so it's a one-line change if a live call rejects it.
-- `search_orders` posts a top-level `{ filter, sort, cursorPaging }` body with Wix MongoDB-style filters.
+- Order search posts a top-level `{ filter, sort, cursorPaging }` body with Wix MongoDB-style filters.
+- `wix_update_order_shipping_address` PATCHes `/ecom/v1/orders/{id}` with `shippingInfo.logistics.shippingDestination` + a field mask; confirm Wix accepts that field on Update Order.
+- `wix_cancel_order` POSTs `/ecom/v1/orders/{id}/cancel` with `restockAllItems` / `sendOrderCanceledEmail`.
 - The plugin icon ships as `thumbnail.svg`. Core resolves plugin thumbnails as **svg > png > jpg**.
