@@ -32,8 +32,9 @@ jest.mock("@server/repositories/message.repository", () => ({
 
 const mockConversationRepo = {
   findActiveByCustomerAndChannel: jest.fn<() => Promise<unknown>>(),
-  findByIdAndOrganization: jest.fn<() => Promise<unknown>>(),
-  create: jest.fn<() => Promise<unknown>>(),
+  findByExternalConversationId: jest.fn<(...args: unknown[]) => Promise<unknown>>(),
+  findByIdAndOrganization: jest.fn<(...args: unknown[]) => Promise<unknown>>(),
+  create: jest.fn<(...args: unknown[]) => Promise<unknown>>(),
   update: jest.fn<() => Promise<unknown>>(),
   updateById: jest.fn<() => Promise<unknown>>(),
   getMessages: jest.fn<() => Promise<unknown[]>>(),
@@ -46,7 +47,7 @@ jest.mock("@server/repositories/conversation.repository", () => ({
 const mockCustomerRepo = {
   findByExternalId: jest.fn<() => Promise<unknown>>(),
   create: jest.fn<() => Promise<unknown>>(),
-  update: jest.fn<() => Promise<unknown>>(),
+  update: jest.fn<(...args: unknown[]) => Promise<unknown>>(),
 };
 jest.mock("@server/repositories/customer.repository", () => ({
   CustomerRepository: jest.fn(() => mockCustomerRepo),
@@ -215,6 +216,126 @@ describe("pluginApi.messages.receive attachments", () => {
         attachments: [{ ...attachment, url: "not-a-url" }],
       }),
     ).rejects.toMatchObject({ code: "BAD_REQUEST" });
+  });
+});
+
+describe("pluginApi.messages.receive conversation lookup", () => {
+  const THREAD_ID = "44444444-4444-4444-8444-444444444444";
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockCustomerRepo.findByExternalId.mockResolvedValue({
+      id: "cust-1",
+      name: "Ana",
+      phone: null,
+      email: null,
+      external_metadata: {},
+    });
+    mockAgentRepo.findByOrganization.mockResolvedValue([{ id: "agent-1", channels: ["email"] }]);
+    mockConversationRepo.findActiveByCustomerAndChannel.mockResolvedValue(null);
+    mockConversationRepo.findByExternalConversationId.mockResolvedValue(null);
+    mockConversationRepo.findByIdAndOrganization.mockResolvedValue(null);
+    mockConversationRepo.getMessages.mockResolvedValue([]);
+    mockConversationRepo.create.mockImplementation(async () => {
+      const conversation = makeConversation();
+      conversation.channel = "email";
+      return conversation;
+    });
+    mockMessageRepo.create.mockImplementation(async (data) => ({ id: "msg-new", ...data }));
+  });
+
+  const emailConversation = (id: string, status: Conversation["status"] = "resolved") => {
+    const conversation = makeConversation();
+    conversation.id = id;
+    conversation.channel = "email";
+    conversation.status = status;
+    conversation.metadata = { email: { conversationId: "<root@shopper.com>" } };
+    return conversation;
+  };
+
+  it("uses the plugin-recovered Hay conversation id before any other lookup", async () => {
+    mockConversationRepo.findByIdAndOrganization.mockResolvedValue(emailConversation(THREAD_ID));
+    mockConversationRepo.findActiveByCustomerAndChannel.mockResolvedValue(
+      emailConversation(CONVERSATION_ID, "open"),
+    );
+
+    const result = await caller()["messages.receive"]({
+      from: "ana@shopper.com",
+      content: "reply via token",
+      channel: "email",
+      conversationId: THREAD_ID,
+      externalConversationId: "<other@shopper.com>",
+    });
+
+    expect(result.conversationId).toBe(THREAD_ID);
+    expect(mockConversationRepo.findByIdAndOrganization).toHaveBeenCalledWith(THREAD_ID, ORG_ID);
+    expect(mockConversationRepo.findByExternalConversationId).not.toHaveBeenCalled();
+    expect(mockConversationRepo.findActiveByCustomerAndChannel).not.toHaveBeenCalled();
+    expect(mockConversationRepo.create).not.toHaveBeenCalled();
+  });
+
+  it("ignores a Hay conversation id that belongs to another channel", async () => {
+    const whatsapp = makeConversation();
+    whatsapp.id = THREAD_ID;
+    mockConversationRepo.findByIdAndOrganization.mockResolvedValue(whatsapp);
+
+    const result = await caller()["messages.receive"]({
+      from: "ana@shopper.com",
+      content: "hello",
+      channel: "email",
+      conversationId: THREAD_ID,
+    });
+
+    expect(result.conversationId).toBe(CONVERSATION_ID);
+    expect(mockConversationRepo.create).toHaveBeenCalled();
+  });
+
+  it("finds the thread by external id before falling back to the customer's active conversation", async () => {
+    mockConversationRepo.findByExternalConversationId.mockResolvedValue(
+      emailConversation(THREAD_ID),
+    );
+    mockConversationRepo.findActiveByCustomerAndChannel.mockResolvedValue(
+      emailConversation(CONVERSATION_ID, "open"),
+    );
+
+    const result = await caller()["messages.receive"]({
+      from: "ana@shopper.com",
+      content: "reply via headers",
+      channel: "email",
+      externalConversationId: "<root@shopper.com>",
+    });
+
+    expect(result.conversationId).toBe(THREAD_ID);
+    expect(mockConversationRepo.findByExternalConversationId).toHaveBeenCalledWith(
+      "email",
+      "<root@shopper.com>",
+      ORG_ID,
+    );
+    expect(mockConversationRepo.findActiveByCustomerAndChannel).not.toHaveBeenCalled();
+  });
+
+  it("creates a titled conversation seeded with the external id and backfills the customer email", async () => {
+    await caller()["messages.receive"]({
+      from: "ana@shopper.com",
+      content: "Where is my order?",
+      channel: "email",
+      externalConversationId: "<root@shopper.com>",
+      title: "Order 1234 late",
+      metadata: { email: "ana@shopper.com" },
+    });
+
+    expect(mockConversationRepo.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        channel: "email",
+        title: "Order 1234 late",
+        metadata: { email: { conversationId: "<root@shopper.com>" } },
+      }),
+    );
+    expect(mockCustomerRepo.update).toHaveBeenCalledWith(
+      "cust-1",
+      ORG_ID,
+      expect.objectContaining({ email: "ana@shopper.com" }),
+    );
   });
 });
 
