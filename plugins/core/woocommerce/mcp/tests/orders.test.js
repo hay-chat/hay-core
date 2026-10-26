@@ -116,6 +116,20 @@ describe("enrichOrder", () => {
 
     const unpaid = { ...ORDER, status: "pending", date_paid: null };
     expect(enrichOrder(unpaid, []).supportSummary.isRefundable).toBe(false);
+
+    // A paid order that was cancelled still owes the customer money.
+    const cancelledPaid = { ...ORDER, status: "cancelled" };
+    expect(enrichOrder(cancelledPaid, []).supportSummary).toMatchObject({
+      isRefundable: true,
+      isCancellable: false,
+    });
+
+    // Processing but tracking already recorded: it has left the warehouse.
+    const processingShipped = enrichOrder(ORDER, [{ trackingNumber: "T" }]);
+    expect(processingShipped.supportSummary).toMatchObject({
+      isCancellable: false,
+      addressChangeable: false,
+    });
   });
 });
 
@@ -279,6 +293,48 @@ describe("order tools", () => {
     });
   });
 
+  it("woocommerce_cancel_order and the address change refuse a processing order that already has tracking", async () => {
+    const shipped = [
+      {
+        method: "GET",
+        path: `${WC}/orders/12/shipment-trackings`,
+        reply: () => ({ status: 404, body: { code: "rest_no_route", message: "No route" } }),
+      },
+      {
+        method: "GET",
+        path: `/wp-json/wc-ast/v3/orders/12/shipment-trackings`,
+        reply: () => [
+          {
+            tracking_provider: "DHL",
+            tracking_number: "JD1",
+            formatted_tracking_link: "https://dhl/JD1",
+          },
+        ],
+      },
+    ];
+    const { calls } = mockFetch(orderRoutes(ORDER, shipped));
+    const res = await server.call("woocommerce_cancel_order", { order_id: "12" });
+    expect(res.isError).toBe(true);
+    expect(res.text).toMatch(/already has shipment tracking \(JD1\)/);
+    expect(calls.some((c) => c.method === "PUT")).toBe(false);
+
+    const { calls: calls2 } = mockFetch(orderRoutes(ORDER, shipped));
+    const moved = await server.call("woocommerce_update_order_shipping_address", {
+      order_id: "12",
+      address: { city: "Porto" },
+    });
+    expect(moved.isError).toBe(true);
+    expect(calls2.some((c) => c.method === "PUT")).toBe(false);
+
+    mockFetch(orderRoutes(ORDER, shipped));
+    const read = await server.call("woocommerce_get_order", { order_id: "12" });
+    expect(read.data.supportSummary).toMatchObject({
+      isCancellable: false,
+      addressChangeable: false,
+    });
+    expect(read.data.tracking[0].trackingUrl).toBe("https://dhl/JD1");
+  });
+
   it("woocommerce_cancel_order refuses completed and cancelled orders without writing", async () => {
     const { calls } = mockFetch(orderRoutes({ ...ORDER, status: "completed" }));
     const res = await server.call("woocommerce_cancel_order", { order_id: "12" });
@@ -405,6 +461,22 @@ describe("customer tools", () => {
     expect(byPhone.data.recentOrders.map((o) => o.id)).toEqual([12]);
   });
 
+  it("woocommerce_find_customer searches by the formatting-proof tail of the phone number", async () => {
+    const { calls } = mockFetch([
+      { method: "GET", path: `${WC}/customers`, reply: () => [] },
+      {
+        method: "GET",
+        path: `${WC}/orders`,
+        reply: ({ query }) => (query.get("search") === "12345678" ? [ORDER] : []),
+      },
+    ]);
+    const res = await server.call("woocommerce_find_customer", { phone: "+351 (912) 345-678" });
+    expect(res.data.found).toBe(true);
+    expect(res.data.recentOrders.map((o) => o.id)).toEqual([12]);
+    expect(calls.map((c) => c.path)).toEqual([`${WC}/orders`]);
+    expect((await server.call("woocommerce_find_customer", { phone: "abc" })).isError).toBe(true);
+  });
+
   it("woocommerce_find_customer reports found=false and requires a key", async () => {
     mockFetch([
       { method: "GET", path: `${WC}/customers`, reply: () => [] },
@@ -416,8 +488,20 @@ describe("customer tools", () => {
     expect((await server.call("woocommerce_find_customer", {})).isError).toBe(true);
   });
 
-  it("woocommerce_list_customer_orders pages with the X-WP headers", async () => {
-    mockFetch([{ method: "GET", path: `${WC}/orders`, reply: () => [ORDER] }]);
+  it("woocommerce_list_customer_orders pages by customer id for accounts and verifies guest hits", async () => {
+    const stranger = { ...ORDER, id: 99, billing: { ...ORDER.billing, email: "o@example.com" } };
+    const { calls } = mockFetch([
+      {
+        method: "GET",
+        path: `${WC}/customers`,
+        reply: () => [{ id: 7, email: "ana@example.com" }],
+      },
+      {
+        method: "GET",
+        path: `${WC}/orders`,
+        reply: ({ query }) => (query.get("customer") === "7" ? [ORDER] : [stranger, ORDER]),
+      },
+    ]);
     const res = await server.call("woocommerce_list_customer_orders", {
       email: "ana@example.com",
       limit: 500,
@@ -428,6 +512,23 @@ describe("customer tools", () => {
       page: 2,
       totalPages: 0,
       total: 0,
+    });
+    expect(calls[1].query.get("customer")).toBe("7");
+    expect(calls[1].query.get("per_page")).toBe("100");
+    expect(calls[1].query.has("search")).toBe(false);
+
+    mockFetch([
+      { method: "GET", path: `${WC}/customers`, reply: () => [] },
+      { method: "GET", path: `${WC}/orders`, reply: () => [stranger, ORDER] },
+    ]);
+    const guest = await server.call("woocommerce_list_customer_orders", {
+      email: "ana@example.com",
+    });
+    expect(guest.data).toEqual({
+      items: [expect.objectContaining({ id: 12 })],
+      page: 1,
+      totalPages: null,
+      total: null,
     });
   });
 });

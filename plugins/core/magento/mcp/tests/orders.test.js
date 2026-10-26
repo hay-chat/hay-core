@@ -166,6 +166,10 @@ describe("enrichOrder", () => {
       isRefundable: false,
       needsCreditMemo: false,
     });
+    // Magento's canCancel() refuses held and payment-review orders.
+    expect(enrichOrder({ ...fresh, state: "holded" }, [], []).supportSummary.isCancellable).toBe(
+      false,
+    );
     const shipped = { ...ORDER, total_refunded: 20 };
     const e = enrichOrder(shipped, [SHIPMENT], [INVOICE]);
     expect(e.supportSummary).toMatchObject({
@@ -297,6 +301,17 @@ describe("order tools", () => {
     mockFetch(orderRoutes({ ...ORDER, state: "complete", total_paid: 0, total_invoiced: 0 }));
     expect((await server.call("magento_cancel_order", { order_id: "12" })).text).toMatch(
       /is complete/,
+    );
+    const { calls: heldCalls } = mockFetch(
+      orderRoutes({ ...ORDER, state: "holded", total_paid: 0, total_invoiced: 0 }),
+    );
+    expect((await server.call("magento_cancel_order", { order_id: "12" })).text).toMatch(
+      /on hold.*Unhold/,
+    );
+    expect(heldCalls.some((c) => c.path.endsWith("/cancel"))).toBe(false);
+    mockFetch(orderRoutes({ ...ORDER, state: "payment_review", total_paid: 0, total_invoiced: 0 }));
+    expect((await server.call("magento_cancel_order", { order_id: "12" })).text).toMatch(
+      /payment review/,
     );
     mockFetch(
       orderRoutes(

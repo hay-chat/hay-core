@@ -11,7 +11,7 @@
 
 const { z } = require("zod");
 const { ok, fail } = require("../lib/format");
-const { searchOrders, summarizeOrder } = require("../lib/orders");
+const { searchOrdersByEmail, summarizeOrder } = require("../lib/orders");
 
 function customerFromOrders(email, orders) {
   const first = orders[0];
@@ -42,7 +42,7 @@ function registerCustomerTools(server) {
       try {
         const needle = email.trim();
         if (!needle) throw new Error("Provide the buyer's email address.");
-        const { orders, hasNext } = await searchOrders({ "buyerInfo.email": needle }, { limit: 5 });
+        const { orders, hasNext } = await searchOrdersByEmail(needle, { limit: 5 });
         if (!orders.length) {
           return ok({
             found: false,
@@ -73,10 +73,10 @@ function registerCustomerTools(server) {
       try {
         const needle = email.trim();
         if (!needle) throw new Error("Provide the buyer's email address.");
-        const page = await searchOrders(
-          { "buyerInfo.email": needle },
-          { limit: Math.min(limit ?? 10, 100), cursor },
-        );
+        const page = await searchOrdersByEmail(needle, {
+          limit: Math.min(limit ?? 10, 100),
+          cursor,
+        });
         return ok({
           items: page.orders.map(summarizeOrder),
           hasNext: page.hasNext,
@@ -89,4 +89,4 @@ function registerCustomerTools(server) {
   );
 }
 
-module.exports = { registerCustomerTools, customerFromOrders };
+module.exports = { registerCustomerTools };

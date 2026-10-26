@@ -24,7 +24,7 @@
     },
     "magento_cancel_order": {
       "label": "Cancelar pedido",
-      "description": "Cancela um pedido que ainda não foi faturado nem enviado."
+      "description": "Cancela um pedido novo ou aguardando pagamento que ainda não foi faturado nem enviado."
     },
     "magento_create_refund": {
       "label": "Reembolsar",

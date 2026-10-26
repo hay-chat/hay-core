@@ -57,7 +57,9 @@ async function magentoApi(method, path, { query, body } = {}) {
         signal: AbortSignal.timeout(DEFAULT_TIMEOUT_MS),
       });
     } catch (err) {
-      if (attempt < MAX_RETRIES) {
+      // A timed-out POST may have been processed server-side (a credit memo
+      // that takes >30s still refunds), so only idempotent GETs are retried.
+      if (method === "GET" && attempt < MAX_RETRIES) {
         attempt += 1;
         await sleep(Math.pow(2, attempt) * 250);
         continue;

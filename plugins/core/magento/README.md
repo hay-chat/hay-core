@@ -17,20 +17,20 @@ GPL-licensed merchant-analytics project) exposed catalog reads, a catalog write 
 reports; it is replaced by an original implementation. All names are prefixed `magento_` so they
 never collide with another store plugin in the same organisation.
 
-| Tool                                    | What it does                                                                                                |
-| --------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
-| `magento_get_store`                     | Store code, base URL, currency, locale (connectivity check)                                                 |
-| `magento_find_customer`                 | Email → account (`/customers/search`) **and** orders by `customer_email` (guests), with 5 recent orders     |
-| `magento_list_customer_orders`          | Paged order history for an email                                                                            |
-| `magento_get_order`                     | Order by entity id **or** increment id, merged with shipments + invoices; `supportSummary`                  |
-| `magento_get_order_tracking`            | Shipments with their tracking numbers                                                                       |
-| `magento_cancel_order`                  | Only orders that were never invoiced/paid (Magento's own rule); paid orders are pointed at the refund       |
-| `magento_create_refund`                 | Credit memo: full, by item, or by amount; online via the paid invoice by default; capped at paid − refunded |
-| `magento_update_order_shipping_address` | Before any shipment exists; merges onto the existing address entity (`PUT /orders/{id}`)                    |
-| `magento_add_order_note`                | Order status-history comment, optionally customer-visible + emailed                                         |
-| `magento_search_products`               | Enabled products by name                                                                                    |
-| `magento_get_product`                   | Product by SKU + stock item + configurable children                                                         |
-| `magento_check_inventory`               | Stock item for a SKU                                                                                        |
+| Tool                                    | What it does                                                                                                                                                                            |
+| --------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `magento_get_store`                     | Store code, base URL, currency, locale (connectivity check)                                                                                                                             |
+| `magento_find_customer`                 | Email → account (`/customers/search`) **and** orders by `customer_email` (guests), with 5 recent orders                                                                                 |
+| `magento_list_customer_orders`          | Paged order history for an email                                                                                                                                                        |
+| `magento_get_order`                     | Order by entity id **or** increment id, merged with shipments + invoices; `supportSummary`                                                                                              |
+| `magento_get_order_tracking`            | Shipments with their tracking numbers                                                                                                                                                   |
+| `magento_cancel_order`                  | Only `new` / `pending_payment` orders that were never invoiced/paid (Magento's `canCancel()` rule); paid orders are pointed at the refund, held / payment-review orders at the merchant |
+| `magento_create_refund`                 | Credit memo: full, by item, or by amount; online via the paid invoice by default; capped at paid − refunded                                                                             |
+| `magento_update_order_shipping_address` | Before any shipment exists; merges onto the existing address entity (`PUT /orders/{id}`)                                                                                                |
+| `magento_add_order_note`                | Order status-history comment, optionally customer-visible + emailed                                                                                                                     |
+| `magento_search_products`               | Enabled products by name                                                                                                                                                                |
+| `magento_get_product`                   | Product by SKU + stock item + configurable children                                                                                                                                     |
+| `magento_check_inventory`               | Stock item for a SKU                                                                                                                                                                    |
 
 Deliberately absent: revenue / order-count / product-sales analytics (merchant BI, a data-exposure
 vector under prompt injection), catalog writes, and store-wide order browsing.
@@ -57,5 +57,11 @@ runs `npm install` inside it at build time.
 
 - `PUT /V1/orders/{id}` with `{ entity: <order address> }` is Magento's `OrderAddressRepository::save`
   route; the plugin sends the existing shipping address entity with the changed fields merged in.
-- Online credit memos use `POST /V1/invoice/{invoiceId}/refund` with `isOnline: true`; an arbitrary
-  partial amount is booked as `adjustment_positive` with zero-quantity item lines.
+- Online credit memos use `POST /V1/invoice/{invoiceId}/refund` with `isOnline: true` against a
+  **paid** invoice (`state === 2`); an arbitrary partial amount is booked as `adjustment_positive`
+  with zero-quantity item lines.
+- `shipping_amount` is omitted on a full refund (Magento then refunds the remaining shipping itself)
+  and sent as `shipping_amount − shipping_refunded` when `refund_shipping` is asked for on an
+  item/amount refund — Magento pins shipping to the value when the key is present.
+- The client never retries a non-GET request after a timeout or 5xx (a credit memo that timed out
+  may already have refunded).

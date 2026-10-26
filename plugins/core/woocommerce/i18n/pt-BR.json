@@ -24,7 +24,7 @@
     },
     "woocommerce_cancel_order": {
       "label": "Cancelar pedido",
-      "description": "Cancela um pedido ainda não despachado (pendente, em espera ou processando)."
+      "description": "Cancela um pedido ainda não despachado (pendente, em espera ou processando, sem rastreio registrado)."
     },
     "woocommerce_create_refund": {
       "label": "Reembolsar",
@@ -32,7 +32,7 @@
     },
     "woocommerce_update_order_shipping_address": {
       "label": "Alterar endereço de entrega",
-      "description": "Altera o endereço de entrega de um pedido ainda não despachado. Recusa após a conclusão do pedido."
+      "description": "Altera o endereço de entrega de um pedido ainda não despachado. Recusa quando já há rastreio registrado ou o pedido foi concluído."
     },
     "woocommerce_add_order_note": {
       "label": "Adicionar nota ao pedido",

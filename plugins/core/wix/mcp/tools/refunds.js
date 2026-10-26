@@ -1,5 +1,5 @@
 /**
- * Refund tool — one semantic action over three Wix endpoints:
+ * Refund tool — one semantic action over three Wix endpoints (Order Billing API):
  *
  *   GET  /ecom/v1/orders/{id}/transactions                 which payments exist + what is left
  *   POST /ecom/v1/order-billing/get-order-refundability    can the provider refund via API?
@@ -20,50 +20,38 @@ const REFUNDABLE = "REFUNDABLE";
 const MANUALLY_REFUNDABLE = "MANUALLY_REFUNDABLE";
 const NON_REFUNDABLE = "NON_REFUNDABLE";
 
-function normalizeState(raw) {
-  const s = String(raw).toUpperCase();
-  if (s.includes("MANUAL")) return MANUALLY_REFUNDABLE;
-  if (s.includes("NON") || s.includes("NOT_REFUND")) return NON_REFUNDABLE;
-  if (s.includes("REFUND")) return REFUNDABLE;
-  return s;
-}
-
 /**
- * Tolerantly read Wix's refundability assessment into
- * `{ [transactionId]: { state, reason } }`. Wix has shipped slightly different
- * shapes for this payload, so we look for any object carrying a transaction
- * id plus a refundability-like string. `null` when nothing parseable.
+ * Read Get Order Refundability into `{ [paymentId]: { state, reason, providerLink } }`.
+ * Documented shape: `payments[]` where each entry carries `payment.paymentId`
+ * and exactly one of `refundable: true`, `manuallyRefundable: { reason }`,
+ * `nonRefundable: { reason }`. `null` when nothing parseable (the refund call
+ * then produces the authoritative error).
  */
 function parseRefundabilities(res) {
-  if (!res || typeof res !== "object") return null;
+  const list = res?.payments;
+  if (!Array.isArray(list) || !list.length) return null;
   const map = {};
-  const visit = (node) => {
-    if (Array.isArray(node)) {
-      node.forEach(visit);
-      return;
-    }
-    if (!node || typeof node !== "object") return;
-    const txId = node.transactionId || node.paymentId;
-    const rawState =
-      node.refundability ??
-      node.refundabilityStatus ??
-      node.status ??
-      node.state ??
-      (typeof node.refundable === "boolean"
-        ? node.refundable
-          ? REFUNDABLE
-          : NON_REFUNDABLE
-        : undefined);
-    const stateStr = typeof rawState === "object" ? rawState?.status : rawState;
-    if (txId && typeof stateStr === "string") {
-      map[txId] = {
-        state: normalizeState(stateStr),
-        reason: node.nonRefundableReason || node.reason || rawState?.reason || null,
+  for (const entry of list) {
+    const id = entry?.payment?.paymentId ?? entry?.paymentId;
+    if (!id) continue;
+    if (entry.refundable === true) {
+      map[id] = { state: REFUNDABLE, reason: null, providerLink: null };
+    } else if (entry.manuallyRefundable) {
+      map[id] = {
+        state: MANUALLY_REFUNDABLE,
+        reason: entry.manuallyRefundable.reason ?? null,
+        providerLink: entry.providerLink ?? null,
       };
+    } else if (entry.nonRefundable) {
+      map[id] = {
+        state: NON_REFUNDABLE,
+        reason: entry.nonRefundable.reason ?? null,
+        providerLink: null,
+      };
+    } else if (entry.refundable === false) {
+      map[id] = { state: NON_REFUNDABLE, reason: null, providerLink: null };
     }
-    Object.values(node).forEach(visit);
-  };
-  visit(res);
+  }
   return Object.keys(map).length ? map : null;
 }
 
@@ -106,8 +94,14 @@ function registerRefundTools(server) {
         .describe(
           'Partial amount in major units as a decimal string (e.g. "10.50"). Omit for full.',
         ),
-      reason: z.string().optional().describe("Why the refund is issued (stored on the refund)."),
-      restock: z.boolean().optional().describe("Restock the refunded items (default false)."),
+      reason: z
+        .string()
+        .optional()
+        .describe("Why the refund is issued (stored on the refund, max 200 characters)."),
+      restock: z
+        .boolean()
+        .optional()
+        .describe("Restock every item of the order (full refunds only; default false)."),
       notify_customer: z
         .boolean()
         .optional()
@@ -177,10 +171,14 @@ function registerRefundTools(server) {
               const none = blocked.filter((p) => p.state === NON_REFUNDABLE);
               const lines = [];
               if (manual.length) {
+                const links = manual.map((p) => p.providerLink).filter(Boolean);
                 lines.push(
-                  "This order's payment provider does not support refunds through Wix. Refund the " +
-                    "buyer in the provider's dashboard, then call wix_create_refund again with " +
-                    "external_refund=true to record it on the order.",
+                  "This order's payment provider does not support refunds through Wix" +
+                    (manual[0].reason ? ` (${manual[0].reason})` : "") +
+                    ". Refund the buyer in the provider's dashboard" +
+                    (links.length ? ` (${links.join(", ")})` : "") +
+                    ", then call wix_create_refund again with external_refund=true to record it " +
+                    "on the order.",
                 );
               }
               if (none.length) {
@@ -193,7 +191,7 @@ function registerRefundTools(server) {
               return ok({
                 refunded: false,
                 reason: "provider_not_api_refundable",
-                orderId: order.id,
+                id: order.id,
                 number: order.number,
                 blocked,
                 message: lines.join(" "),
@@ -205,31 +203,44 @@ function registerRefundTools(server) {
         const body = {
           orderId: order.id,
           paymentRefunds: plan.map((p) => ({
-            transactionId: p.paymentId,
+            paymentId: p.paymentId,
             amount: money(p.amount.toFixed(2)),
             ...(args.external_refund ? { externalRefund: true } : {}),
           })),
-          sideEffects: {
-            restockAllItems: Boolean(args.restock),
-            sendOrderRefundedEmail: Boolean(args.notify_customer),
-          },
         };
-        if (args.reason) body.reason = args.reason;
+        if (args.reason) body.customerReason = String(args.reason).slice(0, 200);
+        const sideEffects = {};
+        if (args.restock && amount === null) {
+          // Restock quantities may not exceed what is being refunded, which
+          // only a full refund guarantees for every line.
+          sideEffects.restock = {
+            lineItems: (order.lineItems || [])
+              .filter((li) => li.id && Number(li.quantity) > 0)
+              .map((li) => ({ lineItemId: li.id, quantity: Number(li.quantity) })),
+          };
+        }
+        if (args.notify_customer) sideEffects.notifications = { sendCustomerEmail: true };
+        if (Object.keys(sideEffects).length) body.sideEffects = sideEffects;
 
         const res = await wixApi("POST", "/ecom/v1/order-billing/refund-payments", { body });
         const refundedTotal = round2(plan.reduce((s, p) => s + p.amount, 0));
         return ok({
           refunded: true,
           external: Boolean(args.external_refund),
-          orderId: order.id,
+          id: order.id,
           number: order.number,
+          refundId: res?.refund?.id ?? null,
+          refundStatus: (res?.refund?.transactions || []).map((t) => ({
+            paymentId: t.paymentId ?? null,
+            status: t.refundStatus ?? null,
+          })),
           amount: { amount: refundedTotal.toFixed(2), currency: order.currency ?? null },
           remainingRefundable: {
             amount: round2(remaining - refundedTotal).toFixed(2),
             currency: order.currency ?? null,
           },
           payments: plan,
-          result: res,
+          restocked: Boolean(sideEffects.restock),
         });
       } catch (err) {
         return fail(err);

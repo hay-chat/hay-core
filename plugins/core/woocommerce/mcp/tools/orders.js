@@ -12,6 +12,7 @@ const { z } = require("zod");
 const { wcApi } = require("../lib/client");
 const { ok, fail } = require("../lib/format");
 const { resolveOrder, getTracking, enrichOrder, PRE_DISPATCH_STATUSES } = require("../lib/orders");
+const { isPreDispatch } = require("../lib/orders");
 
 const ORDER_REF = {
   order_id: z.string().optional().describe("WooCommerce order id."),
@@ -21,7 +22,8 @@ const ORDER_REF = {
     .describe("The order number the customer sees (e.g. 12345). Use when you have no id."),
 };
 
-function assertPreDispatch(order, action) {
+/** Refuse once anything has shipped: wrong status, or tracking already recorded. */
+async function assertPreDispatch(order, action) {
   if (order.status === "cancelled") {
     throw new Error(`Order #${order.number} is already cancelled; cannot ${action}.`);
   }
@@ -29,6 +31,15 @@ function assertPreDispatch(order, action) {
     throw new Error(
       `Order #${order.number} has status "${order.status}"; you can only ${action} while it is ` +
         "pending, on-hold or processing (before dispatch). Escalate to the merchant instead.",
+    );
+  }
+  const tracking = await getTracking(order);
+  if (!isPreDispatch(order, tracking)) {
+    throw new Error(
+      `Order #${order.number} already has shipment tracking (${tracking
+        .map((t) => t.trackingNumber)
+        .join(", ")}); it has left the warehouse, so you cannot ${action}. Escalate to the ` +
+        "merchant/carrier instead.",
     );
   }
 }
@@ -77,8 +88,8 @@ function registerOrderTools(server) {
   server.tool(
     "woocommerce_cancel_order",
     "Cancel an order that has not been dispatched (WRITE): only pending, on-hold or processing " +
-      "orders. WooCommerce restocks the items. Cancelling does not refund — call " +
-      "woocommerce_create_refund for the money.",
+      "orders with no shipment tracking yet. WooCommerce restocks the items. Cancelling does not " +
+      "refund — call woocommerce_create_refund for the money.",
     {
       ...ORDER_REF,
       note: z.string().optional().describe("Internal note explaining the cancellation."),
@@ -86,7 +97,7 @@ function registerOrderTools(server) {
     async (args) => {
       try {
         const order = await resolveOrder(args);
-        assertPreDispatch(order, "cancel");
+        await assertPreDispatch(order, "cancel");
         const updated = await wcApi("PUT", `/orders/${order.id}`, {
           body: { status: "cancelled" },
         });
@@ -113,7 +124,8 @@ function registerOrderTools(server) {
   server.tool(
     "woocommerce_update_order_shipping_address",
     "Change where an undispatched order ships (WRITE): only pending, on-hold or processing " +
-      "orders. Only the fields you pass change; the rest of the address is kept.",
+      "orders with no shipment tracking yet. Only the fields you pass change; the rest of the " +
+      "address is kept.",
     {
       ...ORDER_REF,
       address: z
@@ -134,7 +146,7 @@ function registerOrderTools(server) {
     async (args) => {
       try {
         const order = await resolveOrder(args);
-        assertPreDispatch(order, "change the shipping address");
+        await assertPreDispatch(order, "change the shipping address");
         const shipping = { ...(order.shipping || {}), ...args.address };
         const updated = await wcApi("PUT", `/orders/${order.id}`, { body: { shipping } });
         return ok({

@@ -12,8 +12,12 @@
 const { magentoApi, searchCriteria, MagentoApiError } = require("./client");
 const { num, round2 } = require("./format");
 
-/** Order states where nothing has been invoiced or shipped. Magento's own cancel rule. */
-const CANCELLABLE_STATES = new Set(["new", "pending_payment", "holded", "payment_review"]);
+/**
+ * Order states Magento's own Order::canCancel() accepts. `holded` must be
+ * released and `payment_review` must settle (merchant actions) before a
+ * cancel is possible.
+ */
+const CANCELLABLE_STATES = new Set(["new", "pending_payment"]);
 const CLOSED_STATES = new Set(["canceled", "closed", "complete"]);
 
 function summarizeOrder(order) {

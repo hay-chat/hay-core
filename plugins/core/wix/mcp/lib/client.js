@@ -74,7 +74,9 @@ async function wixApi(method, path, { query, body } = {}) {
         signal: AbortSignal.timeout(DEFAULT_TIMEOUT_MS),
       });
     } catch (err) {
-      if (attempt < MAX_RETRIES) {
+      // A timed-out POST may have been processed server-side (a refund that
+      // takes >30s still refunds), so only idempotent GETs are retried.
+      if (method === "GET" && attempt < MAX_RETRIES) {
         const wait = Math.pow(2, attempt) * 500;
         console.error(`[wix] network error, retry ${attempt + 1}/${MAX_RETRIES} after ${wait}ms`);
         attempt += 1;
@@ -151,4 +153,4 @@ function formatBody(rawBody) {
   return rawBody.slice(0, 600);
 }
 
-module.exports = { wixApi, WixApiError, BASE_URL };
+module.exports = { wixApi, WixApiError };

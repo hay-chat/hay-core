@@ -24,7 +24,7 @@
     },
     "magento_cancel_order": {
       "label": "Cancel Order",
-      "description": "Cancel an order that has not been invoiced or shipped."
+      "description": "Cancel a new or pending-payment order that has not been invoiced or shipped."
     },
     "magento_create_refund": {
       "label": "Create Refund",

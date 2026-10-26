@@ -6,7 +6,7 @@
  * addressChangeable, tracking).
  *
  * Wix eCommerce REST:
- *   POST /ecom/v1/orders/search                      (filter by number / buyerInfo.email)
+ *   POST /ecom/v1/orders/search                      body { search: { filter, sort, cursorPaging } }
  *   GET  /ecom/v1/orders/{id}
  *   GET  /ecom/v1/orders/{id}/transactions           (payments[] + refunds[])
  *   GET  /ecom/v1/orders/{id}/fulfillments           (fulfillments[] with trackingInfo)
@@ -15,16 +15,13 @@
 const { wixApi } = require("./client");
 const { cursorInfo, amountOf, round2 } = require("./format");
 
-const ORDER_STATUS = ["INITIALIZED", "APPROVED", "CANCELED"];
-const PAYMENT_STATUS = [
-  "NOT_PAID",
-  "PAID",
-  "PARTIALLY_PAID",
-  "PARTIALLY_REFUNDED",
-  "FULLY_REFUNDED",
-  "PENDING",
-];
-const FULFILLMENT_STATUS = ["NOT_FULFILLED", "PARTIALLY_FULFILLED", "FULFILLED"];
+const sameEmail = (a, b) =>
+  String(a || "")
+    .trim()
+    .toLowerCase() ===
+  String(b || "")
+    .trim()
+    .toLowerCase();
 
 /** Compact order row for lists (recentOrders, list_customer_orders). */
 function summarizeOrder(order) {
@@ -42,16 +39,24 @@ function summarizeOrder(order) {
 
 /**
  * Search orders. `filter` is a Wix MongoDB-style filter; results newest first.
- * Returns `{ orders, hasNext, nextCursor }`.
+ * Returns `{ orders, hasNext, nextCursor }`. Callers must still verify the
+ * rows match what they asked for: Wix silently ignores unknown body keys, so
+ * a malformed filter returns the store's newest orders instead of an error.
  */
 async function searchOrders(filter, { limit = 20, cursor } = {}) {
-  const body = {
-    filter: filter && Object.keys(filter).length ? filter : undefined,
+  const search = {
     sort: [{ fieldName: "createdDate", order: "DESC" }],
     cursorPaging: { limit, cursor },
   };
-  const res = await wixApi("POST", "/ecom/v1/orders/search", { body });
+  if (filter && Object.keys(filter).length) search.filter = filter;
+  const res = await wixApi("POST", "/ecom/v1/orders/search", { body: { search } });
   return { orders: res?.orders ?? [], ...cursorInfo(res) };
+}
+
+/** Orders whose buyer email actually matches (exact, case-insensitive). */
+async function searchOrdersByEmail(email, paging) {
+  const page = await searchOrders({ "buyerInfo.email": email }, paging);
+  return { ...page, orders: page.orders.filter((o) => sameEmail(o.buyerInfo?.email, email)) };
 }
 
 async function getOrderById(orderId) {
@@ -68,7 +73,8 @@ async function getOrderById(orderId) {
 
 /**
  * Resolve exactly one order from `{ order_id, order_number }`. The buyer only
- * ever knows the number, so the number path searches by `number`.
+ * ever knows the number, so the number path searches by `number` and then
+ * verifies the hit really carries that number.
  */
 async function resolveOrder({ order_id: orderId, order_number: orderNumber }) {
   if (orderId && orderNumber) {
@@ -76,19 +82,16 @@ async function resolveOrder({ order_id: orderId, order_number: orderNumber }) {
   }
   if (orderId) return getOrderById(orderId);
   if (orderNumber) {
-    const { orders } = await searchOrders(
-      { number: String(orderNumber).replace(/^#/, "") },
-      {
-        limit: 1,
-      },
-    );
-    if (!orders.length) {
+    const wanted = String(orderNumber).replace(/^#/, "").trim();
+    const { orders } = await searchOrders({ number: wanted }, { limit: 1 });
+    const match = orders.find((o) => String(o.number) === wanted);
+    if (!match) {
       throw new Error(
-        `No order with number ${orderNumber}. Ask the buyer to double-check the number on their ` +
+        `No order with number ${wanted}. Ask the buyer to double-check the number on their ` +
           "confirmation email, or look the customer up by email with wix_find_customer.",
       );
     }
-    return orders[0];
+    return match;
   }
   throw new Error("Pass order_id or order_number.");
 }
@@ -150,8 +153,28 @@ function paymentBalances(transactions) {
   });
 }
 
+/** paid − refunded from the order's own balanceSummary; null when Wix did not send one. */
+function balanceRemaining(order) {
+  if (!order.balanceSummary?.paid) return null;
+  const paid = amountOf(order.balanceSummary.paid);
+  const refunded = order.balanceSummary.refunded ? amountOf(order.balanceSummary.refunded) : 0;
+  return round2(Math.max(0, paid - refunded));
+}
+
+function contactOf(details) {
+  if (!details) return null;
+  return {
+    firstName: details.firstName ?? null,
+    lastName: details.lastName ?? null,
+    phone: details.phone ?? null,
+    company: details.company ?? null,
+  };
+}
+
 /**
  * Merge order + transactions + fulfilments and derive the support summary.
+ * Projects the fields a support conversation needs (the raw Wix order carries
+ * channel, attribution, tax and activity data the agent must not see).
  * `transactions` / `fulfillments` may be null when a secondary read failed —
  * the summary then degrades (flags still computed from the order itself).
  */
@@ -160,18 +183,44 @@ function enrichOrder(order, transactions, fulfillments) {
   const paidFromTx = round2(payments.reduce((s, p) => s + p.paid, 0));
   const refundedFromTx = round2(payments.reduce((s, p) => s + p.refunded, 0));
   // balanceSummary is authoritative when present; transactions are the fallback.
-  const paid = order.balanceSummary?.paid ? amountOf(order.balanceSummary.paid) : paidFromTx;
-  const refunded = order.balanceSummary?.refunded
-    ? amountOf(order.balanceSummary.refunded)
-    : refundedFromTx;
-  const remainingRefundable = round2(Math.max(0, paid - refunded));
+  const fromBalance = balanceRemaining(order);
+  const remainingRefundable =
+    fromBalance !== null ? fromBalance : round2(Math.max(0, paidFromTx - refundedFromTx));
 
   const notCanceled = order.status !== "CANCELED";
   const unfulfilled = (order.fulfillmentStatus || "NOT_FULFILLED") === "NOT_FULFILLED";
   const tracking = trackingSummary(fulfillments);
+  const destination = order.shippingInfo?.logistics?.shippingDestination ?? null;
 
   return {
-    ...order,
+    id: order.id,
+    number: order.number,
+    createdDate: order.createdDate ?? null,
+    updatedDate: order.updatedDate ?? null,
+    status: order.status,
+    paymentStatus: order.paymentStatus ?? null,
+    fulfillmentStatus: order.fulfillmentStatus ?? null,
+    currency: order.currency ?? null,
+    buyer: {
+      email: order.buyerInfo?.email ?? null,
+      contactId: order.buyerInfo?.contactId ?? null,
+      memberId: order.buyerInfo?.memberId ?? null,
+      ...(contactOf(order.billingInfo?.contactDetails) || {}),
+    },
+    buyerNote: order.buyerNote ?? null,
+    totals: {
+      subtotal: order.priceSummary?.subtotal ?? null,
+      shipping: order.priceSummary?.shipping ?? null,
+      tax: order.priceSummary?.tax ?? null,
+      discount: order.priceSummary?.discount ?? null,
+      total: order.priceSummary?.total ?? null,
+      paid: order.balanceSummary?.paid ?? null,
+      refunded: order.balanceSummary?.refunded ?? null,
+    },
+    shippingMethod: order.shippingInfo?.title ?? null,
+    shippingAddress: destination
+      ? { address: destination.address ?? null, contact: contactOf(destination.contactDetails) }
+      : null,
     lineItems: (order.lineItems || []).map((li) => ({
       id: li.id,
       name: li.productName?.translated || li.productName?.original || null,
@@ -185,7 +234,7 @@ function enrichOrder(order, transactions, fulfillments) {
     tracking,
     supportSummary: {
       isCancellable: notCanceled && unfulfilled,
-      isRefundable: notCanceled ? remainingRefundable > 0 : remainingRefundable > 0,
+      isRefundable: remainingRefundable > 0,
       remainingRefundable: {
         amount: remainingRefundable.toFixed(2),
         currency: order.currency ?? null,
@@ -213,17 +262,16 @@ async function loadEnrichedOrder(order) {
 }
 
 module.exports = {
-  ORDER_STATUS,
-  PAYMENT_STATUS,
-  FULFILLMENT_STATUS,
   summarizeOrder,
   searchOrders,
+  searchOrdersByEmail,
   getOrderById,
   resolveOrder,
   getTransactions,
   getFulfillments,
   trackingSummary,
   paymentBalances,
+  balanceRemaining,
   enrichOrder,
   loadEnrichedOrder,
 };
