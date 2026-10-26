@@ -1,4 +1,5 @@
 ## 2026-10-26 — claude/email-channel — review fixes committed (c1bfdfd), branch pushed, PR to open manually (no gh)
+## 2026-10-26 — claude/email-channel — review fixes committed (c1bfdfd), PR opening
 
 **Works:** 8 commits on branch. Reviewer's 2 HIGHs fixed (alias-only routing; conversationId/external id bound to customer),
 mediums fixed (new-thread rule, root never overwritten, echo by From/Message-ID, Resend retry, header allow-list, From-name

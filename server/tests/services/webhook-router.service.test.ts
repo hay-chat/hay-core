@@ -78,6 +78,7 @@ describe("webhookRouterService.getRoutingDescriptor", () => {
 type RouteKeyPath = {
   itemsPath: string;
   keyPath: string;
+  keyTransform?: "email-address";
   nested?: { itemsPath: string; keyPath: string };
 };
 
@@ -264,8 +265,124 @@ describe("webhookRouterService.dispatch", () => {
   });
 });
 
+describe("webhookRouterService.dispatch (email-address keys)", () => {
+  beforeEach(() => {
+    jest.resetAllMocks();
+    startPluginWorker.mockResolvedValue({ port: 1234, instanceId: "inst" });
+    updateActivityTimestamp.mockResolvedValue(undefined);
+    global.fetch = jest.fn().mockResolvedValue({ ok: true });
+  });
+
+  const emailRouting = {
+    routeKeyPath: { itemsPath: "data.to", keyPath: ".", keyTransform: "email-address" as const },
+  };
+
+  it("routes a plain string array by the normalised address and forwards only that org's recipients", async () => {
+    setOwners({ "in-acme@inbound.hay.chat": "org-acme" });
+    const body = {
+      type: "email.received",
+      data: {
+        email_id: "e1",
+        to: ['"Acme" <In-Acme+c42@Inbound.hay.chat>', "someone@else.com"],
+      },
+    };
+
+    await dispatch("p", emailRouting, body, fakeReq);
+
+    expect(findByKey).toHaveBeenCalledWith("p", "in-acme@inbound.hay.chat");
+    const bodies = forwardedBodies();
+    expect(bodies["org-acme"]).toEqual({
+      type: "email.received",
+      data: { email_id: "e1", to: ['"Acme" <In-Acme+c42@Inbound.hay.chat>'] },
+    });
+  });
+
+  it("drops recipients that are not addresses without a lookup", async () => {
+    setOwners({});
+    await dispatch("p", emailRouting, { data: { to: ["garbage"] } }, fakeReq);
+    expect(findByKey).not.toHaveBeenCalled();
+    expect(global.fetch).not.toHaveBeenCalled();
+  });
+});
+
+describe("webhookRouterService.handle signature formats", () => {
+  const svixSecretBytes = Buffer.from("0123456789abcdef0123456789abcdef");
+  const svixSecret = `whsec_${svixSecretBytes.toString("base64")}`;
+  const rawBody = '{"type":"email.received","data":{"to":["x@y.z"]}}';
+
+  function makeRes() {
+    const res: { statusCode?: number; body?: unknown; status: jest.Mock; json: jest.Mock } = {
+      status: jest.fn(),
+      json: jest.fn(),
+    };
+    res.status.mockImplementation((code: number) => {
+      res.statusCode = code;
+      return res;
+    });
+    res.json.mockImplementation((payload: unknown) => {
+      res.body = payload;
+      return res;
+    });
+    return res;
+  }
+
+  beforeEach(() => {
+    jest.resetAllMocks();
+    process.env.TEST_SVIX_SECRET = svixSecret;
+    findByKey.mockResolvedValue(null);
+  });
+
+  afterEach(() => {
+    delete process.env.TEST_SVIX_SECRET;
+  });
+
+  const svixRouting = {
+    signature: { header: "svix-signature", format: "svix" as const, secretEnv: "TEST_SVIX_SECRET" },
+    routeKeyPath: { itemsPath: "data.to", keyPath: "." },
+  };
+
+  function svixHeaders(ts: number, body: string, key: Buffer = svixSecretBytes) {
+    const sig = require("crypto")
+      .createHmac("sha256", key)
+      .update(`msg_1.${ts}.${body}`)
+      .digest("base64");
+    return { "svix-id": "msg_1", "svix-timestamp": String(ts), "svix-signature": `v1,${sig}` };
+  }
+
+  it("accepts a correctly signed svix request and acks 200", async () => {
+    const ts = Math.floor(Date.now() / 1000);
+    const req = { method: "POST", headers: svixHeaders(ts, rawBody), rawBody } as never;
+    const res = makeRes();
+
+    await webhookRouterService.handle(req, res as never, "p", svixRouting as never);
+
+    expect(res.statusCode).toBe(200);
+  });
+
+  it("rejects a svix request signed with another secret", async () => {
+    const ts = Math.floor(Date.now() / 1000);
+    const req = {
+      method: "POST",
+      headers: svixHeaders(ts, rawBody, Buffer.from("another-secret-another-secret!!")),
+      rawBody,
+    } as never;
+    const res = makeRes();
+
+    await webhookRouterService.handle(req, res as never, "p", svixRouting as never);
+
+    expect(res.statusCode).toBe(401);
+  });
+});
+
 describe("__webhookRouterInternals", () => {
-  const { getPath, withPath } = __webhookRouterInternals;
+  const { getPath, withPath, routingKey } = __webhookRouterInternals;
+
+  it("routingKey treats '.' as the item itself and applies the email transform", () => {
+    expect(routingKey("A@B.com", ".", undefined)).toBe("A@B.com");
+    expect(routingKey("A@B.com", ".", "email-address")).toBe("a@b.com");
+    expect(routingKey({ id: 7 }, "id", undefined)).toBe("7");
+    expect(routingKey({ id: null }, "id", undefined)).toBeUndefined();
+  });
 
   it("getPath walks dot-paths and returns undefined for missing segments", () => {
     const source = { a: { b: { c: 1 } }, list: [1] };

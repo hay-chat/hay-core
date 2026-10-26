@@ -86,7 +86,8 @@ export interface PluginMetadata {
  */
 export interface WebhookSignatureDescriptor {
   header: string;
-  format: "sha256-hmac";
+  /** "sha256-hmac" = hex HMAC of the body in `header`; "svix" = Standard Webhooks (svix-id/timestamp/signature). */
+  format: "sha256-hmac" | "svix";
   secretEnv: string;
 }
 
@@ -110,7 +111,10 @@ export interface WebhookVerificationChallengeDescriptor {
  */
 export interface WebhookRouteKeyPathDescriptor {
   itemsPath: string;
+  /** Dot-path on each item; "." means the item itself is the key. */
   keyPath: string;
+  /** Normalisation applied to every extracted key before the owner lookup. */
+  keyTransform?: "email-address";
   /** Optional sub-array inside each item, routed (and filtered) per element. */
   nested?: { itemsPath: string; keyPath: string };
 }

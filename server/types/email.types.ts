@@ -28,6 +28,10 @@ export interface EmailOptions {
   attachments?: EmailAttachment[];
   headers?: Record<string, string>;
   priority?: "high" | "normal" | "low";
+  /** Explicit Message-ID; nodemailer generates one when omitted. */
+  messageId?: string;
+  /** Queue a failed send for background retry (default true). */
+  retry?: boolean;
 }
 
 export interface EmailTemplateOptions extends Omit<EmailOptions, "html" | "text" | "subject"> {

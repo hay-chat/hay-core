@@ -21,17 +21,25 @@
 /**
  * Signature verification descriptor.
  *
- * Core verifies an HMAC-SHA256 over the EXACT raw request bytes using the
- * secret read from `process.env[secretEnv]`, then timing-safe compares the
- * lowercase hex digest against the value in the named header (the header value
- * may carry a `sha256=` prefix, which Core strips before comparing).
+ * Core reads the secret from `process.env[secretEnv]` and verifies the EXACT
+ * raw request bytes using the declared format:
+ *
+ *   - `"sha256-hmac"`: HMAC-SHA256 of the body, lowercase hex, compared
+ *     timing-safe against the named header (an optional `sha256=` prefix is
+ *     stripped first). Used by Meta-style providers.
+ *   - `"svix"`: the Standard Webhooks / Svix scheme (Resend and others).
+ *     `header` must be `svix-signature`; Core also reads `svix-id` and
+ *     `svix-timestamp`, signs `${id}.${timestamp}.${body}` with the
+ *     base64-decoded secret (`whsec_` prefix stripped), compares against any
+ *     `v1,<base64>` entry in the header and rejects timestamps more than five
+ *     minutes from now.
  */
 export interface WebhookSignatureDescriptor {
-  /** Request header carrying the signature (e.g. "x-hub-signature-256"). */
+  /** Request header carrying the signature (e.g. "x-hub-signature-256", "svix-signature"). */
   header: string;
 
-  /** Signature format. Only HMAC-SHA256 is supported today. */
-  format: "sha256-hmac";
+  /** Signature format. */
+  format: "sha256-hmac" | "svix";
 
   /**
    * Name of the environment variable holding the shared signing secret.
@@ -83,8 +91,24 @@ export interface WebhookRouteKeyPathDescriptor {
   /** Dot-path to the array of events on the parsed body (e.g. "entry"). */
   itemsPath: string;
 
-  /** Dot-path to the routing key on each event item (e.g. "id"). */
+  /**
+   * Dot-path to the routing key on each event item (e.g. "id"). The special
+   * value `"."` means the item itself is the key — for providers whose event
+   * carries a plain array of strings (e.g. a list of recipient addresses).
+   */
   keyPath: string;
+
+  /**
+   * Optional normalisation applied to every extracted key (item-level and
+   * nested) before the owner lookup. Plugins register keys in the same
+   * normalised form.
+   *
+   *   - `"email-address"`: takes the bare address out of `Name <user@host>`
+   *     or `user@host`, lowercases it and drops any `+tag` sub-address, so
+   *     `"Acme" <Support+c42@Acme.com>` → `support@acme.com`. Keys without
+   *     an `@` are dropped.
+   */
+  keyTransform?: "email-address";
 
   /**
    * Optional sub-array inside each item, routed (and filtered) per element.

@@ -31,6 +31,7 @@ import type {
   RemoteMCPServerConfig,
 } from "@server/types/plugin.types";
 import { createLogger } from "@server/lib/logger";
+import type { Conversation } from "@server/database/entities/conversation.entity";
 
 const logger = createLogger("plugin-api-trpc");
 
@@ -108,10 +109,23 @@ export const pluginApiTrpcRouter = router({
         // human agent so Hay flips the conversation to human-took-over and the
         // orchestrator stops running.
         senderType: z.enum(["customer", "human_agent"]).optional(),
-        // Optional provider-side conversation id (e.g. Chatwoot conversation id).
-        // Stored in conversation.metadata[channel].conversationId so outbound
-        // delivery can reuse it without extra lookups.
-        externalConversationId: z.string().optional(),
+        // Optional provider-side conversation id (e.g. Chatwoot conversation id,
+        // or an email thread's root Message-ID). Looked up first so threads the
+        // provider already identified never merge into the customer's active
+        // conversation; stored in conversation.metadata[channel].conversationId
+        // so outbound delivery can reuse it without extra lookups.
+        externalConversationId: z.string().max(998).optional(),
+        // Optional Hay conversation id the plugin recovered from its own
+        // outbound message (e.g. an email reply-to token). Wins over every
+        // other lookup when it belongs to this org and channel.
+        conversationId: z.string().uuid().optional(),
+        // Optional title for a newly created conversation (e.g. email subject).
+        title: z.string().max(255).optional(),
+        // Park the conversation for a human instead of letting the AI answer
+        // (e.g. a DMARC-failing email or a reply that shows a human already
+        // answered outside Hay). The message is stored; the conversation goes
+        // to pending-human so it shows under "Needs attention".
+        holdForHuman: z.boolean().optional(),
         // Media already uploaded to Hay storage (see `media.upload`). Attachment-only
         // messages pass an empty `content`.
         attachments: z
@@ -131,7 +145,7 @@ export const pluginApiTrpcRouter = router({
     .mutation(async ({ input, ctx }) => {
       requireCapability(ctx, "messages");
 
-      const { from, content, channel, metadata, externalConversationId } = input;
+      const { from, content, channel, metadata, externalConversationId, title } = input;
       const attachments: MessageAttachment[] | undefined = input.attachments?.map((attachment) => ({
         ...attachment,
         id: attachment.id ?? randomUUID(),
@@ -148,10 +162,11 @@ export const pluginApiTrpcRouter = router({
             organization_id: organizationId,
             external_id: from,
             name: metadata?.profileName as string | undefined,
-            // Only store a real phone number if the channel provides one.
+            // Only store a real phone number / email if the channel provides one.
             // `from` is a channel-scoped identity (e.g. "instagram:<psid>") and
-            // belongs in external_id, never the phone field.
+            // belongs in external_id, never the phone or email field.
             phone: (metadata?.phone as string | undefined) ?? undefined,
+            email: (metadata?.email as string | undefined) ?? undefined,
             external_metadata: {
               [channel]: {
                 id: from,
@@ -170,6 +185,9 @@ export const pluginApiTrpcRouter = router({
           }
           if (!customer.phone && metadata?.phone) {
             updates.phone = metadata.phone as string;
+          }
+          if (!customer.email && metadata?.email) {
+            updates.email = metadata.email as string;
           }
           if (metadata) {
             updates.external_metadata = {
@@ -197,12 +215,41 @@ export const pluginApiTrpcRouter = router({
           });
         }
 
-        // Find active conversation or create a new one
-        let conversation = await conversationRepository.findActiveByCustomerAndChannel(
-          customer.id,
-          channel,
-          organizationId,
-        );
+        // Resolve the conversation: a Hay id the plugin recovered from its own
+        // outbound message wins, then the provider-side thread id. Both must
+        // belong to this customer — the Hay id travels in every outbound email
+        // (Reply-To token), so a third party who was forwarded one must not be
+        // able to inject into the shopper's thread. Plugins that pass neither
+        // fall back to the customer's active conversation on this channel; a
+        // plugin that does pass an external thread id and misses means a new
+        // thread (one customer, many threads). A resolved thread found by id
+        // or external id is reopened by addMessage below.
+        let conversation: Conversation | null = null;
+        if (input.conversationId) {
+          const byId = await conversationRepository.findByIdAndOrganization(
+            input.conversationId,
+            organizationId,
+          );
+          conversation =
+            byId && byId.channel === channel && byId.customer_id === customer.id && !byId.deleted_at
+              ? byId
+              : null;
+        }
+        if (!conversation && externalConversationId) {
+          const byExternalId = await conversationRepository.findByExternalConversationId(
+            channel,
+            externalConversationId,
+            organizationId,
+          );
+          conversation = byExternalId?.customer_id === customer.id ? byExternalId : null;
+        }
+        if (!conversation && !externalConversationId) {
+          conversation = await conversationRepository.findActiveByCustomerAndChannel(
+            customer.id,
+            channel,
+            organizationId,
+          );
+        }
 
         // Seed channel-specific metadata on brand-new conversations so outbound
         // delivery can look up provider-side IDs (e.g. Chatwoot conversation id)
@@ -218,16 +265,18 @@ export const pluginApiTrpcRouter = router({
             agent_id: agentId,
             channel,
             status: "open",
-            title: "",
+            title: title ?? "",
             metadata: Object.keys(channelMetadata).length ? { [channel]: channelMetadata } : null,
           });
         } else if (externalConversationId) {
-          // Conversation already exists — merge the externalConversationId into
-          // its metadata if it's not already stored there. We intentionally do
-          // not broadcast this metadata-only change because it's internal state.
+          // Conversation already exists — store the externalConversationId if
+          // none is recorded yet. An existing value is the thread root and is
+          // never replaced: a reply that only references our own message would
+          // otherwise detach the thread from its first message. We intentionally
+          // do not broadcast this metadata-only change because it's internal state.
           const existing = conversation.metadata ?? {};
           const existingChannel = (existing[channel] ?? {}) as Record<string, unknown>;
-          if (existingChannel.conversationId !== externalConversationId) {
+          if (existingChannel.conversationId === undefined) {
             const merged = {
               ...existing,
               [channel]: { ...existingChannel, ...channelMetadata },
@@ -292,6 +341,17 @@ export const pluginApiTrpcRouter = router({
         ) {
           await conversationRepository.update(conversation.id, organizationId, {
             status: "human-took-over",
+            needs_processing: false,
+          });
+        } else if (
+          input.holdForHuman &&
+          senderType === "customer" &&
+          conversation.status !== "human-took-over"
+        ) {
+          // addMessage just reopened the conversation and queued it for the
+          // orchestrator; park it for a human instead.
+          await conversationRepository.update(conversation.id, organizationId, {
+            status: "pending-human",
             needs_processing: false,
           });
         }

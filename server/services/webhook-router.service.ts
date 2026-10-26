@@ -6,8 +6,10 @@ import { pluginRegistryRepository } from "../repositories/plugin-registry.reposi
 import { pluginInstanceRepository } from "../repositories/plugin-instance.repository";
 import { pluginWebhookRouteRepository } from "../repositories/plugin-webhook-route.repository";
 import { verifyHmacSha256 } from "./plugin-route.service";
+import { normalizeEmailAddressKey, verifySvixSignature } from "@server/lib/svix-signature";
 import type {
   WebhookDeauthorizationDescriptor,
+  WebhookRouteKeyPathDescriptor,
   WebhookRoutingDescriptor,
 } from "../types/plugin-sdk.types";
 import { createLogger } from "@server/lib/logger";
@@ -115,11 +117,11 @@ export class WebhookRouterService {
       return;
     }
 
-    const signatureHeader = req.headers[routing.signature.header.toLowerCase()];
-    const signature = Array.isArray(signatureHeader) ? signatureHeader[0] : signatureHeader;
-
-    if (!verifyHmacSha256(rawBody, signature, secret)) {
-      logger.warn({ pluginId }, "Shared webhook signature verification failed");
+    if (!this.verifySignature(req, rawBody, routing, secret)) {
+      logger.warn(
+        { pluginId, format: routing.signature.format },
+        "Shared webhook signature verification failed",
+      );
       res.status(401).json({ error: "Invalid signature" });
       return;
     }
@@ -141,6 +143,35 @@ export class WebhookRouterService {
     void this.dispatch(pluginId, routing, body, req).catch((err) => {
       logger.error({ err, pluginId }, "Unexpected error during shared webhook dispatch");
     });
+  }
+
+  /**
+   * Verify the shared-webhook signature with the declared format.
+   */
+  private verifySignature(
+    req: Request,
+    rawBody: Buffer,
+    routing: WebhookRoutingDescriptor,
+    secret: string,
+  ): boolean {
+    const header = (name: string): string | undefined => {
+      const value = req.headers[name.toLowerCase()];
+      return Array.isArray(value) ? value[0] : value;
+    };
+
+    if (routing.signature.format === "svix") {
+      return verifySvixSignature(
+        rawBody,
+        {
+          id: header("svix-id"),
+          timestamp: header("svix-timestamp"),
+          signature: header(routing.signature.header),
+        },
+        secret,
+      );
+    }
+
+    return verifyHmacSha256(rawBody, header(routing.signature.header), secret);
   }
 
   /**
@@ -313,6 +344,8 @@ export class WebhookRouterService {
     req: Request,
   ): Promise<void> {
     const { itemsPath, keyPath, nested } = routing.routeKeyPath;
+    const extractKey = (source: unknown, path: string): string | undefined =>
+      routingKey(source, path, routing.routeKeyPath.keyTransform);
 
     const items = getPath(body, itemsPath);
     if (!Array.isArray(items)) {
@@ -340,17 +373,14 @@ export class WebhookRouterService {
     };
 
     for (const rawItem of items) {
-      const itemKey = getPath(rawItem, keyPath);
+      const itemKey = extractKey(rawItem, keyPath);
       let itemOwner: RouteOwner = null;
-      if (itemKey === undefined || itemKey === null) {
+      if (itemKey === undefined) {
         logger.debug({ pluginId, keyPath }, "Shared webhook item missing routing key");
       } else {
-        itemOwner = await resolveOwner(String(itemKey));
+        itemOwner = await resolveOwner(itemKey);
         if (!itemOwner) {
-          logger.info(
-            { pluginId, routingKey: String(itemKey) },
-            "Unknown routing key for shared webhook",
-          );
+          logger.info({ pluginId, routingKey: itemKey }, "Unknown routing key for shared webhook");
         }
       }
 
@@ -368,16 +398,16 @@ export class WebhookRouterService {
       // Nested routing: split the sub-array by sub-item owner.
       const subItemsByOrg = new Map<string, unknown[]>();
       for (const subItem of subItems) {
-        const subKey = getPath(subItem, nested.keyPath);
+        const subKey = extractKey(subItem, nested.keyPath);
         let owner: RouteOwner;
-        if (subKey === undefined || subKey === null) {
+        if (subKey === undefined) {
           // Account-level sub-item: belongs to the item-level owner.
           owner = itemOwner;
         } else {
-          owner = await resolveOwner(String(subKey));
+          owner = await resolveOwner(subKey);
           if (!owner) {
             logger.info(
-              { pluginId, routingKey: String(subKey) },
+              { pluginId, routingKey: subKey },
               "Unknown nested routing key for shared webhook; dropping sub-item",
             );
           }
@@ -485,6 +515,24 @@ export class WebhookRouterService {
 }
 
 /**
+ * Extract and normalise one routing key. `"."` selects the item itself (for
+ * plain-string arrays); `keyTransform` normalises the value so plugins can
+ * register keys in a canonical form.
+ */
+function routingKey(
+  source: unknown,
+  path: string,
+  transform: WebhookRouteKeyPathDescriptor["keyTransform"],
+): string | undefined {
+  const value = path === "." ? source : getPath(source, path);
+  if (value === undefined || value === null) {
+    return undefined;
+  }
+  const key = String(value);
+  return transform === "email-address" ? normalizeEmailAddressKey(key) : key;
+}
+
+/**
  * Minimal, safe dot-path getter. No code execution. Traverses plain object
  * properties only; returns undefined on any missing/non-object segment.
  */
@@ -550,4 +598,4 @@ function withPath(source: unknown, path: string, value: unknown): Record<string,
 export const webhookRouterService = new WebhookRouterService();
 
 // Exported for unit tests of the no-eval path extractor / body reconstruction.
-export const __webhookRouterInternals = { getPath, setPath, withPath };
+export const __webhookRouterInternals = { getPath, setPath, withPath, routingKey };

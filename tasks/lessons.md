@@ -164,3 +164,18 @@
 - **Failure mode**: The worktree-isolation hook rejects any Bash command where a path or value comes from a shell variable or a `for` loop, so heredoc chains and loops over plugin dirs were silently dropped and early file rewrites never landed.
 - **Detection signal**: "Refusing to run it … cannot be shown not to be git" errors; a file you believed rewritten still has the old content.
 - **Prevention**: Use the Write/Edit tools for file content and spell out absolute paths literally, one plain command per plugin; always pass `--root <abs plugin dir>` to vitest because the shell cwd drifts between calls.
+### Free-text config used as a shared-webhook routing key
+- **Failure mode**: The email channel registered the merchant's typed support address as a routing key. Routing keys are "last connect wins" per plugin, so any org could type a competitor's address and receive their customers' mail through the shared webhook.
+- **Detection signal**: a `setRoutingKeys` call whose key comes from `register.config` rather than from something the provider issued or we verified (OAuth asset id, our own derived alias).
+- **Prevention**: Route only on keys the provider or Hay controls (the alias derived from the org id, a phone_number_id from OAuth). Anything a user types needs proof of control before it may route, or must not route at all.
+
+### Ids we hand to customers are not authentication
+- **Failure mode**: `messages.receive` trusted the Hay conversation id recovered from the Reply-To token and appended the message to that conversation without checking the sender was its customer. The token is in every outbound email, so a forwarded reply let a third party inject into the shopper's thread (and drive the AI's tools).
+- **Detection signal**: a lookup by an id that leaves the system (URL, email header, QR, webhook echo) followed directly by a write, with no ownership check against the authenticated/derived actor.
+- **Prevention**: Every "hint" id must be bound to the actor that is allowed to use it (`customer_id === customer.id`) and silently ignored otherwise; write the mismatch test alongside the happy path.
+
+### Worktree tests silently lose the project .env
+- **Failure mode**: `server/config/env.ts` searches up to 4 directories above `server/config` for `.env`. From the main checkout that reaches `/srv/hay-core/.env`; from `.claude/worktrees/<name>/` it stops one level short, so every DB-backed Jest suite fails with an empty `AggregateError` that looks like a regression.
+- **Detection signal**: suites failing only in the worktree with `AggregateError:` and no message; the same suite green from `/srv/hay-core/repo`.
+- **Prevention**: Compare against the main checkout before debugging; run DB-backed suites from the main checkout (or export the DB vars) and say so in the verification story.
+
