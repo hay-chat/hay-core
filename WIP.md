@@ -1,3 +1,11 @@
+## 2026-10-26 — master @9016b93 — Email inbox channel LIVE end to end (inbound + outbound verified in prod)
+
+**Fixed + deployed:** plugin worker token now minted in one place (`server/lib/plugin-api-token.ts`: scope plugin-api + issuer hay-plugin-api + audience plugin) so both the tRPC plugin API and the REST relay (/v1/plugin-api/send-email) accept it; before, every email reply failed "jwt audience invalid" (and the core `email` tool plugin had the same bug). Jest test covers both checks.
+**Infra done this session:** Cloudflare MX `inbound.hay.chat → receive-euw1.forge.rmta.net` (prio 10, DNS only) added via the ddns token (script in scratchpad; zone 9c9d67b9…); Resend domain inbound.hay.chat fully verified incl. receiving; `email.received` webhook → https://eu.hay.chat/v1/plugins/hay-channel-email/webhook enabled; RESEND_WEBHOOK_SECRET rotated in Infisical + `deploy.sh --env-only`.
+**Verified in prod (Roger's org):** two test mails to in-1abd51c0ea@inbound.hay.chat → webhook → conversations "Test 16:48" (03336bd1…, reply refused pre-fix) and f54778c6… (agent escalated to human, bot message delivered: send-email → SMTP → "Channel delivery successful").
+**Observed, not fixed:** first mail's body reached the agent as just the signature (check reply-parser when body is empty); "Failed to decrypt credential, using as-is (legacy data?)" ×7 on every delivery (legacy plugin-instance credentials); atlassian/notion `router.cjs` fail to load (`@server/trpc` missing in image) — pre-existing warnings at boot; the plugin does not implement /escalate (fine, skipped).
+**Next:** Roger confirms the reply landed in his mailbox (From "Support <support@updates.hay.chat>", threading). Then Gmail forwarding setup for a real support mailbox.
+
 ## 2026-10-26 — master @e67e295 — Email inbox channel unblocked in prod (worker boots, settings page complete)
 
 **Fixed + deployed:** SDK runner now accepts the `email` capability (7cbf7b2; it rejected both core email plugins' manifests), host env filter hands plugins SMTP_FROM_EMAIL/SMTP_FROM_NAME via `server/lib/plugin-env.ts` (tested), and the email-channel plugin no longer lists RESEND_WEBHOOK_SECRET as required (e67e295; core verifies svix, never passes secrets). Docs api-reference lists `email` (hay-docs 208faa1).

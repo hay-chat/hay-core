@@ -1,6 +1,6 @@
 # Context
 
-**Current Task**: Merge-gate session: fact-fix branches, three follow-up fixes, prod env keys, backoffice billing/Snov.io/admin-controls and the email-channel boot fixes are all merged and deployed; the email inbox end-to-end test waits on Resend receiving + MX for inbound.hay.chat.
+**Current Task**: Merge-gate session: everything merged and deployed; the Email inbox channel is verified end to end in prod (inbound via Resend webhook, agent reply delivered by email after the worker-token fix).
 
 **Key Decisions**:
 
@@ -12,4 +12,4 @@
 
 - Done 2026-10-26: VAPID_*/RESEND_*/EMAIL_INBOUND_DOMAIN live in prod (deploy.sh --env-only); backoffice billing branches merged, migrated, Stripe live catalog synced, deployed (see /srv/hay/WIP.md).
 - Dashboard still has no `test` script/vitest config (run `npx vitest run` from `dashboard/`); server `PluginMetadata` lacks the `pages` field the SDK emits.
-- Email inbox live test: Roger enables receiving on inbound.hay.chat in Resend, publishes the MX in Cloudflare, creates the email.received webhook to /v1/plugins/hay-channel-email/webhook, then `deploy.sh --env-only`, save support address, send a test mail. Website copy fixes still in each branch's `tasks/todo.md`.
+- Email inbox: Roger confirms the reply arrived in his mailbox; then set up real Gmail forwarding. Observed: empty-body mail passes the signature to the agent; legacy "Failed to decrypt credential" warnings on delivery; atlassian/notion router.cjs fail to load in the image. Website copy fixes still in each branch's `tasks/todo.md`.
