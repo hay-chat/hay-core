@@ -40,9 +40,25 @@ on the next shopper message.
 - [x] Dashboard: agents/index.vue + agents/[id].vue copy via i18n (en + pt-BR) — commit e63210b
 - [x] Playwright: `tests/agent-pause.spec.ts` (pause → badge → reload persists → API enabled=false → resume)
 - [x] Docs submodule: agents.md, conversations.md, settings.md — hay-docs branch `claude/agent-pause` @e9f19de
-- [ ] Independent review agent on `git diff master...HEAD`; address findings (running)
-- [ ] Website lines to change listed in PR
-- [ ] WIP.md entry (done), push, PR, docs PR, bump submodule pointer
+- [x] Independent review agent on `git diff master...HEAD`; findings addressed in b7996ff (see Review below)
+- [x] Website lines to change listed in PR body
+- [x] WIP.md entry, branch pushed, docs branch pushed, submodule pointer bumped (02d4388)
+- [ ] Open PRs (no `gh` on this host — compare links + body handed to Roger)
+
+## Review (second agent, read-only, on `git diff master...HEAD`)
+
+Must fix, both done:
+
+1. Docs submodule pointer was not committed → bumped in b7996ff.
+2. Inactivity checker (`orchestrator/index.ts`) sent LLM warning/closing messages for paused agents →
+   `findAllOpenConversations` loads `agent`, loop skips paused agents; test `inactivity-paused-agent.test.ts`.
+   Nice to have, done: duplicate `conversation_status_changed` publish removed from `parkForPausedAgent`
+   (repository.update already broadcasts; channel plugins escalated twice); last hardcoded "All Status" label;
+   dead `training`/`error` statuses + keys dropped; docs reworded (Return to AI only after Take Over, in-flight
+   reply completes, unavailable-handoff follow-up turn goes to the queue).
+   Left as follow-ups (pre-existing, noted in PR): conversations with no `agent_id` (websocket path) bypass the
+   pause; "Return to AI" on a paused agent bounces back to Needs Attention with a success toast; a run already
+   holding the lock when the flag flips finishes its reply.
 
 ## Verify (actual results)
 

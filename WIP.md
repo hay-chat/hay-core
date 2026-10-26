@@ -6,8 +6,11 @@ Dashboard copy Pause/Resume/Paused via i18n en+pt-BR, test ids. Jest: 9 new test
 Docs submodule branch `claude/agent-pause` @e9f19de (agents/conversations/settings.md) — push + PR in hay-docs still to do.
 **Half-built:** Playwright `tests/agent-pause.spec.ts` written + type-clean but NOT run: no Hay dev servers on this host
 (3000=AdGuard, 3001=unrelated Next app; Hay runs in Docker from master, no .env for a local stack).
-**Next:** reviewer findings → push branch, open PR vs master (list website `src/docs/content/user-guide/*` mirror lines),
-push docs branch + PR, bump submodule pointer. Run the spec on a machine with `npm run dev`.
+Review done (b7996ff): paused agents also skip inactivity messages, duplicate status publish removed, docs pointer bumped
+to 02d4388; 4 Jest suites / 14 tests green. PR body in `tasks/pr-agent-pause.md` (no `gh` on this host).
+**Next:** open hay-docs PR (claude/agent-pause → main) then hay-core PR (claude/agent-pause → master) with that body;
+run `npx playwright test tests/agent-pause.spec.ts --project=chromium` on a machine with `npm run dev`; after merge bump
+the hay-website `src/docs/content` submodule.
 
 ## 2026-10-21 — master @7448cad — WhatsApp live in prod, Meta webhook configured
 
