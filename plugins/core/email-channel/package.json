@@ -1,0 +1,45 @@
+{
+  "name": "hay-channel-email",
+  "version": "1.0.0",
+  "description": "Connect your support inbox as a channel — forward support@ emails to Hay and let the AI reply by email, threaded like a normal conversation",
+  "author": "Hay",
+  "type": "module",
+  "main": "dist/index.js",
+  "hay-plugin": {
+    "entry": "./dist/index.js",
+    "displayName": "Email",
+    "category": "channel",
+    "channel": "email",
+    "capabilities": [
+      "messages",
+      "customers",
+      "email"
+    ],
+    "env": [
+      "RESEND_API_KEY",
+      "RESEND_WEBHOOK_SECRET",
+      "EMAIL_INBOUND_DOMAIN",
+      "SMTP_FROM_EMAIL"
+    ]
+  },
+  "scripts": {
+    "build": "npm run build:ui && tsc",
+    "build:ui": "vite build --config vite.config.ui.ts",
+    "start": "node dist/index.js",
+    "dev": "npm run build:ui && tsc",
+    "dev:ui": "vite build --watch --config vite.config.ui.ts",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@hay/plugin-sdk": "file:../../../packages/plugin-sdk"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "@vitejs/plugin-vue": "^5.0.0",
+    "typescript": "^5.3.3",
+    "vite": "^5.0.0",
+    "vitest": "^1.1.0",
+    "vue": "^3.4.0"
+  }
+}
