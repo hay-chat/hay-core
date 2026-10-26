@@ -9,6 +9,7 @@ import { PluginInstance } from "../entities/plugin-instance.entity";
 import { pluginInstanceRepository } from "../repositories/plugin-instance.repository";
 import { fetchAndStoreTools } from "./plugin-tools.service";
 import { resolveConfigForWorker } from "@server/lib/config-resolver";
+import { isDeniedPluginEnv } from "@server/lib/plugin-env";
 import { getApiUrl, config as envConfig } from "../config/env";
 import { oauthService } from "./oauth.service";
 import { createLogger } from "@server/lib/logger";
@@ -452,29 +453,8 @@ export class PluginRunnerService {
     env.HAY_API_TOKEN = this.generatePluginJWT(orgId, pluginId, capabilities);
 
     // Add allowed environment variables from host
-    // Pattern-based deny list blocks any env var containing sensitive keywords.
-    // This is more robust than an explicit list — new secrets are blocked by default.
-    const DENIED_ENV_PATTERNS = [
-      /SECRET/i,
-      /PASSWORD/i,
-      /TOKEN/i,
-      /PRIVATE.?KEY/i,
-      /CREDENTIAL/i,
-      /^DB_/i,
-      /^DATABASE/i,
-      /^REDIS/i,
-      /^AWS_/i,
-      /^OPENAI/i,
-      /^ANTHROPIC/i,
-      /^JWT/i,
-      /^SMTP/i,
-      /^GITHUB/i,
-      /^NPM/i,
-      /^PLUGIN_ENCRYPTION/i,
-      /^HAY_/i, // Prevent plugins from overriding SDK internals
-    ];
     for (const envVar of allowedEnvVars) {
-      if (DENIED_ENV_PATTERNS.some((pattern) => pattern.test(envVar))) {
+      if (isDeniedPluginEnv(envVar)) {
         logger.warn({ pluginId, envVar }, "Plugin requested denied environment variable");
         continue;
       }
