@@ -8,9 +8,7 @@
     "status": {
       "all": "All statuses",
       "active": "Active",
-      "inactive": "Paused",
-      "training": "Training",
-      "error": "Error"
+      "inactive": "Paused"
     },
     "actions": {
       "pause": "Pause",

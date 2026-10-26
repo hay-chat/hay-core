@@ -316,20 +316,13 @@ async function parkForPausedAgent(conversation: Conversation, log: pino.Logger):
     return;
   }
 
+  // conversationRepository.update broadcasts conversation_status_changed
+  // itself when status is among the changed fields.
   const updates: Partial<Conversation> = { needs_processing: false };
   if (shouldQueue) {
     updates.status = "pending-human";
   }
   await conversationRepository.update(conversation.id, conversation.organization_id, updates);
-
-  if (shouldQueue) {
-    await publishStatusChange(
-      conversation.organization_id,
-      conversation.id,
-      "pending-human",
-      conversation.title,
-    );
-  }
 }
 
 export const runConversation = async (conversationId: string) => {

@@ -8,9 +8,7 @@
     "status": {
       "all": "Todos os status",
       "active": "Ativo",
-      "inactive": "Pausado",
-      "training": "Treinando",
-      "error": "Erro"
+      "inactive": "Pausado"
     },
     "actions": {
       "pause": "Pausar",

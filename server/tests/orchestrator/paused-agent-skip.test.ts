@@ -4,7 +4,8 @@ import { describe, it, expect, jest, beforeEach } from "@jest/globals";
  * runConversation() must not reply for a paused agent (agents.enabled = false):
  * it returns before acquiring the lock, parks a conversation that already has
  * a shopper message as pending-human (Needs Attention) and clears
- * needs_processing so the sweep stops re-enqueuing it.
+ * needs_processing so the sweep stops re-enqueuing it. The status broadcast
+ * is conversationRepository.update's job, so it is not asserted here.
  */
 
 const mockFindById = jest.fn();
@@ -28,11 +29,6 @@ jest.mock("@server/services/prompt.service", () => ({
 jest.mock("../../orchestrator/perception.layer", () => ({ PerceptionLayer: class {} }));
 jest.mock("../../orchestrator/retrieval.layer", () => ({ RetrievalLayer: class {} }));
 jest.mock("../../orchestrator/execution.layer", () => ({ ExecutionLayer: class {} }));
-
-const mockPublish = jest.fn();
-jest.mock("@server/services/redis.service", () => ({
-  redisService: { isConnected: () => true, publish: mockPublish },
-}));
 
 const mockLogger = {
   debug: jest.fn(),
@@ -78,15 +74,6 @@ describe("runConversation for a paused agent", () => {
       status: "pending-human",
     });
     expect(convo.lock).not.toHaveBeenCalled();
-    expect(mockPublish).toHaveBeenCalledWith(
-      "websocket:events",
-      expect.objectContaining({
-        type: "conversation_status_changed",
-        organizationId: ORG_ID,
-        conversationId: CONVERSATION_ID,
-        payload: expect.objectContaining({ status: "pending-human", title: "Where is my order?" }),
-      }),
-    );
     expect(mockLogger.info).toHaveBeenCalledWith(
       { agentId: AGENT_ID, queued: true },
       "Skipping - agent paused",
@@ -100,7 +87,6 @@ describe("runConversation for a paused agent", () => {
     await runConversation(CONVERSATION_ID);
 
     expect(mockUpdate).toHaveBeenCalledWith(CONVERSATION_ID, ORG_ID, { needs_processing: false });
-    expect(mockPublish).not.toHaveBeenCalled();
     expect(convo.lock).not.toHaveBeenCalled();
   });
 
@@ -111,7 +97,6 @@ describe("runConversation for a paused agent", () => {
     await runConversation(CONVERSATION_ID);
 
     expect(mockUpdate).not.toHaveBeenCalled();
-    expect(mockPublish).not.toHaveBeenCalled();
     expect(convo.lock).not.toHaveBeenCalled();
   });
 

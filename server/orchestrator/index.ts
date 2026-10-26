@@ -120,6 +120,14 @@ export class Orchestrator {
             continue;
           }
 
+          // A paused agent never writes to the shopper, so neither the
+          // inactivity warning nor the closing message may go out. Leave the
+          // conversation alone; runConversation parks it on the next message.
+          if (conversation.agent && !conversation.agent.enabled) {
+            log.debug("Agent paused, skipping inactivity handling");
+            continue;
+          }
+
           // Check for different timeout scenarios
           if (timeSinceLastMessage > silentCloseThreshold) {
             // 2x timeout: Close silently without sending a message
