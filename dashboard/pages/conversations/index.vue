@@ -496,7 +496,7 @@ const getFullName = (user: AssignedUser | undefined) => {
 
 // Wait time utilities imported from @/utils/conversation
 // - getWaitTime(conversation): Calculate wait time in seconds
-// - formatWaitTime(seconds): Format as "2m 30s"
+// - formatWaitTime(seconds): Format as "2m 30s", "5h 12m" or "3d 4h"
 // - getWaitTimeClass(seconds): Get CSS class for color coding
 
 const toggleBulkMode = () => {

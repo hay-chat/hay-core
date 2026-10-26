@@ -66,16 +66,27 @@ export const getWaitTime = (conversation: ConversationWithMessages): number | nu
 };
 
 /**
- * Format wait time for display (e.g., "2m 30s" or "5m")
+ * Format a wait duration compactly using its two largest non-zero units:
+ * "45s", "12m 4s", "5h 12m", "3d 4h" (a zero minor unit is dropped: "5m", "2d").
+ * The unit letters match the dashboard.timeAgo strings, which are identical in
+ * every locale, so the result is safe to interpolate into translated sentences.
  */
 export const formatWaitTime = (waitTimeSeconds: number): string => {
-  if (waitTimeSeconds < 60) {
-    return `${waitTimeSeconds}s`;
-  } else {
-    const minutes = Math.floor(waitTimeSeconds / 60);
-    const seconds = waitTimeSeconds % 60;
-    return seconds > 0 ? `${minutes}m ${seconds}s` : `${minutes}m`;
-  }
+  const total = Math.max(0, Math.floor(waitTimeSeconds));
+  const units: Array<[number, string]> = [
+    [Math.floor(total / 86400), "d"],
+    [Math.floor((total % 86400) / 3600), "h"],
+    [Math.floor((total % 3600) / 60), "m"],
+    [total % 60, "s"],
+  ];
+
+  const majorIndex = units.findIndex(([value]) => value > 0);
+  if (majorIndex === -1) return "0s";
+
+  const [majorValue, majorUnit] = units[majorIndex];
+  const minor = units[majorIndex + 1];
+  if (!minor || minor[0] === 0) return `${majorValue}${majorUnit}`;
+  return `${majorValue}${majorUnit} ${minor[0]}${minor[1]}`;
 };
 
 /**
