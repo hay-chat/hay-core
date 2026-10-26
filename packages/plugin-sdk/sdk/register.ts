@@ -230,8 +230,11 @@ function validateWebhookRouting(descriptor: WebhookRoutingDescriptor): void {
   if (!signature.header || typeof signature.header !== "string") {
     throw new Error("Webhook routing signature.header must be a non-empty string");
   }
-  if (signature.format !== "sha256-hmac") {
-    throw new Error('Webhook routing signature.format must be "sha256-hmac"');
+  if (signature.format !== "sha256-hmac" && signature.format !== "svix") {
+    throw new Error('Webhook routing signature.format must be "sha256-hmac" or "svix"');
+  }
+  if (signature.format === "svix" && signature.header.toLowerCase() !== "svix-signature") {
+    throw new Error('Webhook routing signature.header must be "svix-signature" for the svix format');
   }
   if (!signature.secretEnv || typeof signature.secretEnv !== "string") {
     throw new Error("Webhook routing signature.secretEnv must be a non-empty string");
@@ -245,6 +248,9 @@ function validateWebhookRouting(descriptor: WebhookRoutingDescriptor): void {
   }
   if (!routeKeyPath.keyPath || typeof routeKeyPath.keyPath !== "string") {
     throw new Error("Webhook routing routeKeyPath.keyPath must be a non-empty string");
+  }
+  if (routeKeyPath.keyTransform !== undefined && routeKeyPath.keyTransform !== "email-address") {
+    throw new Error('Webhook routing routeKeyPath.keyTransform must be "email-address"');
   }
   if (routeKeyPath.nested !== undefined) {
     const { nested } = routeKeyPath;
