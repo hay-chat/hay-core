@@ -96,7 +96,7 @@ export type {
   HayLogger,
   HayOrg,
   HayRegisterAPI,
-  UIExtensionDescriptor,
+  PluginPage,
   HttpMethod,
   RouteHandler,
 

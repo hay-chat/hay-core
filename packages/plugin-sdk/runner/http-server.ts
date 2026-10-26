@@ -171,7 +171,7 @@ export class PluginHttpServer {
    * This endpoint returns:
    * - Config schema
    * - Auth methods registry
-   * - UI extensions
+   * - UI pages
    * - Route metadata
    * - MCP descriptors (placeholder for now)
    *
@@ -182,7 +182,6 @@ export class PluginHttpServer {
       try {
         const configSchema = this.registry.getConfigSchema();
         const authMethods = this.registry.getAuthMethods();
-        const uiExtensions = this.registry.getUIExtensions();
         const uiPages = this.registry.getUIPages();
         const routes = this.registry.getRoutes();
 
@@ -218,7 +217,6 @@ export class PluginHttpServer {
               };
             }
           }),
-          uiExtensions,
           pages: uiPages, // UI pages registered via ctx.register.ui.page()
           routes: routes.map((route) => ({
             method: route.method,

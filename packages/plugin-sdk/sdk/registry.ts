@@ -13,7 +13,6 @@ import type {
   OAuth2AuthOptions,
   HttpMethod,
   RouteHandler,
-  UIExtensionDescriptor,
   PluginPage,
   CronJobOptions,
   CronJobDescriptor,
@@ -70,12 +69,6 @@ export class PluginRegistry {
    * Array of route definitions.
    */
   private routes: RegisteredRoute[] = [];
-
-  /**
-   * Registered UI extensions.
-   * Array of UI extension descriptors.
-   */
-  private uiExtensions: UIExtensionDescriptor[] = [];
 
   /**
    * Registered UI pages.
@@ -135,15 +128,6 @@ export class PluginRegistry {
     }
 
     this.routes.push(route);
-  }
-
-  /**
-   * Register a UI extension (legacy).
-   *
-   * @param extension - UI extension descriptor
-   */
-  registerUIExtension(extension: UIExtensionDescriptor): void {
-    this.uiExtensions.push(extension);
   }
 
   /**
@@ -245,15 +229,6 @@ export class PluginRegistry {
    */
   getRoutes(): RegisteredRoute[] {
     return [...this.routes];
-  }
-
-  /**
-   * Get registered UI extensions (legacy).
-   *
-   * @returns Array of UI extension descriptors
-   */
-  getUIExtensions(): UIExtensionDescriptor[] {
-    return [...this.uiExtensions];
   }
 
   /**

@@ -87,10 +87,10 @@ export type {
 export type { HttpMethod, RouteHandler } from "./route";
 
 // ============================================================================
-// UI Extensions (Phase 2.2) ✅
+// UI Pages (Phase 2.2) ✅
 // ============================================================================
 
-export type { UIExtensionDescriptor, PluginPage } from "./ui";
+export type { PluginPage } from "./ui";
 
 // ============================================================================
 // Register API (Phase 2.2) ✅

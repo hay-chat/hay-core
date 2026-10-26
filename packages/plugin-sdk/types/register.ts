@@ -49,7 +49,7 @@ export interface UIRegistrationAPI {
  * - Config schema
  * - Auth methods
  * - HTTP routes
- * - UI extensions
+ * - UI pages
  *
  * @remarks
  * All registration happens during `onInitialize`, before the HTTP server starts.
@@ -86,13 +86,7 @@ export interface UIRegistrationAPI {
  *     res.status(200).json({ ok: true });
  *   });
  *
- *   // Register UI extension (legacy)
- *   register.ui({
- *     slot: 'after-settings',
- *     component: 'components/Settings.vue',
- *   });
- *
- *   // Register UI page (new)
+ *   // Register UI page
  *   register.ui.page({
  *     id: 'setup-guide',
  *     title: 'Setup Guide',

@@ -63,24 +63,6 @@ export function validateMetadata(metadata: unknown): metadata is PluginMetadata 
     }
   }
 
-  // Validate uiExtensions
-  if (meta.uiExtensions !== undefined) {
-    if (!Array.isArray(meta.uiExtensions)) {
-      throw new Error("uiExtensions must be an array");
-    }
-
-    for (const entry of meta.uiExtensions) {
-      const ext = entry as Record<string, unknown>;
-      if (!ext.slot || typeof ext.slot !== "string") {
-        throw new Error(`UI extension must have a string slot`);
-      }
-      if (!ext.component || typeof ext.component !== "string") {
-        throw new Error(`UI extension must have a string component`);
-      }
-      // id is optional - may be auto-generated from slot+component
-    }
-  }
-
   // Validate routes
   if (meta.routes !== undefined) {
     if (!Array.isArray(meta.routes)) {
