@@ -1,3 +1,26 @@
+## 2026-10-26 — master @28eea98 — agent pause switch MERGED + DEPLOYED to eu.hay.chat
+
+**Works:** claude/agent-pause merged to master (no PR, Roger's call) after review: Jest 12/12, server tsc, dashboard
+vue-tsc, lint all green. deploy.sh run → hay-server/hay-dashboard rebuilt. Verified live in Chrome: Pause → "Paused"
+badge persists on reload; playground message while paused → status pending-human, needs_processing=false, no AI reply,
+server log "Skipping - agent paused" queued=true. Agent resumed afterwards.
+**Half-built:** Playwright tests/agent-pause.spec.ts still never run (needs a dev stack). Follow-up: playground banner
+shows the generic "Hay wasn't confident" copy for a paused agent — wants a "agent paused" variant. hay-docs branch
+claude/agent-pause still to merge; docs submodule pointer in master working tree is dirty (left untouched).
+**Next:** merge the other fact-fix branches one at a time (approval-delivery, billing-usage-limits, commerce-semantic-actions,
+mobile-attention, email-channel) with the same review → merge → deploy → Chrome check loop.
+
+## 2026-10-26 — claude/email-channel — plugin committed (44d460c), 6 commits on branch
+
+**Works:** `plugins/core/email-channel` (hay-channel-email): inbound (Resend fetch → classify → strip quotes → thread → messages.receive),
+deliver (threaded reply via send-email, token Reply-To, BCC archive), /ui/status + AfterSettings.vue wizard (en/pt-BR), README.
+Plugin tsc clean, build OK (ui.js + dist), 39 vitest green. Core slices C1–C3 + C5 (holdForHuman) committed earlier.
+NOTE: worktree needs `packages/plugin-sdk` built (`npm run build`) + `plugins/core/email-channel/node_modules/@hay/plugin-sdk`
+symlink to the worktree SDK, else tsc resolves master's SDK types.
+**Half-built:** Playwright spec not written yet; user-guide doc not written; reviewer agent not run; PR not opened. No Resend key.
+**Next:** tests/email-channel-setup.spec.ts (cannot run here: :3001 is a next-server, hay dev server not up) → docs
+`docs/user-guide/integrations/email-inbox.md` (docs submodule, detached HEAD → branch claude/email-channel) → reviewer → PR.
+
 ## 2026-10-26 — claude/email-channel (worktree .claude/worktrees/claude+email-channel) — core slices C1–C3 committed
 
 **Works:** 3 commits on the branch: (1) shared-webhook routing accepts `format: "svix"`, `keyPath: "."`, `keyTransform:
