@@ -36,12 +36,13 @@ test.describe("Message approval", () => {
   test("reviewer edits and approves a queued reply, which is persisted as sent", async ({
     page,
   }) => {
+    // No networkidle wait: the page keeps a WebSocket and a poll open, and a
+    // cold dev server can take a while to serve the first route.
     await page.goto(`/conversations/${seeded.conversationId}`);
-    await page.waitForLoadState("networkidle");
 
     // The queued reply is shown to the reviewer with its approval controls.
     const queuedBadge = page.getByText("Queued for Approval");
-    await expect(queuedBadge).toBeVisible({ timeout: 15000 });
+    await expect(queuedBadge).toBeVisible({ timeout: 60000 });
     await expect(page.getByText(ORIGINAL_REPLY)).toBeVisible();
 
     await page.getByRole("button", { name: "Approve & Send", exact: true }).click();
@@ -70,8 +71,7 @@ test.describe("Message approval", () => {
 
     // A reload shows the released reply with no approval controls left.
     await page.reload();
-    await page.waitForLoadState("networkidle");
-    await expect(page.getByText(EDITED_REPLY)).toBeVisible({ timeout: 15000 });
+    await expect(page.getByText(EDITED_REPLY)).toBeVisible({ timeout: 30000 });
     await expect(page.getByText("Queued for Approval")).toHaveCount(0);
     await expect(page.getByRole("button", { name: "Approve & Send", exact: true })).toHaveCount(0);
   });
