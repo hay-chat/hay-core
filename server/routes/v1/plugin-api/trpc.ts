@@ -121,6 +121,11 @@ export const pluginApiTrpcRouter = router({
         conversationId: z.string().uuid().optional(),
         // Optional title for a newly created conversation (e.g. email subject).
         title: z.string().max(255).optional(),
+        // Park the conversation for a human instead of letting the AI answer
+        // (e.g. a DMARC-failing email or a reply that shows a human already
+        // answered outside Hay). The message is stored; the conversation goes
+        // to pending-human so it shows under "Needs attention".
+        holdForHuman: z.boolean().optional(),
         // Media already uploaded to Hay storage (see `media.upload`). Attachment-only
         // messages pass an empty `content`.
         attachments: z
@@ -325,6 +330,17 @@ export const pluginApiTrpcRouter = router({
         ) {
           await conversationRepository.update(conversation.id, organizationId, {
             status: "human-took-over",
+            needs_processing: false,
+          });
+        } else if (
+          input.holdForHuman &&
+          senderType === "customer" &&
+          conversation.status !== "human-took-over"
+        ) {
+          // addMessage just reopened the conversation and queued it for the
+          // orchestrator; park it for a human instead.
+          await conversationRepository.update(conversation.id, organizationId, {
+            status: "pending-human",
             needs_processing: false,
           });
         }
