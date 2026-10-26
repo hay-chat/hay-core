@@ -1,6 +1,5 @@
 import { spawn } from "child_process";
 import path from "path";
-import * as jwt from "jsonwebtoken";
 import { getPortAllocator } from "./port-allocator.service";
 import type { WorkerInfo, AuthState, ConfigFieldDescriptor } from "../types/plugin-sdk.types";
 import { AppDataSource } from "../database/data-source";
@@ -10,7 +9,8 @@ import { pluginInstanceRepository } from "../repositories/plugin-instance.reposi
 import { fetchAndStoreTools } from "./plugin-tools.service";
 import { resolveConfigForWorker } from "@server/lib/config-resolver";
 import { isDeniedPluginEnv } from "@server/lib/plugin-env";
-import { getApiUrl, config as envConfig } from "../config/env";
+import { mintPluginApiToken } from "@server/lib/plugin-api-token";
+import { getApiUrl } from "../config/env";
 import { oauthService } from "./oauth.service";
 import { createLogger } from "@server/lib/logger";
 import type { HayPluginManifest } from "../types/plugin.types";
@@ -471,16 +471,7 @@ export class PluginRunnerService {
    * Token is scoped to a specific org + plugin and includes granted capabilities.
    */
   private generatePluginJWT(orgId: string, pluginId: string, capabilities: string[]): string {
-    return jwt.sign(
-      {
-        organizationId: orgId,
-        pluginId,
-        scope: "plugin-api",
-        capabilities,
-      },
-      envConfig.jwt.secret,
-      { expiresIn: "24h" },
-    );
+    return mintPluginApiToken(orgId, pluginId, capabilities);
   }
 
   /**
