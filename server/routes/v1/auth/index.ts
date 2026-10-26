@@ -29,7 +29,11 @@ import { StorageService } from "@server/services/storage.service";
 import { handleUpload } from "@server/lib/upload-helper";
 import { rateLimitService } from "@server/services/rate-limit.service";
 import { toAccessState } from "@server/services/organization-access.service";
-import { SUSPENSION_REASONS, accessNoticeSchema } from "@server/types/organization-access.types";
+import {
+  AGENT_PAUSE_REASONS,
+  SUSPENSION_REASONS,
+  accessNoticeSchema,
+} from "@server/types/organization-access.types";
 import { createLogger } from "@server/lib/logger";
 
 const logger = createLogger("auth");
@@ -644,6 +648,8 @@ export const authRouter = t.router({
             suspendedAt: z.union([z.date(), z.string()]).nullable(),
             suspensionReason: z.enum(SUSPENSION_REASONS).nullable(),
             suspensionRedirectUrl: z.string().nullable(),
+            agentPausedAt: z.union([z.date(), z.string()]).nullable(),
+            agentPauseReason: z.enum(AGENT_PAUSE_REASONS).nullable(),
             accessNotice: accessNoticeSchema.nullable(),
           }),
         ),
