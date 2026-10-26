@@ -31,7 +31,10 @@ export function verifySvixSignature(
     return false;
   }
 
-  const key = Buffer.from(secret.startsWith("whsec_") ? secret.slice("whsec_".length) : secret, "base64");
+  const key = Buffer.from(
+    secret.startsWith("whsec_") ? secret.slice("whsec_".length) : secret,
+    "base64",
+  );
   if (key.length === 0) {
     return false;
   }

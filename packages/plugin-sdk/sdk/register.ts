@@ -234,7 +234,9 @@ function validateWebhookRouting(descriptor: WebhookRoutingDescriptor): void {
     throw new Error('Webhook routing signature.format must be "sha256-hmac" or "svix"');
   }
   if (signature.format === "svix" && signature.header.toLowerCase() !== "svix-signature") {
-    throw new Error('Webhook routing signature.header must be "svix-signature" for the svix format');
+    throw new Error(
+      'Webhook routing signature.header must be "svix-signature" for the svix format',
+    );
   }
   if (!signature.secretEnv || typeof signature.secretEnv !== "string") {
     throw new Error("Webhook routing signature.secretEnv must be a non-empty string");
