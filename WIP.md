@@ -1,4 +1,4 @@
-## 2026-10-26 — claude/billing-usage-limits (worktree .claude/worktrees/claude+billing-usage, off claude/agent-pause) — hay-core side of billing slice 2
+## 2026-10-26 — claude/billing-usage-limits (worktree .claude/worktrees/claude+billing-usage, off master, agent-pause already merged) — hay-core side of billing slice 2
 
 **Works:** organizations.agent_paused_at/agent_pause_reason (migration 1784500000000), `internal.organizations.setAccessState`
 takes `agentPause: { reason: "usage_limit" } | null`, orchestrator parks conversations of a paused org via `parkForPausedAgent`,
@@ -6,7 +6,7 @@ takes `agentPause: { reason: "usage_limit" } | null`, orchestrator parks convers
 (paused-agent-skip, access service, internal router), typecheck + eslint clean. Playwright `tests/billing-usage-notice.spec.ts`
 written, NOT run (needs INTERNAL_API_SECRET + dev stack). Docs submodule → hay-docs `claude/billing-usage-docs` (FAQ + settings).
 **Sibling branches:** hay-backoffice `claude/billing-currencies-usage-alerts` (off claude/overage-billing), hay-website
-`claude/billing-change-plan`. Land order: agent-pause → this; overage-billing → backoffice branch.
+`claude/billing-change-plan`, hay-docs `claude/billing-usage-docs` (off main). Land order: overage-billing → backoffice branch.
 **Next:** reviewer findings → fix → push all four → open PRs (gh missing: compare URLs). Roger: `npm run stripe:sync` (test+live),
 backoffice + core `migration:run`.
 
