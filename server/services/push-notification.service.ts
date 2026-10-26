@@ -25,18 +25,19 @@ export interface SubscribeInput {
 }
 
 /** Copy for the "needs a human" alert, by organization locale (falls back to en). */
-const ATTENTION_COPY: Record<string, { title: string; untitled: string; summaryPending: string }> = {
-  en: {
-    title: "A customer needs a human",
-    untitled: "New conversation",
-    summaryPending: "Tap to open the conversation and take over.",
-  },
-  "pt-BR": {
-    title: "Um cliente precisa de um humano",
-    untitled: "Nova conversa",
-    summaryPending: "Toque para abrir a conversa e assumir.",
-  },
-};
+const ATTENTION_COPY: Record<string, { title: string; untitled: string; summaryPending: string }> =
+  {
+    en: {
+      title: "A customer needs a human",
+      untitled: "New conversation",
+      summaryPending: "Tap to open the conversation and take over.",
+    },
+    "pt-BR": {
+      title: "Um cliente precisa de um humano",
+      untitled: "Nova conversa",
+      summaryPending: "Toque para abrir a conversa e assumir.",
+    },
+  };
 
 /** Endpoint is gone (expired/unsubscribed): the row must be deleted. */
 const GONE_STATUS_CODES = new Set([404, 410]);
@@ -132,7 +133,10 @@ class PushNotificationService {
   }
 
   /** Fan out to one user's devices (used by the "send a test" button). */
-  async sendToUser(userId: string, payload: PushPayload): Promise<{ sent: number; removed: number }> {
+  async sendToUser(
+    userId: string,
+    payload: PushPayload,
+  ): Promise<{ sent: number; removed: number }> {
     const subscriptions = await this.listForUser(userId);
     return this.deliver(subscriptions, payload);
   }
@@ -164,7 +168,10 @@ class PushNotificationService {
           if (statusCode && GONE_STATUS_CODES.has(statusCode)) {
             await this.repo().delete({ id: subscription.id });
             removed++;
-            logger.info({ subscriptionId: subscription.id, statusCode }, "Removed dead push subscription");
+            logger.info(
+              { subscriptionId: subscription.id, statusCode },
+              "Removed dead push subscription",
+            );
           } else {
             logger.warn({ err: error, subscriptionId: subscription.id }, "Push delivery failed");
           }
