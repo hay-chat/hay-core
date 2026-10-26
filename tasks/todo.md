@@ -1,68 +1,80 @@
-# WhatsApp Cloud API — Phase 2 plugin (branch claude/whatsapp-plugin)
+# Inbound email channel — Phase 0 spike + Phase 1 MVP (branch claude/email-channel)
 
-Spec: `.claude/plans/whatsapp-cloud/PLAN.md` §3 Phase 2 (D1–D14 final, §5 answers, §6 self-hosting).
-Plugin: `plugins/core/whatsapp`, npm + plugin id `hay-channel-whatsapp-meta`, channel `whatsapp`,
-UMD global `WhatsappMetaPlugin`, Graph `https://graph.facebook.com/v26.0`.
+Spec: `tasks/email-channel-strategy-2026-10-26.md` (§4 threading, §4a forwarding model, §5 core changes, §6 phases, §7 defaults).
+Defaults confirmed by Roger 2026-10-26: Resend inbound, forwarding first, dashboard is the reply surface, From
+`"<Store> Support" <support@mail.hay.chat>` + Reply-To token, new plugin `plugins/core/email-channel` (`hay-channel-email`,
+channel `email`), DMARC-fail/bulk → stored, not auto-replied.
 
-## Checklist (one commit each)
+## Phase 0 — spike (no product code)
 
-- [x] 0. Security: public proxy blocks worker-internal paths + strips `x-hay-webhook-verified` (also PR #100)
-- [x] C1. Core: `onConnected` may return `credentials` (merged into encrypted authState) + `oauth2.connectFlow: "client"`
-- [x] C2. Core: authenticated `plugins.callUiRoute` → worker `/ui/*` (public proxy blocks `ui`); plugin UI props `api` + `locale`
-- [x] C3. Core: `pluginApi.connection.revoke` + `pluginApi.media.upload({ transcribe })` (OpenAI STT in core)
-- [x] 1. Plugin skeleton: manifest, config, webhookRouting (nested), graph-client, manual-mode signature/handshake, onStart/onConnected
-- [x] 2. Inbound normaliser: text/interactive/button/location/contacts/reaction/request_welcome/context/referral, statuses → updateStatus, account_update → revoke
-- [x] 3. Media inbound: GET /{media_id} → download → media.upload (voice → transcribe) → attachments[]
-- [x] 4. deliver.ts: text + attachments, error mapping (131047 / 131056 / 130429 / 190)
-- [x] 5. Onboarding UI: ES v4 popup, manual tab, health card, payment card, en + pt-BR
-- [x] 6. README + docs/user-guide/integrations/whatsapp.md (docs submodule)
-- [x] Verify: `npm run typecheck`, `npm run lint`, `npm run test:server`, plugin `npm test`, plugin build loads
+- [ ] S1. Get Resend API access (prod SMTP_AUTH_PASS = Resend key, via Coolify env on homeserver; never print it)
+- [ ] S2. Receive a Gmail auto-forwarded mail at the managed `<id>.resend.app` address; dump `headers` + `raw` → does
+      `headers` include In-Reply-To / References / Auto-Submitted? Is `received_for` the original support@ address?
+- [ ] S3. Send via Resend with custom `Message-ID`, `In-Reply-To`, `References`, `Reply-To` headers (API and SMTP) →
+      which Message-ID does the recipient see? Is ours honoured?
+- [ ] S4. Resend receiving GA vs beta; quota accounting; attachment URL expiry — write findings to the strategy doc §3
+- [ ] S5. Add `inbound.hay.chat` receiving domain (API) + MX record on Cloudflare → verified
 
-Acceptance: plugin builds + loads; Instagram unchanged; unit tests for normaliser, signature path, deliver
-error mapping, onConnected extras verification; PR open referencing PLAN.md.
+## Phase 1 — MVP (forwarding only)
 
-## Contracts (agents: build against these exactly)
+Core (one commit each):
+- [x] C1. `register.webhookRouting.signature.format: "svix"` (svix-id.svix-timestamp.body, whsec_ base64, `v1,` sigs) +
+      `secretEnv: RESEND_WEBHOOK_SECRET`; routeKeyPath transform `"local-part" | "domain"` on `data.to[]`
+- [x] C2. `messages.receive`: look up `findByExternalConversationId` first when `externalConversationId` given;
+      accept `title` (subject) on new conversations
+- [x] C3. plugin send: `email.send` tRPC capability (or extend `/send-email`) with from/replyTo/headers/attachments/
+      messageId, returns the real Message-ID, surfaces failures (FAQ item 6, `plugin-api.service.ts:151-171`)
+- [x] C4. (folded into plugin metadata: mid/subject/messageId/inReplyTo/references/holdReason) Message/conversation metadata shape for email (`metadata.email.{subject,from,to,cc,html,messageId,references,kind}`)
 
-- **onConnected result** `{ routingKeys?, account?, credentials?: Record<string,string> }`. Core merges
-  `credentials` into `authState.credentials` (encrypted). Reserved keys core ignores: `accessToken`,
-  `refreshToken`, `expiresAt`, `connectedAt`, `tokenType`, `scope`. Worker reads them back via
-  `ctx.auth.get().credentials` on every start.
-- **`oauth2.connectFlow?: "redirect" | "client"`** (default redirect). `"client"`: dashboard OAuth card hides
-  Connect/Reconnect (status + Disconnect stay); `plugins.oauth.initiate` rejects with BAD_REQUEST.
-- **`plugins.callUiRoute`** (authenticated): `{ pluginId, method: "GET"|"POST", path, body? }`,
-  `path` matches `^/ui/[a-z0-9/-]*$`; instance must exist + be enabled for the caller's org; starts the
-  worker, forwards JSON, returns `{ status: number, data: unknown }`. Public proxy 404s first segment `ui`.
-- **Plugin UI props**: `plugin, config, apiBaseUrl, api` (the dashboard `Hay` tRPC client), `locale` (string).
-- **`pluginApi.connection.revoke({ reason })`** → `{ revoked: true }`; core runs `oauthService.revokeOAuth`
-  after responding (the call stops the calling worker).
-- **`pluginApi.media.upload({ data, mimeType, filename, transcribe? })`** → attachment `{id,name,url,type,size}`
-  plus `transcript?: string` when `transcribe` and STT succeeded (absent otherwise, never throws for STT).
-  `mimeType` must be bare (strip `; codecs=opus`).
+Plugin `plugins/core/email-channel`:
+- [x] P1. Skeleton: package.json (`hay-plugin.category: channel`, `channel: email`), config (storeName, forwardingAlias
+      read-only, idleAutoResolveDays), webhookRouting(svix), routes `/webhook` `/deliver` `/escalate` `/ui/*`
+- [x] P2. Inbound: ack <15s → enqueue → fetch received email + attachments → classify (bounce/auto/bulk/echo/dmarc-fail)
+      → reply-parser (strip quotes/signature) → thread match (token → headers → subject heuristic) → `messages.receive`
+- [x] P3. Outbound `/deliver`: text+simple HTML, threading headers, Auto-Submitted, X-Hay-Conversation, Reply-To token,
+      BCC merchant support@ (setting), store Message-ID
+- [x] P4. Setup wizard UI (en + pt-BR): your support address → copy forwarding address → Gmail confirmation code
+      capture → send test → status card; conversation header strip (subject/from/to) in dashboard
+- [x] P5. Out-of-band reply detection → human-took-over + Needs attention
+- [ ] P6. (deferred to Phase 2) Idle auto-resolve (scheduler) — may slip to Phase 2
+
+Verify:
+- [x] V1. Jest: svix verify, routeKey transform, thread matcher, classifier, reply-parser, deliver header builder
+- [x] V2. `npm run typecheck` clean, `npm run lint` clean, plugin `vitest` 43/43, plugin `tsc`/build OK. Server Jest: the 4 touched
+      suites + full run green except DB-backed suites (privacy, tests/integration/*) which fail in the worktree only — `config/env.ts`
+      walks 4 dirs up for `.env` and the worktree is one level deeper than `/srv/hay-core/.env`; same suites pass from the main checkout.
+- [ ] V3. Playwright `tests/email-channel-setup.spec.ts` written, NOT run: no hay dev server on :3001 here (prod containers on
+      8088/8089). Run: `npx playwright test tests/email-channel-setup.spec.ts --project=chromium` with server+dashboard up and
+      RESEND_API_KEY / RESEND_WEBHOOK_SECRET / EMAIL_INBOUND_DOMAIN set.
+- [x] V4. Independent reviewer on `git diff master...HEAD` — outcomes below.
+- [x] V5. Docs `docs/user-guide/integrations/email-inbox.md` (+ index) on hay-docs branch claude/email-channel; website lines in PR body.
+- [x] V6. PR against master; WIP.md + lessons.md updated.
+
+### Review outcomes (V4)
+- #1 HIGH cross-tenant hijack via supportAddress routing key → FIXED: plugin routes by the org alias only (`data.to` is the
+  envelope recipient Resend accepted). Did NOT add a core "refuse key takeover" guard: WhatsApp relies on last-connect-wins
+  when a verified phone number moves orgs. Spike must confirm the alias appears in `data.to` for a Gmail-forwarded mail.
+- #2 HIGH Reply-To token not bound to customer → FIXED: `messages.receive` requires `customer_id` match for both the Hay id
+  hint and the external thread id; test added.
+- #3 MED unknown root merges into active conversation / root overwritten → FIXED: externalConversationId miss creates a new
+  conversation; stored root never overwritten; tests added. WhatsApp (no external id) keeps the active-by-customer fallback.
+- #4 MED ack-then-fetch loss → PARTIAL: ResendClient retries 429/5xx/network 3× with backoff. Durable queue (BullMQ) left as TODO.
+- #5 MED echo single point of failure → FIXED: own From address and `<hay-…>` Message-ID also classify as echo.
+- #6 deliver 503 comment → FIXED comment (core marks failed either way; split kept for logs, mirrors WhatsApp).
+- #7 routing-key `+tag` mismatch → MOOT after #1 (alias has no tag).
+- #8 dead `EmailAPIImpl` → DELETED.
+- #9 header hygiene → FIXED: allow-list (In-Reply-To, References, Auto-Submitted, X-*) in plugin send-email; From name sanitised.
+- #10 policy → `Auto-Submitted: auto-replied` added. DMARC `none` still passes (holding every no-DMARC sender would park most
+  small-business mail); bounces/auto-replies still dropped, not surfaced — Phase 2.
+- #11 test gaps → added: customer mismatch, unmatched root, root preservation, echo by sender/id, Resend retry, header allow-list.
+  Not added: `EmailService` retry:false unit test (service needs a transporter; covered by passthrough test at the plugin-api layer).
+- #12 webhook 200 vs 503 for not_configured → kept 200: core already acked Resend, a 503 would only add log noise.
+
+Acceptance: a Gmail-forwarded shopper email creates an email conversation with subject as title; the AI reply reaches the
+shopper threaded in their client; the shopper's reply lands in the same Hay conversation; a staff reply from the dashboard
+goes out by email; bounces/auto-replies never trigger the AI; plugin failures are reported as failures.
 
 ## Working notes
-
-- `META_APP_SECRET`/`OPENAI_*`/`*TOKEN*` env never reach workers (DENIED_ENV_PATTERNS).
-- Manual mode (D6/§6) = config fields (showWhen `connectionMode === "manual"`): token, phoneNumberId, wabaId,
-  appSecret, verifyToken. Webhook = per-org URL `/v1/plugins/hay-channel-whatsapp-meta/webhook?organizationId=<org>`;
-  worker answers the GET handshake and verifies `x-hub-signature-256` over `req.rawBody` itself. No routing keys,
-  no Hay config_id needed. ES mode = shared URL, core verifies, worker trusts `x-hay-webhook-verified`.
-- Customer identity (D3): `from = "+<wa_id>"`; no wa_id → `whatsapp:bsuid:<user_id>`; BSUID + profile name in metadata.
-- Agents share one worktree: never run git, never `npm install`; only edit files you own.
-
-## Results
-
-Commits on `claude/whatsapp-plugin` (one per slice): proxy security fix (also PR #100); C1 onConnected credentials +
-connectFlow; C2 plugins.callUiRoute + UI props; C3 connection.revoke + media.upload transcribe; plugin skeleton;
-webhooks.setRoutingKeys (core) + manual-mode route claim (plugin) — added after finding that a manual token from the
-app whose callback is the shared URL (Hay's test number) would never route; deliver; media; inbound normaliser + README;
-OAuth card refresh event; settings UI; docs submodule (hay-docs branch claude/whatsapp-plugin).
-
-Verification: `npm run typecheck` exit 0; `npm run lint` exit 0; `npm run test:server` 635 passed / 73 failed — the
-same 5 DB-only integration suites as master; plugin vitest 104/104; SDK vitest 123 passed / 5 failed (known
-sdk/register.test.ts baseline); plugin + Instagram build; worker smoke (runner boots, manual handshake 200/403,
-signed POST 200, unsigned 403, /ui/status). NOT done: anything against real Meta (needs deploy + console webhook),
-browser run of the ES popup (needs https origin), migration 1784400000000 still unrun.
-
-Follow-ups: core has no delivery retry (503 rate_limited just fails the reply); typing indicator / read receipts (D10)
-need a core "processing started" hook; config option labels not translated (plugin `config` i18n); BSUID re-keying on
-`user_changed_user_id`; STT uses the platform OpenAI key, not the org provider (HAY-251).
+- Only `sha256-hmac` signature format exists today (`packages/plugin-sdk/sdk/register.ts:233`).
+- `findActiveByCustomerAndChannel` is the only thread lookup in `messages.receive` (`plugin-api/trpc.ts:217`).
+- Resend webhook = metadata only; body via `GET /emails/receiving/:id`; attachment URLs 1 h; received mail counts in quota.

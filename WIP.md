@@ -1,3 +1,37 @@
+## 2026-10-26 — claude/email-channel — review fixes committed (c1bfdfd), PR opening
+
+**Works:** 8 commits on branch. Reviewer's 2 HIGHs fixed (alias-only routing; conversationId/external id bound to customer),
+mediums fixed (new-thread rule, root never overwritten, echo by From/Message-ID, Resend retry, header allow-list, From-name
+sanitising, Auto-Submitted). Plugin vitest 43/43, server touched suites 52/52, root typecheck + lint clean. Docs guide on hay-docs
+branch claude/email-channel (d953f8b, rebased onto 807a263); submodule pointer bumped on this branch.
+**Half-built:** Playwright spec unrun (no dev server here). DB-backed Jest suites only pass from the main checkout (worktree misses
+`/srv/hay-core/.env`, see lessons). Phase 0 spike S1–S5 still blocked on a Resend API key from Roger.
+**Next:** merge PR → set RESEND_API_KEY / RESEND_WEBHOOK_SECRET / EMAIL_INBOUND_DOMAIN in prod (Coolify) → run spike: confirm
+Gmail-forwarded mail lands with the alias in `data.to`, custom Message-ID honoured → Phase 2 (custom-domain sending, idle resolve).
+
+## 2026-10-26 — claude/email-channel — plugin committed (44d460c), 6 commits on branch
+
+**Works:** `plugins/core/email-channel` (hay-channel-email): inbound (Resend fetch → classify → strip quotes → thread → messages.receive),
+deliver (threaded reply via send-email, token Reply-To, BCC archive), /ui/status + AfterSettings.vue wizard (en/pt-BR), README.
+Plugin tsc clean, build OK (ui.js + dist), 39 vitest green. Core slices C1–C3 + C5 (holdForHuman) committed earlier.
+NOTE: worktree needs `packages/plugin-sdk` built (`npm run build`) + `plugins/core/email-channel/node_modules/@hay/plugin-sdk`
+symlink to the worktree SDK, else tsc resolves master's SDK types.
+**Half-built:** Playwright spec not written yet; user-guide doc not written; reviewer agent not run; PR not opened. No Resend key.
+**Next:** tests/email-channel-setup.spec.ts (cannot run here: :3001 is a next-server, hay dev server not up) → docs
+`docs/user-guide/integrations/email-inbox.md` (docs submodule, detached HEAD → branch claude/email-channel) → reviewer → PR.
+
+## 2026-10-26 — claude/email-channel (worktree .claude/worktrees/claude+email-channel) — core slices C1–C3 committed
+
+**Works:** 3 commits on the branch: (1) shared-webhook routing accepts `format: "svix"`, `keyPath: "."`, `keyTransform:
+"email-address"` (`server/lib/svix-signature.ts`); (2) `messages.receive` resolves conversation by Hay `conversationId` →
+`externalConversationId` → active-by-customer, takes `title`, backfills customer email; (3) plugin send-email passes
+from/replyTo/headers/messageId/attachments/retry, From pinned to platform domain, failures reported honestly. Jest on the 4
+touched suites green, server tsc clean. Pre-existing: 5 SDK register.test.ts failures (`registerAPI.ui`) on master too.
+**Half-built:** nothing. Plugin `plugins/core/email-channel` not started. Resend API key for the spike NOT obtained (prod
+env read blocked by permission classifier) — ask Roger for a key (RESEND_API_KEY, create one in Resend dashboard).
+**Next:** P1 plugin skeleton → P2 inbound (Resend fetch, raw MIME parse via postal-mime, classify, thread) → P3 deliver.
+Plan + acceptance in `tasks/todo.md` (worktree copy); strategy in `tasks/email-channel-strategy-2026-10-26.md`.
+
 ## 2026-10-21 — master @7448cad — WhatsApp live in prod, Meta webhook configured
 
 **Works:** prod deployed (Phase 2 + proxy fix + /logout). Meta console: callback eu.hay.chat/v1/plugins/hay-channel-whatsapp-meta/webhook
