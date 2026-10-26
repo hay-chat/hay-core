@@ -35,12 +35,12 @@ Answer these before writing code:
 
 ### 2. Pick the archetype (full detail + reference plugins in `reference/archetypes.md`)
 
-| The platform…                 | Archetype                           | Reference to copy                                 | Avoid                                            |
-| ----------------------------- | ----------------------------------- | ------------------------------------------------- | ------------------------------------------------ |
-| has a REST API, no hosted MCP | **A. Local bundled MCP**            | **klaviyo** (clean), **zendesk** (many tools)     | magento, woocommerce                             |
-| hosts its own MCP server      | **B. Remote connector**             | **hubspot** (OAuth), **stripe** (API key)         | stripe's stale `.md` docs                        |
-| is two-way messaging          | **C. Channel**                      | **chatwoot** (verify), **email-imap** (semantics) | email (mock), whatsapp (no idempotency)          |
-| is a document source          | **D. Document importer** (advanced) | **atlassian** ConfluenceClient + adf-to-markdown  | atlassian's manifest.json + `@server/*` coupling |
+| The platform…                 | Archetype                           | Reference to copy                                                           | Avoid                                            |
+| ----------------------------- | ----------------------------------- | --------------------------------------------------------------------------- | ------------------------------------------------ |
+| has a REST API, no hosted MCP | **A. Local bundled MCP**            | **shopify** / **woocommerce** (semantic tools + tests), **klaviyo** (clean) | one tool per endpoint (see anti-patterns)        |
+| hosts its own MCP server      | **B. Remote connector**             | **hubspot** (OAuth), **stripe** (API key)                                   | stripe's stale `.md` docs                        |
+| is two-way messaging          | **C. Channel**                      | **chatwoot** (verify), **email-imap** (semantics)                           | email (mock), whatsapp (no idempotency)          |
+| is a document source          | **D. Document importer** (advanced) | **atlassian** ConfluenceClient + adf-to-markdown                            | atlassian's manifest.json + `@server/*` coupling |
 
 ### 3. Scaffold from templates (in `templates/`)
 

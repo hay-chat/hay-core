@@ -13,16 +13,23 @@ const { summarizeOrder } = require("../lib/orders");
 
 const sameEmail = (a, b) => String(a || "").toLowerCase() === String(b || "").toLowerCase();
 const digits = (s) => String(s || "").replace(/\D/g, "");
+/** The part of a phone number that survives formatting differences. */
+const phoneKey = (phone) => digits(phone).slice(-8);
 
 /** Orders whose billing email/phone actually matches (search is fuzzy). */
 function filterOrders(orders, { email, phone }) {
+  const key = phoneKey(phone);
   return orders.filter((o) => {
     if (email && sameEmail(o.billing?.email, email)) return true;
-    if (phone && digits(phone) && digits(o.billing?.phone).endsWith(digits(phone).slice(-8))) {
-      return true;
-    }
+    if (key && digits(o.billing?.phone).endsWith(key)) return true;
     return false;
   });
+}
+
+async function findAccount(email) {
+  if (!email) return null;
+  const { items } = await wcList("/customers", { email, per_page: 1 });
+  return items.find((c) => sameEmail(c.email, email)) || null;
 }
 
 function registerCustomerTools(server) {
@@ -38,15 +45,15 @@ function registerCustomerTools(server) {
     async ({ email, phone }) => {
       try {
         if (!email && !phone) throw new Error("Provide an email and/or a phone number.");
+        if (!email && !phoneKey(phone)) throw new Error(`"${phone}" is not a phone number.`);
 
-        let account = null;
-        if (email) {
-          const { items } = await wcList("/customers", { email, per_page: 1 });
-          account = items.find((c) => sameEmail(c.email, email)) || null;
-        }
+        const account = await findAccount(email);
 
+        // WooCommerce's order search is a substring match over billing
+        // fields; search by the formatting-proof tail of the phone number
+        // and verify every hit afterwards.
         const { items: found } = await wcList("/orders", {
-          search: email || phone,
+          search: email || phoneKey(phone),
           per_page: 10,
           orderby: "date",
           order: "desc",
@@ -97,18 +104,21 @@ function registerCustomerTools(server) {
     async ({ email, limit, page }) => {
       try {
         const perPage = Math.min(limit ?? 10, 100);
-        const { items, total, totalPages } = await wcList("/orders", {
-          search: email,
-          per_page: perPage,
-          page: page ?? 1,
-          orderby: "date",
-          order: "desc",
-        });
+        const paging = { per_page: perPage, page: page ?? 1, orderby: "date", order: "desc" };
+        // Registered customers get exact, countable paging by customer id;
+        // guests only exist on their orders, so fall back to the fuzzy
+        // search and verify each hit (counts are then of the verified page).
+        const account = await findAccount(email);
+        const { items, total, totalPages } = account
+          ? await wcList("/orders", { customer: account.id, ...paging })
+          : await wcList("/orders", { search: email, ...paging });
+        const verified = account ? items : filterOrders(items, { email });
         return ok({
-          items: filterOrders(items, { email }).map(summarizeOrder),
+          items: verified.map(summarizeOrder),
           page: page ?? 1,
-          totalPages,
-          total,
+          // Counts are unknown for guests: the search total includes fuzzy hits.
+          totalPages: account ? totalPages : null,
+          total: account ? total : null,
         });
       } catch (err) {
         return fail(err);

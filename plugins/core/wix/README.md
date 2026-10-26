@@ -40,17 +40,17 @@ One tool per support action, not per Wix endpoint. Reads merge several endpoints
 writes are bounded server-side. All names are prefixed `wix_` so they never collide with another
 store plugin installed in the same organisation.
 
-| Tool                                | What it does                                                                                                                   |
-| ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
-| `wix_find_customer`                 | Email → customer (derived from their orders) + 5 most recent orders                                                            |
-| `wix_list_customer_orders`          | Paged order history for an email                                                                                               |
+| Tool                                | What it does                                                                                                                      |
+| ----------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| `wix_find_customer`                 | Email → customer (derived from their orders) + 5 most recent orders                                                               |
+| `wix_list_customer_orders`          | Paged order history for an email                                                                                                  |
 | `wix_get_order`                     | Order by id **or** number, merged with transactions + fulfilments; `supportSummary` (cancellable, refundable, remaining, address) |
-| `wix_get_order_tracking`            | Fulfilment status + one row per shipment (carrier, number, link)                                                               |
-| `wix_cancel_order`                  | Cancel before dispatch only; optional restock + buyer email. Does **not** refund                                                |
-| `wix_create_refund`                 | Full/partial refund: picks payments, checks refundability, caps at the remaining balance; external-refund fallback            |
-| `wix_update_order_shipping_address` | Change the shipping destination before dispatch only; merges with the existing address                                        |
-| `wix_search_products`               | Free-text catalog search                                                                                                       |
-| `wix_get_product`                   | Product with variants (sku, choices, price, in-stock)                                                                          |
+| `wix_get_order_tracking`            | Fulfilment status + one row per shipment (carrier, number, link)                                                                  |
+| `wix_cancel_order`                  | Cancel before dispatch only; optional restock + buyer email. Does **not** refund                                                  |
+| `wix_create_refund`                 | Full/partial refund: picks payments, checks refundability, caps at the remaining balance; external-refund fallback                |
+| `wix_update_order_shipping_address` | Change the shipping destination before dispatch only; merges with the existing address                                            |
+| `wix_search_products`               | Free-text catalog search                                                                                                          |
+| `wix_get_product`                   | Product with variants (sku, choices, price, in-stock)                                                                             |
 
 There is deliberately **no store-wide order search** (a customer-facing agent must only see the
 verified customer's orders) and **no fulfilment create/update/delete** (warehouse actions, not
@@ -90,7 +90,19 @@ npm run build  --workspace=plugins/core/wix
 - The refund money shape is sent as `paymentRefunds[].amount = { amount: "<decimal-string>" }`
   (major units; currency comes from the order). It's encapsulated in `mcp/lib/format.js → money()`
   so it's a one-line change if a live call rejects it.
-- Order search posts a top-level `{ filter, sort, cursorPaging }` body with Wix MongoDB-style filters.
+- Order and product search post the documented `{ search: { filter, sort, cursorPaging } }` envelope
+  (Wix ignores unknown top-level keys, so a bare `{ filter }` silently returns the newest rows of the
+  whole store). Every search hit is verified afterwards: the order number must match, and customer
+  lookups drop rows whose `buyerInfo.email` differs.
+- Refunds use the Order Billing API as documented: `paymentRefunds[].paymentId`, `customerReason`,
+  `sideEffects.restock.lineItems[]` / `sideEffects.notifications.sendCustomerEmail`. Restocking
+  only happens on a full refund (restock quantities may not exceed what is refunded per line).
+- `get-order-refundability` is parsed from its documented one-of shape per payment
+  (`refundable: true` | `manuallyRefundable: { reason }` + `providerLink` | `nonRefundable: { reason }`).
+- Clients never retry a non-GET request that timed out or returned 5xx: it may already have been
+  processed (double refund / double cancel).
+- `wix_get_order` returns a projection (buyer, totals, shipping destination, line items, payments,
+  tracking, supportSummary), not the raw Wix order.
 - `wix_update_order_shipping_address` PATCHes `/ecom/v1/orders/{id}` with `shippingInfo.logistics.shippingDestination` + a field mask; confirm Wix accepts that field on Update Order.
 - `wix_cancel_order` POSTs `/ecom/v1/orders/{id}/cancel` with `restockAllItems` / `sendOrderCanceledEmail`.
 - The plugin icon ships as `thumbnail.svg`. Core resolves plugin thumbnails as **svg > png > jpg**.

@@ -67,8 +67,11 @@ function orderRoutes(order, { transactions = TRANSACTIONS, fulfillments = [] } =
       method: "POST",
       path: "/ecom/v1/orders/search",
       reply: ({ body }) => {
-        const number = body.filter?.number;
-        const email = body.filter?.["buyerInfo.email"];
+        // Wix wraps the CursorSearch under `search`; a bare top-level filter
+        // would be ignored and return the newest orders of the whole store.
+        expect(body.filter).toBeUndefined();
+        const number = body.search?.filter?.number;
+        const email = body.search?.filter?.["buyerInfo.email"];
         if (number && number !== order.number) return { orders: [] };
         if (email && email !== order.buyerInfo.email) return { orders: [] };
         return { orders: [order], pagingMetadata: { hasNext: false } };
@@ -195,7 +198,28 @@ describe("order tools", () => {
       "GET /ecom/v1/orders/ord-1/transactions",
       "GET /ecom/v1/orders/ord-1/fulfillments",
     ]);
-    expect(calls[0].body.filter.number).toBe("10042");
+    expect(calls[0].body.search.filter.number).toBe("10042");
+    expect(calls[0].body.search.cursorPaging.limit).toBe(1);
+    // Projected, not the raw Wix order.
+    expect(res.data.buyer).toMatchObject({ email: "ana@example.com", firstName: "Ana" });
+    expect(res.data.shippingAddress.address.city).toBe("Lisboa");
+    expect(res.data.billingInfo).toBeUndefined();
+    expect(res.data.buyerInfo).toBeUndefined();
+  });
+
+  it("wix_get_order rejects a search hit whose number does not match (Wix ignores bad filters)", async () => {
+    const { calls } = mockFetch([
+      {
+        method: "POST",
+        path: "/ecom/v1/orders/search",
+        reply: () => ({ orders: [ORDER], pagingMetadata: { hasNext: false } }),
+      },
+      ...orderRoutes(ORDER).slice(1),
+    ]);
+    const res = await server.call("wix_get_order", { order_number: "99" });
+    expect(res.isError).toBe(true);
+    expect(res.text).toMatch(/No order with number 99/);
+    expect(calls).toHaveLength(1);
   });
 
   it("wix_get_order rejects both or neither reference, and reports unknown numbers", async () => {
@@ -241,6 +265,7 @@ describe("order tools", () => {
     const cancel = calls.find((c) => c.path.endsWith("/cancel"));
     expect(cancel.body).toEqual({ restockAllItems: true, sendOrderCanceledEmail: true });
     expect(res.data.detail).toMatch(/wix_create_refund/);
+    expect(res.data.remainingRefundable).toEqual({ amount: "50.00", currency: "EUR" });
   });
 
   it("wix_cancel_order refuses fulfilled and already-cancelled orders without calling Wix", async () => {
@@ -307,8 +332,32 @@ describe("customer tools", () => {
       customer: { email: "ana@example.com", contactId: "c-1", firstName: "Ana", lastName: "Silva" },
       recentOrders: [{ id: "ord-1", number: "10042", paymentStatus: "PAID" }],
     });
-    expect(calls[0].body.filter).toEqual({ "buyerInfo.email": "ana@example.com" });
-    expect(calls[0].body.cursorPaging.limit).toBe(5);
+    expect(calls[0].body.search.filter).toEqual({ "buyerInfo.email": "ana@example.com" });
+    expect(calls[0].body.search.cursorPaging.limit).toBe(5);
+  });
+
+  it("wix_find_customer only returns orders whose buyer email really matches", async () => {
+    const stranger = { ...ORDER, id: "ord-9", number: "9", buyerInfo: { email: "x@example.com" } };
+    mockFetch([
+      {
+        method: "POST",
+        path: "/ecom/v1/orders/search",
+        reply: () => ({ orders: [stranger, ORDER], pagingMetadata: { hasNext: false } }),
+      },
+    ]);
+    const res = await server.call("wix_find_customer", { email: "ANA@example.com " });
+    expect(res.data.recentOrders.map((o) => o.id)).toEqual(["ord-1"]);
+
+    mockFetch([
+      {
+        method: "POST",
+        path: "/ecom/v1/orders/search",
+        reply: () => ({ orders: [stranger], pagingMetadata: { hasNext: false } }),
+      },
+    ]);
+    expect((await server.call("wix_find_customer", { email: "ana@example.com" })).data.found).toBe(
+      false,
+    );
   });
 
   it("wix_find_customer reports found=false for an unknown email", async () => {
@@ -338,6 +387,6 @@ describe("customer tools", () => {
       hasNext: true,
       nextCursor: "c2",
     });
-    expect(calls[0].body.cursorPaging.limit).toBe(100);
+    expect(calls[0].body.search.cursorPaging.limit).toBe(100);
   });
 });

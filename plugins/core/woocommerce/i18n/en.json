@@ -24,7 +24,7 @@
     },
     "woocommerce_cancel_order": {
       "label": "Cancel Order",
-      "description": "Cancel an order that has not been dispatched (pending, on-hold or processing)."
+      "description": "Cancel an order that has not been dispatched (pending, on-hold or processing, with no tracking recorded)."
     },
     "woocommerce_create_refund": {
       "label": "Create Refund",
@@ -32,7 +32,7 @@
     },
     "woocommerce_update_order_shipping_address": {
       "label": "Update Order Shipping Address",
-      "description": "Change where an undispatched order will ship. Refuses once the order is completed."
+      "description": "Change where an undispatched order will ship. Refuses once tracking is recorded or the order is completed."
     },
     "woocommerce_add_order_note": {
       "label": "Add Order Note",

@@ -73,7 +73,10 @@ function registerRefundTools(server) {
       refund_shipping: z
         .boolean()
         .optional()
-        .describe("Also refund the shipping amount (default false)."),
+        .describe(
+          "Also refund the remaining shipping amount. Defaults to false for item/amount refunds " +
+            "and true for a full refund.",
+        ),
       reason: z
         .string()
         .optional()
@@ -124,17 +127,29 @@ function registerRefundTools(server) {
         }
 
         const online = args.online ?? true;
+        const fullRefund = amount === null && !args.items?.length;
+        const shippingLeft = round2(
+          Math.max(0, num(order.shipping_amount) - num(order.shipping_refunded)),
+        );
         const body = {
           items: args.items?.length ? buildItems(order, args.items) : [],
           notify: Boolean(args.notify_customer),
           appendComment: Boolean(args.reason),
           arguments: {
-            shipping_amount: args.refund_shipping ? num(order.shipping_amount) : 0,
             adjustment_positive: 0,
             adjustment_negative: 0,
             extension_attributes: { return_to_stock_items: [] },
           },
         };
+        // Magento refunds the remaining shipping when `shipping_amount` is
+        // absent and pins it to the value when present — so a full refund
+        // omits it, an item/amount refund sends 0 unless shipping was asked
+        // for, and a repeated shipping refund sends only what is left.
+        if (!fullRefund) {
+          body.arguments.shipping_amount = args.refund_shipping ? shippingLeft : 0;
+        } else if (args.refund_shipping === false) {
+          body.arguments.shipping_amount = 0;
+        }
         if (args.reason) {
           body.comment = { comment: args.reason, is_visible_on_front: 0 };
         }
@@ -149,19 +164,18 @@ function registerRefundTools(server) {
           body.items = (order.items || [])
             .filter((i) => !i.parent_item_id)
             .map((i) => ({ order_item_id: i.item_id, qty: 0 }));
-          body.arguments.shipping_amount = 0;
           body.arguments.adjustment_positive = round2(amount);
         }
 
         let path;
         if (online) {
           const invoices = await getInvoices(order.entity_id);
-          const invoice = invoices.find((inv) => num(inv.state) === 2) || invoices[0]; // 2 = paid
+          const invoice = invoices.find((inv) => num(inv.state) === 2); // 2 = paid
           if (!invoice) {
             throw new Error(
-              `Order ${ref} has no invoice, so Magento cannot refund it online. If the customer was ` +
-                "charged outside Magento, refund them there and re-run magento_create_refund with " +
-                "online=false to record it.",
+              `Order ${ref} has no paid invoice, so Magento cannot refund it online. If the ` +
+                "customer was charged outside Magento, refund them there and re-run " +
+                "magento_create_refund with online=false to record it.",
             );
           }
           body.isOnline = true;

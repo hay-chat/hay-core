@@ -88,7 +88,12 @@ function normalizeTrackingItem(item) {
       item.tracking_provider_name ||
       null,
     trackingUrl:
-      item.custom_tracking_link || item.tracking_link || item.tracking_url || item.url || null,
+      item.custom_tracking_link ||
+      item.tracking_link ||
+      item.formatted_tracking_link ||
+      item.tracking_url ||
+      item.url ||
+      null,
     shippedAt: item.date_shipped
       ? /^\d+$/.test(String(item.date_shipped))
         ? new Date(Number(item.date_shipped) * 1000).toISOString()
@@ -160,12 +165,21 @@ function refundedTotal(order) {
   return round2((order.refunds || []).reduce((s, r) => s + Math.abs(num(r.total)), 0));
 }
 
+/**
+ * Nothing has left the warehouse: pre-dispatch status AND no tracking recorded.
+ * Many stores ship while the order is still `processing` (the tracking plugin
+ * writes the number; the status flips later or never), so status alone lies.
+ */
+function isPreDispatch(order, tracking) {
+  return PRE_DISPATCH_STATUSES.has(order.status) && !(tracking || []).length;
+}
+
 function enrichOrder(order, tracking) {
   const total = num(order.total);
   const refunded = refundedTotal(order);
   const remaining = round2(Math.max(0, total - refunded));
   const paid = Boolean(order.date_paid) || order.status === "completed";
-  const preDispatch = PRE_DISPATCH_STATUSES.has(order.status);
+  const preDispatch = isPreDispatch(order, tracking);
   const rows = tracking || [];
 
   return {
@@ -207,7 +221,9 @@ function enrichOrder(order, tracking) {
     tracking: rows,
     supportSummary: {
       isCancellable: preDispatch,
-      isRefundable: paid && remaining > 0 && order.status !== "cancelled",
+      // Refundability is about money, not status: a paid order that was
+      // cancelled still owes the customer a refund.
+      isRefundable: paid && remaining > 0,
       remainingRefundable: { amount: remaining.toFixed(2), currency: order.currency },
       addressChangeable: preDispatch,
       shippedAt: rows.find((r) => r.shippedAt)?.shippedAt ?? order.date_completed ?? null,
@@ -218,6 +234,7 @@ function enrichOrder(order, tracking) {
 
 module.exports = {
   PRE_DISPATCH_STATUSES,
+  isPreDispatch,
   summarizeOrder,
   getOrderById,
   resolveOrder,

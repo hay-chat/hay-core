@@ -54,6 +54,18 @@ describe("wcApi", () => {
     }
   });
 
+  it("never retries a POST that timed out (it may have been processed)", async () => {
+    let n = 0;
+    global.fetch = async () => {
+      n += 1;
+      const err = new Error("The operation was aborted due to timeout");
+      err.name = "TimeoutError";
+      throw err;
+    };
+    await expect(wcApi("POST", "/orders/1/refunds", { body: {} })).rejects.toThrow(/timeout/);
+    expect(n).toBe(1);
+  });
+
   it("retries a GET on 5xx and gives up with the last error", async () => {
     let n = 0;
     const { calls } = mockFetch([

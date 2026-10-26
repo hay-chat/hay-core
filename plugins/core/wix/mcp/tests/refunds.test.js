@@ -14,7 +14,16 @@ const ORDER = {
   status: "APPROVED",
   currency: "EUR",
   fulfillmentStatus: "FULFILLED",
+  lineItems: [
+    { id: "li-1", quantity: 2 },
+    { id: "li-2", quantity: 1 },
+  ],
 };
+
+/** Documented Get Order Refundability shape: everything refundable. */
+function allRefundable(payments) {
+  return { payments: payments.map((p) => ({ payment: { paymentId: p.id }, refundable: true })) };
+}
 
 function routes({ payments, refunds = [], refundability, onRefund }) {
   return [
@@ -27,18 +36,24 @@ function routes({ payments, refunds = [], refundability, onRefund }) {
     {
       method: "POST",
       path: "/ecom/v1/order-billing/get-order-refundability",
-      reply: () =>
-        refundability ?? {
-          refundabilities: payments.map((p) => ({
-            transactionId: p.id,
-            refundability: "REFUNDABLE",
-          })),
-        },
+      reply: () => refundability ?? allRefundable(payments),
     },
     {
       method: "POST",
       path: "/ecom/v1/order-billing/refund-payments",
-      reply: (ctx) => (onRefund ? onRefund(ctx) : { refunds: [{ id: "r-1" }] }),
+      reply: (ctx) =>
+        onRefund
+          ? onRefund(ctx)
+          : {
+              refund: {
+                id: "r-1",
+                transactions: ctx.body.paymentRefunds.map((p) => ({
+                  paymentId: p.paymentId,
+                  amount: p.amount,
+                  refundStatus: "SUCCEEDED",
+                })),
+              },
+            },
     },
   ];
 }
@@ -50,21 +65,31 @@ const CARD = {
 };
 
 describe("parseRefundabilities", () => {
-  it("normalises the states Wix has shipped under different keys", () => {
+  it("reads the documented one-of shape per payment", () => {
     expect(
       parseRefundabilities({
-        refundabilities: [
-          { transactionId: "a", refundability: "REFUNDABLE" },
-          { transactionId: "b", refundabilityStatus: "MANUALLY_REFUNDABLE" },
-          { paymentId: "c", refundable: false, nonRefundableReason: "ALREADY_REFUNDED" },
+        payments: [
+          { payment: { paymentId: "a" }, refundable: true },
+          {
+            payment: { paymentId: "b" },
+            manuallyRefundable: { reason: "NOT_SUPPORTED" },
+            providerLink: "https://provider/refunds",
+          },
+          { payment: { paymentId: "c" }, nonRefundable: { reason: "ALREADY_REFUNDED" } },
+          { payment: {} },
         ],
       }),
     ).toEqual({
-      a: { state: "REFUNDABLE", reason: null },
-      b: { state: "MANUALLY_REFUNDABLE", reason: null },
-      c: { state: "NON_REFUNDABLE", reason: "ALREADY_REFUNDED" },
+      a: { state: "REFUNDABLE", reason: null, providerLink: null },
+      b: {
+        state: "MANUALLY_REFUNDABLE",
+        reason: "NOT_SUPPORTED",
+        providerLink: "https://provider/refunds",
+      },
+      c: { state: "NON_REFUNDABLE", reason: "ALREADY_REFUNDED", providerLink: null },
     });
     expect(parseRefundabilities({})).toBeNull();
+    expect(parseRefundabilities({ payments: [] })).toBeNull();
   });
 });
 
@@ -95,30 +120,43 @@ describe("wix_create_refund", () => {
     registerRefundTools(server);
   });
 
-  it("issues a full refund against the right payment with the side effects asked for", async () => {
+  it("issues a full refund against the right payment with the documented side effects", async () => {
     const { calls } = mockFetch(routes({ payments: [CARD] }));
     const res = await server.call("wix_create_refund", {
       order_id: "ord-1",
       restock: true,
+      notify_customer: true,
       reason: "damaged",
     });
     expect(res.isError).toBe(false);
     expect(res.data).toMatchObject({
       refunded: true,
       external: false,
+      id: "ord-1",
+      refundId: "r-1",
+      refundStatus: [{ paymentId: "pay-1", status: "SUCCEEDED" }],
       amount: { amount: "50.00", currency: "EUR" },
       remainingRefundable: { amount: "0.00" },
+      restocked: true,
     });
     const refund = calls.find((c) => c.path.endsWith("/refund-payments"));
     expect(refund.body).toEqual({
       orderId: "ord-1",
-      paymentRefunds: [{ transactionId: "pay-1", amount: { amount: "50.00" } }],
-      sideEffects: { restockAllItems: true, sendOrderRefundedEmail: false },
-      reason: "damaged",
+      paymentRefunds: [{ paymentId: "pay-1", amount: { amount: "50.00" } }],
+      customerReason: "damaged",
+      sideEffects: {
+        restock: {
+          lineItems: [
+            { lineItemId: "li-1", quantity: 2 },
+            { lineItemId: "li-2", quantity: 1 },
+          ],
+        },
+        notifications: { sendCustomerEmail: true },
+      },
     });
   });
 
-  it("caps a partial refund at the remaining balance after earlier refunds", async () => {
+  it("caps a partial refund at the remaining balance and never restocks on a partial", async () => {
     const { calls } = mockFetch(
       routes({
         payments: [CARD],
@@ -136,9 +174,16 @@ describe("wix_create_refund", () => {
     expect(tooMuch.text).toMatch(/exceeds the remaining refundable balance of 20.00/);
     expect(calls.some((c) => c.path.endsWith("/refund-payments"))).toBe(false);
 
-    const okRes = await server.call("wix_create_refund", { order_id: "ord-1", amount: "20.00" });
+    const okRes = await server.call("wix_create_refund", {
+      order_id: "ord-1",
+      amount: "20.00",
+      restock: true,
+    });
     expect(okRes.data.refunded).toBe(true);
+    expect(okRes.data.restocked).toBe(false);
     expect(okRes.data.payments).toEqual([{ paymentId: "pay-1", amount: 20 }]);
+    const refund = calls.find((c) => c.path.endsWith("/refund-payments"));
+    expect(refund.body.sideEffects).toBeUndefined();
   });
 
   it("refuses a fully refunded order and invalid amounts", async () => {
@@ -168,7 +213,13 @@ describe("wix_create_refund", () => {
       routes({
         payments: [CARD],
         refundability: {
-          refundabilities: [{ transactionId: "pay-1", refundability: "MANUALLY_REFUNDABLE" }],
+          payments: [
+            {
+              payment: { paymentId: "pay-1" },
+              manuallyRefundable: { reason: "NOT_SUPPORTED" },
+              providerLink: "https://provider/refunds",
+            },
+          ],
         },
       }),
     );
@@ -176,8 +227,40 @@ describe("wix_create_refund", () => {
     expect(res.isError).toBe(false);
     expect(res.data.refunded).toBe(false);
     expect(res.data.reason).toBe("provider_not_api_refundable");
+    expect(res.data.message).toMatch(/NOT_SUPPORTED/);
+    expect(res.data.message).toMatch(/https:\/\/provider\/refunds/);
     expect(res.data.message).toMatch(/external_refund=true/);
     expect(calls.some((c) => c.path.endsWith("/refund-payments"))).toBe(false);
+  });
+
+  it("spans two payments and refuses when one of them is non-refundable", async () => {
+    const second = { ...CARD, id: "pay-2", amount: { amount: "20.00" } };
+    const { calls } = mockFetch(routes({ payments: [CARD, second] }));
+    const res = await server.call("wix_create_refund", { order_id: "ord-1", amount: "60.00" });
+    expect(res.data.payments).toEqual([
+      { paymentId: "pay-1", amount: 50 },
+      { paymentId: "pay-2", amount: 10 },
+    ]);
+    expect(calls.find((c) => c.path.endsWith("/refund-payments")).body.paymentRefunds).toEqual([
+      { paymentId: "pay-1", amount: { amount: "50.00" } },
+      { paymentId: "pay-2", amount: { amount: "10.00" } },
+    ]);
+
+    const { calls: calls2 } = mockFetch(
+      routes({
+        payments: [CARD, second],
+        refundability: {
+          payments: [
+            { payment: { paymentId: "pay-1" }, refundable: true },
+            { payment: { paymentId: "pay-2" }, nonRefundable: { reason: "PENDING_REFUND" } },
+          ],
+        },
+      }),
+    );
+    const blocked = await server.call("wix_create_refund", { order_id: "ord-1", amount: "60.00" });
+    expect(blocked.data.refunded).toBe(false);
+    expect(blocked.data.message).toMatch(/pay-2 \(PENDING_REFUND\) cannot be refunded/);
+    expect(calls2.some((c) => c.path.endsWith("/refund-payments"))).toBe(false);
   });
 
   it("records an external refund without the refundability check", async () => {
@@ -191,7 +274,7 @@ describe("wix_create_refund", () => {
     expect(calls.some((c) => c.path.endsWith("/get-order-refundability"))).toBe(false);
     const refund = calls.find((c) => c.path.endsWith("/refund-payments"));
     expect(refund.body.paymentRefunds[0]).toEqual({
-      transactionId: "pay-1",
+      paymentId: "pay-1",
       amount: { amount: "10.00" },
       externalRefund: true,
     });

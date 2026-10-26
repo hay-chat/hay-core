@@ -16,6 +16,7 @@ const {
   loadEnrichedOrder,
   getFulfillments,
   trackingSummary,
+  balanceRemaining,
 } = require("../lib/orders");
 
 const ORDER_REF = {
@@ -105,12 +106,16 @@ function registerOrderTools(server) {
           body,
         });
         const updated = res?.order ?? {};
+        const remaining = balanceRemaining(order);
         return ok({
           status: "CANCELLED",
           id: order.id,
           number: order.number,
           orderStatus: updated.status ?? "CANCELED",
-          remainingRefundable: order.balanceSummary?.paid ?? null,
+          remainingRefundable:
+            remaining === null
+              ? null
+              : { amount: remaining.toFixed(2), currency: order.currency ?? null },
           detail:
             "The order is cancelled. If the buyer paid, refund them with wix_create_refund — " +
             "cancelling alone does not move money.",

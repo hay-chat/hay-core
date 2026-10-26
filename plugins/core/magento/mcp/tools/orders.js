@@ -103,6 +103,18 @@ function registerOrderTools(server) {
               "magento_create_refund instead (a credit memo closes the order).",
           );
         }
+        if (order.state === "holded") {
+          throw new Error(
+            `Order ${ref} is on hold; Magento cannot cancel a held order. Ask the merchant to ` +
+              "release it (Sales → Orders → Unhold), then cancel.",
+          );
+        }
+        if (order.state === "payment_review") {
+          throw new Error(
+            `Order ${ref} is in payment review; Magento cannot cancel it until the payment ` +
+              "provider settles the review. Escalate to the merchant.",
+          );
+        }
         if (!CANCELLABLE_STATES.has(order.state)) {
           throw new Error(
             `Order ${ref} is in state "${order.state}" and cannot be cancelled. Escalate to the merchant.`,
@@ -129,6 +141,7 @@ function registerOrderTools(server) {
           status: "CANCELLED",
           id: order.entity_id,
           number: order.increment_id,
+          orderStatus: "canceled",
           detail: "The order is cancelled. Nothing was paid, so there is nothing to refund.",
         });
       } catch (err) {
