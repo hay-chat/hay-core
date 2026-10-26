@@ -1,0 +1,54 @@
+{
+  "home": {
+    "title": "Home",
+    "headTitle": "Home - Hay",
+    "headline": {
+      "loading": "Checking who is waiting…",
+      "waiting": "Nothing is waiting for a human | 1 conversation is waiting for a human | {count} conversations are waiting for a human"
+    },
+    "subline": {
+      "longestWait": "Longest wait: {time}.",
+      "aiHandling": "Hay is handling {count} open conversation. | Hay is handling {count} open conversations.",
+      "allQuiet": "No open conversations right now."
+    },
+    "waitingCount": "{count} waiting for a human",
+    "sections": {
+      "waiting": "Waiting for a human",
+      "mine": "You're handling",
+      "team": "Teammates are handling"
+    },
+    "row": {
+      "noSummary": "Summary not ready yet. Open the conversation to read it.",
+      "waitingFor": "Waiting {time}",
+      "since": "Since {time} ago",
+      "unknownCustomer": "Customer",
+      "takeOver": "Take over",
+      "open": "Open",
+      "handledBy": "Handled by {name}"
+    },
+    "empty": {
+      "title": "All quiet",
+      "description": "When Hay hands a conversation to a person it shows up here first. Turn on alerts to hear about it on this device."
+    },
+    "error": {
+      "title": "Couldn't load conversations",
+      "retry": "Try again"
+    },
+    "metrics": "Metrics and reports",
+    "push": {
+      "enable": "Alerts on this device",
+      "enabled": "Alerts on",
+      "description": "Get a notification on this device whenever a conversation needs a human, even when Hay isn't open.",
+      "statusOn": "This device gets alerts",
+      "statusOff": "This device doesn't get alerts",
+      "sendTest": "Send a test alert",
+      "testSent": "Test alert sent",
+      "testSentBody": "It should appear on this device within a few seconds.",
+      "testNone": "No device is subscribed",
+      "unsupported": "This browser can't receive push alerts. On iPhone, add Hay to your Home Screen first and open it from there.",
+      "unavailable": "Push alerts are not set up on this Hay server yet. Ask your administrator to add VAPID keys.",
+      "denied": "Notifications are blocked for this site in your browser settings. Allow them, then reload the page.",
+      "failed": "Couldn't turn on alerts"
+    }
+  }
+}
