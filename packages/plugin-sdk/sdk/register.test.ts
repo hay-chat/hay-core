@@ -512,6 +512,40 @@ describe("Register API", () => {
     });
   });
 
+  describe("Webhook Routing Registration", () => {
+    const routeKeyPath = { itemsPath: "data.to", keyPath: "." };
+
+    it("accepts the svix format with the svix-signature header and an email key transform", () => {
+      expect(() =>
+        registerAPI.webhookRouting({
+          signature: { header: "svix-signature", format: "svix", secretEnv: "ALLOWED_VAR" },
+          routeKeyPath: { ...routeKeyPath, keyTransform: "email-address" },
+        }),
+      ).not.toThrow();
+    });
+
+    it("rejects svix with a non-svix header, unknown formats and unknown transforms", () => {
+      expect(() =>
+        registerAPI.webhookRouting({
+          signature: { header: "x-signature", format: "svix", secretEnv: "ALLOWED_VAR" },
+          routeKeyPath,
+        }),
+      ).toThrow(/svix-signature/);
+      expect(() =>
+        registerAPI.webhookRouting({
+          signature: { header: "x-sig", format: "md5" as never, secretEnv: "ALLOWED_VAR" },
+          routeKeyPath,
+        }),
+      ).toThrow(/sha256-hmac|svix/);
+      expect(() =>
+        registerAPI.webhookRouting({
+          signature: { header: "x-sig", format: "sha256-hmac", secretEnv: "ALLOWED_VAR" },
+          routeKeyPath: { ...routeKeyPath, keyTransform: "upper" as never },
+        }),
+      ).toThrow(/keyTransform/);
+    });
+  });
+
   describe("Cron Registration", () => {
     const handler = async () => {};
 

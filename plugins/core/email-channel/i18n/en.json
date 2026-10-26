@@ -1,0 +1,73 @@
+{
+  "name": "Email inbox",
+  "description": "Connect your support inbox: forward support@ emails to Hay and let the AI reply by email, threaded like a normal conversation",
+  "tools": {},
+  "config": {},
+  "ui": {
+    "title": "Connect your inbox",
+    "intro": "Keep your support address. Forward it to Hay and the AI answers by email — every reply stays in the same thread, and you can take over any conversation from the dashboard.",
+    "loadingStatus": "Loading email channel status…",
+    "statusError": {
+      "title": "Couldn't load the email channel status",
+      "body": "Make sure the plugin is enabled and its settings are saved, then try again.",
+      "detail": "Details: {message}",
+      "noApi": "The dashboard API is not available in this view.",
+      "retry": "Try again"
+    },
+    "notReady": {
+      "title": "Email channel is not available on this Hay installation yet",
+      "body": "The host is missing: {missing}. Ask your Hay administrator to configure inbound email."
+    },
+    "needsAddress": {
+      "title": "Save your support address first",
+      "body": "Enter the address your customers write to in the settings above and save. Hay uses it to recognise forwarded mail and to send the right Reply-To."
+    },
+    "address": {
+      "title": "Your Hay forwarding address",
+      "intro": "Forward your support mailbox to this address. It is unique to your workspace.",
+      "copy": "Copy address",
+      "copied": "Copied",
+      "from": "Replies are sent as",
+      "replyTo": "Replies ask to be answered at",
+      "archive": "Copies to your inbox",
+      "archiveOn": "On — every reply is BCC'd to {address}",
+      "archiveOff": "Off — enable \"Keep a copy in my inbox\" above if you want them"
+    },
+    "steps": {
+      "title": "Set up forwarding",
+      "gmail": {
+        "title": "Gmail or Google Workspace",
+        "body": "Open Gmail as the support mailbox → Settings → See all settings → Forwarding and POP/IMAP → Add a forwarding address → paste the Hay address → Next. Google emails Hay a confirmation code; it appears below within a minute. Enter it in Gmail, choose \"Forward a copy of incoming mail\" and save."
+      },
+      "outlook": {
+        "title": "Outlook or Microsoft 365",
+        "body": "Open Outlook on the web as the support mailbox → Settings → Mail → Forwarding → Enable forwarding → paste the Hay address → tick \"Keep a copy of forwarded messages\" → Save. Some Microsoft 365 tenants need an admin to allow external forwarding."
+      },
+      "other": {
+        "title": "Other providers",
+        "body": "Any mailbox that can auto-forward works. Forward a copy (do not redirect-and-delete) so your inbox keeps the original."
+      },
+      "test": {
+        "title": "Send a test",
+        "body": "Email your support address from a personal account. The message appears under Conversations as an email conversation and the AI replies to you by email."
+      }
+    },
+    "confirmation": {
+      "title": "Gmail confirmation code",
+      "waiting": "Waiting for Google's confirmation email… It arrives here as soon as you add the forwarding address in Gmail.",
+      "received": "Google sent a confirmation on {time}.",
+      "code": "Confirmation code",
+      "copyCode": "Copy code",
+      "link": "Or open Google's confirmation link",
+      "noCode": "Hay received Google's message but could not read the code. Open the link below instead."
+    },
+    "health": {
+      "title": "Status",
+      "refresh": "Refresh",
+      "lastInbound": "Last email received",
+      "never": "Nothing received yet",
+      "count": "Emails received since start",
+      "lastError": "Last error"
+    }
+  }
+}
