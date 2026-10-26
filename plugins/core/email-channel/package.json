@@ -1,7 +1,7 @@
 {
   "name": "hay-channel-email",
   "version": "1.0.0",
-  "description": "Connect your support inbox as a channel \u2014 forward support@ emails to Hay and let the AI reply by email, threaded like a normal conversation",
+  "description": "Connect your support inbox as a channel — forward support@ emails to Hay and let the AI reply by email, threaded like a normal conversation",
   "author": "Hay",
   "type": "module",
   "main": "dist/index.js",
@@ -17,7 +17,6 @@
     ],
     "env": [
       "RESEND_API_KEY",
-      "RESEND_WEBHOOK_SECRET",
       "EMAIL_INBOUND_DOMAIN",
       "SMTP_FROM_EMAIL"
     ]
