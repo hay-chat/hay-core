@@ -86,6 +86,31 @@ export interface EmailSendOptions {
 
   /** BCC recipients (optional) */
   bcc?: string | string[];
+
+  /**
+   * Sender shown to the recipient. The address must be on the platform's
+   * sending domain (the domain of SMTP_FROM_EMAIL); the display name is free.
+   */
+  from?: { email: string; name?: string };
+
+  /** Reply-To address (e.g. a channel plugin's inbound token address). */
+  replyTo?: string;
+
+  /** Extra RFC 5322 headers (In-Reply-To, References, Auto-Submitted, ...). */
+  headers?: Record<string, string>;
+
+  /** Message-ID to send with; stored by the caller so replies can be threaded. */
+  messageId?: string;
+
+  /** Base64-encoded attachments. */
+  attachments?: Array<{ filename: string; contentBase64: string; contentType?: string }>;
+
+  /**
+   * Retry through the platform's background queue when the first attempt
+   * fails (default true). Channel plugins pass false: they report the failure
+   * on the message instead and must not be surprised by a later silent send.
+   */
+  retry?: boolean;
 }
 
 /**
@@ -201,6 +226,12 @@ export interface SendEmailHttpRequest {
   html?: string;
   cc?: string[];
   bcc?: string[];
+  from?: { email: string; name?: string };
+  replyTo?: string;
+  headers?: Record<string, string>;
+  messageId?: string;
+  attachments?: Array<{ filename: string; contentBase64: string; contentType?: string }>;
+  retry?: boolean;
 }
 
 export interface SendEmailHttpResponse {

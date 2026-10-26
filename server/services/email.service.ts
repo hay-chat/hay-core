@@ -153,6 +153,7 @@ export class EmailService {
       attachments: options.attachments,
       headers: options.headers,
       priority: options.priority,
+      messageId: options.messageId,
     };
 
     try {
@@ -189,9 +190,11 @@ export class EmailService {
         "Failed to send email",
       );
 
-      // Add to retry queue
-      const queueItem = this.addToQueue(options);
-      logger.debug({ queueItemId: queueItem.id }, "Added to retry queue");
+      // Add to retry queue unless the caller handles failures itself.
+      if (options.retry !== false) {
+        const queueItem = this.addToQueue(options);
+        logger.debug({ queueItemId: queueItem.id }, "Added to retry queue");
+      }
 
       return {
         success: false,

@@ -10,6 +10,17 @@ import { config } from "../../config/env";
 
 const logger = createLogger("plugin-api");
 
+/** Domain of the platform's configured sender (SMTP_FROM_EMAIL). */
+function platformSenderDomain(): string {
+  return config.smtp.from.email.split("@").pop()?.toLowerCase() ?? "";
+}
+
+/** Whether `address` may be used as a From address by a plugin. */
+export function isPlatformSenderAddress(address: string): boolean {
+  const domain = address.trim().toLowerCase().split("@");
+  return domain.length === 2 && domain[1] !== "" && domain[1] === platformSenderDomain();
+}
+
 /**
  * Plugin API Service
  *
@@ -143,19 +154,49 @@ export class PluginAPIService {
         };
       }
 
+      // Plugins may pick the display name freely but can only send from the
+      // platform's own domain: anything else would let a plugin spoof a
+      // merchant's or a third party's address through our relay.
+      if (options.from && !isPlatformSenderAddress(options.from.email)) {
+        return {
+          success: false,
+          error: `from.email must be on the platform sending domain (${platformSenderDomain()})`,
+        };
+      }
+
       // Initialize email service (idempotent - safe to call multiple times)
       await emailService.initialize();
 
-      // Send email using the email service
-      // Note: We validated that 'to' exists above, so it's safe to use non-null assertion
       const result = await emailService.sendEmail({
-        to: options.to!,
+        to: options.to,
         subject: options.subject,
         text: options.text,
         html: options.html,
         cc: options.cc,
         bcc: options.bcc,
+        from: options.from,
+        replyTo: options.replyTo,
+        headers: options.headers,
+        messageId: options.messageId,
+        retry: options.retry,
+        attachments: options.attachments?.map((attachment) => ({
+          filename: attachment.filename,
+          content: Buffer.from(attachment.contentBase64, "base64"),
+          contentType: attachment.contentType,
+        })),
       });
+
+      if (!result.success) {
+        logger.warn(
+          {
+            pluginId: tokenPayload.pluginId,
+            organizationId: tokenPayload.organizationId,
+            error: result.error,
+          },
+          "Email send via plugin failed",
+        );
+        return { success: false, error: result.error ?? "Failed to send email" };
+      }
 
       logger.debug(
         {
