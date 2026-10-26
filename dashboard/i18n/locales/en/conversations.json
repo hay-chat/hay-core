@@ -73,6 +73,8 @@
       "startFirst": "Click 'New Conversation' to start your first conversation."
     },
     "detail": {
+      "moreActions": "More actions",
+      "details": "Details",
       "exitPlayground": "Exit Playground",
       "playgroundTitle": "Conversation Playground",
       "autoSends": "Auto-sends",

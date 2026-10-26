@@ -73,6 +73,8 @@
       "startFirst": "Clique em 'Nova Conversa' para iniciar sua primeira conversa."
     },
     "detail": {
+      "moreActions": "Mais ações",
+      "details": "Detalhes",
       "exitPlayground": "Sair do Playground",
       "playgroundTitle": "Playground de Conversas",
       "autoSends": "Envio automático",

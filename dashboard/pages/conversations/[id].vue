@@ -1,67 +1,126 @@
 <template>
-  <div class="h-screen flex flex-col">
+  <div class="h-full flex flex-col">
     <!-- Header -->
     <div
       class="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60"
     >
-      <div class="flex items-center justify-between px-6 py-4">
+      <div class="flex items-center justify-between gap-2 px-3 py-2 md:px-6 md:py-4">
         <!-- Playground Mode Header -->
         <template v-if="isPlaygroundMode">
-          <div class="flex items-center space-x-4">
-            <Button variant="ghost" @click="exitPlayground">
-              <X class="h-4 w-4 mr-2" />
-              {{ $t("conversations.detail.exitPlayground") }}
+          <div class="flex items-center gap-2 md:gap-4 min-w-0">
+            <Button
+              variant="ghost"
+              class="shrink-0"
+              :aria-label="$t('conversations.detail.exitPlayground')"
+              @click="exitPlayground"
+            >
+              <X class="h-4 w-4 sm:mr-2" />
+              <span class="hidden sm:inline">{{ $t("conversations.detail.exitPlayground") }}</span>
             </Button>
-            <div>
-              <div class="flex items-center gap-2">
-                <h1 class="text-xl font-semibold">
+            <div class="min-w-0">
+              <div class="flex items-center gap-2 min-w-0">
+                <h1 class="text-xl font-semibold truncate">
                   {{ $t("conversations.detail.playgroundTitle") }}
                 </h1>
-                <Badge variant="outline" class="text-xs">
+                <Badge variant="outline" class="text-xs max-sm:!hidden">
                   <Info class="h-3 w-3 mr-1" />
                   {{ $t("conversations.detail.autoSends") }}
                 </Badge>
               </div>
-              <p class="text-sm text-neutral-muted">
+              <p class="text-sm text-neutral-muted hidden sm:block">
                 {{ $t("conversations.detail.playgroundDescription") }}
                 <ThumbsUp class="icon" />/<ThumbsDown class="icon" />
                 {{ $t("conversations.detail.rateQuality") }}
               </p>
             </div>
           </div>
-          <div class="flex items-center space-x-2">
-            <Button v-if="isLocalhost" variant="outline" size="sm" @click="copyConversationJson">
-              <Braces class="h-4 w-4 mr-2" />
-              Copy JSON
-            </Button>
+          <div class="flex items-center gap-2 shrink-0">
+            <!-- Desktop actions -->
+            <div class="hidden md:flex items-center gap-2">
+              <Button v-if="isLocalhost" variant="outline" size="sm" @click="copyConversationJson">
+                <Braces class="h-4 w-4 mr-2" />
+                Copy JSON
+              </Button>
+              <Button
+                v-if="conversation?.playbook_id"
+                variant="outline"
+                size="sm"
+                @click="showSuggestDialog = true"
+              >
+                <Sparkles class="h-4 w-4 mr-2" />
+                {{ $t("suggest.improveFromConversation") }}
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                :disabled="isResetting"
+                @click="resetConversation"
+              >
+                <RefreshCw class="h-4 w-4 mr-2" />
+                {{ $t("conversations.detail.newTest") }}
+              </Button>
+            </div>
+            <!-- Mobile actions -->
+            <DropdownMenu class="md:hidden">
+              <DropdownMenuTrigger as-child>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  :aria-label="$t('conversations.detail.moreActions')"
+                >
+                  <MoreHorizontal class="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem :disabled="isResetting" @click="resetConversation">
+                  <RefreshCw class="mr-2 h-4 w-4" />
+                  {{ $t("conversations.detail.newTest") }}
+                </DropdownMenuItem>
+                <DropdownMenuItem v-if="isLocalhost" @click="copyConversationJson">
+                  <Braces class="mr-2 h-4 w-4" />
+                  Copy JSON
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  v-if="conversation?.playbook_id"
+                  @click="showSuggestDialog = true"
+                >
+                  <Sparkles class="mr-2 h-4 w-4" />
+                  {{ $t("suggest.improveFromConversation") }}
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
             <Button
-              v-if="conversation?.playbook_id"
-              variant="outline"
-              size="sm"
-              @click="showSuggestDialog = true"
+              variant="ghost"
+              size="icon"
+              class="lg:hidden"
+              data-testid="conversation-details-toggle"
+              :aria-label="$t('conversations.detail.details')"
+              @click="showDetailsSheet = true"
             >
-              <Sparkles class="h-4 w-4 mr-2" />
-              {{ $t("suggest.improveFromConversation") }}
-            </Button>
-            <Button variant="outline" size="sm" :disabled="isResetting" @click="resetConversation">
-              <RefreshCw class="h-4 w-4 mr-2" />
-              {{ $t("conversations.detail.newTest") }}
+              <PanelRight class="h-4 w-4" />
             </Button>
           </div>
         </template>
 
         <!-- Regular Conversation Header -->
         <template v-else>
-          <div class="flex items-center space-x-4">
-            <Button variant="ghost" @click="goBack">
-              <ArrowLeft class="h-4 w-4 mr-2" />
-              {{ $t("conversations.detail.backToConversations") }}
+          <div class="flex items-center gap-2 md:gap-4 min-w-0">
+            <Button
+              variant="ghost"
+              class="shrink-0"
+              :aria-label="$t('conversations.detail.backToConversations')"
+              @click="goBack"
+            >
+              <ArrowLeft class="h-4 w-4 sm:mr-2" />
+              <span class="hidden sm:inline">{{
+                $t("conversations.detail.backToConversations")
+              }}</span>
             </Button>
-            <div>
-              <h1 class="text-xl font-semibold">
+            <div class="min-w-0">
+              <h1 class="text-xl font-semibold truncate">
                 {{ conversation?.title || $t("conversations.detail.loading") }}
               </h1>
-              <p class="text-sm text-neutral-muted">
+              <p class="text-sm text-neutral-muted hidden sm:block">
                 {{
                   $t("conversations.detail.conversationNumber", {
                     id: conversation?.id?.slice(0, 8),
@@ -70,7 +129,7 @@
               </p>
             </div>
           </div>
-          <div class="flex items-center space-x-2">
+          <div class="flex items-center gap-2 shrink-0">
             <Badge :variant="getStatusVariant(conversation?.status)">
               <component :is="getStatusIcon(conversation?.status)" class="h-3 w-3 mr-1" />
               {{ formatStatus(conversation?.status) }}
@@ -78,7 +137,7 @@
             <Badge
               v-if="isTestMode"
               :variant="isTestMode ? 'default' : 'secondary'"
-              class="bg-orange-100 text-orange-700 hover:bg-orange-200"
+              class="bg-orange-100 text-orange-700 hover:bg-orange-200 max-sm:!hidden"
             >
               <ShieldAlert class="h-3 w-3 mr-1" />
               {{
@@ -89,27 +148,87 @@
                 })
               }}
             </Badge>
-            <Button v-if="isLocalhost" variant="outline" size="sm" @click="copyConversationJson">
-              <Braces class="h-4 w-4 mr-2" />
-              Copy JSON
-            </Button>
+            <!-- Desktop secondary actions -->
+            <div class="hidden md:flex items-center gap-2">
+              <Button v-if="isLocalhost" variant="outline" size="sm" @click="copyConversationJson">
+                <Braces class="h-4 w-4 mr-2" />
+                Copy JSON
+              </Button>
+              <Button
+                v-if="conversation?.playbook_id"
+                variant="outline"
+                size="sm"
+                @click="showSuggestDialog = true"
+              >
+                <Sparkles class="h-4 w-4 mr-2" />
+                {{ $t("suggest.improveFromConversation") }}
+              </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger as-child>
+                  <Button variant="outline" size="sm" :loading="isExporting">
+                    <Download class="h-4 w-4 mr-2" />
+                    {{ $t("conversations.detail.export") }}
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem @click="exportConversation('pdf')">
+                    <FileText class="mr-2 h-4 w-4" />
+                    {{ $t("conversations.detail.exportPdf") }}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem @click="exportConversation('csv')">
+                    <FileSpreadsheet class="mr-2 h-4 w-4" />
+                    {{ $t("conversations.detail.exportCsv") }}
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+              <Button
+                v-if="conversation?.status === 'open'"
+                variant="outline"
+                size="sm"
+                :class="supervisionMode ? 'bg-orange-50 border-orange-200' : ''"
+                @click="toggleSupervisionMode"
+              >
+                <Eye class="h-4 w-4 mr-2" />
+                {{
+                  supervisionMode
+                    ? $t("conversations.detail.exitSupervision")
+                    : $t("conversations.detail.supervise")
+                }}
+              </Button>
+            </div>
             <Button
-              v-if="conversation?.playbook_id"
-              variant="outline"
+              v-if="conversation?.status === 'open' || conversation?.status === 'pending-human'"
               size="sm"
-              @click="showSuggestDialog = true"
+              data-testid="take-over-button"
+              @click="takeOverConversation"
             >
-              <Sparkles class="h-4 w-4 mr-2" />
-              {{ $t("suggest.improveFromConversation") }}
+              <UserCheck class="h-4 w-4 mr-2" />
+              {{ $t("conversations.detail.takeOver") }}
             </Button>
-            <DropdownMenu>
+            <!-- Mobile secondary actions -->
+            <DropdownMenu class="md:hidden">
               <DropdownMenuTrigger as-child>
-                <Button variant="outline" size="sm" :loading="isExporting">
-                  <Download class="h-4 w-4 mr-2" />
-                  {{ $t("conversations.detail.export") }}
+                <Button
+                  variant="outline"
+                  size="icon"
+                  :loading="isExporting"
+                  :aria-label="$t('conversations.detail.moreActions')"
+                >
+                  <MoreHorizontal class="h-4 w-4" />
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
+                <DropdownMenuItem v-if="isLocalhost" @click="copyConversationJson">
+                  <Braces class="mr-2 h-4 w-4" />
+                  Copy JSON
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  v-if="conversation?.playbook_id"
+                  @click="showSuggestDialog = true"
+                >
+                  <Sparkles class="mr-2 h-4 w-4" />
+                  {{ $t("suggest.improveFromConversation") }}
+                </DropdownMenuItem>
                 <DropdownMenuItem @click="exportConversation('pdf')">
                   <FileText class="mr-2 h-4 w-4" />
                   {{ $t("conversations.detail.exportPdf") }}
@@ -118,29 +237,28 @@
                   <FileSpreadsheet class="mr-2 h-4 w-4" />
                   {{ $t("conversations.detail.exportCsv") }}
                 </DropdownMenuItem>
+                <DropdownMenuItem
+                  v-if="conversation?.status === 'open'"
+                  @click="toggleSupervisionMode"
+                >
+                  <Eye class="mr-2 h-4 w-4" />
+                  {{
+                    supervisionMode
+                      ? $t("conversations.detail.exitSupervision")
+                      : $t("conversations.detail.supervise")
+                  }}
+                </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
             <Button
-              v-if="conversation?.status === 'open'"
-              variant="outline"
-              size="sm"
-              :class="supervisionMode ? 'bg-orange-50 border-orange-200' : ''"
-              @click="toggleSupervisionMode"
+              variant="ghost"
+              size="icon"
+              class="lg:hidden"
+              data-testid="conversation-details-toggle"
+              :aria-label="$t('conversations.detail.details')"
+              @click="showDetailsSheet = true"
             >
-              <Eye class="h-4 w-4 mr-2" />
-              {{
-                supervisionMode
-                  ? $t("conversations.detail.exitSupervision")
-                  : $t("conversations.detail.supervise")
-              }}
-            </Button>
-            <Button
-              v-if="conversation?.status === 'open' || conversation?.status === 'pending-human'"
-              size="sm"
-              @click="takeOverConversation"
-            >
-              <UserCheck class="h-4 w-4 mr-2" />
-              {{ $t("conversations.detail.takeOver") }}
+              <PanelRight class="h-4 w-4" />
             </Button>
           </div>
         </template>
@@ -152,7 +270,7 @@
       <!-- Left Side: Conversation Thread -->
       <div class="flex-1 flex flex-col">
         <!-- Messages Container -->
-        <div ref="messagesContainer" class="flex-1 overflow-y-auto p-6 space-y-4 bg-white">
+        <div ref="messagesContainer" class="flex-1 overflow-y-auto p-3 md:p-6 space-y-4 bg-white">
           <!-- Playground Loading State -->
           <div v-if="isPlaygroundMode && messagesLoading" class="space-y-4">
             <div v-for="i in 3" :key="i" class="animate-pulse">
@@ -303,18 +421,23 @@
 
         <!-- Human Takeover Panel -->
         <div v-if="isTakenOverByCurrentUser" class="border-t bg-blue-50 p-4">
-          <div class="flex items-center justify-between">
+          <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div class="flex items-center space-x-2">
               <UserCheck class="h-4 w-4 text-blue-600" />
               <span class="text-sm font-medium text-blue-800">{{
                 $t("conversations.detail.youAreHandling")
               }}</span>
             </div>
-            <div class="flex items-center space-x-2">
-              <Button variant="outline" size="sm" @click="endTakeover">
+            <div class="flex flex-wrap items-center gap-2">
+              <Button variant="outline" size="sm" class="min-h-11 sm:min-h-0" @click="endTakeover">
                 {{ $t("conversations.detail.releaseConversation") }}
               </Button>
-              <Button variant="outline" size="sm" @click="showCloseDialog = true">
+              <Button
+                variant="outline"
+                size="sm"
+                class="min-h-11 sm:min-h-0"
+                @click="showCloseDialog = true"
+              >
                 {{ $t("conversations.detail.closeConversation") }}
               </Button>
             </div>
@@ -335,7 +458,7 @@
                 </p>
               </div>
             </div>
-            <div class="flex items-center space-x-2">
+            <div class="flex flex-wrap items-center gap-2">
               <Button variant="outline" size="sm" @click="resetConversation">
                 <RefreshCw class="h-4 w-4 mr-2" />
                 {{ $t("conversations.pendingHuman.startNew") }}
@@ -359,7 +482,7 @@
 
         <!-- Pending Human Panel: handoff summary + take over -->
         <div v-if="!isPlaygroundMode && isPendingHuman" class="border-t bg-amber-50 p-4">
-          <div class="flex items-center justify-between gap-4">
+          <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
             <div class="flex items-start space-x-3 min-w-0">
               <AlertCircle class="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" />
               <div class="min-w-0">
@@ -371,7 +494,12 @@
                 </p>
               </div>
             </div>
-            <Button size="sm" class="flex-shrink-0" @click="takeOverConversation">
+            <Button
+              size="sm"
+              class="flex-shrink-0 w-full sm:w-auto min-h-11 sm:min-h-0"
+              data-testid="pending-human-take-over"
+              @click="takeOverConversation"
+            >
               <UserCheck class="h-4 w-4 mr-2" />
               {{ $t("conversations.detail.takeOver") }}
             </Button>
@@ -381,9 +509,9 @@
         <!-- Message Input (playground mode or when conversation is taken over by current user) -->
         <div
           v-if="(isPlaygroundMode && !isPendingHuman) || isTakenOverByCurrentUser"
-          class="border-t p-4 bg-background"
+          class="border-t p-4 pb-[max(1rem,env(safe-area-inset-bottom))] bg-background"
         >
-          <form class="flex space-x-3" @submit.prevent="sendMessage">
+          <form class="flex gap-2 md:gap-3" @submit.prevent="sendMessage">
             <Input
               v-model="newMessage"
               :placeholder="
@@ -391,7 +519,7 @@
                   ? $t('conversations.detail.sendTestMessage')
                   : $t('conversations.detail.sendMessage')
               "
-              class="flex-1"
+              class="flex-1 max-md:!text-base"
               :disabled="isPlaygroundMode && !conversation"
               @keyup.enter="sendMessage"
             />
@@ -407,9 +535,9 @@
         </div>
       </div>
 
-      <!-- Right Side: Context Panel -->
-      <div class="w-80 border-l bg-background-tertiary overflow-y-auto">
-        <div class="p-6 space-y-6">
+      <!-- Right Side: Context Panel (defined once, rendered inline on lg+ and in a Sheet below lg) -->
+      <DefinePanel>
+        <div class="p-4 lg:p-6 space-y-6">
           <!-- Playground Mode Panels -->
           <template v-if="isPlaygroundMode">
             <!-- Orchestrator Status -->
@@ -715,8 +843,21 @@
             </Card>
           </template>
         </div>
+      </DefinePanel>
+      <div class="hidden lg:block lg:w-80 border-l bg-background-tertiary overflow-y-auto">
+        <ReusePanel />
       </div>
     </div>
+
+    <!-- Details Sheet (below lg) -->
+    <Sheet :open="showDetailsSheet" side="right" size="sm" @update:open="showDetailsSheet = $event">
+      <SheetHeader @close="showDetailsSheet = false">
+        <SheetTitle>{{ $t("conversations.detail.details") }}</SheetTitle>
+      </SheetHeader>
+      <SheetContent class="!p-0 bg-background-tertiary">
+        <ReusePanel />
+      </SheetContent>
+    </Sheet>
 
     <!-- Release Dialog -->
     <Dialog v-model:open="showReleaseDialog">
@@ -821,7 +962,10 @@ import {
   FileSpreadsheet,
   Braces,
   Sparkles,
+  MoreHorizontal,
+  PanelRight,
 } from "lucide-vue-next";
+import { createReusableTemplate } from "@vueuse/core";
 import { TRPCClientError } from "@trpc/client";
 import { HayApi } from "@/utils/api";
 import {
@@ -965,6 +1109,10 @@ const humanTakeover = ref(false);
 const isTyping = ref(false);
 const newMessage = ref("");
 const messagesContainer = ref<HTMLElement>();
+
+// Context panel: one template, rendered inline on lg+ and inside a Sheet below lg
+const [DefinePanel, ReusePanel] = createReusableTemplate();
+const showDetailsSheet = ref(false);
 
 // Playground-specific state
 const isResetting = ref(false);
