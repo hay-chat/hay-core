@@ -3,9 +3,9 @@
  *
  * Hay core is billing-agnostic: an external operator (e.g. a hosted-plan
  * backoffice) decides when an organization loses access and tells core through
- * the `internal.organizations.setAccessState` procedure. Core only knows two
- * generic things — whether the org is suspended (and why) and an optional
- * notice to show in the dashboard.
+ * the `internal.organizations.setAccessState` procedure. Core only knows three
+ * generic things — whether the org is suspended (and why), whether its AI agent
+ * is paused (and why) and an optional notice to show in the dashboard.
  */
 
 import { z } from "zod";
@@ -17,6 +17,14 @@ export const SUSPENSION_REASONS = [
   "manual",
 ] as const;
 export type SuspensionReason = (typeof SUSPENSION_REASONS)[number];
+
+/**
+ * Softer than a suspension: the AI stops replying (conversations go to Needs
+ * Attention) while the dashboard keeps working. `usage_limit` = the plan's
+ * included resolutions are used up and the operator refuses overage.
+ */
+export const AGENT_PAUSE_REASONS = ["usage_limit"] as const;
+export type AgentPauseReason = (typeof AGENT_PAUSE_REASONS)[number];
 
 export const ACCESS_NOTICE_LEVELS = ["info", "warning", "critical"] as const;
 export type AccessNoticeLevel = (typeof ACCESS_NOTICE_LEVELS)[number];
@@ -51,5 +59,7 @@ export interface OrganizationAccessState {
   suspendedAt: Date | null;
   suspensionReason: SuspensionReason | null;
   suspensionRedirectUrl: string | null;
+  agentPausedAt: Date | null;
+  agentPauseReason: AgentPauseReason | null;
   accessNotice: AccessNotice | null;
 }

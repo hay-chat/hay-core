@@ -23,6 +23,9 @@
   "accessNotice": {
     "trial_ending": "Seu teste gratuito termina em {date}. Escolha um plano para manter seu agente funcionando.",
     "payment_failed": "Seu último pagamento falhou. Atualize a forma de pagamento antes de {lockDate} para evitar interrupções.",
+    "usage_warning": "Você usou {percent}% das {included} resoluções incluídas neste período ({used} até agora).",
+    "usage_exceeded": "Você usou todas as {included} resoluções incluídas neste período. Até {periodEnd}, cada resolução extra é cobrada a {rate}.",
+    "usage_paused": "Seu agente de IA está pausado: todas as {included} resoluções incluídas deste período foram usadas. Permita resoluções extras ou faça upgrade para retomar agora; ele volta sozinho em {periodEnd}.",
     "defaultCta": "Gerenciar cobrança",
     "dismiss": "Fechar"
   }

@@ -42,6 +42,8 @@ const state = {
   suspendedAt: new Date(),
   suspensionReason: "trial_expired",
   suspensionRedirectUrl: null,
+  agentPausedAt: null,
+  agentPauseReason: null,
   accessNotice: null,
 };
 
@@ -80,7 +82,39 @@ describe("internal.organizations", () => {
       expect.objectContaining({
         organizationId: ORG_ID,
         suspension: { reason: "trial_expired", redirectUrl: "https://hay.chat/billing/locked/" },
+        // omitted by the caller -> defaults to "not paused"
+        agentPause: null,
       }),
+    );
+  });
+
+  it("validates the agent pause reason and passes a valid pause through", async () => {
+    await expect(
+      internalRouter.createCaller(ctx()).organizations.setAccessState({
+        organizationId: ORG_ID,
+        suspension: null,
+        // @ts-expect-error - invalid reason on purpose
+        agentPause: { reason: "because" },
+        notice: null,
+      }),
+    ).rejects.toMatchObject({ code: "BAD_REQUEST" });
+    expect(mockSetAccessState).not.toHaveBeenCalled();
+
+    mockSetAccessState.mockResolvedValueOnce({
+      ...state,
+      suspendedAt: null,
+      suspensionReason: null,
+      agentPausedAt: new Date(),
+      agentPauseReason: "usage_limit",
+    });
+    await internalRouter.createCaller(ctx()).organizations.setAccessState({
+      organizationId: ORG_ID,
+      suspension: null,
+      agentPause: { reason: "usage_limit" },
+      notice: { key: "usage_paused", level: "critical" },
+    });
+    expect(mockSetAccessState).toHaveBeenCalledWith(
+      expect.objectContaining({ suspension: null, agentPause: { reason: "usage_limit" } }),
     );
   });
 

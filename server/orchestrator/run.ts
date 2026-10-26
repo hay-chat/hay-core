@@ -301,17 +301,28 @@ async function saveConfidenceLog(
 }
 
 /**
- * A paused agent never replies. A conversation that already holds a shopper
- * message goes to "pending-human" (Needs Attention) so a human picks it up; a
- * conversation with no shopper message yet (widget just opened) only has its
- * needs_processing flag cleared, so no greeting is sent and the sweep stops.
+ * A paused agent never replies, whether the owner switched the agent off or the
+ * operator paused the whole organization (e.g. included resolutions used up).
+ * A conversation that already holds a shopper message goes to "pending-human"
+ * (Needs Attention) so a human picks it up; a conversation with no shopper
+ * message yet (widget just opened) only has its needs_processing flag cleared,
+ * so no greeting is sent and the sweep stops.
  */
-async function parkForPausedAgent(conversation: Conversation, log: pino.Logger): Promise<void> {
+async function parkForPausedAgent(
+  conversation: Conversation,
+  log: pino.Logger,
+  cause: "agent_disabled" | "organization_paused",
+): Promise<void> {
   const lastCustomerMessage = await conversation.getLastCustomerMessage();
   const shouldQueue = !!lastCustomerMessage && conversation.status !== "pending-human";
 
   log.info(
-    { agentId: conversation.agent_id, queued: shouldQueue },
+    {
+      agentId: conversation.agent_id,
+      cause,
+      reason: conversation.organization?.agentPauseReason ?? null,
+      queued: shouldQueue,
+    },
     "Skipping - agent paused",
   );
 
@@ -380,12 +391,17 @@ export const runConversation = async (conversationId: string) => {
     return;
   }
 
-  // A paused agent (agents.enabled = false) never replies. Shopper messages
-  // are still stored; the conversation is parked in the queue as
-  // pending-human so the team sees it, and needs_processing is cleared so the
-  // sweep stops re-enqueuing it.
+  // A paused agent never replies: either the operator paused the organization
+  // (usage allowance used up, overage refused) or the owner switched the agent
+  // off (agents.enabled = false). Shopper messages are still stored; the
+  // conversation is parked in the queue as pending-human so the team sees it,
+  // and needs_processing is cleared so the sweep stops re-enqueuing it.
+  if (conversation.organization?.agentPausedAt) {
+    await parkForPausedAgent(conversation, log, "organization_paused");
+    return;
+  }
   if (conversation.agent && !conversation.agent.enabled) {
-    await parkForPausedAgent(conversation, log);
+    await parkForPausedAgent(conversation, log, "agent_disabled");
     return;
   }
 
