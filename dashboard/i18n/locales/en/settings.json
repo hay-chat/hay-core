@@ -531,7 +531,11 @@
     "passwordChanged": "Password changed successfully. A confirmation email has been sent.",
     "passwordChangeFailed": "Failed to change password",
     "headTitle": "Profile Settings - Hay Dashboard",
-    "headDescription": "Manage your profile information and account security"
+    "headDescription": "Manage your profile information and account security",
+    "notifications": {
+      "title": "Alerts on this device",
+      "description": "Push notifications when a conversation needs a human. Set per device, so turn them on from each phone or computer you use."
+    }
   },
   "gitConnections": {
     "title": "Git Connections",

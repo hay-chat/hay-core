@@ -1,6 +1,7 @@
 {
   "nav": {
     "gettingStarted": "Primeiros Passos",
+    "home": "Início",
     "dashboard": "Painel",
     "conversations": "Conversas",
     "documents": "Documentos",
@@ -19,7 +20,8 @@
     "customerPrivacy": "Privacidade do Cliente",
     "myProfile": "Meu Perfil",
     "gitConnections": "Conexões Git",
-    "llmProviders": "Modelos de IA"
+    "llmProviders": "Modelos de IA",
+    "openMenu": "Abrir menu"
   },
   "user": {
     "status": "Status",

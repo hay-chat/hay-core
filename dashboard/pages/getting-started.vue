@@ -495,7 +495,7 @@ const fetchProgress = async () => {
     // Skip API call and redirect if onboarding is already completed
     if (appStore.onboardingCompleted) {
       loading.value = false;
-      router.replace("/dashboard");
+      router.replace("/");
       return;
     }
 
@@ -519,7 +519,7 @@ watch(
     if (allCompleted) {
       appStore.setOnboardingCompleted(true);
       // Briefly show the completion banner, then move on to the dashboard
-      setTimeout(() => router.replace("/dashboard"), 1500);
+      setTimeout(() => router.replace("/"), 1500);
     }
   },
 );
