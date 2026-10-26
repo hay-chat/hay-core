@@ -1,4 +1,4 @@
-# Email Channel Plugin
+# Email Inbox Channel Plugin
 
 Use the store's existing support mailbox as a Hay channel. Shoppers keep
 writing to `support@yourstore.com`; the merchant forwards that mailbox to a
