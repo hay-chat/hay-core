@@ -26,16 +26,13 @@ import { parseAddress } from "./mime.js";
  *      platform relay with threading headers and a Reply-To that carries the
  *      conversation id.
  *
- * Env (host allowlist): RESEND_API_KEY, RESEND_WEBHOOK_SECRET (used by core),
- * EMAIL_INBOUND_DOMAIN, SMTP_FROM_EMAIL (its domain is the From domain).
+ * Env (host allowlist): RESEND_API_KEY, EMAIL_INBOUND_DOMAIN, SMTP_FROM_EMAIL
+ * (its domain is the From domain). RESEND_WEBHOOK_SECRET is read by core only.
  */
 
-const REQUIRED_ENV = [
-  "RESEND_API_KEY",
-  "RESEND_WEBHOOK_SECRET",
-  "EMAIL_INBOUND_DOMAIN",
-  "SMTP_FROM_EMAIL",
-];
+// RESEND_WEBHOOK_SECRET stays on the host: core verifies the svix signature
+// before routing, and secrets are never handed to plugin workers.
+const REQUIRED_ENV = ["RESEND_API_KEY", "EMAIL_INBOUND_DOMAIN", "SMTP_FROM_EMAIL"];
 
 function missingEnv(): string[] {
   return REQUIRED_ENV.filter((name) => !process.env[name]);
