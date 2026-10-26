@@ -407,49 +407,79 @@ describe("Register API", () => {
     });
   });
 
-  describe("UI Extension Registration", () => {
-    it("should register valid UI extension", () => {
-      registerAPI.ui({
-        slot: "plugin-settings",
-        component: "SettingsPanel.vue",
+  describe("UI Page Registration", () => {
+    it("should register valid UI page", () => {
+      registerAPI.ui.page({
+        id: "setup-guide",
+        title: "Setup Guide",
+        component: "./components/settings/AfterSettings.vue",
+        slot: "after-settings",
       });
 
-      const extensions = registry.getUIExtensions();
-      expect(extensions).toHaveLength(1);
-      expect(extensions[0].slot).toBe("plugin-settings");
-      expect(extensions[0].component).toBe("SettingsPanel.vue");
-      expect(logger.debug).toHaveBeenCalledWith("Registered UI extension", {
-        slot: "plugin-settings",
+      const pages = registry.getUIPages();
+      expect(pages).toHaveLength(1);
+      expect(pages[0]).toEqual({
+        id: "setup-guide",
+        title: "Setup Guide",
+        component: "./components/settings/AfterSettings.vue",
+        slot: "after-settings",
+      });
+      expect(logger.debug).toHaveBeenCalledWith("Registered UI page", {
+        id: "setup-guide",
+        slot: "after-settings",
       });
     });
 
-    it("should validate slot is present", () => {
+    it("should validate id is present", () => {
       expect(() => {
-        registerAPI.ui({
-          slot: "",
-          component: "Component.vue",
-        });
-      }).toThrow("UI extension slot must be a non-empty string");
+        registerAPI.ui.page({ id: "", title: "Page", component: "Page.vue" });
+      }).toThrow("Plugin page id must be a non-empty string");
+    });
+
+    it("should validate title is present", () => {
+      expect(() => {
+        registerAPI.ui.page({ id: "page", title: "", component: "Page.vue" });
+      }).toThrow("Plugin page title must be a non-empty string");
     });
 
     it("should validate component is present", () => {
       expect(() => {
-        registerAPI.ui({
-          slot: "plugin-settings",
-          component: "",
-        });
-      }).toThrow("UI extension component must be a non-empty string");
+        registerAPI.ui.page({ id: "page", title: "Page", component: "" });
+      }).toThrow("Plugin page component must be a non-empty string");
     });
 
-    it("should allow UI extension with props", () => {
-      registerAPI.ui({
-        slot: "plugin-settings",
-        component: "SettingsPanel.vue",
-        props: { theme: "dark", size: "large" },
-      });
+    it("should validate slot value", () => {
+      expect(() => {
+        registerAPI.ui.page({
+          id: "page",
+          title: "Page",
+          component: "Page.vue",
+          slot: "sidebar" as any,
+        });
+      }).toThrow("Plugin page slot must be one of: standalone, after-settings, before-settings");
+    });
 
-      const extensions = registry.getUIExtensions();
-      expect(extensions[0].props).toEqual({ theme: "dark", size: "large" });
+    it("should validate optional icon and requiresSetup types", () => {
+      expect(() => {
+        registerAPI.ui.page({ id: "page", title: "Page", component: "Page.vue", icon: 1 as any });
+      }).toThrow("Plugin page icon must be a string");
+
+      expect(() => {
+        registerAPI.ui.page({
+          id: "page",
+          title: "Page",
+          component: "Page.vue",
+          requiresSetup: "yes" as any,
+        });
+      }).toThrow("Plugin page requiresSetup must be a boolean");
+    });
+
+    it("should reject duplicate page ids", () => {
+      registerAPI.ui.page({ id: "page", title: "Page", component: "Page.vue" });
+
+      expect(() => {
+        registerAPI.ui.page({ id: "page", title: "Other", component: "Other.vue" });
+      }).toThrow('UI page with id "page" is already registered');
     });
   });
 
@@ -499,16 +529,13 @@ describe("Register API", () => {
       registerAPI.route("POST", "/webhook", async () => {});
 
       // UI
-      registerAPI.ui({
-        slot: "plugin-settings",
-        component: "Settings.vue",
-      });
+      registerAPI.ui.page({ id: "settings", title: "Settings", component: "Settings.vue" });
 
       // Verify all registered
       expect(registry.hasConfigField("apiKey")).toBe(true);
       expect(registry.getAuthMethods()).toHaveLength(1);
       expect(registry.getRoutes()).toHaveLength(1);
-      expect(registry.getUIExtensions()).toHaveLength(1);
+      expect(registry.getUIPages()).toHaveLength(1);
     });
   });
 

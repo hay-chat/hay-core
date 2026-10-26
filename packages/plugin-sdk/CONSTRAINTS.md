@@ -12,6 +12,7 @@ This document outlines the critical constraints that MUST be enforced throughout
 - No orchestration layer
 
 The SDK provides the plugin runtime and HTTP server only. Hay Core is responsible for:
+
 - Discovering plugins
 - Spawning worker processes
 - Managing plugin lifecycle
@@ -23,6 +24,7 @@ The SDK provides the plugin runtime and HTTP server only. Hay Core is responsibl
 **The SDK MUST NOT import or reference any code from the Hay Core repository.**
 
 All types and mechanisms must be defined locally inside `plugin-sdk/`. This ensures:
+
 - Clean separation of concerns
 - SDK can be extracted to its own repository
 - No circular dependencies
@@ -33,13 +35,15 @@ All types and mechanisms must be defined locally inside `plugin-sdk/`. This ensu
 **The SDK must enforce separation between descriptor APIs and runtime APIs.**
 
 ### Descriptor APIs (onInitialize only)
+
 - `register.config()` - Define config schema
 - `register.auth.*()` - Define auth methods
 - `register.route()` - Define HTTP routes
-- `register.ui()` - Define UI extensions
+- `register.ui.page()` - Define UI pages
 - `config.field()` - Create field references for auth/other descriptors
 
 ### Runtime APIs (onStart, onValidateAuth, onConfigUpdate, onDisable only)
+
 - `config.get()` - Read config values
 - `config.getOptional()` - Read optional config values
 - `auth.get()` - Read auth credentials
@@ -47,6 +51,7 @@ All types and mechanisms must be defined locally inside `plugin-sdk/`. This ensu
 - `mcp.startExternal()` - Connect to external MCP servers
 
 **Enforcement**: The SDK should use different context types to prevent misuse:
+
 - `HayGlobalContext` provides descriptor APIs
 - `HayStartContext` and other runtime contexts provide runtime APIs
 
@@ -57,6 +62,7 @@ All types and mechanisms must be defined locally inside `plugin-sdk/`. This ensu
 The `onEnable()` hook (if it exists) is triggered only by Hay Core during plugin installation, not by the worker runner.
 
 The runner only handles these hooks:
+
 - `onInitialize` - Global initialization
 - `onStart` - Org runtime start
 - `onValidateAuth` - Auth validation
@@ -94,10 +100,12 @@ The runner only handles these hooks:
       "configField": "apiKey"
     }
   ],
-  "uiExtensions": [
+  "pages": [
     {
-      "slot": "after-settings",
-      "component": "components/Settings.vue"
+      "id": "settings",
+      "title": "Settings",
+      "component": "./components/Settings.vue",
+      "slot": "after-settings"
     }
   ],
   "mcp": {
@@ -135,6 +143,7 @@ The `hay-plugin.env` array in `package.json` is an allowlist:
 ```
 
 If a config field references an env var (via `env: "SHOPIFY_API_KEY"`), the runner must:
+
 1. Check that the env var is in the manifest allowlist
 2. Only then allow `config.get()` to fall back to `process.env`
 
@@ -154,6 +163,7 @@ The runner receives org ID and org-specific config/auth when started by Hay Core
 ## Implementation Notes
 
 These constraints should be:
+
 - Documented in code comments
 - Enforced via TypeScript types where possible
 - Validated at runtime where necessary
