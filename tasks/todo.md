@@ -18,11 +18,11 @@ channel `email`), DMARC-fail/bulk → stored, not auto-replied.
 ## Phase 1 — MVP (forwarding only)
 
 Core (one commit each):
-- [ ] C1. `register.webhookRouting.signature.format: "svix"` (svix-id.svix-timestamp.body, whsec_ base64, `v1,` sigs) +
+- [x] C1. `register.webhookRouting.signature.format: "svix"` (svix-id.svix-timestamp.body, whsec_ base64, `v1,` sigs) +
       `secretEnv: RESEND_WEBHOOK_SECRET`; routeKeyPath transform `"local-part" | "domain"` on `data.to[]`
-- [ ] C2. `messages.receive`: look up `findByExternalConversationId` first when `externalConversationId` given;
+- [x] C2. `messages.receive`: look up `findByExternalConversationId` first when `externalConversationId` given;
       accept `title` (subject) on new conversations
-- [ ] C3. plugin send: `email.send` tRPC capability (or extend `/send-email`) with from/replyTo/headers/attachments/
+- [x] C3. plugin send: `email.send` tRPC capability (or extend `/send-email`) with from/replyTo/headers/attachments/
       messageId, returns the real Message-ID, surfaces failures (FAQ item 6, `plugin-api.service.ts:151-171`)
 - [ ] C4. Message/conversation metadata shape for email (`metadata.email.{subject,from,to,cc,html,messageId,references,kind}`)
 

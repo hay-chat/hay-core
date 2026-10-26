@@ -1,3 +1,15 @@
+## 2026-10-26 — claude/email-channel (worktree .claude/worktrees/claude+email-channel) — core slices C1–C3 committed
+
+**Works:** 3 commits on the branch: (1) shared-webhook routing accepts `format: "svix"`, `keyPath: "."`, `keyTransform:
+"email-address"` (`server/lib/svix-signature.ts`); (2) `messages.receive` resolves conversation by Hay `conversationId` →
+`externalConversationId` → active-by-customer, takes `title`, backfills customer email; (3) plugin send-email passes
+from/replyTo/headers/messageId/attachments/retry, From pinned to platform domain, failures reported honestly. Jest on the 4
+touched suites green, server tsc clean. Pre-existing: 5 SDK register.test.ts failures (`registerAPI.ui`) on master too.
+**Half-built:** nothing. Plugin `plugins/core/email-channel` not started. Resend API key for the spike NOT obtained (prod
+env read blocked by permission classifier) — ask Roger for a key (RESEND_API_KEY, create one in Resend dashboard).
+**Next:** P1 plugin skeleton → P2 inbound (Resend fetch, raw MIME parse via postal-mime, classify, thread) → P3 deliver.
+Plan + acceptance in `tasks/todo.md` (worktree copy); strategy in `tasks/email-channel-strategy-2026-10-26.md`.
+
 ## 2026-10-26 — master (no code changes) — Inbound email channel: strategy written
 
 **Works:** exploration only. Code audit (channel plugin infra, email.service, plugin-api) + Resend receiving / multi-tenant
