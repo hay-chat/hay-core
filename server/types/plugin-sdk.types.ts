@@ -15,7 +15,7 @@ import type { ChildProcess } from "child_process";
  * Minimal manifest stored in package.json "hay-plugin" block
  * This replaces the legacy HayPluginManifest with a simpler structure.
  *
- * Config schema, auth methods, and UI extensions are NOT in the manifest.
+ * Config schema, auth methods, and UI pages are NOT in the manifest.
  * They are fetched from the /metadata endpoint at runtime.
  */
 export interface HayPluginManifest {
@@ -57,7 +57,6 @@ export type PluginMetadataState =
 export interface PluginMetadata {
   configSchema: Record<string, ConfigFieldDescriptor>;
   authMethods: AuthMethodDescriptor[];
-  uiExtensions: UIExtensionDescriptor[];
   routes: RouteDescriptor[];
   mcp: {
     local: LocalMcpDescriptor[];
@@ -288,16 +287,6 @@ export interface OAuthTokenOpDescriptor {
   grantType: string;
   tokenParam: string;
   includeClientSecret?: boolean;
-}
-
-/**
- * UI extension descriptor (from /metadata endpoint)
- */
-export interface UIExtensionDescriptor {
-  id: string;
-  slot: string; // e.g., "plugin-settings", "conversation-sidebar"
-  component: string; // Vue component path
-  props?: Record<string, unknown>;
 }
 
 /**
