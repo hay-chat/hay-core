@@ -1,7 +1,7 @@
 {
   "name": "hay-plugin-magento",
   "version": "1.0.0",
-  "description": "Connect your Magento store to manage products, orders, customers, and e-commerce operations",
+  "description": "Connect your Magento 2 store so the agent can find a customer's orders, track shipments, cancel or re-route unshipped orders, issue refunds, and answer product and stock questions",
   "author": "Hay",
   "type": "module",
   "main": "dist/index.js",
@@ -17,13 +17,15 @@
   "scripts": {
     "build": "tsc",
     "start": "node dist/index.js",
-    "dev": "tsc --watch"
+    "dev": "tsc --watch",
+    "test": "vitest run"
   },
   "dependencies": {
     "@hay/plugin-sdk": "file:../../../packages/plugin-sdk"
   },
   "devDependencies": {
     "@types/node": "^20.10.0",
-    "typescript": "^5.3.3"
+    "typescript": "^5.3.3",
+    "vitest": "^1.6.1"
   }
 }
