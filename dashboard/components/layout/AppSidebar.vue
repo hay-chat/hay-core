@@ -113,12 +113,7 @@ const user = computed(() => {
 });
 
 // Helper function to check if a path is active
-const isPathActive = (path: string): boolean => {
-  if (path === "/") {
-    return route.path === "/";
-  }
-  return route.path.startsWith(path);
-};
+const isPathActive = (path: string): boolean => route.path.startsWith(path);
 
 // Get conversations count for badge
 const conversationsBadge = computed(() => {
@@ -126,8 +121,8 @@ const conversationsBadge = computed(() => {
   return count > 0 ? count.toString() : undefined;
 });
 
-// Conversations waiting for a human: the number that matters most on Home
-const homeBadge = computed(() => {
+// Conversations waiting for a human: what the Inbox lists
+const inboxBadge = computed(() => {
   const count = appStore.pendingHumanCount;
   return count > 0 ? count.toString() : undefined;
 });
@@ -151,11 +146,17 @@ const navMain = computed(() => {
 
   items.push(
     {
-      title: t("nav.home"),
-      url: "/",
+      title: t("nav.dashboard"),
+      url: "/dashboard",
+      icon: AreaChart,
+      isActive: isPathActive("/dashboard"),
+    },
+    {
+      title: t("nav.inbox"),
+      url: "/inbox",
       icon: Inbox,
-      badge: homeBadge.value,
-      isActive: isPathActive("/"),
+      badge: inboxBadge.value,
+      isActive: isPathActive("/inbox"),
     },
     {
       title: t("nav.conversations"),
@@ -175,12 +176,6 @@ const navMain = computed(() => {
       url: "/playbooks",
       icon: BookOpen,
       isActive: isPathActive("/playbooks"),
-    },
-    {
-      title: t("nav.dashboard"),
-      url: "/dashboard",
-      icon: AreaChart,
-      isActive: isPathActive("/dashboard"),
     },
     // {
     //   title: "Insights",

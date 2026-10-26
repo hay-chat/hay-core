@@ -1,7 +1,7 @@
 {
   "home": {
-    "title": "Início",
-    "headTitle": "Início - Hay",
+    "title": "Caixa de entrada",
+    "headTitle": "Caixa de entrada - Hay",
     "headline": {
       "loading": "Verificando quem está esperando…",
       "waiting": "Nenhuma conversa esperando por um humano | 1 conversa esperando por um humano | {count} conversas esperando por um humano"

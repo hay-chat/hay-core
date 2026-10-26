@@ -13,14 +13,14 @@
       <Menu class="h-5 w-5" />
     </Button>
 
-    <NuxtLink to="/" class="flex min-w-0 flex-1 items-center gap-2 px-1">
+    <NuxtLink to="/inbox" class="flex min-w-0 flex-1 items-center gap-2 px-1">
       <span class="truncate text-base font-semibold text-foreground">
         {{ userStore.activeOrganization?.name || "Hay" }}
       </span>
     </NuxtLink>
 
     <NuxtLink
-      to="/"
+      to="/inbox"
       class="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-foreground transition-colors hover:bg-accent"
       :aria-label="$t('home.waitingCount', { count: appStore.pendingHumanCount })"
       data-testid="mobile-attention-badge"
