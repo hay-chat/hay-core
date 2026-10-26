@@ -1,5 +1,6 @@
-import { ref, computed } from "vue";
+import { ref } from "vue";
 import { Hay } from "@/utils/api";
+import { useUserStore } from "@/stores/user";
 
 /**
  * Web Push opt-in for this browser/device. The server only knows about a device
@@ -41,6 +42,18 @@ export function urlBase64ToUint8Array(base64String: string): Uint8Array {
     output[i] = raw.charCodeAt(i);
   }
   return output;
+}
+
+const SYNCED_ORG_KEY = "hay:push-synced-org";
+
+/** Base64url of the key a subscription was created with, for VAPID rotation checks. */
+function subscriptionServerKey(subscription: PushSubscription): string | null {
+  const key = subscription.options?.applicationServerKey;
+  if (!key) return null;
+  const bytes = new Uint8Array(key);
+  let binary = "";
+  bytes.forEach((b) => (binary += String.fromCharCode(b)));
+  return window.btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 }
 
 async function getRegistration(): Promise<ServiceWorkerRegistration> {
@@ -89,6 +102,15 @@ async function detect(): Promise<void> {
   }
 }
 
+function rememberSyncedOrg(organizationId?: string) {
+  try {
+    const id = organizationId ?? useUserStore().activeOrganization?.id;
+    if (id) window.localStorage.setItem(SYNCED_ORG_KEY, id);
+  } catch {
+    // localStorage unavailable (private mode): sync will simply run again next load
+  }
+}
+
 export function usePushNotifications() {
   const init = () => {
     if (!initPromise) initPromise = detect();
@@ -113,13 +135,18 @@ export function usePushNotifications() {
         return false;
       }
       const registration = await getRegistration();
-      const subscription =
-        (await registration.pushManager.getSubscription()) ??
-        (await registration.pushManager.subscribe({
-          userVisibleOnly: true,
-          applicationServerKey: urlBase64ToUint8Array(key) as BufferSource,
-        }));
+      let subscription = await registration.pushManager.getSubscription();
+      // A subscription made with an older server key can never be delivered to
+      if (subscription && subscriptionServerKey(subscription) !== key) {
+        await subscription.unsubscribe();
+        subscription = null;
+      }
+      subscription ??= await registration.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(key) as BufferSource,
+      });
       await Hay.notifications.subscribePush.mutate(subscriptionToInput(subscription));
+      rememberSyncedOrg();
       status.value = "on";
       return true;
     } catch (err) {
@@ -145,6 +172,11 @@ export function usePushNotifications() {
         await subscription.unsubscribe();
         await Hay.notifications.unsubscribePush.mutate({ endpoint });
       }
+      try {
+        window.localStorage.removeItem(SYNCED_ORG_KEY);
+      } catch {
+        // ignore
+      }
       status.value = "off";
     } catch (err) {
       console.error("[Push] disable failed:", err);
@@ -154,8 +186,20 @@ export function usePushNotifications() {
     }
   };
 
-  /** Re-send an existing subscription so it is tied to the current user + org. */
-  const sync = async (): Promise<void> => {
+  /**
+   * Re-send an existing subscription so it follows the active organization.
+   * Only does network work when this device is opted in and the org changed
+   * since the last sync (remembered in localStorage).
+   */
+  const sync = async (organizationId: string | undefined): Promise<void> => {
+    if (!organizationId || !isSupported()) return;
+    let lastSynced: string | null = null;
+    try {
+      lastSynced = window.localStorage.getItem(SYNCED_ORG_KEY);
+    } catch {
+      lastSynced = null;
+    }
+    if (lastSynced === organizationId) return;
     await init();
     if (status.value !== "on") return;
     try {
@@ -163,6 +207,7 @@ export function usePushNotifications() {
       const subscription = await registration.pushManager.getSubscription();
       if (subscription) {
         await Hay.notifications.subscribePush.mutate(subscriptionToInput(subscription));
+        rememberSyncedOrg(organizationId);
       }
     } catch (err) {
       console.error("[Push] sync failed:", err);
@@ -185,8 +230,6 @@ export function usePushNotifications() {
     status,
     busy,
     error,
-    isOn: computed(() => status.value === "on"),
-    canToggle: computed(() => status.value === "on" || status.value === "off"),
     init,
     enable,
     disable,

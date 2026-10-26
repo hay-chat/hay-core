@@ -60,10 +60,11 @@
 <script setup lang="ts">
 import { computed } from "vue";
 import { UserCheck, ChevronRight } from "lucide-vue-next";
-import { formatWaitTime } from "@/utils/conversation";
+import { formatWaitTime, getHandoffWaitClass } from "@/utils/conversation";
 import { useNow } from "@/composables/useNow";
 // getChannelIcon / getChannelLabel are auto-imported from @/utils/channel.
 
+/** One row of `conversations.attention` (server/routes/v1/conversations). */
 export interface AttentionConversation {
   id: string;
   title: string | null;
@@ -100,11 +101,5 @@ const waitSeconds = computed(() => {
 
 const waitLabel = computed(() => formatWaitTime(waitSeconds.value));
 
-// Thresholds mirror getWaitTimeClass (utils/conversation.ts) but in minutes:
-// a human hand-off waits longer than an AI reply before it feels slow.
-const waitClass = computed(() => {
-  if (waitSeconds.value >= 10 * 60) return "text-destructive-700";
-  if (waitSeconds.value >= 3 * 60) return "text-amber-700";
-  return "text-neutral-muted";
-});
+const waitClass = computed(() => getHandoffWaitClass(waitSeconds.value));
 </script>

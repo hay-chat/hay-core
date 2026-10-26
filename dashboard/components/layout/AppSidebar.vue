@@ -132,17 +132,6 @@ const homeBadge = computed(() => {
   return count > 0 ? count.toString() : undefined;
 });
 
-// Initialize data on component mount
-onMounted(async () => {
-  if (authStore.isAuthenticated) {
-    await Promise.all([
-      appStore.getOpenConversationsCount(),
-      appStore.fetchPendingHumanCount(),
-      appStore.getPlugins(), // Load plugins for sidebar
-    ]);
-  }
-});
-
 // Make navMain reactive to route changes
 const navMain = computed(() => {
   const items = [];

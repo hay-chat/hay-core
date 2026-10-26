@@ -1,14 +1,13 @@
 ## 2026-10-26 — claude/mobile-attention (worktree .claude/worktrees/mobile-attention) — Home inbox + mobile + push
 
-**Works (committed, lint+typecheck green, 9 Jest tests):** `/` is an attention-first Home (pending-human list, one-tap Take over,
-mine/teammates sections, live via WS); phone layout (top bar + drawer, `Page` header wraps); conversation detail/list responsive
-(details → Sheet below lg, More menu, stacked take-over panel); Web Push end-to-end: `push_subscriptions` + migration, VAPID env,
-`notifications.*` router, hook on pending-human in conversation-events.service, `public/sw.js` + manifest, `usePushNotifications`,
-"Alerts on this device" on Home + Profile. i18n en/pt-BR.
-**Half-built:** e2e not yet run (ports 3000/3001 are taken by other apps on this host → local docker pg/redis on 55432/56379,
-dashboard 3100 / server 3101 planned); reviewer agent, docs, website line list, PR still to do.
-**Next:** write `tests/mobile-home-attention.spec.ts` (Pixel viewport; seed pending-human convo via AppDataSource; tap Take over),
-run it against the alt-port stack, then reviewer → docs → PR.
+**Works (all committed):** `/` = attention-first Home via new `conversations.attention` procedure (waiting + handling, one-tap
+Take over, live via WS); phone layout (top bar + drawer); conversation pages responsive; Web Push end-to-end (push_subscriptions
++ migration, VAPID env, `notifications.*`, hook in conversationRepository on real status transition, sw.js + manifest,
+"Alerts on this device" on Home + Profile); docs submodule branch `claude/mobile-attention` (faq/dashboard/conversations/troubleshooting).
+**Verified:** server tsc + nuxi typecheck clean, eslint clean, 11 Jest tests, Playwright `tests/mobile-home-attention.spec.ts` 2/2
+green on the alt-port stack (dashboard 3100 / API 3101 / docker pg 55432, redis 56379, browser server 3200).
+Fixed e2e auth helper: storage keys are store ids (`auth`/`user`), org list at store top level.
+**Next:** push + PR (main + hay-docs); tear down `hay-e2e-*` docker containers and the two background dev servers.
 
 ## 2026-10-21 — master @7448cad — WhatsApp live in prod, Meta webhook configured
 

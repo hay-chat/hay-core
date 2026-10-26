@@ -133,3 +133,14 @@ export const getFullName = (user: {
   }
   return "Unknown User";
 };
+
+/**
+ * Text colour for how long a hand-off has waited for a human. Thresholds are
+ * minutes, not seconds like getWaitTimeClass: a person picking up a hand-off
+ * is slower than an AI reply, so the alarm starts later.
+ */
+export const getHandoffWaitClass = (waitTimeSeconds: number): string => {
+  if (waitTimeSeconds >= 10 * 60) return "text-destructive-700";
+  if (waitTimeSeconds >= 3 * 60) return "text-amber-700";
+  return "text-neutral-muted";
+};

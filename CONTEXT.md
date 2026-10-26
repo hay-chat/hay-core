@@ -1,13 +1,13 @@
 # CONTEXT
 
-**Current Task**: WhatsApp Cloud API Phase 2 plugin (plugins/core/whatsapp) built on branch claude/whatsapp-plugin; PR open.
+**Current Task**: Mobile/attention-first Home + Web Push on branch claude/mobile-attention (worktree .claude/worktrees/mobile-attention); all verification green, PR being opened.
 
 **Key Decisions**
-- Manual mode = config fields; per-org URL (worker verifies) or shared URL (worker claims routing keys via webhooks.setRoutingKeys).
-- STT lives in core (`media.upload({transcribe})`) because workers never see OPENAI_*; plugin UI talks to its worker only via authenticated `plugins.callUiRoute` (/ui/*).
-- Public proxy now blocks worker-internal paths (PR #100) — ship before anything else.
+- Push hook lives in conversationRepository.update/updateById (real previous→new status compare, fire-and-forget), not in the WS broadcaster.
+- Home reads one SQL procedure `conversations.attention` (pending-human + human-took-over); metrics dashboard moved to /dashboard.
+- Playwright specs seed with `pg` + SQL (TypeORM decorators don't load under Playwright); e2e storage keys are plain store ids.
 
 **Next Steps**
-- Merge #100, then the Phase 2 PR + hay-docs claude/whatsapp-plugin; deploy.
-- Meta console: callback URL + verify token, subscribe webhook fields; E2E on test number.
-- App Review videos (Phase A).
+- Merge PR + hay-docs branch claude/mobile-attention; set VAPID_* in prod env (`npx web-push generate-vapid-keys`).
+- Tear down hay-e2e-pg/redis/pw containers and the 3100/3101 dev servers.
+- Follow-ups: PWA icons (maskable set), notification preferences per user.

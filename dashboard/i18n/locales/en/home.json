@@ -48,7 +48,8 @@
       "unsupported": "This browser can't receive push alerts. On iPhone, add Hay to your Home Screen first and open it from there.",
       "unavailable": "Push alerts are not set up on this Hay server yet. Ask your administrator to add VAPID keys.",
       "denied": "Notifications are blocked for this site in your browser settings. Allow them, then reload the page.",
-      "failed": "Couldn't turn on alerts"
+      "failed": "Couldn't turn on alerts",
+      "blocked": "Alerts off"
     }
   }
 }

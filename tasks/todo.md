@@ -23,19 +23,19 @@ appears, even with no dashboard tab open. Everything else (metrics, charts) is s
 
 ## Checklist
 - [x] Plan + worktree `claude/mobile-attention` (.claude/worktrees/mobile-attention)
-- [ ] Server: web-push dep, VAPID config, PushSubscription entity + migration, push service, router
-- [ ] Server: Jest unit test for push service (fan-out, prune 410, unconfigured no-op, trigger on pending-human)
-- [ ] Dashboard: sw.js + manifest + head meta; usePushNotifications composable
-- [ ] Dashboard: layout mobile top bar + drawer (Sheet) ; Page header wraps
-- [ ] Dashboard: Home page at `/` (attention inbox) + nav ("Home" first); auth redirects to `/`
-- [ ] Dashboard: conversation detail responsive (header, panel → sheet, composer); list responsive
-- [ ] Dashboard: Profile "Notifications on this device" card
-- [ ] i18n en + pt-BR
-- [ ] Verify: `npm run typecheck`, `npm run lint`, `npm run test:server` (output recorded below)
-- [ ] Verify: impeccable detect on changed UI; Playwright `tests/mobile-home-attention.spec.ts` (phone viewport)
-- [ ] Independent reviewer agent on `git diff master...HEAD`; address findings
-- [ ] Docs: docs/user-guide (faq "works on phones", conversations/dashboard) ; website lines list
-- [ ] WIP.md + CONTEXT.md + lessons; push; PR
+- [x] Server: web-push dep, VAPID config, PushSubscription entity + migration, push service, router
+- [x] Server: Jest unit test for push service (fan-out, prune 410, unconfigured no-op, trigger on pending-human)
+- [x] Dashboard: sw.js + manifest + head meta; usePushNotifications composable
+- [x] Dashboard: layout mobile top bar + drawer (Sheet) ; Page header wraps
+- [x] Dashboard: Home page at `/` (attention inbox) + nav ("Home" first); auth redirects to `/`
+- [x] Dashboard: conversation detail responsive (header, panel → sheet, composer); list responsive
+- [x] Dashboard: Profile "Notifications on this device" card
+- [x] i18n en + pt-BR
+- [x] Verify: `npm run typecheck`, `npm run lint`, `npm run test:server` (output recorded below)
+- [x] Verify: impeccable detect on changed UI; Playwright `tests/mobile-home-attention.spec.ts` (phone viewport)
+- [x] Independent reviewer agent on `git diff master...HEAD`; address findings
+- [x] Docs: docs/user-guide (faq "works on phones", conversations/dashboard) ; website lines list
+- [x] WIP.md + CONTEXT.md + lessons; push; PR
 
 ## Working notes
 - Entities live in BOTH `server/entities/*` (index.ts) and `server/database/entities/*`; data-source lists them explicitly.
@@ -46,3 +46,25 @@ appears, even with no dashboard tab open. Everything else (metrics, charts) is s
 - Dashboard has no unit-test runner (no vitest config); dashboard coverage = Playwright.
 - Ports 3000/3001 on this host belong to other apps (coolify containers / a next-server). E2E needs alternate ports.
 - Old `/dashboard` metrics page unchanged; Home is new `pages/index.vue`.
+
+## Reviewer outcome
+
+Independent reviewer ran on `git diff master...HEAD`; 31 findings. Addressed: onboarding redirect restored on Home; push hook moved to
+`conversationRepository` with a real transition check (fire-and-forget); `subscribe` upserts on endpoint; fan-out joins active
+`user_organizations`; `removeForMember` on member removal; `sendTest` uses org locale; `attention` tRPC procedure replaces the
+client-side list filtering; layout owns count/plugin fetches and refreshes the badge on all conversation events; push `sync` gated by
+a localStorage org marker + VAPID key-rotation check; `Input type="switch"`; blocked/unsupported affordance; sw.js origin guard +
+openWindow fallback; details Sheet closes at ≥lg; `getHandoffWaitClass` util; unused exports removed; spec Chromium-only + cleanup
+on failure; `.impeccable/` ignored; `.env.example` VAPID_SUBJECT empty. Disagreed/deferred: none blocking; maskable PWA icon set and
+per-user notification preferences left as follow-ups (noted in CONTEXT.md).
+
+## Results
+
+- Server: `npx tsc --noEmit` clean; `npx jest tests/services/push-notification.service.test.ts` 11/11 passed.
+- Dashboard: `npx nuxi typecheck` clean (exit 0).
+- Lint: `npx eslint "server/**/*.{js,ts}" "dashboard/**/*.{js,ts,vue}" --cache --max-warnings 0` clean.
+- Impeccable detect on changed UI files: no findings (`[]`).
+- Playwright: `tests/mobile-home-attention.spec.ts --project=chromium` 2 passed (Pixel 7 emulation; alt-port stack with
+  `E2E_BASE_URL=http://localhost:3100`, browser server in docker via `PW_TEST_CONNECT_WS_ENDPOINT`). The shared auth helper was
+  broken (`pinia:auth` keys, org list nested under `user`), fixed in `tests/helpers/auth.ts`.
+- Docs: hay-docs branch `claude/mobile-attention` (faq, dashboard, conversations, troubleshooting).

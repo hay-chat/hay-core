@@ -199,7 +199,7 @@ test.describe("Atlassian plugin import flow (real API)", () => {
     let bearer: string | undefined;
     let orgId: string | undefined;
     try {
-      const auth = JSON.parse(ls["pinia:auth"] ?? "{}") as {
+      const auth = JSON.parse(ls["auth"] ?? "{}") as {
         tokens?: { accessToken?: string };
       };
       bearer = auth.tokens?.accessToken;
@@ -207,7 +207,7 @@ test.describe("Atlassian plugin import flow (real API)", () => {
       /* ignore */
     }
     try {
-      const userState = JSON.parse(ls["pinia:user"] ?? "{}") as {
+      const userState = JSON.parse(ls["user"] ?? "{}") as {
         user?: { activeOrganizationId?: string };
       };
       orgId = userState.user?.activeOrganizationId;

@@ -78,3 +78,24 @@
 - **Failure mode**: PLAN.md and the WhatsApp plugin assumed `META_APP_ID`/`META_APP_SECRET` were the Meta app (1869497150332050). They hold the Instagram Business Login app id/secret (1478077373981180), which Instagram OAuth needs. Every WhatsApp webhook failed core's signature check, and Embedded Signup would have exchanged codes with the wrong client.
 - **Detection signal**: Meta's dashboard "Test" webhook logs `Shared webhook signature verification failed` while the GET handshake (verify token only) passes; the env app id differs from the app id in the dashboard URL.
 - **Prevention**: Before reusing provider credentials across plugins, compare the env value with the app id the provider console shows for that product. WhatsApp now reads `META_WHATSAPP_APP_ID`/`META_WHATSAPP_APP_SECRET`.
+
+## 2026-10-26: Mobile Home + Web Push (claude/mobile-attention)
+
+### Playwright specs cannot import TypeORM entities
+- **Failure mode**: A spec that imported `server/entities/*` to seed data crashed in `PrimaryGeneratedColumn` ("Cannot read properties of undefined (reading 'constructor')"): Playwright's transpiler emits no decorator metadata.
+- **Detection signal**: The error is in the entity module, not the test body, and only appears under `npx playwright test` (global-setup runs through `tsx`, so it works there).
+- **Prevention**: Seed and assert from specs with raw SQL via `pg` (dotenv from `../.env`); keep TypeORM in `tests/global-setup.ts` only.
+
+### Side effects in the repository, not the event broadcaster
+- **Failure mode**: The first push hook sat in `conversationEventsService.broadcastConversationUpdated` and fired whenever `changedFields` contained "status", including re-saves of the same status, and awaited remote HTTPS calls inside the orchestrator's save path.
+- **Detection signal**: A hook keyed on "field was in the update payload" instead of "value actually changed"; an `await` on a network fan-out inside a DB write path.
+- **Prevention**: Put transition hooks where the previous value is known (`conversationRepository.update/updateById`), compare previous vs new, and fire-and-forget with a caught promise.
+
+### Python edit scripts: assert before writing, and no `"\\n"` in quoted heredocs
+- **Failure mode**: One multi-file edit script aborted mid-way on a later assertion, leaving the earlier files written and a later rewrite silently missing; another wrote a literal backslash-n to a JSON file, which 500'd the Nuxt dev server ("Could not parse JSON file").
+- **Detection signal**: `git status` disagreeing with what you believe you changed; a dev server 500 right after an i18n edit.
+- **Prevention**: One file per script, or compute every replacement before the first `write`; re-validate JSON with `json.loads` after editing it.
+
+### `npm run lint` from a workspace directory runs the workspace's (missing) script
+- **Failure mode**: Running `npm run lint` with cwd inside `dashboard/` fails with "Missing script: lint" because the dashboard package has none; the root script is the one that lints everything.
+- **Prevention**: Run root scripts from the repo root, or call `npx eslint "server/**/*.{js,ts}" "dashboard/**/*.{js,ts,vue}" --cache --max-warnings 0` directly.
