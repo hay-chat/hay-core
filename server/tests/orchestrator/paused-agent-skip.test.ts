@@ -1,8 +1,10 @@
 import { describe, it, expect, jest, beforeEach } from "@jest/globals";
 
 /**
- * runConversation() must not reply for a paused agent (agents.enabled = false):
- * it returns before acquiring the lock, parks a conversation that already has
+ * runConversation() must not reply for a paused agent — either the owner
+ * switched it off (agents.enabled = false) or the operator paused the whole
+ * organization (organizations.agent_paused_at, e.g. usage allowance used up).
+ * It returns before acquiring the lock, parks a conversation that already has
  * a shopper message as pending-human (Needs Attention) and clears
  * needs_processing so the sweep stops re-enqueuing it.
  */
@@ -88,7 +90,7 @@ describe("runConversation for a paused agent", () => {
       }),
     );
     expect(mockLogger.info).toHaveBeenCalledWith(
-      { agentId: AGENT_ID, queued: true },
+      { agentId: AGENT_ID, cause: "agent_disabled", reason: null, queued: true },
       "Skipping - agent paused",
     );
   });
@@ -129,6 +131,66 @@ describe("runConversation for a paused agent", () => {
     // Returning null from lock() makes runConversation bail right after the
     // gates, which is all we need to prove the paused gate is open.
     const convo = conversation({
+      agent: { id: AGENT_ID, enabled: true },
+      lock: jest.fn(async () => null),
+    });
+    mockFindById.mockResolvedValueOnce(convo);
+
+    await runConversation(CONVERSATION_ID);
+
+    expect(convo.lock).toHaveBeenCalled();
+    expect(mockUpdate).not.toHaveBeenCalled();
+  });
+});
+
+describe("runConversation for an organization whose agent the operator paused", () => {
+  beforeEach(() => jest.clearAllMocks());
+
+  const pausedOrganization = {
+    suspendedAt: null,
+    suspensionReason: null,
+    agentPausedAt: new Date("2026-10-26T10:00:00Z"),
+    agentPauseReason: "usage_limit",
+  };
+
+  it("parks the conversation as pending-human even though the agent itself is enabled", async () => {
+    const convo = conversation({
+      organization: pausedOrganization,
+      agent: { id: AGENT_ID, enabled: true },
+    });
+    mockFindById.mockResolvedValueOnce(convo);
+
+    await runConversation(CONVERSATION_ID);
+
+    expect(mockUpdate).toHaveBeenCalledWith(CONVERSATION_ID, ORG_ID, {
+      needs_processing: false,
+      status: "pending-human",
+    });
+    expect(convo.lock).not.toHaveBeenCalled();
+    expect(mockLogger.info).toHaveBeenCalledWith(
+      { agentId: AGENT_ID, cause: "organization_paused", reason: "usage_limit", queued: true },
+      "Skipping - agent paused",
+    );
+  });
+
+  it("sends no greeting when the shopper has not written yet", async () => {
+    const convo = conversation({
+      organization: pausedOrganization,
+      agent: { id: AGENT_ID, enabled: true },
+      getLastCustomerMessage: jest.fn(async () => null),
+    });
+    mockFindById.mockResolvedValueOnce(convo);
+
+    await runConversation(CONVERSATION_ID);
+
+    expect(mockUpdate).toHaveBeenCalledWith(CONVERSATION_ID, ORG_ID, { needs_processing: false });
+    expect(mockPublish).not.toHaveBeenCalled();
+    expect(convo.lock).not.toHaveBeenCalled();
+  });
+
+  it("resumes normally once agentPausedAt is cleared", async () => {
+    const convo = conversation({
+      organization: { ...pausedOrganization, agentPausedAt: null, agentPauseReason: null },
       agent: { id: AGENT_ID, enabled: true },
       lock: jest.fn(async () => null),
     });

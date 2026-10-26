@@ -17,7 +17,11 @@ import {
   DEFAULT_TIMEZONE,
   type OrganizationSettings,
 } from "../types/organization-settings.types";
-import type { AccessNotice, SuspensionReason } from "../types/organization-access.types";
+import type {
+  AccessNotice,
+  AgentPauseReason,
+  SuspensionReason,
+} from "../types/organization-access.types";
 
 @Entity("organizations")
 @Index("idx_organizations_slug", ["slug"])
@@ -49,6 +53,14 @@ export class Organization extends BaseEntity {
 
   @Column({ type: "varchar", length: 2048, nullable: true })
   suspensionRedirectUrl?: string | null;
+
+  // AI paused by the operator (e.g. usage allowance used up): no automatic
+  // replies, conversations wait in Needs Attention, dashboard stays usable.
+  @Column({ type: "timestamptz", nullable: true })
+  agentPausedAt?: Date | null;
+
+  @Column({ type: "varchar", length: 50, nullable: true })
+  agentPauseReason?: AgentPauseReason | null;
 
   @Column({ type: "jsonb", nullable: true })
   accessNotice?: AccessNotice | null;

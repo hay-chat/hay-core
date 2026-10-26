@@ -4,7 +4,11 @@ import { router } from "@server/trpc/init";
 import { internalProcedure } from "@server/trpc/middleware/internal";
 import { organizationService } from "@server/services/organization.service";
 import { organizationAccessService } from "@server/services/organization-access.service";
-import { SUSPENSION_REASONS, accessNoticeSchema } from "@server/types/organization-access.types";
+import {
+  AGENT_PAUSE_REASONS,
+  SUSPENSION_REASONS,
+  accessNoticeSchema,
+} from "@server/types/organization-access.types";
 import { createLogger } from "@server/lib/logger";
 
 const logger = createLogger("internal");
@@ -35,6 +39,11 @@ const internalOrganizationsRouter = router({
             redirectUrl: z.string().url().max(2048).optional(),
           })
           .nullable(),
+        // Optional so an operator that predates agent pauses keeps working (= resume).
+        agentPause: z
+          .object({ reason: z.enum(AGENT_PAUSE_REASONS) })
+          .nullable()
+          .default(null),
         notice: accessNoticeSchema.nullable(),
       }),
     )
