@@ -14,16 +14,16 @@ function sign(id: string, ts: string, payload: Buffer, key: Buffer = secretBytes
 describe("verifySvixSignature", () => {
   it("accepts a valid v1 signature", () => {
     const signature = `v1,${sign("msg_1", timestamp, body)}`;
-    expect(
-      verifySvixSignature(body, { id: "msg_1", timestamp, signature }, secret, now),
-    ).toBe(true);
+    expect(verifySvixSignature(body, { id: "msg_1", timestamp, signature }, secret, now)).toBe(
+      true,
+    );
   });
 
   it("accepts when any of several space-separated signatures matches", () => {
     const signature = `v1,${sign("msg_1", timestamp, body, crypto.randomBytes(24))} v1,${sign("msg_1", timestamp, body)}`;
-    expect(
-      verifySvixSignature(body, { id: "msg_1", timestamp, signature }, secret, now),
-    ).toBe(true);
+    expect(verifySvixSignature(body, { id: "msg_1", timestamp, signature }, secret, now)).toBe(
+      true,
+    );
   });
 
   it("rejects a tampered body, a wrong id and a wrong secret", () => {
@@ -31,9 +31,9 @@ describe("verifySvixSignature", () => {
     expect(
       verifySvixSignature(Buffer.from("{}"), { id: "msg_1", timestamp, signature }, secret, now),
     ).toBe(false);
-    expect(
-      verifySvixSignature(body, { id: "msg_2", timestamp, signature }, secret, now),
-    ).toBe(false);
+    expect(verifySvixSignature(body, { id: "msg_2", timestamp, signature }, secret, now)).toBe(
+      false,
+    );
     expect(
       verifySvixSignature(
         body,
@@ -68,7 +68,9 @@ describe("verifySvixSignature", () => {
 describe("normalizeEmailAddressKey", () => {
   it("extracts, lowercases and strips sub-addresses", () => {
     expect(normalizeEmailAddressKey('"Acme" <Support+c42@Acme.com>')).toBe("support@acme.com");
-    expect(normalizeEmailAddressKey("in-3f9a2b@inbound.hay.chat")).toBe("in-3f9a2b@inbound.hay.chat");
+    expect(normalizeEmailAddressKey("in-3f9a2b@inbound.hay.chat")).toBe(
+      "in-3f9a2b@inbound.hay.chat",
+    );
     expect(normalizeEmailAddressKey("  USER@Example.ORG ")).toBe("user@example.org");
   });
 
