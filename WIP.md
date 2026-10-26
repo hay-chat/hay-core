@@ -1,3 +1,15 @@
+## 2026-10-26 — claude/mobile-attention (worktree .claude/worktrees/mobile-attention) — Home inbox + mobile + push
+
+**Works (committed, lint+typecheck green, 9 Jest tests):** `/` is an attention-first Home (pending-human list, one-tap Take over,
+mine/teammates sections, live via WS); phone layout (top bar + drawer, `Page` header wraps); conversation detail/list responsive
+(details → Sheet below lg, More menu, stacked take-over panel); Web Push end-to-end: `push_subscriptions` + migration, VAPID env,
+`notifications.*` router, hook on pending-human in conversation-events.service, `public/sw.js` + manifest, `usePushNotifications`,
+"Alerts on this device" on Home + Profile. i18n en/pt-BR.
+**Half-built:** e2e not yet run (ports 3000/3001 are taken by other apps on this host → local docker pg/redis on 55432/56379,
+dashboard 3100 / server 3101 planned); reviewer agent, docs, website line list, PR still to do.
+**Next:** write `tests/mobile-home-attention.spec.ts` (Pixel viewport; seed pending-human convo via AppDataSource; tap Take over),
+run it against the alt-port stack, then reviewer → docs → PR.
+
 ## 2026-10-21 — master @7448cad — WhatsApp live in prod, Meta webhook configured
 
 **Works:** prod deployed (Phase 2 + proxy fix + /logout). Meta console: callback eu.hay.chat/v1/plugins/hay-channel-whatsapp-meta/webhook
