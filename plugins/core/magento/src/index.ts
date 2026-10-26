@@ -3,8 +3,13 @@ import { defineHayPlugin } from "@hay/plugin-sdk";
 /**
  * Magento Plugin
  *
- * Connect your Magento 2 e-commerce store to manage products, orders, customers,
- * inventory, and analyze sales performance through Magento's REST API
+ * Connects a Magento 2 store so the agent can find a customer's orders, track
+ * shipments, cancel or re-route unshipped orders, issue refunds (credit memos)
+ * and answer product/stock questions — one semantic tool per support action
+ * (see mcp/README.md), not one tool per REST endpoint.
+ *
+ * Spawns a local Node MCP server (./mcp/index.js) that calls the Magento REST
+ * API with the integration token.
  */
 export default defineHayPlugin((globalCtx) => ({
   name: "Magento",
@@ -27,7 +32,8 @@ export default defineHayPlugin((globalCtx) => ({
       apiToken: {
         type: "string",
         label: "API Token",
-        description: "Magento API token (create in System > Integrations)",
+        description:
+          "Magento integration access token (System > Integrations) with access to Sales, Catalog and Customers",
         required: true,
         encrypted: true,
       },
@@ -139,7 +145,7 @@ export default defineHayPlugin((globalCtx) => ({
       await ctx.mcp.startLocalStdio({
         id: "magento-mcp",
         command: "node",
-        args: ["mcp-server.js"],
+        args: ["index.js"],
         cwd: "./mcp",
         env: {
           MAGENTO_BASE_URL: baseUrl,

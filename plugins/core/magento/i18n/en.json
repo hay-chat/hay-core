@@ -1,62 +1,54 @@
 {
   "name": "Magento",
-  "description": "Connect your Magento store to manage products, orders, customers, and e-commerce operations",
+  "description": "Connect your Magento 2 store so the agent can find a customer's orders, track shipments, cancel or re-route unshipped orders, issue refunds, and answer product and stock questions.",
   "tools": {
-    "get_product_by_sku": {
-      "label": "Get Product by SKU",
-      "description": "Get detailed information about a product by its SKU (Stock Keeping Unit)"
+    "magento_get_store": {
+      "label": "Get Store Info",
+      "description": "Get basic information about the connected store (code, URL, currency, locale)."
     },
-    "get_product_by_id": {
-      "label": "Get Product by ID",
-      "description": "Get detailed information about a product by its numeric ID"
+    "magento_find_customer": {
+      "label": "Find Customer",
+      "description": "Find a customer by email (accounts and guest checkouts), with their most recent orders."
     },
-    "search_products": {
+    "magento_list_customer_orders": {
+      "label": "List Customer Orders",
+      "description": "List a customer's orders by email, most recent first."
+    },
+    "magento_get_order": {
+      "label": "Get Order",
+      "description": "Get an order by id or number: items, totals, address, invoices, tracking and support eligibility."
+    },
+    "magento_get_order_tracking": {
+      "label": "Get Order Tracking",
+      "description": "Get an order's shipments and tracking numbers."
+    },
+    "magento_cancel_order": {
+      "label": "Cancel Order",
+      "description": "Cancel an order that has not been invoiced or shipped."
+    },
+    "magento_create_refund": {
+      "label": "Create Refund",
+      "description": "Refund an order via a credit memo, in full, by item, or by amount, capped at the remaining balance."
+    },
+    "magento_update_order_shipping_address": {
+      "label": "Update Order Shipping Address",
+      "description": "Change where an unshipped order will ship. Refuses once a shipment exists."
+    },
+    "magento_add_order_note": {
+      "label": "Add Order Note",
+      "description": "Add an internal comment to an order, optionally shown and emailed to the customer."
+    },
+    "magento_search_products": {
       "label": "Search Products",
-      "description": "Search for products using a query term with pagination support"
+      "description": "Search enabled products by name."
     },
-    "advanced_product_search": {
-      "label": "Advanced Product Search",
-      "description": "Search for products with advanced filtering options and custom field criteria"
+    "magento_get_product": {
+      "label": "Get Product",
+      "description": "Get a product by SKU with price, stock, description and its variants."
     },
-    "get_product_categories": {
-      "label": "Get Product Categories",
-      "description": "Get all categories for a specific product by SKU"
-    },
-    "get_related_products": {
-      "label": "Get Related Products",
-      "description": "Get products related to a specific product by SKU"
-    },
-    "get_product_stock": {
-      "label": "Get Product Stock",
-      "description": "Get stock information for a product by SKU"
-    },
-    "get_product_attributes": {
-      "label": "Get Product Attributes",
-      "description": "Get all attributes (base and custom) for a product by SKU"
-    },
-    "update_product_attribute": {
-      "label": "Update Product Attribute",
-      "description": "Update a specific attribute of a product by SKU"
-    },
-    "get_revenue": {
-      "label": "Get Revenue",
-      "description": "Get the total revenue for a given date range with status filtering"
-    },
-    "get_revenue_by_country": {
-      "label": "Get Revenue by Country",
-      "description": "Get revenue filtered by country for a given date range"
-    },
-    "get_order_count": {
-      "label": "Get Order Count",
-      "description": "Get the number of orders for a given date range with status filtering"
-    },
-    "get_product_sales": {
-      "label": "Get Product Sales",
-      "description": "Get statistics about the quantity of products sold in a given date range with country and status filtering"
-    },
-    "get_customer_ordered_products_by_email": {
-      "label": "Get Customer Ordered Products by Email",
-      "description": "Get all ordered products for a customer by email address with detailed product information"
+    "magento_check_inventory": {
+      "label": "Check Inventory",
+      "description": "Check stock status and quantity for a SKU."
     }
   },
   "config": {
@@ -66,7 +58,7 @@
     },
     "apiToken": {
       "label": "API Token",
-      "description": "Magento API token (create in System > Integrations)"
+      "description": "Magento integration access token (System → Integrations) with access to Sales, Catalog and Customers"
     }
   }
 }
