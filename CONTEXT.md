@@ -1,13 +1,13 @@
 # CONTEXT
 
-**Current Task**: Inbound email channel — strategy written (exploration, no code). See `tasks/email-channel-strategy-2026-10-26.md`.
+**Current Task**: Billing slice 2 (currencies, usage alerts 50/80/100, overage switch, in-place plan change) across hay-backoffice, hay-core, hay-website, hay-docs; code done, reviewer agent running.
 
-**Key Decisions** (proposed defaults, not yet confirmed by Roger)
-- Stay on Resend: receiving on `inbound.hay.chat`, merchants forward support@ to `<org>@inbound.hay.chat` first; custom-domain sending (Resend multi-tenant Option A) in phase 2; Gmail/M365 APIs only on demand (CASA cost).
-- Threading: Reply-To token → In-Reply-To/References → subject heuristic; new plugin `email-channel`, existing `plugins/core/email` tool untouched.
-- Core needs: svix webhook signature format, routeKey transform, `messages.receive` honours externalConversationId, send-email passthrough + honest failures.
+**Key Decisions**
+- Overage off + 100 % → `agentPause` access-state field (AI parked, dashboard usable), not a suspension.
+- One Stripe price per plan/interval with `currency_options`; currency chosen at checkout, locked afterwards.
+- All plan changes in place with `create_prorations`; refund policy §4 must change (website copy listed in PR).
 
 **Next Steps**
-- Roger confirms §7 defaults in the strategy doc.
-- Phase 0 spike: enable Resend receiving, dump headers of a Gmail-forwarded mail, check Message-ID control via SMTP vs API.
-- Then plan Phase 1 in a `claude/email-channel` worktree.
+- Address reviewer findings, push `claude/billing-usage-limits` (+ hay-docs `claude/billing-usage-docs`), open stacked PRs.
+- Roger runs `npm run stripe:sync` in test/live and the two migrations.
+- Follow-up: admin UI for currency/overage; renewal reminder email (slice 3).
