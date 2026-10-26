@@ -1,68 +1,80 @@
-# WhatsApp Cloud API — Phase 2 plugin (branch claude/whatsapp-plugin)
+# Billing: currencies, usage alerts, overage switch, in-place plan change (2026-10-26)
 
-Spec: `.claude/plans/whatsapp-cloud/PLAN.md` §3 Phase 2 (D1–D14 final, §5 answers, §6 self-hosting).
-Plugin: `plugins/core/whatsapp`, npm + plugin id `hay-channel-whatsapp-meta`, channel `whatsapp`,
-UMD global `WhatsappMetaPlugin`, Graph `https://graph.facebook.com/v26.0`.
+Slice 2 of the "fix or stop claiming" list (`tasks/prospect-faq-answers-2026-10-26.md`, items 1-3).
+Three repos, three stacked branches, land one at a time:
 
-## Checklist (one commit each)
+| Repo           | Worktree                                 | Branch                                   | Based on                                                           |
+| -------------- | ---------------------------------------- | ---------------------------------------- | ------------------------------------------------------------------ |
+| hay-backoffice | `/srv/hay/wt-billing-currencies`         | `claude/billing-currencies-usage-alerts` | `claude/overage-billing` (unmerged, owns the metered overage item) |
+| hay-core       | `.claude/worktrees/claude+billing-usage` | `claude/billing-usage-limits`            | `claude/agent-pause` (unmerged, owns `parkForPausedAgent`)         |
+| hay-website    | `/srv/hay/wt-website-billing`            | `claude/billing-change-plan`             | `main`                                                             |
 
-- [x] 0. Security: public proxy blocks worker-internal paths + strips `x-hay-webhook-verified` (also PR #100)
-- [x] C1. Core: `onConnected` may return `credentials` (merged into encrypted authState) + `oauth2.connectFlow: "client"`
-- [x] C2. Core: authenticated `plugins.callUiRoute` → worker `/ui/*` (public proxy blocks `ui`); plugin UI props `api` + `locale`
-- [x] C3. Core: `pluginApi.connection.revoke` + `pluginApi.media.upload({ transcribe })` (OpenAI STT in core)
-- [x] 1. Plugin skeleton: manifest, config, webhookRouting (nested), graph-client, manual-mode signature/handshake, onStart/onConnected
-- [x] 2. Inbound normaliser: text/interactive/button/location/contacts/reaction/request_welcome/context/referral, statuses → updateStatus, account_update → revoke
-- [x] 3. Media inbound: GET /{media_id} → download → media.upload (voice → transcribe) → attachments[]
-- [x] 4. deliver.ts: text + attachments, error mapping (131047 / 131056 / 130429 / 190)
-- [x] 5. Onboarding UI: ES v4 popup, manual tab, health card, payment card, en + pt-BR
-- [x] 6. README + docs/user-guide/integrations/whatsapp.md (docs submodule)
-- [x] Verify: `npm run typecheck`, `npm run lint`, `npm run test:server`, plugin `npm test`, plugin build loads
+## Goal
 
-Acceptance: plugin builds + loads; Instagram unchanged; unit tests for normaliser, signature path, deliver
-error mapping, onConnected extras verification; PR open referencing PLAN.md.
+1. Stripe catalog carries EUR, USD, GBP and BRL (the prices the site already shows); a customer checks out in
+   one currency and stays in it.
+2. Usage warnings at 50 %, 80 % and 100 % of the included resolutions: email at each, dashboard banner from 80 %.
+3. Account setting "allow extra resolutions" (overage), on by default. Off + 100 % → the AI pauses until renewal
+   or upgrade, humans keep working, nothing extra is billed.
+4. "Change plan" on hay.chat/billing changes the existing subscription in place (prorated), never a second one.
 
-## Contracts (agents: build against these exactly)
+## Acceptance criteria
 
-- **onConnected result** `{ routingKeys?, account?, credentials?: Record<string,string> }`. Core merges
-  `credentials` into `authState.credentials` (encrypted). Reserved keys core ignores: `accessToken`,
-  `refreshToken`, `expiresAt`, `connectedAt`, `tokenType`, `scope`. Worker reads them back via
-  `ctx.auth.get().credentials` on every start.
-- **`oauth2.connectFlow?: "redirect" | "client"`** (default redirect). `"client"`: dashboard OAuth card hides
-  Connect/Reconnect (status + Disconnect stay); `plugins.oauth.initiate` rejects with BAD_REQUEST.
-- **`plugins.callUiRoute`** (authenticated): `{ pluginId, method: "GET"|"POST", path, body? }`,
-  `path` matches `^/ui/[a-z0-9/-]*$`; instance must exist + be enabled for the caller's org; starts the
-  worker, forwards JSON, returns `{ status: number, data: unknown }`. Public proxy 404s first segment `ui`.
-- **Plugin UI props**: `plugin, config, apiBaseUrl, api` (the dashboard `Hay` tRPC client), `locale` (string).
-- **`pluginApi.connection.revoke({ reason })`** → `{ revoked: true }`; core runs `oauthService.revokeOAuth`
-  after responding (the call stops the calling worker).
-- **`pluginApi.media.upload({ data, mimeType, filename, transcribe? })`** → attachment `{id,name,url,type,size}`
-  plus `transcript?: string` when `transcribe` and STT succeeded (absent otherwise, never throws for STT).
-  `mimeType` must be bare (strip `; codecs=opus`).
+- [ ] `billing-plans.json` is the single source of prices in four currencies; `npm run stripe:sync` writes them as
+      Stripe `currency_options` on the existing lookup-key prices (flat + metered), idempotently.
+- [ ] `POST /api/billing/checkout` with no live subscription → Checkout in the requested currency (default EUR).
+- [ ] `POST /api/billing/checkout` with an active subscription → `subscriptions.update` swapping flat + overage
+      items, `proration_behavior: create_prorations`; response `{ action: "changed" }`; same plan+interval → 400.
+- [ ] `Subscription.currency` stored; overview/plans/emails show amounts in that currency.
+- [ ] Annual plans: allowance for the period = monthly allowance × 12 (fixes the annual metering bug).
+- [ ] Usage job: crossing 50/80/100 % sends one email per threshold per period (dedup in `email_send_log`);
+      ≥ 80 % pushes a dashboard notice; 100 % notice says overage billing started or the AI is paused.
+- [ ] `Account.overageEnabled` (default true) editable via `POST /api/billing/settings`; off + 100 % → hay-core
+      `agentPause: { reason: "usage_limit" }`, no meter events; on again / renewal → pause lifted.
+- [ ] hay-core: `internal.organizations.setAccessState` accepts `agentPause`; orchestrator parks conversations for a
+      paused org exactly like a paused agent; `auth.me` exposes the fields; en + pt-BR notice strings.
+- [ ] Tests: backoffice vitest (stripe.service, usage-tracking, account-access, billing route via supertest);
+      hay-core jest (internal router, access service, orchestrator skip); Playwright spec for the banner.
+- [ ] Docs: `docs/user-guide/faq.md` + `settings.md` billing answers match the product; website copy lines listed.
+
+## Decisions (defaults taken, state in PR)
+
+- Currency is chosen at checkout (plans page selector, pre-selected from the `hay_region` cookie) and locked to the
+  subscription afterwards. Stripe forbids mixing currencies on one customer anyway.
+- One Stripe price per plan/interval with `currency_options` (not 4× prices) so lookup keys and the Customer Portal
+  keep working unchanged.
+- All plan changes apply immediately with proration (upgrades and downgrades). Refund policy §4 must change.
+- Overage off → AI pauses at 100 %; the dashboard stays usable and conversations land in Needs Attention
+  (reuses `parkForPausedAgent` from `claude/agent-pause`). Hard suspension would lock humans out too.
+- Email at 50/80/100, banner only at 80/100 (a 50 % banner is noise).
+- Admin UI does not show currency/overage yet (follow-up TODO).
+
+## Checklist
+
+- [x] Read WIP, FAQ sheet, backoffice billing code, website billing.js, hay-core access state
+- [x] Worktrees created, node_modules linked
+- [ ] Backoffice: billing-plans.json + PLAN_CONFIG + planPricing/includedResolutionsFor
+- [ ] Backoffice: sync script currency_options; verifyStripeCatalog currency check
+- [ ] Backoffice: migrations (subscriptions.currency, accounts.overage_enabled, accounts.agent_paused_reason,
+      usage_records.alerted_threshold)
+- [ ] Backoffice: checkout currency + changeSubscriptionPlan + route branches + /settings
+- [ ] Backoffice: usage thresholds (email template, send log, notice) + overage cap + access sync with agentPause
+- [ ] Backoffice: tests green (`npm test`), `tsc --noEmit`, prettier
+- [ ] hay-core: types/entity/migration/service/router/run.ts/auth.me/store/i18n
+- [ ] hay-core: jest tests, typecheck, lint; Playwright spec written (run if a dev stack is available)
+- [ ] hay-core: docs/user-guide updates
+- [ ] Website: billing.js currency, change-plan flow, overage toggle; `node --check`
+- [ ] Reviewer agent on the three diffs; findings addressed
+- [ ] WIP.md entries in all three repos; push; PR bodies with verification story + website copy list
 
 ## Working notes
 
-- `META_APP_SECRET`/`OPENAI_*`/`*TOKEN*` env never reach workers (DENIED_ENV_PATTERNS).
-- Manual mode (D6/§6) = config fields (showWhen `connectionMode === "manual"`): token, phoneNumberId, wabaId,
-  appSecret, verifyToken. Webhook = per-org URL `/v1/plugins/hay-channel-whatsapp-meta/webhook?organizationId=<org>`;
-  worker answers the GET handshake and verifies `x-hub-signature-256` over `req.rawBody` itself. No routing keys,
-  no Hay config_id needed. ES mode = shared URL, core verifies, worker trusts `x-hay-webhook-verified`.
-- Customer identity (D3): `from = "+<wa_id>"`; no wa_id → `whatsapp:bsuid:<user_id>`; BSUID + profile name in metadata.
-- Agents share one worktree: never run git, never `npm install`; only edit files you own.
+- Backoffice `main` is at 27247d1; `claude/overage-billing` (6 commits) is unmerged and holds the overage item code.
+- hay-core dev stack is not running locally (ports 3000/3001 are other apps; hay-core runs in Docker on 8088/8089).
+- `gh` is not installed on this machine: PRs are opened from the compare URL with the body files in `tasks/prompts/`.
+- Stripe SDK v20: `prices.create/update` take `currency_options`; `checkout.sessions.create` takes `currency`;
+  `subscriptions.update` items take `{ id, price }` and `proration_behavior`.
 
 ## Results
 
-Commits on `claude/whatsapp-plugin` (one per slice): proxy security fix (also PR #100); C1 onConnected credentials +
-connectFlow; C2 plugins.callUiRoute + UI props; C3 connection.revoke + media.upload transcribe; plugin skeleton;
-webhooks.setRoutingKeys (core) + manual-mode route claim (plugin) — added after finding that a manual token from the
-app whose callback is the shared URL (Hay's test number) would never route; deliver; media; inbound normaliser + README;
-OAuth card refresh event; settings UI; docs submodule (hay-docs branch claude/whatsapp-plugin).
-
-Verification: `npm run typecheck` exit 0; `npm run lint` exit 0; `npm run test:server` 635 passed / 73 failed — the
-same 5 DB-only integration suites as master; plugin vitest 104/104; SDK vitest 123 passed / 5 failed (known
-sdk/register.test.ts baseline); plugin + Instagram build; worker smoke (runner boots, manual handshake 200/403,
-signed POST 200, unsigned 403, /ui/status). NOT done: anything against real Meta (needs deploy + console webhook),
-browser run of the ES popup (needs https origin), migration 1784400000000 still unrun.
-
-Follow-ups: core has no delivery retry (503 rate_limited just fails the reply); typing indicator / read receipts (D10)
-need a core "processing started" hook; config option labels not translated (plugin `config` i18n); BSUID re-keying on
-`user_changed_user_id`; STT uses the platform OpenAI key, not the org provider (HAY-251).
+(filled in when done)
