@@ -3,7 +3,7 @@
 **Merged to master:** fix-wait-time-units (82a04f2: formatWaitTime shows two largest units, "3d 4h"; 6 vitest), fix-manage-middleware (b626a21: dropped dangling `middleware: ["auth"]` on /integrations/plugins/manage; `dashboard/tests/route-middleware.test.ts` guards every named middleware), fix-sdk-register-tests (removed legacy `register.ui()` / `uiExtensions` from plugin-sdk + server metadata; SDK suite 134/134, was 5 failing).
 **Checks on master:** dashboard nuxt typecheck, server tsc, eslint on changed files, SDK build: all clean.
 **Live-verified in Chrome after deploy (b626a21):** manage page renders, no "Unknown route middleware"; Inbox shows "Longest wait: 336d 21h" and rows "Waiting for 336d 21h".
-**Follow-ups:** dashboard has no `test` script / vitest config (new tests run via `npx vitest run` from dashboard/); `PluginMetadata` on the server lacks a `pages` field the SDK emits; prod env VAPID_*/RESEND_* still unset; backoffice billing branches still unmerged; worktrees under .claude/worktrees/ for the three fix branches can be removed.
+**Follow-ups:** dashboard has no `test` script / vitest config (new tests run via `npx vitest run` from dashboard/); `PluginMetadata` on the server lacks a `pages` field the SDK emits; prod env VAPID_*/RESEND_*/EMAIL_INBOUND_DOMAIN now set via Infisical + `deploy.sh --env-only` (Inbox offers "Alerts on this device"); backoffice billing branches merged/migrated/Stripe-synced/deployed (notes in /srv/hay/WIP.md); worktrees under .claude/worktrees/ for the three fix branches can be removed.
 **Next:** nothing pending on hay-core from this session.
 
 ## 2026-10-26 — master — fact-fix branches MERGED straight to master + DEPLOYED (merge-gate session)

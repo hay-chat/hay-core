@@ -10,6 +10,6 @@
 
 **Next Steps**:
 
-- Set prod env: VAPID_PUBLIC_KEY/VAPID_PRIVATE_KEY/VAPID_SUBJECT (push alerts), RESEND_API_KEY/RESEND_WEBHOOK_SECRET/EMAIL_INBOUND_DOMAIN (email channel); then the backoffice side of billing (claude/overage-billing → claude/billing-currencies-usage-alerts, stripe:sync, migrations).
+- Done 2026-10-26: VAPID_*/RESEND_*/EMAIL_INBOUND_DOMAIN live in prod (deploy.sh --env-only); backoffice billing branches merged, migrated, Stripe live catalog synced, deployed (see /srv/hay/WIP.md).
 - Dashboard still has no `test` script/vitest config (run `npx vitest run` from `dashboard/`); server `PluginMetadata` lacks the `pages` field the SDK emits.
 - Website copy fixes listed in each branch's `tasks/todo.md` (`git show origin/claude/<branch>:tasks/todo.md`).
