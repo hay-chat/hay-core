@@ -216,25 +216,34 @@ export const pluginApiTrpcRouter = router({
         }
 
         // Resolve the conversation: a Hay id the plugin recovered from its own
-        // outbound message wins, then the provider-side thread id, then the
-        // customer's active conversation on this channel. A resolved thread
-        // found by id or external id is reopened by addMessage below.
+        // outbound message wins, then the provider-side thread id. Both must
+        // belong to this customer — the Hay id travels in every outbound email
+        // (Reply-To token), so a third party who was forwarded one must not be
+        // able to inject into the shopper's thread. Plugins that pass neither
+        // fall back to the customer's active conversation on this channel; a
+        // plugin that does pass an external thread id and misses means a new
+        // thread (one customer, many threads). A resolved thread found by id
+        // or external id is reopened by addMessage below.
         let conversation: Conversation | null = null;
         if (input.conversationId) {
           const byId = await conversationRepository.findByIdAndOrganization(
             input.conversationId,
             organizationId,
           );
-          conversation = byId && byId.channel === channel && !byId.deleted_at ? byId : null;
+          conversation =
+            byId && byId.channel === channel && byId.customer_id === customer.id && !byId.deleted_at
+              ? byId
+              : null;
         }
         if (!conversation && externalConversationId) {
-          conversation = await conversationRepository.findByExternalConversationId(
+          const byExternalId = await conversationRepository.findByExternalConversationId(
             channel,
             externalConversationId,
             organizationId,
           );
+          conversation = byExternalId?.customer_id === customer.id ? byExternalId : null;
         }
-        if (!conversation) {
+        if (!conversation && !externalConversationId) {
           conversation = await conversationRepository.findActiveByCustomerAndChannel(
             customer.id,
             channel,
@@ -260,12 +269,14 @@ export const pluginApiTrpcRouter = router({
             metadata: Object.keys(channelMetadata).length ? { [channel]: channelMetadata } : null,
           });
         } else if (externalConversationId) {
-          // Conversation already exists — merge the externalConversationId into
-          // its metadata if it's not already stored there. We intentionally do
-          // not broadcast this metadata-only change because it's internal state.
+          // Conversation already exists — store the externalConversationId if
+          // none is recorded yet. An existing value is the thread root and is
+          // never replaced: a reply that only references our own message would
+          // otherwise detach the thread from its first message. We intentionally
+          // do not broadcast this metadata-only change because it's internal state.
           const existing = conversation.metadata ?? {};
           const existingChannel = (existing[channel] ?? {}) as Record<string, unknown>;
-          if (existingChannel.conversationId !== externalConversationId) {
+          if (existingChannel.conversationId === undefined) {
             const merged = {
               ...existing,
               [channel]: { ...existingChannel, ...channelMetadata },

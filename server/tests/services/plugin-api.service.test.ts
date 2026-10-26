@@ -19,8 +19,32 @@ jest.mock("@server/services/email.service", () => ({
 
 import {
   PluginAPIService,
+  allowedCustomHeaders,
   isPlatformSenderAddress,
 } from "@server/services/plugin-api/plugin-api.service";
+
+describe("allowedCustomHeaders", () => {
+  it("keeps threading, auto-responder and X- headers and drops envelope or multi-line ones", () => {
+    expect(
+      allowedCustomHeaders({
+        "In-Reply-To": "<a@b>",
+        References: "<a@b> <c@d>",
+        "Auto-Submitted": "auto-replied",
+        "X-Hay-Conversation": "c1",
+        From: "evil@example.com",
+        "Return-Path": "<bounce@example.com>",
+        "X-Injected": "a\r\nBcc: x@y.z",
+      }),
+    ).toEqual({
+      "In-Reply-To": "<a@b>",
+      References: "<a@b> <c@d>",
+      "Auto-Submitted": "auto-replied",
+      "X-Hay-Conversation": "c1",
+    });
+    expect(allowedCustomHeaders({ From: "x" })).toBeUndefined();
+    expect(allowedCustomHeaders(undefined)).toBeUndefined();
+  });
+});
 
 const token = {
   pluginId: "hay-channel-email",

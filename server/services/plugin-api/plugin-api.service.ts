@@ -16,6 +16,27 @@ function platformSenderDomain(): string {
 }
 
 /** Whether `address` may be used as a From address by a plugin. */
+/**
+ * Custom headers a plugin may set on outbound email: threading, our own
+ * tracking headers and auto-responder hints. Anything else (From, To, Subject,
+ * Return-Path, …) is dropped so a plugin cannot rewrite the envelope.
+ */
+const ALLOWED_HEADER_PATTERN = /^(in-reply-to|references|auto-submitted|x-[a-z0-9-]+)$/i;
+
+export function allowedCustomHeaders(
+  headers: Record<string, string> | undefined,
+): Record<string, string> | undefined {
+  if (!headers) {
+    return undefined;
+  }
+  const allowed = Object.fromEntries(
+    Object.entries(headers).filter(
+      ([name, value]) => ALLOWED_HEADER_PATTERN.test(name) && !/[\r\n]/.test(value),
+    ),
+  );
+  return Object.keys(allowed).length ? allowed : undefined;
+}
+
 export function isPlatformSenderAddress(address: string): boolean {
   const domain = address.trim().toLowerCase().split("@");
   return domain.length === 2 && domain[1] !== "" && domain[1] === platformSenderDomain();
@@ -176,7 +197,7 @@ export class PluginAPIService {
         bcc: options.bcc,
         from: options.from,
         replyTo: options.replyTo,
-        headers: options.headers,
+        headers: allowedCustomHeaders(options.headers),
         messageId: options.messageId,
         retry: options.retry,
         attachments: options.attachments?.map((attachment) => ({

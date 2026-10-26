@@ -15,6 +15,23 @@ describe("classifyInbound", () => {
     ).toBe("echo");
   });
 
+  it("recognises our own mail by From address or Message-ID when the custom header is missing", () => {
+    expect(
+      classifyInbound({
+        ...base,
+        from: "Acme Support <Support@updates.hay.test>",
+        headers: {},
+        ownAddress: "support@updates.hay.test",
+      }),
+    ).toEqual({ kind: "echo", hold: false, reason: "own-address" });
+    expect(
+      classifyInbound({ ...base, headers: {}, messageId: "<hay-msg-1@updates.hay.test>" }),
+    ).toEqual({ kind: "echo", hold: false, reason: "own-message-id" });
+    expect(
+      classifyInbound({ ...base, headers: {}, ownAddress: "support@updates.hay.test" }).kind,
+    ).toBe("customer");
+  });
+
   it("recognises Gmail's forwarding confirmation", () => {
     expect(
       classifyInbound({

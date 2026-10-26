@@ -15,9 +15,11 @@ email, threaded like a normal conversation.
 2. **Receiving.** Resend receives the forwarded mail and posts one shared
    `email.received` webhook to `/v1/plugins/hay-channel-email/webhook`. Core
    verifies the svix signature (`RESEND_WEBHOOK_SECRET`) and routes the event
-   to the org whose routing keys match a recipient address (`data.to[]`,
+   to the org whose routing key matches the envelope recipient (`data.to[]`,
    normalised: lowercase, display name and `+tag` removed). Each org registers
-   two keys: its alias and its support address.
+   one key: its alias. The support address is never a routing key — it is
+   unverified config, and routing on it would let one org claim another's
+   mail.
 3. **Inbound.** The worker fetches the full email from Resend, classifies it
    (echo of our own mail, Gmail confirmation, bounce, auto-reply, list mail,
    customer), strips quoted history and signatures, uploads real attachments
@@ -55,8 +57,9 @@ signing secret into `RESEND_WEBHOOK_SECRET`.
 
 ## Plugin configuration
 
-- **Your support address** (required): what shoppers write to. Used as a
-  routing key and as the BCC archive target.
+- **Your support address** (required): what shoppers write to. Used to
+  recognise the merchant's own out-of-band replies and as the BCC archive
+  target.
 - **Sender name**: display name on replies (defaults to the workspace name).
 - **Keep a copy in my inbox**: BCC the support address on every reply.
 

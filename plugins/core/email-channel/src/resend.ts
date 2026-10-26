@@ -53,17 +53,38 @@ export interface ResendClientOptions {
   apiKey: string;
   fetchImpl?: typeof fetch;
   baseUrl?: string;
+  /** Backoff between retries of a transient API failure (ms). Override for tests. */
+  retryDelaysMs?: number[];
+  sleep?: (ms: number) => Promise<void>;
+}
+
+/**
+ * Core acks the webhook to Resend before the worker fetches the email, so a
+ * transient API failure here would lose the mail. Retry 429/5xx and network
+ * errors a few times before giving up.
+ * TODO: persist the event (BullMQ) so a worker restart mid-fetch is recoverable too.
+ */
+const DEFAULT_RETRY_DELAYS_MS = [500, 1500, 4000];
+
+function isTransient(error: unknown): boolean {
+  return error instanceof ResendApiError
+    ? error.status === 429 || error.status >= 500
+    : !(error instanceof Error && error.name === "SyntaxError");
 }
 
 export class ResendClient {
   private readonly apiKey: string;
   private readonly fetchImpl: typeof fetch;
   private readonly baseUrl: string;
+  private readonly retryDelaysMs: number[];
+  private readonly sleep: (ms: number) => Promise<void>;
 
   constructor(options: ResendClientOptions) {
     this.apiKey = options.apiKey;
     this.fetchImpl = options.fetchImpl ?? fetch;
     this.baseUrl = (options.baseUrl ?? RESEND_API_BASE).replace(/\/$/, "");
+    this.retryDelaysMs = options.retryDelaysMs ?? DEFAULT_RETRY_DELAYS_MS;
+    this.sleep = options.sleep ?? ((ms) => new Promise<void>((resolve) => setTimeout(resolve, ms)));
   }
 
   async getReceivedEmail(emailId: string): Promise<ReceivedEmail> {
@@ -88,6 +109,20 @@ export class ResendClient {
   }
 
   private async getJson<T>(path: string): Promise<T> {
+    for (let attempt = 0; ; attempt++) {
+      try {
+        return await this.getJsonOnce<T>(path);
+      } catch (error: unknown) {
+        const delay = this.retryDelaysMs[attempt];
+        if (delay === undefined || !isTransient(error)) {
+          throw error;
+        }
+        await this.sleep(delay);
+      }
+    }
+  }
+
+  private async getJsonOnce<T>(path: string): Promise<T> {
     const response = await this.fetchImpl(`${this.baseUrl}${path}`, {
       headers: { Authorization: `Bearer ${this.apiKey}` },
     });
