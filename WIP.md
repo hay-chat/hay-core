@@ -1,3 +1,14 @@
+## 2026-10-26 — claude/email-channel — review fixes committed (c1bfdfd), branch pushed, PR to open manually (no gh)
+
+**Works:** 8 commits on branch. Reviewer's 2 HIGHs fixed (alias-only routing; conversationId/external id bound to customer),
+mediums fixed (new-thread rule, root never overwritten, echo by From/Message-ID, Resend retry, header allow-list, From-name
+sanitising, Auto-Submitted). Plugin vitest 43/43, server touched suites 52/52, root typecheck + lint clean. Docs guide on hay-docs
+branch claude/email-channel (d953f8b, rebased onto 807a263); submodule pointer bumped on this branch.
+**Half-built:** Playwright spec unrun (no dev server here). DB-backed Jest suites only pass from the main checkout (worktree misses
+`/srv/hay-core/.env`, see lessons). Phase 0 spike S1–S5 still blocked on a Resend API key from Roger.
+**Next:** merge PR → set RESEND_API_KEY / RESEND_WEBHOOK_SECRET / EMAIL_INBOUND_DOMAIN in prod (Coolify) → run spike: confirm
+Gmail-forwarded mail lands with the alias in `data.to`, custom Message-ID honoured → Phase 2 (custom-domain sending, idle resolve).
+
 ## 2026-10-26 — master @28eea98 — agent pause switch MERGED + DEPLOYED to eu.hay.chat
 
 **Works:** claude/agent-pause merged to master (no PR, Roger's call) after review: Jest 12/12, server tsc, dashboard

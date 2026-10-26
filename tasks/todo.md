@@ -24,22 +24,22 @@ Core (one commit each):
       accept `title` (subject) on new conversations
 - [x] C3. plugin send: `email.send` tRPC capability (or extend `/send-email`) with from/replyTo/headers/attachments/
       messageId, returns the real Message-ID, surfaces failures (FAQ item 6, `plugin-api.service.ts:151-171`)
-- [ ] C4. Message/conversation metadata shape for email (`metadata.email.{subject,from,to,cc,html,messageId,references,kind}`)
+- [x] C4. (folded into plugin metadata: mid/subject/messageId/inReplyTo/references/holdReason) Message/conversation metadata shape for email (`metadata.email.{subject,from,to,cc,html,messageId,references,kind}`)
 
 Plugin `plugins/core/email-channel`:
-- [ ] P1. Skeleton: package.json (`hay-plugin.category: channel`, `channel: email`), config (storeName, forwardingAlias
+- [x] P1. Skeleton: package.json (`hay-plugin.category: channel`, `channel: email`), config (storeName, forwardingAlias
       read-only, idleAutoResolveDays), webhookRouting(svix), routes `/webhook` `/deliver` `/escalate` `/ui/*`
-- [ ] P2. Inbound: ack <15s → enqueue → fetch received email + attachments → classify (bounce/auto/bulk/echo/dmarc-fail)
+- [x] P2. Inbound: ack <15s → enqueue → fetch received email + attachments → classify (bounce/auto/bulk/echo/dmarc-fail)
       → reply-parser (strip quotes/signature) → thread match (token → headers → subject heuristic) → `messages.receive`
-- [ ] P3. Outbound `/deliver`: text+simple HTML, threading headers, Auto-Submitted, X-Hay-Conversation, Reply-To token,
+- [x] P3. Outbound `/deliver`: text+simple HTML, threading headers, Auto-Submitted, X-Hay-Conversation, Reply-To token,
       BCC merchant support@ (setting), store Message-ID
-- [ ] P4. Setup wizard UI (en + pt-BR): your support address → copy forwarding address → Gmail confirmation code
+- [x] P4. Setup wizard UI (en + pt-BR): your support address → copy forwarding address → Gmail confirmation code
       capture → send test → status card; conversation header strip (subject/from/to) in dashboard
-- [ ] P5. Out-of-band reply detection → human-took-over + Needs attention
-- [ ] P6. Idle auto-resolve (scheduler) — may slip to Phase 2
+- [x] P5. Out-of-band reply detection → human-took-over + Needs attention
+- [ ] P6. (deferred to Phase 2) Idle auto-resolve (scheduler) — may slip to Phase 2
 
 Verify:
-- [ ] V1. Jest: svix verify, routeKey transform, thread matcher, classifier, reply-parser, deliver header builder
+- [x] V1. Jest: svix verify, routeKey transform, thread matcher, classifier, reply-parser, deliver header builder
 - [ ] V2. `npm run typecheck`, `npm run lint`, `npm run test:server`, plugin `npm test`, plugin build loads
 - [ ] V3. Playwright `tests/email-channel-setup.spec.ts`: wizard end to end (chromium)
 - [ ] V4. Independent reviewer agent on `git diff master...HEAD`; findings addressed/recorded here

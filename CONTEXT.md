@@ -1,13 +1,13 @@
 # CONTEXT
 
-**Current Task**: Inbound email channel — strategy written (exploration, no code). See `tasks/email-channel-strategy-2026-10-26.md`.
+**Current Task**: Inbound email channel — Phase 1 built on branch `claude/email-channel` (worktree `.claude/worktrees/claude+email-channel`), pushed; PR not yet opened (no `gh` here). PR body: scratchpad `pr-body-email-channel.md`; compare URL https://github.com/hay-chat/hay-core/compare/master...claude/email-channel?expand=1
 
-**Key Decisions** (proposed defaults, not yet confirmed by Roger)
-- Stay on Resend: receiving on `inbound.hay.chat`, merchants forward support@ to `<org>@inbound.hay.chat` first; custom-domain sending (Resend multi-tenant Option A) in phase 2; Gmail/M365 APIs only on demand (CASA cost).
-- Threading: Reply-To token → In-Reply-To/References → subject heuristic; new plugin `email-channel`, existing `plugins/core/email` tool untouched.
-- Core needs: svix webhook signature format, routeKey transform, `messages.receive` honours externalConversationId, send-email passthrough + honest failures.
+**Key Decisions**
+- Resend receiving + forwarding to per-org alias `in-<10hex>@EMAIL_INBOUND_DOMAIN`; route only on the alias (typed support address never routes mail).
+- Threading: Reply-To token → References root → new thread; `messages.receive` binds both hints to the customer; stored root never overwritten.
+- Docs guide on hay-docs branch `claude/email-channel` (d953f8b), submodule pointer bumped on the branch.
 
 **Next Steps**
-- Roger confirms §7 defaults in the strategy doc.
-- Phase 0 spike: enable Resend receiving, dump headers of a Gmail-forwarded mail, check Message-ID control via SMTP vs API.
-- Then plan Phase 1 in a `claude/email-channel` worktree.
+- Roger: open PR from the compare URL (body in scratchpad), provide a Resend API key for the Phase 0 spike.
+- After merge: set RESEND_API_KEY / RESEND_WEBHOOK_SECRET / EMAIL_INBOUND_DOMAIN in prod, run spike (alias in `data.to`? Message-ID honoured?).
+- Run Playwright `tests/email-channel-setup.spec.ts` against a dev server; Phase 2: custom-domain sending, idle auto-resolve.
