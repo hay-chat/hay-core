@@ -21,6 +21,10 @@
     "./sdk/stdio-mcp-client": {
       "types": "./dist/sdk/stdio-mcp-client.d.ts",
       "import": "./dist/sdk/stdio-mcp-client.js"
+    },
+    "./tool-errors": {
+      "types": "./tool-errors/index.d.ts",
+      "default": "./tool-errors/index.cjs"
     }
   },
   "bin": {

@@ -28,7 +28,7 @@
     },
     "shopify_add_order_note": {
       "label": "Add Order Note",
-      "description": "Add or replace the internal note on an order."
+      "description": "Add to the internal note on an order. Existing notes are kept."
     },
     "shopify_calculate_refund": {
       "label": "Calculate Refund",
@@ -40,7 +40,7 @@
     },
     "shopify_cancel_order": {
       "label": "Cancel Order",
-      "description": "Cancel an order, optionally restocking items, refunding, and notifying the customer."
+      "description": "Cancel an order before it ships, optionally restocking items, refunding, and notifying the customer. Refuses once anything has shipped."
     },
     "shopify_get_returnable_items": {
       "label": "Get Returnable Items",

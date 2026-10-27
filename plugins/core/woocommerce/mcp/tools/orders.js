@@ -10,7 +10,7 @@
 
 const { z } = require("zod");
 const { wcApi } = require("../lib/client");
-const { ok, fail } = require("../lib/format");
+const { ok, fail, toolError } = require("../lib/format");
 const { resolveOrder, getTracking, enrichOrder, PRE_DISPATCH_STATUSES } = require("../lib/orders");
 const { isPreDispatch } = require("../lib/orders");
 
@@ -25,21 +25,36 @@ const ORDER_REF = {
 /** Refuse once anything has shipped: wrong status, or tracking already recorded. */
 async function assertPreDispatch(order, action) {
   if (order.status === "cancelled") {
-    throw new Error(`Order #${order.number} is already cancelled; cannot ${action}.`);
+    throw toolError(
+      "PRECONDITION",
+      `Order #${order.number} is already cancelled; cannot ${action}.`,
+      {
+        details: { reason: "ALREADY_CANCELLED" },
+      },
+    );
   }
   if (!PRE_DISPATCH_STATUSES.has(order.status)) {
-    throw new Error(
+    throw toolError(
+      "PRECONDITION",
       `Order #${order.number} has status "${order.status}"; you can only ${action} while it is ` +
         "pending, on-hold or processing (before dispatch). Escalate to the merchant instead.",
+      { details: { reason: "NOT_PRE_DISPATCH", status: order.status } },
     );
   }
   const tracking = await getTracking(order);
   if (!isPreDispatch(order, tracking)) {
-    throw new Error(
+    throw toolError(
+      "PRECONDITION",
       `Order #${order.number} already has shipment tracking (${tracking
         .map((t) => t.trackingNumber)
         .join(", ")}); it has left the warehouse, so you cannot ${action}. Escalate to the ` +
         "merchant/carrier instead.",
+      {
+        details: {
+          reason: "ALREADY_SHIPPED",
+          trackingNumbers: tracking.map((t) => t.trackingNumber),
+        },
+      },
     );
   }
 }
