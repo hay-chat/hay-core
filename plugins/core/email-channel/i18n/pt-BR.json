@@ -1,8 +1,30 @@
 {
   "name": "Caixa de e-mail",
-  "description": "Conecte sua caixa de suporte: encaminhe os e-mails de support@ para a Hay e deixe a IA responder por e-mail, na mesma conversa",
-  "tools": {},
-  "config": {},
+  "description": "Conecte sua caixa de suporte: encaminhe os e-mails de support@ para a Hay e deixe a IA responder por e-mail, na mesma conversa. A IA também pode enviar e-mails para a sua equipe.",
+  "tools": {
+    "send-email": {
+      "label": "Enviar e-mail para a equipe",
+      "description": "Enviar um e-mail para a equipe da loja (os endereços de notificação, ou o endereço de suporte) — por exemplo, quando um cliente precisa de uma pessoa"
+    }
+  },
+  "config": {
+    "supportAddress": {
+      "label": "Seu endereço de suporte",
+      "description": "O endereço para onde seus clientes já escrevem, por exemplo suporte@sualoja.com. Você vai encaminhar essa caixa para o endereço da Hay mostrado abaixo."
+    },
+    "storeName": {
+      "label": "Nome do remetente",
+      "description": "Aparece como remetente das respostas da Hay, por exemplo \"Suporte Acme\". Por padrão, o nome do seu espaço de trabalho."
+    },
+    "bccArchive": {
+      "label": "Guardar uma cópia na minha caixa",
+      "description": "Enviar cópia oculta (CCO) de cada resposta da Hay para o seu endereço de suporte, para que sua caixa tenha a conversa completa."
+    },
+    "notificationRecipients": {
+      "label": "Endereços de notificação da equipe",
+      "description": "Endereços separados por vírgula para onde a ação \"Enviar e-mail para a equipe\" da IA escreve, por exemplo quando um cliente precisa de uma pessoa. Por padrão, o seu endereço de suporte."
+    }
+  },
   "ui": {
     "title": "Conecte sua caixa de entrada",
     "intro": "Mantenha seu endereço de suporte. Encaminhe-o para a Hay e a IA responde por e-mail — cada resposta fica na mesma conversa, e você pode assumir qualquer atendimento pelo painel.",
