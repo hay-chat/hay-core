@@ -38,7 +38,7 @@
     "push": {
       "enable": "Alertas neste dispositivo",
       "enabled": "Alertas ativados",
-      "description": "Receba uma notificação neste dispositivo sempre que uma conversa precisar de um humano, mesmo com a Hay fechada.",
+      "description": "Receba uma notificação neste dispositivo sempre que uma conversa precisar de um humano, mesmo com o Hay.chat fechado. Os alertas vão para quem está como Disponível. Se ninguém responder em 10 minutos, o Hay.chat avisa de novo e depois envia um e-mail.",
       "statusOn": "Este dispositivo recebe alertas",
       "statusOff": "Este dispositivo não recebe alertas",
       "sendTest": "Enviar alerta de teste",

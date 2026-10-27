@@ -13,6 +13,7 @@ import {
   generateSecureToken,
 } from "@server/lib/auth/utils/hashing";
 import { authSessionService, RefreshRejectedError } from "@server/services/auth-session.service";
+import { pushNotificationService } from "@server/services/push-notification.service";
 import {
   protectedProcedure,
   protectedProcedureWithoutOrg,
@@ -698,11 +699,18 @@ export const authRouter = t.router({
   /**
    * End this device's session. Public on purpose: holding the refresh token is
    * the proof, and logout must work after the access token has expired.
+   * `pushEndpoint` is this device's Web Push subscription: a logged-out phone
+   * must stop showing customer names on its lock screen.
    */
-  logout: publicProcedure.input(refreshTokenSchema).mutation(async ({ input }) => {
-    await authSessionService.revoke(input.refreshToken);
-    return { success: true };
-  }),
+  logout: publicProcedure
+    .input(refreshTokenSchema.extend({ pushEndpoint: z.string().url().max(2048).optional() }))
+    .mutation(async ({ input }) => {
+      const userId = await authSessionService.revoke(input.refreshToken);
+      if (userId && input.pushEndpoint) {
+        await pushNotificationService.unsubscribe(userId, input.pushEndpoint);
+      }
+      return { success: true };
+    }),
 
   changePassword: protectedProcedure
     .input(

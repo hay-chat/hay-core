@@ -1,3 +1,9 @@
+## 2026-10-27 — claude/w1-push-hygiene — L10 D11-5 push hygiene + D11-8 alert ladder done (not merged)
+- D11-5: logout drops push (browser unsubscribe + auth.logout pushEndpoint deletes row); sw.js pushsubscriptionchange -> public notifications.rotatePush (old endpoint = proof); sync() upserts on every app open/foreground (5-min throttle); devices per user (organization_id dropped), fan-out to every org the user is active in; alert links carry ?org= and the auth middleware switches org.
+- D11-8: notification_deliveries (step initial/repush/email per recipient per cycle, unique claim); conversation-alert.service: recipients = active + Available members; sweep job every 60 s: re-push at 10 min, email 10 min later (at once if re-push reached no device), only within business hours (stub: always open until D5-6), cancelled on human reply / take-over / close.
+- Migration PushPerUserAndNotificationDeliveries1785600000000 (ran on hay_test). Verified: server tsc, full jest 102 suites, dashboard typecheck.
+- Next: orchestrator merges + runs migration on staging; manual phone test; alert-health card on Home = follow-up.
+
 ## 2026-10-27 — claude/merge-email-plugins — Email plugin merged into Email inbox (not merged, not pushed)
 - 70f2c91 email-channel: `send-email` action (email-mcp, capability mcp) emails notificationRecipients, else supportAddress; supportAddress now optional; i18n en/pt-BR; vitest 57.
 - 8a318c0 plugins/core/email + its e2e specs/lockfile entries removed; docs/comments updated.
