@@ -1,3 +1,10 @@
+## 2026-10-27 — claude/w1-agent-join-notice — "talking to a person" notices done (not merged)
+- Takeover/release store System msgs with metadata systemEvent (agent_joined | agent_returned_to_ai | agent_left) + agentFirstName; HumanAgent replies carry agentFirstName (sendMessage).
+- Widget: centred line from metadata in 13 locales; "10:42 · Marina" on person replies. Dashboard: centred line (en/pt-BR), also for old takeover rows.
+- Public whitelist passes only systemEvent/agentFirstName, blanks System content. Widget history via new getWidgetMessages; orchestrator getPublicMessages + channel delivery unchanged (System skipped). run.ts untouched.
+- Verified: jest services/routes/orchestrator 65 suites + new integration; tsc; webchat vitest 109, vue-tsc, build; dashboard typecheck + util test.
+- Next: merge into staging (handlers diff is metadata-only), rebuild webchat dist, manual test on :8090.
+
 ## 2026-10-27 late — staging: Wave 1 L2 merged
 - L2 close classifier merged (c40e1e7, migration AddConversationOutcomes1785100000000), unresolved treated as closed in widget (728066a); loader idle fix (ca54167). Tester running on both.
 - L11 EU inference building. Next: L10, L7, L4, L5 lanes. See tasks/voc-roadmap.md.
