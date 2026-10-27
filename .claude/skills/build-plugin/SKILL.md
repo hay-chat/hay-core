@@ -39,7 +39,7 @@ Answer these before writing code:
 | ----------------------------- | ----------------------------------- | --------------------------------------------------------------------------- | ------------------------------------------------ |
 | has a REST API, no hosted MCP | **A. Local bundled MCP**            | **shopify** / **woocommerce** (semantic tools + tests), **klaviyo** (clean) | one tool per endpoint (see anti-patterns)        |
 | hosts its own MCP server      | **B. Remote connector**             | **hubspot** (OAuth), **stripe** (API key)                                   | stripe's stale `.md` docs                        |
-| is two-way messaging          | **C. Channel**                      | **chatwoot** (verify), **email-imap** (semantics)                           | email (mock), whatsapp (no idempotency)          |
+| is two-way messaging          | **C. Channel**                      | **chatwoot** (verify), **email-imap** (semantics)                           | whatsapp (no idempotency)                        |
 | is a document source          | **D. Document importer** (advanced) | **atlassian** ConfluenceClient + adf-to-markdown                            | atlassian's manifest.json + `@server/*` coupling |
 
 ### 3. Scaffold from templates (in `templates/`)

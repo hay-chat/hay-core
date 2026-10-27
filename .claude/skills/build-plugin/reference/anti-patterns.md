@@ -19,8 +19,8 @@ references point at the offending code so you can see the smell.
 - **Never ship a `dist/`-only plugin.** `email-imap` has no `src/` and no `package.json` — it
   can't be rebuilt or discovered, and a `dist/` clean deletes it. Always commit `src/` +
   `package.json`; `dist/` and `node_modules/` are gitignored build output.
-- **Keep `package.json`, README, and code in agreement.** `email`'s README claims
-  `category: utility` / type `mcp-connector` while `package.json` says `tool` / `mcp` and lists
+- **Keep `package.json`, README, and code in agreement.** The former `email` plugin's README claimed
+  `category: utility` / type `mcp-connector` while its `package.json` said `tool` / `mcp` and listed
   different env vars. Three contradicting contracts for one plugin.
 
 ## The `mcp/` dependency gap (read this before shipping Archetype A)
@@ -101,15 +101,15 @@ Either way: **no vendored bloat** (see next).
 - **Suppress retry storms on non-retryable failures.** Return `200 { success: false, error }` for
   permanent provider errors (e.g. WhatsApp's 24h-window `63016`, Chatwoot 4xx) so Hay records the
   failure instead of the provider hammering your webhook.
-- **Don't ship mock success paths.** `email/src/index.ts`'s `send-email` returns
-  `{ success: true, messageId: "mock-…" }` and sends nothing. If it's not implemented, fail
+- **Don't ship mock success paths.** The former `email` plugin's `send-email` returned
+  `{ success: true, messageId: "mock-…" }` and sent nothing. If it's not implemented, fail
   loudly or don't register the tool.
-- **One implementation per plugin.** `email` has a shipped mock entry AND an orphaned, _real_
-  `mcp/index.js` that's never built or spawned. Keep exactly one; delete the other.
+- **One implementation per plugin.** The former `email` plugin had a shipped mock entry AND an
+  orphaned, _real_ `mcp/index.js` that was never built or spawned. Keep exactly one; delete the other.
 
 ## Boundaries & types
 
-- **Don't reach into `server/dist` from a plugin.** `email/mcp/index.js` imports
+- **Don't reach into `server/dist` from a plugin.** The former `email/mcp/index.js` imported
   `../../../../server/dist/services/plugin-api/plugin-api-client.js`. Use the SDK / the HTTP
   plugin-api, not deep relative paths into the host build.
 - **`strict: true`, avoid `any`.** Most plugins ship `tsconfig strict:false` + `catch (e: any)`
