@@ -244,4 +244,48 @@ describe("useConsent — ePrivacy storage gate", () => {
       expect(localStorage.getItem("hay-customer-id")).toBeNull();
     });
   });
+
+  describe("reloads within the same tab", () => {
+    it("remembers the interaction, so the chat can be resumed after a reload", () => {
+      initConsent("implicit");
+      markInteraction();
+      safeStorage.session.setItem("hay-conversation-id", "conv-1");
+
+      initConsent("implicit"); // the reload
+      const { canUseSession, canUseLocal } = useConsent();
+      expect(canUseSession.value).toBe(true);
+      expect(canUseLocal.value).toBe(true);
+      expect(safeStorage.session.getItem("hay-conversation-id")).toBe("conv-1");
+    });
+
+    it("strict mode still needs grantConsent() for persistent storage after a reload", () => {
+      initConsent("strict");
+      markInteraction();
+
+      initConsent("strict");
+      const { canUseSession, canUseLocal } = useConsent();
+      expect(canUseSession.value).toBe(true);
+      expect(canUseLocal.value).toBe(false);
+    });
+
+    it("keeps a revoke after a reload, and a later grant lifts it", () => {
+      initConsent("implicit");
+      markInteraction();
+      revokeConsent();
+
+      initConsent("implicit");
+      expect(useConsent().canUseLocal.value).toBe(false);
+
+      grantConsent();
+      initConsent("implicit");
+      expect(useConsent().canUseLocal.value).toBe(true);
+    });
+
+    it("writes nothing before the first message, even when the host revokes or grants", () => {
+      initConsent("implicit");
+      revokeConsent();
+      grantConsent();
+      expect(sessionStorage.length).toBe(0);
+    });
+  });
 });

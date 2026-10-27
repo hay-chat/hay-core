@@ -156,6 +156,7 @@ const {
   startTyping,
   stopTyping,
   startNewConversation,
+  resumeActiveConversation,
 } = useChat({
   ...props.config,
   // The greeting is pinned as the first message, so give the chat the same
@@ -164,10 +165,8 @@ const {
   greetingMessage: props.config.greetingMessage || t("widget.defaultGreeting"),
 });
 
-// Initialize on mount if configured to auto-open
 onMounted(() => {
-  // Could add auto-open feature here if needed
-  // For now, widget waits for user to click
+  resumeActiveConversation();
 });
 </script>
 
