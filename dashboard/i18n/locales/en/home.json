@@ -38,7 +38,7 @@
     "push": {
       "enable": "Alerts on this device",
       "enabled": "Alerts on",
-      "description": "Get a notification on this device whenever a conversation needs a human, even when Hay isn't open.",
+      "description": "Get a notification on this device whenever a conversation needs a human, even when Hay.chat isn't open. Alerts go to team members set to Available. If nobody answers within 10 minutes, Hay.chat alerts again, then sends an email.",
       "statusOn": "This device gets alerts",
       "statusOff": "This device doesn't get alerts",
       "sendTest": "Send a test alert",

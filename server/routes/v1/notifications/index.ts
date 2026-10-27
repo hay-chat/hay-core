@@ -1,4 +1,4 @@
-import { t, authenticatedProcedure } from "@server/trpc";
+import { t, authenticatedProcedure, publicProcedure } from "@server/trpc";
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { pushNotificationService } from "@server/services/push-notification.service";
@@ -36,8 +36,21 @@ export const notificationsRouter = t.router({
     .input(subscriptionInput)
     .mutation(async ({ ctx, input }) => {
       assertConfigured();
-      await pushNotificationService.subscribe(ctx.user!.id, ctx.organizationId!, input);
+      await pushNotificationService.subscribe(ctx.user!.id, input);
       return { subscribed: true };
+    }),
+
+  /**
+   * The service worker's `pushsubscriptionchange` handler: the browser
+   * replaced this device's subscription. No access token in a service worker;
+   * the old endpoint (a secret capability URL) identifies the device.
+   */
+  rotatePush: publicProcedure
+    .input(subscriptionInput.extend({ oldEndpoint: z.string().url().max(2048) }))
+    .mutation(async ({ input }) => {
+      const { oldEndpoint, ...subscription } = input;
+      const rotated = await pushNotificationService.rotate(oldEndpoint, subscription);
+      return { rotated };
     }),
 
   unsubscribePush: authenticatedProcedure

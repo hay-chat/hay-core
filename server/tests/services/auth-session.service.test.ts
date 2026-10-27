@@ -172,11 +172,12 @@ describe("auth sessions: rotating, sliding refresh tokens (D11-3)", () => {
 
   it("logout revokes the session", async () => {
     const tokens = await authSessionService.createSession(user);
-    await authSessionService.revoke(tokens.refreshToken);
+    await expect(authSessionService.revoke(tokens.refreshToken)).resolves.toBe(user.id);
     await expectRejected(tokens.refreshToken, "revoked");
     expect((await load(tokens.refreshToken)).revokedReason).toBe("logout");
-    // Idempotent
-    await expect(authSessionService.revoke(tokens.refreshToken)).resolves.toBeUndefined();
+    // Idempotent, still names the user (logout also drops this device's push)
+    await expect(authSessionService.revoke(tokens.refreshToken)).resolves.toBe(user.id);
+    await expect(authSessionService.revoke("not-a-token")).resolves.toBeNull();
   });
 
   it("a password change (tokenVersion bump) revokes existing sessions", async () => {

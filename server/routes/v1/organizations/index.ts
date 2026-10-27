@@ -1,5 +1,4 @@
 import { t, authenticatedProcedure, scopedProcedure } from "@server/trpc";
-import { pushNotificationService } from "@server/services/push-notification.service";
 import { z } from "zod";
 import { organizationService } from "@server/services/organization.service";
 import { toAccessState } from "@server/services/organization-access.service";
@@ -714,9 +713,8 @@ export const organizationsRouter = t.router({
 
       await userOrgRepository.remove(userOrg);
 
-      // Their devices must stop receiving this organization's alerts
-
-      await pushNotificationService.removeForMember(input.userId, ctx.organizationId!);
+      // Their devices stop receiving this organization's alerts on their own:
+      // alerts fan out only to active members.
 
       // Log audit event
       await auditLogService.logMemberRemove(
