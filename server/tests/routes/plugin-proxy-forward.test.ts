@@ -118,6 +118,7 @@ describe("isWorkerInternalPath", () => {
     "/mcp/list-tools",
     "/deliver",
     "/escalate",
+    "/templates",
     "/on-connected",
     "/validate-auth",
     "/config-update",

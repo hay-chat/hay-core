@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { deliver, splitText } from "./deliver.js";
-import { GraphClient } from "./graph-client.js";
+import { GraphClient, type GraphTemplate } from "./graph-client.js";
+import { TemplateStore } from "./templates.js";
 import type { ChannelContext } from "./context.js";
 import type { WhatsAppConnection } from "./connection.js";
 import { fakeLogger, queuedFetch } from "./test/fakes.js";
@@ -56,8 +57,33 @@ function setup(
     logger: fakeLogger(),
   };
   const run = (payload: unknown) => deliver(payload, ctx, { fetchImpl: storage.impl });
-  return { run, graphCalls: graphFetch.calls, storageCalls: storage.calls, mutation };
+  return { run, ctx, graphCalls: graphFetch.calls, storageCalls: storage.calls, mutation };
 }
+
+/** setup() plus a synced template store (Graph's template list is stubbed, not fetched). */
+async function setupWithTemplates(responses: Array<[number, unknown]>, templates: GraphTemplate[]) {
+  const t = setup(responses);
+  vi.spyOn(t.ctx.graph, "listTemplates").mockResolvedValue(templates);
+  const store = new TemplateStore(t.ctx.graph, fakeLogger());
+  await store.sync(embedded);
+  t.ctx.templates = store;
+  return t;
+}
+
+const approved = (
+  name: string,
+  language: string,
+  text: string,
+  extra: Partial<GraphTemplate> = {},
+): GraphTemplate => ({
+  id: `${name}-${language}`,
+  name,
+  language,
+  status: "APPROVED",
+  category: "UTILITY",
+  components: [{ type: "BODY", text }],
+  ...extra,
+});
 
 function jsonBody(call: { init?: RequestInit }): Record<string, unknown> {
   return JSON.parse(String(call.init?.body)) as Record<string, unknown>;
@@ -396,6 +422,143 @@ describe("deliver", () => {
 
     expect(result.body).toEqual({ success: true, providerMessageId: "wamid.1" });
     expect(jsonBody(graphCalls[0])).toMatchObject({ type: "text", text: { body: "Here you go" } });
+  });
+});
+
+describe("deliver — templates (D13-3, D13-4)", () => {
+  const handoffTemplates = [
+    approved("hay_handoff_to_person", "en", "A person will reply."),
+    approved("hay_handoff_to_person", "pt_BR", "Uma pessoa vai responder."),
+  ];
+
+  it("sends a human-picked template with positional body parameters", async () => {
+    const { run, graphCalls } = await setupWithTemplates(
+      [accepted("wamid.t")],
+      [approved("order_update", "en", "Hi {{1}}, order {{2}}")],
+    );
+
+    const result = await run({
+      to: "+5511999999999",
+      content: "Hi Ana, order 42",
+      messageMetadata: {
+        channelTemplate: {
+          name: "order_update",
+          language: "en",
+          parameters: [
+            { name: "1", value: "Ana" },
+            { name: "2", value: "42" },
+          ],
+        },
+      },
+    });
+
+    expect(result).toEqual({ status: 200, body: { success: true, providerMessageId: "wamid.t" } });
+    expect(graphCalls).toHaveLength(1);
+    expect(jsonBody(graphCalls[0])).toMatchObject({
+      type: "template",
+      template: {
+        name: "order_update",
+        language: { code: "en" },
+        components: [
+          {
+            type: "body",
+            parameters: [
+              { type: "text", text: "Ana" },
+              { type: "text", text: "42" },
+            ],
+          },
+        ],
+      },
+    });
+  });
+
+  it("labels named parameters", async () => {
+    const { run, graphCalls } = await setupWithTemplates(
+      [accepted("wamid.t")],
+      [approved("greet", "en", "Hi {{first_name}}", { parameter_format: "NAMED" })],
+    );
+
+    await run({
+      to: "+5511999999999",
+      content: "Hi Ana",
+      messageMetadata: {
+        channelTemplate: {
+          name: "greet",
+          language: "en",
+          parameters: [{ name: "first_name", value: "Ana" }],
+        },
+      },
+    });
+
+    expect(jsonBody(graphCalls[0])).toMatchObject({
+      template: {
+        components: [
+          {
+            type: "body",
+            parameters: [{ type: "text", parameter_name: "first_name", text: "Ana" }],
+          },
+        ],
+      },
+    });
+  });
+
+  it("maps a refused template like any other send", async () => {
+    const { run } = await setupWithTemplates([graphError(400, 132001)], []);
+
+    const result = await run({
+      to: "+5511999999999",
+      content: "x",
+      messageMetadata: { channelTemplate: { name: "gone", language: "en", parameters: [] } },
+    });
+
+    expect(result).toEqual({ status: 200, body: { success: false, error: "graph_132001" } });
+  });
+
+  it("sends the hand-off template in the conversation's language when the window is closed", async () => {
+    const { run, graphCalls } = await setupWithTemplates(
+      [graphError(400, 131047), accepted("wamid.h")],
+      handoffTemplates,
+    );
+
+    const result = await run({
+      to: "+5511999999999",
+      content: "Vou passar você para a equipe.",
+      language: "pt",
+      messageMetadata: { isHandoffMessage: true },
+    });
+
+    expect(result).toEqual({ status: 200, body: { success: true, providerMessageId: "wamid.h" } });
+    expect(jsonBody(graphCalls[1])).toMatchObject({
+      type: "template",
+      template: { name: "hay_handoff_to_person", language: { code: "pt_BR" } },
+    });
+  });
+
+  it("keeps the window error for a non-hand-off message", async () => {
+    const { run, graphCalls } = await setupWithTemplates(
+      [graphError(400, 131047)],
+      handoffTemplates,
+    );
+
+    const result = await run({ to: "+5511999999999", content: "Anything else?" });
+
+    expect(result).toEqual({ status: 200, body: { success: false, error: "24h_window_expired" } });
+    expect(graphCalls).toHaveLength(1);
+  });
+
+  it("keeps the window error when no hand-off template is approved", async () => {
+    const { run } = await setupWithTemplates(
+      [graphError(400, 131047)],
+      [approved("hay_handoff_to_person", "en", "x", { status: "PENDING" })],
+    );
+
+    const result = await run({
+      to: "+5511999999999",
+      content: "Handing off",
+      messageMetadata: { isHandoffMessage: true },
+    });
+
+    expect(result).toEqual({ status: 200, body: { success: false, error: "24h_window_expired" } });
   });
 });
 
