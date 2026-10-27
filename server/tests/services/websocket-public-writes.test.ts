@@ -289,3 +289,52 @@ describe("WebSocket dashboard authentication", () => {
     expect(orgMembers(service).get(ORG_ID)?.has(clientId)).toBe(true);
   });
 });
+
+describe("WebSocket message events for webchat clients", () => {
+  it("strip internal metadata before reaching a webchat client", async () => {
+    jest.clearAllMocks();
+    const service = new WebSocketService();
+    mockConversationRepo.findById.mockResolvedValue(webConversation());
+    const { ws, send } = connect(service);
+    await send({ type: "identify", customerId: "visitor-1", conversationId: CONV_ID });
+
+    (service as unknown as { handleRedisEvent(e: unknown): void }).handleRedisEvent({
+      type: "message_received",
+      organizationId: ORG_ID,
+      conversationId: CONV_ID,
+      payload: {
+        id: "m1",
+        content: "Hi",
+        type: "BotAgent",
+        sender: "Hay.chat",
+        timestamp: "2026-10-27T00:00:00Z",
+        deliveryState: "sent",
+        status: "sent",
+        attachments: [],
+        metadata: { originalMessage: "replaced answer", confidence: 0.3, isClosureMessage: true },
+      },
+    });
+
+    expect(ws.last()).toEqual({
+      type: "message",
+      conversationId: CONV_ID,
+      data: {
+        id: "m1",
+        content: "Hi",
+        type: "BotAgent",
+        sender: "Hay.chat",
+        timestamp: "2026-10-27T00:00:00Z",
+        attachments: [],
+        metadata: { isClosureMessage: true },
+      },
+    });
+  });
+
+  it("no longer serves load_history to unauthenticated clients", async () => {
+    const service = new WebSocketService();
+    const { ws, send } = connect(service);
+    const before = ws.sent.length;
+    await send({ type: "load_history", conversationId: CONV_ID });
+    expect(ws.sent.length).toBe(before);
+  });
+});
