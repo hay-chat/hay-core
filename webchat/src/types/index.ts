@@ -14,8 +14,10 @@ export interface HayChatConfig {
   /** Locale for widget UI strings (e.g. "en-us", "pt-br", "fr-fr"). Auto-detected from browser if omitted. */
   locale?: string;
   /**
-   * Called after a conversation is created. Use this to attach server-side secrets.
-   * If it returns a Promise, the widget input waits until it resolves.
+   * Called after a conversation is created, which happens when the visitor
+   * sends their first message (opening the widget creates nothing). Use this
+   * to attach server-side secrets. If it returns a Promise, that first message
+   * is sent only once it resolves.
    */
   onConversationStarted?: (conversation: { id: string }) => void | Promise<void>;
   /** Agent name displayed in the header. Populated from public config. */

@@ -11,7 +11,7 @@ import Widget from "../Widget.vue";
 vi.mock("../composables/useChat", () => ({
   useChat: () => ({
     isOpen: ref(false),
-    isConnected: ref(false),
+    isInitialized: ref(false),
     messages: ref([]),
     isTyping: ref(false),
     unreadCount: ref(0),
