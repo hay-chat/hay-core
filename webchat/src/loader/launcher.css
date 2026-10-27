@@ -1,0 +1,118 @@
+/* Hay.chat widget: what shows before the chat loads (the root and the button).
+   Everything else lives in the chat chunk (src/styles/widget.css). */
+
+/* Theme Colors */
+#hay-webchat-root[data-theme="blue"] {
+  --hay-primary: #3b82f6;
+  --hay-primary-dark: #2563eb;
+  --hay-primary-light: #60a5fa;
+}
+
+#hay-webchat-root[data-theme="green"] {
+  --hay-primary: #10b981;
+  --hay-primary-dark: #059669;
+  --hay-primary-light: #34d399;
+}
+
+#hay-webchat-root[data-theme="purple"] {
+  --hay-primary: #8b5cf6;
+  --hay-primary-dark: #7c3aed;
+  --hay-primary-light: #a78bfa;
+}
+
+#hay-webchat-root[data-theme="black"] {
+  --hay-primary: #000000;
+  --hay-primary-dark: #171717;
+  --hay-primary-light: #404040;
+}
+
+/* Reset and base styles */
+#hay-webchat-root {
+  all: initial;
+  position: fixed;
+  z-index: 999999;
+  pointer-events: none;
+}
+
+#hay-webchat-root * {
+  pointer-events: auto;
+}
+
+.hay-chat-button {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  width: 60px;
+  height: 60px;
+  border-radius: 24px;
+  corner-shape: squircle;
+  background: var(--hay-primary);
+  border: none;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  transition: all 0.3s ease;
+  z-index: 999999;
+}
+
+.hay-chat-button:hover {
+  background: var(--hay-primary-dark);
+  transform: scale(1.05);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.2);
+}
+
+.hay-chat-button:focus-visible {
+  outline: 2px solid var(--hay-primary);
+  outline-offset: 2px;
+}
+
+.hay-chat-button--left {
+  left: 20px;
+  right: auto;
+}
+
+.hay-chat-button__icon-close,
+.hay-chat-button[aria-expanded="true"] .hay-chat-button__icon-open {
+  display: none;
+}
+
+.hay-chat-button[aria-expanded="true"] .hay-chat-button__icon-close {
+  display: block;
+}
+
+.hay-chat-button__badge {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  background: #ef4444;
+  color: white;
+  border-radius: 50%;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family:
+    -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  font-size: 12px;
+  font-weight: 600;
+  border: 2px solid white;
+}
+
+.hay-chat-button__badge[hidden] {
+  display: none;
+}
+
+/* Accessibility - Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  #hay-webchat-root *,
+  #hay-webchat-root *::before,
+  #hay-webchat-root *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

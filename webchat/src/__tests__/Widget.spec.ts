@@ -1,80 +1,83 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { ref } from "vue";
-import { flushPromises, shallowMount } from "@vue/test-utils";
+import { describe, it, expect, vi, beforeEach } from "vitest";
+import { nextTick, ref } from "vue";
+import { shallowMount } from "@vue/test-utils";
 import Widget from "../Widget.vue";
 
 /**
- * The widget must render nothing when the backend says so — the organization
- * disabled webchat or was suspended (`webchat.getPublicConfig` → { enabled: false }).
+ * Widget is the chat window the loader mounts. It drives the loader's button
+ * (open state, unread badge) and resumes this tab's conversation on mount.
  */
 
-vi.mock("../composables/useChat", () => ({
-  useChat: () => ({
-    isOpen: ref(false),
-    isInitialized: ref(false),
-    messages: ref([]),
-    isTyping: ref(false),
-    unreadCount: ref(0),
-    isConversationClosed: ref(false),
-    currentAgentType: ref(null),
-    currentAgentName: ref(null),
-    toggleChat: vi.fn(),
-    closeChat: vi.fn(),
-    sendMessage: vi.fn(),
-    startTyping: vi.fn(),
-    stopTyping: vi.fn(),
-    startNewConversation: vi.fn(),
-    resumeActiveConversation: vi.fn(),
-  }),
-}));
+const chat = {
+  isOpen: ref(false),
+  isInitialized: ref(false),
+  messages: ref([]),
+  isTyping: ref(false),
+  unreadCount: ref(0),
+  isConversationClosed: ref(false),
+  currentAgentType: ref(null),
+  currentAgentName: ref(null),
+  sendFailure: ref(null),
+  toggleChat: vi.fn(),
+  openChat: vi.fn(),
+  closeChat: vi.fn(),
+  sendMessage: vi.fn(),
+  startTyping: vi.fn(),
+  stopTyping: vi.fn(),
+  startNewConversation: vi.fn(),
+  resumeActiveConversation: vi.fn(),
+};
+
+vi.mock("../composables/useChat", () => ({ useChat: () => chat }));
 
 const config = { organizationId: "org-1", baseUrl: "https://api.example.test" };
+const launcher = () => ({ setOpen: vi.fn(), setUnread: vi.fn() });
 
-const mockFetchResult = (data: unknown) =>
-  vi.fn(async () => ({ ok: true, json: async () => ({ result: { data } }) }));
-
-describe("Widget visibility", () => {
-  const originalFetch = globalThis.fetch;
-
+describe("Widget", () => {
   beforeEach(() => {
-    vi.spyOn(console, "log").mockImplementation(() => {});
+    vi.clearAllMocks();
+    chat.isOpen.value = false;
+    chat.unreadCount.value = 0;
   });
 
-  afterEach(() => {
-    globalThis.fetch = originalFetch;
-    vi.restoreAllMocks();
+  it("resumes this tab's conversation on mount without opening", () => {
+    shallowMount(Widget, { props: { config, publicConfig: null, launcher: launcher() } });
+    expect(chat.resumeActiveConversation).toHaveBeenCalled();
+    expect(chat.openChat).not.toHaveBeenCalled();
   });
 
-  it("renders nothing when the public config reports enabled: false", async () => {
-    globalThis.fetch = mockFetchResult({ enabled: false }) as unknown as typeof fetch;
-
-    const wrapper = shallowMount(Widget, { props: { config } });
-    await flushPromises();
-
-    expect(wrapper.find(".hay-webchat-widget").exists()).toBe(false);
+  it("opens on mount when the visitor clicked while the chat was loading", () => {
+    shallowMount(Widget, {
+      props: { config, publicConfig: null, launcher: launcher(), openOnMount: true },
+    });
+    expect(chat.openChat).toHaveBeenCalled();
   });
 
-  it("renders when the public config reports enabled: true", async () => {
-    globalThis.fetch = mockFetchResult({
-      enabled: true,
-      agentName: "Hay",
-    }) as unknown as typeof fetch;
+  it("keeps the loader's button in step with the chat", async () => {
+    const bridge = launcher();
+    shallowMount(Widget, { props: { config, publicConfig: null, launcher: bridge } });
 
-    const wrapper = shallowMount(Widget, { props: { config } });
-    await flushPromises();
+    chat.unreadCount.value = 2;
+    chat.isOpen.value = true;
+    await nextTick();
 
-    expect(wrapper.find(".hay-webchat-widget").exists()).toBe(true);
+    expect(bridge.setUnread).toHaveBeenLastCalledWith(2);
+    expect(bridge.setOpen).toHaveBeenLastCalledWith(true);
   });
 
-  it("keeps rendering when the config request fails (network blip)", async () => {
-    globalThis.fetch = vi.fn(async () => {
-      throw new Error("offline");
-    }) as unknown as typeof fetch;
-    vi.spyOn(console, "warn").mockImplementation(() => {});
+  it("exposes toggle() for the button", () => {
+    const wrapper = shallowMount(Widget, {
+      props: { config, publicConfig: null, launcher: launcher() },
+    });
+    (wrapper.vm as unknown as { toggle: () => void }).toggle();
+    expect(chat.toggleChat).toHaveBeenCalled();
+  });
 
-    const wrapper = shallowMount(Widget, { props: { config } });
-    await flushPromises();
-
-    expect(wrapper.find(".hay-webchat-widget").exists()).toBe(true);
+  it("uses the agent name from the public config when the host sets none", async () => {
+    chat.isOpen.value = true;
+    const wrapper = shallowMount(Widget, {
+      props: { config, publicConfig: { agentName: "Ana" }, launcher: launcher() },
+    });
+    expect(wrapper.findComponent({ name: "ChatWindow" }).props("agentName")).toBe("Ana");
   });
 });
