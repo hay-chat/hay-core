@@ -101,7 +101,7 @@ describe("deliver", () => {
     ]);
   });
 
-  it("reports a refused send as a failure and an unreachable Hay as 503", async () => {
+  it("reports a refused send as a failure, a failed history load as 503, and never retries a send that threw", async () => {
     const refused = fakeContext({
       api: fakeApi({ messages, sendResult: { success: false, error: "550 no" } }),
     });
@@ -110,8 +110,12 @@ describe("deliver", () => {
       body: { success: false, error: "550 no" },
     });
 
-    const down = fakeContext({ api: fakeApi({ messages, sendThrows: new Error("ECONNREFUSED") }) });
-    expect((await deliver(payload(), down)).status).toBe(503);
+    // The mail may have gone out before the call failed: a retry could send it twice.
+    const down = fakeContext({ api: fakeApi({ messages, sendThrows: new Error("socket hang up") }) });
+    expect(await deliver(payload(), down)).toEqual({
+      status: 200,
+      body: { success: false, error: "send_uncertain" },
+    });
 
     const noHistory = fakeContext({ api: fakeApi({ queryThrows: new Error("timeout") }) });
     expect((await deliver(payload(), noHistory)).status).toBe(503);

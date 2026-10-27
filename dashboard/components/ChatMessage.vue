@@ -572,6 +572,15 @@ const { t } = useI18n();
 
 /** Provider error codes that mean "outside the 24h customer service window". */
 const WINDOW_EXPIRED_CODES = new Set(["24h_window_expired", "131047", 131047]);
+/** Generic delivery codes (core retries and channel plugins) with a friendly text. */
+const DELIVERY_CODE_TEXT: Record<string, string> = {
+  rate_limited: "conversations.delivery.codes.retriedOut",
+  graph_unavailable: "conversations.delivery.codes.retriedOut",
+  worker_unavailable: "conversations.delivery.codes.retriedOut",
+  worker_unreachable: "conversations.delivery.codes.retriedOut",
+  delivery_uncertain: "conversations.delivery.codes.uncertain",
+  send_uncertain: "conversations.delivery.codes.uncertain",
+};
 
 interface Props {
   message: Message;
@@ -659,6 +668,10 @@ const providerErrorText = computed(() => {
   const error = props.message.providerError;
   if (error?.code !== undefined && WINDOW_EXPIRED_CODES.has(error.code)) {
     return t("conversations.delivery.windowExpired");
+  }
+  const friendly = typeof error?.code === "string" ? DELIVERY_CODE_TEXT[error.code] : undefined;
+  if (friendly) {
+    return t(friendly);
   }
   const text = error?.title ?? error?.message ?? error?.code;
   return text !== undefined && text !== "" ? String(text) : t("conversations.delivery.failed");

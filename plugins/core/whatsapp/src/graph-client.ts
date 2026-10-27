@@ -24,15 +24,42 @@ export class GraphApiError extends Error {
   public readonly subcode?: number;
   /** `error.error_data.details` — WhatsApp's human-readable cause. */
   public readonly details?: string;
+  /**
+   * Network failure (status 0) before the request reached Meta (DNS, refused,
+   * connect timeout), so Meta certainly did not accept it. False for failures
+   * that may have happened after Meta received the request.
+   */
+  public readonly notSent: boolean;
 
-  constructor(message: string, status: number, code?: number, subcode?: number, details?: string) {
+  constructor(
+    message: string,
+    status: number,
+    code?: number,
+    subcode?: number,
+    details?: string,
+    notSent = false,
+  ) {
     super(message);
     this.name = "GraphApiError";
     this.status = status;
     this.code = code;
     this.subcode = subcode;
     this.details = details;
+    this.notSent = notSent;
   }
+}
+
+/** Node fetch failures that happen before any byte of the request reaches the server. */
+const CONNECT_PHASE_CODES = new Set([
+  "ECONNREFUSED",
+  "ENOTFOUND",
+  "EAI_AGAIN",
+  "UND_ERR_CONNECT_TIMEOUT",
+]);
+
+function isConnectPhaseError(error: unknown): boolean {
+  const cause = (error as { cause?: { code?: unknown } } | null)?.cause;
+  return typeof cause?.code === "string" && CONNECT_PHASE_CODES.has(cause.code);
 }
 
 /**
@@ -138,7 +165,14 @@ export class GraphClient {
       response = await this.fetchImpl(url.toString(), { method, headers, body });
     } catch (error: unknown) {
       const reason = error instanceof Error ? error.message : "unknown";
-      throw new GraphApiError(`Graph API network error: ${reason}`, 0);
+      throw new GraphApiError(
+        `Graph API network error: ${reason}`,
+        0,
+        undefined,
+        undefined,
+        undefined,
+        isConnectPhaseError(error),
+      );
     }
 
     const text = await response.text();
