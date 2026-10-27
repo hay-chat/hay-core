@@ -143,7 +143,8 @@ export class Message {
     toolInput?: Record<string, unknown>;
     toolOutput?: unknown;
     toolLatencyMs?: number;
-    httpStatus?: number;
+    /** Tool error code from @hay/plugin-sdk/tool-errors when toolStatus is ERROR. */
+    toolErrorCode?: string;
     toolStatus?: string;
     toolExecutedAt?: string;
     // Playbook & Document metadata

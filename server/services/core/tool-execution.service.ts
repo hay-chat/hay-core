@@ -7,6 +7,8 @@ import { v4 as uuidv4 } from "uuid";
 import type { HayPluginManifest } from "@server/types/plugin.types";
 import { conversationSecretService } from "../conversation-secret.service";
 import { createLogger } from "@server/lib/logger";
+import { actionLogService, toolErrorCode } from "../action-log.service";
+import { classifyTool, CORE_TOOL_RISK, type ToolRisk } from "./tool-risk";
 
 const logger = createLogger("tool-execution");
 
@@ -14,6 +16,17 @@ interface ToolExecutionResult {
   success: boolean;
   result?: unknown;
   error?: string;
+}
+
+interface ToolLogEntry {
+  turn: number;
+  name: string;
+  input: Record<string, unknown>;
+  ok: boolean;
+  result?: unknown;
+  errorClass?: string;
+  latencyMs: number;
+  idempotencyKey: string;
 }
 
 interface ToolCallData {
@@ -64,142 +77,90 @@ export class ToolExecutionService {
     try {
       logger.info({ toolName: toolCall.name, args: toolCall.args }, "Executing tool");
 
-      const currentContext = conversation.orchestration_status as ConversationContext | null;
-      if (currentContext) {
-        // Initialize toolLog if it doesn't exist
-        if (!currentContext.toolLog) {
-          currentContext.toolLog = [];
-        }
-        const toolLogEntry: {
-          turn: number;
-          name: string;
-          input: Record<string, unknown>;
-          ok: boolean;
-          result?: unknown;
-          errorClass?: string;
-          latencyMs: number;
-          idempotencyKey: string;
-        } = {
-          turn: currentContext.lastTurn + 1,
-          name: toolCall.name,
-          input: toolCall.args,
-          ok: false,
-          latencyMs: 0,
-          idempotencyKey: uuidv4(),
-        };
-
-        const startTime = Date.now();
-        const executedAt = new Date().toISOString();
-
-        try {
-          logger.debug({ toolCall }, "Executing tool call");
-          const result = await this.executeToolCall(
-            conversation,
-            {
-              tool_name: toolCall.name,
-              arguments: toolCall.args,
-            },
-            toolLogEntry.idempotencyKey,
-          );
-          logger.debug({ result }, "Tool call result");
-
-          toolLogEntry.ok = true;
-          toolLogEntry.result = result;
-          toolLogEntry.latencyMs = Date.now() - startTime;
-
-          // Update the message with the result
-          if (messageId) {
-            const message = await this.messageService.messageRepository.findById(messageId);
-            if (message) {
-              await this.messageService.messageRepository.update(messageId, {
-                content: `Action completed: ${toolCall.name}`,
-                metadata: {
-                  ...message.metadata,
-                  toolOutput: result,
-                  toolStatus: "SUCCESS",
-                  toolLatencyMs: toolLogEntry.latencyMs,
-                  toolExecutedAt: executedAt,
-                  httpStatus: 200,
-                },
-              });
-
-              // Broadcast the updated message via WebSocket
-              await this.broadcastMessageUpdate(conversation, message.id, {
-                content: `Action completed: ${toolCall.name}`,
-                metadata: {
-                  ...message.metadata,
-                  toolOutput: result,
-                  toolStatus: "SUCCESS",
-                  toolLatencyMs: toolLogEntry.latencyMs,
-                  toolExecutedAt: executedAt,
-                  httpStatus: 200,
-                },
-              });
-            }
-          }
-
-          currentContext.toolLog.push(toolLogEntry);
-          await this.conversationRepository.updateById(conversation.id, {
-            orchestration_status: currentContext as unknown as Record<string, unknown>,
-          });
-
-          return { success: true, result };
-        } catch (error: unknown) {
-          const err = error as Error;
-          toolLogEntry.ok = false;
-          toolLogEntry.errorClass = err.constructor.name;
-          toolLogEntry.result = err.message || "Unknown error";
-          toolLogEntry.latencyMs = Date.now() - startTime;
-
-          // Extract MCP error details if available
-          const mcpErrorDetails = (err as MCPError).mcpErrorDetails;
-          const errorOutput = mcpErrorDetails || {
-            error: err.message || "Unknown error",
-            errorType: err.constructor.name,
-            stack: err.stack,
-          };
-
-          // Update the message with the error
-          if (messageId) {
-            const message = await this.messageService.messageRepository.findById(messageId);
-            if (message) {
-              await this.messageService.messageRepository.update(messageId, {
-                content: `Action failed: ${toolCall.name}`,
-                metadata: {
-                  ...message.metadata,
-                  toolOutput: errorOutput,
-                  toolStatus: "ERROR",
-                  toolLatencyMs: toolLogEntry.latencyMs,
-                  toolExecutedAt: executedAt,
-                  httpStatus: 500,
-                },
-              });
-
-              // Broadcast the updated message via WebSocket
-              await this.broadcastMessageUpdate(conversation, message.id, {
-                content: `Action failed: ${toolCall.name}`,
-                metadata: {
-                  ...message.metadata,
-                  toolOutput: errorOutput,
-                  toolStatus: "ERROR",
-                  toolLatencyMs: toolLogEntry.latencyMs,
-                  toolExecutedAt: executedAt,
-                  httpStatus: 500,
-                },
-              });
-            }
-          }
-
-          currentContext.toolLog.push(toolLogEntry);
-          await this.conversationRepository.updateById(conversation.id, {
-            orchestration_status: currentContext as unknown as Record<string, unknown>,
-          });
-
-          return { success: false, error: err.message || "Unknown error" };
-        }
+      const currentContext = conversation.orchestration_status as unknown as ConversationContext | null;
+      if (!currentContext) {
+        return { success: false, error: "No conversation context available" };
+      }
+      if (!currentContext.toolLog) {
+        currentContext.toolLog = [];
       }
 
-      return { success: false, error: "No conversation context available" };
+      const target = await this.resolveTarget(conversation.organization_id, toolCall.name);
+      const toolLogEntry: ToolLogEntry = {
+        turn: currentContext.lastTurn + 1,
+        name: toolCall.name,
+        input: toolCall.args,
+        ok: false,
+        latencyMs: 0,
+        idempotencyKey: uuidv4(),
+      };
+
+      const startTime = Date.now();
+      const executedAt = new Date().toISOString();
+      let outcome: ToolExecutionResult;
+      let errorCode: string | null = null;
+
+      try {
+        const result = await this.executeToolCall(
+          conversation,
+          { tool_name: toolCall.name, arguments: toolCall.args },
+          toolLogEntry.idempotencyKey,
+        );
+        toolLogEntry.ok = true;
+        toolLogEntry.result = result;
+        toolLogEntry.latencyMs = Date.now() - startTime;
+
+        await this.finishToolMessage(conversation, messageId, `Action completed: ${toolCall.name}`, {
+          toolOutput: result,
+          toolStatus: "SUCCESS",
+          toolLatencyMs: toolLogEntry.latencyMs,
+          toolExecutedAt: executedAt,
+        });
+        outcome = { success: true, result };
+      } catch (error: unknown) {
+        const err = error as Error;
+        toolLogEntry.errorClass = err.constructor.name;
+        toolLogEntry.result = err.message || "Unknown error";
+        toolLogEntry.latencyMs = Date.now() - startTime;
+
+        // Extract MCP error details if available
+        const mcpErrorDetails = (err as MCPError).mcpErrorDetails;
+        errorCode = toolErrorCode(mcpErrorDetails);
+        const errorOutput = mcpErrorDetails || {
+          error: err.message || "Unknown error",
+          errorType: err.constructor.name,
+        };
+
+        await this.finishToolMessage(conversation, messageId, `Action failed: ${toolCall.name}`, {
+          toolOutput: errorOutput,
+          toolStatus: "ERROR",
+          toolErrorCode: errorCode,
+          toolLatencyMs: toolLogEntry.latencyMs,
+          toolExecutedAt: executedAt,
+        });
+        outcome = { success: false, error: err.message || "Unknown error" };
+      }
+
+      await actionLogService.record({
+        organizationId: conversation.organization_id,
+        conversationId: conversation.id,
+        messageId: messageId ?? null,
+        pluginId: target.pluginId,
+        toolName: target.toolName,
+        risk: target.risk,
+        args: toolCall.args,
+        outcome: outcome.success ? "success" : "error",
+        errorCode,
+        durationMs: toolLogEntry.latencyMs,
+        idempotencyKey: toolLogEntry.idempotencyKey,
+      });
+
+      currentContext.toolLog.push(toolLogEntry);
+      await this.conversationRepository.updateById(conversation.id, {
+        orchestration_status: currentContext as unknown as Record<string, unknown>,
+      });
+
+      return outcome;
     } catch (error) {
       logger.error({ err: error }, "Error handling tool execution");
       return {
@@ -207,6 +168,49 @@ export class ToolExecutionService {
         error: (error as Error).message || "Unknown error",
       };
     }
+  }
+
+  /**
+   * Split `pluginId:toolName` (or a core tool name) and look up its risk class.
+   * An unparseable or uncached tool resolves to an unclassified write.
+   */
+  private async resolveTarget(
+    organizationId: string,
+    fullToolName: string,
+  ): Promise<{ pluginId: string | null; toolName: string; risk: ToolRisk }> {
+    const { coreToolRegistry } = await import("./core-tools");
+    if (coreToolRegistry.has(fullToolName)) {
+      return { pluginId: null, toolName: fullToolName, risk: CORE_TOOL_RISK };
+    }
+    const colonIndex = fullToolName.lastIndexOf(":");
+    if (colonIndex === -1) {
+      return { pluginId: null, toolName: fullToolName, risk: classifyTool(null) };
+    }
+    const pluginId = fullToolName.substring(0, colonIndex);
+    const toolName = fullToolName.substring(colonIndex + 1);
+    try {
+      const { mcpRegistryService } = await import("@server/services/mcp-registry.service");
+      const risk = await mcpRegistryService.getToolRisk(organizationId, pluginId, toolName);
+      return { pluginId, toolName, risk };
+    } catch (err) {
+      logger.warn({ err, pluginId, toolName }, "Could not resolve tool risk; treating as a write");
+      return { pluginId, toolName, risk: classifyTool(null) };
+    }
+  }
+
+  /** Write the final state onto the TOOL message and push it to the dashboard. */
+  private async finishToolMessage(
+    conversation: Conversation,
+    messageId: string | undefined,
+    content: string,
+    patch: Record<string, unknown>,
+  ): Promise<void> {
+    if (!messageId) return;
+    const message = await this.messageService.messageRepository.findById(messageId);
+    if (!message) return;
+    const metadata = { ...message.metadata, ...patch };
+    await this.messageService.messageRepository.update(messageId, { content, metadata });
+    await this.broadcastMessageUpdate(conversation, message.id, { content, metadata });
   }
 
   private async executeToolCall(
@@ -551,6 +555,7 @@ export class ToolExecutionService {
 
         const messagePayload = {
           type: "message",
+          conversationId: conversation.id,
           data: {
             id: message.id,
             content: updates.content,
@@ -561,9 +566,9 @@ export class ToolExecutionService {
           },
         };
 
-        // Broadcast to both organization (dashboard) and conversation (webchat) clients
+        // Dashboard only. Tool output (order data, error details) must never
+        // reach the shopper's webchat socket.
         websocketService.sendToOrganization(conversation.organization_id, messagePayload);
-        websocketService.sendToConversation(conversation.id, messagePayload);
         logger.debug({ messageId }, "Tool result broadcast via WebSocket");
       }
     } catch (error) {
