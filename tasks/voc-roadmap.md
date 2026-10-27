@@ -134,6 +134,10 @@ Staging seed: org/user created via `auth.register` (credentials in `../hay-core-
 - Confirm it's OK that staging uses the `OPENAI_API_KEY` from the main checkout's `.env` (nothing else copied).
 
 ## Working notes
+- Agent tests use DB `hay_test` (same Postgres :5433) + Redis db 1, never `hay_staging`.
+- Staging shop test page: scratchpad `staging/shop/index.html` served on 127.0.0.1:8090 (org 3383b5a0…, "Casa Aurora Demo").
+- Observed at baseline: Conversations header shows a made-up "-17% from yesterday" trend (D3-2 scope).
+- Chrome: Browser 1 is this Mac (verified by loading the 127.0.0.1-only page).
 
 - Main checkout `.env` points at the DO managed DB (`pilot`) and has a live Stripe key: never copy it, never run
   migrations from the main checkout.

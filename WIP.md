@@ -1,3 +1,9 @@
+## 2026-10-27 — staging — VOC roadmap orchestration started
+
+**Works:** `staging` worktree `../hay-core-staging` + local env (Docker project hay-staging: PG :5433 `hay_staging`, Redis :6380, RabbitMQ :5673; server :3001, dashboard :3000; shop page :8090). Baseline tested (widget → AI reply → dashboard). Plan in `tasks/voc-roadmap.md`.
+**In progress:** Wave 0 agents L1 (claude/d9-public-widget-hardening) and L2 (claude/d1-billing-honesty).
+**Next:** merge + manual-test each, then L8, L3, L9, L5, L10, L6, X.
+
 ## 2026-10-26 — master @9016b93 — Email inbox channel LIVE end to end (inbound + outbound verified in prod)
 
 **Fixed + deployed:** plugin worker token now minted in one place (`server/lib/plugin-api-token.ts`: scope plugin-api + issuer hay-plugin-api + audience plugin) so both the tRPC plugin API and the REST relay (/v1/plugin-api/send-email) accept it; before, every email reply failed "jwt audience invalid" (and the core `email` tool plugin had the same bug). Jest test covers both checks.
