@@ -100,6 +100,12 @@
 **Works:** `staging` worktree `../hay-core-staging` + local env (Docker project hay-staging: PG :5433 `hay_staging`, Redis :6380, RabbitMQ :5673; server :3001, dashboard :3000; shop page :8090). Baseline tested (widget → AI reply → dashboard). Plan in `tasks/voc-roadmap.md`.
 **In progress:** Wave 0 agents L1 (claude/d9-public-widget-hardening) and L2 (claude/d1-billing-honesty).
 **Next:** merge + manual-test each, then L8, L3, L9, L5, L10, L6, X.
+## 2026-10-27 — claude/nuvemshop (worktree hay-core-nuvemshop) — Nuvemshop plugin at commerce parity (not pushed)
+
+**Works:** `plugins/core/nuvemshop` rewritten to the 26 Oct conventions: 17 `nuvemshop_` tools (get_order by id or number + fulfillment tracking + payment/Pix fields, get_order_tracking, cancel and address change pre-dispatch only, appending notes, check_refund_status, request_refund that records only (API can't move money), identity-gated get_payment_link, capped create_coupon, check_inventory by SKU), MCP annotations on every tool, pt-BR i18n, README parity matrix. 55 vitest tests + tsc clean.
+**Half-built / unverified:** nothing live-tested; fulfillment-order PATCH merge semantics, merchant-token access to /transactions, coupon `max_uses` need a real store. OAuth partner app not built (needs `{client_id}` authorize-URL placeholder + keeping `user_id` in core oauth.service).
+**Research write-up:** seo repo `Engineering/02 Research/D18 Nuvemshop parity.md` (matrix, API limits, OAuth, open decisions).
+**Next:** Roger answers D18 §5; test against a Nuvemshop dev store; then push + PR.
 
 ## 2026-10-26 — master @9016b93 — Email inbox channel LIVE end to end (inbound + outbound verified in prod)
 

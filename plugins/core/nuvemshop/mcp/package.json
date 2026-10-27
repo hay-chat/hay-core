@@ -1,0 +1,14 @@
+{
+  "name": "nuvemshop-mcp-server",
+  "version": "2.0.0",
+  "private": true,
+  "description": "Local Node MCP server for Nuvemshop / Tiendanube: semantic support actions over the store REST API. Spawned over stdio by the Nuvemshop plugin.",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.25.2",
+    "zod": "^3.25.76"
+  }
+}
