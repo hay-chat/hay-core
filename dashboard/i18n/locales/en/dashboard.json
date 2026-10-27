@@ -20,15 +20,18 @@
     "ofConversations": "of conversations",
     "avgMessages": "Avg Messages",
     "messagesPer": "messages per",
-    "conversation": "conversation"
+    "conversation": "conversation",
+    "avgResponseTime": "Avg Response Time",
+    "medianResponseTime": "median {value}",
+    "noRepliesYet": "No replies in this period"
   },
   "activity": {
     "title": "Conversation Activity",
     "description": "Daily conversation volume"
   },
   "topAgents": {
-    "title": "Top Performing Agents",
-    "description": "Best agents by resolution rate this month",
+    "title": "Top Agents",
+    "description": "Agents with the most conversations in this period",
     "conversations": "{count} conversations",
     "resolutionRate": "resolution rate",
     "emptyTitle": "No agents created yet"
