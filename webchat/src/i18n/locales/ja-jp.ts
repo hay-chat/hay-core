@@ -1,6 +1,6 @@
 export default {
   "widget.defaultTitle": "チャットで相談",
-  "widget.defaultSubtitle": "通常、数分以内に返信いたします",
+  "widget.defaultSubtitle": "お気軽にご相談ください",
   "widget.defaultGreeting": "こんにちは！本日はどのようなご用件でしょうか？",
   "chat.close": "チャットを閉じる",
   "chat.open": "チャットを開く",

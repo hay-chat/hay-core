@@ -5,7 +5,7 @@
       <ChatWindow
         v-if="isOpen"
         :widget-title="config.widgetTitle || t('widget.defaultTitle')"
-        :widget-subtitle="config.widgetSubtitle || t('widget.defaultSubtitle')"
+        :widget-subtitle="widgetSubtitle"
         :position="config.position || 'right'"
         :show-greeting="config.showGreeting ?? true"
         :greeting-message="config.greetingMessage || t('widget.defaultGreeting')"
@@ -45,6 +45,7 @@ import MinimizedButton from "./components/MinimizedButton.vue";
 import { useChat } from "./composables/useChat";
 import { provideI18n } from "./i18n";
 import { debugLog } from "./utils/debug";
+import { resolveWidgetSubtitle } from "./utils/subtitle";
 import type { HayChatConfig } from "./types";
 
 const props = defineProps<{
@@ -52,6 +53,10 @@ const props = defineProps<{
 }>();
 
 const t = provideI18n(props.config.locale);
+
+const widgetSubtitle = computed(() =>
+  resolveWidgetSubtitle(props.config.widgetSubtitle, t("widget.defaultSubtitle")),
+);
 
 const isExpanded = ref(false);
 

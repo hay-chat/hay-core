@@ -1,6 +1,6 @@
 export default {
   "widget.defaultTitle": "在线咨询",
-  "widget.defaultSubtitle": "我们通常会在几分钟内回复",
+  "widget.defaultSubtitle": "我们很乐意为您提供帮助",
   "widget.defaultGreeting": "您好！请问有什么可以帮您的吗？",
   "chat.close": "关闭聊天",
   "chat.open": "打开聊天",

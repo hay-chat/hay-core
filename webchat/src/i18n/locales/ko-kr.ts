@@ -1,6 +1,6 @@
 export default {
   "widget.defaultTitle": "문의하기",
-  "widget.defaultSubtitle": "보통 몇 분 이내에 답변드립니다",
+  "widget.defaultSubtitle": "기꺼이 도와드리겠습니다",
   "widget.defaultGreeting": "안녕하세요! 무엇을 도와드릴까요?",
   "chat.close": "채팅 닫기",
   "chat.open": "채팅 열기",
