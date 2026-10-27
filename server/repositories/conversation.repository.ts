@@ -1,4 +1,4 @@
-import { Repository, SelectQueryBuilder, In, IsNull } from "typeorm";
+import { Brackets, Repository, SelectQueryBuilder, In, IsNull } from "typeorm";
 import type { QueryDeepPartialEntity } from "typeorm";
 import { v4 as uuidv4 } from "uuid";
 import { Conversation } from "../database/entities/conversation.entity";
@@ -9,6 +9,7 @@ import { BaseRepository } from "./base.repository";
 import type { ListParams } from "../trpc/middleware/pagination";
 import { Message, MessageType } from "@server/database/entities/message.entity";
 import { createLogger } from "@server/lib/logger";
+import { AGENT_SYSTEM_EVENTS } from "@server/services/webchat/public-message";
 
 const LOCK_DURATION_MS = 15_000;
 
@@ -567,6 +568,36 @@ export class ConversationRepository extends BaseRepository<Conversation> {
       },
       order: { created_at: "ASC" },
     });
+  }
+
+  /**
+   * What the webchat widget shows: the public messages plus the System lines
+   * announcing a team member joining or leaving. Kept apart from
+   * getPublicMessages, which the orchestrator reads as conversation history.
+   */
+  async getWidgetMessages(conversationId: string): Promise<Message[]> {
+    const { DeliveryState } = await import("@server/types/message-feedback.types");
+    return await this.getMessageRepository()
+      .createQueryBuilder("message")
+      .where("message.conversation_id = :conversationId", { conversationId })
+      .andWhere("message.delivery_state = :sent", { sent: DeliveryState.SENT })
+      .andWhere(
+        new Brackets((qb) => {
+          qb.where("message.type IN (:...publicTypes)", {
+            publicTypes: [
+              MessageType.CUSTOMER,
+              MessageType.BOT_AGENT,
+              MessageType.HUMAN_AGENT,
+              MessageType.PRODUCT_RECOMMENDATION,
+            ],
+          }).orWhere(
+            "(message.type = :systemType AND message.metadata ->> 'systemEvent' IN (:...systemEvents))",
+            { systemType: MessageType.SYSTEM, systemEvents: [...AGENT_SYSTEM_EVENTS] },
+          );
+        }),
+      )
+      .orderBy("message.created_at", "ASC")
+      .getMany();
   }
 
   async getMessages(conversationId: string): Promise<Message[]> {

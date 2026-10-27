@@ -14,4 +14,8 @@ export default {
   "input.send": "发送消息",
   "error.sendFailed": "消息发送失败，请稍后再试。",
   "error.messageTooLong": "消息过长，请缩短后重试。",
+  "chat.teamMember": "一位团队成员",
+  "chat.agentJoined": "{name} 加入了对话",
+  "chat.agentLeft": "{name} 离开了对话",
+  "chat.agentReturnedToAi": "{name} 离开了对话。您现在再次与 AI 助手对话。",
 } as const;

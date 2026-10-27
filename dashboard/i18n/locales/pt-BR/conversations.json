@@ -204,6 +204,12 @@
         "bodyWithTitle": "A conversa \"{title}\" precisa de atendimento humano",
         "bodyDefault": "Uma nova conversa precisa de atendimento humano"
       }
+    },
+    "agentNotice": {
+      "teamMember": "Um membro da equipe",
+      "joined": "{name} entrou na conversa",
+      "returnedToAi": "{name} saiu da conversa. O assistente de IA voltou a responder.",
+      "left": "{name} saiu da conversa e a devolveu para a fila"
     }
   }
 }

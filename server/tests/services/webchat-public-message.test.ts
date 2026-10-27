@@ -2,7 +2,13 @@ import { describe, it, expect, jest } from "@jest/globals";
 
 jest.mock("@server/database/data-source", () => ({ AppDataSource: { isInitialized: false } }));
 
-import { toPublicMessage, toPublicMessageMetadata } from "@server/services/webchat/public-message";
+import {
+  agentFirstName,
+  isWidgetVisibleMessage,
+  toPublicMessage,
+  toPublicMessageEvent,
+  toPublicMessageMetadata,
+} from "@server/services/webchat/public-message";
 import type { Message } from "@server/database/entities/message.entity";
 
 // Shape of what the orchestrator stores on a bot message (orchestrator/run.ts buildMessageMetadata).
@@ -27,7 +33,9 @@ describe("toPublicMessageMetadata", () => {
   });
 
   it("keeps the greeting marker the widget uses to replace its placeholder", () => {
-    expect(toPublicMessageMetadata({ isGreeting: true, confidence: 0.9 })).toEqual({ isGreeting: true });
+    expect(toPublicMessageMetadata({ isGreeting: true, confidence: 0.9 })).toEqual({
+      isGreeting: true,
+    });
   });
 
   it("returns an empty object for missing or malformed metadata", () => {
@@ -66,5 +74,76 @@ describe("toPublicMessage", () => {
 
   it("keeps full metadata for playground (staff demo) conversations", () => {
     expect(toPublicMessage(message, { isPlayground: true }).metadata).toBe(internalMetadata);
+  });
+});
+
+describe("agent join/leave notices", () => {
+  const takeoverMetadata = {
+    isTakeoverMessage: true,
+    userId: "user-1",
+    userName: "Marina Souza",
+    systemEvent: "agent_joined",
+    agentFirstName: "Marina",
+  };
+
+  it("passes only the event and the first name", () => {
+    expect(toPublicMessageMetadata(takeoverMetadata)).toEqual({
+      systemEvent: "agent_joined",
+      agentFirstName: "Marina",
+    });
+  });
+
+  it("drops unknown events and non-string names", () => {
+    expect(toPublicMessageMetadata({ systemEvent: "agent_fired", agentFirstName: 42 })).toEqual({});
+    expect(toPublicMessageMetadata({ agentFirstName: "   " })).toEqual({});
+  });
+
+  it("lets the widget see agent events but no other System message", () => {
+    expect(isWidgetVisibleMessage("System", takeoverMetadata)).toBe(true);
+    expect(isWidgetVisibleMessage("System", { systemEvent: "agent_left" })).toBe(true);
+    expect(isWidgetVisibleMessage("System", { systemEvent: "agent_returned_to_ai" })).toBe(true);
+    expect(isWidgetVisibleMessage("System", { isTakeoverMessage: true })).toBe(false);
+    expect(isWidgetVisibleMessage("System", null)).toBe(false);
+    expect(isWidgetVisibleMessage("Tool", takeoverMetadata)).toBe(false);
+    expect(isWidgetVisibleMessage("HumanAgent", null)).toBe(true);
+  });
+
+  it("blanks the staff-facing System text (which carries the full name)", () => {
+    const message = {
+      id: "m2",
+      content: "Marina Souza took over this conversation",
+      type: "System",
+      sender: null,
+      created_at: new Date("2026-10-27T00:00:00Z"),
+      metadata: takeoverMetadata,
+    } as unknown as Message;
+
+    const result = toPublicMessage(message, { isPlayground: false });
+    expect(result.content).toBe("");
+    expect(JSON.stringify(result)).not.toContain("Souza");
+
+    const event = toPublicMessageEvent("c1", {
+      id: "m2",
+      type: "System",
+      content: message.content,
+      metadata: takeoverMetadata,
+    });
+    expect(JSON.stringify(event)).not.toContain("Souza");
+  });
+
+  it("keeps the first name on a person's reply", () => {
+    expect(
+      toPublicMessageMetadata({
+        sender: "assistant",
+        sentByUserId: "user-1",
+        agentFirstName: "Marina",
+      }),
+    ).toEqual({ agentFirstName: "Marina" });
+  });
+
+  it("agentFirstName uses only the profile's first name", () => {
+    expect(agentFirstName({ firstName: " Marina " })).toBe("Marina");
+    expect(agentFirstName({ firstName: "" })).toBeUndefined();
+    expect(agentFirstName(null)).toBeUndefined();
   });
 });

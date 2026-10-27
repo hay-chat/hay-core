@@ -14,4 +14,8 @@ export default {
   "input.send": "메시지 보내기",
   "error.sendFailed": "메시지를 보내지 못했습니다. 잠시 후 다시 시도해 주세요.",
   "error.messageTooLong": "메시지가 너무 깁니다. 줄여서 다시 시도해 주세요.",
+  "chat.teamMember": "팀원",
+  "chat.agentJoined": "{name}님이 채팅에 참여했습니다",
+  "chat.agentLeft": "{name}님이 채팅에서 나갔습니다",
+  "chat.agentReturnedToAi": "{name}님이 채팅에서 나갔습니다. 이제 다시 AI 어시스턴트와 대화합니다.",
 } as const;

@@ -14,4 +14,8 @@ export default {
   "input.send": "Wyślij wiadomość",
   "error.sendFailed": "Nie udało się wysłać wiadomości. Spróbuj ponownie za chwilę.",
   "error.messageTooLong": "Wiadomość jest za długa. Skróć ją i spróbuj ponownie.",
+  "chat.teamMember": "Członek zespołu",
+  "chat.agentJoined": "{name} dołącza do czatu",
+  "chat.agentLeft": "{name} opuszcza czat",
+  "chat.agentReturnedToAi": "{name} opuszcza czat. Ponownie rozmawiasz z asystentem AI.",
 } as const;

@@ -13,7 +13,7 @@ import { UserOrganization } from "@server/entities/user-organization.entity";
 const logger = createLogger("websocket");
 import { verifyDPoPForRequest } from "../routes/v1/public-conversations";
 import { getClientIp } from "@server/lib/client-ip";
-import { toPublicMessageEvent } from "./webchat/public-message";
+import { isWidgetVisibleMessage, toPublicMessageEvent } from "./webchat/public-message";
 import { PUBLIC_WIDGET_LIMITS, isPublicWidgetRateLimited } from "./public-widget-limits";
 
 // Largest frame a client may send. Clients only send small JSON control frames
@@ -188,10 +188,8 @@ export class WebSocketService {
         data: payload,
       };
 
-      // Define public message types (visible to customers via webchat)
-      const publicMessageTypes = ["Customer", "BotAgent", "HumanAgent"];
-      const isPublicMessage =
-        payload?.type !== undefined && publicMessageTypes.includes(payload.type);
+      // Customer-facing types plus agent join/leave lines (visible via webchat)
+      const isPublicMessage = isWidgetVisibleMessage(payload?.type, payload?.metadata);
       const isPlayground = payload?.isPlayground === true;
 
       // Always send ALL messages to dashboard (organization clients) for full visibility

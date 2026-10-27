@@ -1,3 +1,9 @@
+## 2026-10-27 — claude/w1-agent-join-notice — "talking to a person" notices done (not merged)
+- Takeover/release store System msgs with metadata systemEvent (agent_joined | agent_returned_to_ai | agent_left) + agentFirstName; HumanAgent replies carry agentFirstName (sendMessage).
+- Widget: centred line from metadata in 13 locales; "10:42 · Marina" on person replies. Dashboard: centred line (en/pt-BR), also for old takeover rows.
+- Public whitelist passes only systemEvent/agentFirstName, blanks System content. Widget history via new getWidgetMessages; orchestrator getPublicMessages + channel delivery unchanged (System skipped). run.ts untouched.
+- Verified: jest services/routes/orchestrator 65 suites + new integration; tsc; webchat vitest 109, vue-tsc, build; dashboard typecheck + util test.
+- Next: merge into staging (handlers diff is metadata-only), rebuild webchat dist, manual test on :8090.
 ## 2026-10-27 — claude/w1-first-message-race — orchestrator race fixes done (not merged, not pushed)
 - 264360c Bug A: greeting + instructions written in createConversation (no creation run); addMessage stores the customer row before setting needs_processing; setProcessed -> markProcessed(lastCustomerMessageId) compare-and-set; run re-reads flag after lock and re-queues on non-error exit.
 - bc36f02 Bug B: releaseFromUser("ai") queues a run only if the newest Customer message has no BotAgent/HumanAgent reply after it. Release route handler untouched.
