@@ -70,6 +70,18 @@ const jobRegistry: CronJobConfig[] = [
     skipDatabaseLogging: true, // Don't log frequent cleanups
   },
 
+  {
+    name: "auth-session-cleanup",
+    description: "Delete login sessions that expired or were revoked over 30 days ago",
+    schedule: "30 3 * * *", // Daily at 3:30 AM
+    handler: async () => {
+      const { authSessionService } = await import("./auth-session.service");
+      await authSessionService.cleanupEndedSessions();
+    },
+    singleton: true,
+    enabled: true,
+  },
+
   // ============================================================
   // BACKGROUND PROCESSING JOBS
   // ============================================================

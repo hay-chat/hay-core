@@ -9,11 +9,10 @@ import { AuthCode } from "@server/entities/auth-code.entity";
 import {
   hashPassword,
   verifyPassword,
-  generateSessionId,
   hashApiKey,
   generateSecureToken,
 } from "@server/lib/auth/utils/hashing";
-import { generateTokens, verifyRefreshToken, refreshAccessToken } from "@server/lib/auth/utils/jwt";
+import { authSessionService, RefreshRejectedError } from "@server/services/auth-session.service";
 import {
   protectedProcedure,
   protectedProcedureWithoutOrg,
@@ -164,9 +163,7 @@ export const authRouter = t.router({
     user.updateLastSeen();
     await userRepository.save(user);
 
-    // Generate tokens
-    const sessionId = generateSessionId();
-    const tokens = generateTokens(user, sessionId);
+    const tokens = await authSessionService.createSession(user, ctx);
 
     // Load all user organizations (multi-org support)
     const organizations = await getUserOrganizations(user.id);
@@ -196,7 +193,7 @@ export const authRouter = t.router({
     };
   }),
 
-  register: publicProcedure.input(registerSchema).mutation(async ({ input }) => {
+  register: publicProcedure.input(registerSchema).mutation(async ({ input, ctx }) => {
     const { email, password, firstName, lastName, organizationName, organizationSlug } = input;
 
     // Use a transaction for atomicity
@@ -275,8 +272,7 @@ export const authRouter = t.router({
           await userRepository.save(existingUser);
         }
 
-        const sessionId = generateSessionId();
-        const tokens = generateTokens(existingUser, sessionId);
+        const tokens = await authSessionService.createSession(existingUser, ctx, manager);
         const organizations = await getUserOrganizations(existingUser.id);
 
         return {
@@ -324,9 +320,7 @@ export const authRouter = t.router({
         await userOrgRepository.save(userOrg);
       }
 
-      // Generate tokens
-      const sessionId = generateSessionId();
-      const tokens = generateTokens(user, sessionId);
+      const tokens = await authSessionService.createSession(user, ctx, manager);
 
       // Load all user organizations (multi-org support)
       const organizations = await getUserOrganizations(user.id);
@@ -343,42 +337,26 @@ export const authRouter = t.router({
     });
   }),
 
-  refreshToken: publicProcedure.input(refreshTokenSchema).mutation(async ({ input }) => {
+  /**
+   * Rotate: returns a new access token AND a new refresh token, and slides the
+   * session's 90-day idle timeout. UNAUTHORIZED means "log out"; any other
+   * error (database down, ...) is transient and the client keeps its session.
+   */
+  refreshToken: publicProcedure.input(refreshTokenSchema).mutation(async ({ input, ctx }) => {
     try {
-      const payload = verifyRefreshToken(input.refreshToken);
-
-      // Find user
-      const userRepository = AppDataSource.getRepository(User);
-      const user = await userRepository.findOne({
-        where: { id: payload.userId },
-      });
-
-      if (!user || !user.isActive) {
-        throw new TRPCError({
-          code: "UNAUTHORIZED",
-          message: "Invalid refresh token",
-        });
-      }
-
-      // Check token version — rejects tokens issued before password change/reset
-      if (payload.tokenVersion !== undefined && payload.tokenVersion !== (user.tokenVersion ?? 0)) {
-        throw new TRPCError({
-          code: "UNAUTHORIZED",
-          message: "Token has been revoked",
-        });
-      }
-
-      // Generate new access token
-      const accessToken = await refreshAccessToken(input.refreshToken);
-
-      return {
-        accessToken,
-        expiresIn: 900, // 15 minutes
-      };
+      return await authSessionService.refresh(input.refreshToken, ctx);
     } catch (error) {
+      if (error instanceof RefreshRejectedError) {
+        throw new TRPCError({
+          code: "UNAUTHORIZED",
+          message: "Invalid or expired refresh token",
+          cause: { type: "REFRESH_REJECTED", reason: error.reason },
+        });
+      }
+      logger.error({ err: error }, "Refresh failed for a non-auth reason");
       throw new TRPCError({
-        code: "UNAUTHORIZED",
-        message: "Invalid or expired refresh token",
+        code: "INTERNAL_SERVER_ERROR",
+        message: "Could not refresh the session, please retry",
       });
     }
   }),
@@ -717,9 +695,12 @@ export const authRouter = t.router({
       };
     }),
 
-  logout: protectedProcedure.mutation(async () => {
-    // In a stateless JWT system, logout is handled client-side
-    // Here we could invalidate refresh tokens if we're tracking them
+  /**
+   * End this device's session. Public on purpose: holding the refresh token is
+   * the proof, and logout must work after the access token has expired.
+   */
+  logout: publicProcedure.input(refreshTokenSchema).mutation(async ({ input }) => {
+    await authSessionService.revoke(input.refreshToken);
     return { success: true };
   }),
 
@@ -1592,7 +1573,7 @@ export const authRouter = t.router({
 
   exchangeAuthCode: publicProcedure
     .input(z.object({ code: z.string().min(1) }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
       const codeHash = await hashApiKey(input.code);
 
       const authCodeRepo = AppDataSource.getRepository(AuthCode);
@@ -1636,9 +1617,7 @@ export const authRouter = t.router({
       user.updateLastSeen();
       await userRepository.save(user);
 
-      // Generate tokens
-      const sessionId = generateSessionId();
-      const tokens = generateTokens(user, sessionId);
+      const tokens = await authSessionService.createSession(user, ctx);
 
       // Load all user organizations
       const organizations = await getUserOrganizations(user.id);

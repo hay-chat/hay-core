@@ -1,12 +1,16 @@
 import * as jwt from "jsonwebtoken";
 import { authConfig } from "@server/config/auth.config";
-import type { JWTPayload, RefreshTokenPayload, AuthTokens } from "@server/types/auth.types";
+import type { JWTPayload, RefreshTokenPayload } from "@server/types/auth.types";
 import { User } from "@server/entities/user.entity";
 
+/** Access-token lifetime in seconds. */
+export const ACCESS_TOKEN_TTL_SECONDS = parseExpiresIn(authConfig.jwt.expiresIn);
+
 /**
- * Generate access and refresh tokens for a user
+ * Sign a short-lived access token. Refresh tokens are opaque and owned by
+ * auth-session.service.ts.
  */
-export function generateTokens(user: User, sessionId?: string): AuthTokens {
+export function generateAccessToken(user: Pick<User, "id" | "email" | "tokenVersion">): string {
   const payload: JWTPayload = {
     userId: user.id,
     email: user.email,
@@ -14,37 +18,10 @@ export function generateTokens(user: User, sessionId?: string): AuthTokens {
     tokenVersion: user.tokenVersion ?? 0,
   };
 
-  const signOptions: jwt.SignOptions = {
-    expiresIn: authConfig.jwt.expiresIn as jwt.SignOptions["expiresIn"],
+  return jwt.sign(payload, authConfig.jwt.secret, {
+    expiresIn: ACCESS_TOKEN_TTL_SECONDS,
     algorithm: authConfig.jwt.algorithm,
-  };
-  const accessToken = jwt.sign(payload, authConfig.jwt.secret, signOptions);
-
-  const refreshPayload: RefreshTokenPayload = {
-    userId: user.id,
-    email: user.email,
-    type: "refresh",
-    tokenVersion: user.tokenVersion ?? 0,
-    sessionId: sessionId || `session_${Date.now()}_${Math.random().toString(36).substring(2)}`,
-  };
-
-  const refreshSignOptions: jwt.SignOptions = {
-    expiresIn: authConfig.jwt.refreshExpiresIn as jwt.SignOptions["expiresIn"],
-    algorithm: authConfig.jwt.algorithm,
-  };
-  const refreshToken = jwt.sign(refreshPayload, authConfig.jwt.refreshSecret, refreshSignOptions);
-
-  // Calculate expiration time in seconds
-  const expiresIn =
-    typeof authConfig.jwt.expiresIn === "string"
-      ? parseExpiresIn(authConfig.jwt.expiresIn)
-      : authConfig.jwt.expiresIn;
-
-  return {
-    accessToken,
-    refreshToken,
-    expiresIn,
-  };
+  });
 }
 
 /**
@@ -71,8 +48,10 @@ export function verifyToken<T = JWTPayload>(token: string): T {
 }
 
 /**
- * Verify a refresh token and return the payload.
- * Uses a separate signing secret from access tokens.
+ * Verify a legacy JWT refresh token (issued before D11-3 rotation) and return
+ * the payload. Uses a separate signing secret from access tokens.
+ * TODO: remove with the legacy branch in auth-session.service.ts once every
+ * pre-rotation refresh token has expired (30 days after the D11-3 deploy).
  */
 export function verifyRefreshToken(token: string): RefreshTokenPayload {
   try {
@@ -104,25 +83,6 @@ export function decodeToken<T = JWTPayload>(token: string): T | null {
   } catch {
     return null;
   }
-}
-
-/**
- * Generate a new access token from a refresh token
- */
-export async function refreshAccessToken(refreshToken: string): Promise<string> {
-  const payload = verifyRefreshToken(refreshToken);
-
-  const newPayload: JWTPayload = {
-    userId: payload.userId,
-    email: payload.email,
-    type: "access",
-  };
-
-  const signOptions: jwt.SignOptions = {
-    expiresIn: authConfig.jwt.expiresIn as jwt.SignOptions["expiresIn"],
-    algorithm: authConfig.jwt.algorithm,
-  };
-  return jwt.sign(newPayload, authConfig.jwt.secret, signOptions);
 }
 
 /**
