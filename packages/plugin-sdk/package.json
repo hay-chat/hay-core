@@ -25,6 +25,9 @@
     "./tool-errors": {
       "types": "./tool-errors/index.d.ts",
       "default": "./tool-errors/index.cjs"
+    },
+    "./tool-risk": {
+      "default": "./tool-risk/index.cjs"
     }
   },
   "bin": {
