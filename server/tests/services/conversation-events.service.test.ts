@@ -104,6 +104,42 @@ describe("conversationEventsService.broadcastMessageReceived", () => {
       expect(mockSendToConversation).not.toHaveBeenCalled();
     });
 
+    it("shows agent join/leave lines with metadata only, never the staff-facing text", async () => {
+      await conversationEventsService.broadcastMessageReceived(
+        conversation,
+        message({
+          type: "System",
+          content: "Marina Souza took over this conversation",
+          metadata: {
+            systemEvent: "agent_joined",
+            agentFirstName: "Marina",
+            userName: "Marina Souza",
+            userId: "u1",
+          },
+        } as unknown as Partial<Message>),
+      );
+
+      const [, event] = mockSendToConversation.mock.calls[0] as [
+        string,
+        { data: Record<string, unknown> },
+      ];
+      expect(event.data.content).toBe("");
+      expect(event.data.metadata).toEqual({
+        systemEvent: "agent_joined",
+        agentFirstName: "Marina",
+      });
+      expect(JSON.stringify(event)).not.toContain("Souza");
+    });
+
+    it("keeps other System messages away from the customer", async () => {
+      await conversationEventsService.broadcastMessageReceived(
+        conversation,
+        message({ type: "System", content: "internal instructions" } as Partial<Message>),
+      );
+
+      expect(mockSendToConversation).not.toHaveBeenCalled();
+    });
+
     it("shows everything in playground conversations", async () => {
       await conversationEventsService.broadcastMessageReceived(
         { ...conversation, metadata: { isPlayground: true } },
