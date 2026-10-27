@@ -17,6 +17,7 @@ import { LLMService } from "@server/services/core/llm.service";
 import { PromptService } from "@server/services/prompt.service";
 import { createLogger } from "@server/lib/logger";
 import { hasTiptapContent } from "@server/types/tiptap.types";
+import { closureCopy } from "./closure-copy";
 import { handoffCopy, type HandoffCopyKey } from "./handoff-copy";
 import { AiReplySuppressedError, isPauseBlocker, recheckAiReply } from "./reply-guard";
 import type { ExecutionResult } from "./execution.layer";
@@ -550,9 +551,10 @@ export const runConversation = async (conversationId: string) => {
       const { generateConversationTitle } = await import("./conversation-utils");
       await generateConversationTitle(conversation.id, conversation.organization_id);
 
-      // Update conversation status to resolved
+      // An unhappy close is not a resolution (D5-5): it gets its own status.
+      // The billing outcome is recorded by the repository on this transition.
       await conversationRepository.update(conversation.id, conversation.organization_id, {
-        status: "resolved",
+        status: intent.label === "close_unsatisfied" ? "unresolved" : "resolved",
         ended_at: new Date(),
         resolution_metadata: {
           resolved: intent.label === "close_satisfied",
@@ -590,10 +592,12 @@ export const runConversation = async (conversationId: string) => {
         });
       } catch (error) {
         log.debug({ err: error }, "Error generating closing message, using fallback");
-        closingMessage =
-          intent.label === "close_satisfied"
-            ? "Great! I'm glad I could help. This conversation has been marked as resolved. Feel free to start a new conversation if you need anything else!"
-            : "I understand. This conversation has been marked as resolved. Please feel free to start a new conversation if you need further assistance.";
+        closingMessage = closureCopy(
+          intent.label === "close_unsatisfied" ? "closeUnsatisfied" : "closeSatisfied",
+          language,
+          conversation.language,
+          conversation.organization?.defaultLanguage,
+        );
       }
 
       await sendBotMessage(
