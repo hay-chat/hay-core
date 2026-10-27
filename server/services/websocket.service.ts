@@ -8,6 +8,8 @@ import type { JWTPayload } from "../types/auth.types";
 import type { Message } from "../database/entities/message.entity";
 import { MessageType } from "../database/entities/message.entity";
 import { createLogger } from "@server/lib/logger";
+import { AppDataSource } from "@server/database/data-source";
+import { UserOrganization } from "@server/entities/user-organization.entity";
 
 const logger = createLogger("websocket");
 import { verifyDPoPForRequest } from "../routes/v1/public-conversations";
@@ -19,6 +21,8 @@ interface WebSocketClient {
   conversationId?: string;
   pluginId?: string;
   authenticated: boolean;
+  /** Resolves once token authentication (if any) has finished. */
+  ready: Promise<void>;
   metadata: Record<string, unknown>;
 }
 
@@ -274,6 +278,7 @@ export class WebSocketService {
       organizationId: organizationId || "",
       customerId: "",
       authenticated: false,
+      ready: Promise.resolve(),
       metadata: {
         userAgent: req.headers["user-agent"],
         ip: req.socket.remoteAddress,
@@ -282,31 +287,9 @@ export class WebSocketService {
 
     this.clients.set(clientId, client);
 
-    // Authenticate if token provided
-    if (token) {
-      const authenticated = this.authenticateClient(clientId, token);
-      logger.debug(
-        { clientId, authenticated, organizationId: client.organizationId },
-        "Client authentication result",
-      );
-
-      // Add to organization clients if authenticated
-      if (client.authenticated && client.organizationId) {
-        if (!this.organizationClients.has(client.organizationId)) {
-          this.organizationClients.set(client.organizationId, new Set());
-        }
-        this.organizationClients.get(client.organizationId)!.add(clientId);
-        logger.debug(
-          { clientId, organizationId: client.organizationId },
-          "Added client to organization",
-        );
-      } else {
-        logger.debug(
-          { clientId, authenticated: client.authenticated, organizationId: client.organizationId },
-          "Client NOT added to organization",
-        );
-      }
-    }
+    // Authentication checks org membership against the database, so it is
+    // async. Frames that arrive meanwhile wait for it in handleMessage.
+    client.ready = token ? this.authenticateClient(clientId, token) : Promise.resolve();
 
     // Set up event handlers
     ws.on("message", (data) => {
@@ -334,21 +317,39 @@ export class WebSocketService {
   /**
    * Authenticate WebSocket client
    */
-  private authenticateClient(clientId: string, token: string): boolean {
+  private async authenticateClient(clientId: string, token: string): Promise<void> {
     const client = this.clients.get(clientId);
-    if (!client) return false;
+    if (!client) return;
 
+    let decoded: JWTPayloadWithOrg;
     try {
-      const decoded = jwt.verify(token, config.jwt.secret) as JWTPayloadWithOrg;
-      // Keep the organizationId from query params if not in token
-      if (decoded.organizationId) {
-        client.organizationId = decoded.organizationId;
-      }
-      client.authenticated = true;
-      return true;
-    } catch (error) {
-      return false;
+      decoded = jwt.verify(token, config.jwt.secret) as JWTPayloadWithOrg;
+    } catch {
+      return;
     }
+
+    if (decoded.organizationId) {
+      // The token is scoped to one organization.
+      client.organizationId = decoded.organizationId;
+    } else {
+      // User access tokens carry no organization: the `org` query parameter is
+      // only a request, so confirm the user is an active member before
+      // streaming that organization's events.
+      if (!decoded.userId || !client.organizationId) return;
+      const membership = await AppDataSource.getRepository(UserOrganization).findOne({
+        where: { userId: decoded.userId, organizationId: client.organizationId, isActive: true },
+      });
+      if (!membership) {
+        logger.warn({ clientId }, "WebSocket client is not a member of the requested organization");
+        return;
+      }
+    }
+
+    client.authenticated = true;
+    if (!this.organizationClients.has(client.organizationId)) {
+      this.organizationClients.set(client.organizationId, new Set());
+    }
+    this.organizationClients.get(client.organizationId)!.add(clientId);
   }
 
   /**
@@ -359,6 +360,7 @@ export class WebSocketService {
     if (!client) return;
 
     try {
+      await client.ready;
       const message = JSON.parse(data);
 
       switch (message.type) {
