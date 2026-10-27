@@ -3,8 +3,7 @@
 import type { HayChatConfig, LauncherBridge } from "@/types";
 import css from "./launcher.css?inline";
 
-const ICON_OPEN =
-  '<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>';
+const ICON_OPEN = '<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>';
 const ICON_CLOSE =
   '<line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line>';
 

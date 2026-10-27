@@ -82,7 +82,8 @@ const canUseLocal = computed(() => {
 export function initConsent(configMode: ConsentMode = "implicit"): void {
   mode.value = configMode;
   hasInteracted.value = readSession(SESSION_INTERACTED_KEY) === "1";
-  explicitGrant.value = hasInteracted.value && readSession(SESSION_REVOKED_KEY) === "1" ? false : null;
+  explicitGrant.value =
+    hasInteracted.value && readSession(SESSION_REVOKED_KEY) === "1" ? false : null;
 }
 
 /**
