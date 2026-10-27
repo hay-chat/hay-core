@@ -6,8 +6,7 @@ Started 2026-10-27. Research: `/Users/rogerjunior/Documents/code/hay/seo/Enginee
 ## Resume here (orchestrator checkpoint — keep current; safe to /compact after reading this)
 - Last update: 2026-10-27 ~19:45. Staging HEAD d64da73 (+ roadmap commits).
 - Wave 0 merged into staging: L2, L1, L8, L3 + D5-2 fix (a0b0220), L9, L5 (24818be), L10 (824abf1), L6 (d64da73). Migrations ran on hay_staging + hay_test.
-- Waiting to merge: `claude/d12-reply-time-defaults` (f572619, worktree ../hay-core-hay-core-reply-defaults): entity default dropped, migration `DropWebchatSubtitleDefault1784800000000`, dashboard default/placeholder. Merge after the running tester, then migration:run on hay_staging (+ hay_test).
-- Running: tester for D5-2 A3 + L9 (D3-2, D5-1, D3-3) + L10 (D11-3/4) + L6 (D12-1/3/4/5/8). D5-2 A1/A2/A4/A5 PASS (GIFs D5-2-handoff-en-offline.gif, D5-2-handoff-pt-offline.gif).
+- reply-defaults merged (migration ran both DBs). Review done (2 confirmed: per-org rate counter spent by refused IP requests; /uploads `..` traversal on local disk). Running: claude/wave0-review-fixes (those 2 + legacy refresh replay + sharp pixel limit) and claude/wave0-test-fixes (double greeting, date presets exclude today). Merge both → quick retest (greeting, KPI cards) → tag → PR.
 - X tickets done, PRs open (not merged): hay-backoffice#3 (D1-4), hay-backoffice#4 + hay-website#44 (D15-1), hay-shopify-app#1 (D12-2 embed). WP plugin 1.0.1 = patch at `/Users/rogerjunior/Documents/code/hay/haychat-svn-patches/1.0.1-d12-2-no-render-blocking.patch` (svn commit = WP.org release → Roger).
 - Then: Wave 0 review agent over `git diff 5bfee16..staging` → fixes → tag `wave-0-done` → PR staging→master (body: tickets, migrations AddConversationHandedOffAt1784600000000 / AddRefreshTokenRotationToSessions1784700000000 / DropWebchatSubtitleDefault1784800000000, tests, manual results + GIFs, Needs Roger, D8 after-deploy steps: deploy → `docker cp scripts/make-media-private.cjs hay-server:/tmp/` → dry run → `--apply` → `doctl compute cdn flush <id> --files 'uploads/*'` (hay-ams ff84a7bc-8770-4a41-af22-2192d46e9473, hay d67a8597-cd2c-4825-b902-a788706e0647) → Spaces listing Restricted → old URL 403; image needs sharp's optional Linux binaries).
 - Dashboard died once from OOM (vue-tsc watcher in nuxt dev); restarted with NODE_OPTIONS=--max-old-space-size=3072.
@@ -72,7 +71,7 @@ Started 2026-10-27. Research: `/Users/rogerjunior/Documents/code/hay/seo/Enginee
 | (base) | all up to `AddOrganizationAgentPause1784500000000` | —     | ✓ 2026-10-27   |
 | L2 | `AddConversationHandedOffAt1784600000000` | conversations | ✓ |
 | L10 | `AddRefreshTokenRotationToSessions1784700000000` (drops refresh_token_hash/is_active; adds generation, token_version, rotated_at, revoked_at, revoked_reason) | sessions | ✓ |
-| reply-defaults | `DropWebchatSubtitleDefault1784800000000` | webchat_settings | pending merge |
+| reply-defaults | `DropWebchatSubtitleDefault1784800000000` | webchat_settings | ✓ |
 
 ## Wave 0 — security, honesty, quick fixes (tag `wave-0-done`)
 
@@ -113,10 +112,10 @@ Not doing: **D4-1** (Roger waits for the full D4 build). Copy must not claim Req
 | D11-1 | drop in-flight AI reply on take-over/pause | b5a4120 | merged → tested ✓: takeover 1.4 s after shopper msg → no AI reply, log "Dropped in-flight AI reply" blocker human_took_over | D11-1-takeover-while-thinking.gif |
 | D11-2 | inactivity skips held/paused chats | b5a4120 | merged → tested ✓ (by contrast): assigned open chat idle 18 min untouched; unassigned control processed. Paused-org/agent-off branches covered by Jest only | — |
 | D6-1 | Shopify cancel guard, note append, tracking NOT_FOUND (returnProcess deferred) | 24818be | merged → automated ✓; live dev-store test pending store connection | — |
-| D11-3 | refresh-token rotation (hrt1.), reuse detection, 90-day sliding sessions | 824abf1 | merged → automated ✓ (jest auth-session 20/20, dashboard session tests 21/21); manual pending | — |
-| D11-4 | never log out on network errors | 824abf1 | merged → automated ✓; manual pending | — |
-| D12-1/3/4/5/8 | widget: quiet logs, greeting first, no reply-time promise, refused-send notice, dead WS paths removed | d64da73 | merged → automated ✓ (webchat vitest 67/67, dist rebuilt); manual pending | — |
-| D5-2 fix | fixed honest line on every path | a0b0220 | tested ✓: en/pt offline lines exact, pending-human, order after greeting; A3 online pending | D5-2-handoff-en-offline.gif, D5-2-handoff-pt-offline.gif |
+| D11-3 | refresh-token rotation (hrt1.), reuse detection, 90-day sliding sessions | 824abf1 | merged → tested ✓: hrt1 rotation gen0→1, grace reuse 200 same token, after 130 s reuse 401 + session revoked (reuse_detected), logout → 401 | — (curl) |
+| D11-4 | never log out on network errors | 824abf1 | merged → tested ✓: expired token refreshes silently; fetch blocked 20 s → stays logged in; recovers (gen 2), not revoked | D11-4-offline-refresh-no-logout.gif |
+| D12-1/3/4/5/8 | widget: quiet logs, greeting first, no reply-time promise, refused-send notice, dead WS paths removed | d64da73 | merged → tested: header "We're here to help"/pt ✓, 0 console logs (debug shows them) ✓, too-long refused → notice + text restored ✓, order kept ✓ BUT greeting shown twice ✗ (regression of 5af9c35 → claude/wave0-test-fixes) | D12-1-8-widget-header-and-quiet-console.gif, D12-3-4-greeting-order-and-refused-send.gif |
+| D5-2 fix | fixed honest line on every path | a0b0220 | tested ✓: en/pt offline lines exact, pending-human, order after greeting; online → "I've passed this to the team…" ✓; nudge uses new model ✓ | D5-2-handoff-en-offline.gif, D5-2-handoff-pt-offline.gif, D5-2-A3-handoff-online.gif |
 | D6-4 | `@hay/plugin-sdk/tool-errors` {code, retryable}; Shopify + Woo (mutations no longer retried after timeout → OUTCOME_UNKNOWN) | 24818be | merged → automated ✓ | — |
 
 ## Wave 1 — foundations
@@ -176,6 +175,11 @@ Staging seed: org/user created via `auth.register` (credentials in `../hay-core-
 - Confirm it's OK that staging uses the `OPENAI_API_KEY` from the main checkout's `.env` (nothing else copied).
 
 ## Follow-ups logged (not in Wave 0 scope)
+- L9 tested 2026-10-27: D3-2 ✓ (404s, no nav links), D3-3 ✓ (Open conversation highlights message; heartbeat pauses hidden, resumes on show), D5-1 values correct in API but cards 0 because DateRangeSelector presets end at midnight today → claude/wave0-test-fixes. GIFs D3-2-D5-1-analytics-404-and-dashboard-metrics.gif, D3-3-feedback-open-conversation.gif.
+- **Widget restore on reload broken in default consent mode** (pre-existing, ~HAY-85): no sessionStorage read before consent; after consent no DPoP keypair → new conversation + customer. Shopper waiting on hand-off loses the thread on reload. High priority, L6 Wave 1 (with D9-4).
+- widget.js served `Cache-Control: max-age=604800` → shoppers run old builds up to 7 days after deploy (D12-6 hashed chunks/short loader cache).
+- Review plausibles not fixed: reply-guard `findById` loads all messages per check (slim query); GDPR erasure doesn't delete `/v1/media` or S3 files (delete by attachment id); 2-min refresh grace hands current token to old-token holder (by design).
+- Minor: sentiment gauge "50% Fair" with no data; offline dashboard shows empty states without error; widget textarea maxlength 1000 vs server 4000; tRPC 401 includes stack traces in dev.
 - Widget header says "We typically reply within minutes" permanently — false promise (give to L6 D12-8 or D5-10).
 - Shopify `returnProcess` refund tool (D6-1 part 5) → its own ticket + dev-store test. Wix/Magento structured errors when prioritised.
 - Inactivity easy-tier model `gpt-4.1-nano` deprecated → in D5-2 fix.
