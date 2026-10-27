@@ -644,6 +644,22 @@
       "description": "Os embeddings são sempre gerenciados pela Hay e fixados em 1536 dimensões.",
       "model": "Modelo de Embedding",
       "modelHelper": "Deve produzir vetores de 1536 dimensões (ex.: text-embedding-3-small)."
+    },
+    "region": {
+      "title": "Região de processamento de IA",
+      "description": "Escolha onde as mensagens dos seus clientes são processadas pela IA.",
+      "euOnly": "Processar IA somente na UE",
+      "euOnlyHint": "Todas as respostas de IA, buscas em documentos e produtos e transcrições de mensagens de voz desta organização rodam no endpoint de residência de dados na UE da OpenAI. Enquanto isso estiver ativo, os agentes usam os modelos gerenciados na UE do Hay.chat.",
+      "statusEu": "Processamento de IA: data centers na UE (residência de dados na UE da OpenAI).",
+      "statusDefault": "Processamento de IA: provedor de IA padrão do Hay.chat, que pode rodar fora da UE.",
+      "unavailable": "O processamento somente na UE ainda não está disponível. Ele aparecerá aqui quando estiver pronto.",
+      "misconfiguredTitle": "Somente UE está ativo, mas o endpoint na UE não está disponível",
+      "misconfiguredDescription": "Respostas de IA, buscas e transcrições estão pausadas para esta organização em vez de serem processadas fora da UE. Fale com o suporte do Hay.chat ou desative Somente UE para voltar ao provedor padrão.",
+      "customProviderPaused": "Somente UE está ativo, então o provedor e os modelos abaixo não são usados. Eles ficam salvos e voltam a valer se você desativar Somente UE.",
+      "saveSuccessEu": "A IA agora roda somente na UE",
+      "saveSuccessDefault": "A IA agora roda no provedor padrão",
+      "saveFailed": "Falha ao alterar a região de processamento de IA",
+      "loadFailed": "Falha ao carregar a região de processamento de IA"
     }
   }
 }

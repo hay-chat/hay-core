@@ -1,11 +1,51 @@
 <template>
   <Page :title="$t('llmSettings.title')" :description="$t('llmSettings.description')">
     <template #header>
-      <Button :loading="isSaving" :disabled="!unlocked || !hasChanges" @click="save">
+      <Button :loading="isSaving" :disabled="!unlocked || !hasChanges || isEu" @click="save">
         <Save class="h-4 w-4 mr-2" />
         {{ $t("llmSettings.save") }}
       </Button>
     </template>
+
+    <!-- AI processing region. EU is only offered when the server has an EU endpoint
+         configured, so the page never claims EU processing that is not routed. -->
+    <Card>
+      <CardHeader>
+        <CardTitle class="flex items-center gap-2">
+          <Globe class="h-5 w-5" />
+          {{ $t("llmSettings.region.title") }}
+        </CardTitle>
+        <CardDescription>{{ $t("llmSettings.region.description") }}</CardDescription>
+      </CardHeader>
+      <CardContent v-if="region" class="space-y-4">
+        <Alert v-if="isEu && !region.euAvailable" variant="destructive">
+          <AlertTitle>{{ $t("llmSettings.region.misconfiguredTitle") }}</AlertTitle>
+          <AlertDescription>
+            {{ $t("llmSettings.region.misconfiguredDescription") }}
+          </AlertDescription>
+        </Alert>
+
+        <Input
+          v-if="region.euAvailable || isEu"
+          :model-value="isEu"
+          type="switch"
+          :label="$t('llmSettings.region.euOnly')"
+          :hint="$t('llmSettings.region.euOnlyHint')"
+          :disabled="isSavingRegion || (!isEu && !region.euAvailable)"
+          @update:model-value="setRegion"
+        />
+        <p v-else class="text-sm text-muted-foreground">
+          {{ $t("llmSettings.region.unavailable") }}
+        </p>
+
+        <p v-if="isEu && region.euAvailable" class="text-sm font-medium">
+          {{ $t("llmSettings.region.statusEu") }}
+        </p>
+        <p v-else-if="!isEu" class="text-sm font-medium">
+          {{ $t("llmSettings.region.statusDefault") }}
+        </p>
+      </CardContent>
+    </Card>
 
     <!-- Warning gate -->
     <Card class="border-amber-500/50">
@@ -28,13 +68,18 @@
       </CardContent>
     </Card>
 
-    <!-- Config — visible but locked (dimmed + non-interactive) until acknowledged -->
+    <Alert v-if="isEu" variant="info">
+      <AlertDescription>{{ $t("llmSettings.region.customProviderPaused") }}</AlertDescription>
+    </Alert>
+
+    <!-- Config — visible but locked (dimmed + non-interactive) until acknowledged,
+         and while EU-only is on (the managed EU endpoint is used instead) -->
     <div
       :class="[
         'space-y-6 transition-opacity',
-        { 'pointer-events-none select-none opacity-50': !unlocked },
+        { 'pointer-events-none select-none opacity-50': !unlocked || isEu },
       ]"
-      :aria-disabled="!unlocked"
+      :aria-disabled="!unlocked || isEu"
     >
       <!-- Chat provider -->
       <Card>
@@ -135,7 +180,7 @@
 </template>
 
 <script setup lang="ts">
-import { Save, AlertTriangle, Unlock, ShieldCheck } from "lucide-vue-next";
+import { Save, AlertTriangle, Unlock, ShieldCheck, Globe } from "lucide-vue-next";
 import { Hay } from "@/utils/api";
 import { useToast } from "@/composables/useToast";
 // Type-only import (erased at runtime); the catalog VALUES are fetched over tRPC,
@@ -199,6 +244,45 @@ function defaults(): LlmForm {
     tiers: tierDefaultsFor("openai"),
     embeddingModel: "text-embedding-3-small",
   };
+}
+
+type AiRegion = "default" | "eu";
+interface RegionState {
+  region: AiRegion;
+  euAvailable: boolean;
+  hasCustomProvider: boolean;
+}
+
+const region = ref<RegionState | null>(null);
+const isSavingRegion = ref(false);
+const isEu = computed(() => region.value?.region === "eu");
+
+async function loadRegion() {
+  try {
+    region.value = await Hay.organizations.getAiRegion.query();
+  } catch (error) {
+    console.error("Failed to load AI region:", error);
+    toast.error(t("llmSettings.region.loadFailed"));
+  }
+}
+
+async function setRegion(value: boolean | string | number) {
+  const next: AiRegion = value === true ? "eu" : "default";
+  try {
+    isSavingRegion.value = true;
+    await Hay.organizations.updateAiRegion.mutate({ region: next });
+    await loadRegion();
+    toast.success(
+      next === "eu"
+        ? t("llmSettings.region.saveSuccessEu")
+        : t("llmSettings.region.saveSuccessDefault"),
+    );
+  } catch (error) {
+    console.error("Failed to update AI region:", error);
+    toast.error(t("llmSettings.region.saveFailed"));
+  } finally {
+    isSavingRegion.value = false;
+  }
 }
 
 const form = ref<LlmForm>(defaults());
@@ -313,7 +397,7 @@ async function save() {
 }
 
 onMounted(async () => {
-  await loadCatalog();
+  await Promise.all([loadRegion(), loadCatalog()]);
   await load();
 });
 
