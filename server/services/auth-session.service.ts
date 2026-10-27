@@ -10,7 +10,7 @@ import {
 } from "@server/lib/auth/utils/jwt";
 import type { AuthTokens } from "@server/types/auth.types";
 import { createLogger } from "@server/lib/logger";
-import { LessThan, type EntityManager, type Repository } from "typeorm";
+import { LessThan, QueryFailedError, type EntityManager, type Repository } from "typeorm";
 
 const logger = createLogger("auth-session");
 
@@ -83,6 +83,13 @@ function tokensFor(user: User, session: Session): AuthTokens {
   };
 }
 
+function isUniqueViolation(error: unknown): boolean {
+  return (
+    error instanceof QueryFailedError &&
+    (error.driverError as { code?: string } | undefined)?.code === "23505"
+  );
+}
+
 function truncate(value: string | undefined, max: number): string | null {
   return value ? value.slice(0, max) : null;
 }
@@ -96,6 +103,7 @@ export class AuthSessionService {
     user: User,
     client: SessionClientInfo = {},
     manager: EntityManager = AppDataSource.manager,
+    legacyTokenHash: string | null = null,
   ): Promise<AuthTokens> {
     const now = new Date();
     const repo = manager.getRepository(Session);
@@ -108,6 +116,7 @@ export class AuthSessionService {
         expiresAt: new Date(now.getTime() + SESSION_IDLE_TIMEOUT_MS),
         ipAddress: truncate(client.ipAddress, 255),
         userAgent: truncate(client.userAgent, 1000),
+        legacyTokenHash,
       }),
     );
     return tokensFor(user, session);
@@ -211,7 +220,20 @@ export class AuthSessionService {
     if (payload.tokenVersion !== undefined && payload.tokenVersion !== (user.tokenVersion ?? 0)) {
       throw new RefreshRejectedError("revoked");
     }
-    return this.createSession(user, client);
+
+    // Accept once: the new session records the token's hash under a unique
+    // index, so a replay (or a concurrent second use) cannot mint another.
+    const legacyTokenHash = crypto.createHash("sha256").update(refreshToken).digest("hex");
+    const sessions = AppDataSource.getRepository(Session);
+    if (await sessions.exists({ where: { legacyTokenHash } })) {
+      throw new RefreshRejectedError("reused");
+    }
+    try {
+      return await this.createSession(user, client, AppDataSource.manager, legacyTokenHash);
+    } catch (error) {
+      if (isUniqueViolation(error)) throw new RefreshRejectedError("reused");
+      throw error;
+    }
   }
 
   /** End the session a refresh token belongs to (explicit logout). Idempotent. */
