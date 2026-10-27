@@ -4,6 +4,7 @@ import { config } from "../config/env";
 import { createLogger } from "@server/lib/logger";
 import { MessageType } from "../database/entities/message.entity";
 import { Conversation } from "../database/entities/conversation.entity";
+import { handoffCopy } from "../orchestrator/handoff-copy";
 
 const logger = createLogger("message-recovery");
 
@@ -249,8 +250,11 @@ export class MessageRecoveryService {
 
     // Add customer-facing message
     await conversation.addMessage({
-      content:
-        "We're having technical difficulties processing your request. A human agent will assist you shortly.",
+      content: handoffCopy(
+        "recoveryEscalation",
+        conversation.language,
+        conversation.organization?.defaultLanguage,
+      ),
       type: MessageType.BOT_AGENT,
       metadata: {
         isEscalation: true,

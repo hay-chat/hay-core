@@ -28,7 +28,7 @@ You are writing a short customer service message. The AI assistant's drafted rep
 ## EXAMPLES (English; always write in the target language)
 
 - Customer asked to return an order: "Thanks for your patience — to make sure your return for order #1001 is handled correctly, I'm connecting you with a team member who will take care of it from here."
-- Customer asked about a billing charge: "I want to make sure you get an accurate answer about that charge, so I'm bringing in a team member who can look into it for you right away."
+- Customer asked about a billing charge: "I want to make sure you get an accurate answer about that charge, so I'm bringing in a team member who can look into it for you."
 
 ---
 
