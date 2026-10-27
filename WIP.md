@@ -1,3 +1,10 @@
+## 2026-10-27 — claude/merge-email-plugins — Email plugin merged into Email inbox (not merged, not pushed)
+- 70f2c91 email-channel: `send-email` action (email-mcp, capability mcp) emails notificationRecipients, else supportAddress; supportAddress now optional; i18n en/pt-BR; vitest 57.
+- 8a318c0 plugins/core/email + its e2e specs/lockfile entries removed; docs/comments updated.
+- 5953d3c migration MergeEmailPluginIntoEmailInbox1785300000000 (merge recipients / move lone instances / rewrite hay-plugin-email:send-email refs / drop registry row); ran on hay_test only.
+- Verified: plugin build + vitest, worker smoke (list-tools, call-tool → relay payload), server tsc, jest plugin|mcp|playbook 16 suites + new migration test.
+- Next: merge into staging, manual check on plugins page; prod: migration runs on deploy (Needs Roger).
+
 ## 2026-10-27 — claude/w1-greeting-locale — greeting in shopper locale done (not merged, not pushed)
 - 489750f server: public create validates `language` (BCP-47 regex, max 35); toSupportedLanguage maps pt-BR->pt; greeting translated at create via existing generateLocalizedGreeting (org LLM, falls back to original).
 - 32375d5 webchat: create sends resolveLocale(config.locale) (same as UI).
