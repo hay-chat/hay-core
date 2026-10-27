@@ -8,6 +8,11 @@ import { conversationRepository } from "../../../repositories/conversation.repos
 import { CustomerRepository } from "../../../repositories/customer.repository";
 import { OrganizationRepository } from "../../../repositories/organization.repository";
 import { createLogger } from "@server/lib/logger";
+import {
+  webchatSettingsService,
+  matchesAllowedDomains,
+} from "../../../services/webchat/webchat-settings.service";
+import { config } from "@server/config/env";
 
 const logger = createLogger("public-conversations");
 
@@ -58,9 +63,32 @@ const getMessagesSchema = z.object({
 
 export const publicConversationsRouter = t.router({
   // Create a new public conversation with public key registration
-  create: publicProcedure.input(createPublicConversationSchema).mutation(async ({ input }) => {
+  create: publicProcedure.input(createPublicConversationSchema).mutation(async ({ input, ctx }) => {
     try {
       const organizationId = input.organizationId;
+
+      const organization = await organizationRepository.findById(organizationId);
+      if (
+        !organization ||
+        organization.suspendedAt ||
+        !(await webchatSettingsService.isEnabled(organizationId))
+      ) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Webchat is not available" });
+      }
+
+      // Origin is set by the browser and cannot be changed by page scripts, so
+      // this stops an org ID from being copied onto another site. It does not
+      // stop non-browser clients, which can send any header.
+      const hostname = requestHostname(ctx.req.headers);
+      if (
+        !isDashboardHost(hostname) &&
+        !(await webchatSettingsService.isDomainAllowed(organizationId, hostname))
+      ) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "This website is not allowed to use this chat",
+        });
+      }
 
       // Validate the JWK is for ES256
       if (input.publicJwk.kty !== "EC" || input.publicJwk.crv !== "P-256") {
@@ -72,8 +100,7 @@ export const publicConversationsRouter = t.router({
 
       // Validate playground mode is allowed for this organization
       if (input.isPlayground) {
-        const organization = await organizationRepository.findById(organizationId);
-        if (!organization?.settings?.isPlayground) {
+        if (!organization.settings?.isPlayground) {
           throw new TRPCError({
             code: "FORBIDDEN",
             message: "Playground mode is not enabled for this organization",
@@ -125,6 +152,9 @@ export const publicConversationsRouter = t.router({
         createdAt: conversation.created_at,
       };
     } catch (error) {
+      if (error instanceof TRPCError) {
+        throw error;
+      }
       logger.error({ err: error }, "Error creating public conversation");
       throw new TRPCError({
         code: "INTERNAL_SERVER_ERROR",
@@ -351,6 +381,31 @@ export const publicConversationsRouter = t.router({
       }
     }),
 });
+
+/**
+ * Hostname of the page that made the request: from Origin, falling back to
+ * Referer. Null when neither is a valid URL (e.g. the "null" origin of a
+ * sandboxed iframe, or a non-browser client that sends neither).
+ */
+function requestHostname(headers: Record<string, string | string[] | undefined>): string | null {
+  for (const name of ["origin", "referer"]) {
+    const value = headers[name];
+    if (typeof value !== "string" || !value) continue;
+    try {
+      return new URL(value).hostname.toLowerCase() || null;
+    } catch {
+      continue;
+    }
+  }
+  return null;
+}
+
+// The Hay.chat dashboard previews the widget (demo page, playground) on its own
+// domain, which merchants never add to their allowed list.
+function isDashboardHost(hostname: string | null): boolean {
+  const dashboardHost = config.domain.dashboard.replace(/:\d+$/, "").toLowerCase();
+  return !!hostname && !!dashboardHost && matchesAllowedDomains([dashboardHost], hostname);
+}
 
 // Public components of an EC JWK used for DPoP proof verification.
 interface EcPublicJwk {

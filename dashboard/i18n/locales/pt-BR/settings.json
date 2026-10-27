@@ -322,7 +322,7 @@
     "securityAccessDescription": "Controle onde seu widget pode ser incorporado",
     "allowedDomains": "Domínios Permitidos",
     "allowedDomainsPlaceholder": "exemplo.com\napp.exemplo.com\n*",
-    "allowedDomainsDescription": "Insira um domínio por linha. Use * para permitir todos os domínios.",
+    "allowedDomainsDescription": "Sites onde seu chat pode iniciar conversas. Insira um domínio por linha, por exemplo loja.com, ou *.loja.com para todos os subdomínios (www.loja.com precisa de uma linha própria ou do curinga). * permite qualquer site: quem copiar o ID da sua organização pode usar seu chat, e o consumo de IA dele, no próprio site. Troque * pelos seus domínios antes de publicar.",
     "enableWebchat": "Ativar widget de webchat",
     "reset": "Redefinir",
     "saveChanges": "Salvar Alterações",
