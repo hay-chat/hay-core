@@ -1,0 +1,30 @@
+{
+  "name": "hay-plugin-nuvemshop",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Connect your Nuvemshop / Tiendanube store — look up products, orders and customers, cancel orders, track refund state, and sync your catalog so the agent can recommend real products.",
+  "author": "Hay",
+  "main": "dist/index.js",
+  "hay-plugin": {
+    "entry": "./dist/index.js",
+    "displayName": "Nuvemshop",
+    "category": "integration",
+    "capabilities": [
+      "mcp",
+      "auth",
+      "products"
+    ],
+    "env": []
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch"
+  },
+  "dependencies": {
+    "@hay/plugin-sdk": "file:../../../packages/plugin-sdk"
+  },
+  "devDependencies": {
+    "typescript": "^5.3.3",
+    "@types/node": "^20.10.0"
+  }
+}
