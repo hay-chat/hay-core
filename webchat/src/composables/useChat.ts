@@ -471,7 +471,7 @@ export function useChat(config: HayChatConfig) {
   // Set status change callback for conversation status updates
   setStatusChangeCallback((status: string, _payload: any) => {
     // Handle conversation closure
-    if (status === "closed" || status === "resolved") {
+    if (status === "closed" || status === "resolved" || status === "unresolved") {
       isConversationClosed.value = true;
     }
 

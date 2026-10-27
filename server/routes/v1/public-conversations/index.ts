@@ -232,7 +232,7 @@ export const publicConversationsRouter = t.router({
         hasMore: filteredMessages.length === input.limit,
         typing: isTyping,
         status: conversation?.status || "open",
-        isClosed: conversation?.status === "closed" || conversation?.status === "resolved",
+        isClosed: ["closed", "resolved", "unresolved"].includes(conversation?.status ?? ""),
         error: null,
         errorMessage: null,
       };
