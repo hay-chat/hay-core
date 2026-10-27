@@ -252,7 +252,7 @@ describe("DataRetentionService", () => {
       expect(setArg.deleted_at).toBeInstanceOf(Date);
     });
 
-    it("should only anonymize conversations with status closed or resolved", async () => {
+    it("should only anonymize ended conversations (closed, resolved or unresolved)", async () => {
       setupRepositories({
         organizations: [{ id: "org-1", name: "Test Org", settings: { retentionDays: 7 } }],
         expiredConversations: [],
@@ -262,7 +262,7 @@ describe("DataRetentionService", () => {
 
       // Verify the query filters by status
       expect(convQueryBuilder.andWhere).toHaveBeenCalledWith("conv.status IN (:...statuses)", {
-        statuses: ["closed", "resolved"],
+        statuses: ["closed", "resolved", "unresolved"],
       });
     });
 
