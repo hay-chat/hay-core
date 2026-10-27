@@ -6,6 +6,7 @@ import { getUTCNow } from "@server/utils/date.utils";
 import { hookManager } from "@server/services/hooks/hook-manager";
 import { PromptService } from "@server/services/prompt.service";
 import { createLogger } from "@server/lib/logger";
+import { getAiReplyBlocker, recheckAiReply } from "./reply-guard";
 
 const logger = createLogger("conversation-utils");
 
@@ -134,17 +135,25 @@ export async function generateHandoffSummary(
 }
 
 /**
- * Send a contextual inactivity warning message to the user
+ * Send a contextual inactivity warning message to the user.
+ * Returns whether a warning was sent: never while a human holds the
+ * conversation or the agent or organization is paused (D11-2).
  */
 export async function sendInactivityWarning(
   conversationId: string,
   organizationId: string,
-): Promise<void> {
+): Promise<boolean> {
   const log = logger.child({ organizationId, conversationId });
   try {
     const conversation = await conversationRepository.findById(conversationId);
     if (!conversation || conversation.organization_id !== organizationId) {
       throw new Error("Conversation not found");
+    }
+
+    const blocker = getAiReplyBlocker(conversation);
+    if (blocker) {
+      log.debug({ blocker }, "Skipping inactivity warning - AI may not reply");
+      return false;
     }
 
     // Get recent messages for context
@@ -154,7 +163,7 @@ export async function sendInactivityWarning(
       .slice(-5); // Last 5 messages
 
     if (recentMessages.length === 0) {
-      return;
+      return false;
     }
 
     const conversationContext = recentMessages
@@ -173,6 +182,13 @@ export async function sendInactivityWarning(
       tier: "easy",
     });
 
+    // The LLM call took a while; the owner may have taken over meanwhile.
+    const blockerAfterLlm = await recheckAiReply(conversationId);
+    if (blockerAfterLlm) {
+      log.debug({ blocker: blockerAfterLlm }, "Dropped inactivity warning - AI may not reply");
+      return false;
+    }
+
     // Add the warning message to the conversation
     await conversation.addMessage({
       content: response.trim(),
@@ -185,6 +201,7 @@ export async function sendInactivityWarning(
     });
 
     log.debug("Sent inactivity warning");
+    return true;
   } catch (error) {
     log.error({ err: error }, "Error sending inactivity warning");
     throw error;
@@ -192,7 +209,9 @@ export async function sendInactivityWarning(
 }
 
 /**
- * Close an inactive conversation with an appropriate message
+ * Close an inactive conversation with an appropriate message.
+ * Does nothing while a human holds the conversation or the agent or
+ * organization is paused: the owner decides when it ends (D11-2).
  */
 export async function closeInactiveConversation(
   conversationId: string,
@@ -208,6 +227,12 @@ export async function closeInactiveConversation(
       conversation.organization_id !== organizationId ||
       conversation.status !== "open"
     ) {
+      return;
+    }
+
+    const blocker = getAiReplyBlocker(conversation);
+    if (blocker) {
+      log.debug({ blocker }, "Skipping inactivity close - AI may not reply");
       return;
     }
 
@@ -245,6 +270,13 @@ export async function closeInactiveConversation(
           // One-line sign-off; the alternative branch is a hardcoded string.
           tier: "easy",
         });
+      }
+
+      // The LLM call took a while; the owner may have taken over meanwhile.
+      const blockerAfterLlm = await recheckAiReply(conversationId);
+      if (blockerAfterLlm) {
+        log.debug({ blocker: blockerAfterLlm }, "Dropped inactivity close - AI may not reply");
+        return;
       }
 
       // Add closure message
