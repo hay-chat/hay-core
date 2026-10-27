@@ -15,7 +15,7 @@
       :loading="opening"
       @click="openCta"
     >
-      {{ notice.ctaLabel || $t("accessNotice.defaultCta") }}
+      {{ ctaLabel }}
     </Button>
     <button
       type="button"
@@ -45,6 +45,14 @@ const message = computed(() => {
   if (!notice.value) return "";
   const key = `accessNotice.${notice.value.key}`;
   return te(key) ? t(key, notice.value.params ?? {}) : (notice.value.text ?? "");
+});
+
+// Known notice keys get a translated label; otherwise the operator's label, then a generic one.
+const ctaLabel = computed(() => {
+  if (!notice.value) return "";
+  const key = `accessNoticeCta.${notice.value.key}`;
+  if (te(key)) return t(key);
+  return notice.value.ctaLabel || t("accessNotice.defaultCta");
 });
 
 const levelClass = computed(() => {

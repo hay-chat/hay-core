@@ -118,6 +118,30 @@ describe("internal.organizations", () => {
     );
   });
 
+  it.each([
+    ["usage_cap_reached", { used: "1,200", cap: "1,200", periodEnd: "2026-11-01" }],
+    ["trial_grace", { lockDate: "2026-11-03" }],
+    ["manual_suspension_pending", { date: "2026-11-05", reason: "Terms review." }],
+  ])("passes the %s notice key and params through unchanged", async (key, params) => {
+    mockSetAccessState.mockResolvedValueOnce(state);
+    const notice = {
+      key,
+      level: "critical" as const,
+      params,
+      text: "Fallback text",
+      ctaUrl: "https://hay.chat/billing/",
+      ctaLabel: "Open",
+      expiresAt: "2026-11-05T00:00:00.000Z",
+    };
+    await internalRouter.createCaller(ctx()).organizations.setAccessState({
+      organizationId: ORG_ID,
+      suspension: null,
+      agentPause: { reason: "usage_limit" },
+      notice,
+    });
+    expect(mockSetAccessState).toHaveBeenCalledWith(expect.objectContaining({ notice }));
+  });
+
   it("maps an unknown organization to NOT_FOUND", async () => {
     mockSetAccessState.mockResolvedValueOnce(null);
     await expect(
