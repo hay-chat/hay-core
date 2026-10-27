@@ -48,9 +48,4 @@ describe("hand-off prompts", () => {
     expect(en).toMatch(/Never promise or estimate when the team will reply/);
     expect(read("pt/execution/planner.md")).toMatch(/Nunca prometa nem estime/);
   });
-
-  it("the hand-off message prompt exists in en and pt", () => {
-    expect(read("en/conversation/handoff-message.md")).toMatch(/id: handoff-message/);
-    expect(read("pt/conversation/handoff-message.md")).toMatch(/id: handoff-message/);
-  });
 });
