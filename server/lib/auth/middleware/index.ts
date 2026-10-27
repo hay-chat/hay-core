@@ -114,15 +114,8 @@ export async function authenticate(req: Request): Promise<AuthUser | null> {
 
     // Try Basic authentication
     if (!baseAuthUser && authHeader.startsWith("Basic ")) {
-      const result = await authenticateBasicAuth(authHeader);
-      if (result) {
-        // Store tokens in response headers for the client
-        if (req.res) {
-          req.res.setHeader("X-Access-Token", result.tokens.accessToken);
-          req.res.setHeader("X-Refresh-Token", result.tokens.refreshToken);
-          req.res.setHeader("X-Token-Expires-In", result.tokens.expiresIn.toString());
-        }
-        baseAuthUser = result.user;
+      baseAuthUser = await authenticateBasicAuth(authHeader);
+      if (baseAuthUser) {
         logAuthSuccess("basic", baseAuthUser.id);
       }
     }

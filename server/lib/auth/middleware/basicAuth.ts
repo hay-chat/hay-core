@@ -1,23 +1,13 @@
 import { User } from "@server/entities/user.entity";
 import { AuthUser } from "@server/lib/auth/AuthUser";
 import { parseBasicAuth, verifyPassword } from "@server/lib/auth/utils/hashing";
-import { generateTokens } from "@server/lib/auth/utils/jwt";
 import { AppDataSource } from "@server/database/data-source";
 
-export interface BasicAuthResult {
-  user: AuthUser;
-  tokens: {
-    accessToken: string;
-    refreshToken: string;
-    expiresIn: number;
-  };
-}
-
 /**
- * Authenticate a user using Basic Authentication (email:password)
- * Returns both the authenticated user and JWT tokens
+ * Authenticate a user using Basic Authentication (email:password).
+ * Per-request credentials: no session or tokens are issued.
  */
-export async function authenticateBasicAuth(authHeader?: string): Promise<BasicAuthResult | null> {
+export async function authenticateBasicAuth(authHeader?: string): Promise<AuthUser | null> {
   if (!authHeader || !authHeader.startsWith("Basic ")) {
     return null;
   }
@@ -56,18 +46,9 @@ export async function authenticateBasicAuth(authHeader?: string): Promise<BasicA
   user.lastLoginAt = new Date();
   await userRepository.save(user);
 
-  // Generate JWT tokens
-  const tokens = generateTokens(user);
-
-  // Create AuthUser instance
-  const authUser = new AuthUser(user, "basic", {
+  return new AuthUser(user, "basic", {
     sessionId: `basic_${Date.now()}_${Math.random().toString(36).substring(2)}`,
   });
-
-  return {
-    user: authUser,
-    tokens,
-  };
 }
 
 /**
