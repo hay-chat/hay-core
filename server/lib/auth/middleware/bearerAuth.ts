@@ -64,6 +64,11 @@ export async function authenticateBearerAuth(authHeader?: string): Promise<AuthU
     throw new Error("Token payload mismatch");
   }
 
+  // A password change/reset bumps tokenVersion: reject access tokens issued before it.
+  if (payload.tokenVersion !== undefined && payload.tokenVersion !== (user.tokenVersion ?? 0)) {
+    throw new Error("Token has been revoked");
+  }
+
   // Create AuthUser instance with JWT metadata
   const authUser = new AuthUser(user, "jwt", {
     sessionId: `jwt_${payload.iat}_${payload.userId}`,

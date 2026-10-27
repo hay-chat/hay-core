@@ -2,9 +2,17 @@ import { Entity, Column, Index, ManyToOne, JoinColumn } from "typeorm";
 import { BaseEntity } from "./base.entity";
 import { User } from "./user.entity";
 
+export type SessionRevokedReason = "logout" | "reuse_detected" | "password_changed";
+
+/**
+ * One login on one device: a refresh-token family.
+ *
+ * The refresh token is derived from (id, generation) and is never stored.
+ * Each refresh bumps `generation` (rotation) and pushes `expiresAt` to
+ * now + the idle timeout (sliding session). See auth-session.service.ts.
+ */
 @Entity("sessions")
 @Index("idx_sessions_user_id", ["userId"])
-@Index("idx_sessions_refresh_token_hash", ["refreshTokenHash"])
 @Index("idx_sessions_expires_at", ["expiresAt"])
 export class Session extends BaseEntity {
   @Column({ type: "uuid" })
@@ -14,8 +22,16 @@ export class Session extends BaseEntity {
   @JoinColumn()
   user?: User;
 
-  @Column({ type: "varchar", length: 255 })
-  refreshTokenHash!: string;
+  /** Bumped on every refresh; only the token of the current generation rotates. */
+  @Column({ type: "integer", default: 0 })
+  generation!: number;
+
+  /** users.token_version when the session started; a password change bumps it. */
+  @Column({ type: "integer", default: 0 })
+  tokenVersion!: number;
+
+  @Column({ type: "timestamptz", nullable: true })
+  rotatedAt?: Date | null;
 
   @Column({ type: "timestamptz" })
   expiresAt!: Date;
@@ -23,21 +39,15 @@ export class Session extends BaseEntity {
   @Column({ type: "timestamptz" })
   lastActivity!: Date;
 
+  @Column({ type: "timestamptz", nullable: true })
+  revokedAt?: Date | null;
+
+  @Column({ type: "varchar", length: 32, nullable: true })
+  revokedReason?: SessionRevokedReason | null;
+
   @Column({ type: "varchar", length: 255, nullable: true })
-  ipAddress?: string;
+  ipAddress?: string | null;
 
   @Column({ type: "text", nullable: true })
-  userAgent?: string;
-
-  @Column({ type: "boolean", default: true })
-  isActive!: boolean;
-
-  isExpired(): boolean {
-    return new Date() > this.expiresAt;
-  }
-
-  toJSON() {
-    const { refreshTokenHash: _refreshTokenHash, ...sessionWithoutToken } = this;
-    return sessionWithoutToken;
-  }
+  userAgent?: string | null;
 }

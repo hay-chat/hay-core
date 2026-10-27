@@ -73,13 +73,14 @@ export const useAuthStore = defineStore("auth", {
     },
 
     async logout(reason?: string) {
-      // Only try to call logout API if we have a valid token
-      if (this.tokens?.accessToken) {
+      // End this device's session server-side; the refresh token is the proof,
+      // so this works after the access token expired.
+      if (this.tokens?.refreshToken) {
         try {
-          await HayAuthApi.auth.logout.mutate();
+          await HayAuthApi.auth.logout.mutate({ refreshToken: this.tokens.refreshToken });
         } catch (error) {
-          // Ignore errors on logout - token might already be invalid
-          console.log("[Auth] Logout API call failed (expected if token expired):", error);
+          // Ignore errors on logout - the session may already be revoked
+          console.log("[Auth] Logout API call failed:", error);
         }
       }
 
@@ -165,10 +166,10 @@ export const useAuthStore = defineStore("auth", {
           refreshToken: currentTokens.refreshToken,
         });
 
-        // Keep the existing refresh token, only update access token
+        // Refresh tokens rotate: the old one stops working once its successor is used.
         this.tokens = {
           accessToken: result.accessToken,
-          refreshToken: currentTokens.refreshToken, // Keep existing refresh token
+          refreshToken: result.refreshToken,
           expiresAt: Date.now() + result.expiresIn * 1000, // Convert seconds to milliseconds
         };
 
