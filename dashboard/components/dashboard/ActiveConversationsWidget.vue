@@ -4,7 +4,7 @@
       <div class="flex items-center justify-between">
         <div>
           <CardTitle>Active conversations</CardTitle>
-          <CardDescription>Live list across Hay + humans</CardDescription>
+          <CardDescription>Live list across Hay.chat + humans</CardDescription>
         </div>
         <Button variant="ghost" size="sm" @click="viewAll">
           View All
@@ -45,7 +45,7 @@
                 {{
                   conv.handler.type === "human"
                     ? `Human${conv.handler.name ? ` • ${conv.handler.name}` : ""}`
-                    : "Hay"
+                    : "Hay.chat"
                 }}
               </span>
               <span v-if="conv.lastMessageAt">• {{ formatRelativeTime(conv.lastMessageAt) }}</span>

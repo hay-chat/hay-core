@@ -117,7 +117,7 @@ export default defineHayPlugin((globalCtx) => {
           type: "string",
           label: "Connection method",
           description:
-            "Embedded Signup connects your number in a Meta popup. Manual uses a permanent token from your own Meta app (self-hosting, or before Hay's app review).",
+            "Embedded Signup connects your number in a Meta popup. Manual uses a permanent token from your own Meta app (self-hosting, or before Hay.chat's app review).",
           required: false,
           encrypted: false,
           default: "embedded-signup",

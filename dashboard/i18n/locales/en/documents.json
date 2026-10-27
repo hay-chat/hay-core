@@ -3,7 +3,7 @@
     "page": {
       "title": "Documents",
       "description": "Manage your knowledge base documents for AI agents.",
-      "seoTitle": "Documents - Hay Dashboard",
+      "seoTitle": "Documents - Hay.chat",
       "seoDescription": "Manage your knowledge base documents"
     },
     "actions": {
@@ -138,8 +138,8 @@
       "edit": "Edit",
       "save": "Save",
       "cancel": "Cancel",
-      "seoTitle": "{title} - Documents - Hay Dashboard",
-      "seoTitleDefault": "Document - Hay Dashboard",
+      "seoTitle": "{title} - Documents - Hay.chat",
+      "seoTitleDefault": "Document - Hay.chat",
       "seoDescription": "View document details"
     },
     "new": {
@@ -167,7 +167,7 @@
       "page": {
         "title": "Import Document",
         "description": "Add new documents to your knowledge base from various sources.",
-        "seoTitle": "Import Documents - Hay Dashboard",
+        "seoTitle": "Import Documents - Hay.chat",
         "seoDescription": "Import documents to your knowledge base"
       },
       "tutorial": "Tutorial",

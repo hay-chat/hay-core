@@ -1,7 +1,7 @@
 <template>
   <Page
     title="Document Sources"
-    description="External knowledge sources that sync documents into Hay."
+    description="External knowledge sources that sync documents into Hay.chat."
   >
     <template #header>
       <div class="mt-4 sm:mt-0 flex space-x-3">

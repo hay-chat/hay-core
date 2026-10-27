@@ -342,7 +342,7 @@ watch(
 
 // SEO
 useHead({
-  title: "Accept Invitation - Hay Dashboard",
+  title: "Accept Invitation - Hay.chat",
   meta: [{ name: "description", content: "Accept your organization invitation" }],
 });
 </script>

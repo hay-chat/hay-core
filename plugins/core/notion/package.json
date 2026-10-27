@@ -1,7 +1,7 @@
 {
   "name": "hay-plugin-notion",
   "version": "0.1.0",
-  "description": "Notion integration — import Notion pages and database entries as documents into Hay's knowledge base",
+  "description": "Notion integration — import Notion pages and database entries as documents into Hay.chat's knowledge base",
   "author": "Hay",
   "license": "MIT",
   "type": "module",

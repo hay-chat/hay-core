@@ -2173,6 +2173,6 @@ definePageMeta({
 
 // Head management
 useHead({
-  title: computed(() => `${conversation.value?.title || "New Conversation"} - Hay Dashboard`),
+  title: computed(() => `${conversation.value?.title || "New Conversation"} - Hay.chat`),
 });
 </script>

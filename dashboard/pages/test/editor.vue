@@ -185,6 +185,6 @@ definePageMeta({
 
 // Set page title
 useHead({
-  title: "Instructions Editor Test - Hay Dashboard",
+  title: "Instructions Editor Test - Hay.chat",
 });
 </script>

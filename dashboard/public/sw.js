@@ -17,10 +17,10 @@ self.addEventListener("push", (event) => {
   try {
     data = event.data ? event.data.json() : {};
   } catch {
-    data = { title: "Hay", body: event.data ? event.data.text() : "" };
+    data = { title: "Hay.chat", body: event.data ? event.data.text() : "" };
   }
 
-  const title = data.title || "Hay";
+  const title = data.title || "Hay.chat";
   const options = {
     body: data.body || "",
     tag: data.tag || "hay",

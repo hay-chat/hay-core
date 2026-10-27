@@ -64,7 +64,7 @@ export async function escalateHandler(
     // Step 1 — internal note (best-effort; don't fail escalation if note fails)
     try {
       const note =
-        `🤖 Hay AI handed this conversation off to a human agent.` +
+        `🤖 Hay.chat AI handed this conversation off to a human agent.` +
         (reason ? ` Reason: ${reason}.` : "");
       await api.sendMessage(chatwootConversationId, note, { private: true });
     } catch (noteErr: any) {

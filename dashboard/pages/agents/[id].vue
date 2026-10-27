@@ -754,7 +754,7 @@ definePageMeta({
 
 // Head management
 useHead({
-  title: computed(() => `${isEditMode.value ? "Edit" : "Create"} Agent - Hay Dashboard`),
+  title: computed(() => `${isEditMode.value ? "Edit" : "Create"} Agent - Hay.chat`),
   meta: [
     {
       name: "description",

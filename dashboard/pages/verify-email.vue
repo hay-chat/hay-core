@@ -216,7 +216,7 @@ definePageMeta({
 
 // Head management
 useHead({
-  title: "Verify Email - Hay Dashboard",
+  title: "Verify Email - Hay.chat",
   meta: [
     {
       name: "description",

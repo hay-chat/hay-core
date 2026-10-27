@@ -402,5 +402,5 @@ onMounted(async () => {
 });
 
 definePageMeta({ layout: "default" });
-useHead({ title: computed(() => `${t("llmSettings.title")} - Hay Dashboard`) });
+useHead({ title: computed(() => `${t("llmSettings.title")} - Hay.chat`) });
 </script>

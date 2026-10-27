@@ -244,7 +244,7 @@
     "title": "Tokens de API",
     "description": "Gerencie tokens de API para acesso no nível da organização",
     "connectionDetails": "Detalhes de conexão",
-    "connectionDetailsDescription": "Use estes valores ao conectar o Hay a outra plataforma, como o widget de chat da Shopify.",
+    "connectionDetailsDescription": "Use estes valores ao conectar o Hay.chat a outra plataforma, como o widget de chat da Shopify.",
     "serverUrl": "URL do servidor Hay.chat",
     "organizationId": "ID da organização",
     "createToken": "Criar Token",
@@ -460,7 +460,7 @@
     "deleteApiKeyTitle": "Excluir Chave de API",
     "deleteApiKeyDescription": "Tem certeza de que deseja excluir esta chave de API? Esta ação não pode ser desfeita.",
     "deleteApiKeyConfirm": "Excluir",
-    "headTitle": "Configurações de Segurança - Hay Dashboard",
+    "headTitle": "Configurações de Segurança - Hay.chat",
     "headDescription": "Gerencie autenticação, controles de acesso e políticas de segurança"
   },
   "profile": {
@@ -530,7 +530,7 @@
     "verificationResendFailed": "Falha ao reenviar email de verificação",
     "passwordChanged": "Senha alterada com sucesso. Um email de confirmação foi enviado.",
     "passwordChangeFailed": "Falha ao alterar senha",
-    "headTitle": "Configurações do Perfil - Hay Dashboard",
+    "headTitle": "Configurações do Perfil - Hay.chat",
     "headDescription": "Gerencie suas informações de perfil e segurança da conta",
     "notifications": {
       "title": "Alertas neste dispositivo",
@@ -540,7 +540,7 @@
   "gitConnections": {
     "title": "Conexões Git",
     "description": "Conecte seus repositórios Git para instalar e sincronizar plugins automaticamente",
-    "headTitle": "Conexões Git - Hay Dashboard",
+    "headTitle": "Conexões Git - Hay.chat",
     "headDescription": "Gerencie conexões de repositórios Git para sincronização de plugins",
     "connectGitHub": "Conectar GitHub",
     "notConfigured": "GitHub App não configurado",
@@ -597,7 +597,7 @@
   },
   "llmSettings": {
     "title": "Modelos de IA",
-    "description": "Escolha qual provedor e modelos de IA alimentam seus agentes. Os embeddings continuam gerenciados pela Hay.",
+    "description": "Escolha qual provedor e modelos de IA alimentam seus agentes. Os embeddings continuam gerenciados pelo Hay.chat.",
     "save": "Salvar Alterações",
     "saveSuccess": "Configurações de modelos de IA salvas",
     "saveFailed": "Falha ao salvar as configurações de modelos de IA",
@@ -623,7 +623,7 @@
       "baseUrl": "URL Base",
       "baseUrlHelper": "A URL base da API compatível com OpenAI do provedor.",
       "byo": "Usar minha própria chave de API",
-      "byoHint": "Quando desativado, a IA gerenciada da Hay é usada (cobrada no seu plano).",
+      "byoHint": "Quando desativado, a IA gerenciada do Hay.chat é usada (cobrada no seu plano).",
       "apiKey": "Chave de API",
       "apiKeyPlaceholder": "Insira a chave de API do provedor",
       "apiKeyHelper": "Armazenada criptografada; nunca exibida novamente após salvar.",
@@ -641,7 +641,7 @@
     },
     "embedding": {
       "title": "Embeddings (Gerenciado)",
-      "description": "Os embeddings são sempre gerenciados pela Hay e fixados em 1536 dimensões.",
+      "description": "Os embeddings são sempre gerenciados pelo Hay.chat e fixados em 1536 dimensões.",
       "model": "Modelo de Embedding",
       "modelHelper": "Deve produzir vetores de 1536 dimensões (ex.: text-embedding-3-small)."
     },
