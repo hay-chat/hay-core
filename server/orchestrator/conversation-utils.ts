@@ -61,6 +61,7 @@ export async function generateConversationTitle(
       prompt,
       // Title generation is a short summarisation with no downstream decision.
       tier: "easy",
+      organizationId,
     });
 
     const title = response.trim().replace(/^["']|["']$/g, ""); // Remove quotes if present
@@ -120,6 +121,7 @@ export async function generateHandoffSummary(
       prompt,
       // Summarising a transcript for a human agent — no tool use, no planning.
       tier: "medium",
+      organizationId,
     });
 
     const summary = response.trim().replace(/^["']|["']$/g, "");
@@ -181,6 +183,7 @@ export async function sendInactivityWarning(
       prompt,
       // Short inactivity nudge from the last 5 messages.
       tier: "easy",
+      organizationId,
     });
 
     // The LLM call took a while; the owner may have taken over meanwhile.
@@ -273,6 +276,7 @@ export async function closeInactiveConversation(
           prompt,
           // One-line sign-off; the alternative branch is a hardcoded string.
           tier: "easy",
+          organizationId,
         });
       }
 
@@ -387,6 +391,7 @@ export async function validateConversationClosure(
       // A shouldClose boolean over a transcript. Medium rather than easy: getting
       // this wrong closes a live conversation.
       tier: "medium",
+      organizationId,
       jsonSchema: {
         type: "object",
         properties: {
