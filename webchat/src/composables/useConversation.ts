@@ -1,4 +1,5 @@
 import type { HayChatConfig } from "@/types";
+import { resolveLocale } from "@/i18n/resolve";
 
 interface ConversationMetadata {
   source: string;
@@ -89,6 +90,8 @@ export function useConversation(config: HayChatConfig) {
         organizationId: config.organizationId,
         publicJwk,
         metadata,
+        // Same locale the widget UI uses, so the server greeting matches it.
+        language: resolveLocale(config.locale),
         ...(context && Object.keys(context).length > 0 ? { context } : {}),
         ...(customerExternalId ? { customerExternalId } : {}),
       }),
