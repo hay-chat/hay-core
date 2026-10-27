@@ -1,6 +1,6 @@
 export default {
   "widget.defaultTitle": "Bizimle sohbet edin",
-  "widget.defaultSubtitle": "Genellikle birkaç dakika içinde yanıt veririz",
+  "widget.defaultSubtitle": "Size yardımcı olmak için buradayız",
   "widget.defaultGreeting": "Merhaba! Bugün size nasıl yardımcı olabiliriz?",
   "chat.close": "Sohbeti kapat",
   "chat.open": "Sohbeti aç",
@@ -12,4 +12,6 @@ export default {
   "chat.conversationClosed": "Görüşme Kapandı",
   "input.placeholder": "Bir mesaj yazın...",
   "input.send": "Mesaj gönder",
+  "error.sendFailed": "Mesajınız gönderilemedi. Lütfen birazdan tekrar deneyin.",
+  "error.messageTooLong": "Mesajınız çok uzun. Lütfen kısaltıp tekrar deneyin.",
 } as const;

@@ -1,6 +1,6 @@
 export default {
   "widget.defaultTitle": "Chatea con nosotros",
-  "widget.defaultSubtitle": "Normalmente respondemos en minutos",
+  "widget.defaultSubtitle": "Estamos aquí para ayudarte",
   "widget.defaultGreeting": "¡Hola! ¿Cómo podemos ayudarte hoy?",
   "chat.close": "Cerrar chat",
   "chat.open": "Abrir chat",
@@ -12,4 +12,6 @@ export default {
   "chat.conversationClosed": "Conversación Cerrada",
   "input.placeholder": "Escribe un mensaje...",
   "input.send": "Enviar mensaje",
+  "error.sendFailed": "No se pudo enviar tu mensaje. Inténtalo de nuevo en un momento.",
+  "error.messageTooLong": "Tu mensaje es demasiado largo. Acórtalo e inténtalo de nuevo.",
 } as const;

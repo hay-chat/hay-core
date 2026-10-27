@@ -1,6 +1,6 @@
 export default {
   "widget.defaultTitle": "문의하기",
-  "widget.defaultSubtitle": "보통 몇 분 이내에 답변드립니다",
+  "widget.defaultSubtitle": "기꺼이 도와드리겠습니다",
   "widget.defaultGreeting": "안녕하세요! 무엇을 도와드릴까요?",
   "chat.close": "채팅 닫기",
   "chat.open": "채팅 열기",
@@ -12,4 +12,6 @@ export default {
   "chat.conversationClosed": "대화 종료됨",
   "input.placeholder": "메시지를 입력하세요...",
   "input.send": "메시지 보내기",
+  "error.sendFailed": "메시지를 보내지 못했습니다. 잠시 후 다시 시도해 주세요.",
+  "error.messageTooLong": "메시지가 너무 깁니다. 줄여서 다시 시도해 주세요.",
 } as const;

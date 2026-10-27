@@ -3,6 +3,7 @@ import Widget from "./Widget.vue";
 import type { HayChatConfig } from "./types";
 import { addContext } from "./composables/useWidgetContext";
 import { initConsent, grantConsent, revokeConsent } from "./composables/useConsent";
+import { setDebug, debugLog } from "./utils/debug";
 import "./styles/widget.css";
 
 // Get config from window object or use defaults
@@ -15,6 +16,8 @@ const defaultConfig: HayChatConfig = {
 };
 
 const config = { ...defaultConfig, ...window.HayChat?.config };
+
+setDebug(config.debug);
 
 // Initialize ePrivacy consent gate before any composable touches storage.
 initConsent(config.consent);
@@ -46,4 +49,4 @@ if (window.HayChat) {
   window.HayChat.revokeConsent = revokeConsent;
 }
 
-console.log("[Hay Webchat] Widget loaded", { organizationId: config.organizationId });
+debugLog("[Hay Webchat] Widget loaded", { organizationId: config.organizationId });

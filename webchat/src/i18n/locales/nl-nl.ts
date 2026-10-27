@@ -1,6 +1,6 @@
 export default {
   "widget.defaultTitle": "Chat met ons",
-  "widget.defaultSubtitle": "We reageren meestal binnen enkele minuten",
+  "widget.defaultSubtitle": "Wij helpen u graag",
   "widget.defaultGreeting": "Hallo! Hoe kunnen we u vandaag helpen?",
   "chat.close": "Chat sluiten",
   "chat.open": "Chat openen",
@@ -12,4 +12,6 @@ export default {
   "chat.conversationClosed": "Gesprek Gesloten",
   "input.placeholder": "Typ een bericht...",
   "input.send": "Bericht verzenden",
+  "error.sendFailed": "Uw bericht kon niet worden verzonden. Probeer het zo meteen opnieuw.",
+  "error.messageTooLong": "Uw bericht is te lang. Maak het korter en probeer het opnieuw.",
 } as const;
