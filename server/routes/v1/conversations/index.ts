@@ -15,6 +15,10 @@ import { createLogger } from "@server/lib/logger";
 import { agentFirstName } from "../../../services/webchat/public-message";
 import { ConversationExportService } from "../../../services/conversation-export.service";
 import { AppDataSource } from "../../../database/data-source";
+import {
+  listChannelTemplates,
+  prepareChannelTemplate,
+} from "../../../services/channel-templates.service";
 
 const logger = createLogger("conversations");
 const conversationExportService = new ConversationExportService();
@@ -646,6 +650,98 @@ export const conversationsRouter = t.router({
 
     return message;
   }),
+
+  /**
+   * D13-3: templates the conversation's channel can send now (e.g. WhatsApp
+   * templates once the 24 h reply window closed). `supported: false` when the
+   * channel has none.
+   */
+  channelTemplates: authenticatedProcedure
+    .input(z.object({ conversationId: z.string().uuid() }))
+    .query(async ({ ctx, input }) => {
+      const conversation = await conversationRepository.findById(input.conversationId);
+      if (!conversation || conversation.organization_id !== ctx.organizationId) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Conversation not found" });
+      }
+      try {
+        return await listChannelTemplates(conversation.organization_id, conversation.channel);
+      } catch (error) {
+        logger.warn({ err: error, conversationId: conversation.id }, "Channel templates failed");
+        throw new TRPCError({
+          code: "BAD_GATEWAY",
+          message: "Could not load templates from the channel",
+        });
+      }
+    }),
+
+  /**
+   * D13-3: a person sends an approved channel template (human-started only).
+   * Stored as a human-agent message with the rendered text; the channel plugin
+   * sends the template itself from `metadata.channelTemplate` on delivery.
+   */
+  sendChannelTemplate: authenticatedProcedure
+    .input(
+      z.object({
+        conversationId: z.string().uuid(),
+        name: z.string().min(1).max(512),
+        language: z.string().min(1).max(20),
+        values: z.record(z.string().max(64), z.string().max(1024)).default({}),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const conversation = await conversationRepository.findById(input.conversationId);
+      if (!conversation || conversation.organization_id !== ctx.organizationId) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Conversation not found" });
+      }
+      if (
+        conversation.status !== "human-took-over" ||
+        conversation.assigned_user_id !== ctx.user?.id
+      ) {
+        throw new TRPCError({
+          code: "PRECONDITION_FAILED",
+          message: "Take over the conversation before sending a template",
+        });
+      }
+
+      let prepared: Awaited<ReturnType<typeof prepareChannelTemplate>>;
+      try {
+        prepared = await prepareChannelTemplate({
+          organizationId: conversation.organization_id,
+          channel: conversation.channel,
+          name: input.name,
+          language: input.language,
+          values: input.values,
+        });
+      } catch (error) {
+        logger.warn({ err: error, conversationId: conversation.id }, "Channel templates failed");
+        throw new TRPCError({
+          code: "BAD_GATEWAY",
+          message: "Could not load templates from the channel",
+        });
+      }
+      if ("error" in prepared) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message:
+            prepared.error === "missing_variables"
+              ? "Fill in every template variable"
+              : "This template is not available on the channel",
+        });
+      }
+
+      const { userRepository } = await import("../../../repositories/user.repository");
+      const message = await conversation.addMessage({
+        content: prepared.content,
+        type: MessageType.HUMAN_AGENT,
+        metadata: {
+          sender: "assistant",
+          sentByUserId: ctx.user?.id,
+          agentFirstName: agentFirstName(await userRepository.findById(ctx.user!.id)),
+          channelTemplate: prepared.channelTemplate,
+        },
+      });
+      return message;
+    }),
 
   takeover: authenticatedProcedure
     .input(

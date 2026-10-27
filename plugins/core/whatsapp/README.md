@@ -24,12 +24,33 @@ The settings page has three parts:
 - **Health card**: number, display name, `health_status`, quality rating and messaging tier.
 - **Payment card**: when the WhatsApp Business account has no payment method, links to its
   WhatsApp Manager page and re-checks when the user comes back.
+- **Message templates card**: every template on the account with its status, category and
+  Meta's rejection reason, plus a "Sync with Meta" button.
+
+## Templates and the 24-hour window
+
+- **Window (D13-2)**: each inbound message sends `replyWindowExpiresAt` (message time + 24 h)
+  to `messages.receive`. Core stores it on the conversation; the composer shows when it
+  closes, and once closed offers templates instead of free text.
+- **Template store (D13-1)**: kept in the worker (one per org), synced from
+  `GET /{waba}/message_templates` on start, on connect and from the settings page, and patched
+  by `message_template_status_update` / `template_category_update` webhooks. `GET /templates`
+  gives core the sendable ones (approved, body variables only); a restarted worker syncs again.
+- **Human-picked templates (D13-3)**: core stores the message with `metadata.channelTemplate`
+  `{name, language, parameters}`; `/deliver` sends it as a template. Human-started only, no
+  automated sends.
+- **Hand-off fallback (D13-4)**: when an AI hand-off message (`metadata.isHandoffMessage`) hits
+  131047, `/deliver` sends the `handoffTemplateName` template (default `hay_handoff_to_person`)
+  in the conversation's language, else English. Without an approved one, the window error stays.
+- **Starter templates (D13-5)**: after a successful sync, missing `hay_we_replied` and
+  `hay_handoff_to_person` (UTILITY, `en` + `pt_BR`) are submitted for Meta's review. Idempotent
+  by name and language.
 
 Customer identity (D3): `external_id` is `+<wa_id>` in E.164. Users who hide their number
 behind a WhatsApp username have only a business-scoped user id, so they get
 `whatsapp:bsuid:<user_id>` and are messaged with `recipient`.
 
-Not yet: templates and the closed-window flow (Phase 3), coexistence echoes and history
+Not yet: templates with media headers or variable button links, coexistence echoes and history
 import (Phase 4), typing indicators and read receipts, interactive messages sent by the agent.
 
 ## Connecting a number
@@ -149,24 +170,26 @@ Set `META_WHATSAPP_APP_ID`, `META_WHATSAPP_APP_SECRET`, `META_WHATSAPP_ES_CONFIG
   method on file. The settings page links to the page in WhatsApp Manager where the business
   adds one.
 - Free-form replies are allowed only within 24 hours of the customer's last message. Outside
-  that window, delivery returns `24h_window_expired`; templates come in Phase 3.
+  that window, delivery returns `24h_window_expired` and a person can send an approved template.
 - Meta allows about 1 message per 6 seconds to the same user; above that it returns 131056.
-  Delivery returns 503 (`rate_limited`) for 131056 and 130429. Core does not retry deliveries
-  yet, so the reply is marked failed — see the follow-up in PLAN.md.
+  Delivery returns 503 (`rate_limited`) for 131056 and 130429. Core retries a 503 three times
+  with backoff (5 s, 15 s, 45 s), then marks the reply failed and alerts owners and admins.
 
 ## Delivery error mapping (`POST /deliver`)
 
-| Meta error                                     | Response                                                                       |
-| ---------------------------------------------- | ------------------------------------------------------------------------------ |
-| 131047 (outside the 24h window)                | `200 {success:false, error:"24h_window_expired"}`                              |
-| 131056, 130429, 80007, 4, 131057, network, 5xx | `503` (transient)                                                              |
-| 190 (token revoked)                            | `200 {success:false, error:"token_revoked"}`; Embedded Signup also disconnects |
-| 133010 (number not registered)                 | `200 {success:false, error:"phone_not_registered"}`                            |
-| 131026 (recipient unavailable)                 | `200 {success:false, error:"recipient_unavailable"}`                           |
-| other 4xx                                      | `200 {success:false, error:"graph_<code>"}`                                    |
+| Meta error                                      | Response                                                                       |
+| ----------------------------------------------- | ------------------------------------------------------------------------------ |
+| 131047 (outside the 24h window)                 | `200 {success:false, error:"24h_window_expired"}`                              |
+| 131056, 130429, 80007, 4, 131057                | `503 rate_limited` (core retries)                                              |
+| 5xx with a Graph error, connect-phase network   | `503 graph_unavailable` (core retries)                                         |
+| bare 5xx, timeout or reset (may have been sent) | `200 {success:false, error:"delivery_uncertain"}` (never retried)              |
+| 190 (token revoked)                             | `200 {success:false, error:"token_revoked"}`; Embedded Signup also disconnects |
+| 133010 (number not registered)                  | `200 {success:false, error:"phone_not_registered"}`                            |
+| 131026 (recipient unavailable)                  | `200 {success:false, error:"recipient_unavailable"}`                           |
+| other 4xx                                       | `200 {success:false, error:"graph_<code>"}`                                    |
 
 Once one message of a multi-part reply has been accepted, a later failure is logged and the
-response is still a success, so a future retry can't send the text twice.
+response is still a success, so a retry can't send the text twice.
 
 ## Development
 

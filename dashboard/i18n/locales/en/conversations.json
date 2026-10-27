@@ -218,6 +218,26 @@
       "joined": "{name} joined the chat",
       "returnedToAi": "{name} left the chat. The AI assistant is answering again.",
       "left": "{name} left the chat and returned it to the queue"
+    },
+    "replyWindow": {
+      "open": "Reply window closes {relative}",
+      "closed": "The reply window has closed. Until the customer writes again, only an approved template reaches them.",
+      "sendTemplate": "Send a template",
+      "composerClosed": "Reply window closed. Send a template instead.",
+      "picker": {
+        "title": "Send a template",
+        "description": "Pick an approved template. When the customer replies, the window opens again.",
+        "loading": "Loading templates…",
+        "loadFailed": "Couldn't load templates. Close this and try again.",
+        "unsupported": "This channel has no templates.",
+        "empty": "No approved templates yet. An admin can check them in the channel's settings.",
+        "template": "Template",
+        "variable": "Value for variable {name}",
+        "preview": "Preview",
+        "send": "Send template",
+        "sent": "Template sent",
+        "failed": "Couldn't send the template"
+      }
     }
   }
 }
