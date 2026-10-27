@@ -45,6 +45,7 @@
 <script setup lang="ts">
 import { ref, computed, watch } from "vue";
 import { Calendar, ChevronDown } from "lucide-vue-next";
+import { toLocalDateString } from "@/utils/date";
 
 interface DateRange {
   startDate: string;
@@ -121,9 +122,11 @@ const calculateDatesForPreset = (preset: PresetType): DateRange => {
       startDate.setDate(startDate.getDate() - 29);
   }
 
+  // Local calendar days; consumers widen them to whole days with
+  // toISODateRange, so the range always includes all of today.
   return {
-    startDate: startDate.toISOString().split("T")[0],
-    endDate: endDate.toISOString().split("T")[0],
+    startDate: toLocalDateString(startDate),
+    endDate: toLocalDateString(endDate),
   };
 };
 
