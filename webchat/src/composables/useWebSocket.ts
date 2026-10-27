@@ -91,7 +91,7 @@ export function useWebSocket(baseUrl: string, organizationId: string) {
           addMessage({
             id: data.data.id || `msg_${Date.now()}`,
             sender: "agent",
-            content: data.data.content || data.data.text,
+            content: data.data.content || data.data.text || "",
             timestamp: parseServerTime(data.data.timestamp),
             metadata: data.data.metadata,
             agentType: data.data.type,
