@@ -38,7 +38,6 @@ export class WebchatSettings {
     length: 200,
     name: "widget_subtitle",
     nullable: true,
-    default: "We typically reply within minutes",
   })
   widgetSubtitle!: string | null;
 
