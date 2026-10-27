@@ -170,11 +170,15 @@ class DocsAuditService {
       });
 
       // Step 2: Extract company context from summaries
-      const companyContext = await this.extractCompanyContext(documents, organization || undefined);
+      const companyContext = await this.extractCompanyContext(
+        organizationId,
+        documents,
+        organization || undefined,
+      );
 
       // Step 3: Run dimensions — coverage uses context, others run in parallel
       const [coverage, contentQuality, infoArch] = await Promise.all([
-        this.analyzeCoverage(documents, companyContext),
+        this.analyzeCoverage(organizationId, documents, companyContext),
         this.analyzeContentQuality(documents),
         this.analyzeInformationArchitecture(documents),
       ]);
@@ -220,6 +224,7 @@ class DocsAuditService {
   // ─── Company Context Extraction ──────────────────────────────────────────
 
   private async extractCompanyContext(
+    organizationId: string,
     documents: Document[],
     organization?: Organization,
   ): Promise<CompanyContext> {
@@ -280,6 +285,7 @@ Verticals: E_COMMERCE, SAAS, MANUFACTURING, INSURANCE, HEALTH, PROFESSIONAL_SERV
         prompt,
         jsonSchema: schema,
         tier: "medium",
+        organizationId,
         temperature: 0.3,
         max_tokens: 1000,
       });
@@ -303,6 +309,7 @@ Verticals: E_COMMERCE, SAAS, MANUFACTURING, INSURANCE, HEALTH, PROFESSIONAL_SERV
   // ─── Coverage & Gaps (Context-Aware) ────────────────────────────────────
 
   async analyzeCoverage(
+    organizationId: string,
     documents: Document[],
     companyContext: CompanyContext,
   ): Promise<DimensionResult> {
@@ -390,6 +397,7 @@ Score from 0-100 based on how well the documentation covers the product's featur
         prompt,
         jsonSchema: schema,
         tier: "medium",
+        organizationId,
         temperature: 0.3,
         max_tokens: 3000,
       });

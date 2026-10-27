@@ -1114,6 +1114,7 @@ Translated message:`;
     try {
       const translated = await llmService.invoke({
         prompt: translationPrompt,
+        organizationId: this.organization_id,
         // Translating a one-line greeting; falls back to the original on error.
         tier: "medium",
       });

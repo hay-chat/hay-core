@@ -311,6 +311,7 @@ export class ExecutionLayer {
         history: messages, // Pass Message[] directly instead of converting to string
         prompt: finalPrompt,
         jsonSchema: this.buildPlannerSchema(allToolNames),
+        organizationId: conversation.organization_id,
       });
 
       const result = JSON.parse(response) as ExecutionResult;
@@ -727,6 +728,7 @@ export class ExecutionLayer {
         customerQuery: lastCustomerMessage?.content ?? "",
         conversationHistory,
         toolsCalledThisTurn: options.toolsCalledThisTurn ?? [],
+        organizationId: conversation.organization_id,
       },
       config,
     );
@@ -855,6 +857,7 @@ export class ExecutionLayer {
       companyDomain: conversation.organization?.settings?.companyDomain as string | undefined,
       hasRetrievedDocuments,
       hasToolResults,
+      organizationId: conversation.organization_id,
     };
 
     // Get configuration
@@ -1010,6 +1013,7 @@ export class ExecutionLayer {
       retrievedDocuments: retrievedDocs as Array<{ document: Document; similarity: number }>,
       conversationHistory,
       customerQuery: lastCustomerMessage.content,
+      organizationId: conversation.organization_id,
     };
 
     // Get configuration

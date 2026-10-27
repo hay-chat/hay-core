@@ -50,6 +50,7 @@ export interface CompanyInterestContext {
   companyDomain?: string; // Optional: Company's business domain/industry
   hasRetrievedDocuments: boolean; // Whether any documents were retrieved
   hasToolResults: boolean; // Whether response is based on tool results
+  organizationId: string; // Routes the evaluation through the org's AI provider and region
 }
 
 /**
@@ -143,6 +144,7 @@ export class CompanyInterestGuardrailService {
         jsonSchema: schema,
         temperature: 0.2, // Low temperature for consistent evaluation
         tier: "medium",
+        organizationId: context.organizationId,
       });
 
       const parsed = JSON.parse(result);

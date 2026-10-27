@@ -91,6 +91,7 @@ export class PerceptionLayer {
       // rather than easy: `intent.label` drives conversation closing in run.ts, so
       // a misread is user-visible — and easy is only ~0.3pp cheaper.
       tier: "medium",
+      organizationId,
     });
 
     const result = JSON.parse(perception) as Perception;
@@ -197,6 +198,7 @@ export class PerceptionLayer {
       jsonSchema: candidateSchema,
       // Ranking pre-fetched candidates against a schema — no planning, no tools.
       tier: "medium",
+      organizationId,
     });
 
     const parsed = JSON.parse(result) as {

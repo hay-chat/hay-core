@@ -88,6 +88,7 @@ export class RetrievalLayer {
       // below is the real safety net, and the planner now re-checks fit each turn
       // (see playbook-gate.ts), so a hard-tier model buys nothing here.
       tier: "medium",
+      organizationId,
     });
 
     const parsed = JSON.parse(result) as {
