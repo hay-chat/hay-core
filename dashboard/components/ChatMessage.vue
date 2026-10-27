@@ -1,5 +1,14 @@
 <template>
+  <!-- A team member joined or left: a centred line, as the shopper sees it -->
+  <div v-if="agentNoticeText" class="flex justify-center py-1">
+    <span
+      class="inline-flex items-center px-3 py-1 bg-background-tertiary rounded-full text-sm text-neutral-muted text-center"
+    >
+      {{ agentNoticeText }}
+    </span>
+  </div>
   <div
+    v-else
     :class="[
       'chat-message',
       `chat-message--${message.type}`,
@@ -557,6 +566,7 @@ import { useNow } from "@/composables/useNow";
 import { resolveMediaUrl } from "@/composables/useMediaUrl";
 import { MessageStatus, type Message, MessageSentiment } from "@/types/message";
 import { useI18n } from "vue-i18n";
+import { agentNotice } from "@/utils/agentNotice";
 
 const { t } = useI18n();
 
@@ -585,6 +595,14 @@ const props = withDefaults(defineProps<Props>(), {
   showTimestamp: true,
   botAvatarUrl: null,
   humanAvatarUrl: null,
+});
+
+// Takeover/release System messages read as "Marina Souza joined the chat"
+const agentNoticeText = computed(() => {
+  const notice = agentNotice(props.message);
+  if (!notice) return null;
+  const name = notice.name || t("conversations.agentNotice.teamMember");
+  return t(`conversations.agentNotice.${notice.key}`, { name });
 });
 
 const emit = defineEmits<{

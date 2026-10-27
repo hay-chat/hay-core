@@ -204,6 +204,12 @@
         "bodyWithTitle": "Conversation \"{title}\" requires human assistance",
         "bodyDefault": "New conversation requires human assistance"
       }
+    },
+    "agentNotice": {
+      "teamMember": "A team member",
+      "joined": "{name} joined the chat",
+      "returnedToAi": "{name} left the chat. The AI assistant is answering again.",
+      "left": "{name} left the chat and returned it to the queue"
     }
   }
 }

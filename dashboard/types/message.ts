@@ -61,6 +61,13 @@ export interface Message {
     // Handoff metadata
     isHandoffMessage?: boolean;
     handoffType?: string;
+    // Takeover / release (System messages)
+    isTakeoverMessage?: boolean;
+    isReleaseMessage?: boolean;
+    returnToMode?: "ai" | "queue";
+    userName?: string;
+    systemEvent?: "agent_joined" | "agent_returned_to_ai" | "agent_left";
+    agentFirstName?: string;
     // Product recommendation payload (type === "ProductRecommendation")
     productRecommendation?: ProductRecommendationPayload;
   } | null;
