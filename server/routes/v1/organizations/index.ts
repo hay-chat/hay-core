@@ -18,6 +18,11 @@ import { llmProviderFactory } from "@server/services/llm/llm-provider.factory";
 import { encryptValue } from "@server/lib/auth/utils/encryption";
 import type { OrgLlmConfig } from "@server/services/llm/provider.types";
 import {
+  AI_REGIONS,
+  isEuRegionConfigured,
+  regionFromSettings,
+} from "@server/services/llm/ai-region";
+import {
   CHAT_MODEL_CATALOG,
   EMBEDDING_MODEL_CATALOG,
   DEFAULT_TIER_MAP,
@@ -272,6 +277,15 @@ export const organizationsRouter = t.router({
         throw new TRPCError({ code: "NOT_FOUND", message: "Organization not found" });
       }
 
+      // EU-only orgs always run on the managed EU endpoint; a custom provider would
+      // be ignored, so refuse to save one rather than pretend it applies.
+      if (regionFromSettings(organization.settings) === "eu") {
+        throw new TRPCError({
+          code: "PRECONDITION_FAILED",
+          message: "Turn off EU-only AI processing before changing the AI provider",
+        });
+      }
+
       const existing = organization.settings?.llm;
       let apiKeyEncrypted = existing?.chat.apiKeyEncrypted;
       if (input.chat.apiKey && input.chat.apiKey.trim()) {
@@ -297,6 +311,51 @@ export const organizationsRouter = t.router({
       llmProviderFactory.invalidate(ctx.organizationId!);
 
       return { success: true };
+    }),
+
+  // Where the org's AI calls are processed, and whether the EU endpoint is
+  // configured on this deployment (the UI only offers EU when it is).
+  getAiRegion: scopedProcedure(RESOURCES.ORGANIZATION_SETTINGS, ACTIONS.READ).query(
+    async ({ ctx }) => {
+      const organization = await organizationService.findOne(ctx.organizationId!);
+      if (!organization) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Organization not found" });
+      }
+      return {
+        region: regionFromSettings(organization.settings),
+        euAvailable: isEuRegionConfigured(),
+        hasCustomProvider: !!organization.settings?.llm,
+      };
+    },
+  ),
+
+  // Opt the org in or out of EU-only AI processing. Turning EU on is refused while
+  // the EU endpoint is not configured, so an org is never marked EU-only without
+  // an EU endpoint behind it.
+  updateAiRegion: scopedProcedure(RESOURCES.ORGANIZATION_SETTINGS, ACTIONS.UPDATE)
+    .input(z.object({ region: z.enum(AI_REGIONS) }))
+    .mutation(async ({ ctx, input }) => {
+      if (input.region === "eu" && !isEuRegionConfigured()) {
+        throw new TRPCError({
+          code: "PRECONDITION_FAILED",
+          message: "EU AI processing is not available on this deployment",
+        });
+      }
+      const organization = await organizationService.findOne(ctx.organizationId!);
+      if (!organization) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Organization not found" });
+      }
+
+      await organizationService.update(ctx.organizationId!, {
+        settings: { ...(organization.settings || {}), aiRegion: input.region },
+      });
+      llmProviderFactory.invalidate(ctx.organizationId!);
+      logger.info(
+        { organizationId: ctx.organizationId, userId: ctx.user?.id, region: input.region },
+        "AI processing region changed",
+      );
+
+      return { success: true, region: input.region };
     }),
 
   updateSettings: scopedProcedure(RESOURCES.ORGANIZATION_SETTINGS, ACTIONS.UPDATE)
