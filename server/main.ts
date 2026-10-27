@@ -150,7 +150,7 @@ async function startServer() {
   server.use(express.urlencoded({ extended: true, limit: "50mb", verify: captureRawBody }));
 
   server.get("/", (req, res) => {
-    res.send("Welcome to Hay");
+    res.send("Welcome to Hay.chat");
   });
 
   // Health check endpoint.

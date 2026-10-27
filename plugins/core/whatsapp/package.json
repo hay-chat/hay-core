@@ -1,7 +1,7 @@
 {
   "name": "hay-channel-whatsapp-meta",
   "version": "1.0.0",
-  "description": "Connect WhatsApp as a communication channel — exchange WhatsApp messages, media and voice notes through Hay's AI orchestrator using the Meta WhatsApp Cloud API (Embedded Signup or a pasted system-user token)",
+  "description": "Connect WhatsApp as a communication channel — exchange WhatsApp messages, media and voice notes through Hay.chat's AI orchestrator using the Meta WhatsApp Cloud API (Embedded Signup or a pasted system-user token)",
   "author": "Hay",
   "type": "module",
   "main": "dist/index.js",

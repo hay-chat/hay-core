@@ -3,8 +3,8 @@
     <div class="tutorial-header">
       <h3>Instagram Setup Guide</h3>
       <p>
-        Connect your Instagram Professional account to Hay. Once connected, direct messages sent to
-        your account are routed through Hay's AI, and replies are delivered straight back to the
+        Connect your Instagram Professional account to Hay.chat. Once connected, direct messages sent to
+        your account are routed through Hay.chat's AI, and replies are delivered straight back to the
         Instagram thread.
       </p>
     </div>
@@ -19,8 +19,8 @@
         <p>
           Click the <strong>Connect</strong> button above to sign in with
           <strong>Facebook Login for Business</strong>. Choose the Facebook Page and the linked
-          Instagram Professional account you want Hay to manage, then approve the requested
-          permissions. Hay stores the connection securely &mdash; there are no tokens to copy or
+          Instagram Professional account you want Hay.chat to manage, then approve the requested
+          permissions. Hay.chat stores the connection securely &mdash; there are no tokens to copy or
           paste.
         </p>
         <p class="hint">
@@ -36,8 +36,8 @@
           <h4>Text-only messages (MVP)</h4>
         </div>
         <p>
-          In this first release, Hay handles <strong>text</strong> direct messages only. Inbound
-          media (images, stories, reactions) is ignored, and Hay's replies are sent as plain text.
+          In this first release, Hay.chat handles <strong>text</strong> direct messages only. Inbound
+          media (images, stories, reactions) is ignored, and Hay.chat's replies are sent as plain text.
           Rich content support is coming in a later update.
         </p>
       </div>
@@ -51,7 +51,7 @@
         <p>
           Instagram only lets businesses send a free-form reply within <strong>24 hours</strong> of
           the customer's last message. After that window closes, the customer must message you again
-          before Hay can respond.
+          before Hay.chat can respond.
         </p>
       </div>
 
@@ -62,7 +62,7 @@
           <h4>Where messages appear</h4>
         </div>
         <p>
-          Once connected, new Instagram DMs show up as conversations in your Hay inbox. The AI agent
+          Once connected, new Instagram DMs show up as conversations in your Hay.chat inbox. The AI agent
           assigned to the Instagram channel responds automatically.
         </p>
         <p class="hint">

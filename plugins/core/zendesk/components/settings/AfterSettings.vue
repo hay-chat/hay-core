@@ -28,7 +28,7 @@
           <span class="step-number">2</span>
           <h4>Generate API Token</h4>
         </div>
-        <p>Write a description (like "Hay AI Agent") for the token and click "Create token".</p>
+        <p>Write a description (like "Hay.chat AI Agent") for the token and click "Create token".</p>
         <img
           :src="`${apiBaseUrl || 'http://localhost:3001'}/plugins/public/${encodeURIComponent(plugin?.id || 'hay-plugin-zendesk')}/images/Z00002.png`"
           alt="Zendesk API Settings"

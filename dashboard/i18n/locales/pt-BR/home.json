@@ -1,14 +1,14 @@
 {
   "home": {
     "title": "Caixa de entrada",
-    "headTitle": "Caixa de entrada - Hay",
+    "headTitle": "Caixa de entrada - Hay.chat",
     "headline": {
       "loading": "Verificando quem está esperando…",
       "waiting": "Nenhuma conversa esperando por um humano | 1 conversa esperando por um humano | {count} conversas esperando por um humano"
     },
     "subline": {
       "longestWait": "Maior espera: {time}.",
-      "aiHandling": "A Hay está cuidando de {count} conversa aberta. | A Hay está cuidando de {count} conversas abertas.",
+      "aiHandling": "O Hay.chat está cuidando de {count} conversa aberta. | O Hay.chat está cuidando de {count} conversas abertas.",
       "allQuiet": "Nenhuma conversa aberta no momento."
     },
     "waitingCount": "{count} esperando por um humano",
@@ -28,7 +28,7 @@
     },
     "empty": {
       "title": "Tudo tranquilo",
-      "description": "Quando a Hay passa uma conversa para uma pessoa, ela aparece aqui primeiro. Ative os alertas para ser avisado neste dispositivo."
+      "description": "Quando o Hay.chat passa uma conversa para uma pessoa, ela aparece aqui primeiro. Ative os alertas para ser avisado neste dispositivo."
     },
     "error": {
       "title": "Não foi possível carregar as conversas",
@@ -45,8 +45,8 @@
       "testSent": "Alerta de teste enviado",
       "testSentBody": "Ele deve aparecer neste dispositivo em alguns segundos.",
       "testNone": "Nenhum dispositivo inscrito",
-      "unsupported": "Este navegador não recebe alertas push. No iPhone, adicione a Hay à Tela de Início e abra por lá.",
-      "unavailable": "Os alertas push ainda não foram configurados neste servidor da Hay. Peça ao administrador para adicionar as chaves VAPID.",
+      "unsupported": "Este navegador não recebe alertas push. No iPhone, adicione o Hay.chat à Tela de Início e abra por lá.",
+      "unavailable": "Os alertas push ainda não foram configurados neste servidor do Hay.chat. Peça ao administrador para adicionar as chaves VAPID.",
       "denied": "As notificações estão bloqueadas para este site nas configurações do navegador. Permita e recarregue a página.",
       "failed": "Não foi possível ativar os alertas",
       "blocked": "Alertas desativados"

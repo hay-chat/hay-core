@@ -249,7 +249,7 @@ export const conversationsRouter = t.router({
         status: r.status,
         handler: isHuman
           ? { type: "human" as const, name: handlerName, userId: r.assigned_user_id }
-          : { type: "hay" as const, name: "Hay", userId: null },
+          : { type: "hay" as const, name: "Hay.chat", userId: null },
         lastMessageAt: r.last_message_at ? new Date(r.last_message_at).toISOString() : null,
         updatedAt: r.updated_at ? new Date(r.updated_at).toISOString() : null,
         canJoin: !["closed", "resolved", "unresolved"].includes(r.status),

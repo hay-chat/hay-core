@@ -19,7 +19,7 @@
     "page": {
       "title": "Conversas",
       "description": "Monitore e gerencie todas as conversas com clientes",
-      "headTitle": "Conversas - Hay Dashboard",
+      "headTitle": "Conversas - Hay.chat",
       "headDescription": "Monitore e gerencie todas as conversas com clientes"
     },
     "actions": {
@@ -129,8 +129,8 @@
     "pendingHuman": {
       "needsHuman": "Esta conversa foi encaminhada para um agente humano",
       "summaryPending": "Gerando resumo da conversa…",
-      "notConfident": "Hay não teve confiança para responder esta pergunta",
-      "handedOff": "Hay decidiu encaminhar esta conversa para um agente humano. Fornecer mais contexto nos playbooks pode ser um bom ponto de partida para dar mais informações para que Hay consiga lidar com conversas semelhantes no futuro.",
+      "notConfident": "O Hay.chat não teve confiança para responder esta pergunta",
+      "handedOff": "O Hay.chat decidiu encaminhar esta conversa para um agente humano. Fornecer mais contexto nos playbooks pode ser um bom ponto de partida para dar mais informações para que o Hay.chat consiga lidar com conversas semelhantes no futuro.",
       "startNew": "Iniciar Nova Conversa",
       "editPlaybook": "Editar Playbook",
       "editPlaybooks": "Editar Playbooks"

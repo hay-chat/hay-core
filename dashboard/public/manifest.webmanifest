@@ -1,6 +1,6 @@
 {
-  "name": "Hay",
-  "short_name": "Hay",
+  "name": "Hay.chat",
+  "short_name": "Hay.chat",
   "description": "See which customer conversations need a human and take over from your phone.",
   "start_url": "/inbox",
   "scope": "/",

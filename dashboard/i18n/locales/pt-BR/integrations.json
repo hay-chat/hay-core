@@ -1,8 +1,8 @@
 {
   "channels": {
     "title": "Canais",
-    "description": "Canais de comunicação ativos conectando seus clientes ao Hay",
-    "headTitle": "Canais - Hay Dashboard",
+    "description": "Canais de comunicação ativos conectando seus clientes ao Hay.chat",
+    "headTitle": "Canais - Hay.chat",
     "browseMarketplace": "Ver Marketplace",
     "loading": "Carregando canais...",
     "empty": {
@@ -17,7 +17,7 @@
   "marketplace": {
     "title": "Marketplace de Integrações",
     "description": "Descubra e instale integrações para ampliar as capacidades da sua plataforma",
-    "headTitle": "Marketplace de Integrações - Hay Dashboard",
+    "headTitle": "Marketplace de Integrações - Hay.chat",
     "uploadPlugin": "Enviar Integração",
     "manageCustom": "Gerenciar Personalizados ({count})",
     "refresh": "Atualizar",
@@ -76,7 +76,7 @@
   "manage": {
     "title": "Gerenciar Integrações Personalizadas",
     "description": "Visualize e gerencie as integrações personalizadas da sua organização",
-    "headTitle": "Gerenciar Integrações Personalizadas - Hay Dashboard",
+    "headTitle": "Gerenciar Integrações Personalizadas - Hay.chat",
     "uploadPlugin": "Enviar Integração",
     "refresh": "Atualizar",
     "stats": {
@@ -122,7 +122,7 @@
   "upload": {
     "title": "Enviar Integração Personalizada",
     "description": "Envie uma integração personalizada para ampliar sua plataforma",
-    "headTitle": "Enviar Integração - Hay Dashboard",
+    "headTitle": "Enviar Integração - Hay.chat",
     "backToMarketplace": "Voltar ao Marketplace",
     "card": {
       "title": "Enviar ZIP da Integração",
@@ -175,8 +175,8 @@
   },
   "pluginSettings": {
     "backToMarketplace": "Voltar ao Marketplace",
-    "headTitle": "Configurações da Integração - Hay Dashboard",
-    "headTitleWithName": "Configurações de {name} - Hay Dashboard",
+    "headTitle": "Configurações da Integração - Hay.chat",
+    "headTitleWithName": "Configurações de {name} - Hay.chat",
     "restartWorker": "Reiniciar Worker",
     "restarting": "Reiniciando...",
     "disablePlugin": "Desativar Integração",
