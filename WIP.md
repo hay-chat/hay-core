@@ -1,3 +1,8 @@
+## 2026-10-28 00:30 — staging — L4 action approval + copy lane merged
+- L4 aa8b4c9: tool risk, action_log, playground dry-run, pending approvals + gate (money moves held, threshold 0), resume, 48 h expiry. 3 migrations ran on hay_staging.
+- Copy e31f6b9: access-notice copy for backoffice states, Hay.chat sweep.
+- Half-built: non-commerce plugin tools have no risk class → held by the gate. Next: risk-annotation lane + L5 (Nuvemshop first), then L4 manual test on Woo demo :8085.
+
 ## 2026-10-27 — claude/w1-action-approval — L4 action approval done (not merged, not pushed)
 - dcba4f3 tool risk (readOnlyHint + _meta chat.hay/category); 9df0adb action_log; 58a17b4 playground dry-run; d65787c pending_actions + approvers; 9f8e4e0 policy gate (money moves held, threshold 0, unclassified writes held); 8c36c5f approve/reject/reply-myself resume + actions tRPC + thread card; a417217 48 h expiry job -> pending-human + shopper copy (never auto-approves).
 - Migrations AddActionLog1785710000000, AddPendingActions1785720000000, AddAwaitingApprovalStatus1785730000000 ran on hay_test only.
