@@ -1,4 +1,4 @@
-import { ref, computed, watch } from "vue";
+import { ref, shallowRef, computed, watch } from "vue";
 import { useWebSocket } from "./useWebSocket";
 import { useConversation, WidgetRequestError } from "./useConversation";
 import { useMessageQueue } from "./useMessageQueue";
@@ -27,7 +27,9 @@ export function useChat(config: HayChatConfig) {
   const isOpen = ref(false);
   const isInitialized = ref(false);
   const customerId = ref<string>("");
-  const keypair = ref<Keypair | null>(null);
+  // shallowRef: a deep ref wraps the CryptoKeys in reactive proxies, which
+  // IndexedDB cannot clone (DataCloneError when persisting after consent).
+  const keypair = shallowRef<Keypair | null>(null);
   const nonce = ref<string>("");
   const isConversationClosed = ref(false);
   const isSending = ref(false);
