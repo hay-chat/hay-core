@@ -1,5 +1,5 @@
 import "reflect-metadata";
-import { describe, it, expect, beforeAll, afterAll, beforeEach } from "@jest/globals";
+import { describe, it, expect, beforeAll, afterAll, beforeEach, jest } from "@jest/globals";
 import { AppDataSource } from "../../database/data-source";
 import { Organization } from "../../entities/organization.entity";
 import { User } from "../../entities/user.entity";
@@ -8,10 +8,23 @@ import { Message, MessageType } from "../../database/entities/message.entity";
 import { ConversationTakeoverEvent } from "../../database/entities/conversation-takeover-event.entity";
 import { AnalyticsService } from "../../services/analytics.service";
 import { ConversationRepository } from "../../repositories/conversation.repository";
+import { AddConversationHandedOffAt1784600000000 } from "../../database/migrations/1784600000000-AddConversationHandedOffAt";
+
+// Repository writes broadcast over Redis/WebSocket and send push alerts; this
+// suite only cares about the row.
+jest.mock("../../services/conversation-events.service", () => ({
+  conversationEventsService: {
+    broadcastConversationCreated: jest.fn(),
+    broadcastConversationUpdated: jest.fn(),
+  },
+}));
+jest.mock("../../services/push-notification.service", () => ({
+  pushNotificationService: { onConversationStatusChanged: jest.fn() },
+}));
 
 /**
- * DB-backed: the billable count is SQL over jsonb and sub-queries, so a mock
- * would only restate the implementation.
+ * DB-backed: the billable count is SQL over jsonb and the handoff stamp is a
+ * repository side effect, so a mock would only restate the implementation.
  */
 describe("billable resolutions", () => {
   const orgId = "b111ab1e-0000-4000-8000-000000000001";
@@ -124,15 +137,63 @@ describe("billable resolutions", () => {
     expect((await metrics()).billableResolutions).toBe(3);
   });
 
-  it("does not bill conversations that were handed off, even if handed back to the AI", async () => {
-    await seed({ summary: "Customer wants a refund; AI handed off" });
+  it("does not bill conversations with handed_off_at", async () => {
+    await seed({ handed_off_at: inPeriod });
+    await seed();
+    expect((await metrics()).billableResolutions).toBe(1);
+  });
+
+  it("stamps handed_off_at on the first handoff and keeps it after a hand-back", async () => {
+    const created = await repository.create({
+      title: "lifecycle",
+      organization_id: orgId,
+      status: "open",
+    });
+    expect(created.handed_off_at).toBeNull();
+
+    const handedOff = await repository.update(created.id, orgId, { status: "pending-human" });
+    const firstStamp = handedOff!.handed_off_at;
+    expect(firstStamp).toBeInstanceOf(Date);
+
+    // Human hands it back, then the AI resolves it.
+    await repository.update(created.id, orgId, { status: "open" });
+    await repository.updateById(created.id, { status: "human-took-over" });
+    const resolved = await repository.updateById(created.id, {
+      status: "resolved",
+      ended_at: inPeriod,
+      resolution_metadata: {
+        resolved: true,
+        confidence: 1,
+        reason: "user_indicated_close_satisfied",
+      },
+    });
+    expect(resolved!.handed_off_at!.getTime()).toBe(firstStamp!.getTime());
+
+    await AppDataSource.getRepository(Conversation).update(
+      { id: created.id },
+      { created_at: inPeriod },
+    );
+    expect((await metrics()).billableResolutions).toBe(0);
+  });
+
+  it("stamps a conversation created straight into a human status", async () => {
+    const created = await repository.create({
+      title: "parked",
+      organization_id: orgId,
+      status: "pending-human",
+    });
+    expect(created.handed_off_at).toBeInstanceOf(Date);
+  });
+
+  it("migration backfills handed_off_at from earlier handoff traces", async () => {
+    const withSummary = await seed({ summary: "AI handed off" });
 
     const takenOver = await seed();
     await AppDataSource.getRepository(ConversationTakeoverEvent).save({
       organization_id: orgId,
       conversation_id: takenOver.id,
       user_id: userId,
-      started_at: inPeriod,
+      started_at: new Date("2026-10-10T08:00:00Z"),
       ended_at: inPeriod,
     });
 
@@ -143,7 +204,21 @@ describe("billable resolutions", () => {
       type: MessageType.HUMAN_AGENT,
     });
 
-    await seed();
+    const aiOnly = await seed();
+
+    const queryRunner = AppDataSource.createQueryRunner();
+    try {
+      await new AddConversationHandedOffAt1784600000000().up(queryRunner);
+    } finally {
+      await queryRunner.release();
+    }
+
+    const repo = AppDataSource.getRepository(Conversation);
+    const stamp = async (id: string) => (await repo.findOneByOrFail({ id })).handed_off_at;
+    expect(await stamp(withSummary.id)).toBeInstanceOf(Date);
+    expect((await stamp(takenOver.id))!.toISOString()).toBe("2026-10-10T08:00:00.000Z");
+    expect(await stamp(humanReplied.id)).toBeInstanceOf(Date);
+    expect(await stamp(aiOnly.id)).toBeNull();
     expect((await metrics()).billableResolutions).toBe(1);
   });
 

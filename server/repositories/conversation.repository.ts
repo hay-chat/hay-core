@@ -12,6 +12,26 @@ const LOCK_DURATION_MS = 15_000;
 
 const logger = createLogger("conversation-repo");
 
+const HANDOFF_STATUSES: ReadonlyArray<Conversation["status"]> = [
+  "pending-human",
+  "human-took-over",
+];
+
+/**
+ * Adds handed_off_at on the first move into a human status. Lives here rather
+ * than in each caller (orchestrator, takeover, plugin API, recovery) because
+ * update/updateById/create are the one place every status write passes and
+ * the previous row is known.
+ */
+function withHandoffStamp(
+  previous: Pick<Conversation, "handed_off_at"> | null,
+  data: Partial<Conversation>,
+): Partial<Conversation> {
+  if (!data.status || !HANDOFF_STATUSES.includes(data.status)) return data;
+  if (previous?.handed_off_at || data.handed_off_at) return data;
+  return { ...data, handed_off_at: new Date() };
+}
+
 /**
  * Resolved conversations that never bill. Each value is a SQL predicate on the
  * `conversation` alias; a match removes the conversation from the count.
@@ -27,14 +47,11 @@ export const BILLABLE_RESOLUTION_EXCLUSIONS = {
   // as user_indicated_greet with resolved=false, and inactivity closes also
   // carry resolved=false, so resolved=false alone is not "unhappy".
   unhappy: `COALESCE(conversation.resolution_metadata->>'reason', '') = 'user_indicated_close_unsatisfied'`,
-  // Ever handed off to a human, including chats a human handed back to the AI.
+  // Ever handed off to a human, including chats a human handed back to the AI
+  // (handed_off_at is never cleared; the migration backfilled older rows).
   // TODO(D1-3): Roger's rule is "bill a hand-off if the AI resolved it"; the
   // close classifier decides that and replaces this blanket exclusion.
-  // Proxy until handed_off_at exists: a handoff summary, a takeover event or
-  // a human-agent message.
-  handedOff: `conversation.summary IS NOT NULL
-    OR EXISTS (SELECT 1 FROM conversation_takeover_events cte WHERE cte.conversation_id = conversation.id)
-    OR EXISTS (SELECT 1 FROM messages m WHERE m.conversation_id = conversation.id AND m.type = 'HumanAgent')`,
+  handedOff: `conversation.handed_off_at IS NOT NULL`,
   // TODO(D1-10): add `spam` here once conversations carry a spam outcome.
 } as const;
 
@@ -59,7 +76,7 @@ export class ConversationRepository extends BaseRepository<Conversation> {
    * Override base methods to handle organization_id field naming
    */
   override async create(data: Partial<Conversation>): Promise<Conversation> {
-    const conversation = this.getRepository().create(data);
+    const conversation = this.getRepository().create(withHandoffStamp(null, data));
     const savedConversation = await this.getRepository().save(conversation);
 
     // Broadcast conversation created event
@@ -137,7 +154,10 @@ export class ConversationRepository extends BaseRepository<Conversation> {
       return null;
     }
 
-    await this.getRepository().update({ id }, data as QueryDeepPartialEntity<Conversation>);
+    await this.getRepository().update(
+      { id },
+      withHandoffStamp(conversation, data) as QueryDeepPartialEntity<Conversation>,
+    );
 
     const updatedConversation = await this.findById(id);
 
@@ -178,7 +198,10 @@ export class ConversationRepository extends BaseRepository<Conversation> {
       return null;
     }
 
-    await this.getRepository().update({ id }, data as QueryDeepPartialEntity<Conversation>);
+    await this.getRepository().update(
+      { id },
+      withHandoffStamp(conversation, data) as QueryDeepPartialEntity<Conversation>,
+    );
 
     const updatedConversation = await this.findById(id);
 
