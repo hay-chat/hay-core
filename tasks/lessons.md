@@ -189,3 +189,9 @@
 - **Detection signal**: any flow that reuses `stripeCustomerId` and lets the user choose a currency.
 - **Prevention**: lock the currency as soon as the account has ever had a subscription (or read `customer.currency`); changing currency needs a new Stripe customer.
 
+
+### Logout decided by string heuristics in five places
+
+- **Failure mode**: The dashboard logged the user out from the tRPC error link (any UNAUTHORIZED or a message containing "unauthorized"), the refresh catch (any error, network included), the global Vue error handler, the unhandled-rejection handler and AuthProvider (any init error). `auth.me` at app start went through the client without the refresh link, so reopening the PWA after the 15-minute access token expired logged the owner out; a wrong "current password" (UNAUTHORIZED) did too. The server's refresh mapped every failure, a database outage included, to UNAUTHORIZED.
+- **Detection signal**: More than one call site of `logout("token_expired")`; error classification by `message.includes(...)`.
+- **Prevention**: One owner for the logout decision (the refresh coordinator in `utils/api.ts`), triggered only by the refresh endpoint's UNAUTHORIZED. Everything else retries. Server endpoints that clients treat as a session verdict must reserve UNAUTHORIZED for definitive rejections and return 5xx for infrastructure failures.

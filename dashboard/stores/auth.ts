@@ -1,5 +1,10 @@
 import { defineStore } from "pinia";
-import { HayAuthApi } from "@/utils/api";
+import { HayApi, HayAuthApi } from "@/utils/api";
+import {
+  isDefinitiveAuthFailure,
+  SessionEndedError,
+  withCrossTabLock,
+} from "@/utils/session-refresh";
 import { useUserStore, type User } from "./user";
 import { useAppStore } from "./app";
 
@@ -7,6 +12,17 @@ interface Tokens {
   accessToken: string;
   refreshToken: string;
   expiresAt: number;
+}
+
+/** Tokens as persisted by pinia-plugin-persistedstate (key = store id). */
+function readStoredTokens(): Tokens | null {
+  try {
+    const raw = typeof window !== "undefined" ? window.localStorage.getItem("auth") : null;
+    const tokens = raw ? (JSON.parse(raw) as { tokens?: Tokens | null }).tokens : null;
+    return tokens?.refreshToken && typeof tokens.expiresAt === "number" ? tokens : null;
+  } catch {
+    return null;
+  }
 }
 
 export const useAuthStore = defineStore("auth", {
@@ -21,28 +37,37 @@ export const useAuthStore = defineStore("auth", {
     console.log("[Auth Store] Initial state:", { hasTokens: !!initialState.tokens });
     return initialState;
   },
-  getters: {
-    isSessionTimedOut: (state) => {
-      const SESSION_TIMEOUT = 30 * 60 * 1000; // 30 minutes
-      return Date.now() - state.lastActivity > SESSION_TIMEOUT;
-    },
-  },
   actions: {
+    /**
+     * Load the user for a persisted session. Goes through the main client, so
+     * an expired access token is refreshed first instead of failing.
+     * Offline or server unreachable with a cached user: keep the session and
+     * render from cache. Throws (and clears the session) only on a definitive
+     * auth failure; rethrows a transient error when there is nothing cached.
+     */
     async initializeAuth() {
       try {
-        const user = await HayAuthApi.auth.me.query();
+        const user = await HayApi.auth.me.query();
         const userStore = useUserStore();
         userStore.setUser(user as User);
         this.isAuthenticated = true;
         this.isInitialized = true;
         this.updateActivity();
       } catch (error) {
-        console.log("[Auth] Failed to initialize auth, clearing tokens");
-        // Clear auth state if initialization fails
-        this.tokens = null;
-        this.isAuthenticated = false;
-        this.isInitialized = true;
-        throw error; // Re-throw to let AuthProvider handle the redirect
+        if (isDefinitiveAuthFailure(error)) {
+          console.log("[Auth] Session rejected, clearing tokens");
+          this.tokens = null;
+          this.isAuthenticated = false;
+          this.isInitialized = true;
+          throw error;
+        }
+        if (useUserStore().user?.id) {
+          console.warn("[Auth] Could not reach the server, keeping the cached session:", error);
+          this.isAuthenticated = true;
+          this.isInitialized = true;
+          return;
+        }
+        throw error;
       }
     },
 
@@ -154,14 +179,25 @@ export const useAuthStore = defineStore("auth", {
       }
     },
 
+    /**
+     * One refresh attempt (retries and the logout decision live in
+     * utils/session-refresh via utils/api). Serialized across tabs: a tab that
+     * gets the lock after another one rotated adopts the stored tokens instead
+     * of sending a refresh token that was just replaced.
+     */
     async refreshTokens() {
-      // Store refresh token in a local variable to prevent race conditions
-      const currentTokens = this.tokens;
-      if (!currentTokens?.refreshToken) {
-        throw new Error("No refresh token available");
-      }
+      await withCrossTabLock("hay-auth-refresh", async () => {
+        const stored = readStoredTokens();
+        if (stored && this.tokens && stored.expiresAt > this.tokens.expiresAt) {
+          this.tokens = stored; // Another tab rotated more recently.
+          if (stored.expiresAt - Date.now() > 60_000) return;
+        }
 
-      try {
+        const currentTokens = this.tokens;
+        if (!currentTokens?.refreshToken) {
+          throw new SessionEndedError();
+        }
+
         const result = await HayAuthApi.auth.refreshToken.mutate({
           refreshToken: currentTokens.refreshToken,
         });
@@ -173,19 +209,14 @@ export const useAuthStore = defineStore("auth", {
           expiresAt: Date.now() + result.expiresIn * 1000, // Convert seconds to milliseconds
         };
 
-        // Update cookie
         if (process.client) {
           const token = useCookie("auth-token");
           token.value = result.accessToken;
         }
 
         this.updateActivity();
-        return;
-      } catch (error) {
-        // If refresh fails, clear auth state
-        console.error("[Auth] Failed to refresh token:", error);
-        throw error;
-      }
+        this.$persist?.(); // Write through now, so other tabs see the new pair.
+      });
     },
 
     /**
