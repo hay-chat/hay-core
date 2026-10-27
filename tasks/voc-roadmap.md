@@ -6,7 +6,7 @@ Started 2026-10-27. Research: `/Users/rogerjunior/Documents/code/hay/seo/Enginee
 ## Resume here (orchestrator checkpoint — keep current; safe to /compact after reading this)
 - Last update: 2026-10-27 ~19:45. Staging HEAD d64da73 (+ roadmap commits).
 - Wave 0 merged into staging: L2, L1, L8, L3 + D5-2 fix (a0b0220), L9, L5 (24818be), L10 (824abf1), L6 (d64da73). Migrations ran on hay_staging + hay_test.
-- reply-defaults merged (migration ran both DBs). Review done (2 confirmed: per-org rate counter spent by refused IP requests; /uploads `..` traversal on local disk). Running: claude/wave0-review-fixes (those 2 + legacy refresh replay + sharp pixel limit) and claude/wave0-test-fixes (double greeting, date presets exclude today). Merge both → quick retest (greeting, KPI cards) → tag → PR.
+- Wave 0 DONE: review fixes (b8f3bb5) + test fixes (e4d48c2) merged and retested ✓ (single greeting, KPI cards include today, feedback filter/export). Full suites green (server 963, dashboard 38, webchat 71, sdk 143). Tagged `wave-0-done`; PR staging→master opened. NEXT SESSION: Wave 1 per table below (fresh orchestrator session; start with widget restore-on-reload bug in L6 with D9-4).
 - X tickets done, PRs open (not merged): hay-backoffice#3 (D1-4), hay-backoffice#4 + hay-website#44 (D15-1), hay-shopify-app#1 (D12-2 embed). WP plugin 1.0.1 = patch at `/Users/rogerjunior/Documents/code/hay/haychat-svn-patches/1.0.1-d12-2-no-render-blocking.patch` (svn commit = WP.org release → Roger).
 - Then: Wave 0 review agent over `git diff 5bfee16..staging` → fixes → tag `wave-0-done` → PR staging→master (body: tickets, migrations AddConversationHandedOffAt1784600000000 / AddRefreshTokenRotationToSessions1784700000000 / DropWebchatSubtitleDefault1784800000000, tests, manual results + GIFs, Needs Roger, D8 after-deploy steps: deploy → `docker cp scripts/make-media-private.cjs hay-server:/tmp/` → dry run → `--apply` → `doctl compute cdn flush <id> --files 'uploads/*'` (hay-ams ff84a7bc-8770-4a41-af22-2192d46e9473, hay d67a8597-cd2c-4825-b902-a788706e0647) → Spaces listing Restricted → old URL 403; image needs sharp's optional Linux binaries).
 - Dashboard died once from OOM (vue-tsc watcher in nuxt dev); restarted with NODE_OPTIONS=--max-old-space-size=3072.
@@ -72,6 +72,7 @@ Started 2026-10-27. Research: `/Users/rogerjunior/Documents/code/hay/seo/Enginee
 | L2 | `AddConversationHandedOffAt1784600000000` | conversations | ✓ |
 | L10 | `AddRefreshTokenRotationToSessions1784700000000` (drops refresh_token_hash/is_active; adds generation, token_version, rotated_at, revoked_at, revoked_reason) | sessions | ✓ |
 | reply-defaults | `DropWebchatSubtitleDefault1784800000000` | webchat_settings | ✓ |
+| review-fixes | `AddLegacyRefreshTokenHashToSessions1784900000000` | sessions | ✓ |
 
 ## Wave 0 — security, honesty, quick fixes (tag `wave-0-done`)
 
@@ -114,7 +115,7 @@ Not doing: **D4-1** (Roger waits for the full D4 build). Copy must not claim Req
 | D6-1 | Shopify cancel guard, note append, tracking NOT_FOUND (returnProcess deferred) | 24818be | merged → automated ✓; live dev-store test pending store connection | — |
 | D11-3 | refresh-token rotation (hrt1.), reuse detection, 90-day sliding sessions | 824abf1 | merged → tested ✓: hrt1 rotation gen0→1, grace reuse 200 same token, after 130 s reuse 401 + session revoked (reuse_detected), logout → 401 | — (curl) |
 | D11-4 | never log out on network errors | 824abf1 | merged → tested ✓: expired token refreshes silently; fetch blocked 20 s → stays logged in; recovers (gen 2), not revoked | D11-4-offline-refresh-no-logout.gif |
-| D12-1/3/4/5/8 | widget: quiet logs, greeting first, no reply-time promise, refused-send notice, dead WS paths removed | d64da73 | merged → tested: header "We're here to help"/pt ✓, 0 console logs (debug shows them) ✓, too-long refused → notice + text restored ✓, order kept ✓ BUT greeting shown twice ✗ (regression of 5af9c35 → claude/wave0-test-fixes) | D12-1-8-widget-header-and-quiet-console.gif, D12-3-4-greeting-order-and-refused-send.gif |
+| D12-1/3/4/5/8 | widget: quiet logs, greeting first, no reply-time promise, refused-send notice, dead WS paths removed | d64da73 | merged → tested: header "We're here to help"/pt ✓, 0 console logs (debug shows them) ✓, too-long refused → notice + text restored ✓, order kept ✓ greeting twice ✗ → fixed e4d48c2, retested ✓ one greeting (D12-3-single-greeting.gif) | D12-1-8-widget-header-and-quiet-console.gif, D12-3-4-greeting-order-and-refused-send.gif |
 | D5-2 fix | fixed honest line on every path | a0b0220 | tested ✓: en/pt offline lines exact, pending-human, order after greeting; online → "I've passed this to the team…" ✓; nudge uses new model ✓ | D5-2-handoff-en-offline.gif, D5-2-handoff-pt-offline.gif, D5-2-A3-handoff-online.gif |
 | D6-4 | `@hay/plugin-sdk/tool-errors` {code, retryable}; Shopify + Woo (mutations no longer retried after timeout → OUTCOME_UNKNOWN) | 24818be | merged → automated ✓ | — |
 

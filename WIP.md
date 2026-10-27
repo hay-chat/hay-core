@@ -1,3 +1,7 @@
+## 2026-10-27 ~20:40 — staging: Wave 0 done
+- Review fixes + tester fixes merged and retested; full suites green. Tag `wave-0-done`; PR staging→master open (see roadmap "Resume here").
+- Next: Wave 1 in a fresh orchestrator session ("resume from tasks/voc-roadmap.md").
+
 ## 2026-10-27 ~19:45 — staging (VOC roadmap, Wave 0)
 - Merged L10 (refresh rotation, migration AddRefreshTokenRotationToSessions1784700000000 ran) and L6 (widget hygiene, dist rebuilt). tsc/vue-tsc clean; jest auth-session 20/20; dashboard session 21/21; webchat 67/67.
 - X tickets: PRs hay-backoffice#3 (D1-4), #4 + hay-website#44 (D15-1), hay-shopify-app#1 (D12-2); WP 1.0.1 patch in ../haychat-svn-patches.
