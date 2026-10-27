@@ -62,6 +62,7 @@
       "open": "Aberta",
       "processing": "Processando",
       "pendingHuman": "Precisa de Atenção",
+      "awaitingApproval": "Aguardando Aprovação",
       "humanTookOver": "Controle Manual",
       "resolved": "Resolvida",
       "unresolved": "Não resolvida",
@@ -224,6 +225,8 @@
       "failed": "Falhou",
       "running": "Executando",
       "simulated": "Simulada",
+      "pendingApproval": "Aguardando aprovação",
+      "rejected": "Recusada",
       "unknown": "Desconhecido"
     }
   }

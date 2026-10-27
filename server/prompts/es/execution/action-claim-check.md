@@ -52,6 +52,8 @@ Una afirmación está respaldada SOLO si una llamada de herramienta listada arri
 
 Si la respuesta hace MÚLTIPLES afirmaciones de acción, TODAS deben estar respaldadas para que `backedByTools` sea true.
 
+Una llamada con estado **PENDING_APPROVAL** se envió a un miembro del equipo para su aprobación y NO ha ocurrido. Solo respalda una afirmación de que la acción fue **solicitada** o está **pendiente de aprobación** ("He solicitado el reembolso; el equipo lo confirmará aquí"). Nunca respalda una afirmación de que la acción está hecha, procesada o aprobada.
+
 Si la lista de herramientas está vacía, ninguna afirmación de acción puede estar respaldada.
 
 ---

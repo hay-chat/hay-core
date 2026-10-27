@@ -27,6 +27,7 @@ export type ConversationStatus =
   | "open"
   | "processing"
   | "pending-human"
+  | "awaiting-approval"
   | "human-took-over"
   | "resolved"
   | "unresolved"
@@ -90,6 +91,7 @@ export class Conversation {
       "open",
       "processing",
       "pending-human",
+      "awaiting-approval",
       "human-took-over",
       "resolved",
       "unresolved",
@@ -1006,6 +1008,10 @@ The following tools are available for you to use. You MUST return only valid JSO
         // parked the conversation, a new shopper message must not hand it back
         // to the AI. Only Take Over / Return to AI leave this state.
         newStatus = "pending-human";
+      } else if (this.status === "awaiting-approval") {
+        // Waiting on a person's decision about an action (D4-4). The AI resumes
+        // when the action is approved or rejected, not on a new shopper message.
+        newStatus = "awaiting-approval";
       }
 
       // Update conversation with cooldown and processing status

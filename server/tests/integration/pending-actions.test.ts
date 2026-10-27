@@ -106,7 +106,18 @@ describe("pending actions (D4-3)", () => {
     expect(rejected).toMatchObject({ transitioned: true, action: { status: "rejected" } });
     expect(rejected.action?.decision_note).toBe("Too large");
     expect((await pendingActionService.approve(action.id, orgId, userId)).transitioned).toBe(false);
-    expect(await pendingActionService.wasRejected(conversationId, "shop:create_refund")).toBe(true);
+    const same = { order_id: "1001", amount: "25.00" };
+    expect(
+      (await pendingActionService.findEarlierRequest(conversationId, "shop:create_refund", same))
+        ?.status,
+    ).toBe("rejected");
+    // A different order is a different request.
+    expect(
+      await pendingActionService.findEarlierRequest(conversationId, "shop:create_refund", {
+        order_id: "1002",
+        amount: "25.00",
+      }),
+    ).toBeNull();
   });
 
   it("does not approve an action past its deadline, and expires it", async () => {

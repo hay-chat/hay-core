@@ -52,6 +52,8 @@ A claim is backed ONLY if a tool call listed above:
 
 If the response makes MULTIPLE action claims, ALL of them must be backed for `backedByTools` to be true.
 
+A call with status **PENDING_APPROVAL** was sent to a team member for approval and has NOT happened. It backs only a claim that the action was **requested** or is **waiting for approval** ("I've requested the refund; the team will confirm here"). It never backs a claim that the action is done, processed or approved.
+
 If the tool ledger is empty, no action claim can be backed.
 
 ---

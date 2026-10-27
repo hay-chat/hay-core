@@ -280,6 +280,7 @@ import {
   Circle,
   CheckCircle,
   AlertTriangle,
+  Hourglass,
   XCircle,
   Plus,
 } from "lucide-vue-next";
@@ -449,6 +450,7 @@ const getStatusVariant = (status: string): "default" | "secondary" | "destructiv
   const variants: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
     open: "default",
     "pending-human": "destructive",
+    "awaiting-approval": "outline",
     resolved: "secondary",
     unresolved: "outline",
     active: "default",
@@ -462,6 +464,7 @@ const getStatusIcon = (status: string) => {
   const icons = {
     open: Circle,
     "pending-human": AlertTriangle,
+    "awaiting-approval": Hourglass,
     resolved: CheckCircle,
     unresolved: XCircle,
     active: Circle,
@@ -476,6 +479,7 @@ const formatStatus = (status: string) => {
     open: "conversations.status.open",
     processing: "conversations.status.processing",
     "pending-human": "conversations.status.pendingHuman",
+    "awaiting-approval": "conversations.status.awaitingApproval",
     "human-took-over": "conversations.status.humanTookOver",
     resolved: "conversations.status.resolved",
     unresolved: "conversations.status.unresolved",

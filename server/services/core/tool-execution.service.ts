@@ -11,6 +11,11 @@ import { actionLogService, toolErrorCode } from "../action-log.service";
 import { classifyTool, CORE_TOOL_RISK, type ToolRisk } from "./tool-risk";
 import { isDryRun, simulatedResult } from "./dry-run";
 import type { ActionOutcome } from "@server/database/entities/action-log.entity";
+import type { PendingAction } from "@server/database/entities/pending-action.entity";
+import { decideGate } from "./action-policy";
+import { pendingActionService } from "../pending-action.service";
+import { organizationRepository } from "@server/repositories/organization.repository";
+import { resolveActionApprovalConfig } from "@server/types/organization-settings.types";
 
 const logger = createLogger("tool-execution");
 
@@ -20,6 +25,8 @@ interface ToolExecutionResult {
   error?: string;
   /** A dry-run write: nothing was sent to the provider. */
   simulated?: boolean;
+  /** Held for a person's approval: nothing was sent to the provider yet. */
+  pending?: boolean;
 }
 
 interface ToolLogEntry {
@@ -126,10 +133,7 @@ export class ToolExecutionService {
         executedAt: new Date().toISOString(),
       };
 
-      const step =
-        !target.risk.readOnly && isDryRun(conversation.metadata)
-          ? await this.simulate(call)
-          : await this.runLive(call);
+      const step = await this.runStep(call);
 
       const latencyMs = Date.now() - call.startedAt;
       await actionLogService.record({
@@ -169,6 +173,103 @@ export class ToolExecutionService {
         error: (error as Error).message || "Unknown error",
       };
     }
+  }
+
+  /**
+   * Reads run. A write is simulated in a dry-run conversation, held when the
+   * org's approval policy says so, and run otherwise.
+   */
+  private async runStep(call: PreparedCall): Promise<CallStep> {
+    if (call.target.risk.readOnly) return this.runLive(call);
+    if (isDryRun(call.conversation.metadata)) return this.simulate(call);
+    return (await this.gate(call)) ?? this.runLive(call);
+  }
+
+  /**
+   * Apply the approval policy (D4-4). Returns null when the call may run now;
+   * otherwise a step that tells the AI the action is waiting for a person
+   * (or was already turned down), without touching the provider.
+   */
+  private async gate(call: PreparedCall): Promise<CallStep | null> {
+    const { conversation, toolCall, target } = call;
+    const organization = await organizationRepository.findById(conversation.organization_id);
+    const config = resolveActionApprovalConfig(organization?.settings);
+    const decision = decideGate(target.risk, toolCall.args, config);
+    if (decision.kind === "allow") return null;
+
+    // The same request was already made in this conversation: answer from it
+    // instead of opening a second one.
+    const earlier = await pendingActionService.findEarlierRequest(
+      conversation.id,
+      toolCall.name,
+      toolCall.args,
+    );
+    if (earlier?.status === "rejected") return this.declined(call, earlier);
+    if (earlier?.status === "pending") return this.held(call, earlier);
+
+    const action = await pendingActionService.hold({
+      organizationId: conversation.organization_id,
+      conversationId: conversation.id,
+      messageId: call.messageId ?? null,
+      pluginId: target.pluginId,
+      toolName: toolCall.name,
+      category: target.risk.readOnly ? "other_write" : target.risk.category,
+      args: toolCall.args,
+      amount: decision.amount,
+      holdReason: decision.reason,
+      expiryHours: config.expiryHours,
+    });
+    // The pending action's key is the one the provider will see on approval.
+    call.idempotencyKey = action.idempotency_key;
+    await this.conversationRepository.update(conversation.id, conversation.organization_id, {
+      status: "awaiting-approval",
+    });
+    conversation.status = "awaiting-approval";
+    return this.held(call, action);
+  }
+
+  private async held(call: PreparedCall, action: PendingAction): Promise<CallStep> {
+    const result = {
+      status: "pending_approval",
+      pendingActionId: action.id,
+      message:
+        "NOT DONE YET. This action needs a team member's approval before it runs. " +
+        "Tell the customer you have requested it and that they will get an answer " +
+        "here once the team decides. Do not say it is done, approved or guaranteed, " +
+        "and do not call this tool again for the same request.",
+    };
+    await this.finishToolMessage(call, `Approval requested: ${call.toolCall.name}`, {
+      toolOutput: result,
+      toolStatus: "PENDING_APPROVAL",
+      pendingActionId: action.id,
+    });
+    return {
+      result: { success: false, pending: true, result },
+      logOutcome: "held",
+      errorCode: null,
+    };
+  }
+
+  private async declined(call: PreparedCall, action: PendingAction): Promise<CallStep> {
+    const result = {
+      status: "rejected",
+      pendingActionId: action.id,
+      reason: action.decision_note,
+      message:
+        "A team member already declined this exact request. It was not done. " +
+        "Do not request it again; explain to the customer and offer another option.",
+    };
+    await this.finishToolMessage(call, `Request declined: ${call.toolCall.name}`, {
+      toolOutput: result,
+      toolStatus: "REJECTED",
+      pendingActionId: action.id,
+    });
+    return {
+      result: { success: false, error: result.message, result },
+      logOutcome: "error",
+      errorCode: "APPROVAL_REJECTED",
+      errorClass: "ApprovalRejected",
+    };
   }
 
   /** Dry-run write: nothing reaches the provider, the AI gets a structured mock. */

@@ -16,6 +16,8 @@ const logger = createLogger("action-claim-guardrail");
 export interface ToolLedgerEntry {
   name: string;
   success: boolean;
+  /** Held for a person's approval (D4-4): requested, not done. */
+  pending?: boolean;
 }
 
 /**
@@ -167,7 +169,10 @@ export class ActionClaimGuardrailService {
       return "(none — no tools were called this turn)";
     }
     return entries
-      .map((entry) => `- ${entry.name} — ${entry.success ? "SUCCESS" : "FAILED"}`)
+      .map((entry) => {
+        const status = entry.pending ? "PENDING_APPROVAL" : entry.success ? "SUCCESS" : "FAILED";
+        return `- ${entry.name} — ${status}`;
+      })
       .join("\n");
   }
 

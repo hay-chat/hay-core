@@ -1136,6 +1136,7 @@ async function handleExecutionLoop(
       toolsCalledThisTurn.push({
         name: executionResult.tool.name,
         success: toolExecResult1.success,
+        pending: toolExecResult1.pending,
       });
       await maybeEmitProductRecommendation(
         conversation,
@@ -1166,6 +1167,7 @@ async function handleExecutionLoop(
       toolsCalledThisTurn.push({
         name: executionResult.tool.name,
         success: toolExecResult2.success,
+        pending: toolExecResult2.pending,
       });
       await maybeEmitProductRecommendation(
         conversation,

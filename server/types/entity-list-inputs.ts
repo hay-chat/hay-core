@@ -48,6 +48,7 @@ export const conversationFiltersSchema = z
         "open",
         "processing",
         "pending-human",
+        "awaiting-approval",
         "human-took-over",
         "resolved",
         "unresolved",
