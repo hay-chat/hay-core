@@ -123,7 +123,7 @@
                   {{ $t("dashboard.gettingStarted.integrations.browseAll") }}
                   <ArrowRight class="w-3 h-3 ml-2" />
                 </Button>
-                <Button href="https://hay.canny.io/" target="_blank" variant="outline">
+                <Button :href="suggestIntegrationUrl" target="_blank" variant="outline">
                   <Lightbulb class="w-3 h-3 mr-2" />
                   {{ $t("dashboard.gettingStarted.integrations.suggest") }}
                 </Button>
@@ -382,6 +382,14 @@ import { Hay } from "@/utils/api";
 import { CheckCircle2, Check, ArrowRight, Lightbulb, Lock } from "lucide-vue-next";
 import { useAppStore } from "@/stores/app";
 import { useDomain } from "@/composables/useDomain";
+
+const { locale } = useI18n();
+// Integration suggestions go to a form on the website that emails the team.
+const suggestIntegrationUrl = computed(() =>
+  locale.value.startsWith("pt")
+    ? "https://hay.chat/pt/sugerir-integracao/?from=dashboard"
+    : "https://hay.chat/suggest-integration/?from=dashboard",
+);
 
 interface OnboardingStep {
   id: string;
