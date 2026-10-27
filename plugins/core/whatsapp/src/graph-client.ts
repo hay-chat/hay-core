@@ -24,15 +24,42 @@ export class GraphApiError extends Error {
   public readonly subcode?: number;
   /** `error.error_data.details` — WhatsApp's human-readable cause. */
   public readonly details?: string;
+  /**
+   * Network failure (status 0) before the request reached Meta (DNS, refused,
+   * connect timeout), so Meta certainly did not accept it. False for failures
+   * that may have happened after Meta received the request.
+   */
+  public readonly notSent: boolean;
 
-  constructor(message: string, status: number, code?: number, subcode?: number, details?: string) {
+  constructor(
+    message: string,
+    status: number,
+    code?: number,
+    subcode?: number,
+    details?: string,
+    notSent = false,
+  ) {
     super(message);
     this.name = "GraphApiError";
     this.status = status;
     this.code = code;
     this.subcode = subcode;
     this.details = details;
+    this.notSent = notSent;
   }
+}
+
+/** Node fetch failures that happen before any byte of the request reaches the server. */
+const CONNECT_PHASE_CODES = new Set([
+  "ECONNREFUSED",
+  "ENOTFOUND",
+  "EAI_AGAIN",
+  "UND_ERR_CONNECT_TIMEOUT",
+]);
+
+function isConnectPhaseError(error: unknown): boolean {
+  const cause = (error as { cause?: { code?: unknown } } | null)?.cause;
+  return typeof cause?.code === "string" && CONNECT_PHASE_CODES.has(cause.code);
 }
 
 /**
@@ -88,6 +115,36 @@ export interface WabaInfo {
 
 type JsonObject = Record<string, unknown>;
 
+/** A message template as `GET /{waba}/message_templates` returns it. */
+export interface GraphTemplate {
+  id: string;
+  name: string;
+  language: string;
+  status: string;
+  category?: string;
+  parameter_format?: "POSITIONAL" | "NAMED";
+  rejected_reason?: string;
+  components?: Array<{
+    type?: string;
+    format?: string;
+    text?: string;
+    buttons?: Array<{ type?: string; text?: string; url?: string }>;
+  }>;
+}
+
+/** Body of `POST /{waba}/message_templates`. */
+export interface NewTemplate {
+  name: string;
+  language: string;
+  category: "UTILITY" | "MARKETING" | "AUTHENTICATION";
+  components: JsonObject[];
+}
+
+const TEMPLATE_FIELDS =
+  "id,name,language,status,category,parameter_format,rejected_reason,components";
+/** Stop paging after this many pages (100 each) — a WABA holds at most a few hundred. */
+const MAX_TEMPLATE_PAGES = 20;
+
 interface RequestOptions {
   query?: Record<string, string>;
   body?: JsonObject;
@@ -138,7 +195,14 @@ export class GraphClient {
       response = await this.fetchImpl(url.toString(), { method, headers, body });
     } catch (error: unknown) {
       const reason = error instanceof Error ? error.message : "unknown";
-      throw new GraphApiError(`Graph API network error: ${reason}`, 0);
+      throw new GraphApiError(
+        `Graph API network error: ${reason}`,
+        0,
+        undefined,
+        undefined,
+        undefined,
+        isConnectPhaseError(error),
+      );
     }
 
     const text = await response.text();
@@ -237,7 +301,7 @@ export class GraphClient {
 
   /**
    * Approved template message — the only thing allowed outside the 24h window.
-   * TODO: Phase 3 (D11) wires templates into the human-agent picker and proactive sends.
+   * Sent by the human template picker and the hand-off fallback (D13-3/4).
    */
   sendTemplate(
     phoneNumberId: string,
@@ -317,6 +381,35 @@ export class GraphClient {
       { query: { fields: "id,display_phone_number,verified_name" } },
     );
     return Array.isArray(data?.data) ? data.data : [];
+  }
+
+  /** Every message template on the Messaging account (all statuses), following paging. */
+  async listTemplates(wabaId: string, accessToken: string): Promise<GraphTemplate[]> {
+    const templates: GraphTemplate[] = [];
+    let after: string | undefined;
+    for (let page = 0; page < MAX_TEMPLATE_PAGES; page++) {
+      const data = await this.request<{
+        data?: GraphTemplate[];
+        paging?: { cursors?: { after?: string }; next?: string };
+      }>("GET", `/${encodeURIComponent(wabaId)}/message_templates`, accessToken, {
+        query: { fields: TEMPLATE_FIELDS, limit: "100", ...(after ? { after } : {}) },
+      });
+      templates.push(...(Array.isArray(data?.data) ? data.data : []));
+      after = data?.paging?.next ? data.paging.cursors?.after : undefined;
+      if (!after) break;
+    }
+    return templates;
+  }
+
+  /** Submit a new template for Meta's review. Returns its id and initial status. */
+  createTemplate(
+    wabaId: string,
+    accessToken: string,
+    template: NewTemplate,
+  ): Promise<{ id?: string; status?: string; category?: string }> {
+    return this.request("POST", `/${encodeURIComponent(wabaId)}/message_templates`, accessToken, {
+      body: { ...template },
+    });
   }
 
   /** Resolve a webhook media id to a 5-minute download URL. */

@@ -15,6 +15,8 @@ import { ingestMedia, type Attachment, type InboundMedia, type InboundMediaType 
  *    delivery statuses of our outbound messages (→ `messages.updateStatus`).
  *  - `account_update` carries revocation (PARTNER_APP_UNINSTALLED & co.)
  *    (→ `connection.revoke`, Embedded Signup only).
+ *  - `message_template_status_update` / `template_category_update` patch the
+ *    worker's template store (D13-1).
  *  - Everything else is logged and ignored for now.
  *
  * A failing `messages.receive` throws so index.ts answers 500 and Meta retries;
@@ -180,9 +182,10 @@ export async function handleWebhook(body: unknown, ctx: ChannelContext): Promise
         } else {
           summary.ignored++;
         }
+      } else if (TEMPLATE_FIELDS.has(change.field ?? "")) {
+        handleTemplateChange(change.field ?? "", value, entry.id, connection, ctx);
       } else {
-        // TODO: Phase 3 — template status/quality updates (message_template_*),
-        // phone_number_quality_update for the health card.
+        // TODO: Phase 3 — phone_number_quality_update for the health card.
         // TODO: Phase 4 — coexistence `smb_message_echoes` (human replies from the
         // Business app) and `history`.
         ctx.logger.info("WhatsApp webhook field ignored", {
@@ -195,6 +198,47 @@ export async function handleWebhook(body: unknown, ctx: ChannelContext): Promise
   }
 
   return summary;
+}
+
+const TEMPLATE_FIELDS = new Set(["message_template_status_update", "template_category_update"]);
+
+/** Patch the template store; an unknown template triggers a background resync. */
+function handleTemplateChange(
+  field: string,
+  value: WaValue,
+  wabaId: string | undefined,
+  connection: WhatsAppConnection,
+  ctx: ChannelContext,
+): void {
+  if (wabaId && wabaId !== connection.wabaId) {
+    ctx.logger.warn("WhatsApp template event ignored — another Messaging account", { wabaId });
+    return;
+  }
+  const store = ctx.templates;
+  if (!store) return;
+  const data = value as unknown as JsonObject;
+  const applied =
+    field === "template_category_update"
+      ? store.applyCategoryUpdate(data)
+      : store.applyStatusUpdate(data);
+  ctx.logger.info("WhatsApp template event", {
+    field,
+    name: data.message_template_name,
+    event: data.event ?? data.new_category,
+    applied,
+  });
+  if (!applied) {
+    void store.sync(connection);
+  }
+}
+
+/** WhatsApp's customer service window: 24 hours from the customer's last message. */
+const REPLY_WINDOW_MS = 24 * 60 * 60 * 1000;
+
+function replyWindowExpiresAt(timestamp: string | undefined): string {
+  const seconds = Number(timestamp);
+  const sentAt = Number.isFinite(seconds) && seconds > 0 ? seconds * 1000 : Date.now();
+  return new Date(sentAt + REPLY_WINDOW_MS).toISOString();
 }
 
 async function handleMessagesChange(
@@ -472,6 +516,7 @@ async function receiveMessage(
       channel: "whatsapp",
       senderType: "customer",
       metadata,
+      replyWindowExpiresAt: replyWindowExpiresAt(message.timestamp),
       ...(attachments ? { attachments } : {}),
     },
   );

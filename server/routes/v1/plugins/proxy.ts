@@ -134,7 +134,7 @@ router.all(/^\/([^/]+)\/(.*)?$/, async (req: Request, res: Response): Promise<vo
 
 /**
  * First path segments only core may call on a worker (over localhost): the SDK
- * runner's control endpoints, the channel `/deliver` + `/escalate` contract, and
+ * runner's control endpoints, the channel `/deliver` + `/escalate` + `/templates` contract, and
  * `/ui/*` (settings UI routes, reachable only via the authenticated, org-scoped
  * `plugins.callUiRoute`).
  */
@@ -149,6 +149,7 @@ const WORKER_INTERNAL_SEGMENTS = new Set([
   "mcp",
   "deliver",
   "escalate",
+  "templates",
   "ui",
 ]);
 

@@ -12,9 +12,9 @@ import { outboundMessageId, replySubject, splitAddress, tokenAddress } from "./t
  * recognised as an echo, and our own Message-ID so later replies thread back.
  *
  * Error semantics mirror the WhatsApp channel: a refused send → 200
- * `{success:false, error}`; Hay's own API unreachable → 503. Core marks the
- * message failed in both cases today (no delivery retry exists yet); the
- * status split keeps the two causes apart in logs.
+ * `{success:false, error}`; Hay's own API unreachable before anything was
+ * sent → 503, which core retries. A `sendEmail` call that threw may already
+ * have sent the mail, so it is a final 200 `send_uncertain`, never a retry.
  */
 
 export interface DeliverResult {
@@ -221,10 +221,10 @@ export async function deliver(
       body: { success: true, providerMessageId: result.messageId ?? ourMessageId },
     };
   } catch (error: unknown) {
-    ctx.logger.error("Email delivery failed — Hay API unreachable", {
+    ctx.logger.error("Email delivery failed — outcome unknown, not retried", {
       conversationId: parsed.conversationId,
       error: error instanceof Error ? error.message : String(error),
     });
-    return { status: 503, body: { success: false, error: "hay_api_unavailable" } };
+    return { status: 200, body: { success: false, error: "send_uncertain" } };
   }
 }
