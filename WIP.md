@@ -4,6 +4,11 @@
 - Public whitelist passes only systemEvent/agentFirstName, blanks System content. Widget history via new getWidgetMessages; orchestrator getPublicMessages + channel delivery unchanged (System skipped). run.ts untouched.
 - Verified: jest services/routes/orchestrator 65 suites + new integration; tsc; webchat vitest 109, vue-tsc, build; dashboard typecheck + util test.
 - Next: merge into staging (handlers diff is metadata-only), rebuild webchat dist, manual test on :8090.
+## 2026-10-27 — claude/w1-first-message-race — orchestrator race fixes done (not merged, not pushed)
+- 264360c Bug A: greeting + instructions written in createConversation (no creation run); addMessage stores the customer row before setting needs_processing; setProcessed -> markProcessed(lastCustomerMessageId) compare-and-set; run re-reads flag after lock and re-queues on non-error exit.
+- bc36f02 Bug B: releaseFromUser("ai") queues a run only if the newest Customer message has no BotAgent/HumanAgent reply after it. Release route handler untouched.
+- Verified: tsc clean; full server jest 95/95 suites; new tests/integration/orchestrator-processing-race.test.ts fails before / passes after.
+- Next: orchestrator merges into staging (watch conflict with join-notice branch in conversation.entity.ts releaseFromUser); manual widget retest.
 
 ## 2026-10-27 late — staging: Wave 1 L2 merged
 - L2 close classifier merged (c40e1e7, migration AddConversationOutcomes1785100000000), unresolved treated as closed in widget (728066a); loader idle fix (ca54167). Tester running on both.

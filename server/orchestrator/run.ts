@@ -450,7 +450,16 @@ export const runConversation = async (conversationId: string) => {
     }
   }, LOCK_HEARTBEAT_INTERVAL_MS);
 
+  // Whether this run ended in a processing error. Errors are retried by the
+  // sweep with error counting; every other outcome re-checks the flag on exit.
+  let failed = false;
+
   try {
+    // The flag was read before the lock. Another run may have answered in the
+    // meantime, so re-read it now that no other run can.
+    const current = await conversationRepository.findById(conversation.id);
+    conversation.needs_processing = current?.needs_processing === true;
+
     // Increment processing attempts now that we own the lock
     await conversationRepository.updateById(conversation.id, {
       processing_attempts: (conversation.processing_attempts || 0) + 1,
@@ -480,8 +489,9 @@ export const runConversation = async (conversationId: string) => {
     if (!lastCustomerMessage) {
       // Clear needs_processing so the sweep doesn't re-enqueue this conversation
       // in a tight loop. Without this, any row with needs_processing=true but
-      // no customer message becomes a sweep zombie.
-      await conversation.setProcessed(true);
+      // no customer message becomes a sweep zombie. Compare-and-set: a customer
+      // message that landed after the read above keeps the flag.
+      await conversation.markProcessed(null);
       throw new Error("Last customer message not found");
     }
 
@@ -618,9 +628,8 @@ export const runConversation = async (conversationId: string) => {
       // Set processed and unlock early since we're closing.
       // The finally block will still run — it clears the heartbeat and the
       // ownership-checked unlock is a no-op the second time around.
-      conversation.setProcessed(true);
+      await conversation.markProcessed(lastCustomerMessage.id);
       await updateProcessingState(conversation, "idle");
-      await conversation.unlock(lockerId);
       return; // Exit early since conversation is closed
     }
 
@@ -781,7 +790,7 @@ export const runConversation = async (conversationId: string) => {
       }
     }
 
-    conversation.setProcessed(true);
+    await conversation.markProcessed(lastCustomerMessage.id);
   } catch (error: Error | unknown) {
     if (error instanceof AiReplySuppressedError) {
       // Not a processing failure: a human took over, or the agent or the
@@ -795,6 +804,7 @@ export const runConversation = async (conversationId: string) => {
       !error.message.includes("Conversation does not need processing") &&
       !error.message.includes("Last customer message not found")
     ) {
+      failed = true;
       log.error({ err: error }, "Error in conversation");
 
       // FAILURE: Track error
@@ -832,8 +842,36 @@ export const runConversation = async (conversationId: string) => {
     } catch (unlockError) {
       log.error({ err: unlockError }, "Failed to release lock");
     }
+
+    if (!failed) {
+      await requeueIfStillPending(conversation, log);
+    }
   }
 };
+
+/**
+ * A customer message that arrived while this run held the lock queued a run
+ * that found the lock taken and gave up, and markProcessed left its flag set.
+ * Queue it again now the lock is free, instead of waiting for the sweep.
+ */
+async function requeueIfStillPending(conversation: Conversation, log: pino.Logger): Promise<void> {
+  try {
+    const current = await conversationRepository.findById(conversation.id);
+    if (!current?.needs_processing || current.status !== "open" || current.assigned_user_id) {
+      return;
+    }
+    const { orchestratorQueueService } =
+      await import("@server/services/orchestrator-queue.service");
+    await orchestratorQueueService.enqueue(
+      conversation.id,
+      conversation.organization_id,
+      "customer_message",
+    );
+    log.debug("Customer message arrived during the run, re-queued");
+  } catch (error) {
+    log.warn({ err: error }, "Re-queue check failed, the sweep will pick it up");
+  }
+}
 
 /**
  * Handle iterative execution loop with tool calls

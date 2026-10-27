@@ -90,6 +90,7 @@ const freshRow = () => ({
   organization_id: ORG_ID,
   status: "open",
   assigned_user_id: null,
+  needs_processing: true,
   deleted_at: null,
   agent: { id: AGENT_ID, enabled: true },
   organization: { suspendedAt: null, agentPausedAt: null },
@@ -119,7 +120,7 @@ function makeConversation() {
     })),
     getPublicMessages: jest.fn(async () => []),
     addMessage: jest.fn(async (payload: { content: string }) => ({ id: "new", ...payload })),
-    setProcessed: jest.fn(),
+    markProcessed: jest.fn(async () => true),
   };
 }
 
