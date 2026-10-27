@@ -3,6 +3,16 @@
 Started 2026-10-27. Research: `/Users/rogerjunior/Documents/code/hay/seo/Engineering/02 Research/` (D1–D16; each file's
 "Roger's answers" block overrides its recommendations). Research baseline: origin/master 3e6ede1.
 
+## Resume here (orchestrator checkpoint — keep current; safe to /compact after reading this)
+- Last update: 2026-10-27 evening. Staging HEAD: see `git log -1 staging`.
+- Wave 0 merged: L2 (2cf8ee5) ✓, L1 (6ae259f) ✓, L8 (b2a60d7) ✓, L3 (b5a4120, tester agent running), L9 (538bfea, manual test queued — use report steps: /analytics 404, dashboard Top Agents real + Avg Response Time card, Conversations header no fake trend, heartbeat resumes after tab hide/show, Feedback nav → Open conversation scrolls to message).
+- Running: L5 Shopify agent (claude/d6-shopify-guards, D6-1, D6-4); tester for L3.
+- Wave 0 still to start: L10 (D11-3, D11-4 refresh tokens; owns dashboard/utils/api.ts + stores/auth.ts), L6 (D12-8 widget hygiene; also remove dead WS loadHistory/sendMessage in webchat per L1 follow-up), X: D1-4 backoffice (also read `billableResolutions`, tolerate lower totals), D12-2 (WP plugin real source haychat-svn/trunk + Shopify app embed), D15-1 (Stripe portal: rename button to "Manage or cancel plan", explicit cancel entry point; portal already has cancel at period end + reason ON).
+- Then: Wave 0 review agent over `git diff 5bfee16..staging` → fixes → tag `wave-0-done` → PR staging→master with body (tickets, migration AddConversationHandedOffAt1784600000000, tests, manual results + GIFs, Needs Roger, and the D8 after-deploy steps: deploy → `docker cp scripts/make-media-private.cjs hay-server:/tmp/` → dry run → `--apply` → `doctl compute cdn flush <id> --files 'uploads/*'` (hay-ams ff84a7bc-8770-4a41-af22-2192d46e9473, hay d67a8597-cd2c-4825-b902-a788706e0647) → Spaces listing Restricted → check old URL 403; image needs sharp's optional Linux binaries).
+- Process: builders get `mkwt.sh <slug> <branch>` worktrees (scratchpad) + `.env` with DB_NAME=hay_test/REDIS_DB=1; testers get `scratchpad/TESTER_BRIEF.md`. Max 2 agents while staging env runs. After npm install on staging: touch server/main.ts; if dashboard 503s, kill the nuxt processes and restart `npx nuxt dev --port 3000` in dashboard/ (log scratchpad/staging/dashboard.log).
+- Roger decisions so far: allowed-domains enforcement OK; proxy verified (Traefik ignores client XFF, no Cloudflare proxy); Roger runs the media script himself after deploy; inactivity-close billing default = keep billing until D1-3 (no answer yet); hand-off copy pending confirmation.
+- Context plan: finish Wave 0 in this session; Waves 1–3 each in a fresh orchestrator session (original prompt + "resume from tasks/voc-roadmap.md").
+
 ## Setup
 
 - Integration branch: `staging` (worktree `../hay-core-staging`), cut from origin/master 3e6ede1. Note: CI
