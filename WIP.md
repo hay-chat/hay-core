@@ -1,3 +1,8 @@
+## 2026-10-27 night — staging: Wave 1 started
+- L6 merged (3acc19a): reload resumes conversation, create on first message, split loader + idle loading; tester running.
+- L2 close classifier building (claude/w1-close-classifier). Feature guides committed in seo repo.
+- Next: record L6 test, merge L2, then L11/L10/L7 lanes. See tasks/voc-roadmap.md.
+
 ## 2026-10-27 — claude/w1-widget-loader — Wave 1 L6 widget done (not merged)
 - Commits: reload-resume bug fix (53ff6e6), D9-4 create on first message (e512d9c), D12-6 server cache (e9e2cf8), D12-6/7 loader split + loading modes + lazy locales (f6b2e5c), prettier (78a9683).
 - widget.js loader 6.8 KB / 3.0 KB gzip; chat chunk 116 KB / 40.8 KB gzip. webchat vitest 101/101, vue-tsc, root build, jest webchat-static + http-compression green; real-browser smoke passed.
