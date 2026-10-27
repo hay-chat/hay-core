@@ -397,7 +397,12 @@ export class WebSocketService {
   }
 
   /**
-   * Handle customer identification
+   * Handle customer identification: attach a webchat client to an existing
+   * conversation so it receives that conversation's public events.
+   *
+   * Conversations are only ever created through `publicConversations.create`,
+   * which registers the browser's DPoP key. Creating one here would produce a
+   * conversation with no key, writable by anyone.
    */
   private async handleIdentify(clientId: string, message: IdentifyMessage): Promise<void> {
     const client = this.clients.get(clientId);
@@ -405,48 +410,32 @@ export class WebSocketService {
 
     const { customerId, conversationId, metadata } = message;
 
-    // Update client info
+    if (!conversationId) {
+      this.sendError(client, "conversationId is required");
+      return;
+    }
+
+    const conversation = await conversationRepository.findById(conversationId);
+    if (
+      !conversation ||
+      conversation.organization_id !== client.organizationId ||
+      conversation.channel !== "web"
+    ) {
+      this.sendError(client, "Conversation not found");
+      return;
+    }
+
     client.customerId = customerId;
-    client.conversationId = conversationId;
+    client.conversationId = conversation.id;
     client.metadata = { ...client.metadata, ...metadata };
 
-    // Get or create conversation
-    let conversation;
-    if (conversationId) {
-      conversation = await conversationRepository.findById(conversationId);
-      if (!conversation || conversation.organization_id !== client.organizationId) {
-        return;
-      }
+    if (!this.conversationClients.has(conversation.id)) {
+      this.conversationClients.set(conversation.id, new Set());
     }
+    this.conversationClients.get(conversation.id)!.add(clientId);
 
-    if (!conversation && client.organizationId) {
-      // Create new conversation
-      conversation = await conversationRepository.create({
-        organization_id: client.organizationId,
-        customer_id: customerId,
-        status: "open",
-        metadata: {
-          source: "webchat",
-          ...metadata,
-        },
-      });
-    }
+    logger.debug({ conversationId: conversation.id }, "Webchat client connected to conversation");
 
-    if (conversation) {
-      client.conversationId = conversation.id;
-
-      // Add to conversation clients map
-      if (!this.conversationClients.has(conversation.id)) {
-        this.conversationClients.set(conversation.id, new Set());
-      }
-      this.conversationClients.get(conversation.id)!.add(clientId);
-
-      // Webchat is now a core feature, no longer requires plugin instance
-      // Just log the connection for debugging
-      logger.debug({ conversationId: conversation.id }, "Webchat client connected to conversation");
-    }
-
-    // Send identification confirmation
     client.ws.send(
       JSON.stringify({
         type: "identified",
@@ -457,104 +446,87 @@ export class WebSocketService {
   }
 
   /**
-   * Handle chat message
+   * Handle a chat message from a webchat client.
+   *
+   * Every write needs a valid DPoP proof for the conversation the client
+   * identified into, the same gate as `publicConversations.sendMessage`.
    */
   private async handleChatMessage(clientId: string, message: ChatMessage): Promise<void> {
     const client = this.clients.get(clientId);
-    if (!client || !client.conversationId) return;
+    if (!client) return;
 
-    // Handle message directly in core system (webchat is now core, not a plugin)
+    const conversationId = client.conversationId;
+    if (!conversationId) {
+      this.sendError(client, "Identify with a conversation before sending messages");
+      return;
+    }
+
+    if (!message.proof || !message.method || !message.url) {
+      this.sendError(
+        client,
+        "DPoP authentication required: proof, method and url must be provided",
+      );
+      return;
+    }
+
+    // The proof is verified against the identified conversation. A frame that
+    // names a different conversation is rejected rather than silently rerouted.
+    if (message.conversationId && message.conversationId !== conversationId) {
+      this.sendError(client, "Conversation mismatch");
+      return;
+    }
+
     try {
-      // Check if this is a web conversation that requires DPoP authentication
-      const conversation = await conversationRepository.findById(client.conversationId);
-      if (!conversation) {
-        throw new Error("Conversation not found");
+      const conversation = await conversationRepository.findById(conversationId);
+      if (!conversation || conversation.channel !== "web" || !conversation.publicJwk) {
+        this.sendError(client, "Conversation does not accept webchat messages");
+        return;
       }
 
-      let newNonce: string | undefined;
+      const dpopVerification = await verifyDPoPForRequest(
+        conversationId,
+        message.proof,
+        message.method,
+        message.url,
+      );
 
-      // If conversation has a publicJwk (web channel with DPoP), validate DPoP proof
-      if (conversation.publicJwk) {
-        if (!message.proof || !message.method || !message.url || !message.conversationId) {
+      if (!dpopVerification.success) {
+        if (dpopVerification.newNonce) {
           client.ws.send(
             JSON.stringify({
               type: "error",
-              error:
-                "DPoP authentication required: proof, method, url, and conversationId must be provided",
+              error: "NONCE_EXPIRED",
+              nonce: dpopVerification.newNonce,
             }),
           );
           return;
         }
-
-        // Validate DPoP proof
-        const dpopVerification = await verifyDPoPForRequest(
-          message.conversationId,
-          message.proof,
-          message.method,
-          message.url,
-        );
-
-        if (!dpopVerification.success) {
-          // Check if it's a nonce expiration error
-          if (dpopVerification.error === "NONCE_EXPIRED" && dpopVerification.newNonce) {
-            client.ws.send(
-              JSON.stringify({
-                type: "error",
-                error: "NONCE_EXPIRED",
-                nonce: dpopVerification.newNonce,
-              }),
-            );
-            return;
-          }
-
-          // Other DPoP validation errors
-          client.ws.send(
-            JSON.stringify({
-              type: "error",
-              error: dpopVerification.error || "DPoP validation failed",
-            }),
-          );
-          return;
-        }
-
-        // Store new nonce for response
-        newNonce = dpopVerification.newNonce;
+        this.sendError(client, dpopVerification.error || "DPoP validation failed");
+        return;
       }
 
-      logger.debug({ conversationId: conversation.id }, "Saving customer message to conversation");
-
-      // Save customer message using conversation.addMessage() to ensure broadcasting
-      // addMessage() also enqueues the conversation for RabbitMQ processing
+      // addMessage() broadcasts the message and enqueues the orchestrator run.
       const savedMessage = await conversation.addMessage({
         content: message.content,
         type: MessageType.CUSTOMER,
         sender: "customer",
       });
 
-      logger.debug({ messageId: savedMessage.id }, "Message saved");
-
-      // Send confirmation with new nonce (if DPoP was validated)
-      const confirmationPayload = {
-        type: "message_sent",
-        messageId: savedMessage.id,
-        ...(newNonce && { nonce: newNonce }),
-      };
-      logger.debug({ confirmationPayload }, "Sending confirmation to client");
-      client.ws.send(JSON.stringify(confirmationPayload));
-
-      // Note: Message broadcasting is handled automatically by conversation.addMessage()
-      // Orchestrator processing is triggered via RabbitMQ queue from conversation.addMessage()
-
-      logger.debug({ conversationId: conversation.id }, "Webchat message processed");
-    } catch (error) {
-      logger.error({ err: error }, "Failed to process webchat message");
       client.ws.send(
         JSON.stringify({
-          type: "error",
-          error: "Failed to send message",
+          type: "message_sent",
+          messageId: savedMessage.id,
+          nonce: dpopVerification.newNonce,
         }),
       );
+    } catch (error) {
+      logger.error({ err: error }, "Failed to process webchat message");
+      this.sendError(client, "Failed to send message");
     }
+  }
+
+  private sendError(client: WebSocketClient, error: string): void {
+    client.ws.send(JSON.stringify({ type: "error", error }));
   }
 
   /**
@@ -628,18 +600,10 @@ export class WebSocketService {
       return;
     }
 
-    // Add to conversation subscribers (for webchat/unauthenticated clients only)
-    if (!this.conversationClients.has(conversationId as string)) {
-      this.conversationClients.set(conversationId as string, new Set());
-    }
-    this.conversationClients.get(conversationId as string)!.add(clientId as string);
-
-    client.conversationId = conversationId as string;
-
-    logger.debug(
-      { clientId, conversationId },
-      "Client subscribed to conversation (webchat client)",
-    );
+    // Webchat clients attach to their conversation through `identify`, which
+    // checks the organization and channel. An unchecked subscribe would let
+    // anyone listen to any conversation id.
+    this.sendError(client, "Unauthorized");
   }
 
   /**
