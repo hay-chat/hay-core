@@ -33,7 +33,9 @@ describe("useChat creates the conversation on the first message", () => {
     fetchMock = mockFetch({
       "publicConversations.create": () => {
         created++;
-        return { data: { id: `conv-${created}`, nonce: "n1", createdAt: "2026-10-27T10:00:00.000Z" } };
+        return {
+          data: { id: `conv-${created}`, nonce: "n1", createdAt: "2026-10-27T10:00:00.000Z" },
+        };
       },
       "publicConversations.sendMessage": () => ({
         data: { messageId: "u1", nonce: "n2", createdAt: "2026-10-27T10:00:03.000Z" },
@@ -85,7 +87,10 @@ describe("useChat creates the conversation on the first message", () => {
     expect(onConversationStarted).toHaveBeenCalledWith({ id: "conv-1" });
     expect(FakeWebSocket.instances).toHaveLength(1);
     expect(sessionStorage.getItem("hay-conversation-id")).toBe("conv-1");
-    expect(chat.messages.value.map((m) => m.content)).toEqual([LOCAL_GREETING, "Do you ship to Lisbon?"]);
+    expect(chat.messages.value.map((m) => m.content)).toEqual([
+      LOCAL_GREETING,
+      "Do you ship to Lisbon?",
+    ]);
     unmount();
   });
 

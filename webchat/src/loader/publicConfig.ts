@@ -13,7 +13,11 @@ export async function fetchPublicConfig(config: HayChatConfig): Promise<PublicCo
       `${config.baseUrl}/v1/webchat.getPublicConfig?input=${encodeURIComponent(input)}`,
     );
     if (!response.ok) {
-      console.warn("[Hay Webchat] Public config fetch failed:", response.status, response.statusText);
+      console.warn(
+        "[Hay Webchat] Public config fetch failed:",
+        response.status,
+        response.statusText,
+      );
       return null;
     }
     const data = await response.json();

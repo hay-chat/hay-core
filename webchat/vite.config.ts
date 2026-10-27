@@ -24,9 +24,7 @@ function inlineCssPlugin(): Plugin {
     enforce: "post",
     generateBundle(_options, bundle) {
       const cssFiles = Object.keys(bundle).filter((name) => name.endsWith(".css"));
-      const entry = Object.values(bundle).find(
-        (file) => file.type === "chunk" && file.isEntry,
-      );
+      const entry = Object.values(bundle).find((file) => file.type === "chunk" && file.isEntry);
       if (!entry || entry.type !== "chunk") return;
 
       for (const cssFileName of cssFiles) {
