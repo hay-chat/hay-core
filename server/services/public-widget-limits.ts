@@ -25,16 +25,26 @@ export const PUBLIC_WIDGET_LIMITS = {
 type LimitRule = Exclude<keyof typeof PUBLIC_WIDGET_LIMITS, "maxMessageLength">;
 
 /**
- * Count one request against each rule and report whether any is exhausted.
+ * Count one request against the rules in order and report whether one is
+ * exhausted.
+ *
+ * Rules run one at a time and stop at the first refusal, so a refused request
+ * never spends the counters after it. Callers list the rule narrowest to the
+ * caller first (per IP), then broader ones (per org, per conversation): a
+ * flood from one IP then only burns its own counter and cannot exhaust a
+ * merchant-wide or shopper-wide budget.
  */
 export async function isPublicWidgetRateLimited(
   checks: Array<{ rule: LimitRule; id: string }>,
 ): Promise<boolean> {
-  const results = await Promise.all(
-    checks.map(({ rule, id }) => {
-      const { max, windowSeconds } = PUBLIC_WIDGET_LIMITS[rule];
-      return rateLimitService.checkKeyRateLimit(`public-widget:${rule}:${id}`, max, windowSeconds);
-    }),
-  );
-  return results.some((result) => result.limited);
+  for (const { rule, id } of checks) {
+    const { max, windowSeconds } = PUBLIC_WIDGET_LIMITS[rule];
+    const result = await rateLimitService.checkKeyRateLimit(
+      `public-widget:${rule}:${id}`,
+      max,
+      windowSeconds,
+    );
+    if (result.limited) return true;
+  }
+  return false;
 }

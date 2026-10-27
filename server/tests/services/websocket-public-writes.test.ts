@@ -226,7 +226,7 @@ describe("WebSocket public writes require DPoP", () => {
     expect(ws.last()).toEqual({ type: "error", error: "Invalid message content" });
   });
 
-  it("rate limits per conversation and per proxied client IP", async () => {
+  it("rate limits per proxied client IP before verifying the proof", async () => {
     const conversation = webConversation();
     mockConversationRepo.findById.mockResolvedValue(conversation);
     mockRateLimited.mockResolvedValue(true);
@@ -240,11 +240,42 @@ describe("WebSocket public writes require DPoP", () => {
     });
     await send(validFrame);
 
-    expect(mockRateLimited).toHaveBeenCalledWith([
-      { rule: "messagePerConversation", id: CONV_ID },
-      { rule: "messagePerIp", id: "203.0.113.7" },
-    ]);
+    expect(mockRateLimited).toHaveBeenCalledTimes(1);
+    expect(mockRateLimited).toHaveBeenCalledWith([{ rule: "messagePerIp", id: "203.0.113.7" }]);
     expect(mockVerifyDPoP).not.toHaveBeenCalled();
+    expect(conversation.addMessage).not.toHaveBeenCalled();
+    expect(ws.last()).toEqual({ type: "error", error: "RATE_LIMITED" });
+  });
+
+  it("does not spend the per-conversation budget on a frame with a bad proof", async () => {
+    const conversation = webConversation();
+    mockConversationRepo.findById.mockResolvedValue(conversation);
+    mockVerifyDPoP.mockResolvedValue({ success: false, error: "Public key mismatch" });
+    const { send } = connect(service);
+
+    await send({ type: "identify", customerId: "v", conversationId: CONV_ID });
+    await send(validFrame);
+
+    expect(mockRateLimited).not.toHaveBeenCalledWith([
+      { rule: "messagePerConversation", id: CONV_ID },
+    ]);
+  });
+
+  it("rate limits per conversation once the proof is verified", async () => {
+    const conversation = webConversation();
+    mockConversationRepo.findById.mockResolvedValue(conversation);
+    mockRateLimited.mockImplementation(async (checks) =>
+      checks.some((check) => check.rule === "messagePerConversation"),
+    );
+    const { ws, send } = connect(service);
+
+    await send({ type: "identify", customerId: "v", conversationId: CONV_ID });
+    await send(validFrame);
+
+    expect(mockVerifyDPoP).toHaveBeenCalled();
+    expect(mockRateLimited).toHaveBeenLastCalledWith([
+      { rule: "messagePerConversation", id: CONV_ID },
+    ]);
     expect(conversation.addMessage).not.toHaveBeenCalled();
     expect(ws.last()).toEqual({ type: "error", error: "RATE_LIMITED" });
   });

@@ -1,4 +1,5 @@
 import { createHmac, timingSafeEqual } from "crypto";
+import path from "path";
 import { In } from "typeorm";
 import { config, getApiUrl } from "../config/env";
 import { Upload } from "../entities/upload.entity";
@@ -41,9 +42,22 @@ export function isPublicFolder(folder: string): boolean {
 /**
  * Local-disk storage serves `/uploads/{organizationId}/{folder}/...`.
  * Only public folders may be served there; private files go through /v1/media.
+ *
+ * The static file server decodes and normalises the path after this gate, so
+ * the gate decodes it the same way and refuses anything that could step out
+ * of the folder it names (`..` segments, encoded or not, backslashes, NUL).
  */
 export function isPublicUploadPath(requestPath: string): boolean {
-  const segments = requestPath.split("/").filter(Boolean);
+  let decoded: string;
+  try {
+    decoded = decodeURIComponent(requestPath);
+  } catch {
+    return false;
+  }
+  if (decoded.includes("\\") || decoded.includes("\0")) return false;
+  if (decoded.split("/").includes("..")) return false;
+
+  const segments = path.posix.normalize(decoded).split("/").filter(Boolean);
   return segments.length >= 3 && isPublicFolder(segments[1]);
 }
 

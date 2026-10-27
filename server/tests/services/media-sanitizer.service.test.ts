@@ -1,6 +1,8 @@
 import { describe, it, expect } from "@jest/globals";
 import sharp from "sharp";
 import {
+  MAX_ANIMATION_FRAMES,
+  MAX_IMAGE_INPUT_PIXELS,
   MediaRejectedError,
   sanitizeConversationMedia,
 } from "@server/services/media-sanitizer.service";
@@ -35,6 +37,27 @@ const ftyp = (brand: string) =>
 
 const oggOpus = () =>
   Buffer.concat([Buffer.from("OggS"), Buffer.alloc(24), Buffer.from("OpusHead"), Buffer.alloc(32)]);
+
+/** Animated GIF; consecutive frames differ so the encoder can't merge them. */
+const animatedGif = async (frames: number, size: number) => {
+  const buffers = await Promise.all(
+    Array.from({ length: frames }, (_, i) =>
+      sharp({
+        create: {
+          width: size,
+          height: size,
+          channels: 3,
+          background: i % 2 ? "#fff" : "#000",
+        },
+      })
+        .png()
+        .toBuffer(),
+    ),
+  );
+  return sharp(buffers, { join: { animated: true } })
+    .gif()
+    .toBuffer();
+};
 
 const rejects = (buffer: Buffer, mimeType: string) =>
   expect(sanitizeConversationMedia(buffer, mimeType)).rejects.toBeInstanceOf(MediaRejectedError);
@@ -117,5 +140,28 @@ describe("sanitizeConversationMedia", () => {
     });
 
     await rejects(text, "application/octet-stream");
+  });
+
+  it("keeps a small animated GIF animated", async () => {
+    const result = await sanitizeConversationMedia(await animatedGif(3, 8), "image/gif");
+
+    expect(result.mimeType).toBe("image/gif");
+    expect((await sharp(result.buffer, { animated: true }).metadata()).pages).toBe(3);
+  });
+
+  it("refuses a small GIF whose frames decode past the pixel cap", async () => {
+    const frames = Math.ceil(MAX_IMAGE_INPUT_PIXELS / (2000 * 2000)) + 1;
+    const bomb = await animatedGif(frames, 2000);
+    expect(bomb.length).toBeLessThan(200_000);
+
+    await expect(sanitizeConversationMedia(bomb, "image/gif")).rejects.toThrow(
+      /too large to process/,
+    );
+  });
+
+  it("refuses an animation with too many frames", async () => {
+    const gif = await animatedGif(MAX_ANIMATION_FRAMES + 1, 2);
+
+    await expect(sanitizeConversationMedia(gif, "image/gif")).rejects.toThrow(/too many frames/);
   });
 });

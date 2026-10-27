@@ -251,12 +251,9 @@ export const publicConversationsRouter = t.router({
   // Send a message to a conversation (requires DPoP proof)
   sendMessage: publicProcedure.input(sendMessageSchema).mutation(async ({ input, ctx }) => {
     try {
-      // Checked before DPoP so a flood never reaches signature verification.
+      // Per IP before DPoP so a flood never reaches signature verification.
       if (
-        await isPublicWidgetRateLimited([
-          { rule: "messagePerConversation", id: input.conversationId },
-          { rule: "messagePerIp", id: clientIp(ctx.ipAddress) },
-        ])
+        await isPublicWidgetRateLimited([{ rule: "messagePerIp", id: clientIp(ctx.ipAddress) }])
       ) {
         throw tooManyRequests();
       }
@@ -284,6 +281,16 @@ export const publicConversationsRouter = t.router({
           code: "UNAUTHORIZED",
           message: verified.error || "Invalid DPoP proof",
         });
+      }
+
+      // Per conversation only after the proof checks out, so knowing a
+      // conversationId is not enough to spend (and mute) a shopper's budget.
+      if (
+        await isPublicWidgetRateLimited([
+          { rule: "messagePerConversation", id: input.conversationId },
+        ])
+      ) {
+        throw tooManyRequests();
       }
 
       // Get the conversation instance to use the addMessage method
