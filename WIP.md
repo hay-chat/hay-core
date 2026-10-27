@@ -1,3 +1,9 @@
+## 2026-10-27 — staging — D1-1/D7-1/D1-2 merged + tested
+
+**Landed:** claude/d1-billing-honesty (2cf8ee5): `billableResolutions` metric (no playground/test, unhappy, handed-off), `conversations.handed_off_at` (migration run on staging). Tested by hand: takeover → release → resolve is not billed; clean resolution is.
+**Running:** L1 security agent, L8 media agent.
+**Next:** L3 hand-off honesty (unblocked by L2), then L9, L5, L10, L6, X.
+
 ## 2026-10-27 — staging — VOC roadmap orchestration started
 
 **Works:** `staging` worktree `../hay-core-staging` + local env (Docker project hay-staging: PG :5433 `hay_staging`, Redis :6380, RabbitMQ :5673; server :3001, dashboard :3000; shop page :8090). Baseline tested (widget → AI reply → dashboard). Plan in `tasks/voc-roadmap.md`.

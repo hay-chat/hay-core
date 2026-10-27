@@ -83,6 +83,8 @@ Not doing: **D4-1** (Roger waits for the full D4 build). Copy must not claim Req
 | Ticket   | What                               | Merged | Manual test | GIF                  |
 | -------- | ---------------------------------- | ------ | ----------- | -------------------- |
 | baseline | dashboard + API + widget test page | —      | pending     | baseline-staging.gif |
+| D1-1 + D7-1 | `billableResolutions` on `analytics.conversationMetrics` excludes playground/test, unhappy closes, handed-off | 2cf8ee5 | merged → tested ✓: org metrics resolved 2 / billable 1 (handed-off chat excluded, clean one counted). Jest billable-resolutions 9/9 on merged staging; server tsc clean | d1-2-handoff-not-billed.gif |
+| D1-2 | `conversations.handed_off_at` stamped on first hand-off, never cleared | 2cf8ee5 | merged → tested ✓: dashboard Take over → stamped 17:20:21; Release → Return to AI → status open, stamp kept; resolved → not billed | d1-2-handoff-not-billed.gif |
 
 ## Wave 1 — foundations
 
@@ -122,6 +124,8 @@ Parked: D13-15, D16-10/11, D6-14, D2-10, D7-15, D8-18, D10-9, D11-13, D14-10, fr
 Staging seed: org/user created via `auth.register` (credentials in `../hay-core-staging/.staging-login`, untracked).
 
 ## Needs Roger
+- **Decision (D1, Wave 0):** inactivity closes (incl. "hi" then silence) are still billed until D1-3's close classifier lands; the pricing page says unresolved chats don't count. Keep billing (agent's recommendation; pull the D1-12 pricing copy forward) or add a one-line exclusion now (revenue drops)? Default: keep, until you say otherwise.
+- **Backoffice:** read `billableResolutions` (fallback `resolvedConversations`) in `hay-api.ts` / `usage-tracking.service.ts`; overage delta logic must tolerate a lower total (folded into the D1-4 X ticket).
 
 - Prod: D1-0 over-billing query; D14-1 prod `LLM_*` values; D8 confirm Spaces before switching media private; D3
   whether 26 Oct features are on for every org.
