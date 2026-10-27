@@ -1,3 +1,9 @@
+## 2026-10-27 — claude/w1-eu-inference — Wave 1 L11 EU inference done (not merged)
+- D14-2: OPENAI_BASE_URL for managed OpenAI calls. D14-4: org `settings.aiRegion` ("default" | "eu"); EU orgs' chat, embeddings (docs + products), transcription go to OPENAI_EU_BASE_URL/KEY; fail-closed (no fallback) when EU unset; UI switch in Settings -> AI Models only when EU configured.
+- Found: most llmService calls dropped organizationId (BYO + region ignored). Fixed everywhere except orchestrator/conversation-utils.ts (other lane) — patch in orchestrator handoff, must land before EU is sold.
+- Verified: jest services/orchestrator/routes 64 suites + region tests, vector integration, tsc, dashboard typecheck; real-HTTP smoke against a local mock EU endpoint.
+- Next: apply conversation-utils patch after merge; Roger: OpenAI EU residency approval + Infisical OPENAI_EU_* values.
+
 ## 2026-10-27 night — staging: Wave 1 started
 - L6 merged (3acc19a): reload resumes conversation, create on first message, split loader + idle loading; tester running.
 - L2 close classifier building (claude/w1-close-classifier). Feature guides committed in seo repo.
