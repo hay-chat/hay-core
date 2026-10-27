@@ -8,6 +8,7 @@ import {
   closeInactiveConversation,
 } from "./conversation-utils";
 import { hookManager } from "@server/services/hooks/hook-manager";
+import { recheckAiReply } from "./reply-guard";
 import { createLogger } from "@server/lib/logger";
 
 const logger = createLogger("orchestrator");
@@ -110,6 +111,16 @@ export class Orchestrator {
             continue;
           }
 
+          // Nudges and closes stop while a human holds the conversation (taken
+          // over or assigned) or the agent or organization is paused. A row can
+          // be "open" and assigned: a shopper message on a taken-over chat with
+          // no human reply yet flips it back to open.
+          const blocker = await recheckAiReply(conversation.id);
+          if (blocker) {
+            log.debug({ blocker }, "Skipping inactivity check - AI may not reply");
+            continue;
+          }
+
           const lastMessageTime = new Date(lastUserMessage.created_at);
           const timeSinceLastMessage = now.getTime() - lastMessageTime.getTime();
 
@@ -165,23 +176,28 @@ export class Orchestrator {
                 { timeSinceLastMessage, warningThreshold },
                 "Conversation reached warning threshold, sending warning",
               );
-              await sendInactivityWarning(conversation.id, conversation.organization_id);
-
-              // Mark conversation as needing processing to handle potential response
-              await this.conversationRepository.update(
+              const warned = await sendInactivityWarning(
                 conversation.id,
                 conversation.organization_id,
-                { needs_processing: true },
               );
 
-              // Enqueue for RabbitMQ processing
-              const { orchestratorQueueService } =
-                await import("@server/services/orchestrator-queue.service");
-              await orchestratorQueueService.enqueue(
-                conversation.id,
-                conversation.organization_id,
-                "inactivity",
-              );
+              if (warned) {
+                // Mark conversation as needing processing to handle potential response
+                await this.conversationRepository.update(
+                  conversation.id,
+                  conversation.organization_id,
+                  { needs_processing: true },
+                );
+
+                // Enqueue for RabbitMQ processing
+                const { orchestratorQueueService } =
+                  await import("@server/services/orchestrator-queue.service");
+                await orchestratorQueueService.enqueue(
+                  conversation.id,
+                  conversation.organization_id,
+                  "inactivity",
+                );
+              }
             }
           }
 

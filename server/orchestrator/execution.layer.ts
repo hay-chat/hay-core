@@ -21,6 +21,7 @@ import {
 } from "@server/services/core/action-claim-guardrail.service";
 import { MessageIntent, Message } from "@server/database/entities/message.entity";
 import { Document } from "@server/entities/document.entity";
+import { describeLocalTime } from "./local-time";
 
 /**
  * Minimal shape of a retrieved document needed for confidence assessment.
@@ -225,6 +226,10 @@ export class ExecutionLayer {
             .join("\n")
         : "";
 
+      // The business's local date and hour, so "today", "tomorrow" and greetings
+      // match where the shop is (organization timezone, UTC by default).
+      const { timezone, localTime } = describeLocalTime(conversation.organization?.timezone);
+
       // Get the prompt from PromptService
       const responsePrompt = await this.promptService.getPrompt(
         "execution/planner",
@@ -232,6 +237,8 @@ export class ExecutionLayer {
           hasTools,
           tools: allToolNames.join(", "),
           toolsDetail,
+          timezone,
+          localTime,
         },
         { conversationId: conversation.id, organizationId: conversation.organization_id },
       );
