@@ -35,6 +35,8 @@ export interface HayChatConfig {
    * unless `grantConsent()` is called earlier in the page lifecycle.
    */
   consent?: "strict" | "implicit";
+  /** Log widget diagnostics to the browser console. Off by default. */
+  debug?: boolean;
 }
 
 export interface Message {

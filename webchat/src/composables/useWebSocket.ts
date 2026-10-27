@@ -1,5 +1,6 @@
 import { ref, onUnmounted } from "vue";
 import { safeStorage } from "./useConsent";
+import { debugLog } from "@/utils/debug";
 import type { Message } from "@/types";
 
 export function useWebSocket(baseUrl: string, organizationId: string) {
@@ -173,7 +174,7 @@ export function useWebSocket(baseUrl: string, organizationId: string) {
         break;
 
       default:
-        console.log("[Webchat] Unknown message type:", data.type);
+        debugLog("[Webchat] Unknown message type:", data.type);
     }
   };
 
@@ -249,7 +250,7 @@ export function useWebSocket(baseUrl: string, organizationId: string) {
         timestamp: Date.now(),
       };
 
-      console.log("[Webchat] Sending message with payload:", {
+      debugLog("[Webchat] Sending message with payload:", {
         type: payload.type,
         content: payload.content,
         method: payload.method,
