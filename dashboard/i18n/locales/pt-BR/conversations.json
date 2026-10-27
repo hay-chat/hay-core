@@ -5,6 +5,9 @@
       "failed": "Falha na entrega",
       "windowExpired": "Fora da janela de 24 horas — o cliente precisa enviar uma mensagem primeiro"
     },
+    "attachment": {
+      "loadFailed": "Não foi possível carregar este anexo"
+    },
     "page": {
       "title": "Conversas",
       "description": "Monitore e gerencie todas as conversas com clientes",

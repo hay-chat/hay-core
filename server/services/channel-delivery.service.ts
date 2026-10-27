@@ -18,6 +18,7 @@ import { createLogger } from "@server/lib/logger";
 import { pluginManagerService } from "./plugin-manager.service";
 import { MessageRepository } from "@server/repositories/message.repository";
 import { ConversationRepository } from "@server/repositories/conversation.repository";
+import { DELIVERY_SIGNED_URL_TTL_SECONDS, signAttachmentUrls } from "./media-url.service";
 import type {
   MessageAttachment,
   MessageProviderError,
@@ -309,6 +310,12 @@ class ChannelDeliveryService {
     const deliverUrl = `http://localhost:${worker.port}/deliver`;
 
     try {
+      // Private uploads need a signature: the worker fetches each file with a plain GET.
+      const deliverableAttachments = await signAttachmentUrls(
+        attachments,
+        organizationId,
+        DELIVERY_SIGNED_URL_TTL_SECONDS,
+      );
       const response = await fetch(deliverUrl, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -319,7 +326,7 @@ class ChannelDeliveryService {
           conversationId,
           conversationMetadata,
           messageMetadata,
-          attachments,
+          attachments: deliverableAttachments,
         }),
       });
 

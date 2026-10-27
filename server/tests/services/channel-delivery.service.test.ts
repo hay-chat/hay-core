@@ -44,7 +44,19 @@ jest.mock("@server/repositories/conversation.repository", () => ({
   conversationRepository: mockConversationRepo,
 }));
 
+const mockUploadFind =
+  jest.fn<(options: unknown) => Promise<Array<{ id: string; folder: string }>>>();
+jest.mock("@server/entities/upload.entity", () => ({ Upload: { find: mockUploadFind } }));
+jest.mock("@server/config/env", () => {
+  const actual = jest.requireActual<typeof import("@server/config/env")>("@server/config/env");
+  return {
+    ...actual,
+    config: { ...actual.config, jwt: { ...actual.config.jwt, secret: "delivery-test-secret" } },
+  };
+});
+
 import { channelDeliveryService } from "@server/services/channel-delivery.service";
+import { verifyMediaSignature } from "@server/services/media-url.service";
 
 const ORG_ID = "11111111-1111-4111-8111-111111111111";
 const CONVERSATION_ID = "33333333-3333-4333-8333-333333333333";
@@ -127,6 +139,23 @@ describe("channelDeliveryService /deliver", () => {
       attachments: [attachment],
     });
     expect(mockMessageRepo.updateProviderMessageId).toHaveBeenCalledWith("msg-1", "wamid.OUT.1");
+  });
+
+  it("hands the worker a short-lived signed URL for private Hay uploads", async () => {
+    const uploadId = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+    mockUploadFind.mockResolvedValue([{ id: uploadId, folder: "conversation-media" }]);
+    const stored = { ...attachment, id: uploadId, url: `https://api.example/v1/media/${uploadId}` };
+
+    await dispatch(outboundEvent({ attachments: [stored] }));
+
+    const [delivered] = deliverBody().attachments as Array<{ url: string }>;
+    const url = new URL(delivered.url);
+    expect(url.pathname).toBe(`/v1/media/${uploadId}`);
+    const expires = url.searchParams.get("expires") ?? undefined;
+    expect(Number(expires) - Date.now() / 1000).toBeGreaterThan(14 * 60);
+    expect(verifyMediaSignature(uploadId, expires, url.searchParams.get("sig") ?? undefined)).toBe(
+      true,
+    );
   });
 
   it("delivers attachment-only messages with empty content", async () => {

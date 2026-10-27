@@ -5,6 +5,7 @@ import * as path from "path";
 import { v4 as uuidv4 } from "uuid";
 import { config } from "../config/env";
 import { Upload } from "../entities/upload.entity";
+import { isPublicFolder, mediaUrl } from "./media-url.service";
 
 // Allowed file types
 const ALLOWED_MIME_TYPES: Record<string, string[]> = {
@@ -110,6 +111,9 @@ export class StorageService {
    *                served at /uploads/{organizationId}/{folder}/{uuid}.{ext}
    * S3 storage:    files stored at key uploads/{organizationId}/{folder}/{uuid}.{ext}
    *                URL: {endpoint}/{bucket}/uploads/{organizationId}/{folder}/{uuid}.{ext}
+   *
+   * Files are private unless the folder is public (see media-url.service);
+   * private files are served only through /v1/media/:id.
    */
   async upload(options: UploadOptions): Promise<UploadResult> {
     // 1. Validate file
@@ -127,7 +131,12 @@ export class StorageService {
 
     // 4. Upload to storage
     if (storageType === "s3") {
-      await this.uploadS3(options.buffer, filePath, options.mimeType);
+      await this.uploadS3(
+        options.buffer,
+        filePath,
+        options.mimeType,
+        isPublicFolder(options.folder),
+      );
     } else {
       await this.uploadLocal(options.buffer, filePath);
     }
@@ -145,8 +154,8 @@ export class StorageService {
       uploadedById: options.uploadedById,
     }).save();
 
-    // 6. Generate public URL
-    const url = this.getPublicUrl(upload);
+    // 6. Generate URL (direct for public folders, /v1/media for private ones)
+    const url = this.getUrl(upload);
 
     return { upload, url };
   }
@@ -195,7 +204,7 @@ export class StorageService {
    * Specialized upload for plugin ZIP files
    * Local: {uploadDir}/{organizationId}/plugin-zips/{pluginId}/{uuid}.zip
    * S3: uploads/{organizationId}/plugin-zips/{pluginId}/{uuid}.zip
-   * Served at: /uploads/{organizationId}/plugin-zips/{pluginId}/{uuid}.zip
+   * Private: never served publicly, read back with download().
    */
   async uploadPluginZip(options: {
     buffer: Buffer;
@@ -226,9 +235,15 @@ export class StorageService {
   }
 
   /**
-   * Get public URL from upload record
+   * URL for an upload record. Public folders get a direct storage URL; private
+   * uploads get the stable /v1/media/:id URL, which needs a staff session or a
+   * signature (media-url.service) to open.
    */
-  getPublicUrl(upload: Upload): string {
+  getUrl(upload: Upload): string {
+    if (!isPublicFolder(upload.folder)) {
+      return mediaUrl(upload.id);
+    }
+
     if (upload.storageType === "s3") {
       // S3 URL
       const endpoint = config.storage.s3.endpoint!;
@@ -312,7 +327,12 @@ export class StorageService {
   /**
    * Upload to S3
    */
-  private async uploadS3(buffer: Buffer, filePath: string, mimeType: string): Promise<void> {
+  private async uploadS3(
+    buffer: Buffer,
+    filePath: string,
+    mimeType: string,
+    isPublic: boolean,
+  ): Promise<void> {
     if (!this.s3Client) {
       throw new Error("S3 client not initialized");
     }
@@ -324,7 +344,7 @@ export class StorageService {
         Key: filePath,
         Body: buffer,
         ContentType: mimeType,
-        ACL: "public-read", // Make files publicly accessible
+        ACL: isPublic ? "public-read" : "private",
       },
     });
 

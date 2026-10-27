@@ -29,6 +29,8 @@ import * as archiver from "archiver";
 import { getDashboardUrl } from "@server/config/env";
 import { IsNull, In, EntityManager } from "typeorm";
 import type { AttachmentDeletionResult, ExportPackageData } from "@server/types/privacy.types";
+import { storageService } from "@server/services/storage.service";
+import { isUuid } from "@server/services/media-url.service";
 
 /**
  * Privacy Service
@@ -1722,8 +1724,17 @@ export class PrivacyService {
 
     for (const attachment of attachments) {
       try {
-        // Handle local file paths vs URLs
-        if (attachment.url.startsWith("/") || attachment.url.startsWith("./")) {
+        // Hay uploads (private storage) are read straight from storage by upload id
+        const stored = isUuid(attachment.id)
+          ? await storageService.download(attachment.id).catch(() => null)
+          : null;
+        if (stored) {
+          downloadedFiles.push({
+            path: `attachments/${attachment.conversationId}/${attachment.id}_${attachment.name}`,
+            buffer: stored.buffer,
+            originalUrl: attachment.url,
+          });
+        } else if (attachment.url.startsWith("/") || attachment.url.startsWith("./")) {
           // Local file - read directly
           const localPath = path.join(
             process.cwd(),
