@@ -119,7 +119,7 @@ function makeConversation(agentId: string | null) {
     getPublicMessages: jest.fn(async () => []),
     addMessage: jest.fn(async (payload: { content: string }) => ({ id: "new", ...payload })),
     addHandoffInstructions: jest.fn(async (_doc: unknown, _type: string) => undefined),
-    setProcessed: jest.fn(),
+    markProcessed: jest.fn(async () => true),
   };
 }
 

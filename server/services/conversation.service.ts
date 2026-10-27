@@ -72,10 +72,30 @@ export class ConversationService {
       status: data.status || "open",
       context: {},
       metadata: data.metadata || {},
-      needs_processing: data.status === "open" || data.status === "processing",
+      needs_processing: false,
       customer_id: customerId,
       language: toSupportedLanguage(data.language),
     });
+
+    // An open conversation starts with its instructions and the greeting,
+    // written before we return. The caller (the widget) sends the shopper's
+    // first message right after, so the greeting always comes first and no
+    // run races that message. If this fails, fall back to the orchestrator
+    // run, which writes whatever is missing.
+    if (data.status === "open" || data.status === "processing") {
+      try {
+        await conversation.addInitialSystemMessage();
+        await conversation.addInitialAgentInstructions();
+        await conversation.addInitialBotMessage();
+      } catch (error) {
+        logger.warn(
+          { err: error, conversationId: conversation.id },
+          "Initial messages failed, leaving them to the orchestrator",
+        );
+        await this.conversationRepository.updateById(conversation.id, { needs_processing: true });
+        conversation.needs_processing = true;
+      }
+    }
 
     // Trigger hook for conversation created
     await hookManager.trigger("conversation.created", {

@@ -625,6 +625,57 @@ export class ConversationRepository extends BaseRepository<Conversation> {
     );
   }
 
+  /**
+   * Clear needs_processing for a run that answered up to `lastCustomerMessageId`
+   * (null: the run saw no customer message). Compare-and-set: nothing changes
+   * when a newer customer message exists, because that message set the flag
+   * after the run read its input and still needs an answer. Returns whether
+   * the flag was cleared.
+   */
+  async markProcessed(
+    conversationId: string,
+    lastCustomerMessageId: string | null,
+  ): Promise<boolean> {
+    const newerCustomerMessage = lastCustomerMessageId
+      ? `m.id <> :lastId AND m.created_at >= (SELECT created_at FROM messages WHERE id = :lastId)`
+      : "TRUE";
+
+    const result = await this.getRepository()
+      .createQueryBuilder()
+      .update(Conversation)
+      .set({ needs_processing: false, last_processed_at: () => "NOW()" })
+      .where("id = :id", { id: conversationId })
+      .andWhere(
+        `NOT EXISTS (
+          SELECT 1 FROM messages m
+          WHERE m.conversation_id = :id AND m.type = :customer AND ${newerCustomerMessage}
+        )`,
+        { customer: MessageType.CUSTOMER, lastId: lastCustomerMessageId },
+      )
+      .execute();
+
+    return (result.affected ?? 0) > 0;
+  }
+
+  /**
+   * True when the newest customer message has no bot or staff reply after it.
+   * System notices, tool output and the like are not replies.
+   */
+  async hasUnansweredCustomerMessage(conversationId: string): Promise<boolean> {
+    const [row]: Array<{ unanswered: boolean }> = await AppDataSource.query(
+      `SELECT COALESCE(
+         (SELECT MAX(created_at) FROM messages WHERE conversation_id = $1 AND type = $2)
+           > COALESCE(
+             (SELECT MAX(created_at) FROM messages WHERE conversation_id = $1 AND type IN ($3, $4)),
+             '-infinity'::timestamptz
+           ),
+         FALSE
+       ) AS unanswered`,
+      [conversationId, MessageType.CUSTOMER, MessageType.BOT_AGENT, MessageType.HUMAN_AGENT],
+    );
+    return row?.unanswered === true;
+  }
+
   async getSystemMessages(conversationId: string): Promise<Message[]> {
     const messageRepository = this.getMessageRepository();
     return await messageRepository.find({
