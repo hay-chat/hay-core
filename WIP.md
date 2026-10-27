@@ -1,3 +1,9 @@
+## 2026-10-27 23:00 — staging — L10 merged (D11-5, D11-8)
+- Push subscriptions per user (all orgs), unsubscribe on logout, pushsubscriptionchange in sw.js, re-sync on app open.
+- Alert ladder: push to Available members → re-push at 10 min → email at 20 min; stops on reply/take-over/close. Table notification_deliveries.
+- Migration PushPerUserAndNotificationDeliveries1785600000000 ran on hay_staging + hay_test.
+- Half-built: business hours always "within hours" until D5-6. Next: manual test of the ladder; L4 starts.
+
 ## 2026-10-27 — claude/w1-push-hygiene — L10 D11-5 push hygiene + D11-8 alert ladder done (not merged)
 - D11-5: logout drops push (browser unsubscribe + auth.logout pushEndpoint deletes row); sw.js pushsubscriptionchange -> public notifications.rotatePush (old endpoint = proof); sync() upserts on every app open/foreground (5-min throttle); devices per user (organization_id dropped), fan-out to every org the user is active in; alert links carry ?org= and the auth middleware switches org.
 - D11-8: notification_deliveries (step initial/repush/email per recipient per cycle, unique claim); conversation-alert.service: recipients = active + Available members; sweep job every 60 s: re-push at 10 min, email 10 min later (at once if re-push reached no device), only within business hours (stub: always open until D5-6), cancelled on human reply / take-over / close.
