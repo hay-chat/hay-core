@@ -928,12 +928,62 @@ The following tools are available for you to use. You MUST return only valid JSO
       }
     }
 
-    // Handle Customer message cooldown
+    // Check if test mode is enabled for bot messages
+    let messageStatus = MessageStatus.APPROVED;
+    let reviewRequired = false;
+    let deliveryState = DeliveryState.SENT;
+
+    if (messageData.type === MessageType.BOT_AGENT) {
+      // Get agent and organization to check test mode
+      const { agentRepository } = await import("../../repositories/agent.repository");
+      const { organizationRepository } = await import("../../repositories/organization.repository");
+
+      const agent = this.agent_id ? await agentRepository.findById(this.agent_id) : null;
+      const organization = await organizationRepository.findById(this.organization_id);
+
+      // Check if this is an initial greeting (no customer messages yet)
+      const messages = await this.getMessages();
+      const hasCustomerMessages = messages.some((msg) => msg.type === MessageType.CUSTOMER);
+
+      // Determine if test mode is enabled
+      let testModeEnabled = false;
+      if (agent && agent.testMode !== null && agent.testMode !== undefined) {
+        // Agent has explicit test mode setting
+        testModeEnabled = agent.testMode;
+      } else if (organization && organization.settings?.testModeDefault) {
+        // Fall back to organization default
+        testModeEnabled = organization.settings.testModeDefault;
+      }
+
+      // Only apply test mode if this is a response to a customer (not the initial greeting)
+      if (testModeEnabled && hasCustomerMessages) {
+        messageStatus = MessageStatus.PENDING;
+        reviewRequired = true;
+        deliveryState = DeliveryState.QUEUED;
+      }
+    }
+
+    // CRITICAL: Save the message to database FIRST before broadcasting
+    // This ensures the message is committed to the database before any WebSocket clients
+    // receive the broadcast and potentially try to query for it
+    const message = await messageRepository.create({
+      conversation_id: this.id,
+      content: messageData.content,
+      type: messageData.type as MessageType,
+      metadata: messageData.metadata,
+      sender: messageData.sender,
+      attachments: messageData.attachments,
+      providerMessageId: messageData.providerMessageId ?? null,
+      status: messageStatus,
+      reviewRequired,
+      deliveryState,
+    });
+
+    // Customer message: status, cooldown and processing flag. This runs only
+    // after the row exists, so a run that clears needs_processing can always
+    // see the message that set it (see conversationRepository.markProcessed).
     if (messageData.type === MessageType.CUSTOMER) {
       const { config } = await import("../../config/env");
-
-      // Mark conversation as needing processing
-      await this.setProcessed(false);
 
       // Set cooldown based on configuration
       const cooldownUntil = new Date();
@@ -994,57 +1044,6 @@ The following tools are available for you to use. You MUST return only valid JSO
         await orchestratorQueueService.enqueue(this.id, this.organization_id, "customer_message");
       }
     }
-
-    // Check if test mode is enabled for bot messages
-    let messageStatus = MessageStatus.APPROVED;
-    let reviewRequired = false;
-    let deliveryState = DeliveryState.SENT;
-
-    if (messageData.type === MessageType.BOT_AGENT) {
-      // Get agent and organization to check test mode
-      const { agentRepository } = await import("../../repositories/agent.repository");
-      const { organizationRepository } = await import("../../repositories/organization.repository");
-
-      const agent = this.agent_id ? await agentRepository.findById(this.agent_id) : null;
-      const organization = await organizationRepository.findById(this.organization_id);
-
-      // Check if this is an initial greeting (no customer messages yet)
-      const messages = await this.getMessages();
-      const hasCustomerMessages = messages.some((msg) => msg.type === MessageType.CUSTOMER);
-
-      // Determine if test mode is enabled
-      let testModeEnabled = false;
-      if (agent && agent.testMode !== null && agent.testMode !== undefined) {
-        // Agent has explicit test mode setting
-        testModeEnabled = agent.testMode;
-      } else if (organization && organization.settings?.testModeDefault) {
-        // Fall back to organization default
-        testModeEnabled = organization.settings.testModeDefault;
-      }
-
-      // Only apply test mode if this is a response to a customer (not the initial greeting)
-      if (testModeEnabled && hasCustomerMessages) {
-        messageStatus = MessageStatus.PENDING;
-        reviewRequired = true;
-        deliveryState = DeliveryState.QUEUED;
-      }
-    }
-
-    // CRITICAL: Save the message to database FIRST before broadcasting
-    // This ensures the message is committed to the database before any WebSocket clients
-    // receive the broadcast and potentially try to query for it
-    const message = await messageRepository.create({
-      conversation_id: this.id,
-      content: messageData.content,
-      type: messageData.type as MessageType,
-      metadata: messageData.metadata,
-      sender: messageData.sender,
-      attachments: messageData.attachments,
-      providerMessageId: messageData.providerMessageId ?? null,
-      status: messageStatus,
-      reviewRequired,
-      deliveryState,
-    });
 
     // The message is committed before anyone is told about it, so clients that
     // react to the broadcast by fetching the conversation will find it.
@@ -1221,31 +1220,19 @@ Translated message:`;
     });
   }
 
-  async setProcessed(processed: boolean): Promise<void> {
+  /**
+   * Record that a run answered up to `lastCustomerMessageId` (null: it saw no
+   * customer message). Clears needs_processing only when no newer customer
+   * message arrived meanwhile; returns whether it did.
+   */
+  async markProcessed(lastCustomerMessageId: string | null): Promise<boolean> {
     const { conversationRepository } = await import("../../repositories/conversation.repository");
-
-    if (processed) {
-      // When marking as processed, set both last_processed_at and needs_processing
-      const { getUTCNow } = await import("../../utils/date.utils");
-      const now = getUTCNow();
-
-      await conversationRepository.updateById(this.id, {
-        last_processed_at: now,
-        needs_processing: false,
-      });
-
-      // Update local instance
-      this.last_processed_at = now;
+    const cleared = await conversationRepository.markProcessed(this.id, lastCustomerMessageId);
+    if (cleared) {
       this.needs_processing = false;
-    } else {
-      // When marking as not processed, only update needs_processing
-      await conversationRepository.updateById(this.id, {
-        needs_processing: true,
-      });
-
-      // Update local instance
-      this.needs_processing = true;
+      this.last_processed_at = new Date();
     }
+    return cleared;
   }
 
   /**
@@ -1288,9 +1275,14 @@ Translated message:`;
       status: newStatus,
     };
 
-    // If returning to AI, mark as needing processing
+    // Returning to AI only queues a run when the newest shopper message has
+    // no reply yet (from the AI or staff). Messages answered before or during
+    // the take-over, like the "can I speak with a person?" that started it,
+    // are not run again; the AI picks up from the shopper's next message.
+    let needsProcessing = false;
     if (returnToMode === "ai") {
-      updates.needs_processing = true;
+      needsProcessing = await conversationRepository.hasUnansweredCustomerMessage(this.id);
+      updates.needs_processing = needsProcessing;
       updates.previous_status = null;
     }
 
@@ -1301,10 +1293,10 @@ Translated message:`;
     this.assigned_at = null;
     this.status = newStatus;
     if (returnToMode === "ai") {
-      this.needs_processing = true;
+      this.needs_processing = needsProcessing;
       this.previous_status = null;
-
-      // Enqueue for RabbitMQ processing
+    }
+    if (needsProcessing) {
       const { orchestratorQueueService } =
         await import("../../services/orchestrator-queue.service");
       await orchestratorQueueService.enqueue(this.id, this.organization_id, "ai_return");
