@@ -18,6 +18,7 @@ import { PromptService } from "@server/services/prompt.service";
 import { createLogger } from "@server/lib/logger";
 import { hasTiptapContent } from "@server/types/tiptap.types";
 import { handoffCopy, type HandoffCopyKey } from "./handoff-copy";
+import { AiReplySuppressedError, isPauseBlocker, recheckAiReply } from "./reply-guard";
 import type { ExecutionResult } from "./execution.layer";
 import type { ToolLedgerEntry } from "@server/services/core/action-claim-guardrail.service";
 import type { Message } from "@server/database/entities/message.entity";
@@ -28,7 +29,22 @@ const logger = createLogger("orchestrator-run");
 const LOCK_HEARTBEAT_INTERVAL_MS = 5_000;
 
 /**
+ * Abandon the run if a human took over, or the agent or organization was
+ * paused, since the run started. Called right before anything the shopper
+ * would see, because the gates at the top of runConversation are read once
+ * and a run can take many seconds.
+ */
+async function assertAiMayReply(conversation: Conversation): Promise<void> {
+  const blocker = await recheckAiReply(conversation.id);
+  if (blocker) {
+    throw new AiReplySuppressedError(blocker);
+  }
+}
+
+/**
  * Send a bot message and log how long it took from the start of processing.
+ * Re-checks take-over and pause first, so a reply already in flight is
+ * dropped rather than delivered on top of a human.
  */
 async function sendBotMessage(
   conversation: Conversation,
@@ -41,6 +57,7 @@ async function sendBotMessage(
   log: pino.Logger,
   processingStartedAt: number,
 ): Promise<Message> {
+  await assertAiMayReply(conversation);
   const message = await conversation.addMessage(payload);
   log.info(
     {
@@ -761,7 +778,14 @@ export const runConversation = async (conversationId: string) => {
 
     conversation.setProcessed(true);
   } catch (error: Error | unknown) {
-    if (
+    if (error instanceof AiReplySuppressedError) {
+      // Not a processing failure: a human took over, or the agent or the
+      // organization was paused while this run was thinking. Nothing was sent.
+      log.info({ blocker: error.blocker }, "Dropped in-flight AI reply");
+      if (isPauseBlocker(error.blocker)) {
+        await parkForPausedAgent(conversation, log, error.blocker);
+      }
+    } else if (
       error instanceof Error &&
       !error.message.includes("Conversation does not need processing") &&
       !error.message.includes("Last customer message not found")
@@ -945,6 +969,10 @@ async function handleExecutionLoop(
 
     // Reset empty retry counter on successful response
     emptyRetries = 0;
+
+    // The plan took seconds to produce. Before acting on it (tool call or
+    // message), make sure nobody took over and the agent is still on.
+    await assertAiMayReply(conversation);
 
     log.debug(
       {
@@ -1431,6 +1459,8 @@ async function maybeEmitProductRecommendation(
     return;
   }
 
+  // Product cards are shopper-visible too.
+  await assertAiMayReply(conversation);
   await conversation.addMessage({
     content: `Recommending ${payload.products.length} product${payload.products.length === 1 ? "" : "s"}`,
     type: MessageType.PRODUCT_RECOMMENDATION,
