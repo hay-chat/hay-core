@@ -156,7 +156,7 @@ const apiBaseUrl = getApiUrl();
 // Form state
 const settingsForm = ref({
   widgetTitle: "Chat with us",
-  widgetSubtitle: "We typically reply within minutes",
+  widgetSubtitle: "",
   position: "right" as NonNullable<UpdateSettingsInput["position"]>,
   theme: "blue" as NonNullable<UpdateSettingsInput["theme"]>,
   showGreeting: true,
