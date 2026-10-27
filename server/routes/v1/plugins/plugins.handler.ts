@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { authenticatedProcedure } from "@server/trpc";
+import { pickHealthCheckTool } from "@server/lib/plugin-health-tool";
 import { pluginManagerService } from "@server/services/plugin-manager.service";
 import { pluginRegistryRepository } from "@server/repositories/plugin-registry.repository";
 import { pluginInstanceRepository } from "@server/repositories/plugin-instance.repository";
@@ -1245,66 +1246,21 @@ export const testConnection = authenticatedProcedure
         };
       }
 
-      // Actually test the MCP server by calling a safe tool
-      const safeToolPrefixes = ["list_", "get_", "search_", "find_", "read_"];
-
-      // Priority 0: Check if there's a dedicated health/healthcheck tool
-      let testTool = mcpTools.find((t) => {
-        const name = t.name.toLowerCase();
-        return name === "health" || name === "healthcheck";
-      });
-
-      // Priority 1: Find READ-ONLY tools with NO required parameters (safest for health checks)
-      if (!testTool) {
-        testTool = mcpTools.find((t) => {
-          const schema = t.inputSchema;
-          const hasNoRequiredParams = !schema || !schema.required || schema.required.length === 0;
-          const isReadOnly = safeToolPrefixes.some((prefix) =>
-            t.name.toLowerCase().startsWith(prefix),
-          );
-          return hasNoRequiredParams && isReadOnly;
-        });
-      }
-
-      // Priority 2: Find any tool with NO required parameters
-      if (!testTool) {
-        testTool = mcpTools.find((t) => {
-          const schema = t.inputSchema;
-          if (!schema || !schema.required) return true;
-          return schema.required.length === 0;
-        });
-      }
-
-      // Priority 3: Find safe read-only tools (even if they have required params)
-      if (!testTool) {
-        testTool = mcpTools.find((t) =>
-          safeToolPrefixes.some((prefix) => t.name.toLowerCase().startsWith(prefix)),
-        );
-      }
-
-      // Priority 4: Just use the first tool as last resort
-      if (!testTool) {
-        testTool = mcpTools[0];
-      }
-
-      const hasRequiredParams =
-        testTool.inputSchema?.required && testTool.inputSchema.required.length > 0;
-      logger.debug(
-        { toolName: testTool.name, hasRequiredParams },
-        "Testing MCP connection by calling tool",
-      );
+      // Only a health tool or a read-only tool without required parameters is
+      // ever called; otherwise just check the worker responds.
+      const testTool = pickHealthCheckTool(mcpTools);
+      logger.debug({ toolName: testTool?.name }, "Testing MCP connection by calling tool");
 
       // Call the tool via worker or legacy MCP client
       if (worker && worker.port) {
-        // If the selected tool has required parameters, skip the actual call
-        // and just verify the worker is responding
-        if (hasRequiredParams) {
-          logger.debug("Selected tool has required parameters, skipping actual tool call");
+        // Without a safe tool to call, just verify the worker is responding
+        if (!testTool) {
+          logger.debug("No safe read-only tool to call, skipping actual tool call");
           logger.debug("Worker is running and tools are available - marking as healthy");
           return {
             success: true,
             status: "healthy",
-            message: `MCP server is healthy - worker running with ${mcpTools.length} tools available (tool call skipped due to required parameters)`,
+            message: `MCP server is healthy - worker running with ${mcpTools.length} tools available (no safe read-only tool to call)`,
             tools: mcpTools.map((t) => ({ name: t.name, description: t.description })),
             testedAt: new Date(),
           };
