@@ -7,6 +7,7 @@ const { shopifyGql } = require("../lib/client");
 const {
   ok,
   fail,
+  toolError,
   unwrapConnection,
   pageInfo,
   toGid,
@@ -62,10 +63,48 @@ const ORDER_SUPPORT_FIELDS = `
 // sense — nothing has left the warehouse yet.
 const PRE_DISPATCH_STATUSES = new Set(["UNFULFILLED", "SCHEDULED", "ON_HOLD"]);
 
+// Fulfillment.status values that mean the shipment did NOT happen. Anything else
+// (SUCCESS, or the deprecated OPEN / PENDING) means items are out of the door.
+const VOID_FULFILLMENT_STATUSES = new Set(["CANCELLED", "ERROR", "FAILURE"]);
+
 /**
- * Flatten line items and add a derived support summary. `isCancellable` is a
- * heuristic (Shopify exposes no cancelable field): not cancelled, not closed,
- * nothing fulfilled yet. `orderCancel` remains the source of truth via userErrors.
+ * Why an order can't be cancelled before dispatch, or null if it can.
+ * Needs `name cancelledAt displayFulfillmentStatus fulfillments { status displayStatus }`.
+ * Shopify's own orderCancel checks stay the backstop; this guard makes the rule
+ * explicit and refuses before a request reaches Shopify, like the other platforms.
+ */
+function cancelBlocker(order) {
+  if (order.cancelledAt) {
+    return { reason: "ALREADY_CANCELLED", message: `Order ${order.name} is already cancelled.` };
+  }
+  const shipped = (order.fulfillments || []).filter(
+    (f) => !VOID_FULFILLMENT_STATUSES.has(f.status),
+  );
+  if (shipped.length > 0) {
+    return {
+      reason: "ALREADY_SHIPPED",
+      message:
+        `Order ${order.name} has already shipped, so it can't be cancelled. ` +
+        "Offer a return once it arrives, or hand the conversation to the store team.",
+      fulfillmentStatuses: shipped.map((f) => f.displayStatus || f.status),
+    };
+  }
+  if (!PRE_DISPATCH_STATUSES.has(order.displayFulfillmentStatus)) {
+    return {
+      reason: "FULFILLMENT_IN_PROGRESS",
+      message:
+        `Order ${order.name} is already being fulfilled (${order.displayFulfillmentStatus}), ` +
+        "so it can't be cancelled here. Hand the conversation to the store team.",
+      displayFulfillmentStatus: order.displayFulfillmentStatus,
+    };
+  }
+  return null;
+}
+
+/**
+ * Flatten line items and add a derived support summary. `isCancellable` uses the
+ * same pre-dispatch guard as shopify_cancel_order (Shopify exposes no cancelable
+ * field); `orderCancel` remains the final word via its userErrors.
  */
 function enrichOrder(order) {
   if (!order) return null;
@@ -80,8 +119,7 @@ function enrichOrder(order) {
     ...order,
     lineItems: unwrapConnection(order.lineItems),
     supportSummary: {
-      isCancellable:
-        !order.cancelledAt && !order.closedAt && order.displayFulfillmentStatus === "UNFULFILLED",
+      isCancellable: cancelBlocker(order) === null,
       isRefundable: !!order.refundable,
       // Net payment = captured minus already refunded; the hard ceiling for refunds.
       remainingRefundable: order.netPaymentSet ? order.netPaymentSet.shopMoney : null,
@@ -105,7 +143,8 @@ async function orderNotFound(rawId) {
       { id: probeId },
     );
     if (probe.customer) {
-      return new Error(
+      return toolError(
+        "NOT_FOUND",
         `No order with id ${rawId} — that id belongs to customer ` +
           `"${probe.customer.displayName}". Their recent orders (with order ids) are in the ` +
           "recentOrders field of shopify_find_customer / shopify_get_customer.",
@@ -114,7 +153,8 @@ async function orderNotFound(rawId) {
   } catch {
     // Probe is best-effort; fall through to the generic message.
   }
-  return new Error(
+  return toolError(
+    "NOT_FOUND",
     `Order ${rawId} not found. Get a valid order id from the recentOrders field of ` +
       'shopify_find_customer / shopify_get_customer, or use shopify_get_order_by_name ("#1001").',
   );
@@ -384,8 +424,9 @@ function registerOrderTools(server) {
 
   server.tool(
     "shopify_cancel_order",
-    "Cancel an order (WRITE). Optionally restock, refund, and notify the customer. " +
-      "Fails with Shopify's reason if the order is not cancellable (e.g. already fulfilled).",
+    "Cancel an order before it ships (WRITE). Optionally restock, refund the payment, and " +
+      "notify the customer. Refuses with code PRECONDITION if anything has shipped or is " +
+      "being fulfilled, or if the order is already cancelled.",
     {
       order_id: z.string().describe("Order GID or bare numeric id."),
       reason: z
@@ -396,7 +437,9 @@ function registerOrderTools(server) {
         .boolean()
         .optional()
         .describe(
-          "If true, refund to the original payment method; if omitted, no refundMethod is sent.",
+          "If true, refund the payment to the original payment method as part of the " +
+            "cancellation. If false or omitted, nothing is refunded (authorized-only payments " +
+            "are still voided by Shopify).",
         ),
       notify_customer: z
         .boolean()
@@ -407,24 +450,40 @@ function registerOrderTools(server) {
     async (args) => {
       try {
         const orderId = toGid("Order", args.order_id);
+
+        // Server-side bound: pre-dispatch only, same rule as the other platforms.
+        const CHECK = `
+          query CheckCancellable($id: ID!) {
+            order(id: $id) {
+              id
+              name
+              cancelledAt
+              displayFulfillmentStatus
+              fulfillments(first: 20) { status displayStatus }
+            }
+          }
+        `;
+        const check = await shopifyGql(CHECK, { id: orderId });
+        if (!check.order) throw await orderNotFound(args.order_id);
+        const blocker = cancelBlocker(check.order);
+        if (blocker) {
+          const { message, ...details } = blocker;
+          throw toolError("PRECONDITION", message, details);
+        }
+
+        // Verified 2026-04 (shopify.dev/docs/api/admin-graphql/2026-04/mutations/orderCancel):
+        // orderId/reason/restock are required; refundMethod is a nullable
+        // OrderCancelRefundMethodInput { originalPaymentMethodsRefund, storeCreditRefund }.
+        // The docs don't state what an omitted refundMethod does, so always send an
+        // explicit choice rather than rely on an undocumented default.
         const variables = {
           orderId,
           reason: args.reason,
           restock: args.restock,
+          refundMethod: { originalPaymentMethodsRefund: args.refund_to_original_payment === true },
           notify: args.notify_customer ?? null,
           note: args.staff_note ?? null,
         };
-        // Verified 2026-04: orderCancel requires orderId/reason/restock; refundMethod
-        // is optional (OrderCancelRefundMethodInput). TODO(HAY-219 §8): the exact
-        // OrderCancelRefundMethodInput subfield (originalPaymentMethodsRefund) is a
-        // best-guess — confirm against a dev store before relying on refunds-on-cancel.
-        if (args.refund_to_original_payment !== undefined) {
-          variables.refundMethod = args.refund_to_original_payment
-            ? { originalPaymentMethodsRefund: true }
-            : null;
-        } else {
-          variables.refundMethod = null;
-        }
         const MUTATION = `
           mutation CancelOrder(
             $orderId: ID!
@@ -594,14 +653,34 @@ function registerOrderTools(server) {
 
   server.tool(
     "shopify_add_order_note",
-    "Add or replace the note on an order (WRITE).",
+    "Add an internal note to an order (WRITE). The text is appended to the order's existing " +
+      "note; nothing already there is removed. Not visible to the customer.",
     {
       order_id: z.string().describe("Order GID or bare numeric id."),
-      note: z.string().describe("Note text to set on the order."),
+      note: z.string().describe("Text to append to the order's note."),
     },
     async (args) => {
       try {
         const id = toGid("Order", args.order_id);
+        const text = args.note.trim();
+        if (!text) throw toolError("BAD_INPUT", "The note is empty.");
+
+        // Shopify has one note field per order and orderUpdate replaces it, so read
+        // the current note and append, or a merchant's own note would be wiped.
+        const CURRENT = `
+          query GetOrderNote($id: ID!) {
+            order(id: $id) { id name note }
+          }
+        `;
+        const current = await shopifyGql(CURRENT, { id });
+        if (!current.order) throw await orderNotFound(args.order_id);
+        const existing = current.order.note || "";
+        // A retried call must not add the same text twice.
+        if (existing.trimEnd().endsWith(text)) {
+          return ok({ id: current.order.id, note: existing, appended: false, alreadyPresent: true });
+        }
+        const note = existing.trim() ? `${existing.trimEnd()}\n\n${text}` : text;
+
         const MUTATION = `
           mutation AddOrderNote($id: ID!, $note: String!) {
             orderUpdate(input: { id: $id, note: $note }) {
@@ -610,9 +689,9 @@ function registerOrderTools(server) {
             }
           }
         `;
-        const data = await shopifyGql(MUTATION, { id, note: args.note });
+        const data = await shopifyGql(MUTATION, { id, note });
         assertNoUserErrors(data.orderUpdate);
-        return ok(data.orderUpdate);
+        return ok({ ...data.orderUpdate.order, appended: true });
       } catch (err) {
         return fail(err);
       }
@@ -620,4 +699,4 @@ function registerOrderTools(server) {
   );
 }
 
-module.exports = { registerOrderTools };
+module.exports = { registerOrderTools, orderNotFound, cancelBlocker };
