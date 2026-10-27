@@ -5,6 +5,12 @@ import { createLogger } from "@server/lib/logger";
 import { MessageType } from "../database/entities/message.entity";
 import { Conversation } from "../database/entities/conversation.entity";
 import { handoffCopy } from "../orchestrator/handoff-copy";
+import {
+  getAiReplyBlocker,
+  isPauseBlocker,
+  recheckAiReply,
+  type AiReplyBlocker,
+} from "../orchestrator/reply-guard";
 
 const logger = createLogger("message-recovery");
 
@@ -49,6 +55,14 @@ export class MessageRecoveryService {
 
     if (dryRun) {
       return { success: true, action: "dry_run" };
+    }
+
+    // A human holds the conversation (or it is gone): recovery must not reopen
+    // it for the AI or post into it. A paused agent is still recovered; the
+    // requeued run parks it, and escalation sends nothing to the shopper.
+    const blocker = getAiReplyBlocker(conversation);
+    if (blocker && !isPauseBlocker(blocker)) {
+      return this.skippedFor(conversation.id, blocker);
     }
 
     try {
@@ -175,6 +189,12 @@ export class MessageRecoveryService {
     // Wait for backoff period
     await new Promise((resolve) => setTimeout(resolve, backoffDelay));
 
+    // The owner may have taken over during the wait.
+    const blocker = await recheckAiReply(conversation.id);
+    if (blocker && !isPauseBlocker(blocker)) {
+      return this.skippedFor(conversation.id, blocker);
+    }
+
     // Retry
     await this.conversationRepository.updateById(conversation.id, {
       needs_processing: true,
@@ -239,6 +259,11 @@ export class MessageRecoveryService {
     conversation: Conversation,
     reason: string,
   ): Promise<RecoveryResult> {
+    const blocker = await recheckAiReply(conversation.id);
+    if (blocker && !isPauseBlocker(blocker)) {
+      return this.skippedFor(conversation.id, blocker);
+    }
+
     // Set status to pending-human
     await this.conversationRepository.updateById(conversation.id, {
       status: "pending-human",
@@ -248,20 +273,23 @@ export class MessageRecoveryService {
       needs_processing: false,
     });
 
-    // Add customer-facing message
-    await conversation.addMessage({
-      content: handoffCopy(
-        "recoveryEscalation",
-        conversation.language,
-        conversation.organization?.defaultLanguage,
-      ),
-      type: MessageType.BOT_AGENT,
-      metadata: {
-        isEscalation: true,
-        escalationReason: reason,
-        timestamp: new Date().toISOString(),
-      },
-    });
+    // Add customer-facing message, unless the agent is paused: a paused agent
+    // stays silent (same as parkForPausedAgent in the orchestrator).
+    if (!blocker) {
+      await conversation.addMessage({
+        content: handoffCopy(
+          "recoveryEscalation",
+          conversation.language,
+          conversation.organization?.defaultLanguage,
+        ),
+        type: MessageType.BOT_AGENT,
+        metadata: {
+          isEscalation: true,
+          escalationReason: reason,
+          timestamp: new Date().toISOString(),
+        },
+      });
+    }
 
     // Add system message for internal visibility
     await conversation.addMessage({
@@ -301,6 +329,11 @@ export class MessageRecoveryService {
       success: true,
       action: "escalated_to_human",
     };
+  }
+
+  private skippedFor(conversationId: string, blocker: AiReplyBlocker): RecoveryResult {
+    logger.info({ conversationId, blocker }, "Skipping recovery - AI may not reply");
+    return { success: false, action: `skipped_${blocker}` };
   }
 
   /**
