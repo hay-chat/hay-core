@@ -46,6 +46,7 @@ import {
   Globe,
   ExternalLink,
   Package,
+  ThumbsUp,
 } from "lucide-vue-next";
 import type { Component } from "vue";
 
@@ -177,13 +178,17 @@ const navMain = computed(() => {
       icon: BookOpen,
       isActive: isPathActive("/playbooks"),
     },
-    // {
-    //   title: "Insights",
-    //   url: "/insights",
-    //   icon: BarChart,
-    //   isActive: isPathActive("/insights"),
-    // },
   );
+
+  // Feedback on AI replies; the agent role cannot open /insights.
+  if (!userStore.isAgent) {
+    items.push({
+      title: t("nav.feedback"),
+      url: "/insights/feedback",
+      icon: ThumbsUp,
+      isActive: isPathActive("/insights/feedback"),
+    });
+  }
 
   // Products nav — only shown when a product-source plugin is enabled
   // (e.g. Shopify). Mirrors the marketplace's type.includes('channel') gate.

@@ -20,15 +20,18 @@
     "ofConversations": "das conversas",
     "avgMessages": "Média de Mensagens",
     "messagesPer": "mensagens por",
-    "conversation": "conversa"
+    "conversation": "conversa",
+    "avgResponseTime": "Tempo Médio de Resposta",
+    "medianResponseTime": "mediana {value}",
+    "noRepliesYet": "Nenhuma resposta neste período"
   },
   "activity": {
     "title": "Atividade de Conversas",
     "description": "Volume diário de conversas"
   },
   "topAgents": {
-    "title": "Melhores Agentes",
-    "description": "Melhores agentes por taxa de resolução este mês",
+    "title": "Principais Agentes",
+    "description": "Agentes com mais conversas neste período",
     "conversations": "{count} conversas",
     "resolutionRate": "taxa de resolução",
     "emptyTitle": "Nenhum agente criado ainda"
