@@ -12,6 +12,7 @@
 
 import { createLogger } from "@server/lib/logger";
 import type { ModelTier, UsageRecord } from "./provider.types";
+import type { AiRegion } from "./ai-region";
 
 const logger = createLogger("llm-usage");
 
@@ -22,6 +23,8 @@ export interface UsageEvent {
   provider: string;
   organizationId?: string;
   tier?: ModelTier;
+  /** Region of the endpoint that served the call. */
+  region?: AiRegion;
 }
 
 export type UsageSink = (event: UsageEvent) => void;

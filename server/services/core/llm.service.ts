@@ -63,6 +63,8 @@ export interface ChatOptions {
 export interface EmbeddingOptions {
   text: string;
   model?: string;
+  /** Organization whose AI region to use. Falls back to the env default bundle. */
+  organizationId?: string;
 }
 
 export class LLMService {
@@ -141,6 +143,7 @@ export class LLMService {
               provider: meta.provider,
               organizationId,
               tier,
+              region: bundle.region,
             }),
           )
           .catch(() => undefined);
@@ -176,6 +179,7 @@ export class LLMService {
       provider: result.provider,
       organizationId,
       tier,
+      region: bundle.region,
     });
     this.logChatResultDebugInfo(result);
 
@@ -246,8 +250,8 @@ export class LLMService {
   }
 
   async embedding(options: EmbeddingOptions): Promise<number[]> {
-    const { text, model = config.openai.models.embedding.model } = options;
-    const bundle = await llmProviderFactory.forOrganization();
+    const { text, model = config.openai.models.embedding.model, organizationId } = options;
+    const bundle = await llmProviderFactory.forOrganization(organizationId);
 
     try {
       const embedRequest: EmbeddingRequest = { model, input: text };
@@ -260,6 +264,8 @@ export class LLMService {
         usage: result.usage,
         model: result.model,
         provider: result.provider,
+        organizationId,
+        region: bundle.region,
       });
 
       return result.embeddings[0] ?? [];

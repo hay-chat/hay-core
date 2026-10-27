@@ -4,16 +4,18 @@
  * Mirrors VectorStoreService but operates on the dedicated product_embeddings
  * table so the product catalog can scale and be tuned independently of
  * documents. Embeddings are written/read via raw SQL because TypeORM has no
- * native pgvector type.
+ * native pgvector type. Embeddings go through the org's managed embedding
+ * provider, so an EU-only org's catalog is embedded on the EU endpoint.
  *
  * @module services/product-vector-store
  */
 
-import OpenAI from "openai";
 import type { EntityManager } from "typeorm";
 import { AppDataSource } from "../database/data-source";
 import { config } from "../config/env";
 import { createLogger } from "@server/lib/logger";
+import { llmProviderFactory } from "@server/services/llm/llm-provider.factory";
+import { emitUsage } from "@server/services/llm/usage-sink";
 
 const logger = createLogger("product-vector-store");
 
@@ -35,13 +37,11 @@ export interface ProductSearchResult {
 }
 
 export class ProductVectorStoreService {
-  private openai: OpenAI;
   private readonly model: string;
   private readonly dimensions: number;
   private _initialized: boolean = false;
 
   constructor() {
-    this.openai = new OpenAI({ apiKey: config.openai.apiKey });
     this.model = config.openai.models.embedding.model || "text-embedding-3-small";
     this.dimensions = parseInt(process.env.EMBEDDING_DIM || "1536");
   }
@@ -57,7 +57,8 @@ export class ProductVectorStoreService {
     this._initialized = true;
   }
 
-  private async embedTexts(texts: string[]): Promise<number[][]> {
+  /** Embed texts in order, batched, on the org's region; asserts the column dimension. */
+  private async embed(organizationId: string, texts: string[]): Promise<number[][]> {
     const batches: string[][] = [];
     let currentBatch: string[] = [];
     let currentBatchChars = 0;
@@ -79,30 +80,33 @@ export class ProductVectorStoreService {
       batches.push(currentBatch);
     }
 
+    const { embedding: provider, region } =
+      await llmProviderFactory.forOrganization(organizationId);
     const allVectors: number[][] = [];
 
-    for (let i = 0; i < batches.length; i++) {
-      const batch = batches[i];
-      const response = await this.openai.embeddings.create({
+    for (const batch of batches) {
+      const result = await provider.embed({
         model: this.model,
         input: batch,
         dimensions: this.dimensions,
       });
-
-      const sorted = response.data.sort((a, b) => a.index - b.index);
-      allVectors.push(...sorted.map((item) => item.embedding));
+      if (result.dimensions !== this.dimensions) {
+        throw new Error(
+          `Embedding dimension mismatch: provider returned ${result.dimensions}, expected ${this.dimensions}.`,
+        );
+      }
+      emitUsage({
+        kind: "embedding",
+        usage: result.usage,
+        model: result.model,
+        provider: result.provider,
+        organizationId,
+        region,
+      });
+      allVectors.push(...result.embeddings);
     }
 
     return allVectors;
-  }
-
-  private async embedQuery(text: string): Promise<number[]> {
-    const response = await this.openai.embeddings.create({
-      model: this.model,
-      input: text,
-      dimensions: this.dimensions,
-    });
-    return response.data[0].embedding;
   }
 
   /**
@@ -118,7 +122,7 @@ export class ProductVectorStoreService {
     if (!chunks.length) return [];
 
     const texts = chunks.map((c) => c.content);
-    const vectors = await this.embedTexts(texts);
+    const vectors = await this.embed(organizationId, texts);
     const runner = manager?.queryRunner || AppDataSource;
 
     const ids: string[] = [];
@@ -170,7 +174,7 @@ export class ProductVectorStoreService {
       throw new Error("ProductVectorStore not initialized. Call initialize() first.");
     }
 
-    const queryVector = await this.embedQuery(query);
+    const [queryVector] = await this.embed(organizationId, [query]);
     const vectorParam = `[${queryVector.join(",")}]`;
 
     const searchQuery = `

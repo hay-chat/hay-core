@@ -1,4 +1,5 @@
 import type { OrgLlmConfig } from "@server/services/llm/provider.types";
+import type { AiRegion } from "@server/services/llm/ai-region";
 
 export type { OrgLlmConfig };
 
@@ -333,5 +334,6 @@ export interface OrganizationSettings {
   retentionDays?: number | null; // Data retention period in days (null = disabled/forever)
   isPlayground?: boolean; // Enables playground mode for public conversations (demo orgs only)
   llm?: OrgLlmConfig; // Per-org LLM chat provider + tier→model map (embeddings stay managed)
+  aiRegion?: AiRegion; // Where AI calls are processed; "eu" routes everything to the EU endpoint
   [key: string]: unknown;
 }

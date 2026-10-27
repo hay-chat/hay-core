@@ -589,6 +589,7 @@ export const runConversation = async (conversationId: string) => {
           prompt,
           // Short closing line; falls back to a hardcoded string on error.
           tier: "easy",
+          organizationId: conversation.organization_id,
         });
       } catch (error) {
         log.debug({ err: error }, "Error generating closing message, using fallback");

@@ -1,6 +1,7 @@
 import OpenAI, { toFile } from "openai";
 import { config } from "../config/env";
 import { createLogger } from "@server/lib/logger";
+import { llmProviderFactory } from "@server/services/llm/llm-provider.factory";
 
 const logger = createLogger("transcription");
 
@@ -40,18 +41,38 @@ export interface TranscribeInput {
  * Best effort: every failure path returns null so callers can treat a missing
  * transcript as "no transcript" without failing the surrounding operation.
  */
-// TODO: route through the org's LLM provider bundle and meter usage (HAY-251)
+// TODO: meter usage (HAY-251)
 export class TranscriptionService {
-  private client: OpenAI | null = null;
+  /** One client per endpoint (default or EU), keyed by base URL. */
+  private readonly clients = new Map<string, OpenAI>();
 
-  private getClient(): OpenAI | null {
-    if (!config.openai.apiKey) {
+  /**
+   * The OpenAI client for the org's AI region. EU-only orgs get the EU endpoint or
+   * nothing: when EU is not configured, the factory throws and we skip the
+   * transcript rather than send the audio to the default endpoint.
+   */
+  private async getClient(organizationId: string): Promise<OpenAI | null> {
+    let endpoint;
+    try {
+      endpoint = await llmProviderFactory.managedOpenAIEndpoint(organizationId);
+    } catch (error) {
+      logger.warn(
+        { organizationId, error: error instanceof Error ? error.message : String(error) },
+        "Skipping transcription: no AI endpoint for this organization's region",
+      );
       return null;
     }
-    if (!this.client) {
-      this.client = new OpenAI({ apiKey: config.openai.apiKey });
+    if (!endpoint.apiKey) {
+      logger.debug({ organizationId }, "Skipping transcription: OPENAI_API_KEY not configured");
+      return null;
     }
-    return this.client;
+    const key = endpoint.baseURL ?? "";
+    let client = this.clients.get(key);
+    if (!client) {
+      client = new OpenAI({ apiKey: endpoint.apiKey, baseURL: endpoint.baseURL });
+      this.clients.set(key, client);
+    }
+    return client;
   }
 
   async transcribe({
@@ -60,9 +81,8 @@ export class TranscriptionService {
     filename,
     organizationId,
   }: TranscribeInput): Promise<string | null> {
-    const client = this.getClient();
+    const client = await this.getClient(organizationId);
     if (!client) {
-      logger.debug({ organizationId }, "Skipping transcription: OPENAI_API_KEY not configured");
       return null;
     }
 

@@ -37,6 +37,7 @@ export interface ActionClaimContext {
   customerQuery: string; // The last customer message
   conversationHistory: Message[]; // Full conversation context
   toolsCalledThisTurn: ToolLedgerEntry[]; // Ledger of tool calls made this turn
+  organizationId: string; // Routes the evaluation through the org's AI provider and region
 }
 
 /**
@@ -110,6 +111,7 @@ export class ActionClaimGuardrailService {
         jsonSchema: schema,
         temperature: 0.2, // Low temperature for consistent evaluation
         tier: "medium",
+        organizationId: context.organizationId,
       });
 
       const parsed = JSON.parse(result) as {

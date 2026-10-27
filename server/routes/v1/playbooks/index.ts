@@ -524,6 +524,7 @@ export const playbooksRouter = t.router({
       const response = await llmService.invoke({
         history: prompt,
         jsonSchema,
+        organizationId: ctx.organizationId!,
         temperature: 0.7,
         max_tokens: 4000,
       });

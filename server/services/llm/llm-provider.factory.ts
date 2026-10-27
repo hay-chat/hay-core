@@ -11,6 +11,10 @@
  * - Embeddings are ALWAYS managed (env/Hay key, OpenAI-compatible) regardless of the
  *   org's chat provider — Anthropic/Grok have no embeddings, and the pgvector column
  *   is pinned to one dimension.
+ * - orgId with `settings.aiRegion = "eu"` → the managed EU bundle (chat + embeddings
+ *   on OPENAI_EU_BASE_URL), ignoring `settings.llm`. If the EU endpoint is not
+ *   configured, or the org's settings cannot be read, resolution throws: an EU org's
+ *   data is never sent to the default endpoint.
  *
  * Resolved bundles are cached per org and invalidated on settings update.
  *
@@ -27,7 +31,13 @@ import {
 } from "./openai-compatible.provider";
 import { AnthropicChatProvider } from "./anthropic.provider";
 import { GeminiChatProvider } from "./gemini.provider";
-import { PROVIDER_TIER_DEFAULTS } from "./tier-maps";
+import { EU_TIERS, PROVIDER_TIER_DEFAULTS } from "./tier-maps";
+import {
+  AiRegionUnavailableError,
+  isEuRegionConfigured,
+  regionFromSettings,
+  type AiRegion,
+} from "./ai-region";
 import type {
   ChatProvider,
   EmbeddingProvider,
@@ -42,10 +52,20 @@ export interface ResolvedLlmBundle {
   chat: ChatProvider;
   embedding: EmbeddingProvider;
   tiers: TierModelMap;
+  /** Where this bundle's calls are processed. Emitted on every usage event. */
+  region: AiRegion;
+}
+
+/** A managed OpenAI endpoint (key + base URL) for SDK calls outside the bundle, e.g. audio. */
+export interface ManagedOpenAIEndpoint {
+  apiKey: string;
+  baseURL?: string;
+  region: AiRegion;
 }
 
 class LLMProviderFactory {
   private defaultBundle: ResolvedLlmBundle | undefined;
+  private euBundle: ResolvedLlmBundle | undefined;
   private readonly cache = new Map<string, ResolvedLlmBundle>();
 
   /** Resolve the provider bundle for an organization (or the env default when omitted). */
@@ -60,6 +80,27 @@ class LLMProviderFactory {
     return bundle;
   }
 
+  /**
+   * The managed OpenAI endpoint for an org's region, for calls the bundle does not
+   * cover (voice-note transcription). Throws `AiRegionUnavailableError` like
+   * `forOrganization` when the org is EU-only and EU is not configured.
+   */
+  async managedOpenAIEndpoint(organizationId: string): Promise<ManagedOpenAIEndpoint> {
+    const { region } = await this.forOrganization(organizationId);
+    if (region === "eu") {
+      return {
+        apiKey: config.aiRegion.eu.apiKey,
+        baseURL: config.aiRegion.eu.baseUrl,
+        region,
+      };
+    }
+    return {
+      apiKey: config.openai.apiKey,
+      baseURL: config.openai.baseUrl || undefined,
+      region,
+    };
+  }
+
   /** Drop a cached bundle so the next call re-reads the org's settings. */
   invalidate(organizationId: string): void {
     this.cache.delete(organizationId);
@@ -70,6 +111,7 @@ class LLMProviderFactory {
     return new OpenAICompatibleProvider({
       id: "openai-compatible",
       apiKey: config.openai.apiKey,
+      baseURL: config.openai.baseUrl || undefined,
       embeddingDimensions: config.openai.models.embedding.dimensions,
     });
   }
@@ -80,9 +122,9 @@ class LLMProviderFactory {
    * LLM_API_KEY so an operator can move every default call to another
    * OpenAI-compatible host without touching the database.
    *
-   * Embeddings stay on the OpenAI key regardless: the pgvector column and HNSW
-   * index are pinned to EMBEDDING_DIM, so a host returning a different dimension
-   * would fail `assertDimensions` at write time.
+   * Embeddings stay on the OpenAI key (and OPENAI_BASE_URL) regardless: the pgvector
+   * column and HNSW index are pinned to EMBEDDING_DIM, so a host returning a
+   * different dimension would fail `assertDimensions` at write time.
    */
   private getDefaultBundle(): ResolvedLlmBundle {
     if (!this.defaultBundle) {
@@ -102,7 +144,7 @@ class LLMProviderFactory {
       const chat = new OpenAICompatibleProvider({
         id: "openai-compatible",
         apiKey: config.llm.apiKey || config.openai.apiKey,
-        baseURL: config.llm.baseUrl || undefined,
+        baseURL: config.llm.baseUrl || config.openai.baseUrl || undefined,
         capabilities,
         embeddingDimensions: config.openai.models.embedding.dimensions,
       });
@@ -111,26 +153,62 @@ class LLMProviderFactory {
         chat,
         embedding,
         tiers: PROVIDER_TIER_DEFAULTS["openai-compatible"],
+        region: "default",
       };
     }
     return this.defaultBundle;
   }
 
+  /**
+   * The managed EU bundle: chat and embeddings both on the OpenAI EU data residency
+   * endpoint, with OpenAI tiers (never LLM_TIER_*, which name default-host models).
+   */
+  private getEuBundle(organizationId: string): ResolvedLlmBundle {
+    if (!isEuRegionConfigured()) {
+      throw new AiRegionUnavailableError(organizationId, "eu");
+    }
+    if (!this.euBundle) {
+      const provider = new OpenAICompatibleProvider({
+        id: "openai-compatible",
+        apiKey: config.aiRegion.eu.apiKey,
+        baseURL: config.aiRegion.eu.baseUrl,
+        capabilities: OPENAI_COMPATIBLE_CAPABILITIES.openai,
+        embeddingDimensions: config.openai.models.embedding.dimensions,
+      });
+      this.euBundle = { chat: provider, embedding: provider, tiers: EU_TIERS, region: "eu" };
+    }
+    return this.euBundle;
+  }
+
   private async resolve(organizationId: string): Promise<ResolvedLlmBundle> {
-    let llm: OrgLlmConfig | undefined;
-    try {
-      const org = await organizationRepository.findById(organizationId);
-      llm = org?.settings?.llm;
-    } catch (err) {
-      logger.warn({ err, organizationId }, "Failed to load org LLM config; using default bundle");
+    // No silent fallback when the settings cannot be read: the org may be EU-only,
+    // and the default bundle is not an EU endpoint. Let the error reach the caller.
+    const org = await organizationRepository.findById(organizationId);
+    const region = regionFromSettings(org?.settings);
+
+    if (region === "eu") {
+      const bundle = this.getEuBundle(organizationId);
+      logger.info(
+        { organizationId, region, host: hostOf(config.aiRegion.eu.baseUrl) },
+        "Resolved LLM bundle",
+      );
+      if (org?.settings?.llm) {
+        logger.warn(
+          { organizationId },
+          "Org has its own AI provider configured but is EU-only; using the managed EU endpoint",
+        );
+      }
+      return bundle;
     }
 
+    const llm: OrgLlmConfig | undefined = org?.settings?.llm;
     if (!llm) return this.getDefaultBundle();
 
     return {
       chat: this.buildChatProvider(llm),
       embedding: this.buildManagedEmbeddingProvider(),
       tiers: llm.chat.tiers ?? PROVIDER_TIER_DEFAULTS[llm.chat.provider],
+      region: "default",
     };
   }
 
@@ -144,7 +222,9 @@ class LLMProviderFactory {
         return new OpenAICompatibleProvider({
           id: "openai-compatible",
           apiKey,
-          baseURL: baseUrl,
+          // The managed key belongs to OPENAI_BASE_URL's project; a BYO key without a
+          // base URL talks to api.openai.com.
+          baseURL: baseUrl || (apiKeyEncrypted ? undefined : config.openai.baseUrl || undefined),
           capabilities: OPENAI_COMPATIBLE_CAPABILITIES[vendor ?? "openai"],
         });
       case "anthropic":
@@ -154,6 +234,14 @@ class LLMProviderFactory {
       default:
         throw new Error(`Unknown chat provider: ${String(provider)}`);
     }
+  }
+}
+
+function hostOf(url: string): string {
+  try {
+    return new URL(url).host;
+  } catch {
+    return "invalid-url";
   }
 }
 

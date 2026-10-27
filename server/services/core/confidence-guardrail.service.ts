@@ -51,6 +51,7 @@ export interface ConfidenceContext {
   retrievedDocuments: Array<{ document: Document; similarity: number }>;
   conversationHistory: Message[];
   customerQuery: string; // The original customer question
+  organizationId: string; // Routes the evaluation through the org's AI provider and region
 }
 
 /**
@@ -179,6 +180,7 @@ export class ConfidenceGuardrailService {
         jsonSchema: schema,
         temperature: 0.2, // Low temperature for consistent evaluation
         tier: "medium",
+        organizationId: context.organizationId,
       });
 
       const parsed = JSON.parse(result);
@@ -237,6 +239,7 @@ export class ConfidenceGuardrailService {
         jsonSchema: schema,
         temperature: 0.2,
         tier: "medium",
+        organizationId: context.organizationId,
       });
 
       const parsed = JSON.parse(result);
