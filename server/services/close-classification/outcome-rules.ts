@@ -71,8 +71,6 @@ export function isTestConversation(metadata: Record<string, unknown> | null | un
   if (!metadata) return false;
   return (
     metadata.sourceId === "playground" ||
-    metadata.test_mode === true ||
-    metadata.test_mode === "true" ||
     metadata.isPlayground === true ||
     metadata.isPlayground === "true" ||
     (metadata.runKind !== undefined && metadata.runKind !== null)

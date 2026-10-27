@@ -107,7 +107,15 @@
       "conversationStarted": "Conversation started {date}",
       "youAreHandling": "You are handling this conversation",
       "releaseConversation": "Release Conversation",
-      "closeConversation": "Close Conversation"
+      "closeConversation": "Close Conversation",
+      "simulatedBadge": "Actions are simulated",
+      "liveStoreBadge": "Live store",
+      "useLiveStore": "Use live store",
+      "useSimulatedActions": "Simulate actions",
+      "liveStoreConfirmTitle": "Use your live store?",
+      "liveStoreConfirmDescription": "Refunds, cancellations, address changes and other actions in this test conversation will be sent to your real store. Switch back at any time.",
+      "liveStoreConfirm": "Use live store",
+      "actionModeFailed": "Could not switch the action mode. Try again."
     },
     "pendingHuman": {
       "needsHuman": "This conversation was handed off to a human agent",
@@ -210,6 +218,13 @@
       "joined": "{name} joined the chat",
       "returnedToAi": "{name} left the chat. The AI assistant is answering again.",
       "left": "{name} left the chat and returned it to the queue"
+    },
+    "toolStatus": {
+      "success": "Success",
+      "failed": "Failed",
+      "running": "Running",
+      "simulated": "Simulated",
+      "unknown": "Unknown"
     }
   }
 }

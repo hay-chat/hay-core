@@ -26,6 +26,20 @@
                   <Info class="h-3 w-3 mr-1" />
                   {{ $t("conversations.detail.autoSends") }}
                 </Badge>
+                <Badge
+                  v-if="conversation"
+                  :variant="isLiveStore ? 'destructive' : 'outline'"
+                  class="text-xs shrink-0"
+                  data-testid="playground-action-mode"
+                >
+                  <FlaskConical v-if="!isLiveStore" class="h-3 w-3 mr-1" />
+                  <Zap v-else class="h-3 w-3 mr-1" />
+                  {{
+                    isLiveStore
+                      ? $t("conversations.detail.liveStoreBadge")
+                      : $t("conversations.detail.simulatedBadge")
+                  }}
+                </Badge>
               </div>
               <p class="text-sm text-neutral-muted hidden sm:block">
                 {{ $t("conversations.detail.playgroundDescription") }}
@@ -49,6 +63,19 @@
               >
                 <Sparkles class="h-4 w-4 mr-2" />
                 {{ $t("suggest.improveFromConversation") }}
+              </Button>
+              <Button
+                v-if="conversation"
+                variant="outline"
+                size="sm"
+                :loading="isSwitchingActionMode"
+                @click="toggleActionMode"
+              >
+                {{
+                  isLiveStore
+                    ? $t("conversations.detail.useSimulatedActions")
+                    : $t("conversations.detail.useLiveStore")
+                }}
               </Button>
               <Button
                 variant="outline"
@@ -75,6 +102,18 @@
                 <DropdownMenuItem :disabled="isResetting" @click="resetConversation">
                   <RefreshCw class="mr-2 h-4 w-4" />
                   {{ $t("conversations.detail.newTest") }}
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  v-if="conversation"
+                  :disabled="isSwitchingActionMode"
+                  @click="toggleActionMode"
+                >
+                  <Zap class="mr-2 h-4 w-4" />
+                  {{
+                    isLiveStore
+                      ? $t("conversations.detail.useSimulatedActions")
+                      : $t("conversations.detail.useLiveStore")
+                  }}
                 </DropdownMenuItem>
                 <DropdownMenuItem v-if="isLocalhost" @click="copyConversationJson">
                   <Braces class="mr-2 h-4 w-4" />
@@ -934,6 +973,18 @@
       :conversation-id="conversation.id"
       @applied="handleSuggestionApplied"
     />
+
+    <!-- Playground: confirm before actions reach the real store -->
+    <ConfirmDialog
+      v-if="isPlaygroundMode"
+      v-model:open="showLiveStoreConfirm"
+      :title="$t('conversations.detail.liveStoreConfirmTitle')"
+      :description="$t('conversations.detail.liveStoreConfirmDescription')"
+      :confirm-text="$t('conversations.detail.liveStoreConfirm')"
+      :destructive="true"
+      :loading="isSwitchingActionMode"
+      @confirm="setActionMode(false)"
+    />
   </div>
 </template>
 
@@ -969,6 +1020,8 @@ import {
   Sparkles,
   MoreHorizontal,
   PanelRight,
+  FlaskConical,
+  Zap,
 } from "lucide-vue-next";
 import { createReusableTemplate, useMediaQuery } from "@vueuse/core";
 import { TRPCClientError } from "@trpc/client";
@@ -1369,6 +1422,40 @@ const handleSuggestionApplied = () => {
   }
 };
 
+// Playground action mode: writes are simulated (dry-run) unless switched to live.
+const isLiveStore = computed(() => conversation.value?.metadata?.dryRun === false);
+const showLiveStoreConfirm = ref(false);
+const isSwitchingActionMode = ref(false);
+
+const toggleActionMode = () => {
+  if (isLiveStore.value) {
+    void setActionMode(true);
+  } else {
+    showLiveStoreConfirm.value = true;
+  }
+};
+
+const setActionMode = async (dryRun: boolean) => {
+  if (!conversation.value) return;
+  try {
+    isSwitchingActionMode.value = true;
+    await HayApi.conversations.setDryRun.mutate({
+      conversationId: conversation.value.id,
+      dryRun,
+    });
+    conversation.value = {
+      ...conversation.value,
+      metadata: { ...(conversation.value.metadata ?? {}), dryRun },
+    };
+    showLiveStoreConfirm.value = false;
+  } catch (error) {
+    console.error("Failed to switch playground action mode:", error);
+    useToast().error(t("common.error"), t("conversations.detail.actionModeFailed"));
+  } finally {
+    isSwitchingActionMode.value = false;
+  }
+};
+
 const createTestConversation = async () => {
   try {
     messagesLoading.value = true;
@@ -1376,7 +1463,8 @@ const createTestConversation = async () => {
     const response = await HayApi.conversations.create.mutate({
       metadata: {
         sourceId: "playground",
-        test_mode: true,
+        // Write actions are simulated until the user switches to the live store.
+        dryRun: true,
       },
       status: "open",
     });
