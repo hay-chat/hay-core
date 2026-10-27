@@ -3,6 +3,7 @@ import express from "express";
 import type { FileFilterCallback } from "multer";
 import cors from "cors";
 import { httpCompression } from "@server/lib/http-compression";
+import { webchatStatic } from "@server/lib/webchat-static";
 import { createServer } from "http";
 import { config, validateProductionConfig } from "@server/config/env";
 import { createContext } from "@server/trpc/context";
@@ -207,20 +208,9 @@ async function startServer() {
       })
       .send("/* Widget styles are bundled into widget.js */\n");
   });
-  server.use(
-    "/v1/webchat",
-    express.static(webchatDir, {
-      maxAge: "7d",
-      etag: true,
-      lastModified: true,
-      setHeaders: (res) => {
-        // Security headers
-        res.setHeader("X-Content-Type-Options", "nosniff");
-        // Allow CORS for widget files so they can be loaded from any domain
-        res.setHeader("Access-Control-Allow-Origin", "*");
-      },
-    }),
-  );
+  // widget.js (the loader) gets a short cache; the hashed chunks under assets/
+  // are immutable. See lib/webchat-static.ts.
+  server.use("/v1/webchat", webchatStatic(webchatDir));
 
   // Plugin routes — plugin IDs are plain strings without slashes (e.g., hay-channel-instagram-meta).
 
