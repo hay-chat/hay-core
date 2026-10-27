@@ -38,6 +38,9 @@ export const RESOURCES = {
   // Commerce
   PRODUCTS: "products",
 
+  // Write actions the AI held for approval (refunds, cancels, ...)
+  ACTIONS: "actions",
+
   // Wildcards
   ALL: "*",
 } as const;
@@ -62,6 +65,7 @@ export const ACTIONS = {
   INVITE: "invite", // Invite users
   EXPORT: "export", // Export data
   IMPORT: "import", // Import data
+  APPROVE: "approve", // Approve or reject something held for a person
 
   // Wildcards
   ALL: "*",

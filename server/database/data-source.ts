@@ -37,6 +37,7 @@ import { InsightIssue } from "./entities/insight-issue.entity";
 import { PushSubscription } from "./entities/push-subscription.entity";
 import { NotificationDelivery } from "./entities/notification-delivery.entity";
 import { ActionLog } from "./entities/action-log.entity";
+import { PendingAction } from "./entities/pending-action.entity";
 import { SnakeNamingStrategy } from "./naming-strategy";
 import { config } from "../config/env";
 import { createLogger } from "@server/lib/logger";
@@ -99,6 +100,7 @@ export const AppDataSource = new DataSource({
     ConversationOutcome,
     InsightIssue,
     ActionLog,
+    PendingAction,
   ],
   migrations: __filename.includes("dist")
     ? [__dirname + "/migrations/*.js"] // Production: compiled JS files in same relative location
