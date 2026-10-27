@@ -27,6 +27,7 @@ import { docsAuditRouter } from "./docs-audit";
 import { productsRouter } from "./products";
 import { internalRouter } from "./internal";
 import { notificationsRouter } from "./notifications";
+import { actionsRouter } from "./actions";
 
 // Core routers - always available
 const coreRouters = {
@@ -57,6 +58,7 @@ const coreRouters = {
   docsAudit: docsAuditRouter,
   products: productsRouter,
   notifications: notificationsRouter,
+  actions: actionsRouter,
 };
 
 // Create v1Router with core + plugin routers

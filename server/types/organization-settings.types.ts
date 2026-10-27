@@ -322,6 +322,34 @@ export const DEFAULT_ACTION_CLAIM_GUARDRAIL_CONFIG: ActionClaimGuardrailConfig =
 };
 
 /**
+ * Action approval (D4-3 / D4-4): which AI write actions wait for a person.
+ */
+export interface ActionApprovalConfig {
+  /** Hold refunds, cancels and discounts for approval. Only the owner can turn this off. */
+  moneyMovesNeedApproval: boolean;
+  /** Money moves at or below this amount run without approval. 0 holds every one. */
+  thresholdAmount: number;
+  /** Roles that may approve or reject. The owner always can. */
+  approverRoles: Array<"owner" | "admin" | "member" | "viewer" | "contributor" | "agent">;
+  /** Hours a held action waits before the conversation is escalated to a person. */
+  expiryHours: number;
+}
+
+export const DEFAULT_ACTION_APPROVAL_CONFIG: ActionApprovalConfig = {
+  moneyMovesNeedApproval: true,
+  thresholdAmount: 0,
+  approverRoles: ["owner", "admin"],
+  expiryHours: 48,
+};
+
+/** The org's action approval settings with defaults filled in. */
+export function resolveActionApprovalConfig(
+  settings: OrganizationSettings | null | undefined,
+): ActionApprovalConfig {
+  return { ...DEFAULT_ACTION_APPROVAL_CONFIG, ...(settings?.actionApproval ?? {}) };
+}
+
+/**
  * Organization Settings JSONB structure
  * This type defines the complete structure of the settings field in the Organization entity
  */
@@ -335,5 +363,6 @@ export interface OrganizationSettings {
   isPlayground?: boolean; // Enables playground mode for public conversations (demo orgs only)
   llm?: OrgLlmConfig; // Per-org LLM chat provider + tier→model map (embeddings stay managed)
   aiRegion?: AiRegion; // Where AI calls are processed; "eu" routes everything to the EU endpoint
+  actionApproval?: Partial<ActionApprovalConfig>; // Which AI write actions wait for a person
   [key: string]: unknown;
 }

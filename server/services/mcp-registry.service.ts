@@ -3,6 +3,7 @@ import type { MCPToolDefinition } from "../types/plugin.types";
 import { getPluginRunnerService } from "./plugin-runner.service";
 import { getCachedToolDescriptors } from "./plugin-tools.service";
 import { createLogger } from "@server/lib/logger";
+import { classifyTool, type ToolRisk } from "./core/tool-risk";
 
 const logger = createLogger("mcp-registry");
 
@@ -15,6 +16,8 @@ export interface MCPTool extends MCPToolDefinition {
   pluginId: string;
   serverId: string;
   createdAt: Date;
+  /** Read-only, or which kind of write. Unclassified tools count as writes. */
+  risk: ToolRisk;
 }
 
 /**
@@ -85,6 +88,7 @@ export class MCPRegistryService {
           name: descriptor.name,
           description: descriptor.description,
           input_schema: descriptor.input_schema as MCPTool["input_schema"],
+          risk: descriptor.risk,
           createdAt,
         });
       }
@@ -107,6 +111,16 @@ export class MCPRegistryService {
   async getTool(organizationId: string, toolName: string): Promise<MCPTool | null> {
     const tools = await this.getToolsForOrg(organizationId);
     return tools.find((t) => t.name === toolName) || null;
+  }
+
+  /**
+   * Risk class of one plugin tool. A tool missing from the cache is an
+   * unclassified write: it is never assumed to be safe.
+   */
+  async getToolRisk(organizationId: string, pluginId: string, toolName: string): Promise<ToolRisk> {
+    const tools = await this.getToolsForOrg(organizationId);
+    const tool = tools.find((t) => t.pluginId === pluginId && t.name === toolName);
+    return tool?.risk ?? classifyTool(null);
   }
 
   /**

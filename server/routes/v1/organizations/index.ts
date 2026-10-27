@@ -9,6 +9,7 @@ import {
   TimeFormat,
   Timezone,
   DEFAULT_CONFIDENCE_GUARDRAIL_CONFIG,
+  resolveActionApprovalConfig,
 } from "@server/types/organization-settings.types";
 import type { DeepPartial } from "typeorm";
 import { AppDataSource } from "@server/database/data-source";
@@ -83,6 +84,15 @@ const updateLlmConfigSchema = z.object({
   embedding: z.object({ model: z.string().min(1) }),
 });
 
+/** D4-4: who must approve AI write actions. Expiry stays at the 48 h default. */
+const actionApprovalSchema = z
+  .object({
+    moneyMovesNeedApproval: z.boolean(),
+    thresholdAmount: z.number().min(0).max(1_000_000),
+    approverRoles: z.array(z.enum(["admin", "contributor", "member"])).max(3),
+  })
+  .partial();
+
 const updateSettingsSchema = z.object({
   name: z.string().min(1).max(100).optional(),
   about: z.string().max(10000).optional(),
@@ -94,6 +104,7 @@ const updateSettingsSchema = z.object({
   testModeDefault: z.boolean().optional(),
   confidenceGuardrail: confidenceGuardrailSchema.optional(),
   retentionDays: z.number().int().min(1).max(3650).nullable().optional(), // Data retention in days (null = disabled)
+  actionApproval: actionApprovalSchema.optional(),
 });
 
 export const organizationsRouter = t.router({
@@ -239,6 +250,7 @@ export const organizationsRouter = t.router({
         logoUrl: organization.logoUrl || null,
         confidenceGuardrail,
         retentionDays: organization.settings?.retentionDays ?? null,
+        actionApproval: resolveActionApprovalConfig(organization.settings),
       };
     },
   ),
@@ -370,7 +382,26 @@ export const organizationsRouter = t.router({
       }
 
       // Extract settings fields from input as they go into the settings JSONB field
-      const { testModeDefault, confidenceGuardrail, retentionDays, ...topLevelFields } = input;
+      const {
+        testModeDefault,
+        confidenceGuardrail,
+        retentionDays,
+        actionApproval,
+        ...topLevelFields
+      } = input;
+
+      // Only the owner may let money move without approval or change who approves.
+      if (
+        actionApproval &&
+        (actionApproval.moneyMovesNeedApproval === false ||
+          actionApproval.approverRoles !== undefined) &&
+        ctx.user?.getRole() !== "owner"
+      ) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "Only the organization owner can change who approves actions",
+        });
+      }
 
       // Prepare update payload
       const updatePayload: DeepPartial<Organization> = {
@@ -381,7 +412,8 @@ export const organizationsRouter = t.router({
       if (
         testModeDefault !== undefined ||
         confidenceGuardrail !== undefined ||
-        retentionDays !== undefined
+        retentionDays !== undefined ||
+        actionApproval !== undefined
       ) {
         updatePayload.settings = {
           ...(organization.settings || {}),
@@ -400,6 +432,13 @@ export const organizationsRouter = t.router({
 
         if (retentionDays !== undefined) {
           updatePayload.settings.retentionDays = retentionDays;
+        }
+
+        if (actionApproval !== undefined) {
+          updatePayload.settings.actionApproval = {
+            ...(organization.settings?.actionApproval || {}),
+            ...actionApproval,
+          };
         }
       }
 
@@ -421,6 +460,7 @@ export const organizationsRouter = t.router({
           defaultAgentId: updatedOrg.defaultAgentId,
           testModeDefault: updatedOrg.settings?.testModeDefault || false,
           confidenceGuardrail: updatedOrg.settings?.confidenceGuardrail,
+          actionApproval: resolveActionApprovalConfig(updatedOrg.settings),
         },
       };
     }),

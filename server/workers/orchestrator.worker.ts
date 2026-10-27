@@ -93,7 +93,11 @@ export class OrchestratorWorker {
         );
 
         try {
-          await this.orchestrator!.processConversation(data.conversationId);
+          if (data.trigger === "approval_decided") {
+            await this.orchestrator!.processApprovalDecision(data.conversationId);
+          } else {
+            await this.orchestrator!.processConversation(data.conversationId);
+          }
           rabbitmqService.ack(msg);
           logger.debug(
             { conversationId: data.conversationId },

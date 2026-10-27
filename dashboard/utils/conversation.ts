@@ -20,7 +20,13 @@ export interface ConversationWithMessages {
  */
 export const getWaitTime = (conversation: ConversationWithMessages): number | null => {
   // Only calculate wait time for conversations that might need attention
-  const validStatuses = ["open", "processing", "pending-human", "human-took-over"];
+  const validStatuses = [
+    "open",
+    "processing",
+    "pending-human",
+    "awaiting-approval",
+    "human-took-over",
+  ];
   if (!validStatuses.includes(conversation.status)) {
     return null;
   }

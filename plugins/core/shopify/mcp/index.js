@@ -11,6 +11,8 @@
 
 const { McpServer } = require("@modelcontextprotocol/sdk/server/mcp.js");
 const { StdioServerTransport } = require("@modelcontextprotocol/sdk/server/stdio.js");
+const { applyToolRisk } = require("@hay/plugin-sdk/tool-risk");
+const toolRisk = require("./tool-risk");
 
 const { registerShopTools } = require("./tools/shop");
 const { registerOrderTools } = require("./tools/orders");
@@ -20,7 +22,7 @@ const { registerReturnTools } = require("./tools/returns");
 const { registerProductTools } = require("./tools/products");
 const { registerInventoryTools } = require("./tools/inventory");
 
-const server = new McpServer({ name: "shopify", version: "1.0.0" });
+const server = applyToolRisk(new McpServer({ name: "shopify", version: "1.0.0" }), toolRisk);
 
 registerShopTools(server);
 registerOrderTools(server);

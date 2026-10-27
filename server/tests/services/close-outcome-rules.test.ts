@@ -35,6 +35,7 @@ const baseFacts: CloseFacts = {
   hadRealRequest: true,
   aiReplied: true,
   aiLastReplyIsAnswer: true,
+  approvalRequested: false,
 };
 
 const verdict = (
@@ -85,6 +86,19 @@ describe("close outcome rules", () => {
         outcome: "abandoned",
         billable: false,
       });
+    });
+
+    it("bills a conversation where the AI requested an approval, whatever came after", () => {
+      const facts = { ...baseFacts, approvalRequested: true, handedOff: true };
+      expect(decideOutcome(facts, verdict(false))).toEqual({
+        outcome: "assumed",
+        billable: true,
+        aiResolved: true,
+      });
+      const unhappy = { ...facts, closeReason: "user_indicated_close_unsatisfied" };
+      expect(decideOutcome(unhappy, verdict(false)).billable).toBe(false);
+      const test = { ...facts, isTest: true };
+      expect(decideOutcome(test, verdict(false)).outcome).toBe("test");
     });
 
     it("an unhappy close is never billed, whatever the model says", () => {
@@ -158,6 +172,17 @@ describe("close outcome rules", () => {
       spam_flagged_at: null,
     };
 
+    it("notes a requested approval from the TOOL message", () => {
+      const facts = collectCloseFacts(conversation, [
+        msg(MessageType.CUSTOMER, "Please refund order 1001, it arrived broken"),
+        msg(MessageType.TOOL, "Approval requested: shop:create_refund", {
+          metadata: { toolStatus: "PENDING_APPROVAL", pendingActionId: "pa-1" },
+        }),
+        msg(MessageType.BOT_AGENT, "I've requested the refund; the team will confirm here."),
+      ]);
+      expect(facts.approvalRequested).toBe(true);
+    });
+
     it("treats a greeting and silence as no real request", () => {
       const facts = collectCloseFacts(conversation, [
         msg(MessageType.CUSTOMER, "hi", { intent: "greet" as Message["intent"] }),
@@ -193,10 +218,9 @@ describe("close outcome rules", () => {
       expect(facts).toMatchObject({ hadRealRequest: true, aiLastReplyIsAnswer: false });
     });
 
-    it("recognises playground, test-mode and replay conversations", () => {
+    it("recognises playground and replay conversations", () => {
       for (const metadata of [
         { sourceId: "playground" },
-        { test_mode: true },
         { isPlayground: true },
         { runKind: "simulation" },
       ]) {

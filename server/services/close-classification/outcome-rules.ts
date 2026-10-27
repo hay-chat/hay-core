@@ -12,6 +12,8 @@
  * - assumed: the AI resolved it and the shopper went quiet. Billable, reversed
  *   if the shopper comes back within REVERSAL_WINDOW_MS.
  * - Hand-offs bill when the AI resolved it, even if a human was involved.
+ * - An action the AI requested for approval (D4-4) bills: the AI did the work
+ *   when it requested it, whatever the team decides later.
  * - Never billable: abandoned (no real request or no real answer), unhappy
  *   (shopper closed unhappy), human (a human did the resolving), test
  *   (playground / test mode / replays), spam.
@@ -71,8 +73,6 @@ export function isTestConversation(metadata: Record<string, unknown> | null | un
   if (!metadata) return false;
   return (
     metadata.sourceId === "playground" ||
-    metadata.test_mode === true ||
-    metadata.test_mode === "true" ||
     metadata.isPlayground === true ||
     metadata.isPlayground === "true" ||
     (metadata.runKind !== undefined && metadata.runKind !== null)
@@ -91,6 +91,8 @@ export interface CloseFacts {
   aiReplied: boolean;
   /** The AI's last reply is a real answer, not a question back to the shopper. */
   aiLastReplyIsAnswer: boolean;
+  /** The AI requested an action that needed a person's approval (D4-4). */
+  approvalRequested: boolean;
 }
 
 /** What the LLM decides. Absent when the rule outcome is final or the LLM failed. */
@@ -159,6 +161,9 @@ export function collectCloseFacts(
     hadRealRequest: firstRequestIndex !== -1,
     aiReplied: aiReplies.length > 0,
     aiLastReplyIsAnswer: !!lastReply && !lastReply.content.trim().endsWith("?"),
+    approvalRequested: ordered.some(
+      (m) => m.type === MessageType.TOOL && typeof m.metadata?.pendingActionId === "string",
+    ),
   };
 }
 
@@ -174,10 +179,7 @@ export function needsClassifier(facts: CloseFacts): boolean {
  * and a silent close bills only when the AI's last reply was an answer.
  */
 export function assessByRule(facts: CloseFacts): ClassifierVerdict {
-  const shopperConfirmed = facts.closeReason
-    ? USER_SATISFIED_REASONS.includes(facts.closeReason)
-    : false;
-  const answered = shopperConfirmed
+  const answered = shopperConfirmed(facts)
     ? facts.aiReplied
     : facts.aiReplied && facts.aiLastReplyIsAnswer;
   return {
@@ -199,13 +201,16 @@ export function decideOutcome(facts: CloseFacts, verdict: ClassifierVerdict): Ou
   if (facts.spamFlagged || verdict.isSpam) return decide("spam");
   // The shopper's own "this didn't help" beats any model opinion.
   if (facts.closeReason === USER_UNHAPPY_REASON) return decide("unhappy");
+  if (facts.approvalRequested)
+    return decide(shopperConfirmed(facts) ? "confirmed" : "assumed", true);
   if (!facts.hadRealRequest || !verdict.hadRealRequest) return decide("abandoned");
   if (!verdict.aiResolved) return decide(facts.handedOff ? "human" : "abandoned");
 
-  const shopperConfirmed = facts.closeReason
-    ? USER_SATISFIED_REASONS.includes(facts.closeReason)
-    : false;
-  return decide(shopperConfirmed ? "confirmed" : "assumed", true);
+  return decide(shopperConfirmed(facts) ? "confirmed" : "assumed", true);
+}
+
+function shopperConfirmed(facts: CloseFacts): boolean {
+  return facts.closeReason ? USER_SATISFIED_REASONS.includes(facts.closeReason) : false;
 }
 
 /** Inactivity closes are the only ones the classifier may move to `unresolved`. */

@@ -435,7 +435,7 @@ describe("close classifier (D1-3 + D3-8)", () => {
 
   it("test traffic and greeting-only chats skip the LLM and never bill", async () => {
     const playground = await conversationWithAnswer({
-      metadata: { sourceId: "playground", test_mode: true },
+      metadata: { sourceId: "playground", dryRun: true },
     });
     await inactivityClose(playground);
 

@@ -14,6 +14,8 @@
 
 const { McpServer } = require("@modelcontextprotocol/sdk/server/mcp.js");
 const { StdioServerTransport } = require("@modelcontextprotocol/sdk/server/stdio.js");
+const { applyToolRisk } = require("@hay/plugin-sdk/tool-risk");
+const toolRisk = require("./tool-risk");
 
 const { registerCustomerTools } = require("./tools/customers");
 const { registerOrderTools } = require("./tools/orders");
@@ -21,7 +23,7 @@ const { registerRefundTools } = require("./tools/refunds");
 const { registerProductTools } = require("./tools/products");
 
 function createServer() {
-  const server = new McpServer({ name: "wix-stores", version: "2.0.0" });
+  const server = applyToolRisk(new McpServer({ name: "wix-stores", version: "2.0.0" }), toolRisk);
   registerCustomerTools(server);
   registerOrderTools(server);
   registerRefundTools(server);
