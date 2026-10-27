@@ -12,4 +12,6 @@ export default {
   "chat.conversationClosed": "会話終了",
   "input.placeholder": "メッセージを入力...",
   "input.send": "メッセージを送信",
+  "error.sendFailed": "メッセージを送信できませんでした。しばらくしてからもう一度お試しください。",
+  "error.messageTooLong": "メッセージが長すぎます。短くしてもう一度お試しください。",
 } as const;

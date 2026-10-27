@@ -12,4 +12,6 @@ export default {
   "chat.conversationClosed": "对话已关闭",
   "input.placeholder": "输入消息...",
   "input.send": "发送消息",
+  "error.sendFailed": "消息发送失败，请稍后再试。",
+  "error.messageTooLong": "消息过长，请缩短后重试。",
 } as const;

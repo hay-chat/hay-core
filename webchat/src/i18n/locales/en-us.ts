@@ -12,4 +12,6 @@ export default {
   "chat.conversationClosed": "Conversation Closed",
   "input.placeholder": "Type a message...",
   "input.send": "Send message",
+  "error.sendFailed": "Couldn't send your message. Please try again in a moment.",
+  "error.messageTooLong": "Your message is too long. Please shorten it and try again.",
 } as const;

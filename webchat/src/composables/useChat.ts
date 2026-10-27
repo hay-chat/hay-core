@@ -1,6 +1,6 @@
 import { ref, computed, watch } from "vue";
 import { useWebSocket } from "./useWebSocket";
-import { useConversation } from "./useConversation";
+import { useConversation, WidgetRequestError } from "./useConversation";
 import { useMessageQueue } from "./useMessageQueue";
 import { initContext, getContext } from "./useWidgetContext";
 import {
@@ -12,7 +12,7 @@ import {
 } from "./useDPoP";
 import { safeStorage, useConsent } from "./useConsent";
 import { debugLog } from "@/utils/debug";
-import type { HayChatConfig, Message } from "@/types";
+import type { HayChatConfig, Message, SendFailure } from "@/types";
 import { insertMessage, parseServerTime } from "@/utils/messageOrder";
 
 interface Keypair {
@@ -31,6 +31,12 @@ export function useChat(config: HayChatConfig) {
   const nonce = ref<string>("");
   const isConversationClosed = ref(false);
   const isSending = ref(false);
+  // Set when the server refuses the shopper's message (rate limited, website
+  // not allowed, too long). The UI shows a short notice and restores the text.
+  const sendFailure = ref<SendFailure | null>(null);
+  // Why the last createNewConversation() failed, so sendMessage can tell a
+  // refusal from a network blip.
+  let lastCreateError: unknown = null;
   // These start as null and are populated inside initialize() via safeStorage.
   // This matters because consent state may change between useChat() being
   // called (at widget mount) and initialize() running (on first open), e.g.
@@ -123,6 +129,7 @@ export function useChat(config: HayChatConfig) {
 
   // Create new conversation
   const createNewConversation = async (): Promise<boolean> => {
+    lastCreateError = null;
     try {
       debugLog("[Webchat] Creating new conversation...");
 
@@ -179,6 +186,7 @@ export function useChat(config: HayChatConfig) {
       return true;
     } catch (error) {
       console.error("[Webchat] Failed to create conversation:", error);
+      lastCreateError = error;
       return false;
     }
   };
@@ -716,9 +724,11 @@ export function useChat(config: HayChatConfig) {
     // writes in the conversation lifecycle below are permitted.
     if (retryCount === 0) {
       markInteraction();
+      sendFailure.value = null;
     }
 
     const tempMessageId = `temp-${Date.now()}`;
+    let stage: "create" | "send" = "create";
 
     try {
       // Check if conversation is closed
@@ -732,7 +742,7 @@ export function useChat(config: HayChatConfig) {
       if (!conversationId.value || !keypair.value) {
         const created = await createNewConversation();
         if (!created) {
-          throw new Error("Failed to create conversation");
+          throw lastCreateError ?? new Error("Failed to create conversation");
         }
       }
 
@@ -747,6 +757,7 @@ export function useChat(config: HayChatConfig) {
       }
 
       isSending.value = true;
+      stage = "send";
 
       await sendMessageInternal(text.trim(), conversationId.value!);
 
@@ -764,6 +775,23 @@ export function useChat(config: HayChatConfig) {
         nonce.value = error.nonce;
         // Retry once with new nonce
         return sendMessage(text, retryCount + 1);
+      }
+
+      // The server refused the message (4xx). Retrying automatically will not
+      // help, so take the bubble back, return the text to the input and tell
+      // the shopper. Never surface the internal reason (e.g. domain checks).
+      if (error instanceof WidgetRequestError && error.isRefusal) {
+        for (let i = messages.value.length - 1; i >= 0; i--) {
+          const m = messages.value[i];
+          if (m.id.startsWith("temp-") && m.content === text.trim()) {
+            messages.value.splice(i, 1);
+            break;
+          }
+        }
+
+        const tooLong = stage === "send" && (error.status === 400 || error.status === 413);
+        sendFailure.value = { reason: tooLong ? "messageTooLong" : "sendFailed", text };
+        return;
       }
 
       // Queue message for retry on error (only on first attempt)
@@ -869,6 +897,7 @@ export function useChat(config: HayChatConfig) {
     isTyping,
     unreadCount,
     isSending,
+    sendFailure,
     isConversationClosed,
     currentAgentType,
     currentAgentName,
