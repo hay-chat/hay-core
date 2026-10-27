@@ -23,7 +23,6 @@ export const CHAT_MODEL_CATALOG: Record<ModelFamily, string[]> = {
     "gpt-4o-mini",
     "gpt-4.1",
     "gpt-4.1-mini",
-    "gpt-4.1-nano",
     "gpt-4-turbo",
     "gpt-4",
     "o3",
@@ -97,7 +96,9 @@ export const DEFAULT_TIER_MAP: Record<ModelFamily, TierModelMap> = {
   // hard=4.1 over 4o: newer, better instruction-following, 1M context, and cheaper.
   // medium stays 4o-mini — 4.1-mini is better but ~2.6x the input price, which would
   // eat most of the saving from moving the per-turn guardrails onto this tier.
-  openai: { hard: "gpt-4.1", medium: "gpt-4o-mini", easy: "gpt-4.1-nano" },
+  // easy shares 4o-mini: OpenAI retired gpt-4.1-nano (404 "has been deprecated"),
+  // which broke every easy-tier call (inactivity nudges, hand-off and closing lines).
+  openai: { hard: "gpt-4.1", medium: "gpt-4o-mini", easy: "gpt-4o-mini" },
   anthropic: { hard: "claude-opus-4-8", medium: "claude-sonnet-4-6", easy: "claude-haiku-4-5" },
   gemini: { hard: "gemini-2.5-pro", medium: "gemini-2.5-flash", easy: "gemini-2.5-flash-lite" },
   mistral: {
