@@ -18,7 +18,10 @@ import { runConversation } from "../../orchestrator/run";
  * and sends that message right away. The run started by the create could read
  * "no customer message", write the greeting after the shopper's message and
  * then clear needs_processing, so the first message was never answered.
-
+ *
+ * Bug B: after a hand-off, a take-over and a staff reply, "Return to AI"
+ * re-ran the old "can I speak with a person?" message, handed off again and
+ * left the shopper's next question unanswered.
  *
  * The LLM-backed layers are the boundary; locking, flags, messages and status
  * transitions are real. The queue is an in-memory list drained by the test,
@@ -278,5 +281,58 @@ describe("Bug A: first widget message races the create-triggered run", () => {
       "Answer to: Second question",
     ]);
     expect((await reload(created.id)).needs_processing).toBe(false);
+  });
+});
+
+describe("Bug B: Return to AI after a hand-off", () => {
+  async function handedOffAndTakenOver(): Promise<string> {
+    const created = await createWidgetConversation();
+    await shopperSays(created.id, "Can I speak with a person?");
+    await drainQueue();
+    const handedOff = await reload(created.id);
+    expect(handedOff.status).toBe("pending-human");
+
+    await handedOff.assignToUser(USER_ID);
+    await handedOff.addMessage({ content: "Hi, Ana here. How can I help?", type: "HumanAgent" });
+    return created.id;
+  }
+
+  it("does not re-run the hand-off request, and answers the next question", async () => {
+    const id = await handedOffAndTakenOver();
+
+    await (await reload(id)).releaseFromUser("ai");
+    await drainQueue();
+
+    let conversation = await reload(id);
+    expect(conversation.status).toBe("open");
+    expect(conversation.needs_processing).toBe(false);
+    const handoffLines = (await messagesOf(id)).filter((m) => m.metadata?.isHandoffMessage);
+    expect(handoffLines).toHaveLength(1);
+
+    await shopperSays(id, "What are your opening hours?");
+    await drainQueue();
+
+    conversation = await reload(id);
+    expect(conversation.status).toBe("open");
+    expect(replies(await messagesOf(id)).map((m) => m.content)).toContain(
+      "Answer to: What are your opening hours?",
+    );
+  });
+
+  it("answers a question the shopper asked during the take-over that staff left unanswered", async () => {
+    const id = await handedOffAndTakenOver();
+    await shopperSays(id, "Also, do you sell gift cards?");
+    expect((await reload(id)).status).toBe("human-took-over");
+
+    await (await reload(id)).releaseFromUser("ai");
+    await drainQueue();
+
+    const conversation = await reload(id);
+    expect(conversation.status).toBe("open");
+    const messages = await messagesOf(id);
+    expect(messages.filter((m) => m.metadata?.isHandoffMessage)).toHaveLength(1);
+    expect(replies(messages).map((m) => m.content)).toContain(
+      "Answer to: Also, do you sell gift cards?",
+    );
   });
 });
