@@ -1162,172 +1162,62 @@ async function handleExecutionLoop(
         );
       });
 
-      // Get agent configuration
-      const agent = await agentRepository.findById(conversation.agent_id!);
-      if (!agent) {
-        log.warn("No agent found for handoff, using default behavior");
-        await conversationRepository.update(conversation.id, conversation.organization_id, {
-          status: "pending-human",
-        });
+      // Every hand-off queues the conversation for the team.
+      await conversationRepository.update(conversation.id, conversation.organization_id, {
+        status: "pending-human",
+      });
+      await publishStatusChange(
+        conversation.organization_id,
+        conversation.id,
+        "pending-human",
+        conversation.title,
+      );
 
-        // Notify organization via WebSocket/Redis
-        await publishStatusChange(
-          conversation.organization_id,
-          conversation.id,
-          "pending-human",
-          conversation.title,
-        );
-
-        // Use executionResult.userMessage if available (e.g., from confidence guardrail)
-        const handoffMessage = executionResult.userMessage || fixedHandoffLine("handoffQueued");
-
-        await sendBotMessage(
-          conversation,
-          {
-            content: handoffMessage,
-            type: MessageType.BOT_AGENT,
-            metadata: buildMessageMetadata(executionResult, {
-              isHandoffMessage: true,
-            }),
-          },
-          log,
-          processingStartedAt,
-        );
-        break;
-      }
-
-      // Check if there are online human agents
+      const agent = conversation.agent_id
+        ? await agentRepository.findById(conversation.agent_id)
+        : null;
       const onlineHumans = await userRepository.findOnlineByOrganization(
         conversation.organization_id,
       );
-      log.debug(`Found ${onlineHumans.length} online human agents`);
+      const someoneOnline = onlineHumans.length > 0;
+      const handoffType = someoneOnline ? "available" : "unavailable";
+      log.debug(
+        { hasAgent: !!agent, onlineHumans: onlineHumans.length },
+        "Handing off to the team",
+      );
 
-      if (onlineHumans.length > 0) {
-        // Humans are available
-        const availableInstructions = agent.human_handoff_available_instructions;
-
-        if (hasTiptapContent(availableInstructions)) {
-          // Execute custom instructions for when humans are available
-          log.debug("Executing handoff instructions for available humans");
-          await conversation.addHandoffInstructions(availableInstructions, "available");
-          // Continue loop to process the handoff instructions
-          continue;
-        } else {
-          // Default behavior: update status and send message
-          log.debug("No custom instructions, using default handoff");
-          await conversationRepository.update(conversation.id, conversation.organization_id, {
-            status: "pending-human",
-          });
-
-          // Notify organization via WebSocket/Redis
-          await publishStatusChange(
-            conversation.organization_id,
-            conversation.id,
-            "pending-human",
-            conversation.title,
-          );
-
-          // Use executionResult.userMessage if available (e.g., from confidence guardrail),
-          // otherwise generate a natural handoff message
-          let handoffMessage: string = executionResult.userMessage || "";
-
-          if (!handoffMessage) {
-            const llmService = new LLMService();
-            const messages = await conversation.getMessages();
-            try {
-              const prompt = await PromptService.getInstance().getPrompt(
-                "conversation/handoff-message",
-                {},
-                { conversationId: conversation.id, organizationId: conversation.organization_id },
-              );
-              handoffMessage = await llmService.invoke({
-                history: messages,
-                prompt,
-                // Two-sentence handoff notice; falls back to a fixed line on error.
-                tier: "easy",
-              });
-            } catch (error) {
-              log.error({ err: error }, "Error generating handoff message");
-              handoffMessage = fixedHandoffLine("handoffQueued");
-            }
-          }
-
-          try {
-            await sendBotMessage(
-              conversation,
-              {
-                content: handoffMessage,
-                type: MessageType.BOT_AGENT,
-                metadata: buildMessageMetadata(executionResult, {
-                  isHandoffMessage: true,
-                  handoffType: "available",
-                }),
-              },
-              log,
-              processingStartedAt,
-            );
-          } catch (error) {
-            log.error({ err: error }, "Error generating handoff message");
-            await sendBotMessage(
-              conversation,
-              {
-                content: fixedHandoffLine("handoffQueued"),
-                type: MessageType.BOT_AGENT,
-                metadata: buildMessageMetadata(executionResult, {
-                  isHandoffMessage: true,
-                  handoffType: "available",
-                }),
-              },
-              log,
-              processingStartedAt,
-            );
-          }
-          break;
-        }
-      } else {
-        // No humans available - still set status to pending-human for queue
-        await conversationRepository.update(conversation.id, conversation.organization_id, {
-          status: "pending-human",
-        });
-
-        // Notify organization via WebSocket/Redis
-        await publishStatusChange(
-          conversation.organization_id,
-          conversation.id,
-          "pending-human",
-          conversation.title,
-        );
-
-        const unavailableInstructions = agent.human_handoff_unavailable_instructions;
-
-        if (hasTiptapContent(unavailableInstructions)) {
-          // Execute custom instructions for when humans are not available
-          log.debug("Executing handoff instructions for unavailable humans");
-          await conversation.addHandoffInstructions(unavailableInstructions, "unavailable");
-          // Continue loop to process the handoff instructions
-          continue;
-        } else {
-          // Use executionResult.userMessage if available, otherwise use default
-          const unavailableMessage =
-            executionResult.userMessage || fixedHandoffLine("handoffNobodyOnline");
-
-          log.debug("No custom fallback, using default message");
-          await sendBotMessage(
-            conversation,
-            {
-              content: unavailableMessage,
-              type: MessageType.BOT_AGENT,
-              metadata: buildMessageMetadata(executionResult, {
-                isHandoffMessage: true,
-                handoffType: "unavailable",
-              }),
-            },
-            log,
-            processingStartedAt,
-          );
-          break;
-        }
+      // The merchant's own hand-off instructions for this situation, if any,
+      // are run through the planner on the next iteration.
+      const customInstructions = someoneOnline
+        ? agent?.human_handoff_available_instructions
+        : agent?.human_handoff_unavailable_instructions;
+      if (hasTiptapContent(customInstructions)) {
+        log.debug({ handoffType }, "Executing custom handoff instructions");
+        await conversation.addHandoffInstructions(customInstructions, handoffType);
+        continue;
       }
+
+      // Otherwise the shopper gets a fixed, honest line. The planner's or a
+      // guardrail's own hand-off text is not sent: models keep promising speed
+      // ("please hold on for a moment", "right away") that nobody can keep.
+      // It is kept in metadata for review.
+      await sendBotMessage(
+        conversation,
+        {
+          content: fixedHandoffLine(someoneOnline ? "handoffQueued" : "handoffNobodyOnline"),
+          type: MessageType.BOT_AGENT,
+          metadata: buildMessageMetadata(executionResult, {
+            isHandoffMessage: true,
+            handoffType,
+            ...(executionResult.userMessage
+              ? { discardedHandoffMessage: executionResult.userMessage }
+              : {}),
+          }),
+        },
+        log,
+        processingStartedAt,
+      );
+      break;
     } else if (executionResult.step === "CLOSE") {
       // Handle conversation closure
       log.debug("CLOSE step detected");
