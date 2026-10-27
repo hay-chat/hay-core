@@ -171,6 +171,13 @@ export const config = {
 
   openai: {
     apiKey: process.env.OPENAI_API_KEY || "",
+    /**
+     * Base URL for every managed OpenAI call made with OPENAI_API_KEY: embeddings,
+     * voice-note transcription, and default chat when LLM_BASE_URL is unset.
+     * Empty = api.openai.com. Set to https://eu.api.openai.com/v1 (with a key from
+     * an OpenAI EU data residency project) to keep that traffic in the EU.
+     */
+    baseUrl: process.env.OPENAI_BASE_URL || "",
     models: {
       embedding: {
         model: process.env.OPENAI_EMBEDDING_MODEL || "text-embedding-3-small",
@@ -213,6 +220,25 @@ export const config = {
     baseUrl: process.env.LLM_BASE_URL || "",
     vendor: process.env.LLM_VENDOR || "",
     apiKey: process.env.LLM_API_KEY || "",
+  },
+
+  /**
+   * Per-org AI processing region (Settings -> AI Models -> "EU only"). Orgs with
+   * `settings.aiRegion = "eu"` send every chat, embedding and transcription call
+   * here, never to the default bundle. Both values must be set for an org to be
+   * able to turn EU on; until then the setting is refused.
+   *
+   * OpenAI EU data residency: create an EU project, then
+   *   OPENAI_EU_BASE_URL=https://eu.api.openai.com/v1
+   *   OPENAI_EU_API_KEY=<key from that project>
+   * Optional tier overrides (default: OpenAI catalog tiers):
+   *   OPENAI_EU_TIER_HARD / OPENAI_EU_TIER_MEDIUM / OPENAI_EU_TIER_EASY
+   */
+  aiRegion: {
+    eu: {
+      baseUrl: process.env.OPENAI_EU_BASE_URL || "",
+      apiKey: process.env.OPENAI_EU_API_KEY || "",
+    },
   },
 
   smtp: {
