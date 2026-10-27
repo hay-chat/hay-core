@@ -17,6 +17,7 @@ import { LLMService } from "@server/services/core/llm.service";
 import { PromptService } from "@server/services/prompt.service";
 import { createLogger } from "@server/lib/logger";
 import { hasTiptapContent } from "@server/types/tiptap.types";
+import { handoffCopy, type HandoffCopyKey } from "./handoff-copy";
 import type { ExecutionResult } from "./execution.layer";
 import type { ToolLedgerEntry } from "@server/services/core/action-claim-guardrail.service";
 import type { Message } from "@server/database/entities/message.entity";
@@ -891,6 +892,14 @@ async function handleExecutionLoop(
   // One playbook re-selection per turn, so a planner that keeps saying "doesn't fit"
   // can't ping-pong between playbooks.
   let playbookReselected = false;
+  // Fixed hand-off lines in the customer's language (no time promises).
+  const fixedHandoffLine = (key: HandoffCopyKey) =>
+    handoffCopy(
+      key,
+      customerLanguage,
+      conversation.language,
+      conversation.organization?.defaultLanguage,
+    );
 
   while (iterations < MAX_ITERATIONS) {
     iterations++;
@@ -1142,9 +1151,7 @@ async function handleExecutionLoop(
         );
 
         // Use executionResult.userMessage if available (e.g., from confidence guardrail)
-        const handoffMessage =
-          executionResult.userMessage ||
-          "I'm transferring you to a human agent. Someone will be with you shortly.";
+        const handoffMessage = executionResult.userMessage || fixedHandoffLine("handoffQueued");
 
         await sendBotMessage(
           conversation,
@@ -1200,17 +1207,20 @@ async function handleExecutionLoop(
             const llmService = new LLMService();
             const messages = await conversation.getMessages();
             try {
+              const prompt = await PromptService.getInstance().getPrompt(
+                "conversation/handoff-message",
+                {},
+                { conversationId: conversation.id, organizationId: conversation.organization_id },
+              );
               handoffMessage = await llmService.invoke({
                 history: messages,
-                prompt:
-                  "Based on the conversation context, generate a brief, natural message informing the customer that a human agent will be joining the conversation shortly. Keep it friendly and reassuring. Maximum 2 sentences.",
-                // Two-sentence handoff notice; falls back to a hardcoded string on error.
+                prompt,
+                // Two-sentence handoff notice; falls back to a fixed line on error.
                 tier: "easy",
               });
             } catch (error) {
               log.error({ err: error }, "Error generating handoff message");
-              handoffMessage =
-                "I'm transferring you to a human agent. Someone will be with you shortly.";
+              handoffMessage = fixedHandoffLine("handoffQueued");
             }
           }
 
@@ -1233,7 +1243,7 @@ async function handleExecutionLoop(
             await sendBotMessage(
               conversation,
               {
-                content: "I'm connecting you with a human agent who will be with you shortly.",
+                content: fixedHandoffLine("handoffQueued"),
                 type: MessageType.BOT_AGENT,
                 metadata: buildMessageMetadata(executionResult, {
                   isHandoffMessage: true,
@@ -1271,8 +1281,7 @@ async function handleExecutionLoop(
         } else {
           // Use executionResult.userMessage if available, otherwise use default
           const unavailableMessage =
-            executionResult.userMessage ||
-            "I apologize, but no human agents are currently available.";
+            executionResult.userMessage || fixedHandoffLine("handoffNobodyOnline");
 
           log.debug("No custom fallback, using default message");
           await sendBotMessage(
