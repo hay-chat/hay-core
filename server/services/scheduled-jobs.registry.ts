@@ -111,6 +111,20 @@ const jobRegistry: CronJobConfig[] = [
   },
 
   {
+    name: "pending-action-expiry",
+    description:
+      "Expire AI actions that got no approval in time and hand the conversation to the team",
+    schedule: 60000, // Every 60 seconds
+    handler: async () => {
+      const { actionDecisionService } = await import("./action-decision.service");
+      await actionDecisionService.expireDue();
+    },
+    singleton: true,
+    enabled: true,
+    skipDatabaseLogging: true,
+  },
+
+  {
     name: "orchestrator-worker-tick",
     description:
       "Process orchestrator tick for active conversations (replaced by RabbitMQ consumer)",
