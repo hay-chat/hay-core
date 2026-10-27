@@ -1115,6 +1115,8 @@ Translated message:`;
     return this.addMessage({
       content: greetingText,
       type: "BotAgent",
+      // Lets the webchat swap its local greeting placeholder for this message.
+      metadata: { isGreeting: true },
     });
   }
 
