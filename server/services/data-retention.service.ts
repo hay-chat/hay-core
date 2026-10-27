@@ -82,7 +82,9 @@ export class DataRetentionService {
           .where("conv.organization_id = :orgId", { orgId: org.id })
           .andWhere("conv.deleted_at IS NULL")
           .andWhere("conv.legal_hold = false")
-          .andWhere("conv.status IN (:...statuses)", { statuses: ["closed", "resolved"] })
+          .andWhere("conv.status IN (:...statuses)", {
+            statuses: ["closed", "resolved", "unresolved"],
+          })
           .andWhere(
             "(conv.closed_at IS NOT NULL AND conv.closed_at < :cutoff) OR " +
               "(conv.closed_at IS NULL AND conv.created_at < :cutoff)",

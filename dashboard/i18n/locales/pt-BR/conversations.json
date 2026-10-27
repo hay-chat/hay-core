@@ -37,6 +37,7 @@
       "allStatus": "Todos os Status",
       "active": "Ativa",
       "resolved": "Resolvida",
+      "unresolved": "Não resolvida",
       "escalated": "Escalada",
       "closed": "Encerrada",
       "today": "Hoje",
@@ -63,6 +64,7 @@
       "pendingHuman": "Precisa de Atenção",
       "humanTookOver": "Controle Manual",
       "resolved": "Resolvida",
+      "unresolved": "Não resolvida",
       "closed": "Encerrada",
       "unknown": "Desconhecido"
     },
