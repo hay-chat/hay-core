@@ -1,3 +1,10 @@
+## 2026-10-27 — claude/w1-action-approval — L4 action approval done (not merged, not pushed)
+- dcba4f3 tool risk (readOnlyHint + _meta chat.hay/category); 9df0adb action_log; 58a17b4 playground dry-run; d65787c pending_actions + approvers; 9f8e4e0 policy gate (money moves held, threshold 0, unclassified writes held); 8c36c5f approve/reject/reply-myself resume + actions tRPC + thread card; a417217 48 h expiry job -> pending-human + shopper copy (never auto-approves).
+- Migrations AddActionLog1785710000000, AddPendingActions1785720000000, AddAwaitingApprovalStatus1785730000000 ran on hay_test only.
+- Verified: server tsc, full jest 107 suites, dashboard typecheck + vitest (3 Playwright specs fail as before).
+- Known gaps: unannotated non-commerce plugin writes get held; crash between approve and execute leaves row "approved"; shopper gets no AI reply while awaiting.
+- Next: orchestrator merges into staging, runs migrations, manual test with a Shopify refund in a real conversation.
+
 ## 2026-10-27 23:00 — staging — L10 merged (D11-5, D11-8)
 - Push subscriptions per user (all orgs), unsubscribe on logout, pushsubscriptionchange in sw.js, re-sync on app open.
 - Alert ladder: push to Available members → re-push at 10 min → email at 20 min; stops on reply/take-over/close. Table notification_deliveries.
