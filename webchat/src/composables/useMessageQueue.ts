@@ -1,5 +1,6 @@
 import { ref, watch } from "vue";
 import { safeStorage, useConsent } from "./useConsent";
+import { debugLog } from "@/utils/debug";
 
 interface QueuedMessage {
   id: string;
@@ -51,14 +52,14 @@ export function useMessageQueue() {
       retryCount: 0,
     });
     saveQueue();
-    console.log("[MessageQueue] Message queued:", message.id);
+    debugLog("[MessageQueue] Message queued:", message.id);
   };
 
   // Remove message from queue
   const dequeue = (messageId: string) => {
     queue.value = queue.value.filter((msg) => msg.id !== messageId);
     saveQueue();
-    console.log("[MessageQueue] Message dequeued:", messageId);
+    debugLog("[MessageQueue] Message dequeued:", messageId);
   };
 
   // Get next message to retry with exponential backoff
@@ -68,7 +69,7 @@ export function useMessageQueue() {
     for (const msg of queue.value) {
       // Skip if max retries reached
       if (msg.retryCount >= MAX_RETRIES) {
-        console.log("[MessageQueue] Max retries reached for:", msg.id);
+        debugLog("[MessageQueue] Max retries reached for:", msg.id);
         continue;
       }
 
@@ -91,7 +92,7 @@ export function useMessageQueue() {
       msg.retryCount++;
       msg.timestamp = Date.now(); // Update timestamp for next backoff calculation
       saveQueue();
-      console.log(`[MessageQueue] Retry count incremented for ${messageId}: ${msg.retryCount}`);
+      debugLog(`[MessageQueue] Retry count incremented for ${messageId}: ${msg.retryCount}`);
     }
   };
 
@@ -99,7 +100,7 @@ export function useMessageQueue() {
   const clearQueue = () => {
     queue.value = [];
     safeStorage.local.removeItem(STORAGE_KEY);
-    console.log("[MessageQueue] Queue cleared");
+    debugLog("[MessageQueue] Queue cleared");
   };
 
   // Get messages for specific conversation
@@ -114,7 +115,7 @@ export function useMessageQueue() {
     const removed = beforeCount - queue.value.length;
     if (removed > 0) {
       saveQueue();
-      console.log(`[MessageQueue] Cleared ${removed} failed messages`);
+      debugLog(`[MessageQueue] Cleared ${removed} failed messages`);
     }
   };
 

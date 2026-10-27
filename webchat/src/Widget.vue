@@ -5,7 +5,7 @@
       <ChatWindow
         v-if="isOpen"
         :widget-title="config.widgetTitle || t('widget.defaultTitle')"
-        :widget-subtitle="config.widgetSubtitle || t('widget.defaultSubtitle')"
+        :widget-subtitle="widgetSubtitle"
         :position="config.position || 'right'"
         :show-greeting="config.showGreeting ?? true"
         :greeting-message="config.greetingMessage || t('widget.defaultGreeting')"
@@ -19,6 +19,7 @@
         :organization-logo-url="resolvedLogoUrl"
         :current-agent-type="currentAgentType"
         :current-agent-name="currentAgentName || undefined"
+        :send-failure="sendFailure"
         @close="closeChat"
         @send="sendMessage"
         @start-typing="startTyping"
@@ -44,6 +45,8 @@ import ChatWindow from "./components/ChatWindow.vue";
 import MinimizedButton from "./components/MinimizedButton.vue";
 import { useChat } from "./composables/useChat";
 import { provideI18n } from "./i18n";
+import { debugLog } from "./utils/debug";
+import { resolveWidgetSubtitle } from "./utils/subtitle";
 import type { HayChatConfig } from "./types";
 
 const props = defineProps<{
@@ -51,6 +54,10 @@ const props = defineProps<{
 }>();
 
 const t = provideI18n(props.config.locale);
+
+const widgetSubtitle = computed(() =>
+  resolveWidgetSubtitle(props.config.widgetSubtitle, t("widget.defaultSubtitle")),
+);
 
 const isExpanded = ref(false);
 
@@ -72,7 +79,7 @@ const fetchPublicConfig = async () => {
   try {
     const input = JSON.stringify({ organizationId: props.config.organizationId });
     const url = `${props.config.baseUrl}/v1/webchat.getPublicConfig?input=${encodeURIComponent(input)}`;
-    console.log("[Hay Webchat] Fetching public config from:", url);
+    debugLog("[Hay Webchat] Fetching public config from:", url);
 
     const response = await fetch(url);
     if (!response.ok) {
@@ -86,7 +93,7 @@ const fetchPublicConfig = async () => {
 
     const data = await response.json();
     const result = data?.result?.data;
-    console.log("[Hay Webchat] Public config received:", result);
+    debugLog("[Hay Webchat] Public config received:", result);
 
     // Webchat disabled or organization suspended: render nothing at all.
     if (result?.enabled === false) {
@@ -100,9 +107,9 @@ const fetchPublicConfig = async () => {
         agentAvatarUrl: result.agentAvatarUrl,
         organizationLogoUrl: result.organizationLogoUrl,
       };
-      console.log("[Hay Webchat] Resolved avatar URL:", resolvedAvatarUrl.value);
-      console.log("[Hay Webchat] Resolved logo URL:", resolvedLogoUrl.value);
-      console.log("[Hay Webchat] Resolved agent name:", resolvedAgentName.value);
+      debugLog("[Hay Webchat] Resolved avatar URL:", resolvedAvatarUrl.value);
+      debugLog("[Hay Webchat] Resolved logo URL:", resolvedLogoUrl.value);
+      debugLog("[Hay Webchat] Resolved agent name:", resolvedAgentName.value);
     }
   } catch (error) {
     console.warn("[Hay Webchat] Failed to fetch public config:", error);
@@ -142,13 +149,20 @@ const {
   isConversationClosed,
   currentAgentType,
   currentAgentName,
+  sendFailure,
   toggleChat,
   closeChat,
   sendMessage,
   startTyping,
   stopTyping,
   startNewConversation,
-} = useChat(props.config);
+} = useChat({
+  ...props.config,
+  // The greeting is pinned as the first message, so give the chat the same
+  // localised default the empty state shows.
+  showGreeting: props.config.showGreeting ?? true,
+  greetingMessage: props.config.greetingMessage || t("widget.defaultGreeting"),
+});
 
 // Initialize on mount if configured to auto-open
 onMounted(() => {

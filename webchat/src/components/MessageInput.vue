@@ -1,5 +1,8 @@
 <template>
   <div class="hay-message-input">
+    <p v-if="failure" class="hay-message-input__error" role="alert">
+      {{ failure.reason === "messageTooLong" ? t("error.messageTooLong") : t("error.sendFailed") }}
+    </p>
     <Transition name="hay-counter">
       <span
         v-if="messageText.length > 750"
@@ -50,13 +53,15 @@
 </template>
 
 <script setup lang="ts">
-import { ref, nextTick } from "vue";
+import { ref, nextTick, watch } from "vue";
 import { useI18n } from "@/i18n";
+import type { SendFailure } from "@/types";
 
 const t = useI18n();
 
 const props = defineProps<{
   isConnected: boolean;
+  failure?: SendFailure | null;
 }>();
 
 const emit = defineEmits<{
@@ -71,12 +76,26 @@ const textareaRef = ref<HTMLTextAreaElement | null>(null);
 const isShaking = ref(false);
 let shakeTimeout: ReturnType<typeof setTimeout> | null = null;
 
-const handleInput = () => {
-  // Auto-resize textarea
+const resizeTextarea = () => {
   if (textareaRef.value) {
     textareaRef.value.style.height = "auto";
     textareaRef.value.style.height = textareaRef.value.scrollHeight + "px";
   }
+};
+
+// A refused message comes back so the shopper can retry without retyping.
+// Don't overwrite anything they have started typing since.
+watch(
+  () => props.failure,
+  (failure) => {
+    if (!failure || messageText.value) return;
+    messageText.value = failure.text;
+    nextTick(resizeTextarea);
+  },
+);
+
+const handleInput = () => {
+  resizeTextarea();
 
   // Emit typing indicator
   if (messageText.value.trim()) {
@@ -142,6 +161,13 @@ const handleSend = () => {
   font-size: 11px;
   color: var(--color-neutral-400);
   line-height: 1;
+}
+
+.hay-message-input__error {
+  margin: 0 0 6px;
+  font-size: 12px;
+  line-height: 1.4;
+  color: #b91c1c;
 }
 
 .hay-message-input__counter--danger {

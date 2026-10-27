@@ -35,6 +35,8 @@ export interface HayChatConfig {
    * unless `grantConsent()` is called earlier in the page lifecycle.
    */
   consent?: "strict" | "implicit";
+  /** Log widget diagnostics to the browser console. Off by default. */
+  debug?: boolean;
 }
 
 export interface Message {
@@ -50,35 +52,10 @@ export interface Message {
   senderName?: string;
 }
 
-export interface WebSocketMessage {
-  type: string;
-  [key: string]: unknown;
-}
-
-export interface IdentifyMessage extends WebSocketMessage {
-  type: "identify";
-  customerId: string;
-  conversationId?: string;
-  metadata?: Record<string, unknown>;
-}
-
-export interface ChatMessage extends WebSocketMessage {
-  type: "message";
+/** Shown under the input when the server refuses a message; `text` goes back into the input. */
+export interface SendFailure {
+  reason: "sendFailed" | "messageTooLong";
   text: string;
-  attachments?: unknown[];
-  timestamp?: number;
-}
-
-export interface TypingMessage extends WebSocketMessage {
-  type: "typing";
-  isTyping: boolean;
-}
-
-export interface LoadHistoryMessage extends WebSocketMessage {
-  type: "load_history";
-  conversationId: string;
-  limit?: number;
-  offset?: number;
 }
 
 declare global {

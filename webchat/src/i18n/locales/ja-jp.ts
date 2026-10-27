@@ -1,6 +1,6 @@
 export default {
   "widget.defaultTitle": "チャットで相談",
-  "widget.defaultSubtitle": "通常、数分以内に返信いたします",
+  "widget.defaultSubtitle": "お気軽にご相談ください",
   "widget.defaultGreeting": "こんにちは！本日はどのようなご用件でしょうか？",
   "chat.close": "チャットを閉じる",
   "chat.open": "チャットを開く",
@@ -12,4 +12,6 @@ export default {
   "chat.conversationClosed": "会話終了",
   "input.placeholder": "メッセージを入力...",
   "input.send": "メッセージを送信",
+  "error.sendFailed": "メッセージを送信できませんでした。しばらくしてからもう一度お試しください。",
+  "error.messageTooLong": "メッセージが長すぎます。短くしてもう一度お試しください。",
 } as const;
