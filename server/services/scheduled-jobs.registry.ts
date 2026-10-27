@@ -96,6 +96,21 @@ const jobRegistry: CronJobConfig[] = [
   },
 
   {
+    name: "close-classification",
+    description:
+      "Classify closed conversations: billing outcome + Insights QA event (one LLM call each)",
+    schedule: 10000, // Every 10 seconds, up to 5 closes per run
+    handler: async () => {
+      const { closeClassifierService } =
+        await import("./close-classification/close-classifier.service");
+      await closeClassifierService.processPending(5);
+    },
+    singleton: true,
+    enabled: true,
+    skipDatabaseLogging: true,
+  },
+
+  {
     name: "orchestrator-worker-tick",
     description:
       "Process orchestrator tick for active conversations (replaced by RabbitMQ consumer)",
