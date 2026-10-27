@@ -1,8 +1,30 @@
 {
   "name": "Email inbox",
-  "description": "Connect your support inbox: forward support@ emails to Hay and let the AI reply by email, threaded like a normal conversation",
-  "tools": {},
-  "config": {},
+  "description": "Connect your support inbox: forward support@ emails to Hay and let the AI reply by email, threaded like a normal conversation. The AI can also email your team.",
+  "tools": {
+    "send-email": {
+      "label": "Send email to your team",
+      "description": "Email the store's team (the notification addresses, or the support address) — for example when a customer needs a person"
+    }
+  },
+  "config": {
+    "supportAddress": {
+      "label": "Your support address",
+      "description": "The address your customers already write to, e.g. support@yourstore.com. You will forward this mailbox to the Hay address shown below."
+    },
+    "storeName": {
+      "label": "Sender name",
+      "description": "Shown as the sender of Hay's replies, e.g. \"Acme Support\". Defaults to your workspace name."
+    },
+    "bccArchive": {
+      "label": "Keep a copy in my inbox",
+      "description": "BCC your support address on every reply Hay sends, so your mailbox holds the whole conversation."
+    },
+    "notificationRecipients": {
+      "label": "Team notification addresses",
+      "description": "Comma-separated addresses the AI's \"Send email to your team\" action writes to, e.g. when a customer needs a person. Defaults to your support address."
+    }
+  },
   "ui": {
     "title": "Connect your inbox",
     "intro": "Keep your support address. Forward it to Hay and the AI answers by email — every reply stays in the same thread, and you can take over any conversation from the dashboard.",
