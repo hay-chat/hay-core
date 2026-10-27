@@ -177,6 +177,17 @@ describe("channelDeliveryService /deliver", () => {
     expect(mockFetch).not.toHaveBeenCalled();
   });
 
+  it("never sends agent join/leave lines to an external channel", async () => {
+    await dispatch(
+      outboundEvent({
+        type: "System",
+        content: "Marina Souza took over this conversation",
+        metadata: { systemEvent: "agent_joined", agentFirstName: "Marina" },
+      }),
+    );
+    expect(mockFetch).not.toHaveBeenCalled();
+  });
+
   it("skips queued (test-mode) messages", async () => {
     await dispatch(outboundEvent({ deliveryState: "queued" }));
 

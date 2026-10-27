@@ -12,6 +12,7 @@ import { createListProcedure } from "@server/trpc/procedures/list";
 import { ConversationRepository } from "@server/repositories/conversation.repository";
 import { messageApprovalService } from "../../../services/message-approval.service";
 import { createLogger } from "@server/lib/logger";
+import { agentFirstName } from "../../../services/webchat/public-message";
 import { ConversationExportService } from "../../../services/conversation-export.service";
 import { AppDataSource } from "../../../database/data-source";
 
@@ -625,6 +626,13 @@ export const conversationsRouter = t.router({
       messageType = MessageType.CUSTOMER;
     }
 
+    // The widget shows a person's reply as "10:42 · Marina" (first name only)
+    let senderFirstName: string | undefined;
+    if (messageType === MessageType.HUMAN_AGENT) {
+      const { userRepository } = await import("../../../repositories/user.repository");
+      senderFirstName = agentFirstName(await userRepository.findById(ctx.user!.id));
+    }
+
     // The addMessage method now handles cooldown logic for Customer messages
     const message = await conversation.addMessage({
       content: input.content,
@@ -632,6 +640,7 @@ export const conversationsRouter = t.router({
       metadata: {
         sender: input.role || "user",
         sentByUserId: ctx.user?.id,
+        agentFirstName: senderFirstName,
       },
     });
 
@@ -723,6 +732,9 @@ export const conversationsRouter = t.router({
           isTakeoverMessage: true,
           userId: ctx.user!.id,
           userName: user?.getFullName(),
+          // Shown to the shopper as "Marina joined the chat" (first name only)
+          systemEvent: "agent_joined",
+          agentFirstName: agentFirstName(user),
         },
       });
 
@@ -805,6 +817,9 @@ export const conversationsRouter = t.router({
           userId: ctx.user!.id,
           userName: user?.getFullName(),
           returnToMode: input.returnToMode,
+          // Shown to the shopper as "Marina left the chat" (+ "AI again" when returned to AI)
+          systemEvent: input.returnToMode === "ai" ? "agent_returned_to_ai" : "agent_left",
+          agentFirstName: agentFirstName(user),
         },
       });
 
@@ -818,6 +833,9 @@ export const conversationsRouter = t.router({
           releasedBy: ctx.user!.id,
           userName: user?.getFullName(),
           returnToMode: input.returnToMode,
+          // Shown to the shopper as "Marina left the chat" (+ "AI again" when returned to AI)
+          systemEvent: input.returnToMode === "ai" ? "agent_returned_to_ai" : "agent_left",
+          agentFirstName: agentFirstName(user),
         },
       });
 

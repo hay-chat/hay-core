@@ -1,7 +1,7 @@
 import { createLogger } from "@server/lib/logger";
 import type { Conversation } from "@server/database/entities/conversation.entity";
 import type { Message } from "@server/database/entities/message.entity";
-import { toPublicMessageEvent } from "./webchat/public-message";
+import { isWidgetVisibleMessage, toPublicMessageEvent } from "./webchat/public-message";
 
 const logger = createLogger("websocket");
 
@@ -55,7 +55,7 @@ class ConversationEventsService {
 
       // Same gate websocketService applies on the Redis path: the customer only
       // ever sees public, released messages (or everything in the playground).
-      const isPublic = ["Customer", "BotAgent", "HumanAgent"].includes(message.type);
+      const isPublic = isWidgetVisibleMessage(message.type, message.metadata);
       const isPlayground = conversation.metadata?.isPlayground === true;
       if (!isPlayground && !(isPublic && message.deliveryState === "sent")) {
         logger.debug({ messageId: message.id }, "Redis unavailable; message kept off webchat");

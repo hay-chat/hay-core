@@ -219,7 +219,7 @@ export const publicConversationsRouter = t.router({
       const isPlayground = conversation?.metadata?.isPlayground === true;
       const messages = isPlayground
         ? await conversationRepository.getMessages(input.conversationId)
-        : await conversationRepository.getPublicMessages(input.conversationId);
+        : await conversationRepository.getWidgetMessages(input.conversationId);
 
       // Filter to only return customer-facing messages
       const filteredMessages = messages
