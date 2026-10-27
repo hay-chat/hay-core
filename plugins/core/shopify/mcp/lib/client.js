@@ -8,10 +8,6 @@
  *   SHOPIFY_API_VERSION   Admin API version (e.g. 2026-04)
  */
 
-const SHOP = process.env.SHOPIFY_SHOP;
-const TOKEN = process.env.SHOPIFY_ACCESS_TOKEN;
-const API_VERSION = process.env.SHOPIFY_API_VERSION || "2026-04";
-
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 /**
@@ -25,6 +21,10 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
  * @returns {Promise<any>} the `data` object
  */
 async function shopifyGql(query, variables = {}) {
+  // Read at call time (not module load) so tests can require the module first.
+  const SHOP = process.env.SHOPIFY_SHOP;
+  const TOKEN = process.env.SHOPIFY_ACCESS_TOKEN;
+  const API_VERSION = process.env.SHOPIFY_API_VERSION || "2026-04";
   if (!SHOP || !TOKEN) {
     throw new Error("Shopify MCP server is missing SHOPIFY_SHOP or SHOPIFY_ACCESS_TOKEN");
   }
@@ -70,4 +70,4 @@ async function shopifyGql(query, variables = {}) {
   throw lastErr || new Error("Shopify Admin API request failed after retries");
 }
 
-module.exports = { shopifyGql, SHOP, API_VERSION };
+module.exports = { shopifyGql };

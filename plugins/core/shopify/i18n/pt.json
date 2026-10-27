@@ -28,7 +28,7 @@
     },
     "shopify_add_order_note": {
       "label": "Adicionar Nota ao Pedido",
-      "description": "Adiciona ou substitui a nota interna de um pedido."
+      "description": "Acrescenta texto à nota interna de um pedido. As notas existentes são mantidas."
     },
     "shopify_calculate_refund": {
       "label": "Calcular Reembolso",
@@ -40,7 +40,7 @@
     },
     "shopify_cancel_order": {
       "label": "Cancelar Pedido",
-      "description": "Cancela um pedido, com opção de repor estoque, reembolsar e notificar o cliente."
+      "description": "Cancela um pedido antes do envio, com opção de repor estoque, reembolsar e notificar o cliente. Recusa se algo já foi enviado."
     },
     "shopify_get_returnable_items": {
       "label": "Ver Itens Devolvíveis",

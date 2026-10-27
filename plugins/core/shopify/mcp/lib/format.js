@@ -7,9 +7,25 @@ function ok(data) {
   return { content: [{ type: "text", text: JSON.stringify(data ?? null, null, 2) }] };
 }
 
-/** Wrap an error as an MCP error result. */
+/**
+ * An error with a machine-readable `code` (e.g. "PRECONDITION", "NOT_FOUND") and
+ * optional `details`, so the agent can tell a business refusal from an outage.
+ */
+function toolError(code, message, details) {
+  const err = new Error(message);
+  err.code = code;
+  if (details !== undefined) err.details = details;
+  return err;
+}
+
+/** Wrap an error as an MCP error result. Coded errors are returned as JSON. */
 function fail(err) {
   const message = err instanceof Error ? err.message : String(err);
+  if (err && typeof err.code === "string") {
+    const payload = { code: err.code, message };
+    if (err.details !== undefined) payload.details = err.details;
+    return { isError: true, content: [{ type: "text", text: JSON.stringify(payload, null, 2) }] };
+  }
   return { isError: true, content: [{ type: "text", text: message }] };
 }
 
@@ -51,4 +67,4 @@ function assertNoUserErrors(payload, field = "userErrors") {
   }
 }
 
-module.exports = { ok, fail, unwrapConnection, pageInfo, toGid, assertNoUserErrors };
+module.exports = { ok, fail, toolError, unwrapConnection, pageInfo, toGid, assertNoUserErrors };
