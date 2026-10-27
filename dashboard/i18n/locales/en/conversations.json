@@ -29,7 +29,8 @@
       "activeNow": "Active Now",
       "realTimeConversations": "Real-time conversations",
       "avgResponseTime": "Avg Response Time",
-      "yesterdayChange": "-12% from yesterday"
+      "last7Days": "Last 7 days",
+      "noRepliesLast7Days": "No replies in the last 7 days"
     },
     "filters": {
       "searchPlaceholder": "Search conversations...",

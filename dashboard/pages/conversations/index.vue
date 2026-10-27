@@ -19,34 +19,36 @@
       <MetricCard
         :title="$t('conversations.stats.totalConversations')"
         :icon="MessageSquare"
-        :metric="stats.total"
-        :subtitle="$t('conversations.stats.todayIncrease', { count: stats.todayIncrease })"
+        :metric="totalConversations"
+        :subtitle="
+          createdToday !== null
+            ? $t('conversations.stats.todayIncrease', { count: createdToday })
+            : undefined
+        "
       />
 
       <MetricCard
         :title="$t('conversations.stats.activeNow')"
         :icon="Activity"
-        :metric="stats.active"
+        :metric="appStore.openConversationsCount"
         :subtitle="$t('conversations.stats.realTimeConversations')"
       />
 
       <MetricCard
         :title="$t('conversations.stats.avgResponseTime')"
         :icon="Clock"
-        :metric="`${stats.avgResponseTime}s`"
+        :metric="
+          responseTime && responseTime.sampleSize > 0
+            ? formatWaitTime(responseTime.averageResponseTime)
+            : '—'
+        "
         :format-metric="false"
-        :subtitle="$t('conversations.stats.yesterdayChange')"
-        subtitle-color="green"
+        :subtitle="
+          responseTime && responseTime.sampleSize === 0
+            ? $t('conversations.stats.noRepliesLast7Days')
+            : $t('conversations.stats.last7Days')
+        "
       />
-
-      <!-- <MetricCard
-        title="Satisfaction Rate"
-        :icon="Heart"
-        :metric="`${stats.satisfactionRate}%`"
-        :format-metric="false"
-        subtitle="+3.2% this week"
-        subtitle-color="green"
-      /> -->
     </div>
 
     <!-- Filters and Search -->
@@ -288,6 +290,7 @@ import { formatRelativeTime, formatDuration } from "~/utils/date";
 import { getWaitTime, formatWaitTime, getWaitTimeClass } from "@/utils/conversation";
 import { getEnabledChannelPlugins } from "@/utils/channel";
 import Avatar from "@/components/ui/Avatar.vue";
+import type { RouterOutputs } from "@/types/trpc";
 
 // i18n
 const { t } = useI18n();
@@ -380,33 +383,24 @@ const totalPages = computed(() => Math.ceil(totalConversations.value / pageSize.
 // (getChannelIcon / getChannelLabel) — core never hardcodes channel names.
 const showChannelColumn = computed(() => getEnabledChannelPlugins().length >= 1);
 
-// Computed stats based on real conversations
-const stats = computed(() => {
-  const total = totalConversations.value;
-  const active = conversations.value.filter(
-    (c) => c.status === "open" || c.status === "processing",
-  ).length;
-  const resolved = conversations.value.filter((c) => c.status === "resolved").length;
-  const today = conversations.value.filter((c) => {
-    const created = new Date(c.created_at);
-    const now = new Date();
-    return created.toDateString() === now.toDateString();
-  }).length;
+// Header stats come from the server so they cover the whole organization, not
+// just the page of conversations loaded here. Null = not loaded (or no access).
+type ResponseTime = RouterOutputs["analytics"]["responseTime"]["data"];
+const createdToday = ref<number | null>(null);
+const responseTime = ref<ResponseTime | null>(null);
 
-  // Calculate average response time (mock for now)
-  const avgResponseTime = 4.2;
+const fetchHeaderStats = async () => {
+  const startOfToday = new Date();
+  startOfToday.setHours(0, 0, 0, 0);
+  const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
 
-  // Calculate satisfaction rate (mock for now)
-  const satisfactionRate = resolved > 0 ? Math.round((resolved / total) * 100) : 0;
-
-  return {
-    total,
-    active,
-    avgResponseTime,
-    satisfactionRate,
-    todayIncrease: today,
-  };
-});
+  const [today, replies] = await Promise.allSettled([
+    HayApi.analytics.conversationMetrics.query({ startDate: startOfToday.toISOString() }),
+    HayApi.analytics.responseTime.query({ startDate: sevenDaysAgo.toISOString() }),
+  ]);
+  createdToday.value = today.status === "fulfilled" ? today.value.data.totalConversations : null;
+  responseTime.value = replies.status === "fulfilled" ? replies.value.data : null;
+};
 
 // Select options
 const statusOptions = computed(() => [
@@ -565,7 +559,11 @@ const fetchConversations = async () => {
 };
 
 const refreshConversations = async () => {
-  await Promise.all([fetchConversations(), appStore.refreshConversationsCount()]);
+  await Promise.all([
+    fetchConversations(),
+    appStore.refreshConversationsCount(),
+    fetchHeaderStats(),
+  ]);
 };
 
 const handlePageChange = async (page: number) => {
@@ -609,6 +607,7 @@ onMounted(async () => {
     fetchConversations(),
     appStore.refreshConversationsCount(),
     appStore.fetchPlugins(),
+    fetchHeaderStats(),
   ]);
 
   // Setup WebSocket connection for real-time updates

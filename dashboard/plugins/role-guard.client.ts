@@ -25,9 +25,7 @@ export default defineNuxtPlugin(() => {
     "/settings/webchat": ["owner", "admin"],
     "/agents": ["owner", "admin"],
 
-    // Analytics - all except agent
-    "/analytics": ["owner", "admin", "contributor", "member", "viewer"],
-    "/analytics/reports": ["owner", "admin", "contributor", "member", "viewer"],
+    // Insights - all except agent
     "/insights": ["owner", "admin", "contributor", "member", "viewer"],
 
     // Content creation - contributor+
