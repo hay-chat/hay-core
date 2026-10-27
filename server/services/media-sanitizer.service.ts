@@ -88,10 +88,37 @@ async function detectType(buffer: Buffer, declaredMime: string): Promise<string>
   return mimeType;
 }
 
+/**
+ * Decoded-size caps. A few KB of GIF or WebP can describe thousands of large
+ * frames that decode to gigabytes, so the decoded pixel count is capped across
+ * all frames (sharp counts the whole frame stack when `animated` is set), and
+ * so is the frame count. 50 MP still admits a 48 MP phone photo.
+ */
+export const MAX_IMAGE_INPUT_PIXELS = 50_000_000;
+export const MAX_ANIMATION_FRAMES = 300;
+
 /** Decode and re-encode in the same format, applying EXIF orientation first. */
 async function reencodeImage(buffer: Buffer, mimeType: string): Promise<Buffer> {
   const animated = mimeType === "image/gif" || mimeType === "image/webp";
-  const image = sharp(buffer, { animated }).autoOrient();
+
+  // Header-only read: refuse with a clear reason before any frame is decoded.
+  // The decode below still enforces limitInputPixels on its own.
+  const {
+    width = 0,
+    height = 0,
+    pages = 1,
+  } = await sharp(buffer, {
+    animated,
+    limitInputPixels: false,
+  }).metadata();
+  if (pages > MAX_ANIMATION_FRAMES) {
+    throw new MediaRejectedError(`Image has too many frames (${pages})`);
+  }
+  if (width * height > MAX_IMAGE_INPUT_PIXELS) {
+    throw new MediaRejectedError(`Image is too large to process (${width}x${height})`);
+  }
+
+  const image = sharp(buffer, { animated, limitInputPixels: MAX_IMAGE_INPUT_PIXELS }).autoOrient();
 
   switch (mimeType) {
     case "image/jpeg":
@@ -117,7 +144,8 @@ export async function sanitizeConversationMedia(
 
   try {
     return { buffer: await reencodeImage(buffer, mimeType), mimeType };
-  } catch {
+  } catch (error) {
+    if (error instanceof MediaRejectedError) throw error;
     throw new MediaRejectedError(`Image could not be processed (${mimeType})`);
   }
 }
