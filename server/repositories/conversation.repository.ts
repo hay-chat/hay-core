@@ -2,6 +2,8 @@ import { Repository, SelectQueryBuilder, In, IsNull } from "typeorm";
 import type { QueryDeepPartialEntity } from "typeorm";
 import { v4 as uuidv4 } from "uuid";
 import { Conversation } from "../database/entities/conversation.entity";
+import { ConversationOutcome } from "../database/entities/conversation-outcome.entity";
+import { CLOSED_STATUSES } from "../services/close-classification/outcome-rules";
 import { AppDataSource } from "../database/data-source";
 import { BaseRepository } from "./base.repository";
 import type { ListParams } from "../trpc/middleware/pagination";
@@ -31,29 +33,6 @@ function withHandoffStamp(
   if (previous?.handed_off_at || data.handed_off_at) return data;
   return { ...data, handed_off_at: new Date() };
 }
-
-/**
- * Resolved conversations that never bill. Each value is a SQL predicate on the
- * `conversation` alias; a match removes the conversation from the count.
- */
-export const BILLABLE_RESOLUTION_EXCLUSIONS = {
-  // Dashboard playground (sourceId/test_mode), the public demo playground
-  // (isPlayground) and any replay/simulation run (runKind, D7).
-  test: `COALESCE(conversation.metadata->>'sourceId', '') = 'playground'
-    OR COALESCE(conversation.metadata->>'test_mode', 'false') = 'true'
-    OR COALESCE(conversation.metadata->>'isPlayground', 'false') = 'true'
-    OR conversation.metadata->>'runKind' IS NOT NULL`,
-  // The customer closed unhappy. Only this reason: a "thanks" close is stored
-  // as user_indicated_greet with resolved=false, and inactivity closes also
-  // carry resolved=false, so resolved=false alone is not "unhappy".
-  unhappy: `COALESCE(conversation.resolution_metadata->>'reason', '') = 'user_indicated_close_unsatisfied'`,
-  // Ever handed off to a human, including chats a human handed back to the AI
-  // (handed_off_at is never cleared; the migration backfilled older rows).
-  // TODO(D1-3): Roger's rule is "bill a hand-off if the AI resolved it"; the
-  // close classifier decides that and replaces this blanket exclusion.
-  handedOff: `conversation.handed_off_at IS NOT NULL`,
-  // TODO(D1-10): add `spam` here once conversations carry a spam outcome.
-} as const;
 
 export class ConversationRepository extends BaseRepository<Conversation> {
   private messageRepository!: Repository<Message>;
@@ -170,6 +149,7 @@ export class ConversationRepository extends BaseRepository<Conversation> {
         changedFields,
       );
       this.notifyDevicesOnTransition(conversation.status, updatedConversation);
+      await this.recordCloseOnTransition(conversation.status, updatedConversation);
     }
 
     return updatedConversation;
@@ -189,6 +169,22 @@ export class ConversationRepository extends BaseRepository<Conversation> {
       .catch((error) => {
         logger.warn({ err: error, conversationId: updated.id }, "Push alert failed");
       });
+  }
+
+  /**
+   * Entering a closed status from an open one is a close: record its billing
+   * outcome (D1-3). Moves between closed statuses (resolved -> closed by
+   * staff, resolved -> unresolved by the classifier) are not new closes.
+   */
+  private async recordCloseOnTransition(
+    previousStatus: string,
+    updated: Conversation,
+  ): Promise<void> {
+    if (CLOSED_STATUSES.includes(previousStatus as Conversation["status"])) return;
+    if (!CLOSED_STATUSES.includes(updated.status)) return;
+    const { closeClassifierService } =
+      await import("../services/close-classification/close-classifier.service");
+    await closeClassifierService.recordClose(updated, updated.messages ?? []);
   }
 
   // Simple update method for internal use (orchestrator, etc.)
@@ -214,6 +210,7 @@ export class ConversationRepository extends BaseRepository<Conversation> {
         changedFields,
       );
       this.notifyDevicesOnTransition(conversation.status, updatedConversation);
+      await this.recordCloseOnTransition(conversation.status, updatedConversation);
     }
 
     return updatedConversation;
@@ -723,42 +720,29 @@ export class ConversationRepository extends BaseRepository<Conversation> {
   }
 
   /**
-   * Resolutions the merchant is billed for, counted by when the conversation
-   * was resolved (not when it was created), so a chat opened before the period
-   * and resolved inside it bills in the period that resolved it.
-   *
-   * Each exclusion is a named clause so later rules (spam, D1-10) slot in as
-   * one more entry. The stored per-conversation outcome from D1-3 is meant to
-   * replace this live recount.
+   * Resolutions the merchant is billed for: billable close outcomes (D1-3)
+   * that were not reversed by the shopper coming back, counted by close time.
+   * Reads conversation_outcomes, not the live conversation, so reopening or
+   * deleting a conversation does not rewrite a bill.
    */
   async countBillableResolutions(filters: {
     organizationId: string;
     startDate?: Date;
     endDate?: Date;
   }): Promise<number> {
-    const queryBuilder = this.getRepository()
-      .createQueryBuilder("conversation")
-      .where("conversation.organization_id = :organizationId", {
+    const queryBuilder = AppDataSource.getRepository(ConversationOutcome)
+      .createQueryBuilder("outcome")
+      .where("outcome.organization_id = :organizationId", {
         organizationId: filters.organizationId,
       })
-      .andWhere("conversation.deleted_at IS NULL")
-      .andWhere("conversation.status = 'resolved'");
-
-    // The orchestrator stamps ended_at when it resolves, staff updates stamp
-    // closed_at; GREATEST skips NULLs and picks the latest resolution.
-    const resolvedAt =
-      "COALESCE(GREATEST(conversation.ended_at, conversation.closed_at), conversation.created_at)";
+      .andWhere("outcome.billable = true")
+      .andWhere("outcome.reversed_at IS NULL");
     if (filters.startDate) {
-      queryBuilder.andWhere(`${resolvedAt} >= :startDate`, { startDate: filters.startDate });
+      queryBuilder.andWhere("outcome.closed_at >= :startDate", { startDate: filters.startDate });
     }
     if (filters.endDate) {
-      queryBuilder.andWhere(`${resolvedAt} <= :endDate`, { endDate: filters.endDate });
+      queryBuilder.andWhere("outcome.closed_at <= :endDate", { endDate: filters.endDate });
     }
-
-    for (const clause of Object.values(BILLABLE_RESOLUTION_EXCLUSIONS)) {
-      queryBuilder.andWhere(`NOT (${clause})`);
-    }
-
     return await queryBuilder.getCount();
   }
 

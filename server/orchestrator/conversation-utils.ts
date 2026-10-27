@@ -7,6 +7,7 @@ import { hookManager } from "@server/services/hooks/hook-manager";
 import { PromptService } from "@server/services/prompt.service";
 import { createLogger } from "@server/lib/logger";
 import { getAiReplyBlocker, recheckAiReply } from "./reply-guard";
+import { closureCopy } from "./closure-copy";
 
 const logger = createLogger("conversation-utils");
 
@@ -247,8 +248,11 @@ export async function closeInactiveConversation(
       let closureMessage: string;
       if (hasWarning) {
         // User didn't respond to warning
-        closureMessage =
-          "Since I haven't heard back from you, I'll close this conversation for now. Feel free to start a new conversation whenever you need help!";
+        closureMessage = closureCopy(
+          "inactivityClose",
+          conversation.language,
+          conversation.organization?.defaultLanguage,
+        );
       } else {
         // No warning was sent (e.g., conversation was already inactive for too long)
         const recentMessages = messages
@@ -291,7 +295,8 @@ export async function closeInactiveConversation(
       });
     }
 
-    // Update conversation status to resolved
+    // Provisionally resolved. The repository records the close and the close
+    // classifier moves it to "unresolved" if the AI had not answered (D1-3).
     await conversationRepository.update(conversationId, organizationId, {
       status: "resolved",
       ended_at: getUTCNow(),

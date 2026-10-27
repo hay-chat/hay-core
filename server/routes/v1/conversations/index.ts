@@ -72,7 +72,15 @@ const createConversationSchema = z.object({
   language: z.string().optional(),
   metadata: z.record(z.any()).optional(),
   status: z
-    .enum(["open", "processing", "pending-human", "human-took-over", "resolved", "closed"])
+    .enum([
+      "open",
+      "processing",
+      "pending-human",
+      "human-took-over",
+      "resolved",
+      "unresolved",
+      "closed",
+    ])
     .optional(),
   customerId: z.string().uuid().optional(),
   organizationId: z.string().uuid().optional(),
@@ -81,7 +89,15 @@ const createConversationSchema = z.object({
 const updateConversationSchema = z.object({
   title: z.string().min(1).max(255).optional(),
   status: z
-    .enum(["open", "processing", "pending-human", "human-took-over", "resolved", "closed"])
+    .enum([
+      "open",
+      "processing",
+      "pending-human",
+      "human-took-over",
+      "resolved",
+      "unresolved",
+      "closed",
+    ])
     .optional(),
   metadata: z.record(z.any()).optional(),
   customer_id: z.string().uuid().optional(),
@@ -222,7 +238,7 @@ export const conversationsRouter = t.router({
           : { type: "hay" as const, name: "Hay", userId: null },
         lastMessageAt: r.last_message_at ? new Date(r.last_message_at).toISOString() : null,
         updatedAt: r.updated_at ? new Date(r.updated_at).toISOString() : null,
-        canJoin: !["closed", "resolved"].includes(r.status),
+        canJoin: !["closed", "resolved", "unresolved"].includes(r.status),
       };
     });
   }),
@@ -500,7 +516,7 @@ export const conversationsRouter = t.router({
       }
 
       // Generate title when conversation is closed or resolved
-      if (input.data.status === "closed" || input.data.status === "resolved") {
+      if (["closed", "resolved", "unresolved"].includes(input.data.status ?? "")) {
         await generateConversationTitle(input.id, ctx.organizationId!, false);
       }
 
@@ -648,7 +664,7 @@ export const conversationsRouter = t.router({
       }
 
       // Check if conversation is already closed or resolved
-      if (["closed", "resolved"].includes(conversation.status)) {
+      if (["closed", "resolved", "unresolved"].includes(conversation.status)) {
         throw new TRPCError({
           code: "BAD_REQUEST",
           message: "Cannot take over a closed or resolved conversation",

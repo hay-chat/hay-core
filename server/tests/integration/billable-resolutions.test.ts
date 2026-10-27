@@ -5,6 +5,7 @@ import { Organization } from "../../entities/organization.entity";
 import { User } from "../../entities/user.entity";
 import { Conversation } from "../../database/entities/conversation.entity";
 import { Message, MessageType } from "../../database/entities/message.entity";
+import { ConversationOutcome } from "../../database/entities/conversation-outcome.entity";
 import { ConversationTakeoverEvent } from "../../database/entities/conversation-takeover-event.entity";
 import { AnalyticsService } from "../../services/analytics.service";
 import { ConversationRepository } from "../../repositories/conversation.repository";
@@ -23,10 +24,11 @@ jest.mock("../../services/push-notification.service", () => ({
 }));
 
 /**
- * DB-backed: the billable count is SQL over jsonb and the handoff stamp is a
- * repository side effect, so a mock would only restate the implementation.
+ * DB-backed: the handoff stamp is a repository side effect, so a mock would
+ * only restate the implementation. The billing outcome rules themselves live
+ * in close-classifier.test.ts and close-outcome-rules.test.ts.
  */
-describe("billable resolutions", () => {
+describe("billable resolutions: handed_off_at", () => {
   const orgId = "b111ab1e-0000-4000-8000-000000000001";
   const userId = "b111ab1e-0000-4000-8000-0000000000aa";
   const periodStart = new Date("2026-10-01T00:00:00Z");
@@ -88,6 +90,7 @@ describe("billable resolutions", () => {
   });
 
   beforeEach(async () => {
+    await AppDataSource.getRepository(ConversationOutcome).delete({ organization_id: orgId });
     await AppDataSource.getRepository(ConversationTakeoverEvent).delete({ organization_id: orgId });
     await AppDataSource.getRepository(Conversation).delete({ organization_id: orgId });
   });
@@ -100,47 +103,6 @@ describe("billable resolutions", () => {
     if (AppDataSource.isInitialized) {
       await AppDataSource.destroy();
     }
-  });
-
-  it("bills a plain AI resolution and keeps resolvedConversations unchanged", async () => {
-    await seed();
-    const result = await metrics();
-    expect(result.resolvedConversations).toBe(1);
-    expect(result.billableResolutions).toBe(1);
-  });
-
-  it("does not bill playground, test-mode, demo playground or runKind conversations", async () => {
-    await seed({ metadata: { sourceId: "playground", test_mode: true } });
-    await seed({ metadata: { test_mode: true } });
-    await seed({ metadata: { isPlayground: true } });
-    await seed({ metadata: { runKind: "simulation" } });
-    const result = await metrics();
-    expect(result.resolvedConversations).toBe(4);
-    expect(result.billableResolutions).toBe(0);
-  });
-
-  it("does not bill an unhappy close but keeps 'thanks' and inactivity closes billable", async () => {
-    await seed({
-      resolution_metadata: {
-        resolved: false,
-        confidence: 1,
-        reason: "user_indicated_close_unsatisfied",
-      },
-    });
-    await seed({
-      resolution_metadata: { resolved: false, confidence: 1, reason: "user_indicated_greet" },
-    });
-    await seed({
-      resolution_metadata: { resolved: false, confidence: 1, reason: "inactivity_timeout" },
-    });
-    await seed({ resolution_metadata: null });
-    expect((await metrics()).billableResolutions).toBe(3);
-  });
-
-  it("does not bill conversations with handed_off_at", async () => {
-    await seed({ handed_off_at: inPeriod });
-    await seed();
-    expect((await metrics()).billableResolutions).toBe(1);
   });
 
   it("stamps handed_off_at on the first handoff and keeps it after a hand-back", async () => {
@@ -168,6 +130,9 @@ describe("billable resolutions", () => {
       },
     });
     expect(resolved!.handed_off_at!.getTime()).toBe(firstStamp!.getTime());
+
+    // The rule outcome recorded at close never bills a hand-off; only the
+    // close classifier can decide the AI resolved it.
 
     await AppDataSource.getRepository(Conversation).update(
       { id: created.id },
@@ -219,27 +184,5 @@ describe("billable resolutions", () => {
     expect((await stamp(takenOver.id))!.toISOString()).toBe("2026-10-10T08:00:00.000Z");
     expect(await stamp(humanReplied.id)).toBeInstanceOf(Date);
     expect(await stamp(aiOnly.id)).toBeNull();
-    expect((await metrics()).billableResolutions).toBe(1);
-  });
-
-  it("counts by resolution time, not creation time", async () => {
-    // Opened last period, resolved in this one: bills now.
-    await seed({ created_at: new Date("2026-09-30T23:00:00Z"), ended_at: inPeriod });
-    // Opened this period, resolved next period: bills next period.
-    await seed({ created_at: inPeriod, ended_at: new Date("2026-11-01T01:00:00Z") });
-    // Staff resolution stamps closed_at only.
-    await seed({ ended_at: null, closed_at: inPeriod });
-
-    const result = await metrics();
-    expect(result.billableResolutions).toBe(2);
-    // The legacy count still uses created_at.
-    expect(result.resolvedConversations).toBe(2);
-  });
-
-  it("ignores unresolved, closed and deleted conversations", async () => {
-    await seed({ status: "open", ended_at: null });
-    await seed({ status: "closed", closed_at: inPeriod });
-    await seed({ deleted_at: inPeriod });
-    expect(await repository.countBillableResolutions({ organizationId: orgId })).toBe(0);
   });
 });

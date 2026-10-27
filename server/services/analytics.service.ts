@@ -126,8 +126,9 @@ export class AnalyticsService {
       status: "resolved",
     });
 
-    // What the backoffice meters. Unlike resolvedConversations it drops test,
-    // unhappy and handed-off chats and is bounded by resolution time.
+    // What the backoffice meters: billable close outcomes (D1-3: confirmed or
+    // assumed AI resolutions, hand-offs included when the AI resolved them),
+    // minus those reversed by the shopper returning within 72 h, by close time.
     const billableResolutions = await this.conversationRepository.countBillableResolutions({
       organizationId,
       startDate,

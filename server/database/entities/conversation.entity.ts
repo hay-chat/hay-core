@@ -23,6 +23,15 @@ import { SupportedLanguage } from "../../types/language.types";
 
 const logger = createLogger("conversation-entity");
 
+export type ConversationStatus =
+  | "open"
+  | "processing"
+  | "pending-human"
+  | "human-took-over"
+  | "resolved"
+  | "unresolved"
+  | "closed";
+
 /** Minimal shape of a tool schema entry used when rendering playbook/handoff actions. */
 type ToolSchemaEntry = Record<string, unknown>;
 
@@ -77,10 +86,20 @@ export class Conversation {
 
   @Column({
     type: "enum",
-    enum: ["open", "processing", "pending-human", "human-took-over", "resolved", "closed"],
+    enum: [
+      "open",
+      "processing",
+      "pending-human",
+      "human-took-over",
+      "resolved",
+      "unresolved",
+      "closed",
+    ],
     default: "open",
   })
-  status!: "open" | "processing" | "pending-human" | "human-took-over" | "resolved" | "closed";
+  // unresolved (D5-5): closed without the shopper's problem being solved, i.e.
+  // an unhappy close or an inactivity close the classifier found abandoned.
+  status!: ConversationStatus;
 
   @Column({ type: "timestamptz", nullable: true })
   cooldown_until!: Date | null;
@@ -95,6 +114,13 @@ export class Conversation {
   // handed back to the AI still reads as handed off. Set by the repository.
   @Column({ type: "timestamptz", nullable: true })
   handed_off_at!: Date | null;
+
+  // D9-5: spam never bills. Set by staff, a detector or the close classifier.
+  @Column({ type: "timestamptz", nullable: true })
+  spam_flagged_at!: Date | null;
+
+  @Column({ type: "varchar", length: 255, nullable: true })
+  spam_reason!: string | null;
 
   @Column({ type: "timestamptz", nullable: true })
   lastMessageAt!: Date | null;
@@ -946,6 +972,20 @@ The following tools are available for you to use. You MUST return only valid JSO
       this.needs_processing = shouldProcess;
       this.lastMessageAt = new Date();
       this.status = newStatus;
+
+      // A shopper who comes back within 72 h reverses the charge for their
+      // last resolution (D1-3). Billing must never break message intake.
+      try {
+        const { closeClassifierService } =
+          await import("../../services/close-classification/close-classifier.service");
+        await closeClassifierService.reverseOnCustomerReturn({
+          organizationId: this.organization_id,
+          conversationId: this.id,
+          customerId: this.customer_id,
+        });
+      } catch (error) {
+        logger.error({ err: error, conversationId: this.id }, "Resolution reversal check failed");
+      }
 
       // Enqueue for RabbitMQ processing
       if (shouldProcess) {

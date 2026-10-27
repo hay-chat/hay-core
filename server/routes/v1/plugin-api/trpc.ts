@@ -337,6 +337,7 @@ export const pluginApiTrpcRouter = router({
           senderType === "human_agent" &&
           conversation.status !== "human-took-over" &&
           conversation.status !== "resolved" &&
+          conversation.status !== "unresolved" &&
           conversation.status !== "closed"
         ) {
           await conversationRepository.update(conversation.id, organizationId, {
