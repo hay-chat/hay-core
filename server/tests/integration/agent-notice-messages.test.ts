@@ -109,4 +109,37 @@ describe("agent join/leave notices in stored history", () => {
     const messages = await repository.getPublicMessages(conversationId);
     expect(messages.map((m) => m.type)).toEqual([MessageType.CUSTOMER, MessageType.HUMAN_AGENT]);
   });
+
+  it("a join/leave line does not count as answering the shopper (Return to AI still runs)", async () => {
+    const conversation = await repository.create({
+      title: "unanswered",
+      organization_id: orgId,
+      status: "human-took-over",
+    });
+    const messages = AppDataSource.getRepository(Message);
+    const rows: Array<Partial<Message>> = [
+      { type: MessageType.CUSTOMER, content: "Still there?" },
+      {
+        type: MessageType.SYSTEM,
+        content: "Marina Souza took over this conversation",
+        metadata: { systemEvent: "agent_joined" } as Message["metadata"],
+      },
+    ];
+    let offset = 0;
+    for (const row of rows) {
+      const saved = await messages.save(
+        messages.create({
+          ...row,
+          conversation_id: conversation.id,
+          deliveryState: DeliveryState.SENT,
+        }),
+      );
+      await messages.update(
+        { id: saved.id },
+        { created_at: new Date(Date.UTC(2026, 9, 27, 11, 0, offset++)) },
+      );
+    }
+
+    expect(await repository.hasUnansweredCustomerMessage(conversation.id)).toBe(true);
+  });
 });
