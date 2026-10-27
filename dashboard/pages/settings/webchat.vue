@@ -63,7 +63,7 @@
       </CardHeader>
       <CardContent class="space-y-4">
         <div class="flex items-center space-x-2">
-          <Switch id="showGreeting" v-model:checked="settingsForm.showGreeting" />
+          <Switch id="showGreeting" v-model="settingsForm.showGreeting" />
           <Label for="showGreeting">{{ $t("webchat.showGreeting") }}</Label>
         </div>
 
@@ -85,17 +85,19 @@
         <CardDescription>{{ $t("webchat.securityAccessDescription") }}</CardDescription>
       </CardHeader>
       <CardContent class="space-y-4">
-        <Textarea
-          id="allowedDomains"
-          v-model="allowedDomainsText"
-          :label="$t('webchat.allowedDomains')"
-          :placeholder="$t('webchat.allowedDomainsPlaceholder')"
-          :description="$t('webchat.allowedDomainsDescription')"
-          :rows="4"
-        />
+        <div class="space-y-2">
+          <Label for="allowedDomains">{{ $t("webchat.allowedDomains") }}</Label>
+          <Textarea
+            id="allowedDomains"
+            v-model="allowedDomainsText"
+            :placeholder="$t('webchat.allowedDomainsPlaceholder')"
+            :rows="4"
+          />
+          <p class="text-sm text-neutral-muted">{{ $t("webchat.allowedDomainsDescription") }}</p>
+        </div>
 
         <div class="flex items-center space-x-2">
-          <Switch id="isEnabled" v-model:checked="settingsForm.isEnabled" />
+          <Switch id="isEnabled" v-model="settingsForm.isEnabled" />
           <Label for="isEnabled">{{ $t("webchat.enableWebchat") }}</Label>
         </div>
       </CardContent>
