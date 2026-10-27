@@ -14,4 +14,9 @@ export default {
   "input.send": "Enviar mensagem",
   "error.sendFailed": "Não foi possível enviar sua mensagem. Tente novamente em instantes.",
   "error.messageTooLong": "Sua mensagem é muito longa. Encurte-a e tente novamente.",
+  "chat.teamMember": "Um membro da equipe",
+  "chat.agentJoined": "{name} entrou na conversa",
+  "chat.agentLeft": "{name} saiu da conversa",
+  "chat.agentReturnedToAi":
+    "{name} saiu da conversa. Você está falando com o assistente de IA novamente.",
 } as const;

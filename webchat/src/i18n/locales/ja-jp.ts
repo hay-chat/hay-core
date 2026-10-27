@@ -14,4 +14,9 @@ export default {
   "input.send": "メッセージを送信",
   "error.sendFailed": "メッセージを送信できませんでした。しばらくしてからもう一度お試しください。",
   "error.messageTooLong": "メッセージが長すぎます。短くしてもう一度お試しください。",
+  "chat.teamMember": "チームメンバー",
+  "chat.agentJoined": "{name}がチャットに参加しました",
+  "chat.agentLeft": "{name}がチャットから退出しました",
+  "chat.agentReturnedToAi":
+    "{name}がチャットから退出しました。再びAIアシスタントがお手伝いします。",
 } as const;

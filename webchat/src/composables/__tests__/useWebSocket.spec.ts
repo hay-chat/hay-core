@@ -99,6 +99,31 @@ describe("useWebSocket", () => {
     app.unmount();
   });
 
+  it("adds a team member's join line live, with its metadata", () => {
+    const { ws, app } = setup();
+    ws.connect();
+    const socket = FakeWebSocket.instances[0];
+
+    socket.receive({
+      type: "message",
+      data: {
+        id: "m1",
+        type: "System",
+        content: "",
+        timestamp: "2026-10-27T10:00:00Z",
+        metadata: { systemEvent: "agent_joined", agentFirstName: "Marina" },
+      },
+    });
+
+    expect(ws.messages.value).toHaveLength(1);
+    expect(ws.messages.value[0]).toMatchObject({
+      agentType: "System",
+      content: "",
+      metadata: { systemEvent: "agent_joined", agentFirstName: "Marina" },
+    });
+    app.unmount();
+  });
+
   it("ignores a stray history frame instead of replacing the conversation", () => {
     const { ws, app } = setup();
     ws.connect();

@@ -14,4 +14,9 @@ export default {
   "input.send": "Mesaj gönder",
   "error.sendFailed": "Mesajınız gönderilemedi. Lütfen birazdan tekrar deneyin.",
   "error.messageTooLong": "Mesajınız çok uzun. Lütfen kısaltıp tekrar deneyin.",
+  "chat.teamMember": "Bir ekip üyesi",
+  "chat.agentJoined": "{name} sohbete katıldı",
+  "chat.agentLeft": "{name} sohbetten ayrıldı",
+  "chat.agentReturnedToAi":
+    "{name} sohbetten ayrıldı. Yeniden yapay zekâ asistanıyla sohbet ediyorsunuz.",
 } as const;

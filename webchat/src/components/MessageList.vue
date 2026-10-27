@@ -14,66 +14,73 @@
         'hay-message--user': message.sender === 'user',
         'hay-message--agent': message.sender === 'agent',
         'hay-message--closure': message.metadata?.isClosureMessage,
+        'hay-message--system': agentNoticeText(message, t) !== null,
       }"
     >
-      <div v-if="message.metadata?.isClosureMessage" class="hay-message__closure-badge">
-        {{ t("chat.conversationClosed") }}
+      <!-- A team member joined or left: a centred line, no bubble or time -->
+      <div v-if="agentNoticeText(message, t) !== null" class="hay-message__system">
+        {{ agentNoticeText(message, t) }}
       </div>
-      <!-- Product recommendation cards -->
-      <template
-        v-if="
-          message.agentType === 'ProductRecommendation' &&
-          message.metadata &&
-          Array.isArray((message.metadata as any).productRecommendation?.products)
-        "
-      >
-        <div class="hay-message__content hay-message__content--rich">
-          <div class="hay-product-recs">
-            <a
-              v-for="p in (message.metadata as any).productRecommendation.products as any[]"
-              :key="p.id || p.externalId"
-              :href="p.sourceUrl || '#'"
-              target="_blank"
-              rel="noopener noreferrer"
-              class="hay-product-card"
-            >
-              <div class="hay-product-card__image">
-                <img v-if="p.imageUrl" :src="p.imageUrl" :alt="p.title" loading="lazy" />
-              </div>
-              <div class="hay-product-card__body">
-                <div class="hay-product-card__title">{{ p.title }}</div>
-                <div v-if="p.topVariant?.price" class="hay-product-card__price">
-                  {{ formatPrice(p.topVariant.price, p.topVariant.currency) }}
-                </div>
-                <div v-if="p.available === false" class="hay-product-card__oos">Out of stock</div>
-              </div>
-            </a>
-          </div>
-        </div>
-      </template>
-      <!-- Agent messages: one bubble per image segment (word-reveal only when a
-           single, image-free segment). -->
-      <template v-else-if="message.sender === 'agent'">
-        <div
-          v-for="(segment, i) in splitMarkdownImages(message.content)"
-          :key="i"
-          class="hay-message__content hay-message__content--rich"
-          :class="{ 'hay-message__content--image': isImageSegment(segment) }"
-        >
-          <div
-            v-if="animatingIds.has(message.id) && splitMarkdownImages(message.content).length === 1"
-            v-html="getAnimatedHtml(segment)"
-          ></div>
-          <div v-else v-html="renderMarkdown(segment)"></div>
-        </div>
-      </template>
-      <!-- User messages: plain text -->
       <template v-else>
-        <div class="hay-message__content">{{ message.content }}</div>
+        <div v-if="message.metadata?.isClosureMessage" class="hay-message__closure-badge">
+          {{ t("chat.conversationClosed") }}
+        </div>
+        <!-- Product recommendation cards -->
+        <template
+          v-if="
+            message.agentType === 'ProductRecommendation' &&
+            message.metadata &&
+            Array.isArray((message.metadata as any).productRecommendation?.products)
+          "
+        >
+          <div class="hay-message__content hay-message__content--rich">
+            <div class="hay-product-recs">
+              <a
+                v-for="p in (message.metadata as any).productRecommendation.products as any[]"
+                :key="p.id || p.externalId"
+                :href="p.sourceUrl || '#'"
+                target="_blank"
+                rel="noopener noreferrer"
+                class="hay-product-card"
+              >
+                <div class="hay-product-card__image">
+                  <img v-if="p.imageUrl" :src="p.imageUrl" :alt="p.title" loading="lazy" />
+                </div>
+                <div class="hay-product-card__body">
+                  <div class="hay-product-card__title">{{ p.title }}</div>
+                  <div v-if="p.topVariant?.price" class="hay-product-card__price">
+                    {{ formatPrice(p.topVariant.price, p.topVariant.currency) }}
+                  </div>
+                  <div v-if="p.available === false" class="hay-product-card__oos">Out of stock</div>
+                </div>
+              </a>
+            </div>
+          </div>
+        </template>
+        <!-- Agent messages: one bubble per image segment (word-reveal only when a
+           single, image-free segment). -->
+        <template v-else-if="message.sender === 'agent'">
+          <div
+            v-for="(segment, i) in splitMarkdownImages(message.content)"
+            :key="i"
+            class="hay-message__content hay-message__content--rich"
+            :class="{ 'hay-message__content--image': isImageSegment(segment) }"
+          >
+            <div
+              v-if="
+                animatingIds.has(message.id) && splitMarkdownImages(message.content).length === 1
+              "
+              v-html="getAnimatedHtml(segment)"
+            ></div>
+            <div v-else v-html="renderMarkdown(segment)"></div>
+          </div>
+        </template>
+        <!-- User messages: plain text -->
+        <template v-else>
+          <div class="hay-message__content">{{ message.content }}</div>
+        </template>
+        <div class="hay-message__time">{{ timeLabel(message) }}</div>
       </template>
-      <div class="hay-message__time">
-        {{ formatTime(message.timestamp) }}
-      </div>
     </div>
 
     <div v-if="isTyping" class="hay-message hay-message--agent">
@@ -91,6 +98,7 @@ import { ref, watch, nextTick, type Directive } from "vue";
 import type { Message } from "@/types";
 import { parseMarkdown, wrapWordsForAnimation, splitMarkdownImages } from "@/utils/markdown";
 import { useI18n } from "@/i18n";
+import { agentFirstName, agentNoticeText } from "@/utils/agentNotice";
 
 const t = useI18n();
 
@@ -160,6 +168,12 @@ const formatTime = (timestamp: number) => {
   return `${hours}:${minutes}`;
 };
 
+// "10:42 · Marina" on a team member's reply, so the shopper knows it is a person
+const timeLabel = (message: Message) => {
+  const name = message.agentType === "HumanAgent" ? agentFirstName(message) : undefined;
+  return name ? `${formatTime(message.timestamp)} · ${name}` : formatTime(message.timestamp);
+};
+
 const formatPrice = (amount?: string | number, currency?: string): string => {
   if (amount === undefined || amount === null || amount === "") return "";
   const value = typeof amount === "string" ? parseFloat(amount) : amount;
@@ -199,7 +213,7 @@ watch(
       const msg = newMessages[0];
       animateEntranceIds.add(msg.id);
 
-      if (msg.sender === "agent") {
+      if (msg.sender === "agent" && msg.content) {
         animatingIds.value.add(msg.id);
         const parsed = parseMarkdown(msg.content);
         const { wordCount } = wrapWordsForAnimation(parsed);
@@ -411,6 +425,20 @@ watch(
     transform: translateY(-10px);
     opacity: 1;
   }
+}
+
+/* Team member joined/left line */
+.hay-message--system {
+  align-self: center;
+  max-width: 90%;
+  margin: 8px 0;
+}
+
+.hay-message__system {
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--color-neutral-500);
+  text-align: center;
 }
 
 /* Closure message styling */

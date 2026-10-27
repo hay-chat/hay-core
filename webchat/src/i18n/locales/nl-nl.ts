@@ -14,4 +14,8 @@ export default {
   "input.send": "Bericht verzenden",
   "error.sendFailed": "Uw bericht kon niet worden verzonden. Probeer het zo meteen opnieuw.",
   "error.messageTooLong": "Uw bericht is te lang. Maak het korter en probeer het opnieuw.",
+  "chat.teamMember": "Een teamlid",
+  "chat.agentJoined": "{name} neemt deel aan de chat",
+  "chat.agentLeft": "{name} heeft de chat verlaten",
+  "chat.agentReturnedToAi": "{name} heeft de chat verlaten. U chat weer met de AI-assistent.",
 } as const;
