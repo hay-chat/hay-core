@@ -1,67 +1,47 @@
-import { useAuthStore } from '@/stores/auth';
+import { useAuthStore } from "@/stores/auth";
+import { ensureFreshAccessToken } from "@/utils/api";
 
+/**
+ * Keep the access token fresh in the background, and catch up as soon as the
+ * device is back: a PWA waking from the background or a phone regaining
+ * signal refreshes right away instead of on the next request.
+ * Failures are only logged: utils/api logs out on a rejected refresh alone.
+ */
 export default defineNuxtPlugin(() => {
   const authStore = useAuthStore();
-  let refreshInterval: NodeJS.Timeout | null = null;
+  let refreshInterval: ReturnType<typeof setInterval> | null = null;
 
-  // Function to check if token needs refresh
-  const checkTokenExpiration = () => {
-    if (!authStore.isAuthenticated || !authStore.tokens?.expiresAt) {
-      return;
-    }
-
-    const timeUntilExpiry = authStore.tokens.expiresAt - Date.now();
-    
-    // If token expires in less than 2 minutes, refresh it
-    if (timeUntilExpiry < 120000 && timeUntilExpiry > 0) {
-      console.log('[Auth Refresh Plugin] Token expiring soon, refreshing...');
-      authStore.refreshTokens().catch((error) => {
-        console.error('[Auth Refresh Plugin] Failed to refresh token:', error);
-      });
-    }
+  const refreshIfExpiring = () => {
+    if (!authStore.isAuthenticated) return;
+    ensureFreshAccessToken(2 * 60_000).catch((error) => {
+      console.warn("[Auth Refresh Plugin] Refresh deferred:", error);
+    });
   };
 
-  // Start periodic check when authenticated
-  const startTokenRefreshCheck = () => {
-    // Clear any existing interval
-    if (refreshInterval) {
-      clearInterval(refreshInterval);
-    }
-
-    // Check every 30 seconds
-    refreshInterval = setInterval(() => {
-      checkTokenExpiration();
-    }, 30000);
-
-    // Also check immediately
-    checkTokenExpiration();
+  const onVisibilityChange = () => {
+    if (document.visibilityState === "visible") refreshIfExpiring();
   };
 
-  // Stop periodic check
-  const stopTokenRefreshCheck = () => {
+  const start = () => {
+    stop();
+    refreshInterval = setInterval(refreshIfExpiring, 30_000);
+    window.addEventListener("online", refreshIfExpiring);
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    refreshIfExpiring();
+  };
+
+  const stop = () => {
     if (refreshInterval) {
       clearInterval(refreshInterval);
       refreshInterval = null;
     }
+    window.removeEventListener("online", refreshIfExpiring);
+    document.removeEventListener("visibilitychange", onVisibilityChange);
   };
 
-  // Watch authentication state
   watch(
     () => authStore.isAuthenticated,
-    (isAuthenticated) => {
-      if (isAuthenticated) {
-        startTokenRefreshCheck();
-      } else {
-        stopTokenRefreshCheck();
-      }
-    },
-    { immediate: true }
+    (isAuthenticated) => (isAuthenticated ? start() : stop()),
+    { immediate: true },
   );
-
-  // Clean up on unmount
-  if (process.client) {
-    window.addEventListener('beforeunload', () => {
-      stopTokenRefreshCheck();
-    });
-  }
 });
