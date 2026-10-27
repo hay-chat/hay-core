@@ -850,6 +850,52 @@ export const runConversation = async (conversationId: string) => {
 };
 
 /**
+ * One AI turn after a person decided on a held action (D4-5). There is no new
+ * shopper message: the decision was written into the conversation as a
+ * system note, and the planner answers it (tell the shopper it is done, or
+ * explain the refusal). Skips perception and playbook selection.
+ *
+ * Throws when another run holds the lock, so the queue retries.
+ */
+export const runApprovalFollowUp = async (conversationId: string): Promise<void> => {
+  const conversation = await conversationRepository.findById(conversationId);
+  if (!conversation?.organization_id) return;
+  const log = logger.child({
+    organizationId: conversation.organization_id,
+    conversationId: conversation.id,
+  });
+
+  if (await recheckAiReply(conversation.id)) {
+    log.debug("Skipping approval follow-up - the AI may not reply");
+    return;
+  }
+
+  const lockerId = await conversation.lock();
+  if (!lockerId) {
+    throw new Error("Conversation is locked; approval follow-up will retry");
+  }
+  const heartbeat = setInterval(() => {
+    conversation.refreshLock(lockerId).catch((err) => log.warn({ err }, "Lock heartbeat error"));
+  }, LOCK_HEARTBEAT_INTERVAL_MS);
+
+  try {
+    await handleExecutionLoop(conversation, Date.now(), conversation.language ?? undefined);
+  } catch (error) {
+    if (!(error instanceof AiReplySuppressedError)) throw error;
+    log.info({ blocker: error.blocker }, "Dropped approval follow-up reply");
+  } finally {
+    clearInterval(heartbeat);
+    await updateProcessingState(conversation, "idle");
+    try {
+      await conversation.unlock(lockerId);
+    } catch (unlockError) {
+      log.error({ err: unlockError }, "Failed to release lock");
+    }
+    await requeueIfStillPending(conversation, log);
+  }
+};
+
+/**
  * A customer message that arrived while this run held the lock queued a run
  * that found the lock taken and gave up, and markProcessed left its flag set.
  * Queue it again now the lock is free, instead of waiting for the sweep.

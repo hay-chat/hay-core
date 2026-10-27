@@ -228,6 +228,22 @@
       "pendingApproval": "Aguardando aprovação",
       "rejected": "Recusada",
       "unknown": "Desconhecido"
+    },
+    "pendingAction": {
+      "title": "O Hay.chat quer realizar esta ação",
+      "description": "Ela ainda não foi executada. Aprove para executar agora, ou recuse e a IA avisará o cliente.",
+      "approve": "Aprovar",
+      "reject": "Recusar",
+      "confirmReject": "Recusar ação",
+      "reasonLabel": "Motivo (opcional)",
+      "reasonPlaceholder": "Compartilhado com a IA para explicar ao cliente",
+      "replyMyself": "Vou responder eu mesmo",
+      "failed": "Não foi possível salvar sua decisão",
+      "done": {
+        "approve": "Aprovada",
+        "reject": "Recusada",
+        "reply": "Agora você está atendendo esta conversa"
+      }
     }
   }
 }

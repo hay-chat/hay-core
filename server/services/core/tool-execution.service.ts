@@ -134,21 +134,7 @@ export class ToolExecutionService {
       };
 
       const step = await this.runStep(call);
-
-      const latencyMs = Date.now() - call.startedAt;
-      await actionLogService.record({
-        organizationId: conversation.organization_id,
-        conversationId: conversation.id,
-        messageId: messageId ?? null,
-        pluginId: target.pluginId,
-        toolName: target.toolName,
-        risk: target.risk,
-        args: toolCall.args,
-        outcome: step.logOutcome,
-        errorCode: step.errorCode,
-        durationMs: latencyMs,
-        idempotencyKey: call.idempotencyKey,
-      });
+      const latencyMs = await this.recordAction(call, step);
 
       const toolLogEntry: ToolLogEntry = {
         turn: currentContext.lastTurn + 1,
@@ -173,6 +159,50 @@ export class ToolExecutionService {
         error: (error as Error).message || "Unknown error",
       };
     }
+  }
+
+  /**
+   * Run an action a person approved (D4-5). Skips the gate and the dry-run
+   * check: the decision was made on this exact call. Sends the pending
+   * action's idempotency key, so a provider that honours it applies the
+   * action once even if this runs again. Updates the original TOOL message
+   * and writes the action log. The caller moves the pending action on.
+   */
+  async executeApprovedAction(
+    conversation: Conversation,
+    action: Pick<PendingAction, "tool_name" | "args" | "message_id" | "idempotency_key">,
+  ): Promise<ToolExecutionResult & { errorCode: string | null }> {
+    const call: PreparedCall = {
+      conversation,
+      toolCall: { name: action.tool_name, args: action.args },
+      messageId: action.message_id ?? undefined,
+      target: await this.resolveTarget(conversation.organization_id, action.tool_name),
+      idempotencyKey: action.idempotency_key,
+      startedAt: Date.now(),
+      executedAt: new Date().toISOString(),
+    };
+    const step = await this.runLive(call);
+    await this.recordAction(call, step);
+    return { ...step.result, errorCode: step.errorCode };
+  }
+
+  /** Write the action log row for a finished step. Returns the latency. */
+  private async recordAction(call: PreparedCall, step: CallStep): Promise<number> {
+    const latencyMs = Date.now() - call.startedAt;
+    await actionLogService.record({
+      organizationId: call.conversation.organization_id,
+      conversationId: call.conversation.id,
+      messageId: call.messageId ?? null,
+      pluginId: call.target.pluginId,
+      toolName: call.target.toolName,
+      risk: call.target.risk,
+      args: call.toolCall.args,
+      outcome: step.logOutcome,
+      errorCode: step.errorCode,
+      durationMs: latencyMs,
+      idempotencyKey: call.idempotencyKey,
+    });
+    return latencyMs;
   }
 
   /**

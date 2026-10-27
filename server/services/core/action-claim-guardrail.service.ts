@@ -3,7 +3,7 @@ import { PromptService } from "../prompt.service";
 import { Message } from "@server/database/entities/message.entity";
 import { createLogger } from "@server/lib/logger";
 import {
-  ActionClaimGuardrailConfig,
+  type ActionClaimGuardrailConfig,
   DEFAULT_ACTION_CLAIM_GUARDRAIL_CONFIG,
 } from "@server/types/organization-settings.types";
 
