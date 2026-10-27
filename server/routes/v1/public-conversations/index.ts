@@ -40,7 +40,13 @@ const createPublicConversationSchema = z.object({
     use: z.string().optional(),
   }),
   metadata: z.record(z.any()).optional(),
-  language: z.string().optional(),
+  // The widget's UI locale (BCP-47, e.g. "pt-BR"). Sets the conversation
+  // language so the greeting is written in it; unsupported languages are ignored.
+  language: z
+    .string()
+    .max(35)
+    .regex(/^[A-Za-z]{2,3}(-[A-Za-z0-9]{1,8})*$/)
+    .optional(),
   context: z.record(z.any()).optional(),
   customerExternalId: z.string().optional(),
   isPlayground: z.boolean().optional().default(false),

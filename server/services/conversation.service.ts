@@ -13,8 +13,10 @@ const logger = createLogger("conversation");
 
 const SUPPORTED_LANGUAGE_VALUES = new Set<string>(Object.values(SupportedLanguage));
 
+/** "pt-BR" / "pt" -> "pt"; anything we don't support -> null. */
 function toSupportedLanguage(value: string | null | undefined): SupportedLanguage | null {
-  return value && SUPPORTED_LANGUAGE_VALUES.has(value) ? (value as SupportedLanguage) : null;
+  const primary = value?.split("-")[0].toLowerCase();
+  return primary && SUPPORTED_LANGUAGE_VALUES.has(primary) ? (primary as SupportedLanguage) : null;
 }
 
 export class ConversationService {
