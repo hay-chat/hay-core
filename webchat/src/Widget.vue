@@ -154,7 +154,13 @@ const {
   startTyping,
   stopTyping,
   startNewConversation,
-} = useChat(props.config);
+} = useChat({
+  ...props.config,
+  // The greeting is pinned as the first message, so give the chat the same
+  // localised default the empty state shows.
+  showGreeting: props.config.showGreeting ?? true,
+  greetingMessage: props.config.greetingMessage || t("widget.defaultGreeting"),
+});
 
 // Initialize on mount if configured to auto-open
 onMounted(() => {

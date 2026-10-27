@@ -13,6 +13,7 @@ import {
 import { safeStorage, useConsent } from "./useConsent";
 import { debugLog } from "@/utils/debug";
 import type { HayChatConfig, Message } from "@/types";
+import { insertMessage, parseServerTime } from "@/utils/messageOrder";
 
 interface Keypair {
   privateKey: CryptoKey;
@@ -106,6 +107,20 @@ export function useChat(config: HayChatConfig) {
     );
   };
 
+  // Pin the configured greeting to the top of the conversation. It is a local
+  // placeholder, never replaced by server messages, and it carries a server
+  // time so the browser clock never decides where it sits.
+  const pinGreeting = (timestamp: number) => {
+    if (!config.showGreeting || !config.greetingMessage) return;
+    insertMessage(messages.value, {
+      id: "greeting",
+      sender: "agent",
+      content: config.greetingMessage,
+      timestamp,
+      isGreeting: true,
+    });
+  };
+
   // Create new conversation
   const createNewConversation = async (): Promise<boolean> => {
     try {
@@ -158,16 +173,7 @@ export function useChat(config: HayChatConfig) {
 
       debugLog("[Webchat] Conversation created:", conversationData.id);
 
-      // Show greeting if configured
-      if (config.showGreeting && config.greetingMessage) {
-        messages.value.push({
-          id: "greeting",
-          sender: "agent",
-          content: config.greetingMessage,
-          timestamp: Date.now(),
-          isGreeting: true,
-        });
-      }
+      pinGreeting(parseServerTime(conversationData.createdAt));
 
       // Don't identify yet - will be done after WebSocket connects in initialize()
       return true;
@@ -274,6 +280,7 @@ export function useChat(config: HayChatConfig) {
 
   // Load messages into UI
   const loadMessagesIntoUI = (msgs: any[]) => {
+    // The server returns messages in conversation order; keep it as-is.
     messages.value = [];
     msgs.forEach((msg) => {
       const sender = msg.type === "Customer" ? "user" : "agent";
@@ -281,7 +288,7 @@ export function useChat(config: HayChatConfig) {
         id: msg.id,
         sender,
         content: msg.content,
-        timestamp: new Date(msg.createdAt).getTime(),
+        timestamp: parseServerTime(msg.createdAt),
         metadata: msg.metadata,
         agentType: msg.type,
         senderName: msg.sender || undefined,
@@ -300,6 +307,8 @@ export function useChat(config: HayChatConfig) {
         isConversationClosed.value = true;
       }
     });
+
+    if (messages.value.length > 0) pinGreeting(messages.value[0].timestamp);
   };
 
   // Initialize chat
@@ -553,7 +562,7 @@ export function useChat(config: HayChatConfig) {
         id: msg.id,
         sender,
         content: msg.content,
-        timestamp: new Date(msg.createdAt).getTime(),
+        timestamp: parseServerTime(msg.createdAt),
         metadata: msg.metadata,
         agentType: msg.type,
         senderName: msg.sender || undefined,
@@ -580,17 +589,7 @@ export function useChat(config: HayChatConfig) {
         }
       }
 
-      // If there's a greeting placeholder and the incoming message is from the agent,
-      // replace the greeting with the real server-generated message
-      const greetingIndex = messages.value.findIndex((m) => m.isGreeting);
-      if (greetingIndex !== -1 && sender === "agent") {
-        messages.value.splice(greetingIndex, 1, newMessage);
-        existingIds.add(msg.id);
-        added++;
-        continue;
-      }
-
-      messages.value.push(newMessage);
+      insertMessage(messages.value, newMessage);
       existingIds.add(msg.id);
       added++;
 

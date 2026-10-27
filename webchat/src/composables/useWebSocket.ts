@@ -2,6 +2,7 @@ import { ref, onUnmounted } from "vue";
 import { safeStorage } from "./useConsent";
 import { debugLog } from "@/utils/debug";
 import type { Message } from "@/types";
+import { insertMessage, parseServerTime } from "@/utils/messageOrder";
 
 export function useWebSocket(baseUrl: string, organizationId: string) {
   const ws = ref<WebSocket | null>(null);
@@ -91,7 +92,7 @@ export function useWebSocket(baseUrl: string, organizationId: string) {
             id: data.data.id || `msg_${Date.now()}`,
             sender: "agent",
             content: data.data.content || data.data.text,
-            timestamp: new Date(data.data.timestamp || Date.now()).getTime(),
+            timestamp: parseServerTime(data.data.timestamp),
             metadata: data.data.metadata,
             agentType: data.data.type,
             senderName: data.data.sender || undefined,
@@ -128,14 +129,7 @@ export function useWebSocket(baseUrl: string, organizationId: string) {
   };
 
   const addMessage = (message: Message) => {
-    // If there's a greeting placeholder and the incoming message is from the agent,
-    // replace the greeting with the real server-generated message
-    const greetingIndex = messages.value.findIndex((m) => m.isGreeting);
-    if (greetingIndex !== -1 && message.sender === "agent") {
-      messages.value.splice(greetingIndex, 1, message);
-      return;
-    }
-    messages.value.push(message);
+    insertMessage(messages.value, message);
   };
 
   const identify = (customerId: string, existingConversationId?: string) => {
