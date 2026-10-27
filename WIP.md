@@ -1,3 +1,10 @@
+## 2026-10-27 — claude/nuvemshop (worktree hay-core-nuvemshop) — Nuvemshop plugin at commerce parity (not pushed)
+
+**Works:** `plugins/core/nuvemshop` rewritten to the 26 Oct conventions: 17 `nuvemshop_` tools (get_order by id or number + fulfillment tracking + payment/Pix fields, get_order_tracking, cancel and address change pre-dispatch only, appending notes, check_refund_status, request_refund that records only (API can't move money), identity-gated get_payment_link, capped create_coupon, check_inventory by SKU), MCP annotations on every tool, pt-BR i18n, README parity matrix. 55 vitest tests + tsc clean.
+**Half-built / unverified:** nothing live-tested; fulfillment-order PATCH merge semantics, merchant-token access to /transactions, coupon `max_uses` need a real store. OAuth partner app not built (needs `{client_id}` authorize-URL placeholder + keeping `user_id` in core oauth.service).
+**Research write-up:** seo repo `Engineering/02 Research/D18 Nuvemshop parity.md` (matrix, API limits, OAuth, open decisions).
+**Next:** Roger answers D18 §5; test against a Nuvemshop dev store; then push + PR.
+
 ## 2026-10-26 — master @9016b93 — Email inbox channel LIVE end to end (inbound + outbound verified in prod)
 
 **Fixed + deployed:** plugin worker token now minted in one place (`server/lib/plugin-api-token.ts`: scope plugin-api + issuer hay-plugin-api + audience plugin) so both the tRPC plugin API and the REST relay (/v1/plugin-api/send-email) accept it; before, every email reply failed "jwt audience invalid" (and the core `email` tool plugin had the same bug). Jest test covers both checks.
