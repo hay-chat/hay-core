@@ -5,8 +5,13 @@ import * as path from "path";
 import { v4 as uuidv4 } from "uuid";
 import { config } from "../config/env";
 import { Upload } from "../entities/upload.entity";
+import { isPublicFolder, mediaUrl } from "./media-url.service";
+import { CONVERSATION_MEDIA_TYPES, sanitizeConversationMedia } from "./media-sanitizer.service";
 
-// Allowed file types
+/** Folder for files received from shoppers through channels; see media-sanitizer.service. */
+export const CONVERSATION_MEDIA_FOLDER = "conversation-media";
+
+// Allowed file types for every other folder (logos, documents, plugin ZIPs)
 const ALLOWED_MIME_TYPES: Record<string, string[]> = {
   // Images
   "image/jpeg": [".jpg", ".jpeg"],
@@ -35,21 +40,7 @@ const ALLOWED_MIME_TYPES: Record<string, string[]> = {
   // Archives
   "application/zip": [".zip"],
   "application/x-zip-compressed": [".zip"],
-
-  // Audio / video (conversation media from messaging channels)
-  "audio/ogg": [".ogg", ".oga"],
-  "audio/mpeg": [".mp3"],
-  "audio/aac": [".aac"],
-  "audio/amr": [".amr"],
-  "audio/mp4": [".m4a"],
-  "video/mp4": [".mp4"],
-  "video/3gpp": [".3gp"],
 };
-
-/** Whether the storage service accepts uploads with this MIME type. */
-export function isAllowedMimeType(mimeType: string): boolean {
-  return Boolean(ALLOWED_MIME_TYPES[mimeType]);
-}
 
 export interface UploadOptions {
   buffer: Buffer;
@@ -110,13 +101,25 @@ export class StorageService {
    *                served at /uploads/{organizationId}/{folder}/{uuid}.{ext}
    * S3 storage:    files stored at key uploads/{organizationId}/{folder}/{uuid}.{ext}
    *                URL: {endpoint}/{bucket}/uploads/{organizationId}/{folder}/{uuid}.{ext}
+   *
+   * Files are private unless the folder is public (see media-url.service);
+   * private files are served only through /v1/media/:id.
    */
   async upload(options: UploadOptions): Promise<UploadResult> {
-    // 1. Validate file
-    this.validateFile(options.mimeType, options.buffer.length, options.maxSize);
+    // 1. Validate file; conversation media is checked by content and re-encoded
+    let { buffer, mimeType } = options;
+    let extension: string;
+    if (options.folder === CONVERSATION_MEDIA_FOLDER) {
+      this.validateSize(buffer.length, options.maxSize);
+      ({ buffer, mimeType } = await sanitizeConversationMedia(buffer, mimeType));
+      extension = CONVERSATION_MEDIA_TYPES[mimeType];
+    } else {
+      this.validateFile(mimeType, buffer.length, options.maxSize);
+      extension = path.extname(options.originalName).toLowerCase();
+    }
 
     // 2. Generate filename (UUID + extension only)
-    const filename = this.generateFilename(options.originalName);
+    const filename = `${uuidv4()}${extension}`;
 
     // 3. Build path structure
     // For S3: Include "uploads/" prefix in the key to match bucket structure
@@ -127,9 +130,9 @@ export class StorageService {
 
     // 4. Upload to storage
     if (storageType === "s3") {
-      await this.uploadS3(options.buffer, filePath, options.mimeType);
+      await this.uploadS3(buffer, filePath, mimeType, isPublicFolder(options.folder));
     } else {
-      await this.uploadLocal(options.buffer, filePath);
+      await this.uploadLocal(buffer, filePath);
     }
 
     // 5. Create database record
@@ -137,16 +140,16 @@ export class StorageService {
       filename,
       originalName: options.originalName,
       path: filePath,
-      mimeType: options.mimeType,
-      size: options.buffer.length,
+      mimeType,
+      size: buffer.length,
       storageType,
       folder: options.folder,
       organizationId: options.organizationId,
       uploadedById: options.uploadedById,
     }).save();
 
-    // 6. Generate public URL
-    const url = this.getPublicUrl(upload);
+    // 6. Generate URL (direct for public folders, /v1/media for private ones)
+    const url = this.getUrl(upload);
 
     return { upload, url };
   }
@@ -195,7 +198,7 @@ export class StorageService {
    * Specialized upload for plugin ZIP files
    * Local: {uploadDir}/{organizationId}/plugin-zips/{pluginId}/{uuid}.zip
    * S3: uploads/{organizationId}/plugin-zips/{pluginId}/{uuid}.zip
-   * Served at: /uploads/{organizationId}/plugin-zips/{pluginId}/{uuid}.zip
+   * Private: never served publicly, read back with download().
    */
   async uploadPluginZip(options: {
     buffer: Buffer;
@@ -226,9 +229,15 @@ export class StorageService {
   }
 
   /**
-   * Get public URL from upload record
+   * URL for an upload record. Public folders get a direct storage URL; private
+   * uploads get the stable /v1/media/:id URL, which needs a staff session or a
+   * signature (media-url.service) to open.
    */
-  getPublicUrl(upload: Upload): string {
+  getUrl(upload: Upload): string {
+    if (!isPublicFolder(upload.folder)) {
+      return mediaUrl(upload.id);
+    }
+
     if (upload.storageType === "s3") {
       // S3 URL
       const endpoint = config.storage.s3.endpoint!;
@@ -272,25 +281,16 @@ export class StorageService {
       );
     }
 
-    // Check size
+    this.validateSize(size, maxSize);
+  }
+
+  private validateSize(size: number, maxSize?: number): void {
     const sizeLimit = maxSize || config.storage.limits.maxFileSize;
     if (size > sizeLimit) {
       const maxSizeMB = (sizeLimit / (1024 * 1024)).toFixed(2);
       const fileSizeMB = (size / (1024 * 1024)).toFixed(2);
       throw new Error(`File too large: ${fileSizeMB}MB. Maximum allowed: ${maxSizeMB}MB`);
     }
-  }
-
-  /**
-   * Generate unique filename using UUID only
-   * Format: {uuid}.{ext}
-   */
-  private generateFilename(originalName: string): string {
-    // Extract extension from original filename
-    const ext = path.extname(originalName).toLowerCase();
-
-    // Generate filename with UUID only
-    return `${uuidv4()}${ext}`;
   }
 
   /**
@@ -312,7 +312,12 @@ export class StorageService {
   /**
    * Upload to S3
    */
-  private async uploadS3(buffer: Buffer, filePath: string, mimeType: string): Promise<void> {
+  private async uploadS3(
+    buffer: Buffer,
+    filePath: string,
+    mimeType: string,
+    isPublic: boolean,
+  ): Promise<void> {
     if (!this.s3Client) {
       throw new Error("S3 client not initialized");
     }
@@ -324,7 +329,7 @@ export class StorageService {
         Key: filePath,
         Body: buffer,
         ContentType: mimeType,
-        ACL: "public-read", // Make files publicly accessible
+        ACL: isPublic ? "public-read" : "private",
       },
     });
 

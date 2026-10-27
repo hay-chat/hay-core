@@ -295,6 +295,26 @@ function createHayApi() {
   return _hayApi;
 }
 
+/**
+ * Fetch a private upload (conversation media) through the authenticated
+ * /v1/media/:id route. Browsers can't attach the session to <img src>, so the
+ * bytes are fetched here and rendered from an object URL.
+ * Resolves null when the server has no such upload for this organization.
+ */
+export async function fetchMedia(uploadId: string): Promise<Blob | null> {
+  const response = await fetch(`${getApiBaseUrl()}/media/${encodeURIComponent(uploadId)}`, {
+    headers: {
+      authorization: getAuthToken(),
+      "x-organization-id": getOrganizationId(),
+    },
+  });
+  if (response.status === 404) return null;
+  if (!response.ok) {
+    throw new Error(`Media request failed with status ${response.status}`);
+  }
+  return response.blob();
+}
+
 // Export lazy getters
 export const HayAuthApi = new Proxy({} as ReturnType<typeof createTRPCClient<AppRouter>>, {
   get(_target, prop) {

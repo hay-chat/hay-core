@@ -532,7 +532,7 @@ export const invitationsRouter = t.router({
           id: invitation.organization.id,
           name: invitation.organization.name,
           logo: invitation.organization.logoUpload
-            ? new StorageService().getPublicUrl(invitation.organization.logoUpload)
+            ? new StorageService().getUrl(invitation.organization.logoUpload)
             : null,
         },
         invitedBy: invitation.invitedByUser

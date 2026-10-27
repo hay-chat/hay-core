@@ -25,7 +25,7 @@ class OrganizationService {
     const result: Organization & { logoUrl?: string } = org;
 
     if (org.logoUpload) {
-      result.logoUrl = this.storageService.getPublicUrl(org.logoUpload);
+      result.logoUrl = this.storageService.getUrl(org.logoUpload);
     }
 
     return result;
