@@ -172,14 +172,22 @@ describe("publicConversations rate limits", () => {
     url: "http://localhost:3001/v1/publicConversations.sendMessage",
   };
 
-  it("sendMessage is limited per conversation and per IP", async () => {
+  it("sendMessage is limited per IP before the proof is checked", async () => {
     mockRateLimited.mockResolvedValue(true);
     await expect(callerFor({}, "198.51.100.4").sendMessage(sendInput)).rejects.toMatchObject({
       code: "TOO_MANY_REQUESTS",
     });
-    expect(mockRateLimited).toHaveBeenCalledWith([
+    expect(mockRateLimited).toHaveBeenCalledTimes(1);
+    expect(mockRateLimited).toHaveBeenCalledWith([{ rule: "messagePerIp", id: "198.51.100.4" }]);
+  });
+
+  it("sendMessage does not spend the per-conversation budget on an unverified proof", async () => {
+    mockRateLimited.mockResolvedValue(false);
+    await expect(callerFor().sendMessage(sendInput)).rejects.toMatchObject({
+      code: "UNAUTHORIZED",
+    });
+    expect(mockRateLimited).not.toHaveBeenCalledWith([
       { rule: "messagePerConversation", id: sendInput.conversationId },
-      { rule: "messagePerIp", id: "198.51.100.4" },
     ]);
   });
 

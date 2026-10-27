@@ -485,13 +485,8 @@ export class WebSocketService {
       return;
     }
 
-    // Checked before DPoP so a flood never reaches signature verification.
-    if (
-      await isPublicWidgetRateLimited([
-        { rule: "messagePerConversation", id: conversationId },
-        { rule: "messagePerIp", id: client.ip },
-      ])
-    ) {
+    // Per IP before DPoP so a flood never reaches signature verification.
+    if (await isPublicWidgetRateLimited([{ rule: "messagePerIp", id: client.ip }])) {
       this.sendError(client, "RATE_LIMITED");
       return;
     }
@@ -529,6 +524,15 @@ export class WebSocketService {
           return;
         }
         this.sendError(client, dpopVerification.error || "DPoP validation failed");
+        return;
+      }
+
+      // Per conversation only after the proof checks out, so knowing a
+      // conversationId is not enough to spend (and mute) a shopper's budget.
+      if (
+        await isPublicWidgetRateLimited([{ rule: "messagePerConversation", id: conversationId }])
+      ) {
+        this.sendError(client, "RATE_LIMITED");
         return;
       }
 
