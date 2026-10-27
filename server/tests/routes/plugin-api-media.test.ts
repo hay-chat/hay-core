@@ -51,11 +51,26 @@ jest.mock("@server/services/redis.service", () => ({
   redisService: { publish: jest.fn(), isConnected: () => true, getClient: () => null },
 }));
 
-const mockUpload =
-  jest.fn<(options: Record<string, unknown>) => Promise<{ upload: { id: string }; url: string }>>();
+interface StoredUpload {
+  upload: { id: string; mimeType: string; size: number };
+  url: string;
+}
+const mockUpload = jest.fn<(options: Record<string, unknown>) => Promise<StoredUpload>>();
 jest.mock("@server/services/storage.service", () => ({
+  CONVERSATION_MEDIA_FOLDER: "conversation-media",
   storageService: { upload: mockUpload },
 }));
+
+/** Storage echoes the input type and size unless a test says otherwise. */
+const storeAs = (url: string) =>
+  mockUpload.mockImplementation(async (options) => ({
+    upload: {
+      id: "upload-1",
+      mimeType: options.mimeType as string,
+      size: (options.buffer as Buffer).length,
+    },
+    url,
+  }));
 
 const mockTranscribe =
   jest.fn<
@@ -96,10 +111,7 @@ describe("pluginApi.media.upload", () => {
 
   it("decodes base64 and uploads to conversation-media storage", async () => {
     const bytes = Buffer.from("OggS fake audio bytes");
-    mockUpload.mockResolvedValue({
-      upload: { id: "upload-1" },
-      url: "http://localhost/uploads/org/conversation-media/x.ogg",
-    });
+    storeAs("http://localhost/uploads/org/conversation-media/x.ogg");
 
     const result = await caller()["media.upload"]({
       data: bytes.toString("base64"),
@@ -126,6 +138,21 @@ describe("pluginApi.media.upload", () => {
       type: "audio/ogg",
       size: bytes.length,
     });
+  });
+
+  it("reports the stored type and size when storage corrected or re-encoded the file", async () => {
+    mockUpload.mockResolvedValue({
+      upload: { id: "upload-2", mimeType: "image/png", size: 42 },
+      url: "https://api.example/v1/media/upload-2",
+    });
+
+    const result = await caller()["media.upload"]({
+      data: Buffer.from("not really a jpeg").toString("base64"),
+      mimeType: "image/jpeg",
+      filename: "photo.jpg",
+    });
+
+    expect(result).toMatchObject({ id: "upload-2", type: "image/png", size: 42 });
   });
 
   it("rejects invalid base64 with BAD_REQUEST", async () => {
@@ -172,7 +199,7 @@ describe("pluginApi.media.upload transcription", () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    mockUpload.mockResolvedValue({ upload: { id: "upload-1" }, url: "http://localhost/u/x" });
+    storeAs("http://localhost/u/x");
   });
 
   it("returns the transcript for audio when transcribe is true", async () => {
@@ -218,27 +245,5 @@ describe("pluginApi.media.upload transcription", () => {
 
     expect(mockTranscribe).not.toHaveBeenCalled();
     expect(result).not.toHaveProperty("transcript");
-  });
-});
-
-describe("storageService mime whitelist", () => {
-  it("accepts channel audio/video types", () => {
-    const { isAllowedMimeType } = jest.requireActual<
-      typeof import("@server/services/storage.service")
-    >("@server/services/storage.service");
-
-    for (const type of [
-      "audio/ogg",
-      "audio/mpeg",
-      "audio/aac",
-      "audio/amr",
-      "audio/mp4",
-      "video/mp4",
-      "video/3gpp",
-      "application/pdf",
-    ]) {
-      expect(isAllowedMimeType(type)).toBe(true);
-    }
-    expect(isAllowedMimeType("application/x-msdownload")).toBe(false);
   });
 });

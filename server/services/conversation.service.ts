@@ -117,9 +117,7 @@ export class ConversationService {
     // Surface a usable avatar URL for the conversation's agent (the entity only
     // carries the raw upload record). Lets the dashboard render the agent avatar.
     if (conversation.agent?.avatarUpload) {
-      conversation.agent.avatarUrl = new StorageService().getPublicUrl(
-        conversation.agent.avatarUpload,
-      );
+      conversation.agent.avatarUrl = new StorageService().getUrl(conversation.agent.avatarUpload);
     }
     return conversation;
   }

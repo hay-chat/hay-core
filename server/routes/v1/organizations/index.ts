@@ -845,7 +845,7 @@ export const organizationsRouter = t.router({
       // Get logo URL if exists
       const storageService = new StorageService();
       const logoUrl = userOrg.organization.logoUpload
-        ? storageService.getPublicUrl(userOrg.organization.logoUpload)
+        ? storageService.getUrl(userOrg.organization.logoUpload)
         : null;
 
       return {
