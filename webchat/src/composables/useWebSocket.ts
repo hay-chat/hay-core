@@ -13,13 +13,7 @@ export function useWebSocket(baseUrl: string, organizationId: string) {
   let reconnectTimeout: ReturnType<typeof setTimeout> | null = null;
   let reconnectAttempts = 0;
   const maxReconnectAttempts = 5;
-  let nonceUpdateCallback: ((nonce: string) => void) | null = null;
   let statusChangeCallback: ((status: string, payload: any) => void) | null = null;
-  let pendingMessageResolver: {
-    resolve: (value: boolean) => void;
-    reject: (error: any) => void;
-    timeout: ReturnType<typeof setTimeout>;
-  } | null = null;
 
   const connect = (token?: string) => {
     const wsUrl = new URL("/ws", baseUrl.replace("http", "ws"));
@@ -108,20 +102,6 @@ export function useWebSocket(baseUrl: string, organizationId: string) {
         }
         break;
 
-      case "message_sent":
-        // Message was successfully sent, handle nonce update
-        if (data.nonce && nonceUpdateCallback) {
-          nonceUpdateCallback(data.nonce);
-        }
-
-        // Resolve pending message promise
-        if (pendingMessageResolver) {
-          clearTimeout(pendingMessageResolver.timeout);
-          pendingMessageResolver.resolve(true);
-          pendingMessageResolver = null;
-        }
-        break;
-
       case "typing":
         isTyping.value = data.isTyping;
         break;
@@ -138,39 +118,8 @@ export function useWebSocket(baseUrl: string, organizationId: string) {
         }
         break;
 
-      case "history":
-        if (Array.isArray(data.messages)) {
-          messages.value = data.messages.map((msg: any) => ({
-            id: msg.id || `msg_${Date.now()}`,
-            sender: msg.sender,
-            content: msg.content || msg.text,
-            timestamp: new Date(msg.timestamp).getTime(),
-            metadata: msg.metadata,
-          }));
-        }
-        break;
-
       case "error":
         console.error("[Webchat] Server error:", data.error);
-
-        // Reject pending message if any
-        if (pendingMessageResolver) {
-          clearTimeout(pendingMessageResolver.timeout);
-
-          // Handle NONCE_EXPIRED error
-          if (data.error === "NONCE_EXPIRED" && data.nonce && nonceUpdateCallback) {
-            nonceUpdateCallback(data.nonce);
-            pendingMessageResolver.reject({
-              message: "NONCE_EXPIRED",
-              nonce: data.nonce,
-            });
-          } else {
-            // Other errors
-            pendingMessageResolver.reject(new Error(data.error));
-          }
-
-          pendingMessageResolver = null;
-        }
         break;
 
       default:
@@ -208,61 +157,6 @@ export function useWebSocket(baseUrl: string, organizationId: string) {
     );
   };
 
-  const sendMessage = (
-    text: string,
-    proof: string,
-    method: string,
-    url: string,
-    convId: string,
-  ): Promise<boolean> => {
-    return new Promise((resolve, reject) => {
-      if (!ws.value || ws.value.readyState !== WebSocket.OPEN) {
-        console.error("[Webchat] WebSocket not connected");
-        reject(new Error("WebSocket not connected"));
-        return;
-      }
-
-      // Clear any existing pending resolver
-      if (pendingMessageResolver) {
-        clearTimeout(pendingMessageResolver.timeout);
-        pendingMessageResolver.reject(new Error("Message superseded by new message"));
-      }
-
-      // Create timeout
-      const timeout = setTimeout(() => {
-        if (pendingMessageResolver) {
-          pendingMessageResolver = null;
-          reject(new Error("Message send timeout"));
-        }
-      }, 10000);
-
-      // Store resolver
-      pendingMessageResolver = { resolve, reject, timeout };
-
-      // Send to server with DPoP proof
-      const payload = {
-        type: "message",
-        content: text,
-        proof,
-        method,
-        url,
-        conversationId: convId,
-        timestamp: Date.now(),
-      };
-
-      debugLog("[Webchat] Sending message with payload:", {
-        type: payload.type,
-        content: payload.content,
-        method: payload.method,
-        url: payload.url,
-        conversationId: payload.conversationId,
-        proofLength: payload.proof.length,
-      });
-
-      ws.value.send(JSON.stringify(payload));
-    });
-  };
-
   const sendTypingIndicator = (isTypingValue: boolean) => {
     if (!ws.value || ws.value.readyState !== WebSocket.OPEN) {
       return;
@@ -276,23 +170,6 @@ export function useWebSocket(baseUrl: string, organizationId: string) {
     );
   };
 
-  const loadHistory = () => {
-    if (!ws.value || ws.value.readyState !== WebSocket.OPEN || !conversationId.value) {
-      return;
-    }
-
-    ws.value.send(
-      JSON.stringify({
-        type: "load_history",
-        conversationId: conversationId.value,
-      }),
-    );
-  };
-
-  const setNonceUpdateCallback = (callback: (nonce: string) => void) => {
-    nonceUpdateCallback = callback;
-  };
-
   const setStatusChangeCallback = (callback: (status: string, payload: any) => void) => {
     statusChangeCallback = callback;
   };
@@ -301,12 +178,6 @@ export function useWebSocket(baseUrl: string, organizationId: string) {
     if (reconnectTimeout) {
       clearTimeout(reconnectTimeout);
       reconnectTimeout = null;
-    }
-
-    if (pendingMessageResolver) {
-      clearTimeout(pendingMessageResolver.timeout);
-      pendingMessageResolver.reject(new Error("WebSocket disconnected"));
-      pendingMessageResolver = null;
     }
 
     if (ws.value) {
@@ -329,10 +200,7 @@ export function useWebSocket(baseUrl: string, organizationId: string) {
     isTyping,
     connect,
     identify,
-    sendMessage,
     sendTypingIndicator,
-    loadHistory,
-    setNonceUpdateCallback,
     setStatusChangeCallback,
     disconnect,
   };
