@@ -11,7 +11,7 @@
         :greeting-message="config.greetingMessage || t('widget.defaultGreeting')"
         :messages="messages"
         :is-typing="isTyping"
-        :is-connected="isConnected"
+        :is-ready="isInitialized"
         :is-conversation-closed="isConversationClosed"
         :is-expanded="isExpanded"
         :agent-name="resolvedAgentName"
@@ -142,7 +142,7 @@ const resolvedAgentName = computed(
 
 const {
   isOpen,
-  isConnected,
+  isInitialized,
   messages,
   isTyping,
   unreadCount,

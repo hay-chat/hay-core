@@ -103,9 +103,7 @@ export function useChat(config: HayChatConfig) {
     if (pendingRestoreId && !conversationId.value) {
       const restoreId = pendingRestoreId;
       pendingRestoreId = null;
-      if (await loadExistingConversation(restoreId)) {
-        if (isConnected.value) identify(customerId.value, restoreId);
-      }
+      if (await loadExistingConversation(restoreId)) await startRealtime();
       return;
     }
     if (keypair.value && conversationId.value) {
@@ -202,7 +200,7 @@ export function useChat(config: HayChatConfig) {
 
       pinGreeting(parseServerTime(conversationData.createdAt));
 
-      // Don't identify yet - will be done after WebSocket connects in initialize()
+      // Identifying on the socket happens in startRealtime().
       return true;
     } catch (error) {
       console.error("[Webchat] Failed to create conversation:", error);
@@ -302,7 +300,7 @@ export function useChat(config: HayChatConfig) {
 
       debugLog("[Webchat] Conversation loaded successfully");
 
-      // Don't identify yet - will be done after WebSocket connects in initialize()
+      // Identifying on the socket happens in startRealtime().
       return true;
     } catch (error) {
       console.error("[Webchat] Failed to load existing conversation:", error);
@@ -349,10 +347,56 @@ export function useChat(config: HayChatConfig) {
     if (messages.value.length > 0) pinGreeting(messages.value[0].timestamp);
   };
 
-  // Initialize chat
-  const initialize = async () => {
-    if (isInitialized.value) return;
+  // Connect the socket for live updates on the current conversation, plus the
+  // retry loop and the polling fallback. Only called once a conversation
+  // exists: a socket without one has nothing to listen to.
+  const startRealtime = async () => {
+    if (!conversationId.value) return;
 
+    // Both run over HTTP, so they don't wait for the socket.
+    startRetryLoop();
+    startPolling();
+
+    if (!isConnected.value) {
+      connect();
+      // Wait for the socket (up to 5 seconds) so we can identify right away.
+      await new Promise<void>((resolve) => {
+        const checkConnection = setInterval(() => {
+          if (isConnected.value) {
+            clearInterval(checkConnection);
+            clearTimeout(giveUp);
+            resolve();
+          }
+        }, 100);
+        const giveUp = setTimeout(() => {
+          clearInterval(checkConnection);
+          resolve();
+        }, 5000);
+      });
+    }
+
+    if (conversationId.value && isConnected.value) {
+      debugLog("[Webchat] Identifying with WebSocket after connection...");
+      identify(customerId.value, conversationId.value);
+    }
+  };
+
+  // Prepare the chat: read what storage allows and resume this tab's
+  // conversation if there is one. It never creates a conversation: that waits
+  // for the shopper's first message, so browsing and opening the widget leave
+  // no rows behind and give bots nothing to farm.
+  let initializing: Promise<void> | null = null;
+  const initialize = (): Promise<void> => {
+    if (isInitialized.value) return Promise.resolve();
+    if (!initializing) {
+      initializing = runInitialize().finally(() => {
+        initializing = null;
+      });
+    }
+    return initializing;
+  };
+
+  const runInitialize = async () => {
     try {
       // Check WebCrypto availability
       if (!isWebCryptoAvailable()) {
@@ -380,61 +424,46 @@ export function useChat(config: HayChatConfig) {
       }
       customerId.value = storedCustomerId;
 
-      // Check for existing conversation (HTTP operations don't need WebSocket)
-      const existingConvId = existingConversationId.value;
-      if (existingConvId) {
-        const loaded = await loadExistingConversation(existingConvId);
-        // A deferred resume (key behind the consent gate) must not be replaced
-        // by a new conversation: that is how the shopper's thread got lost.
-        if (!loaded && !pendingRestoreId) {
-          await createNewConversation();
-        }
+      // Resume this tab's conversation (HTTP operations don't need WebSocket).
+      // When its key is still behind the consent gate the resume is deferred
+      // (see loadExistingConversation); nothing new is created either way.
+      if (existingConversationId.value) {
+        await loadExistingConversation(existingConversationId.value);
+      }
+
+      if (conversationId.value) {
+        // Messages are sent over HTTP, so the chat is usable before the socket is up.
+        void startRealtime();
       } else {
-        // No existing conversation, create new
-        await createNewConversation();
+        pinGreeting(Date.now());
       }
-
-      // Connect WebSocket for real-time updates
-      connect();
-
-      // Wait for WebSocket connection
-      await new Promise<void>((resolve) => {
-        if (isConnected.value) {
-          resolve();
-          return;
-        }
-
-        const checkConnection = setInterval(() => {
-          if (isConnected.value) {
-            clearInterval(checkConnection);
-            resolve();
-          }
-        }, 100);
-
-        // Timeout after 5 seconds
-        setTimeout(() => {
-          clearInterval(checkConnection);
-          resolve();
-        }, 5000);
-      });
-
-      // Now identify with the WebSocket (conversation is already loaded)
-      if (conversationId.value && isConnected.value) {
-        debugLog("[Webchat] Identifying with WebSocket after connection...");
-        identify(customerId.value, conversationId.value);
-      }
-
-      // Start retry loop for queued messages
-      startRetryLoop();
-
-      // Start periodic polling as fallback to ensure messages appear even if WebSocket fails
-      startPolling();
 
       isInitialized.value = true;
       debugLog("[Webchat] Chat initialized successfully");
     } catch (error) {
       console.error("[Webchat] Failed to initialize chat:", error);
     }
+  };
+
+  // The shopper is about to send their first message: make sure there is a
+  // conversation to send it to, resuming this tab's one when its key has
+  // become readable, and creating one otherwise.
+  const ensureConversation = async (): Promise<boolean> => {
+    if (conversationId.value && keypair.value) return true;
+
+    if (pendingRestoreId && canUseLocal.value) {
+      const restoreId = pendingRestoreId;
+      pendingRestoreId = null;
+      if (await loadExistingConversation(restoreId)) {
+        void startRealtime();
+        return true;
+      }
+    }
+
+    if (!(await createNewConversation())) return false;
+    // Connect while the message goes out over HTTP; the reply takes longer.
+    void startRealtime();
+    return true;
   };
 
   // Set status change callback for conversation status updates
@@ -585,13 +614,11 @@ export function useChat(config: HayChatConfig) {
     lastReadMessageId.value = null;
   };
 
-  // Start a new conversation (used when current one is closed)
+  // Start over after a closed conversation. The new conversation is created
+  // when the shopper sends its first message.
   const startNewConversation = async () => {
     await clearConversation();
-    const created = await createNewConversation();
-    if (created) {
-    }
-    return created;
+    pinGreeting(Date.now());
   };
 
   // Merge server messages into existing messages (additive only - never removes messages)
@@ -754,8 +781,18 @@ export function useChat(config: HayChatConfig) {
   };
 
   // Send a message
-  const sendMessage = async (text: string, retryCount: number = 0) => {
-    if (!text.trim() || isSending.value) return;
+  // Sends go out one at a time, in the order the shopper wrote them. This
+  // matters most for the first message, which creates the conversation: a
+  // second message must wait for it rather than race it.
+  let sendChain: Promise<unknown> = Promise.resolve();
+  const sendMessage = (text: string): Promise<void> => {
+    const run = sendChain.then(() => sendMessageNow(text));
+    sendChain = run.catch(() => {});
+    return run;
+  };
+
+  const sendMessageNow = async (text: string, retryCount: number = 0): Promise<void> => {
+    if (!text.trim()) return;
 
     // Sending a message is the ePrivacy "service explicitly requested" signal.
     // Mark interaction BEFORE any persistence runs so session/local storage
@@ -769,22 +806,15 @@ export function useChat(config: HayChatConfig) {
     let stage: "create" | "send" = "create";
 
     try {
-      // Check if conversation is closed
+      // A closed conversation is not reused: the message starts a new one.
       if (isConversationClosed.value && retryCount === 0) {
-        debugLog("[Webchat] Conversation closed, creating new one...");
+        debugLog("[Webchat] Conversation closed, starting a new one...");
         await clearConversation();
-        await createNewConversation();
+        pinGreeting(Date.now());
       }
 
-      // Ensure we have a conversation
-      if (!conversationId.value || !keypair.value) {
-        const created = await createNewConversation();
-        if (!created) {
-          throw lastCreateError ?? new Error("Failed to create conversation");
-        }
-      }
-
-      // Add message optimistically (only on first attempt)
+      // Add message optimistically (only on first attempt), before the
+      // conversation is created, so the bubble shows without waiting.
       if (retryCount === 0) {
         messages.value.push({
           id: tempMessageId,
@@ -794,7 +824,14 @@ export function useChat(config: HayChatConfig) {
         });
       }
 
+      // The first message is what creates the conversation.
+      await initialize();
+      if (!(await ensureConversation())) {
+        throw lastCreateError ?? new Error("Failed to create conversation");
+      }
+
       isSending.value = true;
+
       stage = "send";
 
       await sendMessageInternal(text.trim(), conversationId.value!);
@@ -812,7 +849,7 @@ export function useChat(config: HayChatConfig) {
         debugLog("[Webchat] Nonce expired, retrying...");
         nonce.value = error.nonce;
         // Retry once with new nonce
-        return sendMessage(text, retryCount + 1);
+        return sendMessageNow(text, retryCount + 1);
       }
 
       // The server refused the message (4xx). Retrying automatically will not
