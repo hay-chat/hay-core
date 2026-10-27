@@ -15,7 +15,11 @@ jest.mock("@server/services/redis.service", () => ({
   redisService: { subscribe: jest.fn(async () => undefined) },
 }));
 
-jest.mock("@server/database/data-source", () => ({ AppDataSource: { isInitialized: false } }));
+const mockUserOrgFindOne = jest.fn<(options: unknown) => Promise<unknown>>();
+jest.mock("@server/database/data-source", () => ({
+  AppDataSource: { isInitialized: false, getRepository: () => ({ findOne: mockUserOrgFindOne }) },
+}));
+jest.mock("@server/entities/user-organization.entity", () => ({ UserOrganization: class {} }));
 
 const mockConversationRepo = {
   findById: jest.fn<(id: string) => Promise<unknown>>(),
@@ -38,6 +42,7 @@ jest.mock("@server/routes/v1/public-conversations", () => ({
   verifyDPoPForRequest: mockVerifyDPoP,
 }));
 
+import * as jwt from "jsonwebtoken";
 import { WebSocketService } from "@server/services/websocket.service";
 
 const ORG_ID = "11111111-1111-4111-8111-111111111111";
@@ -206,5 +211,37 @@ describe("WebSocket public writes require DPoP", () => {
     await send({ type: "subscribe", conversationId: OTHER_CONV_ID });
 
     expect(internals.conversationClients.get(OTHER_CONV_ID)?.has(clientId) ?? false).toBe(false);
+  });
+});
+
+describe("WebSocket dashboard authentication", () => {
+  let service: WebSocketService;
+  const token = jwt.sign({ userId: "user-1", email: "a@b.c", type: "access" }, "ws-test-secret");
+
+  const orgMembers = (service: WebSocketService) =>
+    (service as unknown as { organizationClients: Map<string, Set<string>> }).organizationClients;
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    service = new WebSocketService();
+  });
+
+  it("does not stream org events to a user who is not a member of the requested org", async () => {
+    mockUserOrgFindOne.mockResolvedValue(null);
+    const { send, clientId } = connect(service, `org=${ORG_ID}&token=${token}`);
+    await send({ type: "subscribe" });
+
+    expect(mockUserOrgFindOne).toHaveBeenCalledWith({
+      where: { userId: "user-1", organizationId: ORG_ID, isActive: true },
+    });
+    expect(orgMembers(service).get(ORG_ID)?.has(clientId) ?? false).toBe(false);
+  });
+
+  it("streams org events to an active member of the requested org", async () => {
+    mockUserOrgFindOne.mockResolvedValue({ id: "membership-1" });
+    const { send, clientId } = connect(service, `org=${ORG_ID}&token=${token}`);
+    await send({ type: "subscribe" });
+
+    expect(orgMembers(service).get(ORG_ID)?.has(clientId)).toBe(true);
   });
 });
