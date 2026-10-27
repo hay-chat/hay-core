@@ -14,6 +14,10 @@ export type SessionRevokedReason = "logout" | "reuse_detected" | "password_chang
 @Entity("sessions")
 @Index("idx_sessions_user_id", ["userId"])
 @Index("idx_sessions_expires_at", ["expiresAt"])
+@Index("idx_sessions_legacy_token_hash", ["legacyTokenHash"], {
+  unique: true,
+  where: '"legacy_token_hash" IS NOT NULL',
+})
 export class Session extends BaseEntity {
   @Column({ type: "uuid" })
   userId!: string;
@@ -50,4 +54,11 @@ export class Session extends BaseEntity {
 
   @Column({ type: "text", nullable: true })
   userAgent?: string | null;
+
+  /**
+   * sha256 of the pre-rotation JWT refresh token this session replaced, so
+   * that token is accepted only once. TODO: drop with refreshLegacy.
+   */
+  @Column({ type: "varchar", length: 64, nullable: true })
+  legacyTokenHash?: string | null;
 }

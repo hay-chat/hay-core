@@ -214,6 +214,28 @@ describe("auth sessions: rotating, sliding refresh tokens (D11-3)", () => {
       expect((await load(tokens.refreshToken)).generation).toBe(0);
     });
 
+    it("accepts a legacy token only once", async () => {
+      const token = legacyToken(0);
+      await authSessionService.refresh(token);
+
+      await expectRejected(token, "reused");
+      expect(await sessions().count({ where: { userId } })).toBe(1);
+    });
+
+    it("mints one session when the same legacy token arrives twice at once", async () => {
+      const token = legacyToken(0);
+      const results = await Promise.allSettled([
+        authSessionService.refresh(token),
+        authSessionService.refresh(token),
+      ]);
+
+      expect(results.filter((r) => r.status === "fulfilled")).toHaveLength(1);
+      expect(results.find((r) => r.status === "rejected")).toMatchObject({
+        reason: { name: "RefreshRejectedError", reason: "reused" },
+      });
+      expect(await sessions().count({ where: { userId } })).toBe(1);
+    });
+
     it("rejects a legacy token issued before a password change", async () => {
       await AppDataSource.getRepository(User).update({ id: userId }, { tokenVersion: 3 });
       await expectRejected(legacyToken(0), "revoked");
