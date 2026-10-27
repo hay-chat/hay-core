@@ -516,6 +516,7 @@ async function receiveMessage(
       channel: "whatsapp",
       senderType: "customer",
       metadata,
+      replyWindowExpiresAt: replyWindowExpiresAt(message.timestamp),
       ...(attachments ? { attachments } : {}),
     },
   );

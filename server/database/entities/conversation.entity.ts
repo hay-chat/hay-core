@@ -125,6 +125,12 @@ export class Conversation {
   @Column({ type: "timestamptz", nullable: true })
   lastMessageAt!: Date | null;
 
+  // D13-2: after this the channel refuses free-form replies (WhatsApp's 24 h
+  // customer service window). Set by the channel plugin with each inbound
+  // message (`messages.receive` replyWindowExpiresAt); null = no window.
+  @Column({ type: "timestamptz", nullable: true })
+  reply_window_expires_at!: Date | null;
+
   @Column({ type: "jsonb", nullable: true })
   context!: Record<string, unknown> | null;
 

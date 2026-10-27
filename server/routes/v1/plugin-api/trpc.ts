@@ -121,6 +121,10 @@ export const pluginApiTrpcRouter = router({
         conversationId: z.string().uuid().optional(),
         // Optional title for a newly created conversation (e.g. email subject).
         title: z.string().max(255).optional(),
+        // D13-2: when the channel stops accepting free-form replies, counted from
+        // this inbound message (WhatsApp: its timestamp + 24 h). Only customer
+        // messages open a window; the latest one wins.
+        replyWindowExpiresAt: z.string().datetime({ offset: true }).optional(),
         // Park the conversation for a human instead of letting the AI answer
         // (e.g. a DMARC-failing email or a reply that shows a human already
         // answered outside Hay). The message is stored; the conversation goes
@@ -319,6 +323,17 @@ export const pluginApiTrpcRouter = router({
               processed: false,
               deduped: true,
             };
+          }
+        }
+
+        if (input.replyWindowExpiresAt && senderType === "customer") {
+          const expiresAt = new Date(input.replyWindowExpiresAt);
+          const current = conversation.reply_window_expires_at;
+          if (!current || new Date(current).getTime() < expiresAt.getTime()) {
+            await conversationRepository.updateById(conversation.id, {
+              reply_window_expires_at: expiresAt,
+            });
+            conversation.reply_window_expires_at = expiresAt;
           }
         }
 

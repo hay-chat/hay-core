@@ -91,6 +91,8 @@ describe("handleWebhook — inbound messages", () => {
         timestamp: "1760000000",
         type: "text",
       },
+      // The 24-hour window runs from the customer's message (D13-2).
+      replyWindowExpiresAt: new Date((1760000000 + 24 * 60 * 60) * 1000).toISOString(),
     });
   });
 

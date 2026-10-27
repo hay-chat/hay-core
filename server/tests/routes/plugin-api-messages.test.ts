@@ -468,6 +468,60 @@ describe("pluginApi.messages.receive holdForHuman", () => {
   });
 });
 
+describe("pluginApi.messages.receive replyWindowExpiresAt (D13-2)", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockCustomerRepo.findByExternalId.mockResolvedValue({
+      id: "cust-1",
+      name: "Ana",
+      phone: null,
+      external_metadata: {},
+    });
+    mockAgentRepo.findByOrganization.mockResolvedValue([{ id: "agent-1", channels: ["whatsapp"] }]);
+    mockConversationRepo.findByIdAndOrganization.mockResolvedValue(null);
+    mockConversationRepo.findByExternalConversationId.mockResolvedValue(null);
+    mockConversationRepo.getMessages.mockResolvedValue([]);
+    mockMessageRepo.create.mockImplementation(async (data) => ({ id: "msg-new", ...data }));
+  });
+
+  const windowUpdates = () =>
+    mockConversationRepo.updateById.mock.calls.filter(
+      (call) => (call[1] as Record<string, unknown>).reply_window_expires_at !== undefined,
+    );
+
+  it("stores the window the channel plugin reports", async () => {
+    mockConversationRepo.findActiveByCustomerAndChannel.mockResolvedValue(makeConversation());
+
+    await caller()["messages.receive"]({
+      from: "5511999999999",
+      content: "hi",
+      channel: "whatsapp",
+      metadata: { mid: "wamid.W.1" },
+      replyWindowExpiresAt: "2026-10-28T10:00:00.000Z",
+    });
+
+    expect(windowUpdates()).toEqual([
+      [CONVERSATION_ID, { reply_window_expires_at: new Date("2026-10-28T10:00:00.000Z") }],
+    ]);
+  });
+
+  it("never moves the window backwards (late webhook retries)", async () => {
+    const conversation = makeConversation();
+    conversation.reply_window_expires_at = new Date("2026-10-29T10:00:00.000Z");
+    mockConversationRepo.findActiveByCustomerAndChannel.mockResolvedValue(conversation);
+
+    await caller()["messages.receive"]({
+      from: "5511999999999",
+      content: "older",
+      channel: "whatsapp",
+      metadata: { mid: "wamid.W.2" },
+      replyWindowExpiresAt: "2026-10-28T10:00:00.000Z",
+    });
+
+    expect(windowUpdates()).toEqual([]);
+  });
+});
+
 describe("pluginApi.messages.updateStatus", () => {
   const storedMessage = (providerStatus: string | null = null) => ({
     id: "msg-1",
