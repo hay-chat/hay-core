@@ -12,4 +12,6 @@ export default {
   "chat.conversationClosed": "Rozmowa Zakończona",
   "input.placeholder": "Napisz wiadomość...",
   "input.send": "Wyślij wiadomość",
+  "error.sendFailed": "Nie udało się wysłać wiadomości. Spróbuj ponownie za chwilę.",
+  "error.messageTooLong": "Wiadomość jest za długa. Skróć ją i spróbuj ponownie.",
 } as const;

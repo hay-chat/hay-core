@@ -43,6 +43,22 @@ interface SendMessageResponse {
 }
 
 /**
+ * The server answered with an HTTP error. A 4xx means the request was refused
+ * (rate limited, website not allowed, message too long, ...) and retrying the
+ * same request automatically will not help.
+ */
+export class WidgetRequestError extends Error {
+  constructor(public readonly status: number) {
+    super(`Request refused with HTTP ${status}`);
+    this.name = "WidgetRequestError";
+  }
+
+  get isRefusal(): boolean {
+    return this.status >= 400 && this.status < 500;
+  }
+}
+
+/**
  * Composable for HTTP communication with publicConversations endpoints
  */
 export function useConversation(config: HayChatConfig) {
@@ -55,41 +71,35 @@ export function useConversation(config: HayChatConfig) {
     publicJwk: JsonWebKey,
     context?: Record<string, unknown>,
     customerExternalId?: string,
-  ): Promise<CreateConversationResponse | null> => {
-    try {
-      const metadata: ConversationMetadata = {
-        source: "web-embed",
-        url: window.location.href,
-        referrer: document.referrer,
-        userAgent: navigator.userAgent,
-        timestamp: new Date().toISOString(),
-      };
+  ): Promise<CreateConversationResponse> => {
+    const metadata: ConversationMetadata = {
+      source: "web-embed",
+      url: window.location.href,
+      referrer: document.referrer,
+      userAgent: navigator.userAgent,
+      timestamp: new Date().toISOString(),
+    };
 
-      const response = await fetch(`${baseUrl}/v1/publicConversations.create`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          organizationId: config.organizationId,
-          publicJwk,
-          metadata,
-          ...(context && Object.keys(context).length > 0 ? { context } : {}),
-          ...(customerExternalId ? { customerExternalId } : {}),
-        }),
-      });
+    const response = await fetch(`${baseUrl}/v1/publicConversations.create`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        organizationId: config.organizationId,
+        publicJwk,
+        metadata,
+        ...(context && Object.keys(context).length > 0 ? { context } : {}),
+        ...(customerExternalId ? { customerExternalId } : {}),
+      }),
+    });
 
-      if (!response.ok) {
-        const error = await response.json().catch(() => ({}));
-        throw new Error(error.message || "Failed to create conversation");
-      }
-
-      const data = await response.json();
-      return data.result.data;
-    } catch (error) {
-      console.error("[Conversation] Failed to create conversation:", error);
-      return null;
+    if (!response.ok) {
+      throw new WidgetRequestError(response.status);
     }
+
+    const data = await response.json();
+    return data.result.data;
   };
 
   /**
@@ -149,45 +159,40 @@ export function useConversation(config: HayChatConfig) {
     method: string,
     url: string,
     context?: Record<string, unknown>,
-  ): Promise<SendMessageResponse | null> => {
-    try {
-      const response = await fetch(`${baseUrl}/v1/publicConversations.sendMessage`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          conversationId,
-          content,
-          proof,
-          method,
-          url,
-          ...(context && Object.keys(context).length > 0 ? { context } : {}),
-        }),
-      });
+  ): Promise<SendMessageResponse> => {
+    const response = await fetch(`${baseUrl}/v1/publicConversations.sendMessage`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        conversationId,
+        content,
+        proof,
+        method,
+        url,
+        ...(context && Object.keys(context).length > 0 ? { context } : {}),
+      }),
+    });
 
-      const data = await response.json();
-
-      // Check if response is OK but contains nonce expiration error
-      if (response.ok && data.result?.data?.error === "NONCE_EXPIRED") {
-        return {
-          messageId: null,
-          nonce: data.result.data.nonce,
-          createdAt: null,
-          error: "NONCE_EXPIRED",
-          errorMessage: data.result.data.errorMessage,
-        };
-      }
-
-      if (!response.ok) {
-        throw new Error("Failed to send message");
-      }
-
-      return data.result.data;
-    } catch (error) {
-      console.error("[Conversation] Failed to send message:", error);
-      return null;
+    if (!response.ok) {
+      throw new WidgetRequestError(response.status);
     }
+
+    const data = await response.json();
+
+    // OK response that carries a nonce expiration error
+    if (data.result?.data?.error === "NONCE_EXPIRED") {
+      return {
+        messageId: null,
+        nonce: data.result.data.nonce,
+        createdAt: null,
+        error: "NONCE_EXPIRED",
+        errorMessage: data.result.data.errorMessage,
+      };
+    }
+
+    return data.result.data;
   };
 
   return {

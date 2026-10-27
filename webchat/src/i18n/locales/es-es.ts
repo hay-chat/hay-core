@@ -12,4 +12,6 @@ export default {
   "chat.conversationClosed": "Conversación Cerrada",
   "input.placeholder": "Escribe un mensaje...",
   "input.send": "Enviar mensaje",
+  "error.sendFailed": "No se pudo enviar tu mensaje. Inténtalo de nuevo en un momento.",
+  "error.messageTooLong": "Tu mensaje es demasiado largo. Acórtalo e inténtalo de nuevo.",
 } as const;

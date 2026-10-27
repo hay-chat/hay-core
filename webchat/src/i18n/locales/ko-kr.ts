@@ -12,4 +12,6 @@ export default {
   "chat.conversationClosed": "대화 종료됨",
   "input.placeholder": "메시지를 입력하세요...",
   "input.send": "메시지 보내기",
+  "error.sendFailed": "메시지를 보내지 못했습니다. 잠시 후 다시 시도해 주세요.",
+  "error.messageTooLong": "메시지가 너무 깁니다. 줄여서 다시 시도해 주세요.",
 } as const;

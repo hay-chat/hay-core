@@ -12,4 +12,6 @@ export default {
   "chat.conversationClosed": "Görüşme Kapandı",
   "input.placeholder": "Bir mesaj yazın...",
   "input.send": "Mesaj gönder",
+  "error.sendFailed": "Mesajınız gönderilemedi. Lütfen birazdan tekrar deneyin.",
+  "error.messageTooLong": "Mesajınız çok uzun. Lütfen kısaltıp tekrar deneyin.",
 } as const;

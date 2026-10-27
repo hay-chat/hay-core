@@ -52,6 +52,12 @@ export interface Message {
   senderName?: string;
 }
 
+/** Shown under the input when the server refuses a message; `text` goes back into the input. */
+export interface SendFailure {
+  reason: "sendFailed" | "messageTooLong";
+  text: string;
+}
+
 declare global {
   interface Window {
     HayChat?: {

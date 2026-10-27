@@ -19,6 +19,7 @@
         :organization-logo-url="resolvedLogoUrl"
         :current-agent-type="currentAgentType"
         :current-agent-name="currentAgentName || undefined"
+        :send-failure="sendFailure"
         @close="closeChat"
         @send="sendMessage"
         @start-typing="startTyping"
@@ -148,6 +149,7 @@ const {
   isConversationClosed,
   currentAgentType,
   currentAgentName,
+  sendFailure,
   toggleChat,
   closeChat,
   sendMessage,

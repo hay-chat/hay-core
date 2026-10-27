@@ -144,6 +144,7 @@
     <MessageInput
       v-else
       :is-connected="isConnected"
+      :failure="sendFailure"
       @send="$emit('send', $event)"
       @start-typing="$emit('startTyping')"
       @stop-typing="$emit('stopTyping')"
@@ -187,7 +188,7 @@ import { computed } from "vue";
 import MessageList from "./MessageList.vue";
 import MessageInput from "./MessageInput.vue";
 import { useI18n } from "@/i18n";
-import type { Message } from "@/types";
+import type { Message, SendFailure } from "@/types";
 
 const t = useI18n();
 
@@ -207,6 +208,7 @@ const props = defineProps<{
   organizationLogoUrl?: string;
   currentAgentType?: string;
   currentAgentName?: string;
+  sendFailure?: SendFailure | null;
 }>();
 
 defineEmits<{
