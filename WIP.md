@@ -1,3 +1,9 @@
+## 2026-10-27 — staging — L1 security, L8 private media, L3 hand-off honesty merged
+
+**Landed + tested:** D9-1/3/2, D3-1, D12-1 (6ae259f), D8-1/2 (b2a60d7), webchat settings switch/description fix (262ba92). L3 (b5a4120) merged, suites green, manual test by a tester agent in progress.
+**Running:** L9 dashboard agent; tester for L3. Manual tests now delegated to tester agents (brief in scratchpad TESTER_BRIEF.md).
+**Next:** L5 Shopify (D6-1/4), L10 refresh tokens, L6 widget hygiene, X tickets.
+
 ## 2026-10-27 — staging — D1-1/D7-1/D1-2 merged + tested
 
 **Landed:** claude/d1-billing-honesty (2cf8ee5): `billableResolutions` metric (no playground/test, unhappy, handed-off), `conversations.handed_off_at` (migration run on staging). Tested by hand: takeover → release → resolve is not billed; clean resolution is.

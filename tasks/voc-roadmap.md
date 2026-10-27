@@ -85,6 +85,13 @@ Not doing: **D4-1** (Roger waits for the full D4 build). Copy must not claim Req
 | baseline | dashboard + API + widget test page | —      | pending     | baseline-staging.gif |
 | D1-1 + D7-1 | `billableResolutions` on `analytics.conversationMetrics` excludes playground/test, unhappy closes, handed-off | 2cf8ee5 | merged → tested ✓: org metrics resolved 2 / billable 1 (handed-off chat excluded, clean one counted). Jest billable-resolutions 9/9 on merged staging; server tsc clean | d1-2-handoff-not-billed.gif |
 | D1-2 | `conversations.handed_off_at` stamped on first hand-off, never cleared | 2cf8ee5 | merged → tested ✓: dashboard Take over → stamped 17:20:21; Release → Return to AI → status open, stamp kept; resolved → not billed | d1-2-handoff-not-billed.gif |
+| D9-1 | DPoP on every WS write (+ extra: org membership check before streaming org events; subscribe/load_history closed) | 6ae259f | merged → tested ✓: raw WS identify w/o id → error, message w/o proof → "DPoP authentication required", subscribe → Unauthorized; 0 new conversations/messages. 7 L1 suites 42/42 on merged staging | — (curl/ws) |
+| D9-3 | allowed domains enforced on create; `endsWith` bug fixed | 6ae259f + 262ba92 | merged → tested ✓: `*.example.com` saved in Settings → shop/a.b.example.com 200, evilexample.com / example.com.evil.io / 127.0.0.1:8090 / no Origin 403; widget on 127.0.0.1 can't start a chat; localhost:8090 allowed only because dashboard host is localhost in dev. Integration fix 262ba92: switches used `v-model:checked` (always looked off, ignored clicks) and Textarea dropped the description | d9-3-allowed-domains-and-widget-ok.gif |
+| D9-2 | rate limits + 4000-char cap | 6ae259f | merged → tested ✓: 30× create from one XFF IP 200, 31st 429, other IP 200; 4001 chars → 400 too_big | — |
+| D3-1 | public message whitelist (tRPC + WS) | 6ae259f | merged → tested ✓ via suite webchat-public-message + widget still renders replies | d9-3-allowed-domains-and-widget-ok.gif |
+| D12-1 | Express brotli/gzip | 6ae259f | merged → tested ✓: widget.js 128,322 → br 42,998 / gzip 44,830, `Vary: Accept-Encoding` | — |
+| D8-1 | private media via `/v1/media/:id` (session or HMAC-signed URL) | b2a60d7 | merged → tested ✓: no auth 401, staff 200 (+nosniff, CSP sandbox, inline disposition), wrong org 404, Range 206, signed 200, tampered sig 404, `/uploads/.../conversation-media` 404; Inbox renders attachment from blob URL | d8-1-private-media-inbox.gif |
+| D8-2 | allow-list, magic bytes, sharp re-encode (EXIF stripped); HEIC refused | b2a60d7 | merged → tested ✓: smoke JPEG with Make+GPS EXIF downloaded with none | — |
 
 ## Wave 1 — foundations
 
@@ -124,6 +131,8 @@ Parked: D13-15, D16-10/11, D6-14, D2-10, D7-15, D8-18, D10-9, D11-13, D14-10, fr
 Staging seed: org/user created via `auth.register` (credentials in `../hay-core-staging/.staging-login`, untracked).
 
 ## Needs Roger
+- **Before deploying Wave 0:** (a) orgs that saved a restricted allowed-domains list will start getting 403s from unlisted sites (never enforced before) — check prod data; bare `shop.com` no longer allows `www.shop.com`. (b) Confirm Traefik doesn't trust client X-Forwarded-For and whether Cloudflare proxies in front (per-IP rate limits depend on it). (c) D8 media switch-over: deploy first, then set ACL private on `uploads/*/{conversation-media,documents,plugin-zips}/` in Spaces (commands in the L8 report, copied below), Spaces listing Restricted, purge CDN; ensure the server image installs sharp's optional Linux binaries.
+- **Copy:** neutral hand-off line until D5-6/7 — en "I've passed this to the team. They'll reply to you here in this chat." / pt "Encaminhei sua mensagem para a equipe. Eles vão te responder aqui neste chat." OK? Planner local time is hour-precision to keep prompt caching.
 - **Decision (D1, Wave 0):** inactivity closes (incl. "hi" then silence) are still billed until D1-3's close classifier lands; the pricing page says unresolved chats don't count. Keep billing (agent's recommendation; pull the D1-12 pricing copy forward) or add a one-line exclusion now (revenue drops)? Default: keep, until you say otherwise.
 - **Backoffice:** read `billableResolutions` (fallback `resolvedConversations`) in `hay-api.ts` / `usage-tracking.service.ts`; overage delta logic must tolerate a lower total (folded into the D1-4 X ticket).
 
@@ -136,6 +145,16 @@ Staging seed: org/user created via `auth.register` (credentials in `../hay-core-
 - Connect test stores to the **local staging server**: Shopify haychat-2 app/token, Nuvemshop app/token, WhatsApp test
   number (channel tickets).
 - Confirm it's OK that staging uses the `OPENAI_API_KEY` from the main checkout's `.env` (nothing else copied).
+
+## Follow-ups logged (not in Wave 0 scope)
+- Widget: no shopper feedback when create is refused (403/429) — message just vanishes (L6).
+- Widget media: sign attachment URLs in `public-conversations` getMessages + WS push with `signAttachmentUrls` (L1, before D8-9).
+- WS `identify` (read side) needs no DPoP; WS auth ignores tokenVersion; `getMessages` not rate limited (L1).
+- Per-org create burst (600/min) can be used to lock out an org's shoppers → Turnstile / under-attack mode (D9-9/10).
+- HEIC: needs heic-convert or libvips with libde265 (L8).
+- run.ts: available + custom instructions branch never sets `pending-human`; small take-over race before hand-off update (L3).
+- `organizations/[id]/index.vue` still binds `Checkbox v-model:checked` (check Checkbox API) (L9).
+- AI invents shop facts without a knowledge base ("yes we ship to Germany") — guardrail topic, not Wave 0.
 
 ## Working notes
 - Manual-test GIFs live outside the repo: `seo/Engineering/04 Feature guides/_test-gifs/`.
