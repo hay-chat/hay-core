@@ -824,7 +824,7 @@ async onStart(ctx) {
 }
 ```
 
-**Examples:** Email plugin
+**Examples:** Email inbox (`send-email` action)
 
 ---
 
@@ -1078,7 +1078,7 @@ this.process.on("exit", (code, signal) => {
 
 ### In-Process MCP Server
 
-- **Email** (`/plugins/core/email/src/index.ts`)
+- **Email inbox** (`/plugins/core/email-channel/src/notify.ts`)
 - Simple in-process MCP with tool implementations
 
 ---

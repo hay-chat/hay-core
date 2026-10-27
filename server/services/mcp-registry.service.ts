@@ -69,7 +69,7 @@ export class MCPRegistryService {
         continue;
       }
 
-      // Get the semantic plugin ID (e.g., hay-plugin-email) from the plugin registry
+      // Get the semantic plugin ID (e.g., hay-plugin-acme) from the plugin registry
       // instance.pluginId is the UUID, instance.plugin.pluginId is the semantic ID
       const semanticPluginId = instance.plugin?.pluginId || instance.pluginId;
 
