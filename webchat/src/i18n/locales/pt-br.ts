@@ -1,6 +1,6 @@
 export default {
   "widget.defaultTitle": "Fale conosco",
-  "widget.defaultSubtitle": "Normalmente respondemos em minutos",
+  "widget.defaultSubtitle": "Estamos aqui para ajudar",
   "widget.defaultGreeting": "Olá! Como podemos ajudar você hoje?",
   "chat.close": "Fechar chat",
   "chat.open": "Abrir chat",
