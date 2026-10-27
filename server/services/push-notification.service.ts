@@ -9,7 +9,7 @@ const logger = createLogger("push-notifications");
 
 /** What the dashboard's service worker (dashboard/public/sw.js) receives. */
 export interface PushPayload {
-  kind: "conversation_needs_attention" | "test";
+  kind: "conversation_needs_attention" | "channel_delivery_failed" | "test";
   title: string;
   body: string;
   /** Path on the dashboard origin the notification opens, e.g. /conversations/<id>. */
@@ -32,6 +32,8 @@ const COPY = {
     summaryPending: "Tap to open the conversation and take over.",
     testTitle: "Hay alerts are on",
     testBody: "You will be notified here when a conversation needs a human.",
+    deliveryFailedTitle: "A reply could not be delivered",
+    deliveryFailedBody: "Hay.chat retried 3 times and gave up. Open the conversation to follow up.",
   },
   "pt-BR": {
     title: "Um cliente precisa de um humano",
@@ -39,6 +41,9 @@ const COPY = {
     summaryPending: "Toque para abrir a conversa e assumir.",
     testTitle: "Alertas do Hay ativados",
     testBody: "Você será avisado aqui quando uma conversa precisar de um humano.",
+    deliveryFailedTitle: "Uma resposta não pôde ser entregue",
+    deliveryFailedBody:
+      "O Hay.chat tentou mais 3 vezes e desistiu. Abra a conversa para acompanhar.",
   },
 } as const;
 
@@ -130,23 +135,51 @@ class PushNotificationService {
   }
 
   /**
-   * Fan out to every opted-in device of the organization's active members.
+   * A reply to a shopper failed on an external channel after every retry
+   * (channel-delivery.service). Owners and admins only.
+   */
+  async onChannelDeliveryFailed(args: {
+    organizationId: string;
+    conversationId: string;
+  }): Promise<void> {
+    if (!this.isConfigured()) return;
+    const copy = await copyFor(args.organizationId);
+    await this.sendToOrganization(
+      args.organizationId,
+      {
+        kind: "channel_delivery_failed",
+        title: copy.deliveryFailedTitle,
+        body: copy.deliveryFailedBody,
+        url: `/conversations/${args.conversationId}`,
+        tag: `delivery-failed:${args.conversationId}`,
+      },
+      { roles: ["owner", "admin"] },
+    );
+  }
+
+  /**
+   * Fan out to every opted-in device of the organization's active members
+   * (optionally only members with one of `roles`).
    * Devices of users who lost access keep their row until the next delivery
    * attempt prunes them; the membership join keeps them silent meanwhile.
    */
   async sendToOrganization(
     organizationId: string,
     payload: PushPayload,
+    options: { roles?: string[] } = {},
   ): Promise<{ sent: number; removed: number }> {
-    const subscriptions = await this.repo()
+    const query = this.repo()
       .createQueryBuilder("s")
       .innerJoin(
         "user_organizations",
         "uo",
         "uo.user_id = s.user_id AND uo.organization_id = s.organization_id AND uo.is_active = true",
       )
-      .where("s.organization_id = :organizationId", { organizationId })
-      .getMany();
+      .where("s.organization_id = :organizationId", { organizationId });
+    if (options.roles?.length) {
+      query.andWhere("uo.role IN (:...roles)", { roles: options.roles });
+    }
+    const subscriptions = await query.getMany();
     return this.deliver(subscriptions, payload);
   }
 

@@ -184,7 +184,17 @@ function mapGraphError(error: GraphApiError): ErrorMapping {
   if (error.code !== undefined && RATE_LIMIT_CODES.has(error.code)) {
     return { status: 503, error: "rate_limited" };
   }
-  if (error.status === 0 || error.status >= 500) return { status: 503, error: "graph_unavailable" };
+  if (error.status === 0) {
+    return error.notSent
+      ? { status: 503, error: "graph_unavailable" }
+      : { status: 200, error: "delivery_uncertain" };
+  }
+  if (error.status >= 500) {
+    // Meta answered with its own error body: it processed and refused the send.
+    return error.code !== undefined
+      ? { status: 503, error: "graph_unavailable" }
+      : { status: 200, error: "delivery_uncertain" };
+  }
   if (error.code === 190) return { status: 200, error: "token_revoked" };
   if (error.code === 133010) return { status: 200, error: "phone_not_registered" };
   if (error.code === 131026) return { status: 200, error: "recipient_unavailable" };

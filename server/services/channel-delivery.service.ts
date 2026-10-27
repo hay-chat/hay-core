@@ -62,8 +62,31 @@ interface PluginDeliverResponse {
   error?: string;
 }
 
-class ChannelDeliveryService {
+/** Worker answers meaning "nothing was sent, try again later" (the /deliver contract). */
+const RETRYABLE_WORKER_STATUSES = new Set([429, 503]);
+
+/** 3 retries with exponential backoff (5 s, 15 s, 45 s). Meta's pair limit is ~1 msg / 6 s. */
+const DEFAULT_RETRY_DELAYS_MS = [5_000, 15_000, 45_000];
+
+type DeliveryAttemptOutcome =
+  | { kind: "delivered"; providerMessageId?: string }
+  | { kind: "failed"; retryable: boolean; error: string };
+
+/** `cause.code` of a Node fetch failure (e.g. ECONNREFUSED), if any. */
+function errorCode(error: unknown): string | undefined {
+  const cause = (error as { cause?: { code?: unknown } } | null)?.cause;
+  return typeof cause?.code === "string" ? cause.code : undefined;
+}
+
+export class ChannelDeliveryService {
   private initialized = false;
+  private readonly retryDelaysMs: number[];
+  private readonly sleep: (ms: number) => Promise<void>;
+
+  constructor(options: { retryDelaysMs?: number[]; sleep?: (ms: number) => Promise<void> } = {}) {
+    this.retryDelaysMs = options.retryDelaysMs ?? DEFAULT_RETRY_DELAYS_MS;
+    this.sleep = options.sleep ?? ((ms) => new Promise((resolve) => setTimeout(resolve, ms)));
+  }
 
   /**
    * Initialize by subscribing to the same Redis channel as the WebSocket service.
@@ -172,6 +195,7 @@ class ChannelDeliveryService {
         messageId,
         conversationId,
         conversationMetadata: (conversation.metadata ?? null) as Record<string, unknown> | null,
+        language: conversation.language ?? null,
         messageMetadata: (payload.metadata ?? null) as Record<string, unknown> | null,
         attachments: payload.attachments ?? [],
       });
@@ -265,6 +289,16 @@ class ChannelDeliveryService {
    *
    * Resolves the org's enabled plugin instance whose manifest `channel` field
    * (package.json `hay-plugin.channel`) matches the conversation channel.
+   *
+   * Retry (D13-7): a transient failure is retried up to `retryDelaysMs.length`
+   * times with backoff. Only failures where the provider certainly did not
+   * accept the message are retried, so a reply is never sent twice:
+   *   - the worker answered 503 or 429 (the /deliver contract: a plugin returns
+   *     these only while nothing was accepted; once one part went out it
+   *     reports success),
+   *   - the worker could not be started or the connection to it was refused.
+   * Anything else is final. After the last retry the message keeps
+   * `providerStatus: failed` and the org's owners and admins are alerted.
    */
   private async deliverViaPlugin(args: {
     organizationId: string;
@@ -274,20 +308,12 @@ class ChannelDeliveryService {
     messageId: string;
     conversationId: string;
     conversationMetadata: Record<string, unknown> | null;
+    /** Conversation language (e.g. "pt"), so a plugin can pick a template language. */
+    language: string | null;
     messageMetadata: Record<string, unknown> | null;
     attachments: MessageAttachment[];
   }): Promise<void> {
-    const {
-      organizationId,
-      channel,
-      to,
-      content,
-      messageId,
-      conversationId,
-      conversationMetadata,
-      messageMetadata,
-      attachments,
-    } = args;
+    const { organizationId, channel, messageId, conversationId, attachments } = args;
 
     const pluginId = await pluginManagerService.findPluginIdByChannel(organizationId, channel);
 
@@ -295,6 +321,82 @@ class ChannelDeliveryService {
       logger.warn({ channel, organizationId }, "No enabled plugin for channel in organization");
       return;
     }
+
+    // Private uploads need a signature: the worker fetches each file with a plain GET.
+    // Signed once: the TTL outlives every retry.
+    const deliverableAttachments = await signAttachmentUrls(
+      attachments,
+      organizationId,
+      DELIVERY_SIGNED_URL_TTL_SECONDS,
+    );
+    const body = JSON.stringify({
+      to: args.to,
+      content: args.content,
+      messageId,
+      conversationId,
+      conversationMetadata: args.conversationMetadata,
+      language: args.language,
+      messageMetadata: args.messageMetadata,
+      attachments: deliverableAttachments,
+    });
+
+    for (let attempt = 0; ; attempt++) {
+      const outcome = await this.attemptDelivery({ organizationId, pluginId, body });
+
+      if (outcome.kind === "delivered") {
+        if (outcome.providerMessageId) {
+          // Store the provider's message id (e.g. Meta wamid, Chatwoot message id)
+          // so later status webhooks can be matched back to this message.
+          await messageRepository.updateProviderMessageId(messageId, outcome.providerMessageId);
+        }
+        logger.info(
+          { messageId, providerMessageId: outcome.providerMessageId, channel, attempt },
+          "Channel delivery successful",
+        );
+        return;
+      }
+
+      const retriesLeft = attempt < this.retryDelaysMs.length;
+      if (outcome.retryable && retriesLeft) {
+        const delayMs = this.retryDelaysMs[attempt];
+        logger.warn(
+          { messageId, channel, error: outcome.error, attempt: attempt + 1, delayMs },
+          "Channel delivery failed transiently — retrying",
+        );
+        await this.sleep(delayMs);
+        continue;
+      }
+
+      if (outcome.error === "24h_window_expired") {
+        logger.warn({ messageId, channel, conversationId }, "24h session window expired");
+      } else {
+        logger.error(
+          { messageId, channel, error: outcome.error, attempts: attempt + 1 },
+          "Channel delivery failed",
+        );
+      }
+      const error: MessageProviderError = { code: outcome.error };
+      await this.markDeliveryFailed({ messageId, conversationId, organizationId, error });
+      if (outcome.retryable) {
+        await this.alertDeliveryFailed({
+          organizationId,
+          conversationId,
+          messageId,
+          channel,
+          error,
+        });
+      }
+      return;
+    }
+  }
+
+  /** One POST to the worker's /deliver, classified for the retry loop. */
+  private async attemptDelivery(args: {
+    organizationId: string;
+    pluginId: string;
+    body: string;
+  }): Promise<DeliveryAttemptOutcome> {
+    const { organizationId, pluginId, body } = args;
 
     let worker;
     try {
@@ -304,67 +406,73 @@ class ChannelDeliveryService {
         { err: error, pluginId, organizationId },
         "Failed to get/start channel plugin worker",
       );
-      return;
+      return { kind: "failed", retryable: true, error: "worker_unavailable" };
     }
 
     const deliverUrl = `http://localhost:${worker.port}/deliver`;
-
+    let response: Response;
     try {
-      // Private uploads need a signature: the worker fetches each file with a plain GET.
-      const deliverableAttachments = await signAttachmentUrls(
-        attachments,
-        organizationId,
-        DELIVERY_SIGNED_URL_TTL_SECONDS,
-      );
-      const response = await fetch(deliverUrl, {
+      response = await fetch(deliverUrl, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          to,
-          content,
-          messageId,
-          conversationId,
-          conversationMetadata,
-          messageMetadata,
-          attachments: deliverableAttachments,
-        }),
+        body,
       });
-
-      const result = (await response.json()) as PluginDeliverResponse;
-
-      if (result.success && result.providerMessageId) {
-        // Store the provider's message id (e.g. Meta wamid, Chatwoot message id)
-        // so later status webhooks can be matched back to this message.
-        await messageRepository.updateProviderMessageId(messageId, result.providerMessageId);
-        logger.info(
-          {
-            messageId,
-            providerMessageId: result.providerMessageId,
-            channel,
-          },
-          "Channel delivery successful",
-        );
-      } else if (!result.success) {
-        if (result.error === "24h_window_expired") {
-          logger.warn({ messageId, channel, conversationId }, "24h session window expired");
-        } else {
-          logger.error(
-            { messageId, channel, error: result.error },
-            "Channel delivery returned failure",
-          );
-        }
-        await this.markDeliveryFailed({
-          messageId,
-          conversationId,
-          organizationId,
-          error: { code: result.error ?? "delivery_failed" },
-        });
-      }
     } catch (error) {
+      // Refused = the worker never saw the request. Any other network error may
+      // have happened after the worker sent the message, so it is not retried.
+      const refused = errorCode(error) === "ECONNREFUSED";
       logger.error(
-        { err: error, deliverUrl, messageId },
+        { err: error, deliverUrl, refused },
         "Failed to deliver message to plugin worker",
       );
+      return { kind: "failed", retryable: refused, error: "worker_unreachable" };
+    }
+
+    let result: PluginDeliverResponse = {};
+    try {
+      result = ((await response.json()) ?? {}) as PluginDeliverResponse;
+    } catch {
+      result = {};
+    }
+
+    if (result.success) {
+      return { kind: "delivered", providerMessageId: result.providerMessageId };
+    }
+    return {
+      kind: "failed",
+      retryable: RETRYABLE_WORKER_STATUSES.has(response.status),
+      error: result.error ?? "delivery_failed",
+    };
+  }
+
+  /**
+   * Tell the org's owners and admins a reply could not be delivered after every
+   * retry: web push to their devices, and a dashboard event (toast) for anyone
+   * who has it open. Best effort.
+   */
+  private async alertDeliveryFailed(args: {
+    organizationId: string;
+    conversationId: string;
+    messageId: string;
+    channel: string;
+    error: MessageProviderError;
+  }): Promise<void> {
+    const { organizationId, conversationId, messageId, channel, error } = args;
+    try {
+      const { redisService } = await import("./redis.service");
+      await redisService.publish("websocket:events", {
+        type: "channel_delivery_failed",
+        organizationId,
+        payload: { conversationId, messageId, channel, providerError: error },
+      });
+    } catch (err) {
+      logger.error({ err, messageId }, "Failed to publish delivery-failure alert");
+    }
+    try {
+      const { pushNotificationService } = await import("./push-notification.service");
+      await pushNotificationService.onChannelDeliveryFailed({ organizationId, conversationId });
+    } catch (err) {
+      logger.error({ err, messageId }, "Failed to push delivery-failure alert");
     }
   }
 

@@ -3,7 +3,15 @@
     "untitled": "Conversa sem título",
     "delivery": {
       "failed": "Falha na entrega",
-      "windowExpired": "Fora da janela de 24 horas — o cliente precisa enviar uma mensagem primeiro"
+      "windowExpired": "Fora da janela de 24 horas — o cliente precisa enviar uma mensagem primeiro",
+      "codes": {
+        "retriedOut": "O canal não aceitou esta resposta. O Hay.chat tentou mais 3 vezes e desistiu.",
+        "uncertain": "O canal não confirmou esta resposta. O cliente pode não ter recebido."
+      },
+      "alert": {
+        "title": "Uma resposta não pôde ser entregue",
+        "body": "O Hay.chat tentou mais 3 vezes e desistiu. Abra a conversa para acompanhar."
+      }
     },
     "attachment": {
       "loadFailed": "Não foi possível carregar este anexo"

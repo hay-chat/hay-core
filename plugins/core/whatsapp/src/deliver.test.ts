@@ -252,12 +252,44 @@ describe("deliver", () => {
     });
   });
 
-  it("maps a network failure to a retryable 503", async () => {
-    const { run } = setup([]); // queuedFetch throws on an unexpected call
+  it("maps a network failure before the request reached Meta to a retryable 503", async () => {
+    const refused = Object.assign(new TypeError("fetch failed"), {
+      cause: { code: "ECONNREFUSED" },
+    });
+    const ctx: ChannelContext = {
+      getConnection: () => embedded,
+      graph: new GraphClient({
+        logger: fakeLogger(),
+        fetchImpl: vi.fn(async () => {
+          throw refused;
+        }) as unknown as typeof fetch,
+      }),
+      api: { mutation: vi.fn() as ChannelContext["api"]["mutation"] },
+      logger: fakeLogger(),
+    };
 
-    expect(await run({ to: "+5511999999999", content: "Hi" })).toEqual({
+    expect(await deliver({ to: "+5511999999999", content: "Hi" }, ctx)).toEqual({
       status: 503,
       body: { success: false, error: "graph_unavailable" },
+    });
+  });
+
+  it("never asks for a retry when the request may have reached Meta", async () => {
+    const { run } = setup([]); // queuedFetch throws a plain error (e.g. a reset)
+
+    expect(await run({ to: "+5511999999999", content: "Hi" })).toEqual({
+      status: 200,
+      body: { success: false, error: "delivery_uncertain" },
+    });
+  });
+
+  it("retries a Meta 5xx refusal but not a bare gateway 5xx", async () => {
+    expect(
+      await setup([graphError(500, 131000)]).run({ to: "+5511999999999", content: "Hi" }),
+    ).toEqual({ status: 503, body: { success: false, error: "graph_unavailable" } });
+    expect(await setup([[504, undefined]]).run({ to: "+5511999999999", content: "Hi" })).toEqual({
+      status: 200,
+      body: { success: false, error: "delivery_uncertain" },
     });
   });
 

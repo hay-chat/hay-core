@@ -3,7 +3,15 @@
     "untitled": "Untitled conversation",
     "delivery": {
       "failed": "Delivery failed",
-      "windowExpired": "Outside the 24-hour window — the customer must message first"
+      "windowExpired": "Outside the 24-hour window — the customer must message first",
+      "codes": {
+        "retriedOut": "The channel didn't accept this reply. Hay.chat retried 3 times and gave up.",
+        "uncertain": "The channel didn't confirm this reply. The customer may not have received it."
+      },
+      "alert": {
+        "title": "A reply could not be delivered",
+        "body": "Hay.chat retried 3 times and gave up. Open the conversation to follow up."
+      }
     },
     "attachment": {
       "loadFailed": "Couldn't load this attachment"
