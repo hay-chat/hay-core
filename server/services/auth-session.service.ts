@@ -236,14 +236,19 @@ export class AuthSessionService {
     }
   }
 
-  /** End the session a refresh token belongs to (explicit logout). Idempotent. */
-  async revoke(refreshToken: string): Promise<void> {
+  /**
+   * End the session a refresh token belongs to (explicit logout). Idempotent.
+   * Returns the session's user (also for an already-ended session), or null
+   * when the token names no session.
+   */
+  async revoke(refreshToken: string): Promise<string | null> {
     const decoded = decodeRefreshToken(refreshToken);
-    if (!decoded) return;
+    if (!decoded) return null;
     const repo = AppDataSource.getRepository(Session);
     const session = await repo.findOne({ where: { id: decoded.sessionId } });
-    if (!session || session.revokedAt) return;
-    await this.markRevoked(repo, session, "logout", new Date());
+    if (!session) return null;
+    if (!session.revokedAt) await this.markRevoked(repo, session, "logout", new Date());
+    return session.userId;
   }
 
   /** Delete sessions that ended (expired or revoked) more than 30 days ago. */

@@ -163,9 +163,9 @@ export class ConversationRepository extends BaseRepository<Conversation> {
    */
   private notifyDevicesOnTransition(previousStatus: string, updated: Conversation): void {
     if (updated.status === previousStatus) return;
-    void import("../services/push-notification.service")
-      .then(({ pushNotificationService }) =>
-        pushNotificationService.onConversationStatusChanged(updated),
+    void import("../services/conversation-alert.service")
+      .then(({ conversationAlertService }) =>
+        conversationAlertService.onConversationStatusChanged(updated),
       )
       .catch((error) => {
         logger.warn({ err: error, conversationId: updated.id }, "Push alert failed");

@@ -2,7 +2,6 @@ import webPush, { type PushSubscription as WebPushSubscription } from "web-push"
 import { config } from "@server/config/env";
 import { AppDataSource } from "@server/database/data-source";
 import { PushSubscription } from "@server/database/entities/push-subscription.entity";
-import type { Conversation } from "@server/database/entities/conversation.entity";
 import { createLogger } from "@server/lib/logger";
 
 const logger = createLogger("push-notifications");
@@ -12,7 +11,7 @@ export interface PushPayload {
   kind: "conversation_needs_attention" | "test";
   title: string;
   body: string;
-  /** Path on the dashboard origin the notification opens, e.g. /conversations/<id>. */
+  /** Path on the dashboard origin the notification opens, e.g. /conversations/<id>?org=<orgId>. */
   url: string;
   /** Collapses repeated notifications about the same conversation. */
   tag: string;
@@ -24,28 +23,23 @@ export interface SubscribeInput {
   userAgent?: string | null;
 }
 
-/** Notification copy by organization locale (falls back to en). */
-const COPY = {
+/** Test-alert copy by organization locale (falls back to en). */
+const TEST_COPY = {
   en: {
-    title: "A customer needs a human",
-    untitled: "New conversation",
-    summaryPending: "Tap to open the conversation and take over.",
-    testTitle: "Hay alerts are on",
-    testBody: "You will be notified here when a conversation needs a human.",
+    title: "Hay.chat alerts are on",
+    body: "You will be notified here when a conversation needs a human.",
   },
   "pt-BR": {
-    title: "Um cliente precisa de um humano",
-    untitled: "Nova conversa",
-    summaryPending: "Toque para abrir a conversa e assumir.",
-    testTitle: "Alertas do Hay ativados",
-    testBody: "Você será avisado aqui quando uma conversa precisar de um humano.",
+    title: "Alertas do Hay.chat ativados",
+    body: "Você será avisado aqui quando uma conversa precisar de um humano.",
   },
 } as const;
 
-async function copyFor(organizationId: string): Promise<(typeof COPY)[keyof typeof COPY]> {
-  const { getOrganizationLocale } = await import("./email.service");
-  const locale = await getOrganizationLocale(organizationId);
-  return COPY[locale as keyof typeof COPY] ?? COPY.en;
+/** Per-recipient result of a push: how many devices accepted it. */
+export interface PushResult {
+  devices: number;
+  sent: number;
+  removed: number;
 }
 
 /** Endpoint is gone (expired/unsubscribed): the row must be deleted. */
@@ -80,15 +74,15 @@ class PushNotificationService {
 
   /**
    * Register (or re-point) a device. The endpoint is unique per browser
-   * profile, so re-subscribing from the same device under another user or
-   * organization moves the row instead of duplicating it.
+   * profile, so re-subscribing from the same device under another user moves
+   * the row instead of duplicating it. Idempotent: the dashboard calls it on
+   * every app open.
    */
-  async subscribe(userId: string, organizationId: string, input: SubscribeInput): Promise<void> {
+  async subscribe(userId: string, input: SubscribeInput): Promise<void> {
     await this.repo().upsert(
       {
         endpoint: input.endpoint,
         user_id: userId,
-        organization_id: organizationId,
         p256dh: input.keys.p256dh,
         auth: input.keys.auth,
         user_agent: input.userAgent ? input.userAgent.slice(0, 255) : null,
@@ -103,51 +97,31 @@ class PushNotificationService {
     return (result.affected ?? 0) > 0;
   }
 
-  /** A member who left must stop receiving the organization's alerts. */
-  async removeForMember(userId: string, organizationId: string): Promise<void> {
-    await this.repo().delete({ user_id: userId, organization_id: organizationId });
-  }
-
-  /** Called by the conversation repository on a status transition; only pending-human alerts. */
-  async onConversationStatusChanged(conversation: Conversation): Promise<void> {
-    if (conversation.status !== "pending-human") return;
-    if (!this.isConfigured()) return;
-
-    const copy = await copyFor(conversation.organization_id);
-
-    const who = conversation.customer?.name || conversation.title || copy.untitled;
-    const body = conversation.summary
-      ? `${who}: ${conversation.summary}`
-      : `${who}. ${copy.summaryPending}`;
-
-    await this.sendToOrganization(conversation.organization_id, {
-      kind: "conversation_needs_attention",
-      title: copy.title,
-      body,
-      url: `/conversations/${conversation.id}`,
-      tag: `conversation:${conversation.id}`,
-    });
-  }
-
   /**
-   * Fan out to every opted-in device of the organization's active members.
-   * Devices of users who lost access keep their row until the next delivery
-   * attempt prunes them; the membership join keeps them silent meanwhile.
+   * The browser rotated a subscription (`pushsubscriptionchange` in sw.js).
+   * The service worker has no access token, so the old endpoint, an
+   * unguessable capability URL only the device and the server know, is the
+   * proof. Returns false when the old endpoint is unknown.
    */
-  async sendToOrganization(
-    organizationId: string,
-    payload: PushPayload,
-  ): Promise<{ sent: number; removed: number }> {
-    const subscriptions = await this.repo()
-      .createQueryBuilder("s")
-      .innerJoin(
-        "user_organizations",
-        "uo",
-        "uo.user_id = s.user_id AND uo.organization_id = s.organization_id AND uo.is_active = true",
-      )
-      .where("s.organization_id = :organizationId", { organizationId })
-      .getMany();
-    return this.deliver(subscriptions, payload);
+  async rotate(oldEndpoint: string, input: SubscribeInput): Promise<boolean> {
+    const existing = await this.repo().findOne({ where: { endpoint: oldEndpoint } });
+    if (!existing) return false;
+    if (oldEndpoint !== input.endpoint) {
+      // The new endpoint may already be registered (the app re-synced first)
+      await this.repo().delete({ endpoint: input.endpoint });
+    }
+    await this.repo().update(
+      { id: existing.id },
+      { endpoint: input.endpoint, p256dh: input.keys.p256dh, auth: input.keys.auth },
+    );
+    return true;
+  }
+
+  /** Push to every device of one user. */
+  async sendToUser(userId: string, payload: PushPayload): Promise<PushResult> {
+    const subscriptions = await this.repo().find({ where: { user_id: userId } });
+    const { sent, removed } = await this.deliver(subscriptions, payload);
+    return { devices: subscriptions.length, sent, removed };
   }
 
   /** The "send a test" button: the caller's own devices only. */
@@ -155,12 +129,14 @@ class PushNotificationService {
     userId: string,
     organizationId: string,
   ): Promise<{ sent: number; removed: number }> {
-    const copy = await copyFor(organizationId);
+    const { getOrganizationLocale } = await import("./email.service");
+    const locale = await getOrganizationLocale(organizationId);
+    const copy = TEST_COPY[locale as keyof typeof TEST_COPY] ?? TEST_COPY.en;
     const subscriptions = await this.repo().find({ where: { user_id: userId } });
     return this.deliver(subscriptions, {
       kind: "test",
-      title: copy.testTitle,
-      body: copy.testBody,
+      title: copy.title,
+      body: copy.body,
       url: "/",
       tag: "test",
     });

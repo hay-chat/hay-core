@@ -36,7 +36,6 @@ import { useToast } from "@/composables/useToast";
 import { useServerStatus } from "@/composables/useServerStatus";
 import { useAppStore } from "@/stores/app";
 import { useAuthStore } from "@/stores/auth";
-import { useUserStore } from "@/stores/user";
 import { onMounted, onUnmounted, ref, watch } from "vue";
 
 // Initialize WebSocket connection for real-time updates
@@ -48,7 +47,6 @@ const { toast } = useToast();
 const serverStatus = useServerStatus();
 const appStore = useAppStore();
 const authStore = useAuthStore();
-const userStore = useUserStore();
 const route = useRoute();
 
 const menuOpen = ref(false);
@@ -71,6 +69,11 @@ const unsubscribers: Array<() => void> = [];
 const refreshBadge = () => {
   void appStore.fetchPendingHumanCount();
 };
+const syncPushWhenVisible = () => {
+  if (document.visibilityState === "visible" && authStore.isAuthenticated) {
+    void pushNotifications.sync();
+  }
+};
 
 onMounted(() => {
   // Request notification permission on mount
@@ -89,8 +92,10 @@ onMounted(() => {
     void appStore.getPlugins();
   }
 
-  // Re-attach this device's push subscription when the active org changed
-  void pushNotifications.sync(userStore.activeOrganization?.id);
+  // Re-register this device's push subscription on every app open and when
+  // the installed app comes back to the foreground (throttled in the composable)
+  void pushNotifications.sync();
+  document.addEventListener("visibilitychange", syncPushWhenVisible);
 
   // Start polling /v1/health so we can surface a banner when the server is down
   serverStatus.startMonitoring();
@@ -113,6 +118,7 @@ onMounted(() => {
 });
 
 onUnmounted(() => {
+  document.removeEventListener("visibilitychange", syncPushWhenVisible);
   serverStatus.stopMonitoring();
   unsubscribers.forEach((off) => off());
 });

@@ -19,8 +19,8 @@ jest.mock("../../services/conversation-events.service", () => ({
     broadcastConversationUpdated: jest.fn(),
   },
 }));
-jest.mock("../../services/push-notification.service", () => ({
-  pushNotificationService: { onConversationStatusChanged: jest.fn() },
+jest.mock("../../services/conversation-alert.service", () => ({
+  conversationAlertService: { onConversationStatusChanged: jest.fn() },
 }));
 
 /**

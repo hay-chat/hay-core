@@ -62,6 +62,19 @@ export default defineNuxtRouteMiddleware(
   async (to: RouteLocationNormalized, from: RouteLocationNormalized) => {
     console.log("[Auth Middleware] Checking route:", to.path, "process.client:", process.client);
 
+    // Alert links (push, email) carry ?org=<id>: open them in that organization
+    // for users who belong to several. Before the same-page check, which also
+    // matches the first load.
+    if (process.client && typeof to.query.org === "string") {
+      const userStore = useUserStore();
+      if (
+        to.query.org !== userStore.activeOrganizationId &&
+        userStore.organizations.some((org) => org.id === to.query.org)
+      ) {
+        await userStore.switchOrganization(to.query.org);
+      }
+    }
+
     // Skip auth check if staying on the same page (e.g., opening modals)
     // UNLESS we have URL tokens (for E2E testing)
     const hasUrlTokens = to.query.accessToken && to.query.refreshToken && to.query.expiresIn;

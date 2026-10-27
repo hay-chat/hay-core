@@ -1,11 +1,14 @@
 import { ref } from "vue";
 import { Hay } from "@/utils/api";
-import { useUserStore } from "@/stores/user";
 
 /**
  * Web Push opt-in for this browser/device. The server only knows about a device
- * once `enable()` succeeds; `sync()` re-sends the current subscription so the
- * row follows the user's active organization after an org switch.
+ * once `enable()` succeeds. A device belongs to the user, not to one
+ * organization: it gets the alerts of every organization the user is in.
+ * `sync()` re-sends the current subscription on every app open (idempotent
+ * upsert), so a subscription the browser rotated or the server pruned comes
+ * back without the user doing anything. On logout `releaseForLogout()` drops
+ * it, so a logged-out phone stops showing customer names.
  *
  * Status meanings:
  *  - unsupported: browser has no Push API (or iOS Safari outside an installed PWA)
@@ -22,6 +25,9 @@ let publicKey: string | null | undefined;
 let initPromise: Promise<void> | null = null;
 
 const SW_PATH = "/sw.js";
+/** Minimum gap between two background re-syncs (app open, back to foreground). */
+const SYNC_INTERVAL_MS = 5 * 60 * 1000;
+let lastSyncAt = 0;
 
 function isSupported(): boolean {
   return (
@@ -44,8 +50,6 @@ export function urlBase64ToUint8Array(base64String: string): Uint8Array {
   return output;
 }
 
-const SYNCED_ORG_KEY = "hay:push-synced-org";
-
 /** Base64url of the key a subscription was created with, for VAPID rotation checks. */
 function subscriptionServerKey(subscription: PushSubscription): string | null {
   const key = subscription.options?.applicationServerKey;
@@ -56,9 +60,23 @@ function subscriptionServerKey(subscription: PushSubscription): string | null {
   return window.btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 }
 
+/**
+ * The worker's script URL carries the API base so its `pushsubscriptionchange`
+ * handler can re-register a rotated subscription without a page open.
+ */
+function workerUrl(): string {
+  const api = `${useRuntimeConfig().public.apiBaseUrl}/v1`;
+  return `${SW_PATH}?api=${encodeURIComponent(api)}`;
+}
+
 async function getRegistration(): Promise<ServiceWorkerRegistration> {
+  const url = workerUrl();
   const existing = await navigator.serviceWorker.getRegistration(SW_PATH);
-  return existing ?? navigator.serviceWorker.register(SW_PATH);
+  const scriptUrl =
+    existing && (existing.active ?? existing.waiting ?? existing.installing)?.scriptURL;
+  if (existing && scriptUrl === new URL(url, window.location.origin).href) return existing;
+  // First registration, or a worker registered before the API base was in its URL
+  return navigator.serviceWorker.register(url);
 }
 
 async function fetchPublicKey(): Promise<string | null> {
@@ -102,13 +120,20 @@ async function detect(): Promise<void> {
   }
 }
 
-function rememberSyncedOrg(organizationId?: string) {
-  try {
-    const id = organizationId ?? useUserStore().activeOrganization?.id;
-    if (id) window.localStorage.setItem(SYNCED_ORG_KEY, id);
-  } catch {
-    // localStorage unavailable (private mode): sync will simply run again next load
+/** Subscribe (or re-subscribe after a VAPID key rotation) and register with the server. */
+async function subscribeAndRegister(key: string): Promise<void> {
+  const registration = await getRegistration();
+  let subscription = await registration.pushManager.getSubscription();
+  // A subscription made with an older server key can never be delivered to
+  if (subscription && subscriptionServerKey(subscription) !== key) {
+    await subscription.unsubscribe();
+    subscription = null;
   }
+  subscription ??= await registration.pushManager.subscribe({
+    userVisibleOnly: true,
+    applicationServerKey: urlBase64ToUint8Array(key) as BufferSource,
+  });
+  await Hay.notifications.subscribePush.mutate(subscriptionToInput(subscription));
 }
 
 export function usePushNotifications() {
@@ -134,19 +159,8 @@ export function usePushNotifications() {
         status.value = "unavailable";
         return false;
       }
-      const registration = await getRegistration();
-      let subscription = await registration.pushManager.getSubscription();
-      // A subscription made with an older server key can never be delivered to
-      if (subscription && subscriptionServerKey(subscription) !== key) {
-        await subscription.unsubscribe();
-        subscription = null;
-      }
-      subscription ??= await registration.pushManager.subscribe({
-        userVisibleOnly: true,
-        applicationServerKey: urlBase64ToUint8Array(key) as BufferSource,
-      });
-      await Hay.notifications.subscribePush.mutate(subscriptionToInput(subscription));
-      rememberSyncedOrg();
+      await subscribeAndRegister(key);
+      lastSyncAt = Date.now();
       status.value = "on";
       return true;
     } catch (err) {
@@ -172,11 +186,6 @@ export function usePushNotifications() {
         await subscription.unsubscribe();
         await Hay.notifications.unsubscribePush.mutate({ endpoint });
       }
-      try {
-        window.localStorage.removeItem(SYNCED_ORG_KEY);
-      } catch {
-        // ignore
-      }
       status.value = "off";
     } catch (err) {
       console.error("[Push] disable failed:", err);
@@ -187,30 +196,45 @@ export function usePushNotifications() {
   };
 
   /**
-   * Re-send an existing subscription so it follows the active organization.
-   * Only does network work when this device is opted in and the org changed
-   * since the last sync (remembered in localStorage).
+   * Re-register this device's subscription with the server. Runs on every app
+   * open and when the app comes back to the foreground (throttled). Only does
+   * work when the user opted in on this device (permission granted and a
+   * browser subscription exists); never prompts.
    */
-  const sync = async (organizationId: string | undefined): Promise<void> => {
-    if (!organizationId || !isSupported()) return;
-    let lastSynced: string | null = null;
-    try {
-      lastSynced = window.localStorage.getItem(SYNCED_ORG_KEY);
-    } catch {
-      lastSynced = null;
-    }
-    if (lastSynced === organizationId) return;
+  const sync = async (): Promise<void> => {
+    if (!isSupported() || Notification.permission !== "granted") return;
+    if (Date.now() - lastSyncAt < SYNC_INTERVAL_MS) return;
+    lastSyncAt = Date.now();
     await init();
     if (status.value !== "on") return;
     try {
-      const registration = await getRegistration();
-      const subscription = await registration.pushManager.getSubscription();
-      if (subscription) {
-        await Hay.notifications.subscribePush.mutate(subscriptionToInput(subscription));
-        rememberSyncedOrg(organizationId);
-      }
+      const key = await fetchPublicKey();
+      if (!key) return;
+      await subscribeAndRegister(key);
     } catch (err) {
       console.error("[Push] sync failed:", err);
+    }
+  };
+
+  /**
+   * Logout: drop this device's browser subscription and return its endpoint
+   * so the logout call can delete the server row (works after the access
+   * token expired). Never throws; logout must not depend on it.
+   */
+  const releaseForLogout = async (): Promise<string | undefined> => {
+    if (!isSupported()) return undefined;
+    try {
+      const registration = await navigator.serviceWorker.getRegistration(SW_PATH);
+      const subscription = await registration?.pushManager.getSubscription();
+      if (!subscription) return undefined;
+      const endpoint = subscription.endpoint;
+      await subscription.unsubscribe();
+      status.value = "off";
+      lastSyncAt = 0;
+      return endpoint;
+    } catch (err) {
+      console.error("[Push] release on logout failed:", err);
+      return undefined;
     }
   };
 
@@ -234,6 +258,7 @@ export function usePushNotifications() {
     enable,
     disable,
     sync,
+    releaseForLogout,
     sendTest,
   };
 }

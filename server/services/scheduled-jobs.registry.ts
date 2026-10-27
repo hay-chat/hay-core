@@ -163,6 +163,20 @@ const jobRegistry: CronJobConfig[] = [
   },
 
   {
+    name: "conversation-alert-escalation",
+    description:
+      "Re-push, then email, Available members about conversations waiting 10+ min for a human",
+    schedule: 60000, // Every 60 seconds
+    handler: async () => {
+      const { conversationAlertService } = await import("./conversation-alert.service");
+      await conversationAlertService.runEscalationSweep();
+    },
+    singleton: true,
+    enabled: true,
+    skipDatabaseLogging: true,
+  },
+
+  {
     name: "orchestrator-stale-message-check",
     description: "Detect and recover stale/lost messages",
     schedule: 60000, // Every 60 seconds (1 minute)

@@ -98,11 +98,22 @@ export const useAuthStore = defineStore("auth", {
     },
 
     async logout(reason?: string) {
+      // A logged-out device must stop getting alerts (customer names on the
+      // lock screen): drop the browser subscription here, the server row below.
+      let pushEndpoint: string | undefined;
+      if (process.client) {
+        const { usePushNotifications } = await import("@/composables/usePushNotifications");
+        pushEndpoint = await usePushNotifications().releaseForLogout();
+      }
+
       // End this device's session server-side; the refresh token is the proof,
       // so this works after the access token expired.
       if (this.tokens?.refreshToken) {
         try {
-          await HayAuthApi.auth.logout.mutate({ refreshToken: this.tokens.refreshToken });
+          await HayAuthApi.auth.logout.mutate({
+            refreshToken: this.tokens.refreshToken,
+            pushEndpoint,
+          });
         } catch (error) {
           // Ignore errors on logout - the session may already be revoked
           console.log("[Auth] Logout API call failed:", error);
