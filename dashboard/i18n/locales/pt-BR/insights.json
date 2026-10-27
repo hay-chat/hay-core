@@ -1,0 +1,43 @@
+{
+  "insights": {
+    "feedback": {
+      "title": "Avaliações",
+      "description": "Avaliações que sua equipe deu às respostas da IA. Abra qualquer avaliação para ver a resposta na conversa.",
+      "seoTitle": "Avaliações - Hay.chat",
+      "refresh": "Atualizar",
+      "exportCsv": "Exportar CSV",
+      "unknownSource": "Desconhecida",
+      "stats": {
+        "total": "Total de Avaliações",
+        "positive": "Positivas",
+        "negative": "Negativas",
+        "positiveRate": "Taxa Positiva"
+      },
+      "ratings": {
+        "good": "Boa",
+        "bad": "Ruim",
+        "neutral": "Neutra"
+      },
+      "filters": {
+        "title": "Filtros",
+        "rating": "Avaliação",
+        "allRatings": "Todas as avaliações",
+        "source": "Origem",
+        "allSources": "Todas as origens",
+        "startDate": "Data inicial",
+        "endDate": "Data final"
+      },
+      "list": {
+        "title": "Histórico de Avaliações",
+        "count": "{count} avaliações",
+        "loading": "Carregando avaliações...",
+        "empty": "Nenhuma avaliação corresponde a estes filtros",
+        "reviewer": "Avaliada por {email}",
+        "openConversation": "Abrir conversa",
+        "showing": "Mostrando {from}-{to} de {total}",
+        "previous": "Anterior",
+        "next": "Próxima"
+      }
+    }
+  }
+}

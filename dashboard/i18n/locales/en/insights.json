@@ -1,0 +1,43 @@
+{
+  "insights": {
+    "feedback": {
+      "title": "Feedback",
+      "description": "Ratings your team gave to AI replies. Open any rating to see the reply in its conversation.",
+      "seoTitle": "Feedback - Hay.chat",
+      "refresh": "Refresh",
+      "exportCsv": "Export CSV",
+      "unknownSource": "Unknown",
+      "stats": {
+        "total": "Total Feedback",
+        "positive": "Positive",
+        "negative": "Negative",
+        "positiveRate": "Positive Rate"
+      },
+      "ratings": {
+        "good": "Good",
+        "bad": "Bad",
+        "neutral": "Neutral"
+      },
+      "filters": {
+        "title": "Filters",
+        "rating": "Rating",
+        "allRatings": "All ratings",
+        "source": "Source",
+        "allSources": "All sources",
+        "startDate": "Start date",
+        "endDate": "End date"
+      },
+      "list": {
+        "title": "Feedback History",
+        "count": "{count} feedback entries",
+        "loading": "Loading feedback...",
+        "empty": "No feedback matches these filters",
+        "reviewer": "Rated by {email}",
+        "openConversation": "Open conversation",
+        "showing": "Showing {from}-{to} of {total}",
+        "previous": "Previous",
+        "next": "Next"
+      }
+    }
+  }
+}

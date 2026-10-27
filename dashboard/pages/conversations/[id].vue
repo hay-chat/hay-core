@@ -379,7 +379,12 @@
             >
               <ChatMessage
                 v-for="(message, index) in conversation?.messages"
+                :id="`message-${message.id}`"
                 :key="message.id"
+                :class="{
+                  'rounded-lg ring-2 ring-primary ring-offset-2':
+                    message.id === highlightedMessageId,
+                }"
                 :message="message as Message"
                 :show-feedback="true"
                 :show-approval="isTestMode"
@@ -1109,6 +1114,10 @@ const humanTakeover = ref(false);
 const isTyping = ref(false);
 const newMessage = ref("");
 const messagesContainer = ref<HTMLElement>();
+// Deep link from the feedback page: /conversations/:id?message=<messageId>
+const highlightedMessageId = computed(() =>
+  typeof route.query.message === "string" ? route.query.message : null,
+);
 
 // Context panel: one template, rendered inline on lg+ and inside a Sheet below lg
 const [DefinePanel, ReusePanel] = createReusableTemplate();
@@ -1685,6 +1694,13 @@ const viewConversation = (id: string) => {
   navigateTo(`/conversations/${id}`);
 };
 
+const scrollToMessage = (messageId: string) => {
+  // eslint-disable-next-line no-undef
+  nextTick(() => {
+    document.getElementById(`message-${messageId}`)?.scrollIntoView({ block: "center" });
+  });
+};
+
 const scrollToBottom = () => {
   // eslint-disable-next-line no-undef
   nextTick(() => {
@@ -1842,6 +1858,7 @@ onMounted(async () => {
   } else {
     // Regular mode: Fetch conversation
     await Promise.all([fetchConversation()]);
+    if (highlightedMessageId.value) scrollToMessage(highlightedMessageId.value);
   }
 
   // Setup WebSocket connection for real-time updates
