@@ -44,6 +44,7 @@ import ChatWindow from "./components/ChatWindow.vue";
 import MinimizedButton from "./components/MinimizedButton.vue";
 import { useChat } from "./composables/useChat";
 import { provideI18n } from "./i18n";
+import { debugLog } from "./utils/debug";
 import type { HayChatConfig } from "./types";
 
 const props = defineProps<{
@@ -72,7 +73,7 @@ const fetchPublicConfig = async () => {
   try {
     const input = JSON.stringify({ organizationId: props.config.organizationId });
     const url = `${props.config.baseUrl}/v1/webchat.getPublicConfig?input=${encodeURIComponent(input)}`;
-    console.log("[Hay Webchat] Fetching public config from:", url);
+    debugLog("[Hay Webchat] Fetching public config from:", url);
 
     const response = await fetch(url);
     if (!response.ok) {
@@ -86,7 +87,7 @@ const fetchPublicConfig = async () => {
 
     const data = await response.json();
     const result = data?.result?.data;
-    console.log("[Hay Webchat] Public config received:", result);
+    debugLog("[Hay Webchat] Public config received:", result);
 
     // Webchat disabled or organization suspended: render nothing at all.
     if (result?.enabled === false) {
@@ -100,9 +101,9 @@ const fetchPublicConfig = async () => {
         agentAvatarUrl: result.agentAvatarUrl,
         organizationLogoUrl: result.organizationLogoUrl,
       };
-      console.log("[Hay Webchat] Resolved avatar URL:", resolvedAvatarUrl.value);
-      console.log("[Hay Webchat] Resolved logo URL:", resolvedLogoUrl.value);
-      console.log("[Hay Webchat] Resolved agent name:", resolvedAgentName.value);
+      debugLog("[Hay Webchat] Resolved avatar URL:", resolvedAvatarUrl.value);
+      debugLog("[Hay Webchat] Resolved logo URL:", resolvedLogoUrl.value);
+      debugLog("[Hay Webchat] Resolved agent name:", resolvedAgentName.value);
     }
   } catch (error) {
     console.warn("[Hay Webchat] Failed to fetch public config:", error);

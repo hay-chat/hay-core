@@ -2,7 +2,13 @@ import { defineConfig } from "vite";
 import vue from "@vitejs/plugin-vue";
 import path from "path";
 
-// Plugin to inline CSS into JS bundle
+// Plugin to inline CSS into JS bundle.
+// The injection code is added at the END of the chunk (before the
+// sourceMappingURL comment), never prepended: prepending shifts every line and
+// column of the already-generated sourcemap, so production stack traces and
+// Lighthouse would point at the wrong code. Appending leaves every mapping
+// intact. Running the injection last is safe: the whole bundle executes
+// synchronously, so the <style> is in place before the browser paints.
 function inlineCssPlugin() {
   return {
     name: "inline-css",
@@ -12,27 +18,19 @@ function inlineCssPlugin() {
       const cssFiles = Object.keys(bundle).filter((i) => i.endsWith(".css"));
       const jsFiles = Object.keys(bundle).filter((i) => i.endsWith(".js") && !i.endsWith(".es.js"));
 
-      // Get CSS content and inject it into JS
       cssFiles.forEach((cssFileName) => {
         const cssChunk = bundle[cssFileName];
         if (cssChunk.type === "asset" && typeof cssChunk.source === "string") {
-          const cssContent = cssChunk.source;
+          const cssInjectionCode = `(function(){if(typeof document!=="undefined"){var s=document.createElement("style");s.textContent=${JSON.stringify(cssChunk.source)};document.head.appendChild(s);}})();`;
 
-          // Inject CSS into each JS file
           jsFiles.forEach((jsFileName) => {
             const jsChunk = bundle[jsFileName];
             if (jsChunk.type === "chunk") {
-              // Prepend CSS injection code to the JS bundle
-              const cssInjectionCode = `
-(function() {
-  if (typeof document !== 'undefined') {
-    const style = document.createElement('style');
-    style.textContent = ${JSON.stringify(cssContent)};
-    document.head.appendChild(style);
-  }
-})();
-`;
-              jsChunk.code = cssInjectionCode + jsChunk.code;
+              const mapComment = jsChunk.code.lastIndexOf("\n//# sourceMappingURL=");
+              jsChunk.code =
+                mapComment === -1
+                  ? `${jsChunk.code}\n${cssInjectionCode}\n`
+                  : `${jsChunk.code.slice(0, mapComment)}\n${cssInjectionCode}${jsChunk.code.slice(mapComment)}`;
             }
           });
 
@@ -49,6 +47,12 @@ export default defineConfig({
   define: {
     // Define process.env for Vue in production mode
     "process.env.NODE_ENV": JSON.stringify("production"),
+    // Vue compile-time feature flags. All components use <script setup>, so the
+    // Options API can be tree-shaken; devtools and hydration-mismatch details
+    // are development aids that should not ship to merchants' storefronts.
+    __VUE_OPTIONS_API__: JSON.stringify(false),
+    __VUE_PROD_DEVTOOLS__: JSON.stringify(false),
+    __VUE_PROD_HYDRATION_MISMATCH_DETAILS__: JSON.stringify(false),
   },
   build: {
     outDir: "dist",
