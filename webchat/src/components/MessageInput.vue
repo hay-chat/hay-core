@@ -23,13 +23,13 @@
         :placeholder="t('input.placeholder')"
         rows="1"
         ref="textareaRef"
-        :disabled="!isConnected"
+        :disabled="!isReady"
         :maxlength="MAX_LENGTH"
         class="hay-message-input__textarea"
       ></textarea>
       <button
         @click="handleSend"
-        :disabled="!messageText.trim() || !isConnected"
+        :disabled="!messageText.trim() || !isReady"
         class="hay-message-input__button"
         :aria-label="t('input.send')"
       >
@@ -60,7 +60,7 @@ import type { SendFailure } from "@/types";
 const t = useI18n();
 
 const props = defineProps<{
-  isConnected: boolean;
+  isReady: boolean;
   failure?: SendFailure | null;
 }>();
 
@@ -133,7 +133,7 @@ const handleKeydown = (event: KeyboardEvent) => {
 };
 
 const handleSend = () => {
-  if (!messageText.value.trim() || !props.isConnected) return;
+  if (!messageText.value.trim() || !props.isReady) return;
 
   emit("send", messageText.value);
   emit("stopTyping");
