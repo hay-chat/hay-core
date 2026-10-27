@@ -1,43 +1,98 @@
-// lib/client.js — shared Nuvemshop / Tiendanube REST client.
-//
-// Reads credentials from env (injected by the plugin entry's startLocalStdio):
-//   NUVEMSHOP_STORE_ID, NUVEMSHOP_ACCESS_TOKEN, NUVEMSHOP_API_VERSION,
-//   NUVEMSHOP_MAIN_LANGUAGE.
-//
-// API quirks encoded here so tools don't have to care:
-//  - Auth header is `Authentication: bearer <token>` (nonstandard name,
-//    lowercase "bearer") — `Authorization` is rejected with 401.
-//  - `User-Agent` is mandatory (400 without it).
-//  - Rate limit is a leaky bucket (~2 req/s, burst 40) → 429 with an
-//    X-Rate-Limit-Reset header in milliseconds.
-//  - 402 means the store's subscription lapsed and the whole API is suspended.
+/**
+ * Nuvemshop / Tiendanube REST client (native `fetch`, no axios).
+ *
+ * Env (injected by the plugin worker, read at call time so tests can require
+ * the module without credentials):
+ *   NUVEMSHOP_STORE_ID       numeric store id (the OAuth `user_id`)
+ *   NUVEMSHOP_ACCESS_TOKEN   custom-app (or OAuth) access token
+ *   NUVEMSHOP_API_VERSION    default "2025-03"
+ *   NUVEMSHOP_MAIN_LANGUAGE  default "pt" (localises i18n fields)
+ *
+ * API quirks encoded here so tools don't have to care:
+ *  - The auth header is `Authentication: bearer <token>` (nonstandard name,
+ *    lowercase "bearer"); `Authorization` is rejected with 401.
+ *  - `User-Agent` is mandatory (400 without it).
+ *  - Rate limit is a leaky bucket (about 2 req/s, burst 40) → 429 with an
+ *    X-Rate-Limit-Reset header in milliseconds.
+ *  - 402 means the store's subscription lapsed and the whole API is suspended.
+ *  - List endpoints 404 ("Last page is N") past the last page instead of
+ *    returning [] — `nsList` turns that into an empty page.
+ *
+ * Replay policy: 429 was never processed, so any method may retry. A transport
+ * error, timeout or 5xx may have been applied server-side (a re-POSTed cancel
+ * or coupon would run twice), so only idempotent GETs are replayed.
+ */
 
-const STORE_ID = process.env.NUVEMSHOP_STORE_ID;
-const TOKEN = process.env.NUVEMSHOP_ACCESS_TOKEN;
-const API_VERSION = process.env.NUVEMSHOP_API_VERSION || "2025-03";
-const MAIN_LANGUAGE = process.env.NUVEMSHOP_MAIN_LANGUAGE || "pt";
-
-// api.nuvemshop.com.br and api.tiendanube.com are interchangeable twins.
+// api.nuvemshop.com.br and api.tiendanube.com are interchangeable twins; either
+// host serves any store regardless of country.
 const API_HOST = "https://api.nuvemshop.com.br";
+const DEFAULT_API_VERSION = "2025-03";
 const USER_AGENT = "Hay (https://hay.chat)";
+const MAX_RETRIES = 3;
+const DEFAULT_TIMEOUT_MS = 30000;
 
-function sleep(ms) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+function credentials() {
+  const storeId = (process.env.NUVEMSHOP_STORE_ID || "").trim();
+  const token = (process.env.NUVEMSHOP_ACCESS_TOKEN || "").trim();
+  if (!storeId || !token) {
+    throw new Error("Nuvemshop MCP server is missing NUVEMSHOP_STORE_ID or NUVEMSHOP_ACCESS_TOKEN");
+  }
+  return {
+    storeId,
+    token,
+    apiVersion: process.env.NUVEMSHOP_API_VERSION || DEFAULT_API_VERSION,
+  };
+}
+
+function mainLanguage() {
+  return process.env.NUVEMSHOP_MAIN_LANGUAGE || "pt";
+}
+
+class NuvemshopApiError extends Error {
+  constructor(method, path, status, rawBody) {
+    super(`Nuvemshop API ${method} ${path} failed: HTTP ${status}: ${describe(status, rawBody)}`);
+    this.name = "NuvemshopApiError";
+    this.status = status;
+  }
+}
+
+function describe(status, rawBody) {
+  if (status === 401) {
+    return (
+      "the access token was rejected. It may have been re-issued or the app uninstalled; " +
+      "reconnect the plugin."
+    );
+  }
+  if (status === 402)
+    return "the store's Nuvemshop subscription is unpaid, so its API is suspended.";
+  if (!rawBody) return "(empty response body)";
+  try {
+    const parsed = JSON.parse(rawBody);
+    const parts = [parsed?.description, parsed?.message, parsed?.error]
+      .filter((p) => typeof p === "string" && p)
+      .join(" — ");
+    // Validation errors come back as { field: ["msg"] }.
+    if (!parts && parsed && typeof parsed === "object") return JSON.stringify(parsed).slice(0, 400);
+    return parts || rawBody.slice(0, 400);
+  } catch {
+    return rawBody.slice(0, 400);
+  }
 }
 
 /**
- * Single request helper: builds auth headers, serializes query params,
- * normalizes errors, and retries transport errors / 429 / 5xx.
+ * Call the store API and return `{ data, headers }`.
  *
- * Returns the parsed JSON body. Pass `{ withMeta: true }` to instead get
- * `{ data, total }` where `total` is the X-Total-Count header (list endpoints).
+ * @param {string} method
+ * @param {string} path - Path under the store, e.g. "/orders/12".
+ * @param {object} [options]
+ * @param {object} [options.query]
+ * @param {object} [options.body]
  */
-async function nuvemshopApi(method, path, { query, body, withMeta } = {}) {
-  if (!STORE_ID || !TOKEN) {
-    throw new Error("Nuvemshop MCP server is missing NUVEMSHOP_STORE_ID or NUVEMSHOP_ACCESS_TOKEN");
-  }
-
-  const url = new URL(`${API_HOST}/${API_VERSION}/${STORE_ID}${path}`);
+async function nsRequest(method, path, { query, body } = {}) {
+  const { storeId, token, apiVersion } = credentials();
+  const url = new URL(`${API_HOST}/${apiVersion}/${storeId}${path}`);
   if (query) {
     for (const [key, value] of Object.entries(query)) {
       if (value === undefined || value === null || value === "") continue;
@@ -46,79 +101,74 @@ async function nuvemshopApi(method, path, { query, body, withMeta } = {}) {
   }
 
   const headers = {
-    Authentication: `bearer ${TOKEN}`,
+    Authentication: `bearer ${token}`,
     "User-Agent": USER_AGENT,
     Accept: "application/json",
   };
   if (body !== undefined) headers["Content-Type"] = "application/json; charset=utf-8";
 
-  // Replay policy: transport errors and 5xx may have been applied server-side,
-  // so only GETs are replayed (a re-POSTed /orders/{id}/cancel would hit an
-  // already-cancelled order and report a false failure). 429 means the server
-  // refused the request, so any method may retry.
-  const maxAttempts = 3;
-  let lastError;
-  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-    let res;
+  let attempt = 0;
+  while (true) {
+    let response;
     try {
-      res = await fetch(url, {
+      response = await fetch(url, {
         method,
         headers,
         body: body !== undefined ? JSON.stringify(body) : undefined,
+        signal: AbortSignal.timeout(DEFAULT_TIMEOUT_MS),
       });
     } catch (err) {
-      lastError = err;
-      if (method === "GET" && attempt < maxAttempts) {
-        await sleep(attempt * 500);
+      if (method === "GET" && attempt < MAX_RETRIES) {
+        attempt += 1;
+        await sleep(Math.pow(2, attempt) * 250);
         continue;
       }
-      throw new Error(`Nuvemshop request failed: ${err.message || err}`);
+      throw new Error(`Nuvemshop API ${method} ${path} failed: ${err.message || String(err)}`);
     }
 
-    if (res.status === 429 || (res.status >= 500 && method === "GET")) {
-      if (attempt < maxAttempts) {
-        // X-Rate-Limit-Reset is milliseconds until the bucket drains.
-        const reset = Number(res.headers.get("x-rate-limit-reset"));
-        const wait =
-          res.status === 429 && Number.isFinite(reset) && reset > 0
-            ? Math.min(reset, 5000)
-            : attempt * 800;
-        await sleep(wait);
-        continue;
-      }
+    const retryable = response.status === 429 || (response.status >= 500 && method === "GET");
+    if (retryable && attempt < MAX_RETRIES) {
+      attempt += 1;
+      const reset = Number(response.headers.get("x-rate-limit-reset"));
+      const wait =
+        response.status === 429 && Number.isFinite(reset) && reset > 0
+          ? Math.min(reset, 5000)
+          : Math.pow(2, attempt) * 400;
+      await sleep(wait);
+      continue;
     }
 
-    if (!res.ok) {
-      const text = await res.text().catch(() => "");
-      let err;
-      if (res.status === 402) {
-        err = new Error("Nuvemshop API suspended (HTTP 402): the store's subscription is unpaid.");
-      } else if (res.status === 401) {
-        err = new Error(
-          "Nuvemshop rejected the access token (HTTP 401). The token may have been " +
-            "re-issued or the app uninstalled — reconnect the plugin.",
-        );
-      } else {
-        err = new Error(
-          `Nuvemshop ${method} ${path} failed (HTTP ${res.status}): ${text.slice(0, 300)}`,
-        );
-      }
-      err.status = res.status;
-      throw err;
-    }
-
-    const text = await res.text();
-    const data = text ? JSON.parse(text) : null;
-    if (withMeta) {
-      // Absent header must yield undefined, not 0 (Number(null) === 0 trap).
-      const rawTotal = res.headers.get("x-total-count");
-      const total = rawTotal === null || rawTotal === "" ? undefined : Number(rawTotal);
-      return { data, total: Number.isFinite(total) ? total : undefined };
-    }
-    return data;
+    const text = await response.text();
+    if (!response.ok) throw new NuvemshopApiError(method, path, response.status, text);
+    return { data: text ? JSON.parse(text) : null, headers: response.headers };
   }
-
-  throw new Error(`Nuvemshop request failed after retries: ${lastError?.message || lastError}`);
 }
 
-module.exports = { nuvemshopApi, STORE_ID, API_VERSION, MAIN_LANGUAGE };
+/** Convenience: just the JSON body. */
+async function nsApi(method, path, options) {
+  const { data } = await nsRequest(method, path, options);
+  return data;
+}
+
+/**
+ * List endpoint: `{ items, total }`. `total` comes from X-Total-Count and is
+ * null when the header is absent. A 404 past the last page is an empty page.
+ */
+async function nsList(path, query) {
+  try {
+    const { data, headers } = await nsRequest("GET", path, { query });
+    const raw = headers.get("x-total-count");
+    const total = raw === null || raw === "" ? null : Number(raw);
+    return {
+      items: Array.isArray(data) ? data : [],
+      total: Number.isFinite(total) ? total : null,
+    };
+  } catch (err) {
+    if (err instanceof NuvemshopApiError && err.status === 404 && Number(query?.page) > 1) {
+      return { items: [], total: null };
+    }
+    throw err;
+  }
+}
+
+module.exports = { nsRequest, nsApi, nsList, NuvemshopApiError, mainLanguage, API_HOST };
