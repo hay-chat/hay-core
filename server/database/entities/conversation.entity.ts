@@ -479,7 +479,7 @@ The following tools are available for you to use. You MUST return only valid JSO
             toolSchema = toolSchemas.find((schema) => schema.name === toolName);
 
             if (!toolSchema) {
-              // Try to find tool that ends with :toolName (e.g., "hay-plugin-email:send-email" matches "send-email")
+              // Try to find tool that ends with :toolName (e.g., "hay-plugin-acme:create-ticket" matches "create-ticket")
               toolSchema = toolSchemas.find((schema) => {
                 const schemaName = schema.name as string;
                 return schemaName.endsWith(`:${toolName}`);
@@ -507,7 +507,7 @@ The following tools are available for you to use. You MUST return only valid JSO
 
         if (toolSchema) {
           // Add tool ID to enabled_tools list using the actual tool name from the schema
-          // This ensures we use the correct namespaced name (e.g., "hay-plugin-email:send-email")
+          // This ensures we use the correct namespaced name (e.g., "hay-plugin-acme:create-ticket")
           const toolNameToAdd = toolSchema.name as string;
           if (!enabledToolIds.includes(toolNameToAdd)) {
             enabledToolIds.push(toolNameToAdd);
@@ -763,7 +763,7 @@ The following tools are available for you to use. You MUST return only valid JSO
             toolSchema = toolSchemas.find((schema) => schema.name === toolName);
 
             if (!toolSchema) {
-              // Try to find tool that ends with :toolName (e.g., "hay-plugin-email:send-email" matches "send-email")
+              // Try to find tool that ends with :toolName (e.g., "hay-plugin-acme:create-ticket" matches "create-ticket")
               toolSchema = toolSchemas.find((schema) => {
                 const schemaName = schema.name as string;
                 return schemaName.endsWith(`:${toolName}`);

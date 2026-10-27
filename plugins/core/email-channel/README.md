@@ -57,11 +57,29 @@ signing secret into `RESEND_WEBHOOK_SECRET`.
 
 ## Plugin configuration
 
-- **Your support address** (required): what shoppers write to. Used to
-  recognise the merchant's own out-of-band replies and as the BCC archive
-  target.
+- **Your support address**: what shoppers write to. Needed for the channel
+  (the settings page asks for it); used to recognise the merchant's own
+  out-of-band replies, as the BCC archive target and as the default team
+  notification address. Optional in the schema so a workspace can use only
+  the `send-email` action.
 - **Sender name**: display name on replies (defaults to the workspace name).
 - **Keep a copy in my inbox**: BCC the support address on every reply.
+- **Team notification addresses**: comma-separated recipients of the
+  `send-email` action. Defaults to the support address.
+
+## Agent action: `send-email`
+
+The plugin registers one MCP tool (local server `email-mcp`, capability
+`mcp`). Playbooks reference it as `hay-channel-email:send-email`. It emails
+the store's team — the notification addresses, else the support address —
+with `subject` + `body` from the agent, through the same relay and sender
+as channel replies (platform default sender when the inbound env is
+missing). Recipients come from config only; the agent cannot choose an
+address. If the support mailbox forwards the notification back to Hay, the
+From address marks it as an echo and it is dropped. A refused send fails the
+tool call. This action replaced the former standalone "Email" plugin
+(`hay-plugin-email`); migration `MergeEmailPluginIntoEmailInbox1785300000000`
+moved existing installs here.
 
 ## Limitations (phase 1)
 

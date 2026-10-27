@@ -926,7 +926,7 @@ export const getMCPTools = authenticatedProcedure.query(async ({ ctx }) => {
         name: tool.name,
         label: tool.name,
         description: tool.description || "",
-        pluginId: plugin.pluginId, // Plugin package ID (e.g., "hay-plugin-email")
+        pluginId: plugin.pluginId, // Plugin package ID (e.g., "hay-plugin-acme")
         pluginName: plugin.name,
         annotations: tool.annotations,
       });
