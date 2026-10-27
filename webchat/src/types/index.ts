@@ -39,6 +39,55 @@ export interface HayChatConfig {
   consent?: "strict" | "implicit";
   /** Log widget diagnostics to the browser console. Off by default. */
   debug?: boolean;
+  /**
+   * When the chat itself (everything but the button) is downloaded.
+   * - `'idle'` (default): once the page has finished loading and the browser
+   *   is idle, or earlier if the visitor reaches for the button.
+   * - `'eager'`: straight away.
+   * - `'interaction'`: only when the visitor hovers, focuses, touches or
+   *   clicks the button. Nothing at all is fetched before that, not even the
+   *   widget settings, so a disabled widget shows its button until then.
+   * A visitor with a conversation in progress in this tab always gets it
+   * straight away, so replies show on the badge.
+   */
+  loading?: LoadingMode;
+}
+
+export type LoadingMode = "eager" | "idle" | "interaction";
+
+/** `webchat.getPublicConfig` response, fetched by the loader. */
+export interface PublicConfig {
+  enabled?: boolean;
+  agentName?: string | null;
+  agentAvatarUrl?: string | null;
+  organizationLogoUrl?: string | null;
+}
+
+/** The loader's button, driven by the chat once it is mounted. */
+export interface LauncherBridge {
+  setOpen(open: boolean): void;
+  setUnread(count: number): void;
+}
+
+/** A host API call made before the chat chunk loaded, replayed in order. */
+export type HostCall =
+  | { name: "addContext"; args: [key: string, value: unknown] }
+  | { name: "grantConsent"; args: [] }
+  | { name: "revokeConsent"; args: [] };
+
+/** Contract between widget.js (the loader) and the chat chunk. */
+export interface ChatMountOptions {
+  container: HTMLElement;
+  config: HayChatConfig;
+  publicConfig: PublicConfig | null;
+  launcher: LauncherBridge;
+  hostCalls: HostCall[];
+  /** The visitor clicked the button while the chat was loading. */
+  open: boolean;
+}
+
+export interface ChatHandle {
+  toggle(): void;
 }
 
 export interface Message {

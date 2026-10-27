@@ -46,3 +46,21 @@ describe("resolveWidgetSubtitle", () => {
     expect(resolveWidgetSubtitle("Ask us about sizing", fallback)).toBe("Ask us about sizing");
   });
 });
+
+describe("loadTranslations (one locale chunk per visitor)", () => {
+  it("loads the configured locale", async () => {
+    const { loadTranslations } = await import("../index");
+    expect((await loadTranslations("pt-br"))["chat.open"]).toBe("Abrir chat");
+    expect((await loadTranslations("pt-PT"))["input.placeholder"]).toBe(
+      (await import("../locales/pt-pt")).default["input.placeholder"],
+    );
+  });
+
+  it("falls back to English for an unknown locale", async () => {
+    const { loadTranslations } = await import("../index");
+    const original = navigator.language;
+    Object.defineProperty(navigator, "language", { value: "xx-XX", configurable: true });
+    expect(await loadTranslations("xx")).toBe(enUs);
+    Object.defineProperty(navigator, "language", { value: original, configurable: true });
+  });
+});
