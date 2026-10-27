@@ -13,6 +13,13 @@ import { UserOrganization } from "@server/entities/user-organization.entity";
 
 const logger = createLogger("websocket");
 import { verifyDPoPForRequest } from "../routes/v1/public-conversations";
+import { getClientIp } from "@server/lib/client-ip";
+import { PUBLIC_WIDGET_LIMITS, isPublicWidgetRateLimited } from "./public-widget-limits";
+
+// Largest frame a client may send. Clients only send small JSON control frames
+// and chat messages (capped at PUBLIC_WIDGET_LIMITS.maxMessageLength); the ws
+// default of 100 MiB would let one frame exhaust memory.
+const MAX_FRAME_BYTES = 64 * 1024;
 
 interface WebSocketClient {
   ws: WebSocket;
@@ -21,6 +28,8 @@ interface WebSocketClient {
   conversationId?: string;
   pluginId?: string;
   authenticated: boolean;
+  /** Client IP from the proxy headers; kept out of `metadata`, which identify lets the client extend. */
+  ip: string;
   /** Resolves once token authentication (if any) has finished. */
   ready: Promise<void>;
   metadata: Record<string, unknown>;
@@ -111,6 +120,7 @@ export class WebSocketService {
         port: serverOrPort,
         path: "/ws",
         clientTracking: true,
+        maxPayload: MAX_FRAME_BYTES,
       });
       logger.debug({ port: serverOrPort }, "WebSocket server initialized on standalone port");
     } else {
@@ -119,6 +129,7 @@ export class WebSocketService {
         server: serverOrPort,
         path: "/ws",
         clientTracking: true,
+        maxPayload: MAX_FRAME_BYTES,
       });
       logger.debug("WebSocket server initialized");
     }
@@ -278,10 +289,10 @@ export class WebSocketService {
       organizationId: organizationId || "",
       customerId: "",
       authenticated: false,
+      ip: getClientIp(req.headers, req.socket.remoteAddress),
       ready: Promise.resolve(),
       metadata: {
         userAgent: req.headers["user-agent"],
-        ip: req.socket.remoteAddress,
       },
     };
 
@@ -468,6 +479,26 @@ export class WebSocketService {
         client,
         "DPoP authentication required: proof, method and url must be provided",
       );
+      return;
+    }
+
+    if (
+      typeof message.content !== "string" ||
+      !message.content.trim() ||
+      message.content.length > PUBLIC_WIDGET_LIMITS.maxMessageLength
+    ) {
+      this.sendError(client, "Invalid message content");
+      return;
+    }
+
+    // Checked before DPoP so a flood never reaches signature verification.
+    if (
+      await isPublicWidgetRateLimited([
+        { rule: "messagePerConversation", id: conversationId },
+        { rule: "messagePerIp", id: client.ip },
+      ])
+    ) {
+      this.sendError(client, "RATE_LIMITED");
       return;
     }
 

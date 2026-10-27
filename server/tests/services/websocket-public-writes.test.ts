@@ -42,6 +42,13 @@ jest.mock("@server/routes/v1/public-conversations", () => ({
   verifyDPoPForRequest: mockVerifyDPoP,
 }));
 
+const mockRateLimited =
+  jest.fn<(checks: Array<{ rule: string; id: string }>) => Promise<boolean>>();
+jest.mock("@server/services/public-widget-limits", () => ({
+  PUBLIC_WIDGET_LIMITS: { maxMessageLength: 4000 },
+  isPublicWidgetRateLimited: mockRateLimited,
+}));
+
 import * as jwt from "jsonwebtoken";
 import { WebSocketService } from "@server/services/websocket.service";
 
@@ -108,6 +115,7 @@ describe("WebSocket public writes require DPoP", () => {
     jest.clearAllMocks();
     service = new WebSocketService();
     mockVerifyDPoP.mockResolvedValue({ success: true, newNonce: "nonce-2" });
+    mockRateLimited.mockResolvedValue(false);
   });
 
   it("identify without a conversationId does not create a conversation", async () => {
@@ -203,6 +211,42 @@ describe("WebSocket public writes require DPoP", () => {
       expect.objectContaining({ content: "hello" }),
     );
     expect(ws.last()).toEqual({ type: "message_sent", messageId: "msg-1", nonce: "nonce-2" });
+  });
+
+  it("rejects messages longer than the cap before verifying DPoP", async () => {
+    const conversation = webConversation();
+    mockConversationRepo.findById.mockResolvedValue(conversation);
+    const { ws, send } = connect(service);
+
+    await send({ type: "identify", customerId: "visitor-1", conversationId: CONV_ID });
+    await send({ ...validFrame, content: "x".repeat(4001) });
+
+    expect(mockVerifyDPoP).not.toHaveBeenCalled();
+    expect(conversation.addMessage).not.toHaveBeenCalled();
+    expect(ws.last()).toEqual({ type: "error", error: "Invalid message content" });
+  });
+
+  it("rate limits per conversation and per proxied client IP", async () => {
+    const conversation = webConversation();
+    mockConversationRepo.findById.mockResolvedValue(conversation);
+    mockRateLimited.mockResolvedValue(true);
+    const { ws, send } = connect(service);
+
+    await send({
+      type: "identify",
+      customerId: "v",
+      conversationId: CONV_ID,
+      metadata: { ip: "1.1.1.1" },
+    });
+    await send(validFrame);
+
+    expect(mockRateLimited).toHaveBeenCalledWith([
+      { rule: "messagePerConversation", id: CONV_ID },
+      { rule: "messagePerIp", id: "203.0.113.7" },
+    ]);
+    expect(mockVerifyDPoP).not.toHaveBeenCalled();
+    expect(conversation.addMessage).not.toHaveBeenCalled();
+    expect(ws.last()).toEqual({ type: "error", error: "RATE_LIMITED" });
   });
 
   it("does not let an unauthenticated client subscribe to an arbitrary conversation", async () => {
