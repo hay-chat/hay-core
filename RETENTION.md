@@ -33,7 +33,7 @@ For each organization with `retentionDays > 0`:
 1. **Identifies eligible conversations** matching all criteria:
    - `deleted_at IS NULL` (not already anonymized)
    - `legal_hold = false` (not under legal hold)
-   - Status is `closed` or `resolved`
+   - Status is `closed`, `resolved` or `unresolved`
    - `closed_at` (or `created_at` if never closed) is before the cutoff date
 
 2. **Deletes linked embeddings** via `vectorStoreService.deleteByConversationIds()`
@@ -58,6 +58,15 @@ Anonymized conversations keep their structural fields for analytics:
 - Status and channel
 - Agent assignment (`agent_id`)
 - Organization assignment (`organization_id`)
+
+### Billing outcomes and insight issues
+
+Two tables written at close outlive the conversation's messages on purpose:
+
+- `conversation_outcomes`: one billing outcome per close (outcome, billable, reversed, timestamps). It holds no message text; `classification_reason` is a short model explanation, instructed to contain no personal data and passed through the log redaction regexes. It is the billing record, so it is kept.
+- `insight_issues`: one QA event per classified close for the Insights engine. `summary`, `snippet`, `paraphrase`, `root_cause` and `area` are PII-redacted (the model is told to replace personal data with `[redacted]`, then the email/phone/card/IP regexes run). Per Roger's D3 decision, redacted snippets may outlive conversation retention.
+
+Both reference the conversation with `ON DELETE SET NULL` and the organization with `ON DELETE CASCADE`.
 
 ## Legal Hold
 

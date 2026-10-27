@@ -1425,6 +1425,7 @@ const getStatusVariant = (
     open: "default",
     "pending-human": "destructive",
     resolved: "secondary",
+    unresolved: "outline",
     processing: "outline",
     closed: "secondary",
   };
@@ -1437,6 +1438,7 @@ const getStatusIcon = (status: string | undefined) => {
     open: Circle,
     "pending-human": AlertTriangle,
     resolved: CheckCircle,
+    unresolved: XCircle,
     active: Circle,
     escalated: AlertTriangle,
     closed: XCircle,
@@ -1452,6 +1454,7 @@ const formatStatus = (status: string | undefined) => {
     "pending-human": "conversations.status.pendingHuman",
     "human-took-over": "conversations.status.humanTookOver",
     resolved: "conversations.status.resolved",
+    unresolved: "conversations.status.unresolved",
     closed: "conversations.status.closed",
   };
   return keys[status] ? t(keys[status]) : status;

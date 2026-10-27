@@ -229,7 +229,9 @@ export class Orchestrator {
                 conversation.id,
                 conversation.organization_id,
                 {
-                  status: "resolved",
+                  // Unhappy closes are not resolutions (D5-5).
+                  status:
+                    lastUserMessage.intent === "close_unsatisfied" ? "unresolved" : "resolved",
                   ended_at: now,
                   resolution_metadata: {
                     resolved: lastUserMessage.intent === "close_satisfied",

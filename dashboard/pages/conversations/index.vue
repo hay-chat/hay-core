@@ -407,6 +407,7 @@ const statusOptions = computed(() => [
   { label: t("conversations.filters.allStatus"), value: "" },
   { label: t("conversations.filters.active"), value: "active" },
   { label: t("conversations.filters.resolved"), value: "resolved" },
+  { label: t("conversations.filters.unresolved"), value: "unresolved" },
   { label: t("conversations.filters.escalated"), value: "escalated" },
   { label: t("conversations.filters.closed"), value: "closed" },
 ]);
@@ -449,6 +450,7 @@ const getStatusVariant = (status: string): "default" | "secondary" | "destructiv
     open: "default",
     "pending-human": "destructive",
     resolved: "secondary",
+    unresolved: "outline",
     active: "default",
     escalated: "destructive",
     closed: "secondary",
@@ -461,6 +463,7 @@ const getStatusIcon = (status: string) => {
     open: Circle,
     "pending-human": AlertTriangle,
     resolved: CheckCircle,
+    unresolved: XCircle,
     active: Circle,
     escalated: AlertTriangle,
     closed: XCircle,
@@ -475,6 +478,7 @@ const formatStatus = (status: string) => {
     "pending-human": "conversations.status.pendingHuman",
     "human-took-over": "conversations.status.humanTookOver",
     resolved: "conversations.status.resolved",
+    unresolved: "conversations.status.unresolved",
     closed: "conversations.status.closed",
   };
   return keys[status] ? t(keys[status]) : status;

@@ -1,7 +1,7 @@
 import { ConversationRepository } from "../repositories/conversation.repository";
 import { MessageRepository } from "../repositories/message.repository";
 import { CustomerService } from "./customer.service";
-import { Conversation } from "../database/entities/conversation.entity";
+import { Conversation, type ConversationStatus } from "../database/entities/conversation.entity";
 import { Message, MessageType } from "../database/entities/message.entity";
 import { getUTCNow } from "../utils/date.utils";
 import { hookManager } from "./hooks/hook-manager";
@@ -35,7 +35,7 @@ export class ConversationService {
       agentId?: string | null;
       playbook_id?: string | null;
       metadata?: Record<string, unknown>;
-      status?: "open" | "processing" | "pending-human" | "human-took-over" | "resolved" | "closed";
+      status?: ConversationStatus;
       customer_id?: string | null;
       language?: string | null;
     },
@@ -127,7 +127,7 @@ export class ConversationService {
     organizationId: string,
     data: {
       title?: string;
-      status?: "open" | "processing" | "pending-human" | "human-took-over" | "resolved" | "closed";
+      status?: ConversationStatus;
       needs_processing?: boolean;
       last_processed_at?: Date | null;
       agent_id?: string | null;
@@ -148,7 +148,7 @@ export class ConversationService {
   ): Promise<Conversation | null> {
     // Automatically set closed_at when status changes to closed or resolved
     const updateData = { ...data };
-    if (data.status === "closed" || data.status === "resolved") {
+    if (data.status === "closed" || data.status === "resolved" || data.status === "unresolved") {
       updateData.closed_at = getUTCNow();
     }
 
