@@ -2,7 +2,12 @@
   "name": "WhatsApp",
   "description": "Conecte um número do WhatsApp Business e troque mensagens, mídias e áudios pela IA do Hay",
   "tools": {},
-  "config": {},
+  "config": {
+    "handoffTemplateName": {
+      "label": "Modelo de transferência",
+      "description": "Modelo aprovado enviado quando a IA passa a conversa para a sua equipe depois que a janela de 24 horas fechou"
+    }
+  },
   "ui": {
     "title": "Conectar WhatsApp",
     "intro": "Conecte um número do WhatsApp Business para que a IA do Hay atenda seus clientes no WhatsApp — texto, mídias e áudios.",
@@ -129,6 +134,35 @@
       "onFile": "Forma de pagamento cadastrada",
       "unknown": "A Meta cobra as mensagens do WhatsApp diretamente de você. A Meta não permite que o Hay veja sua forma de pagamento, então confira no Gerenciador do WhatsApp — sem uma, as respostas param depois das 1.000 mensagens de serviço gratuitas por número por mês.",
       "check": "Conferir forma de pagamento no Gerenciador do WhatsApp"
+    },
+    "templates": {
+      "title": "Modelos de mensagem",
+      "intro": "Fora da janela de 24 horas, o WhatsApp só entrega modelos aprovados pela Meta. O Hay.chat envia dois modelos iniciais para aprovação quando você conecta: hay_we_replied e hay_handoff_to_person.",
+      "sync": "Sincronizar com a Meta",
+      "empty": "Nenhum modelo ainda. Crie modelos no WhatsApp Manager ou sincronize de novo depois que os modelos iniciais forem enviados.",
+      "error": "Não foi possível carregar os modelos da Meta: {message}",
+      "rejectedReason": "Motivo da Meta: {reason}",
+      "unsupported": {
+        "header_media": "Tem um cabeçalho com mídia, então o Hay.chat ainda não pode enviá-lo.",
+        "header_variables": "Tem variáveis no cabeçalho, então o Hay.chat ainda não pode enviá-lo.",
+        "button_variables": "Tem um botão com link variável, então o Hay.chat ainda não pode enviá-lo."
+      },
+      "status": {
+        "APPROVED": "Aprovado",
+        "PENDING": "Em análise",
+        "REJECTED": "Rejeitado",
+        "PAUSED": "Pausado",
+        "DISABLED": "Desativado",
+        "IN_APPEAL": "Em recurso",
+        "FLAGGED": "Sinalizado",
+        "LIMIT_EXCEEDED": "Limite excedido",
+        "PENDING_DELETION": "Sendo excluído"
+      },
+      "category": {
+        "UTILITY": "Utilidade",
+        "MARKETING": "Marketing",
+        "AUTHENTICATION": "Autenticação"
+      }
     }
   }
 }

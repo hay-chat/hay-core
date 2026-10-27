@@ -2,7 +2,12 @@
   "name": "WhatsApp",
   "description": "Connect a WhatsApp Business number and exchange messages, media and voice notes through Hay's AI",
   "tools": {},
-  "config": {},
+  "config": {
+    "handoffTemplateName": {
+      "label": "Hand-off template",
+      "description": "Approved template sent when the AI hands a conversation to your team after the 24-hour window has closed"
+    }
+  },
   "ui": {
     "title": "Connect WhatsApp",
     "intro": "Connect a WhatsApp Business number so Hay's AI can answer your customers on WhatsApp — text, media and voice notes.",
@@ -129,6 +134,35 @@
       "onFile": "Payment method on file",
       "unknown": "Meta bills you directly for WhatsApp messages. Meta doesn't let Hay read your payment method, so check it in WhatsApp Manager — without one, replies stop after the free 1,000 service messages per number per month.",
       "check": "Check payment method in WhatsApp Manager"
+    },
+    "templates": {
+      "title": "Message templates",
+      "intro": "Outside the 24-hour window, WhatsApp only delivers templates Meta has approved. Hay.chat submits two starter templates when you connect: hay_we_replied and hay_handoff_to_person.",
+      "sync": "Sync with Meta",
+      "empty": "No templates yet. Create them in WhatsApp Manager, or sync again once the starter templates are submitted.",
+      "error": "Couldn't load templates from Meta: {message}",
+      "rejectedReason": "Meta's reason: {reason}",
+      "unsupported": {
+        "header_media": "Has a media header, so Hay.chat can't send it yet.",
+        "header_variables": "Has variables in the header, so Hay.chat can't send it yet.",
+        "button_variables": "Has a button with a variable link, so Hay.chat can't send it yet."
+      },
+      "status": {
+        "APPROVED": "Approved",
+        "PENDING": "In review",
+        "REJECTED": "Rejected",
+        "PAUSED": "Paused",
+        "DISABLED": "Disabled",
+        "IN_APPEAL": "In appeal",
+        "FLAGGED": "Flagged",
+        "LIMIT_EXCEEDED": "Limit exceeded",
+        "PENDING_DELETION": "Being deleted"
+      },
+      "category": {
+        "UTILITY": "Utility",
+        "MARKETING": "Marketing",
+        "AUTHENTICATION": "Authentication"
+      }
     }
   }
 }

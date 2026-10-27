@@ -164,6 +164,64 @@
         </template>
       </section>
 
+      <!-- Message templates card (D13-1) -->
+      <section v-if="status.connected" class="card" aria-labelledby="wa-templates-title">
+        <div class="card-header">
+          <h4 id="wa-templates-title">{{ t("templates.title") }}</h4>
+          <button
+            type="button"
+            class="btn btn-outline btn-sm"
+            :disabled="templatesLoading"
+            @click="loadTemplates(true)"
+          >
+            <span v-if="templatesLoading" class="spinner" aria-hidden="true"></span>
+            {{ t("templates.sync") }}
+          </button>
+        </div>
+        <p class="body">{{ t("templates.intro") }}</p>
+
+        <p v-if="templatesError" class="notice notice-error small" role="alert">
+          {{ t("templates.error", { message: templatesError }) }}
+        </p>
+
+        <p
+          v-else-if="templateList && templateList.templates.length === 0"
+          class="muted"
+          role="status"
+        >
+          {{ t("templates.empty") }}
+        </p>
+
+        <ul v-if="templateList && templateList.templates.length" class="template-list">
+          <li
+            v-for="template in templateList.templates"
+            :key="`${template.name}:${template.language}`"
+            class="template-row"
+          >
+            <div class="template-head">
+              <code>{{ template.name }}</code>
+              <span class="badge badge-neutral">{{ template.language }}</span>
+              <span v-if="template.category" class="badge badge-neutral">
+                {{ label("templates.category", template.category) }}
+              </span>
+              <span class="badge" :class="templateTone(template.status)">
+                {{ label("templates.status", template.status) }}
+              </span>
+            </div>
+            <p v-if="template.body" class="template-body">{{ template.body }}</p>
+            <p v-if="template.rejectedReason" class="small template-note">
+              {{ t("templates.rejectedReason", { reason: template.rejectedReason }) }}
+            </p>
+            <p
+              v-else-if="template.status === 'APPROVED' && template.unsupported"
+              class="small template-note"
+            >
+              {{ t(`templates.unsupported.${template.unsupported}`) }}
+            </p>
+          </li>
+        </ul>
+      </section>
+
       <!-- Tabs -->
       <div class="tabs" role="tablist" :aria-label="t('tabs.label')">
         <button
@@ -330,6 +388,7 @@
 <script lang="ts">
 import { computed, defineComponent, onBeforeUnmount, onMounted, ref, type PropType } from "vue";
 import type { ChannelStatus } from "../../src/status";
+import type { TemplateSnapshot } from "../../src/templates";
 import { createTranslator } from "./messages";
 import { loadFacebookSdk, runEmbeddedSignup, type SignupSession } from "./embedded-signup";
 
@@ -391,6 +450,14 @@ function isChannelStatus(value: unknown): value is ChannelStatus {
     "connected" in value &&
     "mode" in value &&
     "embeddedSignup" in value
+  );
+}
+
+function isTemplateSnapshot(value: unknown): value is TemplateSnapshot {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    Array.isArray((value as { templates?: unknown }).templates)
   );
 }
 
@@ -680,8 +747,44 @@ export default defineComponent({
       }, 2000);
     };
 
+    // --- Message templates (D13-1) ---------------------------------------------
+    const templateList = ref<TemplateSnapshot | null>(null);
+    const templatesError = ref<string | null>(null);
+    const templatesLoading = ref(false);
+
+    /** List the worker's templates; `sync` asks Meta again first. */
+    const loadTemplates = async (sync = false): Promise<void> => {
+      if (!props.api) return;
+      templatesLoading.value = true;
+      try {
+        const response = await props.api.plugins.callUiRoute.mutate({
+          pluginId: pluginId.value,
+          method: sync ? "POST" : "GET",
+          path: sync ? "/ui/templates/sync" : "/ui/templates",
+        });
+        if (response.status !== 200 || !isTemplateSnapshot(response.data)) {
+          throw new Error(`Worker responded with HTTP ${response.status}`);
+        }
+        templateList.value = response.data;
+        templatesError.value = response.data.error;
+      } catch (error: unknown) {
+        templatesError.value = errorMessage(error);
+      } finally {
+        templatesLoading.value = false;
+      }
+    };
+
+    const templateTone = (value: string): string =>
+      toneOf(
+        value,
+        ["APPROVED"],
+        ["PENDING", "IN_APPEAL", "PAUSED", "LIMIT_EXCEEDED"],
+        ["REJECTED", "DISABLED", "FLAGGED"],
+      );
+
     onMounted(() => {
       void loadStatus();
+      void loadTemplates();
       window.addEventListener("focus", onReturn);
       document.addEventListener("visibilitychange", onReturn);
     });
@@ -722,6 +825,11 @@ export default defineComponent({
       webhookUrl,
       copied,
       copyWebhookUrl,
+      templateList,
+      templatesError,
+      templatesLoading,
+      loadTemplates,
+      templateTone,
     };
   },
 });
@@ -861,6 +969,46 @@ export default defineComponent({
   background: #fef2f2;
   color: #b91c1c;
   border-color: #fecaca;
+}
+
+.template-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.template-row {
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  padding: 0.5rem 0.75rem;
+}
+
+.template-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.375rem;
+}
+
+.template-head code {
+  font-size: 0.8125rem;
+  font-weight: 600;
+}
+
+.template-body {
+  color: #4b5563;
+  font-size: 0.8125rem;
+  margin: 0.375rem 0 0 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.template-note {
+  color: #b45309;
+  margin: 0.25rem 0 0 0;
 }
 
 .badge-neutral {
