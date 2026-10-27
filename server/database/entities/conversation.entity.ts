@@ -91,6 +91,11 @@ export class Conversation {
   @Column({ type: "timestamptz", nullable: true })
   closed_at!: Date | null;
 
+  // First move to pending-human or human-took-over. Never cleared, so a chat
+  // handed back to the AI still reads as handed off. Set by the repository.
+  @Column({ type: "timestamptz", nullable: true })
+  handed_off_at!: Date | null;
+
   @Column({ type: "timestamptz", nullable: true })
   lastMessageAt!: Date | null;
 
