@@ -69,4 +69,22 @@ describe("insertMessage", () => {
     insertMessage(list, greeting(at("2026-10-27T10:00:05Z")));
     expect(list.map((m) => m.id)).toEqual(["greeting", "a1"]);
   });
+
+  it("replaces the local greeting with the server's greeting, keeping it first", () => {
+    const list: Message[] = [
+      greeting(at("2026-10-27T10:00:00Z")),
+      { id: "temp-1", sender: "user", content: "hi", timestamp: at("2026-10-27T12:00:00Z") },
+    ];
+    insertMessage(list, { ...server("g1", "2026-10-27T10:00:01Z"), metadata: { isGreeting: true } });
+    expect(list.map((m) => m.id)).toEqual(["g1", "temp-1"]);
+    expect(list[0].isGreeting).toBe(true);
+  });
+
+  it("does not put the local greeting back over the server's greeting", () => {
+    const list: Message[] = [];
+    insertMessage(list, { ...server("g1", "2026-10-27T10:00:01Z"), metadata: { isGreeting: true } });
+    insertMessage(list, server("a1", "2026-10-27T10:00:05Z"));
+    insertMessage(list, greeting(at("2026-10-27T10:00:01Z")));
+    expect(list.map((m) => m.id)).toEqual(["g1", "a1"]);
+  });
 });

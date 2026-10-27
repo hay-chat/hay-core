@@ -114,8 +114,9 @@ export function useChat(config: HayChatConfig) {
   };
 
   // Pin the configured greeting to the top of the conversation. It is a local
-  // placeholder, never replaced by server messages, and it carries a server
-  // time so the browser clock never decides where it sits.
+  // placeholder until the server's greeting message arrives and takes its
+  // place (see insertMessage), and it carries a server time so the browser
+  // clock never decides where it sits.
   const pinGreeting = (timestamp: number) => {
     if (!config.showGreeting || !config.greetingMessage) return;
     insertMessage(messages.value, {
@@ -288,11 +289,12 @@ export function useChat(config: HayChatConfig) {
 
   // Load messages into UI
   const loadMessagesIntoUI = (msgs: any[]) => {
-    // The server returns messages in conversation order; keep it as-is.
+    // The server returns messages in conversation order; insertMessage keeps
+    // it and pins the server greeting first.
     messages.value = [];
     msgs.forEach((msg) => {
       const sender = msg.type === "Customer" ? "user" : "agent";
-      messages.value.push({
+      insertMessage(messages.value, {
         id: msg.id,
         sender,
         content: msg.content,
@@ -316,6 +318,8 @@ export function useChat(config: HayChatConfig) {
       }
     });
 
+    // Conversations whose server greeting has not been stored yet still show
+    // the local one; pinGreeting leaves an existing server greeting alone.
     if (messages.value.length > 0) pinGreeting(messages.value[0].timestamp);
   };
 
