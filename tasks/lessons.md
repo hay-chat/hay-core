@@ -195,3 +195,15 @@
 - **Failure mode**: The dashboard logged the user out from the tRPC error link (any UNAUTHORIZED or a message containing "unauthorized"), the refresh catch (any error, network included), the global Vue error handler, the unhandled-rejection handler and AuthProvider (any init error). `auth.me` at app start went through the client without the refresh link, so reopening the PWA after the 15-minute access token expired logged the owner out; a wrong "current password" (UNAUTHORIZED) did too. The server's refresh mapped every failure, a database outage included, to UNAUTHORIZED.
 - **Detection signal**: More than one call site of `logout("token_expired")`; error classification by `message.includes(...)`.
 - **Prevention**: One owner for the logout decision (the refresh coordinator in `utils/api.ts`), triggered only by the refresh endpoint's UNAUTHORIZED. Everything else retries. Server endpoints that clients treat as a session verdict must reserve UNAUTHORIZED for definitive rejections and return 5xx for infrastructure failures.
+
+### `git commit` after a path-limited `git add` still commits everything staged
+
+- **Failure mode**: Deletions staged earlier with `git rm` rode along into an unrelated server commit made with `git add <server files> && git commit`.
+- **Detection signal**: `git rm` / `git mv` used mid-task, then a commit meant to cover only some files.
+- **Prevention**: For a partial commit use `git commit -- <paths>` (commits only those paths), or check `git diff --cached --stat` before committing.
+
+### Consent state that lives only in memory resets on every page load
+
+- **Failure mode**: The widget's "visitor sent a message" consent signal was an in-memory flag, so each reload started with the storage gates closed; the stored conversation was never read and a new conversation and customer replaced the shopper's thread.
+- **Detection signal**: A gate (`hasInteracted`, consent, feature unlock) that guards reading storage but is itself never persisted.
+- **Prevention**: Persist the signal in the tier it unlocks (sessionStorage for the in-tab chat), and test "reload" explicitly: re-run init with module state reset and browser storage kept.
