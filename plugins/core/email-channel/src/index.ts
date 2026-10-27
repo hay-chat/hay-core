@@ -147,7 +147,7 @@ export default defineHayPlugin((globalCtx) => {
           type: "string",
           label: "Your support address",
           description:
-            "The address your customers already write to, e.g. support@yourstore.com. You will forward this mailbox to the Hay address shown below.",
+            "The address your customers already write to, e.g. support@yourstore.com. You will forward this mailbox to the Hay.chat address shown below.",
           // Optional so a workspace can use only the team-notification action.
           required: false,
           encrypted: false,
@@ -156,7 +156,7 @@ export default defineHayPlugin((globalCtx) => {
           type: "string",
           label: "Sender name",
           description:
-            'Shown as the sender of Hay\'s replies, e.g. "Acme Support". Defaults to your workspace name.',
+            'Shown as the sender of Hay.chat\'s replies, e.g. "Acme Support". Defaults to your workspace name.',
           required: false,
           encrypted: false,
         },
@@ -164,7 +164,7 @@ export default defineHayPlugin((globalCtx) => {
           type: "boolean",
           label: "Keep a copy in my inbox",
           description:
-            "BCC your support address on every reply Hay sends, so your mailbox holds the whole conversation.",
+            "BCC your support address on every reply Hay.chat sends, so your mailbox holds the whole conversation.",
           required: false,
           default: false,
         },

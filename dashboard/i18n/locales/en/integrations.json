@@ -1,8 +1,8 @@
 {
   "channels": {
     "title": "Channels",
-    "description": "Active communication channels connecting your customers to Hay",
-    "headTitle": "Channels - Hay Dashboard",
+    "description": "Active communication channels connecting your customers to Hay.chat",
+    "headTitle": "Channels - Hay.chat",
     "browseMarketplace": "Browse Marketplace",
     "loading": "Loading channels...",
     "empty": {
@@ -17,7 +17,7 @@
   "marketplace": {
     "title": "Integration Marketplace",
     "description": "Discover and install integrations to extend your platform capabilities",
-    "headTitle": "Integration Marketplace - Hay Dashboard",
+    "headTitle": "Integration Marketplace - Hay.chat",
     "uploadPlugin": "Upload Integration",
     "manageCustom": "Manage Custom ({count})",
     "refresh": "Refresh",
@@ -76,7 +76,7 @@
   "manage": {
     "title": "Manage Custom Integrations",
     "description": "View and manage your organization's custom integrations",
-    "headTitle": "Manage Custom Integrations - Hay Dashboard",
+    "headTitle": "Manage Custom Integrations - Hay.chat",
     "uploadPlugin": "Upload Integration",
     "refresh": "Refresh",
     "stats": {
@@ -122,7 +122,7 @@
   "upload": {
     "title": "Upload Custom Integration",
     "description": "Upload a custom integration to extend your platform",
-    "headTitle": "Upload Integration - Hay Dashboard",
+    "headTitle": "Upload Integration - Hay.chat",
     "backToMarketplace": "Back to Marketplace",
     "card": {
       "title": "Upload Integration ZIP",
@@ -175,8 +175,8 @@
   },
   "pluginSettings": {
     "backToMarketplace": "Back to Marketplace",
-    "headTitle": "Integration Settings - Hay Dashboard",
-    "headTitleWithName": "{name} Settings - Hay Dashboard",
+    "headTitle": "Integration Settings - Hay.chat",
+    "headTitleWithName": "{name} Settings - Hay.chat",
     "restartWorker": "Restart Worker",
     "restarting": "Restarting...",
     "disablePlugin": "Disable Integration",

@@ -107,7 +107,7 @@
     <!-- Header -->
     <mj-section background-color="#f4f4f4" padding="40px 25px 20px 25px">
       <mj-column>
-        <mj-image src="{{logoUrl}}" width="100px" alt="Hay" />
+        <mj-image src="{{logoUrl}}" width="100px" alt="Hay.chat" />
       </mj-column>
     </mj-section>
 
@@ -122,7 +122,7 @@
         </mj-text>
 
         <mj-text align="center" font-size="11px" color="#999999" padding="20px 0 0 0">
-          &copy; {{ currentYear }} Hay. {{ t.common.allRightsReserved }}.
+          &copy; {{ currentYear }} Hay.chat. {{ t.common.allRightsReserved }}.
         </mj-text>
       </mj-column>
     </mj-section>

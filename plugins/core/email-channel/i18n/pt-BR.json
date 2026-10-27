@@ -1,6 +1,6 @@
 {
   "name": "Caixa de e-mail",
-  "description": "Conecte sua caixa de suporte: encaminhe os e-mails de support@ para a Hay e deixe a IA responder por e-mail, na mesma conversa. A IA também pode enviar e-mails para a sua equipe.",
+  "description": "Conecte sua caixa de suporte: encaminhe os e-mails de support@ para o Hay.chat e deixe a IA responder por e-mail, na mesma conversa. A IA também pode enviar e-mails para a sua equipe.",
   "tools": {
     "send-email": {
       "label": "Enviar e-mail para a equipe",
@@ -10,15 +10,15 @@
   "config": {
     "supportAddress": {
       "label": "Seu endereço de suporte",
-      "description": "O endereço para onde seus clientes já escrevem, por exemplo suporte@sualoja.com. Você vai encaminhar essa caixa para o endereço da Hay mostrado abaixo."
+      "description": "O endereço para onde seus clientes já escrevem, por exemplo suporte@sualoja.com. Você vai encaminhar essa caixa para o endereço do Hay.chat mostrado abaixo."
     },
     "storeName": {
       "label": "Nome do remetente",
-      "description": "Aparece como remetente das respostas da Hay, por exemplo \"Suporte Acme\". Por padrão, o nome do seu espaço de trabalho."
+      "description": "Aparece como remetente das respostas do Hay.chat, por exemplo \"Suporte Acme\". Por padrão, o nome do seu espaço de trabalho."
     },
     "bccArchive": {
       "label": "Guardar uma cópia na minha caixa",
-      "description": "Enviar cópia oculta (CCO) de cada resposta da Hay para o seu endereço de suporte, para que sua caixa tenha a conversa completa."
+      "description": "Enviar cópia oculta (CCO) de cada resposta do Hay.chat para o seu endereço de suporte, para que sua caixa tenha a conversa completa."
     },
     "notificationRecipients": {
       "label": "Endereços de notificação da equipe",
@@ -27,7 +27,7 @@
   },
   "ui": {
     "title": "Conecte sua caixa de entrada",
-    "intro": "Mantenha seu endereço de suporte. Encaminhe-o para a Hay e a IA responde por e-mail — cada resposta fica na mesma conversa, e você pode assumir qualquer atendimento pelo painel.",
+    "intro": "Mantenha seu endereço de suporte. Encaminhe-o para o Hay.chat e a IA responde por e-mail — cada resposta fica na mesma conversa, e você pode assumir qualquer atendimento pelo painel.",
     "loadingStatus": "Carregando status do canal de e-mail…",
     "statusError": {
       "title": "Não foi possível carregar o status do canal de e-mail",
@@ -37,15 +37,15 @@
       "retry": "Tentar de novo"
     },
     "notReady": {
-      "title": "O canal de e-mail ainda não está disponível nesta instalação da Hay",
-      "body": "Falta no servidor: {missing}. Peça ao administrador da Hay para configurar o recebimento de e-mail."
+      "title": "O canal de e-mail ainda não está disponível nesta instalação do Hay.chat",
+      "body": "Falta no servidor: {missing}. Peça ao administrador do Hay.chat para configurar o recebimento de e-mail."
     },
     "needsAddress": {
       "title": "Salve seu endereço de suporte primeiro",
-      "body": "Informe acima o endereço para o qual seus clientes escrevem e salve. A Hay usa esse endereço para reconhecer os e-mails encaminhados e enviar o Reply-To correto."
+      "body": "Informe acima o endereço para o qual seus clientes escrevem e salve. O Hay.chat usa esse endereço para reconhecer os e-mails encaminhados e enviar o Reply-To correto."
     },
     "address": {
-      "title": "Seu endereço de encaminhamento na Hay",
+      "title": "Seu endereço de encaminhamento no Hay.chat",
       "intro": "Encaminhe sua caixa de suporte para este endereço. Ele é exclusivo do seu workspace.",
       "copy": "Copiar endereço",
       "copied": "Copiado",
@@ -59,11 +59,11 @@
       "title": "Configure o encaminhamento",
       "gmail": {
         "title": "Gmail ou Google Workspace",
-        "body": "Abra o Gmail com a conta de suporte → Configurações → Ver todas as configurações → Encaminhamento e POP/IMAP → Adicionar um endereço de encaminhamento → cole o endereço da Hay → Avançar. O Google envia à Hay um código de confirmação; ele aparece abaixo em até um minuto. Digite-o no Gmail, escolha \"Encaminhar uma cópia dos e-mails recebidos\" e salve."
+        "body": "Abra o Gmail com a conta de suporte → Configurações → Ver todas as configurações → Encaminhamento e POP/IMAP → Adicionar um endereço de encaminhamento → cole o endereço do Hay.chat → Avançar. O Google envia ao Hay.chat um código de confirmação; ele aparece abaixo em até um minuto. Digite-o no Gmail, escolha \"Encaminhar uma cópia dos e-mails recebidos\" e salve."
       },
       "outlook": {
         "title": "Outlook ou Microsoft 365",
-        "body": "Abra o Outlook na web com a conta de suporte → Configurações → E-mail → Encaminhamento → Ativar encaminhamento → cole o endereço da Hay → marque \"Manter uma cópia das mensagens encaminhadas\" → Salvar. Alguns tenants do Microsoft 365 exigem que um administrador permita encaminhamento externo."
+        "body": "Abra o Outlook na web com a conta de suporte → Configurações → E-mail → Encaminhamento → Ativar encaminhamento → cole o endereço do Hay.chat → marque \"Manter uma cópia das mensagens encaminhadas\" → Salvar. Alguns tenants do Microsoft 365 exigem que um administrador permita encaminhamento externo."
       },
       "other": {
         "title": "Outros provedores",
@@ -81,7 +81,7 @@
       "code": "Código de confirmação",
       "copyCode": "Copiar código",
       "link": "Ou abra o link de confirmação do Google",
-      "noCode": "A Hay recebeu a mensagem do Google, mas não conseguiu ler o código. Abra o link abaixo."
+      "noCode": "O Hay.chat recebeu a mensagem do Google, mas não conseguiu ler o código. Abra o link abaixo."
     },
     "health": {
       "title": "Status",

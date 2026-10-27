@@ -1,6 +1,6 @@
 {
   "name": "Email inbox",
-  "description": "Connect your support inbox: forward support@ emails to Hay and let the AI reply by email, threaded like a normal conversation. The AI can also email your team.",
+  "description": "Connect your support inbox: forward support@ emails to Hay.chat and let the AI reply by email, threaded like a normal conversation. The AI can also email your team.",
   "tools": {
     "send-email": {
       "label": "Send email to your team",
@@ -10,15 +10,15 @@
   "config": {
     "supportAddress": {
       "label": "Your support address",
-      "description": "The address your customers already write to, e.g. support@yourstore.com. You will forward this mailbox to the Hay address shown below."
+      "description": "The address your customers already write to, e.g. support@yourstore.com. You will forward this mailbox to the Hay.chat address shown below."
     },
     "storeName": {
       "label": "Sender name",
-      "description": "Shown as the sender of Hay's replies, e.g. \"Acme Support\". Defaults to your workspace name."
+      "description": "Shown as the sender of Hay.chat's replies, e.g. \"Acme Support\". Defaults to your workspace name."
     },
     "bccArchive": {
       "label": "Keep a copy in my inbox",
-      "description": "BCC your support address on every reply Hay sends, so your mailbox holds the whole conversation."
+      "description": "BCC your support address on every reply Hay.chat sends, so your mailbox holds the whole conversation."
     },
     "notificationRecipients": {
       "label": "Team notification addresses",
@@ -27,7 +27,7 @@
   },
   "ui": {
     "title": "Connect your inbox",
-    "intro": "Keep your support address. Forward it to Hay and the AI answers by email — every reply stays in the same thread, and you can take over any conversation from the dashboard.",
+    "intro": "Keep your support address. Forward it to Hay.chat and the AI answers by email — every reply stays in the same thread, and you can take over any conversation from the dashboard.",
     "loadingStatus": "Loading email channel status…",
     "statusError": {
       "title": "Couldn't load the email channel status",
@@ -37,15 +37,15 @@
       "retry": "Try again"
     },
     "notReady": {
-      "title": "Email channel is not available on this Hay installation yet",
-      "body": "The host is missing: {missing}. Ask your Hay administrator to configure inbound email."
+      "title": "Email channel is not available on this Hay.chat installation yet",
+      "body": "The host is missing: {missing}. Ask your Hay.chat administrator to configure inbound email."
     },
     "needsAddress": {
       "title": "Save your support address first",
-      "body": "Enter the address your customers write to in the settings above and save. Hay uses it to recognise forwarded mail and to send the right Reply-To."
+      "body": "Enter the address your customers write to in the settings above and save. Hay.chat uses it to recognise forwarded mail and to send the right Reply-To."
     },
     "address": {
-      "title": "Your Hay forwarding address",
+      "title": "Your Hay.chat forwarding address",
       "intro": "Forward your support mailbox to this address. It is unique to your workspace.",
       "copy": "Copy address",
       "copied": "Copied",
@@ -59,11 +59,11 @@
       "title": "Set up forwarding",
       "gmail": {
         "title": "Gmail or Google Workspace",
-        "body": "Open Gmail as the support mailbox → Settings → See all settings → Forwarding and POP/IMAP → Add a forwarding address → paste the Hay address → Next. Google emails Hay a confirmation code; it appears below within a minute. Enter it in Gmail, choose \"Forward a copy of incoming mail\" and save."
+        "body": "Open Gmail as the support mailbox → Settings → See all settings → Forwarding and POP/IMAP → Add a forwarding address → paste the Hay.chat address → Next. Google emails Hay.chat a confirmation code; it appears below within a minute. Enter it in Gmail, choose \"Forward a copy of incoming mail\" and save."
       },
       "outlook": {
         "title": "Outlook or Microsoft 365",
-        "body": "Open Outlook on the web as the support mailbox → Settings → Mail → Forwarding → Enable forwarding → paste the Hay address → tick \"Keep a copy of forwarded messages\" → Save. Some Microsoft 365 tenants need an admin to allow external forwarding."
+        "body": "Open Outlook on the web as the support mailbox → Settings → Mail → Forwarding → Enable forwarding → paste the Hay.chat address → tick \"Keep a copy of forwarded messages\" → Save. Some Microsoft 365 tenants need an admin to allow external forwarding."
       },
       "other": {
         "title": "Other providers",
@@ -81,7 +81,7 @@
       "code": "Confirmation code",
       "copyCode": "Copy code",
       "link": "Or open Google's confirmation link",
-      "noCode": "Hay received Google's message but could not read the code. Open the link below instead."
+      "noCode": "Hay.chat received Google's message but could not read the code. Open the link below instead."
     },
     "health": {
       "title": "Status",

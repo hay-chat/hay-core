@@ -227,20 +227,20 @@ export default defineNuxtConfig({
   // App configuration
   app: {
     head: {
-      title: "Hay Dashboard",
+      title: "Hay.chat",
       meta: [
         { charset: "utf-8" },
         {
           name: "viewport",
           content: "width=device-width, initial-scale=1, viewport-fit=cover",
         },
-        { name: "description", content: "Hay platform dashboard application" },
+        { name: "description", content: "Hay.chat dashboard" },
         { name: "robots", content: "noindex, nofollow" },
         // Installable on phones (Add to Home Screen); iOS needs this to allow Web Push
         { name: "theme-color", content: "#001df5" },
         { name: "mobile-web-app-capable", content: "yes" },
         { name: "apple-mobile-web-app-capable", content: "yes" },
-        { name: "apple-mobile-web-app-title", content: "Hay" },
+        { name: "apple-mobile-web-app-title", content: "Hay.chat" },
         { name: "apple-mobile-web-app-status-bar-style", content: "default" },
       ],
       script: [
