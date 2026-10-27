@@ -54,7 +54,6 @@ export function useChat(config: HayChatConfig) {
     identify,
     sendTypingIndicator,
     disconnect,
-    setNonceUpdateCallback,
     setStatusChangeCallback,
   } = useWebSocket(config.baseUrl, config.organizationId);
 
@@ -389,12 +388,6 @@ export function useChat(config: HayChatConfig) {
       console.error("[Webchat] Failed to initialize chat:", error);
     }
   };
-
-  // Set nonce update callback for WebSocket responses
-  setNonceUpdateCallback((newNonce: string) => {
-    nonce.value = newNonce;
-    debugLog("[Webchat] Nonce updated from WebSocket");
-  });
 
   // Set status change callback for conversation status updates
   setStatusChangeCallback((status: string, _payload: any) => {
