@@ -86,6 +86,14 @@ export class AnalyticsService {
       status: "resolved",
     });
 
+    // What the backoffice meters. Unlike resolvedConversations it drops test,
+    // unhappy and handed-off chats and is bounded by resolution time.
+    const billableResolutions = await this.conversationRepository.countBillableResolutions({
+      organizationId,
+      startDate,
+      endDate,
+    });
+
     const avgMessagesPerConversation =
       await this.messageRepository.getAverageMessagesPerConversation(
         organizationId,
@@ -96,6 +104,7 @@ export class AnalyticsService {
     return {
       totalConversations,
       resolvedConversations,
+      billableResolutions,
       resolutionRate:
         totalConversations > 0 ? (resolvedConversations / totalConversations) * 100 : 0,
       avgMessagesPerConversation,
