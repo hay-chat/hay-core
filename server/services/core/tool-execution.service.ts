@@ -9,6 +9,8 @@ import { conversationSecretService } from "../conversation-secret.service";
 import { createLogger } from "@server/lib/logger";
 import { actionLogService, toolErrorCode } from "../action-log.service";
 import { classifyTool, CORE_TOOL_RISK, type ToolRisk } from "./tool-risk";
+import { isDryRun, simulatedResult } from "./dry-run";
+import type { ActionOutcome } from "@server/database/entities/action-log.entity";
 
 const logger = createLogger("tool-execution");
 
@@ -16,6 +18,8 @@ interface ToolExecutionResult {
   success: boolean;
   result?: unknown;
   error?: string;
+  /** A dry-run write: nothing was sent to the provider. */
+  simulated?: boolean;
 }
 
 interface ToolLogEntry {
@@ -27,6 +31,31 @@ interface ToolLogEntry {
   errorClass?: string;
   latencyMs: number;
   idempotencyKey: string;
+}
+
+interface ToolTarget {
+  pluginId: string | null;
+  toolName: string;
+  risk: ToolRisk;
+}
+
+/** Everything known about a call before it runs. */
+interface PreparedCall {
+  conversation: Conversation;
+  toolCall: { name: string; args: Record<string, unknown> };
+  messageId?: string;
+  target: ToolTarget;
+  idempotencyKey: string;
+  startedAt: number;
+  executedAt: string;
+}
+
+/** How a call ended, for the caller, the action log and the tool log. */
+interface CallStep {
+  result: ToolExecutionResult;
+  logOutcome: ActionOutcome;
+  errorCode: string | null;
+  errorClass?: string;
 }
 
 interface ToolCallData {
@@ -77,7 +106,8 @@ export class ToolExecutionService {
     try {
       logger.info({ toolName: toolCall.name, args: toolCall.args }, "Executing tool");
 
-      const currentContext = conversation.orchestration_status as unknown as ConversationContext | null;
+      const currentContext =
+        conversation.orchestration_status as unknown as ConversationContext | null;
       if (!currentContext) {
         return { success: false, error: "No conversation context available" };
       }
@@ -86,61 +116,22 @@ export class ToolExecutionService {
       }
 
       const target = await this.resolveTarget(conversation.organization_id, toolCall.name);
-      const toolLogEntry: ToolLogEntry = {
-        turn: currentContext.lastTurn + 1,
-        name: toolCall.name,
-        input: toolCall.args,
-        ok: false,
-        latencyMs: 0,
+      const call: PreparedCall = {
+        conversation,
+        toolCall,
+        messageId,
+        target,
         idempotencyKey: uuidv4(),
+        startedAt: Date.now(),
+        executedAt: new Date().toISOString(),
       };
 
-      const startTime = Date.now();
-      const executedAt = new Date().toISOString();
-      let outcome: ToolExecutionResult;
-      let errorCode: string | null = null;
+      const step =
+        !target.risk.readOnly && isDryRun(conversation.metadata)
+          ? await this.simulate(call)
+          : await this.runLive(call);
 
-      try {
-        const result = await this.executeToolCall(
-          conversation,
-          { tool_name: toolCall.name, arguments: toolCall.args },
-          toolLogEntry.idempotencyKey,
-        );
-        toolLogEntry.ok = true;
-        toolLogEntry.result = result;
-        toolLogEntry.latencyMs = Date.now() - startTime;
-
-        await this.finishToolMessage(conversation, messageId, `Action completed: ${toolCall.name}`, {
-          toolOutput: result,
-          toolStatus: "SUCCESS",
-          toolLatencyMs: toolLogEntry.latencyMs,
-          toolExecutedAt: executedAt,
-        });
-        outcome = { success: true, result };
-      } catch (error: unknown) {
-        const err = error as Error;
-        toolLogEntry.errorClass = err.constructor.name;
-        toolLogEntry.result = err.message || "Unknown error";
-        toolLogEntry.latencyMs = Date.now() - startTime;
-
-        // Extract MCP error details if available
-        const mcpErrorDetails = (err as MCPError).mcpErrorDetails;
-        errorCode = toolErrorCode(mcpErrorDetails);
-        const errorOutput = mcpErrorDetails || {
-          error: err.message || "Unknown error",
-          errorType: err.constructor.name,
-        };
-
-        await this.finishToolMessage(conversation, messageId, `Action failed: ${toolCall.name}`, {
-          toolOutput: errorOutput,
-          toolStatus: "ERROR",
-          toolErrorCode: errorCode,
-          toolLatencyMs: toolLogEntry.latencyMs,
-          toolExecutedAt: executedAt,
-        });
-        outcome = { success: false, error: err.message || "Unknown error" };
-      }
-
+      const latencyMs = Date.now() - call.startedAt;
       await actionLogService.record({
         organizationId: conversation.organization_id,
         conversationId: conversation.id,
@@ -149,18 +140,28 @@ export class ToolExecutionService {
         toolName: target.toolName,
         risk: target.risk,
         args: toolCall.args,
-        outcome: outcome.success ? "success" : "error",
-        errorCode,
-        durationMs: toolLogEntry.latencyMs,
-        idempotencyKey: toolLogEntry.idempotencyKey,
+        outcome: step.logOutcome,
+        errorCode: step.errorCode,
+        durationMs: latencyMs,
+        idempotencyKey: call.idempotencyKey,
       });
 
+      const toolLogEntry: ToolLogEntry = {
+        turn: currentContext.lastTurn + 1,
+        name: toolCall.name,
+        input: toolCall.args,
+        ok: step.result.success,
+        result: step.result.success ? step.result.result : step.result.error,
+        errorClass: step.errorClass,
+        latencyMs,
+        idempotencyKey: call.idempotencyKey,
+      };
       currentContext.toolLog.push(toolLogEntry);
       await this.conversationRepository.updateById(conversation.id, {
         orchestration_status: currentContext as unknown as Record<string, unknown>,
       });
 
-      return outcome;
+      return step.result;
     } catch (error) {
       logger.error({ err: error }, "Error handling tool execution");
       return {
@@ -170,14 +171,62 @@ export class ToolExecutionService {
     }
   }
 
+  /** Dry-run write: nothing reaches the provider, the AI gets a structured mock. */
+  private async simulate(call: PreparedCall): Promise<CallStep> {
+    const result = simulatedResult(call.toolCall.name, call.toolCall.args);
+    await this.finishToolMessage(call, `Action simulated: ${call.toolCall.name}`, {
+      toolOutput: result,
+      toolStatus: "SIMULATED",
+    });
+    return {
+      result: { success: true, simulated: true, result },
+      logOutcome: "simulated",
+      errorCode: null,
+    };
+  }
+
+  /** Send the call to the core tool or plugin and record the answer. */
+  private async runLive(call: PreparedCall): Promise<CallStep> {
+    const { conversation, toolCall } = call;
+    try {
+      const result = await this.executeToolCall(
+        conversation,
+        { tool_name: toolCall.name, arguments: toolCall.args },
+        call.idempotencyKey,
+      );
+      await this.finishToolMessage(call, `Action completed: ${toolCall.name}`, {
+        toolOutput: result,
+        toolStatus: "SUCCESS",
+      });
+      return { result: { success: true, result }, logOutcome: "success", errorCode: null };
+    } catch (error: unknown) {
+      const err = error as Error;
+      // Extract MCP error details if available
+      const mcpErrorDetails = (err as MCPError).mcpErrorDetails;
+      const errorCode = toolErrorCode(mcpErrorDetails);
+      const errorOutput = mcpErrorDetails || {
+        error: err.message || "Unknown error",
+        errorType: err.constructor.name,
+      };
+      await this.finishToolMessage(call, `Action failed: ${toolCall.name}`, {
+        toolOutput: errorOutput,
+        toolStatus: "ERROR",
+        toolErrorCode: errorCode,
+      });
+      return {
+        result: { success: false, error: err.message || "Unknown error" },
+        logOutcome: "error",
+        errorCode,
+        errorClass: err.constructor.name,
+      };
+    }
+  }
+
   /**
    * Split `pluginId:toolName` (or a core tool name) and look up its risk class.
    * An unparseable or uncached tool resolves to an unclassified write.
    */
-  private async resolveTarget(
-    organizationId: string,
-    fullToolName: string,
-  ): Promise<{ pluginId: string | null; toolName: string; risk: ToolRisk }> {
+  private async resolveTarget(organizationId: string, fullToolName: string): Promise<ToolTarget> {
     const { coreToolRegistry } = await import("./core-tools");
     if (coreToolRegistry.has(fullToolName)) {
       return { pluginId: null, toolName: fullToolName, risk: CORE_TOOL_RISK };
@@ -200,17 +249,21 @@ export class ToolExecutionService {
 
   /** Write the final state onto the TOOL message and push it to the dashboard. */
   private async finishToolMessage(
-    conversation: Conversation,
-    messageId: string | undefined,
+    call: PreparedCall,
     content: string,
     patch: Record<string, unknown>,
   ): Promise<void> {
-    if (!messageId) return;
-    const message = await this.messageService.messageRepository.findById(messageId);
+    if (!call.messageId) return;
+    const message = await this.messageService.messageRepository.findById(call.messageId);
     if (!message) return;
-    const metadata = { ...message.metadata, ...patch };
-    await this.messageService.messageRepository.update(messageId, { content, metadata });
-    await this.broadcastMessageUpdate(conversation, message.id, { content, metadata });
+    const metadata = {
+      ...message.metadata,
+      ...patch,
+      toolLatencyMs: Date.now() - call.startedAt,
+      toolExecutedAt: call.executedAt,
+    };
+    await this.messageService.messageRepository.update(call.messageId, { content, metadata });
+    await this.broadcastMessageUpdate(call.conversation, message.id, { content, metadata });
   }
 
   private async executeToolCall(

@@ -65,6 +65,7 @@
 
 <script setup lang="ts">
 import { ref, computed, watch } from "vue";
+import { useI18n } from "vue-i18n";
 import VueJsonPretty from "vue-json-pretty";
 import "vue-json-pretty/lib/styles.css";
 import {
@@ -77,7 +78,10 @@ import {
   Loader2,
   CalendarClock,
   AlertCircle,
+  FlaskConical,
 } from "lucide-vue-next";
+
+const { t } = useI18n();
 
 interface Props {
   toolName?: string;
@@ -184,6 +188,8 @@ const statusVariant = computed(() => {
       return "destructive";
     case "RUNNING":
       return "tool";
+    case "SIMULATED":
+      return "secondary";
     default:
       return "outline";
   }
@@ -197,6 +203,8 @@ const statusIcon = computed(() => {
       return XCircle;
     case "RUNNING":
       return Loader2;
+    case "SIMULATED":
+      return FlaskConical;
     default:
       return AlertCircle;
   }
@@ -205,13 +213,15 @@ const statusIcon = computed(() => {
 const statusText = computed(() => {
   switch (props.toolStatus) {
     case "SUCCESS":
-      return "Success";
+      return t("conversations.toolStatus.success");
     case "ERROR":
-      return "Failed";
+      return t("conversations.toolStatus.failed");
     case "RUNNING":
-      return "Running";
+      return t("conversations.toolStatus.running");
+    case "SIMULATED":
+      return t("conversations.toolStatus.simulated");
     default:
-      return "Unknown";
+      return t("conversations.toolStatus.unknown");
   }
 });
 

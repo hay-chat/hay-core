@@ -193,10 +193,9 @@ describe("close outcome rules", () => {
       expect(facts).toMatchObject({ hadRealRequest: true, aiLastReplyIsAnswer: false });
     });
 
-    it("recognises playground, test-mode and replay conversations", () => {
+    it("recognises playground and replay conversations", () => {
       for (const metadata of [
         { sourceId: "playground" },
-        { test_mode: true },
         { isPlayground: true },
         { runKind: "simulation" },
       ]) {

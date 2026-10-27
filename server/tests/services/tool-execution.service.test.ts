@@ -153,13 +153,91 @@ describe("ToolExecutionService action log", () => {
   });
 });
 
+describe("ToolExecutionService dry-run", () => {
+  it("returns a mock for a write in a playground conversation and logs it as simulated", async () => {
+    const service = new ToolExecutionService();
+
+    const res = await service.handleToolExecution(
+      makeConversation({ sourceId: "playground", dryRun: true }),
+      { name: "shop:create_refund", args: { order_id: "1", amount: "10.00" } },
+      "msg-1",
+    );
+
+    expect(mockCallTool).not.toHaveBeenCalled();
+    expect(res).toMatchObject({
+      success: true,
+      simulated: true,
+      result: {
+        simulated: true,
+        wouldHaveCalled: { tool: "shop:create_refund", args: { order_id: "1", amount: "10.00" } },
+      },
+    });
+    expect(mockRecord.mock.calls[0][0].outcome).toBe("simulated");
+    expect(mockMessageUpdate.mock.calls[0][1].metadata.toolStatus).toBe("SIMULATED");
+  });
+
+  it("simulates by default in the playground even without the flag", async () => {
+    const service = new ToolExecutionService();
+    const res = await service.handleToolExecution(makeConversation({ sourceId: "playground" }), {
+      name: "shop:create_refund",
+      args: {},
+    });
+    expect(res.simulated).toBe(true);
+    expect(mockCallTool).not.toHaveBeenCalled();
+  });
+
+  it("simulates an unclassified tool (treated as a write)", async () => {
+    mockGetToolRisk.mockResolvedValue({
+      readOnly: false,
+      category: "other_write",
+      classified: false,
+    });
+    const service = new ToolExecutionService();
+    const res = await service.handleToolExecution(makeConversation({ dryRun: true }), {
+      name: "shop:mystery",
+      args: {},
+    });
+    expect(res.simulated).toBe(true);
+  });
+
+  it("lets reads through to the live store", async () => {
+    mockGetToolRisk.mockResolvedValue({ readOnly: true, category: null, classified: true });
+    mockCallTool.mockResolvedValue({ content: [{ type: "text", text: "order" }] });
+    const service = new ToolExecutionService();
+
+    const res = await service.handleToolExecution(makeConversation({ sourceId: "playground" }), {
+      name: "shop:get_order",
+      args: { order_id: "1" },
+    });
+
+    expect(mockCallTool).toHaveBeenCalledTimes(1);
+    expect(res.simulated).toBeUndefined();
+    expect(mockRecord.mock.calls[0][0].outcome).toBe("success");
+  });
+
+  it("sends writes when the playground was switched to the live store", async () => {
+    mockCallTool.mockResolvedValue({ content: [{ type: "text", text: "refunded" }] });
+    const service = new ToolExecutionService();
+    const res = await service.handleToolExecution(
+      makeConversation({ sourceId: "playground", dryRun: false }),
+      { name: "shop:create_refund", args: {} },
+    );
+    expect(mockCallTool).toHaveBeenCalledTimes(1);
+    expect(res.simulated).toBeUndefined();
+  });
+});
+
 describe("action log helpers", () => {
   const { redactArgs, toolErrorCode } = jest.requireActual("@server/services/action-log.service");
 
   it("redacts sensitive keys at any depth", () => {
     expect(
       redactArgs({ a: 1, accessToken: "x", nested: [{ password: "p", note: "keep" }] }),
-    ).toEqual({ a: 1, accessToken: "[redacted]", nested: [{ password: "[redacted]", note: "keep" }] });
+    ).toEqual({
+      a: 1,
+      accessToken: "[redacted]",
+      nested: [{ password: "[redacted]", note: "keep" }],
+    });
   });
 
   it("falls back to INTERNAL for non tool-errors failures", () => {
