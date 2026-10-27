@@ -843,7 +843,6 @@ export function useChat(config: HayChatConfig) {
 
       isSending.value = false;
     } catch (error: any) {
-      console.error("[Webchat] Failed to send message:", error);
       isSending.value = false;
 
       // Handle nonce expiration
@@ -853,6 +852,8 @@ export function useChat(config: HayChatConfig) {
         // Retry once with new nonce
         return sendMessageNow(text, retryCount + 1);
       }
+
+      console.error("[Webchat] Failed to send message:", error);
 
       // The server refused the message (4xx). Retrying automatically will not
       // help, so take the bubble back, return the text to the input and tell
