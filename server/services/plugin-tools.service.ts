@@ -8,6 +8,7 @@
 
 import { pluginInstanceRepository } from "@server/repositories/plugin-instance.repository";
 import { createLogger } from "@server/lib/logger";
+import { classifyTool, type ToolRisk } from "@server/services/core/tool-risk";
 
 const logger = createLogger("plugin-tools");
 
@@ -31,7 +32,18 @@ interface MCPTool {
   inputSchema?: Record<string, unknown>;
   input_schema?: Record<string, unknown>;
   annotations?: MCPToolAnnotations;
+  _meta?: Record<string, unknown>;
   serverId?: string;
+}
+
+/** A cached tool as core uses it: schema plus its risk class. */
+export interface CachedToolDescriptor {
+  serverId: string;
+  name: string;
+  description: string;
+  input_schema: unknown;
+  annotations?: MCPToolAnnotations;
+  risk: ToolRisk;
 }
 
 /**
@@ -222,14 +234,9 @@ export async function storeToolsInConfig(instanceId: string, tools: MCPTool[]): 
  */
 export function getCachedToolDescriptors(
   config: Record<string, unknown> | null | undefined,
-): Array<{ serverId: string; name: string; description: string; input_schema: unknown }> {
+): CachedToolDescriptor[] {
   const localServers = (config as PluginToolsConfig | null | undefined)?.mcpServers?.local ?? [];
-  const descriptors: Array<{
-    serverId: string;
-    name: string;
-    description: string;
-    input_schema: unknown;
-  }> = [];
+  const descriptors: CachedToolDescriptor[] = [];
 
   for (const server of localServers) {
     const serverId = server.serverId || "default";
@@ -241,6 +248,9 @@ export function getCachedToolDescriptors(
         // MCP-spec `inputSchema` (what workers return and what gets cached
         // verbatim) with `input_schema` as the legacy-cache fallback.
         input_schema: tool.inputSchema ?? tool.input_schema,
+        annotations: tool.annotations,
+        // Read-only, a write category, or an unclassified write (see tool-risk).
+        risk: classifyTool(tool),
       });
     }
   }

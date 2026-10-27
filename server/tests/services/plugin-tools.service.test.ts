@@ -48,6 +48,39 @@ describe("getCachedToolDescriptors", () => {
     expect(descriptors[0].input_schema).toEqual(schema);
   });
 
+  it("exposes the risk class from cached annotations, defaulting to a write", () => {
+    const config = {
+      mcpServers: {
+        local: [
+          {
+            serverId: "store",
+            tools: [
+              {
+                name: "get_order",
+                description: "Read",
+                inputSchema: schema,
+                annotations: { readOnlyHint: true },
+              },
+              {
+                name: "create_refund",
+                description: "Refund",
+                inputSchema: schema,
+                annotations: { readOnlyHint: false, destructiveHint: true },
+                _meta: { "chat.hay/category": "refund" },
+              },
+              { name: "mystery", description: "Unannotated", inputSchema: schema },
+            ],
+          },
+        ],
+      },
+    };
+
+    const [read, refund, mystery] = getCachedToolDescriptors(config);
+    expect(read.risk).toEqual({ readOnly: true, category: null, classified: true });
+    expect(refund.risk).toEqual({ readOnly: false, category: "refund", classified: true });
+    expect(mystery.risk).toEqual({ readOnly: false, category: "other_write", classified: false });
+  });
+
   it("returns empty for missing config", () => {
     expect(getCachedToolDescriptors(null)).toEqual([]);
     expect(getCachedToolDescriptors({})).toEqual([]);

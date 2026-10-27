@@ -49,6 +49,14 @@ describe("woocommerce MCP server (stdio)", () => {
         expect(tool.description.length).toBeGreaterThan(20);
         expect(tool.inputSchema.type).toBe("object");
       }
+      // Risk classes reach tools/list, where Hay.chat core reads them.
+      const byName = Object.fromEntries(tools.map((t) => [t.name, t]));
+      expect(byName.woocommerce_get_order.annotations).toEqual({
+        readOnlyHint: true,
+        destructiveHint: false,
+      });
+      expect(byName.woocommerce_create_refund.annotations.readOnlyHint).toBe(false);
+      expect(byName.woocommerce_create_refund._meta).toEqual({ "chat.hay/category": "refund" });
     } finally {
       await client.close();
     }
