@@ -7,12 +7,12 @@
         <span class="font-bold">{{ formattedToolName }}</span>
       </div>
       <div class="tool-header__right">
-        <Badge :variant="httpStatus ? httpStatusVariant : statusVariant" class="text-xs font-mono">
+        <Badge :variant="statusVariant" class="text-xs font-mono">
           <component
-            :is="httpStatus ? httpStatusIcon : statusIcon"
-            :class="['h-3 w-3 mr-1', { 'animate-spin': toolStatus === 'RUNNING' && !httpStatus }]"
+            :is="statusIcon"
+            :class="['h-3 w-3 mr-1', { 'animate-spin': toolStatus === 'RUNNING' }]"
           />
-          {{ httpStatus ? `${httpStatus}: ${httpStatusText}` : statusText }}
+          {{ statusText }}
         </Badge>
         <ChevronDown v-if="!isExpanded" class="h-3 w-3 chevron" />
         <ChevronUp v-else class="h-3 w-3 chevron" />
@@ -84,7 +84,6 @@ interface Props {
   toolInput?: Record<string, unknown>;
   toolOutput?: Record<string, unknown> | string | number | boolean | null;
   toolStatus?: string;
-  httpStatus?: number;
   latency?: number;
   executedAt?: string;
 }
@@ -214,37 +213,6 @@ const statusText = computed(() => {
     default:
       return "Unknown";
   }
-});
-
-const httpStatusVariant = computed(() => {
-  if (!props.httpStatus) return "outline";
-  if (props.httpStatus >= 200 && props.httpStatus < 300) return "success";
-  if (props.httpStatus >= 400) return "destructive";
-  return "secondary";
-});
-
-const httpStatusIcon = computed(() => {
-  if (!props.httpStatus) return AlertCircle;
-  if (props.httpStatus >= 200 && props.httpStatus < 300) return CheckCircle;
-  if (props.httpStatus >= 400) return XCircle;
-  return AlertCircle;
-});
-
-const httpStatusText = computed(() => {
-  if (!props.httpStatus) return "Unknown";
-  const statusMessages: Record<number, string> = {
-    200: "OK",
-    201: "Created",
-    204: "No Content",
-    400: "Bad Request",
-    401: "Unauthorized",
-    403: "Forbidden",
-    404: "Not Found",
-    500: "Internal Server Error",
-    502: "Bad Gateway",
-    503: "Service Unavailable",
-  };
-  return statusMessages[props.httpStatus] || "Unknown Status";
 });
 
 const { formatTime } = useOrgDateTime();

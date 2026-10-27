@@ -107,7 +107,6 @@
             :tool-input="message.metadata?.toolInput"
             :tool-output="message.metadata?.toolOutput"
             :tool-status="message.metadata?.toolStatus"
-            :http-status="message.metadata?.httpStatus"
             :latency="message.metadata?.toolLatencyMs"
             :executed-at="message.metadata?.toolExecutedAt"
           />
