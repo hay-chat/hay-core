@@ -1,10 +1,10 @@
 <template>
-  <Page title="Feedback Insights" description="Analyze AI response quality through user feedback">
+  <Page :title="$t('insights.feedback.title')" :description="$t('insights.feedback.description')">
     <template #header>
       <div class="flex items-center gap-2">
         <Button variant="outline" :disabled="loading" @click="refreshData">
           <RefreshCw class="h-4 w-4 mr-2" :class="{ 'animate-spin': loading }" />
-          Refresh
+          {{ $t("insights.feedback.refresh") }}
         </Button>
         <Button
           variant="outline"
@@ -12,7 +12,7 @@
           @click="exportToCSV"
         >
           <Download class="h-4 w-4 mr-2" />
-          Export CSV
+          {{ $t("insights.feedback.exportCsv") }}
         </Button>
       </div>
     </template>
@@ -23,7 +23,7 @@
         <CardContent class="p-6">
           <div class="flex items-center justify-between">
             <div>
-              <p class="text-sm text-neutral-muted">Total Feedback</p>
+              <p class="text-sm text-neutral-muted">{{ $t("insights.feedback.stats.total") }}</p>
               <p class="text-2xl font-bold">{{ stats.total }}</p>
             </div>
             <MessageSquare class="h-8 w-8 text-neutral-muted" />
@@ -35,7 +35,7 @@
         <CardContent class="p-6">
           <div class="flex items-center justify-between">
             <div>
-              <p class="text-sm text-neutral-muted">Positive</p>
+              <p class="text-sm text-neutral-muted">{{ $t("insights.feedback.stats.positive") }}</p>
               <p class="text-2xl font-bold text-green-600">
                 {{ stats.byRating.good }} ({{ stats.percentages.good || 0 }}%)
               </p>
@@ -49,7 +49,7 @@
         <CardContent class="p-6">
           <div class="flex items-center justify-between">
             <div>
-              <p class="text-sm text-neutral-muted">Negative</p>
+              <p class="text-sm text-neutral-muted">{{ $t("insights.feedback.stats.negative") }}</p>
               <p class="text-2xl font-bold text-red-600">
                 {{ stats.byRating.bad }} ({{ stats.percentages.bad || 0 }}%)
               </p>
@@ -63,7 +63,9 @@
         <CardContent class="p-6">
           <div class="flex items-center justify-between">
             <div>
-              <p class="text-sm text-neutral-muted">Success Rate</p>
+              <p class="text-sm text-neutral-muted">
+                {{ $t("insights.feedback.stats.positiveRate") }}
+              </p>
               <p class="text-2xl font-bold" :class="successRateColor">{{ successRate }}%</p>
             </div>
             <TrendingUp class="h-8 w-8" :class="successRateColor" />
@@ -75,27 +77,22 @@
     <!-- Filters -->
     <Card class="mb-6">
       <CardHeader>
-        <CardTitle>Filters</CardTitle>
+        <CardTitle>{{ $t("insights.feedback.filters.title") }}</CardTitle>
       </CardHeader>
       <CardContent>
         <div class="grid gap-4 md:grid-cols-4">
           <Input
             v-model="filters.rating"
             type="select"
-            label="Rating"
-            :options="[
-              { label: 'All Ratings', value: '' },
-              { label: 'Good', value: 'good' },
-              { label: 'Bad', value: 'bad' },
-              { label: 'Neutral', value: 'neutral' },
-            ]"
+            :label="$t('insights.feedback.filters.rating')"
+            :options="ratingOptions"
             @update:model-value="applyFilters"
           />
 
           <Input
             v-model="filters.source"
             type="select"
-            label="Source"
+            :label="$t('insights.feedback.filters.source')"
             :options="sourceOptions"
             @update:model-value="applyFilters"
           />
@@ -103,14 +100,14 @@
           <Input
             v-model="filters.startDate"
             type="date"
-            label="Start Date"
+            :label="$t('insights.feedback.filters.startDate')"
             @update:model-value="applyFilters"
           />
 
           <Input
             v-model="filters.endDate"
             type="date"
-            label="End Date"
+            :label="$t('insights.feedback.filters.endDate')"
             @update:model-value="applyFilters"
           />
         </div>
@@ -120,17 +117,19 @@
     <!-- Feedback List -->
     <Card>
       <CardHeader>
-        <CardTitle>Feedback History</CardTitle>
-        <CardDescription> {{ filteredFeedback.length }} feedback entries </CardDescription>
+        <CardTitle>{{ $t("insights.feedback.list.title") }}</CardTitle>
+        <CardDescription>
+          {{ $t("insights.feedback.list.count", { count: filteredFeedback.length }) }}
+        </CardDescription>
       </CardHeader>
       <CardContent>
         <div v-if="loading" class="text-center py-12">
-          <Loading label="Loading feedback..." />
+          <Loading :label="$t('insights.feedback.list.loading')" />
         </div>
 
         <div v-else-if="filteredFeedback.length === 0" class="text-center py-12">
           <MessageSquare class="h-12 w-12 text-neutral-muted mx-auto mb-4" />
-          <p class="text-neutral-muted">No feedback found with current filters</p>
+          <p class="text-neutral-muted">{{ $t("insights.feedback.list.empty") }}</p>
         </div>
 
         <div v-else class="space-y-4">
@@ -145,7 +144,7 @@
                   <Badge :variant="getRatingVariant(entry.rating)">
                     <ThumbsUp v-if="entry.rating === 'good'" class="h-3 w-3 mr-1" />
                     <ThumbsDown v-if="entry.rating === 'bad'" class="h-3 w-3 mr-1" />
-                    {{ entry.rating }}
+                    {{ $t(`insights.feedback.ratings.${entry.rating}`) }}
                   </Badge>
                   <Badge variant="outline">
                     {{ getSourceName(entry.message?.source?.id) }}
@@ -155,17 +154,28 @@
                   </span>
                 </div>
 
+                <p
+                  v-if="entry.message?.content"
+                  class="text-sm text-neutral-muted line-clamp-2 mb-2 border-l-2 pl-2"
+                >
+                  {{ entry.message.content }}
+                </p>
+
                 <p v-if="entry.comment" class="text-sm mb-2">{{ entry.comment }}</p>
 
-                <div class="text-xs text-neutral-muted">
-                  <span>Message ID: {{ entry.messageId.slice(0, 8) }}</span>
-                  <span class="mx-2">•</span>
-                  <span>Reviewer: {{ entry.reviewer?.email }}</span>
+                <div v-if="entry.reviewer?.email" class="text-xs text-neutral-muted">
+                  {{ $t("insights.feedback.list.reviewer", { email: entry.reviewer.email }) }}
                 </div>
               </div>
 
-              <Button variant="ghost" size="sm" @click="viewMessage(entry.messageId)">
-                <ExternalLink class="h-4 w-4" />
+              <Button
+                variant="outline"
+                size="sm"
+                :disabled="!entry.message?.conversation_id"
+                @click="viewMessage(entry)"
+              >
+                {{ $t("insights.feedback.list.openConversation") }}
+                <ExternalLink class="h-4 w-4 ml-2" />
               </Button>
             </div>
           </div>
@@ -173,10 +183,13 @@
           <!-- Pagination -->
           <div class="flex items-center justify-between pt-4 border-t">
             <p class="text-sm text-neutral-muted">
-              Showing {{ (currentPage - 1) * pageSize + 1 }}-{{
-                Math.min(currentPage * pageSize, filteredFeedback.length)
+              {{
+                $t("insights.feedback.list.showing", {
+                  from: (currentPage - 1) * pageSize + 1,
+                  to: Math.min(currentPage * pageSize, filteredFeedback.length),
+                  total: filteredFeedback.length,
+                })
               }}
-              of {{ filteredFeedback.length }}
             </p>
             <div class="flex items-center gap-2">
               <Button
@@ -185,7 +198,7 @@
                 :disabled="currentPage === 1"
                 @click="currentPage--"
               >
-                Previous
+                {{ $t("insights.feedback.list.previous") }}
               </Button>
               <Button
                 variant="outline"
@@ -193,7 +206,7 @@
                 :disabled="currentPage === totalPages"
                 @click="currentPage++"
               >
-                Next
+                {{ $t("insights.feedback.list.next") }}
               </Button>
             </div>
           </div>
@@ -220,6 +233,8 @@ import { useSources } from "@/composables/useSources";
 
 type FeedbackEntry = RouterOutputs["messageFeedback"]["list"][number];
 
+const { t } = useI18n();
+const router = useRouter();
 const { sources, loadSources } = useSources();
 const { formatDateTime } = useOrgDateTime();
 
@@ -259,8 +274,15 @@ const successRateColor = computed(() => {
   return "text-red-600";
 });
 
+const ratingOptions = computed(() => [
+  { label: t("insights.feedback.filters.allRatings"), value: "" },
+  { label: t("insights.feedback.ratings.good"), value: "good" },
+  { label: t("insights.feedback.ratings.bad"), value: "bad" },
+  { label: t("insights.feedback.ratings.neutral"), value: "neutral" },
+]);
+
 const sourceOptions = computed(() => {
-  const options = [{ label: "All Sources", value: "" }];
+  const options = [{ label: t("insights.feedback.filters.allSources"), value: "" }];
   sources.value.forEach((source) => {
     options.push({ label: source.name, value: source.id });
   });
@@ -372,14 +394,16 @@ const getRatingVariant = (rating: string) => {
 };
 
 const getSourceName = (sourceId: string | undefined) => {
-  if (!sourceId) return "Unknown";
+  if (!sourceId) return t("insights.feedback.unknownSource");
   const source = sources.value.find((s) => s.id === sourceId);
   return source?.name || sourceId;
 };
 
-const viewMessage = (messageId: string) => {
-  // TODO: Navigate to conversation containing this message
-  console.log("View message:", messageId);
+// Opens the conversation scrolled to (and highlighting) the rated message.
+const viewMessage = (entry: FeedbackEntry) => {
+  const conversationId = entry.message?.conversation_id;
+  if (!conversationId) return;
+  router.push({ path: `/conversations/${conversationId}`, query: { message: entry.messageId } });
 };
 
 // Lifecycle
@@ -394,6 +418,6 @@ definePageMeta({
 
 // Head
 useHead({
-  title: "Feedback Insights - Hay Dashboard",
+  title: t("insights.feedback.seoTitle"),
 });
 </script>
