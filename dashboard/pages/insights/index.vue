@@ -408,7 +408,7 @@ definePageMeta({
 
 // Head management
 useHead({
-  title: "Insights - Hay Dashboard",
+  title: "Insights - Hay.chat",
   meta: [
     {
       name: "description",

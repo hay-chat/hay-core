@@ -945,7 +945,7 @@ definePageMeta({
 
 // Head management
 useHead({
-  title: computed(() => `${t("general.title")} - Hay Dashboard`),
+  title: computed(() => `${t("general.title")} - Hay.chat`),
   meta: [
     {
       name: "description",

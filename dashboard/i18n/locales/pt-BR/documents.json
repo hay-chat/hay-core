@@ -3,7 +3,7 @@
     "page": {
       "title": "Documentos",
       "description": "Gerencie os documentos da sua base de conhecimento para agentes de IA.",
-      "seoTitle": "Documentos - Hay Dashboard",
+      "seoTitle": "Documentos - Hay.chat",
       "seoDescription": "Gerencie os documentos da sua base de conhecimento"
     },
     "actions": {
@@ -138,8 +138,8 @@
       "edit": "Editar",
       "save": "Salvar",
       "cancel": "Cancelar",
-      "seoTitle": "{title} - Documentos - Hay Dashboard",
-      "seoTitleDefault": "Documento - Hay Dashboard",
+      "seoTitle": "{title} - Documentos - Hay.chat",
+      "seoTitleDefault": "Documento - Hay.chat",
       "seoDescription": "Ver detalhes do documento"
     },
     "new": {
@@ -167,7 +167,7 @@
       "page": {
         "title": "Importar Documento",
         "description": "Adicione novos documentos à sua base de conhecimento de várias fontes.",
-        "seoTitle": "Importar Documentos - Hay Dashboard",
+        "seoTitle": "Importar Documentos - Hay.chat",
         "seoDescription": "Importe documentos para sua base de conhecimento"
       },
       "tutorial": "Tutorial",

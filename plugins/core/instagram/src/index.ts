@@ -48,7 +48,7 @@ export default defineHayPlugin((globalCtx) => {
         clientId: {
           type: "string",
           label: "Meta App ID",
-          description: "Hay-managed Meta app id (configured by the platform)",
+          description: "Hay.chat-managed Meta app id (configured by the platform)",
           required: false,
           encrypted: false,
           env: "META_APP_ID",
@@ -56,7 +56,7 @@ export default defineHayPlugin((globalCtx) => {
         clientSecret: {
           type: "string",
           label: "Meta App Secret",
-          description: "Hay-managed Meta app secret (configured by the platform)",
+          description: "Hay.chat-managed Meta app secret (configured by the platform)",
           required: false,
           encrypted: true,
           // Only core needs this (token exchange/refresh); keep it out of the worker.

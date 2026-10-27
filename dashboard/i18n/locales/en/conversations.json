@@ -19,7 +19,7 @@
     "page": {
       "title": "Conversations",
       "description": "Monitor and manage all customer conversations",
-      "headTitle": "Conversations - Hay Dashboard",
+      "headTitle": "Conversations - Hay.chat",
       "headDescription": "Monitor and manage all customer conversations"
     },
     "actions": {
@@ -129,8 +129,8 @@
     "pendingHuman": {
       "needsHuman": "This conversation was handed off to a human agent",
       "summaryPending": "Generating conversation summary…",
-      "notConfident": "Hay wasn't confident about answering this question",
-      "handedOff": "Hay decided to hand this conversation to a human agent. Providing more context in the playbooks can be a good place to start to provide more information so Hay can handle similar conversations next time.",
+      "notConfident": "Hay.chat wasn't confident about answering this question",
+      "handedOff": "Hay.chat decided to hand this conversation to a human agent. Providing more context in the playbooks can be a good place to start to provide more information so Hay.chat can handle similar conversations next time.",
       "startNew": "Start New Conversation",
       "editPlaybook": "Edit Playbook",
       "editPlaybooks": "Edit Playbooks"

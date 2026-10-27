@@ -2,7 +2,7 @@
   "page": {
     "title": "Playbooks",
     "description": "Automated conversation flows and responses for your agents",
-    "headTitle": "Playbooks - Hay Dashboard"
+    "headTitle": "Playbooks - Hay.chat"
   },
   "actions": {
     "generatePlaybook": "Generate Playbook",
@@ -78,12 +78,12 @@
   "edit": {
     "title": "Edit {name}",
     "description": "Update your playbook configuration",
-    "headTitle": "Edit Playbook - Hay Dashboard"
+    "headTitle": "Edit Playbook - Hay.chat"
   },
   "create": {
     "title": "Create New",
     "description": "Define automated conversation flows for your agents",
-    "headTitle": "Create Playbook - Hay Dashboard",
+    "headTitle": "Create Playbook - Hay.chat",
     "headDescription": "Create a new automated conversation playbook",
     "editHeadDescription": "Edit your automated conversation playbook"
   },
@@ -158,7 +158,7 @@
   "wizard": {
     "title": "Create Playbook",
     "description": "Follow the steps to create a new playbook",
-    "headTitle": "Create Playbook - Hay Dashboard",
+    "headTitle": "Create Playbook - Hay.chat",
     "steps": {
       "purpose": "Purpose",
       "actions": "Actions",

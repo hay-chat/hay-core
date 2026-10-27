@@ -3,8 +3,8 @@
     <div class="tutorial-header">
       <h3>Chatwoot Setup Guide</h3>
       <p>
-        Connect a Chatwoot Agent Bot to Hay. The bot receives every incoming message on the inboxes
-        you assign it to, routes them through Hay's AI, and only escalates to a human when the
+        Connect a Chatwoot Agent Bot to Hay.chat. The bot receives every incoming message on the inboxes
+        you assign it to, routes them through Hay.chat's AI, and only escalates to a human when the
         orchestrator decides a handoff is needed.
       </p>
     </div>
@@ -18,7 +18,7 @@
         </div>
         <p>
           In your Chatwoot instance, navigate to <strong>Settings &rarr; Agent Bots</strong> and
-          click <strong>Add Agent Bot</strong>. Give it a name (e.g. "Hay AI") and set the
+          click <strong>Add Agent Bot</strong>. Give it a name (e.g. "Hay.chat AI") and set the
           <strong>Bot Outgoing URL</strong> to:
         </p>
         <div class="webhook-url-box">
@@ -59,7 +59,7 @@
         <p class="hint">
           After saving the bot, Chatwoot shows two values in the bot's Edit page: an
           <strong>Access Token</strong> and a <strong>Webhook Secret</strong>. You'll paste both
-          into the form above — the access token is how Hay calls Chatwoot's API, and the webhook
+          into the form above — the access token is how Hay.chat calls Chatwoot's API, and the webhook
           secret is what Chatwoot uses to cryptographically sign every webhook it sends you.
         </p>
       </div>
@@ -80,7 +80,7 @@
           <li><strong>Webhook Secret</strong> &rarr; <code>Webhook Secret</code></li>
         </ul>
         <p class="hint">
-          Hay uses the Webhook Secret to verify that every incoming webhook was genuinely sent by
+          Hay.chat uses the Webhook Secret to verify that every incoming webhook was genuinely sent by
           Chatwoot (via an HMAC-SHA256 signature in the <code>X-Chatwoot-Signature</code> header).
           Requests without a valid signature are rejected.
         </p>
@@ -110,11 +110,11 @@
           <h4>Assign the Bot to an Inbox</h4>
         </div>
         <p>
-          In Chatwoot, go to <strong>Settings &rarr; Inboxes</strong>, pick the inbox you want Hay
+          In Chatwoot, go to <strong>Settings &rarr; Inboxes</strong>, pick the inbox you want Hay.chat
           to handle, open <strong>Configuration &rarr; Bot Configuration</strong>, and select your
           bot. New conversations on that inbox will open in <code>pending</code> state — that's the
-          bot's triage window. Your customers can chat, Hay responds, and humans only get notified
-          when Hay escalates.
+          bot's triage window. Your customers can chat, Hay.chat responds, and humans only get notified
+          when Hay.chat escalates.
         </p>
       </div>
 
@@ -125,7 +125,7 @@
           <h4>(Optional) Set an Escalation Team</h4>
         </div>
         <p>
-          If you set <strong>Escalation Team ID</strong> above, Hay will automatically assign
+          If you set <strong>Escalation Team ID</strong> above, Hay.chat will automatically assign
           escalated conversations to that team in Chatwoot. Find the team ID in
           <strong>Settings &rarr; Teams</strong> — it's the number in the URL when you open a team's
           settings. Leave blank to let Chatwoot's default routing take over.
@@ -140,11 +140,11 @@
         </div>
         <p>
           Send a message to the inbox you assigned the bot to (use the Chatwoot live chat widget or
-          your customer-facing surface). You should see a new conversation appear in the Hay inbox
+          your customer-facing surface). You should see a new conversation appear in the Hay.chat inbox
           and the AI should reply inside Chatwoot within a few seconds.
         </p>
         <p class="hint">
-          To assign a specific Hay agent to the Chatwoot channel, go to
+          To assign a specific Hay.chat agent to the Chatwoot channel, go to
           <strong>Settings &rarr; Channels</strong> and pick an agent for the
           <code>chatwoot</code> channel.
         </p>
@@ -168,11 +168,11 @@
           ></path>
         </svg>
         <div>
-          <strong>How handoff works:</strong> When Hay's orchestrator decides to escalate (e.g.
-          low-confidence response, policy guardrail), Hay will post an internal note in the Chatwoot
+          <strong>How handoff works:</strong> When Hay.chat's orchestrator decides to escalate (e.g.
+          low-confidence response, policy guardrail), Hay.chat will post an internal note in the Chatwoot
           conversation with the handoff reason, move the conversation out of the bot's
           <code>pending</code> state into <code>open</code>, and (optionally) assign it to your
-          escalation team. Replies from a Chatwoot human agent are propagated back to Hay so the
+          escalation team. Replies from a Chatwoot human agent are propagated back to Hay.chat so the
           conversation history stays in sync.
         </div>
       </div>
