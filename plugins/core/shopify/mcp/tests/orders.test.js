@@ -93,6 +93,7 @@ describe("shopify_cancel_order", () => {
     expect(res.isError).toBe(true);
     expect(res.data).toMatchObject({
       code: "PRECONDITION",
+      retryable: false,
       details: { reason: "ALREADY_SHIPPED", fulfillmentStatuses: ["IN_TRANSIT"] },
     });
     expect(res.data.message).toMatch(/already shipped/);
@@ -180,7 +181,10 @@ describe("shopify_cancel_order", () => {
       restock: true,
     });
     expect(res.isError).toBe(true);
-    expect(res.text).toMatch(/Has open return/);
+    expect(res.data).toMatchObject({
+      code: "PROVIDER_REFUSED",
+      message: "Shopify refused: Has open return",
+    });
   });
 });
 
