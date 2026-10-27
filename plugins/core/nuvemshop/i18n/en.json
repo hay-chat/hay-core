@@ -1,0 +1,72 @@
+{
+  "name": "Nuvemshop",
+  "description": "Connect your Nuvemshop / Tiendanube store so the agent can look up products, orders and customers, cancel orders, and track refund status.",
+  "tools": {
+    "nuvemshop_get_store": {
+      "label": "Get Store Info",
+      "description": "Get basic store information such as name, domain, language and currency."
+    },
+    "nuvemshop_search_products": {
+      "label": "Search Products",
+      "description": "Search products by name, description or SKU, optionally within a category."
+    },
+    "nuvemshop_get_product": {
+      "label": "Get Product",
+      "description": "Get a product's details, variants, prices, stock and images by ID."
+    },
+    "nuvemshop_get_product_by_sku": {
+      "label": "Get Product by SKU",
+      "description": "Find the product that has a variant with the given SKU."
+    },
+    "nuvemshop_list_categories": {
+      "label": "List Categories",
+      "description": "List the store's product categories."
+    },
+    "nuvemshop_get_order": {
+      "label": "Get Order",
+      "description": "Get an order's items, totals, payment and shipping status, and support eligibility."
+    },
+    "nuvemshop_get_order_by_number": {
+      "label": "Get Order by Number",
+      "description": "Look up an order by the number the customer sees (e.g. #101)."
+    },
+    "nuvemshop_list_customer_orders": {
+      "label": "List Customer Orders",
+      "description": "List a customer's orders, most recent first."
+    },
+    "nuvemshop_check_refund_status": {
+      "label": "Check Refund Status",
+      "description": "Check an order's refund state, payment provider, and how a refund can be executed."
+    },
+    "nuvemshop_cancel_order": {
+      "label": "Cancel Order",
+      "description": "Cancel an order with optional restock and customer notification. Does not move money."
+    },
+    "nuvemshop_add_order_note": {
+      "label": "Add Order Note",
+      "description": "Add a merchant-facing note to an order as an audit trail of support actions."
+    },
+    "nuvemshop_find_customer": {
+      "label": "Find Customer",
+      "description": "Find customers by email or by name/document text."
+    },
+    "nuvemshop_get_customer": {
+      "label": "Get Customer",
+      "description": "Get a customer's full details, addresses and purchase totals by ID."
+    }
+  },
+  "config": {
+    "storeId": {
+      "label": "Store ID",
+      "description": "Your numeric store ID (the user_id of your store, shown when creating the custom app)."
+    },
+    "accessToken": {
+      "label": "Access token",
+      "description": "Access token from a custom app created in your store admin. Grant products, orders and customers permissions."
+    },
+    "apiVersion": {
+      "label": "API version",
+      "description": "Nuvemshop API version to use."
+    }
+  }
+}
