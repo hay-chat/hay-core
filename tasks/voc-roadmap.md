@@ -103,6 +103,12 @@ Not doing: **D4-1** (Roger waits for the full D4 build). Copy must not claim Req
 | D12-1 | Express brotli/gzip | 6ae259f | merged → tested ✓: widget.js 128,322 → br 42,998 / gzip 44,830, `Vary: Accept-Encoding` | — |
 | D8-1 | private media via `/v1/media/:id` (session or HMAC-signed URL) | b2a60d7 | merged → tested ✓: no auth 401, staff 200 (+nosniff, CSP sandbox, inline disposition), wrong org 404, Range 206, signed 200, tampered sig 404, `/uploads/.../conversation-media` 404; Inbox renders attachment from blob URL | d8-1-private-media-inbox.gif |
 | D8-2 | allow-list, magic bytes, sharp re-encode (EXIF stripped); HEIC refused | b2a60d7 | merged → tested ✓: smoke JPEG with Make+GPS EXIF downloaded with none | — |
+| D5-2 | honest hand-off copy | b5a4120 | merged → failed ✗: no-agent path sends planner line "Please hold on for a moment" / "aguarde um momento"; fixed lines unused. Sent back (claude/d5-handoff-fix) | D5-2-handoff-copy.gif |
+| D5-3 | org timezone + local time (hour precision) in planner | b5a4120 | merged → tested ✓: São Paulo tz → "between 3:00 PM and 4:00 PM (GMT-3)" at 15:21 BRT | D5-3-local-time.gif |
+| D11-1 | drop in-flight AI reply on take-over/pause | b5a4120 | merged → tested ✓: takeover 1.4 s after shopper msg → no AI reply, log "Dropped in-flight AI reply" blocker human_took_over | D11-1-takeover-while-thinking.gif |
+| D11-2 | inactivity skips held/paused chats | b5a4120 | merged → tested ✓ (by contrast): assigned open chat idle 18 min untouched; unassigned control processed. Paused-org/agent-off branches covered by Jest only | — |
+| D6-1 | Shopify cancel guard, note append, tracking NOT_FOUND (returnProcess deferred) | 24818be | merged → automated ✓; live dev-store test pending store connection | — |
+| D6-4 | `@hay/plugin-sdk/tool-errors` {code, retryable}; Shopify + Woo (mutations no longer retried after timeout → OUTCOME_UNKNOWN) | 24818be | merged → automated ✓ | — |
 
 ## Wave 1 — foundations
 
@@ -142,6 +148,7 @@ Parked: D13-15, D16-10/11, D6-14, D2-10, D7-15, D8-18, D10-9, D11-13, D14-10, fr
 Staging seed: org/user created via `auth.register` (credentials in `../hay-core-staging/.staging-login`, untracked).
 
 ## Needs Roger
+- **Shopify cancel default (D6-1):** cancelling no longer refunds unless the agent passes `refund_to_original_payment: true` (explicit false sent otherwise). Should Shopify cancels refund by default?
 - **Before deploying Wave 0 (answered 2026-10-27):** (a) allowed-domains enforcement: Roger OK. (b) Proxy checked read-only on homeserver: Traefik v3.6 (`coolify-proxy`) static config has no `forwardedHeaders.trustedIPs`/`insecure`, so it ignores client X-Forwarded-For and sets its own; eu.hay.chat → 94.63.38.3 (house IP, no Cloudflare proxy, no cf-ray) → per-IP limits see the real visitor IP. (Dynamic dir `/data/coolify/proxy/dynamic` unreadable without sudo, but entrypoint forwarded-header trust can't be set there.) (c) D8 media switch-over: Roger asked me to do it after he deploys. Plan: run a one-off script inside `hay-server` (it already has `@aws-sdk/client-s3` + its S3 env) that sets ACL private on `uploads/*/{conversation-media,documents,plugin-zips}/`; then `doctl compute cdn flush` for the prod bucket's CDN (CDNs exist for hay-ams.ams3 and hay.sfo3); verify an old media URL returns 403 and an old WhatsApp photo still renders. Needs permission to run commands inside the prod container (the classifier blocked reading its env).
 - **Copy:** neutral hand-off line until D5-6/7 — en "I've passed this to the team. They'll reply to you here in this chat." / pt "Encaminhei sua mensagem para a equipe. Eles vão te responder aqui neste chat." OK? Planner local time is hour-precision to keep prompt caching.
 - **Decision (D1, Wave 0):** inactivity closes (incl. "hi" then silence) are still billed until D1-3's close classifier lands; the pricing page says unresolved chats don't count. Keep billing (agent's recommendation; pull the D1-12 pricing copy forward) or add a one-line exclusion now (revenue drops)? Default: keep, until you say otherwise.
@@ -158,6 +165,9 @@ Staging seed: org/user created via `auth.register` (credentials in `../hay-core-
 - Confirm it's OK that staging uses the `OPENAI_API_KEY` from the main checkout's `.env` (nothing else copied).
 
 ## Follow-ups logged (not in Wave 0 scope)
+- Widget header says "We typically reply within minutes" permanently — false promise (give to L6 D12-8 or D5-10).
+- Shopify `returnProcess` refund tool (D6-1 part 5) → its own ticket + dev-store test. Wix/Magento structured errors when prioritised.
+- Inactivity easy-tier model `gpt-4.1-nano` deprecated → in D5-2 fix.
 - Widget: no shopper feedback when create is refused (403/429) — message just vanishes (L6).
 - Widget media: sign attachment URLs in `public-conversations` getMessages + WS push with `signAttachmentUrls` (L1, before D8-9).
 - WS `identify` (read side) needs no DPoP; WS auth ignores tokenVersion; `getMessages` not rate limited (L1).
