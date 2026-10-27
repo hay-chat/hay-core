@@ -1,3 +1,9 @@
+## 2026-10-27 ~19:45 — staging (VOC roadmap, Wave 0)
+- Merged L10 (refresh rotation, migration AddRefreshTokenRotationToSessions1784700000000 ran) and L6 (widget hygiene, dist rebuilt). tsc/vue-tsc clean; jest auth-session 20/20; dashboard session 21/21; webchat 67/67.
+- X tickets: PRs hay-backoffice#3 (D1-4), #4 + hay-website#44 (D15-1), hay-shopify-app#1 (D12-2); WP 1.0.1 patch in ../haychat-svn-patches.
+- Half-built: claude/d12-reply-time-defaults (f572619) waiting to merge; tester running on L9/L10/L6.
+- Next: merge reply-defaults → Wave 0 review agent → tag wave-0-done → PR staging→master. See tasks/voc-roadmap.md "Resume here".
+
 ## 2026-10-27 — staging — L1 security, L8 private media, L3 hand-off honesty merged
 
 **Landed + tested:** D9-1/3/2, D3-1, D12-1 (6ae259f), D8-1/2 (b2a60d7), webchat settings switch/description fix (262ba92). L3 (b5a4120) merged, suites green, manual test by a tester agent in progress.

@@ -4,11 +4,13 @@ Started 2026-10-27. Research: `/Users/rogerjunior/Documents/code/hay/seo/Enginee
 "Roger's answers" block overrides its recommendations). Research baseline: origin/master 3e6ede1.
 
 ## Resume here (orchestrator checkpoint — keep current; safe to /compact after reading this)
-- Last update: 2026-10-27 evening. Staging HEAD: see `git log -1 staging`.
-- Wave 0 merged: L2 (2cf8ee5) ✓, L1 (6ae259f) ✓, L8 (b2a60d7) ✓, L3 (b5a4120, tester agent running), L9 (538bfea, manual test queued — use report steps: /analytics 404, dashboard Top Agents real + Avg Response Time card, Conversations header no fake trend, heartbeat resumes after tab hide/show, Feedback nav → Open conversation scrolls to message).
-- Running: L5 Shopify agent (claude/d6-shopify-guards, D6-1, D6-4); tester for L3.
-- Wave 0 still to start: L10 (D11-3, D11-4 refresh tokens; owns dashboard/utils/api.ts + stores/auth.ts), L6 (D12-8 widget hygiene; also remove dead WS loadHistory/sendMessage in webchat per L1 follow-up), X: D1-4 backoffice (also read `billableResolutions`, tolerate lower totals), D12-2 (WP plugin real source haychat-svn/trunk + Shopify app embed), D15-1 (Stripe portal: rename button to "Manage or cancel plan", explicit cancel entry point; portal already has cancel at period end + reason ON).
-- Then: Wave 0 review agent over `git diff 5bfee16..staging` → fixes → tag `wave-0-done` → PR staging→master with body (tickets, migration AddConversationHandedOffAt1784600000000, tests, manual results + GIFs, Needs Roger, and the D8 after-deploy steps: deploy → `docker cp scripts/make-media-private.cjs hay-server:/tmp/` → dry run → `--apply` → `doctl compute cdn flush <id> --files 'uploads/*'` (hay-ams ff84a7bc-8770-4a41-af22-2192d46e9473, hay d67a8597-cd2c-4825-b902-a788706e0647) → Spaces listing Restricted → check old URL 403; image needs sharp's optional Linux binaries).
+- Last update: 2026-10-27 ~19:45. Staging HEAD d64da73 (+ roadmap commits).
+- Wave 0 merged into staging: L2, L1, L8, L3 + D5-2 fix (a0b0220), L9, L5 (24818be), L10 (824abf1), L6 (d64da73). Migrations ran on hay_staging + hay_test.
+- Waiting to merge: `claude/d12-reply-time-defaults` (f572619, worktree ../hay-core-hay-core-reply-defaults): entity default dropped, migration `DropWebchatSubtitleDefault1784800000000`, dashboard default/placeholder. Merge after the running tester, then migration:run on hay_staging (+ hay_test).
+- Running: tester for D5-2 A3 + L9 (D3-2, D5-1, D3-3) + L10 (D11-3/4) + L6 (D12-1/3/4/5/8). D5-2 A1/A2/A4/A5 PASS (GIFs D5-2-handoff-en-offline.gif, D5-2-handoff-pt-offline.gif).
+- X tickets done, PRs open (not merged): hay-backoffice#3 (D1-4), hay-backoffice#4 + hay-website#44 (D15-1), hay-shopify-app#1 (D12-2 embed). WP plugin 1.0.1 = patch at `/Users/rogerjunior/Documents/code/hay/haychat-svn-patches/1.0.1-d12-2-no-render-blocking.patch` (svn commit = WP.org release → Roger).
+- Then: Wave 0 review agent over `git diff 5bfee16..staging` → fixes → tag `wave-0-done` → PR staging→master (body: tickets, migrations AddConversationHandedOffAt1784600000000 / AddRefreshTokenRotationToSessions1784700000000 / DropWebchatSubtitleDefault1784800000000, tests, manual results + GIFs, Needs Roger, D8 after-deploy steps: deploy → `docker cp scripts/make-media-private.cjs hay-server:/tmp/` → dry run → `--apply` → `doctl compute cdn flush <id> --files 'uploads/*'` (hay-ams ff84a7bc-8770-4a41-af22-2192d46e9473, hay d67a8597-cd2c-4825-b902-a788706e0647) → Spaces listing Restricted → old URL 403; image needs sharp's optional Linux binaries).
+- Dashboard died once from OOM (vue-tsc watcher in nuxt dev); restarted with NODE_OPTIONS=--max-old-space-size=3072.
 - Process: builders get `mkwt.sh <slug> <branch>` worktrees (scratchpad) + `.env` with DB_NAME=hay_test/REDIS_DB=1; testers get `scratchpad/TESTER_BRIEF.md`. Max 2 agents while staging env runs. After npm install on staging: touch server/main.ts; if dashboard 503s, kill the nuxt processes and restart `npx nuxt dev --port 3000` in dashboard/ (log scratchpad/staging/dashboard.log).
 - Roger decisions so far: allowed-domains enforcement OK; proxy verified (Traefik ignores client XFF, no Cloudflare proxy); Roger runs the media script himself after deploy; inactivity-close billing default = keep billing until D1-3 (no answer yet); hand-off copy pending confirmation.
 - 2026-10-27 evening: Roger is away until tomorrow. Mandate: go as far as possible through the waves; when blocked, pin it under Needs Roger and move on; leave only what truly needs Roger. Auto-compact window set to 400k by Roger.
@@ -68,6 +70,9 @@ Started 2026-10-27. Research: `/Users/rogerjunior/Documents/code/hay/seo/Enginee
 | Branch | Migration                                          | Table | Ran on staging |
 | ------ | -------------------------------------------------- | ----- | -------------- |
 | (base) | all up to `AddOrganizationAgentPause1784500000000` | —     | ✓ 2026-10-27   |
+| L2 | `AddConversationHandedOffAt1784600000000` | conversations | ✓ |
+| L10 | `AddRefreshTokenRotationToSessions1784700000000` (drops refresh_token_hash/is_active; adds generation, token_version, rotated_at, revoked_at, revoked_reason) | sessions | ✓ |
+| reply-defaults | `DropWebchatSubtitleDefault1784800000000` | webchat_settings | pending merge |
 
 ## Wave 0 — security, honesty, quick fixes (tag `wave-0-done`)
 
@@ -75,17 +80,17 @@ Agent branches (one per lane):
 
 | Lane | Branch                                                  | Tickets (order)                                      | Status            |
 | ---- | ------------------------------------------------------- | ---------------------------------------------------- | ----------------- |
-| L1   | claude/d9-public-widget-hardening                       | D9-1, D9-3, D9-2, D3-1, D12-1                        | queued            |
-| L2   | claude/d1-billing-honesty                               | D1-1+D7-1, D1-2                                      | queued            |
-| L8   | claude/d8-private-media                                 | D8-1, D8-2                                           | queued            |
-| L3   | claude/d5-honest-handoff                                | D5-2, D5-3, D11-1, D11-2                             | queued (after L2) |
-| L9   | claude/d3-dashboard-trust                               | D3-2 (delete Analytics+Reports), D5-1 (=D11-6), D3-3 | queued (after L2) |
-| L5   | claude/d6-shopify-guards                                | D6-1, D6-4                                           | queued            |
-| L10  | claude/d11-session-refresh                              | D11-3, D11-4                                         | queued            |
-| L6   | claude/d12-widget-hygiene                               | D12-8                                                | queued            |
-| X    | backoffice claude/d1-4-metering-integrity               | D1-4                                                 | queued            |
-| X    | WP plugin (haychat-svn/trunk) + hay-shopify-app-haychat | D12-2                                                | queued            |
-| X    | D15-1 (Stripe portal stopgap)                           | D15-1                                                | queued            |
+| L1   | claude/d9-public-widget-hardening                       | D9-1, D9-3, D9-2, D3-1, D12-1                        | merged 6ae259f            |
+| L2   | claude/d1-billing-honesty                               | D1-1+D7-1, D1-2                                      | merged 2cf8ee5            |
+| L8   | claude/d8-private-media                                 | D8-1, D8-2                                           | merged b2a60d7            |
+| L3   | claude/d5-honest-handoff                                | D5-2, D5-3, D11-1, D11-2                             | merged b5a4120 + fix a0b0220 |
+| L9   | claude/d3-dashboard-trust                               | D3-2 (delete Analytics+Reports), D5-1 (=D11-6), D3-3 | merged 538bfea    |
+| L5   | claude/d6-shopify-guards                                | D6-1, D6-4                                           | merged 24818be            |
+| L10  | claude/d11-session-refresh                              | D11-3, D11-4                                         | merged 824abf1            |
+| L6   | claude/d12-widget-hygiene                               | D12-8                                                | merged d64da73            |
+| X    | backoffice claude/d1-4-metering-integrity               | D1-4                                                 | PR hay-backoffice#3 |
+| X    | WP plugin (haychat-svn/trunk) + hay-shopify-app-haychat | D12-2                                                | PR hay-shopify-app#1 + WP patch |
+| X    | D15-1 (Stripe portal stopgap)                           | PR hay-backoffice#4, hay-website#44 |
 
 Not doing: **D4-1** (Roger waits for the full D4 build). Copy must not claim Require Approval holds actions.
 
@@ -108,6 +113,10 @@ Not doing: **D4-1** (Roger waits for the full D4 build). Copy must not claim Req
 | D11-1 | drop in-flight AI reply on take-over/pause | b5a4120 | merged → tested ✓: takeover 1.4 s after shopper msg → no AI reply, log "Dropped in-flight AI reply" blocker human_took_over | D11-1-takeover-while-thinking.gif |
 | D11-2 | inactivity skips held/paused chats | b5a4120 | merged → tested ✓ (by contrast): assigned open chat idle 18 min untouched; unassigned control processed. Paused-org/agent-off branches covered by Jest only | — |
 | D6-1 | Shopify cancel guard, note append, tracking NOT_FOUND (returnProcess deferred) | 24818be | merged → automated ✓; live dev-store test pending store connection | — |
+| D11-3 | refresh-token rotation (hrt1.), reuse detection, 90-day sliding sessions | 824abf1 | merged → automated ✓ (jest auth-session 20/20, dashboard session tests 21/21); manual pending | — |
+| D11-4 | never log out on network errors | 824abf1 | merged → automated ✓; manual pending | — |
+| D12-1/3/4/5/8 | widget: quiet logs, greeting first, no reply-time promise, refused-send notice, dead WS paths removed | d64da73 | merged → automated ✓ (webchat vitest 67/67, dist rebuilt); manual pending | — |
+| D5-2 fix | fixed honest line on every path | a0b0220 | tested ✓: en/pt offline lines exact, pending-human, order after greeting; A3 online pending | D5-2-handoff-en-offline.gif, D5-2-handoff-pt-offline.gif |
 | D6-4 | `@hay/plugin-sdk/tool-errors` {code, retryable}; Shopify + Woo (mutations no longer retried after timeout → OUTCOME_UNKNOWN) | 24818be | merged → automated ✓ | — |
 
 ## Wave 1 — foundations
@@ -152,7 +161,9 @@ Staging seed: org/user created via `auth.register` (credentials in `../hay-core-
 - **Before deploying Wave 0 (answered 2026-10-27):** (a) allowed-domains enforcement: Roger OK. (b) Proxy checked read-only on homeserver: Traefik v3.6 (`coolify-proxy`) static config has no `forwardedHeaders.trustedIPs`/`insecure`, so it ignores client X-Forwarded-For and sets its own; eu.hay.chat → 94.63.38.3 (house IP, no Cloudflare proxy, no cf-ray) → per-IP limits see the real visitor IP. (Dynamic dir `/data/coolify/proxy/dynamic` unreadable without sudo, but entrypoint forwarded-header trust can't be set there.) (c) D8 media switch-over: Roger asked me to do it after he deploys. Plan: run a one-off script inside `hay-server` (it already has `@aws-sdk/client-s3` + its S3 env) that sets ACL private on `uploads/*/{conversation-media,documents,plugin-zips}/`; then `doctl compute cdn flush` for the prod bucket's CDN (CDNs exist for hay-ams.ams3 and hay.sfo3); verify an old media URL returns 403 and an old WhatsApp photo still renders. Needs permission to run commands inside the prod container (the classifier blocked reading its env).
 - **Copy:** neutral hand-off line until D5-6/7 — en "I've passed this to the team. They'll reply to you here in this chat." / pt "Encaminhei sua mensagem para a equipe. Eles vão te responder aqui neste chat." OK? Planner local time is hour-precision to keep prompt caching.
 - **Decision (D1, Wave 0):** inactivity closes (incl. "hi" then silence) are still billed until D1-3's close classifier lands; the pricing page says unresolved chats don't count. Keep billing (agent's recommendation; pull the D1-12 pricing copy forward) or add a one-line exclusion now (revenue drops)? Default: keep, until you say otherwise.
-- **Backoffice:** read `billableResolutions` (fallback `resolvedConversations`) in `hay-api.ts` / `usage-tracking.service.ts`; overage delta logic must tolerate a lower total (folded into the D1-4 X ticket).
+- **X-ticket PRs to review/merge/deploy:** hay-backoffice#3 (D1-4; prod `npm run migration:run` `1785200000000-TrackReportedOverage`; backfill bills nothing new; deployable before hay-core), hay-backoffice#4 (set `STRIPE_PORTAL_CONFIGURATION_ID=bpc_…` in prod), hay-website#44, hay-shopify-app#1 (`shopify app deploy`, check haychat-2 widget still styled).
+- **WP plugin 1.0.1:** apply `/Users/rogerjunior/Documents/code/hay/haychat-svn-patches/1.0.1-d12-2-no-render-blocking.patch` in haychat-svn (`patch -p0` from the svn root), `svn cp trunk tags/1.0.1`, svn commit (= WP.org release). php not installed here, so not linted.
+- **Sessions (D11-3):** a reused old refresh token after the 2-min grace now ends the whole session (reuse detection, beyond the D-file); confirm prod `JWT_REFRESH_EXPIRES_IN` is 30d before the legacy branch is removed; basic auth no longer returns X-Access-Token headers.
 
 - Prod: D1-0 over-billing query; D14-1 prod `LLM_*` values; D8 confirm Spaces before switching media private; D3
   whether 26 Oct features are on for every org.
