@@ -241,10 +241,6 @@ export default defineNuxtConfig({
         { name: "apple-mobile-web-app-title", content: "Hay" },
         { name: "apple-mobile-web-app-status-bar-style", content: "default" },
       ],
-      script: [
-        // TEMPORARY: Figma capture script - remove after capture
-        { src: "https://mcp.figma.com/mcp/html-to-design/capture.js", async: true },
-      ],
       link: [
         { rel: "manifest", href: "/manifest.webmanifest" },
         { rel: "apple-touch-icon", href: "/favicon.png" },
