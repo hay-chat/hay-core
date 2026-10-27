@@ -1,4 +1,10 @@
-import { describe, it, expect, jest, beforeEach } from "@jest/globals";
+import { describe, it, expect, jest, beforeEach, beforeAll, afterAll } from "@jest/globals";
+import express from "express";
+import fs from "fs";
+import http from "http";
+import type { AddressInfo } from "net";
+import os from "os";
+import path from "path";
 
 /**
  * media-url.service — signed URLs for private uploads.
@@ -75,6 +81,84 @@ describe("isPublicUploadPath", () => {
     expect(isPublicUploadPath(`/${ORG_ID}/plugin-zips/p/x.zip`)).toBe(false);
     expect(isPublicUploadPath(`/${ORG_ID}/documents/${ORG_ID}/d.pdf`)).toBe(false);
     expect(isPublicUploadPath(`/organizations`)).toBe(false);
+  });
+
+  it.each([
+    `/${ORG_ID}/organizations/../conversation-media/a.txt`,
+    `/${ORG_ID}/organizations/%2e%2e/conversation-media/a.txt`,
+    `/${ORG_ID}/organizations/%2E%2E/conversation-media/a.txt`,
+    `/${ORG_ID}/organizations/.%2e/conversation-media/a.txt`,
+    `/${ORG_ID}/organizations%2f..%2fconversation-media/a.txt`,
+    `/${ORG_ID}/avatars/../../${ORG_ID}/conversation-media/a.txt`,
+    `/${ORG_ID}/organizations/..%5cconversation-media/a.txt`,
+    `/${ORG_ID}/organizations/a%00.png`,
+    `/${ORG_ID}/organizations/%E0%A4%A`,
+  ])("refuses a path that could step out of its public folder: %s", (requestPath) => {
+    expect(isPublicUploadPath(requestPath)).toBe(false);
+  });
+
+  it("still serves encoded file names inside a public folder", () => {
+    expect(isPublicUploadPath(`/${ORG_ID}/organizations/my%20logo.png`)).toBe(true);
+    expect(isPublicUploadPath(`/${ORG_ID}/organizations/./logo.png`)).toBe(true);
+  });
+});
+
+describe("/uploads gate in front of express.static", () => {
+  let server: http.Server;
+  let port: number;
+  let root: string;
+
+  beforeAll(async () => {
+    root = fs.mkdtempSync(path.join(os.tmpdir(), "uploads-gate-"));
+    fs.mkdirSync(path.join(root, ORG_ID, "organizations"), { recursive: true });
+    fs.mkdirSync(path.join(root, ORG_ID, "conversation-media"), { recursive: true });
+    fs.writeFileSync(path.join(root, ORG_ID, "organizations", "logo.png"), "public");
+    fs.writeFileSync(path.join(root, ORG_ID, "conversation-media", "a.txt"), "private");
+
+    // Same wiring as server/main.ts.
+    const app = express();
+    app.use(
+      "/uploads",
+      (req, res, next) => (isPublicUploadPath(req.path) ? next() : res.status(404).end()),
+      express.static(root),
+    );
+    server = app.listen(0);
+    await new Promise<void>((resolve) => server.once("listening", () => resolve()));
+    port = (server.address() as AddressInfo).port;
+  });
+
+  afterAll(async () => {
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+    fs.rmSync(root, { recursive: true, force: true });
+  });
+
+  // Raw request so the client does not normalise `..` before sending.
+  const get = (rawPath: string) =>
+    new Promise<{ status: number; body: string }>((resolve, reject) => {
+      const req = http.request({ host: "127.0.0.1", port, path: rawPath, method: "GET" }, (res) => {
+        let body = "";
+        res.on("data", (chunk) => (body += chunk));
+        res.on("end", () => resolve({ status: res.statusCode ?? 0, body }));
+      });
+      req.on("error", reject);
+      req.end();
+    });
+
+  it("serves a public file", async () => {
+    await expect(get(`/uploads/${ORG_ID}/organizations/logo.png`)).resolves.toEqual({
+      status: 200,
+      body: "public",
+    });
+  });
+
+  it.each([
+    `/uploads/${ORG_ID}/organizations/../conversation-media/a.txt`,
+    `/uploads/${ORG_ID}/organizations/%2e%2e/conversation-media/a.txt`,
+    `/uploads/${ORG_ID}/organizations/%2e%2e%2fconversation-media%2fa.txt`,
+  ])("does not serve a private file through %s", async (rawPath) => {
+    const response = await get(rawPath);
+    expect(response.status).toBe(404);
+    expect(response.body).not.toContain("private");
   });
 });
 
