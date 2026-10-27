@@ -146,11 +146,6 @@ const takeoverApi = useConversationTakeover();
 const toast = useToast();
 const now = useNow();
 
-// First-time setup comes before the inbox: nothing can be waiting yet.
-if (!appStore.onboardingCompleted) {
-  router.replace("/getting-started");
-}
-
 const loading = ref(true);
 const error = ref<string | null>(null);
 const takingOver = ref<string | null>(null);
