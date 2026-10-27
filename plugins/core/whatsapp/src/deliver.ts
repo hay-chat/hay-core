@@ -2,6 +2,7 @@ import type { ChannelContext } from "./context.js";
 import type { WhatsAppConnection } from "./connection.js";
 import { GraphApiError, type OutboundMediaType, type Recipient } from "./graph-client.js";
 import { recipientFor } from "./identity.js";
+import { DEFAULT_HANDOFF_TEMPLATE, type StoredTemplate } from "./templates.js";
 
 /**
  * POST /deliver — called by core's ChannelDeliveryService for every bot or
@@ -13,8 +14,18 @@ import { recipientFor } from "./identity.js";
  * Returns the first wamid so core can match later status webhooks.
  *
  * Error semantics: permanent Graph failures → 200 `{success:false, error}`;
- * rate limits and Graph outages → 503 so core may retry — but only while
- * nothing was accepted yet, since a retry would duplicate what already went out.
+ * rate limits and Graph outages → 503 so core retries (3 times with backoff) —
+ * but only when Meta certainly did not accept anything: nothing of this reply
+ * went out yet, and the failure is a structured Graph refusal or a network
+ * error before the request reached Meta. A lost response (timeout, reset,
+ * gateway 5xx without a Graph error) may hide an accepted message, so it is a
+ * final `delivery_uncertain` instead of a retry that could send the text twice.
+ *
+ * Templates (D13-3, D13-4): a message whose metadata carries `channelTemplate`
+ * (a person picked a template because the 24-hour window closed) is sent as
+ * that template. When an AI hand-off message (`isHandoffMessage`) hits the
+ * closed window (131047), the configured hand-off template goes out instead,
+ * in the conversation's language when the account has it.
  */
 
 export interface DeliverResult {
@@ -46,12 +57,22 @@ interface Attachment {
   type: string;
 }
 
+interface TemplateSend {
+  name: string;
+  language: string;
+  parameters: Array<{ name: string; value: string }>;
+}
+
 interface DeliverPayload {
   to: string;
   content: string;
   messageId?: string;
   conversationId?: string;
   attachments: Attachment[];
+  /** Conversation language (e.g. "pt"), for the hand-off template. */
+  language?: string;
+  channelTemplate?: TemplateSend;
+  isHandoffMessage: boolean;
 }
 
 interface PreparedMedia {
@@ -67,6 +88,18 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function optionalString(value: unknown): string | undefined {
   return typeof value === "string" ? value : undefined;
+}
+
+function parseTemplateSend(value: unknown): TemplateSend | undefined {
+  if (!isRecord(value) || typeof value.name !== "string" || typeof value.language !== "string") {
+    return undefined;
+  }
+  const parameters = Array.isArray(value.parameters)
+    ? value.parameters
+        .filter(isRecord)
+        .map((p) => ({ name: String(p.name ?? ""), value: String(p.value ?? "") }))
+    : [];
+  return { name: value.name, language: value.language, parameters };
 }
 
 /** Runtime shape check of core's POST body. Null when unusable. */
@@ -99,7 +132,9 @@ function parsePayload(payload: unknown): DeliverPayload | null {
   }
 
   const content = (optionalString(payload.content) ?? "").trim();
-  if (!content && attachments.length === 0) {
+  const metadata = isRecord(payload.messageMetadata) ? payload.messageMetadata : {};
+  const channelTemplate = parseTemplateSend(metadata.channelTemplate);
+  if (!content && attachments.length === 0 && !channelTemplate) {
     return null;
   }
   return {
@@ -108,7 +143,31 @@ function parsePayload(payload: unknown): DeliverPayload | null {
     messageId: optionalString(payload.messageId),
     conversationId: optionalString(payload.conversationId),
     attachments,
+    language: optionalString(payload.language),
+    channelTemplate,
+    isHandoffMessage: metadata.isHandoffMessage === true,
   };
+}
+
+/**
+ * Graph `components` for a template's body variables. Positional templates
+ * take the values in order; named ones label each value with its name.
+ */
+export function templateComponents(
+  parameters: TemplateSend["parameters"],
+  parameterFormat: StoredTemplate["parameterFormat"],
+): Array<Record<string, unknown>> | undefined {
+  if (parameters.length === 0) return undefined;
+  return [
+    {
+      type: "body",
+      parameters: parameters.map((p) =>
+        parameterFormat === "NAMED"
+          ? { type: "text", parameter_name: p.name, text: p.value }
+          : { type: "text", text: p.value },
+      ),
+    },
+  ];
 }
 
 /** Split text into ≤limit chunks, preferring paragraph, then line, then word boundaries. */
@@ -184,7 +243,17 @@ function mapGraphError(error: GraphApiError): ErrorMapping {
   if (error.code !== undefined && RATE_LIMIT_CODES.has(error.code)) {
     return { status: 503, error: "rate_limited" };
   }
-  if (error.status === 0 || error.status >= 500) return { status: 503, error: "graph_unavailable" };
+  if (error.status === 0) {
+    return error.notSent
+      ? { status: 503, error: "graph_unavailable" }
+      : { status: 200, error: "delivery_uncertain" };
+  }
+  if (error.status >= 500) {
+    // Meta answered with its own error body: it processed and refused the send.
+    return error.code !== undefined
+      ? { status: 503, error: "graph_unavailable" }
+      : { status: 200, error: "delivery_uncertain" };
+  }
   if (error.code === 190) return { status: 200, error: "token_revoked" };
   if (error.code === 133010) return { status: 200, error: "phone_not_registered" };
   if (error.code === 131026) return { status: 200, error: "recipient_unavailable" };
@@ -235,6 +304,10 @@ export async function deliver(
   const { phoneNumberId, accessToken } = connection;
   const fetchImpl = options.fetchImpl ?? fetch;
   const logIds = { messageId, conversationId, phoneNumberId };
+
+  if (parsed.channelTemplate) {
+    return sendTemplateMessage(parsed.channelTemplate, recipient, connection, ctx, logIds);
+  }
 
   logger.info("Delivering WhatsApp message", {
     ...logIds,
@@ -312,6 +385,11 @@ export async function deliver(
       return { status: 500, body: { success: false, error: "internal_error" } };
     }
 
+    if (graphError.code === 131047 && parsed.isHandoffMessage) {
+      const fallback = await sendHandoffTemplate(parsed, recipient, connection, ctx, logIds);
+      if (fallback) return fallback;
+    }
+
     const mapped = mapGraphError(graphError);
     logger.warn("WhatsApp delivery refused by Graph", {
       ...logIds,
@@ -330,4 +408,86 @@ export async function deliver(
     captioned,
   });
   return { status: 200, body: { success: true, providerMessageId: sent[0] } };
+}
+
+type LogIds = Record<string, string | undefined>;
+
+async function sendTemplateMessage(
+  template: TemplateSend,
+  recipient: Recipient,
+  connection: WhatsAppConnection,
+  ctx: ChannelContext,
+  logIds: LogIds,
+): Promise<DeliverResult> {
+  const stored = ctx.templates?.find(template.name, template.language);
+  try {
+    const wamid = await ctx.graph.sendTemplate(
+      connection.phoneNumberId,
+      connection.accessToken,
+      recipient,
+      {
+        name: template.name,
+        languageCode: template.language,
+        components: templateComponents(
+          template.parameters,
+          stored?.parameterFormat ?? "POSITIONAL",
+        ),
+      },
+    );
+    ctx.logger.info("WhatsApp template delivered", { ...logIds, template: template.name });
+    return { status: 200, body: { success: true, providerMessageId: wamid } };
+  } catch (error: unknown) {
+    if (!(error instanceof GraphApiError)) {
+      ctx.logger.error("WhatsApp template delivery failed", {
+        ...logIds,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return { status: 500, body: { success: false, error: "internal_error" } };
+    }
+    await revokeOnTokenError(error, connection, ctx);
+    const mapped = mapGraphError(error);
+    ctx.logger.warn("WhatsApp template refused by Graph", {
+      ...logIds,
+      template: template.name,
+      status: error.status,
+      code: error.code,
+      result: mapped.error,
+    });
+    return { status: mapped.status, body: { success: false, error: mapped.error } };
+  }
+}
+
+/**
+ * The AI handed off after the 24-hour window closed: tell the customer a
+ * person will reply, with the approved hand-off template. Null when no such
+ * template is approved, so the caller reports the original window error.
+ */
+async function sendHandoffTemplate(
+  parsed: DeliverPayload,
+  recipient: Recipient,
+  connection: WhatsAppConnection,
+  ctx: ChannelContext,
+  logIds: LogIds,
+): Promise<DeliverResult | null> {
+  const name = ctx.handoffTemplateName?.trim() || DEFAULT_HANDOFF_TEMPLATE;
+  const template = ctx.templates?.pickLanguage(name, parsed.language);
+  if (!template || template.variables.length > 0) {
+    ctx.logger.warn("WhatsApp hand-off outside the window — no sendable hand-off template", {
+      ...logIds,
+      template: name,
+    });
+    return null;
+  }
+  ctx.logger.info("WhatsApp hand-off outside the window — sending the hand-off template", {
+    ...logIds,
+    template: name,
+    language: template.language,
+  });
+  return sendTemplateMessage(
+    { name: template.name, language: template.language, parameters: [] },
+    recipient,
+    connection,
+    ctx,
+    logIds,
+  );
 }

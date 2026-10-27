@@ -190,6 +190,7 @@ class ConversationEventsService {
               }
             : null,
           metadata: conversation.metadata,
+          reply_window_expires_at: conversation.reply_window_expires_at,
           changedFields, // Optional: which fields were changed
         },
       };

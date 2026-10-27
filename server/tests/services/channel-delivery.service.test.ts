@@ -44,6 +44,11 @@ jest.mock("@server/repositories/conversation.repository", () => ({
   conversationRepository: mockConversationRepo,
 }));
 
+const mockOnChannelDeliveryFailed = jest.fn<(args: unknown) => Promise<void>>();
+jest.mock("@server/services/push-notification.service", () => ({
+  pushNotificationService: { onChannelDeliveryFailed: mockOnChannelDeliveryFailed },
+}));
+
 const mockUploadFind =
   jest.fn<(options: unknown) => Promise<Array<{ id: string; folder: string }>>>();
 jest.mock("@server/entities/upload.entity", () => ({ Upload: { find: mockUploadFind } }));
@@ -55,7 +60,10 @@ jest.mock("@server/config/env", () => {
   };
 });
 
-import { channelDeliveryService } from "@server/services/channel-delivery.service";
+import {
+  ChannelDeliveryService,
+  channelDeliveryService,
+} from "@server/services/channel-delivery.service";
 import { verifyMediaSignature } from "@server/services/media-url.service";
 
 const ORG_ID = "11111111-1111-4111-8111-111111111111";
@@ -92,7 +100,9 @@ const outboundEvent = (payload: Record<string, unknown>) => ({
 });
 
 const mockFetch =
-  jest.fn<(url: string, init: RequestInit) => Promise<{ json: () => Promise<unknown> }>>();
+  jest.fn<
+    (url: string, init: RequestInit) => Promise<{ status?: number; json: () => Promise<unknown> }>
+  >();
 
 const deliverBody = () => {
   const [, init] = mockFetch.mock.calls[0] as unknown as [string, { body: string }];
@@ -217,5 +227,125 @@ describe("channelDeliveryService /deliver", () => {
       },
     });
     expect(mockMessageRepo.updateProviderMessageId).not.toHaveBeenCalled();
+  });
+});
+
+describe("channelDeliveryService retry (D13-7)", () => {
+  const sleep = jest.fn(async (_ms: number) => {});
+  let handler: RedisHandler;
+
+  const deliverOnce = async (event: unknown) => {
+    handler(event);
+    // Retries chain several awaits; give the loop time to settle.
+    await new Promise((resolve) => setTimeout(resolve, 30));
+  };
+
+  const answer = (status: number, body: unknown) => ({ status, json: async () => body });
+
+  beforeAll(async () => {
+    global.fetch = mockFetch as unknown as typeof fetch;
+    const service = new ChannelDeliveryService({ retryDelaysMs: [10, 20, 40], sleep });
+    await service.initialize();
+    handler = capturedHandler!;
+  });
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockConversationRepo.findById.mockResolvedValue(conversation);
+    mockFindPluginIdByChannel.mockResolvedValue("hay-channel-whatsapp");
+    mockGetOrStartWorker.mockResolvedValue({ port: 4567 });
+  });
+
+  it("retries a 503 with backoff and stores the provider id once it goes through", async () => {
+    mockFetch
+      .mockResolvedValueOnce(answer(503, { success: false, error: "rate_limited" }))
+      .mockResolvedValueOnce(answer(503, { success: false, error: "rate_limited" }))
+      .mockResolvedValueOnce(answer(200, { success: true, providerMessageId: "wamid.OK" }));
+
+    await deliverOnce(outboundEvent({}));
+
+    expect(mockFetch).toHaveBeenCalledTimes(3);
+    expect(sleep.mock.calls.map(([ms]) => ms)).toEqual([10, 20]);
+    expect(mockMessageRepo.updateProviderMessageId).toHaveBeenCalledWith("msg-1", "wamid.OK");
+    expect(mockMessageRepo.update).not.toHaveBeenCalled();
+    expect(mockOnChannelDeliveryFailed).not.toHaveBeenCalled();
+  });
+
+  it("gives up after 3 retries, keeps the message failed and alerts owners/admins", async () => {
+    mockFetch.mockResolvedValue(answer(503, { success: false, error: "rate_limited" }));
+
+    await deliverOnce(outboundEvent({}));
+
+    expect(mockFetch).toHaveBeenCalledTimes(4);
+    expect(sleep.mock.calls.map(([ms]) => ms)).toEqual([10, 20, 40]);
+    expect(mockMessageRepo.update).toHaveBeenCalledWith("msg-1", {
+      providerStatus: "failed",
+      providerError: { code: "rate_limited" },
+    });
+    expect(mockPublish).toHaveBeenCalledWith("websocket:events", {
+      type: "channel_delivery_failed",
+      organizationId: ORG_ID,
+      payload: {
+        conversationId: CONVERSATION_ID,
+        messageId: "msg-1",
+        channel: "whatsapp",
+        providerError: { code: "rate_limited" },
+      },
+    });
+    expect(mockOnChannelDeliveryFailed).toHaveBeenCalledWith({
+      organizationId: ORG_ID,
+      conversationId: CONVERSATION_ID,
+    });
+  });
+
+  it("never retries a permanent refusal (200 success:false) and does not alert", async () => {
+    mockFetch.mockResolvedValue(answer(200, { success: false, error: "24h_window_expired" }));
+
+    await deliverOnce(outboundEvent({}));
+
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+    expect(sleep).not.toHaveBeenCalled();
+    expect(mockMessageRepo.update).toHaveBeenCalledWith("msg-1", {
+      providerStatus: "failed",
+      providerError: { code: "24h_window_expired" },
+    });
+    expect(mockOnChannelDeliveryFailed).not.toHaveBeenCalled();
+  });
+
+  it("never retries a 500 (the worker may have sent part of the reply)", async () => {
+    mockFetch.mockResolvedValue(answer(500, { success: false, error: "internal_error" }));
+
+    await deliverOnce(outboundEvent({}));
+
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+    expect(mockMessageRepo.update).toHaveBeenCalledWith("msg-1", {
+      providerStatus: "failed",
+      providerError: { code: "internal_error" },
+    });
+  });
+
+  it("retries when the worker refused the connection, not on other network errors", async () => {
+    const refused = Object.assign(new TypeError("fetch failed"), {
+      cause: { code: "ECONNREFUSED" },
+    });
+    mockFetch
+      .mockRejectedValueOnce(refused)
+      .mockResolvedValueOnce(answer(200, { success: true, providerMessageId: "wamid.OK" }));
+    await deliverOnce(outboundEvent({}));
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+    expect(mockMessageRepo.updateProviderMessageId).toHaveBeenCalledWith("msg-1", "wamid.OK");
+
+    jest.clearAllMocks();
+    mockConversationRepo.findById.mockResolvedValue(conversation);
+    mockFindPluginIdByChannel.mockResolvedValue("hay-channel-whatsapp");
+    mockGetOrStartWorker.mockResolvedValue({ port: 4567 });
+    const reset = Object.assign(new TypeError("fetch failed"), { cause: { code: "ECONNRESET" } });
+    mockFetch.mockRejectedValueOnce(reset);
+    await deliverOnce(outboundEvent({}));
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+    expect(mockMessageRepo.update).toHaveBeenCalledWith("msg-1", {
+      providerStatus: "failed",
+      providerError: { code: "worker_unreachable" },
+    });
   });
 });

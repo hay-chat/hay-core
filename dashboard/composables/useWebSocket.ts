@@ -1,4 +1,5 @@
 import { ref, onUnmounted } from "vue";
+import { useI18n } from "vue-i18n";
 import {
   createAuthenticatedWebSocket,
   parseWebSocketMessage,
@@ -73,6 +74,7 @@ let reconnectTimeout: ReturnType<typeof setTimeout> | null = null;
 
 export function useWebSocket() {
   const notifications = useNotifications();
+  const { t } = useI18n();
 
   /**
    * Connect to WebSocket server
@@ -196,6 +198,10 @@ export function useWebSocket() {
         // Could handle new message notifications here
         break;
 
+      case "channel_delivery_failed":
+        void handleChannelDeliveryFailed();
+        break;
+
       case "organization_access_changed":
         void handleOrganizationAccessChanged(message.payload);
         break;
@@ -221,6 +227,21 @@ export function useWebSocket() {
         customerName: payload.customerName,
       });
     }
+  };
+
+  /**
+   * Core gave up delivering a reply after its retries (D13-7). Owners and
+   * admins get a toast; they also get a push notification from the server.
+   */
+  const handleChannelDeliveryFailed = async () => {
+    const { useUserStore } = await import("@/stores/user");
+    if (!useUserStore().isAdmin) return;
+    const { useToast } = await import("@/composables/useToast");
+    useToast().error(
+      t("conversations.delivery.alert.title"),
+      t("conversations.delivery.alert.body"),
+      10000,
+    );
   };
 
   /**

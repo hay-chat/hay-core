@@ -9,6 +9,13 @@
 - D11-8: notification_deliveries (step initial/repush/email per recipient per cycle, unique claim); conversation-alert.service: recipients = active + Available members; sweep job every 60 s: re-push at 10 min, email 10 min later (at once if re-push reached no device), only within business hours (stub: always open until D5-6), cancelled on human reply / take-over / close.
 - Migration PushPerUserAndNotificationDeliveries1785600000000 (ran on hay_test). Verified: server tsc, full jest 102 suites, dashboard typecheck.
 - Next: orchestrator merges + runs migration on staging; manual phone test; alert-health card on Home = follow-up.
+## 2026-10-27 — claude/w1-whatsapp-templates — L7 D13-7 + D13-1..5 done (not merged, not pushed)
+- d25e567 D13-7 core retry (3x, 5/15/45 s) only on worker 503/429/start-fail/ECONNREFUSED; then failed + owner/admin push + toast. WhatsApp 503 only for sure-not-sent; email thrown send = send_uncertain.
+- 6c6b03d D13-1/5 worker template store (sync on start/connect/button, status+category webhooks), settings card, starter templates hay_we_replied / hay_handoff_to_person (en, pt_BR).
+- 4628f25 D13-2 conversations.reply_window_expires_at (migration AddConversationReplyWindow1785470000000, ran on hay_test only).
+- 15399d6 D13-3/4 core GET /templates contract + conversations.channelTemplates/sendChannelTemplate, ReplyWindow composer + picker; hand-off 131047 -> template.
+- Verified: server tsc + full jest (101 suites), whatsapp build + vitest 132, email-channel 57, dashboard typecheck.
+- Next: merge into staging; real-WABA check of sync/webhooks/starter approval/template send (Needs Roger).
 
 ## 2026-10-27 — claude/merge-email-plugins — Email plugin merged into Email inbox (not merged, not pushed)
 - 70f2c91 email-channel: `send-email` action (email-mcp, capability mcp) emails notificationRecipients, else supportAddress; supportAddress now optional; i18n en/pt-BR; vitest 57.

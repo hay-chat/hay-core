@@ -516,22 +516,34 @@
           v-if="(isPlaygroundMode && !isPendingHuman) || isTakenOverByCurrentUser"
           class="border-t p-4 pb-[max(1rem,env(safe-area-inset-bottom))] bg-background"
         >
+          <ReplyWindow
+            v-if="conversation && !isPlaygroundMode"
+            v-model:closed="isReplyWindowClosed"
+            :conversation-id="conversation.id"
+            :expires-at="conversation.reply_window_expires_at"
+            :can-send="isTakenOverByCurrentUser"
+          />
           <form class="flex gap-2 md:gap-3" @submit.prevent="sendMessage">
             <Input
               v-model="newMessage"
               :placeholder="
                 isPlaygroundMode
                   ? $t('conversations.detail.sendTestMessage')
-                  : $t('conversations.detail.sendMessage')
+                  : isReplyWindowClosed
+                    ? $t('conversations.replyWindow.composerClosed')
+                    : $t('conversations.detail.sendMessage')
               "
               class="flex-1 max-md:!text-base"
-              :disabled="isPlaygroundMode && !conversation"
+              :disabled="(isPlaygroundMode && !conversation) || isReplyWindowClosed"
               @keyup.enter="sendMessage"
             />
             <Button
               type="submit"
               :disabled="
-                !newMessage.trim() || isSendingMessage || (isPlaygroundMode && !conversation)
+                !newMessage.trim() ||
+                isSendingMessage ||
+                (isPlaygroundMode && !conversation) ||
+                isReplyWindowClosed
               "
             >
               <Send class="h-4 w-4" />
@@ -1056,6 +1068,15 @@ interface MessageStatusEventPayload {
 const isMessageEventPayload = (value: unknown): value is MessageEventPayload =>
   typeof value === "object" && value !== null;
 
+/** The slice of the `conversation_updated` WebSocket payload this page reads. */
+interface ReplyWindowPayload {
+  id?: string;
+  reply_window_expires_at?: ConversationDetail["reply_window_expires_at"];
+}
+
+const isReplyWindowPayload = (value: unknown): value is ReplyWindowPayload =>
+  typeof value === "object" && value !== null;
+
 const isConversationEventPayload = (value: unknown): value is ConversationEventPayload =>
   typeof value === "object" && value !== null;
 
@@ -1226,6 +1247,9 @@ const showReleaseDialog = ref(false);
 const showCloseDialog = ref(false);
 const releaseMode = ref<"ai" | "queue">("queue");
 const isUpdatingLegalHold = ref(false);
+
+// Set by <ReplyWindow> when the channel's reply window has closed (D13-2).
+const isReplyWindowClosed = ref(false);
 
 // Check if conversation is taken over by current user
 const isTakenOverByCurrentUser = computed(() => {
@@ -1849,6 +1873,7 @@ const { useWebSocket } = await import("@/composables/useWebSocket");
 const websocket = useWebSocket();
 let unsubscribeMessage: (() => void) | null = null;
 let unsubscribeStatusChanged: (() => void) | null = null;
+let unsubscribeConversationUpdated: (() => void) | null = null;
 let unsubscribeMessageApproved: (() => void) | null = null;
 let unsubscribeMessageBlocked: (() => void) | null = null;
 let unsubscribeMessageStatus: (() => void) | null = null;
@@ -2056,6 +2081,14 @@ onMounted(async () => {
     }, 300);
   };
 
+  // The channel plugin moved the reply window (a new customer message).
+  unsubscribeConversationUpdated = websocket.on("conversation_updated", (payload: unknown) => {
+    if (!isReplyWindowPayload(payload) || payload.id !== conversationId.value) return;
+    if (conversation.value && payload.reply_window_expires_at !== undefined) {
+      conversation.value.reply_window_expires_at = payload.reply_window_expires_at;
+    }
+  });
+
   // Listen for status changes
   unsubscribeStatusChanged = websocket.on(
     "conversation_status_changed",
@@ -2116,6 +2149,7 @@ onUnmounted(() => {
   // Cleanup WebSocket event handlers
   if (unsubscribeMessage) unsubscribeMessage();
   if (unsubscribeStatusChanged) unsubscribeStatusChanged();
+  if (unsubscribeConversationUpdated) unsubscribeConversationUpdated();
   if (unsubscribeMessageApproved) unsubscribeMessageApproved();
   if (unsubscribeMessageBlocked) unsubscribeMessageBlocked();
   if (unsubscribeMessageStatus) unsubscribeMessageStatus();

@@ -4,6 +4,7 @@ import { handleWebhook } from "./webhook.js";
 import type { ChannelContext } from "./context.js";
 import type { ConnectionMode, WhatsAppConnection } from "./connection.js";
 import { fakeLogger } from "./test/fakes.js";
+import { TemplateStore } from "./templates.js";
 import * as p from "./test/payloads.js";
 
 type Input = Record<string, unknown>;
@@ -90,6 +91,8 @@ describe("handleWebhook — inbound messages", () => {
         timestamp: "1760000000",
         type: "text",
       },
+      // The 24-hour window runs from the customer's message (D13-2).
+      replyWindowExpiresAt: new Date((1760000000 + 24 * 60 * 60) * 1000).toISOString(),
     });
   });
 
@@ -432,5 +435,100 @@ describe("handleWebhook — account_update", () => {
     );
 
     expect(summary).toEqual({ processed: 0, ignored: 1, statuses: 0 });
+  });
+});
+
+describe("handleWebhook — template events (D13-1)", () => {
+  const approvedTemplate = {
+    id: "tpl-1",
+    name: "hay_we_replied",
+    language: "en",
+    status: "PENDING",
+    category: "UTILITY",
+    components: [{ type: "BODY", text: "Hi! Our team has replied." }],
+  };
+
+  async function withStore() {
+    const t = setup();
+    const store = new TemplateStore(t.ctx.graph, fakeLogger());
+    const list = vi.spyOn(t.ctx.graph, "listTemplates").mockResolvedValue([approvedTemplate]);
+    await store.sync(t.ctx.getConnection()!);
+    t.ctx.templates = store;
+    return { t, store, list };
+  }
+
+  it("patches a template's status from message_template_status_update", async () => {
+    const { t, store } = await withStore();
+
+    await handleWebhook(
+      p.envelope({
+        field: "message_template_status_update",
+        value: {
+          event: "APPROVED",
+          message_template_id: "tpl-1",
+          message_template_name: "hay_we_replied",
+          message_template_language: "en",
+          reason: "NONE",
+        },
+      }),
+      t.ctx,
+    );
+
+    expect(store.find("hay_we_replied", "en")).toMatchObject({
+      status: "APPROVED",
+      sendable: true,
+    });
+  });
+
+  it("patches the category from template_category_update", async () => {
+    const { t, store } = await withStore();
+
+    await handleWebhook(
+      p.envelope({
+        field: "template_category_update",
+        value: { message_template_id: "tpl-1", new_category: "MARKETING" },
+      }),
+      t.ctx,
+    );
+
+    expect(store.find("hay_we_replied", "en")?.category).toBe("MARKETING");
+  });
+
+  it("resyncs when the template is unknown", async () => {
+    const { t, list } = await withStore();
+
+    await handleWebhook(
+      p.envelope({
+        field: "message_template_status_update",
+        value: { event: "APPROVED", message_template_id: "tpl-new" },
+      }),
+      t.ctx,
+    );
+
+    expect(list).toHaveBeenCalledTimes(2);
+  });
+
+  it("ignores another Messaging account's template events", async () => {
+    const { t, store } = await withStore();
+
+    await handleWebhook(
+      {
+        object: "whatsapp_business_account",
+        entry: [
+          {
+            id: "999",
+            changes: [
+              {
+                field: "message_template_status_update",
+                value: { event: "REJECTED", message_template_id: "tpl-1" },
+              },
+            ],
+          },
+        ],
+      },
+      t.ctx,
+    );
+
+    expect(store.find("hay_we_replied", "en")?.status).toBe("PENDING");
   });
 });
