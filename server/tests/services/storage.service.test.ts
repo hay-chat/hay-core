@@ -72,6 +72,45 @@ describe("StorageService private uploads", () => {
     expect(result.url).toBe(`https://api.example.test/v1/media/${result.upload.id}`);
   });
 
+  it("sanitises conversation media and names the file after its real type", async () => {
+    const result = await new StorageService().upload({
+      buffer: PNG,
+      originalName: "photo.jpg",
+      mimeType: "image/jpeg",
+      folder: "conversation-media",
+      organizationId: ORG_ID,
+    });
+
+    expect(result.upload.mimeType).toBe("image/png");
+    expect(result.upload.filename).toMatch(/\.png$/);
+    expect(mockS3Params[0].ContentType).toBe("image/png");
+  });
+
+  it("refuses SVG in conversation media but still accepts it for logos", async () => {
+    const svg = Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"></svg>');
+    const storage = new StorageService();
+
+    await expect(
+      storage.upload({
+        buffer: svg,
+        originalName: "x.svg",
+        mimeType: "image/svg+xml",
+        folder: "conversation-media",
+        organizationId: ORG_ID,
+      }),
+    ).rejects.toThrow();
+    expect(mockS3Params).toHaveLength(0);
+
+    await storage.upload({
+      buffer: svg,
+      originalName: "logo.svg",
+      mimeType: "image/svg+xml",
+      folder: "organizations",
+      organizationId: ORG_ID,
+    });
+    expect(mockS3Params).toHaveLength(1);
+  });
+
   it("keeps organization logos publicly readable with a direct URL", async () => {
     const result = await new StorageService().upload({
       buffer: PNG,

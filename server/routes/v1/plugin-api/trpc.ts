@@ -17,7 +17,7 @@ import {
 } from "@server/database/entities/message.entity";
 import { mcpRegistryService } from "@server/services/mcp-registry.service";
 import { redisService } from "@server/services/redis.service";
-import { storageService } from "@server/services/storage.service";
+import { CONVERSATION_MEDIA_FOLDER, storageService } from "@server/services/storage.service";
 import { transcriptionService } from "@server/services/transcription.service";
 import { oauthService } from "@server/services/oauth.service";
 import { randomUUID } from "crypto";
@@ -588,33 +588,35 @@ export const pluginApiTrpcRouter = router({
           buffer,
           originalName: input.filename,
           mimeType: input.mimeType,
-          folder: "conversation-media",
+          folder: CONVERSATION_MEDIA_FOLDER,
           organizationId,
         });
       } catch (error) {
-        // Storage rejects disallowed mime types and oversized files with plain
-        // errors — those are caller mistakes, not server faults.
+        // Storage rejects disallowed or mislabelled content and oversized files
+        // with plain errors — those are caller mistakes, not server faults.
         throw new TRPCError({
           code: "BAD_REQUEST",
           message: error instanceof Error ? error.message : "Upload failed",
         });
       }
 
+      // Type and size of what was stored: the type comes from the file's content
+      // and images are re-encoded, so both may differ from the plugin's input.
       const attachment = {
         id: stored.upload.id,
         name: input.filename,
         url: stored.url,
-        type: input.mimeType,
-        size: buffer.length,
+        type: stored.upload.mimeType,
+        size: stored.upload.size,
       };
 
-      if (!input.transcribe || !input.mimeType.toLowerCase().startsWith("audio/")) {
+      if (!input.transcribe || !attachment.type.startsWith("audio/")) {
         return attachment;
       }
 
       const transcript = await transcriptionService.transcribe({
         buffer,
-        mimeType: input.mimeType,
+        mimeType: attachment.type,
         filename: input.filename,
         organizationId,
       });
