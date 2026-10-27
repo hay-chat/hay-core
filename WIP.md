@@ -1,3 +1,7 @@
+## 2026-10-27 late — staging: Wave 1 L2 merged
+- L2 close classifier merged (c40e1e7, migration AddConversationOutcomes1785100000000), unresolved treated as closed in widget (728066a); loader idle fix (ca54167). Tester running on both.
+- L11 EU inference building. Next: L10, L7, L4, L5 lanes. See tasks/voc-roadmap.md.
+
 ## 2026-10-27 night — staging: Wave 1 started
 - L6 merged (3acc19a): reload resumes conversation, create on first message, split loader + idle loading; tester running.
 - L2 close classifier building (claude/w1-close-classifier). Feature guides committed in seo repo.
