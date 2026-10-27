@@ -973,6 +973,20 @@ The following tools are available for you to use. You MUST return only valid JSO
       this.lastMessageAt = new Date();
       this.status = newStatus;
 
+      // A shopper who comes back within 72 h reverses the charge for their
+      // last resolution (D1-3). Billing must never break message intake.
+      try {
+        const { closeClassifierService } =
+          await import("../../services/close-classification/close-classifier.service");
+        await closeClassifierService.reverseOnCustomerReturn({
+          organizationId: this.organization_id,
+          conversationId: this.id,
+          customerId: this.customer_id,
+        });
+      } catch (error) {
+        logger.error({ err: error, conversationId: this.id }, "Resolution reversal check failed");
+      }
+
       // Enqueue for RabbitMQ processing
       if (shouldProcess) {
         const { orchestratorQueueService } =
