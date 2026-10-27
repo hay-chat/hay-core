@@ -2,6 +2,7 @@ import { createExpressMiddleware } from "@trpc/server/adapters/express";
 import express from "express";
 import type { FileFilterCallback } from "multer";
 import cors from "cors";
+import { httpCompression } from "@server/lib/http-compression";
 import { createServer } from "http";
 import { config, validateProductionConfig } from "@server/config/env";
 import { createContext } from "@server/trpc/context";
@@ -131,6 +132,8 @@ async function startServer() {
       optionsSuccessStatus: 204,
     }),
   );
+
+  server.use(httpCompression());
 
   // Add JSON parsing middleware with increased size limit for document uploads.
   // The `verify` hook captures the raw request bytes on `req.rawBody` so that
