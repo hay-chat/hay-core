@@ -8,13 +8,16 @@
  * Those tokens never expire (they are invalidated only by re-issuing or
  * uninstalling), so there is no refresh cron.
  *
- * TODO: add a managed OAuth mode via a Hay partner app. Tiendanube's OAuth is
- * nonstandard (authorize URL is https://www.tiendanube.com/apps/{app_id}/authorize
- * with no scope param — scopes are fixed at app registration), so core's oauth2
- * flow needs an {app_id} URL substitution before that can land.
+ * A managed OAuth mode (Hay partner app) needs two core changes first — the
+ * authorize URL embeds the app id (https://www.tiendanube.com/apps/{app_id}/authorize,
+ * no scope param) and the token response's `user_id` (the store id every API
+ * path needs) must be persisted. See README.md → "OAuth (partner app)".
  *
- * The MCP server (./mcp) only ever sees NUVEMSHOP_STORE_ID +
- * NUVEMSHOP_ACCESS_TOKEN + NUVEMSHOP_API_VERSION + NUVEMSHOP_MAIN_LANGUAGE.
+ * The MCP server (./mcp) only ever sees NUVEMSHOP_STORE_ID, NUVEMSHOP_ACCESS_TOKEN,
+ * NUVEMSHOP_API_VERSION, NUVEMSHOP_MAIN_LANGUAGE and the coupon cap
+ * (NUVEMSHOP_COUPONS_ENABLED, NUVEMSHOP_COUPON_MAX_PERCENT,
+ * NUVEMSHOP_COUPON_MAX_AMOUNT, NUVEMSHOP_COUPON_MAX_DAYS). The cap is enforced
+ * inside the coupon tool, not in the prompt.
  *
  * When the `products` capability is enabled, `onStart` also runs a background
  * bulk catalog sync — paging REST /products and pushing CanonicalProduct
@@ -34,6 +37,10 @@ import type {
 // host serves any store regardless of country.
 const API_HOST = "https://api.nuvemshop.com.br";
 const DEFAULT_API_VERSION = "2025-03";
+// Goodwill coupon cap defaults (Roger, D16): on, 10% max, fixed amounts off until
+// the merchant sets one (stores price in BRL, ARS, MXN… so no universal number).
+const DEFAULT_COUPON_MAX_PERCENT = 10;
+const DEFAULT_COUPON_MAX_DAYS = 30;
 // Mandatory on every request — Nuvemshop returns 400 without it.
 const USER_AGENT = "Hay (https://hay.chat)";
 
@@ -106,6 +113,25 @@ async function nuvemshopFetch<T>(
     );
   }
   return (await res.json()) as T;
+}
+
+/** Coupon cap → MCP env. Invalid or negative numbers fall back to the safe defaults. */
+function couponEnv(config: {
+  getOptional: <T = unknown>(key: string) => T | undefined;
+}): Record<string, string> {
+  const enabled = config.getOptional<boolean | string>("couponsEnabled");
+  const nonNegative = (key: string, fallback: number): string => {
+    const n = Number(config.getOptional<number | string>(key));
+    return String(Number.isFinite(n) && n >= 0 ? n : fallback);
+  };
+  return {
+    NUVEMSHOP_COUPONS_ENABLED: String(
+      enabled === undefined ? true : enabled !== false && enabled !== "false",
+    ),
+    NUVEMSHOP_COUPON_MAX_PERCENT: nonNegative("couponMaxPercent", DEFAULT_COUPON_MAX_PERCENT),
+    NUVEMSHOP_COUPON_MAX_AMOUNT: nonNegative("couponMaxAmount", 0),
+    NUVEMSHOP_COUPON_MAX_DAYS: nonNegative("couponMaxDays", DEFAULT_COUPON_MAX_DAYS),
+  };
 }
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -393,8 +419,8 @@ export default defineHayPlugin((globalCtx) => ({
         label: "Access token",
         description:
           "Access token from a custom app (admin → Aplicativos a medida / " +
-          "Aplicaciones a medida). Grant it products, orders and customers " +
-          "permissions. Shown only once at creation.",
+          "Aplicaciones a medida). Grant it read/write orders, fulfillment orders, " +
+          "customers and coupons, and read products. Shown only once at creation.",
         required: true,
         encrypted: true,
       },
@@ -403,6 +429,34 @@ export default defineHayPlugin((globalCtx) => ({
         label: "API version",
         description: "Nuvemshop API version to use.",
         default: DEFAULT_API_VERSION,
+      },
+      couponsEnabled: {
+        type: "boolean",
+        label: "Allow goodwill coupons",
+        description:
+          "Let the agent create single-use apology coupons within the caps below. " +
+          "Anything above the cap is refused and handed to a person.",
+        default: true,
+      },
+      couponMaxPercent: {
+        type: "number",
+        label: "Coupon cap: maximum percentage",
+        description:
+          "Largest percentage discount the agent may give (0 turns percentage coupons off).",
+        default: DEFAULT_COUPON_MAX_PERCENT,
+      },
+      couponMaxAmount: {
+        type: "number",
+        label: "Coupon cap: maximum fixed amount",
+        description:
+          "Largest fixed discount in your store currency (0 or empty turns fixed-amount coupons off).",
+        default: 0,
+      },
+      couponMaxDays: {
+        type: "number",
+        label: "Coupon validity (days)",
+        description: "Coupons the agent creates expire after at most this many days.",
+        default: DEFAULT_COUPON_MAX_DAYS,
       },
     });
 
@@ -483,6 +537,7 @@ export default defineHayPlugin((globalCtx) => ({
           NUVEMSHOP_ACCESS_TOKEN: creds.accessToken,
           NUVEMSHOP_API_VERSION: apiVersion,
           NUVEMSHOP_MAIN_LANGUAGE: mainLanguage,
+          ...couponEnv(ctx.config),
         },
       });
       ctx.logger.info("Nuvemshop MCP server started successfully");
