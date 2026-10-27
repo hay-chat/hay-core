@@ -61,12 +61,13 @@ describe("useChat message ordering with a skewed browser clock", () => {
     const { chat, unmount } = await mountChat();
     await initialize(chat);
 
+    await chat.sendMessage("Where is my order?");
+
+    // The conversation is created by the first message; from then on the
+    // greeting carries the server's createdAt, not the fast browser clock.
     const greeting = chat.messages.value[0];
     expect(greeting.isGreeting).toBe(true);
-    // Stamped with the server's createdAt, not the fast browser clock.
     expect(greeting.timestamp).toBe(new Date(SERVER_CREATED_AT).getTime());
-
-    await chat.sendMessage("Where is my order?");
 
     FakeWebSocket.instances[0].receive({
       type: "message",

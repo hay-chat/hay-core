@@ -76,5 +76,6 @@ export const dpopMock = () => ({
   storeKeypair: vi.fn(async () => {}),
   getKeypair: vi.fn(async () => null),
   clearKeypair: vi.fn(async () => {}),
+  clearAllKeypairs: vi.fn(async () => {}),
   createDPoPProof: vi.fn(async () => "proof"),
 });

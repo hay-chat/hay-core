@@ -107,8 +107,8 @@
       </div>
     </div>
 
-    <!-- Skeleton loading while connecting -->
-    <div v-if="!isConnected" class="hay-chat-skeleton">
+    <!-- Skeleton while the chat prepares (resuming a conversation can take a moment) -->
+    <div v-if="!isReady" class="hay-chat-skeleton">
       <div class="hay-chat-skeleton__message hay-chat-skeleton__message--agent">
         <div class="hay-chat-skeleton__line" style="width: 70%"></div>
         <div class="hay-chat-skeleton__line" style="width: 50%"></div>
@@ -143,7 +143,7 @@
     <!-- Input (hidden when conversation is closed) -->
     <MessageInput
       v-else
-      :is-connected="isConnected"
+      :is-ready="isReady"
       :failure="sendFailure"
       @send="$emit('send', $event)"
       @start-typing="$emit('startTyping')"
@@ -200,7 +200,7 @@ const props = defineProps<{
   greetingMessage?: string;
   messages: Message[];
   isTyping: boolean;
-  isConnected: boolean;
+  isReady: boolean;
   isConversationClosed: boolean;
   isExpanded: boolean;
   agentName?: string;

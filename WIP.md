@@ -1,3 +1,9 @@
+## 2026-10-27 — claude/w1-widget-loader — Wave 1 L6 widget done (not merged)
+- Commits: reload-resume bug fix (53ff6e6), D9-4 create on first message (e512d9c), D12-6 server cache (e9e2cf8), D12-6/7 loader split + loading modes + lazy locales (f6b2e5c), prettier (78a9683).
+- widget.js loader 6.8 KB / 3.0 KB gzip; chat chunk 116 KB / 40.8 KB gzip. webchat vitest 101/101, vue-tsc, root build, jest webchat-static + http-compression green; real-browser smoke passed.
+- Not done: server-side D9-4 cleanup of empty conversations in checkInactivity (L1), strict mode without grant cannot resume after reload (key never persisted; needs Roger's call).
+- Next: orchestrator merges into staging, rebuild webchat dist on staging, manual test on http://localhost:8090.
+
 ## 2026-10-27 ~20:40 — staging: Wave 0 done
 - Review fixes + tester fixes merged and retested; full suites green. Tag `wave-0-done`; PR staging→master open (see roadmap "Resume here").
 - Next: Wave 1 in a fresh orchestrator session ("resume from tasks/voc-roadmap.md").

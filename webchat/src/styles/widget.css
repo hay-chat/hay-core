@@ -1,37 +1,9 @@
 /* Hay Webchat Widget - Global Styles */
 
-/* Theme Colors */
-#hay-webchat-root[data-theme="blue"] {
-  --hay-primary: #3b82f6;
-  --hay-primary-dark: #2563eb;
-  --hay-primary-light: #60a5fa;
-}
+/* Theme colours, the root reset and the button live in the loader
+   (src/loader/launcher.css), which paints before this chunk loads. */
 
-#hay-webchat-root[data-theme="green"] {
-  --hay-primary: #10b981;
-  --hay-primary-dark: #059669;
-  --hay-primary-light: #34d399;
-}
-
-#hay-webchat-root[data-theme="purple"] {
-  --hay-primary: #8b5cf6;
-  --hay-primary-dark: #7c3aed;
-  --hay-primary-light: #a78bfa;
-}
-
-#hay-webchat-root[data-theme="black"] {
-  --hay-primary: #000000;
-  --hay-primary-dark: #171717;
-  --hay-primary-light: #404040;
-}
-
-/* Reset and base styles */
 #hay-webchat-root {
-  all: initial;
-  position: fixed;
-  z-index: 999999;
-  pointer-events: none;
-
   --color-neutral-50: oklch(98.5% 0.002 247.839);
   --color-neutral-100: oklch(96.7% 0.003 264.542);
   --color-neutral-200: oklch(92.8% 0.006 264.531);
@@ -43,10 +15,6 @@
   --color-neutral-800: oklch(27.8% 0.033 256.848);
   --color-neutral-900: oklch(21% 0.034 264.665);
   --color-neutral-950: oklch(13% 0.028 261.692);
-}
-
-#hay-webchat-root * {
-  pointer-events: auto;
 }
 
 /* Typography */
@@ -119,16 +87,5 @@
 @media (max-width: 480px) {
   #hay-webchat-root {
     font-size: 14px;
-  }
-}
-
-/* Accessibility - Reduced motion */
-@media (prefers-reduced-motion: reduce) {
-  #hay-webchat-root *,
-  #hay-webchat-root *::before,
-  #hay-webchat-root *::after {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
   }
 }
