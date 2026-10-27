@@ -322,7 +322,7 @@
     "securityAccessDescription": "Control where your widget can be embedded",
     "allowedDomains": "Allowed Domains",
     "allowedDomainsPlaceholder": "example.com\napp.example.com\n*",
-    "allowedDomainsDescription": "Enter one domain per line. Use * to allow all domains.",
+    "allowedDomainsDescription": "Websites where your chat can start conversations. Enter one domain per line, e.g. shop.com or *.shop.com for every subdomain (www.shop.com needs its own line or the wildcard). * allows any website: anyone who copies your organization ID could run your chat, and its AI usage, on their own site. Replace * with your domains before going live.",
     "enableWebchat": "Enable webchat widget",
     "reset": "Reset",
     "saveChanges": "Save Changes",
