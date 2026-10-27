@@ -1,3 +1,8 @@
+## 2026-10-27 — claude/w1-greeting-locale — greeting in shopper locale done (not merged, not pushed)
+- 489750f server: public create validates `language` (BCP-47 regex, max 35); toSupportedLanguage maps pt-BR->pt; greeting translated at create via existing generateLocalizedGreeting (org LLM, falls back to original).
+- 32375d5 webchat: create sends resolveLocale(config.locale) (same as UI).
+- Verified: tsc; full server jest 98 suites incl. new tests/integration/greeting-locale.test.ts; webchat vitest 111, vue-tsc, build.
+- Next: merge into staging, rebuild webchat dist, manual test on :8090 with locale pt-BR.
 ## 2026-10-27 — claude/w1-agent-join-notice — "talking to a person" notices done (not merged)
 - Takeover/release store System msgs with metadata systemEvent (agent_joined | agent_returned_to_ai | agent_left) + agentFirstName; HumanAgent replies carry agentFirstName (sendMessage).
 - Widget: centred line from metadata in 13 locales; "10:42 · Marina" on person replies. Dashboard: centred line (en/pt-BR), also for old takeover rows.

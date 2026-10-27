@@ -144,6 +144,34 @@ describe("publicConversations.create allowed domains", () => {
   });
 });
 
+describe("publicConversations.create language", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockFindOrganization.mockResolvedValue({ id: ORG_ID, suspendedAt: null, settings: {} });
+    mockIsEnabled.mockResolvedValue(true);
+    mockGetSettings.mockResolvedValue({ allowedDomains: ["*"] });
+    mockRateLimited.mockResolvedValue(false);
+  });
+
+  it("passes the widget locale on to the conversation", async () => {
+    await callerFor().create({ ...createInput, language: "pt-BR" });
+    expect(mockCreateConversation).toHaveBeenCalledWith(
+      ORG_ID,
+      expect.objectContaining({ language: "pt-BR" }),
+    );
+  });
+
+  it.each(["", "portuguese-brazil-x", "pt_BR", "<script>", "a".repeat(40)])(
+    "rejects a malformed locale %p",
+    async (language) => {
+      await expect(callerFor().create({ ...createInput, language })).rejects.toMatchObject({
+        code: "BAD_REQUEST",
+      });
+      expect(mockCreateConversation).not.toHaveBeenCalled();
+    },
+  );
+});
+
 describe("publicConversations rate limits", () => {
   beforeEach(() => {
     jest.clearAllMocks();
