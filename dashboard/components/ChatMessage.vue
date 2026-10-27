@@ -107,9 +107,15 @@
             :tool-input="message.metadata?.toolInput"
             :tool-output="message.metadata?.toolOutput"
             :tool-status="message.metadata?.toolStatus"
-            :http-status="message.metadata?.httpStatus"
             :latency="message.metadata?.toolLatencyMs"
             :executed-at="message.metadata?.toolExecutedAt"
+          />
+          <PendingActionCard
+            v-if="
+              message.metadata?.toolStatus === 'PENDING_APPROVAL' && message.metadata?.pendingActionId
+            "
+            :pending-action-id="message.metadata.pendingActionId"
+            :conversation-id="message.conversation_id"
           />
         </div>
         <div v-else-if="message.type === 'ProductRecommendation'">

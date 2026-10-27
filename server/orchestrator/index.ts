@@ -1,7 +1,7 @@
 import { ConversationRepository } from "@server/repositories/conversation.repository";
 import { Conversation } from "@server/database/entities/conversation.entity";
 import { config } from "@server/config/env";
-import { runConversation } from "./run";
+import { runApprovalFollowUp, runConversation } from "./run";
 import {
   generateConversationTitle,
   sendInactivityWarning,
@@ -52,6 +52,11 @@ export class Orchestrator {
       logger.error({ err: error, conversationId }, "Error processing conversation");
       throw error;
     }
+  }
+
+  /** One AI turn after a person decided on a held action (D4-5). */
+  async processApprovalDecision(conversationId: string) {
+    await runApprovalFollowUp(conversationId);
   }
 
   async checkInactivity(): Promise<void> {

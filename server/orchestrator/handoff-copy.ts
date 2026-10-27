@@ -13,7 +13,9 @@ export type HandoffCopyKey =
   /** Handed to the team and nobody is online right now. */
   | "handoffNobodyOnline"
   /** Stale-message recovery gave up and handed the chat to the team. */
-  | "recoveryEscalation";
+  | "recoveryEscalation"
+  /** A change that needed a team member's OK got no decision in time (D4-8). */
+  | "approvalExpired";
 
 type CopyLanguage = "en" | "pt" | "es";
 
@@ -24,6 +26,8 @@ const HANDOFF_COPY: Record<CopyLanguage, Record<HandoffCopyKey, string>> = {
       "No one from the team is online right now. I've passed your message on, and they'll reply to you here in this chat.",
     recoveryEscalation:
       "Sorry, I ran into a problem with your message. I've passed it to the team, and they'll reply to you here in this chat.",
+    approvalExpired:
+      "The change you asked for needed a team member's OK, and it didn't come through in time, so it was not made. I've passed this to the team, and they'll reply to you here in this chat.",
   },
   pt: {
     handoffQueued: "Encaminhei sua mensagem para a equipe. Eles vão te responder aqui neste chat.",
@@ -31,6 +35,8 @@ const HANDOFF_COPY: Record<CopyLanguage, Record<HandoffCopyKey, string>> = {
       "Ninguém da equipe está online agora. Encaminhei sua mensagem, e eles vão te responder aqui neste chat.",
     recoveryEscalation:
       "Desculpe, tive um problema com a sua mensagem. Encaminhei para a equipe, e eles vão te responder aqui neste chat.",
+    approvalExpired:
+      "A alteração que você pediu precisava da aprovação de alguém da equipe, e ela não chegou a tempo, então não foi feita. Encaminhei para a equipe, e eles vão te responder aqui neste chat.",
   },
   es: {
     handoffQueued: "Le pasé tu mensaje al equipo. Te responderán aquí, en este chat.",
@@ -38,6 +44,8 @@ const HANDOFF_COPY: Record<CopyLanguage, Record<HandoffCopyKey, string>> = {
       "Ahora mismo no hay nadie del equipo conectado. Les pasé tu mensaje y te responderán aquí, en este chat.",
     recoveryEscalation:
       "Lo siento, tuve un problema con tu mensaje. Se lo pasé al equipo y te responderán aquí, en este chat.",
+    approvalExpired:
+      "El cambio que pediste necesitaba la aprobación de alguien del equipo y no llegó a tiempo, así que no se hizo. Se lo pasé al equipo y te responderán aquí, en este chat.",
   },
 };
 

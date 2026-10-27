@@ -19,6 +19,7 @@ import {
   listChannelTemplates,
   prepareChannelTemplate,
 } from "../../../services/channel-templates.service";
+import { isPlaygroundConversation } from "../../../services/core/dry-run";
 
 const logger = createLogger("conversations");
 const conversationExportService = new ConversationExportService();
@@ -81,6 +82,7 @@ const createConversationSchema = z.object({
       "open",
       "processing",
       "pending-human",
+      "awaiting-approval",
       "human-took-over",
       "resolved",
       "unresolved",
@@ -98,6 +100,7 @@ const updateConversationSchema = z.object({
       "open",
       "processing",
       "pending-human",
+      "awaiting-approval",
       "human-took-over",
       "resolved",
       "unresolved",
@@ -191,7 +194,13 @@ export const conversationsRouter = t.router({
       throw new TRPCError({ code: "UNAUTHORIZED", message: "Organization context required" });
     }
 
-    const statuses = ["open", "processing", "pending-human", "human-took-over"];
+    const statuses = [
+      "open",
+      "processing",
+      "pending-human",
+      "awaiting-approval",
+      "human-took-over",
+    ];
 
     const rows = await AppDataSource.query(
       `
@@ -1077,6 +1086,32 @@ export const conversationsRouter = t.router({
         userId: ctx.user!.id,
         reason: input.reason,
       });
+    }),
+
+  /**
+   * Switch a playground conversation between simulated actions (dry-run, the
+   * default) and the live store. Only playground conversations can be switched.
+   */
+  setDryRun: scopedProcedure(RESOURCES.CONVERSATIONS, ACTIONS.UPDATE)
+    .input(z.object({ conversationId: z.string().uuid(), dryRun: z.boolean() }))
+    .mutation(async ({ ctx, input }) => {
+      const conversation = await conversationRepository.findById(input.conversationId);
+      if (!conversation || conversation.organization_id !== ctx.organizationId) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Conversation not found" });
+      }
+      if (!isPlaygroundConversation(conversation.metadata)) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Only playground conversations can switch between simulated and live actions",
+        });
+      }
+      const metadata = { ...(conversation.metadata ?? {}), dryRun: input.dryRun };
+      await conversationRepository.updateById(conversation.id, { metadata });
+      logger.info(
+        { conversationId: conversation.id, userId: ctx.user?.id, dryRun: input.dryRun },
+        "Playground action mode changed",
+      );
+      return { dryRun: input.dryRun };
     }),
 
   /**

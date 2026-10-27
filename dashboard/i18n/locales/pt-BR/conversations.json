@@ -70,6 +70,7 @@
       "open": "Aberta",
       "processing": "Processando",
       "pendingHuman": "Precisa de Atenção",
+      "awaitingApproval": "Aguardando Aprovação",
       "humanTookOver": "Controle Manual",
       "resolved": "Resolvida",
       "unresolved": "Não resolvida",
@@ -115,7 +116,15 @@
       "conversationStarted": "Conversa iniciada em {date}",
       "youAreHandling": "Você está gerenciando esta conversa",
       "releaseConversation": "Liberar Conversa",
-      "closeConversation": "Encerrar Conversa"
+      "closeConversation": "Encerrar Conversa",
+      "simulatedBadge": "Ações simuladas",
+      "liveStoreBadge": "Loja real",
+      "useLiveStore": "Usar loja real",
+      "useSimulatedActions": "Simular ações",
+      "liveStoreConfirmTitle": "Usar sua loja real?",
+      "liveStoreConfirmDescription": "Reembolsos, cancelamentos, mudanças de endereço e outras ações nesta conversa de teste serão enviados para sua loja real. Você pode voltar a qualquer momento.",
+      "liveStoreConfirm": "Usar loja real",
+      "actionModeFailed": "Não foi possível trocar o modo de ações. Tente novamente."
     },
     "pendingHuman": {
       "needsHuman": "Esta conversa foi encaminhada para um agente humano",
@@ -237,6 +246,32 @@
         "send": "Enviar modelo",
         "sent": "Modelo enviado",
         "failed": "Não foi possível enviar o modelo"
+      }
+    },
+    "toolStatus": {
+      "success": "Sucesso",
+      "failed": "Falhou",
+      "running": "Executando",
+      "simulated": "Simulada",
+      "pendingApproval": "Aguardando aprovação",
+      "rejected": "Recusada",
+      "expired": "Expirada, não executada",
+      "unknown": "Desconhecido"
+    },
+    "pendingAction": {
+      "title": "O Hay.chat quer realizar esta ação",
+      "description": "Ela ainda não foi executada. Aprove para executar agora, ou recuse e a IA avisará o cliente.",
+      "approve": "Aprovar",
+      "reject": "Recusar",
+      "confirmReject": "Recusar ação",
+      "reasonLabel": "Motivo (opcional)",
+      "reasonPlaceholder": "Compartilhado com a IA para explicar ao cliente",
+      "replyMyself": "Vou responder eu mesmo",
+      "failed": "Não foi possível salvar sua decisão",
+      "done": {
+        "approve": "Aprovada",
+        "reject": "Recusada",
+        "reply": "Agora você está atendendo esta conversa"
       }
     }
   }

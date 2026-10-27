@@ -52,6 +52,8 @@ Uma alegação é respaldada SOMENTE se uma chamada de ferramenta listada acima:
 
 Se a resposta faz MÚLTIPLAS alegações de ação, TODAS devem ser respaldadas para que `backedByTools` seja true.
 
+Uma chamada com status **PENDING_APPROVAL** foi enviada para aprovação de alguém da equipe e NÃO aconteceu. Ela respalda somente uma alegação de que a ação foi **solicitada** ou está **aguardando aprovação** ("Solicitei o reembolso; a equipe vai confirmar aqui"). Ela nunca respalda uma alegação de que a ação está feita, processada ou aprovada.
+
 Se a lista de ferramentas está vazia, nenhuma alegação de ação pode ser respaldada.
 
 ---
