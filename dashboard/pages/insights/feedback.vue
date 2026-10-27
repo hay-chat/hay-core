@@ -228,6 +228,7 @@ import {
   ExternalLink,
 } from "lucide-vue-next";
 import { HayApi } from "@/utils/api";
+import { toISODateRange } from "@/utils/date";
 import type { RouterInputs, RouterOutputs } from "@/types/trpc";
 import { useSources } from "@/composables/useSources";
 
@@ -300,15 +301,13 @@ const filteredFeedback = computed(() => {
     result = result.filter((f) => f.message?.source?.id === filters.value.source);
   }
 
-  if (filters.value.startDate) {
-    const startDate = new Date(filters.value.startDate);
-    result = result.filter((f) => new Date(f.createdAt) >= startDate);
+  const { startDate, endDate } = toISODateRange(filters.value);
+  if (startDate) {
+    result = result.filter((f) => new Date(f.createdAt) >= new Date(startDate));
   }
 
-  if (filters.value.endDate) {
-    const endDate = new Date(filters.value.endDate);
-    endDate.setHours(23, 59, 59, 999);
-    result = result.filter((f) => new Date(f.createdAt) <= endDate);
+  if (endDate) {
+    result = result.filter((f) => new Date(f.createdAt) <= new Date(endDate));
   }
 
   return result;
@@ -366,8 +365,8 @@ const exportToCSV = async () => {
     const result = await HayApi.messageFeedback.export.query({
       rating:
         (filters.value.rating as RouterInputs["messageFeedback"]["export"]["rating"]) || undefined,
-      startDate: filters.value.startDate || undefined,
-      endDate: filters.value.endDate || undefined,
+      // The API wants ISO datetimes; send whole local days.
+      ...toISODateRange(filters.value),
     });
 
     // Create and download CSV

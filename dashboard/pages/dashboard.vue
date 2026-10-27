@@ -348,6 +348,7 @@ import {
 import { HayApi } from "@/utils/api";
 import { useAnalyticsStore } from "@/stores/analytics";
 import { formatWaitTime } from "@/utils/conversation";
+import { toISODateRange } from "@/utils/date";
 import type { RouterOutputs } from "@/types/trpc";
 
 // State
@@ -557,14 +558,7 @@ const formatTimeAgo = (date: Date) => {
 
 const fetchDashboardData = async (forceRefresh = false) => {
   try {
-    const dateFilters = {
-      startDate: dateRange.value.startDate
-        ? new Date(dateRange.value.startDate).toISOString()
-        : undefined,
-      endDate: dateRange.value.endDate
-        ? new Date(dateRange.value.endDate).toISOString()
-        : undefined,
-    };
+    const dateFilters = toISODateRange(dateRange.value);
 
     // Fetch all data in parallel using the analytics store for caching
     const [

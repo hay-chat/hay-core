@@ -17,6 +17,8 @@ import {
  */
 export interface PublicMessageMetadata {
   isClosureMessage?: true;
+  /** The conversation's opening greeting; replaces the widget's placeholder. */
+  isGreeting?: true;
   productRecommendation?: { products: unknown[] };
 }
 
@@ -27,6 +29,10 @@ export function toPublicMessageMetadata(metadata: unknown): PublicMessageMetadat
 
   if (source.isClosureMessage === true) {
     result.isClosureMessage = true;
+  }
+
+  if (source.isGreeting === true) {
+    result.isGreeting = true;
   }
 
   const recommendation = source.productRecommendation as { products?: unknown } | undefined;

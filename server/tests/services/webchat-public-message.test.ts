@@ -26,6 +26,10 @@ describe("toPublicMessageMetadata", () => {
     });
   });
 
+  it("keeps the greeting marker the widget uses to replace its placeholder", () => {
+    expect(toPublicMessageMetadata({ isGreeting: true, confidence: 0.9 })).toEqual({ isGreeting: true });
+  });
+
   it("returns an empty object for missing or malformed metadata", () => {
     expect(toPublicMessageMetadata(null)).toEqual({});
     expect(toPublicMessageMetadata("x")).toEqual({});
