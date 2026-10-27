@@ -47,6 +47,9 @@ export function useChat(config: HayChatConfig) {
 
   // Populated inside initialize() via safeStorage — see comment above.
   const existingConversationId = ref<string | null>(null);
+  // A conversation found in sessionStorage whose DPoP key sits behind the
+  // closed persistent-storage gate. Resumed when the gate opens.
+  let pendingRestoreId: string | null = null;
 
   // Initialize conversation HTTP service (used for all message sending and loading)
   const conversation = useConversation(config);
@@ -86,8 +89,24 @@ export function useChat(config: HayChatConfig) {
   // that start before grantConsent() would lose their persistent identifiers.
   watch(canUseLocal, async (allowed) => {
     if (!allowed) return;
-    if (customerId.value) {
+    // A customer ID stored on an earlier visit wins over the in-memory one
+    // made while the gate was closed; overwriting it would split the
+    // shopper's history across two customers.
+    const storedCustomerId = safeStorage.local.getItem("hay-customer-id");
+    if (storedCustomerId) {
+      customerId.value = storedCustomerId;
+    } else if (customerId.value) {
       safeStorage.local.setItem("hay-customer-id", customerId.value);
+    }
+    // The page loaded with a conversation to resume but its key could not be
+    // read yet (strict mode, consent granted after load). Resume it now.
+    if (pendingRestoreId && !conversationId.value) {
+      const restoreId = pendingRestoreId;
+      pendingRestoreId = null;
+      if (await loadExistingConversation(restoreId)) {
+        if (isConnected.value) identify(customerId.value, restoreId);
+      }
+      return;
     }
     if (keypair.value && conversationId.value) {
       try {
@@ -197,9 +216,16 @@ export function useChat(config: HayChatConfig) {
     try {
       debugLog("[Webchat] Loading existing conversation:", convId);
 
-      // Get keypair from IndexedDB. Only attempted when the persistent-storage
-      // gate is open — otherwise we can't have stored it, so treat as missing.
-      const storedKeypair = canUseLocal.value ? await getKeypair(convId) : null;
+      // The key lives in IndexedDB, behind the persistent-storage gate. While
+      // the gate is closed, keep the conversation ID: the host may still grant
+      // consent (cookie banners often answer after the widget loads), and the
+      // canUseLocal watcher resumes it then.
+      if (!canUseLocal.value) {
+        debugLog("[Webchat] Conversation key not readable before consent, deferring resume");
+        pendingRestoreId = convId;
+        return false;
+      }
+      const storedKeypair = await getKeypair(convId);
       if (!storedKeypair) {
         debugLog("[Webchat] No keypair found, clearing conversation");
         safeStorage.session.removeItem("hay-conversation-id");
@@ -358,8 +384,9 @@ export function useChat(config: HayChatConfig) {
       const existingConvId = existingConversationId.value;
       if (existingConvId) {
         const loaded = await loadExistingConversation(existingConvId);
-        if (!loaded) {
-          // Failed to load, create new
+        // A deferred resume (key behind the consent gate) must not be replaced
+        // by a new conversation: that is how the shopper's thread got lost.
+        if (!loaded && !pendingRestoreId) {
           await createNewConversation();
         }
       } else {
@@ -504,6 +531,13 @@ export function useChat(config: HayChatConfig) {
       lastReadMessageId.value = lastAgentMessage.id;
       safeStorage.session.setItem("hay-last-read-message-id", lastAgentMessage.id);
     }
+  };
+
+  // After a reload or a navigation, pick the conversation from this tab back
+  // up without waiting for a click, so the socket reconnects and replies that
+  // arrive meanwhile show on the unread badge.
+  const resumeActiveConversation = () => {
+    if (safeStorage.session.getItem("hay-conversation-id")) void initialize();
   };
 
   // Toggle chat window
@@ -908,6 +942,7 @@ export function useChat(config: HayChatConfig) {
 
     // Actions
     initialize,
+    resumeActiveConversation,
     toggleChat,
     openChat,
     closeChat,

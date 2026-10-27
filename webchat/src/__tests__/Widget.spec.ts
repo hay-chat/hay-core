@@ -24,6 +24,7 @@ vi.mock("../composables/useChat", () => ({
     startTyping: vi.fn(),
     stopTyping: vi.fn(),
     startNewConversation: vi.fn(),
+    resumeActiveConversation: vi.fn(),
   }),
 }));
 
