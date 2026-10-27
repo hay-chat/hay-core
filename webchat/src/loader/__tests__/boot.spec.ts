@@ -113,6 +113,32 @@ describe("widget loader", () => {
     expect(chunk.loadChat).not.toHaveBeenCalled();
   });
 
+  it("idle: waits for the settings before downloading, even when the browser is idle first", async () => {
+    globalThis.fetch = vi.fn(
+      () =>
+        new Promise((resolve) =>
+          setTimeout(
+            () =>
+              resolve({
+                ok: true,
+                status: 200,
+                statusText: "",
+                json: async () => ({ result: { data: { enabled: false } } }),
+              }),
+            10_000,
+          ),
+        ),
+    ) as unknown as typeof fetch;
+    const chunk = fakeChunk();
+    boot(config, chunk.loadChat);
+
+    await vi.advanceTimersByTimeAsync(5000); // idle has fired, settings still pending
+    expect(chunk.loadChat).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(10_000);
+    expect(document.getElementById("hay-webchat-root")).toBeNull();
+    expect(chunk.loadChat).not.toHaveBeenCalled();
+  });
+
   it("keeps the button when the settings request fails (network blip)", async () => {
     globalThis.fetch = vi.fn(async () => {
       throw new Error("offline");

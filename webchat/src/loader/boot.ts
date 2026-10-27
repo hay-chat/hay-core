@@ -63,14 +63,15 @@ export function boot(
   let wantOpen = false;
   let chat: Promise<ChatHandle | null> | null = null;
 
-  const startChat = (): Promise<ChatHandle | null> =>
+  const startChat = (urgent = false): Promise<ChatHandle | null> =>
     (chat ??= (async () => {
       if (disabled) return null;
-      // Fetch the settings and the chunk side by side; the settings decide
-      // whether the chat mounts at all.
-      const chunk = loadChat();
+      // When the chat is needed now (click, eager, a conversation in this tab),
+      // fetch the settings and the chunk side by side. Otherwise (idle) ask the
+      // settings first, so a disabled widget never downloads the chat.
+      const chunk = urgent || wantOpen ? loadChat() : null;
       if (!(await checkEnabled())) return null;
-      const module = await chunk;
+      const module = await (chunk ?? loadChat());
       handle = await module.mountChat({
         container: launcher.chatContainer,
         config,
@@ -99,14 +100,14 @@ export function boot(
   });
 
   // Intent: the visitor is reaching for the button, so start downloading.
-  const onIntent = () => void startChat();
+  const onIntent = () => void startChat(true);
   launcher.button.addEventListener("pointerenter", onIntent, { once: true });
   launcher.button.addEventListener("focus", onIntent, { once: true });
   launcher.button.addEventListener("touchstart", onIntent, { once: true, passive: true });
 
   const mode = hasConversationInTab() ? "eager" : (config.loading ?? "idle");
   if (mode === "eager") {
-    void startChat();
+    void startChat(true);
   } else if (mode === "idle") {
     void checkEnabled();
     whenIdle(() => void startChat());
