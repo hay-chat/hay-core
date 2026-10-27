@@ -5,7 +5,6 @@ import { conversationRepository } from "../repositories/conversation.repository"
 import jwt from "jsonwebtoken";
 import { config } from "../config/env";
 import type { JWTPayload } from "../types/auth.types";
-import type { Message } from "../database/entities/message.entity";
 import { MessageType } from "../database/entities/message.entity";
 import { createLogger } from "@server/lib/logger";
 import { AppDataSource } from "@server/database/data-source";
@@ -14,6 +13,7 @@ import { UserOrganization } from "@server/entities/user-organization.entity";
 const logger = createLogger("websocket");
 import { verifyDPoPForRequest } from "../routes/v1/public-conversations";
 import { getClientIp } from "@server/lib/client-ip";
+import { toPublicMessageEvent } from "./webchat/public-message";
 import { PUBLIC_WIDGET_LIMITS, isPublicWidgetRateLimited } from "./public-widget-limits";
 
 // Largest frame a client may send. Clients only send small JSON control frames
@@ -57,11 +57,6 @@ interface ChatMessage extends WebSocketMessage {
 
 interface TypingMessage extends WebSocketMessage {
   isTyping: boolean;
-}
-
-interface LoadHistoryMessage extends WebSocketMessage {
-  limit?: number;
-  offset?: number;
 }
 
 interface SubscribeMessage extends WebSocketMessage {
@@ -206,7 +201,10 @@ export class WebSocketService {
       // 1. Public message type with SENT delivery state (normal webchat), OR
       // 2. ANY message type for playground conversations (demo mode shows all internal events)
       if ((isPublicMessage && payload?.deliveryState === "sent") || isPlayground) {
-        const conversationSent = this.sendToConversation(conversationId, messagePayload);
+        const conversationSent = this.sendToConversation(
+          conversationId,
+          isPlayground ? messagePayload : toPublicMessageEvent(conversationId, payload),
+        );
 
         logger.debug(
           { messageType: payload?.type, conversationSent, orgSent, isPlayground },
@@ -385,10 +383,6 @@ export class WebSocketService {
 
         case "typing":
           await this.handleTypingIndicator(clientId, message);
-          break;
-
-        case "load_history":
-          await this.handleLoadHistory(clientId, message);
           break;
 
         case "subscribe":
@@ -578,36 +572,6 @@ export class WebSocketService {
         isTyping: message.isTyping,
       },
       clientId,
-    );
-  }
-
-  /**
-   * Handle load history request
-   */
-  private async handleLoadHistory(clientId: string, message: LoadHistoryMessage): Promise<void> {
-    const client = this.clients.get(clientId);
-    if (!client) return;
-
-    const { conversationId } = message;
-
-    // Load conversation with messages
-    const conversation = await conversationRepository.findById(conversationId as string);
-    if (!conversation || conversation.organization_id !== client.organizationId) {
-      return;
-    }
-
-    const messages = conversation?.messages || [];
-
-    client.ws.send(
-      JSON.stringify({
-        type: "history",
-        messages: messages.map((msg: Message) => ({
-          text: msg.content,
-          sender: msg.type === MessageType.CUSTOMER ? "user" : "agent",
-          timestamp: msg.created_at,
-          metadata: msg.metadata,
-        })),
-      }),
     );
   }
 

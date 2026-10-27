@@ -1,6 +1,7 @@
 import { createLogger } from "@server/lib/logger";
 import type { Conversation } from "@server/database/entities/conversation.entity";
 import type { Message } from "@server/database/entities/message.entity";
+import { toPublicMessageEvent } from "./webchat/public-message";
 
 const logger = createLogger("websocket");
 
@@ -62,17 +63,21 @@ class ConversationEventsService {
       }
 
       const { websocketService } = await import("./websocket.service");
-      const sent = websocketService.sendToConversation(conversation.id, {
-        type: "message",
-        data: {
-          id: message.id,
-          content: message.content,
-          type: message.type,
-          sender: message.sender,
-          timestamp: message.created_at,
-          metadata: message.metadata,
-        },
-      });
+      const data = {
+        id: message.id,
+        content: message.content,
+        type: message.type,
+        sender: message.sender,
+        timestamp: message.created_at,
+        attachments: message.attachments ?? [],
+        metadata: message.metadata,
+      };
+      const sent = websocketService.sendToConversation(
+        conversation.id,
+        isPlayground
+          ? { type: "message", conversationId: conversation.id, data }
+          : toPublicMessageEvent(conversation.id, data),
+      );
       logger.debug(
         { messageId: message.id, conversationId: conversation.id, clientCount: sent },
         "Sent message to clients (Redis not available)",

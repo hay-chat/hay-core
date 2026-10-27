@@ -13,6 +13,7 @@ import {
   matchesAllowedDomains,
 } from "../../../services/webchat/webchat-settings.service";
 import { config } from "@server/config/env";
+import { toPublicMessage } from "../../../services/webchat/public-message";
 import {
   PUBLIC_WIDGET_LIMITS,
   isPublicWidgetRateLimited,
@@ -223,17 +224,7 @@ export const publicConversationsRouter = t.router({
       // Filter to only return customer-facing messages
       const filteredMessages = messages
         .slice(input.offset, input.offset + input.limit)
-        .map((msg) => ({
-          id: msg.id,
-          content: msg.content,
-          type: msg.type,
-          sender: msg.sender,
-          direction:
-            msg.direction ||
-            (msg.type === MessageType.CUSTOMER ? MessageDirection.IN : MessageDirection.OUT),
-          createdAt: msg.created_at,
-          metadata: msg.metadata,
-        }));
+        .map((msg) => toPublicMessage(msg, { isPlayground }));
 
       return {
         messages: filteredMessages,
