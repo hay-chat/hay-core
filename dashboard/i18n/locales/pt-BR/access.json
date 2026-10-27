@@ -26,7 +26,20 @@
     "usage_warning": "Você usou {percent}% das {included} resoluções incluídas neste período ({used} até agora).",
     "usage_exceeded": "Você usou todas as {included} resoluções incluídas neste período. Até {periodEnd}, cada resolução extra é cobrada a {rate}.",
     "usage_paused": "Seu agente de IA está pausado: todas as {included} resoluções incluídas deste período foram usadas. Permita resoluções extras ou faça upgrade para retomar agora; ele volta sozinho em {periodEnd}.",
+    "usage_cap_reached": "Seu agente de IA está pausado: você atingiu o limite de gastos com resoluções extras neste período ({used} de {cap}). Novas conversas vão para a sua equipe. Aumente o limite ou faça upgrade para retomar agora; ele volta sozinho em {periodEnd}.",
+    "trial_grace": "Seu teste gratuito terminou e seu agente de IA está pausado, então novas conversas vão para a sua equipe. Escolha um plano antes de {lockDate} para reativá-lo. Depois dessa data, a conta será bloqueada.",
+    "manual_suspension_pending": "Sua conta do Hay.chat será suspensa em {date}. Fale com o suporte do Hay.chat se tiver dúvidas.",
     "defaultCta": "Gerenciar cobrança",
     "dismiss": "Fechar"
+  },
+  "accessNoticeCta": {
+    "trial_ending": "Escolher um plano",
+    "payment_failed": "Atualizar forma de pagamento",
+    "usage_warning": "Ver uso",
+    "usage_exceeded": "Fazer upgrade do plano",
+    "usage_paused": "Gerenciar uso",
+    "usage_cap_reached": "Aumentar limite de gastos",
+    "trial_grace": "Escolher um plano",
+    "manual_suspension_pending": "Falar com o Hay.chat"
   }
 }
