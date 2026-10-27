@@ -3,6 +3,7 @@
  * same handshake the plugin worker performs. Pins the exact tool surface and
  * the read/write annotations core caches (server/services/plugin-tools.service.ts).
  */
+import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { createRequire } from "node:module";
@@ -64,4 +65,15 @@ describe("nuvemshop MCP server (stdio)", () => {
       await client.close();
     }
   }, 20000);
+});
+
+describe("i18n", () => {
+  it("labels exactly the served tools in every locale (pt-BR matches the dashboard locale)", () => {
+    const dir = path.join(__dirname, "..", "..", "i18n");
+    expect(fs.readdirSync(dir).sort()).toEqual(["en.json", "es.json", "pt-BR.json"]);
+    for (const file of ["en.json", "es.json", "pt-BR.json"]) {
+      const locale = JSON.parse(fs.readFileSync(path.join(dir, file), "utf8"));
+      expect(Object.keys(locale.tools).sort()).toEqual(EXPECTED_TOOLS);
+    }
+  });
 });

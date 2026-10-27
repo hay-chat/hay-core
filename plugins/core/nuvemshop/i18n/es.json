@@ -1,72 +1,104 @@
 {
   "name": "Tiendanube",
-  "description": "Conectá tu tienda Tiendanube / Nuvemshop para que el agente consulte productos, pedidos y clientes, cancele pedidos y siga el estado de los reembolsos.",
+  "description": "Conecta tu tienda Tiendanube para que el agente encuentre pedidos, siga envíos, cancele o cambie la dirección de pedidos no despachados, registre solicitudes de reembolso, envíe enlaces de pago de pedidos impagos, dé cupones de cortesía con tope y responda sobre productos y stock.",
   "tools": {
     "nuvemshop_get_store": {
       "label": "Ver Datos de la Tienda",
-      "description": "Obtiene información básica de la tienda, como nombre, dominio, idioma y moneda."
+      "description": "Obtiene los datos básicos de la tienda: nombre, URL, país, idiomas y moneda."
+    },
+    "nuvemshop_find_customer": {
+      "label": "Buscar Cliente",
+      "description": "Encuentra un cliente por email o DNI/CUIT (cuentas y pedidos sin registro), con sus pedidos más recientes."
+    },
+    "nuvemshop_get_customer": {
+      "label": "Ver Cliente",
+      "description": "Obtiene contacto, direcciones y total gastado de un cliente por ID."
+    },
+    "nuvemshop_list_customer_orders": {
+      "label": "Listar Pedidos del Cliente",
+      "description": "Lista los pedidos de un cliente por email, del más reciente al más antiguo."
+    },
+    "nuvemshop_get_order": {
+      "label": "Ver Pedido",
+      "description": "Obtiene un pedido por ID o número: productos, totales, pago, envío y qué se puede hacer."
+    },
+    "nuvemshop_get_order_tracking": {
+      "label": "Ver Seguimiento del Pedido",
+      "description": "Obtiene número y enlace de seguimiento, transportista, plazo de entrega y último evento."
+    },
+    "nuvemshop_cancel_order": {
+      "label": "Cancelar Pedido",
+      "description": "Cancela un pedido que aún no fue despachado. No mueve dinero."
+    },
+    "nuvemshop_update_order_shipping_address": {
+      "label": "Cambiar Dirección de Envío",
+      "description": "Cambia la dirección de entrega de un pedido aún no despachado. Se niega si ya hay etiqueta o seguimiento."
+    },
+    "nuvemshop_add_order_note": {
+      "label": "Agregar Nota al Pedido",
+      "description": "Agrega una nota interna al pedido como registro. Las notas anteriores se conservan."
+    },
+    "nuvemshop_check_refund_status": {
+      "label": "Ver Estado del Reembolso",
+      "description": "Consulta el estado del reembolso, el medio de pago, las fechas y cómo se ejecuta."
+    },
+    "nuvemshop_request_refund": {
+      "label": "Solicitar Reembolso",
+      "description": "Registra en el pedido pagado una solicitud de reembolso con tope para el comerciante. La API no mueve dinero."
+    },
+    "nuvemshop_get_payment_link": {
+      "label": "Ver Enlace de Pago",
+      "description": "Obtiene el código o enlace de pago de un pedido impago, tras confirmar email o teléfono."
+    },
+    "nuvemshop_create_coupon": {
+      "label": "Crear Cupón de Cortesía",
+      "description": "Crea un cupón de un solo uso dentro del tope de porcentaje o monto del comerciante."
     },
     "nuvemshop_search_products": {
       "label": "Buscar Productos",
-      "description": "Busca productos por nombre, descripción o SKU, opcionalmente dentro de una categoría."
+      "description": "Busca productos publicados por nombre, descripción o SKU."
     },
     "nuvemshop_get_product": {
       "label": "Ver Producto",
-      "description": "Obtiene los detalles, variantes, precios, stock e imágenes de un producto por ID."
+      "description": "Obtiene un producto con descripción, variantes, precios y stock."
     },
-    "nuvemshop_get_product_by_sku": {
-      "label": "Ver Producto por SKU",
-      "description": "Encuentra el producto que tiene una variante con el SKU indicado."
+    "nuvemshop_check_inventory": {
+      "label": "Consultar Stock",
+      "description": "Consulta stock y precio de una variante por SKU."
     },
     "nuvemshop_list_categories": {
       "label": "Listar Categorías",
       "description": "Lista las categorías de productos de la tienda."
-    },
-    "nuvemshop_get_order": {
-      "label": "Ver Pedido",
-      "description": "Obtiene los ítems, totales, estado de pago y envío de un pedido, y la elegibilidad de soporte."
-    },
-    "nuvemshop_get_order_by_number": {
-      "label": "Ver Pedido por Número",
-      "description": "Encuentra un pedido por el número que ve el cliente (p. ej. #101)."
-    },
-    "nuvemshop_list_customer_orders": {
-      "label": "Listar Pedidos del Cliente",
-      "description": "Lista los pedidos de un cliente, del más reciente al más antiguo."
-    },
-    "nuvemshop_check_refund_status": {
-      "label": "Verificar Reembolso",
-      "description": "Verifica el estado de reembolso de un pedido, el medio de pago y cómo puede ejecutarse el reembolso."
-    },
-    "nuvemshop_cancel_order": {
-      "label": "Cancelar Pedido",
-      "description": "Cancela un pedido con reposición de stock y notificación opcionales. No mueve dinero."
-    },
-    "nuvemshop_add_order_note": {
-      "label": "Agregar Nota al Pedido",
-      "description": "Agrega una nota interna al pedido como registro de las acciones de soporte."
-    },
-    "nuvemshop_find_customer": {
-      "label": "Buscar Cliente",
-      "description": "Encuentra clientes por email o por texto de nombre/documento."
-    },
-    "nuvemshop_get_customer": {
-      "label": "Ver Cliente",
-      "description": "Obtiene los detalles completos, direcciones y totales de compra de un cliente por ID."
     }
   },
   "config": {
     "storeId": {
       "label": "ID de la tienda",
-      "description": "El ID numérico de tu tienda (el user_id de la tienda, visible al crear la aplicación a medida)."
+      "description": "El ID numérico de tu tienda (el user_id, que se muestra al crear la aplicación a medida)."
     },
     "accessToken": {
       "label": "Token de acceso",
-      "description": "Token de acceso de una aplicación a medida creada en el admin de la tienda. Otorgá permisos de productos, pedidos y clientes."
+      "description": "Token de una aplicación a medida (admin → Aplicaciones a medida). Otorga lectura/escritura de pedidos, envíos, clientes y cupones, y lectura de productos. Se muestra una sola vez."
     },
     "apiVersion": {
       "label": "Versión de la API",
       "description": "Versión de la API de Tiendanube a utilizar."
+    },
+    "couponsEnabled": {
+      "label": "Permitir cupones de cortesía",
+      "description": "Permite que el agente cree cupones de un solo uso dentro de los topes. Por encima del tope, pasa a una persona."
+    },
+    "couponMaxPercent": {
+      "label": "Tope del cupón: porcentaje máximo",
+      "description": "Mayor descuento porcentual que puede dar el agente (0 desactiva los cupones porcentuales)."
+    },
+    "couponMaxAmount": {
+      "label": "Tope del cupón: monto fijo máximo",
+      "description": "Mayor descuento fijo en la moneda de la tienda (0 o vacío desactiva los cupones de monto fijo)."
+    },
+    "couponMaxDays": {
+      "label": "Validez del cupón (días)",
+      "description": "Los cupones que crea el agente vencen como máximo en esta cantidad de días."
     }
   }
 }
