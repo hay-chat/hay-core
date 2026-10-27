@@ -13,6 +13,10 @@ import {
   matchesAllowedDomains,
 } from "../../../services/webchat/webchat-settings.service";
 import { config } from "@server/config/env";
+import {
+  PUBLIC_WIDGET_LIMITS,
+  isPublicWidgetRateLimited,
+} from "../../../services/public-widget-limits";
 
 const logger = createLogger("public-conversations");
 
@@ -44,7 +48,7 @@ const createPublicConversationSchema = z.object({
 // Schema for sending messages
 const sendMessageSchema = z.object({
   conversationId: z.string().uuid(),
-  content: z.string(),
+  content: z.string().min(1).max(PUBLIC_WIDGET_LIMITS.maxMessageLength),
   proof: z.string(), // DPoP proof
   method: z.string(),
   url: z.string(),
@@ -66,6 +70,15 @@ export const publicConversationsRouter = t.router({
   create: publicProcedure.input(createPublicConversationSchema).mutation(async ({ input, ctx }) => {
     try {
       const organizationId = input.organizationId;
+
+      if (
+        await isPublicWidgetRateLimited([
+          { rule: "createPerIp", id: clientIp(ctx.ipAddress) },
+          { rule: "createPerOrg", id: organizationId },
+        ])
+      ) {
+        throw tooManyRequests();
+      }
 
       const organization = await organizationRepository.findById(organizationId);
       if (
@@ -245,8 +258,18 @@ export const publicConversationsRouter = t.router({
   }),
 
   // Send a message to a conversation (requires DPoP proof)
-  sendMessage: publicProcedure.input(sendMessageSchema).mutation(async ({ input }) => {
+  sendMessage: publicProcedure.input(sendMessageSchema).mutation(async ({ input, ctx }) => {
     try {
+      // Checked before DPoP so a flood never reaches signature verification.
+      if (
+        await isPublicWidgetRateLimited([
+          { rule: "messagePerConversation", id: input.conversationId },
+          { rule: "messagePerIp", id: clientIp(ctx.ipAddress) },
+        ])
+      ) {
+        throw tooManyRequests();
+      }
+
       // Verify DPoP proof
       const verified = await verifyDPoPForRequest(
         input.conversationId,
@@ -381,6 +404,17 @@ export const publicConversationsRouter = t.router({
       }
     }),
 });
+
+function clientIp(ipAddress: string | undefined): string {
+  return ipAddress || "Unknown";
+}
+
+function tooManyRequests(): TRPCError {
+  return new TRPCError({
+    code: "TOO_MANY_REQUESTS",
+    message: "Too many requests. Please wait a moment and try again.",
+  });
+}
 
 /**
  * Hostname of the page that made the request: from Origin, falling back to

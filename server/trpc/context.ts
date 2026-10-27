@@ -4,6 +4,7 @@ import { authenticate } from "@server/lib/auth/middleware";
 import type { ListParams } from "./middleware/pagination";
 import type { Request } from "express";
 import { createLogger } from "@server/lib/logger";
+import { getClientIp } from "@server/lib/client-ip";
 
 const logger = createLogger("trpc-context");
 
@@ -50,12 +51,7 @@ export const createContext = async ({
   // Extract organizationId from header
   const organizationId = (req.headers["x-organization-id"] as string | null) || null;
 
-  // Extract IP address (consider proxies)
-  const ipAddress =
-    (req.headers["x-forwarded-for"] as string)?.split(",")[0]?.trim() ||
-    (req.headers["x-real-ip"] as string) ||
-    req.socket.remoteAddress ||
-    "Unknown";
+  const ipAddress = getClientIp(req.headers, req.socket.remoteAddress);
 
   // Extract user agent
   const userAgent = (req.headers["user-agent"] as string) || "Unknown";

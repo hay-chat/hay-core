@@ -57,6 +57,13 @@ jest.mock("@server/services/webchat/webchat-settings.service", () => {
   };
 });
 
+const mockRateLimited =
+  jest.fn<(checks: Array<{ rule: string; id: string }>) => Promise<boolean>>();
+jest.mock("@server/services/public-widget-limits", () => ({
+  PUBLIC_WIDGET_LIMITS: { maxMessageLength: 4000 },
+  isPublicWidgetRateLimited: mockRateLimited,
+}));
+
 import { publicConversationsRouter } from "@server/routes/v1/public-conversations";
 
 const ORG_ID = "11111111-1111-4111-8111-111111111111";
@@ -81,6 +88,7 @@ describe("publicConversations.create allowed domains", () => {
     mockFindOrganization.mockResolvedValue({ id: ORG_ID, suspendedAt: null, settings: {} });
     mockIsEnabled.mockResolvedValue(true);
     mockGetSettings.mockResolvedValue({ allowedDomains: ["shop.example.com", "*.brand.com"] });
+    mockRateLimited.mockResolvedValue(false);
   });
 
   it("creates a conversation from an allowed origin", async () => {
@@ -133,5 +141,53 @@ describe("publicConversations.create allowed domains", () => {
     await expect(callerFor().create(createInput)).rejects.toMatchObject({ code: "FORBIDDEN" });
 
     expect(mockCreateConversation).not.toHaveBeenCalled();
+  });
+});
+
+describe("publicConversations rate limits", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockFindOrganization.mockResolvedValue({ id: ORG_ID, suspendedAt: null, settings: {} });
+    mockIsEnabled.mockResolvedValue(true);
+    mockGetSettings.mockResolvedValue({ allowedDomains: ["*"] });
+  });
+
+  it("create is limited per IP and per org", async () => {
+    mockRateLimited.mockResolvedValue(true);
+    await expect(callerFor({}, "198.51.100.4").create(createInput)).rejects.toMatchObject({
+      code: "TOO_MANY_REQUESTS",
+    });
+    expect(mockRateLimited).toHaveBeenCalledWith([
+      { rule: "createPerIp", id: "198.51.100.4" },
+      { rule: "createPerOrg", id: ORG_ID },
+    ]);
+    expect(mockCreateConversation).not.toHaveBeenCalled();
+  });
+
+  const sendInput = {
+    conversationId: "22222222-2222-4222-8222-222222222222",
+    content: "hello",
+    proof: "proof",
+    method: "POST",
+    url: "http://localhost:3001/v1/publicConversations.sendMessage",
+  };
+
+  it("sendMessage is limited per conversation and per IP", async () => {
+    mockRateLimited.mockResolvedValue(true);
+    await expect(callerFor({}, "198.51.100.4").sendMessage(sendInput)).rejects.toMatchObject({
+      code: "TOO_MANY_REQUESTS",
+    });
+    expect(mockRateLimited).toHaveBeenCalledWith([
+      { rule: "messagePerConversation", id: sendInput.conversationId },
+      { rule: "messagePerIp", id: "198.51.100.4" },
+    ]);
+  });
+
+  it("sendMessage rejects content over the length cap", async () => {
+    mockRateLimited.mockResolvedValue(false);
+    await expect(
+      callerFor().sendMessage({ ...sendInput, content: "x".repeat(4001) }),
+    ).rejects.toMatchObject({ code: "BAD_REQUEST" });
+    expect(mockRateLimited).not.toHaveBeenCalled();
   });
 });
