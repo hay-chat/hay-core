@@ -626,6 +626,25 @@ export class ConversationRepository extends BaseRepository<Conversation> {
     return (result.affected ?? 0) > 0;
   }
 
+  /**
+   * True when the newest customer message has no bot or staff reply after it.
+   * System notices, tool output and the like are not replies.
+   */
+  async hasUnansweredCustomerMessage(conversationId: string): Promise<boolean> {
+    const [row]: Array<{ unanswered: boolean }> = await AppDataSource.query(
+      `SELECT COALESCE(
+         (SELECT MAX(created_at) FROM messages WHERE conversation_id = $1 AND type = $2)
+           > COALESCE(
+             (SELECT MAX(created_at) FROM messages WHERE conversation_id = $1 AND type IN ($3, $4)),
+             '-infinity'::timestamptz
+           ),
+         FALSE
+       ) AS unanswered`,
+      [conversationId, MessageType.CUSTOMER, MessageType.BOT_AGENT, MessageType.HUMAN_AGENT],
+    );
+    return row?.unanswered === true;
+  }
+
   async getSystemMessages(conversationId: string): Promise<Message[]> {
     const messageRepository = this.getMessageRepository();
     return await messageRepository.find({

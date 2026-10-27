@@ -1275,9 +1275,14 @@ Translated message:`;
       status: newStatus,
     };
 
-    // If returning to AI, mark as needing processing
+    // Returning to AI only queues a run when the newest shopper message has
+    // no reply yet (from the AI or staff). Messages answered before or during
+    // the take-over, like the "can I speak with a person?" that started it,
+    // are not run again; the AI picks up from the shopper's next message.
+    let needsProcessing = false;
     if (returnToMode === "ai") {
-      updates.needs_processing = true;
+      needsProcessing = await conversationRepository.hasUnansweredCustomerMessage(this.id);
+      updates.needs_processing = needsProcessing;
       updates.previous_status = null;
     }
 
@@ -1288,10 +1293,10 @@ Translated message:`;
     this.assigned_at = null;
     this.status = newStatus;
     if (returnToMode === "ai") {
-      this.needs_processing = true;
+      this.needs_processing = needsProcessing;
       this.previous_status = null;
-
-      // Enqueue for RabbitMQ processing
+    }
+    if (needsProcessing) {
       const { orchestratorQueueService } =
         await import("../../services/orchestrator-queue.service");
       await orchestratorQueueService.enqueue(this.id, this.organization_id, "ai_return");
