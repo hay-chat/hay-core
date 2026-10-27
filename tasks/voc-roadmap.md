@@ -179,6 +179,7 @@ Staging seed: org/user created via `auth.register` (credentials in `../hay-core-
 - Confirm it's OK that staging uses the `OPENAI_API_KEY` from the main checkout's `.env` (nothing else copied).
 
 ## Follow-ups logged (not in Wave 0 scope)
+- **QUEUED (Roger request 2026-10-27):** widget "Marina joined the chat" / "Marina left the chat. You're chatting with the AI assistant again." system notices on takeover/release (stored as system messages, survive reload, first name only), and human messages show `10:42 · Marina`. Widget only (not WhatsApp/email). en/pt-BR/pt-PT. L6 + server takeover/release paths. Start when an agent slot frees.
 - Every follow-up widget send hits NONCE_EXPIRED then retries (nonce race between polling getMessages / WS / sendMessage?) → doubles send requests; investigate in L1/L6. Refused first message leaves an empty conversation (create before send). Unread badge counts all agent messages since the shopper's last one.
 - Web 72 h reversal only works for identified shoppers (anonymous web visitors have no customer_id; widget starts a new conversation after close) → L6/L1 visitor id. Close-classification job throughput ~30/min (batch 5 per 10 s). Reversal after overage reported → backoffice credit (D1-6).
 - **Widget CSS isolation:** host page global `button{…}` styles hide the widget's send/close icons (no shadow DOM). L6 ticket: shadow DOM or scoped reset.
