@@ -644,6 +644,22 @@
       "description": "Embeddings are always managed by Hay and pinned to 1536 dimensions.",
       "model": "Embedding Model",
       "modelHelper": "Must produce 1536-dimension vectors (e.g. text-embedding-3-small)."
+    },
+    "region": {
+      "title": "AI processing region",
+      "description": "Choose where your customers' messages are processed by AI.",
+      "euOnly": "Process AI in the EU only",
+      "euOnlyHint": "Every AI reply, document and product search, and voice-note transcript for this organization runs on OpenAI's EU data residency endpoint. Agents use Hay.chat's managed EU models while this is on.",
+      "statusEu": "AI processing: EU data centres (OpenAI EU data residency).",
+      "statusDefault": "AI processing: Hay.chat's default AI provider, which may run outside the EU.",
+      "unavailable": "EU-only processing is not available yet. It will appear here once it is ready.",
+      "misconfiguredTitle": "EU-only is on, but the EU endpoint is not available",
+      "misconfiguredDescription": "AI replies, searches and transcripts are paused for this organization rather than processed outside the EU. Contact Hay.chat support, or turn EU-only off to resume on the default provider.",
+      "customProviderPaused": "EU-only is on, so the provider and models below are not used. They are kept and apply again if you turn EU-only off.",
+      "saveSuccessEu": "AI now runs in the EU only",
+      "saveSuccessDefault": "AI now runs on the default provider",
+      "saveFailed": "Failed to change the AI processing region",
+      "loadFailed": "Failed to load the AI processing region"
     }
   }
 }
