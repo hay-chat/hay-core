@@ -10,7 +10,7 @@
 
 const { z } = require("zod");
 const { wcApi } = require("../lib/client");
-const { ok, fail, num, round2 } = require("../lib/format");
+const { ok, fail, toolError, num, round2 } = require("../lib/format");
 const { resolveOrder, refundedTotal } = require("../lib/orders");
 
 /** Build WooCommerce refund line items + their amount from the order's own totals. */
@@ -20,13 +20,15 @@ function buildLineItemRefund(order, requested) {
   for (const req of requested) {
     const li = (order.line_items || []).find((l) => String(l.id) === String(req.line_item_id));
     if (!li) {
-      throw new Error(
+      throw toolError(
+        "BAD_INPUT",
         `Line item ${req.line_item_id} is not on order #${order.number}. Valid line item ids: ` +
           (order.line_items || []).map((l) => `${l.id} (${l.name})`).join(", "),
       );
     }
     if (req.quantity < 1 || req.quantity > li.quantity) {
-      throw new Error(
+      throw toolError(
+        "BAD_INPUT",
         `Quantity ${req.quantity} for "${li.name}" must be between 1 and ${li.quantity}.`,
       );
     }
@@ -87,17 +89,27 @@ function registerRefundTools(server) {
         const order = await resolveOrder(args);
         const ref = `#${order.number}`;
         if (order.status === "cancelled" && !order.date_paid) {
-          throw new Error(`Order ${ref} is cancelled and was never paid; nothing to refund.`);
+          throw toolError(
+            "PRECONDITION",
+            `Order ${ref} is cancelled and was never paid; nothing to refund.`,
+            {
+              details: { reason: "NOT_PAID" },
+            },
+          );
         }
         if (!order.date_paid && order.status !== "completed") {
-          throw new Error(
+          throw toolError(
+            "PRECONDITION",
             `Order ${ref} has no recorded payment (status "${order.status}"); there is nothing to refund.`,
+            { details: { reason: "NOT_PAID", status: order.status } },
           );
         }
         const remaining = round2(Math.max(0, num(order.total) - refundedTotal(order)));
         if (remaining <= 0) {
-          throw new Error(
+          throw toolError(
+            "PRECONDITION",
             `Order ${ref} is already fully refunded (${order.total} ${order.currency}).`,
+            { details: { reason: "FULLY_REFUNDED" } },
           );
         }
 
@@ -111,12 +123,14 @@ function registerRefundTools(server) {
           amount = Number(args.amount);
         }
         if (!Number.isFinite(amount) || amount <= 0) {
-          throw new Error(`Invalid refund amount "${args.amount}".`);
+          throw toolError("BAD_INPUT", `Invalid refund amount "${args.amount}".`);
         }
         if (amount > remaining + 0.001) {
-          throw new Error(
+          throw toolError(
+            "PRECONDITION",
             `Refund of ${amount.toFixed(2)} exceeds the remaining refundable balance of ` +
               `${remaining.toFixed(2)} ${order.currency} for order ${ref}.`,
+            { details: { reason: "EXCEEDS_REFUNDABLE", requested: amount, remaining } },
           );
         }
 
@@ -133,11 +147,15 @@ function registerRefundTools(server) {
         try {
           refund = await wcApi("POST", `/orders/${order.id}/refunds`, { body });
         } catch (err) {
-          if (refundPayment) {
-            throw new Error(
+          // Only a definite refusal gets the manual-refund hint. After a timeout or an
+          // unknown outcome the refund may exist; re-running would record it twice.
+          if (refundPayment && err.code === "PROVIDER_REFUSED") {
+            throw toolError(
+              "PROVIDER_REFUSED",
               `${err.message}. If the payment gateway (${order.payment_method_title || order.payment_method}) ` +
                 "cannot refund through WooCommerce, refund the customer in the gateway's dashboard and " +
                 "re-run woocommerce_create_refund with refund_payment=false to record it on the order.",
+              { details: err.details },
             );
           }
           throw err;

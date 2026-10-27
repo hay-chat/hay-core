@@ -125,6 +125,10 @@ describe("woocommerce_create_refund", () => {
       amount: "15.00",
     });
     expect(tooMuch.isError).toBe(true);
+    expect(tooMuch.error).toMatchObject({
+      code: "PRECONDITION",
+      details: { reason: "EXCEEDS_REFUNDABLE" },
+    });
     expect(tooMuch.text).toMatch(/exceeds the remaining refundable balance of 10.00 EUR/);
     expect(calls.some((c) => c.method === "POST")).toBe(false);
 
@@ -148,6 +152,14 @@ describe("woocommerce_create_refund", () => {
     expect(calls.some((c) => c.method === "POST")).toBe(false);
   });
 
+  it("after an unconfirmed refund (5xx without a WooCommerce error) does not suggest re-running it", async () => {
+    const { calls } = mockFetch(routes(ORDER, () => ({ status: 502, body: null })));
+    const res = await server.call("woocommerce_create_refund", { order_id: "12" });
+    expect(res.error).toMatchObject({ code: "OUTCOME_UNKNOWN", retryable: false });
+    expect(res.text).not.toMatch(/refund_payment=false/);
+    expect(calls.filter((c) => c.method === "POST")).toHaveLength(1);
+  });
+
   it("surfaces a gateway failure with the explicit manual-refund fallback, and records a manual refund when asked", async () => {
     mockFetch(
       routes(ORDER, () => ({
@@ -160,6 +172,7 @@ describe("woocommerce_create_refund", () => {
     );
     const failed = await server.call("woocommerce_create_refund", { order_id: "12" });
     expect(failed.isError).toBe(true);
+    expect(failed.error.code).toBe("PROVIDER_REFUSED");
     expect(failed.text).toMatch(/does not support refunds/);
     expect(failed.text).toMatch(/refund_payment=false/);
 

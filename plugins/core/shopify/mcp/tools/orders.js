@@ -206,7 +206,8 @@ function registerOrderTools(server) {
         const data = await shopifyGql(QUERY, { query: `name:"${args.name}"` });
         const first = unwrapConnection(data.orders)[0];
         if (!first) {
-          throw new Error(
+          throw toolError(
+            "NOT_FOUND",
             `No order named "${args.name}" found. Order names usually include the "#" prefix ` +
               '(e.g. "#1001"); or find the order via the customer\'s recentOrders.',
           );
@@ -249,7 +250,8 @@ function registerOrderTools(server) {
         `;
         const data = await shopifyGql(QUERY, { id, first });
         if (!data.customer) {
-          throw new Error(
+          throw toolError(
+            "NOT_FOUND",
             `Customer ${args.customer_id} not found; get a valid customer id from ` +
               "shopify_find_customer (email/phone).",
           );
@@ -308,13 +310,24 @@ function registerOrderTools(server) {
         const check = await shopifyGql(CHECK, { id });
         if (!check.order) throw await orderNotFound(args.order_id);
         if (check.order.cancelledAt) {
-          throw new Error(`Order ${check.order.name} is cancelled; cannot change its address.`);
+          throw toolError(
+            "PRECONDITION",
+            `Order ${check.order.name} is cancelled, so its address can't be changed.`,
+            { details: { reason: "ALREADY_CANCELLED" } },
+          );
         }
         if (!PRE_DISPATCH_STATUSES.has(check.order.displayFulfillmentStatus)) {
-          throw new Error(
+          throw toolError(
+            "PRECONDITION",
             `Order ${check.order.name} has fulfillment status ` +
               `${check.order.displayFulfillmentStatus}; the shipping address can only be ` +
               "changed before dispatch. Escalate to the merchant/carrier instead.",
+            {
+              details: {
+                reason: "ALREADY_DISPATCHED",
+                displayFulfillmentStatus: check.order.displayFulfillmentStatus,
+              },
+            },
           );
         }
 
@@ -468,7 +481,7 @@ function registerOrderTools(server) {
         const blocker = cancelBlocker(check.order);
         if (blocker) {
           const { message, ...details } = blocker;
-          throw toolError("PRECONDITION", message, details);
+          throw toolError("PRECONDITION", message, { details });
         }
 
         // Verified 2026-04 (shopify.dev/docs/api/admin-graphql/2026-04/mutations/orderCancel):
@@ -584,24 +597,31 @@ function registerOrderTools(server) {
           }
         `;
         const check = await shopifyGql(CHECK, { id: orderId });
-        if (!check.order) throw new Error(`Order ${args.order_id} not found.`);
+        if (!check.order) throw await orderNotFound(args.order_id);
         if (!check.order.refundable) {
-          throw new Error(
+          throw toolError(
+            "PRECONDITION",
             `Order ${check.order.name} is not refundable (already fully refunded or no ` +
               "eligible payment transactions).",
+            { details: { reason: "NOT_REFUNDABLE" } },
           );
         }
         if (args.transactions && args.transactions.length > 0) {
           const requested = args.transactions.reduce((sum, t) => sum + Number(t.amount), 0);
           const remaining = Number(check.order.netPaymentSet.shopMoney.amount);
           if (!Number.isFinite(requested) || requested <= 0) {
-            throw new Error(`Invalid refund transaction amounts (total ${requested}).`);
+            throw toolError(
+              "BAD_INPUT",
+              `Invalid refund transaction amounts (total ${requested}).`,
+            );
           }
           if (requested > remaining + 0.001) {
-            throw new Error(
+            throw toolError(
+              "PRECONDITION",
               `Refund of ${requested} exceeds the remaining refundable balance of ` +
                 `${remaining} ${check.order.netPaymentSet.shopMoney.currencyCode} for order ` +
                 `${check.order.name}. Use shopify_calculate_refund to get correct amounts.`,
+              { details: { reason: "EXCEEDS_REFUNDABLE", requested, remaining } },
             );
           }
         }
@@ -677,7 +697,12 @@ function registerOrderTools(server) {
         const existing = current.order.note || "";
         // A retried call must not add the same text twice.
         if (existing.trimEnd().endsWith(text)) {
-          return ok({ id: current.order.id, note: existing, appended: false, alreadyPresent: true });
+          return ok({
+            id: current.order.id,
+            note: existing,
+            appended: false,
+            alreadyPresent: true,
+          });
         }
         const note = existing.trim() ? `${existing.trimEnd()}\n\n${text}` : text;
 

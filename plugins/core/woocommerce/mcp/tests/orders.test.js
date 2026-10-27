@@ -315,7 +315,12 @@ describe("order tools", () => {
     const { calls } = mockFetch(orderRoutes(ORDER, shipped));
     const res = await server.call("woocommerce_cancel_order", { order_id: "12" });
     expect(res.isError).toBe(true);
-    expect(res.text).toMatch(/already has shipment tracking \(JD1\)/);
+    expect(res.error).toMatchObject({
+      code: "PRECONDITION",
+      retryable: false,
+      details: { reason: "ALREADY_SHIPPED", trackingNumbers: ["JD1"] },
+    });
+    expect(res.error.message).toMatch(/already has shipment tracking \(JD1\)/);
     expect(calls.some((c) => c.method === "PUT")).toBe(false);
 
     const { calls: calls2 } = mockFetch(orderRoutes(ORDER, shipped));
@@ -339,7 +344,8 @@ describe("order tools", () => {
     const { calls } = mockFetch(orderRoutes({ ...ORDER, status: "completed" }));
     const res = await server.call("woocommerce_cancel_order", { order_id: "12" });
     expect(res.isError).toBe(true);
-    expect(res.text).toMatch(/status "completed"/);
+    expect(res.error.code).toBe("PRECONDITION");
+    expect(res.error.message).toMatch(/status "completed"/);
     expect(calls.some((c) => c.method === "PUT")).toBe(false);
     mockFetch(orderRoutes({ ...ORDER, status: "cancelled" }));
     expect((await server.call("woocommerce_cancel_order", { order_id: "12" })).text).toMatch(

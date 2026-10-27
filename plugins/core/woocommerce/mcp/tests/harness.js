@@ -25,6 +25,8 @@ function createFakeServer() {
         isError: Boolean(res.isError),
         text,
         data: res.isError ? null : JSON.parse(text),
+        // Failed calls carry the shared `{ code, retryable, message, details? }` payload.
+        error: res.isError ? JSON.parse(text) : null,
       };
     },
   };

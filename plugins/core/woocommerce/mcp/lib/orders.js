@@ -10,7 +10,7 @@
  */
 
 const { wcApi, wcList, WooApiError } = require("./client");
-const { num, round2 } = require("./format");
+const { num, round2, toolError } = require("./format");
 
 /** Statuses under which nothing has left the warehouse yet. */
 const PRE_DISPATCH_STATUSES = new Set(["pending", "on-hold", "processing"]);
@@ -33,7 +33,8 @@ async function getOrderById(orderId) {
     return await wcApi("GET", `/orders/${encodeURIComponent(orderId)}`);
   } catch (err) {
     if (err instanceof WooApiError && err.status === 404) {
-      throw new Error(
+      throw toolError(
+        "NOT_FOUND",
         `Order ${orderId} not found. Find the order via woocommerce_find_customer (email) and use ` +
           "the id from recentOrders, or pass the number the customer sees as order_number.",
       );
@@ -48,9 +49,11 @@ async function getOrderById(orderId) {
  * number path verifies the match and falls back to a search.
  */
 async function resolveOrder({ order_id: orderId, order_number: orderNumber }) {
-  if (orderId && orderNumber) throw new Error("Pass either order_id or order_number, not both.");
+  if (orderId && orderNumber) {
+    throw toolError("BAD_INPUT", "Pass either order_id or order_number, not both.");
+  }
   if (orderId) return getOrderById(orderId);
-  if (!orderNumber) throw new Error("Pass order_id or order_number.");
+  if (!orderNumber) throw toolError("BAD_INPUT", "Pass order_id or order_number.");
 
   const wanted = String(orderNumber).replace(/^#/, "").trim();
   if (/^\d+$/.test(wanted)) {
@@ -64,7 +67,8 @@ async function resolveOrder({ order_id: orderId, order_number: orderNumber }) {
   const { items } = await wcList("/orders", { search: wanted, per_page: 10 });
   const match = items.find((o) => String(o.number) === wanted);
   if (!match) {
-    throw new Error(
+    throw toolError(
+      "NOT_FOUND",
       `No order with number ${wanted}. Ask the customer to check the number on their confirmation ` +
         "email, or look them up by email with woocommerce_find_customer.",
     );

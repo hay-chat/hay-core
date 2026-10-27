@@ -9,6 +9,7 @@ const { shopifyGql } = require("../lib/client");
 const {
   ok,
   fail,
+  toolError,
   unwrapConnection,
   pageInfo,
   toGid,
@@ -38,7 +39,7 @@ function registerCustomerTools(server) {
     async (args) => {
       try {
         if (!args.email && !args.phone) {
-          throw new Error("Provide an email and/or a phone number to search for.");
+          throw toolError("BAD_INPUT", "Provide an email and/or a phone number to search for.");
         }
         // Shopify search syntax: `email:` and `phone:` filters, uppercase OR.
         const parts = [];
@@ -148,7 +149,8 @@ function registerCustomerTools(server) {
         const data = await shopifyGql(query, { id: toGid("Customer", args.customerId) });
         const customer = data.customer;
         if (!customer) {
-          throw new Error(
+          throw toolError(
+            "NOT_FOUND",
             `Customer ${args.customerId} not found. If this id came from an order, it is an ` +
               "Order id, not a Customer id — get a valid customer id from shopify_find_customer " +
               "(email/phone).",

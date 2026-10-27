@@ -8,7 +8,7 @@
 
 const { z } = require("zod");
 const { wcList } = require("../lib/client");
-const { ok, fail } = require("../lib/format");
+const { ok, fail, toolError } = require("../lib/format");
 const { summarizeOrder } = require("../lib/orders");
 
 const sameEmail = (a, b) => String(a || "").toLowerCase() === String(b || "").toLowerCase();
@@ -44,8 +44,11 @@ function registerCustomerTools(server) {
     },
     async ({ email, phone }) => {
       try {
-        if (!email && !phone) throw new Error("Provide an email and/or a phone number.");
-        if (!email && !phoneKey(phone)) throw new Error(`"${phone}" is not a phone number.`);
+        if (!email && !phone)
+          throw toolError("BAD_INPUT", "Provide an email and/or a phone number.");
+        if (!email && !phoneKey(phone)) {
+          throw toolError("BAD_INPUT", `"${phone}" is not a phone number.`);
+        }
 
         const account = await findAccount(email);
 

@@ -8,7 +8,7 @@
 
 const { z } = require("zod");
 const { wcApi, wcList, WooApiError } = require("../lib/client");
-const { ok, fail } = require("../lib/format");
+const { ok, fail, toolError } = require("../lib/format");
 
 function summarizeProduct(p) {
   return {
@@ -69,7 +69,8 @@ function registerProductTools(server) {
           product = await wcApi("GET", `/products/${encodeURIComponent(productId)}`);
         } catch (err) {
           if (err instanceof WooApiError && err.status === 404) {
-            throw new Error(
+            throw toolError(
+              "NOT_FOUND",
               `Product ${productId} not found. Find the id with woocommerce_search_products.`,
             );
           }

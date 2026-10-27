@@ -12,6 +12,7 @@ const { shopifyGql } = require("../lib/client");
 const {
   ok,
   fail,
+  toolError,
   unwrapConnection,
   pageInfo,
   toGid,
@@ -60,7 +61,8 @@ function registerReturnTools(server) {
             id: orderId,
           });
           if (!probe.order) {
-            throw new Error(
+            throw toolError(
+              "NOT_FOUND",
               `Order ${args.order_id} not found. Get a valid order id from the recentOrders ` +
                 "field of shopify_find_customer / shopify_get_customer.",
             );
