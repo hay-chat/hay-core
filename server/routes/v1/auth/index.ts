@@ -56,7 +56,7 @@ async function getUserOrganizations(userId: string) {
     name: userOrg.organization.name,
     slug: userOrg.organization.slug,
     logo: userOrg.organization.logoUpload
-      ? storageService.getPublicUrl(userOrg.organization.logoUpload)
+      ? storageService.getUrl(userOrg.organization.logoUpload)
       : null,
     role: userOrg.role,
     permissions: userOrg.permissions,

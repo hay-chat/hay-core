@@ -226,30 +226,33 @@
           :key="attachment.id"
           class="chat-message__attachment"
         >
+          <span v-if="failedAttachments[attachment.id]" class="chat-message__attachment-error">
+            <AlertCircle class="chat-message__attachment-icon" />
+            {{ t("conversations.attachment.loadFailed") }}
+          </span>
           <img
-            v-if="attachment.type.startsWith('image/')"
-            :src="attachment.url"
+            v-else-if="attachment.type.startsWith('image/')"
+            :src="attachmentUrls[attachment.id]"
             :alt="attachment.name"
             class="chat-message__attachment-media"
           />
           <audio
             v-else-if="attachment.type.startsWith('audio/')"
-            :src="attachment.url"
+            :src="attachmentUrls[attachment.id]"
             controls
             class="chat-message__attachment-media"
           />
           <video
             v-else-if="attachment.type.startsWith('video/')"
-            :src="attachment.url"
+            :src="attachmentUrls[attachment.id]"
             controls
             class="chat-message__attachment-media"
           />
           <a
             v-else
-            :href="attachment.url"
-            target="_blank"
-            rel="noopener"
+            href="#"
             class="chat-message__attachment-file"
+            @click.prevent="openAttachment(attachment)"
           >
             <Paperclip class="chat-message__attachment-icon" />
             <span>{{ attachment.name }}</span>
@@ -551,6 +554,7 @@ import { markdownToHtml } from "@/utils/markdownToHtml";
 import { splitMarkdownImages } from "@/utils/splitMarkdownImages";
 import { formatRelativeTimeLong } from "@/utils/date";
 import { useNow } from "@/composables/useNow";
+import { resolveMediaUrl } from "@/composables/useMediaUrl";
 import { MessageStatus, type Message, MessageSentiment } from "@/types/message";
 import { useI18n } from "vue-i18n";
 
@@ -641,6 +645,44 @@ const providerErrorText = computed(() => {
   const text = error?.title ?? error?.message ?? error?.code;
   return text !== undefined && text !== "" ? String(text) : t("conversations.delivery.failed");
 });
+
+type MessageAttachment = NonNullable<Message["attachments"]>[number];
+
+// Attachments are private uploads: images, audio and video are fetched with the
+// session as soon as the message renders; other files only when clicked.
+const attachmentUrls = ref<Record<string, string>>({});
+const failedAttachments = ref<Record<string, boolean>>({});
+
+const isInlineMedia = (type: string): boolean => /^(image|audio|video)\//.test(type);
+
+watch(
+  () => props.message.attachments,
+  (attachments) => {
+    for (const attachment of attachments ?? []) {
+      if (!isInlineMedia(attachment.type) || attachmentUrls.value[attachment.id]) continue;
+      resolveMediaUrl(attachment)
+        .then((url) => {
+          attachmentUrls.value[attachment.id] = url;
+        })
+        .catch(() => {
+          failedAttachments.value[attachment.id] = true;
+        });
+    }
+  },
+  { immediate: true },
+);
+
+const openAttachment = async (attachment: MessageAttachment): Promise<void> => {
+  try {
+    const link = document.createElement("a");
+    link.href = await resolveMediaUrl(attachment);
+    link.download = attachment.name;
+    link.rel = "noopener";
+    link.click();
+  } catch {
+    failedAttachments.value[attachment.id] = true;
+  }
+};
 
 const formatFileSize = (bytes: number): string => {
   if (bytes < 1024) return `${bytes} B`;
@@ -996,6 +1038,14 @@ const getConfidenceIcon = (tier: string | undefined) => {
   gap: 0.375rem;
   font-size: 0.75rem;
   text-decoration: underline;
+}
+
+.chat-message__attachment-error {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  font-size: 0.75rem;
+  color: var(--color-red-600);
 }
 
 .chat-message__attachment-icon {

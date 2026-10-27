@@ -76,14 +76,14 @@ export class WebchatSettingsService {
       if (agent) {
         agentName = agent.name;
         if (agent.avatarUpload) {
-          agentAvatarUrl = storageService.getPublicUrl(agent.avatarUpload);
+          agentAvatarUrl = storageService.getUrl(agent.avatarUpload);
         }
       }
     }
 
     // Get organization logo URL
     const organizationLogoUrl = organization?.logoUpload
-      ? storageService.getPublicUrl(organization.logoUpload)
+      ? storageService.getUrl(organization.logoUpload)
       : null;
 
     return {

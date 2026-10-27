@@ -8,6 +8,7 @@ import { createContext } from "@server/trpc/context";
 import { initializeDatabase } from "@server/database/data-source";
 import { createLogger } from "@server/lib/logger";
 import { initTelemetry, captureException, shutdownTelemetry } from "@server/lib/telemetry";
+import { isPublicUploadPath } from "@server/services/media-url.service";
 import "reflect-metadata";
 import "dotenv/config";
 
@@ -166,8 +167,10 @@ async function startServer() {
   if (!require("fs").existsSync(uploadDir)) {
     require("fs").mkdirSync(uploadDir, { recursive: true });
   }
+  // Only public folders (logos, avatars, document images); private files go through /v1/media.
   server.use(
     "/uploads",
+    (req, res, next) => (isPublicUploadPath(req.path) ? next() : res.status(404).end()),
     express.static(uploadDir, {
       maxAge: "7d",
       etag: true,
@@ -443,6 +446,10 @@ async function startServer() {
   // Plugin API routes - secure HTTP endpoints for plugins to call back to the server
   const pluginAPIRouter = await import("@server/routes/v1/plugin-api/index");
   server.use("/v1/plugin-api", pluginAPIRouter.default);
+
+  // Private uploads (conversation media): staff session or signed URL
+  const mediaRouter = await import("@server/routes/v1/media/index");
+  server.use("/v1/media", mediaRouter.default);
 
   // Create dynamic router with plugin routes (after plugins are loaded)
   const { createV1Router } = await import("@server/routes/v1");

@@ -5,6 +5,9 @@
       "failed": "Delivery failed",
       "windowExpired": "Outside the 24-hour window — the customer must message first"
     },
+    "attachment": {
+      "loadFailed": "Couldn't load this attachment"
+    },
     "page": {
       "title": "Conversations",
       "description": "Monitor and manage all customer conversations",
