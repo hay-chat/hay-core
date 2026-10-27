@@ -998,6 +998,7 @@ import {
   Clock,
   Send,
   AlertTriangle,
+  Hourglass,
   AlertCircle,
   Circle,
   CheckCircle,
@@ -1512,6 +1513,7 @@ const getStatusVariant = (
   const variants: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
     open: "default",
     "pending-human": "destructive",
+    "awaiting-approval": "outline",
     resolved: "secondary",
     unresolved: "outline",
     processing: "outline",
@@ -1525,6 +1527,7 @@ const getStatusIcon = (status: string | undefined) => {
   const icons = {
     open: Circle,
     "pending-human": AlertTriangle,
+    "awaiting-approval": Hourglass,
     resolved: CheckCircle,
     unresolved: XCircle,
     active: Circle,
@@ -1540,6 +1543,7 @@ const formatStatus = (status: string | undefined) => {
     open: "conversations.status.open",
     processing: "conversations.status.processing",
     "pending-human": "conversations.status.pendingHuman",
+    "awaiting-approval": "conversations.status.awaitingApproval",
     "human-took-over": "conversations.status.humanTookOver",
     resolved: "conversations.status.resolved",
     unresolved: "conversations.status.unresolved",

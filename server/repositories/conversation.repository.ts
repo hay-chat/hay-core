@@ -495,7 +495,7 @@ export class ConversationRepository extends BaseRepository<Conversation> {
       .andWhere("conversation.channel = :channel", { channel })
       .andWhere("conversation.organization_id = :organizationId", { organizationId })
       .andWhere("conversation.status IN (:...statuses)", {
-        statuses: ["open", "processing", "pending-human", "human-took-over"],
+        statuses: ["open", "processing", "pending-human", "awaiting-approval", "human-took-over"],
       })
       .andWhere("conversation.deleted_at IS NULL")
       .orderBy("conversation.created_at", "DESC")

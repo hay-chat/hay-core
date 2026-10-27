@@ -78,6 +78,7 @@ const createConversationSchema = z.object({
       "open",
       "processing",
       "pending-human",
+      "awaiting-approval",
       "human-took-over",
       "resolved",
       "unresolved",
@@ -95,6 +96,7 @@ const updateConversationSchema = z.object({
       "open",
       "processing",
       "pending-human",
+      "awaiting-approval",
       "human-took-over",
       "resolved",
       "unresolved",
@@ -188,7 +190,13 @@ export const conversationsRouter = t.router({
       throw new TRPCError({ code: "UNAUTHORIZED", message: "Organization context required" });
     }
 
-    const statuses = ["open", "processing", "pending-human", "human-took-over"];
+    const statuses = [
+      "open",
+      "processing",
+      "pending-human",
+      "awaiting-approval",
+      "human-took-over",
+    ];
 
     const rows = await AppDataSource.query(
       `

@@ -62,6 +62,7 @@
       "open": "Open",
       "processing": "Processing",
       "pendingHuman": "Needs Attention",
+      "awaitingApproval": "Awaiting Approval",
       "humanTookOver": "Manual Control",
       "resolved": "Resolved",
       "unresolved": "Unresolved",
@@ -224,6 +225,8 @@
       "failed": "Failed",
       "running": "Running",
       "simulated": "Simulated",
+      "pendingApproval": "Awaiting approval",
+      "rejected": "Declined",
       "unknown": "Unknown"
     }
   }

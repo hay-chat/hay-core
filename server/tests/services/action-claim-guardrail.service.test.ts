@@ -108,6 +108,7 @@ describe("ActionClaimGuardrailService.assessActionClaim", () => {
         toolsCalledThisTurn: [
           { name: "shopify_cancel_order", success: false },
           { name: "shopify_get_order_by_name", success: true },
+          { name: "shopify_create_refund", success: false, pending: true },
         ],
       }),
     );
@@ -115,6 +116,7 @@ describe("ActionClaimGuardrailService.assessActionClaim", () => {
     const vars = getPrompt.mock.calls[0][1];
     expect(vars.toolLedger).toContain("shopify_cancel_order — FAILED");
     expect(vars.toolLedger).toContain("shopify_get_order_by_name — SUCCESS");
+    expect(vars.toolLedger).toContain("shopify_create_refund — PENDING_APPROVAL");
   });
 
   it("reports an empty ledger explicitly in the prompt", async () => {

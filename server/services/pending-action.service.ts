@@ -121,11 +121,24 @@ export class PendingActionService {
   }
 
   /** Was this exact tool already declined in this conversation? */
-  async wasRejected(conversationId: string, toolName: string): Promise<boolean> {
-    const count = await this.repo.count({
-      where: { conversation_id: conversationId, tool_name: toolName, status: "rejected" },
-    });
-    return count > 0;
+  /**
+   * The latest request in this conversation for the same tool with the same
+   * args that is still waiting or was turned down, if any. Lets the gate
+   * answer a repeated call without opening a second request.
+   */
+  async findEarlierRequest(
+    conversationId: string,
+    toolName: string,
+    args: Record<string, unknown>,
+  ): Promise<PendingAction | null> {
+    return this.repo
+      .createQueryBuilder("pa")
+      .where("pa.conversation_id = :conversationId", { conversationId })
+      .andWhere("pa.tool_name = :toolName", { toolName })
+      .andWhere("pa.status IN (:...statuses)", { statuses: ["pending", "rejected"] })
+      .andWhere("pa.args = CAST(:args AS jsonb)", { args: JSON.stringify(args) })
+      .orderBy("pa.created_at", "DESC")
+      .getOne();
   }
 
   /**

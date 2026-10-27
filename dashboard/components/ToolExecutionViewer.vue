@@ -79,6 +79,7 @@ import {
   CalendarClock,
   AlertCircle,
   FlaskConical,
+  Hourglass,
 } from "lucide-vue-next";
 
 const { t } = useI18n();
@@ -189,7 +190,10 @@ const statusVariant = computed(() => {
     case "RUNNING":
       return "tool";
     case "SIMULATED":
+    case "PENDING_APPROVAL":
       return "secondary";
+    case "REJECTED":
+      return "destructive";
     default:
       return "outline";
   }
@@ -205,6 +209,10 @@ const statusIcon = computed(() => {
       return Loader2;
     case "SIMULATED":
       return FlaskConical;
+    case "PENDING_APPROVAL":
+      return Hourglass;
+    case "REJECTED":
+      return XCircle;
     default:
       return AlertCircle;
   }
@@ -220,6 +228,10 @@ const statusText = computed(() => {
       return t("conversations.toolStatus.running");
     case "SIMULATED":
       return t("conversations.toolStatus.simulated");
+    case "PENDING_APPROVAL":
+      return t("conversations.toolStatus.pendingApproval");
+    case "REJECTED":
+      return t("conversations.toolStatus.rejected");
     default:
       return t("conversations.toolStatus.unknown");
   }

@@ -147,6 +147,8 @@ export class Message {
     toolErrorCode?: string;
     toolStatus?: string;
     toolExecutedAt?: string;
+    /** The pending action this call opened or answered from (D4-4). */
+    pendingActionId?: string;
     // Playbook & Document metadata
     isPlaybook?: boolean;
     playbookId?: string;

@@ -694,7 +694,14 @@ export const pluginApiTrpcRouter = router({
       z.object({
         channel: z.string().min(1).max(64),
         externalConversationId: z.string().min(1),
-        status: z.enum(["open", "pending-human", "human-took-over", "resolved", "closed"]),
+        status: z.enum([
+          "open",
+          "pending-human",
+          "awaiting-approval",
+          "human-took-over",
+          "resolved",
+          "closed",
+        ]),
       }),
     )
     .mutation(async ({ input, ctx }) => {
