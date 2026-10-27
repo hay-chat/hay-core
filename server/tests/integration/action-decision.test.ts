@@ -99,7 +99,6 @@ describe("action decisions (D4-5)", () => {
   afterAll(async () => {
     await AppDataSource.getRepository(PendingAction).delete({ organization_id: orgId });
     await AppDataSource.getRepository(Conversation).delete({ organization_id: orgId });
-    await AppDataSource.destroy();
   });
 
   it("approve: runs once with the stored key, marks executed, resumes the AI", async () => {
@@ -203,5 +202,93 @@ describe("action decisions (D4-5)", () => {
     expect(mockExecuteApproved).toHaveBeenCalledTimes(1);
     expect(await statusOf(conversation.id)).toBe("human-took-over");
     expect(mockEnqueue).not.toHaveBeenCalled();
+  });
+});
+
+describe("action expiry (D4-8)", () => {
+  beforeAll(async () => {
+    if (!AppDataSource.isInitialized) await AppDataSource.initialize();
+  });
+
+  beforeEach(() => {
+    mockExecuteApproved.mockReset();
+    mockEnqueue.mockReset();
+  });
+
+  afterAll(async () => {
+    await AppDataSource.getRepository(PendingAction).delete({ organization_id: orgId });
+    await AppDataSource.getRepository(Conversation).delete({ organization_id: orgId });
+    await AppDataSource.destroy();
+  });
+
+  async function holdPastDeadline(conversationId: string, messageId?: string) {
+    const action = await pendingActionService.hold({
+      organizationId: orgId,
+      conversationId,
+      messageId,
+      pluginId: "shop",
+      toolName: "shop:create_refund",
+      category: "refund",
+      args: { order_id: "2002", amount: "10.00" },
+      amount: 10,
+      holdReason: "money_move",
+      expiryHours: 48,
+    });
+    await AppDataSource.getRepository(PendingAction).update(action.id, {
+      expires_at: new Date(Date.now() - 60_000),
+    });
+    return action;
+  }
+
+  function messagesOf(conversationId: string, type: MessageType) {
+    return AppDataSource.getRepository(Message).find({
+      where: { conversation_id: conversationId, type },
+    });
+  }
+
+  it("expires without running, tells the shopper in their language, hands off once", async () => {
+    const conversation = await newConversation();
+    await AppDataSource.getRepository(Conversation).update(conversation.id, { language: "pt-BR" });
+    const tool = await AppDataSource.getRepository(Message).save(
+      AppDataSource.getRepository(Message).create({
+        conversation_id: conversation.id,
+        type: MessageType.TOOL,
+        content: "Awaiting approval: shop:create_refund",
+        metadata: { toolStatus: "PENDING_APPROVAL" },
+      }),
+    );
+    const action = await holdPastDeadline(conversation.id, tool.id);
+
+    expect(await actionDecisionService.expireDue()).toBeGreaterThanOrEqual(1);
+    await actionDecisionService.expireDue(); // a second run changes nothing
+
+    expect(await pendingActionService.findById(action.id, orgId)).toMatchObject({
+      status: "expired",
+    });
+    expect(mockExecuteApproved).not.toHaveBeenCalled();
+    expect(mockEnqueue).not.toHaveBeenCalled();
+    expect(await statusOf(conversation.id)).toBe("pending-human");
+
+    const shopper = await messagesOf(conversation.id, MessageType.BOT_AGENT);
+    expect(shopper).toHaveLength(1);
+    expect(shopper[0].content).toContain("não foi feita");
+    const updatedTool = await AppDataSource.getRepository(Message).findOneBy({ id: tool.id });
+    expect(updatedTool?.metadata?.toolStatus).toBe("EXPIRED");
+    expect(await pendingActionService.approve(action.id, orgId, userId)).toMatchObject({
+      transitioned: false,
+    });
+  });
+
+  it("leaves a conversation a human took over alone", async () => {
+    const conversation = await newConversation("human-took-over");
+    const action = await holdPastDeadline(conversation.id);
+
+    await actionDecisionService.expireDue();
+
+    expect(await pendingActionService.findById(action.id, orgId)).toMatchObject({
+      status: "expired",
+    });
+    expect(await statusOf(conversation.id)).toBe("human-took-over");
+    expect(await messagesOf(conversation.id, MessageType.BOT_AGENT)).toHaveLength(0);
   });
 });

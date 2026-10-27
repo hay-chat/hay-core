@@ -7,6 +7,9 @@
  * - Reject: one AI turn explains, using the reason.
  * - Reply myself: the action is closed as handled by the team and the
  *   conversation goes to the Needs Attention queue; no AI turn.
+ * - No decision before the deadline (D4-8): the action expires (it is never
+ *   approved automatically), the shopper is told it was not done and the
+ *   conversation goes to the Needs Attention queue.
  *
  * The AI turn is driven by a system note (never shown to the shopper) plus
  * the `approval_decided` orchestrator trigger.
@@ -19,6 +22,8 @@ import { pendingActionService } from "./pending-action.service";
 import { ToolExecutionService } from "./core/tool-execution.service";
 import { MessageService } from "./core/message.service";
 import { createLogger } from "@server/lib/logger";
+import { handoffCopy } from "@server/orchestrator/handoff-copy";
+import { getAiReplyBlocker } from "@server/orchestrator/reply-guard";
 
 const logger = createLogger("action-decision");
 
@@ -83,7 +88,10 @@ export class ActionDecisionService {
     const conversation = await conversationRepository.findById(action.conversation_id);
     if (!conversation || conversation.organization_id !== organizationId) return decision;
 
-    await this.markToolMessage(action, `Request declined: ${action.tool_name}`, "REJECTED");
+    await this.markToolMessage(action, `Request declined: ${action.tool_name}`, "REJECTED", {
+      status: "rejected",
+      reason: action.decision_note,
+    });
     const why = reason?.trim() ? ` The reason given: "${reason.trim()}".` : " No reason was given.";
     const note =
       `A team member DECLINED the action ${action.tool_name}. It was NOT done.${why} ` +
@@ -104,7 +112,10 @@ export class ActionDecisionService {
     const { action } = decision;
     if (!action || !decision.transitioned) return decision;
 
-    await this.markToolMessage(action, `Handed to the team: ${action.tool_name}`, "REJECTED");
+    await this.markToolMessage(action, `Handed to the team: ${action.tool_name}`, "REJECTED", {
+      status: "rejected",
+      reason: action.decision_note,
+    });
     const conversation = await conversationRepository.findById(action.conversation_id);
     if (conversation && conversation.status === "awaiting-approval") {
       await conversationRepository.update(conversation.id, organizationId, {
@@ -159,21 +170,84 @@ export class ActionDecisionService {
     }
   }
 
+  /**
+   * Expire every action past its deadline (scheduled job). Never approves.
+   * Returns how many actions expired.
+   */
+  async expireDue(now: Date = new Date()): Promise<number> {
+    const expired = await pendingActionService.expireDue(now);
+    const byConversation = new Map<string, PendingAction>();
+    for (const action of expired) {
+      await this.markToolMessage(action, `Request expired: ${action.tool_name}`, "EXPIRED", {
+        status: "expired",
+      });
+      byConversation.set(action.conversation_id, action);
+    }
+    for (const action of byConversation.values()) {
+      try {
+        await this.handOffExpired(action);
+      } catch (err) {
+        logger.error(
+          { err, conversationId: action.conversation_id },
+          "Could not hand off after expiry",
+        );
+      }
+    }
+    return expired.length;
+  }
+
+  /**
+   * Once nothing else is waiting, move the conversation to the team's queue and
+   * tell the shopper the change was not made. A conversation that already left
+   * the awaiting state (closed, taken over) is left alone.
+   */
+  private async handOffExpired(action: PendingAction): Promise<void> {
+    const conversation = await conversationRepository.findById(action.conversation_id);
+    if (!conversation || conversation.status !== "awaiting-approval") return;
+    if (await pendingActionService.hasPending(conversation.id)) return;
+
+    await conversationRepository.update(conversation.id, conversation.organization_id, {
+      status: "pending-human",
+    });
+    conversation.status = "pending-human";
+
+    await conversation.addMessage({
+      content:
+        `The approval request for ${action.tool_name} expired without a decision. ` +
+        `It was NOT done. The conversation was passed to the team.`,
+      type: MessageType.SYSTEM,
+      metadata: { pendingActionId: action.id, isApprovalDecision: true },
+    });
+
+    // A paused agent stays silent, same as any other hand-off.
+    if (getAiReplyBlocker(conversation)) return;
+    await conversation.addMessage({
+      content: handoffCopy(
+        "approvalExpired",
+        conversation.language,
+        conversation.organization?.defaultLanguage,
+      ),
+      type: MessageType.BOT_AGENT,
+      metadata: {
+        pendingActionId: action.id,
+        isEscalation: true,
+        escalationReason: "approval_expired",
+      },
+    });
+  }
+
   private async markToolMessage(
     action: PendingAction,
     content: string,
     toolStatus: string,
+    toolOutput: Record<string, unknown>,
   ): Promise<void> {
     if (!action.message_id) return;
     const message = await this.messages.messageRepository.findById(action.message_id);
     if (!message) return;
     await this.messages.messageRepository.update(action.message_id, {
       content,
-      metadata: {
-        ...message.metadata,
-        toolStatus,
-        toolOutput: { status: "rejected", reason: action.decision_note },
-      },
+      metadata: { ...message.metadata, toolStatus, toolOutput },
     });
   }
 }

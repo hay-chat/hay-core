@@ -74,6 +74,7 @@ import {
   ChevronUp,
   CheckCircle,
   XCircle,
+  TimerOff,
   Clock,
   Loader2,
   CalendarClock,
@@ -193,6 +194,7 @@ const statusVariant = computed(() => {
     case "PENDING_APPROVAL":
       return "secondary";
     case "REJECTED":
+    case "EXPIRED":
       return "destructive";
     default:
       return "outline";
@@ -213,6 +215,8 @@ const statusIcon = computed(() => {
       return Hourglass;
     case "REJECTED":
       return XCircle;
+    case "EXPIRED":
+      return TimerOff;
     default:
       return AlertCircle;
   }
@@ -232,6 +236,8 @@ const statusText = computed(() => {
       return t("conversations.toolStatus.pendingApproval");
     case "REJECTED":
       return t("conversations.toolStatus.rejected");
+    case "EXPIRED":
+      return t("conversations.toolStatus.expired");
     default:
       return t("conversations.toolStatus.unknown");
   }

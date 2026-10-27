@@ -227,6 +227,7 @@
       "simulated": "Simulada",
       "pendingApproval": "Aguardando aprovação",
       "rejected": "Recusada",
+      "expired": "Expirada, não executada",
       "unknown": "Desconhecido"
     },
     "pendingAction": {
