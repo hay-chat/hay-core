@@ -228,6 +228,22 @@
       "pendingApproval": "Awaiting approval",
       "rejected": "Declined",
       "unknown": "Unknown"
+    },
+    "pendingAction": {
+      "title": "Hay.chat wants to take this action",
+      "description": "It has not run. Approve to run it now, or decline and the AI will tell the customer.",
+      "approve": "Approve",
+      "reject": "Decline",
+      "confirmReject": "Decline action",
+      "reasonLabel": "Reason (optional)",
+      "reasonPlaceholder": "Shared with the AI so it can explain to the customer",
+      "replyMyself": "I'll reply myself",
+      "failed": "Could not save your decision",
+      "done": {
+        "approve": "Approved",
+        "reject": "Declined",
+        "reply": "You are now handling this conversation"
+      }
     }
   }
 }

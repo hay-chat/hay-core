@@ -42,6 +42,7 @@ export interface Message {
     toolOutput?: Record<string, unknown> | string | number | boolean | null;
     toolLatencyMs?: number;
     toolStatus?: string;
+    pendingActionId?: string;
     toolExecutedAt?: string;
     // Playbook & Document metadata
     isPlaybook?: boolean;
