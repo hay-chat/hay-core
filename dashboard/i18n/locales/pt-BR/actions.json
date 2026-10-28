@@ -9,6 +9,7 @@
       "address_change": "Alterações de endereço",
       "customer_update": "Alterações nos dados do cliente",
       "note": "Notas no pedido e reenvio de e-mails",
+      "destructive": "Exclusões e mudanças de configuração",
       "other_write": "Outras ações"
     },
     "settings": {
@@ -22,7 +23,7 @@
         "masterOffHint": "A aprovação está desligada. O Hay.chat executa todas as ações na hora, exceto as que um playbook pede para aprovar.",
         "categoriesLabel": "Precisa de aprovação",
         "moneyBadge": "Dinheiro",
-        "unclassifiedNote": "Ações de integrações que não informam o que fazem sempre precisam de aprovação enquanto a aprovação estiver ligada."
+        "unclassifiedNote": "Exclusões, mudanças de configuração e ações de integrações que não informam o que fazem sempre precisam de aprovação enquanto a aprovação estiver ligada."
       },
       "threshold": {
         "label": "Aprovar automaticamente reembolsos e descontos até",

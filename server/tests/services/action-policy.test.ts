@@ -58,6 +58,18 @@ describe("decideGate", () => {
     });
   });
 
+  it("always holds destructive writes, whatever the category settings say", () => {
+    expect(decideGate(risk("destructive"), { id: "1" }, ON)).toEqual({
+      kind: "hold",
+      reason: "destructive_write",
+      amount: null,
+    });
+    const allOff = { ...ON, categories: { refund: false, note: false } };
+    expect(decideGate(risk("destructive"), {}, allOff).kind).toBe("hold");
+    const off = { moneyMovesNeedApproval: false, thresholdAmount: 0 };
+    expect(decideGate(risk("destructive"), {}, off)).toEqual({ kind: "allow" });
+  });
+
   it("lets other classified writes run", () => {
     for (const category of ["address_change", "note", "return", "customer_update"]) {
       expect(decideGate(risk(category), {}, ON)).toEqual({ kind: "allow" });

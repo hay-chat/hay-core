@@ -10,6 +10,7 @@
  *  - with the org's approval off (`moneyMovesNeedApproval` false), every other
  *    call runs;
  *  - tools that do not declare a risk class are held (they may move money);
+ *  - destructive writes (deletes, account configuration) are always held;
  *  - a category the org does not require approval for runs (by default only
  *    money moves - refund, cancel, discount, exchange - require it);
  *  - a tool that enforces its own cap (capEnforced) runs: within the cap it
@@ -22,13 +23,23 @@ import type {
   ActionApprovalConfig,
   ApprovalCategory,
 } from "@server/types/organization-settings.types";
-import { MONEY_CATEGORIES, type ToolRisk, type WriteCategory } from "./tool-risk";
+import {
+  DESTRUCTIVE_CATEGORY,
+  MONEY_CATEGORIES,
+  type ToolRisk,
+  type WriteCategory,
+} from "./tool-risk";
 
 export type GateDecision =
   | { kind: "allow" }
   | {
       kind: "hold";
-      reason: "money_move" | "category_policy" | "playbook_policy" | "unclassified_write";
+      reason:
+        | "money_move"
+        | "category_policy"
+        | "playbook_policy"
+        | "unclassified_write"
+        | "destructive_write";
       amount: number | null;
     };
 
@@ -87,6 +98,10 @@ export function decideGate(
 
   if (!risk.classified) {
     return { kind: "hold", reason: "unclassified_write", amount: extractAmount(args) };
+  }
+
+  if (risk.category === DESTRUCTIVE_CATEGORY) {
+    return { kind: "hold", reason: "destructive_write", amount: extractAmount(args) };
   }
 
   if (!categoryNeedsApproval(config, risk.category) || risk.capEnforced) {
