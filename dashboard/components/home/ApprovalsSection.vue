@@ -261,6 +261,7 @@ interface GraduationSuggestion {
   approved: number;
   total: number;
   amount: number;
+  currency: string;
 }
 const DISMISS_KEY = "hay-approvals-graduation-dismissed";
 const userStore = useUserStore();
@@ -275,7 +276,7 @@ const showNudge = computed(
   () => userStore.isOwner && !!suggestion.value && dismissed.value !== suggestionKey.value,
 );
 const suggestedAmount = computed(() =>
-  suggestion.value ? formatAmount(suggestion.value.amount, null) : "",
+  suggestion.value ? formatAmount(suggestion.value.amount, suggestion.value.currency) : "",
 );
 const nudgeMessage = computed(() => {
   if (!suggestion.value) return "";

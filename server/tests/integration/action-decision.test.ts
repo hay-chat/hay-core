@@ -49,14 +49,14 @@ async function newConversation(status: Conversation["status"] = "awaiting-approv
   );
 }
 
-function hold(conversationId: string) {
+function hold(conversationId: string, extraArgs: Record<string, unknown> = {}) {
   return pendingActionService.hold({
     organizationId: orgId,
     conversationId,
     pluginId: "shop",
     toolName: "shop:create_refund",
     category: "refund",
-    args: { order_id: "1001", amount: "25.00" },
+    args: { order_id: "1001", amount: "25.00", ...extraArgs },
     amount: 25,
     holdReason: "money_move",
     expiryHours: 48,
@@ -308,15 +308,16 @@ describe("approve with a lowered amount, bulk approve and the Approvals list (D4
 
   it("runs the lowered amount and tells the AI about it", async () => {
     const conversation = await newConversation();
-    const action = await hold(conversation.id);
+    const action = await hold(conversation.id, { currency: "BRL" });
 
     const result = await actionDecisionService.approve(action.id, orgId, decider, 10);
 
     expect(result.transitioned).toBe(true);
+    const lowered = { order_id: "1001", amount: "10.00", currency: "BRL" };
     const [, executed] = mockExecuteApproved.mock.calls[0] as [unknown, PendingAction];
-    expect(executed.args).toEqual({ order_id: "1001", amount: "10.00" });
+    expect(executed.args).toEqual(lowered);
     const stored = await pendingActionService.findById(action.id, orgId);
-    expect(stored).toMatchObject({ amount: 10, args: { order_id: "1001", amount: "10.00" } });
+    expect(stored).toMatchObject({ amount: 10, args: lowered });
     const notes = await systemNotes(conversation.id);
     expect(notes[0].content).toContain("lowered the amount from 25 to 10");
   });
@@ -349,7 +350,8 @@ describe("approve with a lowered amount, bulk approve and the Approvals list (D4
 
   it("lists pending actions with the conversation title and whether the amount can change", async () => {
     const conversation = await newConversation();
-    const action = await hold(conversation.id);
+    const action = await hold(conversation.id, { currency: "brl" });
+    const noCurrency = await hold(conversation.id);
 
     const items = await pendingActionService.listApprovals(orgId);
     const item = items.find((i) => i.id === action.id);
@@ -358,6 +360,11 @@ describe("approve with a lowered amount, bulk approve and the Approvals list (D4
       conversationTitle: "decision",
       customerName: null,
       amountEditable: true,
+      currency: "BRL",
+    });
+    // Without a currency the amount's unit is unknown: approve as it is.
+    expect(items.find((i) => i.id === noCurrency.id)).toMatchObject({
+      amountEditable: false,
       currency: null,
     });
   });
