@@ -38,6 +38,11 @@
       "notFound": "Agente não encontrado",
       "loadFailed": "Falha ao carregar o agente",
       "loadListFailed": "Falha ao carregar os agentes"
+    },
+    "sharedChannel": {
+      "description": "Escolha os canais que este agente atende. Um canal pode ser atribuído a mais de um agente; nesse caso responde o agente padrão, se for um deles, senão o agente ativo mais antigo.",
+      "note": "{channel} também está atribuído a {agents}. Quem responde lá é {responder}: o agente padrão, se for um deles, senão o mais antigo.",
+      "noResponder": "ninguém"
     }
   }
 }

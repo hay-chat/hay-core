@@ -386,6 +386,39 @@ async function parkForPausedAgent(
   }
 }
 
+async function isChannelAiOff(conversation: Conversation): Promise<boolean> {
+  const { resolveChannelAiMode } = await import("@server/types/organization-settings.types");
+  if (resolveChannelAiMode(conversation.organization?.settings, conversation.channel) !== "off") {
+    return false;
+  }
+  const { isTestConversation } =
+    await import("@server/services/close-classification/outcome-rules");
+  return !isTestConversation(conversation.metadata);
+}
+
+/**
+ * Leave the conversation to the team without a word to the shopper: clear
+ * needs_processing so the sweep stops re-enqueuing it, and queue an open
+ * conversation as pending-human so it shows up in Needs Attention.
+ */
+async function parkForTeam(conversation: Conversation, log: pino.Logger): Promise<void> {
+  log.debug({ channel: conversation.channel }, "Skipping - AI is off on this channel");
+  if (!conversation.needs_processing) return;
+  const queue = conversation.status === "open";
+  await conversationRepository.update(conversation.id, conversation.organization_id, {
+    needs_processing: false,
+    ...(queue ? { status: "pending-human" as const } : {}),
+  });
+  if (queue) {
+    await publishStatusChange(
+      conversation.organization_id,
+      conversation.id,
+      "pending-human",
+      conversation.title,
+    );
+  }
+}
+
 export const runConversation = async (conversationId: string) => {
   // Note: findById is used here because this is called from the internal message queue
   // with trusted conversation IDs (not user input). We validate org context below.
@@ -470,6 +503,13 @@ export const runConversation = async (conversationId: string) => {
   }
   if (conversation.agent && !conversation.agent.enabled) {
     await parkForPausedAgent(conversation, log, "agent_disabled");
+    return;
+  }
+
+  // AI switched off on this channel (D7-14, "start on Web Chat only"): the
+  // team answers. No notice to the shopper; test conversations still run.
+  if (await isChannelAiOff(conversation)) {
+    await parkForTeam(conversation, log);
     return;
   }
 

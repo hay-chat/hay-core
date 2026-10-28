@@ -38,6 +38,11 @@
       "notFound": "Agent not found",
       "loadFailed": "Failed to load agent",
       "loadListFailed": "Failed to load agents"
+    },
+    "sharedChannel": {
+      "description": "Choose which channels this agent handles. A channel can be assigned to more than one agent; then the default agent answers if it is one of them, otherwise the oldest enabled agent.",
+      "note": "{channel} is also assigned to {agents}. {responder} answers there: the default agent if it is one of them, otherwise the oldest.",
+      "noResponder": "nobody"
     }
   }
 }

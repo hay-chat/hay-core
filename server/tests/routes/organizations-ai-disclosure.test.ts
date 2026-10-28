@@ -81,7 +81,7 @@ describe("AI disclosure label", () => {
       label: null,
       hiddenChannels: [],
       locked: false,
-      draftsChannels: [],
+      channelAiModes: {},
     });
     expect(isAiLabelShown(US_ORG as never, "web")).toBe(true);
   });
@@ -123,33 +123,41 @@ describe("AI disclosure label", () => {
     await expect(caller().updateAiDisclosure({ hiddenChannels: ["../web"] })).rejects.toThrow();
   });
 
-  it("switches channels to drafts only and back (D14-7)", async () => {
-    await caller().updateAiDisclosure({ draftsChannels: ["whatsapp", "email"] });
+  it("sets channels to drafts only or off, and back (D14-7, D7-14)", async () => {
+    await caller().updateAiDisclosure({
+      channelAiModes: { whatsapp: "drafts", email: "off", web: "on" },
+    });
     expect(mockUpdate).toHaveBeenLastCalledWith(ORG_ID, {
       settings: expect.objectContaining({
         retentionDays: 30,
-        channelAiModes: { whatsapp: "drafts", email: "drafts" },
+        channelAiModes: { whatsapp: "drafts", email: "off" },
       }),
     });
 
     mockFindOne.mockResolvedValue({
       ...US_ORG,
-      settings: { channelAiModes: { whatsapp: "drafts", web: "on" } },
+      settings: { channelAiModes: { whatsapp: "drafts", email: "off", web: "on" } },
     });
     await expect(caller().getAiDisclosure()).resolves.toMatchObject({
-      draftsChannels: ["whatsapp"],
+      channelAiModes: { whatsapp: "drafts", email: "off" },
     });
 
     // Saving only the label leaves the channel modes alone.
     await caller().updateAiDisclosure({ label: "Aurora bot" });
     expect(mockUpdate).toHaveBeenLastCalledWith(ORG_ID, {
-      settings: expect.objectContaining({ channelAiModes: { whatsapp: "drafts", web: "on" } }),
+      settings: expect.objectContaining({
+        channelAiModes: { whatsapp: "drafts", email: "off", web: "on" },
+      }),
     });
 
-    await caller().updateAiDisclosure({ draftsChannels: [] });
+    await caller().updateAiDisclosure({ channelAiModes: {} });
     expect(mockUpdate).toHaveBeenLastCalledWith(ORG_ID, {
       settings: expect.objectContaining({ channelAiModes: {} }),
     });
+
+    await expect(
+      caller().updateAiDisclosure({ channelAiModes: { web: "paused" as never } }),
+    ).rejects.toThrow();
   });
 
   it("sends the label to the widget", async () => {
