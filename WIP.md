@@ -1,3 +1,8 @@
+## 2026-10-28 — claude/w3-perf (L6)
+- Done: D12-9 `webchat/scripts/check-perf.mjs` (brotli-q5 budgets loader 10 KB / chat 48 KB / locale 2 KB + jsdom check: 0 requests before interaction in "interaction" mode), new CI job "Webchat Tests & Perf Budget", optional `scripts/perf/lighthouse.mjs`.
+- D12-10 in hay-website: /widget-performance/ page, draft PR hay-chat/hay-website#47 (branch claude/w3-perf-page).
+- Next: orchestrator merges claude/w3-perf; re-measure Hay.chat in prod after compression + loader deploy, update the page; separate ticket for hay.chat's own 3.8 s FCP.
+
 ## 2026-10-28 08:40 — staging — W3 L7b merged, hand-tested
 - Merged claude/w3-golive-b (0528417); migrations 1785850000000/1785851000000/1785852000000 on hay_staging. Fix 27c9561 (risky bucket red only when non-empty).
 - Hand test: Tests page replay → report (1 same answer, judge reason), Save as test case, readiness card copy (replies only), Start on Web Chat only saved channelAiModes. Test agent deleted + channel modes reset afterwards.
