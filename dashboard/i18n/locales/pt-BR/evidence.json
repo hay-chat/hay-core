@@ -55,7 +55,7 @@
     },
     "disputes": {
       "title": "Contestações de pagamento",
-      "description": "Contestações (chargebacks) informadas pelas suas plataformas de pagamento conectadas. Anexe o pacote de evidências como rascunho e depois revise e envie na plataforma.",
+      "description": "Contestações (chargebacks) informadas pelas suas plataformas de pagamento conectadas. Anexe o pacote de evidências e revise-o na plataforma antes do prazo.",
       "order": "Pedido {order}",
       "noOrderLabel": "Pedido desconhecido",
       "status": {
@@ -65,18 +65,18 @@
         "lost": "Perdida",
         "closed": "Encerrada"
       },
-      "drafted": "Evidências anexadas como rascunho",
+      "drafted": "Evidências anexadas, não enviadas",
       "dueBy": "Prazo das evidências: {at}",
       "noOrder": "Nenhuma conversa menciona este pedido ainda, então não há o que anexar.",
       "download": "Baixar pacote",
-      "attach": "Anexar como rascunho",
+      "attach": "Anexar evidências",
       "attachAgain": "Anexar de novo",
       "open": "Abrir em {platform}",
-      "confirmTitle": "Anexar o pacote de evidências como rascunho?",
-      "confirmDescription": "O Hay.chat envia o PDF de evidências para esta contestação em {platform} e adiciona uma nota curta. Nada é enviado ao banco: você revisa a resposta e a envia em {platform}. Arquivos que você adicionou lá são mantidos.",
-      "confirm": "Anexar como rascunho",
+      "confirmTitle": "Anexar o pacote de evidências a esta contestação?",
+      "confirmDescription": "O Hay.chat envia o PDF de evidências para esta contestação em {platform} e adiciona uma nota curta. O Hay.chat nunca envia a resposta ao banco, mas algumas plataformas (como o Shopify Payments) enviam automaticamente as evidências salvas na data do prazo; revise em {platform} antes disso. Arquivos que você adicionou lá são mantidos.",
+      "confirm": "Anexar evidências",
       "attached": "Evidências anexadas à contestação em {platform}",
-      "attachedHelp": "É um rascunho. Revise e envie a resposta em {platform} antes do prazo.",
+      "attachedHelp": "Salvo em {platform}, sem envio pelo Hay.chat. Revise lá antes do prazo: algumas plataformas enviam as evidências salvas automaticamente nessa data.",
       "reasons": {
         "product_not_received": "Produto não recebido",
         "product_unacceptable": "Diferente do anunciado",

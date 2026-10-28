@@ -44,7 +44,7 @@ export const ALERT_COPY: Record<NotificationLocale, AlertCopy> = {
     reminderSubject: (f) => `Chargeback evidence due soon${orderPart(f.order, "for order")}`,
     reminderTitle: "Chargeback evidence is due soon",
     message: (f) =>
-      `${f.platform} reported a chargeback${orderPart(f.order, "on order")}. Hay.chat can attach the customer conversations to it as a draft; you review and submit it on ${f.platform}.`,
+      `${f.platform} reported a chargeback${orderPart(f.order, "on order")}. Hay.chat can attach the customer conversations to it; review the response on ${f.platform} before the due date, since some platforms send saved evidence automatically on that date.`,
     reminderMessage: (f) =>
       `The evidence for the chargeback${orderPart(f.order, "on order")} is due${f.dueBy ? ` on ${f.dueBy}` : " soon"} and nothing has been attached yet.`,
     labels: {
@@ -63,7 +63,7 @@ export const ALERT_COPY: Record<NotificationLocale, AlertCopy> = {
     reminderSubject: (f) => `Prazo de evidências se aproximando${orderPart(f.order, "do pedido")}`,
     reminderTitle: "O prazo para enviar evidências está chegando",
     message: (f) =>
-      `${f.platform} informou uma contestação${orderPart(f.order, "no pedido")}. O Hay.chat pode anexar as conversas com o cliente como rascunho; você revisa e envia em ${f.platform}.`,
+      `${f.platform} informou uma contestação${orderPart(f.order, "no pedido")}. O Hay.chat pode anexar as conversas com o cliente; revise a resposta em ${f.platform} antes do prazo, pois algumas plataformas enviam as evidências salvas automaticamente nessa data.`,
     reminderMessage: (f) =>
       `As evidências da contestação${orderPart(f.order, "do pedido")} vencem${f.dueBy ? ` em ${f.dueBy}` : " em breve"} e nada foi anexado ainda.`,
     labels: {
