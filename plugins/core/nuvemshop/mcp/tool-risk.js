@@ -12,6 +12,7 @@ module.exports = {
     "nuvemshop_get_order",
     "nuvemshop_get_order_tracking",
     "nuvemshop_get_payment_link",
+    "nuvemshop_get_return_instructions",
     "nuvemshop_find_customer",
     "nuvemshop_get_customer",
     "nuvemshop_list_customer_orders",

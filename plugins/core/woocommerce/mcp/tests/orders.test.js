@@ -94,6 +94,7 @@ describe("enrichOrder", () => {
       shippedAt: null,
       deliveredAt: null,
       tracking: expect.objectContaining({ isStale: false, shippedAt: null }),
+      returnInstructions: null,
     });
     // Amounts carry their currency so the AI never assumes "$".
     expect(e.totals).toMatchObject({ currency: "EUR", total: "60.00" });
@@ -549,5 +550,150 @@ describe("customer tools", () => {
       totalPages: null,
       total: null,
     });
+  });
+});
+
+describe("return instructions (D6-13)", () => {
+  it("exposes the merchant's text on get_order and through its own tool", async () => {
+    process.env.RETURN_INSTRUCTIONS = "Send it back within 30 days: https://store.test/returns";
+    try {
+      expect(enrichOrder(ORDER, []).supportSummary.returnInstructions).toMatch(/30 days/);
+      const { registerReturnTools } = require("../tools/returns");
+      const server = createFakeServer();
+      registerReturnTools(server);
+      const res = await server.call("woocommerce_get_return_instructions", {});
+      expect(res.data).toMatchObject({
+        configured: true,
+        instructions: expect.stringMatching(/returns/),
+      });
+    } finally {
+      delete process.env.RETURN_INSTRUCTIONS;
+    }
+  });
+
+  it("tells the agent to hand off when nothing is set", async () => {
+    const { registerReturnTools } = require("../tools/returns");
+    const server = createFakeServer();
+    registerReturnTools(server);
+    const res = await server.call("woocommerce_get_return_instructions", {});
+    expect(res.data).toMatchObject({ configured: false, instructions: null });
+    expect(res.data.relay).toMatch(/hand the conversation/);
+  });
+});
+
+describe("marketplace orders in not-found (D10-6)", () => {
+  it("routes a Mercado Livre order id to Minhas compras", async () => {
+    mockFetch([]); // every request 404s
+    const { registerOrderTools: register } = require("../tools/orders");
+    const server = createFakeServer();
+    register(server);
+    const res = await server.call("woocommerce_get_order", { order_id: "2000012345678901" });
+    expect(res.error.code).toBe("NOT_FOUND");
+    expect(res.error.details).toMatchObject({ marketplace: "mercado_livre" });
+    expect(res.error.message).toMatch(/Minhas compras/);
+  });
+});
+
+describe("wider tracking sources (D16-8)", () => {
+  const { getTracking, trackingNumberInNote } = require("../lib/orders");
+  const base = { ...ORDER, id: 40, meta_data: [], line_items: [{ id: 1, meta_data: [] }] };
+
+  it("reads VillaTheme per-line-item tracking (JSON string, newest last)", async () => {
+    mockFetch([]);
+    const order = {
+      ...base,
+      line_items: [
+        {
+          id: 101,
+          meta_data: [
+            {
+              key: "_vi_wot_order_item_tracking_data",
+              value: JSON.stringify([
+                { tracking_number: "OLD1", carrier_name: "Correios", time: 1761000000 },
+                {
+                  tracking_number: "QB123456789BR",
+                  carrier_name: "Correios",
+                  carrier_url: "https://rastreamento.correios.com.br/?objetos={tracking_number}",
+                  time: 1761500000,
+                },
+              ]),
+            },
+          ],
+        },
+      ],
+    };
+    expect(await getTracking(order)).toEqual([
+      expect.objectContaining({
+        trackingNumber: "QB123456789BR",
+        carrier: "Correios",
+        trackingUrl: "https://rastreamento.correios.com.br/?objetos=QB123456789BR",
+        source: "villatheme",
+        lineItemId: 101,
+      }),
+    ]);
+  });
+
+  it("reads YITH keys including the carrier the generic fallback misses", async () => {
+    mockFetch([]);
+    const order = {
+      ...base,
+      meta_data: [
+        { key: "ywot_tracking_code", value: "LB987654321BR" },
+        { key: "ywot_carrier_name", value: "Jadlog" },
+        { key: "ywot_pick_up_date", value: "2026-10-20" },
+      ],
+    };
+    expect(await getTracking(order)).toEqual([
+      expect.objectContaining({
+        trackingNumber: "LB987654321BR",
+        carrier: "Jadlog",
+        shippedAt: "2026-10-20",
+        source: "yith",
+      }),
+    ]);
+  });
+
+  it("falls back to a tracking number in the order notes", async () => {
+    const { calls } = mockFetch([
+      {
+        method: "GET",
+        path: `${WC}/orders/40/notes`,
+        reply: () => [
+          {
+            id: 2,
+            note: "Order status changed from Pending to Processing.",
+            date_created_gmt: "2026-10-20T10:00:00",
+          },
+          {
+            id: 1,
+            note: "Order shipped via USPS with tracking number 9400111899223344556677.",
+            date_created_gmt: "2026-10-21T10:00:00",
+          },
+        ],
+      },
+    ]);
+    expect(await getTracking(base)).toEqual([
+      expect.objectContaining({
+        trackingNumber: "9400111899223344556677",
+        source: "order_note",
+        shippedAt: "2026-10-21T10:00:00Z",
+      }),
+    ]);
+    expect(calls.some((c) => c.path === `${WC}/orders/40/notes`)).toBe(true);
+  });
+
+  it("finds tracking numbers in common note wordings and ignores plain notes", () => {
+    expect(trackingNumberInNote("Código de rastreio: QB123456789BR")).toBe("QB123456789BR");
+    expect(trackingNumberInNote("Seu pedido foi postado. <a href='x'>AA123456789BR</a>")).toBe(
+      "AA123456789BR",
+    );
+    expect(trackingNumberInNote("Tracking #: 1Z999AA10123456784")).toBe("1Z999AA10123456784");
+    expect(trackingNumberInNote("Tracking info updated by the warehouse")).toBeNull();
+    expect(trackingNumberInNote("Payment received.")).toBeNull();
+  });
+
+  it("returns an empty list when nothing is recorded anywhere", async () => {
+    mockFetch([{ method: "GET", path: `${WC}/orders/40/notes`, reply: () => [] }]);
+    expect(await getTracking(base)).toEqual([]);
   });
 });

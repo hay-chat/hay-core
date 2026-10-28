@@ -38,6 +38,8 @@ const WRITE_CATEGORIES = Object.freeze({
   refund: { destructive: true },
   cancel: { destructive: true },
   discount: { destructive: true },
+  // Swapping or exchanging items ships goods or changes what the shopper paid for.
+  exchange: { destructive: true },
   return: { destructive: false },
   address_change: { destructive: true },
   customer_update: { destructive: true },

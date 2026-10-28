@@ -34,6 +34,15 @@
     },
     "./coupon-policy": {
       "default": "./coupon-policy/index.cjs"
+    },
+    "./return-instructions": {
+      "default": "./return-instructions/index.cjs"
+    },
+    "./identity": {
+      "default": "./identity/index.cjs"
+    },
+    "./marketplace-orders": {
+      "default": "./marketplace-orders/index.cjs"
     }
   },
   "bin": {
