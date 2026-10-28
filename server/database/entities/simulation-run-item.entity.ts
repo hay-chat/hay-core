@@ -7,6 +7,10 @@ import {
   Index,
 } from "typeorm";
 import type { SimulationUsage } from "./simulation-run.entity";
+import type {
+  ReplayBucket,
+  SimulationVerdict,
+} from "@server/services/simulation/turn-judge.service";
 
 /**
  * What a case is checked against (D7-9/D7-10/D7-12). Set for replays and test
@@ -51,6 +55,7 @@ export interface SimulationSeedTurn {
 @Index("idx_simulation_run_items_run_position", ["run_id", "position"])
 @Index("idx_simulation_run_items_org_created", ["organization_id", "created_at"])
 @Index("idx_simulation_run_items_conversation", ["conversation_id"])
+@Index("idx_simulation_run_items_run_bucket", ["run_id", "bucket"])
 export class SimulationRunItem {
   @PrimaryGeneratedColumn("uuid")
   id!: string;
@@ -77,6 +82,14 @@ export class SimulationRunItem {
   /** What the run is checked against; null = not judged (plain simulation). */
   @Column({ type: "jsonb", nullable: true })
   expectations!: SimulationExpectations | null;
+
+  /** The judge's verdict (D7-10); null until judged, or when not judged. */
+  @Column({ type: "jsonb", nullable: true })
+  verdict!: SimulationVerdict | null;
+
+  /** The replay-report bucket, copied out of the verdict for grouping. */
+  @Column({ type: "varchar", length: 32, nullable: true })
+  bucket!: ReplayBucket | null;
 
   /** Set when the item is dispatched. */
   @Column({ type: "uuid", nullable: true })
