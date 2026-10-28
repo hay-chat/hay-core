@@ -62,6 +62,8 @@ export interface OrganizationAccessState {
   agentPausedAt: Date | null;
   agentPauseReason: AgentPauseReason | null;
   accessNotice: AccessNotice | null;
+  /** The operator's current billing period (end exclusive); null = UTC calendar months. */
+  billingPeriod: { start: Date; end: Date } | null;
   /** The owner's "Pause AI everywhere" (D11-9); independent of the operator's pause. */
   aiPausedAt: Date | null;
   aiPausedByUserId: string | null;

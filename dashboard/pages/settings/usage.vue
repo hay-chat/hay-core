@@ -3,11 +3,11 @@
     <template #header>
       <div class="flex items-end gap-2">
         <Input
-          v-model="month"
+          v-model="periodValue"
           type="select"
-          :label="$t('usage.month')"
-          :options="monthOptions"
-          data-testid="usage-month"
+          :label="$t('usage.period')"
+          :options="periodOptions"
+          data-testid="usage-period"
         />
         <Button variant="outline" :loading="loading" @click="loadAll">
           {{ $t("usage.refresh") }}
@@ -33,7 +33,13 @@
             <Alert v-if="summary.agentPaused.paused" variant="warning">
               <AlertDescription>{{ $t("usage.meter.paused") }}</AlertDescription>
             </Alert>
-            <p class="text-xs text-muted-foreground">{{ $t("usage.meter.periodNote") }}</p>
+            <p class="text-xs text-muted-foreground">
+              {{
+                summary.period.source === "billing"
+                  ? $t("usage.meter.periodNote")
+                  : $t("usage.meter.calendarNote")
+              }}
+            </p>
             <!-- TODO: core does not receive the plan allowance or overage state from the
                  billing operator; show them here once it does (no backoffice call from core). -->
             <p class="text-xs text-muted-foreground">{{ $t("usage.meter.planNote") }}</p>
@@ -238,10 +244,11 @@ import type { RouterOutputs } from "@/types/trpc";
 
 /**
  * Settings > Usage (D1-5, D1-6): the live count of billable resolutions for a
- * calendar month, its breakdown by outcome, and the ledger behind it with CSV
+ * billing period (UTC calendar month without one), its breakdown by outcome, and the ledger behind it with CSV
  * export and Exclude (5 % self-serve, beyond that sent to Hay.chat for review).
  */
 type Summary = RouterOutputs["usage"]["summary"];
+type Period = RouterOutputs["usage"]["periods"][number];
 type LedgerItem = RouterOutputs["usage"]["ledger"]["items"][number];
 
 const NOT_BILLED = ["human", "unhappy", "abandoned", "test", "spam"] as const;
@@ -253,20 +260,19 @@ const STATUS_VARIANT: Record<
   reversed: "secondary",
   excluded: "outline",
   pending_review: "warning",
+  denied: "secondary",
 };
 const PAGE_SIZE = 25;
 const MIN_REASON = 3;
-const MONTHS_BACK = 12;
 
 const { t, te, locale } = useI18n();
 const toast = useToast();
 const { formatDateTime } = useOrgDateTime();
 
-function monthKey(date: Date): string {
-  return date.toISOString().slice(0, 7);
-}
-
-const month = ref(monthKey(new Date()));
+const periods = ref<Period[]>([]);
+/** The select works on strings; the API takes the period index (0 = current). */
+const periodValue = ref("0");
+const period = computed(() => Number(periodValue.value));
 const summary = ref<Summary | null>(null);
 const items = ref<LedgerItem[]>([]);
 const total = ref(0);
@@ -287,19 +293,6 @@ const exclusionsLeft = computed(() =>
 );
 const willNeedReview = computed(() => exclusionsLeft.value <= 0);
 
-const monthOptions = computed(() => {
-  const now = new Date();
-  const formatter = new Intl.DateTimeFormat(locale.value, {
-    month: "long",
-    year: "numeric",
-    timeZone: "UTC",
-  });
-  return Array.from({ length: MONTHS_BACK }, (_, i) => {
-    const date = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - i, 1));
-    return { label: formatter.format(date), value: monthKey(date) };
-  });
-});
-
 /** Period dates are UTC calendar days; format them without a timezone shift. */
 function utcDay(value: Date | string): string {
   return new Intl.DateTimeFormat(locale.value, {
@@ -314,17 +307,23 @@ const periodStart = computed(() => (summary.value ? utcDay(summary.value.period.
 const periodEnd = computed(() =>
   summary.value ? utcDay(new Date(new Date(summary.value.period.end).getTime() - 1)) : "",
 );
+const periodOptions = computed(() =>
+  periods.value.map((p) => ({
+    label: `${utcDay(p.start)} – ${utcDay(new Date(new Date(p.end).getTime() - 1))}`,
+    value: String(p.index),
+  })),
+);
 
 const outcomeLabel = (outcome: string) =>
   te(`usage.ledger.outcomes.${outcome}`) ? t(`usage.ledger.outcomes.${outcome}`) : outcome;
 
 async function loadSummary() {
-  summary.value = await Hay.usage.summary.query({ month: month.value });
+  summary.value = await Hay.usage.summary.query({ period: period.value });
 }
 
 async function loadLedger() {
   const result = await Hay.usage.ledger.query({
-    month: month.value,
+    period: period.value,
     page: page.value,
     pageSize: PAGE_SIZE,
   });
@@ -335,7 +334,12 @@ async function loadLedger() {
 async function loadAll() {
   loading.value = true;
   try {
-    await Promise.all([loadSummary(), loadLedger()]);
+    const [periodList] = await Promise.all([
+      Hay.usage.periods.query(),
+      loadSummary(),
+      loadLedger(),
+    ]);
+    periods.value = periodList;
   } catch (error) {
     toast.error(t("usage.loadFailed"), error instanceof Error ? error.message : undefined);
   } finally {
@@ -346,12 +350,15 @@ async function loadAll() {
 async function exportCsv() {
   exporting.value = true;
   try {
-    const { csv } = await Hay.usage.exportCsv.mutate({ month: month.value });
+    const { csv } = await Hay.usage.exportCsv.mutate({ period: period.value });
     const blob = new Blob([csv], { type: "text/csv" });
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `hay-chat-resolutions-${month.value}.csv`;
+    const start = summary.value
+      ? new Date(summary.value.period.start).toISOString().slice(0, 10)
+      : "";
+    a.download = `hay-chat-resolutions-${start}.csv`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -394,7 +401,7 @@ async function confirmExclude() {
   }
 }
 
-watch(month, () => {
+watch(period, () => {
   if (page.value === 1) {
     void loadAll();
     return;

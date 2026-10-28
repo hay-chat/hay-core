@@ -12,10 +12,23 @@ jest.mock("@server/lib/logger", () => ({ createLogger: () => mockLogger }));
 
 const mockSetAccessState = jest.fn();
 const mockGetAccessState = jest.fn();
+const mockSetBillingPeriod = jest.fn();
+const mockSetLimits = jest.fn();
 jest.mock("@server/services/organization-access.service", () => ({
   organizationAccessService: {
     setAccessState: mockSetAccessState,
     getAccessState: mockGetAccessState,
+    setBillingPeriod: mockSetBillingPeriod,
+    setLimits: mockSetLimits,
+  },
+}));
+
+const mockListPendingExclusions = jest.fn();
+const mockReviewExclusion = jest.fn();
+jest.mock("@server/services/resolution-ledger.service", () => ({
+  resolutionLedgerService: {
+    listPendingExclusions: mockListPendingExclusions,
+    reviewExclusion: mockReviewExclusion,
   },
 }));
 
@@ -158,6 +171,55 @@ describe("internal.organizations", () => {
     ).rejects.toMatchObject({ code: "NOT_FOUND" });
   });
 
+  it("passes the billing period through as dates and refuses an empty one", async () => {
+    mockSetBillingPeriod.mockResolvedValueOnce(state);
+    await internalRouter.createCaller(ctx()).organizations.setBillingPeriod({
+      organizationId: ORG_ID,
+      period: { start: "2026-10-14T09:30:00.000Z", end: "2026-11-14T09:30:00.000Z" } as never,
+    });
+    expect(mockSetBillingPeriod).toHaveBeenCalledWith({
+      organizationId: ORG_ID,
+      period: {
+        start: new Date("2026-10-14T09:30:00.000Z"),
+        end: new Date("2026-11-14T09:30:00.000Z"),
+      },
+    });
+
+    await expect(
+      internalRouter.createCaller(ctx()).organizations.setBillingPeriod({
+        organizationId: ORG_ID,
+        period: { start: new Date("2026-10-14"), end: new Date("2026-10-14") },
+      }),
+    ).rejects.toMatchObject({ code: "BAD_REQUEST" });
+
+    mockSetBillingPeriod.mockResolvedValueOnce(null);
+    await expect(
+      internalRouter
+        .createCaller(ctx())
+        .organizations.setBillingPeriod({ organizationId: ORG_ID, period: null }),
+    ).rejects.toMatchObject({ code: "NOT_FOUND" });
+  });
+
+  it("sets the simulation allowance and validates it", async () => {
+    mockSetLimits.mockResolvedValueOnce({ maxSimulationsPerMonth: 100 });
+    await expect(
+      internalRouter
+        .createCaller(ctx())
+        .organizations.setLimits({ organizationId: ORG_ID, maxSimulationsPerMonth: 100 }),
+    ).resolves.toEqual({ maxSimulationsPerMonth: 100 });
+    await expect(
+      internalRouter
+        .createCaller(ctx())
+        .organizations.setLimits({ organizationId: ORG_ID, maxSimulationsPerMonth: -1 }),
+    ).rejects.toMatchObject({ code: "BAD_REQUEST" });
+    mockSetLimits.mockResolvedValueOnce(null);
+    await expect(
+      internalRouter
+        .createCaller(ctx())
+        .organizations.setLimits({ organizationId: ORG_ID, maxSimulationsPerMonth: null }),
+    ).rejects.toMatchObject({ code: "NOT_FOUND" });
+  });
+
   it("deletes through organizationService.deleteWithData", async () => {
     const organization = { id: ORG_ID, name: "Acme" };
     mockFindOne.mockResolvedValueOnce(organization);
@@ -172,5 +234,42 @@ describe("internal.organizations", () => {
     await expect(
       internalRouter.createCaller(ctx()).organizations.delete({ organizationId: ORG_ID }),
     ).rejects.toMatchObject({ code: "NOT_FOUND" });
+  });
+
+  it("lists pending exclusions and passes a review decision with the reviewer through", async () => {
+    mockListPendingExclusions.mockResolvedValueOnce([]);
+    await internalRouter.createCaller(ctx()).resolutions.listPendingExclusions({});
+    expect(mockListPendingExclusions).toHaveBeenCalledWith({ limit: 100 });
+
+    mockReviewExclusion.mockResolvedValueOnce({ status: "denied" });
+    const outcomeId = "22222222-2222-4222-8222-222222222222";
+    await expect(
+      internalRouter.createCaller(ctx()).resolutions.reviewExclusion({
+        organizationId: ORG_ID,
+        outcomeId,
+        decision: "deny",
+        reviewer: "  roger  ",
+      }),
+    ).resolves.toEqual({ status: "denied" });
+    expect(mockReviewExclusion).toHaveBeenCalledWith({
+      organizationId: ORG_ID,
+      outcomeId,
+      decision: "deny",
+      reviewer: "roger",
+    });
+
+    await expect(
+      internalRouter.createCaller(ctx()).resolutions.reviewExclusion({
+        organizationId: ORG_ID,
+        outcomeId,
+        decision: "approve",
+        reviewer: " ",
+      }),
+    ).rejects.toMatchObject({ code: "BAD_REQUEST" });
+    await expect(
+      internalRouter
+        .createCaller(ctx("wrong"))
+        .resolutions.listPendingExclusions({ organizationId: ORG_ID }),
+    ).rejects.toMatchObject({ code: "UNAUTHORIZED" });
   });
 });

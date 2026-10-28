@@ -9,6 +9,7 @@ import {
   SUSPENSION_REASONS,
   accessNoticeSchema,
 } from "@server/types/organization-access.types";
+import { resolutionLedgerService } from "@server/services/resolution-ledger.service";
 import { createLogger } from "@server/lib/logger";
 
 const logger = createLogger("internal");
@@ -55,6 +56,48 @@ const internalOrganizationsRouter = router({
       return state;
     }),
 
+  /**
+   * The current billing period (end exclusive), sent by the operator on every
+   * usage run. The usage page and the exclusion allowance follow it; null goes
+   * back to UTC calendar months.
+   */
+  setBillingPeriod: internalProcedure
+    .input(
+      organizationIdInput.extend({
+        period: z
+          .object({ start: z.coerce.date(), end: z.coerce.date() })
+          .refine((p) => p.end.getTime() > p.start.getTime(), {
+            message: "The period must end after it starts",
+          })
+          .nullable(),
+      }),
+    )
+    .mutation(async ({ input }) => {
+      const state = await organizationAccessService.setBillingPeriod(input);
+      if (!state) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Organization not found" });
+      }
+      return state;
+    }),
+
+  /**
+   * Plan limits from the operator (Lane A4). `maxSimulationsPerMonth` null
+   * falls back to the core default (config/simulation-caps.ts).
+   */
+  setLimits: internalProcedure
+    .input(
+      organizationIdInput.extend({
+        maxSimulationsPerMonth: z.number().int().min(0).max(100_000).nullable(),
+      }),
+    )
+    .mutation(async ({ input }) => {
+      const limits = await organizationAccessService.setLimits(input);
+      if (!limits) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Organization not found" });
+      }
+      return limits;
+    }),
+
   delete: internalProcedure.input(organizationIdInput).mutation(async ({ input }) => {
     const organization = await organizationService.findOne(input.organizationId);
     if (!organization) {
@@ -68,6 +111,34 @@ const internalOrganizationsRouter = router({
   }),
 });
 
+/**
+ * Exclusions over the self-serve allowance wait for Hay.chat staff (Lane A3).
+ * Staff work from the operator's admin UI; core only sees the shared secret,
+ * so the operator passes the staff login as `reviewer` for the audit trail.
+ */
+const internalResolutionsRouter = router({
+  listPendingExclusions: internalProcedure
+    .input(
+      z.object({
+        organizationId: z.string().uuid().optional(),
+        limit: z.number().int().min(1).max(500).default(100),
+      }),
+    )
+    .query(({ input }) => resolutionLedgerService.listPendingExclusions(input)),
+
+  reviewExclusion: internalProcedure
+    .input(
+      organizationIdInput.extend({
+        outcomeId: z.string().uuid(),
+        decision: z.enum(["approve", "deny"]),
+        reviewer: z.string().trim().min(1).max(255),
+        note: z.string().trim().max(1000).optional(),
+      }),
+    )
+    .mutation(({ input }) => resolutionLedgerService.reviewExclusion(input)),
+});
+
 export const internalRouter = router({
   organizations: internalOrganizationsRouter,
+  resolutions: internalResolutionsRouter,
 });
