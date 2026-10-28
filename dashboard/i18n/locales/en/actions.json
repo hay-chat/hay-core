@@ -32,7 +32,7 @@
         "title": "Customer confirmation",
         "description": "Before an action, Hay.chat tells the customer exactly what it will do and asks \"Shall I go ahead?\". It only continues after the customer replies.",
         "label": "Ask the customer to confirm first",
-        "cancelNote": "Always on for cancellations. Order notes and resent emails are not asked about."
+        "cancelNote": "Always on for cancellations, even when this is switched off."
       },
       "approvers": {
         "title": "Who can approve",

@@ -256,6 +256,7 @@
       "pendingApproval": "Aguardando aprovação",
       "rejected": "Recusada",
       "expired": "Expirada, não executada",
+      "needsConfirmation": "Perguntando ao cliente",
       "unknown": "Desconhecido"
     },
     "pendingAction": {
