@@ -1,3 +1,8 @@
+## 2026-10-28 01:20 — staging — Wave 1 review: plugin fixes merged, server fixes running, W2 L5 started
+- fde9618 merged claude/w1-review-plugins (9 fixes: Shopify/Woo/Nuvemshop coupon dedupe + ownership, Woo refund record-only only for bacs/cod/cheque, Pix/coupon times, approval card, rotatePush needs old auth). woo/shopify/nuvemshop rebuilt, tsc ok.
+- Running: claude/w1-review-server (11 server fixes), claude/w2-commerce (W2 L5).
+- Next: merge server fixes, migrations if any, full suites, tag wave-1-done, PR #104 body, GIFs to Roger.
+
 ## 2026-10-28 00:55 — staging — L5 commerce merged + tested
 - b0b59ab merged claude/w1-commerce; SDK + 10 plugins rebuilt, tsc ok.
 - Manual ✓ (Woo :8085): 10% coupon created and restricted; second coupon refused (ALREADY_HAS_COUPON); 25% held then approved → created; EUR totals in EUR; bank-transfer refund approved with refund_payment=false.
