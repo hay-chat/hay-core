@@ -1,3 +1,7 @@
+## 2026-10-28 03:30 — staging — W2 D1-5/D1-6 merged + hand-tested
+- Settings > Usage: billable count (= analytics billableResolutions), breakdown, ledger, CSV, Exclude (5 % instant, then sent for review). Migration run on hay_staging.
+- Next: D8 part A merge when done; L13 D2-2..5.
+
 ## 2026-10-28 — claude/w2-usage-ledger (L9+L2 Wave 2) — D1-5, D1-6 done, committed, not pushed
 - Settings > Usage (/settings/usage, owner/admin): live billable count per UTC calendar month, breakdown by outcome, ledger with CSV + Exclude (reason required).
 - Exclusion: instant up to max(1, floor(5 %)) of the month's billable; beyond = pending_review (still billed). Audited in audit_logs + row columns. billableResolutions skips excluded.

@@ -4,6 +4,7 @@ Started 2026-10-27. Research: `/Users/rogerjunior/Documents/code/hay/seo/Enginee
 "Roger's answers" block overrides its recommendations). Research baseline: origin/master 3e6ede1.
 
 ## Resume here (orchestrator checkpoint — keep current; safe to /compact after reading this)
+- 2026-10-28 03:30: W2 L9+L2 (e89c856, D1-5 Settings > Usage, D1-6 ledger + exclusions) merged, migration AddResolutionExclusions1785750000000 run, hand-tested ✓ (exclude → 20→19 = analytics billableResolutions; over 5 % → sent for review, count unchanged; audit rows). Fix a332d28 copy. Running: D8 part A (claude/w2-media-ingest). NEXT: L13 D2-2..5.
 - 2026-10-28 03:15: W2 L3 (ccf449e, D5-6..11) + L4 (d43ea72, D4-6/9/10/11, D6-6/7) merged, migrations run on hay_staging, hand-tested ✓ (closed hand-off + email follow-up; shopper confirm → held refund → lowered to 10.00 → Woo refund 10.00 → AI told shopper; Action log filters; typed confirm). Fixes: 45c491c action-log "Sent for approval" label; 3a8cd39 Input checkbox label rendered twice (shared). GIFs W2-L3-*, W2-L4-*. NEXT: next W2 lanes L9+L2 (D1-5, D1-6) and L8+L7 (D8-3, D8-5..17).
 - 2026-10-28 02:40: full suites green on 1f6b394 (server 1204, dash 43 + typecheck, webchat 114, SDK 195, 13 plugins). Tagged `wave-1-done` at e5cfef2 (so Wave 2 review = `git diff wave-1-done..staging`, covering L11+L5). PR #104 body + title updated; GIFs sent. Running: W2 L4 (claude/w2-approvals-ui: D4-6/9/10/11, D6-6/7) + W2 L3 (claude/w2-business-hours: D5-6..11). Prompts in scratchpad lane-w2-l4.md / lane-w2-l3.md.
 - 2026-10-28 02:15: Wave 2 L11 (D14-5..8) + L5 (D6-10..13, D10-3, D10-6, D16-2, D16-8) merged + hand-tested. My fixes: 4cd82e9 drafts approve buttons always + i18n; 992bcb5 plugin settings save no longer wipes secrets; 18c4a4a marketplace copy; aefb1c0 Woo resend reports mail failure (EMAIL_FAILED). GIFs W2-D14-*, W2-L5-*. NEXT: full suites alone → tag wave-1-done → PR #104 body → GIFs to Roger → next W2 lanes.
@@ -95,6 +96,7 @@ Started 2026-10-27. Research: `/Users/rogerjunior/Documents/code/hay/seo/Enginee
 | W1 L4 | `AddAwaitingApprovalStatus1785730000000` | conversations (enum) | ✓ |
 | W2 L3 | `AddBusinessHoursSchedules1785740000000` | business_hours_schedules (+ webchat follow-up) | ✓ |
 | W2 L4 | `AddPlaybookApprovalCategories1785744000000` | playbooks | ✓ |
+| W2 L9+L2 | `AddResolutionExclusions1785750000000` | conversation_outcomes | ✓ |
 
 ## Wave 0 — security, honesty, quick fixes (tag `wave-0-done`)
 
@@ -179,6 +181,7 @@ Parked: D13-15, D16-10/11, D6-14, D2-10, D7-15, D8-18, D10-9, D11-13, D14-10, fr
 Staging seed: org/user created via `auth.register` (credentials in `../hay-core-staging/.staging-login`, untracked).
 
 ## Needs Roger
+- [W2 D1-5/6] Usage page and the 5 % exclusion cap use the UTC calendar month (core doesn't know the billing period; TODO to take it from the access state). Min 1 instant exclusion/month. Exclusions allowed for current + previous month. X follow-ups: backoffice must bill from `billableResolutions` (not `resolvedConversations`) or exclusions don't change the invoice; credit exclusions made after overage was reported; Hay.chat-side UI/API to approve/deny `pending_review` exclusion requests (today: set exclusion_status='excluded' + excluded_at by hand).
 - [W2 L3] Email replies from the D5-9 follow-up do not come back into the conversation (no core inbound email); the resume link only restores the chat in the same browser. Teams are not modelled, so schedules are per channel. "Shopper has left" = zero widget sockets on this server (single instance). Closures are whole days only. OK for now?
 - [W2 L4] Approval scope: threshold applies to refunds and discounts only; typed confirm is UI-only (API accepts the change); shopper confirmation checks only the next turn; order notes and resent emails also ask the shopper to confirm; graduation nudge ignores currency and needs 5 approvals in 30 days; bulk approve includes cancels; playbook approval overrides have no version history. Shopify refunds lowered in the inbox may not match line items. Confirm these defaults.
 - [W2 L11] Confirm: EU heuristic = aiRegion eu OR Europe/* timezone; `[label]` first-line format on non-web channels; disclosure controls live on Customer Privacy; drafts-only allowed on Web Chat too; existing orgs keep their retention (suggest opt-in prompt to 365 d). D14-1, D14-3 still pending your answers.
