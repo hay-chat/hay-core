@@ -68,6 +68,16 @@
                 v-if="conversation"
                 variant="outline"
                 size="sm"
+                data-testid="improve-knowledge-button"
+                @click="showKnowledgeDialog = true"
+              >
+                <BookOpen class="h-4 w-4 mr-2" />
+                {{ $t("knowledgeSuggest.improveFromConversation") }}
+              </Button>
+              <Button
+                v-if="conversation"
+                variant="outline"
+                size="sm"
                 :loading="isSwitchingActionMode"
                 @click="toggleActionMode"
               >
@@ -125,6 +135,10 @@
                 >
                   <Sparkles class="mr-2 h-4 w-4" />
                   {{ $t("suggest.improveFromConversation") }}
+                </DropdownMenuItem>
+                <DropdownMenuItem v-if="conversation" @click="showKnowledgeDialog = true">
+                  <BookOpen class="mr-2 h-4 w-4" />
+                  {{ $t("knowledgeSuggest.improveFromConversation") }}
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -201,6 +215,16 @@
               >
                 <Sparkles class="h-4 w-4 mr-2" />
                 {{ $t("suggest.improveFromConversation") }}
+              </Button>
+              <Button
+                v-if="conversation"
+                variant="outline"
+                size="sm"
+                data-testid="improve-knowledge-button"
+                @click="showKnowledgeDialog = true"
+              >
+                <BookOpen class="h-4 w-4 mr-2" />
+                {{ $t("knowledgeSuggest.improveFromConversation") }}
               </Button>
               <DropdownMenu>
                 <DropdownMenuTrigger as-child>
@@ -282,6 +306,10 @@
                 >
                   <Sparkles class="mr-2 h-4 w-4" />
                   {{ $t("suggest.improveFromConversation") }}
+                </DropdownMenuItem>
+                <DropdownMenuItem v-if="conversation" @click="showKnowledgeDialog = true">
+                  <BookOpen class="mr-2 h-4 w-4" />
+                  {{ $t("knowledgeSuggest.improveFromConversation") }}
                 </DropdownMenuItem>
                 <DropdownMenuItem @click="exportConversation('pdf')">
                   <FileText class="mr-2 h-4 w-4" />
@@ -1047,6 +1075,14 @@
       @applied="handleSuggestionApplied"
     />
 
+    <!-- AI Suggest Knowledge Edits Dialog (D3-6) -->
+    <SuggestKnowledgeDialog
+      v-if="conversation"
+      v-model:open="showKnowledgeDialog"
+      :conversation-id="conversation.id"
+      @applied="handleKnowledgeApplied"
+    />
+
     <!-- Playground: confirm before actions reach the real store -->
     <ConfirmDialog
       v-if="isPlaygroundMode"
@@ -1535,6 +1571,13 @@ const handleSuggestionApplied = () => {
   if (conversation.value?.playbook_id) {
     router.push(`/playbooks/${conversation.value.playbook_id}`);
   }
+};
+
+// AI suggest-edits for knowledge: edit a document the AI used, or add a Q&A
+const showKnowledgeDialog = ref(false);
+
+const handleKnowledgeApplied = (documentId: string) => {
+  useRouter().push(`/documents/${documentId}`);
 };
 
 // Playground action mode: writes are simulated (dry-run) unless switched to live.
