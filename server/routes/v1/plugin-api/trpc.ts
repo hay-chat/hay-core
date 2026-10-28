@@ -251,15 +251,11 @@ export const pluginApiTrpcRouter = router({
           }
         }
 
-        // Get agent for this channel
+        // Get agent for this channel. An org with no agent at all still gets
+        // the message: it lands in the inbox parked for a human (below) rather
+        // than being rejected, which would drop it after the provider's retries.
         const agentId = await getAgentForChannel(organizationId, channel);
-
-        if (!agentId) {
-          throw new TRPCError({
-            code: "NOT_FOUND",
-            message: "No agent configured for this channel",
-          });
-        }
+        const holdForHuman = input.holdForHuman || !agentId;
 
         // Resolve the conversation: a Hay id the plugin recovered from its own
         // outbound message wins, then the provider-side thread id. Both must
@@ -407,7 +403,7 @@ export const pluginApiTrpcRouter = router({
             needs_processing: false,
           });
         } else if (
-          input.holdForHuman &&
+          holdForHuman &&
           senderType === "customer" &&
           conversation.status !== "human-took-over"
         ) {
