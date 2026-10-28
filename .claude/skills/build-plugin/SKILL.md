@@ -42,6 +42,10 @@ Answer these before writing code:
 | is two-way messaging          | **C. Channel**                      | **chatwoot** (verify), **email-imap** (semantics)                           | whatsapp (no idempotency)                        |
 | is a document source          | **D. Document importer** (advanced) | **atlassian** ConfluenceClient + adf-to-markdown                            | atlassian's manifest.json + `@server/*` coupling |
 
+**Payment provider** (Pix, card refunds: Mercado Pago, PagBank, Pagar.me…)? Archetype A plus the
+shared five-tool contract in `packages/plugin-sdk/payment-provider/README.md` (`@hay/plugin-sdk/payment-provider`).
+Copy **mercadopago**.
+
 ### 3. Scaffold from templates (in `templates/`)
 
 - `package.json.tmpl`, `tsconfig.json.tmpl` — always.

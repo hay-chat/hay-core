@@ -1,0 +1,34 @@
+{
+  "name": "hay-plugin-mercadopago",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Connect Mercado Pago so the agent can find the payment behind an order, resend an unpaid Pix code to a verified customer, refund within what was paid, and report refund status honestly",
+  "author": "Hay",
+  "main": "dist/index.js",
+  "hay-plugin": {
+    "entry": "./dist/index.js",
+    "displayName": "Mercado Pago",
+    "category": "integration",
+    "capabilities": [
+      "mcp",
+      "auth"
+    ],
+    "env": [
+      "MERCADOPAGO_CLIENT_ID",
+      "MERCADOPAGO_CLIENT_SECRET"
+    ]
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@hay/plugin-sdk": "file:../../../packages/plugin-sdk"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "typescript": "^5.3.3",
+    "vitest": "^1.6.1"
+  }
+}

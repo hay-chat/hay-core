@@ -149,4 +149,34 @@ function parsePix(metaData) {
   return null;
 }
 
-module.exports = { parsePix, PIX_PROVIDERS: PROVIDERS.map((p) => p.provider) };
+/**
+ * Payment-provider ids an order points at (D10-7), from an ALLOWLIST of meta
+ * keys, so the agent can look the payment up with a payment_provider plugin
+ * (e.g. mercadopago_find_payments). Returned paid or unpaid: refunds need it.
+ * - Mercado Pago: _Mercado_Pago_Payment_IDs, comma-separated payment ids
+ *   (official "Mercado Pago payments for WooCommerce" plugin).
+ */
+const PAYMENT_REFERENCE_KEYS = [{ provider: "mercadopago", key: "_Mercado_Pago_Payment_IDs" }];
+
+/** @returns {{provider: string, paymentId: string}[]} */
+function parsePaymentReferences(metaData) {
+  const refs = [];
+  const seen = new Set();
+  for (const { provider, key } of PAYMENT_REFERENCE_KEYS) {
+    for (const m of metaData || []) {
+      if (!m || m.key !== key) continue;
+      for (const id of String(m.value ?? "").split(/[\s,;|]+/)) {
+        if (!/^\d{6,}$/.test(id) || seen.has(`${provider}:${id}`)) continue;
+        seen.add(`${provider}:${id}`);
+        refs.push({ provider, paymentId: id });
+      }
+    }
+  }
+  return refs;
+}
+
+module.exports = {
+  parsePix,
+  parsePaymentReferences,
+  PIX_PROVIDERS: PROVIDERS.map((p) => p.provider),
+};
