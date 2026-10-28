@@ -26,14 +26,24 @@ export default {
   "waiting.title": "En attente d'une personne",
   "waiting.typical": "Répond généralement en {time}",
   "waiting.alerted": "Nous avons prévenu l'équipe.",
-  "waiting.closed": "L'équipe revient {when}. D'ici là, l'assistant IA peut continuer à vous aider.",
+  "waiting.closed":
+    "L'équipe revient {when}. D'ici là, l'assistant IA peut continuer à vous aider.",
   "waiting.minutes": "~{n} min",
   "waiting.hours": "~{n} h",
-  "contact.prompt": "Laissez votre e-mail et nous vous enverrons la réponse de l'équipe si vous êtes parti.",
+  "contact.prompt":
+    "Laissez votre e-mail et nous vous enverrons la réponse de l'équipe si vous êtes parti.",
   "contact.label": "E-mail",
   "contact.placeholder": "vous@exemple.fr",
   "contact.submit": "Me prévenir",
   "contact.consent": "Nous utiliserons votre e-mail uniquement pour répondre à cette conversation.",
-  "contact.saved": "Merci ! Si vous êtes parti quand l'équipe répond, nous vous enverrons un e-mail.",
+  "contact.saved":
+    "Merci ! Si vous êtes parti quand l'équipe répond, nous vous enverrons un e-mail.",
   "contact.failed": "Impossible d'enregistrer votre e-mail. Vérifiez-le et réessayez.",
+  "input.attach": "Joindre une photo ou un PDF",
+  "error.fileTooLarge": "Ce fichier est trop volumineux. Photos et PDF jusqu'à 10 Mo.",
+  "error.fileType": "Vous pouvez envoyer des photos (JPG, PNG, GIF, WebP) ou des PDF.",
+  "error.fileFailed": "Impossible d'envoyer votre fichier. Essayez-en un autre.",
+  "attachment.photo": "Photo",
+  "attachment.file": "Fichier",
+  "attachment.sending": "Envoi...",
 } as const;

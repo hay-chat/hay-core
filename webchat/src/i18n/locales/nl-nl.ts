@@ -28,11 +28,20 @@ export default {
   "waiting.closed": "Het team is {when} terug. Tot die tijd kan de AI-assistent je verder helpen.",
   "waiting.minutes": "~{n} min",
   "waiting.hours": "~{n} u",
-  "contact.prompt": "Laat je e-mailadres achter, dan sturen we het antwoord van het team daarheen als je weg bent.",
+  "contact.prompt":
+    "Laat je e-mailadres achter, dan sturen we het antwoord van het team daarheen als je weg bent.",
   "contact.label": "E-mail",
   "contact.placeholder": "jij@voorbeeld.nl",
   "contact.submit": "Laat het me weten",
   "contact.consent": "We gebruiken je e-mailadres alleen om op dit gesprek te reageren.",
   "contact.saved": "Bedankt! Als je weg bent wanneer het team reageert, sturen we je een e-mail.",
-  "contact.failed": "Je e-mailadres kon niet worden opgeslagen. Controleer het en probeer het opnieuw.",
+  "contact.failed":
+    "Je e-mailadres kon niet worden opgeslagen. Controleer het en probeer het opnieuw.",
+  "input.attach": "Foto of pdf bijvoegen",
+  "error.fileTooLarge": "Dat bestand is te groot. Foto's en pdf's tot 10 MB.",
+  "error.fileType": "Je kunt foto's (JPG, PNG, GIF, WebP) of pdf's sturen.",
+  "error.fileFailed": "Je bestand kon niet worden verstuurd. Probeer een ander bestand.",
+  "attachment.photo": "Foto",
+  "attachment.file": "Bestand",
+  "attachment.sending": "Versturen...",
 } as const;

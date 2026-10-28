@@ -1,7 +1,11 @@
 import { createLogger } from "@server/lib/logger";
 import type { Conversation } from "@server/database/entities/conversation.entity";
 import type { Message } from "@server/database/entities/message.entity";
-import { isWidgetVisibleMessage, toPublicMessageEvent } from "./webchat/public-message";
+import {
+  isWidgetVisibleMessage,
+  toPublicAttachments,
+  toPublicMessageEvent,
+} from "./webchat/public-message";
 
 const logger = createLogger("websocket");
 
@@ -72,11 +76,15 @@ class ConversationEventsService {
         attachments: message.attachments ?? [],
         metadata: message.metadata,
       };
+      const attachments = await toPublicAttachments(
+        message.attachments,
+        conversation.organization_id,
+      );
       const sent = websocketService.sendToConversation(
         conversation.id,
         isPlayground
-          ? { type: "message", conversationId: conversation.id, data }
-          : toPublicMessageEvent(conversation.id, data),
+          ? { type: "message", conversationId: conversation.id, data: { ...data, attachments } }
+          : toPublicMessageEvent(conversation.id, data, attachments),
       );
       logger.debug(
         { messageId: message.id, conversationId: conversation.id, clientCount: sent },

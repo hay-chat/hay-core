@@ -35,4 +35,11 @@ export default {
   "contact.consent": "We'll only use your email to reply to this conversation.",
   "contact.saved": "Thanks! If you've left when the team replies, we'll email you.",
   "contact.failed": "Couldn't save your email. Please check it and try again.",
+  "input.attach": "Attach a photo or PDF",
+  "error.fileTooLarge": "That file is too large. Photos and PDFs up to 10 MB.",
+  "error.fileType": "You can send photos (JPG, PNG, GIF, WebP) or PDFs.",
+  "error.fileFailed": "Couldn't send your file. Please try another one.",
+  "attachment.photo": "Photo",
+  "attachment.file": "File",
+  "attachment.sending": "Sending...",
 } as const;

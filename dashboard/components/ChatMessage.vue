@@ -65,7 +65,7 @@
         </div>
       </template>
       <div
-        v-else
+        v-else-if="!hidesMediaPlaceholder"
         :class="[
           'chat-message__bubble',
           {
@@ -113,7 +113,8 @@
           />
           <PendingActionCard
             v-if="
-              message.metadata?.toolStatus === 'PENDING_APPROVAL' && message.metadata?.pendingActionId
+              message.metadata?.toolStatus === 'PENDING_APPROVAL' &&
+              message.metadata?.pendingActionId
             "
             :pending-action-id="message.metadata.pendingActionId"
             :conversation-id="message.conversation_id"
@@ -653,6 +654,11 @@ const SPLIT_EXCLUDED_TYPES = ["Playbook", "Document", "Tool", "ProductRecommenda
 const contentSegments = computed(() => splitMarkdownImages(props.message.content || ""));
 const isImageSegment = (segment: string): boolean =>
   /^!\[[^\]]*\]\([^)]*\)\s*$/.test(segment.trim());
+// "[Customer sent a photo]" is the line the AI reads; staff see the files themselves.
+const hidesMediaPlaceholder = computed(
+  () => props.message.metadata?.mediaPlaceholder === true && !!props.message.attachments?.length,
+);
+
 const isSegmented = computed(
   () =>
     !SPLIT_EXCLUDED_TYPES.includes(props.message.type) &&
