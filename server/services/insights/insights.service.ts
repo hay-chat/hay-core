@@ -53,6 +53,12 @@ export interface InsightListFilters {
   /** Window in days: counts members (and requires activity) in it. */
   days: number;
   minSize?: number;
+  /**
+   * Also list insights suggested for archiving (open, not seen for
+   * ARCHIVE_SUGGESTION_DAYS) even when last seen before the window (F8), so
+   * the owner can archive them instead of them staying open out of sight.
+   */
+  includeArchiveSuggested?: boolean;
 }
 
 export interface InsightSnippet {
@@ -89,9 +95,11 @@ export function fixedStatus(
   return { status, beforePerWeek, afterPerWeek };
 }
 
+const ARCHIVE_SUGGESTION_STATES = ["new", "acknowledged", "addressed"];
+
 export function archiveSuggested(state: string, lastSeenAt: Date, now = new Date()): boolean {
   return (
-    ["new", "acknowledged", "addressed"].includes(state) &&
+    ARCHIVE_SUGGESTION_STATES.includes(state) &&
     now.getTime() - new Date(lastSeenAt).getTime() > ARCHIVE_SUGGESTION_DAYS * 86400000
   );
 }
@@ -187,8 +195,14 @@ export class InsightsService {
       "c.organization_id = $1",
       "c.merged_into_id IS NULL",
       "c.promoted_at IS NOT NULL",
-      "c.last_seen_at >= now() - ($2 || ' days')::interval",
     ];
+    // Last seen before the archive cut-off, in a state where archiving is suggested.
+    params.push(ARCHIVE_SUGGESTION_STATES);
+    const stale =
+      `(c.state = ANY($${params.length}::varchar[])` +
+      ` AND c.last_seen_at < now() - interval '${ARCHIVE_SUGGESTION_DAYS} days')`;
+    const inWindow = "c.last_seen_at >= now() - ($2 || ' days')::interval";
+    where.push(filters.includeArchiveSuggested ? `(${inWindow} OR ${stale})` : inWindow);
     const state = filters.state ?? "open";
     if (state === "open") {
       params.push(OPEN_STATES);
@@ -208,7 +222,10 @@ export class InsightsService {
     let having = "";
     if (filters.minSize && filters.minSize > 1) {
       params.push(filters.minSize);
-      having = `WHERE period_size >= $${params.length}`;
+      // Archive suggestions have no activity in the window; the size filter can't hide them.
+      having = filters.includeArchiveSuggested
+        ? `WHERE period_size >= $${params.length} OR stale`
+        : `WHERE period_size >= $${params.length}`;
     }
 
     const rows: ClusterRow[] = await AppDataSource.query(
@@ -217,7 +234,8 @@ export class InsightsService {
                 (SELECT count(*)::int FROM insight_cluster_members m
                    JOIN insight_issues i ON i.id = m.insight_issue_id
                   WHERE m.cluster_id = c.id
-                    AND i.created_at >= now() - ($2 || ' days')::interval) AS period_size
+                    AND i.created_at >= now() - ($2 || ' days')::interval) AS period_size,
+                ${stale} AS stale
            FROM insight_clusters c
           WHERE ${where.join(" AND ")}
        ) t ${having}
