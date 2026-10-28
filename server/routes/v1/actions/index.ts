@@ -5,7 +5,11 @@ import { RESOURCES, ACTIONS } from "@server/types/scopes";
 import type { AuthUser } from "@server/lib/auth/AuthUser";
 import { organizationRepository } from "@server/repositories/organization.repository";
 import { resolveActionApprovalConfig } from "@server/types/organization-settings.types";
-import { canApproveActions, pendingActionService } from "@server/services/pending-action.service";
+import {
+  canApproveActions,
+  deciderOf,
+  pendingActionService,
+} from "@server/services/pending-action.service";
 import {
   actionDecisionService,
   type DecisionResult,
@@ -34,8 +38,15 @@ async function assertApprover(
   return organizationId;
 }
 
-function toResponse({ action, transitioned }: DecisionResult) {
+function toResponse({ action, transitioned, blocked }: DecisionResult) {
   if (!action) throw new TRPCError({ code: "NOT_FOUND", message: "Action not found" });
+  if (blocked === "conversation_closed") {
+    throw new TRPCError({
+      code: "PRECONDITION_FAILED",
+      message:
+        "This conversation is closed, so the action was not run. Reopen the conversation to approve it, or decline it.",
+    });
+  }
   return { action, transitioned };
 }
 
@@ -66,7 +77,9 @@ export const actionsRouter = t.router({
 
   approve: authenticatedProcedure.input(idInput).mutation(async ({ ctx, input }) => {
     const organizationId = await assertApprover(ctx.user, ctx.organizationId);
-    return toResponse(await actionDecisionService.approve(input.id, organizationId, ctx.user!.id));
+    return toResponse(
+      await actionDecisionService.approve(input.id, organizationId, deciderOf(ctx.user!)),
+    );
   }),
 
   reject: authenticatedProcedure
@@ -77,7 +90,7 @@ export const actionsRouter = t.router({
         await actionDecisionService.reject(
           input.id,
           organizationId,
-          ctx.user!.id,
+          deciderOf(ctx.user!),
           input.reason || null,
         ),
       );
@@ -86,7 +99,7 @@ export const actionsRouter = t.router({
   replyMyself: authenticatedProcedure.input(idInput).mutation(async ({ ctx, input }) => {
     const organizationId = await assertApprover(ctx.user, ctx.organizationId);
     return toResponse(
-      await actionDecisionService.replyMyself(input.id, organizationId, ctx.user!.id),
+      await actionDecisionService.replyMyself(input.id, organizationId, deciderOf(ctx.user!)),
     );
   }),
 });

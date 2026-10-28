@@ -33,6 +33,12 @@ export interface HoldInput {
   expiryHours: number;
 }
 
+/**
+ * decision_note on a request closed by "I'll reply myself": rejected so it
+ * never runs, but handed to the team rather than declined.
+ */
+export const HANDLED_BY_TEAM_NOTE = "handled_by_team";
+
 /** Result of a decision: the row as it is now, and whether this call moved it. */
 export interface Transition {
   action: PendingAction | null;
@@ -58,6 +64,21 @@ export function canApproveActions(
   return (user.userOrganization?.permissions ?? []).includes(
     `${RESOURCES.ACTIONS}:${ACTIONS.APPROVE}`,
   );
+}
+
+/**
+ * Who decided. `userId` is stored in `decided_by` (a users FK), so an API key
+ * caller has no user id: its key id goes into the decision event instead.
+ */
+export interface Decider {
+  userId: string | null;
+  apiKeyId?: string | null;
+}
+
+/** The decider of a request: the signed-in user, or the API key that called. */
+export function deciderOf(user: AuthUser): Decider {
+  if (user.authMethod === "apikey") return { userId: null, apiKeyId: user.apiKeyId ?? null };
+  return { userId: user.id };
 }
 
 /** The columns a status transition may set alongside the status. */
@@ -120,11 +141,11 @@ export class PendingActionService {
     );
   }
 
-  /** Was this exact tool already declined in this conversation? */
   /**
    * The latest request in this conversation for the same tool with the same
    * args that is still waiting or was turned down, if any. Lets the gate
-   * answer a repeated call without opening a second request.
+   * answer a repeated call without opening a second request. A request handed
+   * to the team ("I'll reply myself") was not declined, so it does not count.
    */
   async findEarlierRequest(
     conversationId: string,
@@ -136,6 +157,9 @@ export class PendingActionService {
       .where("pa.conversation_id = :conversationId", { conversationId })
       .andWhere("pa.tool_name = :toolName", { toolName })
       .andWhere("pa.status IN (:...statuses)", { statuses: ["pending", "rejected"] })
+      .andWhere("pa.decision_note IS DISTINCT FROM :handledByTeam", {
+        handledByTeam: HANDLED_BY_TEAM_NOTE,
+      })
       .andWhere("pa.args = CAST(:args AS jsonb)", { args: JSON.stringify(args) })
       .orderBy("pa.created_at", "DESC")
       .getOne();
@@ -145,19 +169,19 @@ export class PendingActionService {
    * pending -> approved, once. Expired-but-unswept rows cannot be approved.
    * A second approve (double click, two people) gets `transitioned: false`.
    */
-  async approve(id: string, organizationId: string, userId: string): Promise<Transition> {
+  async approve(id: string, organizationId: string, decider: Decider): Promise<Transition> {
     const moved = await this.transition(
       id,
       organizationId,
       ["pending"],
       "approved",
       {
-        decided_by: userId,
+        decided_by: decider.userId,
         decided_at: new Date(),
       },
       true,
     );
-    if (moved) await this.publish("action_approved", moved, { userId });
+    if (moved) await this.publish("action_approved", moved, { ...decider });
     return { action: moved ?? (await this.findById(id, organizationId)), transitioned: !!moved };
   }
 
@@ -165,15 +189,15 @@ export class PendingActionService {
   async reject(
     id: string,
     organizationId: string,
-    userId: string,
+    decider: Decider,
     reason: string | null,
   ): Promise<Transition> {
     const moved = await this.transition(id, organizationId, ["pending"], "rejected", {
-      decided_by: userId,
+      decided_by: decider.userId,
       decided_at: new Date(),
       decision_note: reason,
     });
-    if (moved) await this.publish("action_rejected", moved, { userId, reason });
+    if (moved) await this.publish("action_rejected", moved, { ...decider, reason });
     return { action: moved ?? (await this.findById(id, organizationId)), transitioned: !!moved };
   }
 

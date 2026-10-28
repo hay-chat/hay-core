@@ -390,10 +390,15 @@ export const organizationsRouter = t.router({
         ...topLevelFields
       } = input;
 
-      // Only the owner may let money move without approval or change who approves.
+      // Only the owner may let money move without approval, raise the amount
+      // that needs approval (a huge threshold is approval switched off), or
+      // change who approves. Lowering the threshold is fine for admins.
+      const currentThreshold = resolveActionApprovalConfig(organization.settings).thresholdAmount;
       if (
         actionApproval &&
         (actionApproval.moneyMovesNeedApproval === false ||
+          (actionApproval.thresholdAmount !== undefined &&
+            actionApproval.thresholdAmount > currentThreshold) ||
           actionApproval.approverRoles !== undefined) &&
         ctx.user?.getRole() !== "owner"
       ) {

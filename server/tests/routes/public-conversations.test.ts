@@ -172,6 +172,50 @@ describe("publicConversations.create language", () => {
   );
 });
 
+describe("publicConversations.create metadata", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockFindOrganization.mockResolvedValue({ id: ORG_ID, suspendedAt: null, settings: {} });
+    mockIsEnabled.mockResolvedValue(true);
+    mockGetSettings.mockResolvedValue({ allowedDomains: ["*"] });
+    mockRateLimited.mockResolvedValue(false);
+  });
+
+  it("keeps the page details and drops every key the server trusts", async () => {
+    await callerFor().create({
+      ...createInput,
+      metadata: {
+        source: "web-embed",
+        url: "https://shop.example.com/cart",
+        referrer: "",
+        userAgent: "Mozilla/5.0",
+        timestamp: "2026-10-28T00:00:00Z",
+        dryRun: true,
+        isPlayground: true,
+        sourceId: "playground",
+        runKind: "simulation",
+        test_mode: "true",
+        channel: "whatsapp",
+        whatsapp: { conversationId: "wa-1" },
+      },
+    });
+
+    const [, data] = mockCreateConversation.mock.calls[0] as [
+      string,
+      { metadata: Record<string, unknown> },
+    ];
+    expect(data.metadata).toEqual({
+      source: "web-embed",
+      url: "https://shop.example.com/cart",
+      referrer: "",
+      userAgent: "Mozilla/5.0",
+      timestamp: "2026-10-28T00:00:00Z",
+      channel: "web",
+      createdAt: expect.any(String),
+    });
+  });
+});
+
 describe("publicConversations rate limits", () => {
   beforeEach(() => {
     jest.clearAllMocks();

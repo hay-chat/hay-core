@@ -22,6 +22,11 @@ jest.mock("../../services/core/tool-execution.service", () => ({
 jest.mock("../../services/orchestrator-queue.service", () => ({
   orchestratorQueueService: { enqueue: mockEnqueue },
 }));
+const mockRunFollowUp = jest.fn<(conversationId: string) => Promise<void>>();
+jest.mock("../../orchestrator/run", () => {
+  class ConversationLockedError extends Error {}
+  return { runApprovalFollowUp: mockRunFollowUp, ConversationLockedError };
+});
 
 import { AppDataSource } from "../../database/data-source";
 import { Organization } from "../../entities/organization.entity";
@@ -29,15 +34,13 @@ import { User } from "../../entities/user.entity";
 import { Conversation } from "../../database/entities/conversation.entity";
 import { PendingAction } from "../../database/entities/pending-action.entity";
 import { Message, MessageType } from "../../database/entities/message.entity";
-import { pendingActionService } from "../../services/pending-action.service";
-import {
-  actionDecisionService,
-  HANDLED_BY_TEAM_NOTE,
-} from "../../services/action-decision.service";
+import { HANDLED_BY_TEAM_NOTE, pendingActionService } from "../../services/pending-action.service";
+import { actionDecisionService } from "../../services/action-decision.service";
 import { decidedActionsLedger } from "../../orchestrator/decided-actions";
 
 const orgId = "da4e0000-0000-4000-8000-000000000005";
 const userId = "da4e0000-0000-4000-8000-0000000000a5";
+const decider = { userId };
 
 async function newConversation(status: Conversation["status"] = "awaiting-approval") {
   const conversations = AppDataSource.getRepository(Conversation);
@@ -107,8 +110,8 @@ describe("action decisions (D4-5)", () => {
     const action = await hold(conversation.id);
 
     const results = await Promise.all([
-      actionDecisionService.approve(action.id, orgId, userId),
-      actionDecisionService.approve(action.id, orgId, userId),
+      actionDecisionService.approve(action.id, orgId, decider),
+      actionDecisionService.approve(action.id, orgId, decider),
     ]);
 
     expect(results.filter((r) => r.transitioned)).toHaveLength(1);
@@ -117,7 +120,7 @@ describe("action decisions (D4-5)", () => {
     expect(executed.idempotency_key).toBe(action.idempotency_key);
 
     // A third, late approve does nothing either.
-    const late = await actionDecisionService.approve(action.id, orgId, userId);
+    const late = await actionDecisionService.approve(action.id, orgId, decider);
     expect(late.transitioned).toBe(false);
     expect(mockExecuteApproved).toHaveBeenCalledTimes(1);
 
@@ -139,7 +142,7 @@ describe("action decisions (D4-5)", () => {
     const conversation = await newConversation();
     const action = await hold(conversation.id);
 
-    await actionDecisionService.approve(action.id, orgId, userId);
+    await actionDecisionService.approve(action.id, orgId, decider);
 
     const row = await pendingActionService.findById(action.id, orgId);
     expect(row).toMatchObject({ status: "failed", error_code: "PRECONDITION" });
@@ -151,7 +154,7 @@ describe("action decisions (D4-5)", () => {
     const conversation = await newConversation();
     const action = await hold(conversation.id);
 
-    const result = await actionDecisionService.reject(action.id, orgId, userId, "Past 30 days");
+    const result = await actionDecisionService.reject(action.id, orgId, decider, "Past 30 days");
 
     expect(result.transitioned).toBe(true);
     expect(mockExecuteApproved).not.toHaveBeenCalled();
@@ -164,8 +167,8 @@ describe("action decisions (D4-5)", () => {
     const conversation = await newConversation();
     const approved = await hold(conversation.id);
     const declined = await hold(conversation.id);
-    await actionDecisionService.approve(approved.id, orgId, userId);
-    await actionDecisionService.reject(declined.id, orgId, userId, "Needs a photo");
+    await actionDecisionService.approve(approved.id, orgId, decider);
+    await actionDecisionService.reject(declined.id, orgId, decider, "Needs a photo");
 
     const row = await AppDataSource.getRepository(Conversation).findOneByOrFail({
       id: conversation.id,
@@ -192,7 +195,7 @@ describe("action decisions (D4-5)", () => {
       expiryHours: 48,
     });
 
-    await actionDecisionService.reject(first.id, orgId, userId, null);
+    await actionDecisionService.reject(first.id, orgId, decider, null);
 
     expect(await statusOf(conversation.id)).toBe("awaiting-approval");
     expect(mockEnqueue).not.toHaveBeenCalled();
@@ -202,20 +205,88 @@ describe("action decisions (D4-5)", () => {
     const conversation = await newConversation();
     const action = await hold(conversation.id);
 
-    await actionDecisionService.replyMyself(action.id, orgId, userId);
+    await actionDecisionService.replyMyself(action.id, orgId, decider);
 
     const row = await pendingActionService.findById(action.id, orgId);
     expect(row).toMatchObject({ status: "rejected", decision_note: HANDLED_BY_TEAM_NOTE });
     expect(await statusOf(conversation.id)).toBe("pending-human");
     expect(mockEnqueue).not.toHaveBeenCalled();
     expect(mockExecuteApproved).not.toHaveBeenCalled();
+    // Handed to the team is not "declined": a later identical call is not
+    // answered with "a team member already declined this".
+    expect(
+      await pendingActionService.findEarlierRequest(conversation.id, action.tool_name, action.args),
+    ).toBeNull();
+  });
+
+  it("hands to the team instead of an AI turn when the channel's reply window closed", async () => {
+    const conversation = await newConversation();
+    await AppDataSource.getRepository(Conversation).update(conversation.id, {
+      reply_window_expires_at: new Date(Date.now() - 60_000),
+    });
+    const action = await hold(conversation.id);
+
+    await actionDecisionService.approve(action.id, orgId, decider);
+
+    expect(mockExecuteApproved).toHaveBeenCalledTimes(1);
+    expect(mockEnqueue).not.toHaveBeenCalled();
+    expect(await statusOf(conversation.id)).toBe("pending-human");
+    const notes = (await systemNotes(conversation.id)).map((n) => n.content).join("\n");
+    expect(notes).toContain("approved and done");
+    expect(notes).toContain("reply window");
+  });
+
+  it("still resumes the AI while the reply window is open", async () => {
+    const conversation = await newConversation();
+    await AppDataSource.getRepository(Conversation).update(conversation.id, {
+      reply_window_expires_at: new Date(Date.now() + 3600_000),
+    });
+    const action = await hold(conversation.id);
+
+    await actionDecisionService.reject(action.id, orgId, decider, null);
+
+    expect(await statusOf(conversation.id)).toBe("open");
+    expect(mockEnqueue).toHaveBeenCalledWith(conversation.id, orgId, "approval_decided");
+  });
+
+  it.each(["resolved", "unresolved", "closed"] as const)(
+    "approve on a %s conversation does not run the action",
+    async (status) => {
+      const conversation = await newConversation(status);
+      const action = await hold(conversation.id);
+
+      const result = await actionDecisionService.approve(action.id, orgId, decider);
+
+      expect(result).toMatchObject({ transitioned: false, blocked: "conversation_closed" });
+      expect(mockExecuteApproved).not.toHaveBeenCalled();
+      expect((await pendingActionService.findById(action.id, orgId))?.status).toBe("pending");
+    },
+  );
+
+  it("without a queue, retries the follow-up while another run holds the lock", async () => {
+    const { ConversationLockedError } = jest.requireMock<{
+      ConversationLockedError: new () => Error;
+    }>("../../orchestrator/run");
+    mockEnqueue.mockResolvedValue(false);
+    mockRunFollowUp
+      .mockRejectedValueOnce(new ConversationLockedError())
+      .mockResolvedValueOnce(undefined);
+    actionDecisionService.followUpRetryMs = 5;
+    const conversation = await newConversation();
+    const action = await hold(conversation.id);
+
+    await actionDecisionService.reject(action.id, orgId, decider, null);
+    await new Promise((resolve) => setTimeout(resolve, 200));
+
+    expect(mockRunFollowUp).toHaveBeenCalledTimes(2);
+    expect(mockRunFollowUp).toHaveBeenCalledWith(conversation.id);
   });
 
   it("does not resume the AI when a human took over meanwhile", async () => {
     const conversation = await newConversation("human-took-over");
     const action = await hold(conversation.id);
 
-    await actionDecisionService.approve(action.id, orgId, userId);
+    await actionDecisionService.approve(action.id, orgId, decider);
 
     expect(mockExecuteApproved).toHaveBeenCalledTimes(1);
     expect(await statusOf(conversation.id)).toBe("human-took-over");
@@ -292,7 +363,7 @@ describe("action expiry (D4-8)", () => {
     expect(shopper[0].content).toContain("não foi feita");
     const updatedTool = await AppDataSource.getRepository(Message).findOneBy({ id: tool.id });
     expect(updatedTool?.metadata?.toolStatus).toBe("EXPIRED");
-    expect(await pendingActionService.approve(action.id, orgId, userId)).toMatchObject({
+    expect(await pendingActionService.approve(action.id, orgId, decider)).toMatchObject({
       transitioned: false,
     });
   });
