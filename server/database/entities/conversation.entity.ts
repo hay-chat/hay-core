@@ -999,13 +999,16 @@ The following tools are available for you to use. You MUST return only valid JSO
 
       // Only apply test mode if this is a response to a customer (not the initial greeting).
       // Test conversations (playground, simulation runs) reach no shopper, so
-      // their replies are never held for approval.
+      // their replies are never held for approval. The locked-workspace holding
+      // reply (D15-4) is a fixed line, not AI output, and no one can approve it
+      // while the workspace is locked: it always goes out.
       const { isTestConversation } =
         await import("../../services/close-classification/outcome-rules");
       if (
         (testModeEnabled || draftsOnly) &&
         hasCustomerMessages &&
-        !isTestConversation(this.metadata)
+        !isTestConversation(this.metadata) &&
+        messageData.metadata?.isSuspendedHoldingReply !== true
       ) {
         messageStatus = MessageStatus.PENDING;
         reviewRequired = true;

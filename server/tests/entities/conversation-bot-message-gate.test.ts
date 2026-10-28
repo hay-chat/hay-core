@@ -4,7 +4,9 @@ import { describe, it, expect, jest, beforeEach } from "@jest/globals";
  * Conversation.addMessage() for an AI (BotAgent) reply:
  * - stamps the AI processing region in effect (D14-5, shown in the debug view);
  * - queues the reply for approval when the agent or org is in test mode, or when
- *   the conversation's channel is set to "drafts only" (D14-7).
+ *   the conversation's channel is set to "drafts only" (D14-7);
+ * - never holds the fixed holding reply of a locked organization (D15-4, G4):
+ *   no one can approve it while the workspace is locked, so it would never go out.
  */
 
 const mockGetMessages = jest.fn<() => Promise<unknown[]>>();
@@ -132,5 +134,40 @@ describe("Conversation.addMessage for an AI reply", () => {
     });
     await makeConversation("whatsapp").addMessage(botReply);
     expect(created()).not.toMatchObject({ reviewRequired: true });
+  });
+
+  it("sends the locked-workspace holding reply straight away on drafts only and in test mode", async () => {
+    const holding = {
+      content: "Thanks for your message. We have received it.",
+      type: MessageType.BOT_AGENT,
+      metadata: { isSuspendedHoldingReply: true },
+    };
+    for (const settings of [
+      { channelAiModes: { whatsapp: "drafts" } },
+      { testModeDefault: true },
+    ]) {
+      mockCreateMessage.mockClear();
+      mockFindOrg.mockResolvedValue({ id: ORG_ID, settings });
+      await makeConversation("whatsapp").addMessage(holding);
+      expect(created()).toMatchObject({
+        status: "approved",
+        reviewRequired: false,
+        deliveryState: "sent",
+      });
+    }
+
+    // Agent-level test mode too.
+    mockCreateMessage.mockClear();
+    mockFindOrg.mockResolvedValue({ id: ORG_ID, settings: {} });
+    mockFindAgent.mockResolvedValue({ id: "agent-1", testMode: true });
+    const conversation = makeConversation("whatsapp");
+    conversation.agent_id = "agent-1";
+    await conversation.addMessage(holding);
+    expect(created()).toMatchObject({ reviewRequired: false, deliveryState: "sent" });
+
+    // An ordinary AI reply on the same agent is still held.
+    mockCreateMessage.mockClear();
+    await conversation.addMessage(botReply);
+    expect(created()).toMatchObject({ reviewRequired: true, deliveryState: "queued" });
   });
 });

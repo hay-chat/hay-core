@@ -17,7 +17,7 @@ import type { Conversation } from "@server/database/entities/conversation.entity
 import { MessageType } from "@server/database/entities/message.entity";
 import { config } from "@server/config/env";
 import { createLogger } from "@server/lib/logger";
-import { validateUrlForSSRF } from "@server/utils/ssrf";
+import { fetchPublicFile } from "@server/utils/fetch-public-file";
 import { recheckAiReply } from "@server/orchestrator/reply-guard";
 import { CONVERSATION_MEDIA_FOLDER, storageService } from "@server/services/storage.service";
 import { cleanFilename } from "@server/services/webchat/widget-attachments";
@@ -50,28 +50,6 @@ function cameFromToolResult(
         JSON.stringify(url).slice(1, -1),
       ),
   );
-}
-
-async function download(
-  url: string,
-  maxBytes: number,
-): Promise<{ buffer: Buffer; mimeType: string }> {
-  await validateUrlForSSRF(url);
-  // No redirects: a redirect could point past the SSRF check.
-  const response = await fetch(url, {
-    redirect: "manual",
-    signal: AbortSignal.timeout(DOWNLOAD_TIMEOUT_MS),
-  });
-  if (!response.ok) throw new Error(`download failed with status ${response.status}`);
-  const declared = Number(response.headers.get("content-length") ?? "0");
-  if (declared > maxBytes) throw new Error("file too large");
-  const buffer = Buffer.from(await response.arrayBuffer());
-  if (buffer.length > maxBytes) throw new Error("file too large");
-  const mimeType = (response.headers.get("content-type") ?? "application/octet-stream")
-    .split(";")[0]
-    .trim()
-    .toLowerCase();
-  return { buffer, mimeType };
 }
 
 export const sendAttachmentTool: CoreToolDefinition = {
@@ -110,10 +88,10 @@ export const sendAttachmentTool: CoreToolDefinition = {
 
     let stored: Awaited<ReturnType<typeof storageService.upload>>;
     try {
-      const { buffer, mimeType } = await download(
-        url,
-        config.storage.limits.conversationMediaMaxFileSize,
-      );
+      const { buffer, mimeType } = await fetchPublicFile(url, {
+        maxBytes: config.storage.limits.conversationMediaMaxFileSize,
+        timeoutMs: DOWNLOAD_TIMEOUT_MS,
+      });
       if (!AI_ATTACHMENT_TYPES.includes(mimeType)) {
         return { sent: false, error: "only images and PDFs can be sent" };
       }

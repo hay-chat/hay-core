@@ -176,7 +176,8 @@ export class Message {
     };
     confidenceTier?: "high" | "medium" | "low";
     confidenceDetails?: string;
-    documentsUsed?: Array<{ id: string; title: string; similarity: number }>;
+    /** `excerpt`: the knowledge-base text the AI read (dispute evidence, G5). */
+    documentsUsed?: Array<{ id: string; title: string; similarity: number; excerpt?: string }>;
     recheckAttempted?: boolean;
     recheckCount?: number;
     // Tool execution metadata

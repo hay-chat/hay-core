@@ -60,6 +60,10 @@ interface CopyTable {
   policiesHeading: string;
   policiesIntro: string;
   policyFirstShown: string;
+  /** Under an excerpt read from the document today (no text recorded at the time). */
+  policyCurrentText: string;
+  /** Where the timeline stops at the page limit. */
+  timelineTruncated: string;
   attachmentsHeading: string;
   attachmentsNone: string;
   imageOmitted: string;
@@ -134,8 +138,12 @@ const en: CopyTable = {
     "Messages the customer saw or sent, store actions and their results, and hand-offs to the store's team, in date order. Internal notes and system instructions are left out.",
   policiesHeading: "Store policies shown to the customer",
   policiesIntro:
-    "Documents the store's AI assistant used when answering the customer. The excerpt is the document as it is stored today; it may have been edited since it was first used.",
+    "Documents the store's AI assistant used when answering the customer. Each excerpt is the text as it was when the assistant used it, unless marked otherwise.",
   policyFirstShown: "First used in a reply: {at}",
+  policyCurrentText:
+    "This is the document as it is stored today: the text at the time was not recorded. It may have been edited since.",
+  timelineTruncated:
+    "{count} more timeline entries are not shown, to keep this file within {pages} pages. The full conversations stay available to the store in Hay.chat.",
   attachmentsHeading: "Attachments",
   attachmentsNone: "No attachments.",
   imageOmitted: "Image left out to keep this file under 4 MB. It is included in the ZIP download.",
@@ -265,8 +273,12 @@ const ptBR: CopyTable = {
     "Mensagens que o cliente viu ou enviou, ações da loja e seus resultados, e transferências para a equipe da loja, em ordem de data. Notas internas e instruções do sistema ficam de fora.",
   policiesHeading: "Políticas da loja mostradas ao cliente",
   policiesIntro:
-    "Documentos que o assistente de IA da loja usou ao responder o cliente. O trecho é o documento como está armazenado hoje; ele pode ter sido editado depois do primeiro uso.",
+    "Documentos que o assistente de IA da loja usou ao responder o cliente. Cada trecho é o texto como estava quando o assistente o usou, salvo indicação em contrário.",
   policyFirstShown: "Usado pela primeira vez em uma resposta: {at}",
+  policyCurrentText:
+    "Este é o documento como está armazenado hoje: o texto da época não foi registrado. Ele pode ter sido editado desde então.",
+  timelineTruncated:
+    "Mais {count} itens da linha do tempo não aparecem aqui, para manter este arquivo em até {pages} páginas. As conversas completas continuam disponíveis para a loja no Hay.chat.",
   attachmentsHeading: "Anexos",
   attachmentsNone: "Nenhum anexo.",
   imageOmitted:
