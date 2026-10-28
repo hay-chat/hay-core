@@ -94,6 +94,8 @@ export interface MemberCandidate {
   membershipActive: boolean;
   userActive: boolean;
   status: string;
+  /** Lock-screen privacy: send this person a generic alert with no customer details. */
+  hideAlertPreview: boolean;
 }
 
 export type CustomerMessageAlert = "customer_reply" | "followup";
@@ -212,6 +214,14 @@ function conversationPath(conversation: Pick<Conversation, "id" | "organization_
 }
 
 /** Notifications about one conversation replace each other on a device. */
+/**
+ * The lock-screen-safe version of an alert: no customer name, summary or
+ * message text. Same link and tag, so tapping it still opens the conversation.
+ */
+export function privateAlertPayload(payload: PushPayload, locale: NotificationLocale): PushPayload {
+  return { ...payload, title: "Hay.chat", body: COPY[locale].pushTitle };
+}
+
 function conversationTag(conversation: Pick<Conversation, "id">): string {
   return `conversation:${conversation.id}`;
 }
@@ -251,9 +261,10 @@ class ConversationAlertService {
       membership_active: boolean;
       user_active: boolean;
       status: string;
+      hide_alert_preview: boolean;
     }> = await AppDataSource.query(
       `SELECT u.id, u.email, u.first_name, uo.is_active AS membership_active,
-              u.is_active AS user_active, u.status
+              u.is_active AS user_active, u.status, u.hide_alert_preview
          FROM user_organizations uo
          JOIN users u ON u.id = uo.user_id
         WHERE uo.organization_id = $1
@@ -270,6 +281,7 @@ class ConversationAlertService {
         membershipActive: row.membership_active,
         userActive: row.user_active,
         status: row.status,
+        hideAlertPreview: row.hide_alert_preview === true,
       }))
       .filter(isAlertRecipient);
   }
@@ -323,23 +335,29 @@ class ConversationAlertService {
   /**
    * Push one step to each recipient's devices, recording the result per
    * recipient. Returns the status of each recipient this call claimed
-   * (recipients already claimed by an earlier call are left out).
+   * (recipients already claimed by an earlier call are left out). A recipient
+   * with lock-screen privacy on gets the generic alert instead.
    */
   private async pushTo(
     conversation: Conversation,
     cycleStartedAt: Date,
     step: NotificationStep,
     recipients: MemberCandidate[],
+    locale: NotificationLocale,
     payload: PushPayload,
   ): Promise<Map<string, NotificationStatus>> {
     const results = new Map<string, NotificationStatus>();
+    const privatePayload = privateAlertPayload(payload, locale);
     await Promise.all(
       recipients.map(async (recipient) => {
         const row = await this.claim(conversation, cycleStartedAt, step, "push", recipient.id);
         if (!row) return;
         let status: NotificationStatus;
         try {
-          const result = await pushNotificationService.sendToUser(recipient.id, payload);
+          const result = await pushNotificationService.sendToUser(
+            recipient.id,
+            recipient.hideAlertPreview ? privatePayload : payload,
+          );
           status =
             result.sent > 0 ? "sent" : result.devices - result.removed > 0 ? "failed" : "no_device";
           await this.finish(row, status, `devices=${result.devices} sent=${result.sent}`);
@@ -371,7 +389,7 @@ class ConversationAlertService {
     const locale = await organizationNotificationLocale(conversation.organization_id);
     const copy = COPY[locale];
     const who = customerLabel(conversation, locale);
-    await this.pushTo(conversation, cycleStartedAt, step, recipients, {
+    await this.pushTo(conversation, cycleStartedAt, step, recipients, locale, {
       kind: "conversation_needs_attention",
       title: step === "initial" ? copy.pushTitle : copy.repushTitle,
       body: conversation.summary
@@ -489,7 +507,7 @@ class ConversationAlertService {
     const copy = COPY[locale];
     const who = customerLabel(target, locale);
     const text = excerpt(message.content);
-    await this.pushTo(target, collapseWindowStart(message.created_at), alert, recipients, {
+    await this.pushTo(target, collapseWindowStart(message.created_at), alert, recipients, locale, {
       kind: "conversation_needs_attention",
       title: alert === "customer_reply" ? copy.replyTitle : copy.followupTitle,
       body: text ? `${who}: ${text}` : `${who}. ${copy.summaryPending}`,
@@ -574,13 +592,20 @@ class ConversationAlertService {
     const copy = COPY[locale];
     const who = customerLabel(conversation, locale);
     const minutes = minutesSince(waitingSince, now);
-    const results = await this.pushTo(conversation, waitingSince, "unanswered", recipients, {
-      kind: "conversation_needs_attention",
-      title: copy.unansweredTitle,
-      body: copy.unansweredBody(who, minutes),
-      url: conversationPath(conversation),
-      tag: conversationTag(conversation),
-    });
+    const results = await this.pushTo(
+      conversation,
+      waitingSince,
+      "unanswered",
+      recipients,
+      locale,
+      {
+        kind: "conversation_needs_attention",
+        title: copy.unansweredTitle,
+        body: copy.unansweredBody(who, minutes),
+        url: conversationPath(conversation),
+        tag: conversationTag(conversation),
+      },
+    );
 
     const unreached = recipients.filter((recipient) => {
       const status = results.get(recipient.id);

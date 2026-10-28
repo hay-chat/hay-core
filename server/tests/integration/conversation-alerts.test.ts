@@ -157,6 +157,25 @@ describe("conversation alert ladder", () => {
     expect(await steps(conversation.id)).toEqual(["initial:push:sent"]);
   });
 
+  it("sends the generic alert to a member with lock-screen privacy on (D11-12)", async () => {
+    await AppDataSource.getRepository(User).update({ id: availableId }, { hideAlertPreview: true });
+    try {
+      const conversation = await waitingConversation();
+      const [, payload] = mockSendToUser.mock.calls[0];
+      expect(payload).toMatchObject({
+        title: "Hay.chat",
+        body: "Um cliente precisa de um humano",
+        url: `/conversations/${conversation.id}?org=${orgId}`,
+      });
+      expect(JSON.stringify(payload)).not.toContain("refund");
+    } finally {
+      await AppDataSource.getRepository(User).update(
+        { id: availableId },
+        { hideAlertPreview: false },
+      );
+    }
+  });
+
   it("records no_device for a member without devices", async () => {
     mockSendToUser.mockResolvedValue({ devices: 0, sent: 0, removed: 0 });
     const conversation = await waitingConversation();
