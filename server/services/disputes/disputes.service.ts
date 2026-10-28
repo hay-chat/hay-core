@@ -200,6 +200,8 @@ export class DisputesService {
 
     if (dispute.status === "needs_response" && !dispute.alertedAt) {
       await this.alert(dispute, "opened");
+      // The alert stamps alerted_at in the database (here or in a racing report).
+      dispute = await repo.findOneByOrFail({ id: dispute.id });
     }
     return { created, dispute };
   }

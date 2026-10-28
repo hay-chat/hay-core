@@ -1,8 +1,10 @@
 /**
- * D2-7: matching a reported dispute to an order. No database: the order
- * index is the boundary.
+ * D2-7: dispute intake without a database. The order index and the dispute
+ * repository are the boundary (the SQL runs in tests/integration/disputes.test.ts).
  */
 import { describe, it, expect, jest, afterEach } from "@jest/globals";
+import { AppDataSource } from "../../database/data-source";
+import type { Dispute } from "../../database/entities/dispute.entity";
 import { orderLinkService, type OrderGroup } from "../../services/order-links/order-link.service";
 import { DisputesService } from "../../services/disputes/disputes.service";
 
@@ -37,5 +39,40 @@ describe("DisputesService.matchOrder", () => {
     );
     const match = await service.matchOrder("org", "stripe", ["#2002", "#1001"]);
     expect(match?.orderKey).toBe("5550001");
+  });
+});
+
+describe("DisputesService.report", () => {
+  afterEach(() => jest.restoreAllMocks());
+
+  it("returns the alertedAt the alert stamped, not the row loaded before it", async () => {
+    const alertedAt = new Date("2026-10-28T10:00:00Z");
+    const row = {
+      id: "d1",
+      organizationId: "org",
+      pluginId: "stripe",
+      externalId: "dp_1",
+      status: "needs_response",
+      orderKey: "5550001",
+      orderRefs: ["#1001"],
+      alertedAt: null,
+    } as unknown as Dispute;
+    const repo = {
+      findOne: jest.fn(async () => row),
+      update: jest.fn(async () => ({})),
+      findOneByOrFail: jest.fn(async () => ({ ...row, alertedAt })),
+    };
+    jest
+      .spyOn(AppDataSource, "getRepository")
+      .mockReturnValue(repo as unknown as ReturnType<typeof AppDataSource.getRepository>);
+    const service = new DisputesService({ platformName: () => null });
+    const alert = jest.spyOn(service, "alert").mockResolvedValue(true);
+
+    const { dispute } = await service.report("org", "stripe", {
+      externalId: "dp_1",
+      status: "needs_response",
+    });
+    expect(alert).toHaveBeenCalledWith(expect.objectContaining({ id: "d1" }), "opened");
+    expect(dispute.alertedAt).toEqual(alertedAt);
   });
 });
