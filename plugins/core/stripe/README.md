@@ -58,7 +58,17 @@ The Stripe plugin uses Stripe's Model Context Protocol (MCP) server to provide s
 ### Disputes
 - List disputes by status
 - Update dispute evidence
-- Submit dispute responses
+- Submit dispute responses (Stripe MCP tool, held for approval)
+
+### Chargeback alerts and evidence drafts (Hay.chat)
+- On start the plugin registers a webhook endpoint for `charge.dispute.*` on
+  the connected account (only when the Hay.chat API is public https) and syncs
+  disputes opened in the last 120 days; a 6-hourly cron re-syncs.
+- Webhook bodies are hints: each dispute is re-read from Stripe with the key.
+- Owners and admins get an alert with the evidence deadline; on Evidence packs,
+  "Attach as draft" uploads the pack PDF to `customer_communication` (or
+  `uncategorized_file`) and adds a note to `uncategorized_text` with
+  `submit=false`. Hay.chat never submits; files the merchant added are kept.
 
 ### Search & Documentation
 - Search across all Stripe resources
