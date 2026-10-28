@@ -60,6 +60,21 @@ export function canApproveActions(
   );
 }
 
+/**
+ * Who decided. `userId` is stored in `decided_by` (a users FK), so an API key
+ * caller has no user id: its key id goes into the decision event instead.
+ */
+export interface Decider {
+  userId: string | null;
+  apiKeyId?: string | null;
+}
+
+/** The decider of a request: the signed-in user, or the API key that called. */
+export function deciderOf(user: AuthUser): Decider {
+  if (user.authMethod === "apikey") return { userId: null, apiKeyId: user.apiKeyId ?? null };
+  return { userId: user.id };
+}
+
 /** The columns a status transition may set alongside the status. */
 type DecisionFields = Partial<
   Pick<PendingAction, "decided_by" | "decided_at" | "decision_note" | "error_code" | "executed_at">
@@ -145,19 +160,19 @@ export class PendingActionService {
    * pending -> approved, once. Expired-but-unswept rows cannot be approved.
    * A second approve (double click, two people) gets `transitioned: false`.
    */
-  async approve(id: string, organizationId: string, userId: string): Promise<Transition> {
+  async approve(id: string, organizationId: string, decider: Decider): Promise<Transition> {
     const moved = await this.transition(
       id,
       organizationId,
       ["pending"],
       "approved",
       {
-        decided_by: userId,
+        decided_by: decider.userId,
         decided_at: new Date(),
       },
       true,
     );
-    if (moved) await this.publish("action_approved", moved, { userId });
+    if (moved) await this.publish("action_approved", moved, { ...decider });
     return { action: moved ?? (await this.findById(id, organizationId)), transitioned: !!moved };
   }
 
@@ -165,15 +180,15 @@ export class PendingActionService {
   async reject(
     id: string,
     organizationId: string,
-    userId: string,
+    decider: Decider,
     reason: string | null,
   ): Promise<Transition> {
     const moved = await this.transition(id, organizationId, ["pending"], "rejected", {
-      decided_by: userId,
+      decided_by: decider.userId,
       decided_at: new Date(),
       decision_note: reason,
     });
-    if (moved) await this.publish("action_rejected", moved, { userId, reason });
+    if (moved) await this.publish("action_rejected", moved, { ...decider, reason });
     return { action: moved ?? (await this.findById(id, organizationId)), transitioned: !!moved };
   }
 
