@@ -14,6 +14,7 @@ const { StdioClientTransport } = require("@modelcontextprotocol/sdk/client/stdio
 
 const EXPECTED_TOOLS = [
   "woocommerce_add_order_note",
+  "woocommerce_calculate_refund",
   "woocommerce_cancel_order",
   "woocommerce_check_inventory",
   "woocommerce_create_refund",
@@ -21,9 +22,12 @@ const EXPECTED_TOOLS = [
   "woocommerce_get_order",
   "woocommerce_get_order_tracking",
   "woocommerce_get_product",
+  "woocommerce_get_product_by_slug",
   "woocommerce_get_store",
   "woocommerce_list_customer_orders",
   "woocommerce_search_products",
+  "woocommerce_update_customer",
+  "woocommerce_update_customer_address",
   "woocommerce_update_order_shipping_address",
 ];
 

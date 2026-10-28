@@ -49,7 +49,118 @@ function buildLineItemRefund(order, requested) {
   return { lines, amount };
 }
 
+/**
+ * Validate a refund request against the order and work out what it would do:
+ * refuses unpaid and fully refunded orders and amounts above what is left.
+ * Shared by woocommerce_create_refund and the read-only woocommerce_calculate_refund.
+ */
+function planRefund(order, args) {
+  const ref = `#${order.number}`;
+  if (order.status === "cancelled" && !order.date_paid) {
+    throw toolError(
+      "PRECONDITION",
+      `Order ${ref} is cancelled and was never paid; nothing to refund.`,
+      {
+        details: { reason: "NOT_PAID" },
+      },
+    );
+  }
+  if (!order.date_paid && order.status !== "completed") {
+    throw toolError(
+      "PRECONDITION",
+      `Order ${ref} has no recorded payment (status "${order.status}"); there is nothing to refund.`,
+      { details: { reason: "NOT_PAID", status: order.status } },
+    );
+  }
+  const remaining = round2(Math.max(0, num(order.total) - refundedTotal(order)));
+  if (remaining <= 0) {
+    throw toolError(
+      "PRECONDITION",
+      `Order ${ref} is already fully refunded (${order.total} ${order.currency}).`,
+      { details: { reason: "FULLY_REFUNDED" } },
+    );
+  }
+
+  let amount = remaining;
+  let lines = [];
+  if (args.line_items && args.line_items.length) {
+    const built = buildLineItemRefund(order, args.line_items);
+    lines = built.lines;
+    amount = args.amount !== undefined ? Number(args.amount) : built.amount;
+  } else if (args.amount !== undefined) {
+    amount = Number(args.amount);
+  }
+  if (!Number.isFinite(amount) || amount <= 0) {
+    throw toolError("BAD_INPUT", `Invalid refund amount "${args.amount}".`);
+  }
+  if (amount > remaining + 0.001) {
+    throw toolError(
+      "PRECONDITION",
+      `Refund of ${amount.toFixed(2)} exceeds the remaining refundable balance of ` +
+        `${remaining.toFixed(2)} ${order.currency} for order ${ref}.`,
+      { details: { reason: "EXCEEDS_REFUNDABLE", requested: amount, remaining } },
+    );
+  }
+  return { ref, amount, lines, remaining };
+}
+
+/** Which order and how much: shared by the refund tool and its read-only preview. */
+const REFUND_INPUT = {
+  order_id: z.string().optional().describe("WooCommerce order id."),
+  order_number: z.string().optional().describe("The order number the customer sees."),
+  amount: z
+    .string()
+    .optional()
+    .describe(
+      'Partial amount as a decimal string (e.g. "10.50"). Omit with line_items to refund those items.',
+    ),
+  line_items: z
+    .array(
+      z.object({
+        line_item_id: z.string().describe("Line item id from woocommerce_get_order."),
+        quantity: z.number().int().describe("Quantity of that item to refund."),
+      }),
+    )
+    .optional()
+    .describe("Items to refund (and restock when restock=true)."),
+};
+
 function registerRefundTools(server) {
+  server.tool(
+    "woocommerce_calculate_refund",
+    "Preview a refund without making it (read-only): the amount woocommerce_create_refund would " +
+      "refund for these arguments, per-item amounts (incl. tax) and what is left refundable " +
+      "afterwards. Same rules and refusals as the real refund. Omit amount and line_items to see " +
+      "the full remaining balance.",
+    REFUND_INPUT,
+    async (args) => {
+      try {
+        const order = await resolveOrder(args);
+        const { amount, lines, remaining } = planRefund(order, args);
+        return ok({
+          id: order.id,
+          number: order.number,
+          amount: { amount: amount.toFixed(2), currency: order.currency },
+          remainingRefundableBefore: { amount: remaining.toFixed(2), currency: order.currency },
+          remainingRefundableAfter: {
+            amount: round2(remaining - amount).toFixed(2),
+            currency: order.currency,
+          },
+          lineItems: lines.map((l) => ({
+            id: l.id,
+            quantity: l.quantity,
+            refundTotal: l.refund_total,
+            refundTax: round2(l.refund_tax.reduce((sum, t) => sum + t.refund_total, 0)),
+          })),
+          paymentMethod: order.payment_method_title || order.payment_method || null,
+          note: "Nothing was refunded. Call woocommerce_create_refund with the same arguments to refund.",
+        });
+      } catch (err) {
+        return fail(err);
+      }
+    },
+  );
+
   server.tool(
     "woocommerce_create_refund",
     "Refund an order (WRITE). Omit amount and line_items for a full refund of whatever is left; " +
@@ -58,23 +169,7 @@ function registerRefundTools(server) {
       "balance. By default the payment gateway is asked to return the money; if it cannot, the " +
       "error says so — refund in the gateway and re-run with refund_payment=false to record it.",
     {
-      order_id: z.string().optional().describe("WooCommerce order id."),
-      order_number: z.string().optional().describe("The order number the customer sees."),
-      amount: z
-        .string()
-        .optional()
-        .describe(
-          'Partial amount as a decimal string (e.g. "10.50"). Omit with line_items to refund those items.',
-        ),
-      line_items: z
-        .array(
-          z.object({
-            line_item_id: z.string().describe("Line item id from woocommerce_get_order."),
-            quantity: z.number().int().describe("Quantity of that item to refund."),
-          }),
-        )
-        .optional()
-        .describe("Items to refund (and restock when restock=true)."),
+      ...REFUND_INPUT,
       reason: z.string().optional().describe("Why the refund is issued (stored on the refund)."),
       restock: z.boolean().optional().describe("Restock refunded items (default false)."),
       refund_payment: z
@@ -87,52 +182,7 @@ function registerRefundTools(server) {
     async (args) => {
       try {
         const order = await resolveOrder(args);
-        const ref = `#${order.number}`;
-        if (order.status === "cancelled" && !order.date_paid) {
-          throw toolError(
-            "PRECONDITION",
-            `Order ${ref} is cancelled and was never paid; nothing to refund.`,
-            {
-              details: { reason: "NOT_PAID" },
-            },
-          );
-        }
-        if (!order.date_paid && order.status !== "completed") {
-          throw toolError(
-            "PRECONDITION",
-            `Order ${ref} has no recorded payment (status "${order.status}"); there is nothing to refund.`,
-            { details: { reason: "NOT_PAID", status: order.status } },
-          );
-        }
-        const remaining = round2(Math.max(0, num(order.total) - refundedTotal(order)));
-        if (remaining <= 0) {
-          throw toolError(
-            "PRECONDITION",
-            `Order ${ref} is already fully refunded (${order.total} ${order.currency}).`,
-            { details: { reason: "FULLY_REFUNDED" } },
-          );
-        }
-
-        let amount = remaining;
-        let lines = [];
-        if (args.line_items && args.line_items.length) {
-          const built = buildLineItemRefund(order, args.line_items);
-          lines = built.lines;
-          amount = args.amount !== undefined ? Number(args.amount) : built.amount;
-        } else if (args.amount !== undefined) {
-          amount = Number(args.amount);
-        }
-        if (!Number.isFinite(amount) || amount <= 0) {
-          throw toolError("BAD_INPUT", `Invalid refund amount "${args.amount}".`);
-        }
-        if (amount > remaining + 0.001) {
-          throw toolError(
-            "PRECONDITION",
-            `Refund of ${amount.toFixed(2)} exceeds the remaining refundable balance of ` +
-              `${remaining.toFixed(2)} ${order.currency} for order ${ref}.`,
-            { details: { reason: "EXCEEDS_REFUNDABLE", requested: amount, remaining } },
-          );
-        }
+        const { amount, lines, remaining } = planRefund(order, args);
 
         const refundPayment = args.refund_payment ?? true;
         const body = {
@@ -185,4 +235,4 @@ function registerRefundTools(server) {
   );
 }
 
-module.exports = { registerRefundTools, buildLineItemRefund };
+module.exports = { registerRefundTools, buildLineItemRefund, planRefund };

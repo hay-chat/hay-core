@@ -49,6 +49,22 @@
     "woocommerce_check_inventory": {
       "label": "Verificar estoque",
       "description": "Verifica o status e a quantidade em estoque de um SKU de produto ou variação."
+    },
+    "woocommerce_get_product_by_slug": {
+      "label": "Ver produto pelo link",
+      "description": "Consulta um produto pelo link da loja ou slug, com preço, estoque e variações."
+    },
+    "woocommerce_calculate_refund": {
+      "label": "Simular reembolso",
+      "description": "Calcula quanto um reembolso devolveria (por item, com impostos) sem reembolsar nada."
+    },
+    "woocommerce_update_customer": {
+      "label": "Atualizar cliente",
+      "description": "Atualiza o nome ou telefone salvos no cadastro de um cliente registrado."
+    },
+    "woocommerce_update_customer_address": {
+      "label": "Atualizar endereço do cliente",
+      "description": "Altera o endereço de cobrança ou de entrega salvo na conta do cliente."
     }
   },
   "config": {

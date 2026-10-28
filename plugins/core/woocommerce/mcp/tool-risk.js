@@ -10,6 +10,8 @@ module.exports = {
     "woocommerce_get_order_tracking",
     "woocommerce_search_products",
     "woocommerce_get_product",
+    "woocommerce_get_product_by_slug",
+    "woocommerce_calculate_refund",
     "woocommerce_check_inventory",
     "woocommerce_find_customer",
     "woocommerce_list_customer_orders",
@@ -19,5 +21,7 @@ module.exports = {
     woocommerce_create_refund: "refund",
     woocommerce_update_order_shipping_address: "address_change",
     woocommerce_add_order_note: "note",
+    woocommerce_update_customer: "customer_update",
+    woocommerce_update_customer_address: "customer_update",
   },
 };
