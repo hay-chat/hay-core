@@ -94,6 +94,7 @@ describe("enrichOrder", () => {
       shippedAt: null,
       deliveredAt: null,
       tracking: expect.objectContaining({ isStale: false, shippedAt: null }),
+      returnInstructions: null,
     });
     // Amounts carry their currency so the AI never assumes "$".
     expect(e.totals).toMatchObject({ currency: "EUR", total: "60.00" });
@@ -549,5 +550,33 @@ describe("customer tools", () => {
       totalPages: null,
       total: null,
     });
+  });
+});
+
+describe("return instructions (D6-13)", () => {
+  it("exposes the merchant's text on get_order and through its own tool", async () => {
+    process.env.RETURN_INSTRUCTIONS = "Send it back within 30 days: https://store.test/returns";
+    try {
+      expect(enrichOrder(ORDER, []).supportSummary.returnInstructions).toMatch(/30 days/);
+      const { registerReturnTools } = require("../tools/returns");
+      const server = createFakeServer();
+      registerReturnTools(server);
+      const res = await server.call("woocommerce_get_return_instructions", {});
+      expect(res.data).toMatchObject({
+        configured: true,
+        instructions: expect.stringMatching(/returns/),
+      });
+    } finally {
+      delete process.env.RETURN_INSTRUCTIONS;
+    }
+  });
+
+  it("tells the agent to hand off when nothing is set", async () => {
+    const { registerReturnTools } = require("../tools/returns");
+    const server = createFakeServer();
+    registerReturnTools(server);
+    const res = await server.call("woocommerce_get_return_instructions", {});
+    expect(res.data).toMatchObject({ configured: false, instructions: null });
+    expect(res.data.relay).toMatch(/hand the conversation/);
   });
 });

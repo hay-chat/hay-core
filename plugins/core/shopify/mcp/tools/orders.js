@@ -5,6 +5,7 @@
 const { z } = require("zod");
 const { shopifyGql } = require("../lib/client");
 const { staleTracking, stalestShipment } = require("@hay/plugin-sdk/stale-tracking");
+const { readReturnInstructions } = require("@hay/plugin-sdk/return-instructions");
 const {
   ok,
   fail,
@@ -205,6 +206,8 @@ function enrichOrder(order, originCountry = null, now = Date.now()) {
       deliveredAt,
       addressChangeable: PRE_DISPATCH_STATUSES.has(order.displayFulfillmentStatus),
       tracking: orderStaleTracking(order, originCountry, now),
+      // D6-13: the merchant's "How to return" text (null = hand return questions off).
+      returnInstructions: readReturnInstructions(),
     },
   };
 }

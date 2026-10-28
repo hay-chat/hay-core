@@ -18,6 +18,7 @@
 const { nsApi, nsList, NuvemshopApiError } = require("./client");
 const { num, round2, toolError } = require("./format");
 const { staleTracking, stalestShipment } = require("@hay/plugin-sdk/stale-tracking");
+const { readReturnInstructions } = require("@hay/plugin-sdk/return-instructions");
 
 /** Fulfillment-order statuses under which nothing has left the warehouse. */
 const PRE_DISPATCH_FO = new Set(["UNPACKED", "IN_PREPARATION", "PACKED"]);
@@ -390,6 +391,8 @@ function enrichOrder(
       shippedAt: tracking.find((t) => t.dispatchedAt)?.dispatchedAt ?? null,
       deliveredAt: tracking.find((t) => t.deliveredAt)?.deliveredAt ?? null,
       tracking: trackingStaleness(order, tracking, originCountry, now),
+      // D6-13: the merchant's "How to return" text (null = hand return questions off).
+      returnInstructions: readReturnInstructions(),
     },
   };
 }

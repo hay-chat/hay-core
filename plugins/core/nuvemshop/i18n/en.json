@@ -69,6 +69,10 @@
     "nuvemshop_list_categories": {
       "label": "List Categories",
       "description": "List the store's product categories."
+    },
+    "nuvemshop_get_return_instructions": {
+      "label": "Get Return Instructions",
+      "description": "Get the store's own instructions for returning an item, to relay as written."
     }
   },
   "config": {
@@ -107,6 +111,10 @@
     "staleTrackingInternationalDays": {
       "label": "Stale tracking: international (days)",
       "description": "Treat an international shipment as stuck when its tracking has not moved for more than this many days."
+    },
+    "returnInstructions": {
+      "label": "How to return",
+      "description": "Your return process, in your words: where to send items, any link or form, and deadlines. Hay.chat relays it as written when a customer asks how to return something. Leave empty and Hay.chat hands those questions to your team."
     }
   }
 }

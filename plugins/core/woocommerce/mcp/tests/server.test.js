@@ -24,6 +24,7 @@ const EXPECTED_TOOLS = [
   "woocommerce_get_order_tracking",
   "woocommerce_get_product",
   "woocommerce_get_product_by_slug",
+  "woocommerce_get_return_instructions",
   "woocommerce_get_store",
   "woocommerce_list_customer_orders",
   "woocommerce_resend_order_confirmation",
