@@ -47,6 +47,7 @@ import { auditLogService } from "@server/services/audit-log.service";
 import { handleUpload } from "@server/lib/upload-helper";
 import { StorageService } from "@server/services/storage.service";
 import { createLogger } from "@server/lib/logger";
+import { notifyOperator } from "@server/services/operator-events.service";
 
 const logger = createLogger("organizations");
 
@@ -526,7 +527,10 @@ export const organizationsRouter = t.router({
       const media = { ...(organization.settings?.media ?? {}) };
       if (input.readImages !== undefined) media.readImages = input.readImages;
       // Letting the AI read ID documents is the owner's call (D8-12). Cards are never readable.
-      if (input.allowIdDocuments !== undefined && input.allowIdDocuments !== media.allowIdDocuments) {
+      if (
+        input.allowIdDocuments !== undefined &&
+        input.allowIdDocuments !== media.allowIdDocuments
+      ) {
         if (input.allowIdDocuments && ctx.user?.getRole() !== "owner") {
           throw new TRPCError({
             code: "FORBIDDEN",
@@ -1072,6 +1076,12 @@ export const organizationsRouter = t.router({
 
     await organizationService.deleteWithData(organization);
     logger.info({ orgId: organization.id, userId: ctx.user!.id }, "Organization deleted by owner");
+    // A hosted operator stops billing for the deleted workspace (D15-11).
+    await notifyOperator({
+      event: "organization.deleted",
+      organizationId: organization.id,
+      occurredAt: new Date().toISOString(),
+    });
 
     return {
       success: true,
