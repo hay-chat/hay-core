@@ -1,3 +1,7 @@
+## 2026-10-28 08:55 — staging — W3 L5 Mercado Pago merged, hand-tested (no real account)
+- Merged claude/w3-brazil-pay (73d722d0); no migrations; plugin-sdk rebuilt; plugin registered after server restart.
+- Hand test: plugin page, enable → "Connecting is not available yet" notice (no MP keys on staging). Tests on merged tree: MP 21, Woo 124, SDK payment-provider 8.
+- Guide: seo mercado-pago (cf73bb3, unpushed). Running: L13 disputes, L6 perf. Then Wave 3 close.
 ## 2026-10-28 08:40 — staging — W3 L7b merged, hand-tested
 - Merged claude/w3-golive-b (0528417); migrations 1785850000000/1785851000000/1785852000000 on hay_staging. Fix 27c9561 (risky bucket red only when non-empty).
 - Hand test: Tests page replay → report (1 same answer, judge reason), Save as test case, readiness card copy (replies only), Start on Web Chat only saved channelAiModes. Test agent deleted + channel modes reset afterwards.
