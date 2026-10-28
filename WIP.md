@@ -1,3 +1,10 @@
+## 2026-10-28 04:00 — claude/w2-evidence-pack (L13) — D2-2..D2-5 done, committed, not pushed
+- D2-2 conversation PDF: store name + full date/time/UTC offset (org tz). D2-3 DisputeEvidenceService (server/services/dispute-evidence). D2-4 order_conversation_links (tool calls via recordAction + Message subscriber + `npm run order-links:backfill`). D2-5 /evidence page, evidencePacks router, PDF/ZIP (manifest + README).
+- Migration AddOrderConversationLinks1785762000000 (run on hay_test only).
+- Gaps: emoji dropped in PDF; remote http attachments not fetched; no page cap; pre-action-log writes show tracking only; policy excerpts = current doc text.
+- Pre-existing failure on base: tests/routes/actions.test.ts "API key caller" (untouched).
+- Next: merge into staging, run migration + backfill on hay_staging, hand-test.
+
 ## 2026-10-28 03:30 — staging — W2 D1-5/D1-6 merged + hand-tested
 - Settings > Usage: billable count (= analytics billableResolutions), breakdown, ledger, CSV, Exclude (5 % instant, then sent for review). Migration run on hay_staging.
 - Next: D8 part A merge when done; L13 D2-2..5.
