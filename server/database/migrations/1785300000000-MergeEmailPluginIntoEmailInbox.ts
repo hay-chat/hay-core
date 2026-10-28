@@ -34,15 +34,21 @@ const NEW_PLUGIN = "hay-channel-email";
 const OLD_ACTION = `${OLD_PLUGIN}:send-email`;
 const NEW_ACTION = `${NEW_PLUGIN}:send-email`;
 
-/** Columns that can hold action references, with their SQL type. */
-const REFERENCE_COLUMNS: Array<{ table: string; column: string; type: "jsonb" | "text" }> = [
-  { table: "playbooks", column: "instructions", type: "jsonb" },
-  { table: "playbooks", column: "prompt_template", type: "text" },
-  { table: "playbook_versions", column: "instructions", type: "jsonb" },
-  { table: "playbook_versions", column: "prompt_template", type: "text" },
-  { table: "agents", column: "instructions", type: "text" },
-  { table: "agents", column: "human_handoff_available_instructions", type: "jsonb" },
-  { table: "agents", column: "human_handoff_unavailable_instructions", type: "jsonb" },
+/**
+ * Columns that can hold action references. Their SQL type is read from the
+ * catalog at run time rather than listed here: `agents.instructions` is text
+ * on some hosts and jsonb on others (production), and a hardcoded type made
+ * this migration fail with "column is of type jsonb but expression is of type
+ * text" and roll the whole release batch back.
+ */
+const REFERENCE_COLUMNS: Array<{ table: string; column: string }> = [
+  { table: "playbooks", column: "instructions" },
+  { table: "playbooks", column: "prompt_template" },
+  { table: "playbook_versions", column: "instructions" },
+  { table: "playbook_versions", column: "prompt_template" },
+  { table: "agents", column: "instructions" },
+  { table: "agents", column: "human_handoff_available_instructions" },
+  { table: "agents", column: "human_handoff_unavailable_instructions" },
 ];
 
 export class MergeEmailPluginIntoEmailInbox1785300000000 implements MigrationInterface {
@@ -127,12 +133,23 @@ export class MergeEmailPluginIntoEmailInbox1785300000000 implements MigrationInt
   }
 
   private async rewriteActionReferences(queryRunner: QueryRunner): Promise<void> {
-    for (const { table, column, type } of REFERENCE_COLUMNS) {
+    for (const { table, column } of REFERENCE_COLUMNS) {
+      const typeRows: Array<{ data_type: string }> = await queryRunner.query(
+        `SELECT data_type FROM information_schema.columns
+         WHERE table_schema = current_schema() AND table_name = $1 AND column_name = $2`,
+        [table, column],
+      );
+      const dataType = typeRows[0]?.data_type;
+      if (!dataType) {
+        continue; // column absent on this host: nothing to rewrite
+      }
       const replaced = `REPLACE("${column}"::text, $1, $2)`;
+      const value =
+        dataType === "jsonb" || dataType === "json" ? `${replaced}::${dataType}` : replaced;
       await queryRunner.query(
         `
         UPDATE "${table}"
-        SET "${column}" = ${type === "jsonb" ? `${replaced}::jsonb` : replaced}
+        SET "${column}" = ${value}
         WHERE "${column}"::text LIKE '%' || $1 || '%'
         `,
         [OLD_ACTION, NEW_ACTION],
