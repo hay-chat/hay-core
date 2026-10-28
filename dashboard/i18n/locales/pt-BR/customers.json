@@ -31,6 +31,7 @@
     "profile": {
       "description": "Perfil do cliente e histórico de conversas",
       "back": "Voltar para clientes",
+      "evidencePack": "Pacote de evidências",
       "notFound": "Cliente não encontrado"
     },
     "conversations": {

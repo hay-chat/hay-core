@@ -105,6 +105,7 @@
       "export": "Exportar",
       "exportPdf": "Exportar como PDF",
       "exportCsv": "Exportar como CSV",
+      "evidencePack": "Pacote de evidências para disputa",
       "exportFailed": "Falha ao exportar conversa. Tente novamente.",
       "exitSupervision": "Sair da Supervisão",
       "supervise": "Supervisionar",
