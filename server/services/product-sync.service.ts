@@ -12,7 +12,7 @@
  * not trigger re-embed.
  */
 
-import type { EntityManager } from "typeorm";
+import { In, type EntityManager } from "typeorm";
 import { AppDataSource } from "../database/data-source";
 import { Product, ProductStatus } from "../entities/product.entity";
 import { ProductVariant, VariantAvailability } from "../entities/product-variant.entity";
@@ -228,6 +228,55 @@ export class ProductSyncService {
       logger.error({ err, productId: row.id }, "Failed to write product delete audit log");
     }
     return true;
+  }
+
+  /**
+   * Catalogue reconciliation after a complete full sync: delete this source's
+   * products whose externalId the store no longer returned (deleted upstream).
+   * `keepExternalIds` is every product id the sync saw, so a product that
+   * failed to upsert is kept, not removed. Only the caller knows the sync read
+   * every page; an empty list is refused so a failed listing cannot wipe the
+   * catalogue.
+   */
+  async pruneProducts(
+    organizationId: string,
+    source: string,
+    keepExternalIds: string[],
+  ): Promise<{ removed: number }> {
+    if (!keepExternalIds.length) {
+      throw new Error("pruneProducts needs at least one externalId to keep");
+    }
+    const repo = AppDataSource.getRepository(Product);
+    const stale = await repo
+      .createQueryBuilder("product")
+      .select(["product.id", "product.externalId"])
+      .where("product.organizationId = :organizationId", { organizationId })
+      .andWhere("product.source = :source", { source })
+      .andWhere("NOT (product.externalId = ANY(:keep))", {
+        keep: [...new Set(keepExternalIds)],
+      })
+      .getMany();
+    if (!stale.length) return { removed: 0 };
+
+    const ids = stale.map((p) => p.id);
+    await AppDataSource.transaction(async (manager) => {
+      await productVectorStoreService.deleteByProductIds(organizationId, ids, manager);
+      await manager.getRepository(Product).delete({ id: In(ids) });
+    });
+
+    try {
+      await auditLogService.logProductPrune(undefined, organizationId, source, {
+        removed: stale.length,
+        externalIds: stale.slice(0, 50).map((p) => p.externalId),
+      });
+    } catch (err) {
+      logger.error({ err, organizationId, source }, "Failed to write product prune audit log");
+    }
+    logger.info(
+      { organizationId, source, removed: stale.length },
+      "Removed products deleted upstream",
+    );
+    return { removed: stale.length };
   }
 
   /**

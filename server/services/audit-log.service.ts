@@ -761,6 +761,23 @@ export class AuditLogService {
     });
   }
 
+  /** Log a catalogue reconciliation that removed products deleted upstream. */
+  async logProductPrune(
+    userId: string | undefined,
+    organizationId: string,
+    source: string,
+    changes: { removed: number; externalIds: string[] },
+  ): Promise<AuditLog> {
+    return this.log({
+      userId,
+      organizationId,
+      action: "product.prune",
+      resource: "product",
+      changes: { source, ...changes },
+      status: "success",
+    });
+  }
+
   /** Log a bulk sync run (initial bulk import or scheduled re-sync). */
   async logProductSync(
     userId: string | undefined,

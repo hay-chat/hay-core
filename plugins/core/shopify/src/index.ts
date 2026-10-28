@@ -343,6 +343,9 @@ async function bulkSync(
 ): Promise<void> {
   let cursor: string | undefined;
   let total = 0;
+  // Every product id Shopify returned; a failing page throws before the prune,
+  // so a partial listing never deletes anything.
+  const seen: string[] = [];
 
   do {
     const data = await shopifyGraphql<{
@@ -353,6 +356,7 @@ async function bulkSync(
     }>(shop, accessToken, apiVersion, PRODUCTS_QUERY, { cursor });
 
     const batch = data.products.edges.map((e) => mapProduct(e.node));
+    seen.push(...batch.map((p) => p.externalId));
     if (batch.length) {
       const result = await productSource.upsert(batch);
       total += result.upserted;
@@ -364,7 +368,9 @@ async function bulkSync(
     cursor = data.products.pageInfo.hasNextPage ? data.products.pageInfo.endCursor : undefined;
   } while (cursor);
 
-  logger.info("Shopify bulk sync complete", { total });
+  // Products deleted in Shopify since the last sync leave the catalogue.
+  const { removed } = await productSource.prune(seen);
+  logger.info("Shopify bulk sync complete", { total, removed });
 }
 
 // ============================================================================

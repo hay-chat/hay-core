@@ -364,6 +364,9 @@ async function bulkSync(
   const perPage = 200; // API max
   let page = 1;
   let total = 0;
+  // Every product id Nuvemshop returned; a failing page throws before the
+  // prune, so a partial listing never deletes anything.
+  const seen: string[] = [];
 
   for (;;) {
     let batch: NuvemshopProduct[];
@@ -382,6 +385,7 @@ async function bulkSync(
     if (!batch.length) break;
 
     const products = batch.map((product) => mapProduct(product, lang, currency));
+    seen.push(...products.map((p) => p.externalId));
     const result = await productSource.upsert(products);
     total += result.upserted;
     if (result.errors > 0) {
@@ -392,7 +396,9 @@ async function bulkSync(
     page += 1;
   }
 
-  logger.info("Nuvemshop bulk sync complete", { total });
+  // Products deleted in Nuvemshop since the last sync leave the catalogue.
+  const { removed } = await productSource.prune(seen);
+  logger.info("Nuvemshop bulk sync complete", { total, removed });
 }
 
 /** D6-13 "How to return" owner text → MCP env (unset = the agent hands off). */
