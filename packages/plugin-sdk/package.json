@@ -37,6 +37,9 @@
     },
     "./return-instructions": {
       "default": "./return-instructions/index.cjs"
+    },
+    "./identity": {
+      "default": "./identity/index.cjs"
     }
   },
   "bin": {

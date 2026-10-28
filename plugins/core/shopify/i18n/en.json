@@ -97,6 +97,10 @@
     "shopify_get_return_instructions": {
       "label": "Get Return Instructions",
       "description": "Get the store's own instructions for returning an item, to relay as written."
+    },
+    "shopify_send_payment_link": {
+      "label": "Send Payment Link",
+      "description": "Email the payment link of an unpaid order to the order's email, once the customer's email or phone matches."
     }
   },
   "config": {

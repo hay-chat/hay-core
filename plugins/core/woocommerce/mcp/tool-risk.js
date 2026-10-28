@@ -16,6 +16,7 @@ module.exports = {
     "woocommerce_find_customer",
     "woocommerce_list_customer_orders",
     "woocommerce_get_return_instructions",
+    "woocommerce_resend_pix",
   ],
   write: {
     woocommerce_cancel_order: "cancel",

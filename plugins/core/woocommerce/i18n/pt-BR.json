@@ -77,6 +77,10 @@
     "woocommerce_get_return_instructions": {
       "label": "Ver Instruções de Devolução",
       "description": "Obtém as instruções da loja para devolver um item, para repassar como estão."
+    },
+    "woocommerce_resend_pix": {
+      "label": "Reenviar Pix ou Link de Pagamento",
+      "description": "Envia o código Pix ou o link de pagamento de um pedido não pago, depois que o e-mail ou telefone do cliente confere com o pedido."
     }
   },
   "config": {
