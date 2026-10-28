@@ -1,3 +1,5 @@
+import type { ChannelRendering } from "@server/lib/channel-rendering";
+
 export interface HayPluginManifest {
   id: string;
   name: string;
@@ -14,6 +16,8 @@ export interface HayPluginManifest {
   >;
   entry: string;
   channel?: string; // For channel-type plugins: which conversation channel this plugin handles (e.g., "whatsapp")
+  /** What a channel can show (D13-12): see server/lib/channel-rendering.ts. */
+  rendering?: ChannelRendering;
   autoActivate?: boolean;
   invisible?: boolean;
   menuItems?: Array<{

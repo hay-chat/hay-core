@@ -10,6 +10,10 @@
     "displayName": "Instagram",
     "category": "channel",
     "channel": "instagram",
+    "rendering": {
+      "markdown": "plain",
+      "productRecommendations": "text"
+    },
     "capabilities": [
       "messages",
       "customers"

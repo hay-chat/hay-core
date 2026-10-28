@@ -22,10 +22,12 @@ jest.mock("@server/services/redis.service", () => ({
 const mockFindPluginIdByChannel =
   jest.fn<(organizationId: string, channel: string) => Promise<string | null>>();
 const mockGetOrStartWorker = jest.fn<() => Promise<{ port: number }>>();
+const mockGetChannelRendering = jest.fn<(pluginId: string) => Record<string, string>>();
 jest.mock("@server/services/plugin-manager.service", () => ({
   pluginManagerService: {
     findPluginIdByChannel: mockFindPluginIdByChannel,
     getOrStartWorker: mockGetOrStartWorker,
+    getChannelRendering: mockGetChannelRendering,
   },
 }));
 
@@ -134,6 +136,7 @@ describe("channelDeliveryService /deliver", () => {
     jest.clearAllMocks();
     mockConversationRepo.findById.mockResolvedValue(conversation);
     mockFindPluginIdByChannel.mockResolvedValue("hay-channel-whatsapp");
+    mockGetChannelRendering.mockReturnValue({});
     mockGetOrStartWorker.mockResolvedValue({ port: 4567 });
     mockFetch.mockResolvedValue({
       json: async () => ({ success: true, providerMessageId: "wamid.OUT.1" }),
@@ -260,6 +263,7 @@ describe("channelDeliveryService retry (D13-7)", () => {
     jest.clearAllMocks();
     mockConversationRepo.findById.mockResolvedValue(conversation);
     mockFindPluginIdByChannel.mockResolvedValue("hay-channel-whatsapp");
+    mockGetChannelRendering.mockReturnValue({});
     mockGetOrStartWorker.mockResolvedValue({ port: 4567 });
   });
 
@@ -345,6 +349,7 @@ describe("channelDeliveryService retry (D13-7)", () => {
     jest.clearAllMocks();
     mockConversationRepo.findById.mockResolvedValue(conversation);
     mockFindPluginIdByChannel.mockResolvedValue("hay-channel-whatsapp");
+    mockGetChannelRendering.mockReturnValue({});
     mockGetOrStartWorker.mockResolvedValue({ port: 4567 });
     const reset = Object.assign(new TypeError("fetch failed"), { cause: { code: "ECONNRESET" } });
     mockFetch.mockRejectedValueOnce(reset);
@@ -367,6 +372,7 @@ describe("channelDeliveryService AI disclosure (D14-7)", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockFindPluginIdByChannel.mockResolvedValue("hay-channel-whatsapp");
+    mockGetChannelRendering.mockReturnValue({});
     mockGetOrStartWorker.mockResolvedValue({ port: 4567 });
     mockFetch.mockResolvedValue({ json: async () => ({ success: true }) });
     mockMessageRepo.findById.mockResolvedValue({ id: "msg-1", metadata: { model: "m" } });
@@ -492,5 +498,71 @@ describe("channelDeliveryService /escalate attachments (D8-10)", () => {
     mockConversationRepo.findById.mockResolvedValue({ ...conversation, channel: "chatwoot" });
     await dispatch(statusEvent);
     expect(deliverBody().attachments).toEqual([]);
+  });
+});
+
+describe("channelDeliveryService channel-aware rendering (D13-12)", () => {
+  const product = {
+    title: "Blue running shoe",
+    sourceUrl: "https://store.example/products/blue-shoe",
+    topVariant: { price: "299.90", currency: "BRL" },
+  };
+  const cardsEvent = outboundEvent({
+    type: "ProductRecommendation",
+    content: "Recommending 2 products",
+    metadata: { productRecommendation: { query: "shoe", products: [product, { title: "Sock" }] } },
+  });
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockConversationRepo.findById.mockResolvedValue({ ...conversation, language: "pt-BR" });
+    mockFindPluginIdByChannel.mockResolvedValue("some-channel-plugin");
+    mockGetOrStartWorker.mockResolvedValue({ port: 4567 });
+    mockFetch.mockResolvedValue({ json: async () => ({ success: true }) });
+  });
+
+  it("sends product cards as a text list with links when the channel declares it", async () => {
+    mockGetChannelRendering.mockReturnValue({ productRecommendations: "text" });
+    await dispatch(cardsEvent);
+    expect(mockGetChannelRendering).toHaveBeenCalledWith("some-channel-plugin");
+    const content = deliverBody().content as string;
+    expect(content).toContain("• Blue running shoe · R$");
+    expect(content).toContain("299,90");
+    expect(content).toContain("\nhttps://store.example/products/blue-shoe");
+    expect(content).toContain("• Sock");
+    expect(content).not.toContain("Recommending");
+  });
+
+  it("does not send product cards to a channel that declares nothing", async () => {
+    mockGetChannelRendering.mockReturnValue({});
+    await dispatch(cardsEvent);
+    expect(mockFetch).not.toHaveBeenCalled();
+  });
+
+  it("holds product cards while AI replies on the channel wait for review", async () => {
+    mockGetChannelRendering.mockReturnValue({ productRecommendations: "text" });
+    mockConversationRepo.findById.mockResolvedValue({
+      ...conversation,
+      organization: { ...conversation.organization, settings: { testModeDefault: true } },
+    });
+    await dispatch(cardsEvent);
+    expect(mockFetch).not.toHaveBeenCalled();
+  });
+
+  it("strips Markdown for a plain channel and converts it for WhatsApp", async () => {
+    mockGetChannelRendering.mockReturnValue({ markdown: "plain" });
+    await dispatch(outboundEvent({ content: "**Hi** see [our store](https://s.example)" }));
+    expect(deliverBody().content).toBe("Hi see our store (https://s.example)");
+
+    mockFetch.mockClear();
+    mockGetChannelRendering.mockReturnValue({ markdown: "whatsapp" });
+    await dispatch(outboundEvent({ content: "**Hi** *there*" }));
+    expect(deliverBody().content).toBe("*Hi* _there_");
+  });
+
+  it("leaves Markdown alone when the channel declares nothing", async () => {
+    mockGetChannelRendering.mockReturnValue({});
+    await dispatch(outboundEvent({ content: "**Hi**" }));
+    expect(deliverBody().content).toBe("**Hi**");
   });
 });
