@@ -81,6 +81,53 @@ export function resumeUrl(
   return url.toString();
 }
 
+/**
+ * D5-8: the shopper left an email at hand-off. It belongs to this conversation
+ * and is what the follow-up uses. The call is not authenticated as the
+ * customer (a widget can link any customerExternalId), so it only fills the
+ * customer's email when the customer has none, never overwrites it.
+ * TODO: sign customerExternalId so the widget can prove the customer link.
+ */
+export async function saveHandoffEmail(conversation: Conversation, email: string): Promise<void> {
+  const { conversationRepository } = await import("@server/repositories/conversation.repository");
+  const { CustomerRepository } = await import("@server/repositories/customer.repository");
+  const customerRepository = new CustomerRepository();
+  const organizationId = conversation.organization_id;
+  const consent = { emailConsentAt: new Date().toISOString(), emailConsentSource: "handoff" };
+
+  await conversationRepository.updateById(conversation.id, {
+    metadata: {
+      ...(conversation.metadata ?? {}),
+      contactEmail: email,
+      contactEmailConsentAt: consent.emailConsentAt,
+    },
+  });
+
+  const customer = conversation.customer_id
+    ? await customerRepository.findByIdAndOrganization(conversation.customer_id, organizationId)
+    : null;
+  if (customer) {
+    if (customer.email) return;
+    await customerRepository.update(customer.id, organizationId, {
+      email,
+      external_metadata: {
+        ...(customer.external_metadata ?? {}),
+        web: {
+          ...((customer.external_metadata?.web as Record<string, unknown>) ?? {}),
+          ...consent,
+        },
+      },
+    });
+    return;
+  }
+  const created = await customerRepository.create({
+    organization_id: organizationId,
+    email,
+    external_metadata: { web: consent },
+  });
+  await conversationRepository.updateById(conversation.id, { customer_id: created.id });
+}
+
 /** Atomically claim the follow-up slot; true when this caller may send. */
 async function claimFollowUp(conversationId: string): Promise<boolean> {
   const { redisService } = await import("./redis.service");
@@ -107,7 +154,9 @@ export async function emailHumanReplyIfAway(
   message: { content?: string | null; sender?: string | null },
 ): Promise<boolean> {
   if (conversation.channel !== "web" || conversation.metadata?.isPlayground === true) return false;
-  const email = conversation.customer?.email;
+  // The address the shopper left in this chat first; the customer's own as a fallback.
+  const contactEmail = conversation.metadata?.contactEmail;
+  const email = (typeof contactEmail === "string" && contactEmail) || conversation.customer?.email;
   if (!email || !message.content) return false;
 
   const { websocketService } = await import("./websocket.service");

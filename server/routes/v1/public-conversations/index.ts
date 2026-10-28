@@ -578,31 +578,8 @@ export const publicConversationsRouter = t.router({
         throw new TRPCError({ code: "NOT_FOUND", message: "Conversation not found" });
       }
 
-      const organizationId = conversation.organization_id;
-      const consent = { emailConsentAt: new Date().toISOString(), emailConsentSource: "handoff" };
-      const customer = conversation.customer_id
-        ? await customerRepository.findByIdAndOrganization(conversation.customer_id, organizationId)
-        : null;
-
-      if (customer) {
-        await customerRepository.update(customer.id, organizationId, {
-          email: input.email,
-          external_metadata: {
-            ...(customer.external_metadata ?? {}),
-            web: {
-              ...((customer.external_metadata?.web as Record<string, unknown>) ?? {}),
-              ...consent,
-            },
-          },
-        });
-      } else {
-        const created = await customerRepository.create({
-          organization_id: organizationId,
-          email: input.email,
-          external_metadata: { web: consent },
-        });
-        await conversationRepository.updateById(conversation.id, { customer_id: created.id });
-      }
+      const { saveHandoffEmail } = await import("@server/services/web-follow-up.service");
+      await saveHandoffEmail(conversation, input.email);
 
       return { saved: true, nonce: verified.newNonce, error: null };
     }),
