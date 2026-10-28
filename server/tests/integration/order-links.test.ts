@@ -88,7 +88,12 @@ describe("orderLinkService (D2-4)", () => {
         content: "Pedido #1001 chegou partido",
       }),
     );
-    await new Promise((resolve) => setTimeout(resolve, 300));
+    // The subscriber writes in the background; wait for it.
+    const links = AppDataSource.getRepository(OrderConversationLink);
+    for (let i = 0; i < 50; i++) {
+      if (await links.count({ where: { conversation_id: ids.b } })) break;
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
     // Another org mentioning the same number stays out.
     await orderLinkService.recordFromMessage({
       id: "00000000-0000-4000-8000-000000000001",
@@ -97,10 +102,7 @@ describe("orderLinkService (D2-4)", () => {
       content: "order #1001",
     });
 
-    const links = await AppDataSource.getRepository(OrderConversationLink).find({
-      where: { organization_id: orgId },
-    });
-    expect(links).toHaveLength(3);
+    expect(await links.count({ where: { organization_id: orgId } })).toBe(3);
 
     const groups = await orderLinkService.findOrders(orgId, { query: "#1001" });
     expect(groups).toHaveLength(1);
