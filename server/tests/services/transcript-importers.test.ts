@@ -2,6 +2,7 @@ import { describe, it, expect } from "@jest/globals";
 import { parseCsv, parseGenericCsv } from "../../services/importers/transcripts/csv";
 import { parsePastedTranscripts } from "../../services/importers/transcripts/paste";
 import { parseWhatsAppExport } from "../../services/importers/transcripts/whatsapp";
+import { parseTidioCsv } from "../../services/importers/transcripts/tidio";
 import {
   normalizeTranscripts,
   TranscriptImportError,
@@ -148,5 +149,22 @@ describe("WhatsApp export", () => {
     expect(() =>
       parseWhatsAppExport("31/12/2025, 22:15 - Maria: Oi", { businessName: "Other" }),
     ).toThrow(/Nobody named "Other"/);
+  });
+});
+
+describe("Tidio CSV", () => {
+  it("reads Tidio-style columns and drops system rows", () => {
+    const csv = [
+      "Chat ID,Sender,Message,Date",
+      "t-1,Visitor,Is the blue one in stock?,2026-09-01 10:00:00",
+      "t-1,System,Operator joined the chat,2026-09-01 10:00:30",
+      "t-1,Operator,It is!,2026-09-01 10:01:00",
+    ].join("\n");
+    const [chat] = parseTidioCsv(csv);
+    expect(chat.externalId).toBe("t-1");
+    expect(chat.turns.map((t) => [t.role, t.text])).toEqual([
+      ["customer", "Is the blue one in stock?"],
+      ["agent", "It is!"],
+    ]);
   });
 });
