@@ -33,6 +33,7 @@ const {
   fail,
   toolError,
   unwrapConnection,
+  pageInfo,
   toGid,
   assertNoUserErrors,
 } = require("../lib/format");
@@ -73,36 +74,55 @@ function isActive(discount, now) {
   return !discount.endsAt || Date.parse(discount.endsAt) > now.getTime();
 }
 
+// Pages scanned for an existing goodwill coupon before failing closed.
+const GOODWILL_PAGE_SIZE = 50;
+const GOODWILL_MAX_PAGES = 10;
+
 async function findActiveGoodwill(customerGid, now) {
   const title = goodwillTitle(customerGid);
-  // TODO: verify the `title:` search filter on a real store; the exact title
-  // match below is what enforces the bound either way.
-  const data = await shopifyGql(
-    `
-    query FindGoodwillDiscounts($query: String!) {
-      codeDiscountNodes(first: 20, query: $query, sortKey: CREATED_AT, reverse: true) {
-        nodes {
-          id
-          codeDiscount {
-            ... on DiscountCodeBasic {
-              title
-              status
-              endsAt
-              usageLimit
-              asyncUsageCount
-              codes(first: 1) { nodes { code } }
+  // Search for this customer's own title and page through every hit: the
+  // store-wide newest-N would let a busy store hand out a second code. The
+  // search is fuzzy (tokenised), so the exact title match below is what
+  // enforces the bound.
+  let after = null;
+  for (let page = 0; page < GOODWILL_MAX_PAGES; page++) {
+    const data = await shopifyGql(
+      `
+      query FindGoodwillDiscounts($query: String!, $first: Int!, $after: String) {
+        codeDiscountNodes(first: $first, after: $after, query: $query, sortKey: CREATED_AT, reverse: true) {
+          nodes {
+            id
+            codeDiscount {
+              ... on DiscountCodeBasic {
+                title
+                status
+                endsAt
+                usageLimit
+                asyncUsageCount
+                codes(first: 1) { nodes { code } }
+              }
             }
           }
+          pageInfo { hasNextPage endCursor }
         }
       }
-    }
-  `,
-    { query: `title:"${TITLE_PREFIX}"` },
+    `,
+      { query: `title:"${title}"`, first: GOODWILL_PAGE_SIZE, after },
+    );
+    const match = unwrapConnection(data.codeDiscountNodes).find(
+      (n) => n.codeDiscount?.title === title && isActive(n.codeDiscount, now),
+    );
+    if (match) return match.codeDiscount;
+    const info = pageInfo(data.codeDiscountNodes);
+    if (!info.hasNextPage || !info.endCursor) return null;
+    after = info.endCursor;
+  }
+  // Could not see every candidate: fail closed rather than risk a second code.
+  throw toolError(
+    "PRECONDITION",
+    "Could not confirm this customer has no unused Hay.chat goodwill coupon. Hand off to a person.",
+    { details: { reason: "GOODWILL_CHECK_INCOMPLETE" } },
   );
-  const match = unwrapConnection(data.codeDiscountNodes).find(
-    (n) => n.codeDiscount?.title === title && isActive(n.codeDiscount, now),
-  );
-  return match ? match.codeDiscount : null;
 }
 
 async function getOrder(orderId) {

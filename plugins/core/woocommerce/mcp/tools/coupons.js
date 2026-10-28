@@ -55,21 +55,39 @@ function isActive(coupon, now) {
   return !Number.isFinite(ms) || ms > now.getTime();
 }
 
-/** The customer's active Hay.chat goodwill coupon, if any. */
+const GOODWILL_PAGE_SIZE = 100;
+// 20 pages = 2,000 HAY* coupons scanned before failing closed.
+const GOODWILL_MAX_PAGES = 20;
+
+/**
+ * The customer's active Hay.chat goodwill coupon, if any. Pages through every
+ * search=HAY hit (WooCommerce cannot filter coupons by email restriction), so a
+ * store with many coupons cannot hide an earlier one past the first page.
+ */
 async function findActiveGoodwill(email, now) {
-  const { items } = await wcList("/coupons", {
-    search: CODE_PREFIX,
-    per_page: 100,
-    orderby: "date",
-    order: "desc",
-  });
-  return (
-    items.find(
+  for (let page = 1; page <= GOODWILL_MAX_PAGES; page++) {
+    const { items, totalPages } = await wcList("/coupons", {
+      search: CODE_PREFIX,
+      per_page: GOODWILL_PAGE_SIZE,
+      page,
+      orderby: "date",
+      order: "desc",
+    });
+    const match = items.find(
       (c) =>
         isGoodwill(c) &&
         (c.email_restrictions || []).some((e) => String(e).toLowerCase() === email) &&
         isActive(c, now),
-    ) || null
+    );
+    if (match) return match;
+    const last = items.length < GOODWILL_PAGE_SIZE || (totalPages > 0 && page >= totalPages);
+    if (last) return null;
+  }
+  // Could not see every candidate: fail closed rather than risk a second coupon.
+  throw toolError(
+    "PRECONDITION",
+    "Could not confirm this customer has no unused Hay.chat goodwill coupon. Hand off to a person.",
+    { details: { reason: "GOODWILL_CHECK_INCOMPLETE" } },
   );
 }
 
@@ -153,8 +171,10 @@ function registerCouponTools(server) {
             usage_limit_per_user: 1,
             email_restrictions: [email],
             free_shipping: false,
-            // Store-local time; WooCommerce ignores date_expires_gmt on write.
-            date_expires: expires.toISOString().slice(0, 19),
+            // WooCommerce ignores date_expires_gmt on write and reads a bare
+            // date_expires as store-local time, but WC_Data::set_date_prop honours
+            // an explicit "Z" offset, so this expires at the exact UTC instant.
+            date_expires: `${expires.toISOString().slice(0, 19)}Z`,
             description: `Hay.chat goodwill coupon. Reason: ${args.reason}`,
             meta_data: [{ key: GOODWILL_META_KEY, value: args.reason }],
           },

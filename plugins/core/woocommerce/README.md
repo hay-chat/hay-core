@@ -40,9 +40,10 @@ and customer CRUD, meta data, WordPress posts.
 ### Refunds
 
 `woocommerce_create_refund` asks the payment gateway for the money (`api_refund: true`) by default.
-When the gateway cannot refund through WooCommerce, the error is returned verbatim with the explicit
-fallback: refund in the gateway's dashboard, then re-run with `refund_payment=false` to record it on
-the order. It never silently records a refund that did not move money.
+When the gateway cannot refund through WooCommerce, the error is returned verbatim and tells the
+agent not to re-run and to hand off: a person refunds in the gateway. `refund_payment=false`
+(record only) is accepted only for offline methods (bacs, cod, cheque), where the store pays the
+money back by hand; the result then says `moneyMoved: false, recordedOnly: true`.
 
 ## Build & test
 

@@ -58,6 +58,8 @@ const decided = ref(false);
 const rejecting = ref(false);
 const reason = ref("");
 const busy = ref<"approve" | "reject" | "reply" | null>(null);
+/** Thrown after the decision was saved but the takeover failed (already reported). */
+const TAKEOVER_FAILED = Symbol("takeoverFailed");
 
 async function decide(kind: "approve" | "reject" | "reply", run: () => Promise<unknown>) {
   busy.value = kind;
@@ -66,6 +68,7 @@ async function decide(kind: "approve" | "reject" | "reply", run: () => Promise<u
     decided.value = true;
     toast.success(t(`conversations.pendingAction.done.${kind}`));
   } catch (error) {
+    if (error === TAKEOVER_FAILED) return;
     toast.error(
       t("conversations.pendingAction.failed"),
       error instanceof Error ? error.message : undefined,
@@ -83,11 +86,21 @@ const reject = () =>
     HayApi.actions.reject.mutate({ id: props.pendingActionId, reason: reason.value || null }),
   );
 
+// The decision and the takeover are two calls: once the decision is saved the
+// card is done (a retry would fail), so a takeover failure gets its own message.
 const replyMyself = () =>
   decide("reply", async () => {
     await HayApi.actions.replyMyself.mutate({ id: props.pendingActionId });
-    if (props.conversationId) {
+    if (!props.conversationId) return;
+    try {
       await HayApi.conversations.takeover.mutate({ conversationId: props.conversationId });
+    } catch (error) {
+      decided.value = true;
+      toast.error(
+        t("conversations.pendingAction.takeoverFailed"),
+        error instanceof Error ? error.message : undefined,
+      );
+      throw TAKEOVER_FAILED;
     }
   });
 </script>

@@ -43,13 +43,19 @@ export const notificationsRouter = t.router({
   /**
    * The service worker's `pushsubscriptionchange` handler: the browser
    * replaced this device's subscription. No access token in a service worker;
-   * the old endpoint (a secret capability URL) identifies the device.
+   * the old endpoint finds the device and the old subscription's `auth` secret
+   * (known only to the device and this server) proves it.
    */
   rotatePush: publicProcedure
-    .input(subscriptionInput.extend({ oldEndpoint: z.string().url().max(2048) }))
+    .input(
+      subscriptionInput.extend({
+        oldEndpoint: z.string().url().max(2048),
+        oldAuth: z.string().min(1).max(512),
+      }),
+    )
     .mutation(async ({ input }) => {
-      const { oldEndpoint, ...subscription } = input;
-      const rotated = await pushNotificationService.rotate(oldEndpoint, subscription);
+      const { oldEndpoint, oldAuth, ...subscription } = input;
+      const rotated = await pushNotificationService.rotate(oldEndpoint, oldAuth, subscription);
       return { rotated };
     }),
 

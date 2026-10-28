@@ -94,7 +94,9 @@ describe("woocommerce_create_coupon", () => {
       meta_data: [{ key: "_hay_goodwill", value: "late parcel" }],
     });
     expect(post.body.code).toMatch(/^HAY[A-Z2-9]{8}$/);
-    const days = (Date.parse(`${post.body.date_expires}Z`) - Date.now()) / 86400000;
+    // Explicit UTC: WooCommerce would read a bare timestamp as store-local time.
+    expect(post.body.date_expires).toMatch(/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ$/);
+    const days = (Date.parse(post.body.date_expires) - Date.now()) / 86400000;
     expect(Math.round(days)).toBe(30);
     expect(res.data).toMatchObject({
       created: true,
@@ -167,7 +169,7 @@ describe("woocommerce_create_coupon", () => {
     process.env.WOOCOMMERCE_COUPON_MAX_DAYS = "7";
     const { calls } = mockFetch(routes());
     await server.call("woocommerce_create_coupon", { ...BASE_ARGS, valid_days: 90 });
-    const days = (Date.parse(`${posts(calls)[0].body.date_expires}Z`) - Date.now()) / 86400000;
+    const days = (Date.parse(posts(calls)[0].body.date_expires) - Date.now()) / 86400000;
     expect(Math.round(days)).toBe(7);
   });
 
@@ -200,6 +202,42 @@ describe("woocommerce_create_coupon", () => {
     const res = await server.call("woocommerce_create_coupon", BASE_ARGS);
     expect(res.isError).toBe(false);
     expect(posts(calls)).toHaveLength(1);
+  });
+
+  it("pages through every HAY coupon to find an earlier one", async () => {
+    const other = goodwill({ email_restrictions: ["bob@example.com"] });
+    const { calls } = mockFetch([
+      {
+        method: "GET",
+        path: `${API}/coupons`,
+        reply: ({ query }) =>
+          query.get("page") === "1" ? Array.from({ length: 100 }, () => other) : [goodwill()],
+      },
+      ...routes().slice(1),
+    ]);
+    const res = await server.call("woocommerce_create_coupon", BASE_ARGS);
+    expect(res.error).toMatchObject({ details: { reason: "ALREADY_HAS_COUPON" } });
+    const pages = calls.filter((c) => c.method === "GET" && c.path === `${API}/coupons`);
+    expect(pages.map((c) => c.query.get("page"))).toEqual(["1", "2"]);
+    expect(posts(calls)).toHaveLength(0);
+  });
+
+  it("fails closed when there are too many HAY coupons to check", async () => {
+    const other = goodwill({ email_restrictions: ["bob@example.com"] });
+    const { calls } = mockFetch([
+      {
+        method: "GET",
+        path: `${API}/coupons`,
+        reply: () => Array.from({ length: 100 }, () => other),
+      },
+      ...routes().slice(1),
+    ]);
+    const res = await server.call("woocommerce_create_coupon", BASE_ARGS);
+    expect(res.error).toMatchObject({
+      code: "PRECONDITION",
+      details: { reason: "GOODWILL_CHECK_INCOMPLETE" },
+    });
+    expect(posts(calls)).toHaveLength(0);
   });
 
   it("ties the coupon to an order of the same customer and notes it privately", async () => {

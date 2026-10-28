@@ -37,7 +37,7 @@ describe("couponPolicy", () => {
   });
 });
 
-const ORDER_ARGS = { order_number: "101" };
+const ORDER_ARGS = { order_number: "101", email: "Ana@Example.com" };
 
 /** Order lookup + note write + coupon POST, as one successful create needs. */
 function storeRoutes(order = makeOrder()) {
@@ -158,6 +158,7 @@ describe("nuvemshop_create_coupon", () => {
       type: "percentage",
       value: 5,
       reason: "late",
+      email: "ana@example.com",
     });
     expect(res.error).toMatchObject({ code: "BAD_INPUT" });
     expect(calls).toHaveLength(0);
@@ -195,9 +196,93 @@ describe("nuvemshop_create_coupon", () => {
       value: 5,
       reason: "late",
       order_id: String(again.id),
+      email: "ana@example.com",
       hay_approval_id: "pa-2",
     });
     expect(res2.text).toMatch(/already received a Hay.chat goodwill coupon/);
     expect(second.calls.some((c) => c.method === "POST")).toBe(false);
+  });
+  it("refuses when the email does not match the order's customer", async () => {
+    const { calls } = mockFetch(storeRoutes());
+    const res = await server.call("nuvemshop_create_coupon", {
+      type: "percentage",
+      value: 5,
+      reason: "late",
+      order_number: "101",
+      email: "mallory@example.com",
+    });
+    expect(res.error).toMatchObject({
+      code: "PRECONDITION",
+      details: { reason: "CUSTOMER_MISMATCH" },
+    });
+    expect(calls.some((c) => c.method === "POST" || c.method === "PUT")).toBe(false);
+  });
+
+  it("matches a guest order by contact_email", async () => {
+    const guest = makeOrder({ customer: null, contact_email: "guest@example.com" });
+    mockFetch(storeRoutes(guest));
+    const res = await server.call("nuvemshop_create_coupon", {
+      type: "percentage",
+      value: 5,
+      reason: "late",
+      order_id: String(guest.id),
+      email: "guest@example.com",
+    });
+    expect(res.isError).toBe(false);
+  });
+
+  it("marks the order before creating the coupon, so a failure cannot be re-issued", async () => {
+    const order = makeOrder();
+    const { calls } = mockFetch(
+      orderRoutes(order, {
+        extra: [
+          { method: "POST", path: `${BASE}/coupons`, reply: () => ({ status: 422, body: {} }) },
+          {
+            method: "PUT",
+            path: `${BASE}/orders/${order.id}`,
+            reply: ({ body }) => ({ ...order, ...body }),
+          },
+        ],
+      }),
+    );
+    const res = await server.call("nuvemshop_create_coupon", {
+      type: "percentage",
+      value: 5,
+      reason: "late",
+      ...ORDER_ARGS,
+    });
+    expect(res.isError).toBe(true);
+    expect(res.error).toMatchObject({
+      retryable: false,
+      details: { reason: "COUPON_CREATE_FAILED" },
+    });
+    expect(res.text).toMatch(/do not retry/);
+    const writes = calls.filter((c) => c.method === "PUT" || c.method === "POST").map((c) => c.method);
+    expect(writes).toEqual(["PUT", "POST"]);
+    expect(calls.find((c) => c.method === "PUT").body.owner_note).toMatch(/HAY COUPON HAY/);
+  });
+
+  it("issues nothing when the order note cannot be written", async () => {
+    const order = makeOrder();
+    const { calls } = mockFetch(
+      orderRoutes(order, {
+        extra: [
+          couponRoute(),
+          {
+            method: "PUT",
+            path: `${BASE}/orders/${order.id}`,
+            reply: () => ({ status: 422, body: {} }),
+          },
+        ],
+      }),
+    );
+    const res = await server.call("nuvemshop_create_coupon", {
+      type: "percentage",
+      value: 5,
+      reason: "late",
+      ...ORDER_ARGS,
+    });
+    expect(res.isError).toBe(true);
+    expect(calls.some((c) => c.method === "POST")).toBe(false);
   });
 });

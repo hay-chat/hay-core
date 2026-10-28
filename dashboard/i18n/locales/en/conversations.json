@@ -268,6 +268,7 @@
       "reasonPlaceholder": "Shared with the AI so it can explain to the customer",
       "replyMyself": "I'll reply myself",
       "failed": "Could not save your decision",
+      "takeoverFailed": "Your decision was saved, but taking over the conversation failed. Use Take Over to handle it yourself.",
       "done": {
         "approve": "Approved",
         "reject": "Declined",

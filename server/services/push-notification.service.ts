@@ -1,3 +1,4 @@
+import { timingSafeEqual } from "crypto";
 import webPush, { type PushSubscription as WebPushSubscription } from "web-push";
 import { config } from "@server/config/env";
 import { AppDataSource } from "@server/database/data-source";
@@ -57,6 +58,13 @@ export interface PushResult {
 /** Endpoint is gone (expired/unsubscribed): the row must be deleted. */
 const GONE_STATUS_CODES = new Set([404, 410]);
 
+/** Constant-time comparison of two secrets (no early exit on the first mismatch). */
+function sameSecret(stored: string, given: string): boolean {
+  const a = Buffer.from(stored || "");
+  const b = Buffer.from(given || "");
+  return a.length > 0 && a.length === b.length && timingSafeEqual(a, b);
+}
+
 class PushNotificationService {
   private vapidApplied = false;
 
@@ -111,13 +119,14 @@ class PushNotificationService {
 
   /**
    * The browser rotated a subscription (`pushsubscriptionchange` in sw.js).
-   * The service worker has no access token, so the old endpoint, an
-   * unguessable capability URL only the device and the server know, is the
-   * proof. Returns false when the old endpoint is unknown.
+   * The service worker has no access token, so the proof is the old
+   * subscription's `auth` secret: only the device and this server hold it (the
+   * endpoint alone is not enough, the push service and its logs see it).
+   * Returns false when the old endpoint is unknown or the secret does not match.
    */
-  async rotate(oldEndpoint: string, input: SubscribeInput): Promise<boolean> {
+  async rotate(oldEndpoint: string, oldAuth: string, input: SubscribeInput): Promise<boolean> {
     const existing = await this.repo().findOne({ where: { endpoint: oldEndpoint } });
-    if (!existing) return false;
+    if (!existing || !sameSecret(existing.auth, oldAuth)) return false;
     if (oldEndpoint !== input.endpoint) {
       // The new endpoint may already be registered (the app re-synced first)
       await this.repo().delete({ endpoint: input.endpoint });
