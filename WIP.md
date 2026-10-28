@@ -1,3 +1,9 @@
+## 2026-10-28 — staging — Lane A merged
+- claude/w4-a-billing merged (60730bcf); migrations AddOrganizationBillingPeriod + AddResolutionExclusionReview on hay_test + hay_staging (agent).
+- Fixed boundary double count: countBillableResolutions now end-exclusive + regression test (close-classifier 18/18 incl. new).
+- Backoffice Lane A and G branches local only (hay-backoffice-w4-a, -w4-g) → PRs needed; deploy core first.
+- Running: Lanes E+F, H. Left: Lane I.
+
 ## 2026-10-28 — staging — Lane G merged
 - claude/w4-g-exports merged (6d798bc9); migration AddOperatorEvents ran on hay_test + hay_staging (by the agent).
 - Integration 38/41 suites pass in the full run while other agents share hay_test; the 3 failing ones (organization-export, insight-backfill, conversation-media) pass when re-run alone → contention flakes.

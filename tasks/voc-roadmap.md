@@ -302,6 +302,11 @@ Roger said "Do it now" for every gap. Not started; lanes below.
 - (Lane G) Plan-change email says "applies now"; wrong if the portal schedules downgrades at period end. Default: keep unless portal schedules.
 - (Lane G) Follow-up: `sendPausedNotice` (D11-9) likely also held under drafts-only/test mode → same bypass as the holding reply.
 - (Lane G) Backoffice G2 commit is local only: hay-backoffice-w4-g, branch claude/w4-g-plan-email → needs a PR.
+- (Lane A) Backoffice A1–A4 local only: hay-backoffice-w4-a, branch claude/w4-a-billing (migration AddCreditedOverage not run, no local DB) → needs a PR. Deploy order: hay-core before backoffice.
+- (Lane A) Credits = negative Stripe invoice item at plan overage rate, net of pilot discount; tax on negative items unverified. Default: keep, check one Stripe test-mode invoice.
+- (Lane A) Simulation allowance: 20 % of monthly included even on annual plans (solo 100, starter 400, growth/enterprise 500); unknown plan → core default 200. Default: keep.
+- (Lane A) Staff can approve exclusions older than the just-closed period, which are not credited. Default: limit approvals to excludable periods.
+- (Lane A) Logged, not fixed: simulation cap still counts by UTC month; merchants not told of staff review decisions; credit lost if the subscription cancels; admin OrgDetail doesn't show credited overage.
 - Deferred to a Claude-in-Chrome session: prod env keys (Turnstile, VAPID, OPERATOR_EVENTS_URL/INTERNAL_API_SECRET, SMTP_FROM_NAME, JWT_REFRESH_EXPIRES_IN check, Meta, MP, OpenAI EU), Meta Messenger setup + App Review, Mercado Pago app, OpenAI EU application, Stripe test-mode plan changes, WABA checks, real-store checks, connecting test stores to staging.
 - Deferred: disputes real tests (after the C3 rationale doc), iPhone push test (can run before deploy: staging over an https tunnel + VAPID keys), WP 1.0.1/1.1.0 svn release, lawyer questions, read-only prod checks (D1-0, D14-1, D3), merchant comms, Spanish alert + widget locale native checks, legal copy in website #46.
 - After deploy: Claude does the D8 media-private switch (needs Roger's go-ahead then).
