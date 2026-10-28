@@ -59,6 +59,10 @@ export const INSIGHT_ACTION_TYPES = [
 ] as const;
 export type InsightActionType = (typeof INSIGHT_ACTION_TYPES)[number];
 
+/** Where an insight issue came from: the close classifier, or a staff rating of a reply. */
+export const INSIGHT_SOURCES = ["ai_review", "user_feedback"] as const;
+export type InsightSource = (typeof INSIGHT_SOURCES)[number];
+
 export const INSIGHT_POLARITIES = ["positive", "negative", "neutral"] as const;
 export type InsightPolarity = (typeof INSIGHT_POLARITIES)[number];
 
@@ -220,14 +224,15 @@ export function isInactivityClose(closeReason: string | null): boolean {
 
 /**
  * Relevance of an insight issue, 0-100: the model's score plus starting
- * signal weights from D3 §0.1 (takeover +20, knowledge gap +10). Tune on
- * real data in the Insights engine.
+ * signal weights from D3 §0.1 (thumbs-down +30, takeover +20, knowledge gap
+ * +10). Tune on real data in the Insights engine.
  */
 export function computeRelevance(
   modelRelevance: number,
-  signals: { handedOff: boolean; actionType: InsightActionType },
+  signals: { handedOff: boolean; actionType: InsightActionType; negativeFeedback?: boolean },
 ): number {
   let score = Number.isFinite(modelRelevance) ? modelRelevance : 0;
+  if (signals.negativeFeedback) score += 30;
   if (signals.handedOff) score += 20;
   if (signals.actionType === "knowledge_add" || signals.actionType === "knowledge_edit") {
     score += 10;

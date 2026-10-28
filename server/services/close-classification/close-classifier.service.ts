@@ -117,7 +117,8 @@ function pick<T extends string>(value: unknown, allowed: ReadonlyArray<T>, fallb
   return allowed.includes(value as T) ? (value as T) : fallback;
 }
 
-function clean(value: unknown, maxLength: number): string | null {
+/** Trim, PII-redact and cap a model-written text field; empty becomes null. */
+export function redactInsightText(value: unknown, maxLength: number): string | null {
   if (typeof value !== "string") return null;
   const text = redactString(value.trim()).slice(0, maxLength);
   return text.length > 0 ? text : null;
@@ -422,7 +423,7 @@ export class CloseClassifierService {
           billable: decision.billable,
           ai_resolved: decision.aiResolved,
           classified_by: "llm",
-          classification_reason: clean(response.outcome_reason, 500),
+          classification_reason: redactInsightText(response.outcome_reason, 500),
           classified_at: new Date(),
           claimed_until: null,
           last_error: null,
@@ -453,11 +454,12 @@ export class CloseClassifierService {
               handedOff: row.handed_off,
               actionType: response.action_type,
             }),
-            summary: clean(response.summary, 1000) ?? "",
-            root_cause: clean(response.root_cause, 500),
-            area: clean(response.area, 64),
-            snippet: clean(response.snippet, 300),
-            paraphrase: clean(response.paraphrase, 500),
+            summary: redactInsightText(response.summary, 1000) ?? "",
+            root_cause: redactInsightText(response.root_cause, 500),
+            area: redactInsightText(response.area, 64),
+            snippet: redactInsightText(response.snippet, 300),
+            paraphrase: redactInsightText(response.paraphrase, 500),
+            enriched_at: new Date(),
             signals: {
               outcome: decision.outcome,
               billable: decision.billable,

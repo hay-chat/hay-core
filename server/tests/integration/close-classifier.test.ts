@@ -210,6 +210,7 @@ describe("close classifier (D1-3 + D3-8)", () => {
     // Deterministic redaction runs on top of the prompt's privacy rule.
     expect(issue.summary).not.toContain("jane@example.com");
     expect(issue.snippet).not.toContain("912 345 678");
+    expect(issue.enriched_at).toBeInstanceOf(Date);
     expect(issue.signals).toMatchObject({ outcome: "assumed", channel: "whatsapp" });
 
     expect(await billable()).toBe(1);

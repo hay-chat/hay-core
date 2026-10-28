@@ -65,8 +65,10 @@ Two tables written at close outlive the conversation's messages on purpose:
 
 - `conversation_outcomes`: one billing outcome per close (outcome, billable, reversed, timestamps). It holds no message text; `classification_reason` is a short model explanation, instructed to contain no personal data and passed through the log redaction regexes. It is the billing record, so it is kept.
 - `insight_issues`: one QA event per classified close for the Insights engine. `summary`, `snippet`, `paraphrase`, `root_cause` and `area` are PII-redacted (the model is told to replace personal data with `[redacted]`, then the email/phone/card/IP regexes run). Per Roger's D3 decision, redacted snippets may outlive conversation retention.
+  - `source = user_feedback` issues (one per staff rating of an AI reply) also keep a redacted `detail` written by the enrichment call; the staff comment is redacted before it is stored, and the reviewer is not recorded. They link to the message and the feedback row with `ON DELETE SET NULL`, so retention deleting the message (which cascades to `message_feedback`) leaves the issue in place. Deleting a feedback row by hand in the dashboard deletes its issue too (the rating was withdrawn).
+- `insight_issue_embeddings`: one vector per issue, built only from the redacted issue text (stored in `content`). It cascades with the issue and with the organization.
 
-Both reference the conversation with `ON DELETE SET NULL` and the organization with `ON DELETE CASCADE`.
+`conversation_outcomes` and `insight_issues` reference the conversation with `ON DELETE SET NULL` and the organization with `ON DELETE CASCADE`. DSAR: a customer erasure deletes their conversations, which nulls the link; the issues hold no identifiers of the customer, so they are not part of the export.
 
 ## Legal Hold
 
