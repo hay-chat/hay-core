@@ -4,6 +4,7 @@ Started 2026-10-27. Research: `/Users/rogerjunior/Documents/code/hay/seo/Enginee
 "Roger's answers" block overrides its recommendations). Research baseline: origin/master 3e6ede1.
 
 ## Resume here (orchestrator checkpoint — keep current; safe to /compact after reading this)
+- 2026-10-28 03:15: W2 L3 (ccf449e, D5-6..11) + L4 (d43ea72, D4-6/9/10/11, D6-6/7) merged, migrations run on hay_staging, hand-tested ✓ (closed hand-off + email follow-up; shopper confirm → held refund → lowered to 10.00 → Woo refund 10.00 → AI told shopper; Action log filters; typed confirm). Fixes: 45c491c action-log "Sent for approval" label; 3a8cd39 Input checkbox label rendered twice (shared). GIFs W2-L3-*, W2-L4-*. NEXT: next W2 lanes L9+L2 (D1-5, D1-6) and L8+L7 (D8-3, D8-5..17).
 - 2026-10-28 02:40: full suites green on 1f6b394 (server 1204, dash 43 + typecheck, webchat 114, SDK 195, 13 plugins). Tagged `wave-1-done` at e5cfef2 (so Wave 2 review = `git diff wave-1-done..staging`, covering L11+L5). PR #104 body + title updated; GIFs sent. Running: W2 L4 (claude/w2-approvals-ui: D4-6/9/10/11, D6-6/7) + W2 L3 (claude/w2-business-hours: D5-6..11). Prompts in scratchpad lane-w2-l4.md / lane-w2-l3.md.
 - 2026-10-28 02:15: Wave 2 L11 (D14-5..8) + L5 (D6-10..13, D10-3, D10-6, D16-2, D16-8) merged + hand-tested. My fixes: 4cd82e9 drafts approve buttons always + i18n; 992bcb5 plugin settings save no longer wipes secrets; 18c4a4a marketplace copy; aefb1c0 Woo resend reports mail failure (EMAIL_FAILED). GIFs W2-D14-*, W2-L5-*. NEXT: full suites alone → tag wave-1-done → PR #104 body → GIFs to Roger → next W2 lanes.
 - Last update: 2026-10-27 ~19:45. Staging HEAD d64da73 (+ roadmap commits).
@@ -92,6 +93,8 @@ Started 2026-10-27. Research: `/Users/rogerjunior/Documents/code/hay/seo/Enginee
 | W1 L4 | `AddActionLog1785710000000` | action_log | ✓ |
 | W1 L4 | `AddPendingActions1785720000000` | pending_actions | ✓ |
 | W1 L4 | `AddAwaitingApprovalStatus1785730000000` | conversations (enum) | ✓ |
+| W2 L3 | `AddBusinessHoursSchedules1785740000000` | business_hours_schedules (+ webchat follow-up) | ✓ |
+| W2 L4 | `AddPlaybookApprovalCategories1785744000000` | playbooks | ✓ |
 
 ## Wave 0 — security, honesty, quick fixes (tag `wave-0-done`)
 
@@ -176,6 +179,8 @@ Parked: D13-15, D16-10/11, D6-14, D2-10, D7-15, D8-18, D10-9, D11-13, D14-10, fr
 Staging seed: org/user created via `auth.register` (credentials in `../hay-core-staging/.staging-login`, untracked).
 
 ## Needs Roger
+- [W2 L3] Email replies from the D5-9 follow-up do not come back into the conversation (no core inbound email); the resume link only restores the chat in the same browser. Teams are not modelled, so schedules are per channel. "Shopper has left" = zero widget sockets on this server (single instance). Closures are whole days only. OK for now?
+- [W2 L4] Approval scope: threshold applies to refunds and discounts only; typed confirm is UI-only (API accepts the change); shopper confirmation checks only the next turn; order notes and resent emails also ask the shopper to confirm; graduation nudge ignores currency and needs 5 approvals in 30 days; bulk approve includes cancels; playbook approval overrides have no version history. Shopify refunds lowered in the inbox may not match line items. Confirm these defaults.
 - [W2 L11] Confirm: EU heuristic = aiRegion eu OR Europe/* timezone; `[label]` first-line format on non-web channels; disclosure controls live on Customer Privacy; drafts-only allowed on Web Chat too; existing orgs keep their retention (suggest opt-in prompt to 365 d). D14-1, D14-3 still pending your answers.
 - [W2 L5] Shopify re-consent: add write_order_edits, write_discounts + dispute scopes to hay-shopify-app `shopify.app.toml`, run `shopify app deploy`. Then real-store checks (Shopify swap/exchange/payment link, Nuvemshop marketplace/returns).
 - [W2 L5] D16-2 one-click Woo connect needs an HTTPS HAY_API_URL to test (tunnel or staging host); keys travel through the admin's browser redirect — confirm acceptable. Pending connects are lost on worker restart.
@@ -214,6 +219,9 @@ Staging seed: org/user created via `auth.register` (credentials in `../hay-core-
 - Confirm it's OK that staging uses the `OPENAI_API_KEY` from the main checkout's `.env` (nothing else copied).
 
 ## Follow-ups logged (not in Wave 0 scope)
+- [W2 L3] First D5-9 human reply after the shopper closed the tab sent no email (widget socket probably not yet cleaned up); the second did. Consider a short grace / re-check.
+- [W2 L3] Business-hours UI: start/end time inputs stack vertically; "09:00 AM" mixes 24 h and AM/PM. Staging default schedule left as Wed 00:00–23:59.
+- [W2 L4] Action log stores only error_code, so failed rows show the generic code text (e.g. "The store refused the request") instead of the reason (EMAIL_FAILED). Store details.reason in action_log.
 - Perception misdetects language when an English message names a Brazilian brand ("Mercado Livre") → reply in pt. Language should follow the conversation/widget locale.
 - Widget footer shows "Powered by Hay" — check whether it's the logo wordmark or text; text should read "Hay.chat".
 - Woo resend handoff reply is generic ("passed this to the team"); could say the email couldn't be sent first.

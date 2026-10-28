@@ -1,3 +1,9 @@
+## 2026-10-28 03:15 — staging — W2 L3 + L4 merged, hand-tested, fixes in
+- Merged L3 (ccf449e, business hours/hand-off/email follow-up) + L4 (d43ea72, approvals UI, shopper confirm, action log). Migrations run on hay_staging.
+- Manual ✓: closed hand-off + email capture + follow-up path; confirm → held refund → lowered to 10.00 → Woo refund 10.00 → AI told shopper; Action log filters; Settings > Actions typed confirm; playbook override; failure reason card.
+- Fixes: 45c491c action log "Sent for approval"; 3a8cd39 Input checkbox label shown twice.
+- Next: W2 lanes L9+L2 (D1-5, D1-6) and L8+L7 (D8-3, D8-5..17).
+
 ## 2026-10-28 — claude/w2-business-hours (L3 Wave 2) — D5-6..11 done, committed, not pushed
 - D5-6 schedules (per channel + org default, tz/DST, closures) + Settings page; migration AddBusinessHoursSchedules1785740000000 (run on hay_test).
 - D5-7 availability-aware hand-off copy; pending-human: AI quiet in hours, answers outside; widget header "Open now / Back Mon 09:00".
