@@ -24,7 +24,8 @@
     "migration:revert": "typeorm-ts-node-commonjs migration:revert -d ./database/data-source.ts",
     "migration:show": "typeorm-ts-node-commonjs migration:show -d ./database/data-source.ts",
     "migration:ensure": "./scripts/check-migrations.sh",
-    "migration:check": "tsx scripts/ensure-migrations.ts"
+    "migration:check": "tsx scripts/ensure-migrations.ts",
+    "order-links:backfill": "tsx scripts/backfill-order-links.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.100.1",
