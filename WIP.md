@@ -1,3 +1,7 @@
+## 2026-10-28 — staging — Needs Roger interview → questionnaire artifact
+- Answered in chat (in tasks/voc-roadmap.md "Roger's answers"): PR #104 = all Waves 0–3; 72 h reversal both outcome types; staff close bills; channelAiModes not breaking; lockfile clean (npm install on clean clone, no diff).
+- Remaining ~80 items (blockers, money/safety, copy, defaults, actions, gaps) are in https://claude.ai/artifact/PGDLNwQ2oSg71qpH4vQHKc; answers saved in its db collection `answers` (doc id = item id).
+- Next: read answers with ArtifactData list → move each into "Roger's answers" in tasks/voc-roadmap.md, ticket lines for code changes, commit every ~5, then summary.
 ## 2026-10-28 — staging — Wave 3 closed (tag wave-3-done)
 - Review fixes: simulations out of order index/evidence/analytics; dispute attach owners/admins only; https-only provider link; lowercase plugin channel names (runKind spoof); Shopify auto-submit copy; plugin-api suites load again.
 - Full suites alone: server 178 suites/1639 ✓, dashboard 61 ✓ (3 pre-existing Playwright specs), webchat 134, sdk 213, all plugins ✓.
