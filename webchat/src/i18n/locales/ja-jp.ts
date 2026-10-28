@@ -44,4 +44,7 @@ export default {
   "attachment.photo": "写真",
   "attachment.file": "ファイル",
   "attachment.sending": "送信中...",
+  "error.verificationFailed": "We couldn't verify your message. Please refresh the page and try again.",
+  "challenge.label": "Security check",
+  "challenge.prompt": "Quick security check before we send your message.",
 } as const;

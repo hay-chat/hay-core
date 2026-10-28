@@ -119,6 +119,7 @@ const FAILURE_KEYS: Record<SendFailure["reason"], TranslationKey> = {
   fileTooLarge: "error.fileTooLarge",
   fileType: "error.fileType",
   fileFailed: "error.fileFailed",
+  verificationFailed: "error.verificationFailed",
 };
 const isShaking = ref(false);
 let shakeTimeout: ReturnType<typeof setTimeout> | null = null;
