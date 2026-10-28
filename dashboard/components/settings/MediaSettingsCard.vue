@@ -28,6 +28,18 @@
         </p>
       </div>
 
+      <div class="space-y-1">
+        <Input
+          v-model="caseEmail"
+          type="email"
+          :label="$t('customerPrivacy.media.caseEmail')"
+          :placeholder="$t('customerPrivacy.media.caseEmailPlaceholder')"
+        />
+        <p class="text-sm text-muted-foreground">
+          {{ $t("customerPrivacy.media.caseEmailHint") }}
+        </p>
+      </div>
+
       <Button :loading="isSaving" @click="save">
         {{ $t("customerPrivacy.media.save") }}
       </Button>
@@ -40,6 +52,7 @@ import { ref, onMounted } from "vue";
 import { Hay } from "@/utils/api";
 import { useToast } from "@/composables/useToast";
 import { useUserStore } from "@/stores/user";
+import { TRPCClientError } from "@trpc/client";
 
 const { t } = useI18n();
 const toast = useToast();
@@ -49,12 +62,14 @@ const loaded = ref(false);
 const isSaving = ref(false);
 const readImages = ref(true);
 const allowIdDocuments = ref(false);
+const caseEmail = ref("");
 
 async function load() {
   try {
     const result = await Hay.organizations.getMediaSettings.query();
     readImages.value = result.readImages;
     allowIdDocuments.value = result.allowIdDocuments;
+    caseEmail.value = result.caseEmail ?? "";
     loaded.value = true;
   } catch (error) {
     console.error("Failed to load media settings:", error);
@@ -67,13 +82,17 @@ async function save() {
   try {
     await Hay.organizations.updateMediaSettings.mutate({
       readImages: readImages.value,
+      caseEmail: caseEmail.value.trim() || null,
       // Only the owner may change it; others leave it as it is.
       ...(userStore.isOwner ? { allowIdDocuments: allowIdDocuments.value } : {}),
     });
     toast.success(t("customerPrivacy.media.saveSuccess"));
   } catch (error) {
     console.error("Failed to save media settings:", error);
-    toast.error(t("customerPrivacy.media.saveFailed"));
+    const invalidEmail = error instanceof TRPCClientError && error.data?.code === "BAD_REQUEST";
+    toast.error(
+      t(invalidEmail ? "customerPrivacy.media.caseEmailInvalid" : "customerPrivacy.media.saveFailed"),
+    );
   } finally {
     isSaving.value = false;
   }

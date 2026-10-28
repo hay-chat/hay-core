@@ -316,6 +316,12 @@
     <div class="flex flex-1 overflow-hidden">
       <!-- Left Side: Conversation Thread -->
       <div class="flex-1 flex flex-col">
+        <ProductCaseBanner
+          v-if="productCase && conversation"
+          :conversation-id="conversation.id"
+          :product-case="productCase"
+          @forwarded="onProductCaseForwarded"
+        />
         <!-- Messages Container -->
         <div ref="messagesContainer" class="flex-1 overflow-y-auto p-3 md:p-6 space-y-4 bg-white">
           <!-- Playground Loading State -->
@@ -1070,6 +1076,10 @@ import {
 import { createReusableTemplate, useMediaQuery } from "@vueuse/core";
 import { TRPCClientError } from "@trpc/client";
 import { HayApi } from "@/utils/api";
+import ProductCaseBanner, {
+  type ProductCase,
+  type ProductCaseForward,
+} from "@/components/conversations/ProductCaseBanner.vue";
 import {
   getCustomerChannelInfo,
   getCustomerDisplayName,
@@ -1158,6 +1168,7 @@ const isMessageEventPayload = (value: unknown): value is MessageEventPayload =>
 interface ReplyWindowPayload {
   id?: string;
   reply_window_expires_at?: ConversationDetail["reply_window_expires_at"];
+  metadata?: Record<string, unknown> | null;
 }
 
 const isReplyWindowPayload = (value: unknown): value is ReplyWindowPayload =>
@@ -1501,6 +1512,21 @@ const handleSuggestionApplied = () => {
 
 // Playground action mode: writes are simulated (dry-run) unless switched to live.
 const isLiveStore = computed(() => conversation.value?.metadata?.dryRun === false);
+
+// A complete product-problem case (D8-14/15) lives on the conversation's metadata.
+const productCase = computed<ProductCase | null>(() => {
+  const value = (conversation.value?.metadata as Record<string, unknown> | null | undefined)
+    ?.productCase;
+  return value && typeof value === "object" ? (value as ProductCase) : null;
+});
+
+const onProductCaseForwarded = (forward: ProductCaseForward) => {
+  if (!conversation.value || !productCase.value) return;
+  conversation.value.metadata = {
+    ...(conversation.value.metadata ?? {}),
+    productCase: { ...productCase.value, forward },
+  };
+};
 const showLiveStoreConfirm = ref(false);
 const isSwitchingActionMode = ref(false);
 
@@ -2249,6 +2275,13 @@ onMounted(async () => {
     if (!isReplyWindowPayload(payload) || payload.id !== conversationId.value) return;
     if (conversation.value && payload.reply_window_expires_at !== undefined) {
       conversation.value.reply_window_expires_at = payload.reply_window_expires_at;
+    }
+    // A product case completed or was emailed (D8-14/15).
+    if (conversation.value && payload.metadata && "productCase" in payload.metadata) {
+      conversation.value.metadata = {
+        ...(conversation.value.metadata ?? {}),
+        productCase: payload.metadata.productCase,
+      };
     }
   });
 

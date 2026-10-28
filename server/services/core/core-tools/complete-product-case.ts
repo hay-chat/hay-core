@@ -2,7 +2,8 @@
  * `complete_product_case` core tool (D8-14): the AI closes a product-problem
  * intake. The tool checks the evidence checklist against the conversation
  * (photos, lot number, invoice) and the AI's input (how used, timeline); it
- * returns what is missing, or marks the case complete on the conversation.
+ * returns what is missing, or marks the case complete on the conversation and
+ * forwards it to the merchant (D8-15).
  */
 
 import { createLogger } from "@server/lib/logger";
@@ -13,6 +14,7 @@ import {
   saveProductCase,
   type ProductCaseInput,
 } from "@server/services/product-case/product-case";
+import { scheduleProductCaseForward } from "@server/services/product-case/forward";
 import type { CoreToolDefinition } from "./index";
 
 const logger = createLogger("core-tool:complete-product-case");
@@ -76,6 +78,8 @@ export const completeProductCaseTool: CoreToolDefinition = {
     await saveProductCase(conversation.id, conversation.organization_id, productCase);
     conversation.metadata = { ...(conversation.metadata ?? {}), productCase };
     logger.info({ conversationId: conversation.id }, "Product case complete");
+    // D8-15: email it to the merchant's configured address (if any).
+    scheduleProductCaseForward(conversation.id, conversation.organization_id);
     return { complete: true };
   },
 };
