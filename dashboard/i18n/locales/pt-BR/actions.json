@@ -158,7 +158,7 @@
     "log": {
       "title": "Registro de ações",
       "headTitle": "Registro de ações - Hay.chat",
-      "description": "Todas as chamadas de ferramenta que a IA fez nas conversas, das mais recentes para as mais antigas.",
+      "description": "Todas as chamadas de ferramenta que a IA fez nas conversas, das mais recentes para as mais antigas. Uma ação aprovada aparece duas vezes: quando foi enviada para aprovação e quando foi executada.",
       "refresh": "Atualizar",
       "filters": {
         "tool": "Ferramenta",
@@ -170,7 +170,7 @@
         "success": "Concluída",
         "error": "Falhou",
         "simulated": "Simulação",
-        "held": "Aguardando aprovação",
+        "held": "Enviada para aprovação",
         "confirming": "Perguntando ao cliente"
       },
       "builtIn": "Nativa",

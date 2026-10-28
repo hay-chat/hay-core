@@ -158,7 +158,7 @@
     "log": {
       "title": "Action log",
       "headTitle": "Action log - Hay.chat",
-      "description": "Every tool call the AI made in conversations, newest first.",
+      "description": "Every tool call the AI made in conversations, newest first. An approved action shows twice: once when it was sent for approval and once when it ran.",
       "refresh": "Refresh",
       "filters": {
         "tool": "Tool",
@@ -170,7 +170,7 @@
         "success": "Done",
         "error": "Failed",
         "simulated": "Dry run",
-        "held": "Waiting for approval",
+        "held": "Sent for approval",
         "confirming": "Asking the customer"
       },
       "builtIn": "Built-in",
