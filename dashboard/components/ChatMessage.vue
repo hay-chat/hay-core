@@ -275,6 +275,13 @@
             <span>{{ attachment.name }}</span>
             <span class="opacity-70">({{ formatFileSize(attachment.size) }})</span>
           </a>
+          <p
+            v-if="analysisCaption(attachment)"
+            class="chat-message__attachment-analysis"
+            :title="analysisCaption(attachment)"
+          >
+            {{ analysisCaption(attachment) }}
+          </p>
         </div>
       </div>
       <!-- Queued Message Actions (Test Mode) -->
@@ -746,6 +753,18 @@ const openAttachment = async (attachment: MessageAttachment): Promise<void> => {
   }
 };
 
+// What the AI read from a customer's photo or PDF (D8-11), shown under the file.
+const analysisCaption = (attachment: MessageAttachment): string => {
+  const analysis = attachment.analysis;
+  if (!analysis) return "";
+  if (analysis.status === "pending") return t("conversations.attachment.analysisPending");
+  if (analysis.status === "done" && analysis.description) {
+    return t("conversations.attachment.analysisRead", { description: analysis.description });
+  }
+  if (analysis.status === "failed") return t("conversations.attachment.analysisFailed");
+  return "";
+};
+
 const formatFileSize = (bytes: number): string => {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
@@ -1108,6 +1127,13 @@ const getConfidenceIcon = (tier: string | undefined) => {
   gap: 0.375rem;
   font-size: 0.75rem;
   color: var(--color-red-600);
+}
+
+.chat-message__attachment-analysis {
+  margin-top: 0.25rem;
+  font-size: 0.75rem;
+  line-height: 1.1rem;
+  opacity: 0.75;
 }
 
 .chat-message__attachment-icon {

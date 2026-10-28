@@ -61,12 +61,47 @@ export interface MessageProviderError {
   message?: string;
 }
 
+/** What the vision pass decided a file is (D8-11). */
+export const MEDIA_CLASSES = [
+  "damage",
+  "product",
+  "receipt",
+  "id_document",
+  "card",
+  "screenshot",
+  "other",
+] as const;
+export type MediaClass = (typeof MEDIA_CLASSES)[number];
+
+/**
+ * Result of the vision pass on a customer's image or PDF (D8-11/12). Shown to
+ * the AI through services/media-analysis/agent-view.ts, never to the shopper.
+ * A withheld file (ID document or payment card) keeps only its class: no
+ * description, fields or text are stored for it.
+ */
+export interface AttachmentAnalysis {
+  status: "pending" | "done" | "failed" | "skipped";
+  /** Why it was skipped or failed, e.g. "disabled", "scan_blocked", "no_text". */
+  reason?: string;
+  class?: MediaClass;
+  /** True when the AI must not see what the file shows (D8-12). */
+  withheld?: boolean;
+  description?: string;
+  /** Fields read from the file, e.g. lot_number, order_number, amount. */
+  fields?: Record<string, string>;
+  /** PDF text (card numbers removed, truncated). */
+  text?: string;
+  startedAt?: string;
+  analyzedAt?: string;
+}
+
 export interface MessageAttachment {
   id: string;
   name: string;
   url: string;
   type: string;
   size: number;
+  analysis?: AttachmentAnalysis;
 }
 
 @Entity("messages")

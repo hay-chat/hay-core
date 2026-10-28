@@ -196,6 +196,11 @@ export const config = {
       transcription: {
         model: process.env.OPENAI_TRANSCRIPTION_MODEL || "gpt-4o-mini-transcribe",
       },
+      // Vision pass on customer photos and PDFs (D8-11). Served by the EU endpoint
+      // when configured, else the org's managed OpenAI endpoint.
+      vision: {
+        model: process.env.OPENAI_VISION_MODEL || "gpt-4.1-mini",
+      },
     },
   },
 

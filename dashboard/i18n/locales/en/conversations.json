@@ -20,7 +20,10 @@
       "uploading": "Uploading {name}…",
       "uploadFailed": "Couldn't upload {name}. Try again or pick another file.",
       "tooLarge": "{name} is larger than {size} MB.",
-      "tooMany": "You can send up to {count} files at once."
+      "tooMany": "You can send up to {count} files at once.",
+      "analysisPending": "AI is reading this file…",
+      "analysisRead": "AI read: {description}",
+      "analysisFailed": "The AI couldn't read this file"
     },
     "page": {
       "title": "Conversations",

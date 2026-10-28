@@ -1169,6 +1169,16 @@ const isConversationEventPayload = (value: unknown): value is ConversationEventP
 const isMessageStatusEventPayload = (value: unknown): value is MessageStatusEventPayload =>
   typeof value === "object" && value !== null;
 
+/** `message_media_updated`: the vision pass or scan changed a message's files (D8-11). */
+interface MessageMediaEventPayload {
+  conversationId?: string;
+  messageId?: string;
+  attachments?: Message["attachments"];
+}
+
+const isMessageMediaEventPayload = (value: unknown): value is MessageMediaEventPayload =>
+  typeof value === "object" && value !== null;
+
 /** Extract a human-readable error message from an unknown thrown value. */
 const getErrorMessage = (error: unknown, fallback: string): string => {
   if (error instanceof TRPCClientError) {
@@ -2027,6 +2037,7 @@ let unsubscribeConversationUpdated: (() => void) | null = null;
 let unsubscribeMessageApproved: (() => void) | null = null;
 let unsubscribeMessageBlocked: (() => void) | null = null;
 let unsubscribeMessageStatus: (() => void) | null = null;
+let unsubscribeMessageMedia: (() => void) | null = null;
 
 // Lifecycle
 onMounted(async () => {
@@ -2294,6 +2305,15 @@ onMounted(async () => {
     target.providerStatus = payload.providerStatus ?? null;
     target.providerError = payload.providerError ?? null;
   });
+
+  // The AI read a file (or a scan finished): patch the message's files in place.
+  unsubscribeMessageMedia = websocket.on("message_media_updated", (payload: unknown) => {
+    if (!isMessageMediaEventPayload(payload)) return;
+    if (payload.conversationId !== conversationId.value || !payload.messageId) return;
+    const target = conversation.value?.messages?.find((m) => m.id === payload.messageId);
+    if (!target || !Array.isArray(payload.attachments)) return;
+    target.attachments = payload.attachments;
+  });
 });
 
 // eslint-disable-next-line no-undef
@@ -2305,6 +2325,7 @@ onUnmounted(() => {
   if (unsubscribeMessageApproved) unsubscribeMessageApproved();
   if (unsubscribeMessageBlocked) unsubscribeMessageBlocked();
   if (unsubscribeMessageStatus) unsubscribeMessageStatus();
+  if (unsubscribeMessageMedia) unsubscribeMessageMedia();
 
   // Close test conversation in playground mode
   if (isPlaygroundMode.value && conversation.value) {
