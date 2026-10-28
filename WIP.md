@@ -1,3 +1,7 @@
+## 2026-10-28 — staging — W3 L13 chargeback disputes merged, hand-tested
+- Merged claude/w3-disputes (60765df4); AddDisputes1785860000000 run on hay_staging; SDK + stripe + shopify rebuilt. tsc/dashboard typecheck clean; jest disputes/evidence/proxy 51/51.
+- Hand test: dispute reported via core intake matched Woo order #15, alert recorded; Evidence page Disputes card; Attach as draft confirm → NOT_CONNECTED error shown and stored. Fixed dialog platform name going blank on close (e38e9d2a).
+- Guide: seo payment-disputes (16fbcc0, unpushed). Test dispute row dp_handtest_1 left on staging. Running: L6 perf; then Wave 3 close.
 ## 2026-10-28 08:55 — staging — W3 L5 Mercado Pago merged, hand-tested (no real account)
 - Merged claude/w3-brazil-pay (73d722d0); no migrations; plugin-sdk rebuilt; plugin registered after server restart.
 - Hand test: plugin page, enable → "Connecting is not available yet" notice (no MP keys on staging). Tests on merged tree: MP 21, Woo 124, SDK payment-provider 8.
