@@ -1,3 +1,7 @@
+## 2026-10-28 — staging — W3 L6 widget perf budget merged; all Wave 3 lanes in
+- Merged claude/w3-perf (6a1aecdc): webchat check:perf (brotli-5 size budgets + jsdom request budgets), perf:lighthouse, CI webchat job. Verified on merged tree: check:perf passes, vitest 134/134.
+- hay-website draft PR #47 (D12-10 page) waits for Roger. D12 research request counts corrected in seo (b01e9da, unpushed).
+- Next: Wave 3 close (review agent over wave-2-done..staging, full suites, tag wave-3-done, PR #104).
 ## 2026-10-28 — staging — W3 L13 chargeback disputes merged, hand-tested
 - Merged claude/w3-disputes (60765df4); AddDisputes1785860000000 run on hay_staging; SDK + stripe + shopify rebuilt. tsc/dashboard typecheck clean; jest disputes/evidence/proxy 51/51.
 - Hand test: dispute reported via core intake matched Woo order #15, alert recorded; Evidence page Disputes card; Attach as draft confirm → NOT_CONNECTED error shown and stored. Fixed dialog platform name going blank on close (e38e9d2a).
