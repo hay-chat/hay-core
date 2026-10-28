@@ -29,11 +29,8 @@ import { User } from "../../entities/user.entity";
 import { Conversation } from "../../database/entities/conversation.entity";
 import { PendingAction } from "../../database/entities/pending-action.entity";
 import { Message, MessageType } from "../../database/entities/message.entity";
-import { pendingActionService } from "../../services/pending-action.service";
-import {
-  actionDecisionService,
-  HANDLED_BY_TEAM_NOTE,
-} from "../../services/action-decision.service";
+import { HANDLED_BY_TEAM_NOTE, pendingActionService } from "../../services/pending-action.service";
+import { actionDecisionService } from "../../services/action-decision.service";
 import { decidedActionsLedger } from "../../orchestrator/decided-actions";
 
 const orgId = "da4e0000-0000-4000-8000-000000000005";
@@ -210,6 +207,11 @@ describe("action decisions (D4-5)", () => {
     expect(await statusOf(conversation.id)).toBe("pending-human");
     expect(mockEnqueue).not.toHaveBeenCalled();
     expect(mockExecuteApproved).not.toHaveBeenCalled();
+    // Handed to the team is not "declined": a later identical call is not
+    // answered with "a team member already declined this".
+    expect(
+      await pendingActionService.findEarlierRequest(conversation.id, action.tool_name, action.args),
+    ).toBeNull();
   });
 
   it("hands to the team instead of an AI turn when the channel's reply window closed", async () => {
