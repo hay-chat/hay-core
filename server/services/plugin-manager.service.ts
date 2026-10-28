@@ -29,6 +29,8 @@ interface HayPluginBlock {
   auth?: HayPluginManifest["auth"];
   channel?: string;
   autoActivate?: boolean;
+  /** Enable this plugin automatically for newly created organizations. */
+  defaultEnabled?: boolean;
   trpcRouter?: string;
   documentImporter?: boolean;
 }
@@ -244,6 +246,7 @@ export class PluginManagerService {
         auth: hayPlugin.auth || undefined, // Include auth config if present
         channel: hayPlugin.channel || undefined, // For channel-type plugins
         autoActivate: hayPlugin.autoActivate === true, // Eagerly load router at boot
+        defaultEnabled: hayPlugin.defaultEnabled === true, // Enabled for new orgs
         trpcRouter: hayPlugin.trpcRouter || undefined, // Optional plugin-side tRPC router file
       };
 

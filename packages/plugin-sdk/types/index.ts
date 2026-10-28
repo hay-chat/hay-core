@@ -114,6 +114,27 @@ export type {
 } from "./webhook-routing";
 
 // ============================================================================
+// Webchat extension point (contributions + gates)
+// ============================================================================
+
+export type {
+  WebchatContributionType,
+  WebchatContributionPropValue,
+  WebchatContributionOptions,
+  WebchatContributionDescriptor,
+  WebchatGateEvent,
+  WebchatGateFailurePolicy,
+  WebchatGateInput,
+  WebchatGateResult,
+  HayWebchatGateContext,
+  WebchatGateHandler,
+  WebchatGateOptions,
+  WebchatGateDescriptor,
+  WebchatMetadata,
+  RegisterWebchatAPI,
+} from "./webchat";
+
+// ============================================================================
 // Cron Jobs (HAY-221)
 // ============================================================================
 

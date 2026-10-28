@@ -12,6 +12,7 @@ import type { HttpMethod, RouteHandler } from "./route";
 import type { PluginPage } from "./ui";
 import type { CronJobOptions } from "./cron";
 import type { WebhookRoutingDescriptor } from "./webhook-routing";
+import type { RegisterWebchatAPI } from "./webchat";
 
 /**
  * UI registration API.
@@ -277,6 +278,14 @@ export interface HayRegisterAPI {
    * ```
    */
   webhookRouting(descriptor: WebhookRoutingDescriptor): void;
+
+  /**
+   * Webchat extension API: declarative widget contributions (fixed versioned
+   * types like `challenge@1`) and synchronous server-side gates for widget
+   * actions. The widget never runs plugin code. Requires the `webchat`
+   * capability in the manifest.
+   */
+  webchat: RegisterWebchatAPI;
 
   // Future: mcp descriptor registration (optional)
   // mcp?: RegisterMcpDescriptorAPI;

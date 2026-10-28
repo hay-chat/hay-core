@@ -1,4 +1,8 @@
 import { t, publicProcedure } from "@server/trpc";
+import {
+  webchatExtensionsService,
+  type GateOutcome,
+} from "@server/services/webchat/webchat-extensions.service";
 import { z } from "zod";
 import { ConversationService } from "../../../services/conversation.service";
 import { MessageType, MessageDirection } from "../../../database/entities/message.entity";
@@ -58,6 +62,10 @@ const createPublicConversationSchema = z.object({
   context: z.record(z.any()).optional(),
   customerExternalId: z.string().optional(),
   isPlayground: z.boolean().optional().default(false),
+  // Token from a rendered challenge@1 contribution, or the error code when the
+  // challenge could not run. Checked by plugin gates before the conversation exists.
+  challengeToken: z.string().max(4096).optional(),
+  challengeError: z.string().max(64).optional(),
 });
 
 // Schema for sending messages
@@ -170,6 +178,17 @@ export const publicConversationsRouter = t.router({
         }
       }
 
+      // Plugin gates (e.g. a bot challenge) run before the conversation exists.
+      const gate = await webchatExtensionsService.runGates(organizationId, "conversation.create", {
+        token: input.challengeToken,
+        contributionError: input.challengeError,
+        pageHostname: hostname,
+        frameHostname: config.domain.api,
+        ip: clientIp(ctx.ipAddress),
+        underAttack: false,
+      });
+      if (gate.decision === "deny") throw verificationFailed();
+
       // Create the conversation with the public JWK
       const conversation = await conversationService.createConversation(organizationId, {
         status: "open",
@@ -179,6 +198,7 @@ export const publicConversationsRouter = t.router({
           channel: "web",
           createdAt: new Date().toISOString(),
           ...(input.isPlayground ? { isPlayground: true } : {}),
+          ...(gate.results.length > 0 ? { botCheck: botCheckRecord(gate) } : {}),
         },
       });
 
@@ -357,6 +377,18 @@ export const publicConversationsRouter = t.router({
           message: "Conversation not found",
         });
       }
+
+      const gate = await webchatExtensionsService.runGates(
+        conversation.organization_id,
+        "message.send",
+        {
+          pageHostname: requestHostname(ctx.req.headers),
+          frameHostname: config.domain.api,
+          ip: clientIp(ctx.ipAddress),
+          underAttack: false,
+        },
+      );
+      if (gate.decision === "deny") throw verificationFailed();
 
       // Add the message using the entity method which handles cooldown
       const message = await conversation.addMessage({
@@ -645,6 +677,22 @@ function tooManyRequests(): TRPCError {
     code: "TOO_MANY_REQUESTS",
     message: "Too many requests. Please wait a moment and try again.",
   });
+}
+
+/** Machine-readable refusal the widget maps to a "could not verify" message. */
+export const VERIFICATION_FAILED = "VERIFICATION_FAILED";
+
+function verificationFailed(): TRPCError {
+  return new TRPCError({ code: "FORBIDDEN", message: VERIFICATION_FAILED });
+}
+
+/** What the conversation keeps from a gate run (read by the spam detector). */
+function botCheckRecord(gate: GateOutcome) {
+  return {
+    decision: gate.decision,
+    results: gate.results,
+    checkedAt: new Date().toISOString(),
+  };
 }
 
 /**
