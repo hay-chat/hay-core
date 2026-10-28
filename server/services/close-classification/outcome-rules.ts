@@ -59,8 +59,11 @@ export const INSIGHT_ACTION_TYPES = [
 ] as const;
 export type InsightActionType = (typeof INSIGHT_ACTION_TYPES)[number];
 
-/** Where an insight issue came from: the close classifier, or a staff rating of a reply. */
-export const INSIGHT_SOURCES = ["ai_review", "user_feedback"] as const;
+/**
+ * Where an insight issue came from: the close classifier (or its backfill),
+ * a staff rating of a reply, or the weekly docs audit / broken action check.
+ */
+export const INSIGHT_SOURCES = ["ai_review", "user_feedback", "docs_audit"] as const;
 export type InsightSource = (typeof INSIGHT_SOURCES)[number];
 
 export const INSIGHT_POLARITIES = ["positive", "negative", "neutral"] as const;

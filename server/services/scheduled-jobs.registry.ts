@@ -138,6 +138,20 @@ const jobRegistry: CronJobConfig[] = [
   },
 
   {
+    name: "insight-clustering",
+    description:
+      "Nightly incremental clustering of insight issues: join/create, merge, promotion gate, recurrence (D3-12)",
+    schedule: "15 4 * * *", // Daily at 4:15 AM, after retention
+    handler: async () => {
+      const { insightClusteringService } = await import("./insights/insight-clustering.service");
+      await insightClusteringService.runAll();
+    },
+    singleton: true,
+    enabled: true,
+    timeout: 1800000, // 30 minutes max
+  },
+
+  {
     name: "pending-action-expiry",
     description:
       "Expire AI actions that got no approval in time and hand the conversation to the team",
