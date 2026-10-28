@@ -30,6 +30,7 @@ import { notificationsRouter } from "./notifications";
 import { actionsRouter } from "./actions";
 import { businessHoursRouter } from "./business-hours";
 import { usageRouter } from "./usage";
+import { organizationExportRouter } from "./organization-export";
 import { evidencePacksRouter } from "./evidence-packs";
 import { emailDomainsRouter } from "./email-domains";
 
@@ -65,6 +66,7 @@ const coreRouters = {
   actions: actionsRouter,
   businessHours: businessHoursRouter,
   usage: usageRouter,
+  organizationExport: organizationExportRouter,
   evidencePacks: evidencePacksRouter,
   emailDomains: emailDomainsRouter,
 };

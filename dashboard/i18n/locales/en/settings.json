@@ -756,5 +756,20 @@
     "stateClosedUntil": "Closed, back {when} ({timezone})",
     "stateAlwaysOpen": "No schedule (always open), a teammate is reachable",
     "stateAlwaysOpenNobody": "No schedule (always open), nobody is reachable. The team gets an alert."
+  },
+  "workspaceExport": {
+    "title": "Download all workspace data",
+    "description": "Everything this workspace keeps in Hay.chat in one ZIP: conversations and messages, customers, documents, playbooks and agent settings.",
+    "includes": "The ZIP has a JSON Lines file per kind of data and CSV files for conversations, messages and customers. Attachment files are not included. Only owners and admins can download it, and each download is logged.",
+    "request": "Prepare export",
+    "requestAgain": "Prepare a new export",
+    "requested": "Export started. This page updates when it is ready.",
+    "requestFailed": "Could not start the export. Try again.",
+    "preparing": "Preparing your export. Large workspaces can take a few minutes.",
+    "ready": "Export from {date} is ready ({size}). Available until {expires}.",
+    "failed": "The last export failed. Start a new one.",
+    "expired": "The last export has expired. Start a new one.",
+    "download": "Download ZIP",
+    "downloadFailed": "The export is no longer available. Start a new one."
   }
 }
