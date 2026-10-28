@@ -39,6 +39,7 @@ import { NotificationDelivery } from "./entities/notification-delivery.entity";
 import { ActionLog } from "./entities/action-log.entity";
 import { SimulationRun } from "./entities/simulation-run.entity";
 import { SimulationRunItem } from "./entities/simulation-run-item.entity";
+import { TestTranscript } from "./entities/test-transcript.entity";
 import { PendingAction } from "./entities/pending-action.entity";
 import { BusinessHoursSchedule } from "./entities/business-hours-schedule.entity";
 import { OrderConversationLink } from "./entities/order-conversation-link.entity";
@@ -114,6 +115,7 @@ export const AppDataSource = new DataSource({
     CustomerMergeDismissal,
     SimulationRun,
     SimulationRunItem,
+    TestTranscript,
   ],
   migrations: __filename.includes("dist")
     ? [__dirname + "/migrations/*.js"] // Production: compiled JS files in same relative location
