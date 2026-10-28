@@ -53,15 +53,10 @@
     </mj-button>
 
     {{#if verificationRequired}}
-    <mj-text
-      background-color="#fff3cd"
-      padding="15px"
-      border-left="3px solid #ffc107"
-      color="#856404"
-      font-size="14px"
-      line-height="20px"
-    >
-      <strong>{{ t.common.actionRequired }}:</strong> {{ t.welcome.verificationAction }}
+    <mj-text color="#856404" font-size="14px" line-height="20px" padding="10px 0">
+      <div style="background-color: #fff3cd; border-left: 3px solid #ffc107; padding: 15px">
+        <strong>{{ t.common.actionRequired }}:</strong> {{ t.welcome.verificationAction }}
+      </div>
     </mj-text>
     {{/if}}
   </mj-column>

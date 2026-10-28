@@ -43,7 +43,7 @@
 <mj-section background-color="#ffffff" padding="20px 25px">
   <mj-column>
     {{#if userName}}
-    <mj-text color="#555555" line-height="24px"> {{ t.common.hi }} </mj-text>
+    <mj-text color="#555555" line-height="24px" padding="0 0 10px 0"> {{ t.common.hi }} </mj-text>
     {{/if}}
 
     <mj-text color="#555555" line-height="24px" padding="10px 0">
@@ -51,15 +51,10 @@
     </mj-text>
 
     {{#if actionRequired}}
-    <mj-text
-      background-color="#d1ecf1"
-      padding="15px"
-      border-left="3px solid #17a2b8"
-      color="#0c5460"
-      font-size="14px"
-      line-height="20px"
-    >
-      <strong>{{ t.common.actionRequired }}</strong> {{ actionMessage }}
+    <mj-text color="#0c5460" font-size="14px" line-height="20px" padding="10px 0">
+      <div style="background-color: #d1ecf1; border-left: 3px solid #17a2b8; padding: 15px">
+        <strong>{{ t.common.actionRequired }}</strong> {{ actionMessage }}
+      </div>
     </mj-text>
     {{/if}}
   </mj-column>
@@ -101,7 +96,7 @@
 {{#if additionalInfo}}
 <mj-section background-color="#ffffff" padding="20px 25px">
   <mj-column>
-    <mj-text color="#555555" line-height="24px">
+    <mj-text color="#555555" line-height="24px" padding="0">
       {{ additionalInfo }}
     </mj-text>
   </mj-column>
@@ -116,9 +111,7 @@
     </mj-text>
     {{#each relatedItems}}
     <mj-text color="#555555" line-height="32px" padding="5px 0 5px 20px">
-      • {{#if this.url
-      }}<a href="{{this.url}}" style="color: #001af4; text-decoration: none">{{ this.text }}</a
-      >{{else}}{{ this.text }}{{/if}}
+      • <a href="{{this.url}}" style="color: #001af4; text-decoration: none">{{ this.text }}</a>
     </mj-text>
     {{/each}}
   </mj-column>
@@ -129,7 +122,7 @@
 <mj-section background-color="#ffffff" padding="20px 25px">
   <mj-column>
     <mj-divider border-color="#e9ecef" border-width="1px" padding="0 0 20px 0" />
-    <mj-text font-size="14px" color="#666666" line-height="20px">
+    <mj-text font-size="14px" color="#666666" line-height="20px" padding="0">
       {{ t.notification.receivingBecause }}
       <a href="{{notificationSettings.url}}" style="color: #001af4; text-decoration: none"
         >{{ t.notification.managePreferences }}</a
@@ -141,7 +134,7 @@
 
 <mj-section background-color="#ffffff" padding="20px 25px">
   <mj-column>
-    <mj-text color="#555555" line-height="24px">
+    <mj-text color="#555555" line-height="24px" padding="0">
       {{#if supportContact}}
       {{ t.notification.questionsContact }}
       <a href="mailto:{{supportEmail}}" style="color: #001af4; text-decoration: none">{{
@@ -158,7 +151,9 @@
 {{#if timestamp}}
 <mj-section background-color="#f8f9fa" padding="15px 25px">
   <mj-column>
-    <mj-text align="center" color="#666666" font-size="12px"> {{ t.notification.sentOn }} </mj-text>
+    <mj-text align="center" color="#666666" font-size="12px" padding="0">
+      {{ t.notification.sentOn }}
+    </mj-text>
   </mj-column>
 </mj-section>
 {{/if}}
