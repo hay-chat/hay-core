@@ -1,3 +1,7 @@
+## 2026-10-28 08:00 — staging — W3 L7a test-before-go-live merged, hand-tested
+- Merged claude/w3-golive-a with migrations renumbered to 1785830000000/1785831000000 (run on hay_staging).
+- Hand test: "Test this draft" playground followed the draft; Compare with active diff works; simulations.start run completed (usage logged); simulation conversation hidden from Inbox; testTranscripts paste import OK.
+- Running: L12b. Next: L7b (runs/import UI, D7-9..14, D3-17), migrations 1785850000000+.
 ## 2026-10-28 07:30 — staging — W3 L12a insights foundations merged, hand-tested
 - Merged claude/w3-insights-a (dcb08c8); 2 migrations on hay_staging; feedback backfill run. Fix d5594f6 bracket placeholders.
 - Running: L7a. Next: L12b (clustering, Insights page, digest).
