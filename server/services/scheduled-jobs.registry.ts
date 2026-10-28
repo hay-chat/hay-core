@@ -111,6 +111,33 @@ const jobRegistry: CronJobConfig[] = [
   },
 
   {
+    name: "insight-feedback-enrichment",
+    description:
+      "Explain staff ratings of AI replies as Insights QA events (one easy-tier LLM call each)",
+    schedule: 10000, // Every 10 seconds, up to 5 ratings per run
+    handler: async () => {
+      const { feedbackInsightService } = await import("./insights/feedback-insight.service");
+      await feedbackInsightService.enrichPending(5);
+    },
+    singleton: true,
+    enabled: true,
+    skipDatabaseLogging: true,
+  },
+
+  {
+    name: "insight-embeddings",
+    description: "Embed enriched insight issues for clustering (pgvector, one row per issue)",
+    schedule: 60000, // Every 60 seconds, up to 50 issues per run
+    handler: async () => {
+      const { insightEmbeddingService } = await import("./insights/insight-embedding.service");
+      await insightEmbeddingService.embedPending(50);
+    },
+    singleton: true,
+    enabled: true,
+    skipDatabaseLogging: true,
+  },
+
+  {
     name: "pending-action-expiry",
     description:
       "Expire AI actions that got no approval in time and hand the conversation to the team",

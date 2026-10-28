@@ -25,7 +25,8 @@
     "migration:show": "typeorm-ts-node-commonjs migration:show -d ./database/data-source.ts",
     "migration:ensure": "./scripts/check-migrations.sh",
     "migration:check": "tsx scripts/ensure-migrations.ts",
-    "order-links:backfill": "tsx scripts/backfill-order-links.ts"
+    "order-links:backfill": "tsx scripts/backfill-order-links.ts",
+    "insights:backfill-feedback": "tsx scripts/backfill-feedback-insights.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.100.1",
