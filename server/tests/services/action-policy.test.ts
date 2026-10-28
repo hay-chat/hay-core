@@ -146,23 +146,36 @@ describe("extractAmount", () => {
 
 describe("lowerAmount (D4-6)", () => {
   it("lowers a top-level amount and keeps its type", () => {
-    expect(lowerAmount({ amount: "25.00" }, 10)).toEqual({ amount: "10.00" });
-    expect(lowerAmount({ amount: 25 }, 9.999)).toEqual({ amount: 10 });
+    expect(lowerAmount({ amount: "25.00", currency: "BRL" }, 10)).toEqual({
+      amount: "10.00",
+      currency: "BRL",
+    });
+    expect(lowerAmount({ amount: 25, currency: "usd" }, 9.999)).toEqual({
+      amount: 10,
+      currency: "usd",
+    });
   });
 
   it("lowers a single transaction", () => {
-    expect(lowerAmount({ transactions: [{ parentId: "t", amount: "30.00" }] }, 12.5)).toEqual({
-      transactions: [{ parentId: "t", amount: "12.50" }],
+    expect(
+      lowerAmount({ transactions: [{ parentId: "t", amount: "30.00", currency: "BRL" }] }, 12.5),
+    ).toEqual({
+      transactions: [{ parentId: "t", amount: "12.50", currency: "BRL" }],
     });
   });
 
   it("refuses up, zero, split refunds and calls without an amount", () => {
-    expect(lowerAmount({ amount: "25.00" }, 25.01)).toBeNull();
-    expect(lowerAmount({ amount: "25.00" }, 0)).toBeNull();
+    expect(lowerAmount({ amount: "25.00", currency: "BRL" }, 25.01)).toBeNull();
+    expect(lowerAmount({ amount: "25.00", currency: "BRL" }, 0)).toBeNull();
     expect(
       lowerAmount({ transactions: [{ amount: "10" }, { amount: "5" }] }, 4),
     ).toBeNull();
     expect(lowerAmount({ order_id: "1" }, 4)).toBeNull();
     expect(amountEditable({ order_id: "1" })).toBe(false);
+  });
+
+  it("refuses a call that does not state its currency (unknown unit, e.g. cents)", () => {
+    expect(amountEditable({ amount: 2500 })).toBe(false);
+    expect(lowerAmount({ amount: 2500 }, 1000)).toBeNull();
   });
 });
