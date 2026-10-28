@@ -35,7 +35,4 @@ module.exports = {
     create_email_template: "other_write",
     upload_image_from_url: "other_write",
   },
-  // Left unclassified on purpose, so core holds every call for a person:
-  // it uploads any file path readable on the Hay.chat host to Klaviyo.
-  unclassified: ["upload_image_from_file"],
 };
