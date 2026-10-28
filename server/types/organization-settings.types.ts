@@ -362,6 +362,22 @@ export interface AiDisclosureConfig {
 }
 
 /**
+ * Per-channel AI mode (D14-7). "drafts" = the AI writes the reply and a person
+ * approves it before it is sent (the same queue as Require Approval / test
+ * mode). Keyed by channel id ("web" or a channel plugin's manifest `channel`).
+ * Missing = "on".
+ */
+export const CHANNEL_AI_MODES = ["on", "drafts"] as const;
+export type ChannelAiMode = (typeof CHANNEL_AI_MODES)[number];
+
+export function resolveChannelAiMode(
+  settings: OrganizationSettings | null | undefined,
+  channel: string,
+): ChannelAiMode {
+  return settings?.channelAiModes?.[channel] === "drafts" ? "drafts" : "on";
+}
+
+/**
  * Organization Settings JSONB structure
  * This type defines the complete structure of the settings field in the Organization entity
  */
@@ -377,5 +393,6 @@ export interface OrganizationSettings {
   aiRegion?: AiRegion; // Where AI calls are processed; "eu" routes everything to the EU endpoint
   actionApproval?: Partial<ActionApprovalConfig>; // Which AI write actions wait for a person
   aiDisclosure?: AiDisclosureConfig; // AI label on replies, per channel
+  channelAiModes?: Record<string, ChannelAiMode>; // Per-channel AI mode; missing = "on"
   [key: string]: unknown;
 }

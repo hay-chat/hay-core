@@ -1,5 +1,5 @@
 <template>
-  <!-- AI label on AI replies (D14-6): widget badge, first-reply line on other channels. -->
+  <!-- AI on each channel: the AI label (D14-6) and send automatically vs drafts only (D14-7). -->
   <Card>
     <CardHeader>
       <CardTitle>{{ $t("customerPrivacy.aiLabel.title") }}</CardTitle>
@@ -21,19 +21,29 @@
 
       <div class="space-y-3">
         <p class="text-sm font-medium">{{ $t("customerPrivacy.aiLabel.channelsTitle") }}</p>
+        <p class="text-sm text-muted-foreground">{{ $t("customerPrivacy.aiLabel.draftsHint") }}</p>
         <div
           v-for="ch in channels"
           :key="ch.channel"
           class="flex flex-wrap items-center justify-between gap-3 rounded-lg border p-3"
         >
           <span class="text-sm font-medium">{{ ch.name }}</span>
-          <Input
-            :model-value="!hiddenChannels.includes(ch.channel)"
-            type="switch"
-            :label="$t('customerPrivacy.aiLabel.showLabel')"
-            :disabled="locked"
-            @update:model-value="setShown(ch.channel, $event)"
-          />
+          <div class="flex flex-wrap items-center gap-4">
+            <Input
+              :model-value="draftsChannels.includes(ch.channel) ? 'drafts' : 'on'"
+              type="select"
+              :aria-label="`${ch.name}: ${$t('customerPrivacy.aiLabel.aiReplies')}`"
+              :options="modeOptions"
+              @update:model-value="setDrafts(ch.channel, $event === 'drafts')"
+            />
+            <Input
+              :model-value="!hiddenChannels.includes(ch.channel)"
+              type="switch"
+              :label="$t('customerPrivacy.aiLabel.showLabel')"
+              :disabled="locked"
+              @update:model-value="setShown(ch.channel, $event)"
+            />
+          </div>
         </div>
       </div>
 
@@ -61,6 +71,7 @@ const loaded = ref(false);
 const isSaving = ref(false);
 const label = ref("");
 const hiddenChannels = ref<string[]>([]);
+const draftsChannels = ref<string[]>([]);
 const locked = ref(false);
 
 // Web Chat plus every enabled channel plugin, keyed by channel id (never plugin id).
@@ -70,6 +81,18 @@ const channels = computed(() => [
     .filter((p) => p.enabled && p.type?.includes("channel") && p.channel)
     .map((p) => ({ channel: p.channel as string, name: p.name })),
 ]);
+
+const modeOptions = computed(() => [
+  { label: t("customerPrivacy.aiLabel.modeOn"), value: "on" },
+  { label: t("customerPrivacy.aiLabel.modeDrafts"), value: "drafts" },
+]);
+
+function setDrafts(channel: string, drafts: boolean) {
+  const set = new Set(draftsChannels.value);
+  if (drafts) set.add(channel);
+  else set.delete(channel);
+  draftsChannels.value = [...set];
+}
 
 function setShown(channel: string, shown: string | number | boolean) {
   const set = new Set(hiddenChannels.value);
@@ -84,6 +107,7 @@ async function load() {
     label.value = result.label ?? "";
     hiddenChannels.value = result.hiddenChannels;
     locked.value = result.locked;
+    draftsChannels.value = result.draftsChannels;
     loaded.value = true;
   } catch (error) {
     console.error("Failed to load AI label settings:", error);
@@ -96,6 +120,7 @@ async function save() {
   try {
     await Hay.organizations.updateAiDisclosure.mutate({
       label: label.value.trim() || null,
+      draftsChannels: draftsChannels.value,
       ...(locked.value ? {} : { hiddenChannels: hiddenChannels.value }),
     });
     toast.success(t("customerPrivacy.aiLabel.saveSuccess"));

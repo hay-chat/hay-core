@@ -968,8 +968,13 @@ The following tools are available for you to use. You MUST return only valid JSO
         testModeEnabled = organization.settings.testModeDefault;
       }
 
+      // A channel set to "drafts only" (D14-7) queues every AI reply for a person
+      // to approve, through the same gate as test mode.
+      const { resolveChannelAiMode } = await import("../../types/organization-settings.types");
+      const draftsOnly = resolveChannelAiMode(organization?.settings, this.channel) === "drafts";
+
       // Only apply test mode if this is a response to a customer (not the initial greeting)
-      if (testModeEnabled && hasCustomerMessages) {
+      if ((testModeEnabled || draftsOnly) && hasCustomerMessages) {
         messageStatus = MessageStatus.PENDING;
         reviewRequired = true;
         deliveryState = DeliveryState.QUEUED;

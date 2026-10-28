@@ -41,3 +41,25 @@ export function isAiLabelShown(org: Partial<OrgLike> | null | undefined, channel
   if (isEuOrganization(org)) return true;
   return !(org?.settings?.aiDisclosure?.hiddenChannels ?? []).includes(channel);
 }
+
+/** Default label for channel messages, in the shopper's language (English otherwise). */
+const DEFAULT_AI_LABELS: Record<string, string> = {
+  en: "AI assistant",
+  pt: "Assistente de IA",
+  es: "Asistente de IA",
+};
+
+/**
+ * The line that opens the first AI reply on a non-widget channel (D14-7), e.g.
+ * "[AI assistant]". Null when the org hid the label on this channel.
+ */
+export function aiDisclosureLine(
+  org: (Partial<OrgLike> & { defaultLanguage?: string | null }) | null | undefined,
+  channel: string,
+  language: string | null | undefined,
+): string | null {
+  if (!isAiLabelShown(org, channel)) return null;
+  const base = (language || org?.defaultLanguage || "en").toLowerCase().split(/[-_]/)[0];
+  const label = customAiLabel(org?.settings) ?? DEFAULT_AI_LABELS[base] ?? DEFAULT_AI_LABELS.en;
+  return `[${label}]`;
+}

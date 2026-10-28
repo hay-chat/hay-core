@@ -81,4 +81,36 @@ describe("Conversation.addMessage for an AI reply", () => {
     await makeConversation().addMessage(botReply);
     expect(created().metadata).toEqual({ aiRegion: "default" });
   });
+
+  it("holds the reply for approval on a channel set to drafts only", async () => {
+    mockFindOrg.mockResolvedValue({
+      id: ORG_ID,
+      settings: { channelAiModes: { whatsapp: "drafts" } },
+    });
+    await makeConversation("whatsapp").addMessage(botReply);
+    expect(created()).toMatchObject({
+      status: "pending",
+      reviewRequired: true,
+      deliveryState: "queued",
+    });
+  });
+
+  it("sends straight away on other channels", async () => {
+    mockFindOrg.mockResolvedValue({
+      id: ORG_ID,
+      settings: { channelAiModes: { whatsapp: "drafts" } },
+    });
+    await makeConversation("instagram").addMessage(botReply);
+    expect(created()).not.toMatchObject({ reviewRequired: true });
+  });
+
+  it("does not hold a greeting sent before the customer wrote", async () => {
+    mockGetMessages.mockResolvedValue([]);
+    mockFindOrg.mockResolvedValue({
+      id: ORG_ID,
+      settings: { channelAiModes: { whatsapp: "drafts" } },
+    });
+    await makeConversation("whatsapp").addMessage(botReply);
+    expect(created()).not.toMatchObject({ reviewRequired: true });
+  });
 });

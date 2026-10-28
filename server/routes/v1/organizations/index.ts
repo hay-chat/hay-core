@@ -396,17 +396,23 @@ export const organizationsRouter = t.router({
         // EU orgs always show the label, whatever was saved before.
         hiddenChannels: locked ? [] : (organization.settings?.aiDisclosure?.hiddenChannels ?? []),
         locked,
+        // Channels whose AI replies wait for a person to approve them (D14-7).
+        draftsChannels: Object.entries(organization.settings?.channelAiModes ?? {})
+          .filter(([, mode]) => mode === "drafts")
+          .map(([channel]) => channel),
       };
     },
   ),
 
   // Rename the label or hide it on some channels. EU orgs may rename it but not
-  // hide it (EU AI Act art. 50; Roger's D14 answer 5).
+  // hide it (EU AI Act art. 50; Roger's D14 answer 5). draftsChannels switches
+  // channels to "drafts only": AI replies queue for approval (D14 answer 6).
   updateAiDisclosure: scopedProcedure(RESOURCES.ORGANIZATION_SETTINGS, ACTIONS.UPDATE)
     .input(
       z.object({
         label: z.string().trim().max(AI_LABEL_MAX_LENGTH).nullable().optional(),
         hiddenChannels: z.array(channelIdSchema).max(50).optional(),
+        draftsChannels: z.array(channelIdSchema).max(50).optional(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
@@ -429,8 +435,13 @@ export const organizationsRouter = t.router({
           ? { hiddenChannels: [...new Set(input.hiddenChannels)] }
           : {}),
       };
+      // Only "drafts" is stored; a channel missing from the map sends automatically.
+      const channelAiModes =
+        input.draftsChannels !== undefined
+          ? Object.fromEntries(input.draftsChannels.map((channel) => [channel, "drafts" as const]))
+          : organization.settings?.channelAiModes;
       await organizationService.update(ctx.organizationId!, {
-        settings: { ...(organization.settings || {}), aiDisclosure },
+        settings: { ...(organization.settings || {}), aiDisclosure, channelAiModes },
       });
       return { success: true };
     }),
