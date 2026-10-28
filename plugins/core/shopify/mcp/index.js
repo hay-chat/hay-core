@@ -21,6 +21,7 @@ const { registerCustomerTools } = require("./tools/customers");
 const { registerReturnTools } = require("./tools/returns");
 const { registerProductTools } = require("./tools/products");
 const { registerInventoryTools } = require("./tools/inventory");
+const { registerCouponTools } = require("./tools/coupons");
 
 const server = applyToolRisk(new McpServer({ name: "shopify", version: "1.0.0" }), toolRisk);
 
@@ -31,6 +32,7 @@ registerCustomerTools(server);
 registerReturnTools(server);
 registerProductTools(server);
 registerInventoryTools(server);
+registerCouponTools(server);
 
 async function main() {
   const transport = new StdioServerTransport();

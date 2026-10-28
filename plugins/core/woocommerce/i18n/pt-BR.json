@@ -65,6 +65,10 @@
     "woocommerce_update_customer_address": {
       "label": "Atualizar endereço do cliente",
       "description": "Altera o endereço de cobrança ou de entrega salvo na conta do cliente."
+    },
+    "woocommerce_create_coupon": {
+      "label": "Criar cupom de cortesia",
+      "description": "Cria um cupom de uso único para o e-mail de um cliente, dentro do limite de porcentagem ou valor definido pelo lojista."
     }
   },
   "config": {
@@ -79,6 +83,22 @@
     "consumerSecret": {
       "label": "Consumer Secret",
       "description": "Consumer Secret da API REST do WooCommerce"
+    },
+    "couponsEnabled": {
+      "label": "Permitir cupons de cortesia",
+      "description": "Permite que o agente crie cupons de uso único, restritos ao e-mail do cliente, dentro dos limites abaixo. Um cupom acima do limite aguarda a aprovação de alguém da equipe."
+    },
+    "couponMaxPercent": {
+      "label": "Limite do cupom: porcentagem máxima",
+      "description": "Maior desconto percentual que o agente pode dar (0 desativa cupons percentuais)."
+    },
+    "couponMaxAmount": {
+      "label": "Limite do cupom: valor fixo máximo",
+      "description": "Maior desconto fixo na moeda da loja (0 ou vazio desativa cupons de valor fixo)."
+    },
+    "couponMaxDays": {
+      "label": "Validade do cupom (dias)",
+      "description": "Os cupons criados pelo agente expiram em no máximo este número de dias."
     },
     "staleTrackingDomesticDays": {
       "label": "Rastreio parado: nacional (dias)",

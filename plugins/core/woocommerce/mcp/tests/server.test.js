@@ -17,6 +17,7 @@ const EXPECTED_TOOLS = [
   "woocommerce_calculate_refund",
   "woocommerce_cancel_order",
   "woocommerce_check_inventory",
+  "woocommerce_create_coupon",
   "woocommerce_create_refund",
   "woocommerce_find_customer",
   "woocommerce_get_order",
@@ -61,6 +62,14 @@ describe("woocommerce MCP server (stdio)", () => {
       });
       expect(byName.woocommerce_create_refund.annotations.readOnlyHint).toBe(false);
       expect(byName.woocommerce_create_refund._meta).toEqual({ "chat.hay/category": "refund" });
+      // The coupon tool enforces its own cap; core reads the flag and the approval arg.
+      expect(byName.woocommerce_create_coupon._meta).toEqual({
+        "chat.hay/category": "discount",
+        "chat.hay/capEnforced": true,
+      });
+      expect(byName.woocommerce_create_coupon.inputSchema.properties).toHaveProperty(
+        "hay_approval_id",
+      );
     } finally {
       await client.close();
     }

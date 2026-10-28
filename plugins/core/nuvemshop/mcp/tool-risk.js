@@ -28,4 +28,6 @@ module.exports = {
     nuvemshop_request_refund: "note",
     nuvemshop_create_coupon: "discount",
   },
+  // Enforces the merchant's coupon cap itself; above it, core holds the call.
+  capped: ["nuvemshop_create_coupon"],
 };

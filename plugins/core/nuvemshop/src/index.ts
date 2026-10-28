@@ -451,7 +451,7 @@ export default defineHayPlugin((globalCtx) => ({
         label: "Allow goodwill coupons",
         description:
           "Let the agent create single-use apology coupons within the caps below. " +
-          "Anything above the cap is refused and handed to a person.",
+          "A coupon above the cap waits for a team member to approve it. Each order gets at most one coupon.",
         default: true,
       },
       couponMaxPercent: {

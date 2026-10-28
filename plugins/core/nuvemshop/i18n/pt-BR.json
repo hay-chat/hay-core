@@ -86,7 +86,7 @@
     },
     "couponsEnabled": {
       "label": "Permitir cupons de cortesia",
-      "description": "Permite que o agente crie cupons de uso único dentro dos limites abaixo. Acima do limite, passa para uma pessoa."
+      "description": "Permite que o agente crie cupons de uso único dentro dos limites abaixo. Um cupom acima do limite aguarda a aprovação de alguém da equipe. Cada pedido recebe no máximo um cupom."
     },
     "couponMaxPercent": {
       "label": "Limite do cupom: porcentagem máxima",

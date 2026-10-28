@@ -23,5 +23,8 @@ module.exports = {
     woocommerce_add_order_note: "note",
     woocommerce_update_customer: "customer_update",
     woocommerce_update_customer_address: "customer_update",
+    woocommerce_create_coupon: "discount",
   },
+  // Enforces the merchant's coupon cap itself; above it, core holds the call.
+  capped: ["woocommerce_create_coupon"],
 };
