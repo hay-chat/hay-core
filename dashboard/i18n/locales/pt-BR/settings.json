@@ -337,7 +337,16 @@
     "spamClassifierDescription": "Quando uma conversa parece suspeita, mas não é claramente spam, um modelo de IA pequeno a lê antes de a IA do Hay.chat responder.",
     "spamGuidance": "Orientações para a verificação de spam",
     "spamGuidancePlaceholder": "Por exemplo: não vendemos serviços de SEO, então ofertas assim são spam. Pedidos de atacado são bem-vindos.",
-    "spamGuidanceDescription": "Diga à verificação por IA o que conta como spam na sua loja e o que não conta."
+    "spamGuidanceDescription": "Diga à verificação por IA o que conta como spam na sua loja e o que não conta.",
+    "underAttack": "Modo sob ataque",
+    "underAttackDescription": "Todo visitante resolve a verificação anti-bot antes da primeira mensagem, por {hours} horas. Liga sozinho quando chega um número incomum de novos chats de uma vez. Requer o plugin Proteção contra bots.",
+    "underAttackInactive": "Desligado. Visitantes só são desafiados quando a verificação anti-bot os considera suspeitos.",
+    "underAttackActiveOwner": "Ligado até {until}. Você ligou.",
+    "underAttackActiveAuto": "Ligado até {until}. Ligou automaticamente após uma onda de novos chats.",
+    "underAttackTurnOn": "Ligar",
+    "underAttackTurnOff": "Desligar",
+    "underAttackOnSuccess": "Modo sob ataque ligado",
+    "underAttackOffSuccess": "Modo sob ataque desligado"
   },
   "customerPrivacy": {
     "title": "Privacidade do Cliente",

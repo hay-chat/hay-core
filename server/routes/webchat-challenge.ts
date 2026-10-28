@@ -26,6 +26,7 @@ import { isDashboardHost } from "@server/lib/webchat-origin";
 import { organizationRepository } from "@server/repositories/organization.repository";
 import { webchatSettingsService } from "@server/services/webchat/webchat-settings.service";
 import { webchatExtensionsService } from "@server/services/webchat/webchat-extensions.service";
+import { isUnderAttack } from "@server/services/webchat/under-attack.service";
 import { isPublicWidgetRateLimited } from "@server/services/public-widget-limits";
 
 const logger = createLogger("webchat-challenge");
@@ -186,7 +187,7 @@ export async function webchatChallengeHandler(req: Request, res: Response): Prom
     }
 
     const challenge = (
-      await webchatExtensionsService.resolveChallenges(org, { underAttack: false })
+      await webchatExtensionsService.resolveChallenges(org, { underAttack: await isUnderAttack(org) })
     ).find(
       (candidate) => candidate.id === c,
     );

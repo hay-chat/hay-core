@@ -26,6 +26,10 @@ jest.mock("@server/services/public-widget-limits", () => ({
   isPublicWidgetRateLimited: async () => false,
 }));
 
+jest.mock("@server/services/webchat/under-attack.service", () => ({
+  isUnderAttack: async () => false,
+}));
+
 import { webchatChallengeHandler, parsePageOrigin } from "@server/routes/webchat-challenge";
 
 const ORG = "11111111-1111-4111-8111-111111111111";
