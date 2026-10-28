@@ -179,7 +179,7 @@ const jobRegistry: CronJobConfig[] = [
   {
     name: "conversation-alert-escalation",
     description:
-      "Re-push, then email, Available members about conversations waiting 10+ min for a human",
+      "Re-push, then email, Available members about conversations waiting 10+ min for a human, and alert on held conversations unanswered for 10 min",
     schedule: 60000, // Every 60 seconds
     handler: async () => {
       const { conversationAlertService } = await import("./conversation-alert.service");

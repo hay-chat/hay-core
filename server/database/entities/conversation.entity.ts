@@ -1046,6 +1046,7 @@ The following tools are available for you to use. You MUST return only valid JSO
       cooldownUntil.setSeconds(cooldownUntil.getSeconds() + cooldownSeconds);
 
       // Determine new status based on current state
+      const previousStatus = this.status;
       let newStatus: typeof this.status = "open";
 
       // If conversation is currently taken over by a human
@@ -1090,6 +1091,16 @@ The following tools are available for you to use. You MUST return only valid JSO
       this.needs_processing = shouldProcess;
       this.lastMessageAt = new Date();
       this.status = newStatus;
+
+      // Tell the team when the shopper writes in a conversation a person holds
+      // or is waiting on (D11-7). Push calls are remote: never wait on them.
+      void import("../../services/conversation-alert.service")
+        .then(({ conversationAlertService }) =>
+          conversationAlertService.onCustomerMessage(this, previousStatus, message),
+        )
+        .catch((error) => {
+          logger.warn({ err: error, conversationId: this.id }, "Shopper-message alert failed");
+        });
 
       // A shopper who comes back within 72 h reverses the charge for their
       // last resolution (D1-3). Billing must never break message intake.
