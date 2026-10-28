@@ -510,7 +510,10 @@ async function receiveEcho(
   if (!normalised) {
     return false;
   }
-  const { content, extra, attachments } = await resolveMedia(normalised, connection, ctx);
+  const resolved = await resolveMedia(normalised, connection, ctx);
+  const { extra, attachments } = resolved;
+  // Media lines are worded for the shopper; this one came from the store.
+  const content = resolved.content.replace(/\[Customer sent/g, "[Store sent");
   if (!content.trim() && !attachments) {
     ctx.logger.info("WhatsApp echo ignored — no content", { mid: echo.id, type: echo.type });
     return false;

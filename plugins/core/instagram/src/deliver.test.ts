@@ -120,3 +120,20 @@ describe("Instagram outbound attachments", () => {
     });
   });
 });
+
+describe("deliverHandler echo tracking (D11-11)", () => {
+  it("remembers every mid it sent", async () => {
+    const { SentMessageTracker } = await import("./echo.js");
+    const tracker = new SentMessageTracker();
+    const graph = client();
+    const { response } = res();
+    await deliverHandler(
+      { body: { to: "instagram:123", messageId: "m1", conversationId: "c1", content: "hi", attachments: [photo] } } as Request,
+      response,
+      { getGraphClient: () => graph, getAccessToken: () => "token", logger, tracker },
+    );
+    expect(await tracker.isOwn("mid.file.1", "123")).toBe(true);
+    expect(await tracker.isOwn("mid.text.2", "123")).toBe(true);
+    expect(await tracker.isOwn("mid.other", "123")).toBe(false);
+  });
+});
