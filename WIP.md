@@ -1,3 +1,9 @@
+## 2026-10-28 — claude/w2-channels (L7) — D13-8..D13-13 + D11-10/11 committed, not pushed
+- Done: WhatsApp/IG echoes as human msgs; optional Resend sending domain; Resend bounce webhook; channel health (email+push+plugin page); channel-aware rendering (hay-plugin.rendering); suggested customer merge (/customers pages).
+- Migrations (hay_test only): AddEmailSendingDomains1785780000000, AddPluginInstanceChannelHealth1785781000000, AddCustomerMergeDismissals1785782000000.
+- Half-built: D13-14 Messenger plugin (plugins/core/messenger) + Human Agent tag on Instagram.
+- Next: build Messenger plugin mirroring instagram, pass messageType to /deliver, then report.
+
 ## 2026-10-28 04:20 — staging — W2 D8 part A + L13 evidence pack merged, hand-tested, fixes in
 - Merged 7ba8a51 (media ingest) + e78f8ba (evidence pack); migrations + order-links backfill run on hay_staging.
 - Manual ✓: widget photo upload/refusal, Inbox media, composer PDF → widget; evidence pack PDF/ZIP (hashes ok), Export menu entry.
