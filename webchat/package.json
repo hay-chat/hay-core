@@ -10,7 +10,9 @@
     "preview": "vite preview",
     "typecheck": "vue-tsc --noEmit",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "check:perf": "node scripts/check-perf.mjs",
+    "perf:lighthouse": "node scripts/perf/lighthouse.mjs"
   },
   "dependencies": {
     "vue": "^3.4.21"
