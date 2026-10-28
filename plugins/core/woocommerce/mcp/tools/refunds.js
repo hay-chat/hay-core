@@ -4,14 +4,17 @@
  *   - only orders that were actually paid,
  *   - amount computed from the order's own line-item totals when refunding items,
  *   - never silently "record only": refund_payment=true (default) asks the
- *     payment gateway for the money; when the gateway cannot, WooCommerce's
- *     error is surfaced with the explicit manual-refund fallback.
+ *     payment gateway for the money. refund_payment=false (record only) is
+ *     allowed only for offline methods (bacs/cod/cheque), where the merchant
+ *     pays the money back by hand, and the result says no money moved. When an
+ *     online gateway refuses, the agent must hand off: re-running record-only
+ *     would mark the order Refunded and email the customer while no money moved.
  */
 
 const { z } = require("zod");
 const { wcApi } = require("../lib/client");
 const { ok, fail, toolError, num, round2 } = require("../lib/format");
-const { resolveOrder, refundedTotal } = require("../lib/orders");
+const { resolveOrder, refundedTotal, OFFLINE_PAYMENT_METHODS } = require("../lib/orders");
 
 /** Build WooCommerce refund line items + their amount from the order's own totals. */
 function buildLineItemRefund(order, requested) {
@@ -169,9 +172,9 @@ function registerRefundTools(server) {
       "balance. By default the payment gateway is asked to return the money. Offline methods " +
       "(bank transfer/bacs, cash on delivery/cod, cheque — supportSummary.gatewayCanRefund=false " +
       "in woocommerce_get_order) cannot return money: for those, tell the customer the store " +
-      "will pay the refund back by hand and pass refund_payment=false, which only records it. " +
-      "If a card/online gateway refuses, the error says so — refund in the gateway and re-run " +
-      "with refund_payment=false.",
+      "will pay the refund back by hand and pass refund_payment=false, which only records it " +
+      "(moneyMoved=false). If a card/online gateway refuses, do NOT re-run: hand off to a " +
+      "person, who refunds in the gateway.",
     {
       ...REFUND_INPUT,
       reason: z.string().optional().describe("Why the refund is issued (stored on the refund)."),
@@ -180,8 +183,8 @@ function registerRefundTools(server) {
         .boolean()
         .optional()
         .describe(
-          "Ask the payment gateway to return the money (default true). Use false for offline " +
-            "methods (bacs, cod, cheque) or a refund made elsewhere: it only records the refund.",
+          "Ask the payment gateway to return the money (default true). Use false only for " +
+            "offline methods (bacs, cod, cheque): it records the refund and the store pays it back by hand.",
         ),
     },
     async (args) => {
@@ -190,6 +193,17 @@ function registerRefundTools(server) {
         const { amount, lines, remaining } = planRefund(order, args);
 
         const refundPayment = args.refund_payment ?? true;
+        const offline = OFFLINE_PAYMENT_METHODS.has(order.payment_method);
+        if (!refundPayment && !offline) {
+          throw toolError(
+            "PRECONDITION",
+            `Order ${order.number} was paid with ${order.payment_method_title || order.payment_method}, ` +
+              "which refunds through the gateway. Recording a refund without moving money is only " +
+              "for offline methods (bank transfer, cash on delivery, cheque). Do not retry: hand " +
+              "off to a person.",
+            { details: { reason: "RECORD_ONLY_NOT_ALLOWED" } },
+          );
+        }
         const body = {
           amount: amount.toFixed(2),
           reason: args.reason || "",
@@ -207,10 +221,10 @@ function registerRefundTools(server) {
           if (refundPayment && err.code === "PROVIDER_REFUSED") {
             throw toolError(
               "PROVIDER_REFUSED",
-              `${err.message}. If the payment gateway (${order.payment_method_title || order.payment_method}) ` +
-                "cannot refund through WooCommerce, refund the customer in the gateway's dashboard and " +
-                "re-run woocommerce_create_refund with refund_payment=false to record it on the order.",
-              { details: err.details },
+              `${err.message}. The payment gateway (${order.payment_method_title || order.payment_method}) ` +
+                "did not refund, so no money moved. Do NOT re-run this tool and do not tell the " +
+                "customer the refund was made: hand off to a person, who refunds in the gateway.",
+              { details: { ...err.details, handoff: true } },
             );
           }
           throw err;
@@ -219,6 +233,15 @@ function registerRefundTools(server) {
         return ok({
           refunded: true,
           gatewayRefunded: refundPayment,
+          moneyMoved: refundPayment,
+          recordedOnly: !refundPayment,
+          ...(refundPayment
+            ? {}
+            : {
+                note:
+                  "Recorded on the order only; no money was sent. The store will pay the " +
+                  "customer back by hand. Do not say the money was sent.",
+              }),
           id: order.id,
           number: order.number,
           refundId: refund?.id ?? null,

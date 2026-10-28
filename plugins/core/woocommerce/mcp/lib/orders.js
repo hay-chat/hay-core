@@ -324,6 +324,7 @@ function enrichOrder(
 }
 
 module.exports = {
+  OFFLINE_PAYMENT_METHODS,
   PRE_DISPATCH_STATUSES,
   isPreDispatch,
   summarizeOrder,

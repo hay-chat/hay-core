@@ -160,7 +160,7 @@ describe("woocommerce_create_refund", () => {
     expect(calls.filter((c) => c.method === "POST")).toHaveLength(1);
   });
 
-  it("surfaces a gateway failure with the explicit manual-refund fallback, and records a manual refund when asked", async () => {
+  it("on a gateway refusal tells the agent to hand off, never to re-run record-only", async () => {
     mockFetch(
       routes(ORDER, () => ({
         status: 500,
@@ -174,15 +174,39 @@ describe("woocommerce_create_refund", () => {
     expect(failed.isError).toBe(true);
     expect(failed.error.code).toBe("PROVIDER_REFUSED");
     expect(failed.text).toMatch(/does not support refunds/);
-    expect(failed.text).toMatch(/refund_payment=false/);
+    expect(failed.text).toMatch(/Do NOT re-run/);
+    expect(failed.text).toMatch(/hand off/);
+    expect(failed.text).not.toMatch(/refund_payment=false/);
+  });
 
+  it("refuses record-only on an online gateway", async () => {
     const { calls } = mockFetch(routes(ORDER));
-    const manual = await server.call("woocommerce_create_refund", {
+    const res = await server.call("woocommerce_create_refund", {
+      order_id: "12",
+      refund_payment: false,
+    });
+    expect(res.error).toMatchObject({
+      code: "PRECONDITION",
+      details: { reason: "RECORD_ONLY_NOT_ALLOWED" },
+    });
+    expect(calls.some((c) => c.method === "POST")).toBe(false);
+  });
+
+  it("records an offline (bacs) refund and says no money moved", async () => {
+    const bacs = { ...ORDER, payment_method: "bacs", payment_method_title: "Bank transfer" };
+    const { calls } = mockFetch(routes(bacs));
+    const res = await server.call("woocommerce_create_refund", {
       order_id: "12",
       amount: "5.00",
       refund_payment: false,
     });
-    expect(manual.data).toMatchObject({ refunded: true, gatewayRefunded: false });
+    expect(res.data).toMatchObject({
+      refunded: true,
+      gatewayRefunded: false,
+      moneyMoved: false,
+      recordedOnly: true,
+    });
+    expect(res.data.note).toMatch(/no money was sent/);
     expect(calls.find((c) => c.method === "POST").body.api_refund).toBe(false);
   });
 
