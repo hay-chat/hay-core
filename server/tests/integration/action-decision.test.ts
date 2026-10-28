@@ -212,6 +212,36 @@ describe("action decisions (D4-5)", () => {
     expect(mockExecuteApproved).not.toHaveBeenCalled();
   });
 
+  it("hands to the team instead of an AI turn when the channel's reply window closed", async () => {
+    const conversation = await newConversation();
+    await AppDataSource.getRepository(Conversation).update(conversation.id, {
+      reply_window_expires_at: new Date(Date.now() - 60_000),
+    });
+    const action = await hold(conversation.id);
+
+    await actionDecisionService.approve(action.id, orgId, decider);
+
+    expect(mockExecuteApproved).toHaveBeenCalledTimes(1);
+    expect(mockEnqueue).not.toHaveBeenCalled();
+    expect(await statusOf(conversation.id)).toBe("pending-human");
+    const notes = (await systemNotes(conversation.id)).map((n) => n.content).join("\n");
+    expect(notes).toContain("approved and done");
+    expect(notes).toContain("reply window");
+  });
+
+  it("still resumes the AI while the reply window is open", async () => {
+    const conversation = await newConversation();
+    await AppDataSource.getRepository(Conversation).update(conversation.id, {
+      reply_window_expires_at: new Date(Date.now() + 3600_000),
+    });
+    const action = await hold(conversation.id);
+
+    await actionDecisionService.reject(action.id, orgId, decider, null);
+
+    expect(await statusOf(conversation.id)).toBe("open");
+    expect(mockEnqueue).toHaveBeenCalledWith(conversation.id, orgId, "approval_decided");
+  });
+
   it("does not resume the AI when a human took over meanwhile", async () => {
     const conversation = await newConversation("human-took-over");
     const action = await hold(conversation.id);

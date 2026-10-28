@@ -32,6 +32,12 @@ export const HANDLED_BY_TEAM_NOTE = "handled_by_team";
 
 const CLOSED_STATUSES: ReadonlyArray<Conversation["status"]> = ["resolved", "unresolved", "closed"];
 
+/** The channel's reply window (if it has one) has already closed. */
+function replyWindowClosed(conversation: Conversation, now = new Date()): boolean {
+  const expiresAt = conversation.reply_window_expires_at;
+  return !!expiresAt && new Date(expiresAt).getTime() <= now.getTime();
+}
+
 export interface DecisionResult {
   action: PendingAction | null;
   /** False when someone else already decided (double click, two approvers). */
@@ -75,7 +81,8 @@ export class ActionDecisionService {
       : `A team member approved the action ${action.tool_name}, but it FAILED when it ran: ` +
         `${result.error ?? "unknown error"}. It was NOT done. Tell the customer it did not go ` +
         `through and offer to hand them to the team. Do not retry it.`;
-    await this.resume(conversation, action, note);
+    const outcome = result.success ? "approved and done" : "approved, but it failed";
+    await this.resume(conversation, action, note, outcome);
     return { action: final ?? action, transitioned };
   }
 
@@ -101,7 +108,7 @@ export class ActionDecisionService {
       `A team member DECLINED the action ${action.tool_name}. It was NOT done.${why} ` +
       `Explain this to the customer kindly, using the reason if there is one, and offer ` +
       `another option if one fits. Do not request it again.`;
-    await this.resume(conversation, action, note);
+    await this.resume(conversation, action, note, "declined");
     return decision;
   }
 
@@ -138,6 +145,7 @@ export class ActionDecisionService {
     conversation: Conversation,
     action: PendingAction,
     note: string,
+    outcome: string,
   ): Promise<void> {
     if (CLOSED_STATUSES.includes(conversation.status)) return;
 
@@ -149,11 +157,32 @@ export class ActionDecisionService {
 
     if (conversation.status === "awaiting-approval") {
       if (await pendingActionService.hasPending(conversation.id)) return;
+    } else if (conversation.status !== "open") {
+      return;
+    }
+
+    // The channel only accepts replies inside its window (e.g. 24 h after the
+    // shopper's last message) and a decision can take up to 48 h. Past it, an
+    // AI turn would be refused by the channel, so the team follows up instead.
+    if (replyWindowClosed(conversation)) {
+      await conversationRepository.update(conversation.id, conversation.organization_id, {
+        status: "pending-human",
+      });
+      await conversation.addMessage({
+        content:
+          `The team's decision on ${action.tool_name}: ${outcome}. The channel's reply window ` +
+          `had already closed, so the AI cannot message the customer about it. The ` +
+          `conversation was passed to the team to follow up.`,
+        type: MessageType.SYSTEM,
+        metadata: { pendingActionId: action.id, isApprovalDecision: true },
+      });
+      return;
+    }
+
+    if (conversation.status === "awaiting-approval") {
       await conversationRepository.update(conversation.id, conversation.organization_id, {
         status: "open",
       });
-    } else if (conversation.status !== "open") {
-      return;
     }
 
     const { orchestratorQueueService } = await import("./orchestrator-queue.service");
