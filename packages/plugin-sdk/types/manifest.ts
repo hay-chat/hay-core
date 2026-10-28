@@ -21,6 +21,9 @@ export type PluginCategory = "integration" | "channel" | "tool" | "analytics" | 
  * - `products`: plugin ingests a merchant catalog (e.g. Shopify, Woo).
  *   It receives a `HayProductSourceRuntimeAPI` on `HayStartContext` to
  *   push CanonicalProduct payloads to core.
+ * - `disputes`: plugin reads payment disputes (chargebacks). It receives a
+ *   `HayDisputeSourceRuntimeAPI` on `HayStartContext` and answers core's
+ *   `POST /disputes/evidence` (attach as a draft, never submit).
  */
 export type PluginCapability =
   | "routes"
@@ -32,6 +35,7 @@ export type PluginCapability =
   | "customers"
   | "sources"
   | "products"
+  | "disputes"
   | "cron"
   | "email"
   | "webchat";

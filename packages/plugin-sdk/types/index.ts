@@ -180,3 +180,16 @@ export type {
   CanonicalProduct,
   HayProductSourceRuntimeAPI,
 } from "./products";
+
+// ============================================================================
+// Payment disputes (chargeback intake + evidence draft)
+// ============================================================================
+
+export type {
+  DisputeStatusName,
+  CanonicalDispute,
+  HayDisputeSourceRuntimeAPI,
+  DisputeEvidenceRequest,
+  DisputeEvidenceErrorCode,
+  DisputeEvidenceResponse,
+} from "./disputes";
