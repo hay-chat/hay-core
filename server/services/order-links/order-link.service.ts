@@ -14,6 +14,7 @@ import {
 import { MessageType } from "@server/database/entities/message.entity";
 import { createLogger } from "@server/lib/logger";
 import { splitToolName } from "../dispute-evidence/tool-output";
+import { notSimulationSql } from "../simulation/simulation-kind";
 import {
   normalizeOrderToken,
   ordersFromText,
@@ -175,9 +176,12 @@ export class OrderLinkService {
     filter: { query?: string; conversationId?: string; customerId?: string },
   ): Promise<OrderGroup[]> {
     const repo = AppDataSource.getRepository(OrderConversationLink);
+    // Simulation conversations never count as order history (evidence goes to the bank).
     const qb = repo
       .createQueryBuilder("l")
-      .where("l.organization_id = :organizationId", { organizationId });
+      .innerJoin("conversations", "c", "c.id = l.conversation_id")
+      .where("l.organization_id = :organizationId", { organizationId })
+      .andWhere(notSimulationSql("c"));
     if (filter.query !== undefined) {
       const token = normalizeOrderToken(filter.query);
       if (!token) return [];
@@ -187,10 +191,7 @@ export class OrderLinkService {
       qb.andWhere("l.conversation_id = :conversationId", { conversationId: filter.conversationId });
     }
     if (filter.customerId) {
-      qb.innerJoin("conversations", "c", "c.id = l.conversation_id").andWhere(
-        "c.customer_id = :customerId",
-        { customerId: filter.customerId },
-      );
+      qb.andWhere("c.customer_id = :customerId", { customerId: filter.customerId });
     }
     const seeds = await qb.orderBy("l.created_at", "DESC").limit(200).getMany();
     if (seeds.length === 0) return [];
@@ -203,7 +204,9 @@ export class OrderLinkService {
     }
     const related = await repo
       .createQueryBuilder("l")
+      .innerJoin("conversations", "c", "c.id = l.conversation_id")
       .where("l.organization_id = :organizationId", { organizationId })
+      .andWhere(notSimulationSql("c"))
       .andWhere("(l.order_key IN (:...tokens) OR l.order_label IN (:...tokens))", {
         tokens: [...tokens],
       })
@@ -244,6 +247,17 @@ export class OrderLinkService {
   private async insert(organizationId: string, rows: LinkRow[]): Promise<void> {
     if (rows.length === 0) return;
     try {
+      // Simulation conversations are not indexed: their replies never reached anyone.
+      const ids = [...new Set(rows.map((row) => row.conversation_id))];
+      const simulated: Array<{ id: string }> = await AppDataSource.query(
+        `SELECT c.id FROM conversations c WHERE c.id = ANY($1) AND NOT (${notSimulationSql("c")})`,
+        [ids],
+      );
+      if (simulated.length) {
+        const skip = new Set(simulated.map((c) => c.id));
+        rows = rows.filter((row) => !skip.has(row.conversation_id));
+        if (rows.length === 0) return;
+      }
       await AppDataSource.createQueryBuilder()
         .insert()
         .into(OrderConversationLink)

@@ -22,6 +22,7 @@ import { User } from "@server/entities/user.entity";
 import { organizationRepository } from "@server/repositories/organization.repository";
 import { storageService } from "@server/services/storage.service";
 import { createLogger } from "@server/lib/logger";
+import { isSimulationConversation } from "@server/services/simulation/simulation-kind";
 import { safeTimeZone } from "@server/utils/zoned-datetime";
 import { evidenceLocale, type EvidenceLocale, type EvidenceTemplate } from "./copy";
 import { buildTimeline, type SourceTakeover } from "./timeline";
@@ -89,7 +90,7 @@ export class DisputeEvidenceService {
     const organization = await organizationRepository.findById(organizationId);
     if (!organization) throw new Error("Organization not found");
 
-    const conversations = request.conversationIds.length
+    const found = request.conversationIds.length
       ? await AppDataSource.getRepository(Conversation).find({
           where: {
             id: In(request.conversationIds),
@@ -100,6 +101,8 @@ export class DisputeEvidenceService {
           order: { created_at: "ASC" },
         })
       : [];
+    // Simulated replies were never sent to the customer; they are not evidence.
+    const conversations = found.filter((c) => !isSimulationConversation(c.metadata));
     const ids = conversations.map((c) => c.id);
     const [messages, actionLogs, takeovers] = ids.length
       ? await Promise.all([
