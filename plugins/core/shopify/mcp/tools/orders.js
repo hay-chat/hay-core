@@ -57,7 +57,48 @@ const ORDER_SUPPORT_FIELDS = `
   lineItems(first: 100) {
     edges { node { id title quantity sku } }
   }
+  sourceName
+  tags
+  customAttributes { key value }
+  paymentGatewayNames
+  transactions(first: 20) {
+    id
+    kind
+    status
+    gateway
+    formattedGateway
+    paymentId
+    processedAt
+    amountSet { shopMoney { amount currencyCode } }
+  }
+  refunds(first: 20) {
+    id
+    createdAt
+    note
+    totalRefundedSet { shopMoney { amount currencyCode } }
+  }
 `;
+
+// D10-1: payment and source fields, verified against 2026-04 docs (OrderTransaction
+// and Refund need only read_orders). sourceName ("web", "pos", an app or ERP name)
+// and tags tell a marketplace order synced in by an ERP apart from a storefront one.
+function paymentFields(order) {
+  const money = (set) => (set && set.shopMoney) || null;
+  return {
+    sourceName: order.sourceName ?? null,
+    tags: order.tags || [],
+    customAttributes: order.customAttributes || [],
+    paymentGatewayNames: order.paymentGatewayNames || [],
+    transactions: (order.transactions || []).map(({ amountSet, ...t }) => ({
+      ...t,
+      amount: money(amountSet),
+    })),
+    refunds: (order.refunds || []).map(({ totalRefundedSet, ...r }) => ({
+      ...r,
+      totalRefunded: money(totalRefundedSet),
+    })),
+  };
+}
 
 // Fulfillment statuses under which changing the shipping address still makes
 // sense — nothing has left the warehouse yet.
@@ -117,6 +158,7 @@ function enrichOrder(order) {
 
   return {
     ...order,
+    ...paymentFields(order),
     lineItems: unwrapConnection(order.lineItems),
     supportSummary: {
       isCancellable: cancelBlocker(order) === null,
@@ -163,8 +205,10 @@ async function orderNotFound(rawId) {
 function registerOrderTools(server) {
   server.tool(
     "shopify_get_order",
-    "Get an order with line items, totals, shipping address, tracking, and a supportSummary " +
-      "(isCancellable, isRefundable, remainingRefundable, deliveredAt, addressChangeable).",
+    "Get an order with line items, totals, shipping address, tracking, payment transactions " +
+      "(gateway, kind, status, paymentId), refunds with dates, sourceName, tags, custom " +
+      "attributes, and a supportSummary (isCancellable, isRefundable, remainingRefundable, " +
+      "deliveredAt, addressChangeable).",
     {
       order_id: z.string().describe("Order GID (gid://shopify/Order/123) or bare numeric id."),
     },
@@ -724,4 +768,4 @@ function registerOrderTools(server) {
   );
 }
 
-module.exports = { registerOrderTools, orderNotFound, cancelBlocker };
+module.exports = { registerOrderTools, orderNotFound, cancelBlocker, enrichOrder };
