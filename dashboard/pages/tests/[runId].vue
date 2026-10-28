@@ -43,7 +43,11 @@
         <CardHeader>
           <CardTitle class="flex items-center gap-2 text-base">
             {{ $t(`tests.report.buckets.${group.bucket}`) }}
-            <Badge :variant="group.bucket === 'wrong_or_risky' ? 'destructive' : 'secondary'">
+            <Badge
+              :variant="
+                group.bucket === 'wrong_or_risky' && group.count ? 'destructive' : 'secondary'
+              "
+            >
               {{ group.count }}
             </Badge>
           </CardTitle>
