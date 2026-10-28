@@ -15,6 +15,7 @@
 
 import pdfParse from "pdf-parse";
 import { AppDataSource } from "@server/database/data-source";
+import type { ScanStatus } from "@server/entities/upload.entity";
 import type {
   AttachmentAnalysis,
   Message,
@@ -25,6 +26,8 @@ import { messageRepository } from "@server/repositories/message.repository";
 import { organizationRepository } from "@server/repositories/organization.repository";
 import { resolveMediaSettings } from "@server/types/organization-settings.types";
 import { CONVERSATION_MEDIA_FOLDER, storageService } from "@server/services/storage.service";
+import { isUuid } from "@server/services/media-url.service";
+import { isScanCleared, pendingScans, waitForScans } from "@server/services/media-scan.service";
 import { isAnalyzable, PDF_TYPE, READABLE_IMAGE_TYPES as IMAGE_TYPES } from "./readable";
 import { toStoredAnalysis, type PrivacySettings } from "./privacy";
 import { VisionUnavailableError, visionService, type VisionInput } from "./vision.service";
@@ -41,6 +44,39 @@ export const ANALYSIS_WAIT_MS = 8_000;
 const ANALYSIS_POLL_MS = 300;
 /** A pending analysis older than this is abandoned (crashed process); nobody waits for it. */
 const PENDING_STALE_SECONDS = 120;
+/** Longer than a clamd scan can take (30 s timeout), so the Inbox state always settles. */
+const SCAN_WAIT_MS = 45_000;
+
+/**
+ * Mark a new message's files before it is stored: customer photos/PDFs as
+ * analysis pending (D8-11) and documents still being virus-scanned as
+ * `scan: "pending"` (D8-4), so the first broadcast already shows both.
+ */
+export async function markMediaPending(
+  organizationId: string,
+  attachments: MessageAttachment[] | undefined,
+  readFiles: boolean,
+): Promise<MessageAttachment[] | undefined> {
+  const marked = readFiles ? markAnalysisPending(attachments) : attachments;
+  if (!marked?.length) return marked;
+  const scanning = new Set(
+    await pendingScans(
+      organizationId,
+      marked.map((attachment) => attachment.id).filter(isUuid),
+    ),
+  );
+  if (!scanning.size) return marked;
+  return marked.map((attachment) =>
+    scanning.has(attachment.id) ? { ...attachment, scan: "pending" as const } : attachment,
+  );
+}
+
+/** True when the background pass has work on these files (analysis or scan). */
+export function hasPendingMedia(attachments: MessageAttachment[] | undefined): boolean {
+  return !!attachments?.some(
+    (attachment) => attachment.analysis?.status === "pending" || attachment.scan === "pending",
+  );
+}
 
 /** Mark the readable files of a new customer message as pending. Others are returned as-is. */
 export function markAnalysisPending(
@@ -74,6 +110,10 @@ export async function loadFileForVision(
   const { buffer, upload } = await storageService.download(attachmentId);
   if (upload.organizationId !== organizationId || upload.folder !== CONVERSATION_MEDIA_FOLDER) {
     return { skipped: { status: "skipped", reason: "not_conversation_media" } };
+  }
+  // Never read a document the virus scan has not cleared (D8-4).
+  if (!isScanCleared(upload.scanStatus)) {
+    return { skipped: { status: "skipped", reason: "not_scanned" } };
   }
 
   if (upload.mimeType === PDF_TYPE) {
@@ -133,7 +173,8 @@ export async function publishMediaUpdate(
 }
 
 /**
- * Analyse every pending file of a customer message and store the results.
+ * Settle a message's pending files: wait for virus scans (D8-4), then analyse
+ * pending customer photos/PDFs (D8-11), and store everything in one update.
  * Never throws: each file ends as done, skipped or failed.
  */
 export async function processMessageMedia(
@@ -141,18 +182,25 @@ export async function processMessageMedia(
   organizationId: string,
 ): Promise<void> {
   const message = await messageRepository.findByIdAndOrganization(messageId, organizationId);
-  if (!message?.attachments?.some((attachment) => attachment.analysis?.status === "pending")) {
-    return;
-  }
+  if (!hasPendingMedia(message?.attachments)) return;
+  const attachments = message!.attachments!;
 
-  const organization = await organizationRepository.findById(organizationId);
-  const settings = resolveMediaSettings(organization?.settings);
+  const scanIds = attachments
+    .filter((attachment) => attachment.scan === "pending")
+    .map((attachment) => attachment.id);
+  const scans = scanIds.length
+    ? await waitForScans(scanIds, SCAN_WAIT_MS)
+    : new Map<string, ScanStatus | null>();
 
+  const pendingAnalysis = attachments.filter(
+    (attachment) => attachment.analysis?.status === "pending",
+  );
   const results = new Map<string, AttachmentAnalysis>();
-  await Promise.all(
-    message.attachments
-      .filter((attachment) => attachment.analysis?.status === "pending")
-      .map(async (attachment) => {
+  if (pendingAnalysis.length) {
+    const organization = await organizationRepository.findById(organizationId);
+    const settings = resolveMediaSettings(organization?.settings);
+    await Promise.all(
+      pendingAnalysis.map(async (attachment) => {
         if (!settings.readImages) {
           results.set(attachment.id, { status: "skipped", reason: "disabled" });
           return;
@@ -175,21 +223,27 @@ export async function processMessageMedia(
           });
         }
       }),
-  );
+    );
+  }
 
-  await saveAnalyses(message, organizationId, results);
+  await saveMediaResults(message!, organizationId, results, scans);
 }
 
 /** Merge the results into the message's current attachments (re-read) and store them. */
-async function saveAnalyses(
+async function saveMediaResults(
   message: Message,
   organizationId: string,
   results: Map<string, AttachmentAnalysis>,
+  scans: Map<string, ScanStatus | null>,
 ): Promise<void> {
   const fresh = await messageRepository.findByIdAndOrganization(message.id, organizationId);
   const attachments = (fresh?.attachments ?? message.attachments ?? []).map((attachment) => {
+    let next = attachment;
     const analysis = results.get(attachment.id);
-    return analysis ? { ...attachment, analysis } : attachment;
+    if (analysis) next = { ...next, analysis };
+    const scan = scans.get(attachment.id);
+    if (scan && scan !== "skipped" && next.scan === "pending") next = { ...next, scan };
+    return next;
   });
   await messageRepository.update(message.id, { attachments });
   await publishMediaUpdate(organizationId, message.conversation_id, message.id, attachments);

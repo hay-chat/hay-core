@@ -39,6 +39,9 @@ export function describeAttachmentForAgent(attachment: MessageAttachment): strin
   if (analysis.status === "skipped" && analysis.reason === "no_text") {
     return `[${head}): scanned PDF, its text could not be read]`;
   }
+  if (analysis.status === "skipped" && analysis.reason === "not_scanned") {
+    return `[${head}): held by the virus scan, not read]`;
+  }
   if (analysis.status !== "done") return `[${head}): could not be read]`;
   if (analysis.withheld) {
     return analysis.class === "card"

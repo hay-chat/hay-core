@@ -986,9 +986,13 @@ The following tools are available for you to use. You MUST return only valid JSO
     // A customer's photos and PDFs get the vision pass (D8-11). Marked pending
     // before the row is saved, so the first broadcast already says "reading".
     let attachments = messageData.attachments;
-    if (messageData.type === MessageType.CUSTOMER && hasAttachments) {
-      const { markAnalysisPending } = await import("../../services/media-analysis/pipeline");
-      attachments = markAnalysisPending(attachments);
+    if (hasAttachments) {
+      const { markMediaPending } = await import("../../services/media-analysis/pipeline");
+      attachments = await markMediaPending(
+        this.organization_id,
+        attachments,
+        messageData.type === MessageType.CUSTOMER,
+      );
     }
 
     // CRITICAL: Save the message to database FIRST before broadcasting
@@ -1023,10 +1027,11 @@ The following tools are available for you to use. You MUST return only valid JSO
       }
     }
 
-    // Read the files in the background; the AI turn waits briefly for them.
-    if (attachments?.some((attachment) => attachment.analysis?.status === "pending")) {
-      const { scheduleMessageMedia } = await import("../../services/media-analysis/pipeline");
-      scheduleMessageMedia(message.id, this.organization_id);
+    // Scan and read the files in the background; the AI turn waits briefly for them.
+    if (hasAttachments) {
+      const { hasPendingMedia, scheduleMessageMedia } =
+        await import("../../services/media-analysis/pipeline");
+      if (hasPendingMedia(attachments)) scheduleMessageMedia(message.id, this.organization_id);
     }
 
     // Customer message: status, cooldown and processing flag. This runs only

@@ -279,6 +279,24 @@
             controls
             class="chat-message__attachment-media"
           />
+          <!-- Documents held by the virus scan (D8-4) can't be opened. -->
+          <span
+            v-else-if="attachment.scan && attachment.scan !== 'clean'"
+            class="chat-message__attachment-file"
+            :class="{ 'chat-message__attachment-error': attachment.scan !== 'pending' }"
+          >
+            <Hourglass v-if="attachment.scan === 'pending'" class="chat-message__attachment-icon" />
+            <ShieldAlert v-else class="chat-message__attachment-icon" />
+            <span>{{ attachment.name }}</span>
+            <span class="opacity-70">
+              ·
+              {{
+                attachment.scan === "pending"
+                  ? t("conversations.attachment.scanning")
+                  : t("conversations.attachment.scanBlocked")
+              }}
+            </span>
+          </span>
           <a
             v-else
             href="#"
@@ -595,6 +613,8 @@ import {
   RotateCcw,
   Sparkles,
   EyeOff,
+  Hourglass,
+  ShieldAlert,
 } from "lucide-vue-next";
 import {
   TooltipProvider,

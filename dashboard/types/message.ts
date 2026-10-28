@@ -106,6 +106,8 @@ export interface MessageAttachment {
   type: string;
   size: number;
   analysis?: AttachmentAnalysis;
+  /** Virus scan of a document (D8-4); absent when not scanned. */
+  scan?: "pending" | "clean" | "infected" | "error";
 }
 
 export type MessageProviderStatus = "sent" | "delivered" | "read" | "failed";

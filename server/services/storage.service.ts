@@ -7,6 +7,7 @@ import { config } from "../config/env";
 import { Upload } from "../entities/upload.entity";
 import { isPublicFolder, mediaUrl } from "./media-url.service";
 import { CONVERSATION_MEDIA_TYPES, sanitizeConversationMedia } from "./media-sanitizer.service";
+import { initialScanStatus, startScan } from "./media-scan.service";
 
 /** Folder for files received from shoppers through channels; see media-sanitizer.service. */
 export const CONVERSATION_MEDIA_FOLDER = "conversation-media";
@@ -138,7 +139,9 @@ export class StorageService {
       await this.uploadLocal(buffer, filePath);
     }
 
-    // 5. Create database record
+    // 5. Create database record (conversation documents are virus-scanned, D8-4)
+    const scanStatus =
+      options.folder === CONVERSATION_MEDIA_FOLDER ? initialScanStatus(mimeType) : null;
     const upload = await Upload.create({
       filename,
       originalName: options.originalName,
@@ -149,7 +152,9 @@ export class StorageService {
       folder: options.folder,
       organizationId: options.organizationId,
       uploadedById: options.uploadedById,
+      scanStatus,
     }).save();
+    if (scanStatus === "pending") startScan(upload.id, buffer);
 
     // 6. Generate URL (direct for public folders, /v1/media for private ones)
     const url = this.getUrl(upload);

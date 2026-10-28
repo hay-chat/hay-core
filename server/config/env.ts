@@ -285,6 +285,11 @@ export const config = {
       conversationMediaMaxFileSize:
         parseInt(process.env.CONVERSATION_MEDIA_MAX_SIZE_MB || "25", 10) * 1024 * 1024,
     },
+    // D8-4: clamd for conversation documents; unset host = no scan.
+    clamav: {
+      host: process.env.CLAMAV_HOST || null,
+      port: parseInt(process.env.CLAMAV_PORT || "3310", 10),
+    },
   },
 
   privacy: {
