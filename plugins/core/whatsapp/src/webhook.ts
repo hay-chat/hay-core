@@ -17,6 +17,9 @@ import { describeMedia, ingestMedia, type Attachment, type InboundMedia, type In
  *    (→ `connection.revoke`, Embedded Signup only).
  *  - `message_template_status_update` / `template_category_update` patch the
  *    worker's template store (D13-1).
+ *  - `smb_message_echoes` (coexistence) carries what the owner typed in the
+ *    WhatsApp Business app on the phone (→ `messages.receive` as a
+ *    `human_agent` message, so the AI stops answering over the owner; D13-8).
  *  - Everything else is logged and ignored for now.
  *
  * A failing `messages.receive` throws so index.ts answers 500 and Meta retries;
@@ -94,10 +97,19 @@ interface WaStatus {
   errors?: WaError[];
 }
 
+/** Coexistence: a message the business sent from the WhatsApp Business app. */
+interface WaEcho extends WaMessage {
+  /** The customer's wa_id (`from` is the business number). */
+  to?: string;
+  to_user_id?: string;
+}
+
 interface WaValue {
   metadata?: { phone_number_id?: string; display_phone_number?: string };
   contacts?: WaContact[];
   messages?: WaMessage[];
+  /** smb_message_echoes */
+  message_echoes?: WaEcho[];
   statuses?: WaStatus[];
   errors?: WaError[];
   /** account_update */
@@ -184,10 +196,17 @@ export async function handleWebhook(body: unknown, ctx: ChannelContext): Promise
         }
       } else if (TEMPLATE_FIELDS.has(change.field ?? "")) {
         handleTemplateChange(change.field ?? "", value, entry.id, connection, ctx);
+      } else if (change.field === "smb_message_echoes") {
+        for (const echo of asArray<WaEcho>(value.message_echoes)) {
+          if (await receiveEcho(echo, value, connection, ctx)) {
+            summary.processed++;
+          } else {
+            summary.ignored++;
+          }
+        }
       } else {
         // TODO: Phase 3 — phone_number_quality_update for the health card.
-        // TODO: Phase 4 — coexistence `smb_message_echoes` (human replies from the
-        // Business app) and `history`.
+        // TODO: Phase 4 — coexistence `history` import.
         ctx.logger.info("WhatsApp webhook field ignored", {
           field: change.field,
           wabaId: entry.id,
@@ -436,6 +455,102 @@ function describeOrder(order: NonNullable<WaMessage["order"]>): string {
   return text;
 }
 
+/** Normalised content plus the stored media, transcript or placeholder line. */
+async function resolveMedia(
+  normalised: Normalised,
+  connection: WhatsAppConnection,
+  ctx: ChannelContext,
+): Promise<{ content: string; extra: JsonObject; attachments?: Attachment[] }> {
+  let content = normalised.content;
+  const extra: JsonObject = { ...normalised.metadata };
+  let attachments: Attachment[] | undefined;
+
+  if (normalised.media) {
+    const { type, media } = normalised.media;
+    const result = await ingestMedia({ type, media, connection, ctx });
+    if (result.attachment) {
+      attachments = [result.attachment];
+      if (type === "audio" && result.transcript) {
+        content = result.transcript;
+        extra.voiceNote = true;
+      } else if (!content.trim()) {
+        // Never an empty turn: the agent learns what arrived; the Inbox shows
+        // the media itself instead of this line.
+        content = describeMedia(type, media);
+        extra.mediaPlaceholder = true;
+      }
+    } else if (!content) {
+      // Let the agent still acknowledge something arrived.
+      content = unloadedMedia(type);
+    }
+  }
+  return { content, extra, attachments };
+}
+
+/**
+ * Coexistence echo (D13-8): the owner answered from the WhatsApp Business app.
+ * Stored as a `human_agent` message on the customer's conversation, which core
+ * treats like a take-over, so the AI does not answer over the owner. Meta sends
+ * echoes only for messages typed in the app, never for Hay.chat's own API sends;
+ * core also skips any echo whose wamid matches a message Hay.chat sent.
+ */
+async function receiveEcho(
+  echo: WaEcho,
+  value: WaValue,
+  connection: WhatsAppConnection,
+  ctx: ChannelContext,
+): Promise<boolean> {
+  const from = customerExternalId(echo.to, echo.to_user_id);
+  if (!from) {
+    ctx.logger.warn("WhatsApp echo ignored — no customer id", { mid: echo.id });
+    return false;
+  }
+
+  const normalised = normalise(echo, ctx);
+  if (!normalised) {
+    return false;
+  }
+  const { content, extra, attachments } = await resolveMedia(normalised, connection, ctx);
+  if (!content.trim() && !attachments) {
+    ctx.logger.info("WhatsApp echo ignored — no content", { mid: echo.id, type: echo.type });
+    return false;
+  }
+
+  const digits = echo.to?.replace(/\D/g, "");
+  const metadata = compact({
+    mid: echo.id,
+    phone: digits ? `+${digits}` : undefined,
+    waId: echo.to,
+    userId: echo.to_user_id,
+    phoneNumberId: value.metadata?.phone_number_id ?? connection.phoneNumberId,
+    timestamp: echo.timestamp,
+    type: echo.type,
+    echo: true,
+    source: "whatsapp_business_app",
+    ...extra,
+  });
+
+  const result = await ctx.api.mutation<{ messageId?: string; conversationId?: string }>(
+    "messages.receive",
+    {
+      from,
+      content,
+      channel: "whatsapp",
+      senderType: "human_agent",
+      metadata,
+      ...(attachments ? { attachments } : {}),
+    },
+  );
+
+  ctx.logger.info("WhatsApp Business app reply stored as a human message", {
+    mid: echo.id,
+    type: echo.type,
+    messageId: result?.messageId,
+    conversationId: result?.conversationId,
+  });
+  return true;
+}
+
 /** Forward one inbound message to core. Returns false when ignored. */
 async function receiveMessage(
   message: WaMessage,
@@ -460,29 +575,7 @@ async function receiveMessage(
     return false;
   }
 
-  let content = normalised.content;
-  const extra: JsonObject = { ...normalised.metadata };
-  let attachments: Attachment[] | undefined;
-
-  if (normalised.media) {
-    const { type, media } = normalised.media;
-    const result = await ingestMedia({ type, media, connection, ctx });
-    if (result.attachment) {
-      attachments = [result.attachment];
-      if (type === "audio" && result.transcript) {
-        content = result.transcript;
-        extra.voiceNote = true;
-      } else if (!content.trim()) {
-        // Never an empty turn: the agent learns what arrived; the Inbox shows
-        // the media itself instead of this line.
-        content = describeMedia(type, media);
-        extra.mediaPlaceholder = true;
-      }
-    } else if (!content) {
-      // Let the agent still acknowledge something arrived.
-      content = unloadedMedia(type);
-    }
-  }
+  const { content, extra, attachments } = await resolveMedia(normalised, connection, ctx);
 
   if (!content.trim() && !attachments) {
     ctx.logger.info("WhatsApp message ignored — no content", {

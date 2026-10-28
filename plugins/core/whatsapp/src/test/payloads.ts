@@ -216,3 +216,24 @@ export function accountUpdate(event: string): Json {
     },
   };
 }
+
+/** Coexistence: the owner typed this in the WhatsApp Business app (smb_message_echoes). */
+export function echoChange(echo: Json, phoneNumberId: string = PHONE_NUMBER_ID): Json {
+  return {
+    field: "smb_message_echoes",
+    value: {
+      messaging_product: "whatsapp",
+      metadata: { display_phone_number: "15550783881", phone_number_id: phoneNumberId },
+      message_echoes: [echo],
+    },
+  };
+}
+
+export const textEcho = (body = "Shipped it this morning!") => ({
+  from: "15550783881",
+  to: WA_ID,
+  id: "wamid.ECHO.1",
+  timestamp: "1760000100",
+  type: "text",
+  text: { body },
+});

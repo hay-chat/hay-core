@@ -434,7 +434,7 @@ describe("handleWebhook — account_update", () => {
     const t = setup();
     const summary = await handleWebhook(
       p.envelope({
-        field: "smb_message_echoes",
+        field: "history",
         value: { metadata: { phone_number_id: p.PHONE_NUMBER_ID } },
       }),
       t.ctx,
@@ -536,5 +536,41 @@ describe("handleWebhook — template events (D13-1)", () => {
     );
 
     expect(store.find("hay_we_replied", "en")?.status).toBe("PENDING");
+  });
+});
+
+describe("handleWebhook — coexistence echoes (D13-8)", () => {
+  it("stores the owner's Business app reply as a human message for the customer", async () => {
+    const t = setup();
+    const summary = await handleWebhook(p.envelope(p.echoChange(p.textEcho())), t.ctx);
+
+    expect(summary).toEqual({ processed: 1, ignored: 0, statuses: 0 });
+    const input = t.calls("messages.receive")[0];
+    expect(input).toMatchObject({
+      from: `+${p.WA_ID}`,
+      content: "Shipped it this morning!",
+      channel: "whatsapp",
+      senderType: "human_agent",
+      metadata: expect.objectContaining({ mid: "wamid.ECHO.1", echo: true, phone: `+${p.WA_ID}` }),
+    });
+    // A business message never opens the customer service window.
+    expect(input).not.toHaveProperty("replyWindowExpiresAt");
+  });
+
+  it("ignores echoes for another phone number", async () => {
+    const t = setup();
+    const summary = await handleWebhook(
+      p.envelope(p.echoChange(p.textEcho(), p.OTHER_PHONE_NUMBER_ID)),
+      t.ctx,
+    );
+    expect(summary.ignored).toBe(1);
+    expect(t.calls("messages.receive")).toHaveLength(0);
+  });
+
+  it("ignores an echo without a customer id", async () => {
+    const t = setup();
+    const echo = { ...p.textEcho(), to: undefined };
+    const summary = await handleWebhook(p.envelope(p.echoChange(echo)), t.ctx);
+    expect(summary).toEqual({ processed: 0, ignored: 1, statuses: 0 });
   });
 });
