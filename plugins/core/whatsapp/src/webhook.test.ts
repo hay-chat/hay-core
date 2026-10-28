@@ -379,6 +379,28 @@ describe("handleWebhook — statuses", () => {
   });
 });
 
+describe("handleWebhook — phone_number_quality_update (D13-11)", () => {
+  it("reports a flagged or downgraded number as failing and an upgrade as ok", async () => {
+    const t = setup();
+
+    await handleWebhook(
+      p.envelope(p.qualityUpdate("FLAGGED"), p.qualityUpdate("UPGRADE", "TIER_10K")),
+      t.ctx,
+    );
+
+    expect(t.calls("channel.reportHealth")).toEqual([
+      { status: "failing", detail: "FLAGGED · TIER_1K" },
+      { status: "ok", detail: "UPGRADE · TIER_10K" },
+    ]);
+  });
+
+  it("ignores other quality events", async () => {
+    const t = setup();
+    await handleWebhook(p.envelope(p.qualityUpdate("ONBOARDING")), t.ctx);
+    expect(t.calls("channel.reportHealth")).toEqual([]);
+  });
+});
+
 describe("handleWebhook — account_update", () => {
   it("revokes the connection once when the business removes Hay", async () => {
     const t = setup();

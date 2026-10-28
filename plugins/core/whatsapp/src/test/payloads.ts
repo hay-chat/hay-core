@@ -217,6 +217,13 @@ export function accountUpdate(event: string): Json {
   };
 }
 
+export function qualityUpdate(event: string, currentLimit = "TIER_1K"): Json {
+  return {
+    field: "phone_number_quality_update",
+    value: { display_phone_number: "15550783881", event, current_limit: currentLimit },
+  };
+}
+
 /** Coexistence: the owner typed this in the WhatsApp Business app (smb_message_echoes). */
 export function echoChange(echo: Json, phoneNumberId: string = PHONE_NUMBER_ID): Json {
   return {

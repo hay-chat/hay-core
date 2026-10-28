@@ -18,6 +18,11 @@ jest.mock("@server/repositories/message.repository", () => ({
 const publish = jest.fn<(channel: string, event: unknown) => Promise<void>>();
 jest.mock("@server/services/redis.service", () => ({ redisService: { publish } }));
 
+const recordDeliveryFailure = jest.fn<(organizationId: string, channel: string) => Promise<void>>();
+jest.mock("@server/services/channel-health.service", () => ({
+  channelHealthService: { recordDeliveryFailure },
+}));
+
 import { applyEmailEvent, messageIdCandidates } from "@server/services/email-events.service";
 import emailEventsRouter from "@server/routes/email-events";
 
@@ -163,6 +168,7 @@ describe("POST /v1/webhooks/email-events", () => {
     expect(res.statusCode).toBe(200);
     expect(res.body).toEqual({ ok: true, handled: true });
     expect(update).toHaveBeenCalled();
+    expect(recordDeliveryFailure).toHaveBeenCalledWith("org-1", "email");
   });
 
   it("answers 503 when the secret is not configured", async () => {

@@ -1,7 +1,7 @@
 import { type FindManyOptions } from "typeorm";
-import type { DeepPartial, Repository } from "typeorm";
+import type { DeepPartial, QueryDeepPartialEntity, Repository } from "typeorm";
 import { BaseRepository } from "./base.repository";
-import { PluginInstance } from "@server/entities/plugin-instance.entity";
+import { PluginInstance, type ChannelHealth } from "@server/entities/plugin-instance.entity";
 import { pluginRegistryRepository } from "./plugin-registry.repository";
 import { encryptConfig, type ConfigSchema } from "@server/lib/auth/utils/encryption";
 import type { HayPluginManifest } from "@server/types/plugin.types";
@@ -176,6 +176,12 @@ export class PluginInstanceRepository extends BaseRepository<PluginInstance> {
       lastHealthCheck: new Date(),
       healthStatus: status,
     });
+  }
+
+  async updateChannelHealth(id: string, channelHealth: ChannelHealth): Promise<void> {
+    await this.getRepository().update(id, {
+      channelHealth,
+    } as QueryDeepPartialEntity<PluginInstance>);
   }
 
   async upsertInstance(

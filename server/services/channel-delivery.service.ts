@@ -432,6 +432,8 @@ export class ChannelDeliveryService {
           await messageRepository.updateProviderMessageId(messageId, outcome.providerMessageId);
         }
         if (args.aiDisclosed) await this.markDisclosed(messageId);
+        const { channelHealthService } = await import("./channel-health.service");
+        await channelHealthService.recordDeliverySuccess(organizationId, pluginId);
         logger.info(
           { messageId, providerMessageId: outcome.providerMessageId, channel, attempt },
           "Channel delivery successful",
@@ -460,6 +462,8 @@ export class ChannelDeliveryService {
       }
       const error: MessageProviderError = { code: outcome.error };
       await this.markDeliveryFailed({ messageId, conversationId, organizationId, error });
+      const { channelHealthService } = await import("./channel-health.service");
+      await channelHealthService.recordDeliveryFailure(organizationId, channel);
       if (outcome.retryable) {
         await this.alertDeliveryFailed({
           organizationId,

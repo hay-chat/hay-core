@@ -34,6 +34,7 @@ const mockConversationRepo = {
   findActiveByCustomerAndChannel: jest.fn<() => Promise<unknown>>(),
   findByExternalConversationId: jest.fn<(...args: unknown[]) => Promise<unknown>>(),
   findByIdAndOrganization: jest.fn<(...args: unknown[]) => Promise<unknown>>(),
+  findById: jest.fn<(...args: unknown[]) => Promise<unknown>>(),
   create: jest.fn<(...args: unknown[]) => Promise<unknown>>(),
   update: jest.fn<(...args: unknown[]) => Promise<unknown>>(),
   updateById: jest.fn<(...args: unknown[]) => Promise<unknown>>(),
@@ -64,6 +65,14 @@ jest.mock("@server/repositories/organization.repository", () => ({
 }));
 jest.mock("@server/repositories/plugin-instance.repository", () => ({
   pluginInstanceRepository: {},
+}));
+const mockChannelHealth = {
+  recordDeliveryFailure: jest.fn<(...args: unknown[]) => Promise<void>>(async () => undefined),
+  markFailing: jest.fn<(...args: unknown[]) => Promise<void>>(async () => undefined),
+  markOk: jest.fn<(...args: unknown[]) => Promise<void>>(async () => undefined),
+};
+jest.mock("@server/services/channel-health.service", () => ({
+  channelHealthService: mockChannelHealth,
 }));
 jest.mock("@server/repositories/document.repository", () => ({ documentRepository: {} }));
 jest.mock("@server/services/mcp-registry.service", () => ({ mcpRegistryService: {} }));
@@ -694,6 +703,45 @@ describe("pluginApi.messages.updateStatus", () => {
         payload: expect.objectContaining({ providerStatus: "failed", providerError: error }),
       }),
     );
+  });
+
+  it("feeds a failure into the channel health check (D13-11)", async () => {
+    mockMessageRepo.findByProviderMessageIdAndOrganization.mockResolvedValue(storedMessage("sent"));
+    mockConversationRepo.findById.mockResolvedValue(makeConversation());
+
+    await caller()["messages.updateStatus"]({ providerMessageId: "wamid.1", status: "failed" });
+    await new Promise((resolve) => setImmediate(resolve));
+
+    expect(mockChannelHealth.recordDeliveryFailure).toHaveBeenCalledWith(ORG_ID, "whatsapp");
+  });
+});
+
+describe("pluginApi.channel.reportHealth (D13-11)", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it("marks a quality drop failing and clears only the plugin's own report", async () => {
+    await expect(
+      caller()["channel.reportHealth"]({ status: "failing", detail: "RED" }),
+    ).resolves.toEqual({ ok: true });
+    expect(mockChannelHealth.markFailing).toHaveBeenCalledWith(
+      ORG_ID,
+      expect.any(String),
+      "quality_drop",
+      "RED",
+    );
+
+    await caller()["channel.reportHealth"]({ status: "ok" });
+    expect(mockChannelHealth.markOk).toHaveBeenCalledWith(ORG_ID, expect.any(String), [
+      "quality_drop",
+    ]);
+  });
+
+  it("requires the messages capability", async () => {
+    await expect(
+      caller(ORG_ID, ["customers"])["channel.reportHealth"]({ status: "failing" }),
+    ).rejects.toThrow(/messages/);
   });
 });
 

@@ -5,6 +5,20 @@ import { Organization } from "./organization.entity";
 import type { AuthState, PluginInstanceRuntimeState } from "../types/plugin-sdk.types";
 import { AuthStateEncryptedTransformer } from "../lib/auth/utils/encryption";
 
+/** Why a channel is failing (D13-11). */
+export type ChannelHealthReason = "delivery_failures" | "token_revoked" | "quality_drop";
+
+export interface ChannelHealth {
+  status: "ok" | "failing";
+  reason?: ChannelHealthReason;
+  /** Short provider/plugin detail, e.g. "RED" or "4 replies failed in the last hour". */
+  detail?: string;
+  /** When the current status started (ISO). */
+  since: string;
+  /** Last time admins were alerted (ISO); throttles repeat alerts. */
+  lastAlertAt?: string;
+}
+
 @Entity("plugin_instances")
 @Index(["organizationId", "pluginId"], { unique: true })
 export class PluginInstance extends OrganizationScopedEntity {
@@ -60,6 +74,10 @@ export class PluginInstance extends OrganizationScopedEntity {
 
   @Column({ type: "varchar", length: 50, nullable: true })
   healthStatus?: "healthy" | "unhealthy" | "unknown";
+
+  /** Generic "channel failing" signal (D13-11); see channel-health.service. */
+  @Column({ type: "jsonb", nullable: true })
+  channelHealth?: ChannelHealth | null;
 
   // Legacy status field (kept for backwards compatibility)
   @Column({ type: "varchar", length: 50, default: "stopped" })
