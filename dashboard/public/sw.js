@@ -75,6 +75,9 @@ self.addEventListener("pushsubscriptionchange", (event) => {
     (async () => {
       const old = event.oldSubscription;
       if (!old || !API_BASE) return;
+      // The old auth secret proves this device owns the old subscription.
+      const oldAuth = (old.toJSON().keys || {}).auth;
+      if (!oldAuth) return;
       let next = event.newSubscription;
       if (!next) {
         const key = old.options && old.options.applicationServerKey;
@@ -90,6 +93,7 @@ self.addEventListener("pushsubscriptionchange", (event) => {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           oldEndpoint: old.endpoint,
+          oldAuth,
           endpoint: next.endpoint,
           keys: { p256dh: keys.p256dh || "", auth: keys.auth || "" },
         }),
