@@ -422,6 +422,28 @@ function staleTrackingEnv(config: {
   return env;
 }
 
+/**
+ * D16 goodwill coupon cap → MCP env. Only set values are passed; the MCP
+ * (@hay/plugin-sdk/coupon-policy) applies the defaults (on, 10%, fixed off, 30
+ * days) and clamps bad values.
+ */
+function couponEnv(config: {
+  getOptional: <T = unknown>(key: string) => T | undefined;
+}): Record<string, string> {
+  const env: Record<string, string> = {};
+  const keys: Array<[string, string]> = [
+    ["couponsEnabled", "SHOPIFY_COUPONS_ENABLED"],
+    ["couponMaxPercent", "SHOPIFY_COUPON_MAX_PERCENT"],
+    ["couponMaxAmount", "SHOPIFY_COUPON_MAX_AMOUNT"],
+    ["couponMaxDays", "SHOPIFY_COUPON_MAX_DAYS"],
+  ];
+  for (const [key, name] of keys) {
+    const value = config.getOptional<number | string | boolean>(key);
+    if (value !== undefined && value !== null && value !== "") env[name] = String(value);
+  }
+  return env;
+}
+
 export default defineHayPlugin((globalCtx) => ({
   name: "Shopify",
 
@@ -474,6 +496,34 @@ export default defineHayPlugin((globalCtx) => ({
         description: "Shopify Admin API version to use.",
         default: "2026-04",
       },
+      couponsEnabled: {
+        type: "boolean",
+        label: "Allow goodwill coupons",
+        description:
+          "Let the agent create single-use apology discount codes, only usable by that customer, " +
+          "within the caps below. A coupon above the cap waits for a team member to approve it.",
+        default: true,
+      },
+      couponMaxPercent: {
+        type: "number",
+        label: "Coupon cap: maximum percentage",
+        description:
+          "Largest percentage discount the agent may give (0 turns percentage coupons off).",
+        default: 10,
+      },
+      couponMaxAmount: {
+        type: "number",
+        label: "Coupon cap: maximum fixed amount",
+        description:
+          "Largest fixed discount in your shop currency (0 or empty turns fixed-amount coupons off).",
+        default: 0,
+      },
+      couponMaxDays: {
+        type: "number",
+        label: "Coupon validity (days)",
+        description: "Codes the agent creates expire after at most this many days.",
+        default: 30,
+      },
       staleTrackingDomesticDays: {
         type: "number",
         label: "Stale tracking: domestic (days)",
@@ -511,6 +561,9 @@ export default defineHayPlugin((globalCtx) => ({
         // connected before this change must reconnect to grant the new scopes.
         "read_returns",
         "write_returns",
+        // Goodwill coupon (mcp/tools/coupons.js, D16-4). Stores connected before this
+        // change must reconnect to grant it; until then the tool fails with PERMISSION.
+        "write_discounts",
       ],
       clientId: ctx.config.field("clientId"),
       clientSecret: ctx.config.field("clientSecret"),
@@ -645,6 +698,7 @@ export default defineHayPlugin((globalCtx) => ({
           SHOPIFY_ACCESS_TOKEN: accessToken,
           SHOPIFY_API_VERSION: apiVersion,
           ...staleTrackingEnv(ctx.config),
+          ...couponEnv(ctx.config),
         },
       });
       ctx.logger.info("Shopify MCP server started successfully");

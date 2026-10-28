@@ -65,6 +65,10 @@
     "woocommerce_update_customer_address": {
       "label": "Update Customer Address",
       "description": "Change the billing or shipping address saved on a customer's account."
+    },
+    "woocommerce_create_coupon": {
+      "label": "Create Goodwill Coupon",
+      "description": "Create a single-use apology coupon for one customer's email, within the merchant's percentage or amount cap."
     }
   },
   "config": {
@@ -79,6 +83,22 @@
     "consumerSecret": {
       "label": "Consumer Secret",
       "description": "WooCommerce REST API Consumer Secret"
+    },
+    "couponsEnabled": {
+      "label": "Allow goodwill coupons",
+      "description": "Let the agent create single-use apology coupons, restricted to the customer's email, within the caps below. A coupon above the cap waits for a team member to approve it."
+    },
+    "couponMaxPercent": {
+      "label": "Coupon cap: maximum percentage",
+      "description": "Largest percentage discount the agent may give (0 turns percentage coupons off)."
+    },
+    "couponMaxAmount": {
+      "label": "Coupon cap: maximum fixed amount",
+      "description": "Largest fixed discount in your store currency (0 or empty turns fixed-amount coupons off)."
+    },
+    "couponMaxDays": {
+      "label": "Coupon validity (days)",
+      "description": "Coupons the agent creates expire after at most this many days."
     },
     "staleTrackingDomesticDays": {
       "label": "Stale tracking: domestic (days)",

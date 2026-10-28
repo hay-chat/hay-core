@@ -86,7 +86,7 @@
     },
     "couponsEnabled": {
       "label": "Permitir cupones de cortesía",
-      "description": "Permite que el agente cree cupones de un solo uso dentro de los topes. Por encima del tope, pasa a una persona."
+      "description": "Permite que el agente cree cupones de un solo uso dentro de los topes. Un cupón por encima del tope espera la aprobación de alguien del equipo. Cada pedido recibe como máximo un cupón."
     },
     "couponMaxPercent": {
       "label": "Tope del cupón: porcentaje máximo",

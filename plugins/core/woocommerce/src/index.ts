@@ -36,6 +36,28 @@ function staleTrackingEnv(config: {
   return env;
 }
 
+/**
+ * D16 goodwill coupon cap → MCP env. Only set values are passed; the MCP
+ * (@hay/plugin-sdk/coupon-policy) applies the defaults (on, 10%, fixed off, 30
+ * days) and clamps bad values.
+ */
+function couponEnv(config: {
+  getOptional: <T = unknown>(key: string) => T | undefined;
+}): Record<string, string> {
+  const env: Record<string, string> = {};
+  const keys: Array<[string, string]> = [
+    ["couponsEnabled", "WOOCOMMERCE_COUPONS_ENABLED"],
+    ["couponMaxPercent", "WOOCOMMERCE_COUPON_MAX_PERCENT"],
+    ["couponMaxAmount", "WOOCOMMERCE_COUPON_MAX_AMOUNT"],
+    ["couponMaxDays", "WOOCOMMERCE_COUPON_MAX_DAYS"],
+  ];
+  for (const [key, name] of keys) {
+    const value = config.getOptional<number | string | boolean>(key);
+    if (value !== undefined && value !== null && value !== "") env[name] = String(value);
+  }
+  return env;
+}
+
 export default defineHayPlugin((globalCtx) => ({
   name: "WooCommerce",
 
@@ -64,6 +86,34 @@ export default defineHayPlugin((globalCtx) => ({
         description: "WooCommerce REST API Consumer Secret",
         required: true,
         encrypted: true,
+      },
+      couponsEnabled: {
+        type: "boolean",
+        label: "Allow goodwill coupons",
+        description:
+          "Let the agent create single-use apology coupons, restricted to the customer's email, " +
+          "within the caps below. A coupon above the cap waits for a team member to approve it.",
+        default: true,
+      },
+      couponMaxPercent: {
+        type: "number",
+        label: "Coupon cap: maximum percentage",
+        description:
+          "Largest percentage discount the agent may give (0 turns percentage coupons off).",
+        default: 10,
+      },
+      couponMaxAmount: {
+        type: "number",
+        label: "Coupon cap: maximum fixed amount",
+        description:
+          "Largest fixed discount in your store currency (0 or empty turns fixed-amount coupons off).",
+        default: 0,
+      },
+      couponMaxDays: {
+        type: "number",
+        label: "Coupon validity (days)",
+        description: "Coupons the agent creates expire after at most this many days.",
+        default: 30,
       },
       staleTrackingDomesticDays: {
         type: "number",
@@ -180,6 +230,7 @@ export default defineHayPlugin((globalCtx) => ({
           WOOCOMMERCE_CONSUMER_KEY: consumerKey,
           WOOCOMMERCE_CONSUMER_SECRET: consumerSecret,
           ...staleTrackingEnv(ctx.config),
+          ...couponEnv(ctx.config),
         },
       });
 

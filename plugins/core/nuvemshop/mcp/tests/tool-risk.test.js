@@ -11,7 +11,7 @@ import { describe, it, expect } from "vitest";
 const require = createRequire(import.meta.url);
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const { createFakeServer } = require("./harness");
-const { riskFor, CATEGORY_META_KEY } = require("@hay/plugin-sdk/tool-risk");
+const { riskFor, CATEGORY_META_KEY, CAP_ENFORCED_META_KEY } = require("@hay/plugin-sdk/tool-risk");
 const toolRisk = require("../tool-risk");
 
 function registeredToolNames() {
@@ -37,6 +37,11 @@ describe("tool risk classification", () => {
   it("lists no tool that is not registered", () => {
     const listed = [...toolRisk.read, ...Object.keys(toolRisk.write)];
     expect(listed.filter((name) => !names.includes(name))).toEqual([]);
+  });
+
+  it("flags the coupon tool as enforcing its own cap", () => {
+    expect(toolRisk.capped).toEqual(["nuvemshop_create_coupon"]);
+    expect(riskFor("nuvemshop_create_coupon", toolRisk)._meta[CAP_ENFORCED_META_KEY]).toBe(true);
   });
 
   it("marks writes with a category and reads as read-only", () => {
