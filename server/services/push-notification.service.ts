@@ -3,6 +3,7 @@ import { config } from "@server/config/env";
 import { AppDataSource } from "@server/database/data-source";
 import { PushSubscription } from "@server/database/entities/push-subscription.entity";
 import { createLogger } from "@server/lib/logger";
+import { organizationNotificationLocale } from "./notification-locale";
 
 const logger = createLogger("push-notifications");
 
@@ -23,7 +24,7 @@ export interface SubscribeInput {
   userAgent?: string | null;
 }
 
-/** Test-alert copy by organization locale (falls back to en). */
+/** Test-alert copy by organization notification locale. */
 const TEST_COPY = {
   en: {
     title: "Hay.chat alerts are on",
@@ -33,9 +34,13 @@ const TEST_COPY = {
     title: "Alertas do Hay.chat ativados",
     body: "Você será avisado aqui quando uma conversa precisar de um humano.",
   },
+  es: {
+    title: "Las alertas de Hay.chat están activadas",
+    body: "Te avisaremos aquí cuando una conversación necesite a una persona.",
+  },
 } as const;
 
-/** "A reply could not be delivered" copy by organization locale (falls back to en). */
+/** "A reply could not be delivered" copy by organization notification locale. */
 const DELIVERY_FAILED_COPY = {
   en: {
     title: "A reply could not be delivered",
@@ -44,6 +49,10 @@ const DELIVERY_FAILED_COPY = {
   "pt-BR": {
     title: "Uma resposta não pôde ser entregue",
     body: "O Hay.chat tentou mais 3 vezes e desistiu. Abra a conversa para acompanhar.",
+  },
+  es: {
+    title: "No se pudo entregar una respuesta",
+    body: "Hay.chat lo intentó 3 veces y se rindió. Abre la conversación para dar seguimiento.",
   },
 } as const;
 
@@ -145,10 +154,7 @@ class PushNotificationService {
     conversationId: string;
   }): Promise<void> {
     if (!this.isConfigured()) return;
-    const { getOrganizationLocale } = await import("./email.service");
-    const locale = await getOrganizationLocale(args.organizationId);
-    const copy =
-      DELIVERY_FAILED_COPY[locale as keyof typeof DELIVERY_FAILED_COPY] ?? DELIVERY_FAILED_COPY.en;
+    const copy = DELIVERY_FAILED_COPY[await organizationNotificationLocale(args.organizationId)];
     const subscriptions = await this.repo()
       .createQueryBuilder("s")
       .innerJoin(
@@ -172,9 +178,7 @@ class PushNotificationService {
     userId: string,
     organizationId: string,
   ): Promise<{ sent: number; removed: number }> {
-    const { getOrganizationLocale } = await import("./email.service");
-    const locale = await getOrganizationLocale(organizationId);
-    const copy = TEST_COPY[locale as keyof typeof TEST_COPY] ?? TEST_COPY.en;
+    const copy = TEST_COPY[await organizationNotificationLocale(organizationId)];
     const subscriptions = await this.repo().find({ where: { user_id: userId } });
     return this.deliver(subscriptions, {
       kind: "test",
