@@ -756,5 +756,20 @@
     "stateClosedUntil": "Fechado, volta {when} ({timezone})",
     "stateAlwaysOpen": "Sem horário (sempre aberto), alguém da equipe está disponível",
     "stateAlwaysOpenNobody": "Sem horário (sempre aberto), ninguém está disponível. A equipe recebe um alerta."
+  },
+  "workspaceExport": {
+    "title": "Baixar todos os dados do workspace",
+    "description": "Tudo o que este workspace guarda no Hay.chat em um único ZIP: conversas e mensagens, clientes, documentos, playbooks e configurações dos agentes.",
+    "includes": "O ZIP traz um arquivo JSON Lines por tipo de dado e arquivos CSV de conversas, mensagens e clientes. Os arquivos anexados não estão incluídos. Só donos e administradores podem baixar, e cada download fica registrado.",
+    "request": "Preparar exportação",
+    "requestAgain": "Preparar nova exportação",
+    "requested": "Exportação iniciada. Esta página atualiza quando estiver pronta.",
+    "requestFailed": "Não foi possível iniciar a exportação. Tente de novo.",
+    "preparing": "Preparando sua exportação. Workspaces grandes podem levar alguns minutos.",
+    "ready": "A exportação de {date} está pronta ({size}). Disponível até {expires}.",
+    "failed": "A última exportação falhou. Inicie uma nova.",
+    "expired": "A última exportação expirou. Inicie uma nova.",
+    "download": "Baixar ZIP",
+    "downloadFailed": "A exportação não está mais disponível. Inicie uma nova."
   }
 }

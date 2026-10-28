@@ -164,6 +164,9 @@
       </CardContent>
     </Card>
 
+    <!-- Workspace export: everything the organization keeps (D15-6) -->
+    <WorkspaceExportCard v-if="userStore.isAdmin" />
+
     <!-- Data Deletion Section -->
     <Card>
       <CardHeader>
