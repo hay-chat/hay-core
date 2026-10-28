@@ -178,7 +178,8 @@
           "copy": "Copiar",
           "copied": "Copiado",
           "newPlaybook": "Criar um playbook"
-        }
+        },
+        "auditApproved": "Aprovado; uma sugestão foi aberta para revisão"
       },
       "settingsDialog": {
         "title": "Configurações do Insights",

@@ -102,6 +102,34 @@ function toItem(row: ClusterRow) {
 
 export type InsightListItem = ReturnType<typeof toItem>;
 
+export interface InsightApproval {
+  kind: "playbook_edit" | "knowledge" | "task";
+  playbookId: string | null;
+  /** Evidence brief for the suggest-edits reviewers (both cap feedback at 4000). */
+  feedback: string;
+}
+
+const BRIEF_MAX = 3900;
+
+/** A plain evidence brief: what the pattern is, the likely cause and redacted examples. */
+export function buildBrief(row: Record<string, unknown>): string {
+  const lines: string[] = [];
+  if (row.title) lines.push(`Pattern: ${row.title}`);
+  if (row.summary) lines.push(`Summary: ${row.summary}`);
+  if (row.hypothesis) lines.push(`Likely cause / fix: ${row.hypothesis}`);
+  lines.push(`Seen in ${Number(row.size) || 0} conversations.`);
+  const paraphrases = (row.paraphrases as string[] | null) ?? [];
+  if (paraphrases.length) {
+    lines.push("", "How shoppers put it:", ...paraphrases.map((p) => `- ${p}`));
+  }
+  const snippets = (row.snippets as InsightSnippet[] | null) ?? [];
+  if (snippets.length) {
+    lines.push("", "Examples (personal data removed):", ...snippets.map((s) => `- ${s.text}`));
+  }
+  const brief = lines.join("\n");
+  return brief.length > BRIEF_MAX ? `${brief.slice(0, BRIEF_MAX - 1)}…` : brief;
+}
+
 export class InsightsService {
   async list(organizationId: string, filters: InsightListFilters) {
     const params: unknown[] = [organizationId, String(filters.days)];
@@ -332,6 +360,68 @@ export class InsightsService {
       );
       return { state: to };
     });
+  }
+
+  /**
+   * Approve an insight (D3-14). Never applies anything: it moves the insight to
+   * in_progress and tells the dashboard which reviewer to open. Playbook edits open
+   * the suggest-edits diff (saved as a draft; the owner publishes), knowledge fixes
+   * open the knowledge proposal, everything else becomes a tracked task.
+   */
+  async approve(params: {
+    organizationId: string;
+    clusterId: string;
+    userId: string | null;
+  }): Promise<InsightApproval> {
+    const { organizationId, clusterId, userId } = params;
+    const row = await this.findCluster(organizationId, clusterId);
+    if (!OPEN_STATES.includes(row.state)) {
+      throw new InsightError("BAD_REQUEST", "Only open insights can be approved");
+    }
+    const actionType = row.action_type as string;
+
+    let approval: InsightApproval;
+    if (actionType === "playbook_edit") {
+      const playbookId = await this.mainPlaybook(organizationId, clusterId);
+      approval = playbookId
+        ? { kind: "playbook_edit", playbookId, feedback: buildBrief(row) }
+        : { kind: "task", playbookId: null, feedback: buildBrief(row) };
+    } else if (actionType === "knowledge_edit" || actionType === "knowledge_add") {
+      approval = { kind: "knowledge", playbookId: null, feedback: buildBrief(row) };
+    } else {
+      approval = { kind: "task", playbookId: null, feedback: buildBrief(row) };
+    }
+
+    await this.setState({
+      organizationId,
+      clusterId,
+      to: "in_progress",
+      userId,
+      reason: `approved:${approval.kind}`,
+      approvedAction: {
+        kind: approval.kind,
+        playbookId: approval.playbookId,
+        approvedAt: new Date().toISOString(),
+        approvedBy: userId,
+      },
+    });
+    return approval;
+  }
+
+  /** The playbook most members ran under, if it still exists in the org. */
+  private async mainPlaybook(organizationId: string, clusterId: string): Promise<string | null> {
+    const [row]: Array<{ id: string }> = await AppDataSource.query(
+      `SELECT p.id
+         FROM insight_cluster_members m
+         JOIN insight_issues i ON i.id = m.insight_issue_id
+         JOIN playbooks p ON p.id::text = i.signals->>'playbookId' AND p.organization_id = $2
+        WHERE m.cluster_id = $1
+        GROUP BY p.id
+        ORDER BY count(*) DESC
+        LIMIT 1`,
+      [clusterId, organizationId],
+    );
+    return row?.id ?? null;
   }
 }
 
