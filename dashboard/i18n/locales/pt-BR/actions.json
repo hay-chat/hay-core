@@ -9,7 +9,7 @@
       "address_change": "Alterações de endereço",
       "customer_update": "Alterações nos dados do cliente",
       "note": "Notas no pedido e reenvio de e-mails",
-      "destructive": "Exclusões e mudanças de configuração",
+      "destructive": "Exclusões, mudanças de configuração e respostas a disputas",
       "other_write": "Outras ações"
     },
     "settings": {

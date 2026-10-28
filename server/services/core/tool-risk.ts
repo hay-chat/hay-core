@@ -39,7 +39,8 @@ export const WRITE_CATEGORIES = [
 export type WriteCategory = (typeof WRITE_CATEGORIES)[number];
 
 /**
- * Deletes data or changes account configuration. Always held while approval is
+ * Deletes data, changes account configuration or cannot be taken back (e.g.
+ * submitted dispute evidence). Always held while approval is
  * on, like an unclassified write; the owner cannot switch it off per category.
  */
 export const DESTRUCTIVE_CATEGORY: WriteCategory = "destructive";

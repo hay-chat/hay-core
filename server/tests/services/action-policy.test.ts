@@ -70,6 +70,14 @@ describe("decideGate", () => {
     expect(decideGate(risk("destructive"), {}, off)).toEqual({ kind: "allow" });
   });
 
+  it("holds a dispute update declared destructive, though other_write would run (B6)", () => {
+    expect(decideGate(risk("other_write"), { dispute: "dp_1" }, ON)).toEqual({ kind: "allow" });
+    expect(decideGate(risk("destructive"), { dispute: "dp_1", submit: true }, ON)).toMatchObject({
+      kind: "hold",
+      reason: "destructive_write",
+    });
+  });
+
   it("lets other classified writes run", () => {
     for (const category of ["address_change", "note", "return", "customer_update"]) {
       expect(decideGate(risk(category), {}, ON)).toEqual({ kind: "allow" });
