@@ -70,4 +70,43 @@ describe("Gorgias import", () => {
       ),
     ).rejects.toThrow(/refused the email and API key/);
   });
+
+  it("F10: waits out 429s using Retry-After, then gives up after a few", async () => {
+    let listCalls = 0;
+    const fetchImpl = jest.fn(async (url: string | URL | Request) => {
+      const href = String(url);
+      if (href.includes("/tickets?")) {
+        listCalls++;
+        if (listCalls === 1) {
+          return new Response("{}", { status: 429, headers: { "Retry-After": "3" } });
+        }
+        return json({ data: [{ id: 7 }], meta: { next_cursor: null } });
+      }
+      return json({ id: 7, messages: [{ from_agent: false, body_text: "Hi" }] });
+    });
+    const waits: number[] = [];
+    const sleep = async (ms: number) => {
+      waits.push(ms);
+    };
+    const transcripts = await fetchGorgiasTranscripts(
+      { subdomain: "acme", email: "me@shop.com", apiKey: "key" },
+      fetchImpl as unknown as typeof fetch,
+      sleep,
+    );
+    expect(transcripts.map((t) => t.externalId)).toEqual(["7"]);
+    expect(waits).toEqual([3000]);
+
+    const alwaysLimited = jest.fn(async () => new Response("{}", { status: 429 }));
+    const limitedWaits: number[] = [];
+    await expect(
+      fetchGorgiasTranscripts(
+        { subdomain: "acme", email: "me@shop.com", apiKey: "key" },
+        alwaysLimited as unknown as typeof fetch,
+        async (ms) => {
+          limitedWaits.push(ms);
+        },
+      ),
+    ).rejects.toThrow(/kept rate limiting/);
+    expect(limitedWaits).toEqual([20_000, 20_000, 20_000, 20_000, 20_000]);
+  });
 });

@@ -5,6 +5,30 @@ import { Organization } from "../../entities/organization.entity";
 import { TestTranscript } from "../../database/entities/test-transcript.entity";
 import { testTranscriptService } from "../../services/test-transcript.service";
 import { parseGenericCsv } from "../../services/importers/transcripts/csv";
+import {
+  TranscriptImportError,
+  type TestTranscript as ParsedTranscript,
+} from "../../services/importers/transcripts/test-transcript";
+import { JobStatus } from "../../entities/job.entity";
+
+async function* tickets(count: number, failAfter?: number): AsyncGenerator<ParsedTranscript> {
+  for (let i = 1; i <= count; i++) {
+    if (failAfter !== undefined && i > failAfter) {
+      throw new TranscriptImportError("Gorgias refused the email and API key");
+    }
+    await Promise.resolve();
+    yield { externalId: String(i), turns: [{ role: "customer", text: `Question ${i}` }] };
+  }
+}
+
+async function settled(orgId: string, jobId: string) {
+  for (let attempt = 0; attempt < 200; attempt++) {
+    const status = await testTranscriptService.importStatus(orgId, jobId);
+    if (status && status.status !== JobStatus.PROCESSING) return status;
+    await new Promise((resolve) => setTimeout(resolve, 25));
+  }
+  throw new Error("import never settled");
+}
 
 /** D7-8: imported transcripts are stored per organization and follow retention. */
 describe("test transcripts", () => {
@@ -97,5 +121,52 @@ describe("test transcripts", () => {
     expect(await repo.findOneBy({ id: old.id })).toBeNull();
     expect(await repo.findOneBy({ id: recent.id })).not.toBeNull();
     expect(await repo.findOneBy({ id: keptForever.id })).not.toBeNull();
+  });
+
+  it("F10: imports a slow source in the background, in batches, past the old 100 cap", async () => {
+    const started = await testTranscriptService.importInBackground({
+      organizationId: orgId,
+      source: "gorgias",
+      transcripts: tickets(130),
+    });
+    expect(await testTranscriptService.importStatus(otherOrgId, started.jobId)).toBeNull();
+
+    const status = await settled(orgId, started.jobId);
+    expect(status).toMatchObject({
+      status: JobStatus.COMPLETED,
+      importBatchId: started.importBatchId,
+      imported: 130,
+      error: null,
+    });
+    const { total } = await testTranscriptService.list(orgId, {
+      limit: 1,
+      offset: 0,
+      importBatchId: started.importBatchId,
+    });
+    expect(total).toBe(130);
+  });
+
+  it("F10: a failing source ends the job FAILED with the reason, keeping what landed", async () => {
+    const started = await testTranscriptService.importInBackground({
+      organizationId: orgId,
+      source: "gorgias",
+      transcripts: tickets(130, 60),
+    });
+    const status = await settled(orgId, started.jobId);
+    expect(status).toMatchObject({
+      status: JobStatus.FAILED,
+      imported: 50,
+      error: "Gorgias refused the email and API key",
+    });
+
+    const empty = await testTranscriptService.importInBackground({
+      organizationId: orgId,
+      source: "gorgias",
+      transcripts: tickets(0),
+    });
+    expect(await settled(orgId, empty.jobId)).toMatchObject({
+      status: JobStatus.FAILED,
+      error: "No conversations found",
+    });
   });
 });

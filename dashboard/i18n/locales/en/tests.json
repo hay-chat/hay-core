@@ -46,7 +46,9 @@
       "gorgiasApiKey": "Gorgias API key",
       "gorgiasHelp": "The email and API key are used for this import only and are not stored.",
       "submit": "Import",
-      "done": "No conversations imported | Imported {count} conversation | Imported {count} conversations"
+      "done": "No conversations imported | Imported {count} conversation | Imported {count} conversations",
+      "backgroundStarted": "Importing from Gorgias in the background. This can take a few minutes; you can keep working.",
+      "backgroundFailed": "The Gorgias import stopped: {error} ({count} conversations were imported before it stopped)"
     },
     "runs": {
       "title": "Test runs",

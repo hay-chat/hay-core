@@ -8,7 +8,8 @@ import {
   type TestTranscript,
 } from "@server/services/importers/transcripts";
 import {
-  fetchGorgiasTranscripts,
+  gorgiasTranscripts,
+  normalizeGorgiasSubdomain,
   GORGIAS_MAX_TICKETS,
 } from "@server/services/importers/transcripts/gorgias";
 import { testTranscriptService } from "@server/services/test-transcript.service";
@@ -64,8 +65,9 @@ export const testTranscriptsRouter = t.router({
     ),
 
   /**
-   * Pull the most recent Gorgias tickets. The email and API key are used for
-   * this call only; they are not stored.
+   * Pull the most recent Gorgias tickets (up to GORGIAS_MAX_TICKETS) in the
+   * background; poll `importStatus` with the returned job id. The email and
+   * API key are used for this import only; they are not stored.
    */
   importGorgias: scopedProcedure(RESOURCES.PLAYBOOKS, ACTIONS.UPDATE)
     .input(
@@ -73,12 +75,34 @@ export const testTranscriptsRouter = t.router({
         subdomain: z.string().trim().min(1).max(255),
         email: z.string().trim().email().max(255),
         apiKey: z.string().trim().min(1).max(500),
-        limit: z.number().int().min(1).max(GORGIAS_MAX_TICKETS).default(50),
+        limit: z.number().int().min(1).max(GORGIAS_MAX_TICKETS).default(GORGIAS_MAX_TICKETS),
       }),
     )
-    .mutation(async ({ ctx, input }) =>
-      store(ctx, "gorgias", () => fetchGorgiasTranscripts(input)),
-    ),
+    .mutation(async ({ ctx, input }) => {
+      try {
+        normalizeGorgiasSubdomain(input.subdomain);
+      } catch (error) {
+        if (error instanceof TranscriptImportError) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: error.message });
+        }
+        throw error;
+      }
+      return testTranscriptService.importInBackground({
+        organizationId: ctx.organizationId!,
+        source: "gorgias",
+        transcripts: gorgiasTranscripts(input),
+        createdById: ctx.user?.id ?? null,
+      });
+    }),
+
+  /** Progress of a background import started by `importGorgias`. */
+  importStatus: scopedProcedure(RESOURCES.PLAYBOOKS, ACTIONS.READ)
+    .input(z.object({ jobId: z.string().uuid() }))
+    .query(async ({ ctx, input }) => {
+      const status = await testTranscriptService.importStatus(ctx.organizationId!, input.jobId);
+      if (!status) throw new TRPCError({ code: "NOT_FOUND", message: "Import not found" });
+      return status;
+    }),
 
   list: scopedProcedure(RESOURCES.PLAYBOOKS, ACTIONS.READ)
     .input(
