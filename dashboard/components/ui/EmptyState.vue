@@ -7,7 +7,7 @@
     <p class="mt-2 text-sm text-neutral-muted text-center">
       {{ description }}
     </p>
-    <div class="mt-6 mx-auto text-center">
+    <div v-if="action" class="mt-6 mx-auto text-center">
       <Button :disabled="disabled" @click="actionClick">
         {{ action }}
       </Button>
