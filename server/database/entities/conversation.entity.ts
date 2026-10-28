@@ -999,6 +999,22 @@ The following tools are available for you to use. You MUST return only valid JSO
       deliveryState,
     });
 
+    // Tie the message's uploads to it, so retention and erasure can delete the
+    // files (D8-3). Never blocks the message: the orphan sweep keeps any upload
+    // a message still names.
+    if (hasAttachments) {
+      try {
+        const { linkUploadsToMessage } = await import("../../services/conversation-media.service");
+        await linkUploadsToMessage(this.organization_id, messageData.attachments, {
+          conversationId: this.id,
+          messageId: message.id,
+          customerId: this.customer_id,
+        });
+      } catch (error) {
+        logger.error({ err: error, conversationId: this.id }, "Failed to link message uploads");
+      }
+    }
+
     // Customer message: status, cooldown and processing flag. This runs only
     // after the row exists, so a run that clears needs_processing can always
     // see the message that set it (see conversationRepository.markProcessed).
