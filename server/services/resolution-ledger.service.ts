@@ -451,10 +451,11 @@ export class ResolutionLedgerService {
   }
 
   /**
-   * Staff said "Not spam": closes that were spam only because of the flag
-   * (the rule, or a staff mark) go back to the close classifier, which
-   * decides their outcome afresh. Spam the LLM itself found stays. Same
-   * period limit as marking. Audited in the same transaction.
+   * Staff said "Not spam": spam closes go back to the close classifier, which
+   * decides their outcome afresh. That covers spam from the flag (the
+   * detector, a staff mark) and spam the LLM found at close: the classifier
+   * no longer accepts a spam verdict once staff cleared the conversation.
+   * Same period limit as marking. Audited in the same transaction.
    */
   async clearConversationSpam(input: {
     organizationId: string;
@@ -475,7 +476,7 @@ export class ResolutionLedgerService {
          WHERE organization_id = $1
            AND conversation_id = $2
            AND outcome = 'spam'
-           AND classified_by IN ('rule', 'staff')
+           AND classified_by IN ('rule', 'staff', 'llm')
            AND closed_at >= $3
          RETURNING id`,
         [input.organizationId, input.conversationId, correctableSince(now)],
