@@ -61,11 +61,6 @@ jest.mock("@server/services/media-scan.service", () => ({
   waitForScans: (ids: string[], timeout: number) => mockWaitForScans(ids, timeout),
 }));
 
-jest.mock("@server/services/llm/llm-provider.factory", () => ({
-  llmProviderFactory: {
-    managedOpenAIEndpoint: jest.fn(async () => ({ apiKey: "sk-test", region: "default" })),
-  },
-}));
 
 const mockFindConversation = jest.fn<(...args: unknown[]) => Promise<unknown>>(async () => ({
   id: "conv-1",
@@ -81,6 +76,8 @@ jest.mock("@server/database/data-source", () => ({
 }));
 
 import sharp from "sharp";
+import OpenAI from "openai";
+import { config } from "../../config/env";
 import {
   markAnalysisPending,
   markMediaPending,
@@ -148,6 +145,9 @@ beforeEach(async () => {
     .jpeg()
     .toBuffer();
   mockFindOrganization.mockResolvedValue({ settings: {} });
+  // config is read-only at the type level; tests pick the endpoints vision sees.
+  Object.assign(config.openai, { apiKey: "sk-test", baseUrl: "" });
+  Object.assign(config.aiRegion.eu, { apiKey: "", baseUrl: "" });
   mockDownload.mockImplementation(async (id: unknown) => ({
     buffer: id === PDF_ID ? Buffer.from("%PDF") : jpeg,
     upload: {
@@ -230,6 +230,39 @@ describe("processMessageMedia", () => {
       ORG,
       expect.objectContaining({ type: "message_media_updated" }),
     );
+  });
+
+  it("reads files for an EU-only org on the default endpoint when no EU endpoint is configured (E1)", async () => {
+    mockFindOrganization.mockResolvedValue({ settings: { aiRegion: "eu" } });
+    mockFindMessage.mockResolvedValue(message(markAnalysisPending([photo()])!));
+    mockChatCreate.mockResolvedValue(visionReply(DAMAGE) as never);
+    const events: UsageEvent[] = [];
+    setUsageSink((event) => events.push(event));
+
+    await processMessageMedia("msg-1", ORG);
+    setUsageSink(undefined);
+
+    expect(storedAttachments()[0].analysis).toMatchObject({ status: "done", class: "damage" });
+    expect(events).toEqual([expect.objectContaining({ kind: "vision", region: "default" })]);
+  });
+
+  it("reads files on the EU endpoint whenever it is configured", async () => {
+    Object.assign(config.aiRegion.eu, {
+      apiKey: "sk-eu",
+      baseUrl: "https://eu.api.openai.test/v1",
+    });
+    mockFindMessage.mockResolvedValue(message(markAnalysisPending([photo()])!));
+    mockChatCreate.mockResolvedValue(visionReply(DAMAGE) as never);
+    const events: UsageEvent[] = [];
+    setUsageSink((event) => events.push(event));
+
+    await processMessageMedia("msg-1", ORG);
+    setUsageSink(undefined);
+
+    expect(OpenAI).toHaveBeenCalledWith(
+      expect.objectContaining({ apiKey: "sk-eu", baseURL: "https://eu.api.openai.test/v1" }),
+    );
+    expect(events).toEqual([expect.objectContaining({ kind: "vision", region: "eu" })]);
   });
 
   it("reads PDF text first and keeps it for the AI", async () => {

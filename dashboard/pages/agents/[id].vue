@@ -1,32 +1,30 @@
 <template>
-  <Page title="Agent" description="Configure a new AI agent for your organization" width="max">
+  <Page :title="$t('agents.page.title')" :description="$t('agents.page.description')" width="max">
     <template #header>
       <Button v-if="isEditMode" variant="ghost" @click="() => router.push('/agents')">
         <ArrowLeft class="h-4 w-4 mr-2" />
-        Back to list
+        {{ $t("agents.page.backToList") }}
       </Button>
     </template>
 
     <div v-if="loading" class="text-center py-12">
-      <Loading label="Loading agent..." />
+      <Loading :label="$t('agents.page.loading')" />
     </div>
 
     <template v-else-if="!isEditMode || agent">
       <form data-testid="agent-form" class="space-y-6" @submit.prevent="handleSubmit">
         <Card>
           <CardHeader>
-            <CardTitle>Agent</CardTitle>
-            <CardDescription
-              >Define the agent's behavior and how it should respond to users.</CardDescription
-            >
+            <CardTitle>{{ $t("agents.form.cardTitle") }}</CardTitle>
+            <CardDescription>{{ $t("agents.form.cardDescription") }}</CardDescription>
           </CardHeader>
           <CardContent class="space-y-6">
             <!-- Name Field -->
             <Input
               id="name"
               v-model="form.name"
-              label="Name"
-              placeholder="e.g., Customer Support Agent"
+              :label="$t('agents.form.name.label')"
+              :placeholder="$t('agents.form.name.placeholder')"
               :class="errors.name ? 'border-red-500' : ''"
               :helper-text="errors.name"
               required
@@ -36,16 +34,16 @@
               id="description"
               v-model="form.description"
               type="textarea"
-              label="Description"
-              helper-text="This is an internal description and it won't be visible to the user nor the agent."
-              placeholder="Describe what this agent does..."
+              :label="$t('agents.form.description.label')"
+              :helper-text="$t('agents.form.description.helperText')"
+              :placeholder="$t('agents.form.description.placeholder')"
             />
             <!-- Instructions Field -->
             <InstructionsTiptap
               ref="instructionsEditorRef"
               :initial-data="form.instructions"
-              label="Instructions"
-              hint="Define the general agent's behavior and how it should respond to users. DO NOT include any specific instructions for the agent to follow - use the Playbooks to define that."
+              :label="$t('agents.form.instructions.label')"
+              :hint="$t('agents.form.instructions.hint')"
               :error="errors.instructions"
             />
             <!-- Initial Greeting Field -->
@@ -53,9 +51,9 @@
               id="initialGreeting"
               v-model="form.initialGreeting"
               type="textarea"
-              label="Initial Greeting Message"
-              helper-text="The first message customers will see when starting a conversation. If left empty, a default greeting will be used. This message will be automatically translated to match the conversation's language."
-              placeholder="Hello! How can I help you today?"
+              :label="$t('agents.form.initialGreeting.label')"
+              :helper-text="$t('agents.form.initialGreeting.helperText')"
+              :placeholder="$t('agents.form.initialGreeting.placeholder')"
             />
             <!-- Language Field -->
             <Input
@@ -68,23 +66,23 @@
             />
             <!-- Tone Field -->
             <div>
-              <Label cla>Tone</Label>
+              <Label>{{ $t("agents.form.tone.label") }}</Label>
               <div class="gap-4 mb-4 mt-2 grid grid-cols-3">
                 <OptionCard
                   :image="'/bale/professional.svg'"
-                  label="Professional"
+                  :label="$t('agents.form.tone.professional')"
                   :checked="selectedTone === 'professional'"
                   @click="setTone('professional')"
                 />
                 <OptionCard
                   :image="'/bale/casual.svg'"
-                  label="Casual"
+                  :label="$t('agents.form.tone.casual')"
                   :checked="selectedTone === 'casual'"
                   @click="setTone('casual')"
                 />
                 <OptionCard
                   :image="'/bale/enthusiastic.svg'"
-                  label="Enthusiastic"
+                  :label="$t('agents.form.tone.enthusiastic')"
                   :checked="selectedTone === 'enthusiastic'"
                   @click="setTone('enthusiastic')"
                 />
@@ -93,7 +91,7 @@
                 id="tone"
                 v-model="form.tone"
                 type="textarea"
-                placeholder="Describe the communication tone (e.g., professional, friendly, casual)..."
+                :placeholder="$t('agents.form.tone.placeholder')"
               />
             </div>
             <!-- Things to Avoid Field -->
@@ -101,16 +99,16 @@
               id="avoid"
               v-model="form.avoid"
               type="textarea"
-              label="Things to Avoid"
-              placeholder="List things the agent should avoid (e.g., technical jargon, certain topics)..."
+              :label="$t('agents.form.avoid.label')"
+              :placeholder="$t('agents.form.avoid.placeholder')"
             />
             <!-- Trigger Field -->
             <Input
               id="trigger"
               v-model="form.trigger"
               type="textarea"
-              label="Trigger Conditions"
-              placeholder="Define when this agent should be triggered (e.g., specific keywords, conditions)..."
+              :label="$t('agents.form.trigger.label')"
+              :placeholder="$t('agents.form.trigger.placeholder')"
             />
             <!-- Enabled Field -->
             <div class="space-y-2">
@@ -127,9 +125,11 @@
 
             <!-- Metadata (only in edit mode) -->
             <div v-if="isEditMode && agent" class="space-y-2 text-sm text-neutral-muted">
-              <div v-if="agent.created_at">Created: {{ formatDateTime(agent.created_at) }}</div>
+              <div v-if="agent.created_at">
+                {{ $t("agents.form.createdAt", { date: formatDateTime(agent.created_at) }) }}
+              </div>
               <div v-if="agent.updated_at">
-                Last updated: {{ formatDateTime(agent.updated_at) }}
+                {{ $t("agents.form.updatedAt", { date: formatDateTime(agent.updated_at) }) }}
               </div>
             </div>
           </CardContent>
@@ -138,7 +138,7 @@
         <!-- Channels Field (only shown when the org has at least one channel) -->
         <Card v-if="availableChannels.length > 0">
           <CardHeader>
-            <CardTitle>Channels</CardTitle>
+            <CardTitle>{{ $t("agents.channels.title") }}</CardTitle>
             <CardDescription>{{ $t("agents.sharedChannel.description") }}</CardDescription>
           </CardHeader>
           <CardContent class="space-y-4">
@@ -181,37 +181,34 @@
         <!-- Message Approval Field -->
         <Card>
           <CardHeader>
-            <CardTitle>Message Approval</CardTitle>
-            <CardDescription
-              >Choose whether AI responses are sent automatically or require manual review before
-              reaching customers.</CardDescription
-            >
+            <CardTitle>{{ $t("agents.approval.title") }}</CardTitle>
+            <CardDescription>{{ $t("agents.approval.description") }}</CardDescription>
           </CardHeader>
           <CardContent class="space-y-6">
             <!-- Message Approval Field -->
             <div class="space-y-2">
               <div class="gap-4 grid grid-cols-3">
                 <OptionCard
-                  label="Inherit from Organization"
+                  :label="$t('agents.approval.inherit')"
                   :icon="CornerDownRight"
                   :checked="form.testMode === null"
                   @click="setTestMode(null)"
                 />
                 <OptionCard
-                  label="Require Approval"
+                  :label="$t('agents.approval.require')"
                   :icon="Hand"
                   :checked="form.testMode === true"
                   @click="setTestMode(true)"
                 />
                 <OptionCard
-                  label="Auto-Send"
+                  :label="$t('agents.approval.autoSend')"
                   :icon="FastForward"
                   :checked="form.testMode === false"
                   @click="setTestMode(false)"
                 />
               </div>
               <p class="text-sm text-neutral-muted mt-2">
-                Note: Playground conversations always send automatically regardless of this setting.
+                {{ $t("agents.approval.playgroundNote") }}
               </p>
             </div>
           </CardContent>
@@ -221,25 +218,22 @@
 
         <Card>
           <CardHeader>
-            <CardTitle>Human escalation</CardTitle>
-            <CardDescription
-              >Define the instructions for the agent to follow when a human agent is available or
-              unavailable.</CardDescription
-            >
+            <CardTitle>{{ $t("agents.escalation.title") }}</CardTitle>
+            <CardDescription>{{ $t("agents.escalation.description") }}</CardDescription>
           </CardHeader>
           <CardContent class="space-y-6">
             <InstructionsTiptap
               ref="handoffAvailableEditorRef"
               :initial-data="form.humanHandoffAvailableInstructions"
-              label="If any human agent is available"
-              hint="Define the instructions for the agent to follow when a human agent is available. Leave empty to simply change status to 'pending-human'."
+              :label="$t('agents.escalation.availableLabel')"
+              :hint="$t('agents.escalation.availableHint')"
             />
 
             <InstructionsTiptap
               ref="handoffUnavailableEditorRef"
               :initial-data="form.humanHandoffUnavailableInstructions"
-              label="If all human agents are unavailable"
-              hint="Define the instructions for the agent to follow when no human agents are available (e.g., create a ticket, ask for email)."
+              :label="$t('agents.escalation.unavailableLabel')"
+              :hint="$t('agents.escalation.unavailableHint')"
             />
           </CardContent>
         </Card>
@@ -256,7 +250,7 @@
                 @click="handleDelete"
               >
                 <Trash2 class="h-4 w-4 mr-2" />
-                Delete Agent
+                {{ $t("agents.actions.delete") }}
               </Button>
               <div :class="isEditMode ? '' : 'w-full'" class="flex justify-end space-x-4">
                 <Button
@@ -268,7 +262,7 @@
                   @click="setAsDefaultAgent"
                 >
                   <Star class="h-4 w-4 mr-2" />
-                  Set as Default
+                  {{ $t("agents.actions.setAsDefault") }}
                 </Button>
                 <Button
                   type="button"
@@ -276,10 +270,10 @@
                   :disabled="isSubmitting"
                   @click="handleCancel"
                 >
-                  Cancel
+                  {{ $t("agents.actions.cancel") }}
                 </Button>
                 <Button type="submit" :loading="isSubmitting" :disabled="!form.name">
-                  {{ isEditMode ? "Save Changes" : "Create Agent" }}
+                  {{ isEditMode ? $t("agents.actions.save") : $t("agents.actions.create") }}
                 </Button>
               </div>
             </div>
@@ -289,7 +283,7 @@
     </template>
 
     <div v-else-if="isEditMode && !loading" class="text-center py-12">
-      <Error label="Agent not found" />
+      <Error :label="$t('agents.toast.notFound')" />
     </div>
 
     <!-- Delete Confirmation Dialog -->
@@ -298,7 +292,7 @@
       v-model:open="showDeleteDialog"
       :title="deleteDialogTitle"
       :description="deleteDialogDescription"
-      confirm-text="Delete"
+      :confirm-text="$t('agents.deleteDialog.confirm')"
       :destructive="true"
       @confirm="confirmDelete"
     />
@@ -308,7 +302,7 @@
       v-model:open="showConfirmDialog"
       :title="confirmDialogConfig.title"
       :description="confirmDialogConfig.description"
-      confirm-text="Leave Page"
+      :confirm-text="$t('agents.page.leavePage')"
       :destructive="true"
       @confirm="confirmDialogConfig.onConfirm"
       @cancel="handleDialogCancel"
@@ -406,18 +400,12 @@ const agentId = computed(() => {
   return idValue === "new" ? null : idValue;
 });
 
-// Tone presets
-const tonePresets = {
-  professional: `Your tone is professional, calm, and concise. You communicate clearly, use complete sentences, and avoid slang or emojis. You sound confident but approachable — like a well-trained support specialist who respects the customer's time. You empathize when appropriate, but always keep focus on solving the issue efficiently.
-
-Example: "I understand how that could be frustrating. Let's take a look at your order status together. Could you please confirm your order number?"`,
-  casual: `You sound like a real person chatting over text — relaxed, warm, and approachable. Use contractions, simple phrasing, and occasional emojis when it fits the vibe. Keep answers helpful but conversational, like a teammate helping out a friend.
-
-Example: "Hey there! Totally get it — that happens sometimes 😅 Let me check your order real quick so we can sort this out."`,
-  enthusiastic: `You make every customer interaction feel exciting and positive. You use exclamation marks moderately, express enthusiasm for helping, and celebrate small wins. You make the customer feel heard and valued while keeping replies short and impactful.
-
-Example: "Great question! Let's get this sorted out right away 🎉 I just need your email to find your order!"`,
-};
+// Tone presets, written into the editable Tone field in the dashboard's language.
+const tonePresets = computed(() => ({
+  professional: t("agents.form.tone.presets.professional"),
+  casual: t("agents.form.tone.presets.casual"),
+  enthusiastic: t("agents.form.tone.presets.enthusiastic"),
+}));
 
 // Language options for the agent language select
 // null = inherit from organization (shown as first option)
@@ -479,7 +467,7 @@ const availableChannels = computed(() => {
       thumbnail: getApiUrl(`/plugins/thumbnails/${encodeURIComponent(p.id)}`),
     }));
 
-  return [{ channel: "web", name: "Web Chat", thumbnail: "" }, ...pluginChannels];
+  return [{ channel: "web", name: t("agents.channels.webChat"), thumbnail: "" }, ...pluginChannels];
 });
 
 // Channels this agent shares with other agents, and who answers there (D7-14).
@@ -619,12 +607,12 @@ const validateForm = () => {
   errors.value = {};
 
   if (!form.value.name || form.value.name.trim().length === 0) {
-    errors.value.name = "Agent name is required";
+    errors.value.name = t("agents.form.name.required");
     return false;
   }
 
   if (form.value.name.length > 255) {
-    errors.value.name = "Agent name must be less than 255 characters";
+    errors.value.name = t("agents.form.name.tooLong");
     return false;
   }
 
@@ -704,13 +692,13 @@ const handleSubmit = async () => {
 
 // Delete dialog state
 const showDeleteDialog = ref(false);
-const deleteDialogTitle = ref("Delete Agent");
+const deleteDialogTitle = computed(() => t("agents.deleteDialog.title"));
 const deleteDialogDescription = ref("");
 
 // Handle delete
 const handleDelete = () => {
   if (!agent.value) return;
-  deleteDialogDescription.value = `Are you sure you want to delete "${agent.value.name}"? This action cannot be undone.`;
+  deleteDialogDescription.value = t("agents.deleteDialog.description", { name: agent.value.name });
   showDeleteDialog.value = true;
 };
 
@@ -762,7 +750,7 @@ const setAsDefaultAgent = async () => {
 // Handle tone selection
 const setTone = (tone: string) => {
   selectedTone.value = tone;
-  form.value.tone = tonePresets[tone as keyof typeof tonePresets];
+  form.value.tone = tonePresets.value[tone as keyof typeof tonePresets.value];
 };
 
 // Handle test mode selection
@@ -785,12 +773,14 @@ definePageMeta({
 
 // Head management
 useHead({
-  title: computed(() => `${isEditMode.value ? "Edit" : "Create"} Agent - Hay.chat`),
+  title: computed(() =>
+    isEditMode.value ? t("agents.page.editTitle") : t("agents.page.createTitle"),
+  ),
   meta: [
     {
       name: "description",
       content: computed(() =>
-        isEditMode.value ? "Edit your AI agent configuration" : "Create a new AI agent",
+        isEditMode.value ? t("agents.page.editDescription") : t("agents.page.createDescription"),
       ),
     },
   ],

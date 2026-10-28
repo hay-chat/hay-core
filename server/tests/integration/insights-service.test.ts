@@ -283,6 +283,32 @@ describe("insights service (D3-13)", () => {
     expect((await insightsService.get(orgId, brokenId)).fixed?.status).toBe("not_fixed");
   });
 
+  it("lists archive suggestions last seen before the window, when asked (F8)", async () => {
+    const day = 86400000;
+    const stale = await cluster({ last_seen_at: new Date(Date.now() - 120 * day) });
+    await cluster({ state: "in_progress", last_seen_at: new Date(Date.now() - 120 * day) });
+    await cluster({ last_seen_at: new Date(Date.now() - 40 * day) }); // not stale yet
+    const recent = await cluster();
+
+    const plain = await insightsService.list(orgId, { days: 30 });
+    expect(plain.items.map((i) => i.id)).toEqual([recent]);
+
+    const withStale = await insightsService.list(orgId, {
+      days: 30,
+      minSize: 2,
+      includeArchiveSuggested: true,
+    });
+    expect(withStale.items.map((i) => i.id)).toEqual([stale]);
+    expect(withStale.items[0]).toMatchObject({ archiveSuggested: true, periodSize: 0 });
+
+    const archived = await insightsService.list(orgId, {
+      days: 30,
+      state: "rejected",
+      includeArchiveSuggested: true,
+    });
+    expect(archived.items).toHaveLength(0);
+  });
+
   it("encodes the transition table", () => {
     expect(canTransition("new", "addressed")).toBe(true);
     expect(canTransition("archived", "new")).toBe(true);

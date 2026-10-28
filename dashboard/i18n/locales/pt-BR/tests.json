@@ -46,7 +46,9 @@
       "gorgiasApiKey": "Chave de API do Gorgias",
       "gorgiasHelp": "O e-mail e a chave de API são usados só nesta importação e não ficam guardados.",
       "submit": "Importar",
-      "done": "Nenhuma conversa importada | {count} conversa importada | {count} conversas importadas"
+      "done": "Nenhuma conversa importada | {count} conversa importada | {count} conversas importadas",
+      "backgroundStarted": "Importando do Gorgias em segundo plano. Isso pode levar alguns minutos; você pode continuar trabalhando.",
+      "backgroundFailed": "A importação do Gorgias parou: {error} ({count} conversas foram importadas antes de parar)"
     },
     "runs": {
       "title": "Execuções de teste",

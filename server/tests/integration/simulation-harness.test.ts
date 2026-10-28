@@ -186,6 +186,49 @@ describe("simulation harness", () => {
     ).rejects.toMatchObject({ code: "LIMIT_REACHED" });
   });
 
+  it("holds the monthly cap when runs start at the same time (F1)", async () => {
+    await AppDataSource.getRepository(Organization).update(orgId, {
+      limits: { maxSimulationsPerMonth: 3 },
+    });
+    // Open pooled connections first so the starts really run side by side.
+    await Promise.all(Array.from({ length: 5 }, () => AppDataSource.query("SELECT pg_sleep(0.05)")));
+    const results = await Promise.allSettled(
+      Array.from({ length: 5 }, () =>
+        simulationHarnessService.startRun({ organizationId: orgId, cases: twoCases }),
+      ),
+    );
+    expect(results.filter((r) => r.status === "fulfilled")).toHaveLength(1);
+    for (const r of results.filter((r) => r.status === "rejected")) {
+      expect((r as PromiseRejectedResult).reason).toMatchObject({ code: "LIMIT_REACHED" });
+    }
+    expect((await simulationHarnessService.getAllowance(orgId)).used).toBe(2);
+  });
+
+  it("empties simulation items past the organization's retention, keeping them counted (F2)", async () => {
+    await AppDataSource.getRepository(Organization).update(orgId, {
+      settings: { retentionDays: 30 },
+    });
+    const run = await simulationHarnessService.startRun({ organizationId: orgId, cases: twoCases });
+    const [first, second] = await itemsOf(run.id);
+    await AppDataSource.getRepository(SimulationRunItem).update(second.id, {
+      expectations: { referenceReply: "Your order 1001 ships today" },
+    });
+    await simulationHarnessService.cancelRun(orgId, run.id); // second case: skipped
+    // Both items are old; the one still running must be left alone.
+    await AppDataSource.query(
+      `UPDATE simulation_run_items SET created_at = now() - interval '40 days' WHERE run_id = $1`,
+      [run.id],
+    );
+
+    expect(await simulationHarnessService.scrubExpired()).toBe(1);
+    const [stillRunning, old] = await itemsOf(run.id);
+    expect(stillRunning.id).toBe(first.id);
+    expect(stillRunning.seed).toHaveLength(3);
+    expect(old).toMatchObject({ seed: [], expectations: null, verdict: null, source_ref: null });
+    expect(await simulationHarnessService.scrubExpired()).toBe(0);
+    await AppDataSource.getRepository(Organization).update(orgId, { settings: {} });
+  });
+
   it("refuses a case that does not end with a customer turn", async () => {
     await expect(
       simulationHarnessService.startRun({

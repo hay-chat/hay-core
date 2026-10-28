@@ -72,12 +72,15 @@ describe("feedback → insight issues (D3-9)", () => {
   const issues = () => AppDataSource.getRepository(InsightIssue);
 
   /** A conversation in `org` with a customer question and an AI reply; returns the reply. */
-  async function ratedReply(org = orgId): Promise<Message> {
+  async function ratedReply(
+    org = orgId,
+    metadata: Record<string, unknown> = {},
+  ): Promise<Message> {
     const conversation = await repository.create({
       title: "feedback insights test",
       organization_id: org,
       status: "open",
-      metadata: {},
+      metadata,
     });
     const messages = AppDataSource.getRepository(Message);
     await messages.save(
@@ -161,6 +164,33 @@ describe("feedback → insight issues (D3-9)", () => {
     expect(issue.summary).not.toContain("maria@example.com");
     expect(issue.snippet).not.toContain("jane@example.com");
     expect(issue.signals).toMatchObject({ rating: "bad", hasComment: true });
+  });
+
+  it("a rating in the playground or a simulation creates no issue (F3)", async () => {
+    for (const metadata of [{ isPlayground: true }, { runKind: "simulation" }]) {
+      const reply = await ratedReply(orgId, metadata);
+      const feedback = await feedbackService.createFeedback(orgId, reviewerId, {
+        messageId: reply.id,
+        rating: FeedbackRating.BAD,
+        comment: "Wrong answer",
+      });
+      expect(await issues().countBy({ message_feedback_id: feedback.id })).toBe(0);
+    }
+    // The backfill skips them too (and does not loop on them).
+    const playground = await ratedReply(orgId, { sourceId: "playground" });
+    const repo = AppDataSource.getRepository(MessageFeedback);
+    await repo.save(
+      repo.create({
+        messageId: playground.id,
+        organizationId: orgId,
+        reviewerId,
+        rating: FeedbackRating.GOOD,
+        comment: null,
+      }),
+    );
+    const result = await feedbackInsightService.backfillMissing({ organizationId: orgId });
+    expect(result.created).toBe(0);
+    expect(result.skipped).toBeGreaterThanOrEqual(3);
   });
 
   it("refuses a rating of another organization's message, and writes nothing", async () => {
