@@ -106,7 +106,7 @@
   "verify-signup-email": {
     "subject": "Verify Your Email Address",
     "title": "Verify Your Email Address",
-    "body": "Thank you for signing up for Hay! To complete your registration, please verify your email address by clicking the button below:",
+    "body": "Thank you for signing up for Hay.chat! To complete your registration, please verify your email address by clicking the button below:",
     "verifyButton": "Verify Email Address",
     "expirationWarning": "This verification link will expire in 24 hours.",
     "ignoreEmail": "If you didn't create an account, please ignore this email."
@@ -122,7 +122,7 @@
   "organization-invitation": {
     "subject": "You've Been Invited!",
     "title": "You've Been Invited!",
-    "body": "<strong>{{ inviterName }}</strong> ({{ inviterEmail }}) has invited you to join <strong>{{ organizationName }}</strong> on Hay Platform.",
+    "body": "<strong>{{ inviterName }}</strong> ({{ inviterEmail }}) has invited you to join <strong>{{ organizationName }}</strong> on Hay.chat.",
     "invitedAsRole": "You've been invited as a <strong>{{ role }}</strong>.",
     "acceptTitle": "Accept Your Invitation",
     "acceptButton": "Accept Invitation",

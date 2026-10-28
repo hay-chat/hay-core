@@ -11,12 +11,15 @@
     "category": "integration",
     "capabilities": [
       "mcp",
-      "auth"
+      "auth",
+      "cron",
+      "disputes"
     ]
   },
   "scripts": {
     "build": "tsc",
-    "dev": "tsc --watch"
+    "dev": "tsc --watch",
+    "test": "vitest run"
   },
   "dependencies": {
     "@hay/plugin-sdk": "file:../../../packages/plugin-sdk"

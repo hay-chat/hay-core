@@ -3,6 +3,7 @@ import type { QueryDeepPartialEntity } from "typeorm";
 import { Message, MessageType, MessageSentiment } from "../database/entities/message.entity";
 import { AppDataSource } from "../database/data-source";
 import type { DeliveryState } from "../types/message-feedback.types";
+import { notSimulationSql } from "../services/simulation/simulation-kind";
 
 export class MessageRepository {
   private repository!: Repository<Message>;
@@ -67,6 +68,31 @@ export class MessageRepository {
       .where("message.provider_message_id = :providerMessageId", { providerMessageId })
       .andWhere("conversation.organization_id = :organizationId", { organizationId })
       .getOne();
+  }
+
+  /**
+   * An outbound message by provider id across organizations, with its
+   * conversation's organization. Only for provider callbacks that carry no
+   * organization (account-wide email event webhooks, D13-10).
+   */
+  async findOutboundByProviderMessageIds(
+    providerMessageIds: string[],
+  ): Promise<{ message: Message; organizationId: string; channel: string } | null> {
+    if (providerMessageIds.length === 0) return null;
+    const message = await this.getRepository()
+      .createQueryBuilder("message")
+      .innerJoinAndSelect("message.conversation", "conversation")
+      .where("message.provider_message_id IN (:...providerMessageIds)", { providerMessageIds })
+      .andWhere("message.type IN (:...types)", {
+        types: [MessageType.BOT_AGENT, MessageType.HUMAN_AGENT],
+      })
+      .getOne();
+    if (!message) return null;
+    return {
+      message,
+      organizationId: message.conversation.organization_id,
+      channel: message.conversation.channel,
+    };
   }
 
   async findByConversation(conversationId: string): Promise<Message[]> {
@@ -141,6 +167,7 @@ export class MessageRepository {
       .select("message.sentiment", "sentiment")
       .addSelect("COUNT(*)", "count")
       .where("conversation.organization_id = :organizationId", { organizationId })
+      .andWhere(notSimulationSql("conversation"))
       .andWhere("message.type = :type", { type: MessageType.CUSTOMER })
       .andWhere("message.sentiment IS NOT NULL");
 
@@ -174,6 +201,7 @@ export class MessageRepository {
         FROM conversations c
         LEFT JOIN messages m ON m.conversation_id = c.id
         WHERE c.organization_id = $1
+          AND ${notSimulationSql("c")}
     `;
 
     const params: (string | Date)[] = [organizationId];

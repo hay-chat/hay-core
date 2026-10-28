@@ -3,7 +3,7 @@
     "page": {
       "title": "Documentos",
       "description": "Gerencie os documentos da sua base de conhecimento para agentes de IA.",
-      "seoTitle": "Documentos - Hay Dashboard",
+      "seoTitle": "Documentos - Hay.chat",
       "seoDescription": "Gerencie os documentos da sua base de conhecimento"
     },
     "actions": {
@@ -138,8 +138,8 @@
       "edit": "Editar",
       "save": "Salvar",
       "cancel": "Cancelar",
-      "seoTitle": "{title} - Documentos - Hay Dashboard",
-      "seoTitleDefault": "Documento - Hay Dashboard",
+      "seoTitle": "{title} - Documentos - Hay.chat",
+      "seoTitleDefault": "Documento - Hay.chat",
       "seoDescription": "Ver detalhes do documento"
     },
     "new": {
@@ -167,7 +167,7 @@
       "page": {
         "title": "Importar Documento",
         "description": "Adicione novos documentos à sua base de conhecimento de várias fontes.",
-        "seoTitle": "Importar Documentos - Hay Dashboard",
+        "seoTitle": "Importar Documentos - Hay.chat",
         "seoDescription": "Importe documentos para sua base de conhecimento"
       },
       "tutorial": "Tutorial",
@@ -330,5 +330,29 @@
         "webConnectFailedMessage": "Verifique a URL e tente novamente."
       }
     }
+  },
+  "knowledgeSuggest": {
+    "title": "Melhorar o conhecimento com IA",
+    "descriptionConversation": "Analise esta conversa e proponha uma correção no conhecimento que a IA usa para responder: uma edição em um documento que ela usou, ou uma nova pergunta e resposta. Você pode adicionar um feedback opcional para orientar a sugestão.",
+    "descriptionDocument": "Descreva o que está errado ou faltando e a IA vai propor uma versão revisada deste documento.",
+    "feedbackLabel": "Feedback",
+    "feedbackPlaceholderOptional": "Opcional: o que a IA errou, ou a resposta certa…",
+    "feedbackPlaceholderRequired": "Descreva o que você quer mudar…",
+    "loading": "Lendo a conversa e a base de conhecimento…",
+    "noChangesText": "A base de conhecimento já cobre bem este assunto.",
+    "modeEdit": "Editar documento",
+    "modeAdd": "Nova pergunta e resposta",
+    "editHint": "Ao salvar, o documento é atualizado na hora; a IA passa a usá-lo nas próximas respostas.",
+    "addHint": "Ao adicionar, é criado um documento de pergunta e resposta publicado; a IA passa a usá-lo nas próximas respostas.",
+    "staleWarning": "O documento mudou desde que esta sugestão foi gerada. Salvar vai sobrescrever essas mudanças — clique em Salvar de novo para confirmar.",
+    "save": "Salvar documento",
+    "addQa": "Adicionar pergunta e resposta",
+    "savedToast": "Documento atualizado",
+    "addedToast": "Pergunta e resposta adicionada à base de conhecimento",
+    "improveFromConversation": "Melhorar conhecimento",
+    "textLabel": "Texto a salvar",
+    "editText": "Editar texto",
+    "showChanges": "Ver mudanças",
+    "placeholderWarning": "Preencha cada campo entre colchetes, como \"[a confirmar: …]\", com a informação certa (Editar texto) antes de salvar."
   }
 }

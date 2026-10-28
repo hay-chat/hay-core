@@ -62,4 +62,19 @@ export interface OrganizationAccessState {
   agentPausedAt: Date | null;
   agentPauseReason: AgentPauseReason | null;
   accessNotice: AccessNotice | null;
+  /** The operator's current billing period (end exclusive); null = UTC calendar months. */
+  billingPeriod: { start: Date; end: Date } | null;
+  /** The owner's "Pause AI everywhere" (D11-9); independent of the operator's pause. */
+  aiPausedAt: Date | null;
+  aiPausedByUserId: string | null;
+}
+
+/**
+ * Whether the AI may not reply anywhere in the organization: the operator
+ * paused it (agentPausedAt) or the team paused it (aiPausedAt).
+ */
+export function isOrganizationAiPaused(
+  organization: { agentPausedAt?: Date | null; aiPausedAt?: Date | null } | null | undefined,
+): boolean {
+  return !!(organization?.agentPausedAt || organization?.aiPausedAt);
 }

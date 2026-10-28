@@ -7,8 +7,8 @@
  */
 
 const { z } = require("zod");
-const { wcList } = require("../lib/client");
-const { ok, fail } = require("../lib/format");
+const { wcApi, wcList } = require("../lib/client");
+const { ok, fail, toolError } = require("../lib/format");
 const { summarizeOrder } = require("../lib/orders");
 
 const sameEmail = (a, b) => String(a || "").toLowerCase() === String(b || "").toLowerCase();
@@ -32,6 +32,46 @@ async function findAccount(email) {
   return items.find((c) => sameEmail(c.email, email)) || null;
 }
 
+/** The registered account for an email, or a PRECONDITION error for guests. */
+async function requireAccount(email) {
+  const account = await findAccount(email);
+  if (!account) {
+    throw toolError(
+      "PRECONDITION",
+      `No registered customer account uses ${email} (it may be a guest checkout). There is no ` +
+        "saved profile to change; for an order not yet shipped use " +
+        "woocommerce_update_order_shipping_address.",
+      { details: { reason: "NO_ACCOUNT" } },
+    );
+  }
+  return account;
+}
+
+const ADDRESS_FIELDS = {
+  first_name: z.string().optional(),
+  last_name: z.string().optional(),
+  company: z.string().optional(),
+  address_1: z.string().optional(),
+  address_2: z.string().optional(),
+  city: z.string().optional(),
+  state: z.string().optional().describe("State/county code, e.g. SP or CA."),
+  postcode: z.string().optional(),
+  country: z.string().optional().describe("ISO 3166-1 alpha-2 country code, e.g. BR."),
+  phone: z.string().optional(),
+};
+
+function summarizeAccount(c) {
+  return {
+    id: c.id,
+    email: c.email,
+    firstName: c.first_name || null,
+    lastName: c.last_name || null,
+    phone: c.billing?.phone || null,
+    billing: c.billing || null,
+    shipping: c.shipping || null,
+  };
+}
+
 function registerCustomerTools(server) {
   server.tool(
     "woocommerce_find_customer",
@@ -44,8 +84,11 @@ function registerCustomerTools(server) {
     },
     async ({ email, phone }) => {
       try {
-        if (!email && !phone) throw new Error("Provide an email and/or a phone number.");
-        if (!email && !phoneKey(phone)) throw new Error(`"${phone}" is not a phone number.`);
+        if (!email && !phone)
+          throw toolError("BAD_INPUT", "Provide an email and/or a phone number.");
+        if (!email && !phoneKey(phone)) {
+          throw toolError("BAD_INPUT", `"${phone}" is not a phone number.`);
+        }
 
         const account = await findAccount(email);
 
@@ -125,6 +168,73 @@ function registerCustomerTools(server) {
       }
     },
   );
+
+  server.tool(
+    "woocommerce_update_customer",
+    "Update a registered customer's saved profile (WRITE): first name, last name and phone. " +
+      "Identify the account by the email the customer gave and you verified. The account email " +
+      "itself cannot be changed here (hand off to a person). Existing orders are not changed.",
+    {
+      email: z.string().describe("Email of the customer's account."),
+      first_name: z.string().min(1).optional(),
+      last_name: z.string().min(1).optional(),
+      phone: z
+        .string()
+        .min(3)
+        .optional()
+        .describe("New phone number (saved on the billing profile)."),
+    },
+    async ({ email, first_name: firstName, last_name: lastName, phone }) => {
+      try {
+        if (firstName === undefined && lastName === undefined && phone === undefined) {
+          throw toolError("BAD_INPUT", "Pass at least one of first_name, last_name or phone.");
+        }
+        const account = await requireAccount(email);
+        const body = {};
+        if (firstName !== undefined) body.first_name = firstName;
+        if (lastName !== undefined) body.last_name = lastName;
+        if (phone !== undefined) body.billing = { phone };
+        const updated = await wcApi("PUT", `/customers/${account.id}`, { body });
+        return ok({ updated: true, customer: summarizeAccount(updated) });
+      } catch (err) {
+        return fail(err);
+      }
+    },
+  );
+
+  server.tool(
+    "woocommerce_update_customer_address",
+    "Change the billing or shipping address saved on a registered customer's account (WRITE), " +
+      "used for future orders. Only the fields you pass change. Does not touch existing orders: " +
+      "for an order not yet shipped use woocommerce_update_order_shipping_address.",
+    {
+      email: z.string().describe("Email of the customer's account."),
+      address_type: z.enum(["billing", "shipping"]).describe("Which saved address to change."),
+      address: z.object(ADDRESS_FIELDS).describe("Fields to change on that address."),
+    },
+    async ({ email, address_type: type, address }) => {
+      try {
+        const fields = Object.fromEntries(
+          Object.entries(address).filter(([, value]) => value !== undefined),
+        );
+        if (!Object.keys(fields).length) {
+          throw toolError("BAD_INPUT", "Pass at least one address field to change.");
+        }
+        const account = await requireAccount(email);
+        const updated = await wcApi("PUT", `/customers/${account.id}`, {
+          body: { [type]: { ...(account[type] || {}), ...fields } },
+        });
+        return ok({
+          updated: true,
+          addressType: type,
+          address: updated?.[type] ?? null,
+          customerId: account.id,
+        });
+      } catch (err) {
+        return fail(err);
+      }
+    },
+  );
 }
 
-module.exports = { registerCustomerTools, filterOrders };
+module.exports = { registerCustomerTools, filterOrders, ADDRESS_FIELDS };

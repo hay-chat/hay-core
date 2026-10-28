@@ -76,9 +76,21 @@ describe("woocommerce_create_refund", () => {
     registerRefundTools(server);
   });
 
+  it("refuses a currency that is not the order's, before refunding", async () => {
+    const { calls } = mockFetch(routes(ORDER));
+    const res = await server.call("woocommerce_create_refund", { currency: "usd", order_id: "12" });
+    expect(res.isError).toBe(true);
+    expect(res.error).toMatchObject({
+      code: "BAD_INPUT",
+      details: { reason: "CURRENCY_MISMATCH" },
+    });
+    expect(calls.some((c) => c.method === "POST")).toBe(false);
+  });
+
   it("refunds the full remaining balance through the gateway by default", async () => {
     const { calls } = mockFetch(routes(ORDER));
     const res = await server.call("woocommerce_create_refund", {
+      currency: "EUR",
       order_id: "12",
       reason: "damaged",
     });
@@ -101,6 +113,7 @@ describe("woocommerce_create_refund", () => {
   it("refunds specific items with the computed amount and restock flag", async () => {
     const { calls } = mockFetch(routes(ORDER));
     const res = await server.call("woocommerce_create_refund", {
+      currency: "EUR",
       order_number: "12",
       line_items: [{ line_item_id: "101", quantity: 2 }],
       restock: true,
@@ -121,34 +134,48 @@ describe("woocommerce_create_refund", () => {
     const partly = { ...ORDER, refunds: [{ id: 1, reason: "", total: "-50.00" }] };
     const { calls } = mockFetch(routes(partly));
     const tooMuch = await server.call("woocommerce_create_refund", {
+      currency: "EUR",
       order_id: "12",
       amount: "15.00",
     });
     expect(tooMuch.isError).toBe(true);
+    expect(tooMuch.error).toMatchObject({
+      code: "PRECONDITION",
+      details: { reason: "EXCEEDS_REFUNDABLE" },
+    });
     expect(tooMuch.text).toMatch(/exceeds the remaining refundable balance of 10.00 EUR/);
     expect(calls.some((c) => c.method === "POST")).toBe(false);
 
     const fine = await server.call("woocommerce_create_refund", {
+      currency: "EUR",
       order_id: "12",
       amount: "10.00",
     });
     expect(fine.data.refunded).toBe(true);
 
     mockFetch(routes({ ...ORDER, refunds: [{ id: 1, reason: "", total: "-60.00" }] }));
-    expect((await server.call("woocommerce_create_refund", { order_id: "12" })).text).toMatch(
-      /already fully refunded/,
-    );
+    expect(
+      (await server.call("woocommerce_create_refund", { currency: "EUR", order_id: "12" })).text,
+    ).toMatch(/already fully refunded/);
   });
 
   it("refuses orders with no recorded payment", async () => {
     const { calls } = mockFetch(routes({ ...ORDER, status: "on-hold", date_paid: null }));
-    const res = await server.call("woocommerce_create_refund", { order_id: "12" });
+    const res = await server.call("woocommerce_create_refund", { currency: "EUR", order_id: "12" });
     expect(res.isError).toBe(true);
     expect(res.text).toMatch(/no recorded payment/);
     expect(calls.some((c) => c.method === "POST")).toBe(false);
   });
 
-  it("surfaces a gateway failure with the explicit manual-refund fallback, and records a manual refund when asked", async () => {
+  it("after an unconfirmed refund (5xx without a WooCommerce error) does not suggest re-running it", async () => {
+    const { calls } = mockFetch(routes(ORDER, () => ({ status: 502, body: null })));
+    const res = await server.call("woocommerce_create_refund", { currency: "EUR", order_id: "12" });
+    expect(res.error).toMatchObject({ code: "OUTCOME_UNKNOWN", retryable: false });
+    expect(res.text).not.toMatch(/refund_payment=false/);
+    expect(calls.filter((c) => c.method === "POST")).toHaveLength(1);
+  });
+
+  it("on a gateway refusal tells the agent to hand off, never to re-run record-only", async () => {
     mockFetch(
       routes(ORDER, () => ({
         status: 500,
@@ -158,25 +185,61 @@ describe("woocommerce_create_refund", () => {
         },
       })),
     );
-    const failed = await server.call("woocommerce_create_refund", { order_id: "12" });
+    const failed = await server.call("woocommerce_create_refund", {
+      currency: "EUR",
+      order_id: "12",
+    });
     expect(failed.isError).toBe(true);
+    expect(failed.error.code).toBe("PROVIDER_REFUSED");
     expect(failed.text).toMatch(/does not support refunds/);
-    expect(failed.text).toMatch(/refund_payment=false/);
+    expect(failed.text).toMatch(/Do NOT re-run/);
+    expect(failed.text).toMatch(/hand off/);
+    expect(failed.text).not.toMatch(/refund_payment=false/);
+  });
 
+  it("refuses record-only on an online gateway", async () => {
     const { calls } = mockFetch(routes(ORDER));
-    const manual = await server.call("woocommerce_create_refund", {
+    const res = await server.call("woocommerce_create_refund", {
+      currency: "EUR",
+      order_id: "12",
+      refund_payment: false,
+    });
+    expect(res.error).toMatchObject({
+      code: "PRECONDITION",
+      details: { reason: "RECORD_ONLY_NOT_ALLOWED" },
+    });
+    expect(calls.some((c) => c.method === "POST")).toBe(false);
+  });
+
+  it("records an offline (bacs) refund and says no money moved", async () => {
+    const bacs = { ...ORDER, payment_method: "bacs", payment_method_title: "Bank transfer" };
+    const { calls } = mockFetch(routes(bacs));
+    const res = await server.call("woocommerce_create_refund", {
+      currency: "EUR",
       order_id: "12",
       amount: "5.00",
       refund_payment: false,
     });
-    expect(manual.data).toMatchObject({ refunded: true, gatewayRefunded: false });
+    expect(res.data).toMatchObject({
+      refunded: true,
+      gatewayRefunded: false,
+      moneyMoved: false,
+      recordedOnly: true,
+    });
+    expect(res.data.note).toMatch(/no money was sent/);
     expect(calls.find((c) => c.method === "POST").body.api_refund).toBe(false);
   });
 
   it("rejects invalid amounts", async () => {
     mockFetch(routes(ORDER));
     expect(
-      (await server.call("woocommerce_create_refund", { order_id: "12", amount: "abc" })).text,
+      (
+        await server.call("woocommerce_create_refund", {
+          currency: "EUR",
+          order_id: "12",
+          amount: "abc",
+        })
+      ).text,
     ).toMatch(/Invalid refund amount/);
   });
 });

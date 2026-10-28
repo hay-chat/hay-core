@@ -4,6 +4,7 @@ import { handleWebhook } from "./webhook.js";
 import type { ChannelContext } from "./context.js";
 import type { ConnectionMode, WhatsAppConnection } from "./connection.js";
 import { fakeLogger } from "./test/fakes.js";
+import { TemplateStore } from "./templates.js";
 import * as p from "./test/payloads.js";
 
 type Input = Record<string, unknown>;
@@ -90,6 +91,8 @@ describe("handleWebhook — inbound messages", () => {
         timestamp: "1760000000",
         type: "text",
       },
+      // The 24-hour window runs from the customer's message (D13-2).
+      replyWindowExpiresAt: new Date((1760000000 + 24 * 60 * 60) * 1000).toISOString(),
     });
   });
 
@@ -276,12 +279,18 @@ describe("handleWebhook — media", () => {
     expect(input.metadata).toMatchObject({ voiceNote: true, type: "audio" });
   });
 
-  it("sends an attachment-only document with empty content", async () => {
+  it("gives a captionless document a metadata line instead of an empty turn (D8-8)", async () => {
     const { input, t } = await receiveOne(p.documentMessage);
 
     expect(t.calls("media.upload")[0]).toMatchObject({ filename: "invoice.pdf" });
-    expect(input.content).toBe("");
+    expect(input.content).toBe("[Customer sent a document: invoice.pdf]");
+    expect(input.metadata).toMatchObject({ mediaPlaceholder: true });
     expect(input.attachments).toEqual([upload]);
+  });
+
+  it("keeps a caption as the content and marks no placeholder", async () => {
+    const { input } = await receiveOne(p.imageMessage);
+    expect(input.metadata).not.toHaveProperty("mediaPlaceholder");
   });
 
   it("falls back to a placeholder when the media cannot be downloaded", async () => {
@@ -370,6 +379,28 @@ describe("handleWebhook — statuses", () => {
   });
 });
 
+describe("handleWebhook — phone_number_quality_update (D13-11)", () => {
+  it("reports a flagged or downgraded number as failing and an upgrade as ok", async () => {
+    const t = setup();
+
+    await handleWebhook(
+      p.envelope(p.qualityUpdate("FLAGGED"), p.qualityUpdate("UPGRADE", "TIER_10K")),
+      t.ctx,
+    );
+
+    expect(t.calls("channel.reportHealth")).toEqual([
+      { status: "failing", detail: "FLAGGED · TIER_1K" },
+      { status: "ok", detail: "UPGRADE · TIER_10K" },
+    ]);
+  });
+
+  it("ignores other quality events", async () => {
+    const t = setup();
+    await handleWebhook(p.envelope(p.qualityUpdate("ONBOARDING")), t.ctx);
+    expect(t.calls("channel.reportHealth")).toEqual([]);
+  });
+});
+
 describe("handleWebhook — account_update", () => {
   it("revokes the connection once when the business removes Hay", async () => {
     const t = setup();
@@ -425,12 +456,143 @@ describe("handleWebhook — account_update", () => {
     const t = setup();
     const summary = await handleWebhook(
       p.envelope({
-        field: "smb_message_echoes",
+        field: "history",
         value: { metadata: { phone_number_id: p.PHONE_NUMBER_ID } },
       }),
       t.ctx,
     );
 
+    expect(summary).toEqual({ processed: 0, ignored: 1, statuses: 0 });
+  });
+});
+
+describe("handleWebhook — template events (D13-1)", () => {
+  const approvedTemplate = {
+    id: "tpl-1",
+    name: "hay_we_replied",
+    language: "en",
+    status: "PENDING",
+    category: "UTILITY",
+    components: [{ type: "BODY", text: "Hi! Our team has replied." }],
+  };
+
+  async function withStore() {
+    const t = setup();
+    const store = new TemplateStore(t.ctx.graph, fakeLogger());
+    const list = vi.spyOn(t.ctx.graph, "listTemplates").mockResolvedValue([approvedTemplate]);
+    await store.sync(t.ctx.getConnection()!);
+    t.ctx.templates = store;
+    return { t, store, list };
+  }
+
+  it("patches a template's status from message_template_status_update", async () => {
+    const { t, store } = await withStore();
+
+    await handleWebhook(
+      p.envelope({
+        field: "message_template_status_update",
+        value: {
+          event: "APPROVED",
+          message_template_id: "tpl-1",
+          message_template_name: "hay_we_replied",
+          message_template_language: "en",
+          reason: "NONE",
+        },
+      }),
+      t.ctx,
+    );
+
+    expect(store.find("hay_we_replied", "en")).toMatchObject({
+      status: "APPROVED",
+      sendable: true,
+    });
+  });
+
+  it("patches the category from template_category_update", async () => {
+    const { t, store } = await withStore();
+
+    await handleWebhook(
+      p.envelope({
+        field: "template_category_update",
+        value: { message_template_id: "tpl-1", new_category: "MARKETING" },
+      }),
+      t.ctx,
+    );
+
+    expect(store.find("hay_we_replied", "en")?.category).toBe("MARKETING");
+  });
+
+  it("resyncs when the template is unknown", async () => {
+    const { t, list } = await withStore();
+
+    await handleWebhook(
+      p.envelope({
+        field: "message_template_status_update",
+        value: { event: "APPROVED", message_template_id: "tpl-new" },
+      }),
+      t.ctx,
+    );
+
+    expect(list).toHaveBeenCalledTimes(2);
+  });
+
+  it("ignores another Messaging account's template events", async () => {
+    const { t, store } = await withStore();
+
+    await handleWebhook(
+      {
+        object: "whatsapp_business_account",
+        entry: [
+          {
+            id: "999",
+            changes: [
+              {
+                field: "message_template_status_update",
+                value: { event: "REJECTED", message_template_id: "tpl-1" },
+              },
+            ],
+          },
+        ],
+      },
+      t.ctx,
+    );
+
+    expect(store.find("hay_we_replied", "en")?.status).toBe("PENDING");
+  });
+});
+
+describe("handleWebhook — coexistence echoes (D13-8)", () => {
+  it("stores the owner's Business app reply as a human message for the customer", async () => {
+    const t = setup();
+    const summary = await handleWebhook(p.envelope(p.echoChange(p.textEcho())), t.ctx);
+
+    expect(summary).toEqual({ processed: 1, ignored: 0, statuses: 0 });
+    const input = t.calls("messages.receive")[0];
+    expect(input).toMatchObject({
+      from: `+${p.WA_ID}`,
+      content: "Shipped it this morning!",
+      channel: "whatsapp",
+      senderType: "human_agent",
+      metadata: expect.objectContaining({ mid: "wamid.ECHO.1", echo: true, phone: `+${p.WA_ID}` }),
+    });
+    // A business message never opens the customer service window.
+    expect(input).not.toHaveProperty("replyWindowExpiresAt");
+  });
+
+  it("ignores echoes for another phone number", async () => {
+    const t = setup();
+    const summary = await handleWebhook(
+      p.envelope(p.echoChange(p.textEcho(), p.OTHER_PHONE_NUMBER_ID)),
+      t.ctx,
+    );
+    expect(summary.ignored).toBe(1);
+    expect(t.calls("messages.receive")).toHaveLength(0);
+  });
+
+  it("ignores an echo without a customer id", async () => {
+    const t = setup();
+    const echo = { ...p.textEcho(), to: undefined };
+    const summary = await handleWebhook(p.envelope(p.echoChange(echo)), t.ctx);
     expect(summary).toEqual({ processed: 0, ignored: 1, statuses: 0 });
   });
 });

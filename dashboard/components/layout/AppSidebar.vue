@@ -46,6 +46,11 @@ import {
   Globe,
   ExternalLink,
   Package,
+  ThumbsUp,
+  Lightbulb,
+  History,
+  FileCheck,
+  FlaskConical,
 } from "lucide-vue-next";
 import type { Component } from "vue";
 
@@ -177,13 +182,41 @@ const navMain = computed(() => {
       icon: BookOpen,
       isActive: isPathActive("/playbooks"),
     },
-    // {
-    //   title: "Insights",
-    //   url: "/insights",
-    //   icon: BarChart,
-    //   isActive: isPathActive("/insights"),
-    // },
+    {
+      title: t("nav.tests"),
+      url: "/tests",
+      icon: FlaskConical,
+      isActive: isPathActive("/tests"),
+    },
+    {
+      title: t("nav.actionLog"),
+      url: "/actions",
+      icon: History,
+      isActive: isPathActive("/actions"),
+    },
+    {
+      title: t("nav.evidencePacks"),
+      url: "/evidence",
+      icon: FileCheck,
+      isActive: isPathActive("/evidence"),
+    },
   );
+
+  // Insights and feedback on AI replies; the agent role cannot open /insights.
+  if (!userStore.isAgent) {
+    items.push({
+      title: t("nav.insights"),
+      url: "/insights",
+      icon: Lightbulb,
+      isActive: isPathActive("/insights") && !isPathActive("/insights/feedback"),
+    });
+    items.push({
+      title: t("nav.feedback"),
+      url: "/insights/feedback",
+      icon: ThumbsUp,
+      isActive: isPathActive("/insights/feedback"),
+    });
+  }
 
   // Products nav — only shown when a product-source plugin is enabled
   // (e.g. Shopify). Mirrors the marketplace's type.includes('channel') gate.
@@ -253,6 +286,16 @@ const navMain = computed(() => {
         isActive: isPathActive("/channels"),
       },
       {
+        title: t("nav.actionsSettings"),
+        url: "/settings/actions",
+        isActive: route.path === "/settings/actions",
+      },
+      {
+        title: t("nav.usage"),
+        url: "/settings/usage",
+        isActive: route.path === "/settings/usage",
+      },
+      {
         title: t("nav.users"),
         url: "/settings/users",
         isActive: route.path === "/settings/users",
@@ -271,6 +314,11 @@ const navMain = computed(() => {
         title: t("nav.webchat"),
         url: "/settings/webchat",
         isActive: route.path === "/settings/webchat",
+      },
+      {
+        title: t("nav.businessHours"),
+        url: "/settings/business-hours",
+        isActive: route.path === "/settings/business-hours",
       },
       {
         title: t("nav.gitConnections"),

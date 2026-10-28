@@ -4,11 +4,13 @@ import { PlaybookService } from "../../../services/playbook.service";
 import { PlaybookStatus } from "../../../database/entities/playbook.entity";
 import { TRPCError } from "@trpc/server";
 import { RESOURCES, ACTIONS } from "@server/types/scopes";
+import { APPROVAL_CATEGORIES } from "@server/types/organization-settings.types";
 import { LLMService } from "../../../services/core/llm.service";
 import { PromptService } from "../../../services/prompt.service";
 import { PlaybookSuggestionService } from "../../../services/playbook-suggestion.service";
 import { documentRepository } from "../../../repositories/document.repository";
 import { In } from "typeorm";
+import { listPlaybookTemplates } from "../../../services/product-case/templates";
 
 const playbookService = new PlaybookService();
 
@@ -71,9 +73,16 @@ const updatePlaybookSchema = z.object({
   instructions: instructionsSchema.optional(),
   status: playbookStatusEnum.optional(),
   agentIds: z.array(z.string().uuid()).optional(),
+  // D4-9: categories that always need approval while this playbook runs (tighten-only).
+  approvalCategories: z.array(z.enum(APPROVAL_CATEGORIES)).max(APPROVAL_CATEGORIES.length).optional(),
 });
 
 export const playbooksRouter = t.router({
+  // D8-14: ready-made playbooks; the dashboard creates a draft from one.
+  templates: scopedProcedure(RESOURCES.PLAYBOOKS, ACTIONS.READ)
+    .input(z.object({ locale: z.enum(["en", "pt-BR"]).default("en") }))
+    .query(({ input }) => listPlaybookTemplates(input.locale)),
+
   list: scopedProcedure(RESOURCES.PLAYBOOKS, ACTIONS.READ).query(async ({ ctx }) => {
     const playbooks = await playbookService.getPlaybooks(ctx.organizationId!);
     return playbooks;
@@ -274,6 +283,30 @@ export const playbooksRouter = t.router({
         } catch (error) {
           if (error instanceof TRPCError) throw error;
           throw new TRPCError({ code: "NOT_FOUND", message: "Playbook not found" });
+        }
+      }),
+
+    /** A version (default: the draft) as a diff against the active version. */
+    compare: scopedProcedure(RESOURCES.PLAYBOOKS, ACTIONS.READ)
+      .input(
+        z.object({
+          playbookId: z.string().uuid(),
+          versionId: z.string().uuid().optional(),
+        }),
+      )
+      .query(async ({ ctx, input }) => {
+        try {
+          return await playbookService.compareWithActive(
+            ctx.organizationId!,
+            input.playbookId,
+            input.versionId,
+          );
+        } catch (error) {
+          const message = error instanceof Error ? error.message : "Playbook not found";
+          throw new TRPCError({
+            code: "NOT_FOUND",
+            message: message === "Version not found" ? message : "Playbook not found",
+          });
         }
       }),
 
@@ -501,13 +534,18 @@ export const playbooksRouter = t.router({
       }
 
       // Render the prompt template
-      const prompt = await promptService.getPrompt("playbook/generate-instructions", {
-        purpose: input.purpose,
-        actions: input.actions,
-        documents,
-        escalationRules: input.escalationRules,
-        boundaries: input.boundaries,
-      });
+      const prompt = await promptService.getPrompt(
+        "playbook/generate-instructions",
+        {
+          purpose: input.purpose,
+          actions: input.actions,
+          documents,
+          escalationRules: input.escalationRules,
+          boundaries: input.boundaries,
+        },
+        // The org's language picks the prompt (pt orgs get a Portuguese playbook).
+        { organizationId: ctx.organizationId! },
+      );
 
       const jsonSchema = {
         type: "object",
@@ -524,6 +562,7 @@ export const playbooksRouter = t.router({
       const response = await llmService.invoke({
         history: prompt,
         jsonSchema,
+        organizationId: ctx.organizationId!,
         temperature: 0.7,
         max_tokens: 4000,
       });

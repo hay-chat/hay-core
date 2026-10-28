@@ -1,0 +1,177 @@
+{
+  "tests": {
+    "headTitle": "Tests - Hay.chat",
+    "title": "Tests",
+    "description": "Replay past conversations against your AI agent before it talks to customers. Replies are never sent, actions that change data are simulated, and test runs are never billed.",
+    "allowance": "{remaining} of {limit} free test replies left this month",
+    "draft": {
+      "title": "Testing a playbook draft",
+      "description": "Replies use the draft of {name}, not the published version.",
+      "clear": "Test the published playbooks instead"
+    },
+    "replay": {
+      "title": "Replay past conversations",
+      "description": "Each shopper message is answered once by the AI, with the real history up to that point. The AI's reply is compared with what your team actually sent.",
+      "source": "Conversations to replay",
+      "sources": {
+        "recent": "My most recent closed conversations",
+        "transcripts": "Imported conversations"
+      },
+      "recentCount": "How many conversations",
+      "maxTurns": "Shopper messages to replay per conversation",
+      "label": "Name (optional)",
+      "start": "Start replay",
+      "started": "Replay started",
+      "noTranscripts": "No imported conversations yet. Import some from another tool first.",
+      "selectedTranscripts": "No conversations selected | {count} conversation selected | {count} conversations selected"
+    },
+    "import": {
+      "button": "Import conversations",
+      "title": "Import past conversations",
+      "description": "Paste conversations or upload an export from another tool. They are kept for your organization's retention period and only used for tests.",
+      "format": "Format",
+      "formats": {
+        "paste": "Pasted text",
+        "csv": "CSV (any tool)",
+        "whatsapp": "WhatsApp chat export",
+        "tidio": "Tidio CSV export",
+        "gorgias": "Gorgias (recent tickets)"
+      },
+      "content": "Conversations",
+      "contentPlaceholder": "Customer: Where is my order?\nAgent: Can I have the order number?",
+      "file": "Or choose a file",
+      "businessName": "Your name in the WhatsApp chat",
+      "gorgiasSubdomain": "Gorgias subdomain",
+      "gorgiasEmail": "Gorgias user email",
+      "gorgiasApiKey": "Gorgias API key",
+      "gorgiasHelp": "The email and API key are used for this import only and are not stored.",
+      "submit": "Import",
+      "done": "No conversations imported | Imported {count} conversation | Imported {count} conversations",
+      "backgroundStarted": "Importing from Gorgias in the background. This can take a few minutes; you can keep working.",
+      "backgroundFailed": "The Gorgias import stopped: {error} ({count} conversations were imported before it stopped)"
+    },
+    "runs": {
+      "title": "Test runs",
+      "empty": "No test runs yet.",
+      "open": "Open report",
+      "kinds": {
+        "replay": "Replay",
+        "test_cases": "Test cases",
+        "simulation": "Simulation"
+      },
+      "status": {
+        "running": "Running",
+        "completed": "Finished",
+        "cancelled": "Cancelled",
+        "capped": "Stopped at the token limit"
+      },
+      "progress": "{done} of {total} answered"
+    },
+    "report": {
+      "headTitle": "Test report - Hay.chat",
+      "title": "Test report",
+      "back": "All tests",
+      "cancel": "Stop run",
+      "estimated": "Estimated from {count} replayed shopper messages. A sample of past conversations shows what to fix; it does not predict an exact rate.",
+      "inProgress": "{count} still being answered…",
+      "notJudged": "{count} could not be answered or judged.",
+      "agreement": "Compared with what your team sent: {same} same answer, {partial} partly the same, {different} different.",
+      "empty": "Nothing in this group.",
+      "showing": "Showing {shown} of {count}",
+      "customer": "Shopper",
+      "aiReply": "AI's reply",
+      "humanReply": "What your team sent",
+      "expected": "Expected outcome",
+      "noReply": "No reply",
+      "noHumanReply": "The shopper had the last word",
+      "mockedCalls": "Would have called (simulated, nothing changed):",
+      "storeDataChanged": "Store data changed since: the AI read today's orders and stock, not what was true back then.",
+      "judge": "Why",
+      "improvePlaybook": "Improve playbook",
+      "improveKnowledge": "Improve knowledge",
+      "viewConversation": "View conversation",
+      "passed": "Passed",
+      "failed": "Failed",
+      "unknown": "Not judged",
+      "buckets": {
+        "answered": "Would have answered",
+        "handed_off": "Would have handed off",
+        "needed_action": "Would have needed an action",
+        "wrong_or_risky": "Answer looks wrong or risky",
+        "knowledge_missing": "Knowledge missing"
+      },
+      "bucketHelp": {
+        "answered": "The AI answered on its own.",
+        "handed_off": "The AI passed the conversation to your team.",
+        "needed_action": "The AI would have changed something in your store. The call was simulated.",
+        "wrong_or_risky": "Fix these first: wrong facts, risky promises, or a claim no action backs.",
+        "knowledge_missing": "The AI lacked store information. Add it to your knowledge or playbook."
+      }
+    },
+    "save": {
+      "button": "Save as test case",
+      "title": "Save as test case",
+      "description": "The conversation up to this shopper message is saved. Before you publish a playbook draft, its test cases run against it and you are warned about any that fail.",
+      "name": "Name (optional)",
+      "expectedOutcome": "What a good answer does (optional)",
+      "expectedOutcomePlaceholder": "Asks for the order number before promising anything",
+      "handoff": "Hand-off to your team",
+      "handoffEither": "Either is fine",
+      "handoffMust": "Must hand off",
+      "handoffMustNot": "Must not hand off",
+      "submit": "Save test case",
+      "saved": "Test case saved"
+    },
+    "cases": {
+      "title": "Test cases",
+      "description": "Saved from replays, edited or blocked replies and feedback. A playbook's test cases run before its draft is published.",
+      "empty": "No test cases yet. Save one from a test report or from an AI reply in a conversation.",
+      "runAll": "Run all test cases",
+      "delete": "Delete",
+      "deleted": "Test case deleted",
+      "sources": {
+        "replay": "From a replay",
+        "approval_edit": "Edited reply",
+        "approval_block": "Blocked reply",
+        "feedback": "Feedback",
+        "conversation": "Conversation",
+        "insight": "Insight"
+      }
+    },
+    "regression": {
+      "title": "Test cases",
+      "checking": "Checking for test cases…",
+      "none": "This playbook has no test cases yet. Save some from a test report or a conversation to check drafts before publishing.",
+      "running": "Running test cases against this draft: {done} of {total} done…",
+      "allPassed": "All {count} test cases passed with this draft.",
+      "failing": "{failing} of {total} test cases fail with this draft.",
+      "newFailures": "{count} passed before.",
+      "passedBefore": "passed before",
+      "warnOnly": "You can still publish. Check the report to see what changed.",
+      "openReport": "Open the test report"
+    },
+    "readiness": {
+      "title": "Soft-launch readiness",
+      "description": "How your team reviewed this agent's replies while Require Approval was on. Require Approval holds the AI's replies only; actions that change store data follow action approvals.",
+      "approvalOff": "Require Approval is off for this agent, so replies are sent without review.",
+      "week": "Week of {date}",
+      "approved": "Approved as written",
+      "edited": "Edited before sending",
+      "blocked": "Blocked",
+      "noWeeks": "No reviewed replies yet.",
+      "window": "Last {days} days: {reviewed} replies reviewed, {approved} approved as written, {edited} edited, {blocked} blocked.",
+      "waiting": "{count} replies are waiting for review.",
+      "hints": {
+        "approval_off": "Nothing to decide: replies are already sent automatically.",
+        "not_enough_reviews": "Keep reviewing. With at least {min} reviewed replies in {days} days you will see whether it is safe to auto-send.",
+        "too_many_changes": "Your team still changes more than 1 in 20 replies. Improve playbooks or knowledge from the edited replies first.",
+        "ready": "Your team changed fewer than 1 in 20 replies in the last {days} days. It may be safe to switch this agent to Auto-Send. Actions keep following action approvals."
+      }
+    },
+    "insight": {
+      "replayDraft": "Replay these conversations against the draft",
+      "replayDraftHint": "Before you publish the fix, see how the draft answers the conversations behind this insight. Replays are free and nothing is sent to shoppers.",
+      "noDraft": "Save the suggested playbook changes as a draft first."
+    }
+  }
+}

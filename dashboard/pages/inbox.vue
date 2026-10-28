@@ -19,6 +19,12 @@
       </Button>
     </div>
 
+    <!-- iPhone in a browser tab: how to get alerts (D11-12) -->
+    <InstallAppGuide dismissible />
+
+    <!-- AI actions waiting for an approver (D4-6); hidden when none or not an approver -->
+    <ApprovalsSection @changed="load()" />
+
     <!-- Waiting for a human: the only thing that must be seen first -->
     <section aria-labelledby="home-waiting-heading">
       <h2 id="home-waiting-heading" class="mb-2 flex items-baseline gap-2 text-sm font-semibold">
@@ -104,6 +110,9 @@
       </ul>
     </section>
 
+    <!-- The off switch, one tap from the phone (D11-9) -->
+    <AiPauseCard />
+
     <!-- Everything else is one tap away, not on this screen -->
     <nav class="flex flex-wrap gap-x-6 gap-y-2 pt-2 text-sm">
       <NuxtLink
@@ -111,6 +120,14 @@
         class="inline-flex min-h-11 items-center gap-1 text-primary hover:underline sm:min-h-0"
       >
         {{ $t("nav.conversations") }}
+        <ChevronRight class="h-4 w-4" />
+      </NuxtLink>
+      <NuxtLink
+        to="/spam"
+        class="inline-flex min-h-11 items-center gap-1 text-primary hover:underline sm:min-h-0"
+        data-testid="inbox-spam-link"
+      >
+        {{ $t("home.spam.link") }}
         <ChevronRight class="h-4 w-4" />
       </NuxtLink>
       <NuxtLink
@@ -145,11 +162,6 @@ const websocket = useWebSocket();
 const takeoverApi = useConversationTakeover();
 const toast = useToast();
 const now = useNow();
-
-// First-time setup comes before the inbox: nothing can be waiting yet.
-if (!appStore.onboardingCompleted) {
-  router.replace("/getting-started");
-}
 
 const loading = ref(true);
 const error = ref<string | null>(null);

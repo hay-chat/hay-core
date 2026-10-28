@@ -30,6 +30,10 @@ jest.mock("@server/services/prompt.service", () => ({
 jest.mock("../../orchestrator/perception.layer", () => ({ PerceptionLayer: class {} }));
 jest.mock("../../orchestrator/retrieval.layer", () => ({ RetrievalLayer: class {} }));
 jest.mock("../../orchestrator/execution.layer", () => ({ ExecutionLayer: class {} }));
+// A parked conversation within business hours waits for the team (D5-7).
+jest.mock("@server/services/business-hours.service", () => ({
+  isWithinBusinessHours: async () => true,
+}));
 
 const mockPublish = jest.fn();
 jest.mock("@server/services/redis.service", () => ({
@@ -61,7 +65,10 @@ const conversation = (overrides: Record<string, unknown>) => ({
   status: "open",
   assigned_user_id: null,
   needs_processing: true,
+  language: "pt",
   getLastCustomerMessage: jest.fn(async () => ({ id: "msg-1", content: "hi" })),
+  getMessages: jest.fn(async (): Promise<Array<{ metadata?: Record<string, unknown> }>> => []),
+  addMessage: jest.fn(async (_message: Record<string, unknown>) => ({})),
   lock: jest.fn(async () => "locker"),
   ...overrides,
 });
@@ -93,6 +100,24 @@ describe("runConversation for a paused agent", () => {
       { agentId: AGENT_ID, cause: "agent_disabled", reason: null, queued: true },
       "Skipping - agent paused",
     );
+    // One fixed line tells the shopper the team will reply (D11-9)
+    expect(convo.addMessage).toHaveBeenCalledWith({
+      content: "Obrigado pela sua mensagem. Nossa equipe vai te responder aqui neste chat.",
+      type: "BotAgent",
+      metadata: { isPausedNotice: true },
+    });
+  });
+
+  it("tells the shopper only once per conversation", async () => {
+    const convo = conversation({
+      getMessages: jest.fn(async () => [{ metadata: { isPausedNotice: true } }]),
+    });
+    mockFindById.mockResolvedValueOnce(convo);
+
+    await runConversation(CONVERSATION_ID);
+
+    expect(mockUpdate).toHaveBeenCalled();
+    expect(convo.addMessage).not.toHaveBeenCalled();
   });
 
   it("only clears needs_processing (no greeting, no queue entry) when the shopper has not written yet", async () => {
@@ -104,6 +129,7 @@ describe("runConversation for a paused agent", () => {
     expect(mockUpdate).toHaveBeenCalledWith(CONVERSATION_ID, ORG_ID, { needs_processing: false });
     expect(mockPublish).not.toHaveBeenCalled();
     expect(convo.lock).not.toHaveBeenCalled();
+    expect(convo.addMessage).not.toHaveBeenCalled();
   });
 
   it("leaves an already parked conversation alone", async () => {
@@ -200,5 +226,26 @@ describe("runConversation for an organization whose agent the operator paused", 
 
     expect(convo.lock).toHaveBeenCalled();
     expect(mockUpdate).not.toHaveBeenCalled();
+  });
+});
+
+describe("runConversation while the owner paused the AI everywhere (D11-9)", () => {
+  beforeEach(() => jest.clearAllMocks());
+
+  it("parks the conversation like an operator pause, the agent being enabled", async () => {
+    const convo = conversation({
+      organization: { suspendedAt: null, agentPausedAt: null, aiPausedAt: new Date() },
+      agent: { id: AGENT_ID, enabled: true },
+    });
+    mockFindById.mockResolvedValueOnce(convo);
+
+    await runConversation(CONVERSATION_ID);
+
+    expect(mockUpdate).toHaveBeenCalledWith(CONVERSATION_ID, ORG_ID, {
+      needs_processing: false,
+      status: "pending-human",
+    });
+    expect(convo.lock).not.toHaveBeenCalled();
+    expect(convo.addMessage).toHaveBeenCalledTimes(1);
   });
 });

@@ -41,6 +41,10 @@ export type AuditAction =
   | "organization.member.role_change"
   | "organization.member.remove"
   | "organization.access_state_changed"
+  | "organization.ai_paused"
+  | "organization.ai_resumed"
+  | "organization.export.request"
+  | "organization.export.download"
   | "agent.create"
   | "agent.update"
   | "agent.delete"
@@ -55,8 +59,17 @@ export type AuditAction =
   | "product.update"
   | "product.delete"
   | "product.sync"
+  | "product.prune"
   | "permission.denied"
-  | "retention.cleanup";
+  | "retention.cleanup"
+  | "billing.resolution.exclude"
+  | "billing.resolution.exclusion_review_requested"
+  | "billing.resolution.exclusion_approved"
+  | "billing.resolution.exclusion_denied"
+  | "conversation.spam.marked"
+  | "conversation.spam.cleared"
+  | "dispute_evidence.export"
+  | "dispute_evidence.push";
 
 @Entity("audit_logs")
 @Index("idx_audit_logs_user", ["userId"])

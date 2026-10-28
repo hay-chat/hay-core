@@ -3,6 +3,8 @@ import { PromptService } from "../prompt.service";
 import { Document } from "@server/entities/document.entity";
 import { Message } from "@server/database/entities/message.entity";
 import { createLogger } from "@server/lib/logger";
+import { isUuid } from "@server/services/media-url.service";
+import { policyExcerpt } from "@server/services/dispute-evidence/timeline";
 
 const logger = createLogger("confidence-guardrail");
 
@@ -24,7 +26,7 @@ export interface ConfidenceAssessment {
   tier: "high" | "medium" | "low"; // Confidence tier based on thresholds
   shouldRecheck: boolean; // Whether a recheck should be triggered
   shouldEscalate: boolean; // Whether human escalation is needed
-  documentsUsed: Array<{ id: string; title: string; similarity: number }>;
+  documentsUsed: Array<{ id: string; title: string; similarity: number; excerpt?: string }>;
   details: string; // Human-readable explanation
 }
 
@@ -51,6 +53,7 @@ export interface ConfidenceContext {
   retrievedDocuments: Array<{ document: Document; similarity: number }>;
   conversationHistory: Message[];
   customerQuery: string; // The original customer question
+  organizationId: string; // Routes the evaluation through the org's AI provider and region
 }
 
 /**
@@ -115,11 +118,18 @@ export class ConfidenceGuardrailService {
     const shouldEscalate = tier === "low" && fullConfig.enableEscalation;
 
     // Build documents used list
-    const documentsUsed = context.retrievedDocuments.map((doc) => ({
-      id: doc.document.id,
-      title: doc.document.title,
-      similarity: doc.similarity,
-    }));
+    // Knowledge-base documents (uuid ids, not tool results or the playbook)
+    // keep the text the AI read, so dispute evidence shows the policy as it
+    // was then, not as edited later (G5).
+    const documentsUsed = context.retrievedDocuments.map((doc) => {
+      const excerpt = isUuid(doc.document.id) ? policyExcerpt(doc.document.content) : "";
+      return {
+        id: doc.document.id,
+        title: doc.document.title,
+        similarity: doc.similarity,
+        ...(excerpt ? { excerpt } : {}),
+      };
+    });
 
     // Generate human-readable details
     const details = this.generateDetails(breakdown, tier, score);
@@ -179,6 +189,7 @@ export class ConfidenceGuardrailService {
         jsonSchema: schema,
         temperature: 0.2, // Low temperature for consistent evaluation
         tier: "medium",
+        organizationId: context.organizationId,
       });
 
       const parsed = JSON.parse(result);
@@ -237,6 +248,7 @@ export class ConfidenceGuardrailService {
         jsonSchema: schema,
         temperature: 0.2,
         tier: "medium",
+        organizationId: context.organizationId,
       });
 
       const parsed = JSON.parse(result);

@@ -2,16 +2,19 @@
  * Shared MCP response + GraphQL helpers for the Shopify tools.
  */
 
+const { toolError, toolErrorResult } = require("@hay/plugin-sdk/tool-errors");
+
 /** Wrap a successful result as MCP text content (pretty JSON). */
 function ok(data) {
   return { content: [{ type: "text", text: JSON.stringify(data ?? null, null, 2) }] };
 }
 
-/** Wrap an error as an MCP error result. */
-function fail(err) {
-  const message = err instanceof Error ? err.message : String(err);
-  return { isError: true, content: [{ type: "text", text: message }] };
-}
+/**
+ * Wrap anything thrown in a tool handler as an MCP error result: JSON
+ * `{ code, retryable, message, details? }` from the shared plugin-SDK vocabulary.
+ * Uncoded errors become INTERNAL, so every expected failure must throw a ToolError.
+ */
+const fail = toolErrorResult;
 
 /** Flatten a GraphQL connection (`{ nodes }` or `{ edges { node } }`) to an array. */
 function unwrapConnection(conn) {
@@ -41,14 +44,21 @@ function toGid(type, id) {
 }
 
 /**
- * Throw if a mutation payload returned userErrors. Pass the payload object
- * (e.g. `data.orderCancel`) and the field name that holds the errors.
+ * Throw PROVIDER_REFUSED if a mutation payload returned userErrors. Pass the
+ * payload object (e.g. `data.orderCancel`) and the field name that holds them.
  */
 function assertNoUserErrors(payload, field = "userErrors") {
   const errors = payload && payload[field];
   if (Array.isArray(errors) && errors.length > 0) {
-    throw new Error(`Shopify rejected the request: ${JSON.stringify(errors)}`);
+    const reasons = errors.map((e) => (e && e.message) || "").filter(Boolean);
+    throw toolError(
+      "PROVIDER_REFUSED",
+      `Shopify refused: ${reasons.join("; ") || "no reason given"}`,
+      {
+        details: { userErrors: errors },
+      },
+    );
   }
 }
 
-module.exports = { ok, fail, unwrapConnection, pageInfo, toGid, assertNoUserErrors };
+module.exports = { ok, fail, toolError, unwrapConnection, pageInfo, toGid, assertNoUserErrors };

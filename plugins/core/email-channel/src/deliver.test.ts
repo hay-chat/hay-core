@@ -68,6 +68,21 @@ describe("deliver", () => {
     expect(api.sent[0].html).toContain("<p>It shipped yesterday.</p>");
   });
 
+  it("sends from the support address only once its domain is verified (D13-9)", async () => {
+    const verified = fakeApi({ messages, sendingDomain: "acme.com" });
+    await deliver(payload(), fakeContext({ api: verified }));
+    expect(verified.sent[0].from).toEqual({ email: "support@acme.com", name: "Acme Support" });
+    expect(verified.sent[0].messageId).toBe("<hay-m2@acme.com>");
+
+    const otherDomain = fakeApi({ messages, sendingDomain: "other.com" });
+    await deliver(payload(), fakeContext({ api: otherDomain }));
+    expect(otherDomain.sent[0].from?.email).toBe("support@updates.hay.test");
+
+    const none = fakeApi({ messages });
+    await deliver(payload(), fakeContext({ api: none }));
+    expect(none.sent[0].from?.email).toBe("support@updates.hay.test");
+  });
+
   it("BCCs the support address when the archive option is on", async () => {
     const api = fakeApi({ messages });
     const ctx = fakeContext({ api, settings: { ...settings, bccArchive: true } });
@@ -101,7 +116,7 @@ describe("deliver", () => {
     ]);
   });
 
-  it("reports a refused send as a failure and an unreachable Hay as 503", async () => {
+  it("reports a refused send as a failure, a failed history load as 503, and never retries a send that threw", async () => {
     const refused = fakeContext({
       api: fakeApi({ messages, sendResult: { success: false, error: "550 no" } }),
     });
@@ -110,8 +125,12 @@ describe("deliver", () => {
       body: { success: false, error: "550 no" },
     });
 
-    const down = fakeContext({ api: fakeApi({ messages, sendThrows: new Error("ECONNREFUSED") }) });
-    expect((await deliver(payload(), down)).status).toBe(503);
+    // The mail may have gone out before the call failed: a retry could send it twice.
+    const down = fakeContext({ api: fakeApi({ messages, sendThrows: new Error("socket hang up") }) });
+    expect(await deliver(payload(), down)).toEqual({
+      status: 200,
+      body: { success: false, error: "send_uncertain" },
+    });
 
     const noHistory = fakeContext({ api: fakeApi({ queryThrows: new Error("timeout") }) });
     expect((await deliver(payload(), noHistory)).status).toBe(503);

@@ -7,13 +7,97 @@ import { v4 as uuidv4 } from "uuid";
 import type { HayPluginManifest } from "@server/types/plugin.types";
 import { conversationSecretService } from "../conversation-secret.service";
 import { createLogger } from "@server/lib/logger";
+import { actionLogService, toolErrorCode } from "../action-log.service";
+import { classifyTool, CORE_TOOL_RISK, TOOL_APPROVAL_ARG, type ToolRisk } from "./tool-risk";
+import { isDryRun, simulatedResult } from "./dry-run";
+import type { ActionOutcome } from "@server/database/entities/action-log.entity";
+import type {
+  PendingAction,
+  PendingActionHoldReason,
+} from "@server/database/entities/pending-action.entity";
+import { decideGate, extractAmount, NEEDS_APPROVAL_CODE } from "./action-policy";
+import { pendingActionService } from "../pending-action.service";
+import { orderLinkService } from "../order-links/order-link.service";
+import { organizationRepository } from "@server/repositories/organization.repository";
+import {
+  resolveActionApprovalConfig,
+  type ActionApprovalConfig,
+} from "@server/types/organization-settings.types";
+import { AppDataSource } from "@server/database/data-source";
+import { Playbook } from "@server/database/entities/playbook.entity";
+import {
+  confirmationRequest,
+  findConfirmation,
+  needsCustomerConfirmation,
+  NEEDS_CONFIRMATION_STATUS,
+} from "./customer-confirmation";
+
+/** How far back the confirmation check looks for the AI's question (D4-10). */
+const CONFIRMATION_LOOKBACK_MESSAGES = 50;
 
 const logger = createLogger("tool-execution");
+
+/** `details.amount` from a NEEDS_APPROVAL tool error, when the plugin stated one. */
+function overCapAmount(mcpErrorDetails: unknown): number | null {
+  let parsed: unknown = mcpErrorDetails;
+  if (typeof parsed === "string") {
+    try {
+      parsed = JSON.parse(parsed);
+    } catch {
+      return null;
+    }
+  }
+  const amount = (parsed as { details?: { amount?: unknown } } | null)?.details?.amount;
+  const n = typeof amount === "string" ? Number(amount) : amount;
+  return typeof n === "number" && Number.isFinite(n) && n >= 0 ? n : null;
+}
 
 interface ToolExecutionResult {
   success: boolean;
   result?: unknown;
   error?: string;
+  /** A dry-run write: nothing was sent to the provider. */
+  simulated?: boolean;
+  /** Held for a person's approval: nothing was sent to the provider yet. */
+  pending?: boolean;
+}
+
+interface ToolLogEntry {
+  turn: number;
+  name: string;
+  input: Record<string, unknown>;
+  ok: boolean;
+  result?: unknown;
+  errorClass?: string;
+  latencyMs: number;
+  idempotencyKey: string;
+}
+
+interface ToolTarget {
+  pluginId: string | null;
+  toolName: string;
+  risk: ToolRisk;
+}
+
+/** Everything known about a call before it runs. */
+interface PreparedCall {
+  conversation: Conversation;
+  toolCall: { name: string; args: Record<string, unknown> };
+  messageId?: string;
+  target: ToolTarget;
+  idempotencyKey: string;
+  startedAt: number;
+  executedAt: string;
+  /** Set only when re-running a call a person approved (fills TOOL_APPROVAL_ARG). */
+  approvedActionId?: string;
+}
+
+/** How a call ended, for the caller, the action log and the tool log. */
+interface CallStep {
+  result: ToolExecutionResult;
+  logOutcome: ActionOutcome;
+  errorCode: string | null;
+  errorClass?: string;
 }
 
 interface ToolCallData {
@@ -64,142 +148,48 @@ export class ToolExecutionService {
     try {
       logger.info({ toolName: toolCall.name, args: toolCall.args }, "Executing tool");
 
-      const currentContext = conversation.orchestration_status as ConversationContext | null;
-      if (currentContext) {
-        // Initialize toolLog if it doesn't exist
-        if (!currentContext.toolLog) {
-          currentContext.toolLog = [];
-        }
-        const toolLogEntry: {
-          turn: number;
-          name: string;
-          input: Record<string, unknown>;
-          ok: boolean;
-          result?: unknown;
-          errorClass?: string;
-          latencyMs: number;
-          idempotencyKey: string;
-        } = {
-          turn: currentContext.lastTurn + 1,
-          name: toolCall.name,
-          input: toolCall.args,
-          ok: false,
-          latencyMs: 0,
-          idempotencyKey: uuidv4(),
-        };
-
-        const startTime = Date.now();
-        const executedAt = new Date().toISOString();
-
-        try {
-          logger.debug({ toolCall }, "Executing tool call");
-          const result = await this.executeToolCall(
-            conversation,
-            {
-              tool_name: toolCall.name,
-              arguments: toolCall.args,
-            },
-            toolLogEntry.idempotencyKey,
-          );
-          logger.debug({ result }, "Tool call result");
-
-          toolLogEntry.ok = true;
-          toolLogEntry.result = result;
-          toolLogEntry.latencyMs = Date.now() - startTime;
-
-          // Update the message with the result
-          if (messageId) {
-            const message = await this.messageService.messageRepository.findById(messageId);
-            if (message) {
-              await this.messageService.messageRepository.update(messageId, {
-                content: `Action completed: ${toolCall.name}`,
-                metadata: {
-                  ...message.metadata,
-                  toolOutput: result,
-                  toolStatus: "SUCCESS",
-                  toolLatencyMs: toolLogEntry.latencyMs,
-                  toolExecutedAt: executedAt,
-                  httpStatus: 200,
-                },
-              });
-
-              // Broadcast the updated message via WebSocket
-              await this.broadcastMessageUpdate(conversation, message.id, {
-                content: `Action completed: ${toolCall.name}`,
-                metadata: {
-                  ...message.metadata,
-                  toolOutput: result,
-                  toolStatus: "SUCCESS",
-                  toolLatencyMs: toolLogEntry.latencyMs,
-                  toolExecutedAt: executedAt,
-                  httpStatus: 200,
-                },
-              });
-            }
-          }
-
-          currentContext.toolLog.push(toolLogEntry);
-          await this.conversationRepository.updateById(conversation.id, {
-            orchestration_status: currentContext as unknown as Record<string, unknown>,
-          });
-
-          return { success: true, result };
-        } catch (error: unknown) {
-          const err = error as Error;
-          toolLogEntry.ok = false;
-          toolLogEntry.errorClass = err.constructor.name;
-          toolLogEntry.result = err.message || "Unknown error";
-          toolLogEntry.latencyMs = Date.now() - startTime;
-
-          // Extract MCP error details if available
-          const mcpErrorDetails = (err as MCPError).mcpErrorDetails;
-          const errorOutput = mcpErrorDetails || {
-            error: err.message || "Unknown error",
-            errorType: err.constructor.name,
-            stack: err.stack,
-          };
-
-          // Update the message with the error
-          if (messageId) {
-            const message = await this.messageService.messageRepository.findById(messageId);
-            if (message) {
-              await this.messageService.messageRepository.update(messageId, {
-                content: `Action failed: ${toolCall.name}`,
-                metadata: {
-                  ...message.metadata,
-                  toolOutput: errorOutput,
-                  toolStatus: "ERROR",
-                  toolLatencyMs: toolLogEntry.latencyMs,
-                  toolExecutedAt: executedAt,
-                  httpStatus: 500,
-                },
-              });
-
-              // Broadcast the updated message via WebSocket
-              await this.broadcastMessageUpdate(conversation, message.id, {
-                content: `Action failed: ${toolCall.name}`,
-                metadata: {
-                  ...message.metadata,
-                  toolOutput: errorOutput,
-                  toolStatus: "ERROR",
-                  toolLatencyMs: toolLogEntry.latencyMs,
-                  toolExecutedAt: executedAt,
-                  httpStatus: 500,
-                },
-              });
-            }
-          }
-
-          currentContext.toolLog.push(toolLogEntry);
-          await this.conversationRepository.updateById(conversation.id, {
-            orchestration_status: currentContext as unknown as Record<string, unknown>,
-          });
-
-          return { success: false, error: err.message || "Unknown error" };
-        }
+      const currentContext =
+        conversation.orchestration_status as unknown as ConversationContext | null;
+      if (!currentContext) {
+        return { success: false, error: "No conversation context available" };
+      }
+      if (!currentContext.toolLog) {
+        currentContext.toolLog = [];
       }
 
-      return { success: false, error: "No conversation context available" };
+      // Only core may say a call was approved; drop whatever the model sent.
+      delete toolCall.args[TOOL_APPROVAL_ARG];
+
+      const target = await this.resolveTarget(conversation.organization_id, toolCall.name);
+      const call: PreparedCall = {
+        conversation,
+        toolCall,
+        messageId,
+        target,
+        idempotencyKey: uuidv4(),
+        startedAt: Date.now(),
+        executedAt: new Date().toISOString(),
+      };
+
+      const step = await this.runStep(call);
+      const latencyMs = await this.recordAction(call, step);
+
+      const toolLogEntry: ToolLogEntry = {
+        turn: currentContext.lastTurn + 1,
+        name: toolCall.name,
+        input: toolCall.args,
+        ok: step.result.success,
+        result: step.result.success ? step.result.result : step.result.error,
+        errorClass: step.errorClass,
+        latencyMs,
+        idempotencyKey: call.idempotencyKey,
+      };
+      currentContext.toolLog.push(toolLogEntry);
+      await this.conversationRepository.updateById(conversation.id, {
+        orchestration_status: currentContext as unknown as Record<string, unknown>,
+      });
+
+      return step.result;
     } catch (error) {
       logger.error({ err: error }, "Error handling tool execution");
       return {
@@ -209,10 +199,367 @@ export class ToolExecutionService {
     }
   }
 
+  /**
+   * Run an action a person approved (D4-5). Skips the gate and the dry-run
+   * check: the decision was made on this exact call. Sends the pending
+   * action's idempotency key, so a provider that honours it applies the
+   * action once even if this runs again. Updates the original TOOL message
+   * and writes the action log. The caller moves the pending action on.
+   */
+  async executeApprovedAction(
+    conversation: Conversation,
+    action: Pick<PendingAction, "id" | "tool_name" | "args" | "message_id" | "idempotency_key">,
+  ): Promise<ToolExecutionResult & { errorCode: string | null }> {
+    const call: PreparedCall = {
+      approvedActionId: action.id,
+      conversation,
+      toolCall: { name: action.tool_name, args: action.args },
+      messageId: action.message_id ?? undefined,
+      target: await this.resolveTarget(conversation.organization_id, action.tool_name),
+      idempotencyKey: action.idempotency_key,
+      startedAt: Date.now(),
+      executedAt: new Date().toISOString(),
+    };
+    const step = await this.runLive(call);
+    await this.recordAction(call, step);
+    return { ...step.result, errorCode: step.errorCode };
+  }
+
+  /** Write the action log row for a finished step. Returns the latency. */
+  private async recordAction(call: PreparedCall, step: CallStep): Promise<number> {
+    const latencyMs = Date.now() - call.startedAt;
+    await actionLogService.record({
+      organizationId: call.conversation.organization_id,
+      conversationId: call.conversation.id,
+      messageId: call.messageId ?? null,
+      pluginId: call.target.pluginId,
+      toolName: call.target.toolName,
+      risk: call.target.risk,
+      args: call.toolCall.args,
+      outcome: step.logOutcome,
+      errorCode: step.errorCode,
+      durationMs: latencyMs,
+      idempotencyKey: call.idempotencyKey,
+    });
+    // D2-4: index the orders this call named (dry-run playground calls excepted).
+    if (step.logOutcome !== "simulated") {
+      await orderLinkService.recordFromToolCall({
+        organizationId: call.conversation.organization_id,
+        conversationId: call.conversation.id,
+        messageId: call.messageId ?? null,
+        pluginId: call.target.pluginId,
+        toolName: call.target.toolName,
+        input: call.toolCall.args,
+        output: step.logOutcome === "success" ? step.result.result : undefined,
+      });
+    }
+    return latencyMs;
+  }
+
+  /**
+   * Reads run. A write first needs the shopper's go-ahead (D4-10); then it is
+   * simulated in a dry-run conversation, held when the org's approval policy
+   * says so, and run otherwise.
+   */
+  private async runStep(call: PreparedCall): Promise<CallStep> {
+    if (call.target.risk.readOnly) return this.runLive(call);
+    const organization = await organizationRepository.findById(call.conversation.organization_id);
+    const config = resolveActionApprovalConfig(organization?.settings);
+    if (needsCustomerConfirmation(call.target.risk, config)) {
+      const ask = await this.confirmWithCustomer(call);
+      if (ask) return ask;
+    }
+    if (isDryRun(call.conversation.metadata)) return this.simulate(call);
+    return (await this.gate(call, config)) ?? this.runLive(call);
+  }
+
+  /**
+   * Returns null when the shopper already answered the AI's question about
+   * this exact call (and uses that answer up); otherwise marks this call as
+   * waiting for the shopper and tells the AI to ask. A call already waiting
+   * for (or turned down by) the team is not asked about again.
+   */
+  private async confirmWithCustomer(call: PreparedCall): Promise<CallStep | null> {
+    const { conversation, toolCall } = call;
+    const earlier = await pendingActionService.findEarlierRequest(
+      conversation.id,
+      toolCall.name,
+      toolCall.args,
+    );
+    if (earlier) return null;
+
+    const messages = await this.messageService.messageRepository.getLastMessages(
+      conversation.id,
+      CONFIRMATION_LOOKBACK_MESSAGES,
+    );
+    const confirmation = findConfirmation(messages, toolCall.name, toolCall.args, call.messageId);
+    if (confirmation) {
+      await this.messageService.messageRepository.update(confirmation.id, {
+        metadata: { ...confirmation.metadata, confirmationUsed: true },
+      });
+      return null;
+    }
+
+    const result = confirmationRequest(toolCall.name);
+    await this.finishToolMessage(call, `Confirmation needed: ${toolCall.name}`, {
+      toolOutput: result,
+      toolStatus: NEEDS_CONFIRMATION_STATUS,
+    });
+    return {
+      result: { success: false, result },
+      logOutcome: "confirming",
+      errorCode: null,
+    };
+  }
+
+  /**
+   * Apply the approval policy (D4-4). Returns null when the call may run now;
+   * otherwise a step that tells the AI the action is waiting for a person
+   * (or was already turned down), without touching the provider.
+   */
+  private async gate(call: PreparedCall, config: ActionApprovalConfig): Promise<CallStep | null> {
+    // The same request is already with the team: answer from it, even if the
+    // policy would now let it run (e.g. the threshold was raised), or the
+    // pending one could still be approved and run a second time.
+    const earlier = await this.answerFromEarlierRequest(call);
+    if (earlier) return earlier;
+
+    const { conversation, toolCall, target } = call;
+    const playbookCategories = await this.playbookApprovalCategories(conversation);
+    const decision = decideGate(target.risk, toolCall.args, config, playbookCategories);
+    if (decision.kind === "allow") return null;
+
+    return this.holdForApproval(call, decision.reason, decision.amount, config.expiryHours);
+  }
+
+  /** The categories the conversation's active playbook always holds (D4-9). */
+  private async playbookApprovalCategories(conversation: Conversation): Promise<string[]> {
+    if (!conversation.playbook_id) return [];
+    const playbook = await AppDataSource.getRepository(Playbook).findOne({
+      where: { id: conversation.playbook_id, organization_id: conversation.organization_id },
+      select: { id: true, approval_categories: true },
+    });
+    return Array.isArray(playbook?.approval_categories) ? playbook.approval_categories : [];
+  }
+
+  /**
+   * Open a pending action for this call and tell the AI it is waiting. If the
+   * same request was already made in this conversation, answer from it instead
+   * of opening a second one.
+   */
+  private async holdForApproval(
+    call: PreparedCall,
+    holdReason: PendingActionHoldReason,
+    amount: number | null,
+    expiryHours: number,
+  ): Promise<CallStep> {
+    const { conversation, toolCall, target } = call;
+    const earlier = await this.answerFromEarlierRequest(call);
+    if (earlier) return earlier;
+
+    const action = await pendingActionService.hold({
+      organizationId: conversation.organization_id,
+      conversationId: conversation.id,
+      messageId: call.messageId ?? null,
+      pluginId: target.pluginId,
+      toolName: toolCall.name,
+      category: target.risk.readOnly ? "other_write" : target.risk.category,
+      args: toolCall.args,
+      amount,
+      holdReason,
+      expiryHours,
+    });
+    // The pending action's key is the one the provider will see on approval.
+    call.idempotencyKey = action.idempotency_key;
+    await this.conversationRepository.update(conversation.id, conversation.organization_id, {
+      status: "awaiting-approval",
+    });
+    conversation.status = "awaiting-approval";
+    return this.held(call, action);
+  }
+
+  /** Held or declined when this exact call is already pending or was turned down; else null. */
+  private async answerFromEarlierRequest(call: PreparedCall): Promise<CallStep | null> {
+    const earlier = await pendingActionService.findEarlierRequest(
+      call.conversation.id,
+      call.toolCall.name,
+      call.toolCall.args,
+    );
+    if (earlier?.status === "rejected") return this.declined(call, earlier);
+    if (earlier?.status === "pending") return this.held(call, earlier);
+    return null;
+  }
+
+  /**
+   * A cap-enforcing plugin refused the call as above the merchant's cap
+   * (NEEDS_APPROVAL): hold it for a person instead of failing. This applies
+   * even when the org's money-move approval is off, because the merchant's own
+   * cap is what asked for it. An approved re-run is never held again.
+   */
+  private async holdOverCap(call: PreparedCall, mcpErrorDetails: unknown): Promise<CallStep> {
+    const organization = await organizationRepository.findById(call.conversation.organization_id);
+    const config = resolveActionApprovalConfig(organization?.settings);
+    return this.holdForApproval(
+      call,
+      "over_cap",
+      overCapAmount(mcpErrorDetails) ?? extractAmount(call.toolCall.args),
+      config.expiryHours,
+    );
+  }
+
+  private async held(call: PreparedCall, action: PendingAction): Promise<CallStep> {
+    const result = {
+      status: "pending_approval",
+      pendingActionId: action.id,
+      message:
+        "NOT DONE YET. This action needs a team member's approval before it runs. " +
+        "Tell the customer you have requested it and that they will get an answer " +
+        "here once the team decides. Do not say it is done, approved or guaranteed, " +
+        "and do not call this tool again for the same request.",
+    };
+    await this.finishToolMessage(call, `Approval requested: ${call.toolCall.name}`, {
+      toolOutput: result,
+      toolStatus: "PENDING_APPROVAL",
+      pendingActionId: action.id,
+    });
+    return {
+      result: { success: false, pending: true, result },
+      logOutcome: "held",
+      errorCode: null,
+    };
+  }
+
+  private async declined(call: PreparedCall, action: PendingAction): Promise<CallStep> {
+    const result = {
+      status: "rejected",
+      pendingActionId: action.id,
+      reason: action.decision_note,
+      message:
+        "A team member already declined this exact request. It was not done. " +
+        "Do not request it again; explain to the customer and offer another option.",
+    };
+    await this.finishToolMessage(call, `Request declined: ${call.toolCall.name}`, {
+      toolOutput: result,
+      toolStatus: "REJECTED",
+      pendingActionId: action.id,
+    });
+    return {
+      result: { success: false, error: result.message, result },
+      logOutcome: "error",
+      errorCode: "APPROVAL_REJECTED",
+      errorClass: "ApprovalRejected",
+    };
+  }
+
+  /** Dry-run write: nothing reaches the provider, the AI gets a structured mock. */
+  private async simulate(call: PreparedCall): Promise<CallStep> {
+    const result = simulatedResult(call.toolCall.name, call.toolCall.args);
+    await this.finishToolMessage(call, `Action simulated: ${call.toolCall.name}`, {
+      toolOutput: result,
+      toolStatus: "SIMULATED",
+    });
+    return {
+      result: { success: true, simulated: true, result },
+      logOutcome: "simulated",
+      errorCode: null,
+    };
+  }
+
+  /** Send the call to the core tool or plugin and record the answer. */
+  private async runLive(call: PreparedCall): Promise<CallStep> {
+    const { conversation, toolCall } = call;
+    try {
+      const result = await this.executeToolCall(
+        conversation,
+        { tool_name: toolCall.name, arguments: toolCall.args },
+        call.idempotencyKey,
+        call.approvedActionId,
+      );
+      await this.finishToolMessage(call, `Action completed: ${toolCall.name}`, {
+        toolOutput: result,
+        toolStatus: "SUCCESS",
+      });
+      return { result: { success: true, result }, logOutcome: "success", errorCode: null };
+    } catch (error: unknown) {
+      const err = error as Error;
+      // Extract MCP error details if available
+      const mcpErrorDetails = (err as MCPError).mcpErrorDetails;
+      const errorCode = toolErrorCode(mcpErrorDetails);
+      if (
+        errorCode === NEEDS_APPROVAL_CODE &&
+        !call.target.risk.readOnly &&
+        call.target.risk.capEnforced &&
+        !call.approvedActionId
+      ) {
+        return this.holdOverCap(call, mcpErrorDetails);
+      }
+      const errorOutput = mcpErrorDetails || {
+        error: err.message || "Unknown error",
+        errorType: err.constructor.name,
+      };
+      await this.finishToolMessage(call, `Action failed: ${toolCall.name}`, {
+        toolOutput: errorOutput,
+        toolStatus: "ERROR",
+        toolErrorCode: errorCode,
+      });
+      return {
+        result: { success: false, error: err.message || "Unknown error" },
+        logOutcome: "error",
+        errorCode,
+        errorClass: err.constructor.name,
+      };
+    }
+  }
+
+  /**
+   * Split `pluginId:toolName` (or a core tool name) and look up its risk class.
+   * An unparseable or uncached tool resolves to an unclassified write.
+   */
+  private async resolveTarget(organizationId: string, fullToolName: string): Promise<ToolTarget> {
+    const { coreToolRegistry } = await import("./core-tools");
+    if (coreToolRegistry.has(fullToolName)) {
+      return { pluginId: null, toolName: fullToolName, risk: CORE_TOOL_RISK };
+    }
+    const colonIndex = fullToolName.lastIndexOf(":");
+    if (colonIndex === -1) {
+      return { pluginId: null, toolName: fullToolName, risk: classifyTool(null) };
+    }
+    const pluginId = fullToolName.substring(0, colonIndex);
+    const toolName = fullToolName.substring(colonIndex + 1);
+    try {
+      const { mcpRegistryService } = await import("@server/services/mcp-registry.service");
+      const risk = await mcpRegistryService.getToolRisk(organizationId, pluginId, toolName);
+      return { pluginId, toolName, risk };
+    } catch (err) {
+      logger.warn({ err, pluginId, toolName }, "Could not resolve tool risk; treating as a write");
+      return { pluginId, toolName, risk: classifyTool(null) };
+    }
+  }
+
+  /** Write the final state onto the TOOL message and push it to the dashboard. */
+  private async finishToolMessage(
+    call: PreparedCall,
+    content: string,
+    patch: Record<string, unknown>,
+  ): Promise<void> {
+    if (!call.messageId) return;
+    const message = await this.messageService.messageRepository.findById(call.messageId);
+    if (!message) return;
+    const metadata = {
+      ...message.metadata,
+      ...patch,
+      toolLatencyMs: Date.now() - call.startedAt,
+      toolExecutedAt: call.executedAt,
+    };
+    await this.messageService.messageRepository.update(call.messageId, { content, metadata });
+    await this.broadcastMessageUpdate(call.conversation, message.id, { content, metadata });
+  }
+
   private async executeToolCall(
     conversation: Conversation,
     toolCall: ToolCallData,
     idempotencyKey?: string,
+    approvedActionId?: string,
   ): Promise<unknown> {
     const { tool_name: fullToolName, arguments: toolArgs } = toolCall;
 
@@ -341,24 +688,27 @@ export class ToolExecutionService {
     const organizationId = conversation.organization_id;
 
     // Inject conversation secrets into tool args before execution
+    // Copy first: core-owned args must not leak into the logged / held call args.
     const enrichedArgs = await this.injectConversationSecrets(
       conversation.id,
-      toolArgs,
+      { ...toolArgs },
       toolSchema as Record<string, unknown> | null,
     );
 
-    // Inject the core-generated idempotency key. The LLM must never invent
-    // this value — a made-up key defeats retry deduplication on the provider
-    // side, so core's per-execution UUID always overrides whatever was sent.
-    if (idempotencyKey) {
-      await this.injectIdempotencyKey(
-        organizationId,
-        matchingPlugin.pluginId,
-        actualToolName,
-        enrichedArgs,
+    // Inject the core-generated idempotency key and approval id. The LLM must
+    // never invent these — a made-up key defeats retry deduplication on the
+    // provider side, and a made-up approval would skip a merchant's cap — so
+    // core's values always override whatever was sent.
+    await this.injectCoreArgs(
+      organizationId,
+      matchingPlugin.pluginId,
+      actualToolName,
+      enrichedArgs,
+      {
         idempotencyKey,
-      );
-    }
+        approvedActionId,
+      },
+    );
 
     // Execute the MCP tool via the running process
     return await this.executeMCPTool(
@@ -370,21 +720,25 @@ export class ToolExecutionService {
   }
 
   /**
-   * Fill the tool's `idempotency_key` argument with the core-generated UUID.
+   * Fill core-owned arguments: `idempotency_key` with the core-generated UUID,
+   * and TOOL_APPROVAL_ARG with the pending action's id on an approved re-run.
    *
-   * Gated on the tool's cached input schema actually declaring an
-   * `idempotency_key` property — MCP servers using strict schemas reject
-   * unknown arguments, so blind injection is not safe. Mutates `args` in
-   * place, overriding any LLM-provided value. Failure to resolve the schema
-   * is non-fatal: the call proceeds with the args as-is.
+   * Gated on the tool's cached input schema actually declaring the property —
+   * MCP servers using strict schemas reject unknown arguments, so blind
+   * injection is not safe. Mutates `args` in place, overriding any
+   * LLM-provided value; the approval arg is always removed unless this is an
+   * approved run. Failure to resolve the schema is non-fatal for the key: the
+   * call proceeds without it (and never with an approval id).
    */
-  private async injectIdempotencyKey(
+  private async injectCoreArgs(
     organizationId: string,
     pluginId: string,
     toolName: string,
     args: Record<string, unknown>,
-    idempotencyKey: string,
+    values: { idempotencyKey?: string; approvedActionId?: string },
   ): Promise<void> {
+    delete args[TOOL_APPROVAL_ARG];
+    if (!values.idempotencyKey && !values.approvedActionId) return;
     try {
       const { mcpRegistryService } = await import("@server/services/mcp-registry.service");
       const tools = await mcpRegistryService.getToolsForOrg(organizationId);
@@ -393,14 +747,21 @@ export class ToolExecutionService {
         tool?.input_schema as { properties?: Record<string, unknown> } | undefined
       )?.properties;
 
-      if (properties && "idempotency_key" in properties) {
-        args.idempotency_key = idempotencyKey;
-        logger.debug({ pluginId, toolName, idempotencyKey }, "Injected idempotency key");
+      if (values.idempotencyKey && properties && "idempotency_key" in properties) {
+        args.idempotency_key = values.idempotencyKey;
+        logger.debug(
+          { pluginId, toolName, idempotencyKey: values.idempotencyKey },
+          "Injected idempotency key",
+        );
+      }
+      if (values.approvedActionId && properties && TOOL_APPROVAL_ARG in properties) {
+        args[TOOL_APPROVAL_ARG] = values.approvedActionId;
+        logger.debug({ pluginId, toolName }, "Injected approval id for an approved call");
       }
     } catch (error) {
       logger.warn(
         { err: error, pluginId, toolName },
-        "Failed to resolve tool schema for idempotency key injection",
+        "Failed to resolve tool schema for core argument injection",
       );
     }
   }
@@ -551,6 +912,7 @@ export class ToolExecutionService {
 
         const messagePayload = {
           type: "message",
+          conversationId: conversation.id,
           data: {
             id: message.id,
             content: updates.content,
@@ -561,9 +923,9 @@ export class ToolExecutionService {
           },
         };
 
-        // Broadcast to both organization (dashboard) and conversation (webchat) clients
+        // Dashboard only. Tool output (order data, error details) must never
+        // reach the shopper's webchat socket.
         websocketService.sendToOrganization(conversation.organization_id, messagePayload);
-        websocketService.sendToConversation(conversation.id, messagePayload);
         logger.debug({ messageId }, "Tool result broadcast via WebSocket");
       }
     } catch (error) {

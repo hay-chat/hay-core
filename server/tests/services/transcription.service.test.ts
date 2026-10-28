@@ -10,6 +10,13 @@ const mockConfig = {
 jest.mock("@server/config/env", () => ({ config: mockConfig }));
 
 const mockLogger = { debug: jest.fn(), info: jest.fn(), warn: jest.fn(), error: jest.fn() };
+
+// The org's region decides the endpoint; region routing is covered in llm-ai-region.test.ts.
+jest.mock("@server/services/llm/llm-provider.factory", () => ({
+  llmProviderFactory: {
+    managedOpenAIEndpoint: async () => ({ apiKey: mockConfig.openai.apiKey, region: "default" }),
+  },
+}));
 jest.mock("@server/lib/logger", () => ({ createLogger: () => mockLogger }));
 
 const mockTranscriptionsCreate =

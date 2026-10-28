@@ -33,6 +33,12 @@ export function toAccessState(organization: Organization): OrganizationAccessSta
     agentPausedAt: organization.agentPausedAt ?? null,
     agentPauseReason: organization.agentPauseReason ?? null,
     accessNotice: organization.accessNotice ?? null,
+    billingPeriod:
+      organization.billingPeriodStart && organization.billingPeriodEnd
+        ? { start: organization.billingPeriodStart, end: organization.billingPeriodEnd }
+        : null,
+    aiPausedAt: organization.aiPausedAt ?? null,
+    aiPausedByUserId: organization.aiPausedByUserId ?? null,
   };
 }
 
@@ -117,6 +123,121 @@ class OrganizationAccessService {
       },
       "Organization access state updated",
     );
+
+    return state;
+  }
+
+  /**
+   * Store the operator's current billing period. The operator re-sends it on
+   * every usage run, so only a change is written and logged.
+   */
+  async setBillingPeriod(input: {
+    organizationId: string;
+    period: { start: Date; end: Date } | null;
+  }): Promise<OrganizationAccessState | null> {
+    const organization = await this.repository.findOneBy({ id: input.organizationId });
+    if (!organization) return null;
+
+    const start = input.period?.start ?? null;
+    const end = input.period?.end ?? null;
+    const changed =
+      (organization.billingPeriodStart?.getTime() ?? null) !== (start?.getTime() ?? null) ||
+      (organization.billingPeriodEnd?.getTime() ?? null) !== (end?.getTime() ?? null);
+    if (changed) {
+      organization.billingPeriodStart = start;
+      organization.billingPeriodEnd = end;
+      await this.repository.update(
+        { id: organization.id },
+        { billingPeriodStart: start, billingPeriodEnd: end },
+      );
+      logger.info(
+        { organizationId: organization.id, start, end },
+        "Organization billing period updated",
+      );
+    }
+    return toAccessState(organization);
+  }
+
+  /**
+   * Plan limits the operator sets (Lane A4): today the monthly simulation
+   * allowance. Merged into `organization.limits`; null removes it (core
+   * default applies). Re-sent on every usage run, so only a change is written.
+   */
+  async setLimits(input: {
+    organizationId: string;
+    maxSimulationsPerMonth: number | null;
+  }): Promise<Organization["limits"] | null> {
+    const organization = await this.repository.findOneBy({ id: input.organizationId });
+    if (!organization) return null;
+
+    const current = organization.limits?.maxSimulationsPerMonth ?? null;
+    if (current === input.maxSimulationsPerMonth) return organization.limits ?? {};
+
+    const limits = { ...(organization.limits ?? {}) };
+    if (input.maxSimulationsPerMonth === null) delete limits.maxSimulationsPerMonth;
+    else limits.maxSimulationsPerMonth = input.maxSimulationsPerMonth;
+    await this.repository.update({ id: organization.id }, { limits });
+    logger.info(
+      {
+        organizationId: organization.id,
+        maxSimulationsPerMonth: { from: current, to: input.maxSimulationsPerMonth },
+      },
+      "Organization limits updated by the operator",
+    );
+    return limits;
+  }
+
+  /**
+   * The owner's "Pause AI everywhere" (D11-9). Pausing keeps the original
+   * timestamp and author when already paused. Audited with who did it, and
+   * pushed to every open dashboard so the banner appears everywhere at once.
+   */
+  async setOwnerAiPause(input: {
+    organizationId: string;
+    userId: string;
+    paused: boolean;
+  }): Promise<OrganizationAccessState | null> {
+    const organization = await this.repository.findOneBy({ id: input.organizationId });
+    if (!organization) return null;
+
+    const wasPaused = !!organization.aiPausedAt;
+    if (input.paused && !wasPaused) {
+      organization.aiPausedAt = new Date();
+      organization.aiPausedByUserId = input.userId;
+    } else if (!input.paused) {
+      organization.aiPausedAt = null;
+      organization.aiPausedByUserId = null;
+    }
+    await this.repository.update(
+      { id: organization.id },
+      { aiPausedAt: organization.aiPausedAt, aiPausedByUserId: organization.aiPausedByUserId },
+    );
+    const state = toAccessState(organization);
+
+    if (wasPaused !== input.paused) {
+      try {
+        await auditLogService.log({
+          organizationId: organization.id,
+          userId: input.userId,
+          action: input.paused ? "organization.ai_paused" : "organization.ai_resumed",
+          resource: "organization",
+          metadata: { source: "dashboard" },
+        });
+      } catch (error) {
+        logger.error(
+          { err: error, organizationId: organization.id },
+          "Failed to audit AI pause change",
+        );
+      }
+      websocketService.sendToOrganization(organization.id, {
+        type: ORGANIZATION_ACCESS_CHANGED_EVENT,
+        payload: state,
+      });
+      logger.info(
+        { organizationId: organization.id, userId: input.userId, paused: input.paused },
+        "Owner AI pause changed",
+      );
+    }
 
     return state;
   }

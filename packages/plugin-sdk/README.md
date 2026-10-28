@@ -529,6 +529,55 @@ const mcp = await ctx.mcp.startExternal({
 console.log(mcp.transport); // 'stdio'
 ```
 
+### Tool errors (`@hay/plugin-sdk/tool-errors`)
+
+A failed tool call should tell the agent _why_ in a form it can act on: a business
+refusal ("already shipped") is not an outage, and an outage is not a broken
+connection. Throw a `ToolError` and return `toolErrorResult(err)`; the MCP error
+text becomes JSON `{ code, retryable, message, details? }`.
+
+| code               | retryable | meaning                                                                      |
+| ------------------ | --------- | ---------------------------------------------------------------------------- |
+| `BAD_INPUT`        | no        | Missing or invalid arguments                                                 |
+| `NOT_FOUND`        | no        | The order, customer or item doesn't exist                                    |
+| `PRECONDITION`     | no        | A business rule refused it (e.g. already shipped)                            |
+| `PROVIDER_REFUSED` | no        | The platform rejected the request                                            |
+| `AUTH_FAILED`      | no        | Credentials expired, revoked or wrong: reconnect                             |
+| `SCOPE_MISSING`    | no        | The connection lacks a permission: reconnect with access                     |
+| `RATE_LIMITED`     | yes       | Throttled; retry later                                                       |
+| `PROVIDER_DOWN`    | yes       | The platform failed on a read; retry later                                   |
+| `OUTCOME_UNKNOWN`  | no        | A write failed in a way that may still have applied: check before retrying   |
+| `NEEDS_APPROVAL`   | no        | Above the merchant's cap: core holds it for a person (capped tools only)     |
+| `INTERNAL`         | no        | The plugin failed or is misconfigured (also the fallback for uncoded errors) |
+
+The module is dependency-free CommonJS so local MCP servers (CommonJS scripts) can
+`require()` it; ESM can `import` it. Declare `"@hay/plugin-sdk": "file:../../../../packages/plugin-sdk"`
+in the MCP server's own `package.json`.
+
+```js
+const { toolError, toolErrorResult, codeForHttpStatus } = require("@hay/plugin-sdk/tool-errors");
+
+server.tool("store_cancel_order", "…", shape, async (args) => {
+  try {
+    const order = await getOrder(args.order_id);
+    if (order.shipped) {
+      throw toolError("PRECONDITION", `Order ${order.number} has already shipped.`, {
+        details: { reason: "ALREADY_SHIPPED" },
+      });
+    }
+    // …
+  } catch (err) {
+    return toolErrorResult(err);
+  }
+});
+```
+
+In the HTTP client, decide idempotency once per request: retry 429 for any method,
+retry 5xx and network errors only for reads, and turn a failed write into
+`OUTCOME_UNKNOWN` (`codeForHttpStatus(status, { idempotent })`,
+`codeForNetworkFailure({ idempotent })`). See `plugins/core/shopify/mcp/lib/client.js`
+and `plugins/core/woocommerce/mcp/lib/client.js`.
+
 ## HTTP Routes
 
 Register custom API endpoints:

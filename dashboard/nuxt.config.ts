@@ -103,6 +103,11 @@ export default defineNuxtConfig({
           "en/customers.json",
           "en/access.json",
           "en/home.json",
+          "en/insights.json",
+          "en/actions.json",
+          "en/usage.json",
+          "en/evidence.json",
+          "en/tests.json",
         ],
       },
       {
@@ -125,6 +130,11 @@ export default defineNuxtConfig({
           "pt-BR/customers.json",
           "pt-BR/access.json",
           "pt-BR/home.json",
+          "pt-BR/insights.json",
+          "pt-BR/actions.json",
+          "pt-BR/usage.json",
+          "pt-BR/evidence.json",
+          "pt-BR/tests.json",
         ],
       },
     ],
@@ -225,25 +235,25 @@ export default defineNuxtConfig({
   // App configuration
   app: {
     head: {
-      title: "Hay Dashboard",
+      title: "Hay.chat",
       meta: [
         { charset: "utf-8" },
         {
           name: "viewport",
           content: "width=device-width, initial-scale=1, viewport-fit=cover",
         },
-        { name: "description", content: "Hay platform dashboard application" },
+        { name: "description", content: "Hay.chat dashboard" },
         { name: "robots", content: "noindex, nofollow" },
         // Installable on phones (Add to Home Screen); iOS needs this to allow Web Push
         { name: "theme-color", content: "#001df5" },
         { name: "mobile-web-app-capable", content: "yes" },
         { name: "apple-mobile-web-app-capable", content: "yes" },
-        { name: "apple-mobile-web-app-title", content: "Hay" },
+        { name: "apple-mobile-web-app-title", content: "Hay.chat" },
         { name: "apple-mobile-web-app-status-bar-style", content: "default" },
       ],
       link: [
         { rel: "manifest", href: "/manifest.webmanifest" },
-        { rel: "apple-touch-icon", href: "/favicon.png" },
+        { rel: "apple-touch-icon", sizes: "180x180", href: "/apple-touch-icon.png" },
         { rel: "preconnect", href: "https://fonts.googleapis.com" },
         { rel: "preconnect", href: "https://fonts.gstatic.com", crossorigin: "" },
         {

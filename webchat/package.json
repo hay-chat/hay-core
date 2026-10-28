@@ -5,12 +5,14 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "vite build && vite build -c vite.loader.config.ts",
     "build:watch": "vite build --watch",
     "preview": "vite preview",
     "typecheck": "vue-tsc --noEmit",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "check:perf": "node scripts/check-perf.mjs",
+    "perf:lighthouse": "node scripts/perf/lighthouse.mjs"
   },
   "dependencies": {
     "vue": "^3.4.21"

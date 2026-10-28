@@ -34,9 +34,14 @@ export const RESOURCES = {
   PLUGINS: "plugins",
   ANALYTICS: "analytics",
   AUDIT_LOGS: "audit_logs",
+  // Usage and the resolution ledger; only the admin/owner wildcard holds it
+  BILLING: "billing",
 
   // Commerce
   PRODUCTS: "products",
+
+  // Write actions the AI held for approval (refunds, cancels, ...)
+  ACTIONS: "actions",
 
   // Wildcards
   ALL: "*",
@@ -62,6 +67,7 @@ export const ACTIONS = {
   INVITE: "invite", // Invite users
   EXPORT: "export", // Export data
   IMPORT: "import", // Import data
+  APPROVE: "approve", // Approve or reject something held for a person
 
   // Wildcards
   ALL: "*",

@@ -1,6 +1,12 @@
 import { createLogger } from "@server/lib/logger";
 import type { Conversation } from "@server/database/entities/conversation.entity";
 import type { Message } from "@server/database/entities/message.entity";
+import {
+  isWidgetVisibleMessage,
+  toPublicAttachments,
+  toPublicMessageEvent,
+} from "./webchat/public-message";
+import { isSimulationConversation } from "./simulation/simulation-kind";
 
 const logger = createLogger("websocket");
 
@@ -27,6 +33,8 @@ class ConversationEventsService {
     conversation: MessageBroadcastConversation,
     message: Message,
   ): Promise<void> {
+    // Simulated conversations (D7-7) reach no one: no dashboard, widget or channel.
+    if (isSimulationConversation(conversation.metadata)) return;
     try {
       const { redisService } = await import("./redis.service");
 
@@ -54,7 +62,7 @@ class ConversationEventsService {
 
       // Same gate websocketService applies on the Redis path: the customer only
       // ever sees public, released messages (or everything in the playground).
-      const isPublic = ["Customer", "BotAgent", "HumanAgent"].includes(message.type);
+      const isPublic = isWidgetVisibleMessage(message.type, message.metadata);
       const isPlayground = conversation.metadata?.isPlayground === true;
       if (!isPlayground && !(isPublic && message.deliveryState === "sent")) {
         logger.debug({ messageId: message.id }, "Redis unavailable; message kept off webchat");
@@ -62,17 +70,25 @@ class ConversationEventsService {
       }
 
       const { websocketService } = await import("./websocket.service");
-      const sent = websocketService.sendToConversation(conversation.id, {
-        type: "message",
-        data: {
-          id: message.id,
-          content: message.content,
-          type: message.type,
-          sender: message.sender,
-          timestamp: message.created_at,
-          metadata: message.metadata,
-        },
-      });
+      const data = {
+        id: message.id,
+        content: message.content,
+        type: message.type,
+        sender: message.sender,
+        timestamp: message.created_at,
+        attachments: message.attachments ?? [],
+        metadata: message.metadata,
+      };
+      const attachments = await toPublicAttachments(
+        message.attachments,
+        conversation.organization_id,
+      );
+      const sent = websocketService.sendToConversation(
+        conversation.id,
+        isPlayground
+          ? { type: "message", conversationId: conversation.id, data: { ...data, attachments } }
+          : toPublicMessageEvent(conversation.id, data, attachments),
+      );
       logger.debug(
         { messageId: message.id, conversationId: conversation.id, clientCount: sent },
         "Sent message to clients (Redis not available)",
@@ -90,6 +106,7 @@ class ConversationEventsService {
    * Broadcast conversation created event
    */
   async broadcastConversationCreated(conversation: Conversation): Promise<void> {
+    if (isSimulationConversation(conversation.metadata)) return;
     try {
       const { redisService } = await import("./redis.service");
 
@@ -138,6 +155,7 @@ class ConversationEventsService {
     conversation: Conversation,
     changedFields?: string[],
   ): Promise<void> {
+    if (isSimulationConversation(conversation.metadata)) return;
     try {
       const { redisService } = await import("./redis.service");
 
@@ -185,6 +203,7 @@ class ConversationEventsService {
               }
             : null,
           metadata: conversation.metadata,
+          reply_window_expires_at: conversation.reply_window_expires_at,
           changedFields, // Optional: which fields were changed
         },
       };

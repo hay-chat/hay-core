@@ -1,4 +1,6 @@
 import type { OrgLlmConfig } from "@server/services/llm/provider.types";
+import type { AiRegion } from "@server/services/llm/ai-region";
+import type { WriteCategory } from "@server/services/core/tool-risk";
 
 export type { OrgLlmConfig };
 
@@ -321,6 +323,125 @@ export const DEFAULT_ACTION_CLAIM_GUARDRAIL_CONFIG: ActionClaimGuardrailConfig =
 };
 
 /**
+ * Action approval (D4-3 / D4-4): which AI write actions wait for a person.
+ */
+export interface ActionApprovalConfig {
+  /**
+   * Master switch: approval for AI write actions is on. Off = every call runs
+   * (a playbook's own approval list still applies). Only the owner can turn it off.
+   */
+  moneyMovesNeedApproval: boolean;
+  /** Refunds and discounts at or below this amount run without approval. 0 holds every one. */
+  thresholdAmount: number;
+  /**
+   * Per write category: true = needs approval (D4-9). A missing category uses
+   * the default: money moves (refund, cancel, discount, exchange) need approval,
+   * the rest do not. Destructive tools and tools that do not declare a category
+   * are always held.
+   */
+  categories: Partial<Record<ApprovalCategory, boolean>>;
+  /**
+   * The AI asks the shopper "shall I do it?" before a write action and only
+   * proceeds after they answer (D4-10). Always on for cancels.
+   */
+  customerConfirmation: boolean;
+  /** Roles that may approve or reject. The owner always can. */
+  approverRoles: Array<"owner" | "admin" | "member" | "viewer" | "contributor" | "agent">;
+  /** Hours a held action waits before the conversation is escalated to a person. */
+  expiryHours: number;
+}
+
+/**
+ * Write categories the owner can switch approval on or off for. Not
+ * "destructive" or "other_write": those are always held while approval is on.
+ */
+export const APPROVAL_CATEGORIES = [
+  "refund",
+  "cancel",
+  "discount",
+  "exchange",
+  "return",
+  "address_change",
+  "customer_update",
+  "note",
+] as const satisfies readonly WriteCategory[];
+
+export type ApprovalCategory = (typeof APPROVAL_CATEGORIES)[number];
+
+export const DEFAULT_ACTION_APPROVAL_CONFIG: ActionApprovalConfig = {
+  moneyMovesNeedApproval: true,
+  thresholdAmount: 0,
+  categories: {},
+  customerConfirmation: true,
+  approverRoles: ["owner", "admin"],
+  expiryHours: 48,
+};
+
+/** The org's action approval settings with defaults filled in. */
+export function resolveActionApprovalConfig(
+  settings: OrganizationSettings | null | undefined,
+): ActionApprovalConfig {
+  return { ...DEFAULT_ACTION_APPROVAL_CONFIG, ...(settings?.actionApproval ?? {}) };
+}
+
+/**
+ * AI disclosure label (D14-6/D14-7): the badge on AI replies in the widget and the
+ * first-reply line on other channels. On everywhere by default. EU organizations
+ * can rename it but not hide it (see services/ai-disclosure.ts).
+ */
+export interface AiDisclosureConfig {
+  /** Custom label text. Empty or missing = the localized default ("AI assistant"). */
+  label?: string | null;
+  /** Channel ids ("web" = widget) where the label is hidden. Ignored for EU orgs. */
+  hiddenChannels?: string[];
+}
+
+/**
+ * Per-channel AI mode. Keyed by channel id ("web" or a channel plugin's
+ * manifest `channel`). Missing = "on".
+ * - "on": AI replies go out (subject to Require Approval).
+ * - "drafts" (D14-7): the AI writes the reply and a person approves it before
+ *   it is sent (the same queue as Require Approval / test mode).
+ * - "off" (D7-14): the AI does not answer on this channel at all; shopper
+ *   messages wait for the team. Lets a store go live on one channel first
+ *   ("start on Web Chat only").
+ */
+export const CHANNEL_AI_MODES = ["on", "drafts", "off"] as const;
+export type ChannelAiMode = (typeof CHANNEL_AI_MODES)[number];
+
+export function resolveChannelAiMode(
+  settings: OrganizationSettings | null | undefined,
+  channel: string,
+): ChannelAiMode {
+  const mode = settings?.channelAiModes?.[channel];
+  return mode && (CHANNEL_AI_MODES as readonly string[]).includes(mode) ? mode : "on";
+}
+
+/**
+ * Customer files (D8-11/12/15). Missing values mean the defaults below, so
+ * existing organizations read images unless they turned it off.
+ */
+export interface MediaSettings {
+  /** The AI reads customer photos and PDFs (vision pass). Default on. */
+  readImages?: boolean;
+  /** The AI may see ID documents (owner only). Payment cards are never shown. Default off. */
+  allowIdDocuments?: boolean;
+  /** Where complete product-problem cases are emailed. Unset = Inbox only. */
+  caseEmail?: string | null;
+}
+
+export function resolveMediaSettings(
+  settings: OrganizationSettings | null | undefined,
+): Required<MediaSettings> {
+  const media = settings?.media;
+  return {
+    readImages: media?.readImages !== false,
+    allowIdDocuments: media?.allowIdDocuments === true,
+    caseEmail: typeof media?.caseEmail === "string" && media.caseEmail ? media.caseEmail : null,
+  };
+}
+
+/**
  * Organization Settings JSONB structure
  * This type defines the complete structure of the settings field in the Organization entity
  */
@@ -330,8 +451,19 @@ export interface OrganizationSettings {
   companyInterestGuardrail?: CompanyInterestGuardrailConfig; // Stage 1: Company interest protection
   confidenceGuardrail?: ConfidenceGuardrailConfig; // Stage 2: Fact grounding
   actionClaimGuardrail?: ActionClaimGuardrailConfig; // Stage 0: Action-claim vs tool-call consistency
-  retentionDays?: number | null; // Data retention period in days (null = disabled/forever)
+  retentionDays?: number | null; // Data retention period in days (null = disabled/forever; new orgs start at DEFAULT_NEW_ORG_RETENTION_DAYS)
   isPlayground?: boolean; // Enables playground mode for public conversations (demo orgs only)
   llm?: OrgLlmConfig; // Per-org LLM chat provider + tier→model map (embeddings stay managed)
+  aiRegion?: AiRegion; // Where AI calls are processed; "eu" routes everything to the EU endpoint
+  actionApproval?: Partial<ActionApprovalConfig>; // Which AI write actions wait for a person
+  aiDisclosure?: AiDisclosureConfig; // AI label on replies, per channel
+  channelAiModes?: Record<string, ChannelAiMode>; // Per-channel AI mode; missing = "on"
+  media?: MediaSettings; // Customer photos/PDFs: AI reading, ID documents, case email
   [key: string]: unknown;
 }
+
+/**
+ * Retention for organizations created from now on (D14-8, Roger's D14 answer 7).
+ * Existing organizations keep what they had (usually null = keep forever).
+ */
+export const DEFAULT_NEW_ORG_RETENTION_DAYS = 365;

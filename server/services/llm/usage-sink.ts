@@ -10,18 +10,23 @@
  * @module services/llm/usage-sink
  */
 
+import { AsyncLocalStorage } from "node:async_hooks";
 import { createLogger } from "@server/lib/logger";
 import type { ModelTier, UsageRecord } from "./provider.types";
+import type { AiRegion } from "./ai-region";
 
 const logger = createLogger("llm-usage");
 
 export interface UsageEvent {
-  kind: "chat" | "embedding";
+  /** "vision" = customer photo/PDF pass (D8-11); "transcription" = voice notes (D8-5). */
+  kind: "chat" | "embedding" | "vision" | "transcription";
   usage: UsageRecord;
   model: string;
   provider: string;
   organizationId?: string;
   tier?: ModelTier;
+  /** Region of the endpoint that served the call. */
+  region?: AiRegion;
 }
 
 export type UsageSink = (event: UsageEvent) => void;
@@ -33,12 +38,26 @@ export function setUsageSink(fn: UsageSink | undefined): void {
   sink = fn;
 }
 
+const collectors = new AsyncLocalStorage<UsageSink>();
+
+/**
+ * Run `fn` with `collector` also receiving every usage event emitted inside it
+ * (its awaited calls included), next to the process-wide sink. Used to cost
+ * one piece of work, such as a simulated conversation (D7-7).
+ */
+export function withUsageCollector<T>(collector: UsageSink, fn: () => Promise<T>): Promise<T> {
+  return collectors.run(collector, fn);
+}
+
 /** Emit a usage event to the registered sink. Never throws into the caller. */
 export function emitUsage(event: UsageEvent): void {
-  if (!sink) return;
-  try {
-    sink(event);
-  } catch (err) {
-    logger.warn({ err }, "Usage sink threw; ignoring");
+  const collector = collectors.getStore();
+  for (const target of [sink, collector]) {
+    if (!target) continue;
+    try {
+      target(event);
+    } catch (err) {
+      logger.warn({ err }, "Usage sink threw; ignoring");
+    }
   }
 }

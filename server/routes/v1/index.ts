@@ -27,6 +27,18 @@ import { docsAuditRouter } from "./docs-audit";
 import { productsRouter } from "./products";
 import { internalRouter } from "./internal";
 import { notificationsRouter } from "./notifications";
+import { actionsRouter } from "./actions";
+import { businessHoursRouter } from "./business-hours";
+import { usageRouter } from "./usage";
+import { organizationExportRouter } from "./organization-export";
+import { evidencePacksRouter } from "./evidence-packs";
+import { disputesRouter } from "./disputes";
+import { emailDomainsRouter } from "./email-domains";
+import { insightsRouter } from "./insights";
+import { simulationsRouter } from "./simulations";
+import { testTranscriptsRouter } from "./test-transcripts";
+import { replaysRouter } from "./replays";
+import { testCasesRouter } from "./test-cases";
 
 // Core routers - always available
 const coreRouters = {
@@ -57,6 +69,18 @@ const coreRouters = {
   docsAudit: docsAuditRouter,
   products: productsRouter,
   notifications: notificationsRouter,
+  actions: actionsRouter,
+  businessHours: businessHoursRouter,
+  usage: usageRouter,
+  organizationExport: organizationExportRouter,
+  evidencePacks: evidencePacksRouter,
+  disputes: disputesRouter,
+  emailDomains: emailDomainsRouter,
+  insights: insightsRouter,
+  simulations: simulationsRouter,
+  testTranscripts: testTranscriptsRouter,
+  replays: replaysRouter,
+  testCases: testCasesRouter,
 };
 
 // Create v1Router with core + plugin routers

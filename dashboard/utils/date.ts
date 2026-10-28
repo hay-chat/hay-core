@@ -191,3 +191,42 @@ export function isWithinMinutes(date: Date | string | null | undefined, minutes:
   const diff = now.getTime() - parsedDate.getTime();
   return diff < minutes * 60000;
 }
+
+/**
+ * Format a Date as its local calendar day, "YYYY-MM-DD". `toISOString()`
+ * would give the UTC day, which is a different day near midnight.
+ */
+export function toLocalDateString(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+/**
+ * Parse a "YYYY-MM-DD" calendar day (as date inputs and DateRangeSelector
+ * produce) as local midnight. `new Date("YYYY-MM-DD")` would read it as UTC.
+ */
+export function parseLocalDate(value: string): Date | null {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  if (!match) return null;
+  return new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
+}
+
+/**
+ * Turn a range of local calendar days into the ISO instants the API filters
+ * on (`>= startDate`, `<= endDate`): from the start of the first day to the
+ * end of the last day, so the end day (e.g. today) is included in full.
+ */
+export function toISODateRange(range: { startDate?: string; endDate?: string }): {
+  startDate?: string;
+  endDate?: string;
+} {
+  const start = range.startDate ? parseLocalDate(range.startDate) : null;
+  const end = range.endDate ? parseLocalDate(range.endDate) : null;
+  end?.setHours(23, 59, 59, 999);
+  return {
+    startDate: start?.toISOString(),
+    endDate: end?.toISOString(),
+  };
+}

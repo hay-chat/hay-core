@@ -59,7 +59,7 @@
 
     <!-- Footer -->
     <div class="mt-8 text-center text-sm text-gray-600">
-      <p>&copy; 2025 Hay. All rights reserved.</p>
+      <p>&copy; 2025 Hay.chat. All rights reserved.</p>
     </div>
   </div>
 </template>

@@ -5,12 +5,25 @@ import { conversationRepository } from "../repositories/conversation.repository"
 import jwt from "jsonwebtoken";
 import { config } from "../config/env";
 import type { JWTPayload } from "../types/auth.types";
-import type { Message } from "../database/entities/message.entity";
 import { MessageType } from "../database/entities/message.entity";
 import { createLogger } from "@server/lib/logger";
+import { AppDataSource } from "@server/database/data-source";
+import { UserOrganization } from "@server/entities/user-organization.entity";
 
 const logger = createLogger("websocket");
 import { verifyDPoPForRequest } from "../routes/v1/public-conversations";
+import { getClientIp } from "@server/lib/client-ip";
+import {
+  isWidgetVisibleMessage,
+  toPublicAttachments,
+  toPublicMessageEvent,
+} from "./webchat/public-message";
+import { PUBLIC_WIDGET_LIMITS, isPublicWidgetRateLimited } from "./public-widget-limits";
+
+// Largest frame a client may send. Clients only send small JSON control frames
+// and chat messages (capped at PUBLIC_WIDGET_LIMITS.maxMessageLength); the ws
+// default of 100 MiB would let one frame exhaust memory.
+const MAX_FRAME_BYTES = 64 * 1024;
 
 interface WebSocketClient {
   ws: WebSocket;
@@ -19,6 +32,10 @@ interface WebSocketClient {
   conversationId?: string;
   pluginId?: string;
   authenticated: boolean;
+  /** Client IP from the proxy headers; kept out of `metadata`, which identify lets the client extend. */
+  ip: string;
+  /** Resolves once token authentication (if any) has finished. */
+  ready: Promise<void>;
   metadata: Record<string, unknown>;
 }
 
@@ -44,11 +61,6 @@ interface ChatMessage extends WebSocketMessage {
 
 interface TypingMessage extends WebSocketMessage {
   isTyping: boolean;
-}
-
-interface LoadHistoryMessage extends WebSocketMessage {
-  limit?: number;
-  offset?: number;
 }
 
 interface SubscribeMessage extends WebSocketMessage {
@@ -107,6 +119,7 @@ export class WebSocketService {
         port: serverOrPort,
         path: "/ws",
         clientTracking: true,
+        maxPayload: MAX_FRAME_BYTES,
       });
       logger.debug({ port: serverOrPort }, "WebSocket server initialized on standalone port");
     } else {
@@ -115,6 +128,7 @@ export class WebSocketService {
         server: serverOrPort,
         path: "/ws",
         clientTracking: true,
+        maxPayload: MAX_FRAME_BYTES,
       });
       logger.debug("WebSocket server initialized");
     }
@@ -178,10 +192,8 @@ export class WebSocketService {
         data: payload,
       };
 
-      // Define public message types (visible to customers via webchat)
-      const publicMessageTypes = ["Customer", "BotAgent", "HumanAgent"];
-      const isPublicMessage =
-        payload?.type !== undefined && publicMessageTypes.includes(payload.type);
+      // Customer-facing types plus agent join/leave lines (visible via webchat)
+      const isPublicMessage = isWidgetVisibleMessage(payload?.type, payload?.metadata);
       const isPlayground = payload?.isPlayground === true;
 
       // Always send ALL messages to dashboard (organization clients) for full visibility
@@ -191,12 +203,24 @@ export class WebSocketService {
       // 1. Public message type with SENT delivery state (normal webchat), OR
       // 2. ANY message type for playground conversations (demo mode shows all internal events)
       if ((isPublicMessage && payload?.deliveryState === "sent") || isPlayground) {
-        const conversationSent = this.sendToConversation(conversationId, messagePayload);
-
-        logger.debug(
-          { messageType: payload?.type, conversationSent, orgSent, isPlayground },
-          "Broadcasted message to conversation and org clients",
-        );
+        // Files get signed links first (a DB lookup), so this send is async.
+        void toPublicAttachments(payload?.attachments, organizationId)
+          .catch((error) => {
+            logger.warn({ err: error }, "Could not sign attachments for webchat");
+            return [];
+          })
+          .then((attachments) => {
+            const conversationSent = this.sendToConversation(
+              conversationId,
+              isPlayground
+                ? { ...messagePayload, data: { ...payload, attachments } }
+                : toPublicMessageEvent(conversationId, payload, attachments),
+            );
+            logger.debug(
+              { messageType: payload?.type, conversationSent, orgSent, isPlayground },
+              "Broadcasted message to conversation and org clients",
+            );
+          });
       } else if (!isPublicMessage) {
         logger.debug(
           { messageType: payload?.type, orgSent },
@@ -274,39 +298,18 @@ export class WebSocketService {
       organizationId: organizationId || "",
       customerId: "",
       authenticated: false,
+      ip: getClientIp(req.headers, req.socket.remoteAddress),
+      ready: Promise.resolve(),
       metadata: {
         userAgent: req.headers["user-agent"],
-        ip: req.socket.remoteAddress,
       },
     };
 
     this.clients.set(clientId, client);
 
-    // Authenticate if token provided
-    if (token) {
-      const authenticated = this.authenticateClient(clientId, token);
-      logger.debug(
-        { clientId, authenticated, organizationId: client.organizationId },
-        "Client authentication result",
-      );
-
-      // Add to organization clients if authenticated
-      if (client.authenticated && client.organizationId) {
-        if (!this.organizationClients.has(client.organizationId)) {
-          this.organizationClients.set(client.organizationId, new Set());
-        }
-        this.organizationClients.get(client.organizationId)!.add(clientId);
-        logger.debug(
-          { clientId, organizationId: client.organizationId },
-          "Added client to organization",
-        );
-      } else {
-        logger.debug(
-          { clientId, authenticated: client.authenticated, organizationId: client.organizationId },
-          "Client NOT added to organization",
-        );
-      }
-    }
+    // Authentication checks org membership against the database, so it is
+    // async. Frames that arrive meanwhile wait for it in handleMessage.
+    client.ready = token ? this.authenticateClient(clientId, token) : Promise.resolve();
 
     // Set up event handlers
     ws.on("message", (data) => {
@@ -334,21 +337,39 @@ export class WebSocketService {
   /**
    * Authenticate WebSocket client
    */
-  private authenticateClient(clientId: string, token: string): boolean {
+  private async authenticateClient(clientId: string, token: string): Promise<void> {
     const client = this.clients.get(clientId);
-    if (!client) return false;
+    if (!client) return;
 
+    let decoded: JWTPayloadWithOrg;
     try {
-      const decoded = jwt.verify(token, config.jwt.secret) as JWTPayloadWithOrg;
-      // Keep the organizationId from query params if not in token
-      if (decoded.organizationId) {
-        client.organizationId = decoded.organizationId;
-      }
-      client.authenticated = true;
-      return true;
-    } catch (error) {
-      return false;
+      decoded = jwt.verify(token, config.jwt.secret) as JWTPayloadWithOrg;
+    } catch {
+      return;
     }
+
+    if (decoded.organizationId) {
+      // The token is scoped to one organization.
+      client.organizationId = decoded.organizationId;
+    } else {
+      // User access tokens carry no organization: the `org` query parameter is
+      // only a request, so confirm the user is an active member before
+      // streaming that organization's events.
+      if (!decoded.userId || !client.organizationId) return;
+      const membership = await AppDataSource.getRepository(UserOrganization).findOne({
+        where: { userId: decoded.userId, organizationId: client.organizationId, isActive: true },
+      });
+      if (!membership) {
+        logger.warn({ clientId }, "WebSocket client is not a member of the requested organization");
+        return;
+      }
+    }
+
+    client.authenticated = true;
+    if (!this.organizationClients.has(client.organizationId)) {
+      this.organizationClients.set(client.organizationId, new Set());
+    }
+    this.organizationClients.get(client.organizationId)!.add(clientId);
   }
 
   /**
@@ -359,6 +380,7 @@ export class WebSocketService {
     if (!client) return;
 
     try {
+      await client.ready;
       const message = JSON.parse(data);
 
       switch (message.type) {
@@ -372,10 +394,6 @@ export class WebSocketService {
 
         case "typing":
           await this.handleTypingIndicator(clientId, message);
-          break;
-
-        case "load_history":
-          await this.handleLoadHistory(clientId, message);
           break;
 
         case "subscribe":
@@ -397,7 +415,12 @@ export class WebSocketService {
   }
 
   /**
-   * Handle customer identification
+   * Handle customer identification: attach a webchat client to an existing
+   * conversation so it receives that conversation's public events.
+   *
+   * Conversations are only ever created through `publicConversations.create`,
+   * which registers the browser's DPoP key. Creating one here would produce a
+   * conversation with no key, writable by anyone.
    */
   private async handleIdentify(clientId: string, message: IdentifyMessage): Promise<void> {
     const client = this.clients.get(clientId);
@@ -405,48 +428,32 @@ export class WebSocketService {
 
     const { customerId, conversationId, metadata } = message;
 
-    // Update client info
+    if (!conversationId) {
+      this.sendError(client, "conversationId is required");
+      return;
+    }
+
+    const conversation = await conversationRepository.findById(conversationId);
+    if (
+      !conversation ||
+      conversation.organization_id !== client.organizationId ||
+      conversation.channel !== "web"
+    ) {
+      this.sendError(client, "Conversation not found");
+      return;
+    }
+
     client.customerId = customerId;
-    client.conversationId = conversationId;
+    client.conversationId = conversation.id;
     client.metadata = { ...client.metadata, ...metadata };
 
-    // Get or create conversation
-    let conversation;
-    if (conversationId) {
-      conversation = await conversationRepository.findById(conversationId);
-      if (!conversation || conversation.organization_id !== client.organizationId) {
-        return;
-      }
+    if (!this.conversationClients.has(conversation.id)) {
+      this.conversationClients.set(conversation.id, new Set());
     }
+    this.conversationClients.get(conversation.id)!.add(clientId);
 
-    if (!conversation && client.organizationId) {
-      // Create new conversation
-      conversation = await conversationRepository.create({
-        organization_id: client.organizationId,
-        customer_id: customerId,
-        status: "open",
-        metadata: {
-          source: "webchat",
-          ...metadata,
-        },
-      });
-    }
+    logger.debug({ conversationId: conversation.id }, "Webchat client connected to conversation");
 
-    if (conversation) {
-      client.conversationId = conversation.id;
-
-      // Add to conversation clients map
-      if (!this.conversationClients.has(conversation.id)) {
-        this.conversationClients.set(conversation.id, new Set());
-      }
-      this.conversationClients.get(conversation.id)!.add(clientId);
-
-      // Webchat is now a core feature, no longer requires plugin instance
-      // Just log the connection for debugging
-      logger.debug({ conversationId: conversation.id }, "Webchat client connected to conversation");
-    }
-
-    // Send identification confirmation
     client.ws.send(
       JSON.stringify({
         type: "identified",
@@ -457,104 +464,111 @@ export class WebSocketService {
   }
 
   /**
-   * Handle chat message
+   * Handle a chat message from a webchat client.
+   *
+   * Every write needs a valid DPoP proof for the conversation the client
+   * identified into, the same gate as `publicConversations.sendMessage`.
    */
   private async handleChatMessage(clientId: string, message: ChatMessage): Promise<void> {
     const client = this.clients.get(clientId);
-    if (!client || !client.conversationId) return;
+    if (!client) return;
 
-    // Handle message directly in core system (webchat is now core, not a plugin)
+    const conversationId = client.conversationId;
+    if (!conversationId) {
+      this.sendError(client, "Identify with a conversation before sending messages");
+      return;
+    }
+
+    if (!message.proof || !message.method || !message.url) {
+      this.sendError(
+        client,
+        "DPoP authentication required: proof, method and url must be provided",
+      );
+      return;
+    }
+
+    if (
+      typeof message.content !== "string" ||
+      !message.content.trim() ||
+      message.content.length > PUBLIC_WIDGET_LIMITS.maxMessageLength
+    ) {
+      this.sendError(client, "Invalid message content");
+      return;
+    }
+
+    // Per IP before DPoP so a flood never reaches signature verification.
+    if (await isPublicWidgetRateLimited([{ rule: "messagePerIp", id: client.ip }])) {
+      this.sendError(client, "RATE_LIMITED");
+      return;
+    }
+
+    // The proof is verified against the identified conversation. A frame that
+    // names a different conversation is rejected rather than silently rerouted.
+    if (message.conversationId && message.conversationId !== conversationId) {
+      this.sendError(client, "Conversation mismatch");
+      return;
+    }
+
     try {
-      // Check if this is a web conversation that requires DPoP authentication
-      const conversation = await conversationRepository.findById(client.conversationId);
-      if (!conversation) {
-        throw new Error("Conversation not found");
+      const conversation = await conversationRepository.findById(conversationId);
+      if (!conversation || conversation.channel !== "web" || !conversation.publicJwk) {
+        this.sendError(client, "Conversation does not accept webchat messages");
+        return;
       }
 
-      let newNonce: string | undefined;
+      const dpopVerification = await verifyDPoPForRequest(
+        conversationId,
+        message.proof,
+        message.method,
+        message.url,
+      );
 
-      // If conversation has a publicJwk (web channel with DPoP), validate DPoP proof
-      if (conversation.publicJwk) {
-        if (!message.proof || !message.method || !message.url || !message.conversationId) {
+      if (!dpopVerification.success) {
+        if (dpopVerification.newNonce) {
           client.ws.send(
             JSON.stringify({
               type: "error",
-              error:
-                "DPoP authentication required: proof, method, url, and conversationId must be provided",
+              error: "NONCE_EXPIRED",
+              nonce: dpopVerification.newNonce,
             }),
           );
           return;
         }
-
-        // Validate DPoP proof
-        const dpopVerification = await verifyDPoPForRequest(
-          message.conversationId,
-          message.proof,
-          message.method,
-          message.url,
-        );
-
-        if (!dpopVerification.success) {
-          // Check if it's a nonce expiration error
-          if (dpopVerification.error === "NONCE_EXPIRED" && dpopVerification.newNonce) {
-            client.ws.send(
-              JSON.stringify({
-                type: "error",
-                error: "NONCE_EXPIRED",
-                nonce: dpopVerification.newNonce,
-              }),
-            );
-            return;
-          }
-
-          // Other DPoP validation errors
-          client.ws.send(
-            JSON.stringify({
-              type: "error",
-              error: dpopVerification.error || "DPoP validation failed",
-            }),
-          );
-          return;
-        }
-
-        // Store new nonce for response
-        newNonce = dpopVerification.newNonce;
+        this.sendError(client, dpopVerification.error || "DPoP validation failed");
+        return;
       }
 
-      logger.debug({ conversationId: conversation.id }, "Saving customer message to conversation");
+      // Per conversation only after the proof checks out, so knowing a
+      // conversationId is not enough to spend (and mute) a shopper's budget.
+      if (
+        await isPublicWidgetRateLimited([{ rule: "messagePerConversation", id: conversationId }])
+      ) {
+        this.sendError(client, "RATE_LIMITED");
+        return;
+      }
 
-      // Save customer message using conversation.addMessage() to ensure broadcasting
-      // addMessage() also enqueues the conversation for RabbitMQ processing
+      // addMessage() broadcasts the message and enqueues the orchestrator run.
       const savedMessage = await conversation.addMessage({
         content: message.content,
         type: MessageType.CUSTOMER,
         sender: "customer",
       });
 
-      logger.debug({ messageId: savedMessage.id }, "Message saved");
-
-      // Send confirmation with new nonce (if DPoP was validated)
-      const confirmationPayload = {
-        type: "message_sent",
-        messageId: savedMessage.id,
-        ...(newNonce && { nonce: newNonce }),
-      };
-      logger.debug({ confirmationPayload }, "Sending confirmation to client");
-      client.ws.send(JSON.stringify(confirmationPayload));
-
-      // Note: Message broadcasting is handled automatically by conversation.addMessage()
-      // Orchestrator processing is triggered via RabbitMQ queue from conversation.addMessage()
-
-      logger.debug({ conversationId: conversation.id }, "Webchat message processed");
-    } catch (error) {
-      logger.error({ err: error }, "Failed to process webchat message");
       client.ws.send(
         JSON.stringify({
-          type: "error",
-          error: "Failed to send message",
+          type: "message_sent",
+          messageId: savedMessage.id,
+          nonce: dpopVerification.newNonce,
         }),
       );
+    } catch (error) {
+      logger.error({ err: error }, "Failed to process webchat message");
+      this.sendError(client, "Failed to send message");
     }
+  }
+
+  private sendError(client: WebSocketClient, error: string): void {
+    client.ws.send(JSON.stringify({ type: "error", error }));
   }
 
   /**
@@ -573,36 +587,6 @@ export class WebSocketService {
         isTyping: message.isTyping,
       },
       clientId,
-    );
-  }
-
-  /**
-   * Handle load history request
-   */
-  private async handleLoadHistory(clientId: string, message: LoadHistoryMessage): Promise<void> {
-    const client = this.clients.get(clientId);
-    if (!client) return;
-
-    const { conversationId } = message;
-
-    // Load conversation with messages
-    const conversation = await conversationRepository.findById(conversationId as string);
-    if (!conversation || conversation.organization_id !== client.organizationId) {
-      return;
-    }
-
-    const messages = conversation?.messages || [];
-
-    client.ws.send(
-      JSON.stringify({
-        type: "history",
-        messages: messages.map((msg: Message) => ({
-          text: msg.content,
-          sender: msg.type === MessageType.CUSTOMER ? "user" : "agent",
-          timestamp: msg.created_at,
-          metadata: msg.metadata,
-        })),
-      }),
     );
   }
 
@@ -628,18 +612,10 @@ export class WebSocketService {
       return;
     }
 
-    // Add to conversation subscribers (for webchat/unauthenticated clients only)
-    if (!this.conversationClients.has(conversationId as string)) {
-      this.conversationClients.set(conversationId as string, new Set());
-    }
-    this.conversationClients.get(conversationId as string)!.add(clientId as string);
-
-    client.conversationId = conversationId as string;
-
-    logger.debug(
-      { clientId, conversationId },
-      "Client subscribed to conversation (webchat client)",
-    );
+    // Webchat clients attach to their conversation through `identify`, which
+    // checks the organization and channel. An unchecked subscribe would let
+    // anyone listen to any conversation id.
+    this.sendError(client, "Unauthorized");
   }
 
   /**

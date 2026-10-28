@@ -17,7 +17,22 @@ import type {
   CronJobOptions,
   CronJobDescriptor,
   WebhookRoutingDescriptor,
+  WebchatContributionOptions,
+  WebchatContributionDescriptor,
+  WebchatGateEvent,
+  WebchatGateHandler,
+  WebchatGateDescriptor,
+  WebchatMetadata,
 } from "../types/index.js";
+
+/**
+ * Registered webchat gate (descriptor + handler).
+ *
+ * @internal
+ */
+export interface RegisteredWebchatGate extends WebchatGateDescriptor {
+  handler: WebchatGateHandler;
+}
 
 /**
  * Registered route definition.
@@ -86,6 +101,72 @@ export class PluginRegistry {
    * Declared webhook routing strategy (shared-app fan-out), or undefined.
    */
   private webhookRouting: WebhookRoutingDescriptor | undefined;
+
+  /** Declared webchat contributions. */
+  private webchatContributions: WebchatContributionOptions[] = [];
+
+  /** Registered webchat gates (one per event). */
+  private webchatGates: RegisteredWebchatGate[] = [];
+
+  /**
+   * Register a webchat contribution.
+   *
+   * @param contribution - Contribution options
+   */
+  registerWebchatContribution(contribution: WebchatContributionOptions): void {
+    if (this.webchatContributions.some((c) => c.id === contribution.id)) {
+      throw new Error(`Webchat contribution with id "${contribution.id}" is already registered`);
+    }
+    this.webchatContributions.push(contribution);
+  }
+
+  /**
+   * Register a webchat gate.
+   *
+   * @param gate - Gate descriptor + handler
+   */
+  registerWebchatGate(gate: RegisteredWebchatGate): void {
+    if (this.webchatGates.some((g) => g.event === gate.event)) {
+      throw new Error(`Webchat gate for "${gate.event}" is already registered`);
+    }
+    this.webchatGates.push(gate);
+  }
+
+  /**
+   * Get the registered gate (with handler) for an event.
+   *
+   * @param event - Gate event
+   */
+  getWebchatGate(event: WebchatGateEvent): RegisteredWebchatGate | undefined {
+    return this.webchatGates.find((g) => g.event === event);
+  }
+
+  /**
+   * Get the serialisable webchat metadata for the `/metadata` endpoint.
+   * Config-field references are split out into `configProps`.
+   */
+  getWebchatMetadata(): WebchatMetadata {
+    const contributions: WebchatContributionDescriptor[] = this.webchatContributions.map(
+      ({ id, type, props }) => {
+        const literalProps: Record<string, string | number | boolean> = {};
+        const configProps: Record<string, string> = {};
+        for (const [key, value] of Object.entries(props)) {
+          if (typeof value === "object" && value !== null) {
+            configProps[key] = value.name;
+          } else {
+            literalProps[key] = value;
+          }
+        }
+        return { id, type, props: literalProps, configProps };
+      },
+    );
+    const gates = this.webchatGates.map(({ event, timeoutMs, failurePolicy }) => ({
+      event,
+      timeoutMs,
+      failurePolicy,
+    }));
+    return { contributions, gates };
+  }
 
   /**
    * Register config schema.

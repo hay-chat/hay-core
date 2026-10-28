@@ -36,7 +36,10 @@
         </div>
         <div class="hay-chat-header__info">
           <span class="hay-chat-header__name">{{ displayName }}</span>
-          <span v-if="isShowingTitle && widgetSubtitle" class="hay-chat-header__subtitle">
+          <span v-if="availabilityStatus" class="hay-chat-header__subtitle">
+            {{ availabilityStatus }}
+          </span>
+          <span v-else-if="isShowingTitle && widgetSubtitle" class="hay-chat-header__subtitle">
             {{ widgetSubtitle }}
           </span>
         </div>
@@ -107,8 +110,8 @@
       </div>
     </div>
 
-    <!-- Skeleton loading while connecting -->
-    <div v-if="!isConnected" class="hay-chat-skeleton">
+    <!-- Skeleton while the chat prepares (resuming a conversation can take a moment) -->
+    <div v-if="!isReady" class="hay-chat-skeleton">
       <div class="hay-chat-skeleton__message hay-chat-skeleton__message--agent">
         <div class="hay-chat-skeleton__line" style="width: 70%"></div>
         <div class="hay-chat-skeleton__line" style="width: 50%"></div>
@@ -128,6 +131,20 @@
       :messages="messages"
       :is-typing="isTyping"
       :greeting-message="showGreeting && messages.length === 0 ? greetingMessage : undefined"
+      :ai-label="aiLabel"
+    />
+
+    <WaitingBanner
+      v-if="isWaitingForHuman && !isConversationClosed && saveContactEmail"
+      :detail="waitingDetail ?? null"
+      :contact-saved="contactSaved ?? false"
+      :save-email="saveContactEmail"
+    />
+
+    <ChallengeFrame
+      v-if="setChallengeHost"
+      :interactive="challengeInteractive ?? false"
+      :set-host="setChallengeHost"
     />
 
     <!-- Closed Conversation Footer (replaces input when closed) -->
@@ -143,8 +160,10 @@
     <!-- Input (hidden when conversation is closed) -->
     <MessageInput
       v-else
-      :is-connected="isConnected"
+      :is-ready="isReady"
+      :failure="sendFailure"
       @send="$emit('send', $event)"
+      @attach="(file, caption) => $emit('attach', file, caption)"
       @start-typing="$emit('startTyping')"
       @stop-typing="$emit('stopTyping')"
     />
@@ -186,8 +205,10 @@
 import { computed } from "vue";
 import MessageList from "./MessageList.vue";
 import MessageInput from "./MessageInput.vue";
+import WaitingBanner from "./WaitingBanner.vue";
+import ChallengeFrame from "./ChallengeFrame.vue";
 import { useI18n } from "@/i18n";
-import type { Message } from "@/types";
+import type { Message, SendFailure } from "@/types";
 
 const t = useI18n();
 
@@ -199,7 +220,7 @@ const props = defineProps<{
   greetingMessage?: string;
   messages: Message[];
   isTyping: boolean;
-  isConnected: boolean;
+  isReady: boolean;
   isConversationClosed: boolean;
   isExpanded: boolean;
   agentName?: string;
@@ -207,11 +228,25 @@ const props = defineProps<{
   organizationLogoUrl?: string;
   currentAgentType?: string;
   currentAgentName?: string;
+  sendFailure?: SendFailure | null;
+  aiLabel?: string | null;
+  /** "Open now" / "Back Mon 09:00" when the org set business hours (D5-7). */
+  availabilityStatus?: string | null;
+  /** The conversation waits for a person (D5-10). */
+  isWaitingForHuman?: boolean;
+  waitingDetail?: string | null;
+  contactSaved?: boolean;
+  saveContactEmail?: (email: string) => Promise<boolean>;
+  /** Mount point for the Hay.chat security check frame (challenge@1). */
+  setChallengeHost?: (el: HTMLElement | null) => void;
+  /** The security check needs the shopper to interact. */
+  challengeInteractive?: boolean;
 }>();
 
 defineEmits<{
   close: [];
   send: [message: string];
+  attach: [file: File, caption: string];
   startTyping: [];
   stopTyping: [];
   startNewConversation: [];

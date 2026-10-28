@@ -1,6 +1,6 @@
 export default {
   "widget.defaultTitle": "Schreiben Sie uns",
-  "widget.defaultSubtitle": "Wir antworten normalerweise innerhalb von Minuten",
+  "widget.defaultSubtitle": "Wir sind gerne für Sie da",
   "widget.defaultGreeting": "Hallo! Wie können wir Ihnen heute helfen?",
   "chat.close": "Chat schließen",
   "chat.open": "Chat öffnen",
@@ -10,6 +10,45 @@ export default {
   "chat.startNew": "Neue Unterhaltung starten",
   "chat.poweredBy": "Bereitgestellt von",
   "chat.conversationClosed": "Unterhaltung beendet",
+  "chat.aiLabel": "KI-Assistent",
   "input.placeholder": "Nachricht eingeben...",
   "input.send": "Nachricht senden",
+  "error.sendFailed":
+    "Ihre Nachricht konnte nicht gesendet werden. Bitte versuchen Sie es gleich noch einmal.",
+  "error.messageTooLong":
+    "Ihre Nachricht ist zu lang. Bitte kürzen Sie sie und versuchen Sie es erneut.",
+  "chat.teamMember": "Ein Teammitglied",
+  "chat.agentJoined": "{name} ist dem Chat beigetreten",
+  "chat.agentLeft": "{name} hat den Chat verlassen",
+  "chat.agentReturnedToAi":
+    "{name} hat den Chat verlassen. Sie chatten jetzt wieder mit dem KI-Assistenten.",
+  "availability.open": "Jetzt geöffnet",
+  "availability.backAt": "Zurück {when}",
+  "availability.closed": "Gerade nicht erreichbar",
+  "waiting.title": "Warten auf eine Person",
+  "waiting.typical": "Antwortet meist in {time}",
+  "waiting.alerted": "Wir haben das Team benachrichtigt.",
+  "waiting.closed": "Das Team ist {when} zurück. Bis dahin hilft der KI-Assistent gern weiter.",
+  "waiting.minutes": "~{n} Min.",
+  "waiting.hours": "~{n} Std.",
+  "contact.prompt":
+    "Hinterlassen Sie Ihre E-Mail-Adresse, dann senden wir Ihnen die Antwort des Teams, falls Sie nicht mehr hier sind.",
+  "contact.label": "E-Mail",
+  "contact.placeholder": "sie@beispiel.de",
+  "contact.submit": "Benachrichtigen",
+  "contact.consent": "Wir verwenden Ihre E-Mail-Adresse nur, um auf dieses Gespräch zu antworten.",
+  "contact.saved":
+    "Danke! Falls Sie nicht mehr hier sind, wenn das Team antwortet, schicken wir Ihnen eine E-Mail.",
+  "contact.failed":
+    "Ihre E-Mail-Adresse konnte nicht gespeichert werden. Bitte prüfen Sie sie und versuchen Sie es erneut.",
+  "input.attach": "Foto oder PDF anhängen",
+  "error.fileTooLarge": "Diese Datei ist zu groß. Fotos und PDFs bis 10 MB.",
+  "error.fileType": "Sie können Fotos (JPG, PNG, GIF, WebP) oder PDFs senden.",
+  "error.fileFailed": "Ihre Datei konnte nicht gesendet werden. Bitte versuchen Sie eine andere.",
+  "attachment.photo": "Foto",
+  "attachment.file": "Datei",
+  "attachment.sending": "Wird gesendet...",
+  "error.verificationFailed": "We couldn't verify your message. Please refresh the page and try again.",
+  "challenge.label": "Security check",
+  "challenge.prompt": "Quick security check before we send your message.",
 } as const;

@@ -15,11 +15,11 @@ export const roleProtectedRoutes: Record<string, string[]> = {
   "/settings/billing": ["owner", "admin"],
   "/settings/privacy": ["owner", "admin"],
   "/settings/webchat": ["owner", "admin"],
+  "/settings/business-hours": ["owner", "admin"],
+  "/settings/usage": ["owner", "admin"],
   "/agents": ["owner", "admin"],
 
-  // Analytics - all except agent
-  "/analytics": ["owner", "admin", "contributor", "member", "viewer"],
-  "/analytics/reports": ["owner", "admin", "contributor", "member", "viewer"],
+  // Insights - all except agent
   "/insights": ["owner", "admin", "contributor", "member", "viewer"],
 
   // Content creation - contributor+
@@ -63,6 +63,19 @@ function hasRouteAccess(path: string, userRole: string | undefined): boolean {
 export default defineNuxtRouteMiddleware(
   async (to: RouteLocationNormalized, from: RouteLocationNormalized) => {
     console.log("[Auth Middleware] Checking route:", to.path, "process.client:", process.client);
+
+    // Alert links (push, email) carry ?org=<id>: open them in that organization
+    // for users who belong to several. Before the same-page check, which also
+    // matches the first load.
+    if (process.client && typeof to.query.org === "string") {
+      const userStore = useUserStore();
+      if (
+        to.query.org !== userStore.activeOrganizationId &&
+        userStore.organizations.some((org) => org.id === to.query.org)
+      ) {
+        await userStore.switchOrganization(to.query.org);
+      }
+    }
 
     // Skip auth check if staying on the same page (e.g., opening modals)
     // UNLESS we have URL tokens (for E2E testing)

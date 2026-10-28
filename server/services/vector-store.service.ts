@@ -2,7 +2,8 @@
  * Vector Store Service
  *
  * This service provides vector embedding storage and similarity search using pgvector.
- * It calls the OpenAI embeddings API directly via the OpenAI SDK.
+ * Embeddings go through the org's managed embedding provider, so an EU-only org's
+ * documents and queries are embedded on the EU endpoint.
  *
  * @module services/vector-store
  */
@@ -14,6 +15,7 @@ import { createLogger } from "@server/lib/logger";
 import { llmProviderFactory } from "@server/services/llm/llm-provider.factory";
 import { emitUsage } from "@server/services/llm/usage-sink";
 import type { EmbeddingProvider } from "@server/services/llm/provider.types";
+import type { AiRegion } from "@server/services/llm/ai-region";
 
 const logger = createLogger("vector-store");
 
@@ -49,9 +51,12 @@ export class VectorStoreService {
     this.dimensions = parseInt(process.env.EMBEDDING_DIM || "1536");
   }
 
-  /** Managed embedding provider (env/Hay key); embeddings are org-agnostic. */
-  private async getEmbeddingProvider(): Promise<EmbeddingProvider> {
-    return (await llmProviderFactory.forOrganization()).embedding;
+  /** The org's managed embedding provider; its region follows the org's AI region. */
+  private async getEmbeddingProvider(
+    organizationId: string,
+  ): Promise<{ provider: EmbeddingProvider; region: AiRegion }> {
+    const bundle = await llmProviderFactory.forOrganization(organizationId);
+    return { provider: bundle.embedding, region: bundle.region };
   }
 
   /**
@@ -88,7 +93,7 @@ export class VectorStoreService {
    * to stay within OpenAI API limits (100 texts AND 300K tokens per request).
    * Returns one vector per input text, in the same order.
    */
-  private async embedTexts(texts: string[]): Promise<number[][]> {
+  private async embedTexts(organizationId: string, texts: string[]): Promise<number[][]> {
     // Build batches respecting both count and character limits
     const batches: string[][] = [];
     let currentBatch: string[] = [];
@@ -117,7 +122,7 @@ export class VectorStoreService {
       "Embedding texts",
     );
 
-    const provider = await this.getEmbeddingProvider();
+    const { provider, region } = await this.getEmbeddingProvider(organizationId);
     const allVectors: number[][] = [];
 
     for (let i = 0; i < batches.length; i++) {
@@ -139,6 +144,8 @@ export class VectorStoreService {
         usage: result.usage,
         model: result.model,
         provider: result.provider,
+        organizationId,
+        region,
       });
       allVectors.push(...result.embeddings);
     }
@@ -149,8 +156,8 @@ export class VectorStoreService {
   /**
    * Embed a single query string.
    */
-  private async embedQuery(text: string): Promise<number[]> {
-    const provider = await this.getEmbeddingProvider();
+  private async embedQuery(organizationId: string, text: string): Promise<number[]> {
+    const { provider, region } = await this.getEmbeddingProvider(organizationId);
     const result = await provider.embed({
       model: this.model,
       input: text,
@@ -163,6 +170,8 @@ export class VectorStoreService {
       usage: result.usage,
       model: result.model,
       provider: result.provider,
+      organizationId,
+      region,
     });
     return result.embeddings[0];
   }
@@ -181,7 +190,7 @@ export class VectorStoreService {
     chunks: VectorChunk[],
   ): Promise<string[]> {
     const texts = chunks.map((chunk) => chunk.content);
-    const vectors = await this.embedTexts(texts);
+    const vectors = await this.embedTexts(organizationId, texts);
 
     const insertQuery = `
       INSERT INTO embeddings (
@@ -225,7 +234,7 @@ export class VectorStoreService {
       throw new Error("VectorStore not initialized. Call initialize() first.");
     }
 
-    const queryVector = await this.embedQuery(query);
+    const queryVector = await this.embedQuery(organizationId, query);
 
     const searchQuery = `
       SELECT
@@ -279,7 +288,7 @@ export class VectorStoreService {
       throw new Error("VectorStore not initialized. Call initialize() first.");
     }
 
-    const queryVector = await this.embedQuery(query);
+    const queryVector = await this.embedQuery(organizationId, query);
 
     // Subquery pulls top-N nearest chunks via HNSW, then aggregates by document.
     // Without the inner LIMIT, a GROUP BY over the full org partition would

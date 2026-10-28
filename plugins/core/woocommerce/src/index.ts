@@ -1,4 +1,30 @@
 import { defineHayPlugin } from "@hay/plugin-sdk";
+import { bulkSync, createWooGet } from "./catalog.js";
+import {
+  WcAuthError,
+  WcAuthSessions,
+  buildAuthorizeUrl,
+  buildCallbackUrl,
+  normalizeSiteUrl,
+  safeReturnUrl,
+} from "./wc-auth.js";
+
+/** Re-sync the catalog this often while the worker runs (core keeps it alive). */
+const CATALOG_RESYNC_MS = 6 * 60 * 60 * 1000;
+let resyncTimer: ReturnType<typeof setInterval> | undefined;
+
+/** D16-2 one-click connect: the saved site URL (one org per worker); sessions persist in core. */
+let connectSiteUrl: string | undefined;
+
+function sendWcAuthError(res: any, error: unknown): void {
+  if (error instanceof WcAuthError) {
+    res.status(400).json({ error: { code: error.code, message: error.message } });
+    return;
+  }
+  res.status(500).json({
+    error: { code: "INTERNAL", message: error instanceof Error ? error.message : String(error) },
+  });
+}
 
 /**
  * WooCommerce Plugin
@@ -10,12 +36,72 @@ import { defineHayPlugin } from "@hay/plugin-sdk";
  *
  * Spawns a local Node MCP server (./mcp/index.js) that calls the WooCommerce
  * REST API (wc/v3) with the store's consumer key + secret.
+ *
+ * With the `products` capability, `onStart` also mirrors the catalog (products
+ * and variations) into core via `ctx.productSource` so `recommend_products`
+ * works, and re-syncs every few hours while the worker runs (./catalog.ts).
  */
+/** D6-13 "How to return" owner text → MCP env (unset = the agent hands off). */
+function returnInstructionsEnv(config: {
+  getOptional: <T = unknown>(key: string) => T | undefined;
+}): Record<string, string> {
+  const text = config.getOptional<string>("returnInstructions");
+  return typeof text === "string" && text.trim() ? { RETURN_INSTRUCTIONS: text.trim() } : {};
+}
+
+/** D6-9 per-store stale-tracking thresholds → MCP env (the MCP falls back to 5/10). */
+function staleTrackingEnv(config: {
+  getOptional: <T = unknown>(key: string) => T | undefined;
+}): Record<string, string> {
+  const env: Record<string, string> = {};
+  const domestic = config.getOptional<number | string>("staleTrackingDomesticDays");
+  const international = config.getOptional<number | string>("staleTrackingInternationalDays");
+  if (domestic !== undefined && domestic !== null && domestic !== "") {
+    env.STALE_TRACKING_DOMESTIC_DAYS = String(domestic);
+  }
+  if (international !== undefined && international !== null && international !== "") {
+    env.STALE_TRACKING_INTERNATIONAL_DAYS = String(international);
+  }
+  return env;
+}
+
+/**
+ * D16 goodwill coupon cap → MCP env. Only set values are passed; the MCP
+ * (@hay/plugin-sdk/coupon-policy) applies the defaults (on, 10%, fixed off, 30
+ * days) and clamps bad values.
+ */
+function couponEnv(config: {
+  getOptional: <T = unknown>(key: string) => T | undefined;
+}): Record<string, string> {
+  const env: Record<string, string> = {};
+  const keys: Array<[string, string]> = [
+    ["couponsEnabled", "WOOCOMMERCE_COUPONS_ENABLED"],
+    ["couponMaxPercent", "WOOCOMMERCE_COUPON_MAX_PERCENT"],
+    ["couponMaxAmount", "WOOCOMMERCE_COUPON_MAX_AMOUNT"],
+    ["couponMaxDays", "WOOCOMMERCE_COUPON_MAX_DAYS"],
+  ];
+  for (const [key, name] of keys) {
+    const value = config.getOptional<number | string | boolean>(key);
+    if (value !== undefined && value !== null && value !== "") env[name] = String(value);
+  }
+  return env;
+}
+
 export default defineHayPlugin((globalCtx) => ({
   name: "WooCommerce",
 
   onInitialize(ctx) {
     globalCtx.logger.info("Initializing WooCommerce plugin");
+    const wcAuthSessions = globalCtx.state ? new WcAuthSessions(globalCtx.state) : null;
+    const requireSessions = (): WcAuthSessions => {
+      if (!wcAuthSessions) {
+        throw new WcAuthError(
+          "UNAVAILABLE",
+          "One-click connect is unavailable right now. Enter the keys manually instead.",
+        );
+      }
+      return wcAuthSessions;
+    };
 
     ctx.register.config({
       siteUrl: {
@@ -29,16 +115,69 @@ export default defineHayPlugin((globalCtx) => ({
         type: "string",
         label: "Consumer Key",
         description:
-          "WooCommerce REST API Consumer Key (WooCommerce → Settings → Advanced → REST API, Read/Write)",
-        required: true,
+          "WooCommerce REST API Consumer Key (WooCommerce → Settings → Advanced → REST API, " +
+          "Read/Write). Filled in for you when you use Connect with WooCommerce.",
+        required: false,
         encrypted: true,
       },
       consumerSecret: {
         type: "string",
         label: "Consumer Secret",
         description: "WooCommerce REST API Consumer Secret",
-        required: true,
+        required: false,
         encrypted: true,
+      },
+      couponsEnabled: {
+        type: "boolean",
+        label: "Allow goodwill coupons",
+        description:
+          "Let the agent create single-use apology coupons, restricted to the customer's email, " +
+          "within the caps below. A coupon above the cap waits for a team member to approve it.",
+        default: true,
+      },
+      couponMaxPercent: {
+        type: "number",
+        label: "Coupon cap: maximum percentage",
+        description:
+          "Largest percentage discount the agent may give (0 turns percentage coupons off).",
+        default: 10,
+      },
+      couponMaxAmount: {
+        type: "number",
+        label: "Coupon cap: maximum fixed amount",
+        description:
+          "Largest fixed discount in your store currency (0 or empty turns fixed-amount coupons off).",
+        default: 0,
+      },
+      couponMaxDays: {
+        type: "number",
+        label: "Coupon validity (days)",
+        description: "Coupons the agent creates expire after at most this many days.",
+        default: 30,
+      },
+      staleTrackingDomesticDays: {
+        type: "number",
+        label: "Stale tracking: domestic (days)",
+        description:
+          "Treat a domestic shipment as stuck when its tracking has not moved for more than " +
+          "this many days.",
+        default: 5,
+      },
+      staleTrackingInternationalDays: {
+        type: "number",
+        label: "Stale tracking: international (days)",
+        description:
+          "Treat an international shipment as stuck when its tracking has not moved for more " +
+          "than this many days.",
+        default: 10,
+      },
+      returnInstructions: {
+        type: "string",
+        label: "How to return",
+        description:
+          "Your return process, in your words: where to send items, any link or form, and " +
+          "deadlines. Hay.chat relays it as written when a customer asks how to return " +
+          "something. Leave empty and Hay.chat hands those questions to your team.",
       },
     });
 
@@ -46,6 +185,53 @@ export default defineHayPlugin((globalCtx) => ({
       id: "woocommerce-apikey",
       label: "WooCommerce API Key",
       configField: "consumerKey",
+    });
+
+    // D16-2 one-click connect (see ./wc-auth.ts).
+    ctx.register.ui.page({
+      id: "woocommerce-connect",
+      title: "Connect with WooCommerce",
+      component: "./components/settings/AfterSettings.vue",
+      slot: "after-settings",
+      icon: "plug",
+    });
+
+    // Settings UI (authenticated, org-scoped via plugins.callUiRoute).
+    ctx.register.route("POST", "/ui/wc-auth/start", async (req, res) => {
+      try {
+        const siteUrl = normalizeSiteUrl(connectSiteUrl);
+        const callbackUrl = buildCallbackUrl(
+          process.env.HAY_API_URL,
+          process.env.HAY_PLUGIN_ID || "hay-plugin-woocommerce",
+          process.env.HAY_ORG_ID || "",
+        );
+        const nonce = await requireSessions().start(siteUrl);
+        const returnUrl = safeReturnUrl(req.body?.returnUrl, siteUrl);
+        res.json({ nonce, authorizeUrl: buildAuthorizeUrl({ siteUrl, nonce, callbackUrl, returnUrl }) });
+      } catch (error) {
+        sendWcAuthError(res, error);
+      }
+    });
+
+    ctx.register.route("POST", "/ui/wc-auth/status", async (req, res) => {
+      try {
+        res.json(await requireSessions().status(req.body?.nonce));
+      } catch (error) {
+        sendWcAuthError(res, error);
+      }
+    });
+
+    // Public: WooCommerce posts the generated keys here through the core proxy.
+    ctx.register.route("POST", "/wc-auth/callback", async (req, res) => {
+      try {
+        await requireSessions().receive(req.body);
+        res.status(200).json({ ok: true });
+      } catch (error) {
+        globalCtx.logger.warn("WooCommerce one-click connect callback rejected", {
+          code: error instanceof WcAuthError ? error.code : "INTERNAL",
+        });
+        sendWcAuthError(res, error);
+      }
     });
 
     globalCtx.logger.info("WooCommerce plugin config and auth methods registered");
@@ -119,6 +305,7 @@ export default defineHayPlugin((globalCtx) => ({
     const siteUrl = ctx.config.getOptional<string>("siteUrl");
     const consumerKey = ctx.config.getOptional<string>("consumerKey");
     const consumerSecret = ctx.config.getOptional<string>("consumerSecret");
+    connectSiteUrl = siteUrl;
 
     if (!siteUrl || !consumerKey || !consumerSecret) {
       ctx.logger.info(
@@ -138,6 +325,9 @@ export default defineHayPlugin((globalCtx) => ({
           WORDPRESS_SITE_URL: siteUrl,
           WOOCOMMERCE_CONSUMER_KEY: consumerKey,
           WOOCOMMERCE_CONSUMER_SECRET: consumerSecret,
+          ...staleTrackingEnv(ctx.config),
+          ...returnInstructionsEnv(ctx.config),
+          ...couponEnv(ctx.config),
         },
       });
 
@@ -145,6 +335,28 @@ export default defineHayPlugin((globalCtx) => ({
     } catch (error) {
       ctx.logger.error("Failed to start WooCommerce MCP server:", error);
       throw error;
+    }
+
+    // Products capability: mirror the catalog into core for `recommend_products`.
+    // Runs in the background so it never blocks startup.
+    if (ctx.productSource) {
+      const productSource = ctx.productSource;
+      const wooGet = createWooGet({ siteUrl, consumerKey, consumerSecret });
+      const logger = {
+        info: (msg: string, c?: Record<string, unknown>) => ctx.logger.info(msg, c),
+      };
+      const sync = () =>
+        bulkSync(wooGet, productSource, logger).catch((err) =>
+          ctx.logger.error("WooCommerce catalog sync failed", err),
+        );
+      void sync();
+      if (resyncTimer) clearInterval(resyncTimer);
+      resyncTimer = setInterval(sync, CATALOG_RESYNC_MS);
+    } else {
+      ctx.logger.info(
+        "WooCommerce: productSource runtime not available — skipping catalog sync " +
+          "(capability not negotiated or plugin-api credentials missing).",
+      );
     }
   },
 
@@ -154,6 +366,8 @@ export default defineHayPlugin((globalCtx) => ({
   },
 
   async onDisable(ctx) {
+    if (resyncTimer) clearInterval(resyncTimer);
+    resyncTimer = undefined;
     ctx.logger.info("WooCommerce plugin disabled for org", { orgId: ctx.org.id });
   },
 }));

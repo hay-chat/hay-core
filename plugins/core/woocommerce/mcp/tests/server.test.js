@@ -14,16 +14,24 @@ const { StdioClientTransport } = require("@modelcontextprotocol/sdk/client/stdio
 
 const EXPECTED_TOOLS = [
   "woocommerce_add_order_note",
+  "woocommerce_calculate_refund",
   "woocommerce_cancel_order",
   "woocommerce_check_inventory",
+  "woocommerce_create_coupon",
   "woocommerce_create_refund",
   "woocommerce_find_customer",
   "woocommerce_get_order",
   "woocommerce_get_order_tracking",
   "woocommerce_get_product",
+  "woocommerce_get_product_by_slug",
+  "woocommerce_get_return_instructions",
   "woocommerce_get_store",
   "woocommerce_list_customer_orders",
+  "woocommerce_resend_order_confirmation",
+  "woocommerce_resend_pix",
   "woocommerce_search_products",
+  "woocommerce_update_customer",
+  "woocommerce_update_customer_address",
   "woocommerce_update_order_shipping_address",
 ];
 
@@ -49,6 +57,22 @@ describe("woocommerce MCP server (stdio)", () => {
         expect(tool.description.length).toBeGreaterThan(20);
         expect(tool.inputSchema.type).toBe("object");
       }
+      // Risk classes reach tools/list, where Hay.chat core reads them.
+      const byName = Object.fromEntries(tools.map((t) => [t.name, t]));
+      expect(byName.woocommerce_get_order.annotations).toEqual({
+        readOnlyHint: true,
+        destructiveHint: false,
+      });
+      expect(byName.woocommerce_create_refund.annotations.readOnlyHint).toBe(false);
+      expect(byName.woocommerce_create_refund._meta).toEqual({ "chat.hay/category": "refund" });
+      // The coupon tool enforces its own cap; core reads the flag and the approval arg.
+      expect(byName.woocommerce_create_coupon._meta).toEqual({
+        "chat.hay/category": "discount",
+        "chat.hay/capEnforced": true,
+      });
+      expect(byName.woocommerce_create_coupon.inputSchema.properties).toHaveProperty(
+        "hay_approval_id",
+      );
     } finally {
       await client.close();
     }

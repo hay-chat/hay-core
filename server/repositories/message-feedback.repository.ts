@@ -1,29 +1,13 @@
 import { AppDataSource } from "../database/data-source";
 import { MessageFeedback } from "../database/entities/message-feedback.entity";
 import { Repository } from "typeorm";
-import type { CreateFeedbackInput, FeedbackFilter } from "../types/message-feedback.types";
+import type { FeedbackFilter } from "../types/message-feedback.types";
 
 export class MessageFeedbackRepository {
   private repository: Repository<MessageFeedback>;
 
   constructor() {
     this.repository = AppDataSource.getRepository(MessageFeedback);
-  }
-
-  async create(
-    organizationId: string,
-    reviewerId: string,
-    data: CreateFeedbackInput,
-  ): Promise<MessageFeedback> {
-    const feedback = this.repository.create({
-      messageId: data.messageId,
-      organizationId,
-      reviewerId,
-      rating: data.rating,
-      comment: data.comment || null,
-    });
-
-    return this.repository.save(feedback);
   }
 
   async findById(id: string): Promise<MessageFeedback | null> {

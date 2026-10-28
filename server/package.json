@@ -7,7 +7,7 @@
     "dev": "nodemon main.ts",
     "dev:clean": "nodemon main.ts",
     "build": "npm run build:plugins && tsc && tsc-alias && npm run copy:templates",
-    "copy:templates": "cp -r templates dist/ && cp -r i18n dist/",
+    "copy:templates": "cp -r templates dist/ && cp -r i18n dist/ && cp -r assets dist/",
     "build:plugins": "cd .. && ./scripts/build-plugins.sh",
     "start": "node dist/main.js",
     "kill-ports": "lsof -ti tcp:3000,4000,5000 | xargs kill -9 2>/dev/null || true",
@@ -24,7 +24,10 @@
     "migration:revert": "typeorm-ts-node-commonjs migration:revert -d ./database/data-source.ts",
     "migration:show": "typeorm-ts-node-commonjs migration:show -d ./database/data-source.ts",
     "migration:ensure": "./scripts/check-migrations.sh",
-    "migration:check": "tsx scripts/ensure-migrations.ts"
+    "migration:check": "tsx scripts/ensure-migrations.ts",
+    "order-links:backfill": "tsx scripts/backfill-order-links.ts",
+    "insights:backfill-feedback": "tsx scripts/backfill-feedback-insights.ts",
+    "plugins:enable-defaults": "tsx scripts/enable-default-plugins.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.100.1",
@@ -77,6 +80,7 @@
     "cheerio": "^1.1.2",
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.0.0",
+    "compression": "^1.8.2",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
     "eslint": "^8.54.0",
@@ -85,6 +89,7 @@
     "eslint-plugin-vue": "^9.18.1",
     "express": "^5.1.0",
     "fast-uri": "^3.1.0",
+    "file-type": "^16.5.4",
     "ioredis": "^5.8.1",
     "jest": "^30.2.0",
     "jose": "^6.1.0",
@@ -115,6 +120,7 @@
     "reka-ui": "^2.5.1",
     "sanitize-html": "^2.17.3",
     "shadcn-nuxt": "^0.10.4",
+    "sharp": "^0.35.5",
     "stripe": "^18.5.0",
     "superjson": "^2.2.2",
     "tailwind-merge": "^2.0.0",
@@ -143,6 +149,7 @@
   },
   "devDependencies": {
     "@modelcontextprotocol/sdk": "^1.25.2",
+    "@types/compression": "^1.8.1",
     "@types/pdfkit": "^0.17.5",
     "@types/pg": "^8.11.10",
     "@types/web-push": "^3.6.4",

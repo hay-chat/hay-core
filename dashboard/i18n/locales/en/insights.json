@@ -1,0 +1,204 @@
+{
+  "insights": {
+    "feedback": {
+      "title": "Feedback",
+      "description": "Ratings your team gave to AI replies. Open any rating to see the reply in its conversation.",
+      "seoTitle": "Feedback - Hay.chat",
+      "refresh": "Refresh",
+      "exportCsv": "Export CSV",
+      "unknownSource": "Unknown",
+      "stats": {
+        "total": "Total Feedback",
+        "positive": "Positive",
+        "negative": "Negative",
+        "positiveRate": "Positive Rate"
+      },
+      "ratings": {
+        "good": "Good",
+        "bad": "Bad",
+        "neutral": "Neutral"
+      },
+      "filters": {
+        "title": "Filters",
+        "rating": "Rating",
+        "allRatings": "All ratings",
+        "source": "Source",
+        "allSources": "All sources",
+        "startDate": "Start date",
+        "endDate": "End date"
+      },
+      "list": {
+        "title": "Feedback History",
+        "count": "{count} feedback entries",
+        "loading": "Loading feedback...",
+        "empty": "No feedback matches these filters",
+        "reviewer": "Rated by {email}",
+        "openConversation": "Open conversation",
+        "showing": "Showing {from}-{to} of {total}",
+        "previous": "Previous",
+        "next": "Next"
+      }
+    },
+    "page": {
+      "title": "Insights",
+      "description": "Patterns across your conversations and your team's ratings: what the AI gets wrong, what works, and what to change. Updated every night.",
+      "seoTitle": "Insights - Hay.chat",
+      "refresh": "Refresh",
+      "settings": "Settings",
+      "counts": {
+        "open": "Open",
+        "new": "New",
+        "positive": "Positive",
+        "addressed": "Addressed",
+        "fixedRate": "Fixed after addressed",
+        "fixedRateValue": "{fixed} of {measured}",
+        "fixedRateNone": "Not measured yet"
+      },
+      "filters": {
+        "polarity": "Polarity",
+        "state": "State",
+        "actionType": "Suggested action",
+        "window": "Period",
+        "minSize": "Minimum conversations",
+        "all": "All",
+        "open": "Open (new, acknowledged, in progress)",
+        "allStates": "All states",
+        "days": "Last {days} days"
+      },
+      "polarity": {
+        "negative": "Problem",
+        "positive": "Working well",
+        "neutral": "Neutral"
+      },
+      "states": {
+        "new": "New",
+        "acknowledged": "Acknowledged",
+        "in_progress": "In progress",
+        "addressed": "Addressed",
+        "rejected": "Rejected",
+        "archived": "Archived"
+      },
+      "actionTypes": {
+        "playbook_edit": "Edit a playbook",
+        "new_playbook": "New playbook",
+        "knowledge_edit": "Fix knowledge",
+        "knowledge_add": "Add knowledge",
+        "setup": "Setup",
+        "policy_ambiguity": "Unclear policy",
+        "product_bug": "Product bug",
+        "ux_confusion": "Site confusion",
+        "support_training": "Team training",
+        "none": "No action"
+      },
+      "sources": {
+        "ai_review": "Conversation review",
+        "user_feedback": "Team rating",
+        "docs_audit": "Docs audit"
+      },
+      "list": {
+        "count": "{count} insights",
+        "empty": "No insights match these filters",
+        "emptyDescription": "Insights appear after the nightly analysis once a pattern shows up in at least {min} conversations. Positive patterns show up here too.",
+        "periodSize": "{count} in this period",
+        "conversations": "{count} conversations",
+        "lastSeen": "Last seen {date}",
+        "untitled": "Untitled pattern",
+        "recurring": "Came back",
+        "archiveSuggested": "No new conversations for 45 days",
+        "docsAudit": "Docs audit",
+        "backfilling": "Reviewing your conversations from the last 30 days. New insights will appear here after the analysis.",
+        "loadError": "Could not load insights"
+      },
+      "detail": {
+        "back": "All insights",
+        "loadError": "Could not load this insight",
+        "hypothesis": "Likely cause",
+        "stats": {
+          "periodSize": "In the last 30 days",
+          "total": "All time",
+          "conversations": "Conversations",
+          "takeovers": "Handed to the team",
+          "firstSeen": "First seen",
+          "lastSeen": "Last seen"
+        },
+        "breakdown": {
+          "channels": "Channels",
+          "sources": "Sources",
+          "polarity": "Sentiment"
+        },
+        "evidence": "Evidence",
+        "evidenceHint": "Short excerpts with personal data removed. Links open the conversation while it is still kept.",
+        "paraphrases": "What shoppers asked, in other words",
+        "openConversation": "Open conversation",
+        "conversationGone": "Conversation no longer kept",
+        "recent": "Recent conversations",
+        "untitledConversation": "Conversation",
+        "audit": "History",
+        "auditEmpty": "No changes yet",
+        "auditSystem": "Hay.chat",
+        "auditRecurred": "The pattern came back after it was addressed",
+        "auditMerged": "Merged into a similar insight",
+        "lifecycle": "Status",
+        "suggestedAction": "Suggested action",
+        "actions": {
+          "acknowledged": "Acknowledge",
+          "in_progress": "Start",
+          "addressed": "Mark as addressed",
+          "rejected": "Reject",
+          "archived": "Archive",
+          "new": "Reopen"
+        },
+        "stateChanged": "Insight updated",
+        "stateError": "Could not update this insight",
+        "rejectTitle": "Reject this insight?",
+        "rejectDescription": "Tell us why, so the reason stays in the history. Nothing changes in your AI.",
+        "rejectReason": "Reason (optional)",
+        "rejectConfirm": "Reject",
+        "fixed": {
+          "title": "After it was addressed",
+          "watching": "Watching: we compare the next {days} days with the 30 days before.",
+          "fixed": "Fixed: {after} per week now, down from {before}.",
+          "improved": "Improved: {after} per week now, down from {before}.",
+          "notFixed": "Not fixed yet: {after} per week now, {before} before."
+        },
+        "archiveSuggestion": "No new conversations for 45 days. You can archive this insight.",
+        "approve": {
+          "playbook_edit": "Suggest a playbook edit",
+          "knowledge": "Suggest a knowledge fix",
+          "task": "Create a task",
+          "hintPlaybook": "Opens a suggested edit of the playbook for you to review. Saving it creates a draft; it only reaches new conversations after you publish it.",
+          "hintKnowledge": "Opens a suggested change to your knowledge for you to review before anything is saved.",
+          "hintTask": "This needs a change outside the AI. We keep it as a task here so you can track it.",
+          "error": "Could not prepare the suggestion",
+          "draftSaved": "Draft saved. Publish the playbook to use it in new conversations.",
+          "openPlaybook": "Open playbook",
+          "knowledgeSaved": "Knowledge saved and insight marked as addressed",
+          "taskTitle": "Task",
+          "taskDescription": "Copy this into your task tracker, or keep it here. Mark the insight as addressed when it is done.",
+          "copy": "Copy",
+          "copied": "Copied",
+          "newPlaybook": "Create a playbook"
+        },
+        "auditApproved": "Approved; a suggestion was opened for review"
+      },
+      "settingsDialog": {
+        "title": "Insights settings",
+        "description": "Starting values work for most stores. Changes apply from the next nightly analysis.",
+        "minClusterSize": "Minimum conversations before an insight appears",
+        "digestEnabled": "Weekly digest email to owners and admins",
+        "advanced": "Advanced: similarity",
+        "joinThreshold": "Join similarity (0.70 to 0.98)",
+        "mergeThreshold": "Merge similarity (0.75 to 0.99)",
+        "tuning": "In the last 30 days: {issues} reviewed conversations and ratings, {clusters} patterns, {promoted} shown, {singletons} seen only once.",
+        "save": "Save",
+        "saved": "Insights settings saved",
+        "error": "Could not save the settings"
+      },
+      "fixedBadge": {
+        "fixed": "Fixed",
+        "improved": "Improved",
+        "not_fixed": "Not fixed"
+      }
+    }
+  }
+}

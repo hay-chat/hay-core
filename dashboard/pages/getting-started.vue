@@ -123,7 +123,7 @@
                   {{ $t("dashboard.gettingStarted.integrations.browseAll") }}
                   <ArrowRight class="w-3 h-3 ml-2" />
                 </Button>
-                <Button href="https://hay.canny.io/" target="_blank" variant="outline">
+                <Button :href="suggestIntegrationUrl" target="_blank" variant="outline">
                   <Lightbulb class="w-3 h-3 mr-2" />
                   {{ $t("dashboard.gettingStarted.integrations.suggest") }}
                 </Button>
@@ -370,6 +370,20 @@
             </div>
           </CardContent>
         </Card>
+
+        <!-- Channel-scoped go-live (D7-14): not a tracked step, just the advice. -->
+        <Card data-testid="go-live-one-channel">
+          <CardHeader>
+            <CardTitle class="text-lg">{{ $t("dashboard.gettingStarted.goLive.title") }}</CardTitle>
+          </CardHeader>
+          <CardContent class="!pt-0 space-y-4">
+            <p>{{ $t("dashboard.gettingStarted.goLive.description") }}</p>
+            <Button variant="outline" @click="navigateTo('/settings/customer-privacy')">
+              {{ $t("dashboard.gettingStarted.goLive.button") }}
+              <ArrowRight class="w-3 h-3 ml-2" />
+            </Button>
+          </CardContent>
+        </Card>
       </div>
     </div>
   </Page>
@@ -382,6 +396,14 @@ import { Hay } from "@/utils/api";
 import { CheckCircle2, Check, ArrowRight, Lightbulb, Lock } from "lucide-vue-next";
 import { useAppStore } from "@/stores/app";
 import { useDomain } from "@/composables/useDomain";
+
+const { locale } = useI18n();
+// Integration suggestions go to a form on the website that emails the team.
+const suggestIntegrationUrl = computed(() =>
+  locale.value.startsWith("pt")
+    ? "https://hay.chat/pt/sugerir-integracao/?from=dashboard"
+    : "https://hay.chat/suggest-integration/?from=dashboard",
+);
 
 interface OnboardingStep {
   id: string;

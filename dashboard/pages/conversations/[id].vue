@@ -26,6 +26,28 @@
                   <Info class="h-3 w-3 mr-1" />
                   {{ $t("conversations.detail.autoSends") }}
                 </Badge>
+                <Badge
+                  v-if="conversation"
+                  :variant="isLiveStore ? 'destructive' : 'outline'"
+                  class="text-xs shrink-0"
+                  data-testid="playground-action-mode"
+                >
+                  <FlaskConical v-if="!isLiveStore" class="h-3 w-3 mr-1" />
+                  <Zap v-else class="h-3 w-3 mr-1" />
+                  {{
+                    isLiveStore
+                      ? $t("conversations.detail.liveStoreBadge")
+                      : $t("conversations.detail.simulatedBadge")
+                  }}
+                </Badge>
+                <Badge
+                  v-if="testedDraft"
+                  variant="warning"
+                  class="text-xs shrink-0"
+                  data-testid="playground-draft"
+                >
+                  {{ $t("conversations.detail.testingDraft") }}
+                </Badge>
               </div>
               <p class="text-sm text-neutral-muted hidden sm:block">
                 {{ $t("conversations.detail.playgroundDescription") }}
@@ -49,6 +71,29 @@
               >
                 <Sparkles class="h-4 w-4 mr-2" />
                 {{ $t("suggest.improveFromConversation") }}
+              </Button>
+              <Button
+                v-if="conversation"
+                variant="outline"
+                size="sm"
+                data-testid="improve-knowledge-button"
+                @click="showKnowledgeDialog = true"
+              >
+                <BookOpen class="h-4 w-4 mr-2" />
+                {{ $t("knowledgeSuggest.improveFromConversation") }}
+              </Button>
+              <Button
+                v-if="conversation"
+                variant="outline"
+                size="sm"
+                :loading="isSwitchingActionMode"
+                @click="toggleActionMode"
+              >
+                {{
+                  isLiveStore
+                    ? $t("conversations.detail.useSimulatedActions")
+                    : $t("conversations.detail.useLiveStore")
+                }}
               </Button>
               <Button
                 variant="outline"
@@ -76,6 +121,18 @@
                   <RefreshCw class="mr-2 h-4 w-4" />
                   {{ $t("conversations.detail.newTest") }}
                 </DropdownMenuItem>
+                <DropdownMenuItem
+                  v-if="conversation"
+                  :disabled="isSwitchingActionMode"
+                  @click="toggleActionMode"
+                >
+                  <Zap class="mr-2 h-4 w-4" />
+                  {{
+                    isLiveStore
+                      ? $t("conversations.detail.useSimulatedActions")
+                      : $t("conversations.detail.useLiveStore")
+                  }}
+                </DropdownMenuItem>
                 <DropdownMenuItem v-if="isLocalhost" @click="copyConversationJson">
                   <Braces class="mr-2 h-4 w-4" />
                   Copy JSON
@@ -86,6 +143,10 @@
                 >
                   <Sparkles class="mr-2 h-4 w-4" />
                   {{ $t("suggest.improveFromConversation") }}
+                </DropdownMenuItem>
+                <DropdownMenuItem v-if="conversation" @click="showKnowledgeDialog = true">
+                  <BookOpen class="mr-2 h-4 w-4" />
+                  {{ $t("knowledgeSuggest.improveFromConversation") }}
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -163,6 +224,16 @@
                 <Sparkles class="h-4 w-4 mr-2" />
                 {{ $t("suggest.improveFromConversation") }}
               </Button>
+              <Button
+                v-if="conversation"
+                variant="outline"
+                size="sm"
+                data-testid="improve-knowledge-button"
+                @click="showKnowledgeDialog = true"
+              >
+                <BookOpen class="h-4 w-4 mr-2" />
+                {{ $t("knowledgeSuggest.improveFromConversation") }}
+              </Button>
               <DropdownMenu>
                 <DropdownMenuTrigger as-child>
                   <Button variant="outline" size="sm" :loading="isExporting">
@@ -179,8 +250,23 @@
                     <FileSpreadsheet class="mr-2 h-4 w-4" />
                     {{ $t("conversations.detail.exportCsv") }}
                   </DropdownMenuItem>
+                  <DropdownMenuItem data-testid="open-evidence-pack" @click="openEvidencePack">
+                    <FileCheck class="mr-2 h-4 w-4" />
+                    {{ $t("conversations.detail.evidencePack") }}
+                  </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
+              <Button
+                v-if="conversation && !conversation.spam_flagged_at"
+                variant="outline"
+                size="sm"
+                data-testid="mark-spam-button"
+                :loading="isMarkingSpam"
+                @click="markSpam"
+              >
+                <ShieldAlert class="h-4 w-4 mr-2" />
+                {{ $t("home.spam.markSpam") }}
+              </Button>
               <Button
                 v-if="conversation?.status === 'open'"
                 variant="outline"
@@ -229,6 +315,10 @@
                   <Sparkles class="mr-2 h-4 w-4" />
                   {{ $t("suggest.improveFromConversation") }}
                 </DropdownMenuItem>
+                <DropdownMenuItem v-if="conversation" @click="showKnowledgeDialog = true">
+                  <BookOpen class="mr-2 h-4 w-4" />
+                  {{ $t("knowledgeSuggest.improveFromConversation") }}
+                </DropdownMenuItem>
                 <DropdownMenuItem @click="exportConversation('pdf')">
                   <FileText class="mr-2 h-4 w-4" />
                   {{ $t("conversations.detail.exportPdf") }}
@@ -236,6 +326,18 @@
                 <DropdownMenuItem @click="exportConversation('csv')">
                   <FileSpreadsheet class="mr-2 h-4 w-4" />
                   {{ $t("conversations.detail.exportCsv") }}
+                </DropdownMenuItem>
+                <DropdownMenuItem data-testid="open-evidence-pack" @click="openEvidencePack">
+                  <FileCheck class="mr-2 h-4 w-4" />
+                  {{ $t("conversations.detail.evidencePack") }}
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  v-if="conversation && !conversation.spam_flagged_at"
+                  :disabled="isMarkingSpam"
+                  @click="markSpam"
+                >
+                  <ShieldAlert class="mr-2 h-4 w-4" />
+                  {{ $t("home.spam.markSpam") }}
                 </DropdownMenuItem>
                 <DropdownMenuItem
                   v-if="conversation?.status === 'open'"
@@ -269,6 +371,19 @@
     <div class="flex flex-1 overflow-hidden">
       <!-- Left Side: Conversation Thread -->
       <div class="flex-1 flex flex-col">
+        <ProductCaseBanner
+          v-if="productCase && conversation"
+          :conversation-id="conversation.id"
+          :product-case="productCase"
+          @forwarded="onProductCaseForwarded"
+        />
+        <SpamBanner
+          v-if="conversation?.spam_flagged_at && !isPlaygroundMode"
+          :conversation-id="conversation.id"
+          :spam-reason="conversation.spam_reason"
+          :metadata="conversation.metadata as Record<string, unknown> | null"
+          @cleared="fetchConversation"
+        />
         <!-- Messages Container -->
         <div ref="messagesContainer" class="flex-1 overflow-y-auto p-3 md:p-6 space-y-4 bg-white">
           <!-- Playground Loading State -->
@@ -379,10 +494,16 @@
             >
               <ChatMessage
                 v-for="(message, index) in conversation?.messages"
+                :id="`message-${message.id}`"
                 :key="message.id"
+                :class="{
+                  'rounded-lg ring-2 ring-primary ring-offset-2':
+                    message.id === highlightedMessageId,
+                }"
                 :message="message as Message"
                 :show-feedback="true"
-                :show-approval="isTestMode"
+                :show-approval="true"
+                :show-save-as-test="true"
                 :show-timestamp="shouldShowTimestamp(conversation?.messages, index)"
                 :bot-avatar-url="botAvatarUrl"
                 :human-avatar-url="humanAvatarUrl"
@@ -390,6 +511,7 @@
                 @message-blocked="handleMessageBlocked"
                 @feedback-submitted="handleFeedbackSubmitted"
                 @retry="retryMessage"
+                @save-as-test="openSaveAsTest"
               />
             </TransitionGroup>
 
@@ -511,22 +633,55 @@
           v-if="(isPlaygroundMode && !isPendingHuman) || isTakenOverByCurrentUser"
           class="border-t p-4 pb-[max(1rem,env(safe-area-inset-bottom))] bg-background"
         >
+          <ReplyWindow
+            v-if="conversation && !isPlaygroundMode"
+            v-model:closed="isReplyWindowClosed"
+            :conversation-id="conversation.id"
+            :expires-at="conversation.reply_window_expires_at"
+            :can-send="isTakenOverByCurrentUser"
+          />
+          <ComposerAttachments
+            v-if="conversation && !isPlaygroundMode"
+            ref="composerAttachments"
+            v-model="pendingAttachments"
+            :conversation-id="conversation.id"
+          />
           <form class="flex gap-2 md:gap-3" @submit.prevent="sendMessage">
+            <Button
+              v-if="conversation && !isPlaygroundMode"
+              type="button"
+              variant="ghost"
+              size="icon"
+              class="flex-shrink-0"
+              data-testid="composer-attach"
+              :aria-label="$t('conversations.attachment.attach')"
+              :title="$t('conversations.attachment.attach')"
+              :disabled="isReplyWindowClosed || pendingAttachments.length >= MAX_COMPOSER_FILES"
+              @click="composerAttachments?.open()"
+            >
+              <Paperclip class="h-4 w-4" />
+            </Button>
             <Input
               v-model="newMessage"
               :placeholder="
                 isPlaygroundMode
                   ? $t('conversations.detail.sendTestMessage')
-                  : $t('conversations.detail.sendMessage')
+                  : isReplyWindowClosed
+                    ? $t('conversations.replyWindow.composerClosed')
+                    : $t('conversations.detail.sendMessage')
               "
               class="flex-1 max-md:!text-base"
-              :disabled="isPlaygroundMode && !conversation"
+              :disabled="(isPlaygroundMode && !conversation) || isReplyWindowClosed"
               @keyup.enter="sendMessage"
             />
             <Button
               type="submit"
               :disabled="
-                !newMessage.trim() || isSendingMessage || (isPlaygroundMode && !conversation)
+                (!newMessage.trim() && !readyAttachments.length) ||
+                isUploadingAttachments ||
+                isSendingMessage ||
+                (isPlaygroundMode && !conversation) ||
+                isReplyWindowClosed
               "
             >
               <Send class="h-4 w-4" />
@@ -929,6 +1084,29 @@
       :conversation-id="conversation.id"
       @applied="handleSuggestionApplied"
     />
+
+    <!-- Save an AI reply as a test case (D7-12) -->
+    <SaveTestCaseDialog v-model:open="showSaveAsTest" :target="saveAsTestTarget" />
+
+    <!-- AI Suggest Knowledge Edits Dialog (D3-6) -->
+    <SuggestKnowledgeDialog
+      v-if="conversation"
+      v-model:open="showKnowledgeDialog"
+      :conversation-id="conversation.id"
+      @applied="handleKnowledgeApplied"
+    />
+
+    <!-- Playground: confirm before actions reach the real store -->
+    <ConfirmDialog
+      v-if="isPlaygroundMode"
+      v-model:open="showLiveStoreConfirm"
+      :title="$t('conversations.detail.liveStoreConfirmTitle')"
+      :description="$t('conversations.detail.liveStoreConfirmDescription')"
+      :confirm-text="$t('conversations.detail.liveStoreConfirm')"
+      :destructive="true"
+      :loading="isSwitchingActionMode"
+      @confirm="setActionMode(false)"
+    />
   </div>
 </template>
 
@@ -942,6 +1120,7 @@ import {
   Clock,
   Send,
   AlertTriangle,
+  Hourglass,
   AlertCircle,
   Circle,
   CheckCircle,
@@ -960,14 +1139,23 @@ import {
   Lock,
   FileText,
   FileSpreadsheet,
+  FileCheck,
   Braces,
   Sparkles,
   MoreHorizontal,
   PanelRight,
+  FlaskConical,
+  Zap,
+  Paperclip,
 } from "lucide-vue-next";
 import { createReusableTemplate, useMediaQuery } from "@vueuse/core";
 import { TRPCClientError } from "@trpc/client";
 import { HayApi } from "@/utils/api";
+import SpamBanner from "@/components/conversations/SpamBanner.vue";
+import ProductCaseBanner, {
+  type ProductCase,
+  type ProductCaseForward,
+} from "@/components/conversations/ProductCaseBanner.vue";
 import {
   getCustomerChannelInfo,
   getCustomerDisplayName,
@@ -978,6 +1166,7 @@ import { MessageType, type Message } from "~/types/message";
 import { parseUTCDate } from "~/utils/date";
 import type { AssignedUser } from "@/composables/useConversationTakeover";
 import type { RouterOutputs } from "@/types/trpc";
+import type { ComposerAttachmentItem } from "@/components/conversations/ComposerAttachments.vue";
 
 // i18n
 const { t } = useI18n();
@@ -1051,10 +1240,30 @@ interface MessageStatusEventPayload {
 const isMessageEventPayload = (value: unknown): value is MessageEventPayload =>
   typeof value === "object" && value !== null;
 
+/** The slice of the `conversation_updated` WebSocket payload this page reads. */
+interface ReplyWindowPayload {
+  id?: string;
+  reply_window_expires_at?: ConversationDetail["reply_window_expires_at"];
+  metadata?: Record<string, unknown> | null;
+}
+
+const isReplyWindowPayload = (value: unknown): value is ReplyWindowPayload =>
+  typeof value === "object" && value !== null;
+
 const isConversationEventPayload = (value: unknown): value is ConversationEventPayload =>
   typeof value === "object" && value !== null;
 
 const isMessageStatusEventPayload = (value: unknown): value is MessageStatusEventPayload =>
+  typeof value === "object" && value !== null;
+
+/** `message_media_updated`: the vision pass or scan changed a message's files (D8-11). */
+interface MessageMediaEventPayload {
+  conversationId?: string;
+  messageId?: string;
+  attachments?: Message["attachments"];
+}
+
+const isMessageMediaEventPayload = (value: unknown): value is MessageMediaEventPayload =>
   typeof value === "object" && value !== null;
 
 /** Extract a human-readable error message from an unknown thrown value. */
@@ -1108,7 +1317,21 @@ const supervisionMode = ref(false);
 const humanTakeover = ref(false);
 const isTyping = ref(false);
 const newMessage = ref("");
+// D8-16: files a person adds to their reply (uploaded as soon as picked)
+const MAX_COMPOSER_FILES = 10;
+const pendingAttachments = ref<ComposerAttachmentItem[]>([]);
+const composerAttachments = ref<{ open: () => void }>();
+const readyAttachments = computed(() =>
+  pendingAttachments.value.flatMap((item) => (item.attachment ? [item.attachment] : [])),
+);
+const isUploadingAttachments = computed(() =>
+  pendingAttachments.value.some((item) => !item.attachment),
+);
 const messagesContainer = ref<HTMLElement>();
+// Deep link from the feedback page: /conversations/:id?message=<messageId>
+const highlightedMessageId = computed(() =>
+  typeof route.query.message === "string" ? route.query.message : null,
+);
 
 // Context panel: one template, rendered inline on lg+ and inside a Sheet below lg
 const [DefinePanel, ReusePanel] = createReusableTemplate();
@@ -1217,6 +1440,9 @@ const showReleaseDialog = ref(false);
 const showCloseDialog = ref(false);
 const releaseMode = ref<"ai" | "queue">("queue");
 const isUpdatingLegalHold = ref(false);
+
+// Set by <ReplyWindow> when the channel's reply window has closed (D13-2).
+const isReplyWindowClosed = ref(false);
 
 // Check if conversation is taken over by current user
 const isTakenOverByCurrentUser = computed(() => {
@@ -1336,7 +1562,9 @@ const goBack = () => {
 
 // Playground-specific functions
 const exitPlayground = () => {
-  navigateTo("/conversations");
+  const router = useRouter();
+  // Testing a playbook draft (D7-5): go back to that playbook's editor.
+  router.push(testedDraft.value ? `/playbooks/${testedDraft.value.playbookId}` : "/conversations");
 };
 
 const navigateToPlaybook = () => {
@@ -1360,6 +1588,96 @@ const handleSuggestionApplied = () => {
   }
 };
 
+// D7-12: save an AI reply as a test case (approval edits/blocks and feedback
+// decide what a good answer is, on the server).
+const showSaveAsTest = ref(false);
+const saveAsTestTarget = ref<{ kind: "message"; id: string } | null>(null);
+const openSaveAsTest = (messageId: string) => {
+  saveAsTestTarget.value = { kind: "message", id: messageId };
+  showSaveAsTest.value = true;
+};
+
+// AI suggest-edits for knowledge: edit a document the AI used, or add a Q&A
+const showKnowledgeDialog = ref(false);
+
+const handleKnowledgeApplied = (documentId: string) => {
+  useRouter().push(`/documents/${documentId}`);
+};
+
+// Playground action mode: writes are simulated (dry-run) unless switched to live.
+const isLiveStore = computed(() => conversation.value?.metadata?.dryRun === false);
+
+// A complete product-problem case (D8-14/15) lives on the conversation's metadata.
+const productCase = computed<ProductCase | null>(() => {
+  const value = (conversation.value?.metadata as Record<string, unknown> | null | undefined)
+    ?.productCase;
+  return value && typeof value === "object" ? (value as ProductCase) : null;
+});
+
+// Spam (D9-7): staff can flag a conversation the detector missed.
+const isMarkingSpam = ref(false);
+const markSpam = async () => {
+  if (!conversation.value) return;
+  const toast = useToast();
+  isMarkingSpam.value = true;
+  try {
+    await HayApi.conversations.markSpam.mutate({ conversationId: conversation.value.id });
+    toast.success(t("home.spam.markSpamDone"));
+    await fetchConversation();
+  } catch {
+    toast.error(t("home.spam.actionFailed"));
+  } finally {
+    isMarkingSpam.value = false;
+  }
+};
+
+const onProductCaseForwarded = (forward: ProductCaseForward) => {
+  if (!conversation.value || !productCase.value) return;
+  conversation.value.metadata = {
+    ...(conversation.value.metadata ?? {}),
+    productCase: { ...productCase.value, forward },
+  };
+};
+const showLiveStoreConfirm = ref(false);
+const isSwitchingActionMode = ref(false);
+
+const toggleActionMode = () => {
+  if (isLiveStore.value) {
+    void setActionMode(true);
+  } else {
+    showLiveStoreConfirm.value = true;
+  }
+};
+
+const setActionMode = async (dryRun: boolean) => {
+  if (!conversation.value) return;
+  try {
+    isSwitchingActionMode.value = true;
+    await HayApi.conversations.setDryRun.mutate({
+      conversationId: conversation.value.id,
+      dryRun,
+    });
+    conversation.value = {
+      ...conversation.value,
+      metadata: { ...(conversation.value.metadata ?? {}), dryRun },
+    };
+    showLiveStoreConfirm.value = false;
+  } catch (error) {
+    console.error("Failed to switch playground action mode:", error);
+    useToast().error(t("common.error"), t("conversations.detail.actionModeFailed"));
+  } finally {
+    isSwitchingActionMode.value = false;
+  }
+};
+
+// D7-5: "Test this draft" opens the playground with ?playbookId=&versionId=.
+const testedDraft = computed(() => {
+  const { playbookId, versionId } = route.query;
+  return isPlaygroundMode.value && typeof playbookId === "string" && typeof versionId === "string"
+    ? { playbookId, versionId }
+    : null;
+});
+
 const createTestConversation = async () => {
   try {
     messagesLoading.value = true;
@@ -1367,9 +1685,11 @@ const createTestConversation = async () => {
     const response = await HayApi.conversations.create.mutate({
       metadata: {
         sourceId: "playground",
-        test_mode: true,
+        // Write actions are simulated until the user switches to the live store.
+        dryRun: true,
       },
       status: "open",
+      ...(testedDraft.value ? { playbookVersionOverride: testedDraft.value } : {}),
     });
 
     conversation.value = response;
@@ -1377,6 +1697,9 @@ const createTestConversation = async () => {
     messages.value = [];
   } catch (error) {
     console.error("Failed to create test conversation:", error);
+    if (testedDraft.value) {
+      useToast().error(t("common.error"), t("conversations.detail.testDraftFailed"));
+    }
   } finally {
     messagesLoading.value = false;
   }
@@ -1415,7 +1738,9 @@ const getStatusVariant = (
   const variants: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
     open: "default",
     "pending-human": "destructive",
+    "awaiting-approval": "outline",
     resolved: "secondary",
+    unresolved: "outline",
     processing: "outline",
     closed: "secondary",
   };
@@ -1427,7 +1752,9 @@ const getStatusIcon = (status: string | undefined) => {
   const icons = {
     open: Circle,
     "pending-human": AlertTriangle,
+    "awaiting-approval": Hourglass,
     resolved: CheckCircle,
+    unresolved: XCircle,
     active: Circle,
     escalated: AlertTriangle,
     closed: XCircle,
@@ -1441,8 +1768,10 @@ const formatStatus = (status: string | undefined) => {
     open: "conversations.status.open",
     processing: "conversations.status.processing",
     "pending-human": "conversations.status.pendingHuman",
+    "awaiting-approval": "conversations.status.awaitingApproval",
     "human-took-over": "conversations.status.humanTookOver",
     resolved: "conversations.status.resolved",
+    unresolved: "conversations.status.unresolved",
     closed: "conversations.status.closed",
   };
   return keys[status] ? t(keys[status]) : status;
@@ -1531,11 +1860,14 @@ const confirmClose = async () => {
 const isSendingMessage = ref(false);
 
 const sendMessage = async () => {
-  if (!newMessage.value.trim() || isSendingMessage.value) return;
+  const attachments = isPlaygroundMode.value ? [] : readyAttachments.value;
+  if ((!newMessage.value.trim() && !attachments.length) || isSendingMessage.value) return;
+  if (isUploadingAttachments.value) return;
 
   isSendingMessage.value = true;
   const messageContent = newMessage.value;
   newMessage.value = ""; // Clear immediately to prevent double-send
+  pendingAttachments.value = [];
 
   // Generate temporary ID for optimistic message
   const tempId = `temp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
@@ -1555,6 +1887,7 @@ const sendMessage = async () => {
     updated_at: new Date().toISOString(),
     status: "approved",
     deliveryState: "pending",
+    ...(attachments.length ? { attachments } : {}),
   };
 
   // Add optimistic message to the appropriate list
@@ -1572,6 +1905,7 @@ const sendMessage = async () => {
       conversationId: conversationId.value,
       content: messageContent,
       role,
+      ...(attachments.length ? { attachmentIds: attachments.map((a) => a.id) } : {}),
     });
 
     // Play message sent sound
@@ -1641,8 +1975,13 @@ const retryMessage = async (messageId: string) => {
   // Remove the failed message
   messagesList.splice(messageIndex, 1);
 
-  // Resend by setting the newMessage and calling sendMessage
+  // Resend by setting the newMessage (and its files, still unsent uploads) and calling sendMessage
   newMessage.value = messageContent;
+  pendingAttachments.value = (failedMessage.attachments ?? []).map((attachment) => ({
+    key: attachment.id,
+    name: attachment.name,
+    attachment,
+  }));
   await sendMessage();
 };
 
@@ -1681,8 +2020,21 @@ const exportConversation = async (format: "pdf" | "csv") => {
   }
 };
 
+/** D2-5: the order-centric evidence pack, starting from this conversation. */
+const openEvidencePack = () => {
+  if (!conversation.value?.id) return;
+  useRouter().push({ path: "/evidence", query: { conversation: conversation.value.id } });
+};
+
 const viewConversation = (id: string) => {
   navigateTo(`/conversations/${id}`);
+};
+
+const scrollToMessage = (messageId: string) => {
+  // eslint-disable-next-line no-undef
+  nextTick(() => {
+    document.getElementById(`message-${messageId}`)?.scrollIntoView({ block: "center" });
+  });
 };
 
 const scrollToBottom = () => {
@@ -1830,9 +2182,11 @@ const { useWebSocket } = await import("@/composables/useWebSocket");
 const websocket = useWebSocket();
 let unsubscribeMessage: (() => void) | null = null;
 let unsubscribeStatusChanged: (() => void) | null = null;
+let unsubscribeConversationUpdated: (() => void) | null = null;
 let unsubscribeMessageApproved: (() => void) | null = null;
 let unsubscribeMessageBlocked: (() => void) | null = null;
 let unsubscribeMessageStatus: (() => void) | null = null;
+let unsubscribeMessageMedia: (() => void) | null = null;
 
 // Lifecycle
 onMounted(async () => {
@@ -1842,6 +2196,7 @@ onMounted(async () => {
   } else {
     // Regular mode: Fetch conversation
     await Promise.all([fetchConversation()]);
+    if (highlightedMessageId.value) scrollToMessage(highlightedMessageId.value);
   }
 
   // Setup WebSocket connection for real-time updates
@@ -1964,6 +2319,8 @@ onMounted(async () => {
             updated_at: messageData.timestamp,
             status: messageData.status || "approved",
             metadata: messageData.metadata,
+            attachments:
+              messageData.attachments ?? conversation.value.messages[optimisticIndex].attachments,
             deliveryState: "sent",
           };
           return;
@@ -1984,6 +2341,9 @@ onMounted(async () => {
             updated_at: messageData.timestamp,
             status: messageData.status || "approved",
             metadata: messageData.metadata,
+            attachments:
+              messageData.attachments ??
+              conversation.value.messages[existingMessageIndex].attachments,
             deliveryState: "sent",
           };
           return;
@@ -2035,6 +2395,21 @@ onMounted(async () => {
       refreshDebounceTimer = null;
     }, 300);
   };
+
+  // The channel plugin moved the reply window (a new customer message).
+  unsubscribeConversationUpdated = websocket.on("conversation_updated", (payload: unknown) => {
+    if (!isReplyWindowPayload(payload) || payload.id !== conversationId.value) return;
+    if (conversation.value && payload.reply_window_expires_at !== undefined) {
+      conversation.value.reply_window_expires_at = payload.reply_window_expires_at;
+    }
+    // A product case completed or was emailed (D8-14/15).
+    if (conversation.value && payload.metadata && "productCase" in payload.metadata) {
+      conversation.value.metadata = {
+        ...(conversation.value.metadata ?? {}),
+        productCase: payload.metadata.productCase,
+      };
+    }
+  });
 
   // Listen for status changes
   unsubscribeStatusChanged = websocket.on(
@@ -2089,6 +2464,15 @@ onMounted(async () => {
     target.providerStatus = payload.providerStatus ?? null;
     target.providerError = payload.providerError ?? null;
   });
+
+  // The AI read a file (or a scan finished): patch the message's files in place.
+  unsubscribeMessageMedia = websocket.on("message_media_updated", (payload: unknown) => {
+    if (!isMessageMediaEventPayload(payload)) return;
+    if (payload.conversationId !== conversationId.value || !payload.messageId) return;
+    const target = conversation.value?.messages?.find((m) => m.id === payload.messageId);
+    if (!target || !Array.isArray(payload.attachments)) return;
+    target.attachments = payload.attachments;
+  });
 });
 
 // eslint-disable-next-line no-undef
@@ -2096,9 +2480,11 @@ onUnmounted(() => {
   // Cleanup WebSocket event handlers
   if (unsubscribeMessage) unsubscribeMessage();
   if (unsubscribeStatusChanged) unsubscribeStatusChanged();
+  if (unsubscribeConversationUpdated) unsubscribeConversationUpdated();
   if (unsubscribeMessageApproved) unsubscribeMessageApproved();
   if (unsubscribeMessageBlocked) unsubscribeMessageBlocked();
   if (unsubscribeMessageStatus) unsubscribeMessageStatus();
+  if (unsubscribeMessageMedia) unsubscribeMessageMedia();
 
   // Close test conversation in playground mode
   if (isPlaygroundMode.value && conversation.value) {
@@ -2119,6 +2505,6 @@ definePageMeta({
 
 // Head management
 useHead({
-  title: computed(() => `${conversation.value?.title || "New Conversation"} - Hay Dashboard`),
+  title: computed(() => `${conversation.value?.title || "New Conversation"} - Hay.chat`),
 });
 </script>

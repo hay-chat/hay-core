@@ -1,14 +1,14 @@
 {
   "home": {
     "title": "Inbox",
-    "headTitle": "Inbox - Hay",
+    "headTitle": "Inbox - Hay.chat",
     "headline": {
       "loading": "Checking who is waiting…",
       "waiting": "Nothing is waiting for a human | 1 conversation is waiting for a human | {count} conversations are waiting for a human"
     },
     "subline": {
       "longestWait": "Longest wait: {time}.",
-      "aiHandling": "Hay is handling {count} open conversation. | Hay is handling {count} open conversations.",
+      "aiHandling": "Hay.chat is handling {count} open conversation. | Hay.chat is handling {count} open conversations.",
       "allQuiet": "No open conversations right now."
     },
     "waitingCount": "{count} waiting for a human",
@@ -28,7 +28,7 @@
     },
     "empty": {
       "title": "All quiet",
-      "description": "When Hay hands a conversation to a person it shows up here first. Turn on alerts to hear about it on this device."
+      "description": "When Hay.chat hands a conversation to a person it shows up here first. Turn on alerts to hear about it on this device."
     },
     "error": {
       "title": "Couldn't load conversations",
@@ -38,18 +38,87 @@
     "push": {
       "enable": "Alerts on this device",
       "enabled": "Alerts on",
-      "description": "Get a notification on this device whenever a conversation needs a human, even when Hay isn't open.",
+      "description": "Get a notification on this device whenever a conversation needs a human, even when Hay.chat isn't open. Alerts go to team members set to Available. If nobody answers within 10 minutes, Hay.chat alerts again, then sends an email.",
       "statusOn": "This device gets alerts",
       "statusOff": "This device doesn't get alerts",
       "sendTest": "Send a test alert",
       "testSent": "Test alert sent",
       "testSentBody": "It should appear on this device within a few seconds.",
       "testNone": "No device is subscribed",
-      "unsupported": "This browser can't receive push alerts. On iPhone, add Hay to your Home Screen first and open it from there.",
-      "unavailable": "Push alerts are not set up on this Hay server yet. Ask your administrator to add VAPID keys.",
+      "unsupported": "This browser can't receive push alerts. On iPhone, add Hay.chat to your Home Screen first and open it from there.",
+      "unavailable": "Push alerts are not set up on this Hay.chat server yet. Ask your administrator to add VAPID keys.",
       "denied": "Notifications are blocked for this site in your browser settings. Allow them, then reload the page.",
       "failed": "Couldn't turn on alerts",
-      "blocked": "Alerts off"
+      "blocked": "Alerts off",
+      "privacyLabel": "Hide customer details on the lock screen",
+      "privacyHelp": "Alerts only say \"A customer needs a human\". Open Hay.chat to see who it is. Applies to all your devices.",
+      "privacyOn": "Customer details hidden from alerts",
+      "privacyOff": "Alerts show the customer and summary",
+      "privacyFailed": "Couldn't change this setting"
+    },
+    "aiPause": {
+      "title": "Pause AI everywhere",
+      "description": "Stops every AI reply on every channel right away, including follow-ups and inactivity closes. Customers who write get one short message saying your team will reply, and their conversations wait here for you.",
+      "statusOn": "AI paused",
+      "statusOff": "AI is replying",
+      "pausedBy": "Paused by {name} on {when}.",
+      "pausedAt": "Paused on {when}.",
+      "perChannel": "Turn the AI off on one channel only (drafts only)",
+      "perAgent": "Switch off one agent",
+      "banner": "The AI is paused everywhere. Your team answers every conversation.",
+      "resume": "Resume AI",
+      "paused": "AI paused everywhere",
+      "resumed": "AI resumed",
+      "failed": "Couldn't change the AI pause. Try again."
+    },
+    "install": {
+      "title": "Get alerts on your iPhone",
+      "description": "iPhone only shows Hay.chat alerts when Hay.chat is on your Home Screen. It takes three taps.",
+      "stepShare": "In Safari, tap the Share button",
+      "stepAdd": "Scroll down and tap \"Add to Home Screen\", then \"Add\"",
+      "stepOpen": "Open Hay.chat from the new icon on your Home Screen and turn on alerts",
+      "dismiss": "Hide these steps"
+    },
+    "spam": {
+      "title": "Spam",
+      "headTitle": "Spam - Hay.chat",
+      "description": "Conversations held as spam. Hay.chat's AI doesn't answer them and they never count toward your bill.",
+      "link": "Spam",
+      "empty": {
+        "title": "No spam",
+        "description": "When Hay.chat holds a conversation as spam it shows up here, so you can check it."
+      },
+      "error": "Couldn't load spam",
+      "notSpam": "Not spam",
+      "open": "Open",
+      "flagged": "Held {time} ago",
+      "noPreview": "No message",
+      "unknownCustomer": "Visitor",
+      "notSpamDone": "Moved out of spam",
+      "notSpamReengaged": "Moved out of spam. Hay.chat's AI is answering now.",
+      "markSpam": "Mark as spam",
+      "markSpamDone": "Marked as spam. Hay.chat's AI won't answer it.",
+      "actionFailed": "Couldn't update the conversation",
+      "sources": {
+        "detector": "Spam detector",
+        "staff": "Marked by your team",
+        "close_classifier": "Found at close",
+        "other": "Spam"
+      },
+      "signals": {
+        "links": "Many links",
+        "link_only": "Only a link",
+        "repeated": "Repeated text",
+        "too_long": "Very long message",
+        "no_text": "No words",
+        "known_pattern": "Known spam phrases",
+        "unverified": "Bot check failed"
+      },
+      "classifier": "AI check: {reason}",
+      "banner": {
+        "title": "Held as spam",
+        "description": "Hay.chat's AI isn't answering this conversation and it doesn't count toward your bill."
+      }
     }
   }
 }

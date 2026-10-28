@@ -1,6 +1,9 @@
 import { t, scopedProcedure } from "@server/trpc";
 import { z } from "zod";
 import { AgentService } from "../../../services/agent.service";
+import { softLaunchReadinessService } from "@server/services/soft-launch-readiness.service";
+import { sharedChannels } from "@server/services/agent-channel-routing";
+import { organizationRepository } from "@server/repositories/organization.repository";
 import { TRPCError } from "@trpc/server";
 import { RESOURCES, ACTIONS } from "@server/types/scopes";
 import { SupportedLanguage } from "@server/types/language.types";
@@ -44,6 +47,44 @@ export const agentsRouter = t.router({
   list: scopedProcedure(RESOURCES.AGENTS, ACTIONS.READ).query(async ({ ctx }) => {
     const agents = await agentService.getAgents(ctx.organizationId!);
     return agents;
+  }),
+
+  /**
+   * Soft-launch readiness (D7-13): weekly approve/edit/block counts of the
+   * agent's replies under Require Approval, and whether it may be safe to
+   * turn approval off.
+   */
+  readiness: scopedProcedure(RESOURCES.AGENTS, ACTIONS.READ)
+    .input(
+      z
+        .object({
+          agentId: z.string().uuid().optional(),
+          weeks: z.number().int().min(1).max(26).default(8),
+        })
+        .optional(),
+    )
+    .query(async ({ ctx, input }) =>
+      softLaunchReadinessService.forOrganization(ctx.organizationId!, {
+        agentId: input?.agentId,
+        weeks: input?.weeks ?? 8,
+      }),
+    ),
+
+  /**
+   * Channels assigned to more than one agent and the agent that answers on
+   * each (D7-14), so the agent page can explain who replies.
+   */
+  sharedChannels: scopedProcedure(RESOURCES.AGENTS, ACTIONS.READ).query(async ({ ctx }) => {
+    const [agents, organization] = await Promise.all([
+      agentService.getAgents(ctx.organizationId!),
+      organizationRepository.findById(ctx.organizationId!),
+    ]);
+    const names = new Map(agents.map((a) => [a.id, a.name]));
+    return sharedChannels(agents, organization?.defaultAgentId).map((shared) => ({
+      ...shared,
+      agents: shared.agentIds.map((id) => ({ id, name: names.get(id) ?? "" })),
+      responderName: shared.responderId ? (names.get(shared.responderId) ?? null) : null,
+    }));
   }),
 
   get: scopedProcedure(RESOURCES.AGENTS, ACTIONS.READ)

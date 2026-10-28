@@ -232,6 +232,49 @@ export const customersRouter = t.router({
       return mergedCustomer;
     }),
 
+  /**
+   * Suggested merges (D13-13): customer pairs sharing an email or phone. With
+   * `customerId`, only the pairs that include that customer.
+   */
+  mergeSuggestions: scopedProcedure(RESOURCES.CUSTOMERS, ACTIONS.READ)
+    .input(z.object({ customerId: z.string().uuid().optional() }).optional())
+    .query(async ({ ctx, input }) => {
+      const organizationId = ctx.organizationId!;
+      const rows = await customerRepository.findMergeSuggestions(organizationId, 100);
+      const pairs = input?.customerId
+        ? rows.filter(
+            (row) => row.customerId === input.customerId || row.duplicateId === input.customerId,
+          )
+        : rows.slice(0, 20);
+      const customers = await customerRepository.findManyInOrganization(
+        Array.from(new Set(pairs.flatMap((row) => [row.customerId, row.duplicateId]))),
+        organizationId,
+      );
+      const byId = new Map(customers.map((customer) => [customer.id, customer]));
+      return pairs.flatMap((row) => {
+        const customer = byId.get(row.customerId);
+        const duplicate = byId.get(row.duplicateId);
+        return customer && duplicate
+          ? [{ reason: row.reason, value: row.value, customer, duplicate }]
+          : [];
+      });
+    }),
+
+  /** "Not the same person": stop suggesting this pair. */
+  dismissMergeSuggestion: scopedProcedure(RESOURCES.CUSTOMERS, ACTIONS.UPDATE)
+    .input(z.object({ customerId: z.string().uuid(), otherCustomerId: z.string().uuid() }))
+    .mutation(async ({ ctx, input }) => {
+      if (input.customerId === input.otherCustomerId) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Pick two different customers" });
+      }
+      await customerRepository.dismissMergeSuggestion(
+        ctx.organizationId!,
+        input.customerId,
+        input.otherCustomerId,
+      );
+      return { success: true };
+    }),
+
   // Merge persistent public context into a customer by external ID (server-to-server, API key auth)
   // Context is stored in customer.external_metadata and injected into the LLM prompt on every conversation
   addContext: scopedProcedure(RESOURCES.CUSTOMERS, ACTIONS.UPDATE)

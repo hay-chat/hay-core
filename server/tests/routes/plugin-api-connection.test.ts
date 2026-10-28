@@ -12,7 +12,7 @@ const mockConfig = {
   storage: {
     s3: {},
     local: { uploadDir: "/tmp/hay-test-uploads", baseUrl: "http://localhost/uploads" },
-    limits: { maxFileSize: 10 * 1024 * 1024 },
+    limits: { maxFileSize: 10 * 1024 * 1024, conversationMediaMaxFileSize: 25 * 1024 * 1024 },
   },
 };
 jest.mock("@server/config/env", () => ({ config: mockConfig }));

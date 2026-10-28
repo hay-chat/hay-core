@@ -3,7 +3,7 @@
     "page": {
     "title": "Dashboard",
     "description": "Welcome back! Here's what's happening with your AI agents.",
-    "seoTitle": "Dashboard - Hay",
+    "seoTitle": "Dashboard - Hay.chat",
     "seoDescription": "Manage your AI agents and view performance metrics"
   },
   "actions": {
@@ -20,15 +20,18 @@
     "ofConversations": "of conversations",
     "avgMessages": "Avg Messages",
     "messagesPer": "messages per",
-    "conversation": "conversation"
+    "conversation": "conversation",
+    "avgResponseTime": "Avg Response Time",
+    "medianResponseTime": "median {value}",
+    "noRepliesYet": "No replies in this period"
   },
   "activity": {
     "title": "Conversation Activity",
     "description": "Daily conversation volume"
   },
   "topAgents": {
-    "title": "Top Performing Agents",
-    "description": "Best agents by resolution rate this month",
+    "title": "Top Agents",
+    "description": "Agents with the most conversations in this period",
     "conversations": "{count} conversations",
     "resolutionRate": "resolution rate",
     "emptyTitle": "No agents created yet"
@@ -56,7 +59,7 @@
   },
   "gettingStarted": {
     "title": "Getting Started",
-    "description": "You're just a few steps away from having Hay handle your repetitive support tasks so your team can focus on what truly matters — helping customers and growing your business.",
+    "description": "You're just a few steps away from having Hay.chat handle your repetitive support tasks so your team can focus on what truly matters — helping customers and growing your business.",
     "progress": {
       "title": "Onboarding Progress",
       "stepsCompleted": "{completed} of {total} steps completed",
@@ -65,8 +68,8 @@
     },
     "integrations": {
       "title": "Choose integrations",
-      "subtitle": "Connect your favorite tools and platforms to Hay",
-      "description": "Hay works where your team already does — plug in apps like {zendesk}, {shopify}, or {whatsapp} in just a few clicks to start syncing conversations automatically.",
+      "subtitle": "Connect your favorite tools and platforms to Hay.chat",
+      "description": "Hay.chat works where your team already does — plug in apps like {zendesk}, {shopify}, or {whatsapp} in just a few clicks to start syncing conversations automatically.",
       "count": "{count} integrations connected",
       "browseAll": "Browse All Integrations",
       "suggest": "Suggest an Integration"
@@ -74,7 +77,7 @@
     "agent": {
       "title": "Create an agent",
       "subtitle": "Your AI teammate starts here.",
-      "description": "Define your first Hay agent — give it a name, choose its tone, and decide which channels it should handle.",
+      "description": "Define your first Hay.chat agent — give it a name, choose its tone, and decide which channels it should handle.",
       "count": "{count} agents created",
       "countOne": "{count} agent created",
       "countOther": "{count} agents created",
@@ -83,33 +86,38 @@
     },
     "documents": {
       "title": "Upload training documents",
-      "subtitle": "Teach Hay just like you'd train a new team member.",
-      "description": "Upload your existing playbooks, FAQs, or process docs — Hay learns instantly and never forgets.",
+      "subtitle": "Teach Hay.chat just like you'd train a new team member.",
+      "description": "Upload your existing playbooks, FAQs, or process docs — Hay.chat learns instantly and never forgets.",
       "countOne": "{count} document uploaded",
       "countOther": "{count} documents uploaded",
       "uploadDocuments": "Upload Documents",
       "viewDocuments": "View Documents",
-      "locked": "Finish the previous steps before doing this. Hay will work better this way."
+      "locked": "Finish the previous steps before doing this. Hay.chat will work better this way."
     },
     "playbook": {
       "title": "Create a playbook",
       "subtitle": "Automate common workflows and actions.",
-      "description": "Playbooks let you design how Hay should respond, escalate, or perform tasks (like refunds or order lookups) — all without code.",
+      "description": "Playbooks let you design how Hay.chat should respond, escalate, or perform tasks (like refunds or order lookups) — all without code.",
       "countOne": "{count} playbook created",
       "countOther": "{count} playbooks created",
       "createPlaybook": "Create Playbook",
       "viewPlaybooks": "View Playbooks",
-      "locked": "Finish the previous steps before doing this. Hay will work better this way."
+      "locked": "Finish the previous steps before doing this. Hay.chat will work better this way."
     },
     "playground": {
       "title": "Test the agent in a playground chat",
       "subtitle": "See your agent in action before going live.",
-      "description": "Use the built-in playground to test how Hay responds, tweak instructions, and perfect the experience before connecting to real customers.",
+      "description": "Use the built-in playground to test how Hay.chat responds, tweak instructions, and perfect the experience before connecting to real customers.",
       "countOne": "{count} conversation started",
       "countOther": "{count} conversations started",
       "startChat": "Start Playground Chat",
       "viewConversations": "View Conversations",
-      "locked": "Finish the previous steps before doing this. Hay will work better this way."
+      "locked": "Finish the previous steps before doing this. Hay.chat will work better this way."
+    },
+    "goLive": {
+      "title": "Go live on one channel first",
+      "description": "Many stores start with the AI on Web Chat only and keep WhatsApp, Instagram and email with the team. When you are happy with the replies, switch the other channels on one by one.",
+      "button": "Choose channels for the AI"
     }
   }
   }

@@ -21,6 +21,31 @@
     "./sdk/stdio-mcp-client": {
       "types": "./dist/sdk/stdio-mcp-client.d.ts",
       "import": "./dist/sdk/stdio-mcp-client.js"
+    },
+    "./tool-errors": {
+      "types": "./tool-errors/index.d.ts",
+      "default": "./tool-errors/index.cjs"
+    },
+    "./tool-risk": {
+      "default": "./tool-risk/index.cjs"
+    },
+    "./stale-tracking": {
+      "default": "./stale-tracking/index.cjs"
+    },
+    "./coupon-policy": {
+      "default": "./coupon-policy/index.cjs"
+    },
+    "./return-instructions": {
+      "default": "./return-instructions/index.cjs"
+    },
+    "./identity": {
+      "default": "./identity/index.cjs"
+    },
+    "./marketplace-orders": {
+      "default": "./marketplace-orders/index.cjs"
+    },
+    "./payment-provider": {
+      "default": "./payment-provider/index.cjs"
     }
   },
   "bin": {

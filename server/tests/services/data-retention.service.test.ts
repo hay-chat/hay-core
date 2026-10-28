@@ -21,6 +21,12 @@ jest.mock("../../services/vector-store.service", () => ({
   },
 }));
 
+// Mock media deletion (D8-3)
+const mockDeleteConversationMedia = jest.fn(async (_params: unknown) => ({ deleted: 0, failed: 0 }));
+jest.mock("../../services/conversation-media.service", () => ({
+  deleteConversationMedia: (params: unknown) => mockDeleteConversationMedia(params),
+}));
+
 // Mock centralized logger
 jest.mock("@server/lib/logger", () => ({
   createLogger: () => ({
@@ -133,6 +139,10 @@ describe("DataRetentionService", () => {
 
       // Verify embeddings were deleted
       expect(mockDeleteByConversationIds).toHaveBeenCalledWith("org-1", ["conv-expired"]);
+      expect(mockDeleteConversationMedia).toHaveBeenCalledWith({
+        organizationId: "org-1",
+        conversationIds: ["conv-expired"],
+      });
 
       // Verify audit log was saved
       expect(mockSave).toHaveBeenCalled();
@@ -252,7 +262,7 @@ describe("DataRetentionService", () => {
       expect(setArg.deleted_at).toBeInstanceOf(Date);
     });
 
-    it("should only anonymize conversations with status closed or resolved", async () => {
+    it("should only anonymize ended conversations (closed, resolved or unresolved)", async () => {
       setupRepositories({
         organizations: [{ id: "org-1", name: "Test Org", settings: { retentionDays: 7 } }],
         expiredConversations: [],
@@ -262,7 +272,7 @@ describe("DataRetentionService", () => {
 
       // Verify the query filters by status
       expect(convQueryBuilder.andWhere).toHaveBeenCalledWith("conv.status IN (:...statuses)", {
-        statuses: ["closed", "resolved"],
+        statuses: ["closed", "resolved", "unresolved"],
       });
     });
 

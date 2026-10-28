@@ -1,6 +1,6 @@
 {
-  "name": "Hay",
-  "short_name": "Hay",
+  "name": "Hay.chat",
+  "short_name": "Hay.chat",
   "description": "See which customer conversations need a human and take over from your phone.",
   "start_url": "/inbox",
   "scope": "/",
@@ -8,6 +8,9 @@
   "background_color": "#ffffff",
   "theme_color": "#001df5",
   "icons": [
-    { "src": "/favicon.png", "sizes": "512x512", "type": "image/png", "purpose": "any" }
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/favicon.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-maskable-192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
+    { "src": "/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
   ]
 }

@@ -12,6 +12,19 @@ import { Agent } from "../database/entities/agent.entity";
 import { AppDataSource } from "../database/data-source";
 import { analyzeTiptapInstructions } from "../utils/tiptap-formatter";
 import { createLogger } from "@server/lib/logger";
+import {
+  instructionsToMarkdown,
+  collectMentionReferences,
+  type MentionReferences,
+} from "./playbook-instructions-text";
+
+export interface VersionComparison {
+  active: { id: string; versionNumber: number; status: PlaybookVersionStatus } | null;
+  version: { id: string; versionNumber: number; status: PlaybookVersionStatus };
+  currentMarkdown: string;
+  revisedMarkdown: string;
+  references: MentionReferences;
+}
 
 const logger = createLogger("playbook-service");
 
@@ -116,6 +129,26 @@ export class PlaybookService {
     organizationId: string,
     instructions: PlaybookInstructions | null | undefined,
   ): Promise<string[]> {
+    const unresolved = await this.findUnresolvedActions(organizationId, instructions);
+    const warnings = (unresolved ?? []).map(
+      (action) =>
+        `Referenced action "${action}" does not match any available tool — the agent will not be able to call it.`,
+    );
+    if (warnings.length > 0) {
+      logger.warn({ organizationId, warnings }, "Playbook references unavailable actions");
+    }
+    return warnings;
+  }
+
+  /**
+   * The referenced actions that resolve to no available tool. Returns null when
+   * the tool registry cannot be loaded: then we cannot tell valid from invalid,
+   * so callers report nothing (no false alarms).
+   */
+  async findUnresolvedActions(
+    organizationId: string,
+    instructions: PlaybookInstructions | null | undefined,
+  ): Promise<string[] | null> {
     const analysis = analyzeTiptapInstructions(toTiptapInstructions(instructions));
     if (analysis.actions.length === 0) {
       return [];
@@ -130,26 +163,15 @@ export class PlaybookService {
       // Validation must never block a save — without the registry we cannot
       // tell valid from invalid, so report nothing rather than false alarms.
       logger.warn({ err: error, organizationId }, "Could not load tools for action validation");
-      return [];
+      return null;
     }
 
-    const warnings: string[] = [];
-    for (const action of analysis.actions) {
+    return analysis.actions.filter((action) => {
       const bareName = action.includes(":") ? action.slice(action.lastIndexOf(":") + 1) : action;
-      const resolves = toolNames.some(
+      return !toolNames.some(
         (name) => name === action || name === bareName || name.endsWith(`:${bareName}`),
       );
-      if (!resolves) {
-        warnings.push(
-          `Referenced action "${action}" does not match any available tool — the agent will not be able to call it.`,
-        );
-      }
-    }
-
-    if (warnings.length > 0) {
-      logger.warn({ organizationId, warnings }, "Playbook references unavailable actions");
-    }
-    return warnings;
+    });
   }
 
   async getPlaybooks(organizationId: string): Promise<Playbook[]> {
@@ -178,9 +200,10 @@ export class PlaybookService {
       instructions?: PlaybookInstructions;
       status?: PlaybookStatus;
       agentIds?: string[];
+      approvalCategories?: string[];
     },
   ): Promise<Playbook | null> {
-    const { agentIds, ...updateData } = data;
+    const { agentIds, approvalCategories, ...updateData } = data;
 
     let agents: Agent[] | undefined;
     if (agentIds !== undefined) {
@@ -197,6 +220,10 @@ export class PlaybookService {
     return await this.playbookRepository.update(playbookId, organizationId, {
       ...updateData,
       ...(agents !== undefined && { agents }),
+      ...(approvalCategories !== undefined && {
+        approval_categories:
+          approvalCategories.length > 0 ? [...new Set(approvalCategories)] : null,
+      }),
     });
   }
 
@@ -273,6 +300,41 @@ export class PlaybookService {
       return null;
     }
     return version;
+  }
+
+  /**
+   * A version next to the live one, as markdown for InstructionsDiff (D7-6).
+   * `versionId` defaults to the draft. The base is always the active version
+   * (empty when the playbook was never published).
+   */
+  async compareWithActive(
+    organizationId: string,
+    playbookId: string,
+    versionId?: string,
+  ): Promise<VersionComparison> {
+    const playbook = await this.playbookRepository.findById(playbookId);
+    if (!playbook || playbook.organization_id !== organizationId) {
+      throw new Error("Playbook not found");
+    }
+    const target = versionId
+      ? await this.playbookVersionRepository.findById(versionId)
+      : await this.playbookVersionRepository.findDraftByPlaybookId(playbookId);
+    if (!target || target.playbook_id !== playbookId) {
+      throw new Error("Version not found");
+    }
+    const active = await this.playbookVersionRepository.findActiveByPlaybookId(playbookId);
+    const summary = (v: PlaybookVersion) => ({
+      id: v.id,
+      versionNumber: v.version_number,
+      status: v.status,
+    });
+    return {
+      active: active ? summary(active) : null,
+      version: summary(target),
+      currentMarkdown: instructionsToMarkdown(active?.instructions ?? null),
+      revisedMarkdown: instructionsToMarkdown(target.instructions),
+      references: collectMentionReferences(active?.instructions ?? null, target.instructions),
+    };
   }
 
   async getDraft(organizationId: string, playbookId: string): Promise<PlaybookVersion | null> {

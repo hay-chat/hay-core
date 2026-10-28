@@ -32,7 +32,24 @@ import { Product } from "../entities/product.entity";
 import { ProductVariant } from "../entities/product-variant.entity";
 import { ProductEmbedding } from "../entities/product-embedding.entity";
 import { ConversationTakeoverEvent } from "./entities/conversation-takeover-event.entity";
+import { ConversationOutcome } from "./entities/conversation-outcome.entity";
+import { OperatorEventRecord } from "./entities/operator-event.entity";
+import { InsightIssue } from "./entities/insight-issue.entity";
 import { PushSubscription } from "./entities/push-subscription.entity";
+import { NotificationDelivery } from "./entities/notification-delivery.entity";
+import { ActionLog } from "./entities/action-log.entity";
+import { SimulationRun } from "./entities/simulation-run.entity";
+import { SimulationRunItem } from "./entities/simulation-run-item.entity";
+import { TestTranscript } from "./entities/test-transcript.entity";
+import { TestCase } from "./entities/test-case.entity";
+import { PendingAction } from "./entities/pending-action.entity";
+import { BusinessHoursSchedule } from "./entities/business-hours-schedule.entity";
+import { OrderConversationLink } from "./entities/order-conversation-link.entity";
+import { Dispute } from "./entities/dispute.entity";
+import { PluginState } from "./entities/plugin-state.entity";
+import { EmailSendingDomain } from "./entities/email-sending-domain.entity";
+import { CustomerMergeDismissal } from "./entities/customer-merge-dismissal.entity";
+import { OrderLinkMessageSubscriber } from "./subscribers/order-link-message.subscriber";
 import { SnakeNamingStrategy } from "./naming-strategy";
 import { config } from "../config/env";
 import { createLogger } from "@server/lib/logger";
@@ -91,11 +108,27 @@ export const AppDataSource = new DataSource({
     ProductEmbedding,
     ConversationTakeoverEvent,
     PushSubscription,
+    NotificationDelivery,
+    ConversationOutcome,
+    InsightIssue,
+    ActionLog,
+    PendingAction,
+    BusinessHoursSchedule,
+    OrderConversationLink,
+    Dispute,
+    PluginState,
+    EmailSendingDomain,
+    CustomerMergeDismissal,
+    SimulationRun,
+    SimulationRunItem,
+    TestTranscript,
+    TestCase,
+    OperatorEventRecord,
   ],
   migrations: __filename.includes("dist")
     ? [__dirname + "/migrations/*.js"] // Production: compiled JS files in same relative location
     : ["./database/migrations/*.ts"], // Development: TypeScript files
-  subscribers: [],
+  subscribers: [OrderLinkMessageSubscriber],
   namingStrategy: new SnakeNamingStrategy(),
 });
 

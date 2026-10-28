@@ -26,7 +26,20 @@
     "usage_warning": "You've used {percent}% of your {included} included resolutions this period ({used} so far).",
     "usage_exceeded": "You've used all {included} included resolutions this period. Until {periodEnd} each extra resolution is billed at {rate}.",
     "usage_paused": "Your AI agent is paused: all {included} included resolutions for this period are used. Allow extra resolutions or upgrade to resume now; it restarts on its own on {periodEnd}.",
+    "usage_cap_reached": "Your AI agent is paused: you reached your spend cap for extra resolutions this period ({used} of {cap}). New conversations go to your team. Raise the cap or upgrade to resume now; it restarts on its own on {periodEnd}.",
+    "trial_grace": "Your free trial has ended and your AI agent is paused, so new conversations go to your team. Choose a plan before {lockDate} to switch it back on. After that date the account locks.",
+    "manual_suspension_pending": "Your Hay.chat account will be suspended on {date}. Contact Hay.chat support if you have questions.",
     "defaultCta": "Manage billing",
     "dismiss": "Dismiss"
+  },
+  "accessNoticeCta": {
+    "trial_ending": "Choose a plan",
+    "payment_failed": "Update payment method",
+    "usage_warning": "View usage",
+    "usage_exceeded": "Upgrade plan",
+    "usage_paused": "Manage usage",
+    "usage_cap_reached": "Raise spend cap",
+    "trial_grace": "Choose a plan",
+    "manual_suspension_pending": "Contact Hay.chat"
   }
 }

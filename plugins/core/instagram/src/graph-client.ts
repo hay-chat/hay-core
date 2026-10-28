@@ -9,6 +9,7 @@ import type { HayLogger } from "@hay/plugin-sdk/types";
  *   - getProfile        — resolve an Instagram-scoped sender id (IGSID) to a
  *                         display name / username / avatar for the customer record.
  *   - sendText          — deliver an outbound text DM via /me/messages.
+ *   - sendAttachment    — deliver an outbound image, video, audio or file DM by URL.
  *   - getConnectedAccount — resolve the IG account (ids + username) backing the freshly
  *                         stored access token, used as opaque webhook routing
  *                         keys in `onConnected`.
@@ -42,6 +43,18 @@ export class GraphApiError extends Error {
     this.subcode = subcode;
   }
 }
+
+/**
+ * Meta's Human Agent tag: lets a PERSON reply up to 7 days after the
+ * customer's last message (needs the Human Agent permission). Never used for AI replies.
+ */
+const HUMAN_AGENT_TAG = { messaging_type: "MESSAGE_TAG", tag: "HUMAN_AGENT" } as const;
+
+/** How a send is classed: a normal reply, or a person's reply tagged HUMAN_AGENT. */
+export type SendMode = "response" | "human_agent";
+
+/** Attachment types Instagram DMs accept. */
+export type InstagramAttachmentType = "image" | "video" | "audio" | "file";
 
 export interface InstagramProfile {
   /** The Instagram-scoped id (PSID) the profile was resolved for. */
@@ -156,9 +169,14 @@ export class GraphClient {
    * POST /me/messages { recipient:{id}, message:{text}, messaging_type:"RESPONSE" }
    * Returns the provider message id.
    */
-  async sendText(recipientPsid: string, text: string, accessToken: string): Promise<string> {
-    // Instagram messaging send: { recipient:{id}, message:{text} }. Unlike the
-    // Messenger Platform, Instagram does not use `messaging_type`.
+  async sendText(
+    recipientPsid: string,
+    text: string,
+    accessToken: string,
+    mode: SendMode = "response",
+  ): Promise<string> {
+    // Instagram messaging send: { recipient:{id}, message:{text} }. A normal
+    // reply carries no `messaging_type`; a person's late reply carries the tag.
     const data = await this.request<{ message_id?: string; recipient_id?: string }>(
       "POST",
       "/me/messages",
@@ -166,6 +184,7 @@ export class GraphClient {
       {
         body: {
           recipient: { id: recipientPsid },
+          ...(mode === "human_agent" ? HUMAN_AGENT_TAG : {}),
           message: { text },
         },
       },
@@ -176,6 +195,35 @@ export class GraphClient {
       throw new GraphApiError("Graph API send returned no message_id", 502);
     }
     return messageId;
+  }
+
+  /**
+   * Send an outbound attachment DM (D8-17). Meta downloads the file from `url`
+   * (a short-lived signed Hay.chat link), so it must be publicly reachable.
+   * POST /me/messages { recipient:{id}, message:{attachment:{type, payload:{url}}} }
+   */
+  async sendAttachment(
+    recipientPsid: string,
+    attachment: { type: InstagramAttachmentType; url: string },
+    accessToken: string,
+    mode: SendMode = "response",
+  ): Promise<string> {
+    const data = await this.request<{ message_id?: string; recipient_id?: string }>(
+      "POST",
+      "/me/messages",
+      accessToken,
+      {
+        body: {
+          recipient: { id: recipientPsid },
+          ...(mode === "human_agent" ? HUMAN_AGENT_TAG : {}),
+          message: { attachment: { type: attachment.type, payload: { url: attachment.url } } },
+        },
+      },
+    );
+    if (!data.message_id) {
+      throw new GraphApiError("Graph API send returned no message_id", 502);
+    }
+    return data.message_id;
   }
 
   /**

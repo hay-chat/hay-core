@@ -6,6 +6,7 @@
     "dev": "fuser -k 3000/tcp 2>/dev/null || true && nuxt dev",
     "dev:clean": "fuser -k 3000/tcp 2>/dev/null || true && rm -rf .nuxt && nuxt dev",
     "build": "nuxt build",
+    "test": "vitest run",
     "build:prod": "NODE_ENV=production nuxt build",
     "preview": "nuxt preview",
     "generate": "nuxt generate",
@@ -23,6 +24,8 @@
     "@types/node": "^24.5.2",
     "@types/pdf-parse": "^1.1.5",
     "@types/uuid": "^9.0.8",
+    "@vue/test-utils": "^2.4.6",
+    "jsdom": "^24.1.3",
     "sass": "^1.92.0"
   },
   "dependencies": {

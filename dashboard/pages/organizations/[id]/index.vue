@@ -755,8 +755,8 @@ onMounted(async () => {
 useHead({
   title: computed(() =>
     organization.value
-      ? `${organization.value.name} - Hay Dashboard`
-      : "Organization - Hay Dashboard",
+      ? `${organization.value.name} - Hay.chat`
+      : "Organization - Hay.chat",
   ),
   meta: [
     {

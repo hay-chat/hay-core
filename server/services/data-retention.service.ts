@@ -4,6 +4,7 @@ import { Message } from "@server/database/entities/message.entity";
 import { Organization } from "@server/entities/organization.entity";
 import { AuditLog } from "@server/entities/audit-log.entity";
 import { createLogger } from "@server/lib/logger";
+import { deleteConversationMedia } from "./conversation-media.service";
 
 const logger = createLogger("data-retention");
 
@@ -21,6 +22,7 @@ const logger = createLogger("data-retention");
  *
  * What gets removed (PII):
  * - messages (deleted)
+ * - their media files (deleted from storage)
  * - linked embeddings (deleted via vectorStoreService)
  * - customer link (set to NULL)
  * - title, context, metadata, document_ids
@@ -41,6 +43,7 @@ export class DataRetentionService {
     conversationsAnonymized: number;
     messagesDeleted: number;
     embeddingsDeleted: number;
+    mediaDeleted: number;
   }> {
     const organizationRepository = AppDataSource.getRepository(Organization);
     const conversationRepository = AppDataSource.getRepository(Conversation);
@@ -51,6 +54,7 @@ export class DataRetentionService {
     let conversationsAnonymized = 0;
     let messagesDeleted = 0;
     let embeddingsDeleted = 0;
+    let mediaDeleted = 0;
 
     // Find organizations with retention policies enabled
     const organizations = await organizationRepository
@@ -82,7 +86,9 @@ export class DataRetentionService {
           .where("conv.organization_id = :orgId", { orgId: org.id })
           .andWhere("conv.deleted_at IS NULL")
           .andWhere("conv.legal_hold = false")
-          .andWhere("conv.status IN (:...statuses)", { statuses: ["closed", "resolved"] })
+          .andWhere("conv.status IN (:...statuses)", {
+            statuses: ["closed", "resolved", "unresolved"],
+          })
           .andWhere(
             "(conv.closed_at IS NOT NULL AND conv.closed_at < :cutoff) OR " +
               "(conv.closed_at IS NULL AND conv.created_at < :cutoff)",
@@ -120,6 +126,14 @@ export class DataRetentionService {
           // Continue with anonymization even if embedding deletion fails
         }
 
+        // Delete their media files (D8-3); before the messages, whose
+        // attachments name uploads stored before linking existed.
+        const mediaResult = await deleteConversationMedia({
+          organizationId: org.id,
+          conversationIds,
+        });
+        mediaDeleted += mediaResult.deleted;
+
         // Delete messages (before anonymizing conversations)
         const messageDeleteResult = await messageRepository
           .createQueryBuilder()
@@ -156,6 +170,8 @@ export class DataRetentionService {
             conversationsAnonymized: expiredConversations.length,
             messagesDeleted: messageDeleteResult.affected || 0,
             embeddingsDeleted: orgEmbeddingsDeleted,
+            mediaDeleted: mediaResult.deleted,
+            mediaFailed: mediaResult.failed,
             retentionDays,
             cutoffDate: cutoffDate.toISOString(),
             conversationIds,
@@ -205,6 +221,7 @@ export class DataRetentionService {
         conversationsAnonymized,
         messagesDeleted,
         embeddingsDeleted,
+        mediaDeleted,
       },
       "Data retention cleanup complete",
     );
@@ -214,6 +231,7 @@ export class DataRetentionService {
       conversationsAnonymized,
       messagesDeleted,
       embeddingsDeleted,
+      mediaDeleted,
     };
   }
 

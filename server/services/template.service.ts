@@ -175,12 +175,14 @@ export class TemplateService {
     // Two-pass variable substitution for i18n support:
     // Pass 1: Replace translation keys (t.*) with their values (which may contain {{ variable }} placeholders)
     // Do NOT strip unmatched variables — they'll be resolved in Pass 2
+    // Conditionals and loops wait for Pass 2: evaluated against the translation keys
+    // they would all be false and every {{#if}} block would be dropped.
     const translations = this.translationService.getTranslations(templateId, options.locale);
-    const mjmlWithTranslations = this.replaceVariables(fullMjml, translations, false);
+    const mjmlWithTranslations = this.replaceKeys(fullMjml, translations, { escapeHtml: false });
 
     // Pass 2: Replace regular variables (userName, companyName, etc.)
     // Strip any remaining unmatched variables after this final pass
-    const mjmlWithVars = this.replaceVariables(mjmlWithTranslations, variables, true);
+    const mjmlWithVars = this.replaceVariables(mjmlWithTranslations, variables);
 
     // Compile MJML to HTML
     // NOTE: minify is explicitly disabled due to ReDoS vulnerability in html-minifier (GHSA-pfq8-rq6v-vf5m)
@@ -212,11 +214,7 @@ export class TemplateService {
   /**
    * Replace variables in template content
    */
-  private replaceVariables(
-    content: string,
-    variables: Record<string, unknown>,
-    stripUnmatched: boolean = true,
-  ): string {
+  private replaceVariables(content: string, variables: Record<string, unknown>): string {
     let result = content;
     const originalLength = content.length;
 
@@ -228,29 +226,41 @@ export class TemplateService {
     result = this.processLoops(result, variables);
     logger.debug({ resultLength: result.length }, "After loops");
 
-    // Replace simple variables
-    for (const [key, value] of Object.entries(variables)) {
-      const pattern = new RegExp(`\\{\\{\\s*${key}\\s*\\}\\}`, "g");
-      const matches = result.match(pattern);
-      if (matches) {
-        logger.debug({ key, count: matches.length }, "Replacing variable instances");
-      }
-      result = result.replace(pattern, this.formatValue(value));
-    }
+    result = this.replaceKeys(result, variables, { escapeHtml: true });
 
-    // Only strip unmatched variables on the final pass
-    if (stripUnmatched) {
-      const unmatchedVars = result.match(/\{\{[^}]+\}\}/g);
-      if (unmatchedVars) {
-        logger.debug(
-          { count: unmatchedVars.length, sample: unmatchedVars.slice(0, 5) },
-          "Removing unmatched variables",
-        );
-      }
-      result = result.replace(/\{\{[^}]+\}\}/g, "");
+    // Strip unmatched variables
+    const unmatchedVars = result.match(/\{\{[^}]+\}\}/g);
+    if (unmatchedVars) {
+      logger.debug(
+        { count: unmatchedVars.length, sample: unmatchedVars.slice(0, 5) },
+        "Removing unmatched variables",
+      );
     }
+    result = result.replace(/\{\{[^}]+\}\}/g, "");
 
     return result;
+  }
+
+  /**
+   * Replace {{ key }} / {{ a.b }} placeholders whose value is known, leaving the rest
+   * (and {{#if}}/{{else}}/{{/each}} markers) untouched. Flat keys win over nested
+   * paths so translation keys like "t.common.hi" resolve as-is. Variable values
+   * (not translations) are HTML-escaped: they carry customer text such as summaries.
+   */
+  private replaceKeys(
+    content: string,
+    values: Record<string, unknown>,
+    options: { escapeHtml: boolean },
+  ): string {
+    return content.replace(/\{\{\s*([^#/}\s][^}]*?)\s*\}\}/g, (token, key: string) => {
+      if (key === "else") return token;
+      const value = Object.prototype.hasOwnProperty.call(values, key)
+        ? values[key]
+        : this.getNestedValue(values, key);
+      if (value === undefined) return token;
+      const text = this.formatValue(value);
+      return options.escapeHtml ? escapeHtml(text) : text;
+    });
   }
 
   /**
@@ -270,10 +280,9 @@ export class TemplateService {
         "Processing conditional",
       );
 
-      if (value) {
-        return block; // Don't recursively replace here - will be done in main replaceVariables
-      }
-      return "";
+      // Don't recursively replace here - will be done in main replaceVariables
+      const [ifBlock, elseBlock = ""] = block.split(/\{\{\s*else\s*\}\}/);
+      return value ? ifBlock : elseBlock;
     });
   }
 
@@ -292,6 +301,7 @@ export class TemplateService {
             const itemVariables = {
               ...variables,
               item,
+              this: item,
               index,
               [`${arrayPath.trim()}_item`]: item,
             };
@@ -408,4 +418,13 @@ export class TemplateService {
     await this.loadTemplates();
     await this.translationService.reload();
   }
+}
+
+function escapeHtml(text: string): string {
+  return text
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
 }

@@ -1,7 +1,7 @@
 import { ConversationRepository } from "../repositories/conversation.repository";
 import { MessageRepository } from "../repositories/message.repository";
 import { CustomerService } from "./customer.service";
-import { Conversation } from "../database/entities/conversation.entity";
+import { Conversation, type ConversationStatus } from "../database/entities/conversation.entity";
 import { Message, MessageType } from "../database/entities/message.entity";
 import { getUTCNow } from "../utils/date.utils";
 import { hookManager } from "./hooks/hook-manager";
@@ -13,8 +13,10 @@ const logger = createLogger("conversation");
 
 const SUPPORTED_LANGUAGE_VALUES = new Set<string>(Object.values(SupportedLanguage));
 
+/** "pt-BR" / "pt" -> "pt"; anything we don't support -> null. */
 function toSupportedLanguage(value: string | null | undefined): SupportedLanguage | null {
-  return value && SUPPORTED_LANGUAGE_VALUES.has(value) ? (value as SupportedLanguage) : null;
+  const primary = value?.split("-")[0].toLowerCase();
+  return primary && SUPPORTED_LANGUAGE_VALUES.has(primary) ? (primary as SupportedLanguage) : null;
 }
 
 export class ConversationService {
@@ -35,7 +37,7 @@ export class ConversationService {
       agentId?: string | null;
       playbook_id?: string | null;
       metadata?: Record<string, unknown>;
-      status?: "open" | "processing" | "pending-human" | "human-took-over" | "resolved" | "closed";
+      status?: ConversationStatus;
       customer_id?: string | null;
       language?: string | null;
     },
@@ -72,10 +74,30 @@ export class ConversationService {
       status: data.status || "open",
       context: {},
       metadata: data.metadata || {},
-      needs_processing: data.status === "open" || data.status === "processing",
+      needs_processing: false,
       customer_id: customerId,
       language: toSupportedLanguage(data.language),
     });
+
+    // An open conversation starts with its instructions and the greeting,
+    // written before we return. The caller (the widget) sends the shopper's
+    // first message right after, so the greeting always comes first and no
+    // run races that message. If this fails, fall back to the orchestrator
+    // run, which writes whatever is missing.
+    if (data.status === "open" || data.status === "processing") {
+      try {
+        await conversation.addInitialSystemMessage();
+        await conversation.addInitialAgentInstructions();
+        await conversation.addInitialBotMessage();
+      } catch (error) {
+        logger.warn(
+          { err: error, conversationId: conversation.id },
+          "Initial messages failed, leaving them to the orchestrator",
+        );
+        await this.conversationRepository.updateById(conversation.id, { needs_processing: true });
+        conversation.needs_processing = true;
+      }
+    }
 
     // Trigger hook for conversation created
     await hookManager.trigger("conversation.created", {
@@ -117,9 +139,7 @@ export class ConversationService {
     // Surface a usable avatar URL for the conversation's agent (the entity only
     // carries the raw upload record). Lets the dashboard render the agent avatar.
     if (conversation.agent?.avatarUpload) {
-      conversation.agent.avatarUrl = new StorageService().getPublicUrl(
-        conversation.agent.avatarUpload,
-      );
+      conversation.agent.avatarUrl = new StorageService().getUrl(conversation.agent.avatarUpload);
     }
     return conversation;
   }
@@ -129,7 +149,7 @@ export class ConversationService {
     organizationId: string,
     data: {
       title?: string;
-      status?: "open" | "processing" | "pending-human" | "human-took-over" | "resolved" | "closed";
+      status?: ConversationStatus;
       needs_processing?: boolean;
       last_processed_at?: Date | null;
       agent_id?: string | null;
@@ -150,7 +170,7 @@ export class ConversationService {
   ): Promise<Conversation | null> {
     // Automatically set closed_at when status changes to closed or resolved
     const updateData = { ...data };
-    if (data.status === "closed" || data.status === "resolved") {
+    if (data.status === "closed" || data.status === "resolved" || data.status === "unresolved") {
       updateData.closed_at = getUTCNow();
     }
 

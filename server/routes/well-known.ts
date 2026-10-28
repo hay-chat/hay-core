@@ -15,7 +15,7 @@ router.get("/.well-known/oauth-client", (req, res) => {
 
   res.json({
     client_id: redirectUri,
-    client_name: "Hay",
+    client_name: "Hay.chat",
     client_uri: "https://hay.chat",
     logo_uri: "https://hay.chat/logo.png",
     tos_uri: "https://hay.chat/terms",

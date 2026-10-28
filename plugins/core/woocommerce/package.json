@@ -10,14 +10,16 @@
     "displayName": "WooCommerce",
     "category": "integration",
     "capabilities": [
-      "mcp"
+      "mcp",
+      "products"
     ],
     "env": []
   },
   "scripts": {
-    "build": "tsc",
+    "build": "npm run build:ui && tsc",
+    "build:ui": "vite build --config vite.config.ui.ts",
     "start": "node dist/index.js",
-    "dev": "tsc --watch",
+    "dev": "npm run build:ui && tsc --watch",
     "test": "vitest run"
   },
   "dependencies": {
@@ -25,7 +27,10 @@
   },
   "devDependencies": {
     "@types/node": "^20.10.0",
+    "@vitejs/plugin-vue": "^6.0.3",
     "typescript": "^5.3.3",
-    "vitest": "^1.6.1"
+    "vite": "^6.4.1",
+    "vitest": "^1.6.1",
+    "vue": "^3.5.26"
   }
 }

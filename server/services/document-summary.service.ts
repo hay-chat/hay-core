@@ -69,6 +69,7 @@ ${content}`;
         prompt,
         jsonSchema: schema,
         tier: "easy",
+        organizationId: document.organizationId,
         temperature: 0.3,
         max_tokens: 200,
       });

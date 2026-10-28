@@ -58,6 +58,13 @@ const PROMPT_SCAFFOLD_HEADINGS = [
   "## User Feedback",
   "## Scope Restriction",
   "## Your Task",
+  // Portuguese prompt (server/prompts/pt/playbook/suggest-edits.md)
+  "## Ações Disponíveis (lista permitida)",
+  "## Documentos Disponíveis (lista permitida)",
+  "## Conversa para Analisar",
+  "## Feedback do Usuário",
+  "## Restrição de Escopo",
+  "## Sua Tarefa",
 ];
 
 /**
@@ -84,7 +91,7 @@ export function sanitizeRevisedMarkdown(revised: string, currentMarkdown: string
     .find((line) => line.length > 0);
   if (firstLine) {
     const index = out.indexOf(firstLine);
-    if (index > 0 && /## (Playbook:|Current Instructions)/.test(out.slice(0, index))) {
+    if (index > 0 && /## (Playbook:|Current Instructions|Instruções Atuais)/.test(out.slice(0, index))) {
       out = out.slice(index);
     }
   }

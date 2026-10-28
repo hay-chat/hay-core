@@ -2,6 +2,7 @@ import { Orchestrator } from "../orchestrator";
 import { AppDataSource } from "../database/data-source";
 import { createLogger } from "@server/lib/logger";
 import { rabbitmqService } from "@server/services/rabbitmq.service";
+import { simulationHarnessService } from "@server/services/simulation/simulation-harness.service";
 import {
   orchestratorQueueService,
   ORCHESTRATOR_QUEUES,
@@ -93,7 +94,16 @@ export class OrchestratorWorker {
         );
 
         try {
-          await this.orchestrator!.processConversation(data.conversationId);
+          if (data.trigger === "approval_decided") {
+            await this.orchestrator!.processApprovalDecision(data.conversationId);
+          } else if (data.trigger === "simulation") {
+            // Never throws: a failed simulation fails its item, without retries.
+            await simulationHarnessService.runItem(data.conversationId, (id) =>
+              this.orchestrator!.processConversation(id),
+            );
+          } else {
+            await this.orchestrator!.processConversation(data.conversationId);
+          }
           rabbitmqService.ack(msg);
           logger.debug(
             { conversationId: data.conversationId },

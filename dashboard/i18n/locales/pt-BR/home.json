@@ -1,14 +1,14 @@
 {
   "home": {
     "title": "Caixa de entrada",
-    "headTitle": "Caixa de entrada - Hay",
+    "headTitle": "Caixa de entrada - Hay.chat",
     "headline": {
       "loading": "Verificando quem está esperando…",
       "waiting": "Nenhuma conversa esperando por um humano | 1 conversa esperando por um humano | {count} conversas esperando por um humano"
     },
     "subline": {
       "longestWait": "Maior espera: {time}.",
-      "aiHandling": "A Hay está cuidando de {count} conversa aberta. | A Hay está cuidando de {count} conversas abertas.",
+      "aiHandling": "O Hay.chat está cuidando de {count} conversa aberta. | O Hay.chat está cuidando de {count} conversas abertas.",
       "allQuiet": "Nenhuma conversa aberta no momento."
     },
     "waitingCount": "{count} esperando por um humano",
@@ -28,7 +28,7 @@
     },
     "empty": {
       "title": "Tudo tranquilo",
-      "description": "Quando a Hay passa uma conversa para uma pessoa, ela aparece aqui primeiro. Ative os alertas para ser avisado neste dispositivo."
+      "description": "Quando o Hay.chat passa uma conversa para uma pessoa, ela aparece aqui primeiro. Ative os alertas para ser avisado neste dispositivo."
     },
     "error": {
       "title": "Não foi possível carregar as conversas",
@@ -38,18 +38,87 @@
     "push": {
       "enable": "Alertas neste dispositivo",
       "enabled": "Alertas ativados",
-      "description": "Receba uma notificação neste dispositivo sempre que uma conversa precisar de um humano, mesmo com a Hay fechada.",
+      "description": "Receba uma notificação neste dispositivo sempre que uma conversa precisar de um humano, mesmo com o Hay.chat fechado. Os alertas vão para quem está como Disponível. Se ninguém responder em 10 minutos, o Hay.chat avisa de novo e depois envia um e-mail.",
       "statusOn": "Este dispositivo recebe alertas",
       "statusOff": "Este dispositivo não recebe alertas",
       "sendTest": "Enviar alerta de teste",
       "testSent": "Alerta de teste enviado",
       "testSentBody": "Ele deve aparecer neste dispositivo em alguns segundos.",
       "testNone": "Nenhum dispositivo inscrito",
-      "unsupported": "Este navegador não recebe alertas push. No iPhone, adicione a Hay à Tela de Início e abra por lá.",
-      "unavailable": "Os alertas push ainda não foram configurados neste servidor da Hay. Peça ao administrador para adicionar as chaves VAPID.",
+      "unsupported": "Este navegador não recebe alertas push. No iPhone, adicione o Hay.chat à Tela de Início e abra por lá.",
+      "unavailable": "Os alertas push ainda não foram configurados neste servidor do Hay.chat. Peça ao administrador para adicionar as chaves VAPID.",
       "denied": "As notificações estão bloqueadas para este site nas configurações do navegador. Permita e recarregue a página.",
       "failed": "Não foi possível ativar os alertas",
-      "blocked": "Alertas desativados"
+      "blocked": "Alertas desativados",
+      "privacyLabel": "Ocultar dados do cliente na tela bloqueada",
+      "privacyHelp": "Os alertas dizem apenas \"Um cliente precisa de um humano\". Abra o Hay.chat para ver quem é. Vale para todos os seus dispositivos.",
+      "privacyOn": "Dados do cliente ocultos nos alertas",
+      "privacyOff": "Os alertas mostram o cliente e o resumo",
+      "privacyFailed": "Não foi possível alterar esta configuração"
+    },
+    "aiPause": {
+      "title": "Pausar a IA em tudo",
+      "description": "Para na hora todas as respostas da IA em todos os canais, incluindo lembretes e encerramentos por inatividade. Clientes que escreverem recebem uma mensagem curta dizendo que sua equipe vai responder, e as conversas ficam esperando aqui por você.",
+      "statusOn": "IA pausada",
+      "statusOff": "IA respondendo",
+      "pausedBy": "Pausada por {name} em {when}.",
+      "pausedAt": "Pausada em {when}.",
+      "perChannel": "Desligar a IA em um canal só (apenas rascunhos)",
+      "perAgent": "Desligar um agente",
+      "banner": "A IA está pausada em tudo. Sua equipe responde todas as conversas.",
+      "resume": "Retomar a IA",
+      "paused": "IA pausada em tudo",
+      "resumed": "IA retomada",
+      "failed": "Não foi possível alterar a pausa da IA. Tente de novo."
+    },
+    "install": {
+      "title": "Receba alertas no iPhone",
+      "description": "O iPhone só mostra alertas do Hay.chat quando ele está na Tela de Início. São três toques.",
+      "stepShare": "No Safari, toque no botão Compartilhar",
+      "stepAdd": "Role para baixo e toque em \"Adicionar à Tela de Início\" e depois em \"Adicionar\"",
+      "stepOpen": "Abra o Hay.chat pelo novo ícone na Tela de Início e ative os alertas",
+      "dismiss": "Ocultar estes passos"
+    },
+    "spam": {
+      "title": "Spam",
+      "headTitle": "Spam - Hay.chat",
+      "description": "Conversas retidas como spam. A IA do Hay.chat não responde a elas e elas nunca entram na sua cobrança.",
+      "link": "Spam",
+      "empty": {
+        "title": "Nenhum spam",
+        "description": "Quando o Hay.chat retém uma conversa como spam, ela aparece aqui para você conferir."
+      },
+      "error": "Não foi possível carregar o spam",
+      "notSpam": "Não é spam",
+      "open": "Abrir",
+      "flagged": "Retida há {time}",
+      "noPreview": "Sem mensagem",
+      "unknownCustomer": "Visitante",
+      "notSpamDone": "Removida do spam",
+      "notSpamReengaged": "Removida do spam. A IA do Hay.chat está respondendo agora.",
+      "markSpam": "Marcar como spam",
+      "markSpamDone": "Marcada como spam. A IA do Hay.chat não vai responder.",
+      "actionFailed": "Não foi possível atualizar a conversa",
+      "sources": {
+        "detector": "Detector de spam",
+        "staff": "Marcada pela sua equipe",
+        "close_classifier": "Identificada no encerramento",
+        "other": "Spam"
+      },
+      "signals": {
+        "links": "Muitos links",
+        "link_only": "Só um link",
+        "repeated": "Texto repetido",
+        "too_long": "Mensagem muito longa",
+        "no_text": "Sem palavras",
+        "known_pattern": "Frases típicas de spam",
+        "unverified": "Verificação anti-bot falhou"
+      },
+      "classifier": "Verificação por IA: {reason}",
+      "banner": {
+        "title": "Retida como spam",
+        "description": "A IA do Hay.chat não está respondendo a esta conversa e ela não entra na sua cobrança."
+      }
     }
   }
 }

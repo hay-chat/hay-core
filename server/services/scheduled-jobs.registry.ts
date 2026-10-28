@@ -70,6 +70,18 @@ const jobRegistry: CronJobConfig[] = [
     skipDatabaseLogging: true, // Don't log frequent cleanups
   },
 
+  {
+    name: "auth-session-cleanup",
+    description: "Delete login sessions that expired or were revoked over 30 days ago",
+    schedule: "30 3 * * *", // Daily at 3:30 AM
+    handler: async () => {
+      const { authSessionService } = await import("./auth-session.service");
+      await authSessionService.cleanupEndedSessions();
+    },
+    singleton: true,
+    enabled: true,
+  },
+
   // ============================================================
   // BACKGROUND PROCESSING JOBS
   // ============================================================
@@ -81,6 +93,145 @@ const jobRegistry: CronJobConfig[] = [
     singleton: true, // Prevent concurrent processing
     enabled: true,
     skipDatabaseLogging: true, // Don't log frequent checks
+  },
+
+  {
+    name: "close-classification",
+    description:
+      "Classify closed conversations: billing outcome + Insights QA event (one LLM call each)",
+    schedule: 10000, // Every 10 seconds, up to 5 closes per run
+    handler: async () => {
+      const { closeClassifierService } =
+        await import("./close-classification/close-classifier.service");
+      await closeClassifierService.processPending(5);
+    },
+    singleton: true,
+    enabled: true,
+    skipDatabaseLogging: true,
+  },
+
+  {
+    name: "operator-event-retry",
+    description:
+      "Retry operator events (e.g. organization.deleted) whose delivery failed, with backoff",
+    schedule: 60000, // Every minute, up to 10 due events per run
+    handler: async () => {
+      const { retryOperatorEvents } = await import("./operator-events.service");
+      await retryOperatorEvents(10);
+    },
+    singleton: true,
+    enabled: true,
+    skipDatabaseLogging: true,
+  },
+
+  {
+    name: "insight-feedback-enrichment",
+    description:
+      "Explain staff ratings of AI replies as Insights QA events (one easy-tier LLM call each)",
+    schedule: 10000, // Every 10 seconds, up to 5 ratings per run
+    handler: async () => {
+      const { feedbackInsightService } = await import("./insights/feedback-insight.service");
+      await feedbackInsightService.enrichPending(5);
+    },
+    singleton: true,
+    enabled: true,
+    skipDatabaseLogging: true,
+  },
+
+  {
+    name: "insight-embeddings",
+    description: "Embed enriched insight issues for clustering (pgvector, one row per issue)",
+    schedule: 60000, // Every 60 seconds, up to 50 issues per run
+    handler: async () => {
+      const { insightEmbeddingService } = await import("./insights/insight-embedding.service");
+      await insightEmbeddingService.embedPending(50);
+    },
+    singleton: true,
+    enabled: true,
+    skipDatabaseLogging: true,
+  },
+
+  {
+    name: "insight-clustering",
+    description:
+      "Nightly incremental clustering of insight issues: join/create, merge, promotion gate, recurrence (D3-12)",
+    schedule: "15 4 * * *", // Daily at 4:15 AM, after retention
+    handler: async () => {
+      const { insightClusteringService } = await import("./insights/insight-clustering.service");
+      await insightClusteringService.runAll();
+    },
+    singleton: true,
+    enabled: true,
+    timeout: 1800000, // 30 minutes max
+  },
+
+  {
+    name: "insight-weekly-digest",
+    description: "Weekly Insights digest email to owners and admins",
+    schedule: "0 8 * * 1", // Mondays at 8:00 AM, after the docs audit
+    handler: async () => {
+      const { insightDigestService } = await import("./insights/insight-digest.service");
+      await insightDigestService.runAll();
+    },
+    singleton: true,
+    enabled: true,
+    timeout: 1800000, // 30 minutes max
+  },
+
+  {
+    name: "dispute-evidence-reminder",
+    description:
+      "Remind owners and admins once when a payment dispute's evidence is due within 48h and nothing is attached (D2-7)",
+    schedule: "15 * * * *", // Hourly
+    handler: async () => {
+      const { disputesService } = await import("./disputes/disputes.service");
+      await disputesService.sendReminders();
+    },
+    singleton: true,
+    enabled: true,
+    timeout: 300000, // 5 minutes max
+  },
+
+  {
+    name: "insight-backfill",
+    description:
+      "Insights-only review of the last 30 days of closed conversations when Insights is enabled (D3-18)",
+    schedule: 120000, // Every 2 minutes, 10 conversations per org per run
+    handler: async () => {
+      const { insightBackfillService } = await import("./insights/insight-backfill.service");
+      await insightBackfillService.processPending(10);
+    },
+    singleton: true,
+    enabled: true,
+    skipDatabaseLogging: true,
+    timeout: 600000, // 10 minutes max
+  },
+
+  {
+    name: "insight-docs-audit",
+    description: "Weekly docs audit and broken playbook action check as an Insights input (D3-15)",
+    schedule: "0 5 * * 1", // Mondays at 5:00 AM
+    handler: async () => {
+      const { docsAuditInsightService } = await import("./insights/docs-audit-insight.service");
+      await docsAuditInsightService.runAll();
+    },
+    singleton: true,
+    enabled: true,
+    timeout: 3600000, // 1 hour max
+  },
+
+  {
+    name: "pending-action-expiry",
+    description:
+      "Expire AI actions that got no approval in time and hand the conversation to the team",
+    schedule: 60000, // Every 60 seconds
+    handler: async () => {
+      const { actionDecisionService } = await import("./action-decision.service");
+      await actionDecisionService.expireDue();
+    },
+    singleton: true,
+    enabled: true,
+    skipDatabaseLogging: true,
   },
 
   {
@@ -126,6 +277,20 @@ const jobRegistry: CronJobConfig[] = [
   },
 
   {
+    name: "simulation-sweep",
+    description: "Fail simulated conversations stuck past their timeout and move their runs on",
+    schedule: 60000, // Every 60 seconds
+    handler: async () => {
+      const { simulationHarnessService } =
+        await import("./simulation/simulation-harness.service");
+      await simulationHarnessService.sweepStaleItems();
+    },
+    singleton: true,
+    enabled: true,
+    skipDatabaseLogging: true,
+  },
+
+  {
     name: "orchestrator-inactivity-check",
     description: "Check for inactive conversations",
     schedule: 300000, // Every 5 minutes
@@ -133,6 +298,20 @@ const jobRegistry: CronJobConfig[] = [
     singleton: true,
     enabled: true,
     skipDatabaseLogging: true, // Don't log frequent checks
+  },
+
+  {
+    name: "conversation-alert-escalation",
+    description:
+      "Re-push, then email, Available members about conversations waiting 10+ min for a human, and alert on held conversations unanswered for 10 min",
+    schedule: 60000, // Every 60 seconds
+    handler: async () => {
+      const { conversationAlertService } = await import("./conversation-alert.service");
+      await conversationAlertService.runEscalationSweep();
+    },
+    singleton: true,
+    enabled: true,
+    skipDatabaseLogging: true,
   },
 
   {
@@ -235,17 +414,56 @@ const jobRegistry: CronJobConfig[] = [
   },
 
   {
+    name: "cleanup-expired-organization-exports",
+    description: "Delete full organization export ZIPs past their 7-day retention (D15-6)",
+    schedule: "30 2 * * *", // Daily at 2:30 AM
+    handler: async () => {
+      const { organizationExportService } = await import("./organization-export.service");
+      await organizationExportService.cleanupExpired();
+    },
+    timeout: 600000,
+    enabled: true,
+  },
+
+  {
     name: "conversation-retention-anonymize",
     description: "Anonymize expired conversations based on organization retention policies",
     schedule: "0 3 * * *", // Daily at 3 AM
     handler: async () => {
       const { dataRetentionService } = await import("./data-retention.service");
       await dataRetentionService.anonymizeExpiredConversations();
+      // Imported test transcripts (D7-8) follow the same retention setting.
+      const { testTranscriptService } = await import("./test-transcript.service");
+      await testTranscriptService.deleteExpired();
+      // So do saved test cases (D7-12).
+      const { testCaseService } = await import("./simulation/test-case.service");
+      await testCaseService.deleteExpired();
+      // And simulation run items (seed turns, judge verdicts).
+      const { simulationHarnessService } = await import("./simulation/simulation-harness.service");
+      await simulationHarnessService.scrubExpired();
     },
     // NOTE: Respects organization.settings.retentionDays (null = disabled)
     // Preserves conversation metadata for analytics while removing PII
     // Conversations with legal_hold = true are exempt from anonymization
     timeout: 1800000, // 30 minutes max for large cleanups
+    retryOnFailure: true,
+    maxRetries: 3,
+    singleton: true,
+    enabled: true,
+  },
+
+  {
+    name: "conversation-media-sweep",
+    description:
+      "Delete conversation media past its retention (retentionDays, or 180 days when unset) and orphaned uploads",
+    schedule: "30 3 * * *", // Daily at 3:30 AM, after conversation retention
+    handler: async () => {
+      const { sweepConversationMedia } = await import("./conversation-media.service");
+      await sweepConversationMedia();
+    },
+    // NOTE: media in conversations on legal hold is kept; orphans are uploads
+    // no message used for 24 h (see conversation-media.service)
+    timeout: 1800000,
     retryOnFailure: true,
     maxRetries: 3,
     singleton: true,

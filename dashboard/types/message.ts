@@ -14,6 +14,7 @@ export interface Message {
     completion_tokens?: number;
     total_tokens?: number;
     latency_ms?: number;
+    aiRegion?: "default" | "eu"; // AI processing region when the reply was saved (D14-5)
     confidence?: number;
     confidenceBreakdown?: {
       grounding: number;
@@ -41,9 +42,11 @@ export interface Message {
     toolInput?: Record<string, unknown>;
     toolOutput?: Record<string, unknown> | string | number | boolean | null;
     toolLatencyMs?: number;
-    httpStatus?: number;
     toolStatus?: string;
+    pendingActionId?: string;
     toolExecutedAt?: string;
+    /** tool-errors code of a failed call (D6-6). */
+    toolErrorCode?: string;
     // Playbook & Document metadata
     isPlaybook?: boolean;
     playbookId?: string;
@@ -61,24 +64,50 @@ export interface Message {
     // Handoff metadata
     isHandoffMessage?: boolean;
     handoffType?: string;
+    // Takeover / release (System messages)
+    isTakeoverMessage?: boolean;
+    isReleaseMessage?: boolean;
+    returnToMode?: "ai" | "queue";
+    userName?: string;
+    systemEvent?: "agent_joined" | "agent_returned_to_ai" | "agent_left";
+    agentFirstName?: string;
     // Product recommendation payload (type === "ProductRecommendation")
     productRecommendation?: ProductRecommendationPayload;
+    // Content is only the "[Customer sent …]" line the AI reads (D8-6..9); staff see the files
+    mediaPlaceholder?: boolean;
   } | null;
   sentiment?: MessageSentiment | null;
   intent?: MessageIntent | null;
   created_at: Date;
   updated_at: Date;
-  attachments?: Array<{
-    id: string;
-    name: string;
-    url: string;
-    type: string;
-    size: number;
-  }>;
+  attachments?: MessageAttachment[];
   status: MessageStatus;
   /** Delivery status reported by the channel provider (e.g. WhatsApp). */
   providerStatus?: MessageProviderStatus | null;
   providerError?: MessageProviderError | null;
+}
+
+/** What the vision pass read from a customer's photo or PDF (server AttachmentAnalysis). */
+export interface AttachmentAnalysis {
+  status: "pending" | "done" | "failed" | "skipped";
+  reason?: string;
+  class?: "damage" | "product" | "receipt" | "id_document" | "card" | "screenshot" | "other";
+  withheld?: boolean;
+  description?: string;
+  fields?: Record<string, string>;
+  text?: string;
+  analyzedAt?: string;
+}
+
+export interface MessageAttachment {
+  id: string;
+  name: string;
+  url: string;
+  type: string;
+  size: number;
+  analysis?: AttachmentAnalysis;
+  /** Virus scan of a document (D8-4); absent when not scanned. */
+  scan?: "pending" | "clean" | "infected" | "error";
 }
 
 export type MessageProviderStatus = "sent" | "delivered" | "read" | "failed";

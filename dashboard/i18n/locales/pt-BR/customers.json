@@ -31,12 +31,26 @@
     "profile": {
       "description": "Perfil do cliente e histórico de conversas",
       "back": "Voltar para clientes",
+      "evidencePack": "Pacote de evidências",
       "notFound": "Cliente não encontrado"
     },
     "conversations": {
       "title": "Conversas",
       "none": "Nenhuma conversa ainda",
       "messageCount": "{count} mensagens"
+    },
+    "merge": {
+      "title": "Possivelmente a mesma pessoa",
+      "description": "Estes clientes compartilham um e-mail ou telefone, geralmente o mesmo comprador em dois canais. Mesclar move todas as conversas para um só cliente, e as respostas continuam indo para o canal onde cada conversa começou.",
+      "sameEmail": "Mesmo e-mail: {value}",
+      "samePhone": "Mesmo telefone: {value}",
+      "merge": "Mesclar",
+      "dismiss": "Não é a mesma pessoa",
+      "confirmTitle": "Mesclar estes clientes?",
+      "confirmDescription": "{source} será mesclado em {target}. As conversas passam para {target} e {source} é removido. Não é possível desfazer.",
+      "confirm": "Mesclar clientes",
+      "merged": "Clientes mesclados",
+      "failed": "Algo deu errado. Tente novamente."
     }
   }
 }

@@ -21,6 +21,8 @@ import {
 } from "@server/services/core/action-claim-guardrail.service";
 import { MessageIntent, Message } from "@server/database/entities/message.entity";
 import { Document } from "@server/entities/document.entity";
+import { describeLocalTime } from "./local-time";
+import { handoffCopy } from "./handoff-copy";
 
 /**
  * Minimal shape of a retrieved document needed for confidence assessment.
@@ -205,6 +207,9 @@ export class ExecutionLayer {
         "Starting execution for conversation",
       );
 
+      // Give the vision pass a few seconds to read photos the customer just sent (D8-11).
+      const { waitForMediaAnalysis } = await import("@server/services/media-analysis/pipeline");
+      await waitForMediaAnalysis(conversation.id);
       const messages = await conversation.getMessages();
 
       // Always-available core tools (e.g. recommend_products) get merged with
@@ -225,6 +230,10 @@ export class ExecutionLayer {
             .join("\n")
         : "";
 
+      // The business's local date and hour, so "today", "tomorrow" and greetings
+      // match where the shop is (organization timezone, UTC by default).
+      const { timezone, localTime } = describeLocalTime(conversation.organization?.timezone);
+
       // Get the prompt from PromptService
       const responsePrompt = await this.promptService.getPrompt(
         "execution/planner",
@@ -232,6 +241,8 @@ export class ExecutionLayer {
           hasTools,
           tools: allToolNames.join(", "),
           toolsDetail,
+          timezone,
+          localTime,
         },
         { conversationId: conversation.id, organizationId: conversation.organization_id },
       );
@@ -304,6 +315,7 @@ export class ExecutionLayer {
         history: messages, // Pass Message[] directly instead of converting to string
         prompt: finalPrompt,
         jsonSchema: this.buildPlannerSchema(allToolNames),
+        organizationId: conversation.organization_id,
       });
 
       const result = JSON.parse(response) as ExecutionResult;
@@ -720,6 +732,7 @@ export class ExecutionLayer {
         customerQuery: lastCustomerMessage?.content ?? "",
         conversationHistory,
         toolsCalledThisTurn: options.toolsCalledThisTurn ?? [],
+        organizationId: conversation.organization_id,
       },
       config,
     );
@@ -774,6 +787,24 @@ export class ExecutionLayer {
       }
       // Retry produced nothing usable — fall through to escalation rather than
       // propagating null (which would trigger a blind re-plan without feedback).
+    }
+
+    // An action was held for approval this turn: the honest answer is that it
+    // was requested. Say exactly that instead of handing off, which would also
+    // pull the conversation out of awaiting-approval.
+    if ((options.toolsCalledThisTurn ?? []).some((call) => call.pending)) {
+      log.warn(
+        { claimedActions: assessment.claimedActions },
+        "Stage 0: Retries exhausted after an approval request, sending the fixed requested line",
+      );
+      result.originalMessage = result.userMessage || undefined;
+      result.userMessage = handoffCopy(
+        "approvalRequested",
+        customerLanguage,
+        conversation.language,
+      );
+      result.actionClaimRetryAttempted = true;
+      return result;
     }
 
     const confidenceConfig = await this.getConfidenceConfig(conversation);
@@ -848,6 +879,7 @@ export class ExecutionLayer {
       companyDomain: conversation.organization?.settings?.companyDomain as string | undefined,
       hasRetrievedDocuments,
       hasToolResults,
+      organizationId: conversation.organization_id,
     };
 
     // Get configuration
@@ -1003,6 +1035,7 @@ export class ExecutionLayer {
       retrievedDocuments: retrievedDocs as Array<{ document: Document; similarity: number }>,
       conversationHistory,
       customerQuery: lastCustomerMessage.content,
+      organizationId: conversation.organization_id,
     };
 
     // Get configuration
@@ -1360,6 +1393,8 @@ export class ExecutionLayer {
       const composed = await this.llmService.invoke<string>({
         prompt,
         temperature: 0.3,
+        // Keeps the call on the org's provider and AI region (EU-only orgs).
+        organizationId: conversation.organization_id,
         // Composing a fallback reply from recent history; falls back to a
         // hardcoded message when this returns empty.
         tier: "medium",

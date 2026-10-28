@@ -1,0 +1,421 @@
+import "reflect-metadata";
+import { describe, it, expect, beforeAll, afterAll, beforeEach } from "@jest/globals";
+import { AppDataSource } from "../../database/data-source";
+import { Organization } from "../../entities/organization.entity";
+import { User } from "../../entities/user.entity";
+import { AuditLog } from "../../entities/audit-log.entity";
+import { ConversationOutcome } from "../../database/entities/conversation-outcome.entity";
+import { Conversation } from "../../database/entities/conversation.entity";
+import type { ConversationOutcomeKind } from "../../services/close-classification/outcome-rules";
+import { AnalyticsService } from "../../services/analytics.service";
+import {
+  ResolutionLedgerService,
+  billingPeriodFor,
+  exclusionAllowance,
+} from "../../services/resolution-ledger.service";
+
+/**
+ * DB-backed: the allowance check, the billable count the operator reads and
+ * the audit row all live in SQL, so a mock would only restate them.
+ */
+describe("resolution ledger and exclusions (D1-5, D1-6)", () => {
+  const orgId = "1ed6e700-0000-4000-8000-000000000001";
+  const userId = "1ed6e700-0000-4000-8000-0000000000aa";
+  const service = new ResolutionLedgerService();
+  const analytics = new AnalyticsService();
+  const period = billingPeriodFor(null);
+  // A minute into the current UTC month: always in the period, always excludable.
+  const inPeriod = new Date(period.start.getTime() + 60_000);
+
+  async function seed(
+    count: number,
+    overrides: Partial<ConversationOutcome> & { outcome?: ConversationOutcomeKind } = {},
+  ): Promise<ConversationOutcome[]> {
+    const repo = AppDataSource.getRepository(ConversationOutcome);
+    const rows: ConversationOutcome[] = [];
+    for (let i = 0; i < count; i++) {
+      rows.push(
+        await repo.save(
+          repo.create({
+            organization_id: orgId,
+            conversation_id: null,
+            closed_at: new Date(inPeriod.getTime() + i * 1000),
+            close_status: "resolved",
+            close_reason: "inactivity_timeout",
+            outcome: "assumed",
+            billable: true,
+            ai_resolved: true,
+            handed_off: false,
+            classified_by: "rule",
+            classified_at: inPeriod,
+            ...overrides,
+          }),
+        ),
+      );
+    }
+    return rows;
+  }
+
+  const billableCount = async () =>
+    (
+      await analytics.getConversationMetrics({
+        organizationId: orgId,
+        startDate: period.start,
+        endDate: period.end,
+      })
+    ).billableResolutions;
+
+  beforeAll(async () => {
+    if (!AppDataSource.isInitialized) await AppDataSource.initialize();
+    await AppDataSource.runMigrations();
+    const orgRepo = AppDataSource.getRepository(Organization);
+    if (!(await orgRepo.findOne({ where: { id: orgId } }))) {
+      await orgRepo.save(orgRepo.create({ id: orgId, name: "Ledger Org", slug: "ledger-org" }));
+    }
+    const userRepo = AppDataSource.getRepository(User);
+    if (!(await userRepo.findOne({ where: { id: userId } }))) {
+      await userRepo.save(
+        userRepo.create({ id: userId, email: "ledger-test@example.com", password: "x" }),
+      );
+    }
+  });
+
+  beforeEach(async () => {
+    await AppDataSource.getRepository(ConversationOutcome).delete({ organization_id: orgId });
+    await AppDataSource.getRepository(AuditLog).delete({ organizationId: orgId });
+  });
+
+  afterAll(async () => {
+    await AppDataSource.getRepository(ConversationOutcome).delete({ organization_id: orgId });
+    await AppDataSource.getRepository(Conversation).delete({ organization_id: orgId });
+    await AppDataSource.getRepository(AuditLog).delete({ organizationId: orgId });
+    await AppDataSource.getRepository(Organization).delete({ id: orgId });
+    await AppDataSource.getRepository(User).delete({ id: userId });
+    if (AppDataSource.isInitialized) await AppDataSource.destroy();
+  });
+
+  it("marking a classified conversation as spam stops billing it; Not spam re-classifies", async () => {
+    const conversation = await AppDataSource.getRepository(Conversation).save(
+      AppDataSource.getRepository(Conversation).create({
+        title: "closed",
+        organization_id: orgId,
+        status: "resolved",
+        metadata: {},
+      }),
+    );
+    const [billed] = await seed(1, { conversation_id: conversation.id });
+    // A close from two periods back has been billed and is left alone.
+    const old = new Date(
+      Date.UTC(period.start.getUTCFullYear(), period.start.getUTCMonth() - 2, 5),
+    );
+    const [closedPeriod] = await seed(1, { conversation_id: conversation.id, closed_at: old });
+    expect(await billableCount()).toBe(1);
+
+    const marked = await service.markConversationSpam({
+      organizationId: orgId,
+      conversationId: conversation.id,
+      userId,
+    });
+    expect(marked).toBe(1);
+    expect(await billableCount()).toBe(0);
+    const repo = AppDataSource.getRepository(ConversationOutcome);
+    expect(await repo.findOneByOrFail({ id: billed.id })).toMatchObject({
+      outcome: "spam",
+      billable: false,
+      classified_by: "staff",
+    });
+    expect(await repo.findOneByOrFail({ id: closedPeriod.id })).toMatchObject({
+      outcome: "assumed",
+      billable: true,
+    });
+    const audit = await AppDataSource.getRepository(AuditLog).findOneByOrFail({
+      organizationId: orgId,
+      action: "conversation.spam.marked",
+    });
+    expect(audit.changes).toMatchObject({
+      outcomes: [{ outcomeId: billed.id, outcome: { from: "assumed", to: "spam" } }],
+    });
+
+    await service.clearConversationSpam({
+      organizationId: orgId,
+      conversationId: conversation.id,
+      userId,
+    });
+    expect(await repo.findOneByOrFail({ id: billed.id })).toMatchObject({
+      classified_at: null,
+      classified_by: "rule",
+      attempts: 0,
+    });
+    expect(
+      await AppDataSource.getRepository(AuditLog).countBy({
+        organizationId: orgId,
+        action: "conversation.spam.cleared",
+      }),
+    ).toBe(1);
+  });
+
+  it("allowance is 5 % of the period, at least one", () => {
+    expect(exclusionAllowance(0)).toBe(0);
+    expect(exclusionAllowance(3)).toBe(1);
+    expect(exclusionAllowance(40)).toBe(2);
+    expect(exclusionAllowance(99)).toBe(4);
+  });
+
+  it("excludes instantly within 5 %, then records review requests that stay billed", async () => {
+    const rows = await seed(40);
+    expect(await billableCount()).toBe(40);
+
+    const first = await service.exclude({
+      organizationId: orgId,
+      outcomeId: rows[0].id,
+      userId,
+      reason: "Owner testing from a phone",
+    });
+    expect(first).toEqual({ status: "excluded", used: 1, allowance: 2 });
+    const second = await service.exclude({
+      organizationId: orgId,
+      outcomeId: rows[1].id,
+      userId,
+      reason: "Spam",
+    });
+    expect(second.status).toBe("excluded");
+    expect(await billableCount()).toBe(38);
+
+    const third = await service.exclude({
+      organizationId: orgId,
+      outcomeId: rows[2].id,
+      userId,
+      reason: "Customer came back by email",
+    });
+    expect(third).toEqual({ status: "pending_review", used: 2, allowance: 2 });
+    expect(await billableCount()).toBe(38);
+
+    const stored = await AppDataSource.getRepository(ConversationOutcome).findOneByOrFail({
+      id: rows[2].id,
+    });
+    expect(stored.excluded_at).toBeNull();
+    expect(stored.exclusion_requested_by).toBe(userId);
+    expect(stored.exclusion_reason).toBe("Customer came back by email");
+
+    const audits = await AppDataSource.getRepository(AuditLog).find({
+      where: { organizationId: orgId },
+    });
+    expect(audits.map((a) => a.action).sort()).toEqual([
+      "billing.resolution.exclude",
+      "billing.resolution.exclude",
+      "billing.resolution.exclusion_review_requested",
+    ]);
+    expect(audits.every((a) => a.userId === userId)).toBe(true);
+
+    const usage = await service.getUsage(orgId);
+    expect(usage.billable).toBe(38);
+    expect(usage.breakdown.excluded).toBe(2);
+    expect(usage.breakdown.pendingReview).toBe(1);
+    expect(usage.exclusions).toEqual({ used: 2, allowance: 2, open: true });
+  });
+
+  it("refuses non-billed, reversed, repeated and blank-reason exclusions", async () => {
+    const [unhappy] = await seed(1, { outcome: "unhappy", billable: false, ai_resolved: false });
+    const [reversed] = await seed(1, { reversed_at: inPeriod, reversal_reason: "returned" });
+    const [billed] = await seed(1);
+    const exclude = (outcomeId: string, reason = "because") =>
+      service.exclude({ organizationId: orgId, outcomeId, userId, reason });
+
+    await expect(exclude(unhappy.id)).rejects.toMatchObject({ code: "BAD_REQUEST" });
+    await expect(exclude(reversed.id)).rejects.toMatchObject({ code: "BAD_REQUEST" });
+    await expect(exclude(billed.id, "   ")).rejects.toMatchObject({ code: "BAD_REQUEST" });
+    await exclude(billed.id);
+    await expect(exclude(billed.id)).rejects.toMatchObject({ code: "CONFLICT" });
+    await expect(
+      service.exclude({
+        organizationId: "1ed6e700-0000-4000-8000-000000000999",
+        outcomeId: billed.id,
+        userId,
+        reason: "other org",
+      }),
+    ).rejects.toMatchObject({ code: "NOT_FOUND" });
+  });
+
+  it("refuses exclusions older than the previous period", async () => {
+    const old = new Date(
+      Date.UTC(period.start.getUTCFullYear(), period.start.getUTCMonth() - 2, 15),
+    );
+    const [row] = await seed(1, { closed_at: old });
+    await expect(
+      service.exclude({ organizationId: orgId, outcomeId: row.id, userId, reason: "late" }),
+    ).rejects.toMatchObject({ code: "BAD_REQUEST" });
+  });
+
+  it("breaks the period down by outcome and lists only billable rows", async () => {
+    await seed(3);
+    await seed(1, { outcome: "confirmed", close_reason: "user_indicated_close_satisfied" });
+    await seed(1, { reversed_at: inPeriod, reversal_reason: "returned" });
+    await seed(2, { outcome: "abandoned", billable: false, ai_resolved: false });
+    await seed(1, { outcome: "human", billable: false, ai_resolved: false, handed_off: true });
+    await seed(1, { outcome: "test", billable: false, ai_resolved: false });
+
+    const usage = await service.getUsage(orgId);
+    expect(usage.billable).toBe(4);
+    expect(usage.breakdown.reversed).toBe(1);
+    expect(usage.breakdown.notBilled).toMatchObject({ abandoned: 2, human: 1, test: 1, spam: 0 });
+
+    const ledger = await service.listLedger(orgId, { page: 1, pageSize: 25 });
+    expect(ledger.total).toBe(5);
+    expect(ledger.items.map((i) => i.status).sort()).toEqual([
+      "billed",
+      "billed",
+      "billed",
+      "billed",
+      "reversed",
+    ]);
+  });
+
+  it("exports the ledger as CSV with formulas neutralised", async () => {
+    await seed(1, { classification_reason: '=HYPERLINK("x")' });
+    const csv = await service.exportLedgerCsv(orgId);
+    const [header, line] = csv.split("\n");
+    expect(header).toBe(
+      "closed_at,conversation_id,outcome,status,close_reason,classification_reason,exclusion_reason,exclusion_requested_by,exclusion_requested_at",
+    );
+    expect(line).toContain(`"'=HYPERLINK(""x"")"`);
+    expect(line).toContain('"assumed","billed"');
+  });
+
+  it("staff approve or deny exclusions waiting for review, once, with an audit row", async () => {
+    const rows = await seed(20);
+    const exclude = (outcomeId: string) =>
+      service.exclude({ organizationId: orgId, outcomeId, userId, reason: "came back by email" });
+    expect((await exclude(rows[0].id)).status).toBe("excluded");
+    expect((await exclude(rows[1].id)).status).toBe("pending_review");
+    expect((await exclude(rows[2].id)).status).toBe("pending_review");
+
+    const pending = await service.listPendingExclusions({ organizationId: orgId, limit: 10 });
+    expect(pending.map((p) => p.id)).toEqual([rows[1].id, rows[2].id]);
+    expect(pending[0]).toMatchObject({
+      organizationName: "Ledger Org",
+      exclusionReason: "came back by email",
+      exclusionRequestedBy: "ledger-test@example.com",
+    });
+
+    const review = (outcomeId: string, decision: "approve" | "deny") =>
+      service.reviewExclusion({
+        organizationId: orgId,
+        outcomeId,
+        decision,
+        reviewer: "staff@hay.chat",
+        note: " checked the transcript ",
+      });
+    expect(await review(rows[1].id, "approve")).toEqual({ status: "excluded" });
+    expect(await review(rows[2].id, "deny")).toEqual({ status: "denied" });
+    await expect(review(rows[2].id, "approve")).rejects.toMatchObject({ code: "CONFLICT" });
+    await expect(review(rows[3].id, "approve")).rejects.toMatchObject({ code: "CONFLICT" });
+    await expect(
+      service.reviewExclusion({
+        organizationId: "1ed6e700-0000-4000-8000-000000000999",
+        outcomeId: rows[1].id,
+        decision: "deny",
+        reviewer: "staff@hay.chat",
+      }),
+    ).rejects.toMatchObject({ code: "NOT_FOUND" });
+
+    // Approved leaves the count; denied stays billed and cannot be asked again.
+    expect(await billableCount()).toBe(18);
+    await expect(exclude(rows[2].id)).rejects.toMatchObject({ code: "CONFLICT" });
+    const stored = await AppDataSource.getRepository(ConversationOutcome).findOneByOrFail({
+      id: rows[1].id,
+    });
+    expect(stored).toMatchObject({
+      exclusion_reviewed_by: "staff@hay.chat",
+      exclusion_review_note: "checked the transcript",
+    });
+    expect(stored.excluded_at).not.toBeNull();
+
+    // A reviewed approval does not use the self-serve allowance.
+    const usage = await service.getUsage(orgId);
+    expect(usage.exclusions).toEqual({ used: 1, allowance: 1, open: true });
+    expect(usage.breakdown).toMatchObject({ billed: 18, excluded: 2, pendingReview: 0 });
+    const ledger = await service.listLedger(orgId, { page: 1, pageSize: 25 });
+    expect(ledger.items.find((i) => i.id === rows[2].id)?.status).toBe("denied");
+
+    const audits = await AppDataSource.getRepository(AuditLog).find({
+      where: { organizationId: orgId },
+    });
+    const decisions = audits.filter((a) => a.action.startsWith("billing.resolution.exclusion_"));
+    expect(decisions.map((a) => a.action).sort()).toEqual([
+      "billing.resolution.exclusion_approved",
+      "billing.resolution.exclusion_denied",
+      "billing.resolution.exclusion_review_requested",
+      "billing.resolution.exclusion_review_requested",
+    ]);
+    expect(
+      decisions.find((a) => a.action === "billing.resolution.exclusion_denied")?.metadata,
+    ).toMatchObject({ source: "operator", reviewer: "staff@hay.chat", outcomeId: rows[2].id });
+  });
+
+  describe("with the operator's billing period", () => {
+    const now = new Date();
+    // A period that started 10 days ago and ends in 20: rows from 15 days ago
+    // are in the previous period, though usually the same calendar month.
+    const billing = {
+      start: new Date(now.getTime() - 10 * 86_400_000),
+      end: new Date(now.getTime() + 20 * 86_400_000),
+    };
+    const setPeriod = (value: { start: Date; end: Date } | null) =>
+      AppDataSource.getRepository(Organization).update(
+        { id: orgId },
+        { billingPeriodStart: value?.start ?? null, billingPeriodEnd: value?.end ?? null },
+      );
+
+    beforeEach(() => setPeriod(billing));
+    afterAll(() => setPeriod(null));
+
+    it("counts the usage page and the allowance over the billing period", async () => {
+      const current = await seed(20, { closed_at: new Date(billing.start.getTime() + 60_000) });
+      await seed(5, { closed_at: new Date(billing.start.getTime() - 5 * 86_400_000) });
+
+      const usage = await service.getUsage(orgId);
+      expect(usage.period).toMatchObject({ index: 0, source: "billing" });
+      expect(usage.period.start.getTime()).toBe(billing.start.getTime());
+      expect(usage.billable).toBe(20);
+      expect(usage.exclusions.allowance).toBe(1);
+
+      expect(
+        (
+          await service.exclude({
+            organizationId: orgId,
+            outcomeId: current[0].id,
+            userId,
+            reason: "test",
+          })
+        ).status,
+      ).toBe("excluded");
+      expect(
+        (
+          await service.exclude({
+            organizationId: orgId,
+            outcomeId: current[1].id,
+            userId,
+            reason: "test",
+          })
+        ).status,
+      ).toBe("pending_review");
+
+      const previous = await service.getUsage(orgId, 1);
+      expect(previous.period.end.getTime()).toBe(billing.start.getTime());
+      expect(previous.billable).toBe(5);
+      expect(previous.exclusions).toMatchObject({ used: 0, allowance: 1, open: true });
+
+      const periods = await service.listPeriods(orgId);
+      expect(periods).toHaveLength(12);
+      expect(periods[1].end.getTime()).toBe(periods[0].start.getTime());
+    });
+
+    it("refuses exclusions from before the previous billing period", async () => {
+      const twoBack = billingPeriodFor(billing, 2, now);
+      const [row] = await seed(1, { closed_at: new Date(twoBack.start.getTime() + 60_000) });
+      await expect(
+        service.exclude({ organizationId: orgId, outcomeId: row.id, userId, reason: "late" }),
+      ).rejects.toMatchObject({ code: "BAD_REQUEST" });
+    });
+  });
+});

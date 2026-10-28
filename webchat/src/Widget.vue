@@ -1,17 +1,16 @@
 <template>
-  <div v-if="!hidden" class="hay-webchat-widget">
-    <!-- Chat Window -->
+  <div class="hay-webchat-chat">
     <Transition name="fade">
       <ChatWindow
         v-if="isOpen"
         :widget-title="config.widgetTitle || t('widget.defaultTitle')"
-        :widget-subtitle="config.widgetSubtitle || t('widget.defaultSubtitle')"
+        :widget-subtitle="widgetSubtitle"
         :position="config.position || 'right'"
         :show-greeting="config.showGreeting ?? true"
         :greeting-message="config.greetingMessage || t('widget.defaultGreeting')"
         :messages="messages"
         :is-typing="isTyping"
-        :is-connected="isConnected"
+        :is-ready="isInitialized"
         :is-conversation-closed="isConversationClosed"
         :is-expanded="isExpanded"
         :agent-name="resolvedAgentName"
@@ -19,99 +18,65 @@
         :organization-logo-url="resolvedLogoUrl"
         :current-agent-type="currentAgentType"
         :current-agent-name="currentAgentName || undefined"
+        :send-failure="sendFailure"
+        :ai-label="aiLabel"
+        :availability-status="availabilityStatus"
+        :is-waiting-for-human="isWaitingForHuman"
+        :waiting-detail="waitingLine"
+        :contact-saved="contactEmailSaved"
+        :save-contact-email="saveContactEmail"
+        :set-challenge-host="challengeContribution ? setChallengeHost : undefined"
+        :challenge-interactive="isChallengeInteractive"
         @close="closeChat"
         @send="sendMessage"
+        @attach="sendAttachment"
         @start-typing="startTyping"
         @stop-typing="stopTyping"
         @start-new-conversation="startNewConversation"
         @toggle-expand="toggleExpand"
       />
     </Transition>
-
-    <!-- Minimized Button -->
-    <MinimizedButton
-      :is-open="isOpen"
-      :position="config.position || 'right'"
-      :unread-count="unreadCount"
-      @toggle="toggleChat"
-    />
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from "vue";
+import { ref, computed, onMounted, watch } from "vue";
 import ChatWindow from "./components/ChatWindow.vue";
-import MinimizedButton from "./components/MinimizedButton.vue";
 import { useChat } from "./composables/useChat";
-import { provideI18n } from "./i18n";
-import type { HayChatConfig } from "./types";
+import { provideI18n, type Translations } from "./i18n";
+import { resolveWidgetSubtitle } from "./utils/subtitle";
+import { resolveLocale } from "./i18n/resolve";
+import { resumeConversationId } from "./utils/resume";
+import {
+  fetchAvailability,
+  headerStatus,
+  waitingDetail,
+  type WidgetAvailability,
+} from "./utils/availability";
+import type { HayChatConfig, LauncherBridge, PublicConfig } from "./types";
 
+// The chat window. The button lives in the loader (src/loader), which mounts
+// this component once the chat chunk has loaded and hands over its button.
 const props = defineProps<{
   config: HayChatConfig;
+  publicConfig: PublicConfig | null;
+  launcher: LauncherBridge;
+  translations?: Translations;
+  /** The visitor clicked the button while the chat was loading. */
+  openOnMount?: boolean;
 }>();
 
-const t = provideI18n(props.config.locale);
+const t = provideI18n(props.translations);
+
+const widgetSubtitle = computed(() =>
+  resolveWidgetSubtitle(props.config.widgetSubtitle, t("widget.defaultSubtitle")),
+);
 
 const isExpanded = ref(false);
 
 const toggleExpand = () => {
   isExpanded.value = !isExpanded.value;
 };
-
-// Set when the backend reports the widget must not render (disabled/suspended)
-const hidden = ref(false);
-
-// Fetched config from the backend (fills in values not provided by the host)
-const fetchedConfig = ref<{
-  agentName?: string | null;
-  agentAvatarUrl?: string | null;
-  organizationLogoUrl?: string | null;
-}>({});
-
-const fetchPublicConfig = async () => {
-  try {
-    const input = JSON.stringify({ organizationId: props.config.organizationId });
-    const url = `${props.config.baseUrl}/v1/webchat.getPublicConfig?input=${encodeURIComponent(input)}`;
-    console.log("[Hay Webchat] Fetching public config from:", url);
-
-    const response = await fetch(url);
-    if (!response.ok) {
-      console.warn(
-        "[Hay Webchat] Public config fetch failed:",
-        response.status,
-        response.statusText,
-      );
-      return;
-    }
-
-    const data = await response.json();
-    const result = data?.result?.data;
-    console.log("[Hay Webchat] Public config received:", result);
-
-    // Webchat disabled or organization suspended: render nothing at all.
-    if (result?.enabled === false) {
-      hidden.value = true;
-      return;
-    }
-
-    if (result) {
-      fetchedConfig.value = {
-        agentName: result.agentName,
-        agentAvatarUrl: result.agentAvatarUrl,
-        organizationLogoUrl: result.organizationLogoUrl,
-      };
-      console.log("[Hay Webchat] Resolved avatar URL:", resolvedAvatarUrl.value);
-      console.log("[Hay Webchat] Resolved logo URL:", resolvedLogoUrl.value);
-      console.log("[Hay Webchat] Resolved agent name:", resolvedAgentName.value);
-    }
-  } catch (error) {
-    console.warn("[Hay Webchat] Failed to fetch public config:", error);
-  }
-};
-
-onMounted(() => {
-  fetchPublicConfig();
-});
 
 // Resolve a relative image URL to absolute using baseUrl
 const resolveUrl = (url: string | undefined | null): string | undefined => {
@@ -122,51 +87,106 @@ const resolveUrl = (url: string | undefined | null): string | undefined => {
 
 // Host-provided config takes priority, fetched config fills in gaps
 const resolvedAvatarUrl = computed(() =>
-  resolveUrl(props.config.agentAvatarUrl || fetchedConfig.value.agentAvatarUrl),
+  resolveUrl(props.config.agentAvatarUrl || props.publicConfig?.agentAvatarUrl),
 );
 
 const resolvedLogoUrl = computed(() =>
-  resolveUrl(props.config.organizationLogoUrl || fetchedConfig.value.organizationLogoUrl),
+  resolveUrl(props.config.organizationLogoUrl || props.publicConfig?.organizationLogoUrl),
+);
+
+// AI label on AI replies (D14-6): on unless the org hid it; the org's text or
+// the localized default. Shown when the config could not be fetched.
+const aiLabel = computed(() =>
+  props.publicConfig?.aiLabelShown === false
+    ? null
+    : props.publicConfig?.aiLabelText || t("chat.aiLabel"),
 );
 
 const resolvedAgentName = computed(
-  () => props.config.agentName || fetchedConfig.value.agentName || undefined,
+  () => props.config.agentName || props.publicConfig?.agentName || undefined,
 );
+
+// The org's bot check, when one is on (declarative challenge@1 contribution).
+const challengeContribution =
+  props.publicConfig?.contributions?.find((c) => c.type === "challenge@1") ?? null;
 
 const {
   isOpen,
-  isConnected,
+  isInitialized,
   messages,
   isTyping,
   unreadCount,
   isConversationClosed,
   currentAgentType,
   currentAgentName,
+  conversationStatus,
+  contactEmailSaved,
+  sendFailure,
+  challengeHost,
+  isChallengeInteractive,
   toggleChat,
+  openChat,
   closeChat,
   sendMessage,
+  sendAttachment,
   startTyping,
   stopTyping,
   startNewConversation,
-} = useChat(props.config);
+  resumeActiveConversation,
+  saveContactEmail,
+} = useChat({
+  ...props.config,
+  // The greeting is pinned as the first message, so give the chat the same
+  // localised default the empty state shows.
+  showGreeting: props.config.showGreeting ?? true,
+  greetingMessage: props.config.greetingMessage || t("widget.defaultGreeting"),
+}, { challenge: challengeContribution });
 
-// Initialize on mount if configured to auto-open
-onMounted(() => {
-  // Could add auto-open feature here if needed
-  // For now, widget waits for user to click
+function setChallengeHost(el: HTMLElement | null) {
+  challengeHost.value = el;
+}
+
+// Business hours (D5-7) and the waiting state (D5-10).
+const locale = resolveLocale(props.config.locale);
+const availability = ref<WidgetAvailability | null>(null);
+const refreshAvailability = async () => {
+  availability.value = await fetchAvailability(props.config);
+};
+const availabilityStatus = computed(() => headerStatus(availability.value, t, locale));
+const isWaitingForHuman = computed(
+  () => conversationStatus.value === "pending-human" && currentAgentType.value !== "HumanAgent",
+);
+const waitingLine = computed(() => waitingDetail(availability.value, t, locale));
+watch(isOpen, (open) => {
+  if (open) void refreshAvailability();
 });
+watch(isWaitingForHuman, (waiting) => {
+  if (waiting) void refreshAvailability();
+});
+
+// Keep the loader's button in step with the chat.
+watch(isOpen, (open) => props.launcher.setOpen(open));
+watch(unreadCount, (count) => props.launcher.setUnread(count), { immediate: true });
+
+onMounted(() => {
+  // A follow-up email link (D5-9) reopens its conversation.
+  if (props.openOnMount || resumeConversationId()) openChat();
+  else resumeActiveConversation();
+});
+
+defineExpose({ toggle: toggleChat });
 </script>
 
 <style>
 /* Global styles for the widget */
-.hay-webchat-widget {
+.hay-webchat-chat {
   font-family:
     -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
-.hay-webchat-widget * {
+.hay-webchat-chat * {
   box-sizing: border-box;
 }
 

@@ -23,6 +23,16 @@ import { SupportedLanguage } from "../../types/language.types";
 
 const logger = createLogger("conversation-entity");
 
+export type ConversationStatus =
+  | "open"
+  | "processing"
+  | "pending-human"
+  | "awaiting-approval"
+  | "human-took-over"
+  | "resolved"
+  | "unresolved"
+  | "closed";
+
 /** Minimal shape of a tool schema entry used when rendering playbook/handoff actions. */
 type ToolSchemaEntry = Record<string, unknown>;
 
@@ -77,10 +87,21 @@ export class Conversation {
 
   @Column({
     type: "enum",
-    enum: ["open", "processing", "pending-human", "human-took-over", "resolved", "closed"],
+    enum: [
+      "open",
+      "processing",
+      "pending-human",
+      "awaiting-approval",
+      "human-took-over",
+      "resolved",
+      "unresolved",
+      "closed",
+    ],
     default: "open",
   })
-  status!: "open" | "processing" | "pending-human" | "human-took-over" | "resolved" | "closed";
+  // unresolved (D5-5): closed without the shopper's problem being solved, i.e.
+  // an unhappy close or an inactivity close the classifier found abandoned.
+  status!: ConversationStatus;
 
   @Column({ type: "timestamptz", nullable: true })
   cooldown_until!: Date | null;
@@ -91,8 +112,26 @@ export class Conversation {
   @Column({ type: "timestamptz", nullable: true })
   closed_at!: Date | null;
 
+  // First move to pending-human or human-took-over. Never cleared, so a chat
+  // handed back to the AI still reads as handed off. Set by the repository.
+  @Column({ type: "timestamptz", nullable: true })
+  handed_off_at!: Date | null;
+
+  // D9-5: spam never bills. Set by staff, a detector or the close classifier.
+  @Column({ type: "timestamptz", nullable: true })
+  spam_flagged_at!: Date | null;
+
+  @Column({ type: "varchar", length: 255, nullable: true })
+  spam_reason!: string | null;
+
   @Column({ type: "timestamptz", nullable: true })
   lastMessageAt!: Date | null;
+
+  // D13-2: after this the channel refuses free-form replies (WhatsApp's 24 h
+  // customer service window). Set by the channel plugin with each inbound
+  // message (`messages.receive` replyWindowExpiresAt); null = no window.
+  @Column({ type: "timestamptz", nullable: true })
+  reply_window_expires_at!: Date | null;
 
   @Column({ type: "jsonb", nullable: true })
   context!: Record<string, unknown> | null;
@@ -278,15 +317,29 @@ export class Conversation {
       return;
     }
 
-    // Resolve versioned fields: prefer active version, fall back to playbook row
+    // Resolve versioned fields: a test conversation's version override (D7-5),
+    // else the active version, else the playbook row.
     let instructions = playbook.instructions;
     let requiredFields = playbook.required_fields;
     let activeVersionId: string | null = null;
+    let testedDraftVersionId: string | null = null;
 
-    if (playbook.active_version_id) {
+    const { getPlaybookVersionOverride } = await import("../../services/playbook-version-override");
+    const override = getPlaybookVersionOverride(this.metadata);
+    const overrideVersionId = override?.playbookId === playbookId ? override.versionId : null;
+    const versionId = overrideVersionId ?? playbook.active_version_id;
+
+    if (versionId) {
       const { playbookVersionRepository } =
         await import("../../repositories/playbook-version.repository");
-      const activeVersion = await playbookVersionRepository.findById(playbook.active_version_id);
+      let activeVersion = await playbookVersionRepository.findById(versionId);
+      if (activeVersion?.playbook_id !== playbookId) activeVersion = null;
+      if (activeVersion && overrideVersionId) {
+        testedDraftVersionId = activeVersion.id;
+      } else if (!activeVersion && overrideVersionId && playbook.active_version_id) {
+        // The tested draft is gone (published or discarded): run the live version.
+        activeVersion = await playbookVersionRepository.findById(playbook.active_version_id);
+      }
       if (activeVersion) {
         instructions = activeVersion.instructions;
         requiredFields = activeVersion.required_fields;
@@ -448,7 +501,7 @@ The following tools are available for you to use. You MUST return only valid JSO
             toolSchema = toolSchemas.find((schema) => schema.name === toolName);
 
             if (!toolSchema) {
-              // Try to find tool that ends with :toolName (e.g., "hay-plugin-email:send-email" matches "send-email")
+              // Try to find tool that ends with :toolName (e.g., "hay-plugin-acme:create-ticket" matches "create-ticket")
               toolSchema = toolSchemas.find((schema) => {
                 const schemaName = schema.name as string;
                 return schemaName.endsWith(`:${toolName}`);
@@ -476,7 +529,7 @@ The following tools are available for you to use. You MUST return only valid JSO
 
         if (toolSchema) {
           // Add tool ID to enabled_tools list using the actual tool name from the schema
-          // This ensures we use the correct namespaced name (e.g., "hay-plugin-email:send-email")
+          // This ensures we use the correct namespaced name (e.g., "hay-plugin-acme:create-ticket")
           const toolNameToAdd = toolSchema.name as string;
           if (!enabledToolIds.includes(toolNameToAdd)) {
             enabledToolIds.push(toolNameToAdd);
@@ -536,6 +589,9 @@ The following tools are available for you to use. You MUST return only valid JSO
         metadata: {
           playbookId: playbookId,
           playbookTitle: playbook.title,
+          ...(testedDraftVersionId
+            ? { playbookVersionId: testedDraftVersionId, isDraft: true }
+            : {}),
         },
       });
     } else {
@@ -621,6 +677,8 @@ The following tools are available for you to use. You MUST return only valid JSO
   async addHandoffInstructions(
     instructions: TiptapDoc,
     handoffType: "available" | "unavailable",
+    /** Facts about business hours and who is reachable (D5-7); replaces the generic line. */
+    availabilityContext?: string,
   ): Promise<void> {
     const { conversationRepository } = await import("../../repositories/conversation.repository");
 
@@ -710,7 +768,7 @@ The following tools are available for you to use. You MUST return only valid JSO
 
     let content = `From this message forward you should follow these handoff instructions:
 
-**Handoff Context:** ${handoffType === "available" ? "Human agents are available" : "No human agents available"}
+**Handoff Context:** ${availabilityContext ?? (handoffType === "available" ? "Human agents are available" : "No human agents available")}
 
 **Instructions:**
 ${instructionText}`;
@@ -732,7 +790,7 @@ The following tools are available for you to use. You MUST return only valid JSO
             toolSchema = toolSchemas.find((schema) => schema.name === toolName);
 
             if (!toolSchema) {
-              // Try to find tool that ends with :toolName (e.g., "hay-plugin-email:send-email" matches "send-email")
+              // Try to find tool that ends with :toolName (e.g., "hay-plugin-acme:create-ticket" matches "create-ticket")
               toolSchema = toolSchemas.find((schema) => {
                 const schemaName = schema.name as string;
                 return schemaName.endsWith(`:${toolName}`);
@@ -897,71 +955,28 @@ The following tools are available for you to use. You MUST return only valid JSO
       }
     }
 
-    // Handle Customer message cooldown
-    if (messageData.type === MessageType.CUSTOMER) {
-      const { config } = await import("../../config/env");
-
-      // Mark conversation as needing processing
-      await this.setProcessed(false);
-
-      // Set cooldown based on configuration
-      const cooldownUntil = new Date();
-      const cooldownSeconds = Math.floor(config.conversation.cooldownInterval / 1000);
-      cooldownUntil.setSeconds(cooldownUntil.getSeconds() + cooldownSeconds);
-
-      // Determine new status based on current state
-      let newStatus: typeof this.status = "open";
-
-      // If conversation is currently taken over by a human
-      if (this.status === "human-took-over") {
-        // Check if there are any human agent messages
-        const messages = await this.getMessages();
-        const hasHumanAgentMessages = messages.some((msg) => msg.type === MessageType.HUMAN_AGENT);
-
-        // Only keep it as human-took-over if a human agent has actually responded
-        newStatus = hasHumanAgentMessages ? "human-took-over" : "open";
-      } else if (this.status === "pending-human") {
-        // "Needs attention" is sticky: once the AI handed off, or a paused agent
-        // parked the conversation, a new shopper message must not hand it back
-        // to the AI. Only Take Over / Return to AI leave this state.
-        newStatus = "pending-human";
-      }
-
-      // Update conversation with cooldown and processing status
-      const shouldProcess = newStatus === "open";
-      await conversationRepository.update(this.id, this.organization_id, {
-        status: newStatus,
-        needs_processing: shouldProcess,
-        cooldown_until: cooldownUntil,
-        lastMessageAt: new Date(),
-      });
-
-      // Update local instance
-      this.cooldown_until = cooldownUntil;
-      this.needs_processing = shouldProcess;
-      this.lastMessageAt = new Date();
-      this.status = newStatus;
-
-      // Enqueue for RabbitMQ processing
-      if (shouldProcess) {
-        const { orchestratorQueueService } =
-          await import("../../services/orchestrator-queue.service");
-        await orchestratorQueueService.enqueue(this.id, this.organization_id, "customer_message");
-      }
-    }
-
     // Check if test mode is enabled for bot messages
     let messageStatus = MessageStatus.APPROVED;
     let reviewRequired = false;
     let deliveryState = DeliveryState.SENT;
+    let metadata = messageData.metadata;
 
-    if (messageData.type === MessageType.BOT_AGENT) {
+    // Product cards are AI output the shopper sees, so test mode and "drafts
+    // only" hold them with the text reply they belong to.
+    if (
+      messageData.type === MessageType.BOT_AGENT ||
+      messageData.type === MessageType.PRODUCT_RECOMMENDATION
+    ) {
       // Get agent and organization to check test mode
       const { agentRepository } = await import("../../repositories/agent.repository");
       const { organizationRepository } = await import("../../repositories/organization.repository");
 
       const agent = this.agent_id ? await agentRepository.findById(this.agent_id) : null;
       const organization = await organizationRepository.findById(this.organization_id);
+
+      // Where AI was processed for this reply (D14-5), shown in the dashboard debug view.
+      const { regionFromSettings } = await import("../../services/llm/ai-region");
+      metadata = { ...metadata, aiRegion: regionFromSettings(organization?.settings) };
 
       // Check if this is an initial greeting (no customer messages yet)
       const messages = await this.getMessages();
@@ -977,12 +992,40 @@ The following tools are available for you to use. You MUST return only valid JSO
         testModeEnabled = organization.settings.testModeDefault;
       }
 
-      // Only apply test mode if this is a response to a customer (not the initial greeting)
-      if (testModeEnabled && hasCustomerMessages) {
+      // A channel set to "drafts only" (D14-7) queues every AI reply for a person
+      // to approve, through the same gate as test mode.
+      const { resolveChannelAiMode } = await import("../../types/organization-settings.types");
+      const draftsOnly = resolveChannelAiMode(organization?.settings, this.channel) === "drafts";
+
+      // Only apply test mode if this is a response to a customer (not the initial greeting).
+      // Test conversations (playground, simulation runs) reach no shopper, so
+      // their replies are never held for approval. The locked-workspace holding
+      // reply (D15-4) is a fixed line, not AI output, and no one can approve it
+      // while the workspace is locked: it always goes out.
+      const { isTestConversation } =
+        await import("../../services/close-classification/outcome-rules");
+      if (
+        (testModeEnabled || draftsOnly) &&
+        hasCustomerMessages &&
+        !isTestConversation(this.metadata) &&
+        messageData.metadata?.isSuspendedHoldingReply !== true
+      ) {
         messageStatus = MessageStatus.PENDING;
         reviewRequired = true;
         deliveryState = DeliveryState.QUEUED;
       }
+    }
+
+    // A customer's photos and PDFs get the vision pass (D8-11). Marked pending
+    // before the row is saved, so the first broadcast already says "reading".
+    let attachments = messageData.attachments;
+    if (hasAttachments) {
+      const { markMediaPending } = await import("../../services/media-analysis/pipeline");
+      attachments = await markMediaPending(
+        this.organization_id,
+        attachments,
+        messageData.type === MessageType.CUSTOMER,
+      );
     }
 
     // CRITICAL: Save the message to database FIRST before broadcasting
@@ -992,14 +1035,127 @@ The following tools are available for you to use. You MUST return only valid JSO
       conversation_id: this.id,
       content: messageData.content,
       type: messageData.type as MessageType,
-      metadata: messageData.metadata,
+      metadata,
       sender: messageData.sender,
-      attachments: messageData.attachments,
+      attachments,
       providerMessageId: messageData.providerMessageId ?? null,
       status: messageStatus,
       reviewRequired,
       deliveryState,
     });
+
+    // Tie the message's uploads to it, so retention and erasure can delete the
+    // files (D8-3). Never blocks the message: the orphan sweep keeps any upload
+    // a message still names.
+    if (hasAttachments) {
+      try {
+        const { linkUploadsToMessage } = await import("../../services/conversation-media.service");
+        await linkUploadsToMessage(this.organization_id, messageData.attachments, {
+          conversationId: this.id,
+          messageId: message.id,
+          customerId: this.customer_id,
+        });
+      } catch (error) {
+        logger.error({ err: error, conversationId: this.id }, "Failed to link message uploads");
+      }
+    }
+
+    // Scan and read the files in the background; the AI turn waits briefly for them.
+    if (hasAttachments) {
+      const { hasPendingMedia, scheduleMessageMedia } =
+        await import("../../services/media-analysis/pipeline");
+      if (hasPendingMedia(attachments)) scheduleMessageMedia(message.id, this.organization_id);
+    }
+
+    // Customer message: status, cooldown and processing flag. This runs only
+    // after the row exists, so a run that clears needs_processing can always
+    // see the message that set it (see conversationRepository.markProcessed).
+    if (messageData.type === MessageType.CUSTOMER) {
+      const { config } = await import("../../config/env");
+
+      // Set cooldown based on configuration
+      const cooldownUntil = new Date();
+      const cooldownSeconds = Math.floor(config.conversation.cooldownInterval / 1000);
+      cooldownUntil.setSeconds(cooldownUntil.getSeconds() + cooldownSeconds);
+
+      // Determine new status based on current state
+      const previousStatus = this.status;
+      let newStatus: typeof this.status = "open";
+
+      // If conversation is currently taken over by a human
+      if (this.status === "human-took-over") {
+        // Check if there are any human agent messages
+        const messages = await this.getMessages();
+        const hasHumanAgentMessages = messages.some((msg) => msg.type === MessageType.HUMAN_AGENT);
+
+        // Only keep it as human-took-over if a human agent has actually responded
+        newStatus = hasHumanAgentMessages ? "human-took-over" : "open";
+      } else if (this.status === "pending-human") {
+        // "Needs attention" is sticky: once the AI handed off, or a paused agent
+        // parked the conversation, a new shopper message must not hand it back
+        // to the AI. Only Take Over / Return to AI leave this state.
+        newStatus = "pending-human";
+      } else if (this.status === "awaiting-approval") {
+        // Waiting on a person's decision about an action (D4-4). The AI resumes
+        // when the action is approved or rejected, not on a new shopper message.
+        newStatus = "awaiting-approval";
+      }
+
+      // Update conversation with cooldown and processing status. A conversation
+      // waiting for a person still gets AI answers outside the channel's
+      // business hours (D5-7): only the human queue waits for opening time.
+      let shouldProcess = newStatus === "open";
+      if (newStatus === "pending-human" && !this.assigned_user_id) {
+        const { isWithinBusinessHours } = await import("../../services/business-hours.service");
+        shouldProcess = !(await isWithinBusinessHours({
+          organizationId: this.organization_id,
+          channel: this.channel,
+        }));
+      }
+      await conversationRepository.update(this.id, this.organization_id, {
+        status: newStatus,
+        needs_processing: shouldProcess,
+        cooldown_until: cooldownUntil,
+        lastMessageAt: new Date(),
+      });
+
+      // Update local instance
+      this.cooldown_until = cooldownUntil;
+      this.needs_processing = shouldProcess;
+      this.lastMessageAt = new Date();
+      this.status = newStatus;
+
+      // Tell the team when the shopper writes in a conversation a person holds
+      // or is waiting on (D11-7). Push calls are remote: never wait on them.
+      void import("../../services/conversation-alert.service")
+        .then(({ conversationAlertService }) =>
+          conversationAlertService.onCustomerMessage(this, previousStatus, message),
+        )
+        .catch((error) => {
+          logger.warn({ err: error, conversationId: this.id }, "Shopper-message alert failed");
+        });
+
+      // A shopper who comes back within 72 h reverses the charge for their
+      // last resolution (D1-3). Billing must never break message intake.
+      try {
+        const { closeClassifierService } =
+          await import("../../services/close-classification/close-classifier.service");
+        await closeClassifierService.reverseOnCustomerReturn({
+          organizationId: this.organization_id,
+          conversationId: this.id,
+          customerId: this.customer_id,
+        });
+      } catch (error) {
+        logger.error({ err: error, conversationId: this.id }, "Resolution reversal check failed");
+      }
+
+      // Enqueue for RabbitMQ processing
+      if (shouldProcess) {
+        const { orchestratorQueueService } =
+          await import("../../services/orchestrator-queue.service");
+        await orchestratorQueueService.enqueue(this.id, this.organization_id, "customer_message");
+      }
+    }
 
     // The message is committed before anyone is told about it, so clients that
     // react to the broadcast by fetching the conversation will find it.
@@ -1069,6 +1225,7 @@ Translated message:`;
     try {
       const translated = await llmService.invoke({
         prompt: translationPrompt,
+        organizationId: this.organization_id,
         // Translating a one-line greeting; falls back to the original on error.
         tier: "medium",
       });
@@ -1110,6 +1267,8 @@ Translated message:`;
     return this.addMessage({
       content: greetingText,
       type: "BotAgent",
+      // Lets the webchat swap its local greeting placeholder for this message.
+      metadata: { isGreeting: true },
     });
   }
 
@@ -1173,31 +1332,19 @@ Translated message:`;
     });
   }
 
-  async setProcessed(processed: boolean): Promise<void> {
+  /**
+   * Record that a run answered up to `lastCustomerMessageId` (null: it saw no
+   * customer message). Clears needs_processing only when no newer customer
+   * message arrived meanwhile; returns whether it did.
+   */
+  async markProcessed(lastCustomerMessageId: string | null): Promise<boolean> {
     const { conversationRepository } = await import("../../repositories/conversation.repository");
-
-    if (processed) {
-      // When marking as processed, set both last_processed_at and needs_processing
-      const { getUTCNow } = await import("../../utils/date.utils");
-      const now = getUTCNow();
-
-      await conversationRepository.updateById(this.id, {
-        last_processed_at: now,
-        needs_processing: false,
-      });
-
-      // Update local instance
-      this.last_processed_at = now;
+    const cleared = await conversationRepository.markProcessed(this.id, lastCustomerMessageId);
+    if (cleared) {
       this.needs_processing = false;
-    } else {
-      // When marking as not processed, only update needs_processing
-      await conversationRepository.updateById(this.id, {
-        needs_processing: true,
-      });
-
-      // Update local instance
-      this.needs_processing = true;
+      this.last_processed_at = new Date();
     }
+    return cleared;
   }
 
   /**
@@ -1240,9 +1387,14 @@ Translated message:`;
       status: newStatus,
     };
 
-    // If returning to AI, mark as needing processing
+    // Returning to AI only queues a run when the newest shopper message has
+    // no reply yet (from the AI or staff). Messages answered before or during
+    // the take-over, like the "can I speak with a person?" that started it,
+    // are not run again; the AI picks up from the shopper's next message.
+    let needsProcessing = false;
     if (returnToMode === "ai") {
-      updates.needs_processing = true;
+      needsProcessing = await conversationRepository.hasUnansweredCustomerMessage(this.id);
+      updates.needs_processing = needsProcessing;
       updates.previous_status = null;
     }
 
@@ -1253,10 +1405,10 @@ Translated message:`;
     this.assigned_at = null;
     this.status = newStatus;
     if (returnToMode === "ai") {
-      this.needs_processing = true;
+      this.needs_processing = needsProcessing;
       this.previous_status = null;
-
-      // Enqueue for RabbitMQ processing
+    }
+    if (needsProcessing) {
       const { orchestratorQueueService } =
         await import("../../services/orchestrator-queue.service");
       await orchestratorQueueService.enqueue(this.id, this.organization_id, "ai_return");

@@ -1,11 +1,33 @@
 {
   "name": "Caixa de e-mail",
-  "description": "Conecte sua caixa de suporte: encaminhe os e-mails de support@ para a Hay e deixe a IA responder por e-mail, na mesma conversa",
-  "tools": {},
-  "config": {},
+  "description": "Conecte sua caixa de suporte: encaminhe os e-mails de support@ para o Hay.chat e deixe a IA responder por e-mail, na mesma conversa. A IA também pode enviar e-mails para a sua equipe.",
+  "tools": {
+    "send-email": {
+      "label": "Enviar e-mail para a equipe",
+      "description": "Enviar um e-mail para a equipe da loja (os endereços de notificação, ou o endereço de suporte) — por exemplo, quando um cliente precisa de uma pessoa"
+    }
+  },
+  "config": {
+    "supportAddress": {
+      "label": "Seu endereço de suporte",
+      "description": "O endereço para onde seus clientes já escrevem, por exemplo suporte@sualoja.com. Você vai encaminhar essa caixa para o endereço do Hay.chat mostrado abaixo."
+    },
+    "storeName": {
+      "label": "Nome do remetente",
+      "description": "Aparece como remetente das respostas do Hay.chat, por exemplo \"Suporte Acme\". Por padrão, o nome do seu espaço de trabalho."
+    },
+    "bccArchive": {
+      "label": "Guardar uma cópia na minha caixa",
+      "description": "Enviar cópia oculta (CCO) de cada resposta do Hay.chat para o seu endereço de suporte, para que sua caixa tenha a conversa completa."
+    },
+    "notificationRecipients": {
+      "label": "Endereços de notificação da equipe",
+      "description": "Endereços separados por vírgula para onde a ação \"Enviar e-mail para a equipe\" da IA escreve, por exemplo quando um cliente precisa de uma pessoa. Por padrão, o seu endereço de suporte."
+    }
+  },
   "ui": {
     "title": "Conecte sua caixa de entrada",
-    "intro": "Mantenha seu endereço de suporte. Encaminhe-o para a Hay e a IA responde por e-mail — cada resposta fica na mesma conversa, e você pode assumir qualquer atendimento pelo painel.",
+    "intro": "Mantenha seu endereço de suporte. Encaminhe-o para o Hay.chat e a IA responde por e-mail — cada resposta fica na mesma conversa, e você pode assumir qualquer atendimento pelo painel.",
     "loadingStatus": "Carregando status do canal de e-mail…",
     "statusError": {
       "title": "Não foi possível carregar o status do canal de e-mail",
@@ -15,15 +37,15 @@
       "retry": "Tentar de novo"
     },
     "notReady": {
-      "title": "O canal de e-mail ainda não está disponível nesta instalação da Hay",
-      "body": "Falta no servidor: {missing}. Peça ao administrador da Hay para configurar o recebimento de e-mail."
+      "title": "O canal de e-mail ainda não está disponível nesta instalação do Hay.chat",
+      "body": "Falta no servidor: {missing}. Peça ao administrador do Hay.chat para configurar o recebimento de e-mail."
     },
     "needsAddress": {
       "title": "Salve seu endereço de suporte primeiro",
-      "body": "Informe acima o endereço para o qual seus clientes escrevem e salve. A Hay usa esse endereço para reconhecer os e-mails encaminhados e enviar o Reply-To correto."
+      "body": "Informe acima o endereço para o qual seus clientes escrevem e salve. O Hay.chat usa esse endereço para reconhecer os e-mails encaminhados e enviar o Reply-To correto."
     },
     "address": {
-      "title": "Seu endereço de encaminhamento na Hay",
+      "title": "Seu endereço de encaminhamento no Hay.chat",
       "intro": "Encaminhe sua caixa de suporte para este endereço. Ele é exclusivo do seu workspace.",
       "copy": "Copiar endereço",
       "copied": "Copiado",
@@ -37,11 +59,11 @@
       "title": "Configure o encaminhamento",
       "gmail": {
         "title": "Gmail ou Google Workspace",
-        "body": "Abra o Gmail com a conta de suporte → Configurações → Ver todas as configurações → Encaminhamento e POP/IMAP → Adicionar um endereço de encaminhamento → cole o endereço da Hay → Avançar. O Google envia à Hay um código de confirmação; ele aparece abaixo em até um minuto. Digite-o no Gmail, escolha \"Encaminhar uma cópia dos e-mails recebidos\" e salve."
+        "body": "Abra o Gmail com a conta de suporte → Configurações → Ver todas as configurações → Encaminhamento e POP/IMAP → Adicionar um endereço de encaminhamento → cole o endereço do Hay.chat → Avançar. O Google envia ao Hay.chat um código de confirmação; ele aparece abaixo em até um minuto. Digite-o no Gmail, escolha \"Encaminhar uma cópia dos e-mails recebidos\" e salve."
       },
       "outlook": {
         "title": "Outlook ou Microsoft 365",
-        "body": "Abra o Outlook na web com a conta de suporte → Configurações → E-mail → Encaminhamento → Ativar encaminhamento → cole o endereço da Hay → marque \"Manter uma cópia das mensagens encaminhadas\" → Salvar. Alguns tenants do Microsoft 365 exigem que um administrador permita encaminhamento externo."
+        "body": "Abra o Outlook na web com a conta de suporte → Configurações → E-mail → Encaminhamento → Ativar encaminhamento → cole o endereço do Hay.chat → marque \"Manter uma cópia das mensagens encaminhadas\" → Salvar. Alguns tenants do Microsoft 365 exigem que um administrador permita encaminhamento externo."
       },
       "other": {
         "title": "Outros provedores",
@@ -59,7 +81,7 @@
       "code": "Código de confirmação",
       "copyCode": "Copiar código",
       "link": "Ou abra o link de confirmação do Google",
-      "noCode": "A Hay recebeu a mensagem do Google, mas não conseguiu ler o código. Abra o link abaixo."
+      "noCode": "O Hay.chat recebeu a mensagem do Google, mas não conseguiu ler o código. Abra o link abaixo."
     },
     "health": {
       "title": "Status",
@@ -68,6 +90,30 @@
       "never": "Nada recebido ainda",
       "count": "E-mails recebidos desde o início",
       "lastError": "Último erro"
+    },
+    "domain": {
+      "title": "Enviar pelo seu próprio domínio (opcional)",
+      "intro": "Por padrão, as respostas saem de {platform}. Verifique {domain} e as respostas passam a sair de {support}.",
+      "freeMail": "As respostas continuam saindo de {platform}: {domain} é um provedor de e-mail compartilhado e não pode ser verificado.",
+      "setup": "Configurar {domain}",
+      "records": "Adicione estes registros DNS no seu provedor de domínio e depois selecione Verificar agora. Alterações de DNS podem levar algumas horas.",
+      "type": "Tipo",
+      "name": "Nome",
+      "value": "Valor",
+      "priority": "Prioridade",
+      "check": "Verificar agora",
+      "remove": "Remover domínio",
+      "removeConfirm": "Parar de enviar por {domain}? As respostas voltam a sair de {platform}.",
+      "mismatch": "{domain} está configurado, mas seu endereço de suporte é de outro domínio, então as respostas continuam saindo de {platform}.",
+      "verifiedLine": "As respostas agora saem de {support}.",
+      "error": "Não foi possível atualizar o domínio de envio: {message}",
+      "status": {
+        "verified": "Verificado",
+        "pending": "Verificando DNS",
+        "not_started": "Aguardando registros DNS",
+        "failed": "Falha na verificação",
+        "temporary_failure": "Falha temporária"
+      }
     }
   }
 }

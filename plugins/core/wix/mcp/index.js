@@ -10,10 +10,13 @@
  * Env (injected by the plugin worker):
  *   WIX_API_KEY   site-scoped Wix API key (sent raw in the Authorization header)
  *   WIX_SITE_ID   the Wix site ID the key is scoped to (wix-site-id header)
+ *   STALE_TRACKING_DOMESTIC_DAYS, STALE_TRACKING_INTERNATIONAL_DAYS (optional, D6-9)
  */
 
 const { McpServer } = require("@modelcontextprotocol/sdk/server/mcp.js");
 const { StdioServerTransport } = require("@modelcontextprotocol/sdk/server/stdio.js");
+const { applyToolRisk } = require("@hay/plugin-sdk/tool-risk");
+const toolRisk = require("./tool-risk");
 
 const { registerCustomerTools } = require("./tools/customers");
 const { registerOrderTools } = require("./tools/orders");
@@ -21,7 +24,7 @@ const { registerRefundTools } = require("./tools/refunds");
 const { registerProductTools } = require("./tools/products");
 
 function createServer() {
-  const server = new McpServer({ name: "wix-stores", version: "2.0.0" });
+  const server = applyToolRisk(new McpServer({ name: "wix-stores", version: "2.0.0" }), toolRisk);
   registerCustomerTools(server);
   registerOrderTools(server);
   registerRefundTools(server);

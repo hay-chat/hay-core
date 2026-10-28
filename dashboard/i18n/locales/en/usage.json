@@ -1,0 +1,74 @@
+{
+  "usage": {
+    "headTitle": "Usage - Hay.chat",
+    "title": "Usage",
+    "description": "Resolutions Hay.chat counts for billing, and the ledger behind the number.",
+    "refresh": "Refresh",
+    "period": "Billing period",
+    "loadFailed": "Could not load usage",
+    "meter": {
+      "title": "Billable resolutions",
+      "period": "{start} to {end}",
+      "periodNote": "Counted over your billing period, the same dates as your invoice.",
+      "planNote": "Your plan's allowance and any extra-resolution charges are on your billing page.",
+      "paused": "The AI agent is paused because the plan's resolutions are used up. Conversations wait for your team.",
+      "calendarNote": "Counted per calendar month (UTC). Your invoice may use different period dates."
+    },
+    "breakdown": {
+      "title": "Breakdown",
+      "billed": "Billed",
+      "pendingReview": "of which sent to Hay.chat for review",
+      "reversed": "Reversed: shopper came back within 72 h",
+      "excluded": "Excluded by your team",
+      "notBilledTitle": "Not billed",
+      "outcomes": {
+        "human": "Handed off, not resolved by the AI",
+        "unhappy": "Shopper left unhappy",
+        "abandoned": "No real question or no real answer",
+        "test": "Tests and playground",
+        "spam": "Spam"
+      }
+    },
+    "ledger": {
+      "title": "Resolution ledger",
+      "description": "Every resolution counted in this period, with the reason it counted.",
+      "export": "Export CSV",
+      "exportFailed": "Could not export the ledger",
+      "exclusionsUsed": "Self-serve exclusions this period: {used} of {allowance}",
+      "exclusionsClosed": "Resolutions from this period can no longer be excluded here.",
+      "empty": "No billable resolutions in this period.",
+      "openConversation": "Open conversation",
+      "conversationDeleted": "Conversation deleted",
+      "exclude": "Exclude",
+      "reasonLabel": "Reason: {reason}",
+      "requestedBy": "Requested by {who} on {date}",
+      "excludedBy": "Excluded by {who} on {date}",
+      "previous": "Previous",
+      "next": "Next",
+      "pageOf": "Page {page} of {pages}",
+      "outcomes": {
+        "confirmed": "Shopper confirmed it was solved",
+        "assumed": "AI answered, shopper did not come back"
+      },
+      "statuses": {
+        "billed": "Billed",
+        "reversed": "Reversed",
+        "excluded": "Excluded",
+        "pending_review": "Sent to Hay.chat for review",
+        "denied": "Billed: Hay.chat declined the exclusion"
+      }
+    },
+    "excludeDialog": {
+      "title": "Exclude this resolution",
+      "instant": "It leaves this period's count right away. After this one, {left} self-serve exclusions are left this period.",
+      "review": "You have used this period's self-serve exclusions (5 % of resolutions). This request goes to Hay.chat for review, and the resolution stays counted until then.",
+      "reason": "Reason (required)",
+      "reasonPlaceholder": "For example: this was our own test, or the shopper needed a person",
+      "confirm": "Exclude",
+      "confirmReview": "Send for review",
+      "excluded": "Resolution excluded",
+      "sentForReview": "Sent to Hay.chat for review",
+      "failed": "Could not exclude the resolution"
+    }
+  }
+}

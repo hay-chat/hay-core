@@ -7,17 +7,27 @@
         <span class="font-bold">{{ formattedToolName }}</span>
       </div>
       <div class="tool-header__right">
-        <Badge :variant="httpStatus ? httpStatusVariant : statusVariant" class="text-xs font-mono">
+        <Badge :variant="statusVariant" class="text-xs font-mono">
           <component
-            :is="httpStatus ? httpStatusIcon : statusIcon"
-            :class="['h-3 w-3 mr-1', { 'animate-spin': toolStatus === 'RUNNING' && !httpStatus }]"
+            :is="statusIcon"
+            :class="['h-3 w-3 mr-1', { 'animate-spin': toolStatus === 'RUNNING' }]"
           />
-          {{ httpStatus ? `${httpStatus}: ${httpStatusText}` : statusText }}
+          {{ statusText }}
         </Badge>
         <ChevronDown v-if="!isExpanded" class="h-3 w-3 chevron" />
         <ChevronUp v-else class="h-3 w-3 chevron" />
       </div>
     </div>
+
+    <!-- Plain-language failure reason (D6-6), from the structured error code -->
+    <p
+      v-if="failureReason"
+      class="flex items-start gap-1.5 text-sm text-destructive"
+      data-testid="tool-failure-reason"
+    >
+      <AlertCircle class="mt-0.5 h-3.5 w-3.5 shrink-0" />
+      <span>{{ failureReason }}</span>
+    </p>
 
     <!-- Collapsible Details -->
     <div v-show="isExpanded" class="tool-details">
@@ -65,28 +75,37 @@
 
 <script setup lang="ts">
 import { ref, computed, watch } from "vue";
+import { useI18n } from "vue-i18n";
 import VueJsonPretty from "vue-json-pretty";
 import "vue-json-pretty/lib/styles.css";
+import { parseToolError } from "@/utils/tool-error";
 import {
   Zap,
   ChevronDown,
   ChevronUp,
   CheckCircle,
   XCircle,
+  TimerOff,
   Clock,
   Loader2,
   CalendarClock,
   AlertCircle,
+  FlaskConical,
+  Hourglass,
+  HelpCircle,
 } from "lucide-vue-next";
+
+const { t, te } = useI18n();
 
 interface Props {
   toolName?: string;
   toolInput?: Record<string, unknown>;
   toolOutput?: Record<string, unknown> | string | number | boolean | null;
   toolStatus?: string;
-  httpStatus?: number;
   latency?: number;
   executedAt?: string;
+  /** tool-errors code saved with a failed call (metadata.toolErrorCode). */
+  toolErrorCode?: string;
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -185,6 +204,13 @@ const statusVariant = computed(() => {
       return "destructive";
     case "RUNNING":
       return "tool";
+    case "SIMULATED":
+    case "PENDING_APPROVAL":
+    case "NEEDS_CONFIRMATION":
+      return "secondary";
+    case "REJECTED":
+    case "EXPIRED":
+      return "destructive";
     default:
       return "outline";
   }
@@ -198,6 +224,16 @@ const statusIcon = computed(() => {
       return XCircle;
     case "RUNNING":
       return Loader2;
+    case "SIMULATED":
+      return FlaskConical;
+    case "PENDING_APPROVAL":
+      return Hourglass;
+    case "NEEDS_CONFIRMATION":
+      return HelpCircle;
+    case "REJECTED":
+      return XCircle;
+    case "EXPIRED":
+      return TimerOff;
     default:
       return AlertCircle;
   }
@@ -206,45 +242,37 @@ const statusIcon = computed(() => {
 const statusText = computed(() => {
   switch (props.toolStatus) {
     case "SUCCESS":
-      return "Success";
+      return t("conversations.toolStatus.success");
     case "ERROR":
-      return "Failed";
+      return t("conversations.toolStatus.failed");
     case "RUNNING":
-      return "Running";
+      return t("conversations.toolStatus.running");
+    case "SIMULATED":
+      return t("conversations.toolStatus.simulated");
+    case "PENDING_APPROVAL":
+      return t("conversations.toolStatus.pendingApproval");
+    case "NEEDS_CONFIRMATION":
+      return t("conversations.toolStatus.needsConfirmation");
+    case "REJECTED":
+      return t("conversations.toolStatus.rejected");
+    case "EXPIRED":
+      return t("conversations.toolStatus.expired");
     default:
-      return "Unknown";
+      return t("conversations.toolStatus.unknown");
   }
 });
 
-const httpStatusVariant = computed(() => {
-  if (!props.httpStatus) return "outline";
-  if (props.httpStatus >= 200 && props.httpStatus < 300) return "success";
-  if (props.httpStatus >= 400) return "destructive";
-  return "secondary";
-});
-
-const httpStatusIcon = computed(() => {
-  if (!props.httpStatus) return AlertCircle;
-  if (props.httpStatus >= 200 && props.httpStatus < 300) return CheckCircle;
-  if (props.httpStatus >= 400) return XCircle;
-  return AlertCircle;
-});
-
-const httpStatusText = computed(() => {
-  if (!props.httpStatus) return "Unknown";
-  const statusMessages: Record<number, string> = {
-    200: "OK",
-    201: "Created",
-    204: "No Content",
-    400: "Bad Request",
-    401: "Unauthorized",
-    403: "Forbidden",
-    404: "Not Found",
-    500: "Internal Server Error",
-    502: "Bad Gateway",
-    503: "Service Unavailable",
-  };
-  return statusMessages[props.httpStatus] || "Unknown Status";
+/** Why it failed, in the merchant's language: the reason if known, else the code. */
+const failureReason = computed(() => {
+  if (props.toolStatus !== "ERROR") return null;
+  const { code, reason } = parseToolError(props.toolOutput, props.toolErrorCode);
+  if (reason && te(`aiActions.toolErrors.reasons.${reason}`)) {
+    return t(`aiActions.toolErrors.reasons.${reason}`);
+  }
+  if (code && te(`aiActions.toolErrors.codes.${code}`)) {
+    return t(`aiActions.toolErrors.codes.${code}`);
+  }
+  return t("aiActions.toolErrors.generic");
 });
 
 const { formatTime } = useOrgDateTime();

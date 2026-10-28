@@ -4,19 +4,26 @@
 
 const { z } = require("zod");
 const { shopifyGql } = require("../lib/client");
-const {
-  ok,
-  fail,
-  unwrapConnection,
-  pageInfo,
-  toGid,
-  assertNoUserErrors,
-} = require("../lib/format");
+const { ok, fail, toGid } = require("../lib/format");
+const { orderNotFound } = require("./orders");
+
+/**
+ * One plain answer for "where is my order", so the agent never has to infer it
+ * from an empty list: NOT_SHIPPED (no live fulfillment yet), SHIPPED_NO_TRACKING
+ * (shipped, but the store added no tracking number) or HAS_TRACKING.
+ */
+function trackingState(fulfillments, tracking) {
+  const live = fulfillments.filter((f) => !["CANCELLED", "ERROR", "FAILURE"].includes(f.status));
+  if (live.length === 0) return "NOT_SHIPPED";
+  return tracking.length === 0 ? "SHIPPED_NO_TRACKING" : "HAS_TRACKING";
+}
 
 function registerFulfillmentTools(server) {
   server.tool(
     "shopify_get_order_tracking",
-    "Get an order's fulfillment and tracking status (WISMO) with a flattened tracking summary.",
+    "Get an order's fulfillment and tracking status (WISMO) with a flattened tracking summary. " +
+      "trackingState says plainly whether it has shipped and has a tracking number. " +
+      "An unknown order id fails with code NOT_FOUND.",
     {
       order_id: z.string().describe("Order GID or bare numeric order id."),
     },
@@ -47,9 +54,7 @@ function registerFulfillmentTools(server) {
         const data = await shopifyGql(QUERY, { id });
         const order = data.order;
 
-        if (!order) {
-          return ok(null);
-        }
+        if (!order) throw await orderNotFound(args.order_id);
 
         const tracking = [];
         for (const fulfillment of order.fulfillments || []) {
@@ -70,6 +75,7 @@ function registerFulfillmentTools(server) {
           id: order.id,
           name: order.name,
           displayFulfillmentStatus: order.displayFulfillmentStatus,
+          trackingState: trackingState(order.fulfillments || [], tracking),
           fulfillments: order.fulfillments,
           trackingSummary: tracking,
         });

@@ -8,6 +8,12 @@ import { deliver } from "./deliver.js";
 import { getChannelStatus } from "./status.js";
 import { ingestAlias, splitAddress } from "./thread.js";
 import { parseAddress } from "./mime.js";
+import {
+  NOTIFY_SERVER_ID,
+  NOTIFY_TOOL_RISK,
+  createNotifyServer,
+  resolveNotificationRecipients,
+} from "./notify.js";
 
 /**
  * Email Channel Plugin
@@ -25,6 +31,9 @@ import { parseAddress } from "./mime.js";
  *      thread and calls `messages.receive`; replies go out through the
  *      platform relay with threading headers and a Reply-To that carries the
  *      conversation id.
+ *   4. The agent gets one action, `send-email`, that emails the store's team
+ *      (configured notification addresses, else the support address) — see
+ *      notify.ts. It replaced the standalone "Email" plugin.
  *
  * Env (host allowlist): RESEND_API_KEY, EMAIL_INBOUND_DOMAIN, SMTP_FROM_EMAIL
  * (its domain is the From domain). RESEND_WEBHOOK_SECRET is read by core only.
@@ -68,6 +77,7 @@ export default defineHayPlugin((globalCtx) => {
 
   let settings: ChannelSettings | null = null;
   let resend: ResendClient | null = null;
+  let notificationRecipients: string[] = [];
   const state = emptyState();
 
   const channelContext = (): ChannelContext => ({
@@ -103,6 +113,15 @@ export default defineHayPlugin((globalCtx) => {
     const apiKey = process.env.RESEND_API_KEY;
     resend = apiKey ? new ResendClient({ apiKey }) : null;
     settings = resolveSettings(ctx.config, ctx.org);
+    // Team notifications work without the inbound env (only the relay is needed).
+    const notify = resolveNotificationRecipients(
+      ctx.config.getOptional<string>("notificationRecipients"),
+      parseAddress(ctx.config.getOptional<string>("supportAddress") ?? "")?.address ?? null,
+    );
+    notificationRecipients = notify.recipients;
+    if (notify.invalid.length) {
+      ctx.logger.warn("Ignoring invalid notification addresses", { invalid: notify.invalid });
+    }
     const missing = missingEnv();
     if (!settings || missing.length) {
       ctx.logger.info("Email channel not ready — missing host configuration", {
@@ -133,15 +152,16 @@ export default defineHayPlugin((globalCtx) => {
           type: "string",
           label: "Your support address",
           description:
-            "The address your customers already write to, e.g. support@yourstore.com. You will forward this mailbox to the Hay address shown below.",
-          required: true,
+            "The address your customers already write to, e.g. support@yourstore.com. You will forward this mailbox to the Hay.chat address shown below.",
+          // Optional so a workspace can use only the team-notification action.
+          required: false,
           encrypted: false,
         },
         storeName: {
           type: "string",
           label: "Sender name",
           description:
-            'Shown as the sender of Hay\'s replies, e.g. "Acme Support". Defaults to your workspace name.',
+            'Shown as the sender of Hay.chat\'s replies, e.g. "Acme Support". Defaults to your workspace name.',
           required: false,
           encrypted: false,
         },
@@ -149,9 +169,17 @@ export default defineHayPlugin((globalCtx) => {
           type: "boolean",
           label: "Keep a copy in my inbox",
           description:
-            "BCC your support address on every reply Hay sends, so your mailbox holds the whole conversation.",
+            "BCC your support address on every reply Hay.chat sends, so your mailbox holds the whole conversation.",
           required: false,
           default: false,
+        },
+        notificationRecipients: {
+          type: "string",
+          label: "Team notification addresses",
+          description:
+            'Comma-separated addresses the AI\'s "Send email" action writes to, e.g. when a customer needs a person. Defaults to your support address.',
+          required: false,
+          encrypted: false,
         },
       });
 
@@ -207,6 +235,21 @@ export default defineHayPlugin((globalCtx) => {
 
     async onStart(ctx) {
       await apply(ctx);
+      try {
+        await ctx.mcp.startLocal(
+          NOTIFY_SERVER_ID,
+          () =>
+            createNotifyServer({
+              getSettings: () => settings,
+              getRecipients: () => notificationRecipients,
+              api: new PluginApiClient(ctx.logger),
+              logger: ctx.logger,
+            }),
+          { toolRisk: NOTIFY_TOOL_RISK },
+        );
+      } catch (error: unknown) {
+        ctx.logger.error("Could not start the send-email action", { error: errorMessage(error) });
+      }
     },
 
     async onConfigUpdate(ctx) {
@@ -217,6 +260,7 @@ export default defineHayPlugin((globalCtx) => {
       ctx.logger.info("Email channel disabled", { orgId: ctx.org.id });
       settings = null;
       resend = null;
+      notificationRecipients = [];
     },
   };
 });

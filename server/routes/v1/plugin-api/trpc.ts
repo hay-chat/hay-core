@@ -7,6 +7,7 @@ import { ConversationRepository } from "@server/repositories/conversation.reposi
 import { MessageRepository } from "@server/repositories/message.repository";
 import { AgentRepository } from "@server/repositories/agent.repository";
 import { organizationRepository } from "@server/repositories/organization.repository";
+import { pickAgentForChannel } from "@server/services/agent-channel-routing";
 import { pluginInstanceRepository } from "@server/repositories/plugin-instance.repository";
 import { pluginWebhookRouteRepository } from "@server/repositories/plugin-webhook-route.repository";
 import {
@@ -17,11 +18,12 @@ import {
 } from "@server/database/entities/message.entity";
 import { mcpRegistryService } from "@server/services/mcp-registry.service";
 import { redisService } from "@server/services/redis.service";
-import { storageService } from "@server/services/storage.service";
+import { CONVERSATION_MEDIA_FOLDER, storageService } from "@server/services/storage.service";
 import { transcriptionService } from "@server/services/transcription.service";
 import { oauthService } from "@server/services/oauth.service";
 import { randomUUID } from "crypto";
 import { productSyncService } from "@server/services/product-sync.service";
+import { PluginStateLimitError, pluginStateService } from "@server/services/plugin-state.service";
 import { ProductStatus } from "@server/entities/product.entity";
 import { VariantAvailability } from "@server/entities/product-variant.entity";
 import type { CanonicalProduct } from "@server/types/canonical-product";
@@ -31,7 +33,17 @@ import type {
   RemoteMCPServerConfig,
 } from "@server/types/plugin.types";
 import { createLogger } from "@server/lib/logger";
+import { emailDomainService } from "@server/services/email-domains.service";
+import { channelHealthService } from "@server/services/channel-health.service";
 import type { Conversation } from "@server/database/entities/conversation.entity";
+
+// Channel names become keys of conversation.metadata, so they are kept
+// lowercase: a plugin must not be able to write a core key such as `runKind`.
+const channelNameSchema = z
+  .string()
+  .min(1)
+  .max(64)
+  .regex(/^[a-z0-9][a-z0-9_-]*$/, "Channel names are lowercase letters, digits, - and _");
 
 const logger = createLogger("plugin-api-trpc");
 
@@ -79,6 +91,18 @@ const messageRepository = new MessageRepository();
 const agentRepository = new AgentRepository();
 
 /**
+ * Conversation metadata for a customer reached through an identity it took
+ * over in a merge (D13-13): replies go to that identity, not the customer's
+ * own external_id (which belongs to another channel).
+ */
+function recipientMetadata(
+  customer: { external_id: string | null },
+  identity: string,
+): Record<string, unknown> {
+  return customer.external_id !== identity ? { customerExternalId: identity } : {};
+}
+
+/**
  * Plugin API Router (tRPC)
  *
  * This router provides endpoints for plugins to interact with the Hay platform.
@@ -102,7 +126,7 @@ export const pluginApiTrpcRouter = router({
       z.object({
         from: z.string().min(1, "from is required"),
         content: z.string(),
-        channel: z.string().min(1).max(64),
+        channel: channelNameSchema,
         metadata: z.record(z.any()).optional(),
         // Optional sender type — defaults to customer. "human_agent" is used when
         // an external system (e.g. Chatwoot) forwards a message written by a
@@ -121,6 +145,10 @@ export const pluginApiTrpcRouter = router({
         conversationId: z.string().uuid().optional(),
         // Optional title for a newly created conversation (e.g. email subject).
         title: z.string().max(255).optional(),
+        // D13-2: when the channel stops accepting free-form replies, counted from
+        // this inbound message (WhatsApp: its timestamp + 24 h). Only customer
+        // messages open a window; the latest one wins.
+        replyWindowExpiresAt: z.string().datetime({ offset: true }).optional(),
         // Park the conversation for a human instead of letting the AI answer
         // (e.g. a DMARC-failing email or a reply that shows a human already
         // answered outside Hay). The message is stored; the conversation goes
@@ -154,6 +182,24 @@ export const pluginApiTrpcRouter = router({
       const organizationId = ctx.pluginAuth.organizationId;
 
       try {
+        // An echo of a message Hay.chat itself sent (the provider id was stored
+        // at delivery) is not a human reply: never store it twice and never let
+        // it take the conversation away from the AI (D13-8, D11-11).
+        if (senderType === "human_agent" && typeof metadata?.mid === "string" && metadata.mid) {
+          const ownSend = await messageRepository.findByProviderMessageIdAndOrganization(
+            metadata.mid,
+            organizationId,
+          );
+          if (ownSend) {
+            return {
+              messageId: null,
+              conversationId: ownSend.conversation_id,
+              processed: false,
+              deduped: true,
+            };
+          }
+        }
+
         // Find or create customer
         let customer = await customerRepository.findByExternalId(from, organizationId);
 
@@ -245,7 +291,8 @@ export const pluginApiTrpcRouter = router({
         }
         if (!conversation && !externalConversationId) {
           conversation = await conversationRepository.findActiveByCustomerAndChannel(
-            customer.id,
+            customer,
+            from,
             channel,
             organizationId,
           );
@@ -259,6 +306,10 @@ export const pluginApiTrpcRouter = router({
         };
 
         if (!conversation) {
+          const metadata: Record<string, unknown> = {
+            ...(Object.keys(channelMetadata).length ? { [channel]: channelMetadata } : {}),
+            ...recipientMetadata(customer, from),
+          };
           conversation = await conversationRepository.create({
             organization_id: organizationId,
             customer_id: customer.id,
@@ -266,7 +317,7 @@ export const pluginApiTrpcRouter = router({
             channel,
             status: "open",
             title: title ?? "",
-            metadata: Object.keys(channelMetadata).length ? { [channel]: channelMetadata } : null,
+            metadata: Object.keys(metadata).length ? metadata : null,
           });
         } else if (externalConversationId) {
           // Conversation already exists — store the externalConversationId if
@@ -322,6 +373,17 @@ export const pluginApiTrpcRouter = router({
           }
         }
 
+        if (input.replyWindowExpiresAt && senderType === "customer") {
+          const expiresAt = new Date(input.replyWindowExpiresAt);
+          const current = conversation.reply_window_expires_at;
+          if (!current || new Date(current).getTime() < expiresAt.getTime()) {
+            await conversationRepository.updateById(conversation.id, {
+              reply_window_expires_at: expiresAt,
+            });
+            conversation.reply_window_expires_at = expiresAt;
+          }
+        }
+
         const message = await conversation.addMessage({
           content,
           type: messageType,
@@ -337,6 +399,7 @@ export const pluginApiTrpcRouter = router({
           senderType === "human_agent" &&
           conversation.status !== "human-took-over" &&
           conversation.status !== "resolved" &&
+          conversation.status !== "unresolved" &&
           conversation.status !== "closed"
         ) {
           await conversationRepository.update(conversation.id, organizationId, {
@@ -384,7 +447,7 @@ export const pluginApiTrpcRouter = router({
       z.object({
         to: z.string().min(1, "to is required"),
         content: z.string().min(1, "content is required"),
-        channel: z.string().min(1).max(64),
+        channel: channelNameSchema,
         conversationId: z.string().uuid().optional(),
         metadata: z.record(z.any()).optional(),
       }),
@@ -440,12 +503,14 @@ export const pluginApiTrpcRouter = router({
 
           // Find active conversation or create a new one
           conversation = await conversationRepository.findActiveByCustomerAndChannel(
-            customer.id,
+            customer,
+            to,
             channel,
             organizationId,
           );
 
           if (!conversation) {
+            const metadata = recipientMetadata(customer, to);
             conversation = await conversationRepository.create({
               organization_id: organizationId,
               customer_id: customer.id,
@@ -453,6 +518,7 @@ export const pluginApiTrpcRouter = router({
               channel,
               status: "open",
               title: "",
+              metadata: Object.keys(metadata).length ? metadata : null,
             });
           }
         }
@@ -534,6 +600,18 @@ export const pluginApiTrpcRouter = router({
         providerError,
       });
 
+      if (isFailure) {
+        // Best effort: a health check problem never fails the status update.
+        void (async () => {
+          const conversation = await conversationRepository.findById(message.conversation_id);
+          if (conversation) {
+            await channelHealthService.recordDeliveryFailure(organizationId, conversation.channel);
+          }
+        })().catch((error: unknown) => {
+          logger.warn({ err: error, messageId: message.id }, "Channel health check failed");
+        });
+      }
+
       // Status-only event: never `message_received`, which channel-delivery
       // would treat as a new outbound message and re-deliver.
       try {
@@ -588,33 +666,35 @@ export const pluginApiTrpcRouter = router({
           buffer,
           originalName: input.filename,
           mimeType: input.mimeType,
-          folder: "conversation-media",
+          folder: CONVERSATION_MEDIA_FOLDER,
           organizationId,
         });
       } catch (error) {
-        // Storage rejects disallowed mime types and oversized files with plain
-        // errors — those are caller mistakes, not server faults.
+        // Storage rejects disallowed or mislabelled content and oversized files
+        // with plain errors — those are caller mistakes, not server faults.
         throw new TRPCError({
           code: "BAD_REQUEST",
           message: error instanceof Error ? error.message : "Upload failed",
         });
       }
 
+      // Type and size of what was stored: the type comes from the file's content
+      // and images are re-encoded, so both may differ from the plugin's input.
       const attachment = {
         id: stored.upload.id,
         name: input.filename,
         url: stored.url,
-        type: input.mimeType,
-        size: buffer.length,
+        type: stored.upload.mimeType,
+        size: Number(stored.upload.size),
       };
 
-      if (!input.transcribe || !input.mimeType.toLowerCase().startsWith("audio/")) {
+      if (!input.transcribe || !attachment.type.startsWith("audio/")) {
         return attachment;
       }
 
       const transcript = await transcriptionService.transcribe({
         buffer,
-        mimeType: input.mimeType,
+        mimeType: attachment.type,
         filename: input.filename,
         organizationId,
       });
@@ -639,9 +719,53 @@ export const pluginApiTrpcRouter = router({
         "Plugin reported revoked connection",
       );
       scheduleConnectionRevoke(organizationId, pluginId);
+      void channelHealthService
+        .markFailing(organizationId, pluginId, "token_revoked", input.reason)
+        .catch((error: unknown) => {
+          logger.error({ err: error, organizationId, pluginId }, "Channel health update failed");
+        });
 
       return { revoked: true as const };
     }),
+
+  /**
+   * Report the channel's own health (D13-11), e.g. the provider lowered the
+   * account's quality rating. "failing" alerts the org's owners and admins
+   * (throttled); "ok" clears a failure the plugin reported. Core-detected
+   * failures (failed deliveries, revoked connection) are cleared by core.
+   */
+  "channel.reportHealth": pluginProcedure
+    .input(
+      z.object({
+        status: z.enum(["ok", "failing"]),
+        detail: z.string().max(200).optional(),
+      }),
+    )
+    .mutation(async ({ input, ctx }) => {
+      requireCapability(ctx, "messages");
+      const { organizationId, pluginId } = ctx.pluginAuth;
+      if (input.status === "failing") {
+        await channelHealthService.markFailing(
+          organizationId,
+          pluginId,
+          "quality_drop",
+          input.detail,
+        );
+      } else {
+        await channelHealthService.markOk(organizationId, pluginId, ["quality_drop"]);
+      }
+      return { ok: true as const };
+    }),
+
+  /**
+   * The organization's verified custom sending domain (D13-9), or null. Email
+   * plugins send From the merchant's own address only when its domain matches;
+   * the platform address stays the default.
+   */
+  "email.sendingDomain": pluginProcedure.query(async ({ ctx }) => {
+    requireCapability(ctx, "email");
+    return { domain: await emailDomainService.verifiedDomain(ctx.pluginAuth.organizationId) };
+  }),
 
   /**
    * Replace the shared-webhook routing keys owned by the calling plugin instance.
@@ -689,8 +813,9 @@ export const pluginApiTrpcRouter = router({
   "conversations.updateStatusByExternalId": pluginProcedure
     .input(
       z.object({
-        channel: z.string().min(1).max(64),
+        channel: channelNameSchema,
         externalConversationId: z.string().min(1),
+        // Not "awaiting-approval": only the approval hold sets that.
         status: z.enum(["open", "pending-human", "human-took-over", "resolved", "closed"]),
       }),
     )
@@ -1077,6 +1202,51 @@ export const pluginApiTrpcRouter = router({
     }),
 
   /**
+   * Plugin state (H4) - a worker's own key/value store that survives restarts.
+   * Scoped to the token's organization and plugin id; no capability needed.
+   */
+  "state.get": pluginProcedure
+    .input(z.object({ key: z.string().min(1).max(255) }))
+    .mutation(async ({ input, ctx }) => {
+      const { organizationId, pluginId } = ctx.pluginAuth;
+      return { value: await pluginStateService.get(organizationId, pluginId, input.key) };
+    }),
+
+  "state.set": pluginProcedure
+    .input(
+      z.object({
+        key: z.string().min(1).max(255),
+        value: z.unknown(),
+        ttlMs: z
+          .number()
+          .int()
+          .positive()
+          .max(90 * 24 * 60 * 60 * 1000)
+          .optional(),
+      }),
+    )
+    .mutation(async ({ input, ctx }) => {
+      const { organizationId, pluginId } = ctx.pluginAuth;
+      try {
+        await pluginStateService.set(organizationId, pluginId, input.key, input.value, input.ttlMs);
+      } catch (error) {
+        if (error instanceof PluginStateLimitError) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: error.message });
+        }
+        throw error;
+      }
+      return { ok: true };
+    }),
+
+  "state.delete": pluginProcedure
+    .input(z.object({ key: z.string().min(1).max(255) }))
+    .mutation(async ({ input, ctx }) => {
+      const { organizationId, pluginId } = ctx.pluginAuth;
+      await pluginStateService.delete(organizationId, pluginId, input.key);
+      return { ok: true };
+    }),
+
+  /**
    * Products Capability - Bulk upsert canonical products from a plugin adapter
    *
    * Called by product-source plugins (e.g. Shopify) from their `onStart` /
@@ -1169,6 +1339,58 @@ export const pluginApiTrpcRouter = router({
       );
       return { removed };
     }),
+
+  /**
+   * Products Capability - Remove products deleted upstream
+   *
+   * Called after a complete full sync with every externalId the store
+   * returned; this plugin's products not in the list are deleted (variants
+   * and embeddings go with them).
+   */
+  "products.prune": pluginProcedure
+    .input(
+      z.object({
+        keepExternalIds: z.array(z.string().min(1)).min(1).max(200_000),
+      }),
+    )
+    .mutation(async ({ input, ctx }) => {
+      requireCapability(ctx, "products");
+      const { organizationId, pluginId } = ctx.pluginAuth;
+      return productSyncService.pruneProducts(organizationId, pluginId, input.keepExternalIds);
+    }),
+
+  /**
+   * Disputes Capability - Report a payment dispute (chargeback), D2-7/D2-8
+   *
+   * Called by payment-platform plugins from their webhook / onStart via
+   * `ctx.disputes.report(...)`. Idempotent on (plugin, externalId). Core stamps
+   * the source from the authenticated plugin id, matches the order and alerts
+   * owners and admins once.
+   */
+  "disputes.report": pluginProcedure
+    .input(
+      z.object({
+        externalId: z.string().trim().min(1).max(255),
+        status: z.enum(["needs_response", "under_review", "won", "lost", "closed"]),
+        amount: z.string().max(32).optional(),
+        currency: z.string().length(3).optional(),
+        reason: z.string().max(64).optional(),
+        evidenceDueBy: z.string().datetime({ offset: true }).optional(),
+        initiatedAt: z.string().datetime({ offset: true }).optional(),
+        orderRefs: z.array(z.string().max(255)).max(10).optional(),
+        orderLabel: z.string().max(64).optional(),
+        // Rendered as a link on the dashboard: https only.
+        providerUrl: z.string().url().max(2048).startsWith("https://").optional(),
+      }),
+    )
+    .mutation(async ({ input, ctx }) => {
+      requireCapability(ctx, "disputes");
+      const { organizationId, pluginId } = ctx.pluginAuth;
+      // Imported lazily: the disputes service pulls in the audit log and mailer.
+      const { disputesService } = await import("@server/services/disputes/disputes.service");
+      const { created } = await disputesService.report(organizationId, pluginId, input);
+      return { created };
+    }),
 });
 
 /** Ordering for monotonic provider status updates. `failed` is handled separately. */
@@ -1228,42 +1450,13 @@ async function claimProviderMessage(
   }
 }
 
-/**
- * Helper: Get agent for channel
- *
- * Determines which single agent should handle conversations for a given channel.
- * Agent<->channel is many-to-many (agent.channels), but each incoming message must
- * resolve to exactly one responder. Priority:
- * 1. Agents assigned to this channel. If more than one claims it, prefer the org
- *    default agent if it is among them, otherwise the earliest-created (deterministic).
- *    TODO: replace this tiebreaker once multi-agent-per-channel selection is defined.
- * 2. Organization default agent.
- * 3. First available agent.
- */
+/** The single agent that answers on a channel: see pickAgentForChannel (D7-14). */
 async function getAgentForChannel(organizationId: string, channel: string): Promise<string | null> {
   const [agents, org] = await Promise.all([
     agentRepository.findByOrganization(organizationId),
     organizationRepository.findById(organizationId),
   ]);
-
-  // 1. Agents explicitly assigned to this channel.
-  const assigned = agents.filter((a) => a.channels?.includes(channel));
-  if (assigned.length > 0) {
-    if (org?.defaultAgentId) {
-      const preferred = assigned.find((a) => a.id === org.defaultAgentId);
-      if (preferred) return preferred.id;
-    }
-    // findByOrganization orders by created_at DESC, so the last entry is earliest.
-    return assigned[assigned.length - 1].id;
-  }
-
-  // 2. Organization default agent.
-  if (org?.defaultAgentId) {
-    return org.defaultAgentId;
-  }
-
-  // 3. First available agent.
-  return agents[0]?.id || null;
+  return pickAgentForChannel(agents, org?.defaultAgentId, channel)?.id ?? null;
 }
 
 /**

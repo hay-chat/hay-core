@@ -5,6 +5,7 @@ import path from "path";
 import { createLogger } from "@server/lib/logger";
 import { llmProviderFactory } from "@server/services/llm/llm-provider.factory";
 import { emitUsage } from "@server/services/llm/usage-sink";
+import { describeAttachmentsForAgent } from "@server/services/media-analysis/agent-view";
 import {
   buildRepairMessages,
   StructuredOutputError,
@@ -63,6 +64,8 @@ export interface ChatOptions {
 export interface EmbeddingOptions {
   text: string;
   model?: string;
+  /** Organization whose AI region to use. Falls back to the env default bundle. */
+  organizationId?: string;
 }
 
 export class LLMService {
@@ -141,6 +144,7 @@ export class LLMService {
               provider: meta.provider,
               organizationId,
               tier,
+              region: bundle.region,
             }),
           )
           .catch(() => undefined);
@@ -176,6 +180,7 @@ export class LLMService {
       provider: result.provider,
       organizationId,
       tier,
+      region: bundle.region,
     });
     this.logChatResultDebugInfo(result);
 
@@ -246,8 +251,8 @@ export class LLMService {
   }
 
   async embedding(options: EmbeddingOptions): Promise<number[]> {
-    const { text, model = config.openai.models.embedding.model } = options;
-    const bundle = await llmProviderFactory.forOrganization();
+    const { text, model = config.openai.models.embedding.model, organizationId } = options;
+    const bundle = await llmProviderFactory.forOrganization(organizationId);
 
     try {
       const embedRequest: EmbeddingRequest = { model, input: text };
@@ -260,6 +265,8 @@ export class LLMService {
         usage: result.usage,
         model: result.model,
         provider: result.provider,
+        organizationId,
+        region: bundle.region,
       });
 
       return result.embeddings[0] ?? [];
@@ -373,6 +380,12 @@ export class LLMService {
           toolInput !== undefined ? `\nArguments sent:\n${JSON.stringify(toolInput, null, 2)}` : "";
 
         content = `Tool: ${message.metadata.toolName || "unknown"}\nStatus: ${message.metadata.toolStatus || "unknown"}${inputLine}\nResult:\n${JSON.stringify(formattedOutput, null, 2)}`;
+      }
+
+      // What the vision pass read from the customer's photos and PDFs (D8-11).
+      if (message.type === MessageType.CUSTOMER && message.attachments?.length) {
+        const files = describeAttachmentsForAgent(message.attachments);
+        if (files) content = content ? `${content}\n${files}` : files;
       }
 
       return {

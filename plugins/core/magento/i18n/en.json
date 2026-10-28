@@ -49,6 +49,10 @@
     "magento_check_inventory": {
       "label": "Check Inventory",
       "description": "Check stock status and quantity for a SKU."
+    },
+    "magento_resend_order_confirmation": {
+      "label": "Resend Order Confirmation",
+      "description": "Resend the order confirmation email to the email on the order."
     }
   },
   "config": {
@@ -59,6 +63,14 @@
     "apiToken": {
       "label": "API Token",
       "description": "Magento integration access token (System → Integrations) with access to Sales, Catalog and Customers"
+    },
+    "staleTrackingDomesticDays": {
+      "label": "Stale tracking: domestic (days)",
+      "description": "Treat a domestic shipment as stuck when its tracking has not moved for more than this many days."
+    },
+    "staleTrackingInternationalDays": {
+      "label": "Stale tracking: international (days)",
+      "description": "Treat an international shipment as stuck when its tracking has not moved for more than this many days."
     }
   }
 }

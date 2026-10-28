@@ -2,6 +2,8 @@ import type { Request, Response } from "express";
 import type { HayLogger } from "@hay/plugin-sdk/types";
 import type { GraphClient } from "./graph-client.js";
 import { PluginApiClient } from "./plugin-api.js";
+import { ingestMessage, type InstagramAttachment } from "./media.js";
+import { isOwnApp, type SentMessageTracker } from "./echo.js";
 
 export interface WebhookContext {
   /** Resolves the Graph client (built in onStart once credentials exist). */
@@ -9,6 +11,10 @@ export interface WebhookContext {
   /** Resolves the page/IG access token used to fetch sender profiles. */
   getAccessToken: () => string | null;
   logger: HayLogger;
+  /** Mids this worker sent, to drop the echoes of Hay.chat's own replies (D11-11). */
+  tracker?: SentMessageTracker;
+  /** This Meta app's id(s); an echo carrying one as `app_id` is Hay.chat's own send. */
+  ownAppIds?: Array<string | null | undefined>;
 }
 
 /**
@@ -31,7 +37,8 @@ interface MetaMessagingEvent {
     mid?: string;
     text?: string;
     is_echo?: boolean;
-    attachments?: unknown[];
+    app_id?: string | number;
+    attachments?: InstagramAttachment[];
   };
   postback?: unknown;
   reaction?: unknown;
@@ -82,10 +89,14 @@ function collectMessagingEvents(entry: MetaEntry): MetaMessagingEvent[] {
  * `x-hay-webhook-verified: true`. We reject anything missing that header (it
  * would mean a direct, unverified hit) and otherwise process the body.
  *
- * MVP scope — TEXT messages only. We explicitly log-and-ignore:
- *   - echoes (`message.is_echo`)       → our own outbound, would loop the AI
- *   - empty / whitespace-only text     → nothing to act on
- *   - attachment-only messages         → rich content is a follow-up ticket
+ * Text and attachments (D8-6): images, videos, voice notes and files are
+ * stored in Hay at once (voice notes transcribed); story mentions, reels and
+ * shared posts become a text line. An attachment-only message always reaches
+ * the agent. Echoes (`message.is_echo`) are the business account's own sends:
+ * Hay.chat's replies are dropped, the owner's replies typed in the Instagram app
+ * become `human_agent` messages so the AI stops answering over them (D11-11).
+ * We explicitly log-and-ignore:
+ *   - no text and no attachments       → nothing to act on
  *   - postbacks / reactions            → not modeled yet
  *
  * Inbound dedupe is handled core-side via `metadata.mid`, so we always return
@@ -136,14 +147,16 @@ export async function webhookHandler(
         const message = event.message;
         const senderPsid = event.sender?.id;
 
-        // Echo of our own outbound — never feed it back to the orchestrator.
         if (message?.is_echo) {
-          logger.info("Instagram event ignored — echo", { igAccountId });
-          ignored++;
+          if (await receiveEcho(event, igAccountId, apiClient, ctx)) {
+            processed++;
+          } else {
+            ignored++;
+          }
           continue;
         }
 
-        // Postbacks / reactions are out of scope for the text-only MVP.
+        // Postbacks / reactions are not modeled yet.
         if (!message) {
           logger.info("Instagram event ignored — non-message (postback/reaction)", {
             igAccountId,
@@ -154,13 +167,10 @@ export async function webhookHandler(
           continue;
         }
 
-        // Attachment-only or empty text — nothing actionable in MVP.
         const text = typeof message.text === "string" ? message.text : "";
-        if (!text || text.trim().length === 0) {
-          logger.info("Instagram message ignored — no text content", {
-            igAccountId,
-            hasAttachments: Array.isArray(message.attachments) && message.attachments.length > 0,
-          });
+        const attachments = Array.isArray(message.attachments) ? message.attachments : [];
+        if (text.trim().length === 0 && attachments.length === 0) {
+          logger.info("Instagram message ignored — no text or attachments", { igAccountId });
           ignored++;
           continue;
         }
@@ -187,21 +197,30 @@ export async function webhookHandler(
           });
         }
 
+        const ingested =
+          attachments.length > 0
+            ? await ingestMessage({ text, attachments, mid: message.mid, api: apiClient, logger })
+            : null;
+
         const result = await apiClient.mutation<{
           messageId: string;
           conversationId: string;
           processed: boolean;
         }>("messages.receive", {
           from: `instagram:${senderPsid}`,
-          content: text,
+          content: ingested ? ingested.content : text,
           channel: "instagram",
           senderType: "customer",
+          ...(ingested?.attachments.length ? { attachments: ingested.attachments } : {}),
           metadata: {
             username,
             profileName,
             mid: message.mid,
             igAccountId,
             timestamp: event.timestamp,
+            ...(ingested?.voiceNote ? { voiceNote: true } : {}),
+            ...(ingested?.mediaPlaceholder ? { mediaPlaceholder: true } : {}),
+            ...(ingested?.failures.length ? { mediaFailures: ingested.failures } : {}),
           },
         });
 
@@ -223,4 +242,75 @@ export async function webhookHandler(
     });
     res.status(500).json({ error: "Internal server error" });
   }
+}
+
+/**
+ * An echo of a message the business account sent. Hay.chat's own sends (by
+ * app id, or a mid this worker sent) are dropped; anything else is the owner
+ * replying from the Instagram app and is stored as a human message, which
+ * core treats like a take-over. Returns true when stored.
+ */
+async function receiveEcho(
+  event: MetaMessagingEvent,
+  igAccountId: string | undefined,
+  apiClient: PluginApiClient,
+  ctx: WebhookContext,
+): Promise<boolean> {
+  const { logger } = ctx;
+  const message = event.message ?? {};
+  // On an echo the shopper is the recipient.
+  const customerPsid = event.recipient?.id;
+
+  if (isOwnApp(message.app_id, ctx.ownAppIds ?? [])) {
+    logger.info("Instagram echo ignored — sent by Hay.chat (app id)", { igAccountId });
+    return false;
+  }
+  if (await ctx.tracker?.isOwn(message.mid, customerPsid)) {
+    logger.info("Instagram echo ignored — sent by Hay.chat (mid)", { igAccountId });
+    return false;
+  }
+  if (!customerPsid || customerPsid === igAccountId) {
+    logger.warn("Instagram echo ignored — missing recipient id", { igAccountId });
+    return false;
+  }
+
+  const text = typeof message.text === "string" ? message.text : "";
+  const attachments = Array.isArray(message.attachments) ? message.attachments : [];
+  if (text.trim().length === 0 && attachments.length === 0) {
+    logger.info("Instagram echo ignored — no text or attachments", { igAccountId });
+    return false;
+  }
+
+  const ingested =
+    attachments.length > 0
+      ? await ingestMessage({ text, attachments, mid: message.mid, api: apiClient, logger })
+      : null;
+
+  const result = await apiClient.mutation<{ messageId: string | null; deduped?: boolean }>(
+    "messages.receive",
+    {
+      from: `instagram:${customerPsid}`,
+      // Media lines are worded for the shopper; this one came from the store.
+      content: ingested ? ingested.content.replace(/\[Customer sent/g, "[Store sent") : text,
+      channel: "instagram",
+      senderType: "human_agent",
+      ...(ingested?.attachments.length ? { attachments: ingested.attachments } : {}),
+      metadata: {
+        mid: message.mid,
+        igAccountId,
+        timestamp: event.timestamp,
+        echo: true,
+        source: "instagram_app",
+        ...(ingested?.mediaPlaceholder ? { mediaPlaceholder: true } : {}),
+      },
+    },
+  );
+
+  logger.info("Instagram app reply stored as a human message", {
+    igAccountId,
+    mid: message.mid,
+    messageId: result.messageId,
+    deduped: result.deduped ?? false,
+  });
+  return !result.deduped;
 }
