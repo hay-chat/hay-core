@@ -53,6 +53,12 @@ const TOOL_ERROR_CODES = Object.freeze({
     meaning:
       "A write failed in a way that may still have been applied. Check the record before retrying.",
   },
+  NEEDS_APPROVAL: {
+    retryable: false,
+    meaning:
+      "Above the merchant's cap for this tool. Hay.chat core holds the call for a person's " +
+      "approval when the tool declares capEnforced (see ../tool-risk); otherwise it is a refusal.",
+  },
   INTERNAL: {
     retryable: false,
     meaning: "The plugin itself failed or is misconfigured.",

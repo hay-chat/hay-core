@@ -1,14 +1,61 @@
 import { describe, it, expect } from "vitest";
 import {
   CATEGORY_META_KEY,
+  CAP_ENFORCED_META_KEY,
   WRITE_CATEGORIES,
   riskFor,
+  applyToolRisk,
   normalizeToolRiskSpec,
   withToolRisk,
 } from "./index.cjs";
 import type { ToolWriteCategory } from "../types/index.js";
 
+const spec = {
+  read: ["get_order"],
+  write: { create_coupon: "discount", add_note: "note" },
+  capped: ["create_coupon"],
+};
+
 describe("tool-risk", () => {
+  it("marks reads read-only and writes with their category", () => {
+    expect(riskFor("get_order", spec)).toEqual({
+      annotations: { readOnlyHint: true, destructiveHint: false },
+    });
+    expect(riskFor("add_note", spec)?._meta).toEqual({ [CATEGORY_META_KEY]: "note" });
+    expect(riskFor("unknown", spec)).toBeNull();
+  });
+
+  it("flags capped tools as enforcing their own cap", () => {
+    expect(riskFor("create_coupon", spec)?._meta).toEqual({
+      [CATEGORY_META_KEY]: "discount",
+      [CAP_ENFORCED_META_KEY]: true,
+    });
+  });
+
+  it("merges risk into registerTool() configs over the tool's own annotations", () => {
+    const seen: Record<string, { annotations?: unknown; _meta?: unknown }> = {};
+    const server = applyToolRisk(
+      {
+        registerTool(name: string, config: { annotations?: unknown; _meta?: unknown }) {
+          seen[name] = config;
+        },
+      },
+      spec,
+    );
+    server.registerTool("add_note", {
+      annotations: { readOnlyHint: true, openWorldHint: true },
+      _meta: { other: 1 },
+    });
+    server.registerTool("unknown", { annotations: { readOnlyHint: false } });
+    expect(seen.add_note).toEqual({
+      annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: true },
+      _meta: { other: 1, [CATEGORY_META_KEY]: "note" },
+    });
+    expect(seen.unknown).toEqual({ annotations: { readOnlyHint: false } });
+  });
+});
+
+describe("tool-risk declarations", () => {
   it("keeps the TypeScript category union in step with the helper", () => {
     const typed: Record<ToolWriteCategory, true> = {
       refund: true,
@@ -30,8 +77,20 @@ describe("tool-risk", () => {
 
   describe("normalizeToolRiskSpec", () => {
     it("fills in missing halves", () => {
-      expect(normalizeToolRiskSpec(undefined)).toEqual({ read: [], write: {} });
-      expect(normalizeToolRiskSpec({ read: ["a"] })).toEqual({ read: ["a"], write: {} });
+      expect(normalizeToolRiskSpec(undefined)).toEqual({ read: [], write: {}, capped: [] });
+      expect(normalizeToolRiskSpec({ read: ["a"] })).toEqual({
+        read: ["a"],
+        write: {},
+        capped: [],
+      });
+    });
+
+    it("accepts capped writes and rejects a capped tool that is not a write", () => {
+      expect(normalizeToolRiskSpec(spec).capped).toEqual(["create_coupon"]);
+      expect(() => normalizeToolRiskSpec({ read: ["x"], capped: ["x"] })).toThrow(
+        /must also be declared in toolRisk.write/,
+      );
+      expect(() => normalizeToolRiskSpec({ capped: "x" })).toThrow();
     });
 
     it("rejects an unknown or inherited category", () => {
@@ -87,6 +146,17 @@ describe("tool-risk", () => {
       const out = withToolRisk([remoteRead, unknownWrite], spec);
       expect(out[0]).toBe(remoteRead);
       expect(out[1]).toBe(unknownWrite);
+    });
+
+    it("carries the capEnforced flag for capped writes", () => {
+      const [tool] = withToolRisk([{ name: "create_coupon" }], {
+        write: { create_coupon: "discount" },
+        capped: ["create_coupon"],
+      });
+      expect(tool._meta).toEqual({
+        [CATEGORY_META_KEY]: "discount",
+        [CAP_ENFORCED_META_KEY]: true,
+      });
     });
 
     it("is a no-op without a spec", () => {

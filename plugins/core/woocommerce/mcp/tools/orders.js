@@ -11,7 +11,14 @@
 const { z } = require("zod");
 const { wcApi } = require("../lib/client");
 const { ok, fail, toolError } = require("../lib/format");
-const { resolveOrder, getTracking, enrichOrder, PRE_DISPATCH_STATUSES } = require("../lib/orders");
+const {
+  resolveOrder,
+  getTracking,
+  getRefundDetails,
+  getStoreCountry,
+  enrichOrder,
+  PRE_DISPATCH_STATUSES,
+} = require("../lib/orders");
 const { isPreDispatch } = require("../lib/orders");
 
 const ORDER_REF = {
@@ -62,15 +69,22 @@ async function assertPreDispatch(order, action) {
 function registerOrderTools(server) {
   server.tool(
     "woocommerce_get_order",
-    "Get an order by id or number with line items, totals, addresses, refunds, shipment tracking " +
-      "and a supportSummary (isCancellable, isRefundable, remainingRefundable, addressChangeable). " +
+    "Get an order by id or number with line items, totals, addresses, payment method and " +
+      "transaction id, refunds with dates, shipment tracking, and for an unpaid order its " +
+      "payment link and Pix copy-paste code (pix) when the store's gateway saved one, " +
+      "and a supportSummary (isCancellable, isRefundable, remainingRefundable, addressChangeable, " +
+      "tracking: isStale/daysSinceLastUpdate/staleReason). " +
       "One call answers status, refund and cancellation questions.",
     ORDER_REF,
     async (args) => {
       try {
         const order = await resolveOrder(args);
-        const tracking = await getTracking(order);
-        return ok(enrichOrder(order, tracking));
+        const [tracking, refundDetails, originCountry] = await Promise.all([
+          getTracking(order),
+          getRefundDetails(order),
+          getStoreCountry(),
+        ]);
+        return ok(enrichOrder(order, tracking, { refundDetails, originCountry }));
       } catch (err) {
         return fail(err);
       }

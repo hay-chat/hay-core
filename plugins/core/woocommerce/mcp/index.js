@@ -10,6 +10,9 @@
  *
  * Env (injected by the plugin worker):
  *   WORDPRESS_SITE_URL, WOOCOMMERCE_CONSUMER_KEY, WOOCOMMERCE_CONSUMER_SECRET
+ *   optional: WOOCOMMERCE_COUPONS_ENABLED, WOOCOMMERCE_COUPON_MAX_PERCENT,
+ *   WOOCOMMERCE_COUPON_MAX_AMOUNT, WOOCOMMERCE_COUPON_MAX_DAYS (goodwill coupon cap),
+ *   STALE_TRACKING_DOMESTIC_DAYS, STALE_TRACKING_INTERNATIONAL_DAYS
  */
 
 const { McpServer } = require("@modelcontextprotocol/sdk/server/mcp.js");
@@ -22,6 +25,7 @@ const { registerCustomerTools } = require("./tools/customers");
 const { registerOrderTools } = require("./tools/orders");
 const { registerRefundTools } = require("./tools/refunds");
 const { registerProductTools } = require("./tools/products");
+const { registerCouponTools } = require("./tools/coupons");
 
 function createServer() {
   const server = applyToolRisk(new McpServer({ name: "woocommerce", version: "2.0.0" }), toolRisk);
@@ -30,6 +34,7 @@ function createServer() {
   registerOrderTools(server);
   registerRefundTools(server);
   registerProductTools(server);
+  registerCouponTools(server);
   return server;
 }
 

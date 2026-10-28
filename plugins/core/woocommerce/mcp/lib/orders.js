@@ -11,9 +11,13 @@
 
 const { wcApi, wcList, WooApiError } = require("./client");
 const { num, round2, toolError } = require("./format");
+const { parsePix } = require("./pix");
+const { staleTracking, stalestShipment } = require("@hay/plugin-sdk/stale-tracking");
 
 /** Statuses under which nothing has left the warehouse yet. */
 const PRE_DISPATCH_STATUSES = new Set(["pending", "on-hold", "processing"]);
+/** Core offline payment methods: WooCommerce cannot send money back through them. */
+const OFFLINE_PAYMENT_METHODS = new Set(["bacs", "cod", "cheque"]);
 
 function summarizeOrder(order) {
   return {
@@ -164,6 +168,20 @@ async function getTracking(order) {
   return trackingFromGenericMeta(meta);
 }
 
+/** Refund records with dates; best-effort (an empty list on failure). */
+async function getRefundDetails(order) {
+  if (!(order.refunds || []).length) return [];
+  try {
+    const rows = await wcApi("GET", `/orders/${order.id}/refunds`, {
+      query: { per_page: 100 },
+    });
+    return Array.isArray(rows) ? rows : [];
+  } catch (err) {
+    console.error(`[woocommerce] refund list for order ${order.id} failed: ${err.message}`);
+    return [];
+  }
+}
+
 /** Total already refunded (WooCommerce stores refund totals as negative strings). */
 function refundedTotal(order) {
   return round2((order.refunds || []).reduce((s, r) => s + Math.abs(num(r.total)), 0));
@@ -178,7 +196,63 @@ function isPreDispatch(order, tracking) {
   return PRE_DISPATCH_STATUSES.has(order.status) && !(tracking || []).length;
 }
 
-function enrichOrder(order, tracking) {
+/**
+ * Payment fields (D10-2). `refundDetails` is the /orders/{id}/refunds list (the
+ * order body's refund stubs carry no date). The Pix block is only returned while
+ * the order is unpaid: a paid order's code is spent and would mislead.
+ */
+function paymentFields(order) {
+  const unpaid = order.needs_payment === true || (!order.date_paid && order.status === "pending");
+  return {
+    paymentMethodId: order.payment_method || null,
+    transactionId: order.transaction_id || null,
+    needsPayment: order.needs_payment ?? null,
+    paymentUrl: unpaid ? order.payment_url || null : null,
+    createdVia: order.created_via || null,
+    pix: unpaid ? parsePix(order.meta_data) : null,
+  };
+}
+
+let storeCountryPromise = null;
+
+/** The store's base country ("BR:SP" → "BR"), cached per MCP process; null when unreadable. */
+function getStoreCountry() {
+  if (!storeCountryPromise) {
+    storeCountryPromise = wcApi("GET", "/settings/general/woocommerce_default_country")
+      .then((setting) => String(setting?.value || "").split(":")[0] || null)
+      .catch(() => {
+        storeCountryPromise = null; // retry on the next order read
+        return null;
+      });
+  }
+  return storeCountryPromise;
+}
+
+/**
+ * D6-9: days since the tracking plugin recorded the shipment. WooCommerce has no
+ * carrier events or delivery confirmation, so only shipments with a recorded
+ * tracking row count; a "completed" order without tracking is not flagged (for
+ * many stores completed means delivered).
+ */
+function trackingStaleness(order, rows, originCountry, now) {
+  const results = rows
+    .filter((r) => r.shippedAt)
+    .map((r) =>
+      staleTracking({
+        shippedAt: r.shippedAt,
+        originCountry,
+        destinationCountry: order.shipping?.country || order.billing?.country,
+        now,
+      }),
+    );
+  return stalestShipment(results) || staleTracking({ shippedAt: null, originCountry, now });
+}
+
+function enrichOrder(
+  order,
+  tracking,
+  { refundDetails = [], originCountry = null, now = Date.now() } = {},
+) {
   const total = num(order.total);
   const refunded = refundedTotal(order);
   const remaining = round2(Math.max(0, total - refunded));
@@ -197,7 +271,12 @@ function enrichOrder(order, tracking) {
     customerId: order.customer_id || null,
     customerNote: order.customer_note || null,
     paymentMethod: order.payment_method_title ?? order.payment_method ?? null,
+    ...paymentFields(order),
+    // Every amount on this order is in `totals.currency` (ISO 4217); state it with
+    // the amount, never assume a currency symbol.
     totals: {
+      currency: order.currency,
+      currencySymbol: order.currency_symbol || null,
       total: order.total,
       tax: order.total_tax,
       shipping: order.shipping_total,
@@ -221,7 +300,12 @@ function enrichOrder(order, tracking) {
       total: li.total,
       totalTax: li.total_tax,
     })),
-    refunds: (order.refunds || []).map((r) => ({ id: r.id, reason: r.reason, total: r.total })),
+    refunds: (order.refunds || []).map((r) => ({
+      id: r.id,
+      reason: r.reason,
+      total: r.total,
+      dateCreated: refundDetails.find((d) => d.id === r.id)?.date_created ?? null,
+    })),
     tracking: rows,
     supportSummary: {
       isCancellable: preDispatch,
@@ -229,9 +313,12 @@ function enrichOrder(order, tracking) {
       // cancelled still owes the customer a refund.
       isRefundable: paid && remaining > 0,
       remainingRefundable: { amount: remaining.toFixed(2), currency: order.currency },
+      // false: a refund must be paid back by hand (create_refund with refund_payment=false).
+      gatewayCanRefund: !OFFLINE_PAYMENT_METHODS.has(order.payment_method),
       addressChangeable: preDispatch,
       shippedAt: rows.find((r) => r.shippedAt)?.shippedAt ?? order.date_completed ?? null,
       deliveredAt: null, // WooCommerce has no delivery confirmation.
+      tracking: trackingStaleness(order, rows, originCountry, now),
     },
   };
 }
@@ -247,4 +334,6 @@ module.exports = {
   trackingFromGenericMeta,
   refundedTotal,
   enrichOrder,
+  getRefundDetails,
+  getStoreCountry,
 };

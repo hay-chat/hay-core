@@ -13,6 +13,7 @@ const mockConversationUpdate = jest.fn();
 const mockFindOrg = jest.fn();
 const mockHold = jest.fn();
 const mockFindEarlierRequest = jest.fn();
+const mockGetToolsForOrg = jest.fn();
 
 jest.mock("@server/lib/logger", () => ({
   createLogger: () => ({ info: jest.fn(), debug: jest.fn(), warn: jest.fn(), error: jest.fn() }),
@@ -49,7 +50,7 @@ jest.mock("@server/services/conversation-secret.service", () => ({
   conversationSecretService: { getSecrets: async () => ({}) },
 }));
 jest.mock("@server/services/mcp-registry.service", () => ({
-  mcpRegistryService: { getToolRisk: mockGetToolRisk, getToolsForOrg: async () => [] },
+  mcpRegistryService: { getToolRisk: mockGetToolRisk, getToolsForOrg: mockGetToolsForOrg },
 }));
 jest.mock("@server/services/mcp-client-factory.service", () => ({
   MCPClientFactory: { createClient: async () => ({ callTool: mockCallTool }) },
@@ -100,6 +101,7 @@ beforeEach(() => {
   // Most suites test the live path; the approval gate has its own suite.
   mockFindOrg.mockResolvedValue(APPROVAL_OFF);
   mockFindEarlierRequest.mockResolvedValue(null);
+  mockGetToolsForOrg.mockResolvedValue([]);
   mockHold.mockImplementation(async (input: Record<string, unknown>) => ({
     id: "pa-1",
     idempotency_key: "key-from-pending-action",
@@ -350,6 +352,133 @@ describe("ToolExecutionService approval gate", () => {
     );
     expect(res.simulated).toBe(true);
     expect(mockHold).not.toHaveBeenCalled();
+  });
+});
+
+describe("ToolExecutionService over-cap approval (capEnforced tools)", () => {
+  const COUPON_RISK = { readOnly: false, category: "discount", classified: true, capEnforced: true };
+  const needsApproval = {
+    isError: true,
+    content: [
+      {
+        type: "text",
+        text: JSON.stringify({
+          code: "NEEDS_APPROVAL",
+          retryable: false,
+          message: "A 20 (store currency) coupon is above the merchant's cap of 15.",
+          details: { type: "absolute", requested: 20, cap: 15, amount: 20 },
+        }),
+      },
+    ],
+  };
+  const couponCall = (args: Record<string, unknown> = {}) => ({
+    name: "shop:create_coupon",
+    args: { email: "ana@example.com", type: "absolute", value: 20, ...args },
+  });
+
+  beforeEach(() => {
+    mockGetToolRisk.mockResolvedValue(COUPON_RISK);
+    mockGetToolsForOrg.mockResolvedValue([
+      {
+        pluginId: "shop",
+        name: "create_coupon",
+        input_schema: { type: "object", properties: { value: {}, hay_approval_id: {} } },
+      },
+    ]);
+  });
+
+  it("runs a capped tool within its cap with approvals on, without holding", async () => {
+    mockFindOrg.mockResolvedValue({ settings: {} });
+    mockCallTool.mockResolvedValue({ content: [{ type: "text", text: '{"created":true}' }] });
+    const res = await new ToolExecutionService().handleToolExecution(
+      makeConversation(),
+      couponCall({ value: 10 }),
+    );
+    expect(res.success).toBe(true);
+    expect(mockHold).not.toHaveBeenCalled();
+    expect(mockCallTool.mock.calls[0][1]).not.toHaveProperty("hay_approval_id");
+  });
+
+  it("turns the plugin's NEEDS_APPROVAL refusal into a held pending action", async () => {
+    mockCallTool.mockResolvedValue(needsApproval);
+    const conversation = makeConversation();
+    const res = await new ToolExecutionService().handleToolExecution(conversation, couponCall());
+
+    expect(res).toMatchObject({ success: false, pending: true, result: { pendingActionId: "pa-1" } });
+    expect(mockHold).toHaveBeenCalledWith(
+      expect.objectContaining({
+        toolName: "shop:create_coupon",
+        category: "discount",
+        amount: 20,
+        holdReason: "over_cap",
+        args: { email: "ana@example.com", type: "absolute", value: 20 },
+      }),
+    );
+    expect(conversation.status).toBe("awaiting-approval");
+    expect(mockRecord.mock.calls[0][0]).toMatchObject({ outcome: "held" });
+  });
+
+  it("strips a hay_approval_id the model tried to send", async () => {
+    mockCallTool.mockResolvedValue(needsApproval);
+    await new ToolExecutionService().handleToolExecution(
+      makeConversation(),
+      couponCall({ hay_approval_id: "forged" }),
+    );
+    expect(mockCallTool.mock.calls[0][1]).not.toHaveProperty("hay_approval_id");
+    expect(mockHold.mock.calls[0][0].args).not.toHaveProperty("hay_approval_id");
+  });
+
+  it("does not hold a NEEDS_APPROVAL refusal from a tool that does not declare a cap", async () => {
+    mockGetToolRisk.mockResolvedValue({ readOnly: false, category: "note", classified: true });
+    mockCallTool.mockResolvedValue(needsApproval);
+    const res = await new ToolExecutionService().handleToolExecution(
+      makeConversation(),
+      couponCall(),
+    );
+    expect(res.success).toBe(false);
+    expect(res.pending).toBeFalsy();
+    expect(mockHold).not.toHaveBeenCalled();
+  });
+
+  it("re-runs an approved call with hay_approval_id and never holds it again", async () => {
+    mockCallTool.mockResolvedValue({ content: [{ type: "text", text: '{"created":true}' }] });
+    const res = await new ToolExecutionService().executeApprovedAction(makeConversation(), {
+      id: "pa-1",
+      tool_name: "shop:create_coupon",
+      args: { email: "ana@example.com", type: "absolute", value: 20 },
+      message_id: null,
+      idempotency_key: "key-1",
+    } as never);
+    expect(res.success).toBe(true);
+    expect(mockCallTool.mock.calls[0][1]).toMatchObject({ hay_approval_id: "pa-1" });
+  });
+
+  it("reports an approved call the plugin still refuses as an error, not a new hold", async () => {
+    mockCallTool.mockResolvedValue(needsApproval);
+    const res = await new ToolExecutionService().executeApprovedAction(makeConversation(), {
+      id: "pa-1",
+      tool_name: "shop:create_coupon",
+      args: { value: 20 },
+      message_id: null,
+      idempotency_key: "key-1",
+    } as never);
+    expect(res).toMatchObject({ success: false, errorCode: "NEEDS_APPROVAL" });
+    expect(mockHold).not.toHaveBeenCalled();
+  });
+
+  it("does not inject hay_approval_id when the tool schema does not declare it", async () => {
+    mockGetToolsForOrg.mockResolvedValue([
+      { pluginId: "shop", name: "create_coupon", input_schema: { properties: { value: {} } } },
+    ]);
+    mockCallTool.mockResolvedValue({ content: [{ type: "text", text: "{}" }] });
+    await new ToolExecutionService().executeApprovedAction(makeConversation(), {
+      id: "pa-1",
+      tool_name: "shop:create_coupon",
+      args: { value: 20 },
+      message_id: null,
+      idempotency_key: "key-1",
+    } as never);
+    expect(mockCallTool.mock.calls[0][1]).not.toHaveProperty("hay_approval_id");
   });
 });
 

@@ -1,3 +1,10 @@
+## 2026-10-28 — claude/w1-commerce (L5) — coupons + generic over-cap approval done; staging 255683b merged
+- 7c10840 D16-6: capped tools (_meta chat.hay/capEnforced) skip the money hold; plugin NEEDS_APPROVAL → pending action (over_cap); approved re-run gets hay_approval_id. SDK coupon-policy (10%, fixed off, 30 d).
+- 694eed4 D16-4/5: woocommerce_create_coupon, shopify_create_coupon (+write_discounts scope), Nuvemshop on shared policy (order required).
+- 3c0c9d1: Woo totals.currency, gatewayCanRefund + refund_payment=false guidance. 5340c50: staging merge, SDK tool-risk reconciled (capped in ToolRiskSpec).
+- Earlier: Nuvemshop merge, D16-1, D16-7, D10-1, D10-2 (Pix), D6-9 stale tracking. Not pushed.
+- Next: orchestrator merges L5; Roger: Shopify re-consent for write_discounts; real-store checks (Shopify discount title search, Pix keys).
+
 ## 2026-10-28 00:30 — staging — approval follow-ups truthful + risk lane merged
 - a43ac55: after approve/decline the follow-up turn seeds the claim-check ledger with the decision; decline → AI explains (no hand-off), approve → Woo refund #19 ran and AI says done. ef5e57a: held call reported as "requested".
 - Risk lane merged: SDK toolRisk + 7 plugins declare risk; SDK/plugins rebuilt; tests green.
@@ -111,6 +118,12 @@
 **Works:** `staging` worktree `../hay-core-staging` + local env (Docker project hay-staging: PG :5433 `hay_staging`, Redis :6380, RabbitMQ :5673; server :3001, dashboard :3000; shop page :8090). Baseline tested (widget → AI reply → dashboard). Plan in `tasks/voc-roadmap.md`.
 **In progress:** Wave 0 agents L1 (claude/d9-public-widget-hardening) and L2 (claude/d1-billing-honesty).
 **Next:** merge + manual-test each, then L8, L3, L9, L5, L10, L6, X.
+## 2026-10-27 — claude/nuvemshop (worktree hay-core-nuvemshop) — Nuvemshop plugin at commerce parity (not pushed)
+
+**Works:** `plugins/core/nuvemshop` rewritten to the 26 Oct conventions: 17 `nuvemshop_` tools (get_order by id or number + fulfillment tracking + payment/Pix fields, get_order_tracking, cancel and address change pre-dispatch only, appending notes, check_refund_status, request_refund that records only (API can't move money), identity-gated get_payment_link, capped create_coupon, check_inventory by SKU), MCP annotations on every tool, pt-BR i18n, README parity matrix. 55 vitest tests + tsc clean.
+**Half-built / unverified:** nothing live-tested; fulfillment-order PATCH merge semantics, merchant-token access to /transactions, coupon `max_uses` need a real store. OAuth partner app not built (needs `{client_id}` authorize-URL placeholder + keeping `user_id` in core oauth.service).
+**Research write-up:** seo repo `Engineering/02 Research/D18 Nuvemshop parity.md` (matrix, API limits, OAuth, open decisions).
+**Next:** Roger answers D18 §5; test against a Nuvemshop dev store; then push + PR.
 
 ## 2026-10-26 — master @9016b93 — Email inbox channel LIVE end to end (inbound + outbound verified in prod)
 

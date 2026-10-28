@@ -49,6 +49,26 @@
     "woocommerce_check_inventory": {
       "label": "Verificar estoque",
       "description": "Verifica o status e a quantidade em estoque de um SKU de produto ou variação."
+    },
+    "woocommerce_get_product_by_slug": {
+      "label": "Ver produto pelo link",
+      "description": "Consulta um produto pelo link da loja ou slug, com preço, estoque e variações."
+    },
+    "woocommerce_calculate_refund": {
+      "label": "Simular reembolso",
+      "description": "Calcula quanto um reembolso devolveria (por item, com impostos) sem reembolsar nada."
+    },
+    "woocommerce_update_customer": {
+      "label": "Atualizar cliente",
+      "description": "Atualiza o nome ou telefone salvos no cadastro de um cliente registrado."
+    },
+    "woocommerce_update_customer_address": {
+      "label": "Atualizar endereço do cliente",
+      "description": "Altera o endereço de cobrança ou de entrega salvo na conta do cliente."
+    },
+    "woocommerce_create_coupon": {
+      "label": "Criar cupom de cortesia",
+      "description": "Cria um cupom de uso único para o e-mail de um cliente, dentro do limite de porcentagem ou valor definido pelo lojista."
     }
   },
   "config": {
@@ -63,6 +83,30 @@
     "consumerSecret": {
       "label": "Consumer Secret",
       "description": "Consumer Secret da API REST do WooCommerce"
+    },
+    "couponsEnabled": {
+      "label": "Permitir cupons de cortesia",
+      "description": "Permite que o agente crie cupons de uso único, restritos ao e-mail do cliente, dentro dos limites abaixo. Um cupom acima do limite aguarda a aprovação de alguém da equipe."
+    },
+    "couponMaxPercent": {
+      "label": "Limite do cupom: porcentagem máxima",
+      "description": "Maior desconto percentual que o agente pode dar (0 desativa cupons percentuais)."
+    },
+    "couponMaxAmount": {
+      "label": "Limite do cupom: valor fixo máximo",
+      "description": "Maior desconto fixo na moeda da loja (0 ou vazio desativa cupons de valor fixo)."
+    },
+    "couponMaxDays": {
+      "label": "Validade do cupom (dias)",
+      "description": "Os cupons criados pelo agente expiram em no máximo este número de dias."
+    },
+    "staleTrackingDomesticDays": {
+      "label": "Rastreio parado: nacional (dias)",
+      "description": "Considera uma entrega nacional parada quando o rastreio não se move há mais do que este número de dias."
+    },
+    "staleTrackingInternationalDays": {
+      "label": "Rastreio parado: internacional (dias)",
+      "description": "Considera uma entrega internacional parada quando o rastreio não se move há mais do que este número de dias."
     }
   }
 }

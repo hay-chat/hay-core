@@ -8,16 +8,34 @@ import type { HayPluginManifest } from "@server/types/plugin.types";
 import { conversationSecretService } from "../conversation-secret.service";
 import { createLogger } from "@server/lib/logger";
 import { actionLogService, toolErrorCode } from "../action-log.service";
-import { classifyTool, CORE_TOOL_RISK, type ToolRisk } from "./tool-risk";
+import { classifyTool, CORE_TOOL_RISK, TOOL_APPROVAL_ARG, type ToolRisk } from "./tool-risk";
 import { isDryRun, simulatedResult } from "./dry-run";
 import type { ActionOutcome } from "@server/database/entities/action-log.entity";
-import type { PendingAction } from "@server/database/entities/pending-action.entity";
-import { decideGate } from "./action-policy";
+import type {
+  PendingAction,
+  PendingActionHoldReason,
+} from "@server/database/entities/pending-action.entity";
+import { decideGate, extractAmount, NEEDS_APPROVAL_CODE } from "./action-policy";
 import { pendingActionService } from "../pending-action.service";
 import { organizationRepository } from "@server/repositories/organization.repository";
 import { resolveActionApprovalConfig } from "@server/types/organization-settings.types";
 
 const logger = createLogger("tool-execution");
+
+/** `details.amount` from a NEEDS_APPROVAL tool error, when the plugin stated one. */
+function overCapAmount(mcpErrorDetails: unknown): number | null {
+  let parsed: unknown = mcpErrorDetails;
+  if (typeof parsed === "string") {
+    try {
+      parsed = JSON.parse(parsed);
+    } catch {
+      return null;
+    }
+  }
+  const amount = (parsed as { details?: { amount?: unknown } } | null)?.details?.amount;
+  const n = typeof amount === "string" ? Number(amount) : amount;
+  return typeof n === "number" && Number.isFinite(n) && n >= 0 ? n : null;
+}
 
 interface ToolExecutionResult {
   success: boolean;
@@ -55,6 +73,8 @@ interface PreparedCall {
   idempotencyKey: string;
   startedAt: number;
   executedAt: string;
+  /** Set only when re-running a call a person approved (fills TOOL_APPROVAL_ARG). */
+  approvedActionId?: string;
 }
 
 /** How a call ended, for the caller, the action log and the tool log. */
@@ -122,6 +142,9 @@ export class ToolExecutionService {
         currentContext.toolLog = [];
       }
 
+      // Only core may say a call was approved; drop whatever the model sent.
+      delete toolCall.args[TOOL_APPROVAL_ARG];
+
       const target = await this.resolveTarget(conversation.organization_id, toolCall.name);
       const call: PreparedCall = {
         conversation,
@@ -170,9 +193,10 @@ export class ToolExecutionService {
    */
   async executeApprovedAction(
     conversation: Conversation,
-    action: Pick<PendingAction, "tool_name" | "args" | "message_id" | "idempotency_key">,
+    action: Pick<PendingAction, "id" | "tool_name" | "args" | "message_id" | "idempotency_key">,
   ): Promise<ToolExecutionResult & { errorCode: string | null }> {
     const call: PreparedCall = {
+      approvedActionId: action.id,
       conversation,
       toolCall: { name: action.tool_name, args: action.args },
       messageId: action.message_id ?? undefined,
@@ -227,8 +251,21 @@ export class ToolExecutionService {
     const decision = decideGate(target.risk, toolCall.args, config);
     if (decision.kind === "allow") return null;
 
-    // The same request was already made in this conversation: answer from it
-    // instead of opening a second one.
+    return this.holdForApproval(call, decision.reason, decision.amount, config.expiryHours);
+  }
+
+  /**
+   * Open a pending action for this call and tell the AI it is waiting. If the
+   * same request was already made in this conversation, answer from it instead
+   * of opening a second one.
+   */
+  private async holdForApproval(
+    call: PreparedCall,
+    holdReason: PendingActionHoldReason,
+    amount: number | null,
+    expiryHours: number,
+  ): Promise<CallStep> {
+    const { conversation, toolCall, target } = call;
     const earlier = await pendingActionService.findEarlierRequest(
       conversation.id,
       toolCall.name,
@@ -245,9 +282,9 @@ export class ToolExecutionService {
       toolName: toolCall.name,
       category: target.risk.readOnly ? "other_write" : target.risk.category,
       args: toolCall.args,
-      amount: decision.amount,
-      holdReason: decision.reason,
-      expiryHours: config.expiryHours,
+      amount,
+      holdReason,
+      expiryHours,
     });
     // The pending action's key is the one the provider will see on approval.
     call.idempotencyKey = action.idempotency_key;
@@ -256,6 +293,23 @@ export class ToolExecutionService {
     });
     conversation.status = "awaiting-approval";
     return this.held(call, action);
+  }
+
+  /**
+   * A cap-enforcing plugin refused the call as above the merchant's cap
+   * (NEEDS_APPROVAL): hold it for a person instead of failing. This applies
+   * even when the org's money-move approval is off, because the merchant's own
+   * cap is what asked for it. An approved re-run is never held again.
+   */
+  private async holdOverCap(call: PreparedCall, mcpErrorDetails: unknown): Promise<CallStep> {
+    const organization = await organizationRepository.findById(call.conversation.organization_id);
+    const config = resolveActionApprovalConfig(organization?.settings);
+    return this.holdForApproval(
+      call,
+      "over_cap",
+      overCapAmount(mcpErrorDetails) ?? extractAmount(call.toolCall.args),
+      config.expiryHours,
+    );
   }
 
   private async held(call: PreparedCall, action: PendingAction): Promise<CallStep> {
@@ -324,6 +378,7 @@ export class ToolExecutionService {
         conversation,
         { tool_name: toolCall.name, arguments: toolCall.args },
         call.idempotencyKey,
+        call.approvedActionId,
       );
       await this.finishToolMessage(call, `Action completed: ${toolCall.name}`, {
         toolOutput: result,
@@ -335,6 +390,14 @@ export class ToolExecutionService {
       // Extract MCP error details if available
       const mcpErrorDetails = (err as MCPError).mcpErrorDetails;
       const errorCode = toolErrorCode(mcpErrorDetails);
+      if (
+        errorCode === NEEDS_APPROVAL_CODE &&
+        !call.target.risk.readOnly &&
+        call.target.risk.capEnforced &&
+        !call.approvedActionId
+      ) {
+        return this.holdOverCap(call, mcpErrorDetails);
+      }
       const errorOutput = mcpErrorDetails || {
         error: err.message || "Unknown error",
         errorType: err.constructor.name,
@@ -401,6 +464,7 @@ export class ToolExecutionService {
     conversation: Conversation,
     toolCall: ToolCallData,
     idempotencyKey?: string,
+    approvedActionId?: string,
   ): Promise<unknown> {
     const { tool_name: fullToolName, arguments: toolArgs } = toolCall;
 
@@ -529,24 +593,27 @@ export class ToolExecutionService {
     const organizationId = conversation.organization_id;
 
     // Inject conversation secrets into tool args before execution
+    // Copy first: core-owned args must not leak into the logged / held call args.
     const enrichedArgs = await this.injectConversationSecrets(
       conversation.id,
-      toolArgs,
+      { ...toolArgs },
       toolSchema as Record<string, unknown> | null,
     );
 
-    // Inject the core-generated idempotency key. The LLM must never invent
-    // this value — a made-up key defeats retry deduplication on the provider
-    // side, so core's per-execution UUID always overrides whatever was sent.
-    if (idempotencyKey) {
-      await this.injectIdempotencyKey(
-        organizationId,
-        matchingPlugin.pluginId,
-        actualToolName,
-        enrichedArgs,
+    // Inject the core-generated idempotency key and approval id. The LLM must
+    // never invent these — a made-up key defeats retry deduplication on the
+    // provider side, and a made-up approval would skip a merchant's cap — so
+    // core's values always override whatever was sent.
+    await this.injectCoreArgs(
+      organizationId,
+      matchingPlugin.pluginId,
+      actualToolName,
+      enrichedArgs,
+      {
         idempotencyKey,
-      );
-    }
+        approvedActionId,
+      },
+    );
 
     // Execute the MCP tool via the running process
     return await this.executeMCPTool(
@@ -558,21 +625,25 @@ export class ToolExecutionService {
   }
 
   /**
-   * Fill the tool's `idempotency_key` argument with the core-generated UUID.
+   * Fill core-owned arguments: `idempotency_key` with the core-generated UUID,
+   * and TOOL_APPROVAL_ARG with the pending action's id on an approved re-run.
    *
-   * Gated on the tool's cached input schema actually declaring an
-   * `idempotency_key` property — MCP servers using strict schemas reject
-   * unknown arguments, so blind injection is not safe. Mutates `args` in
-   * place, overriding any LLM-provided value. Failure to resolve the schema
-   * is non-fatal: the call proceeds with the args as-is.
+   * Gated on the tool's cached input schema actually declaring the property —
+   * MCP servers using strict schemas reject unknown arguments, so blind
+   * injection is not safe. Mutates `args` in place, overriding any
+   * LLM-provided value; the approval arg is always removed unless this is an
+   * approved run. Failure to resolve the schema is non-fatal for the key: the
+   * call proceeds without it (and never with an approval id).
    */
-  private async injectIdempotencyKey(
+  private async injectCoreArgs(
     organizationId: string,
     pluginId: string,
     toolName: string,
     args: Record<string, unknown>,
-    idempotencyKey: string,
+    values: { idempotencyKey?: string; approvedActionId?: string },
   ): Promise<void> {
+    delete args[TOOL_APPROVAL_ARG];
+    if (!values.idempotencyKey && !values.approvedActionId) return;
     try {
       const { mcpRegistryService } = await import("@server/services/mcp-registry.service");
       const tools = await mcpRegistryService.getToolsForOrg(organizationId);
@@ -581,14 +652,21 @@ export class ToolExecutionService {
         tool?.input_schema as { properties?: Record<string, unknown> } | undefined
       )?.properties;
 
-      if (properties && "idempotency_key" in properties) {
-        args.idempotency_key = idempotencyKey;
-        logger.debug({ pluginId, toolName, idempotencyKey }, "Injected idempotency key");
+      if (values.idempotencyKey && properties && "idempotency_key" in properties) {
+        args.idempotency_key = values.idempotencyKey;
+        logger.debug(
+          { pluginId, toolName, idempotencyKey: values.idempotencyKey },
+          "Injected idempotency key",
+        );
+      }
+      if (values.approvedActionId && properties && TOOL_APPROVAL_ARG in properties) {
+        args[TOOL_APPROVAL_ARG] = values.approvedActionId;
+        logger.debug({ pluginId, toolName }, "Injected approval id for an approved call");
       }
     } catch (error) {
       logger.warn(
         { err: error, pluginId, toolName },
-        "Failed to resolve tool schema for idempotency key injection",
+        "Failed to resolve tool schema for core argument injection",
       );
     }
   }

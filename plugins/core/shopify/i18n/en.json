@@ -81,6 +81,36 @@
     "shopify_check_inventory": {
       "label": "Check Inventory",
       "description": "Check stock levels for a product variant by id or SKU across all locations."
+    },
+    "shopify_create_coupon": {
+      "label": "Create Goodwill Coupon",
+      "description": "Create a single-use apology discount code for one customer, within the merchant's percentage or amount cap."
+    }
+  },
+  "config": {
+    "couponsEnabled": {
+      "label": "Allow goodwill coupons",
+      "description": "Let the agent create single-use apology discount codes, only usable by that customer, within the caps below. A coupon above the cap waits for a team member to approve it."
+    },
+    "couponMaxPercent": {
+      "label": "Coupon cap: maximum percentage",
+      "description": "Largest percentage discount the agent may give (0 turns percentage coupons off)."
+    },
+    "couponMaxAmount": {
+      "label": "Coupon cap: maximum fixed amount",
+      "description": "Largest fixed discount in your shop currency (0 or empty turns fixed-amount coupons off)."
+    },
+    "couponMaxDays": {
+      "label": "Coupon validity (days)",
+      "description": "Codes the agent creates expire after at most this many days."
+    },
+    "staleTrackingDomesticDays": {
+      "label": "Stale tracking: domestic (days)",
+      "description": "Treat a domestic shipment as stuck when its tracking has not moved for more than this many days."
+    },
+    "staleTrackingInternationalDays": {
+      "label": "Stale tracking: international (days)",
+      "description": "Treat an international shipment as stuck when its tracking has not moved for more than this many days."
     }
   }
 }

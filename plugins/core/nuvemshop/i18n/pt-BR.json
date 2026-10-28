@@ -1,0 +1,112 @@
+{
+  "name": "Nuvemshop",
+  "description": "Conecte sua loja Nuvemshop para o agente encontrar pedidos, rastrear entregas, cancelar ou alterar o endereço de pedidos não despachados, registrar pedidos de estorno, enviar o Pix de pedidos não pagos, dar cupons de cortesia com limite e responder sobre produtos e estoque.",
+  "tools": {
+    "nuvemshop_get_store": {
+      "label": "Ver Dados da Loja",
+      "description": "Obtém os dados básicos da loja: nome, URL, país, idiomas e moeda."
+    },
+    "nuvemshop_find_customer": {
+      "label": "Buscar Cliente",
+      "description": "Encontra um cliente por e-mail ou CPF/CNPJ (contas e pedidos sem cadastro), com os pedidos mais recentes."
+    },
+    "nuvemshop_get_customer": {
+      "label": "Ver Cliente",
+      "description": "Obtém contato, endereços e total gasto de um cliente pelo ID."
+    },
+    "nuvemshop_list_customer_orders": {
+      "label": "Listar Pedidos do Cliente",
+      "description": "Lista os pedidos de um cliente pelo e-mail, do mais recente ao mais antigo."
+    },
+    "nuvemshop_get_order": {
+      "label": "Ver Pedido",
+      "description": "Obtém um pedido pelo ID ou número: itens, totais, pagamento e status do Pix, rastreio e o que pode ser feito."
+    },
+    "nuvemshop_get_order_tracking": {
+      "label": "Ver Rastreio do Pedido",
+      "description": "Obtém código e link de rastreio, transportadora, prazo de entrega e último evento do pedido."
+    },
+    "nuvemshop_cancel_order": {
+      "label": "Cancelar Pedido",
+      "description": "Cancela um pedido que ainda não foi despachado. Não movimenta dinheiro."
+    },
+    "nuvemshop_update_order_shipping_address": {
+      "label": "Alterar Endereço de Entrega",
+      "description": "Altera o endereço de entrega de um pedido ainda não despachado. Recusa se já houver etiqueta ou rastreio."
+    },
+    "nuvemshop_add_order_note": {
+      "label": "Adicionar Nota ao Pedido",
+      "description": "Acrescenta uma nota interna ao pedido como registro. As notas anteriores são mantidas."
+    },
+    "nuvemshop_check_refund_status": {
+      "label": "Ver Status do Reembolso",
+      "description": "Verifica o estado do reembolso, o meio de pagamento, as datas de estorno e como o estorno é feito."
+    },
+    "nuvemshop_request_refund": {
+      "label": "Solicitar Reembolso",
+      "description": "Registra no pedido pago um pedido de estorno com valor limitado para o lojista. A API não movimenta dinheiro."
+    },
+    "nuvemshop_get_payment_link": {
+      "label": "Ver Link de Pagamento",
+      "description": "Obtém o Pix copia e cola, boleto ou link de pagamento de um pedido não pago, após confirmar e-mail ou telefone."
+    },
+    "nuvemshop_create_coupon": {
+      "label": "Criar Cupom de Cortesia",
+      "description": "Cria um cupom de uso único dentro do limite de porcentagem ou valor definido pelo lojista."
+    },
+    "nuvemshop_search_products": {
+      "label": "Buscar Produtos",
+      "description": "Busca produtos publicados por nome, descrição ou SKU."
+    },
+    "nuvemshop_get_product": {
+      "label": "Ver Produto",
+      "description": "Obtém um produto com descrição, variações, preços e estoque."
+    },
+    "nuvemshop_check_inventory": {
+      "label": "Consultar Estoque",
+      "description": "Consulta estoque e preço de uma variação pelo SKU."
+    },
+    "nuvemshop_list_categories": {
+      "label": "Listar Categorias",
+      "description": "Lista as categorias de produtos da loja."
+    }
+  },
+  "config": {
+    "storeId": {
+      "label": "ID da loja",
+      "description": "O ID numérico da sua loja (o user_id da loja, exibido ao criar o aplicativo a medida)."
+    },
+    "accessToken": {
+      "label": "Token de acesso",
+      "description": "Token de um aplicativo a medida (admin → Aplicativos a medida). Conceda leitura/escrita de pedidos, envios, clientes e cupons, e leitura de produtos. Exibido só uma vez."
+    },
+    "apiVersion": {
+      "label": "Versão da API",
+      "description": "Versão da API da Nuvemshop a utilizar."
+    },
+    "couponsEnabled": {
+      "label": "Permitir cupons de cortesia",
+      "description": "Permite que o agente crie cupons de uso único dentro dos limites abaixo. Um cupom acima do limite aguarda a aprovação de alguém da equipe. Cada pedido recebe no máximo um cupom."
+    },
+    "couponMaxPercent": {
+      "label": "Limite do cupom: porcentagem máxima",
+      "description": "Maior desconto percentual que o agente pode dar (0 desativa cupons percentuais)."
+    },
+    "couponMaxAmount": {
+      "label": "Limite do cupom: valor fixo máximo",
+      "description": "Maior desconto em valor fixo na moeda da loja (0 ou vazio desativa cupons de valor fixo)."
+    },
+    "couponMaxDays": {
+      "label": "Validade do cupom (dias)",
+      "description": "Os cupons criados pelo agente expiram em no máximo este número de dias."
+    },
+    "staleTrackingDomesticDays": {
+      "label": "Rastreio parado: nacional (dias)",
+      "description": "Considera uma entrega nacional parada quando o rastreio não se move há mais do que este número de dias."
+    },
+    "staleTrackingInternationalDays": {
+      "label": "Rastreio parado: internacional (dias)",
+      "description": "Considera uma entrega internacional parada quando o rastreio não se move há mais do que este número de dias."
+    }
+  }
+}
