@@ -127,6 +127,8 @@ export class Message {
     completion_tokens?: number;
     total_tokens?: number;
     latency_ms?: number;
+    /** AI processing region in effect when a BotAgent reply was saved (D14-5). */
+    aiRegion?: "default" | "eu";
     confidence?: number;
     confidenceBreakdown?: {
       grounding: number;

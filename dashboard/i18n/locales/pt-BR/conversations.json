@@ -275,6 +275,11 @@
         "reject": "Recusada",
         "reply": "Agora você está atendendo esta conversa"
       }
+    },
+    "debug": {
+      "aiProcessing": "Processamento de IA",
+      "aiRegionEu": "Data centers na UE",
+      "aiRegionDefault": "Qualquer região (provedor de IA padrão)"
     }
   }
 }

@@ -275,6 +275,11 @@
         "reject": "Declined",
         "reply": "You are now handling this conversation"
       }
+    },
+    "debug": {
+      "aiProcessing": "AI processing",
+      "aiRegionEu": "EU data centres",
+      "aiRegionDefault": "Any region (default AI provider)"
     }
   }
 }

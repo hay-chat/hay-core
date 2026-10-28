@@ -19,6 +19,7 @@ import { encryptValue } from "@server/lib/auth/utils/encryption";
 import type { OrgLlmConfig } from "@server/services/llm/provider.types";
 import {
   AI_REGIONS,
+  describeAiProvider,
   isEuRegionConfigured,
   regionFromSettings,
 } from "@server/services/llm/ai-region";
@@ -336,6 +337,7 @@ export const organizationsRouter = t.router({
         region: regionFromSettings(organization.settings),
         euAvailable: isEuRegionConfigured(),
         hasCustomProvider: !!organization.settings?.llm,
+        provider: describeAiProvider(organization.settings),
       };
     },
   ),
