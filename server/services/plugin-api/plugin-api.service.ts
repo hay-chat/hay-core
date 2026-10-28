@@ -5,6 +5,7 @@ import type {
   EmailResult,
 } from "../../types/plugin-api.types";
 import { emailService } from "../email.service";
+import { emailDomainService, addressDomain } from "../email-domains.service";
 import { createLogger } from "../../lib/logger";
 import { config } from "../../config/env";
 import {
@@ -40,6 +41,16 @@ export function allowedCustomHeaders(
     ),
   );
   return Object.keys(allowed).length ? allowed : undefined;
+}
+
+/** Whether `address` is on the organization's verified custom sending domain (D13-9). */
+async function isVerifiedOrganizationAddress(
+  organizationId: string,
+  address: string,
+): Promise<boolean> {
+  const domain = addressDomain(address);
+  if (!domain) return false;
+  return (await emailDomainService.verifiedDomain(organizationId)) === domain;
 }
 
 export function isPlatformSenderAddress(address: string): boolean {
@@ -171,12 +182,17 @@ export class PluginAPIService {
       }
 
       // Plugins may pick the display name freely but can only send from the
-      // platform's own domain: anything else would let a plugin spoof a
-      // merchant's or a third party's address through our relay.
-      if (options.from && !isPlatformSenderAddress(options.from.email)) {
+      // platform's own domain or the organization's verified custom sending
+      // domain (D13-9): anything else would let a plugin spoof a merchant's
+      // or a third party's address through our relay.
+      if (
+        options.from &&
+        !isPlatformSenderAddress(options.from.email) &&
+        !(await isVerifiedOrganizationAddress(tokenPayload.organizationId, options.from.email))
+      ) {
         return {
           success: false,
-          error: `from.email must be on the platform sending domain (${platformSenderDomain()})`,
+          error: `from.email must be on the platform sending domain (${platformSenderDomain()}) or the organization's verified sending domain`,
         };
       }
 

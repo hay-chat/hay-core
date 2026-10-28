@@ -141,6 +141,100 @@
         </template>
       </section>
 
+      <!-- Custom sending domain (D13-9, optional) -->
+      <section
+        v-if="status.supportAddress && status.fromAddress && api?.emailDomains"
+        class="card"
+        aria-labelledby="email-domain-title"
+        data-testid="email-domain-card"
+      >
+        <div class="card-header">
+          <h4 id="email-domain-title">{{ t("domain.title") }}</h4>
+          <span v-if="sendingDomain" :class="['badge', domainBadge]">
+            {{ t(`domain.status.${sendingDomain.status}`) }}
+          </span>
+        </div>
+        <p v-if="isFreeMail" class="body">
+          {{ t("domain.freeMail", { platform: status.fromAddress, domain: supportDomain }) }}
+        </p>
+        <template v-else>
+          <p class="body">
+            {{
+              t("domain.intro", {
+                platform: status.fromAddress,
+                domain: supportDomain,
+                support: status.supportAddress,
+              })
+            }}
+          </p>
+          <div v-if="!sendingDomain" class="actions">
+            <button
+              type="button"
+              class="btn btn-primary btn-sm"
+              :disabled="domainBusy"
+              @click="createDomain"
+            >
+              <span v-if="domainBusy" class="spinner" aria-hidden="true"></span>
+              {{ t("domain.setup", { domain: supportDomain }) }}
+            </button>
+          </div>
+          <template v-else>
+            <p v-if="sendingDomain.domain !== supportDomain" class="notice notice-warning small">
+              {{ t("domain.mismatch", { domain: sendingDomain.domain, platform: status.fromAddress }) }}
+            </p>
+            <p v-else-if="sendingDomain.verified" class="success-line">
+              {{ t("domain.verifiedLine", { support: status.supportAddress }) }}
+            </p>
+            <template v-if="!sendingDomain.verified && sendingDomain.records.length">
+              <p class="small">{{ t("domain.records") }}</p>
+              <div class="dns-scroll">
+                <table class="dns">
+                  <thead>
+                    <tr>
+                      <th scope="col">{{ t("domain.type") }}</th>
+                      <th scope="col">{{ t("domain.name") }}</th>
+                      <th scope="col">{{ t("domain.value") }}</th>
+                      <th scope="col">{{ t("domain.priority") }}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr v-for="record in sendingDomain.records" :key="`${record.type}-${record.name}-${record.value}`">
+                      <td>{{ record.type }}</td>
+                      <td><code class="inline">{{ record.name }}</code></td>
+                      <td><code class="inline dns-value">{{ record.value }}</code></td>
+                      <td>{{ record.priority ?? "" }}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </template>
+            <div class="actions">
+              <button
+                v-if="!sendingDomain.verified"
+                type="button"
+                class="btn btn-primary btn-sm"
+                :disabled="domainBusy"
+                @click="verifyDomain"
+              >
+                <span v-if="domainBusy" class="spinner" aria-hidden="true"></span>
+                {{ t("domain.check") }}
+              </button>
+              <button
+                type="button"
+                class="btn btn-outline btn-sm"
+                :disabled="domainBusy"
+                @click="removeDomain"
+              >
+                {{ t("domain.remove") }}
+              </button>
+            </div>
+          </template>
+          <p v-if="domainError" class="notice notice-error small" role="alert">
+            {{ t("domain.error", { message: domainError }) }}
+          </p>
+        </template>
+      </section>
+
       <!-- Health -->
       <section v-if="status.alias" class="card" aria-labelledby="email-health-title">
         <div class="card-header">
@@ -172,8 +266,21 @@ import { computed, defineComponent, onBeforeUnmount, onMounted, ref, type PropTy
 import type { ChannelStatus } from "../../src/status";
 import { createTranslator } from "./messages";
 
+interface SendingDomain {
+  domain: string;
+  status: string;
+  verified: boolean;
+  records: Array<{ type: string; name: string; value: string; priority?: number }>;
+}
+
 /** The slice of the dashboard tRPC client (`Hay`) this component uses. */
 interface HayApi {
+  emailDomains?: {
+    get: { query(): Promise<SendingDomain | null> };
+    create: { mutate(input: { domain: string }): Promise<SendingDomain | null> };
+    verify: { mutate(): Promise<SendingDomain | null> };
+    remove: { mutate(): Promise<unknown> };
+  };
   plugins: {
     callUiRoute: {
       mutate(input: {
@@ -187,6 +294,24 @@ interface HayApi {
 }
 
 const STEPS = ["gmail", "outlook", "other", "test"];
+/** Shared mailbox providers: a merchant can never verify these domains. */
+const FREE_MAIL_DOMAINS = new Set([
+  "gmail.com",
+  "googlemail.com",
+  "outlook.com",
+  "hotmail.com",
+  "live.com",
+  "msn.com",
+  "yahoo.com",
+  "icloud.com",
+  "me.com",
+  "aol.com",
+  "proton.me",
+  "protonmail.com",
+  "uol.com.br",
+  "bol.com.br",
+  "terra.com.br",
+]);
 const NO_API = "no-api";
 /** Poll for the Gmail confirmation / first inbound while the page is open. */
 const POLL_INTERVAL_MS = 8000;
@@ -234,6 +359,65 @@ export default defineComponent({
     const loading = ref(false);
     const copied = ref(false);
     let pollTimer: ReturnType<typeof setInterval> | null = null;
+
+    const sendingDomain = ref<SendingDomain | null>(null);
+    const domainBusy = ref(false);
+    const domainError = ref<string | null>(null);
+    const supportDomain = computed(
+      () => status.value?.supportAddress?.split("@").pop()?.toLowerCase() ?? "",
+    );
+    const isFreeMail = computed(() => FREE_MAIL_DOMAINS.has(supportDomain.value));
+    const domainBadge = computed(() => {
+      const current = sendingDomain.value?.status;
+      if (current === "verified") return "badge-success";
+      if (current === "failed") return "badge-danger";
+      return "badge-warning";
+    });
+
+    async function domainCall(call: () => Promise<SendingDomain | null>) {
+      domainBusy.value = true;
+      domainError.value = null;
+      try {
+        sendingDomain.value = await call();
+      } catch (error: unknown) {
+        domainError.value = errorMessage(error);
+      } finally {
+        domainBusy.value = false;
+      }
+    }
+
+    function loadDomain() {
+      const api = props.api?.emailDomains;
+      if (!api) return;
+      void domainCall(() => api.get.query());
+    }
+
+    function createDomain() {
+      const api = props.api?.emailDomains;
+      if (!api) return;
+      void domainCall(() => api.create.mutate({ domain: supportDomain.value }));
+    }
+
+    function verifyDomain() {
+      const api = props.api?.emailDomains;
+      if (!api) return;
+      void domainCall(() => api.verify.mutate());
+    }
+
+    function removeDomain() {
+      const api = props.api?.emailDomains;
+      const current = sendingDomain.value;
+      if (!api || !current) return;
+      const message = t("domain.removeConfirm", {
+        domain: current.domain,
+        platform: status.value?.fromAddress ?? "",
+      });
+      if (!window.confirm(message)) return;
+      void domainCall(async () => {
+        await api.remove.mutate();
+        return null;
+      });
+    }
 
     const missingHost = computed(() =>
       (status.value?.missing ?? []).filter((name) => name !== "supportAddress"),
@@ -294,6 +478,7 @@ export default defineComponent({
 
     onMounted(() => {
       void loadStatus();
+      loadDomain();
       pollTimer = setInterval(() => {
         // Keep polling until the first email arrived; afterwards the page is informational.
         if (status.value && (status.value.forwarding || status.value.inboundCount > 0)) {
@@ -319,6 +504,15 @@ export default defineComponent({
       copied,
       missingHost,
       loadStatus,
+      sendingDomain,
+      domainBusy,
+      domainError,
+      supportDomain,
+      isFreeMail,
+      domainBadge,
+      createDomain,
+      verifyDomain,
+      removeDomain,
       copy,
       formatTime,
     };
@@ -411,6 +605,29 @@ export default defineComponent({
   flex-wrap: wrap;
   align-items: center;
   gap: 0.375rem;
+}
+
+.dns-scroll {
+  overflow-x: auto;
+  margin: 8px 0;
+}
+
+.dns {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.dns th,
+.dns td {
+  text-align: left;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--border, #e5e7eb);
+  vertical-align: top;
+}
+
+.dns-value {
+  word-break: break-all;
 }
 
 .health-errors {

@@ -90,6 +90,30 @@
       "never": "Nada recebido ainda",
       "count": "E-mails recebidos desde o início",
       "lastError": "Último erro"
+    },
+    "domain": {
+      "title": "Enviar pelo seu próprio domínio (opcional)",
+      "intro": "Por padrão, as respostas saem de {platform}. Verifique {domain} e as respostas passam a sair de {support}.",
+      "freeMail": "As respostas continuam saindo de {platform}: {domain} é um provedor de e-mail compartilhado e não pode ser verificado.",
+      "setup": "Configurar {domain}",
+      "records": "Adicione estes registros DNS no seu provedor de domínio e depois selecione Verificar agora. Alterações de DNS podem levar algumas horas.",
+      "type": "Tipo",
+      "name": "Nome",
+      "value": "Valor",
+      "priority": "Prioridade",
+      "check": "Verificar agora",
+      "remove": "Remover domínio",
+      "removeConfirm": "Parar de enviar por {domain}? As respostas voltam a sair de {platform}.",
+      "mismatch": "{domain} está configurado, mas seu endereço de suporte é de outro domínio, então as respostas continuam saindo de {platform}.",
+      "verifiedLine": "As respostas agora saem de {support}.",
+      "error": "Não foi possível atualizar o domínio de envio: {message}",
+      "status": {
+        "verified": "Verificado",
+        "pending": "Verificando DNS",
+        "not_started": "Aguardando registros DNS",
+        "failed": "Falha na verificação",
+        "temporary_failure": "Falha temporária"
+      }
     }
   }
 }

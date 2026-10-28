@@ -17,6 +17,15 @@ jest.mock("@server/services/email.service", () => ({
   emailService: { initialize: jest.fn(async () => undefined), sendEmail },
 }));
 
+const verifiedDomain = jest.fn<(organizationId: string) => Promise<string | null>>();
+jest.mock("@server/services/email-domains.service", () => ({
+  emailDomainService: { verifiedDomain },
+  addressDomain: (address: string) => {
+    const parts = address.trim().toLowerCase().split("@");
+    return parts.length === 2 ? parts[1] : "";
+  },
+}));
+
 import {
   PluginAPIService,
   allowedCustomHeaders,
@@ -71,6 +80,27 @@ describe("PluginAPIService.sendEmail", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     sendEmail.mockResolvedValue({ success: true, messageId: "<id@relay>" });
+    verifiedDomain.mockResolvedValue(null);
+  });
+
+  it("allows a From address on the organization's verified sending domain (D13-9)", async () => {
+    verifiedDomain.mockResolvedValue("acme.com");
+    const result = await service.sendEmail(token, {
+      to: "ana@shopper.com",
+      subject: "Re: order",
+      text: "hi",
+      from: { email: "Support@Acme.com", name: "Acme" },
+    });
+    expect(result.success).toBe(true);
+    expect(verifiedDomain).toHaveBeenCalledWith("org-1");
+
+    const other = await service.sendEmail(token, {
+      to: "ana@shopper.com",
+      subject: "Re: order",
+      text: "hi",
+      from: { email: "support@evil.com", name: "Evil" },
+    });
+    expect(other.success).toBe(false);
   });
 
   it("refuses a From address outside the platform domain without sending", async () => {

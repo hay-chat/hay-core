@@ -31,6 +31,7 @@ import type {
   RemoteMCPServerConfig,
 } from "@server/types/plugin.types";
 import { createLogger } from "@server/lib/logger";
+import { emailDomainService } from "@server/services/email-domains.service";
 import type { Conversation } from "@server/database/entities/conversation.entity";
 
 const logger = createLogger("plugin-api-trpc");
@@ -678,6 +679,16 @@ export const pluginApiTrpcRouter = router({
 
       return { revoked: true as const };
     }),
+
+  /**
+   * The organization's verified custom sending domain (D13-9), or null. Email
+   * plugins send From the merchant's own address only when its domain matches;
+   * the platform address stays the default.
+   */
+  "email.sendingDomain": pluginProcedure.query(async ({ ctx }) => {
+    requireCapability(ctx, "email");
+    return { domain: await emailDomainService.verifiedDomain(ctx.pluginAuth.organizationId) };
+  }),
 
   /**
    * Replace the shared-webhook routing keys owned by the calling plugin instance.
