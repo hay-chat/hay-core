@@ -1,3 +1,7 @@
+## 2026-10-28 — staging — Wave 3 closed (tag wave-3-done)
+- Review fixes: simulations out of order index/evidence/analytics; dispute attach owners/admins only; https-only provider link; lowercase plugin channel names (runKind spoof); Shopify auto-submit copy; plugin-api suites load again.
+- Full suites alone: server 178 suites/1639 ✓, dashboard 61 ✓ (3 pre-existing Playwright specs), webchat 134, sdk 213, all plugins ✓.
+- PR #104 body updated for Waves 0–3. Next: Roger's Needs Roger list; Wave 4 (D18–D20) unscheduled.
 ## 2026-10-28 — staging — W3 L6 widget perf budget merged; all Wave 3 lanes in
 - Merged claude/w3-perf (6a1aecdc): webchat check:perf (brotli-5 size budgets + jsdom request budgets), perf:lighthouse, CI webchat job. Verified on merged tree: check:perf passes, vitest 134/134.
 - hay-website draft PR #47 (D12-10 page) waits for Roger. D12 research request counts corrected in seo (b01e9da, unpushed).
