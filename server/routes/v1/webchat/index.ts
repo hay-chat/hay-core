@@ -64,6 +64,8 @@ export const webchatRouter = router({
         allowedDomains: z.array(z.string()).optional(),
         isEnabled: z.boolean().optional(),
         customCss: z.string().nullable().optional(),
+        spamClassifierEnabled: z.boolean().optional(),
+        spamGuidance: z.string().max(2000).nullable().optional(),
       }),
     )
     .mutation(async ({ ctx, input }) => {

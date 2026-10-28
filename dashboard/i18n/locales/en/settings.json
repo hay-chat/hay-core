@@ -330,7 +330,14 @@
     "installationCodeDescription": "Add this code to your website before the closing body tag",
     "loadFailed": "Failed to load webchat settings",
     "saveSuccess": "Webchat settings saved successfully",
-    "saveFailed": "Failed to save webchat settings"
+    "saveFailed": "Failed to save webchat settings",
+    "spamProtection": "Spam protection",
+    "spamProtectionDescription": "Hay.chat screens the first messages of every webchat conversation and holds spam from the AI. Spam never counts toward your bill.",
+    "spamClassifier": "Double-check suspicious chats with AI",
+    "spamClassifierDescription": "When a chat looks suspicious but not clearly spam, a small AI model reads it before Hay.chat's AI answers.",
+    "spamGuidance": "Guidance for the spam check",
+    "spamGuidancePlaceholder": "For example: we never sell SEO services, so offers like that are spam. Wholesale enquiries are welcome.",
+    "spamGuidanceDescription": "Tell the AI check what counts as spam for your store, and what doesn't."
   },
   "customerPrivacy": {
     "title": "Customer Privacy",
