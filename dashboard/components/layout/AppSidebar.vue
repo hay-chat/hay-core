@@ -47,6 +47,7 @@ import {
   ExternalLink,
   Package,
   ThumbsUp,
+  History,
 } from "lucide-vue-next";
 import type { Component } from "vue";
 
@@ -177,6 +178,12 @@ const navMain = computed(() => {
       url: "/playbooks",
       icon: BookOpen,
       isActive: isPathActive("/playbooks"),
+    },
+    {
+      title: t("nav.actionLog"),
+      url: "/actions",
+      icon: History,
+      isActive: isPathActive("/actions"),
     },
   );
 

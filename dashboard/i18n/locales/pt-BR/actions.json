@@ -154,6 +154,34 @@
         "DIFFERENT_PRODUCT": "Uma troca só pode mudar o tamanho ou a cor do mesmo produto.",
         "ALREADY_DISPATCHED": "O pedido já foi despachado."
       }
+    },
+    "log": {
+      "title": "Registro de ações",
+      "headTitle": "Registro de ações - Hay.chat",
+      "description": "Todas as chamadas de ferramenta que a IA fez nas conversas, das mais recentes para as mais antigas.",
+      "refresh": "Atualizar",
+      "filters": {
+        "tool": "Ferramenta",
+        "platform": "Plataforma",
+        "outcome": "Resultado",
+        "all": "Todos"
+      },
+      "outcomes": {
+        "success": "Concluída",
+        "error": "Falhou",
+        "simulated": "Simulação",
+        "held": "Aguardando aprovação",
+        "confirming": "Perguntando ao cliente"
+      },
+      "builtIn": "Nativa",
+      "readOnly": "Somente leitura",
+      "openConversation": "Abrir conversa",
+      "empty": "Nenhuma ação ainda. As chamadas de ferramenta da IA aparecerão aqui.",
+      "emptyFiltered": "Nenhuma ação corresponde a estes filtros.",
+      "previous": "Anterior",
+      "next": "Próxima",
+      "pageOf": "Página {page} de {pages}",
+      "loadFailed": "Não foi possível carregar o registro de ações"
     }
   }
 }

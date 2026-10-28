@@ -154,6 +154,34 @@
         "DIFFERENT_PRODUCT": "A swap can only change the size or colour of the same product.",
         "ALREADY_DISPATCHED": "The order has already been dispatched."
       }
+    },
+    "log": {
+      "title": "Action log",
+      "headTitle": "Action log - Hay.chat",
+      "description": "Every tool call the AI made in conversations, newest first.",
+      "refresh": "Refresh",
+      "filters": {
+        "tool": "Tool",
+        "platform": "Platform",
+        "outcome": "Outcome",
+        "all": "All"
+      },
+      "outcomes": {
+        "success": "Done",
+        "error": "Failed",
+        "simulated": "Dry run",
+        "held": "Waiting for approval",
+        "confirming": "Asking the customer"
+      },
+      "builtIn": "Built-in",
+      "readOnly": "Read only",
+      "openConversation": "Open conversation",
+      "empty": "No actions yet. Tool calls the AI makes will show up here.",
+      "emptyFiltered": "No actions match these filters.",
+      "previous": "Previous",
+      "next": "Next",
+      "pageOf": "Page {page} of {pages}",
+      "loadFailed": "Could not load the action log"
     }
   }
 }
