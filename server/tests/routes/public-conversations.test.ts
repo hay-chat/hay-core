@@ -5,7 +5,10 @@ import { describe, it, expect, jest, beforeEach } from "@jest/globals";
  */
 
 jest.mock("@server/config/env", () => ({
-  config: { domain: { dashboard: "app.hay.chat" }, jwt: { secret: "test" } },
+  config: {
+    domain: { dashboard: "app.hay.chat", api: "api.hay.chat:443" },
+    jwt: { secret: "test" },
+  },
 }));
 const mockLogger = { debug: jest.fn(), info: jest.fn(), warn: jest.fn(), error: jest.fn() };
 jest.mock("@server/lib/logger", () => ({ createLogger: () => mockLogger }));
@@ -342,7 +345,11 @@ describe("publicConversations.create plugin gates", () => {
     expect(mockRunGates).toHaveBeenCalledWith(
       ORG_ID,
       "conversation.create",
-      expect.objectContaining({ token: "tok", pageHostname: "shop.example.com" }),
+      expect.objectContaining({
+        token: "tok",
+        pageHostname: "shop.example.com",
+        frameHostname: "api.hay.chat",
+      }),
     );
   });
 

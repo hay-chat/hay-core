@@ -1,5 +1,5 @@
 import { t, publicProcedure } from "@server/trpc";
-import { requestHostname, isDashboardHost } from "@server/lib/webchat-origin";
+import { requestHostname, isDashboardHost, challengeFrameHostname } from "@server/lib/webchat-origin";
 import {
   webchatExtensionsService,
   type GateOutcome,
@@ -17,7 +17,6 @@ import {
   webchatSettingsService,
   matchesAllowedDomains,
 } from "../../../services/webchat/webchat-settings.service";
-import { config } from "@server/config/env";
 import { toPublicAttachments, toPublicMessage } from "../../../services/webchat/public-message";
 import {
   PUBLIC_WIDGET_LIMITS,
@@ -184,7 +183,7 @@ export const publicConversationsRouter = t.router({
         token: input.challengeToken,
         contributionError: input.challengeError,
         pageHostname: hostname,
-        frameHostname: config.domain.api,
+        frameHostname: challengeFrameHostname(),
         ip: clientIp(ctx.ipAddress),
         underAttack: false,
       });
@@ -384,7 +383,7 @@ export const publicConversationsRouter = t.router({
         "message.send",
         {
           pageHostname: requestHostname(ctx.req.headers),
-          frameHostname: config.domain.api,
+          frameHostname: challengeFrameHostname(),
           ip: clientIp(ctx.ipAddress),
           underAttack: false,
         },
