@@ -1,3 +1,8 @@
+## 2026-10-28 — staging — Lanes E+F and H merged
+- claude/w4-ef merged (841f8fd8; dashboard devDeps @vue/test-utils + jsdom, lockfile changed); claude/w4-h-commerce merged (8e5e46e1; migration AddPluginStates on hay_test + hay_staging).
+- Full server jest after E+F: 1718 pass, 2 fail (scheduler, conversation-media) that pass alone → shared-DB flakes. Dashboard tc + vitest 68/68. Lane H DB tests 8/8, Woo 128/128, server tsc clean.
+- Only Lane I running. Then: release runbook review, satellite PRs (backoffice w4-a, w4-g), hand-tests.
+
 ## 2026-10-28 — staging — Lane A merged
 - claude/w4-a-billing merged (60730bcf); migrations AddOrganizationBillingPeriod + AddResolutionExclusionReview on hay_test + hay_staging (agent).
 - Fixed boundary double count: countBillableResolutions now end-exclusive + regression test (close-classifier 18/18 incl. new).

@@ -307,6 +307,11 @@ Roger said "Do it now" for every gap. Not started; lanes below.
 - (Lane A) Simulation allowance: 20 % of monthly included even on annual plans (solo 100, starter 400, growth/enterprise 500); unknown plan → core default 200. Default: keep.
 - (Lane A) Staff can approve exclusions older than the just-closed period, which are not credited. Default: limit approvals to excludable periods.
 - (Lane A) Logged, not fixed: simulation cap still counts by UTC month; merchants not told of staff review decisions; credit lost if the subscription cancels; admin OrgDetail doesn't show credited overage.
+- (Lane E) EU orgs' photos/PDFs now go to the default (non-EU) provider when no EU endpoint is set (usage tagged region "default"). Default: keep; say so in the DPA wording.
+- (Lane F) Archive-suggested insights always shown in the dashboard list (any window), never in the digest; digest may resend to some recipients after a crash; Gorgias job stuck PROCESSING after restart (TODO sweep). Default: keep all.
+- (Lane F) "Web Chat Off" read as the Enable Web Chat switch on Settings > Web Chat (not the AI channel mode). Default: keep.
+- (Lane H) Catalogue prune deletes products the store no longer returns (not soft delete); Magento stale flag always uses the domestic threshold (no origin country over REST). Default: keep both.
+- (Lane H) New generic plugin state store (encrypted KV, TTL) open to every plugin, scoped by token to org + plugin. Default: keep open.
 - Deferred to a Claude-in-Chrome session: prod env keys (Turnstile, VAPID, OPERATOR_EVENTS_URL/INTERNAL_API_SECRET, SMTP_FROM_NAME, JWT_REFRESH_EXPIRES_IN check, Meta, MP, OpenAI EU), Meta Messenger setup + App Review, Mercado Pago app, OpenAI EU application, Stripe test-mode plan changes, WABA checks, real-store checks, connecting test stores to staging.
 - Deferred: disputes real tests (after the C3 rationale doc), iPhone push test (can run before deploy: staging over an https tunnel + VAPID keys), WP 1.0.1/1.1.0 svn release, lawyer questions, read-only prod checks (D1-0, D14-1, D3), merchant comms, Spanish alert + widget locale native checks, legal copy in website #46.
 - After deploy: Claude does the D8 media-private switch (needs Roger's go-ahead then).
