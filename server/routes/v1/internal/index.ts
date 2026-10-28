@@ -55,6 +55,30 @@ const internalOrganizationsRouter = router({
       return state;
     }),
 
+  /**
+   * The current billing period (end exclusive), sent by the operator on every
+   * usage run. The usage page and the exclusion allowance follow it; null goes
+   * back to UTC calendar months.
+   */
+  setBillingPeriod: internalProcedure
+    .input(
+      organizationIdInput.extend({
+        period: z
+          .object({ start: z.coerce.date(), end: z.coerce.date() })
+          .refine((p) => p.end.getTime() > p.start.getTime(), {
+            message: "The period must end after it starts",
+          })
+          .nullable(),
+      }),
+    )
+    .mutation(async ({ input }) => {
+      const state = await organizationAccessService.setBillingPeriod(input);
+      if (!state) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Organization not found" });
+      }
+      return state;
+    }),
+
   delete: internalProcedure.input(organizationIdInput).mutation(async ({ input }) => {
     const organization = await organizationService.findOne(input.organizationId);
     if (!organization) {

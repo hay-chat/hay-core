@@ -33,6 +33,10 @@ export function toAccessState(organization: Organization): OrganizationAccessSta
     agentPausedAt: organization.agentPausedAt ?? null,
     agentPauseReason: organization.agentPauseReason ?? null,
     accessNotice: organization.accessNotice ?? null,
+    billingPeriod:
+      organization.billingPeriodStart && organization.billingPeriodEnd
+        ? { start: organization.billingPeriodStart, end: organization.billingPeriodEnd }
+        : null,
     aiPausedAt: organization.aiPausedAt ?? null,
     aiPausedByUserId: organization.aiPausedByUserId ?? null,
   };
@@ -121,6 +125,37 @@ class OrganizationAccessService {
     );
 
     return state;
+  }
+
+  /**
+   * Store the operator's current billing period. The operator re-sends it on
+   * every usage run, so only a change is written and logged.
+   */
+  async setBillingPeriod(input: {
+    organizationId: string;
+    period: { start: Date; end: Date } | null;
+  }): Promise<OrganizationAccessState | null> {
+    const organization = await this.repository.findOneBy({ id: input.organizationId });
+    if (!organization) return null;
+
+    const start = input.period?.start ?? null;
+    const end = input.period?.end ?? null;
+    const changed =
+      (organization.billingPeriodStart?.getTime() ?? null) !== (start?.getTime() ?? null) ||
+      (organization.billingPeriodEnd?.getTime() ?? null) !== (end?.getTime() ?? null);
+    if (changed) {
+      organization.billingPeriodStart = start;
+      organization.billingPeriodEnd = end;
+      await this.repository.update(
+        { id: organization.id },
+        { billingPeriodStart: start, billingPeriodEnd: end },
+      );
+      logger.info(
+        { organizationId: organization.id, start, end },
+        "Organization billing period updated",
+      );
+    }
+    return toAccessState(organization);
   }
 
   /**

@@ -15,6 +15,8 @@ type OrgRow = {
   accessNotice: Record<string, unknown> | null;
   aiPausedAt?: Date | null;
   aiPausedByUserId?: string | null;
+  billingPeriodStart?: Date | null;
+  billingPeriodEnd?: Date | null;
 };
 
 const rows = new Map<string, OrgRow>();
@@ -145,6 +147,7 @@ describe("organizationAccessService.setAccessState", () => {
       agentPausedAt: null,
       agentPauseReason: null,
       accessNotice: null,
+      billingPeriod: null,
       aiPausedAt: null,
       aiPausedByUserId: null,
     });
@@ -289,5 +292,56 @@ describe("organizationAccessService.setOwnerAiPause (D11-9)", () => {
       notice: null,
     });
     expect(state?.aiPausedAt).toEqual(pausedAt);
+  });
+});
+
+describe("organizationAccessService.setBillingPeriod", () => {
+  const period = {
+    start: new Date("2026-10-14T09:30:00Z"),
+    end: new Date("2026-11-14T09:30:00Z"),
+  };
+
+  beforeEach(() => {
+    rows.clear();
+    rows.set(ORG_ID, {
+      id: ORG_ID,
+      suspendedAt: null,
+      suspensionReason: null,
+      suspensionRedirectUrl: null,
+      agentPausedAt: null,
+      agentPauseReason: null,
+      accessNotice: null,
+      billingPeriodStart: null,
+      billingPeriodEnd: null,
+    });
+    jest.clearAllMocks();
+  });
+
+  it("stores the period, returns it in the access state and writes only on a change", async () => {
+    const state = await organizationAccessService.setBillingPeriod({
+      organizationId: ORG_ID,
+      period,
+    });
+    expect(state?.billingPeriod).toEqual(period);
+    expect(mockRepository.update).toHaveBeenCalledTimes(1);
+
+    await organizationAccessService.setBillingPeriod({
+      organizationId: ORG_ID,
+      period: { start: new Date(period.start), end: new Date(period.end) },
+    });
+    expect(mockRepository.update).toHaveBeenCalledTimes(1);
+
+    const cleared = await organizationAccessService.setBillingPeriod({
+      organizationId: ORG_ID,
+      period: null,
+    });
+    expect(cleared?.billingPeriod).toBeNull();
+    expect(mockRepository.update).toHaveBeenCalledTimes(2);
+  });
+
+  it("returns null for an unknown organization", async () => {
+    expect(
+      await organizationAccessService.setBillingPeriod({ organizationId: "nope", period }),
+    ).toBeNull();
   });
 });

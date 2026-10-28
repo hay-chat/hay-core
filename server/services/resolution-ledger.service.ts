@@ -15,11 +15,11 @@ import {
 /**
  * Usage page and resolution ledger (D1-5, D1-6).
  *
- * Core does not know the merchant's billing period (the operator that bills
- * reads `billableResolutions` for its own period dates), so the usage page and
- * the exclusion allowance work per UTC calendar month.
- * TODO: when core receives the operator's period dates (alongside the access
- * state), use them here instead of the calendar month.
+ * Periods follow the organization's billing period, which the operator that
+ * bills sends with `internal.organizations.setBillingPeriod` (the current
+ * period's start and end). Earlier periods step back from it by the same
+ * length. An organization without one (self-hosted, or before the operator's
+ * first sync) uses UTC calendar months.
  */
 
 /** Self-serve exclusions allowed per period, as a share of its billable resolutions. */
@@ -28,18 +28,29 @@ export const SELF_SERVE_EXCLUSION_SHARE = 0.05;
 /** How many periods back an exclusion may still be made (0 = current only). */
 const EXCLUDABLE_PAST_PERIODS = 1;
 
+/** Periods the usage page lets the merchant pick, the current one included. */
+export const USAGE_PERIODS_SHOWN = 12;
+
 const CSV_MAX_ROWS = 50_000;
 
 export type LedgerStatus = "billed" | "reversed" | "excluded" | "pending_review";
 
-export interface UsagePeriod {
-  /** YYYY-MM */
-  month: string;
+/** The operator's current billing period, as stored on the organization. */
+export interface BillingPeriodAnchor {
   start: Date;
   /** Exclusive. */
   end: Date;
 }
 
+export interface UsagePeriod {
+  /** 0 = the current period, 1 = the one before, ... */
+  index: number;
+  start: Date;
+  /** Exclusive. */
+  end: Date;
+  /** `billing`: the operator's billing period; `calendar`: UTC calendar month (no operator period). */
+  source: "billing" | "calendar";
+}
 export interface UsageSummary {
   period: UsagePeriod;
   /** What the operator bills: billable, not reversed, not excluded. */
@@ -77,38 +88,82 @@ export interface ExclusionResult {
   allowance: number;
 }
 
-/** The UTC calendar month `month` (YYYY-MM), or the current one. */
-export function periodFor(month?: string, now: Date = new Date()): UsagePeriod {
-  let year = now.getUTCFullYear();
-  let monthIndex = now.getUTCMonth();
-  if (month) {
-    const match = /^(\d{4})-(\d{2})$/.exec(month);
-    const parsedMonth = match ? Number(match[2]) - 1 : -1;
-    if (!match || parsedMonth < 0 || parsedMonth > 11) {
-      throw new TRPCError({ code: "BAD_REQUEST", message: "Invalid month" });
-    }
-    year = Number(match[1]);
-    monthIndex = parsedMonth;
-  }
-  const start = new Date(Date.UTC(year, monthIndex, 1));
-  const end = new Date(Date.UTC(year, monthIndex + 1, 1));
-  return { month: start.toISOString().slice(0, 7), start, end };
+/** `date` moved by whole months in UTC, the day clamped to the target month's last day. */
+function addMonthsUtc(date: Date, months: number): Date {
+  const result = new Date(date.getTime());
+  const day = result.getUTCDate();
+  result.setUTCDate(1);
+  result.setUTCMonth(result.getUTCMonth() + months);
+  const lastDay = new Date(
+    Date.UTC(result.getUTCFullYear(), result.getUTCMonth() + 1, 0),
+  ).getUTCDate();
+  result.setUTCDate(Math.min(day, lastDay));
+  return result;
 }
 
-/** Months between two periods (b - a). */
-function monthsBetween(a: UsagePeriod, b: UsagePeriod): number {
-  return (
-    (b.start.getUTCFullYear() - a.start.getUTCFullYear()) * 12 +
-    (b.start.getUTCMonth() - a.start.getUTCMonth())
-  );
+function wholeMonthsBetween(a: Date, b: Date): number {
+  return (b.getUTCFullYear() - a.getUTCFullYear()) * 12 + (b.getUTCMonth() - a.getUTCMonth());
+}
+
+/**
+ * Period `index` back from the one containing `now`. With an operator period,
+ * its length (1 month, 12 months, ...) is the step and its start the anchor, so
+ * a stale anchor (renewal not synced yet) still rolls into the right period.
+ * Boundaries are computed from the anchor start each time, not chained, so
+ * day clamping (31 Jan -> 28 Feb) does not drift.
+ * TODO: an anchor on the 29th-31st steps back to the clamped day (a period
+ * starting 28 Feb shows 28 Jan before it, where Stripe used 31 Jan). Off by up
+ * to three days on past periods only; send the cycle anchor too if it matters.
+ */
+export function billingPeriodFor(
+  anchor: BillingPeriodAnchor | null,
+  index = 0,
+  now: Date = new Date(),
+): UsagePeriod {
+  if (!anchor) {
+    const start = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - index, 1));
+    const end = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - index + 1, 1));
+    return { index, start, end, source: "calendar" };
+  }
+  const step = Math.max(1, Math.round(wholeMonthsBetween(anchor.start, anchor.end)));
+  const boundary = (k: number): Date =>
+    k === 0 ? anchor.start : k === 1 ? anchor.end : addMonthsUtc(anchor.start, k * step);
+  let k = Math.floor(wholeMonthsBetween(anchor.start, now) / step);
+  while (boundary(k).getTime() > now.getTime()) k -= 1;
+  while (boundary(k + 1).getTime() <= now.getTime()) k += 1;
+  return { index, start: boundary(k - index), end: boundary(k - index + 1), source: "billing" };
+}
+
+/** The excludable period (current or up to EXCLUDABLE_PAST_PERIODS back) containing `date`, or null. */
+function excludablePeriodOf(
+  anchor: BillingPeriodAnchor | null,
+  date: Date,
+  now: Date,
+): UsagePeriod | null {
+  for (let index = 0; index <= EXCLUDABLE_PAST_PERIODS; index++) {
+    const period = billingPeriodFor(anchor, index, now);
+    if (date >= period.start && date < period.end) return period;
+  }
+  return null;
 }
 
 /** Start of the oldest period whose closes may still be corrected (excluded, marked spam). */
-function correctableSince(now: Date): Date {
-  const current = periodFor(undefined, now).start;
-  return new Date(
-    Date.UTC(current.getUTCFullYear(), current.getUTCMonth() - EXCLUDABLE_PAST_PERIODS, 1),
-  );
+function correctableSince(anchor: BillingPeriodAnchor | null, now: Date): Date {
+  return billingPeriodFor(anchor, EXCLUDABLE_PAST_PERIODS, now).start;
+}
+
+/** The organization's stored billing period, or null (calendar months). */
+async function loadPeriodAnchor(
+  manager: EntityManager,
+  organizationId: string,
+): Promise<BillingPeriodAnchor | null> {
+  const org = await manager.getRepository(Organization).findOne({
+    where: { id: organizationId },
+    select: { id: true, billingPeriodStart: true, billingPeriodEnd: true },
+  });
+  return org?.billingPeriodStart && org.billingPeriodEnd
+    ? { start: org.billingPeriodStart, end: org.billingPeriodEnd }
+    : null;
 }
 
 /** Instant exclusions allowed: 5 % of the period, at least one once something bills. */
@@ -162,8 +217,19 @@ async function periodCounts(
 }
 
 export class ResolutionLedgerService {
-  async getUsage(organizationId: string, month?: string): Promise<UsageSummary> {
-    const period = periodFor(month);
+  /** The periods the usage page offers, newest first. */
+  async listPeriods(organizationId: string, now: Date = new Date()): Promise<UsagePeriod[]> {
+    const anchor = await loadPeriodAnchor(AppDataSource.manager, organizationId);
+    return Array.from({ length: USAGE_PERIODS_SHOWN }, (_, index) =>
+      billingPeriodFor(anchor, index, now),
+    );
+  }
+
+  async getUsage(organizationId: string, periodIndex = 0): Promise<UsageSummary> {
+    const period = billingPeriodFor(
+      await loadPeriodAnchor(AppDataSource.manager, organizationId),
+      periodIndex,
+    );
     const rows = await AppDataSource.getRepository(ConversationOutcome)
       .createQueryBuilder("o")
       .select("o.outcome", "outcome")
@@ -237,7 +303,7 @@ export class ResolutionLedgerService {
       exclusions: {
         used: exclusionsUsed,
         allowance: exclusionAllowance(base),
-        open: this.isExcludable(period),
+        open: period.index <= EXCLUDABLE_PAST_PERIODS,
       },
       agentPaused: {
         paused: Boolean(org?.agentPausedAt),
@@ -249,9 +315,12 @@ export class ResolutionLedgerService {
   /** Billable resolutions of the period, newest first. */
   async listLedger(
     organizationId: string,
-    input: { month?: string; page: number; pageSize: number },
+    input: { period?: number; page: number; pageSize: number },
   ): Promise<{ items: LedgerItem[]; total: number; period: UsagePeriod }> {
-    const period = periodFor(input.month);
+    const period = billingPeriodFor(
+      await loadPeriodAnchor(AppDataSource.manager, organizationId),
+      input.period ?? 0,
+    );
     const query = this.ledgerQuery(organizationId, period);
     const total = await query.clone().getCount();
     const raw = await query
@@ -264,8 +333,11 @@ export class ResolutionLedgerService {
   }
 
   /** The period's ledger as CSV, for the merchant's records. */
-  async exportLedgerCsv(organizationId: string, month?: string): Promise<string> {
-    const period = periodFor(month);
+  async exportLedgerCsv(organizationId: string, periodIndex = 0): Promise<string> {
+    const period = billingPeriodFor(
+      await loadPeriodAnchor(AppDataSource.manager, organizationId),
+      periodIndex,
+    );
     const raw = await this.ledgerQuery(organizationId, period)
       .orderBy("o.closed_at", "ASC")
       .addOrderBy("o.id", "ASC")
@@ -346,8 +418,12 @@ export class ResolutionLedgerService {
         throw new TRPCError({ code: "CONFLICT", message: "An exclusion was already requested" });
       }
 
-      const rowPeriod = periodFor(row.closed_at.toISOString().slice(0, 7));
-      if (!this.isExcludable(rowPeriod, now)) {
+      const rowPeriod = excludablePeriodOf(
+        await loadPeriodAnchor(manager, input.organizationId),
+        row.closed_at,
+        now,
+      );
+      if (!rowPeriod) {
         throw new TRPCError({
           code: "BAD_REQUEST",
           message: "Resolutions from this period can no longer be excluded here",
@@ -383,7 +459,8 @@ export class ResolutionLedgerService {
             outcomeId: row.id,
             conversationId: row.conversation_id,
             closedAt: row.closed_at.toISOString(),
-            period: rowPeriod.month,
+            periodStart: rowPeriod.start.toISOString(),
+            periodEnd: rowPeriod.end.toISOString(),
             reason,
             used: counts.excluded + (instant ? 1 : 0),
             allowance,
@@ -427,7 +504,12 @@ export class ResolutionLedgerService {
              AND o.outcome NOT IN ('spam', 'test')
              AND o.closed_at >= $3
            RETURNING o.id, before.outcome, before.billable`,
-          [input.organizationId, input.conversationId, correctableSince(now), now],
+          [
+            input.organizationId,
+            input.conversationId,
+            correctableSince(await loadPeriodAnchor(manager, input.organizationId), now),
+            now,
+          ],
         );
       await manager.getRepository(AuditLog).save(
         AuditLog.createLog({
@@ -479,7 +561,11 @@ export class ResolutionLedgerService {
            AND classified_by IN ('rule', 'staff', 'llm')
            AND closed_at >= $3
          RETURNING id`,
-        [input.organizationId, input.conversationId, correctableSince(now)],
+        [
+          input.organizationId,
+          input.conversationId,
+          correctableSince(await loadPeriodAnchor(manager, input.organizationId), now),
+        ],
       );
       await manager.getRepository(AuditLog).save(
         AuditLog.createLog({
@@ -494,11 +580,6 @@ export class ResolutionLedgerService {
       );
       return rows.length;
     });
-  }
-
-  private isExcludable(period: UsagePeriod, now: Date = new Date()): boolean {
-    const back = monthsBetween(period, periodFor(undefined, now));
-    return back >= 0 && back <= EXCLUDABLE_PAST_PERIODS;
   }
 
   private ledgerQuery(organizationId: string, period: UsagePeriod) {
