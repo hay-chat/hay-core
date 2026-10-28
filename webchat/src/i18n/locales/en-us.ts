@@ -10,6 +10,7 @@ export default {
   "chat.startNew": "Start New Conversation",
   "chat.poweredBy": "Powered by",
   "chat.conversationClosed": "Conversation Closed",
+  "chat.aiLabel": "AI assistant",
   "input.placeholder": "Type a message...",
   "input.send": "Send message",
   "error.sendFailed": "Couldn't send your message. Please try again in a moment.",

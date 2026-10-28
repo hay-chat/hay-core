@@ -71,6 +71,7 @@ describe("organizations AI region", () => {
       region: "default",
       euAvailable: false,
       hasCustomProvider: false,
+      provider: expect.objectContaining({ name: expect.any(String), host: expect.any(String) }),
     });
   });
 

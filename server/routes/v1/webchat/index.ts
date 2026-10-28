@@ -2,6 +2,7 @@ import { router, scopedProcedure, publicProcedure } from "@server/trpc";
 import { z } from "zod";
 import { webchatSettingsService } from "@server/services/webchat/webchat-settings.service";
 import { organizationRepository } from "@server/repositories/organization.repository";
+import { customAiLabel, isAiLabelShown } from "@server/services/ai-disclosure";
 import { WebchatPosition, WebchatTheme } from "@server/database/entities/webchat-settings.entity";
 
 export const webchatRouter = router({
@@ -56,6 +57,12 @@ export const webchatRouter = router({
       }
 
       const config = await webchatSettingsService.getPublicConfig(input.organizationId);
-      return { enabled: true as const, ...config };
+      return {
+        enabled: true as const,
+        ...config,
+        // AI label on AI replies (D14-6). A null text means the widget's localized default.
+        aiLabelShown: isAiLabelShown(organization, "web"),
+        aiLabelText: customAiLabel(organization.settings),
+      };
     }),
 });

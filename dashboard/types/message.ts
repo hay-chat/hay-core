@@ -14,6 +14,7 @@ export interface Message {
     completion_tokens?: number;
     total_tokens?: number;
     latency_ms?: number;
+    aiRegion?: "default" | "eu"; // AI processing region when the reply was saved (D14-5)
     confidence?: number;
     confidenceBreakdown?: {
       grounding: number;

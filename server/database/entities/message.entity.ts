@@ -127,6 +127,10 @@ export class Message {
     completion_tokens?: number;
     total_tokens?: number;
     latency_ms?: number;
+    /** AI processing region in effect when a BotAgent reply was saved (D14-5). */
+    aiRegion?: "default" | "eu";
+    /** This AI reply opened with the AI disclosure line on its channel (D14-7). */
+    aiDisclosureSent?: boolean;
     confidence?: number;
     confidenceBreakdown?: {
       grounding: number;

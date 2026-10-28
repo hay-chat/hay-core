@@ -940,6 +940,7 @@ The following tools are available for you to use. You MUST return only valid JSO
     let messageStatus = MessageStatus.APPROVED;
     let reviewRequired = false;
     let deliveryState = DeliveryState.SENT;
+    let metadata = messageData.metadata;
 
     if (messageData.type === MessageType.BOT_AGENT) {
       // Get agent and organization to check test mode
@@ -948,6 +949,10 @@ The following tools are available for you to use. You MUST return only valid JSO
 
       const agent = this.agent_id ? await agentRepository.findById(this.agent_id) : null;
       const organization = await organizationRepository.findById(this.organization_id);
+
+      // Where AI was processed for this reply (D14-5), shown in the dashboard debug view.
+      const { regionFromSettings } = await import("../../services/llm/ai-region");
+      metadata = { ...metadata, aiRegion: regionFromSettings(organization?.settings) };
 
       // Check if this is an initial greeting (no customer messages yet)
       const messages = await this.getMessages();
@@ -963,8 +968,13 @@ The following tools are available for you to use. You MUST return only valid JSO
         testModeEnabled = organization.settings.testModeDefault;
       }
 
+      // A channel set to "drafts only" (D14-7) queues every AI reply for a person
+      // to approve, through the same gate as test mode.
+      const { resolveChannelAiMode } = await import("../../types/organization-settings.types");
+      const draftsOnly = resolveChannelAiMode(organization?.settings, this.channel) === "drafts";
+
       // Only apply test mode if this is a response to a customer (not the initial greeting)
-      if (testModeEnabled && hasCustomerMessages) {
+      if ((testModeEnabled || draftsOnly) && hasCustomerMessages) {
         messageStatus = MessageStatus.PENDING;
         reviewRequired = true;
         deliveryState = DeliveryState.QUEUED;
@@ -978,7 +988,7 @@ The following tools are available for you to use. You MUST return only valid JSO
       conversation_id: this.id,
       content: messageData.content,
       type: messageData.type as MessageType,
-      metadata: messageData.metadata,
+      metadata,
       sender: messageData.sender,
       attachments: messageData.attachments,
       providerMessageId: messageData.providerMessageId ?? null,

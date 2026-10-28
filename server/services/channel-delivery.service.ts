@@ -19,6 +19,8 @@ import { pluginManagerService } from "./plugin-manager.service";
 import { MessageRepository } from "@server/repositories/message.repository";
 import { ConversationRepository } from "@server/repositories/conversation.repository";
 import { DELIVERY_SIGNED_URL_TTL_SECONDS, signAttachmentUrls } from "./media-url.service";
+import { aiDisclosureLine } from "./ai-disclosure";
+import type { Conversation } from "@server/database/entities/conversation.entity";
 import type {
   MessageAttachment,
   MessageProviderError,
@@ -177,12 +179,18 @@ export class ChannelDeliveryService {
         return;
       }
 
+      // AI disclosure (D14-7): the first AI reply on a channel opens with the
+      // org's AI label, unless the org hid it there (never for EU orgs).
+      const disclosure =
+        payload.type === "BotAgent" ? this.firstReplyDisclosure(conversation, channel) : null;
+
       logger.info(
         {
           conversationId,
           channel,
           messageId,
           to: customer.external_id,
+          aiDisclosure: !!disclosure,
         },
         "Delivering message via channel plugin",
       );
@@ -191,7 +199,8 @@ export class ChannelDeliveryService {
         organizationId,
         channel,
         to: customer.external_id,
-        content,
+        content: disclosure ? (content ? `${disclosure}\n\n${content}` : disclosure) : content,
+        aiDisclosed: !!disclosure,
         messageId,
         conversationId,
         conversationMetadata: (conversation.metadata ?? null) as Record<string, unknown> | null,
@@ -201,6 +210,31 @@ export class ChannelDeliveryService {
       });
     } catch (error) {
       logger.error({ err: error, conversationId }, "Channel delivery failed");
+    }
+  }
+
+  /**
+   * The AI disclosure line for this reply, or null when the label is hidden on
+   * the channel or an earlier AI reply in the conversation already carried it.
+   */
+  private firstReplyDisclosure(conversation: Conversation, channel: string): string | null {
+    const alreadyDisclosed = (conversation.messages ?? []).some(
+      (message) => message.metadata?.aiDisclosureSent === true,
+    );
+    if (alreadyDisclosed) return null;
+    return aiDisclosureLine(conversation.organization, channel, conversation.language);
+  }
+
+  /** Record that a delivered AI reply carried the disclosure line. Best effort. */
+  private async markDisclosed(messageId: string): Promise<void> {
+    try {
+      const message = await messageRepository.findById(messageId);
+      if (!message) return;
+      await messageRepository.update(messageId, {
+        metadata: { ...(message.metadata ?? {}), aiDisclosureSent: true },
+      });
+    } catch (err) {
+      logger.error({ err, messageId }, "Failed to record the AI disclosure");
     }
   }
 
@@ -305,6 +339,8 @@ export class ChannelDeliveryService {
     channel: string;
     to: string;
     content: string;
+    /** The content opens with the AI disclosure line; recorded once delivered. */
+    aiDisclosed?: boolean;
     messageId: string;
     conversationId: string;
     conversationMetadata: Record<string, unknown> | null;
@@ -349,6 +385,7 @@ export class ChannelDeliveryService {
           // so later status webhooks can be matched back to this message.
           await messageRepository.updateProviderMessageId(messageId, outcome.providerMessageId);
         }
+        if (args.aiDisclosed) await this.markDisclosed(messageId);
         logger.info(
           { messageId, providerMessageId: outcome.providerMessageId, channel, attempt },
           "Channel delivery successful",

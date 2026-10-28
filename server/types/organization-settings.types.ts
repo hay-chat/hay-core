@@ -350,6 +350,34 @@ export function resolveActionApprovalConfig(
 }
 
 /**
+ * AI disclosure label (D14-6/D14-7): the badge on AI replies in the widget and the
+ * first-reply line on other channels. On everywhere by default. EU organizations
+ * can rename it but not hide it (see services/ai-disclosure.ts).
+ */
+export interface AiDisclosureConfig {
+  /** Custom label text. Empty or missing = the localized default ("AI assistant"). */
+  label?: string | null;
+  /** Channel ids ("web" = widget) where the label is hidden. Ignored for EU orgs. */
+  hiddenChannels?: string[];
+}
+
+/**
+ * Per-channel AI mode (D14-7). "drafts" = the AI writes the reply and a person
+ * approves it before it is sent (the same queue as Require Approval / test
+ * mode). Keyed by channel id ("web" or a channel plugin's manifest `channel`).
+ * Missing = "on".
+ */
+export const CHANNEL_AI_MODES = ["on", "drafts"] as const;
+export type ChannelAiMode = (typeof CHANNEL_AI_MODES)[number];
+
+export function resolveChannelAiMode(
+  settings: OrganizationSettings | null | undefined,
+  channel: string,
+): ChannelAiMode {
+  return settings?.channelAiModes?.[channel] === "drafts" ? "drafts" : "on";
+}
+
+/**
  * Organization Settings JSONB structure
  * This type defines the complete structure of the settings field in the Organization entity
  */
@@ -359,10 +387,18 @@ export interface OrganizationSettings {
   companyInterestGuardrail?: CompanyInterestGuardrailConfig; // Stage 1: Company interest protection
   confidenceGuardrail?: ConfidenceGuardrailConfig; // Stage 2: Fact grounding
   actionClaimGuardrail?: ActionClaimGuardrailConfig; // Stage 0: Action-claim vs tool-call consistency
-  retentionDays?: number | null; // Data retention period in days (null = disabled/forever)
+  retentionDays?: number | null; // Data retention period in days (null = disabled/forever; new orgs start at DEFAULT_NEW_ORG_RETENTION_DAYS)
   isPlayground?: boolean; // Enables playground mode for public conversations (demo orgs only)
   llm?: OrgLlmConfig; // Per-org LLM chat provider + tier→model map (embeddings stay managed)
   aiRegion?: AiRegion; // Where AI calls are processed; "eu" routes everything to the EU endpoint
   actionApproval?: Partial<ActionApprovalConfig>; // Which AI write actions wait for a person
+  aiDisclosure?: AiDisclosureConfig; // AI label on replies, per channel
+  channelAiModes?: Record<string, ChannelAiMode>; // Per-channel AI mode; missing = "on"
   [key: string]: unknown;
 }
+
+/**
+ * Retention for organizations created from now on (D14-8, Roger's D14 answer 7).
+ * Existing organizations keep what they had (usually null = keep forever).
+ */
+export const DEFAULT_NEW_ORG_RETENTION_DAYS = 365;

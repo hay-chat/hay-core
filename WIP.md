@@ -1,3 +1,10 @@
+## 2026-10-28 — claude/w2-eu-disclosure — Wave 2 L11 (D14-5..8) built, not pushed
+- 0e46e8e D14-5 AI region+provider card (Customer Privacy) + debug note; 4a71322 D14-6 widget AI label (EU: rename, not hide).
+- 6837a58 D14-7 first-reply [label] line on non-web channels + per-channel drafts-only (reuses approval queue).
+- 98f359f D14-8 new orgs retentionDays 365; existing orgs untouched. No migrations, no env vars.
+- Verified: server jest 1200 pass, tsc, dashboard typecheck, webchat vitest+vue-tsc.
+- Next: orchestrator merges into staging; hand-test on :3000 + localhost:8090/w1.html.
+
 ## 2026-10-28 01:35 — staging — Wave 1 review server fixes merged + tested
 - fecc425 merged claude/w1-review-server (approval auth/threshold owner-only, public metadata whitelist, EU fallback org id, reply window on resume, alert locales, closed-conversation approve refused). e574bef shows that refusal in en/pt-BR.
 - Manual ✓: metadata whitelist; approve on resolved conversation → refused, still pending.

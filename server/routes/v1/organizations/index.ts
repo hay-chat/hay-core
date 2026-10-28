@@ -10,6 +10,7 @@ import {
   Timezone,
   DEFAULT_CONFIDENCE_GUARDRAIL_CONFIG,
   resolveActionApprovalConfig,
+  DEFAULT_NEW_ORG_RETENTION_DAYS,
 } from "@server/types/organization-settings.types";
 import type { DeepPartial } from "typeorm";
 import { AppDataSource } from "@server/database/data-source";
@@ -19,9 +20,15 @@ import { encryptValue } from "@server/lib/auth/utils/encryption";
 import type { OrgLlmConfig } from "@server/services/llm/provider.types";
 import {
   AI_REGIONS,
+  describeAiProvider,
   isEuRegionConfigured,
   regionFromSettings,
 } from "@server/services/llm/ai-region";
+import {
+  AI_LABEL_MAX_LENGTH,
+  customAiLabel,
+  isEuOrganization,
+} from "@server/services/ai-disclosure";
 import {
   CHAT_MODEL_CATALOG,
   EMBEDDING_MODEL_CATALOG,
@@ -92,6 +99,13 @@ const actionApprovalSchema = z
     approverRoles: z.array(z.enum(["admin", "contributor", "member"])).max(3),
   })
   .partial();
+
+// A channel id ("web" or a channel plugin's manifest `channel`), never a plugin id.
+const channelIdSchema = z
+  .string()
+  .min(1)
+  .max(64)
+  .regex(/^[a-z0-9][a-z0-9_-]*$/i);
 
 const updateSettingsSchema = z.object({
   name: z.string().min(1).max(100).optional(),
@@ -171,6 +185,7 @@ export const organizationsRouter = t.router({
             maxJobs: 50,
             maxStorageGb: 1,
           },
+          settings: { retentionDays: DEFAULT_NEW_ORG_RETENTION_DAYS },
         });
 
         await organizationRepository.save(organization);
@@ -336,6 +351,7 @@ export const organizationsRouter = t.router({
         region: regionFromSettings(organization.settings),
         euAvailable: isEuRegionConfigured(),
         hasCustomProvider: !!organization.settings?.llm,
+        provider: describeAiProvider(organization.settings),
       };
     },
   ),
@@ -367,6 +383,69 @@ export const organizationsRouter = t.router({
       );
 
       return { success: true, region: input.region };
+    }),
+
+  // AI label on AI replies (D14-6): widget badge + first-reply line on other channels.
+  getAiDisclosure: scopedProcedure(RESOURCES.ORGANIZATION_SETTINGS, ACTIONS.READ).query(
+    async ({ ctx }) => {
+      const organization = await organizationService.findOne(ctx.organizationId!);
+      if (!organization) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Organization not found" });
+      }
+      const locked = isEuOrganization(organization);
+      return {
+        label: customAiLabel(organization.settings),
+        // EU orgs always show the label, whatever was saved before.
+        hiddenChannels: locked ? [] : (organization.settings?.aiDisclosure?.hiddenChannels ?? []),
+        locked,
+        // Channels whose AI replies wait for a person to approve them (D14-7).
+        draftsChannels: Object.entries(organization.settings?.channelAiModes ?? {})
+          .filter(([, mode]) => mode === "drafts")
+          .map(([channel]) => channel),
+      };
+    },
+  ),
+
+  // Rename the label or hide it on some channels. EU orgs may rename it but not
+  // hide it (EU AI Act art. 50; Roger's D14 answer 5). draftsChannels switches
+  // channels to "drafts only": AI replies queue for approval (D14 answer 6).
+  updateAiDisclosure: scopedProcedure(RESOURCES.ORGANIZATION_SETTINGS, ACTIONS.UPDATE)
+    .input(
+      z.object({
+        label: z.string().trim().max(AI_LABEL_MAX_LENGTH).nullable().optional(),
+        hiddenChannels: z.array(channelIdSchema).max(50).optional(),
+        draftsChannels: z.array(channelIdSchema).max(50).optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const organization = await organizationService.findOne(ctx.organizationId!);
+      if (!organization) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Organization not found" });
+      }
+      if (input.hiddenChannels?.length && isEuOrganization(organization)) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "The AI label cannot be hidden for organizations serving the EU",
+        });
+      }
+
+      const current = organization.settings?.aiDisclosure ?? {};
+      const aiDisclosure = {
+        ...current,
+        ...(input.label !== undefined ? { label: input.label || null } : {}),
+        ...(input.hiddenChannels !== undefined
+          ? { hiddenChannels: [...new Set(input.hiddenChannels)] }
+          : {}),
+      };
+      // Only "drafts" is stored; a channel missing from the map sends automatically.
+      const channelAiModes =
+        input.draftsChannels !== undefined
+          ? Object.fromEntries(input.draftsChannels.map((channel) => [channel, "drafts" as const]))
+          : organization.settings?.channelAiModes;
+      await organizationService.update(ctx.organizationId!, {
+        settings: { ...(organization.settings || {}), aiDisclosure, channelAiModes },
+      });
+      return { success: true };
     }),
 
   updateSettings: scopedProcedure(RESOURCES.ORGANIZATION_SETTINGS, ACTIONS.UPDATE)
