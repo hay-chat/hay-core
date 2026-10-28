@@ -111,6 +111,20 @@ const jobRegistry: CronJobConfig[] = [
   },
 
   {
+    name: "operator-event-retry",
+    description:
+      "Retry operator events (e.g. organization.deleted) whose delivery failed, with backoff",
+    schedule: 60000, // Every minute, up to 10 due events per run
+    handler: async () => {
+      const { retryOperatorEvents } = await import("./operator-events.service");
+      await retryOperatorEvents(10);
+    },
+    singleton: true,
+    enabled: true,
+    skipDatabaseLogging: true,
+  },
+
+  {
     name: "insight-feedback-enrichment",
     description:
       "Explain staff ratings of AI replies as Insights QA events (one easy-tier LLM call each)",
