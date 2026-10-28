@@ -56,6 +56,15 @@ describe("decideGate", () => {
     }
   });
 
+  it("lets a cap-enforcing money tool run: the plugin itself refuses above its cap", () => {
+    const capped = classifyTool({
+      annotations: { readOnlyHint: false },
+      _meta: { "chat.hay/category": "discount", "chat.hay/capEnforced": true },
+    });
+    expect(decideGate(capped, { type: "percentage", value: 10 }, ON)).toEqual({ kind: "allow" });
+    expect(decideGate(risk("discount"), { type: "percentage", value: 10 }, ON).kind).toBe("hold");
+  });
+
   it("allows everything when the owner turned the setting off", () => {
     const off = { moneyMovesNeedApproval: false, thresholdAmount: 0 };
     expect(decideGate(risk("refund"), { amount: 999 }, off)).toEqual({ kind: "allow" });

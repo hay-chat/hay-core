@@ -31,6 +31,9 @@
     },
     "./stale-tracking": {
       "default": "./stale-tracking/index.cjs"
+    },
+    "./coupon-policy": {
+      "default": "./coupon-policy/index.cjs"
     }
   },
   "bin": {
