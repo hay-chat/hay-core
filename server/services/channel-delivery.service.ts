@@ -158,8 +158,18 @@ export class ChannelDeliveryService {
         return;
       }
 
-      // Skip web channel — WebSocket service already handles it
-      if (conversation.channel === "web") return;
+      // Web channel: the WebSocket service delivers it. A human reply to a
+      // shopper who has left goes out by email (D5-9).
+      if (conversation.channel === "web") {
+        if (payload.type === "HumanAgent") {
+          const { emailHumanReplyIfAway } = await import("./web-follow-up.service");
+          await emailHumanReplyIfAway(conversation, {
+            content: payload.content,
+            sender: typeof payload.sender === "string" ? payload.sender : null,
+          });
+        }
+        return;
+      }
 
       const channel = conversation.channel;
       const organizationId = conversation.organization_id;
