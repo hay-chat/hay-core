@@ -1,3 +1,10 @@
+## 2026-10-28 — claude/w4-h-commerce (worktree hay-core-w4-h-commerce) — Lane H committed, NOT pushed
+- H1 fef3c87e generic `productSource.prune(keepIds)` + pluginApi products.prune; Shopify/Woo/Nuvemshop prune after a complete sync (deletes, not soft-mark).
+- H2 c01679b7 Wix + Magento orders carry `supportSummary.tracking` stale flag + per-store threshold config.
+- H3 skipped: coupon-per-customer check already paginates past 100.
+- H4 768b57e7 generic encrypted plugin state store (plugin_states, migration 1785910000000, run on hay_test + hay_staging) + SDK `globalCtx.state`; Woo wc-auth sessions persist there.
+- Next: review + PR; Roger: delete vs mark-deleted on prune, Magento origin country, Wix site-properties scope.
+
 ## 2026-10-28 — staging — Lane G merged
 - claude/w4-g-exports merged (6d798bc9); migration AddOperatorEvents ran on hay_test + hay_staging (by the agent).
 - Integration 38/41 suites pass in the full run while other agents share hay_test; the 3 failing ones (organization-export, insight-backfill, conversation-media) pass when re-run alone → contention flakes.
