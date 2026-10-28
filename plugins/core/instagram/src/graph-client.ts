@@ -44,6 +44,15 @@ export class GraphApiError extends Error {
   }
 }
 
+/**
+ * Meta's Human Agent tag: lets a PERSON reply up to 7 days after the
+ * customer's last message (needs the Human Agent permission). Never used for AI replies.
+ */
+const HUMAN_AGENT_TAG = { messaging_type: "MESSAGE_TAG", tag: "HUMAN_AGENT" } as const;
+
+/** How a send is classed: a normal reply, or a person's reply tagged HUMAN_AGENT. */
+export type SendMode = "response" | "human_agent";
+
 /** Attachment types Instagram DMs accept. */
 export type InstagramAttachmentType = "image" | "video" | "audio" | "file";
 
@@ -160,9 +169,14 @@ export class GraphClient {
    * POST /me/messages { recipient:{id}, message:{text}, messaging_type:"RESPONSE" }
    * Returns the provider message id.
    */
-  async sendText(recipientPsid: string, text: string, accessToken: string): Promise<string> {
-    // Instagram messaging send: { recipient:{id}, message:{text} }. Unlike the
-    // Messenger Platform, Instagram does not use `messaging_type`.
+  async sendText(
+    recipientPsid: string,
+    text: string,
+    accessToken: string,
+    mode: SendMode = "response",
+  ): Promise<string> {
+    // Instagram messaging send: { recipient:{id}, message:{text} }. A normal
+    // reply carries no `messaging_type`; a person's late reply carries the tag.
     const data = await this.request<{ message_id?: string; recipient_id?: string }>(
       "POST",
       "/me/messages",
@@ -170,6 +184,7 @@ export class GraphClient {
       {
         body: {
           recipient: { id: recipientPsid },
+          ...(mode === "human_agent" ? HUMAN_AGENT_TAG : {}),
           message: { text },
         },
       },
@@ -191,6 +206,7 @@ export class GraphClient {
     recipientPsid: string,
     attachment: { type: InstagramAttachmentType; url: string },
     accessToken: string,
+    mode: SendMode = "response",
   ): Promise<string> {
     const data = await this.request<{ message_id?: string; recipient_id?: string }>(
       "POST",
@@ -199,6 +215,7 @@ export class GraphClient {
       {
         body: {
           recipient: { id: recipientPsid },
+          ...(mode === "human_agent" ? HUMAN_AGENT_TAG : {}),
           message: { attachment: { type: attachment.type, payload: { url: attachment.url } } },
         },
       },

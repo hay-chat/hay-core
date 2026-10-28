@@ -155,6 +155,7 @@ describe("channelDeliveryService /deliver", () => {
       to: "5511999999999",
       content: "hello",
       messageId: "msg-1",
+      messageType: "BotAgent",
       conversationId: CONVERSATION_ID,
       attachments: [attachment],
     });
@@ -193,6 +194,11 @@ describe("channelDeliveryService /deliver", () => {
     });
     await dispatch(outboundEvent({}));
     expect(deliverBody().to).toBe("+5511888888888");
+  });
+
+  it("tells the worker a person wrote the reply, for Meta's Human Agent tag (D13-14)", async () => {
+    await dispatch(outboundEvent({ type: "HumanAgent" }));
+    expect(deliverBody().messageType).toBe("HumanAgent");
   });
 
   it("sends an empty attachments array when the message has none", async () => {
