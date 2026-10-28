@@ -65,7 +65,8 @@ export async function listSpam(organizationId: string, limit: number): Promise<S
           SELECT LEFT(m.content, 300)
           FROM messages m
           WHERE m.conversation_id = c.id AND m.type = 'Customer'
-          ORDER BY m.created_at ASC
+            AND m.created_at <= c.spam_flagged_at
+          ORDER BY m.created_at DESC
           LIMIT 1
         ) AS preview
       FROM conversations c
