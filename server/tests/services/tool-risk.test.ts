@@ -54,7 +54,7 @@ describe("classifyTool", () => {
     });
   });
 
-  it("counts refund, cancel and discount as money moves", () => {
-    expect([...MONEY_CATEGORIES].sort()).toEqual(["cancel", "discount", "refund"]);
+  it("counts refund, cancel, discount and exchange as money moves", () => {
+    expect([...MONEY_CATEGORIES].sort()).toEqual(["cancel", "discount", "exchange", "refund"]);
   });
 });
