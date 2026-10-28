@@ -1,6 +1,6 @@
 import { LLMService } from "./llm.service";
 import { PromptService } from "../prompt.service";
-import { Message } from "@server/database/entities/message.entity";
+import { Message, MessageType } from "@server/database/entities/message.entity";
 import { createLogger } from "@server/lib/logger";
 import {
   type ActionClaimGuardrailConfig,
@@ -18,6 +18,8 @@ export interface ToolLedgerEntry {
   success: boolean;
   /** Held for a person's approval (D4-4): requested, not done. */
   pending?: boolean;
+  /** A team member decided an earlier held call; this turn answers that decision. */
+  decision?: "approved" | "declined";
 }
 
 /**
@@ -155,7 +157,12 @@ export class ActionClaimGuardrailService {
 
     return recentMessages
       .map((msg) => {
-        const role = msg.type === "Customer" ? "Customer" : "Assistant";
+        const role =
+          msg.type === MessageType.CUSTOMER
+            ? "Customer"
+            : msg.type === MessageType.SYSTEM
+              ? "System note"
+              : "Assistant";
         return `${role}: ${msg.content}`;
       })
       .join("\n");
@@ -170,10 +177,16 @@ export class ActionClaimGuardrailService {
     }
     return entries
       .map((entry) => {
-        const status = entry.pending ? "PENDING_APPROVAL" : entry.success ? "SUCCESS" : "FAILED";
-        return `- ${entry.name} — ${status}`;
+        return `- ${entry.name} — ${this.ledgerStatus(entry)}`;
       })
       .join("\n");
+  }
+
+  private ledgerStatus(entry: ToolLedgerEntry): string {
+    if (entry.decision === "declined") return "DECLINED_BY_TEAM";
+    if (entry.pending) return "PENDING_APPROVAL";
+    const status = entry.success ? "SUCCESS" : "FAILED";
+    return entry.decision === "approved" ? `${status} (approved by the team)` : status;
   }
 
   /**

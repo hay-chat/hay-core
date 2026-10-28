@@ -34,6 +34,7 @@ import {
   actionDecisionService,
   HANDLED_BY_TEAM_NOTE,
 } from "../../services/action-decision.service";
+import { decidedActionsLedger } from "../../orchestrator/decided-actions";
 
 const orgId = "da4e0000-0000-4000-8000-000000000005";
 const userId = "da4e0000-0000-4000-8000-0000000000a5";
@@ -157,6 +158,23 @@ describe("action decisions (D4-5)", () => {
     expect(await statusOf(conversation.id)).toBe("open");
     expect(mockEnqueue).toHaveBeenCalledWith(conversation.id, orgId, "approval_decided");
     expect((await systemNotes(conversation.id))[0].content).toContain("Past 30 days");
+  });
+
+  it("hands the follow-up turn the decisions it answers", async () => {
+    const conversation = await newConversation();
+    const approved = await hold(conversation.id);
+    const declined = await hold(conversation.id);
+    await actionDecisionService.approve(approved.id, orgId, userId);
+    await actionDecisionService.reject(declined.id, orgId, userId, "Needs a photo");
+
+    const row = await AppDataSource.getRepository(Conversation).findOneByOrFail({
+      id: conversation.id,
+    });
+
+    expect(await decidedActionsLedger(row)).toEqual([
+      { name: "shop:create_refund", success: true, decision: "approved" },
+      { name: "shop:create_refund", success: false, decision: "declined" },
+    ]);
   });
 
   it("stays awaiting approval while another action is still pending", async () => {

@@ -149,6 +149,8 @@ export class Message {
     toolExecutedAt?: string;
     /** The pending action this call opened or answered from (D4-4). */
     pendingActionId?: string;
+    /** System note telling the AI how a team member decided that action. */
+    isApprovalDecision?: boolean;
     // Playbook & Document metadata
     isPlaybook?: boolean;
     playbookId?: string;
