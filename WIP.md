@@ -1,3 +1,10 @@
+## 2026-10-28 — claude/w4-d-abuse — Lane D (abuse) D1–D3 built, not merged
+- D1: customerExternalId links only with HMAC-SHA256 signature (per-org secret on webchat_settings.identity_secret, encrypted; reveal/rotate admins-only; dashboard card; widget sends customerExternalIdSignature). Unsigned/invalid -> anonymous.
+- D2: `npm run plugins:enable-defaults` enables defaultEnabled plugins (Turnstile) for existing orgs; no plugin id in core.
+- D3: vision skip ignores "verification unavailable"; Not spam re-reads held files then hands back to AI; Not spam beats LLM close-classifier spam.
+- Half-built: migration 1785870000000-AddWebchatIdentitySecret NOT run (Postgres :5433 down); close-classifier integration test (Not spam undo) NOT run.
+- Cross-repo (not done): WordPress/Woo plugin, Shopify theme block, hay-website context-api doc must sign the id server-side.
+- Next: start DB, run migration on hay_test + integration suites, then merge to staging and run plugins:enable-defaults after deploy.
 ## 2026-10-28 — staging — Needs Roger list fully answered
 - All 86 items answered (questionnaire artifact); recorded in tasks/voc-roadmap.md: "Roger's answers", "Tickets from Roger's answers" (lanes A–I, all "do it now"), "Still on Roger".
 - Nothing built yet. Prod reads (deploy.sh) blocked by classifier → on Roger.
