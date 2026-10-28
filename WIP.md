@@ -1,3 +1,9 @@
+## 2026-10-28 — claude/w1-tool-risk-all-plugins — D4-2 risk classes for all core plugins (not merged)
+- SDK: optional `toolRisk {read, write}` on mcp.startLocal/startLocalStdio/startExternal; worker merges it into /mcp/list-tools (declaration wins; hosted readOnlyHint passes through; unknown writes stay held). Core unchanged.
+- calcom, klaviyo, twenty, zendesk: local `applyToolRisk` + mcp/tests/tool-risk.test.js. atlassian, email-channel (send-email), stripe: SDK declaration. hubspot: remote annotations only. notion/chatwoot/instagram/whatsapp: no agent tools.
+- Deliberately held: klaviyo upload_image_from_file (reads any host file — security follow-up), stripe update_subscription/create_invoice/create_invoice_item/finalize_invoice.
+- Next: orchestrator merges; rebuild packages/plugin-sdk (dist) + restart workers so tools re-list with risk.
+
 ## 2026-10-28 00:30 — staging — L4 action approval + copy lane merged
 - L4 aa8b4c9: tool risk, action_log, playground dry-run, pending approvals + gate (money moves held, threshold 0), resume, 48 h expiry. 3 migrations ran on hay_staging.
 - Copy e31f6b9: access-notice copy for backoffice states, Hay.chat sweep.
