@@ -7,6 +7,7 @@ import { ConversationRepository } from "@server/repositories/conversation.reposi
 import { MessageRepository } from "@server/repositories/message.repository";
 import { AgentRepository } from "@server/repositories/agent.repository";
 import { organizationRepository } from "@server/repositories/organization.repository";
+import { pickAgentForChannel } from "@server/services/agent-channel-routing";
 import { pluginInstanceRepository } from "@server/repositories/plugin-instance.repository";
 import { pluginWebhookRouteRepository } from "@server/repositories/plugin-webhook-route.repository";
 import {
@@ -1343,42 +1344,13 @@ async function claimProviderMessage(
   }
 }
 
-/**
- * Helper: Get agent for channel
- *
- * Determines which single agent should handle conversations for a given channel.
- * Agent<->channel is many-to-many (agent.channels), but each incoming message must
- * resolve to exactly one responder. Priority:
- * 1. Agents assigned to this channel. If more than one claims it, prefer the org
- *    default agent if it is among them, otherwise the earliest-created (deterministic).
- *    TODO: replace this tiebreaker once multi-agent-per-channel selection is defined.
- * 2. Organization default agent.
- * 3. First available agent.
- */
+/** The single agent that answers on a channel: see pickAgentForChannel (D7-14). */
 async function getAgentForChannel(organizationId: string, channel: string): Promise<string | null> {
   const [agents, org] = await Promise.all([
     agentRepository.findByOrganization(organizationId),
     organizationRepository.findById(organizationId),
   ]);
-
-  // 1. Agents explicitly assigned to this channel.
-  const assigned = agents.filter((a) => a.channels?.includes(channel));
-  if (assigned.length > 0) {
-    if (org?.defaultAgentId) {
-      const preferred = assigned.find((a) => a.id === org.defaultAgentId);
-      if (preferred) return preferred.id;
-    }
-    // findByOrganization orders by created_at DESC, so the last entry is earliest.
-    return assigned[assigned.length - 1].id;
-  }
-
-  // 2. Organization default agent.
-  if (org?.defaultAgentId) {
-    return org.defaultAgentId;
-  }
-
-  // 3. First available agent.
-  return agents[0]?.id || null;
+  return pickAgentForChannel(agents, org?.defaultAgentId, channel)?.id ?? null;
 }
 
 /**

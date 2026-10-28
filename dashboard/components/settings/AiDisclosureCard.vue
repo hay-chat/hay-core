@@ -1,5 +1,5 @@
 <template>
-  <!-- AI on each channel: the AI label (D14-6) and send automatically vs drafts only (D14-7). -->
+  <!-- AI on each channel: the AI label (D14-6) and send automatically, drafts only (D14-7) or off (D7-14). -->
   <Card>
     <CardHeader>
       <CardTitle>{{ $t("customerPrivacy.aiLabel.title") }}</CardTitle>
@@ -22,6 +22,16 @@
       <div class="space-y-3">
         <p class="text-sm font-medium">{{ $t("customerPrivacy.aiLabel.channelsTitle") }}</p>
         <p class="text-sm text-muted-foreground">{{ $t("customerPrivacy.aiLabel.draftsHint") }}</p>
+        <p class="text-sm text-muted-foreground">{{ $t("customerPrivacy.aiLabel.offHint") }}</p>
+        <Button
+          v-if="channels.length > 1"
+          variant="outline"
+          size="sm"
+          data-testid="start-web-chat-only"
+          @click="startOnWebChatOnly"
+        >
+          {{ $t("customerPrivacy.aiLabel.webChatOnly") }}
+        </Button>
         <div
           v-for="ch in channels"
           :key="ch.channel"
@@ -30,11 +40,11 @@
           <span class="text-sm font-medium">{{ ch.name }}</span>
           <div class="flex flex-wrap items-center gap-4">
             <Input
-              :model-value="draftsChannels.includes(ch.channel) ? 'drafts' : 'on'"
+              :model-value="modes[ch.channel] ?? 'on'"
               type="select"
               :aria-label="`${ch.name}: ${$t('customerPrivacy.aiLabel.aiReplies')}`"
               :options="modeOptions"
-              @update:model-value="setDrafts(ch.channel, $event === 'drafts')"
+              @update:model-value="setMode(ch.channel, $event as ChannelAiMode)"
             />
             <Input
               :model-value="!hiddenChannels.includes(ch.channel)"
@@ -71,7 +81,9 @@ const loaded = ref(false);
 const isSaving = ref(false);
 const label = ref("");
 const hiddenChannels = ref<string[]>([]);
-const draftsChannels = ref<string[]>([]);
+type ChannelAiMode = "on" | "drafts" | "off";
+// Channel id -> mode; a missing channel is "on".
+const modes = ref<Record<string, ChannelAiMode>>({});
 const locked = ref(false);
 
 // Web Chat plus every enabled channel plugin, keyed by channel id (never plugin id).
@@ -85,13 +97,23 @@ const channels = computed(() => [
 const modeOptions = computed(() => [
   { label: t("customerPrivacy.aiLabel.modeOn"), value: "on" },
   { label: t("customerPrivacy.aiLabel.modeDrafts"), value: "drafts" },
+  { label: t("customerPrivacy.aiLabel.modeOff"), value: "off" },
 ]);
 
-function setDrafts(channel: string, drafts: boolean) {
-  const set = new Set(draftsChannels.value);
-  if (drafts) set.add(channel);
-  else set.delete(channel);
-  draftsChannels.value = [...set];
+function setMode(channel: string, mode: ChannelAiMode) {
+  const next = { ...modes.value };
+  if (mode === "on") delete next[channel];
+  else next[channel] = mode;
+  modes.value = next;
+}
+
+// Go live on one channel first (D7-14): the AI keeps Web Chat as it is and
+// stops answering on every other channel until the team switches it back on.
+function startOnWebChatOnly() {
+  for (const ch of channels.value) {
+    if (ch.channel !== "web") setMode(ch.channel, "off");
+  }
+  toast.info(t("customerPrivacy.aiLabel.webChatOnlyDone"));
 }
 
 function setShown(channel: string, shown: string | number | boolean) {
@@ -107,7 +129,7 @@ async function load() {
     label.value = result.label ?? "";
     hiddenChannels.value = result.hiddenChannels;
     locked.value = result.locked;
-    draftsChannels.value = result.draftsChannels;
+    modes.value = { ...result.channelAiModes };
     loaded.value = true;
   } catch (error) {
     console.error("Failed to load AI label settings:", error);
@@ -120,7 +142,7 @@ async function save() {
   try {
     await Hay.organizations.updateAiDisclosure.mutate({
       label: label.value.trim() || null,
-      draftsChannels: draftsChannels.value,
+      channelAiModes: modes.value,
       ...(locked.value ? {} : { hiddenChannels: hiddenChannels.value }),
     });
     toast.success(t("customerPrivacy.aiLabel.saveSuccess"));
