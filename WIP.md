@@ -1,3 +1,6 @@
+## 2026-10-28 06:50 — staging — W2 review fixes merged, hand-tested
+- Merged claude/w2-review-fixes (a3a4897), no migrations. Manual ✓ #1 Turnstile deny, #2 Mark as spam unbills classified, #3 hand-off email kept on conversation.
+- Next: full suites alone, tag wave-2-done, PR #104, Wave 3 lanes.
 ## 2026-10-28 06:45 — staging — W2 X lane merged, export hand-tested
 - Merged claude/w2-x (610299e): D15-4 locked holding reply, D15-6 export ZIP, D15-7 export while locked, D15-11 deletion event, D16-3. No migrations.
 - Manual ✓: Settings → Privacy export → ZIP checked on disk. Other repos: backoffice#7, website#46 drafts, WP patch 1.1.0.
