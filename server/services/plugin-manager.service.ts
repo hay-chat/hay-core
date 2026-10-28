@@ -9,6 +9,7 @@ import type { HayPluginManifest, PluginLocale } from "@server/types/plugin.types
 import { getPluginRunnerService } from "./plugin-runner.service";
 import type { WorkerInfo } from "@server/types/plugin-sdk.types";
 import { createLogger } from "@server/lib/logger";
+import { registerServerAliasForPlugins } from "@server/lib/plugin-router-alias";
 
 const logger = createLogger("plugin-manager");
 
@@ -750,6 +751,9 @@ export class PluginManagerService {
       // ESM import() rejects unknown file extensions under ts-node — but
       // require() is hooked by ts-node (and tsconfig-paths) so @server/*
       // aliases inside the plugin's router resolve correctly.
+      // Compiled runtime (node dist/main.js) has no path-alias resolver, and the
+      // bundled router keeps `@server/*` external — map it to this server.
+      registerServerAliasForPlugins();
       const routerPath = path.join(this.pluginsDir, plugin.pluginPath, manifest.trpcRouter);
       logger.debug({ routerPath }, "Loading router");
       const routerModule = routerPath.endsWith(".ts")
