@@ -227,7 +227,7 @@ Staging seed: org/user created via `auth.register` (credentials in `../hay-core-
 - Confirm it's OK that staging uses the `OPENAI_API_KEY` from the main checkout's `.env` (nothing else copied).
 
 ## Follow-ups logged (not in Wave 0 scope)
-- [D8] A file removed by the media sweep leaves a dead (404) attachment link in old messages. Reopened widget doesn't scroll to the newest message.
+- [D8] A file removed by the media sweep leaves a dead (404) attachment link in old messages. (Reopened widget not scrolling to the newest message: fixed on staging.)
 - [D2] An order id like "2000012345678901" got indexed from tool input (long numeric ids); consider a length cap for order keys.
 - [W2 L3] First D5-9 human reply after the shopper closed the tab sent no email (widget socket probably not yet cleaned up); the second did. Consider a short grace / re-check.
 - [W2 L3] Business-hours UI: start/end time inputs stack vertically; "09:00 AM" mixes 24 h and AM/PM. Staging default schedule left as Wed 00:00–23:59.
