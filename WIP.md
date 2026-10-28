@@ -1,3 +1,7 @@
+## 2026-10-28 06:10 — staging — W2 L1+L6 bot protection + spam merged, hand-tested
+- Merged claude/w2-turnstile (099db7e); 2 migrations on hay_staging; plugin SDK rebuilt; Turnstile TEST keys in staging .env.
+- Manual ✓: bot check allow, link spam held + /spam + Not spam re-engages AI, under-attack on/off. Fix bb305a2 spam preview.
+- L9+L10 merged (55efdc3), not hand-tested yet. Running: X lane. Next: L9+L10 hand test, guides, X merge, Wave 2 review.
 ## 2026-10-28 05:45 — staging — W2 L7 channels merged, hand-tested
 - Merged claude/w2-channels; 3 migrations on hay_staging; npm install (messenger workspace).
 - Manual ✓: customer merge from /customers; Messenger in Marketplace; Email inbox degrades without Resend. Meta/Resend: tests only (Needs Roger).
