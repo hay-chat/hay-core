@@ -2,7 +2,15 @@
 // Inventory-related tools: variant/SKU stock checks across locations.
 const { z } = require("zod");
 const { shopifyGql } = require("../lib/client");
-const { ok, fail, unwrapConnection, pageInfo, toGid, assertNoUserErrors } = require("../lib/format");
+const {
+  ok,
+  fail,
+  toolError,
+  unwrapConnection,
+  pageInfo,
+  toGid,
+  assertNoUserErrors,
+} = require("../lib/format");
 
 const VARIANT_NODE_FIELDS = `
   id
@@ -45,7 +53,7 @@ function registerInventoryTools(server) {
         const hasVariantId = typeof args.variantId === "string" && args.variantId.length > 0;
         const hasSku = typeof args.sku === "string" && args.sku.length > 0;
         if (hasVariantId === hasSku) {
-          return fail(new Error("Provide exactly one of variantId or sku."));
+          return fail(toolError("BAD_INPUT", "Provide exactly one of variantId or sku."));
         }
 
         // quantities(names:) is required ([String!]!) — always pass at least ["available"].

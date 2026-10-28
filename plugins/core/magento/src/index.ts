@@ -1,5 +1,21 @@
 import { defineHayPlugin } from "@hay/plugin-sdk";
 
+/** D6-9 per-store stale-tracking thresholds → MCP env (the MCP falls back to 5/10). */
+function staleTrackingEnv(config: {
+  getOptional: <T = unknown>(key: string) => T | undefined;
+}): Record<string, string> {
+  const env: Record<string, string> = {};
+  const domestic = config.getOptional<number | string>("staleTrackingDomesticDays");
+  const international = config.getOptional<number | string>("staleTrackingInternationalDays");
+  if (domestic !== undefined && domestic !== null && domestic !== "") {
+    env.STALE_TRACKING_DOMESTIC_DAYS = String(domestic);
+  }
+  if (international !== undefined && international !== null && international !== "") {
+    env.STALE_TRACKING_INTERNATIONAL_DAYS = String(international);
+  }
+  return env;
+}
+
 /**
  * Magento Plugin
  *
@@ -36,6 +52,22 @@ export default defineHayPlugin((globalCtx) => ({
           "Magento integration access token (System > Integrations) with access to Sales, Catalog and Customers",
         required: true,
         encrypted: true,
+      },
+      staleTrackingDomesticDays: {
+        type: "number",
+        label: "Stale tracking: domestic (days)",
+        description:
+          "Treat a domestic shipment as stuck when its tracking has not moved for more than " +
+          "this many days.",
+        default: 5,
+      },
+      staleTrackingInternationalDays: {
+        type: "number",
+        label: "Stale tracking: international (days)",
+        description:
+          "Treat an international shipment as stuck when its tracking has not moved for more " +
+          "than this many days.",
+        default: 10,
       },
     });
 
@@ -148,6 +180,7 @@ export default defineHayPlugin((globalCtx) => ({
         env: {
           MAGENTO_BASE_URL: baseUrl,
           MAGENTO_API_TOKEN: apiToken,
+          ...staleTrackingEnv(ctx.config),
         },
       });
 

@@ -2,7 +2,7 @@
  * Order tools — rich reads, narrow bounded writes.
  *
  *   woocommerce_get_order                      GET /orders/{id} + tracking lookup
- *   woocommerce_get_order_tracking             tracking lookup (3 sources)
+ *   woocommerce_get_order_tracking             tracking lookup (plugins, meta, order notes)
  *   woocommerce_cancel_order                   PUT /orders/{id} {status: cancelled}   pre-dispatch only
  *   woocommerce_update_order_shipping_address  PUT /orders/{id} {shipping}            pre-dispatch only
  *   woocommerce_add_order_note                 POST /orders/{id}/notes
@@ -10,8 +10,15 @@
 
 const { z } = require("zod");
 const { wcApi } = require("../lib/client");
-const { ok, fail } = require("../lib/format");
-const { resolveOrder, getTracking, enrichOrder, PRE_DISPATCH_STATUSES } = require("../lib/orders");
+const { ok, fail, toolError } = require("../lib/format");
+const {
+  resolveOrder,
+  getTracking,
+  getRefundDetails,
+  getStoreCountry,
+  enrichOrder,
+  PRE_DISPATCH_STATUSES,
+} = require("../lib/orders");
 const { isPreDispatch } = require("../lib/orders");
 
 const ORDER_REF = {
@@ -25,21 +32,36 @@ const ORDER_REF = {
 /** Refuse once anything has shipped: wrong status, or tracking already recorded. */
 async function assertPreDispatch(order, action) {
   if (order.status === "cancelled") {
-    throw new Error(`Order #${order.number} is already cancelled; cannot ${action}.`);
+    throw toolError(
+      "PRECONDITION",
+      `Order #${order.number} is already cancelled; cannot ${action}.`,
+      {
+        details: { reason: "ALREADY_CANCELLED" },
+      },
+    );
   }
   if (!PRE_DISPATCH_STATUSES.has(order.status)) {
-    throw new Error(
+    throw toolError(
+      "PRECONDITION",
       `Order #${order.number} has status "${order.status}"; you can only ${action} while it is ` +
         "pending, on-hold or processing (before dispatch). Escalate to the merchant instead.",
+      { details: { reason: "NOT_PRE_DISPATCH", status: order.status } },
     );
   }
   const tracking = await getTracking(order);
   if (!isPreDispatch(order, tracking)) {
-    throw new Error(
+    throw toolError(
+      "PRECONDITION",
       `Order #${order.number} already has shipment tracking (${tracking
         .map((t) => t.trackingNumber)
         .join(", ")}); it has left the warehouse, so you cannot ${action}. Escalate to the ` +
         "merchant/carrier instead.",
+      {
+        details: {
+          reason: "ALREADY_SHIPPED",
+          trackingNumbers: tracking.map((t) => t.trackingNumber),
+        },
+      },
     );
   }
 }
@@ -47,15 +69,23 @@ async function assertPreDispatch(order, action) {
 function registerOrderTools(server) {
   server.tool(
     "woocommerce_get_order",
-    "Get an order by id or number with line items, totals, addresses, refunds, shipment tracking " +
-      "and a supportSummary (isCancellable, isRefundable, remainingRefundable, addressChangeable). " +
+    "Get an order by id or number with line items, totals, addresses, payment method and " +
+      "transaction id, refunds with dates, shipment tracking, and for an unpaid order its " +
+      "payment link and Pix copy-paste code (pix) when the store's gateway saved one, " +
+      "paymentReferences (payment-provider ids, e.g. Mercado Pago, for that plugin's payment tools), " +
+      "and a supportSummary (isCancellable, isRefundable, remainingRefundable, addressChangeable, " +
+      "tracking: isStale/daysSinceLastUpdate/staleReason). " +
       "One call answers status, refund and cancellation questions.",
     ORDER_REF,
     async (args) => {
       try {
         const order = await resolveOrder(args);
-        const tracking = await getTracking(order);
-        return ok(enrichOrder(order, tracking));
+        const [tracking, refundDetails, originCountry] = await Promise.all([
+          getTracking(order),
+          getRefundDetails(order),
+          getStoreCountry(),
+        ]);
+        return ok(enrichOrder(order, tracking, { refundDetails, originCountry }));
       } catch (err) {
         return fail(err);
       }
@@ -65,8 +95,9 @@ function registerOrderTools(server) {
   server.tool(
     "woocommerce_get_order_tracking",
     "Get an order's shipment tracking (where-is-my-order). Reads the store's shipment-tracking " +
-      "plugin (official Shipment Tracking or Advanced Shipment Tracking) or the order's tracking " +
-      "meta. An empty list means nothing has been recorded yet.",
+      "plugin (official Shipment Tracking, Advanced Shipment Tracking, VillaTheme Orders " +
+      "Tracking, YITH Order Tracking), the order's tracking meta, or a tracking number written " +
+      "in the order notes. An empty list means nothing has been recorded yet.",
     ORDER_REF,
     async (args) => {
       try {
@@ -191,4 +222,4 @@ function registerOrderTools(server) {
   );
 }
 
-module.exports = { registerOrderTools, assertPreDispatch };
+module.exports = { registerOrderTools, assertPreDispatch, ORDER_REF };

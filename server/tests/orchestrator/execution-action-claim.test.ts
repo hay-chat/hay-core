@@ -218,6 +218,24 @@ describe("ExecutionLayer action-claim guardrail (Stage 0)", () => {
     expect(outcome?.originalMessage).toBe(originalText);
   });
 
+  it("keeps the approval request instead of handing off when a call was held this turn", async () => {
+    assessActionClaim.mockResolvedValue(failingAssessment);
+    const original = respondResult();
+    const originalText = original.userMessage;
+
+    const outcome = await invokeStageZero(original, {
+      toolsCalledThisTurn: [{ name: "woocommerce_create_refund", success: false, pending: true }],
+      turnGuardrailState: { actionClaimRetries: 1, companyInterestRetries: 0 }, // budget already spent
+    });
+
+    expect(outcome?.step).toBe("RESPOND");
+    expect(outcome?.handoff).toBeUndefined();
+    expect(outcome?.userMessage).toBe(
+      "I've asked the team to approve this. It hasn't been done yet, and you'll get their answer here in this chat.",
+    );
+    expect(outcome?.originalMessage).toBe(originalText);
+  });
+
   it("passes the turn's tool ledger to the assessment", async () => {
     assessActionClaim.mockResolvedValue(passingAssessment);
     const ledger = [{ name: "shopify_cancel_order", success: true }];

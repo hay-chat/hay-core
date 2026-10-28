@@ -1,4 +1,10 @@
 import { t, publicProcedure } from "@server/trpc";
+import { requestHostname, isDashboardHost, challengeFrameHostname } from "@server/lib/webchat-origin";
+import { isUnderAttack, recordCreateAttempt } from "@server/services/webchat/under-attack.service";
+import {
+  webchatExtensionsService,
+  type GateOutcome,
+} from "@server/services/webchat/webchat-extensions.service";
 import { z } from "zod";
 import { ConversationService } from "../../../services/conversation.service";
 import { MessageType, MessageDirection } from "../../../database/entities/message.entity";
@@ -8,6 +14,24 @@ import { conversationRepository } from "../../../repositories/conversation.repos
 import { CustomerRepository } from "../../../repositories/customer.repository";
 import { OrganizationRepository } from "../../../repositories/organization.repository";
 import { createLogger } from "@server/lib/logger";
+import {
+  webchatSettingsService,
+  matchesAllowedDomains,
+} from "../../../services/webchat/webchat-settings.service";
+import { verifiedCustomerExternalId } from "../../../services/webchat/webchat-identity.service";
+import { toPublicAttachments, toPublicMessage } from "../../../services/webchat/public-message";
+import {
+  PUBLIC_WIDGET_LIMITS,
+  isPublicWidgetRateLimited,
+} from "../../../services/public-widget-limits";
+import {
+  WIDGET_ATTACHMENT_MAX_BASE64_LENGTH,
+  WIDGET_ATTACHMENT_TYPES,
+  WidgetAttachmentRejectedError,
+  decodeBase64,
+  describeCustomerAttachments,
+  storeWidgetAttachment,
+} from "../../../services/webchat/widget-attachments";
 
 const logger = createLogger("public-conversations");
 
@@ -30,16 +54,42 @@ const createPublicConversationSchema = z.object({
     use: z.string().optional(),
   }),
   metadata: z.record(z.any()).optional(),
-  language: z.string().optional(),
+  // The widget's UI locale (BCP-47, e.g. "pt-BR"). Sets the conversation
+  // language so the greeting is written in it; unsupported languages are ignored.
+  language: z
+    .string()
+    .max(35)
+    .regex(/^[A-Za-z]{2,3}(-[A-Za-z0-9]{1,8})*$/)
+    .optional(),
   context: z.record(z.any()).optional(),
-  customerExternalId: z.string().optional(),
+  // The store's customer id, linked only when signed by the store's server
+  // with the organization's identity secret (D1, webchat-identity.service).
+  customerExternalId: z.string().max(255).optional(),
+  customerExternalIdSignature: z.string().max(128).optional(),
   isPlayground: z.boolean().optional().default(false),
+  // Token from a rendered challenge@1 contribution, or the error code when the
+  // challenge could not run. Checked by plugin gates before the conversation exists.
+  challengeToken: z.string().max(4096).optional(),
+  challengeError: z.string().max(64).optional(),
 });
 
 // Schema for sending messages
 const sendMessageSchema = z.object({
   conversationId: z.string().uuid(),
-  content: z.string(),
+  content: z.string().min(1).max(PUBLIC_WIDGET_LIMITS.maxMessageLength),
+  proof: z.string(), // DPoP proof
+  method: z.string(),
+  url: z.string(),
+  context: z.record(z.any()).optional(),
+});
+
+// Schema for sending a photo or PDF, with an optional caption (D8-9)
+const sendAttachmentSchema = z.object({
+  conversationId: z.string().uuid(),
+  data: z.string().min(1).max(WIDGET_ATTACHMENT_MAX_BASE64_LENGTH), // base64
+  mimeType: z.enum(WIDGET_ATTACHMENT_TYPES),
+  filename: z.string().min(1).max(255),
+  caption: z.string().max(PUBLIC_WIDGET_LIMITS.maxMessageLength).optional(),
   proof: z.string(), // DPoP proof
   method: z.string(),
   url: z.string(),
@@ -56,11 +106,64 @@ const getMessagesSchema = z.object({
   offset: z.number().optional().default(0),
 });
 
+/**
+ * The only metadata keys a shopper's browser may set: what the widget sends
+ * about the page. Everything else in conversation metadata is trusted by the
+ * server (dryRun, isPlayground, sourceId, runKind, test_mode, channel ids, ...)
+ * and decides whether writes are simulated or the conversation is billed, so
+ * it never comes from the public widget.
+ */
+const PUBLIC_METADATA_KEYS = ["source", "url", "referrer", "userAgent", "timestamp"] as const;
+const PUBLIC_METADATA_MAX_LENGTH = 2048;
+
+export function publicMetadata(
+  metadata: Record<string, unknown> | undefined,
+): Record<string, string> {
+  const kept: Record<string, string> = {};
+  for (const key of PUBLIC_METADATA_KEYS) {
+    const value = metadata?.[key];
+    if (typeof value === "string") kept[key] = value.slice(0, PUBLIC_METADATA_MAX_LENGTH);
+  }
+  return kept;
+}
+
 export const publicConversationsRouter = t.router({
   // Create a new public conversation with public key registration
-  create: publicProcedure.input(createPublicConversationSchema).mutation(async ({ input }) => {
+  create: publicProcedure.input(createPublicConversationSchema).mutation(async ({ input, ctx }) => {
     try {
       const organizationId = input.organizationId;
+
+      if (
+        await isPublicWidgetRateLimited([
+          { rule: "createPerIp", id: clientIp(ctx.ipAddress) },
+          { rule: "createPerOrg", id: organizationId },
+        ])
+      ) {
+        throw tooManyRequests();
+      }
+
+      const organization = await organizationRepository.findById(organizationId);
+      if (
+        !organization ||
+        organization.suspendedAt ||
+        !(await webchatSettingsService.isEnabled(organizationId))
+      ) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Webchat is not available" });
+      }
+
+      // Origin is set by the browser and cannot be changed by page scripts, so
+      // this stops an org ID from being copied onto another site. It does not
+      // stop non-browser clients, which can send any header.
+      const hostname = requestHostname(ctx.req.headers);
+      if (
+        !isDashboardHost(hostname) &&
+        !(await webchatSettingsService.isDomainAllowed(organizationId, hostname))
+      ) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "This website is not allowed to use this chat",
+        });
+      }
 
       // Validate the JWK is for ES256
       if (input.publicJwk.kty !== "EC" || input.publicJwk.crv !== "P-256") {
@@ -72,8 +175,7 @@ export const publicConversationsRouter = t.router({
 
       // Validate playground mode is allowed for this organization
       if (input.isPlayground) {
-        const organization = await organizationRepository.findById(organizationId);
-        if (!organization?.settings?.isPlayground) {
+        if (!organization.settings?.isPlayground) {
           throw new TRPCError({
             code: "FORBIDDEN",
             message: "Playground mode is not enabled for this organization",
@@ -81,15 +183,46 @@ export const publicConversationsRouter = t.router({
         }
       }
 
+      // Every create attempt counts towards the under-attack trigger (D9-10),
+      // including the ones the gates then refuse.
+      const underAttack = await recordCreateAttempt(organizationId);
+
+      // Plugin gates (e.g. a bot challenge) run before the conversation exists.
+      const gate = await webchatExtensionsService.runGates(organizationId, "conversation.create", {
+        token: input.challengeToken,
+        contributionError: input.challengeError,
+        pageHostname: hostname,
+        frameHostname: challengeFrameHostname(),
+        ip: clientIp(ctx.ipAddress),
+        underAttack,
+      });
+      if (gate.decision === "deny") throw verificationFailed();
+
+      // A signed customerExternalId links the store's customer. Unsigned or
+      // wrongly signed, the visitor is anonymous (a fresh customer).
+      const customerExternalId = await verifiedCustomerExternalId(
+        organizationId,
+        input.customerExternalId,
+        input.customerExternalIdSignature,
+      );
+      if (input.customerExternalId && !customerExternalId) {
+        logger.info({ organizationId }, "Ignored an unsigned or invalid customerExternalId");
+      }
+      const customer = customerExternalId
+        ? await customerRepository.findByExternalId(customerExternalId, organizationId)
+        : null;
+
       // Create the conversation with the public JWK
       const conversation = await conversationService.createConversation(organizationId, {
         status: "open",
+        customer_id: customer?.id ?? null,
         language: input.language || null,
         metadata: {
-          ...input.metadata,
+          ...publicMetadata(input.metadata),
           channel: "web",
           createdAt: new Date().toISOString(),
           ...(input.isPlayground ? { isPlayground: true } : {}),
+          ...(gate.results.length > 0 ? { botCheck: botCheckRecord(gate) } : {}),
         },
       });
 
@@ -103,19 +236,6 @@ export const publicConversationsRouter = t.router({
           : {}),
       });
 
-      // Link customer if customerExternalId is provided
-      if (input.customerExternalId) {
-        const customer = await customerRepository.findByExternalId(
-          input.customerExternalId,
-          organizationId,
-        );
-        if (customer) {
-          await conversationRepository.updateById(conversation.id, {
-            customer_id: customer.id,
-          });
-        }
-      }
-
       // Generate initial nonce for this conversation
       const nonce = await dpopCacheService.generateNonce(conversation.id);
 
@@ -125,6 +245,9 @@ export const publicConversationsRouter = t.router({
         createdAt: conversation.created_at,
       };
     } catch (error) {
+      if (error instanceof TRPCError) {
+        throw error;
+      }
       logger.error({ err: error }, "Error creating public conversation");
       throw new TRPCError({
         code: "INTERNAL_SERVER_ERROR",
@@ -175,22 +298,20 @@ export const publicConversationsRouter = t.router({
       const isPlayground = conversation?.metadata?.isPlayground === true;
       const messages = isPlayground
         ? await conversationRepository.getMessages(input.conversationId)
-        : await conversationRepository.getPublicMessages(input.conversationId);
+        : await conversationRepository.getWidgetMessages(input.conversationId);
 
-      // Filter to only return customer-facing messages
-      const filteredMessages = messages
-        .slice(input.offset, input.offset + input.limit)
-        .map((msg) => ({
-          id: msg.id,
-          content: msg.content,
-          type: msg.type,
-          sender: msg.sender,
-          direction:
-            msg.direction ||
-            (msg.type === MessageType.CUSTOMER ? MessageDirection.IN : MessageDirection.OUT),
-          createdAt: msg.created_at,
-          metadata: msg.metadata,
-        }));
+      // Filter to only return customer-facing messages; files get signed links
+      const organizationId = conversation?.organization_id;
+      const filteredMessages = await Promise.all(
+        messages.slice(input.offset, input.offset + input.limit).map(async (msg) =>
+          toPublicMessage(msg, {
+            isPlayground,
+            attachments: organizationId
+              ? await toPublicAttachments(msg.attachments, organizationId)
+              : [],
+          }),
+        ),
+      );
 
       return {
         messages: filteredMessages,
@@ -198,7 +319,7 @@ export const publicConversationsRouter = t.router({
         hasMore: filteredMessages.length === input.limit,
         typing: isTyping,
         status: conversation?.status || "open",
-        isClosed: conversation?.status === "closed" || conversation?.status === "resolved",
+        isClosed: ["closed", "resolved", "unresolved"].includes(conversation?.status ?? ""),
         error: null,
         errorMessage: null,
       };
@@ -215,8 +336,15 @@ export const publicConversationsRouter = t.router({
   }),
 
   // Send a message to a conversation (requires DPoP proof)
-  sendMessage: publicProcedure.input(sendMessageSchema).mutation(async ({ input }) => {
+  sendMessage: publicProcedure.input(sendMessageSchema).mutation(async ({ input, ctx }) => {
     try {
+      // Per IP before DPoP so a flood never reaches signature verification.
+      if (
+        await isPublicWidgetRateLimited([{ rule: "messagePerIp", id: clientIp(ctx.ipAddress) }])
+      ) {
+        throw tooManyRequests();
+      }
+
       // Verify DPoP proof
       const verified = await verifyDPoPForRequest(
         input.conversationId,
@@ -242,6 +370,16 @@ export const publicConversationsRouter = t.router({
         });
       }
 
+      // Per conversation only after the proof checks out, so knowing a
+      // conversationId is not enough to spend (and mute) a shopper's budget.
+      if (
+        await isPublicWidgetRateLimited([
+          { rule: "messagePerConversation", id: input.conversationId },
+        ])
+      ) {
+        throw tooManyRequests();
+      }
+
       // Get the conversation instance to use the addMessage method
       const conversation = await conversationRepository.findById(input.conversationId);
       if (!conversation) {
@@ -250,6 +388,18 @@ export const publicConversationsRouter = t.router({
           message: "Conversation not found",
         });
       }
+
+      const gate = await webchatExtensionsService.runGates(
+        conversation.organization_id,
+        "message.send",
+        {
+          pageHostname: requestHostname(ctx.req.headers),
+          frameHostname: challengeFrameHostname(),
+          ip: clientIp(ctx.ipAddress),
+          underAttack: await isUnderAttack(conversation.organization_id),
+        },
+      );
+      if (gate.decision === "deny") throw verificationFailed();
 
       // Add the message using the entity method which handles cooldown
       const message = await conversation.addMessage({
@@ -285,6 +435,164 @@ export const publicConversationsRouter = t.router({
       });
     }
   }),
+
+  // D8-9: the shopper sends a photo or PDF (requires DPoP proof). The file and
+  // its message are stored in the conversation's organization in one call.
+  sendAttachment: publicProcedure.input(sendAttachmentSchema).mutation(async ({ input, ctx }) => {
+    // Per IP before DPoP so a flood never reaches signature verification.
+    if (
+      await isPublicWidgetRateLimited([{ rule: "attachmentPerIp", id: clientIp(ctx.ipAddress) }])
+    ) {
+      throw tooManyRequests();
+    }
+
+    // The proof shows the caller holds this conversation's key: it is the
+    // ownership check. The organization is the conversation's, never the input's.
+    const verified = await verifyDPoPForRequest(
+      input.conversationId,
+      input.proof,
+      input.method,
+      input.url,
+    );
+    if (!verified.success) {
+      if (verified.newNonce && verified.error === "Invalid or expired nonce") {
+        return {
+          messageId: null,
+          nonce: verified.newNonce,
+          createdAt: null,
+          attachment: null,
+          error: "NONCE_EXPIRED",
+          errorMessage: verified.error,
+        };
+      }
+      throw new TRPCError({
+        code: "UNAUTHORIZED",
+        message: verified.error || "Invalid DPoP proof",
+      });
+    }
+
+    if (
+      await isPublicWidgetRateLimited([
+        { rule: "attachmentPerConversation", id: input.conversationId },
+      ])
+    ) {
+      throw tooManyRequests();
+    }
+
+    const conversation = await conversationRepository.findById(input.conversationId);
+    if (!conversation) {
+      throw new TRPCError({ code: "NOT_FOUND", message: "Conversation not found" });
+    }
+    const organizationId = conversation.organization_id;
+    // Broadest last, so one conversation's flood only spends its own budget first.
+    if (await isPublicWidgetRateLimited([{ rule: "attachmentPerOrg", id: organizationId }])) {
+      throw tooManyRequests();
+    }
+
+    // Same gate as starting a chat: the organization must still offer webchat.
+    const organization = await organizationRepository.findById(organizationId);
+    if (
+      !organization ||
+      organization.suspendedAt ||
+      !(await webchatSettingsService.isEnabled(organizationId))
+    ) {
+      throw new TRPCError({ code: "FORBIDDEN", message: "Webchat is not available" });
+    }
+
+    const buffer = decodeBase64(input.data);
+    if (!buffer) {
+      throw new TRPCError({ code: "BAD_REQUEST", message: "Invalid file data" });
+    }
+
+    let attachment;
+    try {
+      attachment = await storeWidgetAttachment({
+        organizationId,
+        buffer,
+        mimeType: input.mimeType,
+        filename: input.filename,
+      });
+    } catch (error) {
+      if (error instanceof WidgetAttachmentRejectedError) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: error.message });
+      }
+      logger.error({ err: error }, "Error storing widget attachment");
+      throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to send file" });
+    }
+
+    const caption = input.caption?.trim();
+    const message = await conversation.addMessage({
+      content: caption || describeCustomerAttachments([attachment]),
+      type: MessageType.CUSTOMER,
+      attachments: [attachment],
+      metadata: {
+        direction: MessageDirection.IN,
+        timestamp: new Date().toISOString(),
+        ...(caption ? {} : { mediaPlaceholder: true }),
+      },
+    });
+
+    if (input.context && Object.keys(input.context).length > 0) {
+      const merged = { ...(conversation.context ?? {}), ...input.context };
+      await conversationRepository.updateById(conversation.id, { context: merged });
+    }
+
+    const [publicAttachment] = await toPublicAttachments([attachment], organizationId);
+    return {
+      messageId: message.id,
+      nonce: verified.newNonce,
+      createdAt: message.created_at,
+      attachment: publicAttachment ?? null,
+      error: null,
+      errorMessage: null,
+    };
+  }),
+
+  // D5-8: the shopper leaves an email at hand-off so the team's reply can reach
+  // them after they leave (requires DPoP proof). Email only, with consent.
+  setContactEmail: publicProcedure
+    .input(
+      z.object({
+        conversationId: z.string().uuid(),
+        email: z.string().trim().toLowerCase().email().max(255),
+        proof: z.string(),
+        method: z.string(),
+        url: z.string(),
+      }),
+    )
+    .mutation(async ({ input, ctx }) => {
+      if (
+        await isPublicWidgetRateLimited([{ rule: "messagePerIp", id: clientIp(ctx.ipAddress) }])
+      ) {
+        throw tooManyRequests();
+      }
+
+      const verified = await verifyDPoPForRequest(
+        input.conversationId,
+        input.proof,
+        input.method,
+        input.url,
+      );
+      if (!verified.success) {
+        if (verified.newNonce && verified.error === "Invalid or expired nonce") {
+          return { saved: false, nonce: verified.newNonce, error: "NONCE_EXPIRED" };
+        }
+        throw new TRPCError({
+          code: "UNAUTHORIZED",
+          message: verified.error || "Invalid DPoP proof",
+        });
+      }
+
+      const conversation = await conversationRepository.findById(input.conversationId);
+      if (!conversation) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Conversation not found" });
+      }
+
+      const { saveHandoffEmail } = await import("@server/services/web-follow-up.service");
+      await saveHandoffEmail(conversation, input.email);
+
+      return { saved: true, nonce: verified.newNonce, error: null };
+    }),
 
   // Rotate the keypair for a conversation (requires valid DPoP with old key)
   rotateKeys: publicProcedure
@@ -351,6 +659,33 @@ export const publicConversationsRouter = t.router({
       }
     }),
 });
+
+function clientIp(ipAddress: string | undefined): string {
+  return ipAddress || "Unknown";
+}
+
+function tooManyRequests(): TRPCError {
+  return new TRPCError({
+    code: "TOO_MANY_REQUESTS",
+    message: "Too many requests. Please wait a moment and try again.",
+  });
+}
+
+/** Machine-readable refusal the widget maps to a "could not verify" message. */
+export const VERIFICATION_FAILED = "VERIFICATION_FAILED";
+
+function verificationFailed(): TRPCError {
+  return new TRPCError({ code: "FORBIDDEN", message: VERIFICATION_FAILED });
+}
+
+/** What the conversation keeps from a gate run (read by the spam detector). */
+function botCheckRecord(gate: GateOutcome) {
+  return {
+    decision: gate.decision,
+    results: gate.results,
+    checkedAt: new Date().toISOString(),
+  };
+}
 
 // Public components of an EC JWK used for DPoP proof verification.
 interface EcPublicJwk {

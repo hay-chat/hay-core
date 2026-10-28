@@ -61,12 +61,49 @@ export interface MessageProviderError {
   message?: string;
 }
 
+/** What the vision pass decided a file is (D8-11). */
+export const MEDIA_CLASSES = [
+  "damage",
+  "product",
+  "receipt",
+  "id_document",
+  "card",
+  "screenshot",
+  "other",
+] as const;
+export type MediaClass = (typeof MEDIA_CLASSES)[number];
+
+/**
+ * Result of the vision pass on a customer's image or PDF (D8-11/12). Shown to
+ * the AI through services/media-analysis/agent-view.ts, never to the shopper.
+ * A withheld file (ID document or payment card) keeps only its class: no
+ * description, fields or text are stored for it.
+ */
+export interface AttachmentAnalysis {
+  status: "pending" | "done" | "failed" | "skipped";
+  /** Why it was skipped or failed, e.g. "disabled", "scan_blocked", "no_text". */
+  reason?: string;
+  class?: MediaClass;
+  /** True when the AI must not see what the file shows (D8-12). */
+  withheld?: boolean;
+  description?: string;
+  /** Fields read from the file, e.g. lot_number, order_number, amount. */
+  fields?: Record<string, string>;
+  /** PDF text (card numbers removed, truncated). */
+  text?: string;
+  startedAt?: string;
+  analyzedAt?: string;
+}
+
 export interface MessageAttachment {
   id: string;
   name: string;
   url: string;
   type: string;
   size: number;
+  analysis?: AttachmentAnalysis;
+  /** Virus scan of a document (D8-4); absent when the file was not scanned. */
+  scan?: "pending" | "clean" | "infected" | "error";
 }
 
 @Entity("messages")
@@ -127,6 +164,10 @@ export class Message {
     completion_tokens?: number;
     total_tokens?: number;
     latency_ms?: number;
+    /** AI processing region in effect when a BotAgent reply was saved (D14-5). */
+    aiRegion?: "default" | "eu";
+    /** This AI reply opened with the AI disclosure line on its channel (D14-7). */
+    aiDisclosureSent?: boolean;
     confidence?: number;
     confidenceBreakdown?: {
       grounding: number;
@@ -135,7 +176,8 @@ export class Message {
     };
     confidenceTier?: "high" | "medium" | "low";
     confidenceDetails?: string;
-    documentsUsed?: Array<{ id: string; title: string; similarity: number }>;
+    /** `excerpt`: the knowledge-base text the AI read (dispute evidence, G5). */
+    documentsUsed?: Array<{ id: string; title: string; similarity: number; excerpt?: string }>;
     recheckAttempted?: boolean;
     recheckCount?: number;
     // Tool execution metadata
@@ -143,9 +185,16 @@ export class Message {
     toolInput?: Record<string, unknown>;
     toolOutput?: unknown;
     toolLatencyMs?: number;
-    httpStatus?: number;
+    /** Tool error code from @hay/plugin-sdk/tool-errors when toolStatus is ERROR. */
+    toolErrorCode?: string;
     toolStatus?: string;
     toolExecutedAt?: string;
+    /** The pending action this call opened or answered from (D4-4). */
+    pendingActionId?: string;
+    /** A NEEDS_CONFIRMATION ask the shopper answered and a later call used (D4-10). */
+    confirmationUsed?: boolean;
+    /** System note telling the AI how a team member decided that action. */
+    isApprovalDecision?: boolean;
     // Playbook & Document metadata
     isPlaybook?: boolean;
     playbookId?: string;
@@ -154,12 +203,19 @@ export class Message {
     documentTitle?: string;
     // Conversation management metadata
     isInactivityWarning?: boolean;
+    /** "Our team will reply here", sent once while the AI is paused (D11-9). */
+    isPausedNotice?: boolean;
+    /** "We've received it", sent once while the organization is locked (D15-4). */
+    isSuspendedHoldingReply?: boolean;
     warningTimestamp?: string;
     reason?: string;
     inactivity_duration_ms?: number;
     isClosureMessage?: boolean;
     closureReason?: string;
     blockReason?: string;
+    /** Action-claim guardrail on this reply; passed=false survived the retries (D7-10). */
+    actionClaim?: { passed: boolean; claimedActions: string[] };
+    actionClaimRetryAttempted?: boolean;
     // Handoff metadata
     isHandoffMessage?: boolean;
     handoffType?: string;

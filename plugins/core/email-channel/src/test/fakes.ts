@@ -81,6 +81,10 @@ export function fakeApi(
     sendResult?: SendEmailResult;
     sendThrows?: Error;
     queryThrows?: Error;
+    /** What `email.sendingDomain` reports (D13-9). */
+    sendingDomain?: string | null;
+    /** media.upload fails for these filenames, as core does for refused types. */
+    uploadRejects?: string[];
   } = {},
 ): FakeApi {
   const api: FakeApi = {
@@ -99,6 +103,9 @@ export function fakeApi(
         } as T;
       }
       if (procedure === "media.upload") {
+        if (options.uploadRejects?.includes(String(input.filename))) {
+          throw new Error("Plugin API call failed: 400 File type not allowed");
+        }
         return {
           id: "att-1",
           name: input.filename,
@@ -113,6 +120,9 @@ export function fakeApi(
       api.queries.push({ procedure, input });
       if (options.queryThrows) {
         throw options.queryThrows;
+      }
+      if (procedure === "email.sendingDomain") {
+        return { domain: options.sendingDomain ?? null } as T;
       }
       return (options.messages ?? []) as T;
     },

@@ -1,5 +1,14 @@
 <template>
+  <!-- A team member joined or left: a centred line, as the shopper sees it -->
+  <div v-if="agentNoticeText" class="flex justify-center py-1">
+    <span
+      class="inline-flex items-center px-3 py-1 bg-background-tertiary rounded-full text-sm text-neutral-muted text-center"
+    >
+      {{ agentNoticeText }}
+    </span>
+  </div>
   <div
+    v-else
     :class="[
       'chat-message',
       `chat-message--${message.type}`,
@@ -27,7 +36,7 @@
         <div v-if="isQueued && showApproval" class="mb-2 flex-1">
           <Badge variant="outline" class="text-xs">
             <Clock class="h-3 w-3 mr-1" />
-            Queued for Approval
+            {{ t("conversations.draftApproval.queued") }}
           </Badge>
         </div>
 
@@ -56,7 +65,7 @@
         </div>
       </template>
       <div
-        v-else
+        v-else-if="!hidesMediaPlaceholder"
         :class="[
           'chat-message__bubble',
           {
@@ -98,9 +107,17 @@
             :tool-input="message.metadata?.toolInput"
             :tool-output="message.metadata?.toolOutput"
             :tool-status="message.metadata?.toolStatus"
-            :http-status="message.metadata?.httpStatus"
             :latency="message.metadata?.toolLatencyMs"
             :executed-at="message.metadata?.toolExecutedAt"
+            :tool-error-code="message.metadata?.toolErrorCode"
+          />
+          <PendingActionCard
+            v-if="
+              message.metadata?.toolStatus === 'PENDING_APPROVAL' &&
+              message.metadata?.pendingActionId
+            "
+            :pending-action-id="message.metadata.pendingActionId"
+            :conversation-id="message.conversation_id"
           />
         </div>
         <div v-else-if="message.type === 'ProductRecommendation'">
@@ -226,35 +243,77 @@
           :key="attachment.id"
           class="chat-message__attachment"
         >
-          <img
-            v-if="attachment.type.startsWith('image/')"
-            :src="attachment.url"
-            :alt="attachment.name"
-            class="chat-message__attachment-media"
-          />
+          <span v-if="failedAttachments[attachment.id]" class="chat-message__attachment-error">
+            <AlertCircle class="chat-message__attachment-icon" />
+            {{ t("conversations.attachment.loadFailed") }}
+          </span>
+          <div
+            v-else-if="attachment.type.startsWith('image/')"
+            class="chat-message__attachment-image"
+          >
+            <img
+              :src="attachmentUrls[attachment.id]"
+              :alt="attachment.name"
+              class="chat-message__attachment-media"
+              :class="{ 'chat-message__attachment-media--blurred': isBlurred(attachment) }"
+            />
+            <button
+              v-if="isBlurred(attachment)"
+              type="button"
+              class="chat-message__attachment-reveal"
+              @click="revealAttachment(attachment)"
+            >
+              <EyeOff class="chat-message__attachment-icon" />
+              {{ t("conversations.attachment.reveal") }}
+            </button>
+          </div>
           <audio
             v-else-if="attachment.type.startsWith('audio/')"
-            :src="attachment.url"
+            :src="attachmentUrls[attachment.id]"
             controls
             class="chat-message__attachment-media"
           />
           <video
             v-else-if="attachment.type.startsWith('video/')"
-            :src="attachment.url"
+            :src="attachmentUrls[attachment.id]"
             controls
             class="chat-message__attachment-media"
           />
+          <!-- Documents held by the virus scan (D8-4) can't be opened. -->
+          <span
+            v-else-if="attachment.scan && attachment.scan !== 'clean'"
+            class="chat-message__attachment-file"
+            :class="{ 'chat-message__attachment-error': attachment.scan !== 'pending' }"
+          >
+            <Hourglass v-if="attachment.scan === 'pending'" class="chat-message__attachment-icon" />
+            <ShieldAlert v-else class="chat-message__attachment-icon" />
+            <span>{{ attachment.name }}</span>
+            <span class="opacity-70">
+              ·
+              {{
+                attachment.scan === "pending"
+                  ? t("conversations.attachment.scanning")
+                  : t("conversations.attachment.scanBlocked")
+              }}
+            </span>
+          </span>
           <a
             v-else
-            :href="attachment.url"
-            target="_blank"
-            rel="noopener"
+            href="#"
             class="chat-message__attachment-file"
+            @click.prevent="openAttachment(attachment)"
           >
             <Paperclip class="chat-message__attachment-icon" />
             <span>{{ attachment.name }}</span>
             <span class="opacity-70">({{ formatFileSize(attachment.size) }})</span>
           </a>
+          <p
+            v-if="analysisCaption(attachment)"
+            class="chat-message__attachment-analysis"
+            :title="analysisCaption(attachment)"
+          >
+            {{ analysisCaption(attachment) }}
+          </p>
         </div>
       </div>
       <!-- Queued Message Actions (Test Mode) -->
@@ -262,11 +321,11 @@
         <div class="flex gap-2 mt-2 mb-4">
           <Button size="sm" variant="success" @click="handleApproveClick">
             <Check class="h-3 w-3 mr-1" />
-            Approve & Send
+            {{ t("conversations.draftApproval.approve") }}
           </Button>
           <Button size="sm" variant="destructive" @click="handleBlockClick">
             <Ban class="h-3 w-3 mr-1" />
-            Block
+            {{ t("conversations.draftApproval.block") }}
           </Button>
         </div>
       </div>
@@ -293,6 +352,16 @@
               :message-id="message.id"
               @feedback-submitted="handleFeedbackSubmitted"
             />
+            <Button
+              v-if="showSaveAsTest"
+              variant="ghost"
+              size="sm"
+              class="text-xs"
+              data-testid="save-as-test"
+              @click="emit('saveAsTest', message.id)"
+            >
+              {{ $t("tests.save.button") }}
+            </Button>
           </div>
 
           <!-- Right side: timestamp + debug button -->
@@ -480,7 +549,21 @@
             </div>
           </div>
 
-          <!-- Section 5: Performance Metadata -->
+          <!-- Section 5: Where AI processed this reply (D14-5) -->
+          <div v-if="message.metadata?.aiRegion" class="debug-section">
+            <h3 class="debug-section__title">{{ t("conversations.debug.aiProcessing") }}</h3>
+            <div class="debug-section__content">
+              <p class="text-sm">
+                {{
+                  message.metadata.aiRegion === "eu"
+                    ? t("conversations.debug.aiRegionEu")
+                    : t("conversations.debug.aiRegionDefault")
+                }}
+              </p>
+            </div>
+          </div>
+
+          <!-- Section 6: Performance Metadata -->
           <div
             v-if="message.metadata?.latency_ms || message.metadata?.total_tokens"
             class="debug-section"
@@ -539,6 +622,9 @@ import {
   AlertCircle,
   RotateCcw,
   Sparkles,
+  EyeOff,
+  Hourglass,
+  ShieldAlert,
 } from "lucide-vue-next";
 import {
   TooltipProvider,
@@ -551,19 +637,32 @@ import { markdownToHtml } from "@/utils/markdownToHtml";
 import { splitMarkdownImages } from "@/utils/splitMarkdownImages";
 import { formatRelativeTimeLong } from "@/utils/date";
 import { useNow } from "@/composables/useNow";
+import { resolveMediaUrl } from "@/composables/useMediaUrl";
 import { MessageStatus, type Message, MessageSentiment } from "@/types/message";
 import { useI18n } from "vue-i18n";
+import { agentNotice } from "@/utils/agentNotice";
 
 const { t } = useI18n();
 
 /** Provider error codes that mean "outside the 24h customer service window". */
 const WINDOW_EXPIRED_CODES = new Set(["24h_window_expired", "131047", 131047]);
+/** Generic delivery codes (core retries and channel plugins) with a friendly text. */
+const DELIVERY_CODE_TEXT: Record<string, string> = {
+  rate_limited: "conversations.delivery.codes.retriedOut",
+  graph_unavailable: "conversations.delivery.codes.retriedOut",
+  worker_unavailable: "conversations.delivery.codes.retriedOut",
+  worker_unreachable: "conversations.delivery.codes.retriedOut",
+  delivery_uncertain: "conversations.delivery.codes.uncertain",
+  send_uncertain: "conversations.delivery.codes.uncertain",
+};
 
 interface Props {
   message: Message;
   inverted?: boolean;
   showFeedback?: boolean;
   showApproval?: boolean;
+  /** Offer "Save as test case" on sent AI replies (D7-12). */
+  showSaveAsTest?: boolean;
   /**
    * Whether to render this message's timestamp. The parent hides it for all but
    * the last of a run of consecutive same-author messages within the same minute.
@@ -578,9 +677,18 @@ interface Props {
 const props = withDefaults(defineProps<Props>(), {
   showFeedback: false,
   showApproval: false,
+  showSaveAsTest: false,
   showTimestamp: true,
   botAvatarUrl: null,
   humanAvatarUrl: null,
+});
+
+// Takeover/release System messages read as "Marina Souza joined the chat"
+const agentNoticeText = computed(() => {
+  const notice = agentNotice(props.message);
+  if (!notice) return null;
+  const name = notice.name || t("conversations.agentNotice.teamMember");
+  return t(`conversations.agentNotice.${notice.key}`, { name });
 });
 
 const emit = defineEmits<{
@@ -591,6 +699,7 @@ const emit = defineEmits<{
   messageApproved: [messageId: string];
   messageBlocked: [messageId: string];
   retry: [messageId: string];
+  saveAsTest: [messageId: string];
 }>();
 
 // Split plain agent/customer text into one bubble per image. Only regular text
@@ -601,6 +710,14 @@ const SPLIT_EXCLUDED_TYPES = ["Playbook", "Document", "Tool", "ProductRecommenda
 const contentSegments = computed(() => splitMarkdownImages(props.message.content || ""));
 const isImageSegment = (segment: string): boolean =>
   /^!\[[^\]]*\]\([^)]*\)\s*$/.test(segment.trim());
+// "[Customer sent a photo]" is the line the AI reads; staff see the files themselves.
+// A file-only message (staff composer, AI send_attachment) has no text bubble either.
+const hidesMediaPlaceholder = computed(
+  () =>
+    (props.message.metadata?.mediaPlaceholder === true || !props.message.content?.trim()) &&
+    !!props.message.attachments?.length,
+);
+
 const isSegmented = computed(
   () =>
     !SPLIT_EXCLUDED_TYPES.includes(props.message.type) &&
@@ -620,7 +737,8 @@ const hasDebugData = computed(() => {
     props.message.metadata?.executionRationale ||
     props.message.metadata?.confidence ||
     props.message.metadata?.documentsUsed?.length ||
-    props.message.metadata?.companyInterest
+    props.message.metadata?.companyInterest ||
+    props.message.metadata?.aiRegion
   );
 });
 
@@ -638,9 +756,88 @@ const providerErrorText = computed(() => {
   if (error?.code !== undefined && WINDOW_EXPIRED_CODES.has(error.code)) {
     return t("conversations.delivery.windowExpired");
   }
+  const friendly = typeof error?.code === "string" ? DELIVERY_CODE_TEXT[error.code] : undefined;
+  if (friendly) {
+    return t(friendly);
+  }
   const text = error?.title ?? error?.message ?? error?.code;
   return text !== undefined && text !== "" ? String(text) : t("conversations.delivery.failed");
 });
+
+type MessageAttachment = NonNullable<Message["attachments"]>[number];
+
+// Attachments are private uploads: images, audio and video are fetched with the
+// session as soon as the message renders; other files only when clicked.
+const attachmentUrls = ref<Record<string, string>>({});
+const failedAttachments = ref<Record<string, boolean>>({});
+
+const isInlineMedia = (type: string): boolean => /^(image|audio|video)\//.test(type);
+
+watch(
+  () => props.message.attachments,
+  (attachments) => {
+    for (const attachment of attachments ?? []) {
+      if (!isInlineMedia(attachment.type) || attachmentUrls.value[attachment.id]) continue;
+      resolveMediaUrl(attachment)
+        .then((url) => {
+          attachmentUrls.value[attachment.id] = url;
+        })
+        .catch(() => {
+          failedAttachments.value[attachment.id] = true;
+        });
+    }
+  },
+  { immediate: true },
+);
+
+const openAttachment = async (attachment: MessageAttachment): Promise<void> => {
+  try {
+    const link = document.createElement("a");
+    link.href = await resolveMediaUrl(attachment);
+    link.download = attachment.name;
+    link.rel = "noopener";
+    link.click();
+  } catch {
+    failedAttachments.value[attachment.id] = true;
+  }
+};
+
+// ID documents and payment cards (D8-12) stay blurred until a staff member
+// clicks reveal. Photos not read yet are blurred too, so a card photo is never
+// shown in the clear while the vision pass is still running.
+const revealedAttachments = ref<Record<string, boolean>>({});
+
+const isBlurred = (attachment: MessageAttachment): boolean => {
+  if (revealedAttachments.value[attachment.id]) return false;
+  const analysis = attachment.analysis;
+  return (
+    analysis?.status === "pending" ||
+    analysis?.withheld === true ||
+    analysis?.class === "id_document" ||
+    analysis?.class === "card"
+  );
+};
+
+const revealAttachment = (attachment: MessageAttachment): void => {
+  revealedAttachments.value[attachment.id] = true;
+};
+
+// What the AI read from a customer's photo or PDF (D8-11), shown under the file.
+const analysisCaption = (attachment: MessageAttachment): string => {
+  const analysis = attachment.analysis;
+  if (!analysis) return "";
+  if (analysis.status === "pending") return t("conversations.attachment.analysisPending");
+  if (analysis.withheld) {
+    return analysis.class === "card"
+      ? t("conversations.attachment.withheldCard")
+      : t("conversations.attachment.withheldId");
+  }
+  if (analysis.status === "done" && analysis.description) {
+    return t("conversations.attachment.analysisRead", { description: analysis.description });
+  }
+  if (analysis.status === "failed") return t("conversations.attachment.analysisFailed");
+  return "";
+};
 
 const formatFileSize = (bytes: number): string => {
   if (bytes < 1024) return `${bytes} B`;
@@ -996,6 +1193,49 @@ const getConfidenceIcon = (tier: string | undefined) => {
   gap: 0.375rem;
   font-size: 0.75rem;
   text-decoration: underline;
+}
+
+.chat-message__attachment-error {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  font-size: 0.75rem;
+  color: var(--color-red-600);
+}
+
+.chat-message__attachment-image {
+  position: relative;
+  overflow: hidden;
+  border-radius: inherit;
+}
+
+.chat-message__attachment-media--blurred {
+  filter: blur(24px);
+}
+
+.chat-message__attachment-reveal {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.375rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: #fff;
+  background: rgb(0 0 0 / 0.35);
+}
+
+.chat-message__attachment-reveal:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: -4px;
+}
+
+.chat-message__attachment-analysis {
+  margin-top: 0.25rem;
+  font-size: 0.75rem;
+  line-height: 1.1rem;
+  opacity: 0.75;
 }
 
 .chat-message__attachment-icon {

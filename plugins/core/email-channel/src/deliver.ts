@@ -12,9 +12,9 @@ import { outboundMessageId, replySubject, splitAddress, tokenAddress } from "./t
  * recognised as an echo, and our own Message-ID so later replies thread back.
  *
  * Error semantics mirror the WhatsApp channel: a refused send → 200
- * `{success:false, error}`; Hay's own API unreachable → 503. Core marks the
- * message failed in both cases today (no delivery retry exists yet); the
- * status split keeps the two causes apart in logs.
+ * `{success:false, error}`; Hay's own API unreachable before anything was
+ * sent → 503, which core retries. A `sendEmail` call that threw may already
+ * have sent the mail, so it is a final 200 `send_uncertain`, never a retry.
  */
 
 export interface DeliverResult {
@@ -113,6 +113,30 @@ export function threadingFromMessages(
   return { inReplyTo, references, subject };
 }
 
+/**
+ * From address for a reply (D13-9): the merchant's support address once core
+ * reports its domain as the organization's verified sending domain, else the
+ * platform address. A failed lookup falls back to the platform address.
+ */
+export async function senderAddress(
+  settings: { supportAddress: string | null; fromAddress: string },
+  ctx: Pick<ChannelContext, "api" | "logger">,
+): Promise<string> {
+  if (!settings.supportAddress) return settings.fromAddress;
+  try {
+    const { domain } = await ctx.api.query<{ domain: string | null }>("email.sendingDomain", {});
+    const supportDomain = splitAddress(settings.supportAddress).domain.toLowerCase();
+    return domain && domain.toLowerCase() === supportDomain
+      ? settings.supportAddress
+      : settings.fromAddress;
+  } catch (error: unknown) {
+    ctx.logger.warn("Could not read the verified sending domain; using the platform address", {
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return settings.fromAddress;
+  }
+}
+
 export async function deliver(
   payload: unknown,
   ctx: ChannelContext,
@@ -144,7 +168,8 @@ export async function deliver(
   }
 
   const threading = threadingFromMessages(messages, parsed.conversationMetadata);
-  const fromDomain = splitAddress(settings.fromAddress).domain;
+  const fromAddress = await senderAddress(settings, ctx);
+  const fromDomain = splitAddress(fromAddress).domain;
   const ourMessageId = outboundMessageId(parsed.messageId, fromDomain);
 
   // RFC 3834 + the Exchange equivalent: tell the shopper's auto-responders
@@ -201,7 +226,7 @@ export async function deliver(
       subject: replySubject(threading.subject, fallbackSubject),
       body,
       html: textToHtml(body),
-      from: { email: settings.fromAddress, name: settings.storeName },
+      from: { email: fromAddress, name: settings.storeName },
       replyTo: tokenAddress(settings.alias, parsed.conversationId),
       bcc: settings.bccArchive && settings.supportAddress ? [settings.supportAddress] : undefined,
       headers,
@@ -221,10 +246,10 @@ export async function deliver(
       body: { success: true, providerMessageId: result.messageId ?? ourMessageId },
     };
   } catch (error: unknown) {
-    ctx.logger.error("Email delivery failed — Hay API unreachable", {
+    ctx.logger.error("Email delivery failed — outcome unknown, not retried", {
       conversationId: parsed.conversationId,
       error: error instanceof Error ? error.message : String(error),
     });
-    return { status: 503, body: { success: false, error: "hay_api_unavailable" } };
+    return { status: 200, body: { success: false, error: "send_uncertain" } };
   }
 }

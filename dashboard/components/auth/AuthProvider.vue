@@ -26,6 +26,7 @@
 import { useAuthStore } from "@/stores/auth";
 import { useHeartbeat } from "@/composables/useHeartbeat";
 import { Hay } from "@/utils/api";
+import { isDefinitiveAuthFailure } from "@/utils/session-refresh";
 
 const authStore = useAuthStore();
 const route = useRoute();
@@ -105,6 +106,13 @@ const initializeAuth = async () => {
     } catch (error) {
       console.error("[AuthProvider] Failed to initialize auth:", error);
 
+      if (!isDefinitiveAuthFailure(error)) {
+        // Offline or server unreachable, nothing cached yet: keep the session,
+        // stay on the loading screen and try again when the network is back.
+        retryInitializeWhenOnline();
+        return;
+      }
+
       // Only logout and redirect if we're not on a public page
       if (!isPublicPath.value) {
         authStore.logout();
@@ -118,6 +126,20 @@ const initializeAuth = async () => {
     // Auth already initialized and authenticated, start heartbeat
     startHeartbeat();
   }
+};
+
+let initRetryTimer: ReturnType<typeof setTimeout> | null = null;
+
+const retryInitializeWhenOnline = () => {
+  const retry = () => {
+    window.removeEventListener("online", retry);
+    if (initRetryTimer) clearTimeout(initRetryTimer);
+    initRetryTimer = null;
+    showRefreshMessage.value = true;
+    initializeAuth();
+  };
+  window.addEventListener("online", retry);
+  initRetryTimer = setTimeout(retry, 5000);
 };
 
 // Initialize auth on mount
@@ -169,6 +191,9 @@ onUnmounted(() => {
   stopHeartbeat();
   if (refreshTimer.value) {
     clearTimeout(refreshTimer.value);
+  }
+  if (initRetryTimer) {
+    clearTimeout(initRetryTimer);
   }
 });
 </script>

@@ -160,6 +160,8 @@ const props = defineProps<{
   playbookId: string;
   conversationId?: string;
   initialSelection?: string;
+  /** Prefilled brief (an approved insight); generates the suggestion right away. */
+  initialFeedback?: string;
 }>();
 
 const emit = defineEmits<{
@@ -181,9 +183,10 @@ watch(
   (open) => {
     if (open) {
       phase.value = "input";
-      feedback.value = "";
+      feedback.value = props.initialFeedback ?? "";
       result.value = null;
       staleWarning.value = false;
+      if (props.initialFeedback) void generate();
     }
   },
 );

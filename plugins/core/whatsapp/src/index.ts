@@ -8,6 +8,7 @@ import { isTrustedWebhook, verificationChallenge } from "./signature.js";
 import { getChannelStatus } from "./status.js";
 import { handleWebhook } from "./webhook.js";
 import { deliver } from "./deliver.js";
+import { DEFAULT_HANDOFF_TEMPLATE, TemplateStore } from "./templates.js";
 import type { ChannelContext } from "./context.js";
 
 /**
@@ -66,14 +67,31 @@ export default defineHayPlugin((globalCtx) => {
   let mode: ConnectionMode = "embedded-signup";
   let appId: string | null = null;
   let configId: string | null = null;
+  let handoffTemplateName = DEFAULT_HANDOFF_TEMPLATE;
   const graph = new GraphClient({ logger });
+  const templates = new TemplateStore(graph, logger);
 
   const channelContext = (): ChannelContext => ({
     getConnection: () => connection,
     graph,
     api: new PluginApiClient(logger),
     logger,
+    templates,
+    handoffTemplateName,
   });
+
+  const readHandoffTemplate = (config: HayConfigRuntimeAPI): string =>
+    config.getOptional<string>("handoffTemplateName")?.trim() || DEFAULT_HANDOFF_TEMPLATE;
+
+  /** Sync templates, then submit any missing starter template (D13-5). Non-fatal. */
+  const syncTemplates = (current: WhatsAppConnection): void => {
+    void templates
+      .sync(current)
+      .then(() => templates.ensureStarterTemplates(current))
+      .catch((error: unknown) => {
+        logger.warn("WhatsApp template setup failed", { error: errorMessage(error) });
+      });
+  };
 
   /**
    * Make sure Meta delivers this WABA's webhooks to our app, and in manual mode
@@ -99,7 +117,7 @@ export default defineHayPlugin((globalCtx) => {
           type: "string",
           label: "Connection method",
           description:
-            "Embedded Signup connects your number in a Meta popup. Manual uses a permanent token from your own Meta app (self-hosting, or before Hay's app review).",
+            "Embedded Signup connects your number in a Meta popup. Manual uses a permanent token from your own Meta app (self-hosting, or before Hay.chat's app review).",
           required: false,
           encrypted: false,
           default: "embedded-signup",
@@ -168,6 +186,15 @@ export default defineHayPlugin((globalCtx) => {
           required: false,
           encrypted: true,
           showWhen: { field: "connectionMode", equals: "manual" },
+        },
+        handoffTemplateName: {
+          type: "string",
+          label: "Hand-off template",
+          description:
+            "Approved template sent when the AI hands a conversation to your team after the 24-hour window has closed",
+          required: false,
+          encrypted: false,
+          default: DEFAULT_HANDOFF_TEMPLATE,
         },
         manualVerifyToken: {
           type: "string",
@@ -267,6 +294,29 @@ export default defineHayPlugin((globalCtx) => {
         res.status(result.status).json(result.body);
       });
 
+      // Core's template picker (channel-templates.service): sendable templates only.
+      register.route("GET", "/templates", async (_req, res) => {
+        if (connection) {
+          await templates.ensureSynced(connection);
+        }
+        res.status(200).json({ templates: templates.sendable() });
+      });
+
+      register.route("GET", "/ui/templates", async (_req, res) => {
+        if (connection) {
+          await templates.ensureSynced(connection);
+        }
+        res.status(200).json({ connected: Boolean(connection), ...templates.snapshot() });
+      });
+
+      register.route("POST", "/ui/templates/sync", async (_req, res) => {
+        if (connection) {
+          await templates.sync(connection);
+          await templates.ensureStarterTemplates(connection);
+        }
+        res.status(200).json({ connected: Boolean(connection), ...templates.snapshot() });
+      });
+
       register.route("GET", "/ui/status", async (_req, res) => {
         const status = await getChannelStatus(channelContext(), { mode, appId, configId });
         res.status(200).json(status);
@@ -288,6 +338,7 @@ export default defineHayPlugin((globalCtx) => {
       mode = modeOf(ctx.config);
       appId = ctx.config.getOptional<string>("clientId") ?? null;
       configId = ctx.config.getOptional<string>("esConfigId") ?? null;
+      handoffTemplateName = readHandoffTemplate(ctx.config);
       connection = resolveConnection(readConfig(ctx.config), ctx.auth.get()?.credentials);
 
       if (!connection) {
@@ -302,6 +353,7 @@ export default defineHayPlugin((globalCtx) => {
       }
 
       subscribe(connection);
+      syncTemplates(connection);
       ctx.logger.info("WhatsApp plugin started", {
         orgId: ctx.org.id,
         mode: connection.mode,
@@ -313,10 +365,12 @@ export default defineHayPlugin((globalCtx) => {
       // Manual-mode credentials are config; Embedded Signup credentials live in
       // the auth state, which this context does not expose — keep them as-is.
       mode = modeOf(ctx.config);
+      handoffTemplateName = readHandoffTemplate(ctx.config);
       if (mode === "manual") {
         connection = resolveConnection(readConfig(ctx.config), undefined);
         if (connection) {
           subscribe(connection);
+          syncTemplates(connection);
         }
       } else if (connection?.mode === "manual") {
         connection = null;
@@ -355,6 +409,7 @@ export default defineHayPlugin((globalCtx) => {
       if (result.connection) {
         connection = result.connection;
         mode = "embedded-signup";
+        syncTemplates(result.connection);
       }
 
       ctx.logger.info("WhatsApp onConnected — resolved routing keys", {

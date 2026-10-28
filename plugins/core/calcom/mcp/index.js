@@ -20,6 +20,8 @@
 const { McpServer } = require("@modelcontextprotocol/sdk/server/mcp.js");
 const { StdioServerTransport } = require("@modelcontextprotocol/sdk/server/stdio.js");
 const { z } = require("zod");
+const { applyToolRisk } = require("@hay/plugin-sdk/tool-risk");
+const toolRisk = require("./tool-risk");
 
 const CALCOM_BASE_URL = "https://api.cal.com/v2";
 
@@ -100,10 +102,13 @@ function fail(err) {
   };
 }
 
-const server = new McpServer({
-  name: "calcom-mcp-server",
-  version: "1.0.0",
-});
+const server = applyToolRisk(
+  new McpServer({
+    name: "calcom-mcp-server",
+    version: "1.0.0",
+  }),
+  toolRisk,
+);
 
 // ---------------------------------------------------------------------------
 // Account

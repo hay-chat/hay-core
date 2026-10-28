@@ -48,6 +48,10 @@ export class User extends BaseEntity {
   @Column({ type: "varchar", length: 20, default: "available" })
   status!: "available" | "away";
 
+  /** Lock-screen privacy: conversation alerts carry no customer name or summary. */
+  @Column({ type: "boolean", default: false })
+  hideAlertPreview!: boolean;
+
   @Column({ type: "uuid", nullable: true })
   organizationId?: string;
 

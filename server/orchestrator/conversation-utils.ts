@@ -6,6 +6,8 @@ import { getUTCNow } from "@server/utils/date.utils";
 import { hookManager } from "@server/services/hooks/hook-manager";
 import { PromptService } from "@server/services/prompt.service";
 import { createLogger } from "@server/lib/logger";
+import { getAiReplyBlocker, recheckAiReply } from "./reply-guard";
+import { closureCopy } from "./closure-copy";
 
 const logger = createLogger("conversation-utils");
 
@@ -59,6 +61,7 @@ export async function generateConversationTitle(
       prompt,
       // Title generation is a short summarisation with no downstream decision.
       tier: "easy",
+      organizationId,
     });
 
     const title = response.trim().replace(/^["']|["']$/g, ""); // Remove quotes if present
@@ -72,6 +75,40 @@ export async function generateConversationTitle(
     log.error({ err: error }, "Error generating conversation title");
     // Don't throw - title generation is not critical
   }
+}
+
+/** "photo", "PDF", "video", "audio" or "file", for the transcript the summary is written from. */
+function attachmentKind(type: string): string {
+  if (type.startsWith("image/")) return "photo";
+  if (type === "application/pdf") return "PDF";
+  if (type.startsWith("video/")) return "video";
+  if (type.startsWith("audio/")) return "audio";
+  return "file";
+}
+
+/**
+ * One transcript line for the hand-off summary (D8-10). Files are listed so
+ * the summary can tell the agent what the customer sent:
+ * `Customer: It arrived broken [Attachments: box.jpg (photo: Crushed box.), invoice.pdf (PDF)]`.
+ */
+export function handoffTranscriptLine(
+  message: Pick<Message, "type" | "content" | "attachments">,
+): string {
+  const speaker = message.type === MessageType.CUSTOMER ? "Customer" : "Assistant";
+  const files = (message.attachments ?? [])
+    .map((attachment) => {
+      // What the vision pass read (D8-11), so the summary can say what the photo shows.
+      // Withheld ID/card images (D8-12) carry no description at all.
+      const analysis = attachment.analysis;
+      const read = analysis?.withheld
+        ? "withheld for privacy"
+        : analysis?.status === "done"
+          ? analysis.description
+          : "";
+      return `${attachment.name || "file"} (${attachmentKind(attachment.type ?? "")}${read ? `: ${read}` : ""})`;
+    })
+    .join(", ");
+  return `${speaker}: ${message.content}${files ? ` [Attachments: ${files}]` : ""}`;
 }
 
 /**
@@ -105,7 +142,7 @@ export async function generateHandoffSummary(
 
     const conversationContext = publicMessages
       .slice(-15) // Most recent messages carry the handoff context
-      .map((m) => `${m.type === MessageType.CUSTOMER ? "Customer" : "Assistant"}: ${m.content}`)
+      .map(handoffTranscriptLine)
       .join("\n");
 
     const prompt = await promptService.getPrompt(
@@ -118,6 +155,7 @@ export async function generateHandoffSummary(
       prompt,
       // Summarising a transcript for a human agent — no tool use, no planning.
       tier: "medium",
+      organizationId,
     });
 
     const summary = response.trim().replace(/^["']|["']$/g, "");
@@ -134,17 +172,25 @@ export async function generateHandoffSummary(
 }
 
 /**
- * Send a contextual inactivity warning message to the user
+ * Send a contextual inactivity warning message to the user.
+ * Returns whether a warning was sent: never while a human holds the
+ * conversation or the agent or organization is paused (D11-2).
  */
 export async function sendInactivityWarning(
   conversationId: string,
   organizationId: string,
-): Promise<void> {
+): Promise<boolean> {
   const log = logger.child({ organizationId, conversationId });
   try {
     const conversation = await conversationRepository.findById(conversationId);
     if (!conversation || conversation.organization_id !== organizationId) {
       throw new Error("Conversation not found");
+    }
+
+    const blocker = getAiReplyBlocker(conversation);
+    if (blocker) {
+      log.debug({ blocker }, "Skipping inactivity warning - AI may not reply");
+      return false;
     }
 
     // Get recent messages for context
@@ -154,7 +200,7 @@ export async function sendInactivityWarning(
       .slice(-5); // Last 5 messages
 
     if (recentMessages.length === 0) {
-      return;
+      return false;
     }
 
     const conversationContext = recentMessages
@@ -171,7 +217,15 @@ export async function sendInactivityWarning(
       prompt,
       // Short inactivity nudge from the last 5 messages.
       tier: "easy",
+      organizationId,
     });
+
+    // The LLM call took a while; the owner may have taken over meanwhile.
+    const blockerAfterLlm = await recheckAiReply(conversationId);
+    if (blockerAfterLlm) {
+      log.debug({ blocker: blockerAfterLlm }, "Dropped inactivity warning - AI may not reply");
+      return false;
+    }
 
     // Add the warning message to the conversation
     await conversation.addMessage({
@@ -185,6 +239,7 @@ export async function sendInactivityWarning(
     });
 
     log.debug("Sent inactivity warning");
+    return true;
   } catch (error) {
     log.error({ err: error }, "Error sending inactivity warning");
     throw error;
@@ -192,7 +247,9 @@ export async function sendInactivityWarning(
 }
 
 /**
- * Close an inactive conversation with an appropriate message
+ * Close an inactive conversation with an appropriate message.
+ * Does nothing while a human holds the conversation or the agent or
+ * organization is paused: the owner decides when it ends (D11-2).
  */
 export async function closeInactiveConversation(
   conversationId: string,
@@ -211,6 +268,12 @@ export async function closeInactiveConversation(
       return;
     }
 
+    const blocker = getAiReplyBlocker(conversation);
+    if (blocker) {
+      log.debug({ blocker }, "Skipping inactivity close - AI may not reply");
+      return;
+    }
+
     // Generate title if not already set
     await generateConversationTitle(conversationId, organizationId);
 
@@ -222,8 +285,11 @@ export async function closeInactiveConversation(
       let closureMessage: string;
       if (hasWarning) {
         // User didn't respond to warning
-        closureMessage =
-          "Since I haven't heard back from you, I'll close this conversation for now. Feel free to start a new conversation whenever you need help!";
+        closureMessage = closureCopy(
+          "inactivityClose",
+          conversation.language,
+          conversation.organization?.defaultLanguage,
+        );
       } else {
         // No warning was sent (e.g., conversation was already inactive for too long)
         const recentMessages = messages
@@ -244,7 +310,15 @@ export async function closeInactiveConversation(
           prompt,
           // One-line sign-off; the alternative branch is a hardcoded string.
           tier: "easy",
+          organizationId,
         });
+      }
+
+      // The LLM call took a while; the owner may have taken over meanwhile.
+      const blockerAfterLlm = await recheckAiReply(conversationId);
+      if (blockerAfterLlm) {
+        log.debug({ blocker: blockerAfterLlm }, "Dropped inactivity close - AI may not reply");
+        return;
       }
 
       // Add closure message
@@ -259,7 +333,8 @@ export async function closeInactiveConversation(
       });
     }
 
-    // Update conversation status to resolved
+    // Provisionally resolved. The repository records the close and the close
+    // classifier moves it to "unresolved" if the AI had not answered (D1-3).
     await conversationRepository.update(conversationId, organizationId, {
       status: "resolved",
       ended_at: getUTCNow(),
@@ -350,6 +425,7 @@ export async function validateConversationClosure(
       // A shouldClose boolean over a transcript. Medium rather than easy: getting
       // this wrong closes a live conversation.
       tier: "medium",
+      organizationId,
       jsonSchema: {
         type: "object",
         properties: {

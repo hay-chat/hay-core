@@ -1,10 +1,11 @@
 name: CI
 
+# staging runs only the webchat job (perf budget); the other jobs gate master.
 on:
   push:
-    branches: [main, master]
+    branches: [main, master, staging]
   pull_request:
-    branches: [main, master]
+    branches: [main, master, staging]
 
 # Cancel superseded runs on the same ref to save CI minutes.
 concurrency:
@@ -16,6 +17,7 @@ jobs:
   # high-signal gates that should pass before any PR merges.
   quality:
     name: Lint & Typecheck
+    if: github.ref_name != 'staging' && github.base_ref != 'staging'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -35,6 +37,7 @@ jobs:
   # provisioned as services; integration tests run real queries against them.
   server-tests:
     name: Server Tests
+    if: github.ref_name != 'staging' && github.base_ref != 'staging'
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
@@ -90,3 +93,30 @@ jobs:
         run: cd server && npm run migration:run
       - name: Run server tests
         run: cd server && npm test
+
+  # Webchat widget: unit tests, then the performance budget on a fresh build
+  # (D12-9). The budget fails the job when widget.js grows past 10 KB brotli or
+  # the "interaction" loading mode requests anything before the visitor reaches
+  # for the button. No Chrome needed; see webchat/scripts/check-perf.mjs.
+  webchat:
+    name: Webchat Tests & Perf Budget
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: webchat
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: webchat/package-lock.json
+      - name: Install dependencies
+        run: npm ci
+      - name: Run webchat tests
+        run: npm test
+      - name: Build widget
+        run: npm run build
+      - name: Check performance budget
+        run: npm run check:perf

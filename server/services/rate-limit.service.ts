@@ -81,6 +81,19 @@ export class RateLimitService {
   }
 
   /**
+   * Check a rate limit under a caller-chosen key, for limits that are not
+   * plain per-IP or per-email (e.g. `public-widget:create:ip:<ip>`). Keys are
+   * namespaced so they never share a counter with the other checks.
+   */
+  async checkKeyRateLimit(
+    key: string,
+    maxRequests: number,
+    windowSeconds: number,
+  ): Promise<{ limited: boolean; remaining: number; resetAt: Date }> {
+    return this.checkRateLimit(`rate_limit:key:${key}`, maxRequests, windowSeconds);
+  }
+
+  /**
    * Generic rate limit check using Redis
    * Uses sliding window counter algorithm
    * @param failClosed - If true, will reject requests when Redis is unavailable (for critical endpoints like privacy)

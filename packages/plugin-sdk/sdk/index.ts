@@ -40,6 +40,8 @@ export { Logger, createLogger, type LoggerContext } from "./logger.js";
 
 export { StdioMcpClient, type StdioMcpClientOptions, type McpTool } from "./stdio-mcp-client.js";
 
+export { DISPUTE_EVIDENCE_ROUTE, DISPUTE_EVIDENCE_FILE_PREFIX } from "./dispute-source-runtime.js";
+
 // ============================================================================
 // Re-export types for convenience
 // ============================================================================
@@ -82,6 +84,9 @@ export type {
   McpServerInstance,
   McpInitializerContext,
   ExternalMcpOptions,
+  LocalMcpOptions,
+  ToolRiskSpec,
+  ToolWriteCategory,
   HayMcpRuntimeAPI,
 
   // Cron
@@ -91,6 +96,16 @@ export type {
   CronJobHandler,
   CronJobOptions,
   CronJobDescriptor,
+
+  // Webchat
+  WebchatContributionType,
+  WebchatContributionOptions,
+  WebchatGateEvent,
+  WebchatGateInput,
+  WebchatGateResult,
+  HayWebchatGateContext,
+  WebchatGateHandler,
+  WebchatGateOptions,
 
   // Other
   HayLogger,
@@ -110,6 +125,14 @@ export type {
   CanonicalVariant,
   CanonicalProduct,
   HayProductSourceRuntimeAPI,
+
+  // Payment disputes
+  DisputeStatusName,
+  CanonicalDispute,
+  HayDisputeSourceRuntimeAPI,
+  DisputeEvidenceRequest,
+  DisputeEvidenceErrorCode,
+  DisputeEvidenceResponse,
 } from "../types/index.js";
 
 // ============================================================================

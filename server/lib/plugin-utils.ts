@@ -149,3 +149,34 @@ export function extractAuthState(
   const { authState } = separateConfigAndAuth(input, metadata);
   return authState;
 }
+
+/**
+ * Merge a settings-form submission with what is already stored.
+ *
+ * `stored` must hold the decrypted config AND the auth credentials: encrypted fields live in
+ * authState, and the form sends them back masked ("********") or not at all. A masked value keeps
+ * the stored one; an omitted field is kept unless it has an env fallback (so it can reset to env).
+ */
+export function mergeWithStoredConfig(
+  input: Record<string, unknown>,
+  stored: Record<string, unknown>,
+  configSchema: Record<string, { env?: string }> | undefined,
+): Record<string, unknown> {
+  const merged: Record<string, unknown> = { ...input };
+
+  for (const [key, value] of Object.entries(input)) {
+    if (typeof value === "string" && /^\*+$/.test(value)) {
+      merged[key] = stored[key];
+    }
+  }
+
+  for (const [key, value] of Object.entries(stored)) {
+    if (key in merged) continue;
+    const env = configSchema?.[key]?.env;
+    if (!(env && process.env[env])) {
+      merged[key] = value;
+    }
+  }
+
+  return merged;
+}

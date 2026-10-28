@@ -14,7 +14,13 @@
  *
  * Retries 429 / 5xx with backoff; every other non-2xx is surfaced with the
  * WooCommerce error message and code so the agent can act on it.
+ *
+ * Every failure is a ToolError from @hay/plugin-sdk/tool-errors: `code` is the
+ * shared vocabulary (AUTH_FAILED, SCOPE_MISSING, OUTCOME_UNKNOWN, ...) and
+ * WooApiError additionally keeps the HTTP `status` and WooCommerce's `wooCode`.
  */
+
+const { ToolError, toolError, codeForHttpStatus } = require("@hay/plugin-sdk/tool-errors");
 
 const MAX_RETRIES = 3;
 const DEFAULT_TIMEOUT_MS = 30000;
@@ -26,9 +32,9 @@ function credentials() {
   const consumerKey = process.env.WOOCOMMERCE_CONSUMER_KEY;
   const consumerSecret = process.env.WOOCOMMERCE_CONSUMER_SECRET;
   if (!siteUrl || !consumerKey || !consumerSecret) {
-    throw new Error(
-      "WooCommerce MCP server is missing WORDPRESS_SITE_URL, WOOCOMMERCE_CONSUMER_KEY or " +
-        "WOOCOMMERCE_CONSUMER_SECRET",
+    throw toolError(
+      "INTERNAL",
+      "The WooCommerce connection is not configured (missing site URL or API key).",
     );
   }
   return { siteUrl, consumerKey, consumerSecret };
@@ -77,7 +83,17 @@ async function wcRequest(method, path, { query, body, namespace = "wc/v3" } = {}
         await sleep(Math.pow(2, attempt) * 250);
         continue;
       }
-      throw new Error(`WooCommerce API ${method} ${path} failed: ${err.message || String(err)}`);
+      const details = { method, path, cause: err?.message || String(err) };
+      if (method === "GET") {
+        throw toolError(
+          "PROVIDER_DOWN",
+          "The WooCommerce store did not respond. Try again in a moment.",
+          {
+            details,
+          },
+        );
+      }
+      throw toolError("OUTCOME_UNKNOWN", OUTCOME_UNKNOWN_MESSAGE, { details });
     }
 
     // 429 was never processed, so any request may be retried. A 5xx may have
@@ -114,13 +130,66 @@ async function wcList(path, query, options = {}) {
   };
 }
 
-class WooApiError extends Error {
+const OUTCOME_UNKNOWN_MESSAGE =
+  "WooCommerce did not confirm whether this change went through. Check the order before trying again.";
+
+/**
+ * Shared-vocabulary code for a WooCommerce error response. WooCommerce answers a
+ * write with a read-only key with 401 `woocommerce_rest_cannot_create|edit|...`,
+ * which is a permission problem, not bad credentials.
+ */
+function wooErrorCode(method, status, wooCode) {
+  const idempotent = method === "GET";
+  if (
+    (status === 401 || status === 403) &&
+    /_cannot_(create|edit|delete|batch|update)/.test(wooCode || "")
+  ) {
+    return "SCOPE_MISSING";
+  }
+  if (status === 401 || status === 403) return "AUTH_FAILED";
+  if (status === 400) {
+    return /^rest_(invalid_param|missing_callback_param)/.test(wooCode || "")
+      ? "BAD_INPUT"
+      : "PROVIDER_REFUSED";
+  }
+  // A 5xx with a structured WordPress error (e.g. the gateway declined a refund) is
+  // WooCommerce answering "no", not an unknown outcome.
+  if (status >= 500 && !idempotent && wooCode) return "PROVIDER_REFUSED";
+  return codeForHttpStatus(status, { idempotent });
+}
+
+function wooErrorMessage(code, parsed) {
+  switch (code) {
+    case "AUTH_FAILED":
+      return "WooCommerce rejected Hay.chat's API key. The store needs to reconnect WooCommerce in Hay.chat.";
+    case "SCOPE_MISSING":
+      return (
+        "The WooCommerce API key connected to Hay.chat can't make this change (it may be " +
+        "read-only). The store needs to reconnect with a Read/Write key."
+      );
+    case "RATE_LIMITED":
+      return "The WooCommerce store is limiting requests right now. Try again shortly.";
+    case "PROVIDER_DOWN":
+      return "The WooCommerce store is having problems. Try again in a moment.";
+    case "OUTCOME_UNKNOWN":
+      return OUTCOME_UNKNOWN_MESSAGE;
+    case "NOT_FOUND":
+      return `WooCommerce couldn't find it: ${parsed.message}`;
+    default:
+      return `WooCommerce refused: ${parsed.message}`;
+  }
+}
+
+class WooApiError extends ToolError {
   constructor(method, path, status, rawBody) {
     const parsed = parseBody(rawBody);
-    super(`WooCommerce API ${method} ${path} failed: HTTP ${status}: ${parsed.message}`);
+    const code = wooErrorCode(method, status, parsed.code);
+    super(code, wooErrorMessage(code, parsed), {
+      details: { method, path, status, wooCode: parsed.code },
+    });
     this.name = "WooApiError";
     this.status = status;
-    this.code = parsed.code;
+    this.wooCode = parsed.code;
   }
 }
 
@@ -138,4 +207,4 @@ function parseBody(rawBody) {
   }
 }
 
-module.exports = { wcRequest, wcApi, wcList, WooApiError };
+module.exports = { wcRequest, wcApi, wcList, WooApiError, wooErrorCode };

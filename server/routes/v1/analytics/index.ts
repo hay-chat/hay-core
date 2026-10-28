@@ -90,4 +90,16 @@ export const analyticsRouter = t.router({
         },
       };
     }),
+
+  agentPerformance: scopedProcedure(RESOURCES.ANALYTICS, ACTIONS.READ)
+    .input(analyticsInputSchema)
+    .query(async ({ ctx, input }) => {
+      const data = await analyticsService.getAgentPerformance({
+        organizationId: ctx.organizationId!,
+        startDate: input.startDate ? new Date(input.startDate) : undefined,
+        endDate: input.endDate ? new Date(input.endDate) : undefined,
+      });
+
+      return { data };
+    }),
 });

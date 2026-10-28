@@ -15,7 +15,7 @@
 
     <NuxtLink to="/inbox" class="flex min-w-0 flex-1 items-center gap-2 px-1">
       <span class="truncate text-base font-semibold text-foreground">
-        {{ userStore.activeOrganization?.name || "Hay" }}
+        {{ userStore.activeOrganization?.name || "Hay.chat" }}
       </span>
     </NuxtLink>
 

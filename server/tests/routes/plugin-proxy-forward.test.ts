@@ -118,6 +118,7 @@ describe("isWorkerInternalPath", () => {
     "/mcp/list-tools",
     "/deliver",
     "/escalate",
+    "/templates",
     "/on-connected",
     "/validate-auth",
     "/config-update",
@@ -130,6 +131,8 @@ describe("isWorkerInternalPath", () => {
     "/deliver/",
     "/ui/status",
     "/UI/status",
+    "/disputes/evidence",
+    "/Disputes/evidence",
   ])("blocks %s", (path) => {
     expect(isWorkerInternalPath(path)).toBe(true);
   });

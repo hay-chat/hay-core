@@ -1,16 +1,40 @@
-import { Repository, SelectQueryBuilder, In, IsNull } from "typeorm";
+import { Brackets, Repository, SelectQueryBuilder, In } from "typeorm";
 import type { QueryDeepPartialEntity } from "typeorm";
 import { v4 as uuidv4 } from "uuid";
 import { Conversation } from "../database/entities/conversation.entity";
+import { ConversationOutcome } from "../database/entities/conversation-outcome.entity";
+import { CLOSED_STATUSES } from "../services/close-classification/outcome-rules";
 import { AppDataSource } from "../database/data-source";
 import { BaseRepository } from "./base.repository";
 import type { ListParams } from "../trpc/middleware/pagination";
 import { Message, MessageType } from "@server/database/entities/message.entity";
 import { createLogger } from "@server/lib/logger";
+import { AGENT_SYSTEM_EVENTS } from "@server/services/webchat/public-message";
+import { notSimulationSql } from "../services/simulation/simulation-kind";
 
 const LOCK_DURATION_MS = 15_000;
 
 const logger = createLogger("conversation-repo");
+
+const HANDOFF_STATUSES: ReadonlyArray<Conversation["status"]> = [
+  "pending-human",
+  "human-took-over",
+];
+
+/**
+ * Adds handed_off_at on the first move into a human status. Lives here rather
+ * than in each caller (orchestrator, takeover, plugin API, recovery) because
+ * update/updateById/create are the one place every status write passes and
+ * the previous row is known.
+ */
+function withHandoffStamp(
+  previous: Pick<Conversation, "handed_off_at"> | null,
+  data: Partial<Conversation>,
+): Partial<Conversation> {
+  if (!data.status || !HANDOFF_STATUSES.includes(data.status)) return data;
+  if (previous?.handed_off_at || data.handed_off_at) return data;
+  return { ...data, handed_off_at: new Date() };
+}
 
 export class ConversationRepository extends BaseRepository<Conversation> {
   private messageRepository!: Repository<Message>;
@@ -33,7 +57,7 @@ export class ConversationRepository extends BaseRepository<Conversation> {
    * Override base methods to handle organization_id field naming
    */
   override async create(data: Partial<Conversation>): Promise<Conversation> {
-    const conversation = this.getRepository().create(data);
+    const conversation = this.getRepository().create(withHandoffStamp(null, data));
     const savedConversation = await this.getRepository().save(conversation);
 
     // Broadcast conversation created event
@@ -86,17 +110,24 @@ export class ConversationRepository extends BaseRepository<Conversation> {
   }
 
   async findByAgent(agentId: string, organizationId: string): Promise<Conversation[]> {
-    return await this.getRepository().find({
-      where: { agent_id: agentId, organization_id: organizationId, deleted_at: IsNull() },
-      order: { created_at: "DESC" },
-    });
+    return await this.getRepository()
+      .createQueryBuilder("conversation")
+      .where("conversation.agent_id = :agentId", { agentId })
+      .andWhere("conversation.organization_id = :organizationId", { organizationId })
+      .andWhere("conversation.deleted_at IS NULL")
+      .andWhere(notSimulationSql("conversation"))
+      .orderBy("conversation.created_at", "DESC")
+      .getMany();
   }
 
   override async findByOrganization(organizationId: string): Promise<Conversation[]> {
-    return await this.getRepository().find({
-      where: { organization_id: organizationId, deleted_at: IsNull() },
-      order: { created_at: "DESC" },
-    });
+    return await this.getRepository()
+      .createQueryBuilder("conversation")
+      .where("conversation.organization_id = :organizationId", { organizationId })
+      .andWhere("conversation.deleted_at IS NULL")
+      .andWhere(notSimulationSql("conversation"))
+      .orderBy("conversation.created_at", "DESC")
+      .getMany();
   }
 
   override async update(
@@ -111,7 +142,10 @@ export class ConversationRepository extends BaseRepository<Conversation> {
       return null;
     }
 
-    await this.getRepository().update({ id }, data as QueryDeepPartialEntity<Conversation>);
+    await this.getRepository().update(
+      { id },
+      withHandoffStamp(conversation, data) as QueryDeepPartialEntity<Conversation>,
+    );
 
     const updatedConversation = await this.findById(id);
 
@@ -124,6 +158,7 @@ export class ConversationRepository extends BaseRepository<Conversation> {
         changedFields,
       );
       this.notifyDevicesOnTransition(conversation.status, updatedConversation);
+      await this.recordCloseOnTransition(conversation.status, updatedConversation);
     }
 
     return updatedConversation;
@@ -136,13 +171,29 @@ export class ConversationRepository extends BaseRepository<Conversation> {
    */
   private notifyDevicesOnTransition(previousStatus: string, updated: Conversation): void {
     if (updated.status === previousStatus) return;
-    void import("../services/push-notification.service")
-      .then(({ pushNotificationService }) =>
-        pushNotificationService.onConversationStatusChanged(updated),
+    void import("../services/conversation-alert.service")
+      .then(({ conversationAlertService }) =>
+        conversationAlertService.onConversationStatusChanged(updated),
       )
       .catch((error) => {
         logger.warn({ err: error, conversationId: updated.id }, "Push alert failed");
       });
+  }
+
+  /**
+   * Entering a closed status from an open one is a close: record its billing
+   * outcome (D1-3). Moves between closed statuses (resolved -> closed by
+   * staff, resolved -> unresolved by the classifier) are not new closes.
+   */
+  private async recordCloseOnTransition(
+    previousStatus: string,
+    updated: Conversation,
+  ): Promise<void> {
+    if (CLOSED_STATUSES.includes(previousStatus as Conversation["status"])) return;
+    if (!CLOSED_STATUSES.includes(updated.status)) return;
+    const { closeClassifierService } =
+      await import("../services/close-classification/close-classifier.service");
+    await closeClassifierService.recordClose(updated, updated.messages ?? []);
   }
 
   // Simple update method for internal use (orchestrator, etc.)
@@ -152,7 +203,10 @@ export class ConversationRepository extends BaseRepository<Conversation> {
       return null;
     }
 
-    await this.getRepository().update({ id }, data as QueryDeepPartialEntity<Conversation>);
+    await this.getRepository().update(
+      { id },
+      withHandoffStamp(conversation, data) as QueryDeepPartialEntity<Conversation>,
+    );
 
     const updatedConversation = await this.findById(id);
 
@@ -165,6 +219,7 @@ export class ConversationRepository extends BaseRepository<Conversation> {
         changedFields,
       );
       this.notifyDevicesOnTransition(conversation.status, updatedConversation);
+      await this.recordCloseOnTransition(conversation.status, updatedConversation);
     }
 
     return updatedConversation;
@@ -225,6 +280,8 @@ export class ConversationRepository extends BaseRepository<Conversation> {
         .createQueryBuilder("conversation")
         .where("conversation.needs_processing = :needsProcessing", { needsProcessing: true })
         .andWhere("conversation.updated_at < :threshold", { threshold })
+        // Simulation runs track their own conversations (D7-7)
+        .andWhere(notSimulationSql("conversation"))
         .andWhere("conversation.status IN (:...statuses)", {
           statuses: ["open", "processing"],
         })
@@ -273,7 +330,8 @@ export class ConversationRepository extends BaseRepository<Conversation> {
       .where("entity.organization_id = :organizationId", {
         organizationId,
       })
-      .andWhere("entity.deleted_at IS NULL");
+      .andWhere("entity.deleted_at IS NULL")
+      .andWhere(notSimulationSql("entity"));
 
     // Add base where conditions if provided
     if (baseWhere) {
@@ -433,22 +491,31 @@ export class ConversationRepository extends BaseRepository<Conversation> {
   }
 
   /**
-   * Find the most recent active conversation for a customer on a given channel.
-   * Used by channel plugins (WhatsApp, etc.) to reuse existing conversations
-   * instead of creating duplicates.
+   * Find the most recent active conversation for a customer on a given channel
+   * with the given channel identity. Used by channel plugins (WhatsApp, etc.)
+   * to reuse existing conversations instead of creating duplicates.
+   *
+   * A merged customer can have several identities on one channel (D13-13); a
+   * conversation replies to `metadata.customerExternalId`, else the customer's
+   * own external_id, so only a conversation that replies to `identity` matches.
    */
   async findActiveByCustomerAndChannel(
-    customerId: string,
+    customer: { id: string; external_id: string | null },
+    identity: string,
     channel: string,
     organizationId: string,
   ): Promise<Conversation | null> {
     return await this.getRepository()
       .createQueryBuilder("conversation")
-      .where("conversation.customer_id = :customerId", { customerId })
+      .where("conversation.customer_id = :customerId", { customerId: customer.id })
+      .andWhere(
+        "COALESCE(conversation.metadata ->> 'customerExternalId', CAST(:ownExternalId AS text)) = :identity",
+        { ownExternalId: customer.external_id, identity },
+      )
       .andWhere("conversation.channel = :channel", { channel })
       .andWhere("conversation.organization_id = :organizationId", { organizationId })
       .andWhere("conversation.status IN (:...statuses)", {
-        statuses: ["open", "processing", "pending-human", "human-took-over"],
+        statuses: ["open", "processing", "pending-human", "awaiting-approval", "human-took-over"],
       })
       .andWhere("conversation.deleted_at IS NULL")
       .orderBy("conversation.created_at", "DESC")
@@ -486,23 +553,30 @@ export class ConversationRepository extends BaseRepository<Conversation> {
       .andWhere("conversation.needs_processing = :needsProcessing", {
         needsProcessing: true,
       })
+      // pending-human only gets needs_processing outside business hours (D5-7);
+      // runConversation re-checks the hours before answering.
       .andWhere("conversation.status IN (:...statuses)", {
-        statuses: ["open", "processing"],
+        statuses: ["open", "processing", "pending-human"],
       })
       .andWhere("(conversation.cooldown_until IS NULL OR conversation.cooldown_until <= :now)", {
         now: new Date(),
-      });
+      })
+      .andWhere(notSimulationSql("conversation"));
 
     const results = await query.getMany();
 
     return results;
   }
 
+  /** Open conversations for the inactivity check; simulations never time out (D7-7). */
   async findAllOpenConversations(): Promise<Conversation[]> {
-    return await this.getRepository().find({
-      where: { status: "open", deleted_at: IsNull() },
-      order: { created_at: "DESC" },
-    });
+    return await this.getRepository()
+      .createQueryBuilder("conversation")
+      .where("conversation.status = 'open'")
+      .andWhere("conversation.deleted_at IS NULL")
+      .andWhere(notSimulationSql("conversation"))
+      .orderBy("conversation.created_at", "DESC")
+      .getMany();
   }
 
   async getPublicMessages(conversationId: string): Promise<Message[]> {
@@ -521,6 +595,36 @@ export class ConversationRepository extends BaseRepository<Conversation> {
       },
       order: { created_at: "ASC" },
     });
+  }
+
+  /**
+   * What the webchat widget shows: the public messages plus the System lines
+   * announcing a team member joining or leaving. Kept apart from
+   * getPublicMessages, which the orchestrator reads as conversation history.
+   */
+  async getWidgetMessages(conversationId: string): Promise<Message[]> {
+    const { DeliveryState } = await import("@server/types/message-feedback.types");
+    return await this.getMessageRepository()
+      .createQueryBuilder("message")
+      .where("message.conversation_id = :conversationId", { conversationId })
+      .andWhere("message.delivery_state = :sent", { sent: DeliveryState.SENT })
+      .andWhere(
+        new Brackets((qb) => {
+          qb.where("message.type IN (:...publicTypes)", {
+            publicTypes: [
+              MessageType.CUSTOMER,
+              MessageType.BOT_AGENT,
+              MessageType.HUMAN_AGENT,
+              MessageType.PRODUCT_RECOMMENDATION,
+            ],
+          }).orWhere(
+            "(message.type = :systemType AND message.metadata ->> 'systemEvent' IN (:...systemEvents))",
+            { systemType: MessageType.SYSTEM, systemEvents: [...AGENT_SYSTEM_EVENTS] },
+          );
+        }),
+      )
+      .orderBy("message.created_at", "ASC")
+      .getMany();
   }
 
   async getMessages(conversationId: string): Promise<Message[]> {
@@ -546,6 +650,57 @@ export class ConversationRepository extends BaseRepository<Conversation> {
         .filter((msg) => msg.type === MessageType.CUSTOMER)
         .sort((a, b) => b.created_at.getTime() - a.created_at.getTime())[0] || null
     );
+  }
+
+  /**
+   * Clear needs_processing for a run that answered up to `lastCustomerMessageId`
+   * (null: the run saw no customer message). Compare-and-set: nothing changes
+   * when a newer customer message exists, because that message set the flag
+   * after the run read its input and still needs an answer. Returns whether
+   * the flag was cleared.
+   */
+  async markProcessed(
+    conversationId: string,
+    lastCustomerMessageId: string | null,
+  ): Promise<boolean> {
+    const newerCustomerMessage = lastCustomerMessageId
+      ? `m.id <> :lastId AND m.created_at >= (SELECT created_at FROM messages WHERE id = :lastId)`
+      : "TRUE";
+
+    const result = await this.getRepository()
+      .createQueryBuilder()
+      .update(Conversation)
+      .set({ needs_processing: false, last_processed_at: () => "NOW()" })
+      .where("id = :id", { id: conversationId })
+      .andWhere(
+        `NOT EXISTS (
+          SELECT 1 FROM messages m
+          WHERE m.conversation_id = :id AND m.type = :customer AND ${newerCustomerMessage}
+        )`,
+        { customer: MessageType.CUSTOMER, lastId: lastCustomerMessageId },
+      )
+      .execute();
+
+    return (result.affected ?? 0) > 0;
+  }
+
+  /**
+   * True when the newest customer message has no bot or staff reply after it.
+   * System notices, tool output and the like are not replies.
+   */
+  async hasUnansweredCustomerMessage(conversationId: string): Promise<boolean> {
+    const [row]: Array<{ unanswered: boolean }> = await AppDataSource.query(
+      `SELECT COALESCE(
+         (SELECT MAX(created_at) FROM messages WHERE conversation_id = $1 AND type = $2)
+           > COALESCE(
+             (SELECT MAX(created_at) FROM messages WHERE conversation_id = $1 AND type IN ($3, $4)),
+             '-infinity'::timestamptz
+           ),
+         FALSE
+       ) AS unanswered`,
+      [conversationId, MessageType.CUSTOMER, MessageType.BOT_AGENT, MessageType.HUMAN_AGENT],
+    );
+    return row?.unanswered === true;
   }
 
   async getSystemMessages(conversationId: string): Promise<Message[]> {
@@ -595,6 +750,7 @@ export class ConversationRepository extends BaseRepository<Conversation> {
         AND created_at >= $2
         AND created_at <= $3
         AND deleted_at IS NULL
+        AND ${notSimulationSql("conversations")}
       GROUP BY DATE(created_at)
       ORDER BY DATE(created_at) ASC
     `;
@@ -654,7 +810,8 @@ export class ConversationRepository extends BaseRepository<Conversation> {
       .where("conversation.organization_id = :organizationId", {
         organizationId: filters.organizationId,
       })
-      .andWhere("conversation.deleted_at IS NULL");
+      .andWhere("conversation.deleted_at IS NULL")
+      .andWhere(notSimulationSql("conversation"));
 
     if (filters.startDate) {
       queryBuilder.andWhere("conversation.created_at >= :startDate", {
@@ -670,6 +827,36 @@ export class ConversationRepository extends BaseRepository<Conversation> {
       queryBuilder.andWhere("conversation.status = :status", { status: filters.status });
     }
 
+    return await queryBuilder.getCount();
+  }
+
+  /**
+   * Resolutions the merchant is billed for: billable close outcomes (D1-3)
+   * that were not reversed by the shopper coming back nor excluded by the
+   * merchant (D1-6), counted by close time. Reads conversation_outcomes, not the live conversation, so reopening or
+   * deleting a conversation does not rewrite a bill.
+   */
+  async countBillableResolutions(filters: {
+    organizationId: string;
+    startDate?: Date;
+    endDate?: Date;
+  }): Promise<number> {
+    const queryBuilder = AppDataSource.getRepository(ConversationOutcome)
+      .createQueryBuilder("outcome")
+      .where("outcome.organization_id = :organizationId", {
+        organizationId: filters.organizationId,
+      })
+      .andWhere("outcome.billable = true")
+      .andWhere("outcome.reversed_at IS NULL")
+      .andWhere("outcome.excluded_at IS NULL");
+    if (filters.startDate) {
+      queryBuilder.andWhere("outcome.closed_at >= :startDate", { startDate: filters.startDate });
+    }
+    if (filters.endDate) {
+      // End-exclusive like the ledger: billing periods share their boundary
+      // instant, so an inclusive end would count that resolution twice.
+      queryBuilder.andWhere("outcome.closed_at < :endDate", { endDate: filters.endDate });
+    }
     return await queryBuilder.getCount();
   }
 

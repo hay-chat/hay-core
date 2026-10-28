@@ -28,7 +28,10 @@ interface HayPluginBlock {
   env?: string[];
   auth?: HayPluginManifest["auth"];
   channel?: string;
+  rendering?: HayPluginManifest["rendering"];
   autoActivate?: boolean;
+  /** Enable this plugin automatically for newly created organizations. */
+  defaultEnabled?: boolean;
   trpcRouter?: string;
   documentImporter?: boolean;
 }
@@ -243,7 +246,9 @@ export class PluginManagerService {
         },
         auth: hayPlugin.auth || undefined, // Include auth config if present
         channel: hayPlugin.channel || undefined, // For channel-type plugins
+        rendering: hayPlugin.rendering || undefined, // What the channel can show (D13-12)
         autoActivate: hayPlugin.autoActivate === true, // Eagerly load router at boot
+        defaultEnabled: hayPlugin.defaultEnabled === true, // Enabled for new orgs
         trpcRouter: hayPlugin.trpcRouter || undefined, // Optional plugin-side tRPC router file
       };
 
@@ -993,6 +998,11 @@ export class PluginManagerService {
     }
 
     return matches[0] ?? null;
+  }
+
+  /** What a channel plugin declares it can show (D13-12). Empty when nothing is declared. */
+  getChannelRendering(pluginId: string): NonNullable<HayPluginManifest["rendering"]> {
+    return this.registry.get(pluginId)?.manifest?.rendering ?? {};
   }
 
   /**

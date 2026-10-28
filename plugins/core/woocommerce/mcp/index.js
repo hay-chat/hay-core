@@ -10,24 +10,37 @@
  *
  * Env (injected by the plugin worker):
  *   WORDPRESS_SITE_URL, WOOCOMMERCE_CONSUMER_KEY, WOOCOMMERCE_CONSUMER_SECRET
+ *   optional: WOOCOMMERCE_COUPONS_ENABLED, WOOCOMMERCE_COUPON_MAX_PERCENT,
+ *   WOOCOMMERCE_COUPON_MAX_AMOUNT, WOOCOMMERCE_COUPON_MAX_DAYS (goodwill coupon cap),
+ *   STALE_TRACKING_DOMESTIC_DAYS, STALE_TRACKING_INTERNATIONAL_DAYS
  */
 
 const { McpServer } = require("@modelcontextprotocol/sdk/server/mcp.js");
 const { StdioServerTransport } = require("@modelcontextprotocol/sdk/server/stdio.js");
+const { applyToolRisk } = require("@hay/plugin-sdk/tool-risk");
+const toolRisk = require("./tool-risk");
 
 const { registerStoreTools } = require("./tools/store");
 const { registerCustomerTools } = require("./tools/customers");
 const { registerOrderTools } = require("./tools/orders");
 const { registerRefundTools } = require("./tools/refunds");
 const { registerProductTools } = require("./tools/products");
+const { registerCouponTools } = require("./tools/coupons");
+const { registerOrderEmailTools } = require("./tools/order-emails");
+const { registerReturnTools } = require("./tools/returns");
+const { registerPaymentTools } = require("./tools/payments");
 
 function createServer() {
-  const server = new McpServer({ name: "woocommerce", version: "2.0.0" });
+  const server = applyToolRisk(new McpServer({ name: "woocommerce", version: "2.0.0" }), toolRisk);
   registerStoreTools(server);
   registerCustomerTools(server);
   registerOrderTools(server);
   registerRefundTools(server);
   registerProductTools(server);
+  registerCouponTools(server);
+  registerOrderEmailTools(server);
+  registerReturnTools(server);
+  registerPaymentTools(server);
   return server;
 }
 

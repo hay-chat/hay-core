@@ -1,0 +1,108 @@
+{
+  "evidence": {
+    "headTitle": "Evidence packs - Hay.chat",
+    "title": "Evidence packs",
+    "description": "Put every conversation about an order into one document you can attach when a customer disputes a payment.",
+    "search": {
+      "label": "Order number",
+      "placeholder": "e.g. #1001",
+      "submit": "Find order",
+      "forConversation": "Orders mentioned in this conversation",
+      "forCustomer": "Orders this customer talked about",
+      "clear": "Search by order number instead",
+      "empty": "No conversation mentions this order. Orders are found when Hay.chat looked them up in your store or a message named them (for example \"#1001\").",
+      "emptyConversation": "This conversation does not mention an order.",
+      "emptyCustomer": "This customer's conversations do not mention an order."
+    },
+    "order": {
+      "label": "Order #{number}",
+      "conversations": "{count} conversation | {count} conversations",
+      "lastSeen": "Last mentioned {at}",
+      "fromMessages": "From messages",
+      "select": "Select",
+      "selected": "Selected"
+    },
+    "conversationOnly": {
+      "title": "Use this conversation only",
+      "description": "Build the pack from this conversation without an order."
+    },
+    "options": {
+      "title": "Build the pack",
+      "forOrder": "Order #{number}, {count} conversation | Order #{number}, {count} conversations",
+      "forConversation": "This conversation",
+      "template": "Dispute reason",
+      "templates": {
+        "generic": "General",
+        "item_not_received": "Item not received",
+        "not_as_described": "Item not as described or defective",
+        "cancelled_credit": "Cancelled order or credit not processed"
+      },
+      "templateHelp": "Chooses which store actions and policies the summary puts first. The full conversation is always included.",
+      "pdf": "Download PDF",
+      "zip": "Download ZIP",
+      "zipHelp": "The ZIP adds the attachments, a README and a SHA-256 manifest so anyone can check that no file was changed.",
+      "downloaded": "Evidence pack downloaded",
+      "imagesOmitted": "Some images were too large for the 4 MB PDF limit and were left out of the PDF. They are in the ZIP.",
+      "overCap": "This PDF is larger than 4 MB. Some payment providers do not accept files that large; choose fewer conversations or trim it before uploading.",
+      "failed": "Could not build the evidence pack. Try again."
+    },
+    "notes": {
+      "title": "Before you submit",
+      "honest": "The pack is a record of what Hay.chat stored about these conversations. It does not guarantee any dispute outcome, and each payment provider decides what evidence it accepts.",
+      "retention": "Your data retention is set to {days} days. Conversations older than that are deleted and cannot be part of a pack. Disputes can be opened months after an order, so a short retention leaves you less evidence.",
+      "retentionOff": "Conversations are kept until you delete them, so older orders can still be packed.",
+      "retentionLink": "Data retention settings"
+    },
+    "disputes": {
+      "title": "Payment disputes",
+      "description": "Chargebacks your connected payment platforms reported. Attach the evidence pack, then review it on the platform before the due date.",
+      "order": "Order {order}",
+      "noOrderLabel": "Order unknown",
+      "status": {
+        "needs_response": "Needs a response",
+        "under_review": "Under review",
+        "won": "Won",
+        "lost": "Lost",
+        "closed": "Closed"
+      },
+      "drafted": "Evidence attached, not submitted",
+      "dueBy": "Evidence due {at}",
+      "noOrder": "No conversation mentions this order yet, so there is nothing to attach.",
+      "download": "Download pack",
+      "attach": "Attach evidence",
+      "attachAgain": "Attach again",
+      "open": "Open in {platform}",
+      "confirmTitle": "Attach the evidence pack to this dispute?",
+      "confirmDescription": "Hay.chat uploads the evidence PDF to this dispute on {platform} and adds a short note. Hay.chat never submits the response, but some platforms (Shopify Payments, for example) send saved evidence automatically on the due date, so review it on {platform} before then. Files you added there are kept.",
+      "confirm": "Attach evidence",
+      "attached": "Evidence attached to the dispute on {platform}",
+      "attachedHelp": "Saved on {platform}, not submitted by Hay.chat. Review it there before the due date: some platforms send saved evidence automatically on that date.",
+      "reasons": {
+        "product_not_received": "Item not received",
+        "product_unacceptable": "Not as described",
+        "credit_not_processed": "Credit not processed",
+        "subscription_canceled": "Subscription cancelled",
+        "duplicate": "Duplicate charge",
+        "fraudulent": "Fraudulent",
+        "unrecognized": "Unrecognised charge",
+        "general": "General",
+        "customer_initiated": "Customer initiated",
+        "incorrect_account_details": "Incorrect account details",
+        "insufficient_funds": "Insufficient funds",
+        "bank_cannot_process": "Bank cannot process",
+        "debit_not_authorized": "Debit not authorised"
+      },
+      "errors": {
+        "NOT_EDITABLE": "This dispute no longer takes evidence. It may already have been submitted or closed.",
+        "SLOT_TAKEN": "The dispute already holds files you added on the platform, so Hay.chat did not replace them. Download the pack and add it there.",
+        "SCOPE_MISSING": "The connection lacks permission to edit dispute evidence. Reconnect the integration and approve the new permissions.",
+        "NOT_FOUND": "The platform could not find this dispute.",
+        "NOT_CONNECTED": "The integration that reported this dispute is not connected or cannot attach evidence.",
+        "PROVIDER_ERROR": "The platform did not accept the evidence. Try again, or download the pack and add it there.",
+        "NO_ORDER": "No conversation mentions this order, so there is nothing to attach.",
+        "NO_CONVERSATIONS": "The conversations about this order are no longer stored.",
+        "TOO_LARGE": "The evidence file is too large to attach. Download it from this page and trim it before uploading."
+      }
+    }
+  }
+}

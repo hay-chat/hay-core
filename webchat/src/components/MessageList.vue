@@ -1,5 +1,5 @@
 <template>
-  <div class="hay-message-list" ref="messageListRef">
+  <div class="hay-message-list" ref="messageListRef" @scroll="onScroll" @load.capture="onMediaLoad">
     <!-- Greeting Message -->
     <div v-if="greetingMessage && messages.length === 0" class="hay-message hay-message--agent">
       <div class="hay-message__content hay-message__content--rich">{{ greetingMessage }}</div>
@@ -14,66 +14,116 @@
         'hay-message--user': message.sender === 'user',
         'hay-message--agent': message.sender === 'agent',
         'hay-message--closure': message.metadata?.isClosureMessage,
+        'hay-message--system': agentNoticeText(message, t) !== null,
       }"
     >
-      <div v-if="message.metadata?.isClosureMessage" class="hay-message__closure-badge">
-        {{ t("chat.conversationClosed") }}
+      <!-- A team member joined or left: a centred line, no bubble or time -->
+      <div v-if="agentNoticeText(message, t) !== null" class="hay-message__system">
+        {{ agentNoticeText(message, t) }}
       </div>
-      <!-- Product recommendation cards -->
-      <template
-        v-if="
-          message.agentType === 'ProductRecommendation' &&
-          message.metadata &&
-          Array.isArray((message.metadata as any).productRecommendation?.products)
-        "
-      >
-        <div class="hay-message__content hay-message__content--rich">
-          <div class="hay-product-recs">
+      <template v-else>
+        <!-- AI disclosure (EU AI Act art. 50): label on every AI reply unless the org hid it -->
+        <div v-if="aiLabel && message.agentType === 'BotAgent'" class="hay-message__ai-badge">
+          {{ aiLabel }}
+        </div>
+        <div v-if="message.metadata?.isClosureMessage" class="hay-message__closure-badge">
+          {{ t("chat.conversationClosed") }}
+        </div>
+        <!-- Product recommendation cards -->
+        <template
+          v-if="
+            message.agentType === 'ProductRecommendation' &&
+            message.metadata &&
+            Array.isArray((message.metadata as any).productRecommendation?.products)
+          "
+        >
+          <div class="hay-message__content hay-message__content--rich">
+            <div class="hay-product-recs">
+              <a
+                v-for="p in (message.metadata as any).productRecommendation.products as any[]"
+                :key="p.id || p.externalId"
+                :href="p.sourceUrl || '#'"
+                target="_blank"
+                rel="noopener noreferrer"
+                class="hay-product-card"
+              >
+                <div class="hay-product-card__image">
+                  <img v-if="p.imageUrl" :src="p.imageUrl" :alt="p.title" loading="lazy" />
+                </div>
+                <div class="hay-product-card__body">
+                  <div class="hay-product-card__title">{{ p.title }}</div>
+                  <div v-if="p.topVariant?.price" class="hay-product-card__price">
+                    {{ formatPrice(p.topVariant.price, p.topVariant.currency) }}
+                  </div>
+                  <div v-if="p.available === false" class="hay-product-card__oos">Out of stock</div>
+                </div>
+              </a>
+            </div>
+          </div>
+        </template>
+        <!-- Agent messages: one bubble per image segment (word-reveal only when a
+           single, image-free segment). -->
+        <template v-else-if="message.sender === 'agent'">
+          <div
+            v-for="(segment, i) in showsText(message) ? splitMarkdownImages(message.content) : []"
+            :key="i"
+            class="hay-message__content hay-message__content--rich"
+            :class="{ 'hay-message__content--image': isImageSegment(segment) }"
+          >
+            <div
+              v-if="
+                animatingIds.has(message.id) && splitMarkdownImages(message.content).length === 1
+              "
+              v-html="getAnimatedHtml(segment)"
+            ></div>
+            <div v-else v-html="renderMarkdown(segment)"></div>
+          </div>
+        </template>
+        <!-- User messages: plain text -->
+        <template v-else-if="showsText(message)">
+          <div class="hay-message__content">{{ message.content }}</div>
+        </template>
+        <!-- Files: photos inline, other files as a link (signed, expiring URLs) -->
+        <div v-if="message.attachments?.length" class="hay-message__attachments">
+          <template v-for="attachment in message.attachments" :key="attachment.id">
             <a
-              v-for="p in (message.metadata as any).productRecommendation.products as any[]"
-              :key="p.id || p.externalId"
-              :href="p.sourceUrl || '#'"
+              v-if="isImageAttachment(attachment.type) && attachment.url"
+              :href="attachment.url"
               target="_blank"
               rel="noopener noreferrer"
-              class="hay-product-card"
+              class="hay-message__attachment-image"
+              :class="{ 'hay-message__attachment--pending': message.metadata?.pending }"
             >
-              <div class="hay-product-card__image">
-                <img v-if="p.imageUrl" :src="p.imageUrl" :alt="p.title" loading="lazy" />
-              </div>
-              <div class="hay-product-card__body">
-                <div class="hay-product-card__title">{{ p.title }}</div>
-                <div v-if="p.topVariant?.price" class="hay-product-card__price">
-                  {{ formatPrice(p.topVariant.price, p.topVariant.currency) }}
-                </div>
-                <div v-if="p.available === false" class="hay-product-card__oos">Out of stock</div>
-              </div>
+              <img :src="attachment.url" :alt="attachment.name || t('attachment.photo')" />
             </a>
-          </div>
+            <a
+              v-else-if="attachment.url"
+              :href="attachment.url"
+              target="_blank"
+              rel="noopener noreferrer"
+              class="hay-message__attachment-file"
+            >
+              <span class="hay-message__attachment-name">{{
+                attachment.name || t("attachment.file")
+              }}</span>
+              <span class="hay-message__attachment-size">{{
+                formatFileSize(attachment.size)
+              }}</span>
+            </a>
+            <span v-else class="hay-message__attachment-file">
+              <span class="hay-message__attachment-name">{{
+                attachment.name || t("attachment.file")
+              }}</span>
+              <span class="hay-message__attachment-size">{{
+                message.metadata?.pending
+                  ? t("attachment.sending")
+                  : formatFileSize(attachment.size)
+              }}</span>
+            </span>
+          </template>
         </div>
+        <div class="hay-message__time">{{ timeLabel(message) }}</div>
       </template>
-      <!-- Agent messages: one bubble per image segment (word-reveal only when a
-           single, image-free segment). -->
-      <template v-else-if="message.sender === 'agent'">
-        <div
-          v-for="(segment, i) in splitMarkdownImages(message.content)"
-          :key="i"
-          class="hay-message__content hay-message__content--rich"
-          :class="{ 'hay-message__content--image': isImageSegment(segment) }"
-        >
-          <div
-            v-if="animatingIds.has(message.id) && splitMarkdownImages(message.content).length === 1"
-            v-html="getAnimatedHtml(segment)"
-          ></div>
-          <div v-else v-html="renderMarkdown(segment)"></div>
-        </div>
-      </template>
-      <!-- User messages: plain text -->
-      <template v-else>
-        <div class="hay-message__content">{{ message.content }}</div>
-      </template>
-      <div class="hay-message__time">
-        {{ formatTime(message.timestamp) }}
-      </div>
     </div>
 
     <div v-if="isTyping" class="hay-message hay-message--agent">
@@ -91,6 +141,8 @@ import { ref, watch, nextTick, type Directive } from "vue";
 import type { Message } from "@/types";
 import { parseMarkdown, wrapWordsForAnimation, splitMarkdownImages } from "@/utils/markdown";
 import { useI18n } from "@/i18n";
+import { agentFirstName, agentNoticeText } from "@/utils/agentNotice";
+import { formatFileSize, isImageAttachment } from "@/utils/attachments";
 
 const t = useI18n();
 
@@ -98,6 +150,8 @@ const props = defineProps<{
   messages: Message[];
   isTyping: boolean;
   greetingMessage?: string;
+  /** Label on AI replies; null or empty hides it. */
+  aiLabel?: string | null;
 }>();
 
 const messageListRef = ref<HTMLElement | null>(null);
@@ -141,6 +195,12 @@ const vHeightAnimate: Directive<HTMLElement, boolean> = {
   },
 };
 
+// A "[Customer sent a photo]" line is for the AI; the shopper sees the photo.
+const showsText = (message: Message): boolean => {
+  if (!message.content) return false;
+  return !(message.metadata?.mediaPlaceholder === true && message.attachments?.length);
+};
+
 const renderMarkdown = (content: string): string => {
   return parseMarkdown(content);
 };
@@ -160,6 +220,12 @@ const formatTime = (timestamp: number) => {
   return `${hours}:${minutes}`;
 };
 
+// "10:42 · Marina" on a team member's reply, so the shopper knows it is a person
+const timeLabel = (message: Message) => {
+  const name = message.agentType === "HumanAgent" ? agentFirstName(message) : undefined;
+  return name ? `${formatTime(message.timestamp)} · ${name}` : formatTime(message.timestamp);
+};
+
 const formatPrice = (amount?: string | number, currency?: string): string => {
   if (amount === undefined || amount === null || amount === "") return "";
   const value = typeof amount === "string" ? parseFloat(amount) : amount;
@@ -173,6 +239,18 @@ const formatPrice = (amount?: string | number, currency?: string): string => {
   } catch {
     return `${value.toFixed(2)} ${currency ?? ""}`.trim();
   }
+};
+
+// Images load after the list first scrolls, which would push the newest message out of view.
+// Stay pinned to the bottom while they load, unless the shopper has scrolled up to read.
+const pinnedToBottom = ref(true);
+const onScroll = () => {
+  const el = messageListRef.value;
+  if (!el) return;
+  pinnedToBottom.value = el.scrollHeight - el.scrollTop - el.clientHeight < 40;
+};
+const onMediaLoad = () => {
+  if (pinnedToBottom.value) scrollToBottom();
 };
 
 const scrollToBottom = () => {
@@ -199,7 +277,7 @@ watch(
       const msg = newMessages[0];
       animateEntranceIds.add(msg.id);
 
-      if (msg.sender === "agent") {
+      if (msg.sender === "agent" && msg.content) {
         animatingIds.value.add(msg.id);
         const parsed = parseMarkdown(msg.content);
         const { wordCount } = wrapWordsForAnimation(parsed);
@@ -283,6 +361,65 @@ watch(
   border-bottom-left-radius: 4px;
 }
 
+.hay-message__attachments {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.hay-message--user .hay-message__attachments {
+  align-items: flex-end;
+}
+
+.hay-message__attachments:first-child {
+  margin-top: 0;
+}
+
+.hay-message__attachment-image img {
+  display: block;
+  max-width: 220px;
+  max-height: 260px;
+  width: auto;
+  height: auto;
+  border-radius: 12px;
+  object-fit: cover;
+}
+
+.hay-message__attachment--pending {
+  opacity: 0.6;
+}
+
+.hay-message__attachment-file {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-width: 240px;
+  padding: 8px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--color-neutral-200, #e2e8f0);
+  background: var(--color-neutral-50, #f8fafc);
+  color: var(--color-neutral-800);
+  font-size: 13px;
+  text-decoration: none;
+}
+
+a.hay-message__attachment-file:hover {
+  border-color: var(--hay-primary);
+}
+
+.hay-message__attachment-name {
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hay-message__attachment-size {
+  font-size: 11px;
+  color: var(--color-neutral-500, #64748b);
+}
+
 /* Stacked segment bubbles (one per image) read as separate messages. */
 .hay-message__content + .hay-message__content {
   margin-top: 6px;
@@ -349,6 +486,17 @@ watch(
   margin-bottom: 12px;
 }
 
+.hay-message__ai-badge {
+  align-self: flex-start;
+  margin-bottom: 4px;
+  padding: 1px 8px;
+  border: 1px solid var(--color-neutral-200);
+  border-radius: 999px;
+  font-size: 11px;
+  line-height: 16px;
+  color: var(--color-neutral-500);
+}
+
 .hay-message__time {
   font-size: 11px;
   color: var(--color-neutral-400);
@@ -411,6 +559,20 @@ watch(
     transform: translateY(-10px);
     opacity: 1;
   }
+}
+
+/* Team member joined/left line */
+.hay-message--system {
+  align-self: center;
+  max-width: 90%;
+  margin: 8px 0;
+}
+
+.hay-message__system {
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--color-neutral-500);
+  text-align: center;
 }
 
 /* Closure message styling */

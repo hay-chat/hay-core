@@ -9,11 +9,11 @@ import { AuthCode } from "@server/entities/auth-code.entity";
 import {
   hashPassword,
   verifyPassword,
-  generateSessionId,
   hashApiKey,
   generateSecureToken,
 } from "@server/lib/auth/utils/hashing";
-import { generateTokens, verifyRefreshToken, refreshAccessToken } from "@server/lib/auth/utils/jwt";
+import { authSessionService, RefreshRejectedError } from "@server/services/auth-session.service";
+import { pushNotificationService } from "@server/services/push-notification.service";
 import {
   protectedProcedure,
   protectedProcedureWithoutOrg,
@@ -28,6 +28,7 @@ import { getDashboardUrl } from "@server/config/env";
 import { StorageService } from "@server/services/storage.service";
 import { handleUpload } from "@server/lib/upload-helper";
 import { rateLimitService } from "@server/services/rate-limit.service";
+import { DEFAULT_NEW_ORG_RETENTION_DAYS } from "@server/types/organization-settings.types";
 import { toAccessState } from "@server/services/organization-access.service";
 import {
   AGENT_PAUSE_REASONS,
@@ -35,6 +36,7 @@ import {
   accessNoticeSchema,
 } from "@server/types/organization-access.types";
 import { createLogger } from "@server/lib/logger";
+import { enableDefaultPlugins } from "@server/services/default-plugins.service";
 
 const logger = createLogger("auth");
 
@@ -56,7 +58,7 @@ async function getUserOrganizations(userId: string) {
     name: userOrg.organization.name,
     slug: userOrg.organization.slug,
     logo: userOrg.organization.logoUpload
-      ? storageService.getPublicUrl(userOrg.organization.logoUpload)
+      ? storageService.getUrl(userOrg.organization.logoUpload)
       : null,
     role: userOrg.role,
     permissions: userOrg.permissions,
@@ -164,9 +166,7 @@ export const authRouter = t.router({
     user.updateLastSeen();
     await userRepository.save(user);
 
-    // Generate tokens
-    const sessionId = generateSessionId();
-    const tokens = generateTokens(user, sessionId);
+    const tokens = await authSessionService.createSession(user, ctx);
 
     // Load all user organizations (multi-org support)
     const organizations = await getUserOrganizations(user.id);
@@ -196,11 +196,14 @@ export const authRouter = t.router({
     };
   }),
 
-  register: publicProcedure.input(registerSchema).mutation(async ({ input }) => {
+  register: publicProcedure.input(registerSchema).mutation(async ({ input, ctx }) => {
     const { email, password, firstName, lastName, organizationName, organizationSlug } = input;
 
+    // Set inside the transaction when a new organization is created.
+    let createdOrganizationId: string | null = null;
+
     // Use a transaction for atomicity
-    return await AppDataSource.transaction(async (manager) => {
+    const result = await AppDataSource.transaction(async (manager) => {
       const userRepository = manager.getRepository(User);
       const organizationRepository = manager.getRepository(Organization);
 
@@ -240,9 +243,11 @@ export const authRouter = t.router({
             maxJobs: 50,
             maxStorageGb: 1,
           },
+          settings: { retentionDays: DEFAULT_NEW_ORG_RETENTION_DAYS },
         });
 
         await organizationRepository.save(org);
+        createdOrganizationId = org.id;
         return org;
       };
 
@@ -275,8 +280,7 @@ export const authRouter = t.router({
           await userRepository.save(existingUser);
         }
 
-        const sessionId = generateSessionId();
-        const tokens = generateTokens(existingUser, sessionId);
+        const tokens = await authSessionService.createSession(existingUser, ctx, manager);
         const organizations = await getUserOrganizations(existingUser.id);
 
         return {
@@ -324,9 +328,7 @@ export const authRouter = t.router({
         await userOrgRepository.save(userOrg);
       }
 
-      // Generate tokens
-      const sessionId = generateSessionId();
-      const tokens = generateTokens(user, sessionId);
+      const tokens = await authSessionService.createSession(user, ctx, manager);
 
       // Load all user organizations (multi-org support)
       const organizations = await getUserOrganizations(user.id);
@@ -341,44 +343,33 @@ export const authRouter = t.router({
         ...tokens,
       };
     });
+
+    // After commit: give the new organization its default plugins (fire-and-forget).
+    if (createdOrganizationId) void enableDefaultPlugins(createdOrganizationId);
+
+    return result;
   }),
 
-  refreshToken: publicProcedure.input(refreshTokenSchema).mutation(async ({ input }) => {
+  /**
+   * Rotate: returns a new access token AND a new refresh token, and slides the
+   * session's 90-day idle timeout. UNAUTHORIZED means "log out"; any other
+   * error (database down, ...) is transient and the client keeps its session.
+   */
+  refreshToken: publicProcedure.input(refreshTokenSchema).mutation(async ({ input, ctx }) => {
     try {
-      const payload = verifyRefreshToken(input.refreshToken);
-
-      // Find user
-      const userRepository = AppDataSource.getRepository(User);
-      const user = await userRepository.findOne({
-        where: { id: payload.userId },
-      });
-
-      if (!user || !user.isActive) {
-        throw new TRPCError({
-          code: "UNAUTHORIZED",
-          message: "Invalid refresh token",
-        });
-      }
-
-      // Check token version — rejects tokens issued before password change/reset
-      if (payload.tokenVersion !== undefined && payload.tokenVersion !== (user.tokenVersion ?? 0)) {
-        throw new TRPCError({
-          code: "UNAUTHORIZED",
-          message: "Token has been revoked",
-        });
-      }
-
-      // Generate new access token
-      const accessToken = await refreshAccessToken(input.refreshToken);
-
-      return {
-        accessToken,
-        expiresIn: 900, // 15 minutes
-      };
+      return await authSessionService.refresh(input.refreshToken, ctx);
     } catch (error) {
+      if (error instanceof RefreshRejectedError) {
+        throw new TRPCError({
+          code: "UNAUTHORIZED",
+          message: "Invalid or expired refresh token",
+          cause: { type: "REFRESH_REJECTED", reason: error.reason },
+        });
+      }
+      logger.error({ err: error }, "Refresh failed for a non-auth reason");
       throw new TRPCError({
-        code: "UNAUTHORIZED",
-        message: "Invalid or expired refresh token",
+        code: "INTERNAL_SERVER_ERROR",
+        message: "Could not refresh the session, please retry",
       });
     }
   }),
@@ -457,7 +448,7 @@ export const authRouter = t.router({
           variables: {
             userName: user.getFullName(),
             userEmail: user.email,
-            companyName: "Hay",
+            companyName: "Hay.chat",
             resetLink,
             expirationHours: "24",
             requestTime: new Date().toLocaleString(),
@@ -466,7 +457,7 @@ export const authRouter = t.router({
             requestLocation: "Unknown", // TODO: Add geolocation lookup
             supportEmail: "support@hay.chat",
             currentYear: new Date().getFullYear().toString(),
-            companyAddress: "Hay Platform",
+            companyAddress: "Hay.chat",
             websiteUrl: baseUrl,
             preferencesUrl: `${baseUrl}/settings`,
             recipientEmail: user.email,
@@ -595,14 +586,14 @@ export const authRouter = t.router({
           variables: {
             userName: user.getFullName(),
             userEmail: user.email,
-            companyName: "Hay",
+            companyName: "Hay.chat",
             changedAt: new Date().toLocaleString(),
             ipAddress: ctx.ipAddress || "Unknown",
             browser: ctx.userAgent || "Unknown",
             location: "Unknown",
             supportUrl: `${getDashboardUrl()}/support`,
             currentYear: new Date().getFullYear().toString(),
-            companyAddress: "Hay Platform",
+            companyAddress: "Hay.chat",
             websiteUrl: getDashboardUrl(),
             preferencesUrl: `${getDashboardUrl()}/settings`,
             recipientEmail: user.email,
@@ -651,6 +642,8 @@ export const authRouter = t.router({
             agentPausedAt: z.union([z.date(), z.string()]).nullable(),
             agentPauseReason: z.enum(AGENT_PAUSE_REASONS).nullable(),
             accessNotice: accessNoticeSchema.nullable(),
+            aiPausedAt: z.union([z.date(), z.string()]).nullable(),
+            aiPausedByUserId: z.string().nullable(),
           }),
         ),
         activeOrganizationId: z.string().optional(),
@@ -717,11 +710,21 @@ export const authRouter = t.router({
       };
     }),
 
-  logout: protectedProcedure.mutation(async () => {
-    // In a stateless JWT system, logout is handled client-side
-    // Here we could invalidate refresh tokens if we're tracking them
-    return { success: true };
-  }),
+  /**
+   * End this device's session. Public on purpose: holding the refresh token is
+   * the proof, and logout must work after the access token has expired.
+   * `pushEndpoint` is this device's Web Push subscription: a logged-out phone
+   * must stop showing customer names on its lock screen.
+   */
+  logout: publicProcedure
+    .input(refreshTokenSchema.extend({ pushEndpoint: z.string().url().max(2048).optional() }))
+    .mutation(async ({ input }) => {
+      const userId = await authSessionService.revoke(input.refreshToken);
+      if (userId && input.pushEndpoint) {
+        await pushNotificationService.unsubscribe(userId, input.pushEndpoint);
+      }
+      return { success: true };
+    }),
 
   changePassword: protectedProcedure
     .input(
@@ -774,14 +777,14 @@ export const authRouter = t.router({
           variables: {
             userName: user.getFullName(),
             userEmail: user.email,
-            companyName: "Hay",
+            companyName: "Hay.chat",
             changedAt: new Date().toLocaleString(),
             ipAddress: ctx.ipAddress || "Unknown",
             browser: ctx.userAgent || "Unknown",
             location: "Unknown", // TODO: Add geolocation lookup
             supportUrl: `${getDashboardUrl()}/support`,
             currentYear: new Date().getFullYear().toString(),
-            companyAddress: "Hay Platform",
+            companyAddress: "Hay.chat",
             websiteUrl: getDashboardUrl(),
             preferencesUrl: `${getDashboardUrl()}/settings`,
             recipientEmail: user.email,
@@ -1056,7 +1059,7 @@ export const authRouter = t.router({
           userName: user.getFullName(),
           oldEmail,
           newEmail: input.newEmail.toLowerCase(),
-          companyName: "Hay",
+          companyName: "Hay.chat",
           requestTime: new Date().toLocaleString(),
           ipAddress: ctx.ipAddress || "Unknown",
           browser: ctx.userAgent || "Unknown",
@@ -1064,7 +1067,7 @@ export const authRouter = t.router({
           supportUrl: `${baseUrl}/support`,
           cancelUrl: `${baseUrl}/settings/profile`,
           currentYear: new Date().getFullYear().toString(),
-          companyAddress: "Hay Platform",
+          companyAddress: "Hay.chat",
           websiteUrl: getDashboardUrl(),
           preferencesUrl: `${baseUrl}/settings`,
         };
@@ -1211,13 +1214,13 @@ export const authRouter = t.router({
           userEmail: newEmail,
           oldEmail,
           newEmail,
-          companyName: "Hay",
+          companyName: "Hay.chat",
           changedAt: new Date().toLocaleString(),
           ipAddress: "Unknown",
           location: "Unknown",
           supportUrl: `${getDashboardUrl()}/support`,
           currentYear: new Date().getFullYear().toString(),
-          companyAddress: "Hay Platform",
+          companyAddress: "Hay.chat",
           websiteUrl: getDashboardUrl(),
           preferencesUrl: `${getDashboardUrl()}/settings`,
           recipientEmail: newEmail,
@@ -1418,9 +1421,9 @@ export const authRouter = t.router({
           variables: {
             userName: user.getFullName(),
             verificationUrl,
-            companyName: "Hay",
+            companyName: "Hay.chat",
             currentYear: new Date().getFullYear().toString(),
-            companyAddress: "Hay Platform",
+            companyAddress: "Hay.chat",
             websiteUrl: "https://hay.chat",
           },
         });
@@ -1477,7 +1480,7 @@ export const authRouter = t.router({
         userName: user.getFullName(),
         oldEmail: user.email,
         newEmail: user.pendingEmail,
-        companyName: "Hay",
+        companyName: "Hay.chat",
         requestTime: new Date().toLocaleString(),
         ipAddress: ctx.ipAddress || "Unknown",
         browser: ctx.userAgent || "Unknown",
@@ -1485,7 +1488,7 @@ export const authRouter = t.router({
         supportUrl: `${baseUrl}/support`,
         cancelUrl: `${baseUrl}/settings/profile`,
         currentYear: new Date().getFullYear().toString(),
-        companyAddress: "Hay Platform",
+        companyAddress: "Hay.chat",
         websiteUrl: "https://hay.chat",
         preferencesUrl: `${baseUrl}/settings`,
       };
@@ -1592,7 +1595,7 @@ export const authRouter = t.router({
 
   exchangeAuthCode: publicProcedure
     .input(z.object({ code: z.string().min(1) }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
       const codeHash = await hashApiKey(input.code);
 
       const authCodeRepo = AppDataSource.getRepository(AuthCode);
@@ -1636,9 +1639,7 @@ export const authRouter = t.router({
       user.updateLastSeen();
       await userRepository.save(user);
 
-      // Generate tokens
-      const sessionId = generateSessionId();
-      const tokens = generateTokens(user, sessionId);
+      const tokens = await authSessionService.createSession(user, ctx);
 
       // Load all user organizations
       const organizations = await getUserOrganizations(user.id);

@@ -2,12 +2,15 @@ import { createExpressMiddleware } from "@trpc/server/adapters/express";
 import express from "express";
 import type { FileFilterCallback } from "multer";
 import cors from "cors";
+import { httpCompression } from "@server/lib/http-compression";
+import { webchatStatic } from "@server/lib/webchat-static";
 import { createServer } from "http";
 import { config, validateProductionConfig } from "@server/config/env";
 import { createContext } from "@server/trpc/context";
 import { initializeDatabase } from "@server/database/data-source";
 import { createLogger } from "@server/lib/logger";
 import { initTelemetry, captureException, shutdownTelemetry } from "@server/lib/telemetry";
+import { isPublicUploadPath } from "@server/services/media-url.service";
 import "reflect-metadata";
 import "dotenv/config";
 
@@ -132,6 +135,8 @@ async function startServer() {
     }),
   );
 
+  server.use(httpCompression());
+
   // Add JSON parsing middleware with increased size limit for document uploads.
   // The `verify` hook captures the raw request bytes on `req.rawBody` so that
   // downstream consumers (e.g. the plugin proxy → channel plugins) can verify
@@ -145,7 +150,7 @@ async function startServer() {
   server.use(express.urlencoded({ extended: true, limit: "50mb", verify: captureRawBody }));
 
   server.get("/", (req, res) => {
-    res.send("Welcome to Hay");
+    res.send("Welcome to Hay.chat");
   });
 
   // Health check endpoint.
@@ -166,8 +171,10 @@ async function startServer() {
   if (!require("fs").existsSync(uploadDir)) {
     require("fs").mkdirSync(uploadDir, { recursive: true });
   }
+  // Only public folders (logos, avatars, document images); private files go through /v1/media.
   server.use(
     "/uploads",
+    (req, res, next) => (isPublicUploadPath(req.path) ? next() : res.status(404).end()),
     express.static(uploadDir, {
       maxAge: "7d",
       etag: true,
@@ -201,20 +208,13 @@ async function startServer() {
       })
       .send("/* Widget styles are bundled into widget.js */\n");
   });
-  server.use(
-    "/v1/webchat",
-    express.static(webchatDir, {
-      maxAge: "7d",
-      etag: true,
-      lastModified: true,
-      setHeaders: (res) => {
-        // Security headers
-        res.setHeader("X-Content-Type-Options", "nosniff");
-        // Allow CORS for widget files so they can be loaded from any domain
-        res.setHeader("Access-Control-Allow-Origin", "*");
-      },
-    }),
-  );
+  // Hay.chat-hosted challenge frame for webchat bot checks (D9-8). Mounted before
+  // the static files so it is never shadowed by a file of the same name.
+  const { webchatChallengeHandler } = await import("@server/routes/webchat-challenge");
+  server.get("/v1/webchat/challenge", (req, res) => void webchatChallengeHandler(req, res));
+  // widget.js (the loader) gets a short cache; the hashed chunks under assets/
+  // are immutable. See lib/webchat-static.ts.
+  server.use("/v1/webchat", webchatStatic(webchatDir));
 
   // Plugin routes — plugin IDs are plain strings without slashes (e.g., hay-channel-instagram-meta).
 
@@ -379,6 +379,10 @@ async function startServer() {
     return res.redirect(`${dashboardUrl}/settings/git-connections?${params.toString()}`);
   });
 
+  // Resend email events (bounces, complaints, deliveries) — D13-10
+  const emailEventsRouter = await import("@server/routes/email-events");
+  server.use(emailEventsRouter.default);
+
   // Well-known endpoints for OAuth Client Metadata Document (CIMD)
   const wellKnownRouter = await import("@server/routes/well-known");
   server.use(wellKnownRouter.default);
@@ -443,6 +447,10 @@ async function startServer() {
   // Plugin API routes - secure HTTP endpoints for plugins to call back to the server
   const pluginAPIRouter = await import("@server/routes/v1/plugin-api/index");
   server.use("/v1/plugin-api", pluginAPIRouter.default);
+
+  // Private uploads (conversation media): staff session or signed URL
+  const mediaRouter = await import("@server/routes/v1/media/index");
+  server.use("/v1/media", mediaRouter.default);
 
   // Create dynamic router with plugin routes (after plugins are loaded)
   const { createV1Router } = await import("@server/routes/v1");

@@ -94,6 +94,14 @@ export class Playbook {
   @JoinColumn()
   organization!: Organization;
 
+  /**
+   * Write categories that always need approval while this playbook is active
+   * (D4-9). Tighten-only: it can add approval, never remove the org's.
+   * Not versioned, so a change applies at once.
+   */
+  @Column({ type: "jsonb", nullable: true })
+  approval_categories!: string[] | null;
+
   @Column({ type: "uuid", nullable: true })
   active_version_id!: string | null;
 

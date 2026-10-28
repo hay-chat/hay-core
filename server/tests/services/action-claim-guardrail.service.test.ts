@@ -108,6 +108,7 @@ describe("ActionClaimGuardrailService.assessActionClaim", () => {
         toolsCalledThisTurn: [
           { name: "shopify_cancel_order", success: false },
           { name: "shopify_get_order_by_name", success: true },
+          { name: "shopify_create_refund", success: false, pending: true },
         ],
       }),
     );
@@ -115,6 +116,26 @@ describe("ActionClaimGuardrailService.assessActionClaim", () => {
     const vars = getPrompt.mock.calls[0][1];
     expect(vars.toolLedger).toContain("shopify_cancel_order — FAILED");
     expect(vars.toolLedger).toContain("shopify_get_order_by_name — SUCCESS");
+    expect(vars.toolLedger).toContain("shopify_create_refund — PENDING_APPROVAL");
+  });
+
+  it("marks calls the team decided on, so a follow-up can report them truthfully", async () => {
+    llmVerdict({ claimsAction: false, backedByTools: true });
+
+    await service.assessActionClaim(
+      baseContext({
+        toolsCalledThisTurn: [
+          { name: "create_refund", success: true, decision: "approved" },
+          { name: "cancel_order", success: false, decision: "approved" },
+          { name: "create_discount", success: false, decision: "declined" },
+        ],
+      }),
+    );
+
+    const vars = getPrompt.mock.calls[0][1];
+    expect(vars.toolLedger).toContain("create_refund — SUCCESS (approved by the team)");
+    expect(vars.toolLedger).toContain("cancel_order — FAILED (approved by the team)");
+    expect(vars.toolLedger).toContain("create_discount — DECLINED_BY_TEAM");
   });
 
   it("reports an empty ledger explicitly in the prompt", async () => {

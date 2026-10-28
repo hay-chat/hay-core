@@ -23,6 +23,11 @@ import { pluginManagerService } from "@server/services/plugin-manager.service";
 import { pluginInstanceRepository } from "@server/repositories/plugin-instance.repository";
 import { documentSourceRepository } from "@server/repositories/document-source.repository";
 import type { HayPluginManifest } from "@server/types/plugin.types";
+import {
+  KnowledgeSuggestionError,
+  KnowledgeSuggestionService,
+} from "@server/services/knowledge-suggestion.service";
+import { TRPCError } from "@trpc/server";
 
 const logger = createLogger("documents");
 
@@ -376,6 +381,44 @@ export const documentsRouter = t.router({
         title: updatedDocument.title,
         embeddingsRegenerated: false,
       };
+    }),
+  /**
+   * Knowledge "Improve" (D3-6): propose an edit to a document the AI used, or
+   * a new Q&A, from a conversation and/or feedback. Writes nothing; the owner
+   * saves the reviewed diff through update/create.
+   */
+  suggestEdits: scopedProcedure(RESOURCES.DOCUMENTS, ACTIONS.UPDATE)
+    .input(
+      z
+        .object({
+          conversationId: z.string().uuid().optional(),
+          documentId: z.string().uuid().optional(),
+          feedback: z.string().max(4000).optional(),
+        })
+        .refine((i) => i.conversationId || i.feedback, {
+          message: "Provide a conversationId or feedback",
+        }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      try {
+        return await new KnowledgeSuggestionService().suggest({
+          organizationId: ctx.organizationId!,
+          conversationId: input.conversationId,
+          documentId: input.documentId,
+          feedback: input.feedback,
+        });
+      } catch (error) {
+        if (error instanceof KnowledgeSuggestionError) {
+          throw new TRPCError({ code: error.code, message: error.message });
+        }
+        if (error instanceof SyntaxError) {
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: "Failed to parse suggested edits",
+          });
+        }
+        throw error;
+      }
     }),
   delete: scopedProcedure(RESOURCES.DOCUMENTS, ACTIONS.DELETE)
     .input(

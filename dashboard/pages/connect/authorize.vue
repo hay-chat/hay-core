@@ -32,14 +32,14 @@ definePageMeta({
   public: true,
 });
 
-useHead({ title: "Connect to Hay" });
+useHead({ title: "Connect to Hay.chat" });
 
 const router = useRouter();
 const route = useRoute();
 const authStore = useAuthStore();
 
 const status = ref<"loading" | "error">("loading");
-const message = ref("Please wait while we connect your Hay account.");
+const message = ref("Please wait while we connect your Hay.chat account.");
 
 onMounted(async () => {
   const redirectUri = route.query.redirect_uri as string | undefined;

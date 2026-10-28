@@ -1,7 +1,7 @@
 {
   "name": "hay-channel-email",
   "version": "1.0.0",
-  "description": "Connect your support inbox as a channel — forward support@ emails to Hay and let the AI reply by email, threaded like a normal conversation",
+  "description": "Connect your support inbox as a channel — forward support@ emails to Hay.chat and let the AI reply by email, threaded like a normal conversation; the AI can also email your team",
   "author": "Hay",
   "type": "module",
   "main": "dist/index.js",
@@ -10,10 +10,15 @@
     "displayName": "Email inbox",
     "category": "channel",
     "channel": "email",
+    "rendering": {
+      "markdown": "plain",
+      "productRecommendations": "text"
+    },
     "capabilities": [
       "messages",
       "customers",
-      "email"
+      "email",
+      "mcp"
     ],
     "env": [
       "RESEND_API_KEY",

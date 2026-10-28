@@ -3,12 +3,37 @@
     "untitled": "Conversa sem título",
     "delivery": {
       "failed": "Falha na entrega",
-      "windowExpired": "Fora da janela de 24 horas — o cliente precisa enviar uma mensagem primeiro"
+      "windowExpired": "Fora da janela de 24 horas — o cliente precisa enviar uma mensagem primeiro",
+      "codes": {
+        "retriedOut": "O canal não aceitou esta resposta. O Hay.chat tentou mais 3 vezes e desistiu.",
+        "uncertain": "O canal não confirmou esta resposta. O cliente pode não ter recebido."
+      },
+      "alert": {
+        "title": "Uma resposta não pôde ser entregue",
+        "body": "O Hay.chat tentou mais 3 vezes e desistiu. Abra a conversa para acompanhar."
+      }
+    },
+    "attachment": {
+      "loadFailed": "Não foi possível carregar este anexo",
+      "attach": "Anexar um arquivo",
+      "remove": "Remover {name}",
+      "uploading": "Enviando {name}…",
+      "uploadFailed": "Não foi possível enviar {name}. Tente de novo ou escolha outro arquivo.",
+      "tooLarge": "{name} tem mais de {size} MB.",
+      "tooMany": "Você pode enviar até {count} arquivos por vez.",
+      "analysisPending": "A IA está lendo este arquivo…",
+      "analysisRead": "A IA leu: {description}",
+      "analysisFailed": "A IA não conseguiu ler este arquivo",
+      "reveal": "Clique para revelar",
+      "withheldId": "Documento de identidade: oculto para a IA",
+      "withheldCard": "Cartão de pagamento: oculto para a IA",
+      "scanning": "Verificando vírus…",
+      "scanBlocked": "Bloqueado pela verificação de vírus"
     },
     "page": {
       "title": "Conversas",
       "description": "Monitore e gerencie todas as conversas com clientes",
-      "headTitle": "Conversas - Hay Dashboard",
+      "headTitle": "Conversas - Hay.chat",
       "headDescription": "Monitore e gerencie todas as conversas com clientes"
     },
     "actions": {
@@ -26,13 +51,15 @@
       "activeNow": "Ativas Agora",
       "realTimeConversations": "Conversas em tempo real",
       "avgResponseTime": "Tempo Médio de Resposta",
-      "yesterdayChange": "-12% em relação a ontem"
+      "last7Days": "Últimos 7 dias",
+      "noRepliesLast7Days": "Nenhuma resposta nos últimos 7 dias"
     },
     "filters": {
       "searchPlaceholder": "Buscar conversas...",
       "allStatus": "Todos os Status",
       "active": "Ativa",
       "resolved": "Resolvida",
+      "unresolved": "Não resolvida",
       "escalated": "Escalada",
       "closed": "Encerrada",
       "today": "Hoje",
@@ -57,8 +84,10 @@
       "open": "Aberta",
       "processing": "Processando",
       "pendingHuman": "Precisa de Atenção",
+      "awaitingApproval": "Aguardando Aprovação",
       "humanTookOver": "Controle Manual",
       "resolved": "Resolvida",
+      "unresolved": "Não resolvida",
       "closed": "Encerrada",
       "unknown": "Desconhecido"
     },
@@ -90,6 +119,7 @@
       "export": "Exportar",
       "exportPdf": "Exportar como PDF",
       "exportCsv": "Exportar como CSV",
+      "evidencePack": "Pacote de evidências para disputa",
       "exportFailed": "Falha ao exportar conversa. Tente novamente.",
       "exitSupervision": "Sair da Supervisão",
       "supervise": "Supervisionar",
@@ -101,13 +131,23 @@
       "conversationStarted": "Conversa iniciada em {date}",
       "youAreHandling": "Você está gerenciando esta conversa",
       "releaseConversation": "Liberar Conversa",
-      "closeConversation": "Encerrar Conversa"
+      "closeConversation": "Encerrar Conversa",
+      "simulatedBadge": "Ações simuladas",
+      "liveStoreBadge": "Loja real",
+      "useLiveStore": "Usar loja real",
+      "useSimulatedActions": "Simular ações",
+      "liveStoreConfirmTitle": "Usar sua loja real?",
+      "liveStoreConfirmDescription": "Reembolsos, cancelamentos, mudanças de endereço e outras ações nesta conversa de teste serão enviados para sua loja real. Você pode voltar a qualquer momento.",
+      "liveStoreConfirm": "Usar loja real",
+      "actionModeFailed": "Não foi possível trocar o modo de ações. Tente novamente.",
+      "testingDraft": "Testando rascunho do playbook",
+      "testDraftFailed": "Não foi possível testar este rascunho. Ele pode ter sido publicado ou descartado."
     },
     "pendingHuman": {
       "needsHuman": "Esta conversa foi encaminhada para um agente humano",
       "summaryPending": "Gerando resumo da conversa…",
-      "notConfident": "Hay não teve confiança para responder esta pergunta",
-      "handedOff": "Hay decidiu encaminhar esta conversa para um agente humano. Fornecer mais contexto nos playbooks pode ser um bom ponto de partida para dar mais informações para que Hay consiga lidar com conversas semelhantes no futuro.",
+      "notConfident": "O Hay.chat não teve confiança para responder esta pergunta",
+      "handedOff": "O Hay.chat decidiu encaminhar esta conversa para um agente humano. Fornecer mais contexto nos playbooks pode ser um bom ponto de partida para dar mais informações para que o Hay.chat consiga lidar com conversas semelhantes no futuro.",
       "startNew": "Iniciar Nova Conversa",
       "editPlaybook": "Editar Playbook",
       "editPlaybooks": "Editar Playbooks"
@@ -198,6 +238,90 @@
         "bodyWithTitle": "A conversa \"{title}\" precisa de atendimento humano",
         "bodyDefault": "Uma nova conversa precisa de atendimento humano"
       }
+    },
+    "agentNotice": {
+      "teamMember": "Um membro da equipe",
+      "joined": "{name} entrou na conversa",
+      "returnedToAi": "{name} saiu da conversa. O assistente de IA voltou a responder.",
+      "left": "{name} saiu da conversa e a devolveu para a fila"
+    },
+    "replyWindow": {
+      "open": "A janela de resposta fecha {relative}",
+      "closed": "A janela de resposta fechou. Até o cliente escrever de novo, só um modelo aprovado chega até ele.",
+      "sendTemplate": "Enviar um modelo",
+      "composerClosed": "Janela de resposta fechada. Envie um modelo.",
+      "picker": {
+        "title": "Enviar um modelo",
+        "description": "Escolha um modelo aprovado. Quando o cliente responder, a janela abre de novo.",
+        "loading": "Carregando modelos…",
+        "loadFailed": "Não foi possível carregar os modelos. Feche e tente de novo.",
+        "unsupported": "Este canal não tem modelos.",
+        "empty": "Nenhum modelo aprovado ainda. Um administrador pode conferir nas configurações do canal.",
+        "template": "Modelo",
+        "variable": "Valor da variável {name}",
+        "preview": "Prévia",
+        "send": "Enviar modelo",
+        "sent": "Modelo enviado",
+        "failed": "Não foi possível enviar o modelo"
+      }
+    },
+    "toolStatus": {
+      "success": "Sucesso",
+      "failed": "Falhou",
+      "running": "Executando",
+      "simulated": "Simulada",
+      "pendingApproval": "Aguardando aprovação",
+      "rejected": "Recusada",
+      "expired": "Expirada, não executada",
+      "needsConfirmation": "Perguntando ao cliente",
+      "unknown": "Desconhecido"
+    },
+    "pendingAction": {
+      "title": "O Hay.chat quer realizar esta ação",
+      "description": "Ela ainda não foi executada. Aprove para executar agora, ou recuse e a IA avisará o cliente.",
+      "approve": "Aprovar",
+      "reject": "Recusar",
+      "confirmReject": "Recusar ação",
+      "reasonLabel": "Motivo (opcional)",
+      "reasonPlaceholder": "Compartilhado com a IA para explicar ao cliente",
+      "replyMyself": "Vou responder eu mesmo",
+      "failed": "Não foi possível salvar sua decisão",
+      "takeoverFailed": "Sua decisão foi salva, mas não foi possível assumir a conversa. Use Assumir para atender você mesmo.",
+      "conversationClosed": "Esta conversa está encerrada, então a ação não foi executada. Reabra a conversa para aprová-la ou recuse.",
+      "done": {
+        "approve": "Aprovada",
+        "reject": "Recusada",
+        "reply": "Agora você está atendendo esta conversa"
+      }
+    },
+    "debug": {
+      "aiProcessing": "Processamento de IA",
+      "aiRegionEu": "Data centers na UE",
+      "aiRegionDefault": "Qualquer região (provedor de IA padrão)"
+    },
+    "draftApproval": {
+      "queued": "Aguardando aprovação",
+      "approve": "Aprovar e enviar",
+      "block": "Bloquear",
+      "dialogTitle": "Revisar resposta da IA",
+      "dialogDescription": "Revise a resposta e edite se precisar antes de enviá-la ao cliente.",
+      "original": "Resposta original da IA:",
+      "content": "Resposta",
+      "placeholder": "Edite a resposta...",
+      "characters": "{count} caracteres",
+      "blockMessage": "Bloquear resposta",
+      "approveEdited": "Aprovar e enviar editada"
+    },
+    "productCase": {
+      "title": "Caso de problema com produto completo",
+      "lot": "Lote {lot}",
+      "invoice": "Nota {invoice}",
+      "forwardPending": "Enviando para o e-mail de casos da loja…",
+      "forwardSent": "Enviado por e-mail para {to}",
+      "forwardSentToast": "Caso enviado por e-mail",
+      "forwardFailed": "Não foi possível enviar o e-mail do caso",
+      "forwardNotConfigured": "Nenhum e-mail de casos definido (Configurações > Privacidade do Cliente)",
+      "forwardAgain": "Enviar de novo"
     }
   }
 }

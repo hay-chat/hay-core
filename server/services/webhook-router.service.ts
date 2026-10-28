@@ -270,7 +270,7 @@ export class WebhookRouterService {
         `<html><head><title>Data deletion status</title></head><body>` +
           `<h1>Data deletion completed</h1>` +
           `<p>Confirmation code: <code>${code}</code></p>` +
-          `<p>Hay removed the access token and account identifiers it stored for this connection.</p>` +
+          `<p>Hay.chat removed the access token and account identifiers it stored for this connection.</p>` +
           `</body></html>`,
       );
   }

@@ -11,10 +11,13 @@
  * Env (injected by the plugin worker):
  *   MAGENTO_BASE_URL   e.g. https://store.example.com/rest/V1
  *   MAGENTO_API_TOKEN  integration access token
+ *   STALE_TRACKING_DOMESTIC_DAYS, STALE_TRACKING_INTERNATIONAL_DAYS (optional, D6-9)
  */
 
 const { McpServer } = require("@modelcontextprotocol/sdk/server/mcp.js");
 const { StdioServerTransport } = require("@modelcontextprotocol/sdk/server/stdio.js");
+const { applyToolRisk } = require("@hay/plugin-sdk/tool-risk");
+const toolRisk = require("./tool-risk");
 
 const { registerStoreTools } = require("./tools/store");
 const { registerCustomerTools } = require("./tools/customers");
@@ -23,7 +26,7 @@ const { registerRefundTools } = require("./tools/refunds");
 const { registerProductTools } = require("./tools/products");
 
 function createServer() {
-  const server = new McpServer({ name: "magento", version: "2.0.0" });
+  const server = applyToolRisk(new McpServer({ name: "magento", version: "2.0.0" }), toolRisk);
   registerStoreTools(server);
   registerCustomerTools(server);
   registerOrderTools(server);

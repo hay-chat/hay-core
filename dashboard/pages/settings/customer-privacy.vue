@@ -37,6 +37,12 @@
       </Button>
     </Alert>
 
+    <AiProcessingCard />
+
+    <AiDisclosureCard />
+
+    <MediaSettingsCard />
+
     <!-- Data Retention Policy -->
     <Card>
       <CardHeader>
@@ -71,6 +77,9 @@
           </Select>
           <p class="text-sm text-muted-foreground">
             {{ $t("customerPrivacy.retentionHelp") }}
+          </p>
+          <p class="text-sm text-muted-foreground">
+            {{ $t("customerPrivacy.retentionDefaultNote") }}
           </p>
         </div>
 
@@ -226,6 +235,9 @@ import { useToast } from "@/composables/useToast";
 const { t } = useI18n();
 const toast = useToast();
 import CustomerPrivacyRequestsTable from "@/components/CustomerPrivacyRequestsTable.vue";
+import AiProcessingCard from "@/components/settings/AiProcessingCard.vue";
+import AiDisclosureCard from "@/components/settings/AiDisclosureCard.vue";
+import MediaSettingsCard from "@/components/settings/MediaSettingsCard.vue";
 
 // Retention policy state
 const retentionDays = ref<number | null>(null);

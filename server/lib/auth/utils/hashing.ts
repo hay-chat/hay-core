@@ -72,13 +72,6 @@ export function generateSecureToken(bytes: number = 32): string {
 }
 
 /**
- * Generate a secure random session ID
- */
-export function generateSessionId(): string {
-  return `sess_${generateSecureToken(32)}`;
-}
-
-/**
  * Constant-time string comparison to prevent timing attacks
  */
 export function secureCompare(a: string, b: string): boolean {

@@ -1,9 +1,9 @@
 import { LLMService } from "./llm.service";
 import { PromptService } from "../prompt.service";
-import { Message } from "@server/database/entities/message.entity";
+import { Message, MessageType } from "@server/database/entities/message.entity";
 import { createLogger } from "@server/lib/logger";
 import {
-  ActionClaimGuardrailConfig,
+  type ActionClaimGuardrailConfig,
   DEFAULT_ACTION_CLAIM_GUARDRAIL_CONFIG,
 } from "@server/types/organization-settings.types";
 
@@ -16,6 +16,10 @@ const logger = createLogger("action-claim-guardrail");
 export interface ToolLedgerEntry {
   name: string;
   success: boolean;
+  /** Held for a person's approval (D4-4): requested, not done. */
+  pending?: boolean;
+  /** A team member decided an earlier held call; this turn answers that decision. */
+  decision?: "approved" | "declined";
 }
 
 /**
@@ -37,6 +41,7 @@ export interface ActionClaimContext {
   customerQuery: string; // The last customer message
   conversationHistory: Message[]; // Full conversation context
   toolsCalledThisTurn: ToolLedgerEntry[]; // Ledger of tool calls made this turn
+  organizationId: string; // Routes the evaluation through the org's AI provider and region
 }
 
 /**
@@ -110,6 +115,7 @@ export class ActionClaimGuardrailService {
         jsonSchema: schema,
         temperature: 0.2, // Low temperature for consistent evaluation
         tier: "medium",
+        organizationId: context.organizationId,
       });
 
       const parsed = JSON.parse(result) as {
@@ -151,7 +157,12 @@ export class ActionClaimGuardrailService {
 
     return recentMessages
       .map((msg) => {
-        const role = msg.type === "Customer" ? "Customer" : "Assistant";
+        const role =
+          msg.type === MessageType.CUSTOMER
+            ? "Customer"
+            : msg.type === MessageType.SYSTEM
+              ? "System note"
+              : "Assistant";
         return `${role}: ${msg.content}`;
       })
       .join("\n");
@@ -165,8 +176,17 @@ export class ActionClaimGuardrailService {
       return "(none — no tools were called this turn)";
     }
     return entries
-      .map((entry) => `- ${entry.name} — ${entry.success ? "SUCCESS" : "FAILED"}`)
+      .map((entry) => {
+        return `- ${entry.name} — ${this.ledgerStatus(entry)}`;
+      })
       .join("\n");
+  }
+
+  private ledgerStatus(entry: ToolLedgerEntry): string {
+    if (entry.decision === "declined") return "DECLINED_BY_TEAM";
+    if (entry.pending) return "PENDING_APPROVAL";
+    const status = entry.success ? "SUCCESS" : "FAILED";
+    return entry.decision === "approved" ? `${status} (approved by the team)` : status;
   }
 
   /**

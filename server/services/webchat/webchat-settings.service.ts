@@ -18,6 +18,8 @@ export interface WebchatSettingsUpdateDTO {
   allowedDomains?: string[];
   isEnabled?: boolean;
   customCss?: string | null;
+  spamClassifierEnabled?: boolean;
+  spamGuidance?: string | null;
 }
 
 export class WebchatSettingsService {
@@ -76,14 +78,14 @@ export class WebchatSettingsService {
       if (agent) {
         agentName = agent.name;
         if (agent.avatarUpload) {
-          agentAvatarUrl = storageService.getPublicUrl(agent.avatarUpload);
+          agentAvatarUrl = storageService.getUrl(agent.avatarUpload);
         }
       }
     }
 
     // Get organization logo URL
     const organizationLogoUrl = organization?.logoUpload
-      ? storageService.getPublicUrl(organization.logoUpload)
+      ? storageService.getUrl(organization.logoUpload)
       : null;
 
     return {
@@ -100,32 +102,50 @@ export class WebchatSettingsService {
   }
 
   /**
-   * Validate if a domain is allowed to embed the widget
+   * Whether a page on `hostname` may start widget conversations for this org.
    */
-  async isDomainAllowed(organizationId: string, domain: string): Promise<boolean> {
+  async isDomainAllowed(organizationId: string, hostname: string | null): Promise<boolean> {
     const settings = await this.getSettings(organizationId);
-
-    // If allowedDomains contains '*', allow all domains
-    if (settings.allowedDomains.includes("*")) {
-      return true;
-    }
-
-    // Check if the domain matches any allowed domain
-    return settings.allowedDomains.some((allowed) => {
-      // Exact match
-      if (allowed === domain) {
-        return true;
-      }
-
-      // Wildcard subdomain match (e.g., *.example.com matches app.example.com)
-      if (allowed.startsWith("*.")) {
-        const baseDomain = allowed.substring(2);
-        return domain.endsWith(baseDomain);
-      }
-
-      return false;
-    });
+    return matchesAllowedDomains(settings.allowedDomains, hostname);
   }
+}
+
+/**
+ * Reduce an allowed-domain entry to a bare lowercase hostname, so entries typed
+ * as "https://Shop.com/", "shop.com:443" or "shop.com." all mean "shop.com".
+ */
+function normalizeDomainEntry(entry: string): string {
+  return entry
+    .trim()
+    .toLowerCase()
+    .replace(/^[a-z][a-z0-9+.-]*:\/\//, "")
+    .replace(/[/?#].*$/, "")
+    .replace(/:\d+$/, "")
+    .replace(/\.$/, "");
+}
+
+/**
+ * Match a request hostname against an org's allowed domains.
+ *
+ * - `*` allows every site.
+ * - `example.com` allows exactly that host.
+ * - `*.example.com` allows any subdomain of example.com (not the bare domain,
+ *   and not look-alikes such as `evilexample.com`).
+ *
+ * A missing hostname only passes the `*` rule.
+ */
+export function matchesAllowedDomains(allowedDomains: string[], hostname: string | null): boolean {
+  const entries = allowedDomains.map(normalizeDomainEntry).filter(Boolean);
+  if (entries.includes("*")) return true;
+  if (!hostname) return false;
+
+  const host = hostname.toLowerCase().replace(/\.$/, "");
+  return entries.some((entry) => {
+    if (entry.startsWith("*.")) {
+      return host.endsWith(entry.substring(1));
+    }
+    return entry === host;
+  });
 }
 
 export const webchatSettingsService = new WebchatSettingsService();

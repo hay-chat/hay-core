@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <title>Hay Webchat Widget - Development</title>
+    <title>Hay.chat Webchat Widget - Development</title>
   </head>
   <body>
     <div id="app"></div>
@@ -24,6 +24,10 @@
       };
     </script>
 
-    <script type="module" src="/src/main.ts"></script>
+    <!-- Dev: the loader with the chat chunk served by Vite (no build, no hash) -->
+    <script type="module">
+      import { boot } from "/src/loader/boot.ts";
+      boot({ position: "right", theme: "blue", ...window.HayChat.config }, () => import("/src/chat.ts"));
+    </script>
   </body>
 </html>

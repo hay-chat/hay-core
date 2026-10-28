@@ -70,6 +70,35 @@ export interface PluginMetadata {
    * per-org workers. Absent for normal per-org webhooks.
    */
   webhookRouting?: WebhookRoutingDescriptor;
+  /** Plugin-declared webchat contributions and gates (from register.webchat). */
+  webchat?: WebchatMetadata;
+}
+
+// ============================================================================
+// Webchat extension point (contributions + gates)
+// ============================================================================
+
+/** Mirrors the SDK's WebchatContributionDescriptor. */
+export interface WebchatContributionDescriptor {
+  id: string;
+  type: string;
+  props: Record<string, string | number | boolean>;
+  /** Prop name → config field name, resolved by Core per org. */
+  configProps: Record<string, string>;
+}
+
+export type WebchatGateEvent = "conversation.create" | "message.send";
+
+/** Mirrors the SDK's WebchatGateDescriptor. */
+export interface WebchatGateDescriptor {
+  event: WebchatGateEvent;
+  timeoutMs: number;
+  failurePolicy: "open" | "closed";
+}
+
+export interface WebchatMetadata {
+  contributions: WebchatContributionDescriptor[];
+  gates: WebchatGateDescriptor[];
 }
 
 // ============================================================================

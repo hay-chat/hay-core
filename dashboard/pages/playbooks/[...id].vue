@@ -73,6 +73,28 @@
             {{ t("versioning.history.button") }}
           </Button>
 
+          <Button
+            v-if="isEditMode && draftVersion"
+            variant="outline"
+            size="sm"
+            data-testid="test-draft"
+            :loading="isOpeningTest"
+            @click="testDraft"
+          >
+            <FlaskConical class="h-4 w-4 mr-2" />
+            {{ t("versioning.testDraft") }}
+          </Button>
+
+          <Button
+            v-if="isEditMode && draftVersion"
+            variant="outline"
+            size="sm"
+            data-testid="replay-draft"
+            @click="replayDraft"
+          >
+            {{ t("versioning.replayDraft") }}
+          </Button>
+
           <!-- Edit mode: Save (identity) + Publish -->
           <template v-if="isEditMode">
             <Button
@@ -88,7 +110,7 @@
               size="sm"
               :loading="isPublishing"
               :disabled="!draftVersion"
-              @click="showPublishDialog = true"
+              @click="openPublishDialog"
             >
               <Upload class="h-4 w-4 mr-2" />
               {{ t("versioning.publish") }}
@@ -242,6 +264,14 @@
               </CardContent>
             </Card>
 
+            <!-- Approval override, tighten-only (D4-9) -->
+            <PlaybookApprovalCard
+              v-if="isEditMode && playbook"
+              :playbook-id="playbook.id"
+              :categories="playbook.approval_categories ?? []"
+              @saved="(categories) => playbook && (playbook.approval_categories = categories)"
+            />
+
             <!-- About + danger zone (edit mode only) -->
             <Card v-if="isEditMode && playbook">
               <CardHeader>
@@ -308,6 +338,19 @@
       :confirm-text="t('versioning.publishConfirm')"
       @confirm="handlePublish"
     >
+      <VersionDiff
+        v-if="showPublishDialog && playbookId && draftVersion"
+        class="mt-4"
+        :playbook-id="playbookId"
+        :version-id="draftVersion.id"
+      />
+      <!-- D7-12: run the playbook's test cases against the draft; warns, never blocks -->
+      <PrePublishTests
+        v-if="showPublishDialog && playbookId && draftVersion"
+        class="mt-4"
+        :playbook-id="playbookId"
+        :version-id="draftVersion.id"
+      />
       <div class="mt-4">
         <Input
           v-model="publishNote"
@@ -352,6 +395,7 @@ import {
   Circle,
   History,
   Sparkles,
+  FlaskConical,
 } from "lucide-vue-next";
 import type { JSONContent } from "@tiptap/vue-3";
 import type { MCPTool } from "@/components/tiptap/MentionExtension";
@@ -437,6 +481,38 @@ const draftVersion = ref<PlaybookVersion | null>(null);
 const showPublishDialog = ref(false);
 const publishNote = ref("");
 const showVersionHistory = ref(false);
+
+// D7-6: the publish dialog diffs the saved draft, so save pending edits first.
+const openPublishDialog = async () => {
+  await flushAutoSave();
+  showPublishDialog.value = true;
+};
+
+// D7-5: open the playground against the draft (writes simulated there by default).
+const isOpeningTest = ref(false);
+const testDraft = async () => {
+  if (!playbookId.value || !draftVersion.value) return;
+  isOpeningTest.value = true;
+  try {
+    await flushAutoSave();
+    router.push({
+      path: "/conversations/playground",
+      query: { playbookId: playbookId.value, versionId: draftVersion.value.id },
+    });
+  } finally {
+    isOpeningTest.value = false;
+  }
+};
+
+// D7-11: replay past conversations against the draft.
+const replayDraft = async () => {
+  if (!playbookId.value || !draftVersion.value) return;
+  await flushAutoSave();
+  router.push({
+    path: "/tests",
+    query: { playbookId: playbookId.value, versionId: draftVersion.value.id },
+  });
+};
 
 // AI suggest-edits state
 const showSuggestDialog = ref(false);

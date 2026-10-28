@@ -4,9 +4,13 @@
 
 const { z } = require("zod");
 const { shopifyGql } = require("../lib/client");
+const { staleTracking, stalestShipment } = require("@hay/plugin-sdk/stale-tracking");
+const { readReturnInstructions } = require("@hay/plugin-sdk/return-instructions");
+const { orderNotFoundError } = require("@hay/plugin-sdk/marketplace-orders");
 const {
   ok,
   fail,
+  toolError,
   unwrapConnection,
   pageInfo,
   toGid,
@@ -49,25 +53,152 @@ const ORDER_SUPPORT_FIELDS = `
   fulfillments(first: 10) {
     status
     displayStatus
+    createdAt
     deliveredAt
     estimatedDeliveryAt
     trackingInfo { number url company }
+    events(first: 1, sortKey: HAPPENED_AT, reverse: true) {
+      edges { node { happenedAt status } }
+    }
   }
   lineItems(first: 100) {
     edges { node { id title quantity sku } }
   }
+  sourceName
+  tags
+  customAttributes { key value }
+  paymentGatewayNames
+  transactions(first: 20) {
+    id
+    kind
+    status
+    gateway
+    formattedGateway
+    paymentId
+    processedAt
+    amountSet { shopMoney { amount currencyCode } }
+  }
+  refunds(first: 20) {
+    id
+    createdAt
+    note
+    totalRefundedSet { shopMoney { amount currencyCode } }
+  }
 `;
+
+// D10-1: payment and source fields, verified against 2026-04 docs (OrderTransaction
+// and Refund need only read_orders). sourceName ("web", "pos", an app or ERP name)
+// and tags tell a marketplace order synced in by an ERP apart from a storefront one.
+function paymentFields(order) {
+  const money = (set) => (set && set.shopMoney) || null;
+  return {
+    sourceName: order.sourceName ?? null,
+    tags: order.tags || [],
+    customAttributes: order.customAttributes || [],
+    paymentGatewayNames: order.paymentGatewayNames || [],
+    transactions: (order.transactions || []).map(({ amountSet, ...t }) => ({
+      ...t,
+      amount: money(amountSet),
+    })),
+    refunds: (order.refunds || []).map(({ totalRefundedSet, ...r }) => ({
+      ...r,
+      totalRefunded: money(totalRefundedSet),
+    })),
+  };
+}
+
+// The store's country, to tell domestic from international shipments (D6-9).
+const SHOP_COUNTRY = "shop { billingAddress { countryCodeV2 } }";
+const shopCountry = (data) => data?.shop?.billingAddress?.countryCodeV2 ?? null;
 
 // Fulfillment statuses under which changing the shipping address still makes
 // sense — nothing has left the warehouse yet.
 const PRE_DISPATCH_STATUSES = new Set(["UNFULFILLED", "SCHEDULED", "ON_HOLD"]);
 
+// Fulfillment.status values that mean the shipment did NOT happen. Anything else
+// (SUCCESS, or the deprecated OPEN / PENDING) means items are out of the door.
+const VOID_FULFILLMENT_STATUSES = new Set(["CANCELLED", "ERROR", "FAILURE"]);
+
 /**
- * Flatten line items and add a derived support summary. `isCancellable` is a
- * heuristic (Shopify exposes no cancelable field): not cancelled, not closed,
- * nothing fulfilled yet. `orderCancel` remains the source of truth via userErrors.
+ * Why an order can't be cancelled before dispatch, or null if it can.
+ * Needs `name cancelledAt displayFulfillmentStatus fulfillments { status displayStatus }`.
+ * Shopify's own orderCancel checks stay the backstop; this guard makes the rule
+ * explicit and refuses before a request reaches Shopify, like the other platforms.
  */
-function enrichOrder(order) {
+function cancelBlocker(order) {
+  if (order.cancelledAt) {
+    return { reason: "ALREADY_CANCELLED", message: `Order ${order.name} is already cancelled.` };
+  }
+  const shipped = (order.fulfillments || []).filter(
+    (f) => !VOID_FULFILLMENT_STATUSES.has(f.status),
+  );
+  if (shipped.length > 0) {
+    return {
+      reason: "ALREADY_SHIPPED",
+      message:
+        `Order ${order.name} has already shipped, so it can't be cancelled. ` +
+        "Offer a return once it arrives, or hand the conversation to the store team.",
+      fulfillmentStatuses: shipped.map((f) => f.displayStatus || f.status),
+    };
+  }
+  if (!PRE_DISPATCH_STATUSES.has(order.displayFulfillmentStatus)) {
+    return {
+      reason: "FULFILLMENT_IN_PROGRESS",
+      message:
+        `Order ${order.name} is already being fulfilled (${order.displayFulfillmentStatus}), ` +
+        "so it can't be cancelled here. Hand the conversation to the store team.",
+      displayFulfillmentStatus: order.displayFulfillmentStatus,
+    };
+  }
+  return null;
+}
+
+/**
+ * The refund choice a cancel makes when the agent does not pass one: refund to
+ * the original payment only when the order is unfulfilled and fully paid with a
+ * single payment method, where that is plainly what the shopper expects. Null
+ * otherwise: split payments, partial payments or partial fulfilment need an
+ * explicit choice. Needs `displayFulfillmentStatus displayFinancialStatus paymentGatewayNames`.
+ */
+function defaultCancelRefund(order) {
+  const singleMethod = (order.paymentGatewayNames || []).length === 1;
+  return order.displayFulfillmentStatus === "UNFULFILLED" &&
+    order.displayFinancialStatus === "PAID" &&
+    singleMethod
+    ? true
+    : null;
+}
+
+/**
+ * Flatten line items and add a derived support summary. `isCancellable` uses the
+ * same pre-dispatch guard as shopify_cancel_order (Shopify exposes no cancelable
+ * field); `orderCancel` remains the final word via its userErrors.
+ */
+/**
+ * D6-9 stale flag over the shipments still on their way: days since the latest
+ * carrier event (Fulfillment.events), else since the fulfillment was created.
+ */
+function orderStaleTracking(order, originCountry, now) {
+  const inTransit = (order.fulfillments || []).filter(
+    (f) =>
+      !VOID_FULFILLMENT_STATUSES.has(f.status) && !f.deliveredAt && f.displayStatus !== "DELIVERED",
+  );
+  const results = inTransit.map((f) =>
+    staleTracking({
+      shippedAt: f.createdAt || null,
+      lastEventAt: unwrapConnection(f.events)[0]?.happenedAt || null,
+      originCountry,
+      destinationCountry: order.shippingAddress?.countryCode,
+      now,
+    }),
+  );
+  return (
+    stalestShipment(results) ||
+    staleTracking({ shippedAt: null, originCountry, destinationCountry: null, now })
+  );
+}
+
+function enrichOrder(order, originCountry = null, now = Date.now()) {
   if (!order) return null;
   const deliveredAt =
     (order.fulfillments || [])
@@ -78,15 +209,22 @@ function enrichOrder(order) {
 
   return {
     ...order,
+    ...paymentFields(order),
+    fulfillments: (order.fulfillments || []).map(({ events, ...f }) => ({
+      ...f,
+      lastEvent: unwrapConnection(events)[0] ?? null,
+    })),
     lineItems: unwrapConnection(order.lineItems),
     supportSummary: {
-      isCancellable:
-        !order.cancelledAt && !order.closedAt && order.displayFulfillmentStatus === "UNFULFILLED",
+      isCancellable: cancelBlocker(order) === null,
       isRefundable: !!order.refundable,
       // Net payment = captured minus already refunded; the hard ceiling for refunds.
       remainingRefundable: order.netPaymentSet ? order.netPaymentSet.shopMoney : null,
       deliveredAt,
       addressChangeable: PRE_DISPATCH_STATUSES.has(order.displayFulfillmentStatus),
+      tracking: orderStaleTracking(order, originCountry, now),
+      // D6-13: the merchant's "How to return" text (null = hand return questions off).
+      returnInstructions: readReturnInstructions(),
     },
   };
 }
@@ -105,7 +243,8 @@ async function orderNotFound(rawId) {
       { id: probeId },
     );
     if (probe.customer) {
-      return new Error(
+      return toolError(
+        "NOT_FOUND",
         `No order with id ${rawId} — that id belongs to customer ` +
           `"${probe.customer.displayName}". Their recent orders (with order ids) are in the ` +
           "recentOrders field of shopify_find_customer / shopify_get_customer.",
@@ -114,7 +253,8 @@ async function orderNotFound(rawId) {
   } catch {
     // Probe is best-effort; fall through to the generic message.
   }
-  return new Error(
+  return orderNotFoundError(
+    rawId,
     `Order ${rawId} not found. Get a valid order id from the recentOrders field of ` +
       'shopify_find_customer / shopify_get_customer, or use shopify_get_order_by_name ("#1001").',
   );
@@ -123,8 +263,10 @@ async function orderNotFound(rawId) {
 function registerOrderTools(server) {
   server.tool(
     "shopify_get_order",
-    "Get an order with line items, totals, shipping address, tracking, and a supportSummary " +
-      "(isCancellable, isRefundable, remainingRefundable, deliveredAt, addressChangeable).",
+    "Get an order with line items, totals, shipping address, tracking, payment transactions " +
+      "(gateway, kind, status, paymentId), refunds with dates, sourceName, tags, custom " +
+      "attributes, and a supportSummary (isCancellable, isRefundable, remainingRefundable, " +
+      "deliveredAt, addressChangeable, tracking: isStale/daysSinceLastUpdate/staleReason).",
     {
       order_id: z.string().describe("Order GID (gid://shopify/Order/123) or bare numeric id."),
     },
@@ -134,11 +276,12 @@ function registerOrderTools(server) {
         const QUERY = `
           query GetOrder($id: ID!) {
             order(id: $id) { ${ORDER_SUPPORT_FIELDS} }
+            ${SHOP_COUNTRY}
           }
         `;
         const data = await shopifyGql(QUERY, { id });
         if (!data.order) throw await orderNotFound(args.order_id);
-        return ok(enrichOrder(data.order));
+        return ok(enrichOrder(data.order, shopCountry(data)));
       } catch (err) {
         return fail(err);
       }
@@ -161,17 +304,19 @@ function registerOrderTools(server) {
             orders(first: 1, query: $query) {
               edges { node { ${ORDER_SUPPORT_FIELDS} } }
             }
+            ${SHOP_COUNTRY}
           }
         `;
         const data = await shopifyGql(QUERY, { query: `name:"${args.name}"` });
         const first = unwrapConnection(data.orders)[0];
         if (!first) {
-          throw new Error(
+          throw orderNotFoundError(
+            args.name,
             `No order named "${args.name}" found. Order names usually include the "#" prefix ` +
               '(e.g. "#1001"); or find the order via the customer\'s recentOrders.',
           );
         }
-        return ok(enrichOrder(first));
+        return ok(enrichOrder(first, shopCountry(data)));
       } catch (err) {
         return fail(err);
       }
@@ -209,7 +354,8 @@ function registerOrderTools(server) {
         `;
         const data = await shopifyGql(QUERY, { id, first });
         if (!data.customer) {
-          throw new Error(
+          throw toolError(
+            "NOT_FOUND",
             `Customer ${args.customer_id} not found; get a valid customer id from ` +
               "shopify_find_customer (email/phone).",
           );
@@ -268,13 +414,24 @@ function registerOrderTools(server) {
         const check = await shopifyGql(CHECK, { id });
         if (!check.order) throw await orderNotFound(args.order_id);
         if (check.order.cancelledAt) {
-          throw new Error(`Order ${check.order.name} is cancelled; cannot change its address.`);
+          throw toolError(
+            "PRECONDITION",
+            `Order ${check.order.name} is cancelled, so its address can't be changed.`,
+            { details: { reason: "ALREADY_CANCELLED" } },
+          );
         }
         if (!PRE_DISPATCH_STATUSES.has(check.order.displayFulfillmentStatus)) {
-          throw new Error(
+          throw toolError(
+            "PRECONDITION",
             `Order ${check.order.name} has fulfillment status ` +
               `${check.order.displayFulfillmentStatus}; the shipping address can only be ` +
               "changed before dispatch. Escalate to the merchant/carrier instead.",
+            {
+              details: {
+                reason: "ALREADY_DISPATCHED",
+                displayFulfillmentStatus: check.order.displayFulfillmentStatus,
+              },
+            },
           );
         }
 
@@ -384,8 +541,11 @@ function registerOrderTools(server) {
 
   server.tool(
     "shopify_cancel_order",
-    "Cancel an order (WRITE). Optionally restock, refund, and notify the customer. " +
-      "Fails with Shopify's reason if the order is not cancellable (e.g. already fulfilled).",
+    "Cancel an order before it ships (WRITE). Optionally restock, refund the payment, and " +
+      "notify the customer. Refuses with code PRECONDITION if anything has shipped or is " +
+      "being fulfilled, or if the order is already cancelled. Refunds by default only when the " +
+      "order is unfulfilled and paid with a single payment method; for any other order you " +
+      "must pass refund_to_original_payment yourself, or the call is refused with BAD_INPUT.",
     {
       order_id: z.string().describe("Order GID or bare numeric id."),
       reason: z
@@ -396,7 +556,10 @@ function registerOrderTools(server) {
         .boolean()
         .optional()
         .describe(
-          "If true, refund to the original payment method; if omitted, no refundMethod is sent.",
+          "If true, refund the payment to the original payment method as part of the " +
+            "cancellation. If false, nothing is refunded (authorized-only payments are still " +
+            "voided by Shopify). If omitted, defaults to true for an unfulfilled order paid " +
+            "with a single payment method; for any other order it is required.",
         ),
       notify_customer: z
         .boolean()
@@ -407,24 +570,58 @@ function registerOrderTools(server) {
     async (args) => {
       try {
         const orderId = toGid("Order", args.order_id);
+
+        // Server-side bound: pre-dispatch only, same rule as the other platforms.
+        const CHECK = `
+          query CheckCancellable($id: ID!) {
+            order(id: $id) {
+              id
+              name
+              cancelledAt
+              displayFulfillmentStatus
+              displayFinancialStatus
+              paymentGatewayNames
+              fulfillments(first: 20) { status displayStatus }
+            }
+          }
+        `;
+        const check = await shopifyGql(CHECK, { id: orderId });
+        if (!check.order) throw await orderNotFound(args.order_id);
+        const blocker = cancelBlocker(check.order);
+        if (blocker) {
+          const { message, ...details } = blocker;
+          throw toolError("PRECONDITION", message, { details });
+        }
+        const refund = args.refund_to_original_payment ?? defaultCancelRefund(check.order);
+        if (refund === null) {
+          throw toolError(
+            "BAD_INPUT",
+            `Order ${check.order.name} is not an unfulfilled order paid with one payment method, ` +
+              "so say whether to refund it: pass refund_to_original_payment true or false.",
+            {
+              details: {
+                reason: "REFUND_CHOICE_REQUIRED",
+                displayFulfillmentStatus: check.order.displayFulfillmentStatus,
+                displayFinancialStatus: check.order.displayFinancialStatus,
+                paymentGatewayNames: check.order.paymentGatewayNames || [],
+              },
+            },
+          );
+        }
+
+        // Verified 2026-04 (shopify.dev/docs/api/admin-graphql/2026-04/mutations/orderCancel):
+        // orderId/reason/restock are required; refundMethod is a nullable
+        // OrderCancelRefundMethodInput { originalPaymentMethodsRefund, storeCreditRefund }.
+        // The docs don't state what an omitted refundMethod does, so always send an
+        // explicit choice rather than rely on an undocumented default.
         const variables = {
           orderId,
           reason: args.reason,
           restock: args.restock,
+          refundMethod: { originalPaymentMethodsRefund: refund },
           notify: args.notify_customer ?? null,
           note: args.staff_note ?? null,
         };
-        // Verified 2026-04: orderCancel requires orderId/reason/restock; refundMethod
-        // is optional (OrderCancelRefundMethodInput). TODO(HAY-219 §8): the exact
-        // OrderCancelRefundMethodInput subfield (originalPaymentMethodsRefund) is a
-        // best-guess — confirm against a dev store before relying on refunds-on-cancel.
-        if (args.refund_to_original_payment !== undefined) {
-          variables.refundMethod = args.refund_to_original_payment
-            ? { originalPaymentMethodsRefund: true }
-            : null;
-        } else {
-          variables.refundMethod = null;
-        }
         const MUTATION = `
           mutation CancelOrder(
             $orderId: ID!
@@ -504,6 +701,13 @@ function registerOrderTools(server) {
         )
         .optional()
         .describe("Transactions to process for the refund (from shopify_calculate_refund)."),
+      currency: z
+        .string()
+        .regex(/^[A-Za-z]{3}$/)
+        .describe(
+          'The order\'s currency code (ISO 4217, e.g. "USD"), as shopify_calculate_refund shows it. The person ' +
+            "approving the refund sees the amount in it; a different currency is refused.",
+        ),
       idempotency_key: z
         .string()
         .describe("UUID idempotency key; required by Shopify 2026-04 for refund mutations."),
@@ -525,24 +729,40 @@ function registerOrderTools(server) {
           }
         `;
         const check = await shopifyGql(CHECK, { id: orderId });
-        if (!check.order) throw new Error(`Order ${args.order_id} not found.`);
+        if (!check.order) throw await orderNotFound(args.order_id);
         if (!check.order.refundable) {
-          throw new Error(
+          throw toolError(
+            "PRECONDITION",
             `Order ${check.order.name} is not refundable (already fully refunded or no ` +
               "eligible payment transactions).",
+            { details: { reason: "NOT_REFUNDABLE" } },
+          );
+        }
+        const orderCurrency = check.order.netPaymentSet.shopMoney.currencyCode;
+        if (args.currency.toUpperCase() !== orderCurrency) {
+          throw toolError(
+            "BAD_INPUT",
+            `Order ${check.order.name} is in ${orderCurrency}, not ${args.currency}. ` +
+              `Pass currency "${orderCurrency}".`,
+            { details: { reason: "CURRENCY_MISMATCH", currency: orderCurrency } },
           );
         }
         if (args.transactions && args.transactions.length > 0) {
           const requested = args.transactions.reduce((sum, t) => sum + Number(t.amount), 0);
           const remaining = Number(check.order.netPaymentSet.shopMoney.amount);
           if (!Number.isFinite(requested) || requested <= 0) {
-            throw new Error(`Invalid refund transaction amounts (total ${requested}).`);
+            throw toolError(
+              "BAD_INPUT",
+              `Invalid refund transaction amounts (total ${requested}).`,
+            );
           }
           if (requested > remaining + 0.001) {
-            throw new Error(
+            throw toolError(
+              "PRECONDITION",
               `Refund of ${requested} exceeds the remaining refundable balance of ` +
                 `${remaining} ${check.order.netPaymentSet.shopMoney.currencyCode} for order ` +
                 `${check.order.name}. Use shopify_calculate_refund to get correct amounts.`,
+              { details: { reason: "EXCEEDS_REFUNDABLE", requested, remaining } },
             );
           }
         }
@@ -594,14 +814,39 @@ function registerOrderTools(server) {
 
   server.tool(
     "shopify_add_order_note",
-    "Add or replace the note on an order (WRITE).",
+    "Add an internal note to an order (WRITE). The text is appended to the order's existing " +
+      "note; nothing already there is removed. Not visible to the customer.",
     {
       order_id: z.string().describe("Order GID or bare numeric id."),
-      note: z.string().describe("Note text to set on the order."),
+      note: z.string().describe("Text to append to the order's note."),
     },
     async (args) => {
       try {
         const id = toGid("Order", args.order_id);
+        const text = args.note.trim();
+        if (!text) throw toolError("BAD_INPUT", "The note is empty.");
+
+        // Shopify has one note field per order and orderUpdate replaces it, so read
+        // the current note and append, or a merchant's own note would be wiped.
+        const CURRENT = `
+          query GetOrderNote($id: ID!) {
+            order(id: $id) { id name note }
+          }
+        `;
+        const current = await shopifyGql(CURRENT, { id });
+        if (!current.order) throw await orderNotFound(args.order_id);
+        const existing = current.order.note || "";
+        // A retried call must not add the same text twice.
+        if (existing.trimEnd().endsWith(text)) {
+          return ok({
+            id: current.order.id,
+            note: existing,
+            appended: false,
+            alreadyPresent: true,
+          });
+        }
+        const note = existing.trim() ? `${existing.trimEnd()}\n\n${text}` : text;
+
         const MUTATION = `
           mutation AddOrderNote($id: ID!, $note: String!) {
             orderUpdate(input: { id: $id, note: $note }) {
@@ -610,9 +855,9 @@ function registerOrderTools(server) {
             }
           }
         `;
-        const data = await shopifyGql(MUTATION, { id, note: args.note });
+        const data = await shopifyGql(MUTATION, { id, note });
         assertNoUserErrors(data.orderUpdate);
-        return ok(data.orderUpdate);
+        return ok({ ...data.orderUpdate.order, appended: true });
       } catch (err) {
         return fail(err);
       }
@@ -620,4 +865,4 @@ function registerOrderTools(server) {
   );
 }
 
-module.exports = { registerOrderTools };
+module.exports = { registerOrderTools, orderNotFound, cancelBlocker, enrichOrder };

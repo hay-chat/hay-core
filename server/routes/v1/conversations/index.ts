@@ -12,8 +12,27 @@ import { createListProcedure } from "@server/trpc/procedures/list";
 import { ConversationRepository } from "@server/repositories/conversation.repository";
 import { messageApprovalService } from "../../../services/message-approval.service";
 import { createLogger } from "@server/lib/logger";
+import { agentFirstName } from "../../../services/webchat/public-message";
+import { decodeBase64 } from "../../../services/webchat/widget-attachments";
+import {
+  STAFF_ATTACHMENT_MAX_COUNT,
+  StaffAttachmentRejectedError,
+  staffAttachmentsFromUploads,
+  storeStaffAttachment,
+} from "../../../services/staff-attachments";
+import { config } from "@server/config/env";
 import { ConversationExportService } from "../../../services/conversation-export.service";
+import { organizationRepository } from "@server/repositories/organization.repository";
 import { AppDataSource } from "../../../database/data-source";
+import {
+  listChannelTemplates,
+  prepareChannelTemplate,
+} from "../../../services/channel-templates.service";
+import { isPlaygroundConversation } from "../../../services/core/dry-run";
+import { isTestConversation } from "../../../services/close-classification/outcome-rules";
+import { PlaybookService } from "../../../services/playbook.service";
+import { notSimulationSql } from "../../../services/simulation/simulation-kind";
+import { PLAYBOOK_VERSION_OVERRIDE_KEY } from "../../../services/playbook-version-override";
 
 const logger = createLogger("conversations");
 const conversationExportService = new ConversationExportService();
@@ -66,23 +85,38 @@ interface CustomerConversationRow {
   message_count: number | string | null;
 }
 
+/**
+ * Statuses a client may set. "awaiting-approval" is not one: only holding an
+ * action (and deciding it) moves a conversation in and out of it; set from
+ * outside it would leave the conversation with no AI reply and no auto-close.
+ */
+const settableStatusSchema = z.enum([
+  "open",
+  "processing",
+  "pending-human",
+  "human-took-over",
+  "resolved",
+  "unresolved",
+  "closed",
+]);
+
 const createConversationSchema = z.object({
   title: z.string().min(1).max(255).optional(),
   agentId: z.string().uuid().optional(),
   language: z.string().optional(),
   metadata: z.record(z.any()).optional(),
-  status: z
-    .enum(["open", "processing", "pending-human", "human-took-over", "resolved", "closed"])
-    .optional(),
+  status: settableStatusSchema.optional(),
   customerId: z.string().uuid().optional(),
   organizationId: z.string().uuid().optional(),
+  /** D7-5: a test conversation that runs this playbook version (usually the draft). */
+  playbookVersionOverride: z
+    .object({ playbookId: z.string().uuid(), versionId: z.string().uuid() })
+    .optional(),
 });
 
 const updateConversationSchema = z.object({
   title: z.string().min(1).max(255).optional(),
-  status: z
-    .enum(["open", "processing", "pending-human", "human-took-over", "resolved", "closed"])
-    .optional(),
+  status: settableStatusSchema.optional(),
   metadata: z.record(z.any()).optional(),
   customer_id: z.string().uuid().optional(),
 });
@@ -98,11 +132,24 @@ const addMessageSchema = z.object({
   message: messageSchema,
 });
 
-const sendMessageSchema = z.object({
-  conversationId: z.string().uuid(),
-  content: z.string(),
-  role: z.enum(["user", "assistant"]).optional().default("user"),
-});
+const sendMessageSchema = z
+  .object({
+    conversationId: z.string().uuid(),
+    content: z.string(),
+    role: z.enum(["user", "assistant"]).optional().default("user"),
+    /** D8-16: files from `uploadAttachment`, sent by a person who took over. */
+    attachmentIds: z.array(z.string().uuid()).max(STAFF_ATTACHMENT_MAX_COUNT).optional(),
+  })
+  .refine((input) => input.content.trim() !== "" || (input.attachmentIds?.length ?? 0) > 0, {
+    message: "A message needs text or a file",
+    path: ["content"],
+  });
+
+const playbookService = new PlaybookService();
+
+/** Base64 length of the largest conversation-media file, so zod refuses bigger bodies first. */
+const STAFF_ATTACHMENT_MAX_BASE64_LENGTH =
+  Math.ceil(config.storage.limits.conversationMediaMaxFileSize / 3) * 4;
 
 export const conversationsRouter = t.router({
   list: createListProcedure(conversationListInputSchema, conversationRepository),
@@ -134,6 +181,8 @@ export const conversationsRouter = t.router({
         WHERE c.organization_id = $1
           AND c.deleted_at IS NULL
           AND c.status IN ('pending-human', 'human-took-over')
+          AND c.spam_flagged_at IS NULL
+          AND ${notSimulationSql("c")}
         ORDER BY COALESCE(c.last_message_at, c.updated_at) ASC
         LIMIT 200
       `,
@@ -160,6 +209,31 @@ export const conversationsRouter = t.router({
     };
   }),
 
+  /** Spam view (D9-7): spam-flagged conversations, newest first, with reasons. */
+  spam: scopedProcedure(RESOURCES.CONVERSATIONS, ACTIONS.READ)
+    .input(z.object({ limit: z.number().int().min(1).max(200).default(100) }).optional())
+    .query(async ({ ctx, input }) => {
+      const { listSpam } = await import("@server/services/spam/spam-review.service");
+      return listSpam(ctx.organizationId!, input?.limit ?? 100);
+    }),
+
+  /** Flag a conversation as spam: never billed, held from the AI. */
+  markSpam: scopedProcedure(RESOURCES.CONVERSATIONS, ACTIONS.UPDATE)
+    .input(z.object({ conversationId: z.string().uuid() }))
+    .mutation(async ({ ctx, input }) => {
+      const { markSpam } = await import("@server/services/spam/spam-review.service");
+      await markSpam(ctx.organizationId!, input.conversationId, ctx.user!.id);
+      return { success: true };
+    }),
+
+  /** Clear a spam flag; the AI answers again if the shopper is still waiting. */
+  notSpam: scopedProcedure(RESOURCES.CONVERSATIONS, ACTIONS.UPDATE)
+    .input(z.object({ conversationId: z.string().uuid() }))
+    .mutation(async ({ ctx, input }) => {
+      const { markNotSpam } = await import("@server/services/spam/spam-review.service");
+      return markNotSpam(ctx.organizationId!, input.conversationId, ctx.user!.id);
+    }),
+
   /**
    * Active conversations for dashboard widgets.
    * Includes conversations handled by Hay or a human.
@@ -170,7 +244,13 @@ export const conversationsRouter = t.router({
       throw new TRPCError({ code: "UNAUTHORIZED", message: "Organization context required" });
     }
 
-    const statuses = ["open", "processing", "pending-human", "human-took-over"];
+    const statuses = [
+      "open",
+      "processing",
+      "pending-human",
+      "awaiting-approval",
+      "human-took-over",
+    ];
 
     const rows = await AppDataSource.query(
       `
@@ -195,6 +275,7 @@ export const conversationsRouter = t.router({
         WHERE c.organization_id = $1
           AND c.deleted_at IS NULL
           AND c.status = ANY($2)
+          AND ${notSimulationSql("c")}
         ORDER BY last_message_at DESC NULLS LAST, c.updated_at DESC
         LIMIT 5
       `,
@@ -219,10 +300,10 @@ export const conversationsRouter = t.router({
         status: r.status,
         handler: isHuman
           ? { type: "human" as const, name: handlerName, userId: r.assigned_user_id }
-          : { type: "hay" as const, name: "Hay", userId: null },
+          : { type: "hay" as const, name: "Hay.chat", userId: null },
         lastMessageAt: r.last_message_at ? new Date(r.last_message_at).toISOString() : null,
         updatedAt: r.updated_at ? new Date(r.updated_at).toISOString() : null,
-        canJoin: !["closed", "resolved"].includes(r.status),
+        canJoin: !["closed", "resolved", "unresolved"].includes(r.status),
       };
     });
   }),
@@ -324,6 +405,7 @@ export const conversationsRouter = t.router({
             AND c.deleted_at IS NULL
             AND c.created_at >= $2
             AND c.created_at <= $3
+            AND ${notSimulationSql("c")}
         `,
         [organizationId, start.toISOString(), now.toISOString()],
       );
@@ -473,7 +555,30 @@ export const conversationsRouter = t.router({
           message: "Organization ID is required",
         });
       }
-      const conversation = await conversationService.createConversation(organizationId, input);
+      const { playbookVersionOverride, ...data } = input;
+      if (playbookVersionOverride) {
+        if (!isTestConversation(data.metadata)) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "Only test conversations can run a playbook draft",
+          });
+        }
+        const version = await playbookService
+          .getVersion(
+            organizationId,
+            playbookVersionOverride.playbookId,
+            playbookVersionOverride.versionId,
+          )
+          .catch(() => null);
+        if (!version) {
+          throw new TRPCError({ code: "NOT_FOUND", message: "Playbook version not found" });
+        }
+        data.metadata = {
+          ...data.metadata,
+          [PLAYBOOK_VERSION_OVERRIDE_KEY]: playbookVersionOverride,
+        };
+      }
+      const conversation = await conversationService.createConversation(organizationId, data);
 
       return conversation;
     }),
@@ -500,7 +605,7 @@ export const conversationsRouter = t.router({
       }
 
       // Generate title when conversation is closed or resolved
-      if (input.data.status === "closed" || input.data.status === "resolved") {
+      if (["closed", "resolved", "unresolved"].includes(input.data.status ?? "")) {
         await generateConversationTitle(input.id, ctx.organizationId!, false);
       }
 
@@ -609,18 +714,185 @@ export const conversationsRouter = t.router({
       messageType = MessageType.CUSTOMER;
     }
 
+    // D8-16: only a person who took over sends files (delivered by the channel).
+    let attachments: Awaited<ReturnType<typeof staffAttachmentsFromUploads>> = [];
+    if (input.attachmentIds?.length) {
+      if (messageType !== MessageType.HUMAN_AGENT) {
+        throw new TRPCError({
+          code: "PRECONDITION_FAILED",
+          message: "Take over the conversation before sending files",
+        });
+      }
+      try {
+        attachments = await staffAttachmentsFromUploads({
+          organizationId: conversation.organization_id,
+          userId: ctx.user!.id,
+          uploadIds: input.attachmentIds,
+        });
+      } catch (error) {
+        if (!(error instanceof StaffAttachmentRejectedError)) throw error;
+        throw new TRPCError({ code: "BAD_REQUEST", message: error.message });
+      }
+    }
+
+    // The widget shows a person's reply as "10:42 · Marina" (first name only)
+    let senderFirstName: string | undefined;
+    if (messageType === MessageType.HUMAN_AGENT) {
+      const { userRepository } = await import("../../../repositories/user.repository");
+      senderFirstName = agentFirstName(await userRepository.findById(ctx.user!.id));
+    }
+
     // The addMessage method now handles cooldown logic for Customer messages
     const message = await conversation.addMessage({
       content: input.content,
       type: messageType,
+      ...(attachments.length ? { attachments } : {}),
       metadata: {
         sender: input.role || "user",
         sentByUserId: ctx.user?.id,
+        agentFirstName: senderFirstName,
       },
     });
 
     return message;
   }),
+
+  /**
+   * D8-16: store a file a person picked in the Inbox composer. Sent with the
+   * next `sendMessage` (attachmentIds); unsent files are swept after a day.
+   */
+  uploadAttachment: authenticatedProcedure
+    .input(
+      z.object({
+        conversationId: z.string().uuid(),
+        data: z.string().min(1).max(STAFF_ATTACHMENT_MAX_BASE64_LENGTH),
+        mimeType: z.string().min(1).max(100),
+        fileName: z.string().min(1).max(255),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const conversation = await conversationRepository.findById(input.conversationId);
+      if (!conversation || conversation.organization_id !== ctx.organizationId) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Conversation not found" });
+      }
+      if (
+        conversation.status !== "human-took-over" ||
+        conversation.assigned_user_id !== ctx.user?.id
+      ) {
+        throw new TRPCError({
+          code: "PRECONDITION_FAILED",
+          message: "Take over the conversation before sending files",
+        });
+      }
+      const buffer = decodeBase64(input.data);
+      if (!buffer) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Invalid file data" });
+      }
+      try {
+        return await storeStaffAttachment({
+          organizationId: conversation.organization_id,
+          userId: ctx.user!.id,
+          buffer,
+          mimeType: input.mimeType,
+          filename: input.fileName,
+        });
+      } catch (error) {
+        if (!(error instanceof StaffAttachmentRejectedError)) throw error;
+        throw new TRPCError({ code: "BAD_REQUEST", message: error.message });
+      }
+    }),
+
+  /**
+   * D13-3: templates the conversation's channel can send now (e.g. WhatsApp
+   * templates once the 24 h reply window closed). `supported: false` when the
+   * channel has none.
+   */
+  channelTemplates: authenticatedProcedure
+    .input(z.object({ conversationId: z.string().uuid() }))
+    .query(async ({ ctx, input }) => {
+      const conversation = await conversationRepository.findById(input.conversationId);
+      if (!conversation || conversation.organization_id !== ctx.organizationId) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Conversation not found" });
+      }
+      try {
+        return await listChannelTemplates(conversation.organization_id, conversation.channel);
+      } catch (error) {
+        logger.warn({ err: error, conversationId: conversation.id }, "Channel templates failed");
+        throw new TRPCError({
+          code: "BAD_GATEWAY",
+          message: "Could not load templates from the channel",
+        });
+      }
+    }),
+
+  /**
+   * D13-3: a person sends an approved channel template (human-started only).
+   * Stored as a human-agent message with the rendered text; the channel plugin
+   * sends the template itself from `metadata.channelTemplate` on delivery.
+   */
+  sendChannelTemplate: authenticatedProcedure
+    .input(
+      z.object({
+        conversationId: z.string().uuid(),
+        name: z.string().min(1).max(512),
+        language: z.string().min(1).max(20),
+        values: z.record(z.string().max(64), z.string().max(1024)).default({}),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const conversation = await conversationRepository.findById(input.conversationId);
+      if (!conversation || conversation.organization_id !== ctx.organizationId) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Conversation not found" });
+      }
+      if (
+        conversation.status !== "human-took-over" ||
+        conversation.assigned_user_id !== ctx.user?.id
+      ) {
+        throw new TRPCError({
+          code: "PRECONDITION_FAILED",
+          message: "Take over the conversation before sending a template",
+        });
+      }
+
+      let prepared: Awaited<ReturnType<typeof prepareChannelTemplate>>;
+      try {
+        prepared = await prepareChannelTemplate({
+          organizationId: conversation.organization_id,
+          channel: conversation.channel,
+          name: input.name,
+          language: input.language,
+          values: input.values,
+        });
+      } catch (error) {
+        logger.warn({ err: error, conversationId: conversation.id }, "Channel templates failed");
+        throw new TRPCError({
+          code: "BAD_GATEWAY",
+          message: "Could not load templates from the channel",
+        });
+      }
+      if ("error" in prepared) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message:
+            prepared.error === "missing_variables"
+              ? "Fill in every template variable"
+              : "This template is not available on the channel",
+        });
+      }
+
+      const { userRepository } = await import("../../../repositories/user.repository");
+      const message = await conversation.addMessage({
+        content: prepared.content,
+        type: MessageType.HUMAN_AGENT,
+        metadata: {
+          sender: "assistant",
+          sentByUserId: ctx.user?.id,
+          agentFirstName: agentFirstName(await userRepository.findById(ctx.user!.id)),
+          channelTemplate: prepared.channelTemplate,
+        },
+      });
+      return message;
+    }),
 
   takeover: authenticatedProcedure
     .input(
@@ -648,7 +920,7 @@ export const conversationsRouter = t.router({
       }
 
       // Check if conversation is already closed or resolved
-      if (["closed", "resolved"].includes(conversation.status)) {
+      if (["closed", "resolved", "unresolved"].includes(conversation.status)) {
         throw new TRPCError({
           code: "BAD_REQUEST",
           message: "Cannot take over a closed or resolved conversation",
@@ -707,6 +979,9 @@ export const conversationsRouter = t.router({
           isTakeoverMessage: true,
           userId: ctx.user!.id,
           userName: user?.getFullName(),
+          // Shown to the shopper as "Marina joined the chat" (first name only)
+          systemEvent: "agent_joined",
+          agentFirstName: agentFirstName(user),
         },
       });
 
@@ -789,6 +1064,9 @@ export const conversationsRouter = t.router({
           userId: ctx.user!.id,
           userName: user?.getFullName(),
           returnToMode: input.returnToMode,
+          // Shown to the shopper as "Marina left the chat" (+ "AI again" when returned to AI)
+          systemEvent: input.returnToMode === "ai" ? "agent_returned_to_ai" : "agent_left",
+          agentFirstName: agentFirstName(user),
         },
       });
 
@@ -802,6 +1080,9 @@ export const conversationsRouter = t.router({
           releasedBy: ctx.user!.id,
           userName: user?.getFullName(),
           returnToMode: input.returnToMode,
+          // Shown to the shopper as "Marina left the chat" (+ "AI again" when returned to AI)
+          systemEvent: input.returnToMode === "ai" ? "agent_returned_to_ai" : "agent_left",
+          agentFirstName: agentFirstName(user),
         },
       });
 
@@ -950,6 +1231,48 @@ export const conversationsRouter = t.router({
     }),
 
   /**
+   * Switch a playground conversation between simulated actions (dry-run, the
+   * default) and the live store. Only playground conversations can be switched.
+   */
+  // D8-15: send a complete product-problem case to the store's case address again.
+  forwardProductCase: scopedProcedure(RESOURCES.CONVERSATIONS, ACTIONS.UPDATE)
+    .input(z.object({ conversationId: z.string().uuid() }))
+    .mutation(async ({ ctx, input }) => {
+      const conversation = await conversationRepository.findById(input.conversationId);
+      if (!conversation || conversation.organization_id !== ctx.organizationId) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Conversation not found" });
+      }
+      const { forwardProductCase } = await import("../../../services/product-case/forward");
+      const forward = await forwardProductCase(conversation.id, ctx.organizationId!);
+      if (!forward) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "This conversation has no complete product case" });
+      }
+      return forward;
+    }),
+
+  setDryRun: scopedProcedure(RESOURCES.CONVERSATIONS, ACTIONS.UPDATE)
+    .input(z.object({ conversationId: z.string().uuid(), dryRun: z.boolean() }))
+    .mutation(async ({ ctx, input }) => {
+      const conversation = await conversationRepository.findById(input.conversationId);
+      if (!conversation || conversation.organization_id !== ctx.organizationId) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Conversation not found" });
+      }
+      if (!isPlaygroundConversation(conversation.metadata)) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Only playground conversations can switch between simulated and live actions",
+        });
+      }
+      const metadata = { ...(conversation.metadata ?? {}), dryRun: input.dryRun };
+      await conversationRepository.updateById(conversation.id, { metadata });
+      logger.info(
+        { conversationId: conversation.id, userId: ctx.user?.id, dryRun: input.dryRun },
+        "Playground action mode changed",
+      );
+      return { dryRun: input.dryRun };
+    }),
+
+  /**
    * Set or remove legal hold on a conversation
    * Conversations with legal hold are exempt from automatic data retention anonymization
    */
@@ -1046,7 +1369,11 @@ export const conversationsRouter = t.router({
       const timestamp = new Date().toISOString().slice(0, 10);
 
       if (input.format === "pdf") {
-        const pdfBuffer = await conversationExportService.generatePdf(conversation);
+        const organization = await organizationRepository.findById(organizationId);
+        const pdfBuffer = await conversationExportService.generatePdf(conversation, {
+          storeName: organization?.name ?? "",
+          timeZone: organization?.timezone ?? "UTC",
+        });
         return {
           base64Data: pdfBuffer.toString("base64"),
           fileName: `${titleSlug}-${timestamp}.pdf`,

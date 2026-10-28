@@ -12,7 +12,10 @@
 
 import type { Conversation } from "@server/database/entities/conversation.entity";
 import { createLogger } from "@server/lib/logger";
+import { completeProductCaseTool } from "./complete-product-case";
+import { inspectAttachmentTool } from "./inspect-attachment";
 import { recommendProductsTool } from "./recommend-products";
+import { sendAttachmentTool } from "./send-attachment";
 
 const logger = createLogger("core-tools");
 
@@ -64,3 +67,6 @@ export const coreToolRegistry = new CoreToolRegistry();
 
 // Built-in registrations
 coreToolRegistry.register(recommendProductsTool);
+coreToolRegistry.register(sendAttachmentTool);
+coreToolRegistry.register(inspectAttachmentTool);
+coreToolRegistry.register(completeProductCaseTool);

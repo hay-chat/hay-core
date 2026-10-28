@@ -14,7 +14,12 @@
     },
     "actions": {
       "pause": "Pausar",
-      "resume": "Retomar"
+      "resume": "Retomar",
+      "delete": "Excluir agente",
+      "setAsDefault": "Definir como padrão",
+      "cancel": "Cancelar",
+      "save": "Salvar alterações",
+      "create": "Criar agente"
     },
     "enabled": {
       "label": "Agente ativo",
@@ -38,6 +43,93 @@
       "notFound": "Agente não encontrado",
       "loadFailed": "Falha ao carregar o agente",
       "loadListFailed": "Falha ao carregar os agentes"
+    },
+    "sharedChannel": {
+      "description": "Escolha os canais que este agente atende. Um canal pode ser atribuído a mais de um agente; nesse caso responde o agente padrão, se for um deles, senão o agente ativo mais antigo.",
+      "note": "{channel} também está atribuído a {agents}. Quem responde lá é {responder}: o agente padrão, se for um deles, senão o mais antigo.",
+      "noResponder": "ninguém"
+    },
+    "page": {
+      "title": "Agente",
+      "description": "Configure um novo agente de IA para sua organização",
+      "backToList": "Voltar para a lista",
+      "loading": "Carregando agente...",
+      "leavePage": "Sair da página",
+      "editTitle": "Editar agente - Hay.chat",
+      "createTitle": "Criar agente - Hay.chat",
+      "editDescription": "Edite a configuração do seu agente de IA",
+      "createDescription": "Crie um novo agente de IA"
+    },
+    "form": {
+      "cardTitle": "Agente",
+      "cardDescription": "Defina o comportamento do agente e como ele deve responder aos usuários.",
+      "name": {
+        "label": "Nome",
+        "placeholder": "ex.: Agente de Atendimento",
+        "required": "O nome do agente é obrigatório",
+        "tooLong": "O nome do agente deve ter menos de 255 caracteres"
+      },
+      "description": {
+        "label": "Descrição",
+        "helperText": "Esta é uma descrição interna; ela não aparece para o usuário nem para o agente.",
+        "placeholder": "Descreva o que este agente faz..."
+      },
+      "instructions": {
+        "label": "Instruções",
+        "hint": "Defina o comportamento geral do agente e como ele deve responder aos usuários. NÃO inclua instruções específicas para o agente seguir: use os Playbooks para isso."
+      },
+      "initialGreeting": {
+        "label": "Mensagem de saudação inicial",
+        "helperText": "A primeira mensagem que os clientes veem ao iniciar uma conversa. Se ficar vazia, uma saudação padrão é usada. A mensagem é traduzida automaticamente para o idioma da conversa.",
+        "placeholder": "Olá! Como posso ajudar você hoje?"
+      },
+      "tone": {
+        "label": "Tom",
+        "professional": "Profissional",
+        "casual": "Descontraído",
+        "enthusiastic": "Entusiasmado",
+        "placeholder": "Descreva o tom de comunicação (ex.: profissional, simpático, descontraído)...",
+        "presets": {
+          "professional": "Seu tom é profissional, calmo e conciso. Você se comunica com clareza, usa frases completas e evita gírias e emojis. Você soa confiante, mas acessível, como um especialista de atendimento bem treinado que respeita o tempo do cliente. Demonstra empatia quando faz sentido, mas mantém o foco em resolver o problema com eficiência.\n\nExemplo: \"Entendo como isso pode ser frustrante. Vamos verificar juntos o status do seu pedido. Você pode confirmar o número do pedido?\"",
+          "casual": "Você soa como uma pessoa de verdade conversando por mensagem: descontraída, calorosa e acessível. Use frases simples e, quando combinar com o clima, alguns emojis. Mantenha as respostas úteis, mas em tom de conversa, como um colega ajudando um amigo.\n\nExemplo: \"Oi! Entendo total, isso acontece às vezes 😅 Deixa eu dar uma olhada no seu pedido rapidinho pra gente resolver.\"",
+          "enthusiastic": "Você faz cada atendimento parecer animado e positivo. Usa pontos de exclamação com moderação, mostra entusiasmo em ajudar e comemora pequenas conquistas. O cliente se sente ouvido e valorizado, e as respostas continuam curtas e certeiras.\n\nExemplo: \"Ótima pergunta! Vamos resolver isso agora mesmo 🎉 Só preciso do seu e-mail para encontrar o seu pedido!\""
+        }
+      },
+      "avoid": {
+        "label": "O que evitar",
+        "placeholder": "Liste o que o agente deve evitar (ex.: jargão técnico, certos assuntos)..."
+      },
+      "trigger": {
+        "label": "Condições de acionamento",
+        "placeholder": "Defina quando este agente deve ser acionado (ex.: palavras-chave, condições)..."
+      },
+      "createdAt": "Criado em: {date}",
+      "updatedAt": "Última atualização: {date}"
+    },
+    "channels": {
+      "title": "Canais",
+      "webChat": "Web Chat"
+    },
+    "approval": {
+      "title": "Aprovação de mensagens",
+      "description": "Escolha se as respostas da IA são enviadas automaticamente ou precisam de revisão manual antes de chegar aos clientes.",
+      "inherit": "Herdar da organização",
+      "require": "Exigir aprovação",
+      "autoSend": "Envio automático",
+      "playgroundNote": "Observação: conversas do Playground são sempre enviadas automaticamente, independentemente desta configuração."
+    },
+    "escalation": {
+      "title": "Escalonamento humano",
+      "description": "Defina as instruções que o agente deve seguir quando houver ou não um atendente humano disponível.",
+      "availableLabel": "Se algum atendente humano estiver disponível",
+      "availableHint": "Defina as instruções que o agente deve seguir quando houver um atendente humano disponível. Deixe vazio para apenas mudar o status para 'pending-human'.",
+      "unavailableLabel": "Se nenhum atendente humano estiver disponível",
+      "unavailableHint": "Defina as instruções que o agente deve seguir quando não houver atendentes humanos disponíveis (ex.: abrir um chamado, pedir o e-mail)."
+    },
+    "deleteDialog": {
+      "title": "Excluir agente",
+      "description": "Tem certeza de que deseja excluir \"{name}\"? Esta ação não pode ser desfeita.",
+      "confirm": "Excluir"
     }
   }
 }

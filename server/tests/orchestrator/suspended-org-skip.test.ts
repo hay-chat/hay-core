@@ -3,7 +3,8 @@ import { describe, it, expect, jest, beforeEach } from "@jest/globals";
 /**
  * runConversation() must not reply for a suspended organization: it returns
  * before acquiring the lock and clears needs_processing so the sweep stops
- * re-enqueuing the conversation.
+ * re-enqueuing the conversation. An open conversation is queued for the team,
+ * and an external channel gets one fixed holding reply (D15-4).
  */
 
 const mockFindById = jest.fn();
@@ -48,6 +49,14 @@ const conversation = (overrides: Record<string, unknown>) => ({
   status: "open",
   assigned_user_id: null,
   needs_processing: true,
+  channel: "web",
+  language: "pt",
+  getMessages: jest.fn(
+    async (): Promise<Array<{ type: string; metadata?: Record<string, unknown> }>> => [
+      { type: "Customer" },
+    ],
+  ),
+  addMessage: jest.fn(async (_message: Record<string, unknown>) => ({})),
   lock: jest.fn(async () => "locker"),
   ...overrides,
 });
@@ -63,12 +72,55 @@ describe("runConversation for a suspended organization", () => {
 
     await runConversation(CONVERSATION_ID);
 
-    expect(mockUpdate).toHaveBeenCalledWith(CONVERSATION_ID, ORG_ID, { needs_processing: false });
+    expect(mockUpdate).toHaveBeenCalledWith(CONVERSATION_ID, ORG_ID, {
+      needs_processing: false,
+      status: "pending-human",
+    });
     expect(convo.lock).not.toHaveBeenCalled();
+    // The widget shows nothing while locked, so web never gets the holding reply.
+    expect(convo.addMessage).not.toHaveBeenCalled();
     expect(mockLogger.info).toHaveBeenCalledWith(
       { reason: "trial_expired" },
       "Skipping - organization suspended",
     );
+  });
+
+  it("sends one holding reply on an external channel, in the shopper's language", async () => {
+    const convo = conversation({
+      channel: "whatsapp",
+      organization: { suspendedAt: new Date(), suspensionReason: "cancelled" },
+    });
+    mockFindById.mockResolvedValueOnce(convo);
+
+    await runConversation(CONVERSATION_ID);
+
+    expect(convo.addMessage).toHaveBeenCalledTimes(1);
+    expect(convo.addMessage).toHaveBeenCalledWith({
+      content: "Obrigado pela sua mensagem. Nós a recebemos.",
+      type: "BotAgent",
+      metadata: { isSuspendedHoldingReply: true },
+    });
+    expect(convo.lock).not.toHaveBeenCalled();
+  });
+
+  it("never sends the holding reply twice in one conversation", async () => {
+    const convo = conversation({
+      channel: "instagram",
+      status: "pending-human",
+      organization: { suspendedAt: new Date(), suspensionReason: "manual" },
+      getMessages: jest.fn(async () => [
+        { type: "Customer" },
+        { type: "BotAgent", metadata: { isSuspendedHoldingReply: true } },
+        { type: "Customer" },
+      ]),
+    });
+    mockFindById.mockResolvedValueOnce(convo);
+
+    await runConversation(CONVERSATION_ID);
+
+    expect(convo.addMessage).not.toHaveBeenCalled();
+    // Already waiting for the team: only the flag is cleared.
+    expect(mockUpdate).toHaveBeenCalledWith(CONVERSATION_ID, ORG_ID, { needs_processing: false });
   });
 
   it("does not touch the conversation when needs_processing is already false", async () => {
@@ -81,6 +133,7 @@ describe("runConversation for a suspended organization", () => {
     await runConversation(CONVERSATION_ID);
 
     expect(mockUpdate).not.toHaveBeenCalled();
+    expect(convo.addMessage).not.toHaveBeenCalled();
     expect(convo.lock).not.toHaveBeenCalled();
   });
 

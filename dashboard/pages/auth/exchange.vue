@@ -39,7 +39,7 @@ definePageMeta({
 });
 
 useHead({
-  title: "Sign In - Hay",
+  title: "Sign In - Hay.chat",
 });
 
 const router = useRouter();

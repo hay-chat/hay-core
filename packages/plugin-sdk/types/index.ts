@@ -77,6 +77,9 @@ export type {
   McpInitializerContext,
   StdioMcpOptions,
   ExternalMcpOptions,
+  LocalMcpOptions,
+  ToolRiskSpec,
+  ToolWriteCategory,
   HayMcpRuntimeAPI,
 } from "./mcp";
 
@@ -99,6 +102,12 @@ export type { PluginPage } from "./ui";
 export type { HayRegisterAPI, UIRegistrationAPI } from "./register";
 
 // ============================================================================
+// Plugin state (persisted per org + plugin)
+// ============================================================================
+
+export type { HayPluginStateAPI, HayPluginStateSetOptions } from "./state";
+
+// ============================================================================
 // Webhook Routing (shared-app fan-out)
 // ============================================================================
 
@@ -109,6 +118,27 @@ export type {
   WebhookDeauthorizationDescriptor,
   WebhookRoutingDescriptor,
 } from "./webhook-routing";
+
+// ============================================================================
+// Webchat extension point (contributions + gates)
+// ============================================================================
+
+export type {
+  WebchatContributionType,
+  WebchatContributionPropValue,
+  WebchatContributionOptions,
+  WebchatContributionDescriptor,
+  WebchatGateEvent,
+  WebchatGateFailurePolicy,
+  WebchatGateInput,
+  WebchatGateResult,
+  HayWebchatGateContext,
+  WebchatGateHandler,
+  WebchatGateOptions,
+  WebchatGateDescriptor,
+  WebchatMetadata,
+  RegisterWebchatAPI,
+} from "./webchat";
 
 // ============================================================================
 // Cron Jobs (HAY-221)
@@ -156,3 +186,16 @@ export type {
   CanonicalProduct,
   HayProductSourceRuntimeAPI,
 } from "./products";
+
+// ============================================================================
+// Payment disputes (chargeback intake + evidence draft)
+// ============================================================================
+
+export type {
+  DisputeStatusName,
+  CanonicalDispute,
+  HayDisputeSourceRuntimeAPI,
+  DisputeEvidenceRequest,
+  DisputeEvidenceErrorCode,
+  DisputeEvidenceResponse,
+} from "./disputes";

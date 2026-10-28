@@ -30,6 +30,8 @@
       </CardContent>
     </Card>
 
+    <CustomerMergeSuggestions class="mt-4" @merged="reload" />
+
     <Card class="mt-4">
       <CardContent class="p-0">
         <div v-if="loading && rows.length === 0" class="py-12 text-center">
@@ -152,8 +154,9 @@ const page = ref(1);
 const query = ref("");
 const loading = ref(false);
 
+// "_"-prefixed keys are Hay.chat bookkeeping (e.g. merged identities), not channels.
 const channelsFor = (c: CustomerRow): string[] =>
-  c.external_metadata ? Object.keys(c.external_metadata) : [];
+  c.external_metadata ? Object.keys(c.external_metadata).filter((k) => !k.startsWith("_")) : [];
 
 const avatarFor = (c: CustomerRow): string | null => {
   for (const ch of channelsFor(c)) {

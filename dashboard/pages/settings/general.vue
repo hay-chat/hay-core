@@ -875,7 +875,7 @@ const resetToDefaults = () => {
         secret: "",
         events: [],
       },
-      retentionDays: null, // Default: disabled
+      retentionDays: 365, // Default for new orgs (D14-8)
       dataRetention: {
         conversations: "365",
         analytics: "730",
@@ -945,7 +945,7 @@ definePageMeta({
 
 // Head management
 useHead({
-  title: computed(() => `${t("general.title")} - Hay Dashboard`),
+  title: computed(() => `${t("general.title")} - Hay.chat`),
   meta: [
     {
       name: "description",

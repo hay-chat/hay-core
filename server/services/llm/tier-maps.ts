@@ -16,6 +16,16 @@ const OPENAI_COMPATIBLE_TIERS: TierModelMap = {
   easy: process.env.LLM_TIER_EASY || DEFAULT_TIER_MAP.openai.easy,
 };
 
+/**
+ * Tiers for the managed EU bundle. Deliberately NOT LLM_TIER_*: those name models
+ * on the default host (e.g. DeepSeek on DO Gradient) that do not exist on OpenAI EU.
+ */
+export const EU_TIERS: TierModelMap = {
+  hard: process.env.OPENAI_EU_TIER_HARD || DEFAULT_TIER_MAP.openai.hard,
+  medium: process.env.OPENAI_EU_TIER_MEDIUM || DEFAULT_TIER_MAP.openai.medium,
+  easy: process.env.OPENAI_EU_TIER_EASY || DEFAULT_TIER_MAP.openai.easy,
+};
+
 export const PROVIDER_TIER_DEFAULTS: Record<ChatProviderId, TierModelMap> = {
   "openai-compatible": OPENAI_COMPATIBLE_TIERS,
   anthropic: DEFAULT_TIER_MAP.anthropic,

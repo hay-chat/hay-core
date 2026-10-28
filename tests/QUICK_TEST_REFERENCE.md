@@ -1,43 +1,15 @@
 # Quick E2E Test Reference
 
-## Email Plugin Tests
+## Plugin Tests
 
-### Basic Installation & Settings Test
-```bash
-npx playwright test tests/plugin-health-check-and-settings.spec.ts --grep "email plugin" --project=chromium
-```
-
-**What it does:**
-- ✅ Auto-login (no manual setup needed)
-- ✅ Installs Email plugin from marketplace
-- ✅ Verifies settings/configuration UI is visible
-- ✅ Tracks all plugin API calls
-- ✅ Checks for health check API calls
-- ✅ Takes screenshot for verification
-
-**Expected result:**
-```
-✅ Plugin installed: true
-✅ Settings/Configuration visible: true
-✅ Essential API calls made: true
-ℹ️  Health check API called: false (normal for tool plugins)
-```
-
-### Run with Visual Browser
-```bash
-npx playwright test tests/plugin-health-check-and-settings.spec.ts --grep "email plugin" --project=chromium --headed
-```
-
-## All Plugin Tests
-
-### Run Both Email and Shopify Tests
+### Shopify Connector Health Check & Settings
 ```bash
 npx playwright test tests/plugin-health-check-and-settings.spec.ts --project=chromium
 ```
 
-### Run Original Email Plugin Tests
+### Run with Visual Browser
 ```bash
-npx playwright test tests/email-plugin-installation.spec.ts --project=chromium
+npx playwright test tests/plugin-health-check-and-settings.spec.ts --project=chromium --headed
 ```
 
 ## Common Issues
@@ -78,7 +50,7 @@ npx playwright test tests/email-plugin-installation.spec.ts --project=chromium
 | `--project=chromium` | Run in Chromium only (recommended) |
 | `--headed` | Show browser window |
 | `--debug` | Step through test in debug mode |
-| `--grep "email"` | Run only tests matching "email" |
+| `--grep "Shopify"` | Run only tests matching "Shopify" |
 | `--reporter=list` | Compact output |
 
 ## Pre-requisites
@@ -86,6 +58,6 @@ npx playwright test tests/email-plugin-installation.spec.ts --project=chromium
 1. ✅ Server running on `localhost:3001`
 2. ✅ Dashboard running on `localhost:3000`
 3. ✅ Database accessible
-4. ✅ Email plugin built (`plugins/core/email/dist/`)
+4. ✅ Plugins built (`scripts/build-plugins.sh`)
 
 That's it! Just run the command and everything else is automatic. 🚀

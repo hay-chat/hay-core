@@ -39,8 +39,12 @@ Answer these before writing code:
 | ----------------------------- | ----------------------------------- | --------------------------------------------------------------------------- | ------------------------------------------------ |
 | has a REST API, no hosted MCP | **A. Local bundled MCP**            | **shopify** / **woocommerce** (semantic tools + tests), **klaviyo** (clean) | one tool per endpoint (see anti-patterns)        |
 | hosts its own MCP server      | **B. Remote connector**             | **hubspot** (OAuth), **stripe** (API key)                                   | stripe's stale `.md` docs                        |
-| is two-way messaging          | **C. Channel**                      | **chatwoot** (verify), **email-imap** (semantics)                           | email (mock), whatsapp (no idempotency)          |
+| is two-way messaging          | **C. Channel**                      | **chatwoot** (verify), **email-imap** (semantics)                           | whatsapp (no idempotency)                        |
 | is a document source          | **D. Document importer** (advanced) | **atlassian** ConfluenceClient + adf-to-markdown                            | atlassian's manifest.json + `@server/*` coupling |
+
+**Payment provider** (Pix, card refunds: Mercado Pago, PagBank, Pagar.me…)? Archetype A plus the
+shared five-tool contract in `packages/plugin-sdk/payment-provider/README.md` (`@hay/plugin-sdk/payment-provider`).
+Copy **mercadopago**.
 
 ### 3. Scaffold from templates (in `templates/`)
 
@@ -65,6 +69,14 @@ archetypes you're not using.
 - Channel inbound: verify signature over **raw bytes** with replay window + `timingSafeEqual`,
   filter bot/echo/empty, **dedupe on provider message id**, always `200` on success (chatwoot).
 - Channel outbound: non-retryable provider errors → `200 { success:false }` (no retry storms).
+- **Tool risk**: give **every** tool a risk class, or Hay.chat holds each call for human approval
+  as an unknown write. Reads → `read`; writes → a category (`refund`/`cancel`/`discount` move money
+  and are held; `destructive` (deletes, account/helpdesk configuration, cancelled bookings, dispute evidence) is
+  always held; `note`, `customer_update`, `address_change`, `return`, `other_write` run). Local
+  `mcp/` server: `applyToolRisk(server, require("./tool-risk"))` from `@hay/plugin-sdk/tool-risk`
+  (wix, calcom). Hosted or in-process server: pass `toolRisk: { read, write }` to
+  `startExternal`/`startLocalStdio`/`startLocal` (stripe, atlassian); undeclared hosted tools keep
+  the server's own `readOnlyHint`. Add a test that every listed tool is classified.
 - **Translations (`i18n/`)**: ship `i18n/en.json` (+ `pt.json`) with a `tools.<toolName>.label`/`description`
   for **every** MCP tool and a `config.<field>` for every config field. Keys must be the exact tool
   names. Without them the UI humanizes raw names (`list_event_types` → "List Event Types") and only
@@ -101,6 +113,7 @@ npm run typecheck:server   # plugin types compile against the SDK
 - [ ] (Archetype A) `mcp/` uses `@modelcontextprotocol/sdk`, real zod schemas, `console.error` logging, and a documented dependency-install approach.
 - [ ] (Channel) signature verified, inbound deduped, non-retryable errors return `200 {success:false}`.
 - [ ] No committed cruft: no `.git`/vendored repos, `node_modules` bloat, `test-results/`, design `.md` TODOs, or creds in fixtures.
+- [ ] Every MCP tool has a risk class (read, or a write category); a test keeps it complete.
 - [ ] `i18n/en.json` (+ `pt.json`) exists with a `label`/`description` for every MCP tool and config field; tool keys match the exact tool names.
 - [ ] `npm run build` + `typecheck` pass; tools appear in `/mcp/list-tools`.
 

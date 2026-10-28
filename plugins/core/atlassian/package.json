@@ -64,7 +64,8 @@
   "scripts": {
     "build": "tsc && esbuild src/router.ts --bundle --platform=node --target=es2022 --format=cjs --external:@server/* --external:@hay/* --external:zod --external:fs --external:path --external:crypto --external:http --external:https --external:url --outfile=dist/router.cjs",
     "start": "node dist/index.js",
-    "dev": "npm run build && node dist/index.js"
+    "dev": "npm run build && node dist/index.js",
+    "test": "vitest run"
   },
   "keywords": [
     "atlassian",

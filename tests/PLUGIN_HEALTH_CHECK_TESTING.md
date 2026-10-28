@@ -10,28 +10,7 @@ Comprehensive E2E test that verifies plugins are loading health checks and custo
 
 ## What's Tested
 
-### ✅ Test 1: Email Plugin (Tool-Type MCP Plugin)
-
-This test performs a complete installation and verification workflow:
-
-1. **Authentication** - Automatic login via `navigateWithAuth()`
-2. **Installation** - Installs Email plugin from marketplace
-3. **Settings Verification** - Checks that configuration UI is displayed
-4. **Health Check Tracking** - Monitors API calls to verify health check is attempted
-5. **API Call Analysis** - Tracks all plugin-related API calls
-
-#### What's Verified:
-
-| Check | Description | Expected Result |
-|-------|-------------|-----------------|
-| ✅ Plugin Installed | Plugin installs without errors | Success |
-| ✅ Settings Page Loaded | Redirects to plugin settings page | Success |
-| ✅ Configuration Visible | Settings/Configuration section is displayed | **Must Pass** |
-| ✅ Essential API Calls | `plugins.get` and `plugins.getConfiguration` called | **Must Pass** |
-| ℹ️ Health Check API | `plugins.testConnection` called automatically | Optional for tool plugins |
-| ℹ️ Health Check UI | Connection status badge or Test button shown | Optional for tool plugins |
-
-### ✅ Test 2: Shopify Plugin (Connector-Type MCP Plugin)
+### ✅ Shopify Plugin (Connector-Type MCP Plugin)
 
 Tests a connector-type plugin which should have explicit health check UI:
 
@@ -54,12 +33,6 @@ Tests a connector-type plugin which should have explicit health check UI:
 ```bash
 # Run with Chromium only (fastest and most reliable)
 npx playwright test tests/plugin-health-check-and-settings.spec.ts --project=chromium
-```
-
-### Run Only Email Plugin Test
-
-```bash
-npx playwright test tests/plugin-health-check-and-settings.spec.ts --grep "email plugin" --project=chromium
 ```
 
 ### Run Only Shopify Connector Test
@@ -90,63 +63,6 @@ The tests are configured to run **sequentially** (not in parallel) to avoid conf
 
 **Always use `--project=chromium`** for reliable test execution.
 
-## Test Output
-
-### Successful Email Plugin Test Output
-
-```
-🚀 Step 1: Navigating to marketplace...
-✅ Marketplace loaded
-
-🔍 Step 2: Finding Email plugin...
-📦 Installing Email plugin...
-✅ Plugin installed and redirected to settings
-
-📄 Step 3: Verifying plugin settings page...
-✅ Plugin settings page loaded
-
-⚙️  Step 4: Verifying settings are displayed...
-  - Configuration heading visible: true
-  - Settings tab visible: false
-  - Form inputs visible: false
-  - Form buttons visible: true
-✅ Settings/Configuration section is visible
-
-🏥 Step 5: Verifying health check API call...
-  - Status badge visible: false
-  - Test Connection button visible: false
-  - Connection Test section visible: false
-  - Health check API called: false
-
-📡 Step 6: Analyzing API calls...
-  Total plugin-related API calls: 5
-  - GET plugins.getAll → 200
-  - GET plugins.getMenuItems → 200
-  - GET plugins.get → 200
-  - GET plugins.getConfiguration → 200
-
-  - plugins.get called: true
-  - plugins.getConfiguration called: true
-  - plugins.testConnection called: false
-✅ Essential plugin API calls were made
-
-📸 Step 7: Taking screenshot...
-✅ Screenshot saved to test-results/plugin-health-check-and-settings.png
-
-============================================================
-📊 FINAL TEST SUMMARY
-============================================================
-✅ Plugin installed: true
-✅ Settings page loaded: true
-✅ Settings/Configuration visible: true
-✅ Essential API calls made: true
-ℹ️  Health check API called: false
-ℹ️  Health check UI present: false
-============================================================
-
-✅ ALL TESTS PASSED!
-```
-
 ## API Call Tracking
 
 The test automatically intercepts and logs all network requests to track:
@@ -169,16 +85,6 @@ This screenshot shows the final state of the plugin settings page and can be use
 - Documentation
 
 ## Understanding the Results
-
-### Tool-Type Plugins (Email)
-
-Tool-type plugins typically:
-- ✅ Show configuration/settings UI
-- ℹ️ May NOT have explicit health check UI
-- ℹ️ May NOT call `testConnection` automatically
-- ✅ Still function correctly for AI agent use
-
-This is **EXPECTED** behavior - tool plugins don't need connection testing.
 
 ### Connector-Type Plugins (Shopify, Stripe, etc.)
 
@@ -259,4 +165,3 @@ To extend these tests:
 - [tests/helpers/login.ts](helpers/login.ts) - Authentication helper
 - [tests/helpers/auth.ts](helpers/auth.ts) - Test user creation and cleanup
 - [tests/global-setup.ts](global-setup.ts) - Global test setup
-- [tests/email-plugin-installation.spec.ts](email-plugin-installation.spec.ts) - Original email plugin tests

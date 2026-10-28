@@ -12,16 +12,10 @@
     </mj-text>
 
     {{#if message}}
-    <mj-text
-      color="#555555"
-      font-style="italic"
-      line-height="24px"
-      padding="10px 0"
-      background-color="#f9f9f9"
-      border-left="3px solid #001bf4"
-      padding-left="15px"
-    >
-      "{{ message }}"
+    <mj-text color="#555555" font-style="italic" line-height="24px" padding="10px 0">
+      <div style="background-color: #f9f9f9; border-left: 3px solid #001bf4; padding: 10px 15px">
+        "{{ message }}"
+      </div>
     </mj-text>
     {{/if}}
 

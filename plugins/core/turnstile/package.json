@@ -1,0 +1,34 @@
+{
+  "name": "hay-plugin-turnstile",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Stops bots from opening webchat conversations with Cloudflare Turnstile, verified by Hay.chat before a conversation is created",
+  "author": "Hay.chat",
+  "main": "dist/index.js",
+  "hay-plugin": {
+    "entry": "./dist/index.js",
+    "displayName": "Bot protection (Cloudflare Turnstile)",
+    "category": "tool",
+    "capabilities": [
+      "config",
+      "webchat"
+    ],
+    "env": [
+      "TURNSTILE_SITE_KEY",
+      "TURNSTILE_SECRET_KEY"
+    ],
+    "defaultEnabled": true
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@hay/plugin-sdk": "file:../../../packages/plugin-sdk"
+  },
+  "devDependencies": {
+    "typescript": "^5.3.3",
+    "@types/node": "^20.10.0"
+  }
+}

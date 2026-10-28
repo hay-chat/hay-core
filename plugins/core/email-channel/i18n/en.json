@@ -1,11 +1,33 @@
 {
   "name": "Email inbox",
-  "description": "Connect your support inbox: forward support@ emails to Hay and let the AI reply by email, threaded like a normal conversation",
-  "tools": {},
-  "config": {},
+  "description": "Connect your support inbox: forward support@ emails to Hay.chat and let the AI reply by email, threaded like a normal conversation. The AI can also email your team.",
+  "tools": {
+    "send-email": {
+      "label": "Send email to your team",
+      "description": "Email the store's team (the notification addresses, or the support address) — for example when a customer needs a person"
+    }
+  },
+  "config": {
+    "supportAddress": {
+      "label": "Your support address",
+      "description": "The address your customers already write to, e.g. support@yourstore.com. You will forward this mailbox to the Hay.chat address shown below."
+    },
+    "storeName": {
+      "label": "Sender name",
+      "description": "Shown as the sender of Hay.chat's replies, e.g. \"Acme Support\". Defaults to your workspace name."
+    },
+    "bccArchive": {
+      "label": "Keep a copy in my inbox",
+      "description": "BCC your support address on every reply Hay.chat sends, so your mailbox holds the whole conversation."
+    },
+    "notificationRecipients": {
+      "label": "Team notification addresses",
+      "description": "Comma-separated addresses the AI's \"Send email to your team\" action writes to, e.g. when a customer needs a person. Defaults to your support address."
+    }
+  },
   "ui": {
     "title": "Connect your inbox",
-    "intro": "Keep your support address. Forward it to Hay and the AI answers by email — every reply stays in the same thread, and you can take over any conversation from the dashboard.",
+    "intro": "Keep your support address. Forward it to Hay.chat and the AI answers by email — every reply stays in the same thread, and you can take over any conversation from the dashboard.",
     "loadingStatus": "Loading email channel status…",
     "statusError": {
       "title": "Couldn't load the email channel status",
@@ -15,15 +37,15 @@
       "retry": "Try again"
     },
     "notReady": {
-      "title": "Email channel is not available on this Hay installation yet",
-      "body": "The host is missing: {missing}. Ask your Hay administrator to configure inbound email."
+      "title": "Email channel is not available on this Hay.chat installation yet",
+      "body": "The host is missing: {missing}. Ask your Hay.chat administrator to configure inbound email."
     },
     "needsAddress": {
       "title": "Save your support address first",
-      "body": "Enter the address your customers write to in the settings above and save. Hay uses it to recognise forwarded mail and to send the right Reply-To."
+      "body": "Enter the address your customers write to in the settings above and save. Hay.chat uses it to recognise forwarded mail and to send the right Reply-To."
     },
     "address": {
-      "title": "Your Hay forwarding address",
+      "title": "Your Hay.chat forwarding address",
       "intro": "Forward your support mailbox to this address. It is unique to your workspace.",
       "copy": "Copy address",
       "copied": "Copied",
@@ -37,11 +59,11 @@
       "title": "Set up forwarding",
       "gmail": {
         "title": "Gmail or Google Workspace",
-        "body": "Open Gmail as the support mailbox → Settings → See all settings → Forwarding and POP/IMAP → Add a forwarding address → paste the Hay address → Next. Google emails Hay a confirmation code; it appears below within a minute. Enter it in Gmail, choose \"Forward a copy of incoming mail\" and save."
+        "body": "Open Gmail as the support mailbox → Settings → See all settings → Forwarding and POP/IMAP → Add a forwarding address → paste the Hay.chat address → Next. Google emails Hay.chat a confirmation code; it appears below within a minute. Enter it in Gmail, choose \"Forward a copy of incoming mail\" and save."
       },
       "outlook": {
         "title": "Outlook or Microsoft 365",
-        "body": "Open Outlook on the web as the support mailbox → Settings → Mail → Forwarding → Enable forwarding → paste the Hay address → tick \"Keep a copy of forwarded messages\" → Save. Some Microsoft 365 tenants need an admin to allow external forwarding."
+        "body": "Open Outlook on the web as the support mailbox → Settings → Mail → Forwarding → Enable forwarding → paste the Hay.chat address → tick \"Keep a copy of forwarded messages\" → Save. Some Microsoft 365 tenants need an admin to allow external forwarding."
       },
       "other": {
         "title": "Other providers",
@@ -59,7 +81,7 @@
       "code": "Confirmation code",
       "copyCode": "Copy code",
       "link": "Or open Google's confirmation link",
-      "noCode": "Hay received Google's message but could not read the code. Open the link below instead."
+      "noCode": "Hay.chat received Google's message but could not read the code. Open the link below instead."
     },
     "health": {
       "title": "Status",
@@ -68,6 +90,30 @@
       "never": "Nothing received yet",
       "count": "Emails received since start",
       "lastError": "Last error"
+    },
+    "domain": {
+      "title": "Send from your own domain (optional)",
+      "intro": "Replies go out from {platform} by default. Verify {domain} and replies will come from {support} instead.",
+      "freeMail": "Replies keep coming from {platform}: {domain} is a shared mailbox provider, so it cannot be verified.",
+      "setup": "Set up {domain}",
+      "records": "Add these DNS records at your domain provider, then select Check now. DNS changes can take a few hours.",
+      "type": "Type",
+      "name": "Name",
+      "value": "Value",
+      "priority": "Priority",
+      "check": "Check now",
+      "remove": "Remove domain",
+      "removeConfirm": "Stop sending from {domain}? Replies go back to {platform}.",
+      "mismatch": "{domain} is set up, but your support address is on another domain, so replies still come from {platform}.",
+      "verifiedLine": "Replies now come from {support}.",
+      "error": "Could not update the sending domain: {message}",
+      "status": {
+        "verified": "Verified",
+        "pending": "Checking DNS",
+        "not_started": "Waiting for DNS records",
+        "failed": "Verification failed",
+        "temporary_failure": "Temporarily failing"
+      }
     }
   }
 }

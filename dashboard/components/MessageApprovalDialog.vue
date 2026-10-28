@@ -2,16 +2,18 @@
   <Dialog :open="open" size="lg" @update:open="$emit('update:open', $event)">
     <DialogContent>
       <DialogHeader>
-        <DialogTitle>Review AI Message</DialogTitle>
+        <DialogTitle>{{ t("conversations.draftApproval.dialogTitle") }}</DialogTitle>
         <DialogDescription>
-          Review and optionally edit the message before sending to the customer.
+          {{ t("conversations.draftApproval.dialogDescription") }}
         </DialogDescription>
       </DialogHeader>
 
       <div class="space-y-4">
         <!-- Original Content (if edited) -->
         <div v-if="isEdited" class="bg-neutral-100 dark:bg-neutral-800 p-3 rounded-md">
-          <p class="text-xs font-medium text-neutral-muted mb-1">Original AI Response:</p>
+          <p class="text-xs font-medium text-neutral-muted mb-1">
+            {{ t("conversations.draftApproval.original") }}
+          </p>
           <p class="text-sm">{{ originalContent }}</p>
         </div>
 
@@ -20,13 +22,15 @@
           <Input
             id="message-content"
             v-model="editedContent"
-            label="Message Content"
+            :label="t('conversations.draftApproval.content')"
             type="textarea"
             rows="8"
             class="w-full mt-1"
-            placeholder="Edit message content..."
+            :placeholder="t('conversations.draftApproval.placeholder')"
           />
-          <p class="text-xs text-neutral-muted mt-1">{{ editedContent.length }} characters</p>
+          <p class="text-xs text-neutral-muted mt-1">
+            {{ t("conversations.draftApproval.characters", { count: editedContent.length }) }}
+          </p>
         </div>
       </div>
 
@@ -34,18 +38,24 @@
         <template #secondary>
           <Button variant="destructive" :disabled="loading" @click="handleBlock">
             <Ban class="h-4 w-4 mr-2" />
-            Block Message
+            {{ t("conversations.draftApproval.blockMessage") }}
           </Button>
         </template>
         <template #primary>
-          <Button variant="outline" :disabled="loading" @click="handleCancel"> Cancel </Button>
+          <Button variant="outline" :disabled="loading" @click="handleCancel">
+            {{ t("common.cancel") }}
+          </Button>
           <Button
             variant="success"
             :disabled="loading || !editedContent.trim()"
             @click="handleApprove"
           >
             <Check class="h-4 w-4 mr-2" />
-            {{ isEdited ? "Approve & Send Edited" : "Approve & Send" }}
+            {{
+              isEdited
+                ? t("conversations.draftApproval.approveEdited")
+                : t("conversations.draftApproval.approve")
+            }}
           </Button>
         </template>
       </DialogFooter>
@@ -56,7 +66,10 @@
 <script setup lang="ts">
 import { ref, computed, watch } from "vue";
 import { Check, Ban } from "lucide-vue-next";
+import { useI18n } from "vue-i18n";
 import { useMessageApproval } from "@/composables/useMessageApproval";
+
+const { t } = useI18n();
 
 const props = defineProps<{
   open: boolean;

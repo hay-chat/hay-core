@@ -101,6 +101,15 @@ export const config = {
     max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS || "100", 10),
   },
 
+  // Webchat under-attack mode (D9-10): more than `createThreshold` new
+  // conversations for one org within `windowSeconds` challenges every visitor
+  // for `hours`.
+  underAttack: {
+    createThreshold: parseInt(process.env.UNDER_ATTACK_CREATE_THRESHOLD || "30", 10),
+    windowSeconds: 5 * 60,
+    hours: parseInt(process.env.UNDER_ATTACK_HOURS || "4", 10),
+  },
+
   logging: {
     level: process.env.LOG_LEVEL || "debug",
     debug: process.env.DEBUG === "true",
@@ -143,7 +152,6 @@ export const config = {
     secret: process.env.JWT_SECRET || "",
     expiresIn: process.env.JWT_EXPIRES_IN || "7d",
     refreshSecret: process.env.JWT_REFRESH_SECRET || "",
-    refreshExpiresIn: process.env.JWT_REFRESH_EXPIRES_IN || "30d",
   },
 
   orchestrator: {
@@ -172,6 +180,13 @@ export const config = {
 
   openai: {
     apiKey: process.env.OPENAI_API_KEY || "",
+    /**
+     * Base URL for every managed OpenAI call made with OPENAI_API_KEY: embeddings,
+     * voice-note transcription, and default chat when LLM_BASE_URL is unset.
+     * Empty = api.openai.com. Set to https://eu.api.openai.com/v1 (with a key from
+     * an OpenAI EU data residency project) to keep that traffic in the EU.
+     */
+    baseUrl: process.env.OPENAI_BASE_URL || "",
     models: {
       embedding: {
         model: process.env.OPENAI_EMBEDDING_MODEL || "text-embedding-3-small",
@@ -189,6 +204,12 @@ export const config = {
       // Speech-to-text for inbound channel voice notes (`media.upload` with `transcribe`).
       transcription: {
         model: process.env.OPENAI_TRANSCRIPTION_MODEL || "gpt-4o-mini-transcribe",
+      },
+      // Vision pass on customer photos and PDFs (D8-11). Served by the EU endpoint
+      // when configured, else the default OpenAI endpoint for every org (EU-only
+      // orgs included: vision is not blocked while no EU inference exists).
+      vision: {
+        model: process.env.OPENAI_VISION_MODEL || "gpt-4.1-mini",
       },
     },
   },
@@ -216,6 +237,25 @@ export const config = {
     apiKey: process.env.LLM_API_KEY || "",
   },
 
+  /**
+   * Per-org AI processing region (Settings -> AI Models -> "EU only"). Orgs with
+   * `settings.aiRegion = "eu"` send every chat, embedding and transcription call
+   * here, never to the default bundle. Both values must be set for an org to be
+   * able to turn EU on; until then the setting is refused.
+   *
+   * OpenAI EU data residency: create an EU project, then
+   *   OPENAI_EU_BASE_URL=https://eu.api.openai.com/v1
+   *   OPENAI_EU_API_KEY=<key from that project>
+   * Optional tier overrides (default: OpenAI catalog tiers):
+   *   OPENAI_EU_TIER_HARD / OPENAI_EU_TIER_MEDIUM / OPENAI_EU_TIER_EASY
+   */
+  aiRegion: {
+    eu: {
+      baseUrl: process.env.OPENAI_EU_BASE_URL || "",
+      apiKey: process.env.OPENAI_EU_API_KEY || "",
+    },
+  },
+
   smtp: {
     host: process.env.SMTP_HOST || "localhost",
     port: parseInt(process.env.SMTP_PORT || "587", 10),
@@ -226,7 +266,7 @@ export const config = {
     },
     from: {
       email: process.env.SMTP_FROM_EMAIL || "noreply@updates.hay.chat",
-      name: process.env.SMTP_FROM_NAME || "Hay",
+      name: process.env.SMTP_FROM_NAME || "Hay.chat",
     },
     // Automatically disable SMTP in test environment (unless explicitly enabled via SMTP_ENABLED=true)
     // In other environments, require explicit SMTP_ENABLED=true to send emails
@@ -249,6 +289,16 @@ export const config = {
     },
     limits: {
       maxFileSize: parseInt(process.env.UPLOAD_MAX_SIZE_MB || "10", 10) * 1024 * 1024,
+      // Files sent in conversations (folder conversation-media): Meta allows
+      // 16 MB video/audio and 100 MB documents. Plugins send base64 in a JSON
+      // body limited to 50 MB, so keep this at or below 35.
+      conversationMediaMaxFileSize:
+        parseInt(process.env.CONVERSATION_MEDIA_MAX_SIZE_MB || "25", 10) * 1024 * 1024,
+    },
+    // D8-4: clamd for conversation documents; unset host = no scan.
+    clamav: {
+      host: process.env.CLAMAV_HOST || null,
+      port: parseInt(process.env.CLAMAV_PORT || "3310", 10),
     },
   },
 
@@ -277,6 +327,10 @@ export const config = {
   // Empty disables those procedures entirely — the default for self-hosting.
   internal: {
     apiSecret: process.env.INTERNAL_API_SECRET || "",
+    // Where core POSTs signed events the operator may need to act on (for
+    // example organization.deleted, so the operator can stop billing).
+    // Empty disables them.
+    operatorEventsUrl: process.env.OPERATOR_EVENTS_URL || "",
   },
 
   github: {

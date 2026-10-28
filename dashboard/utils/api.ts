@@ -7,6 +7,11 @@ import { useAuthStore } from "@/stores/auth";
 import { useUserStore } from "@/stores/user";
 import { reportServerError } from "@/composables/useServerStatus";
 import { redirectForSuspension, SUSPENDED_ROUTE } from "@/composables/useSuspension";
+import {
+  createRefreshCoordinator,
+  isDefinitiveAuthFailure,
+  isUnauthorizedError,
+} from "./session-refresh";
 
 // Helper function to get auth cookie
 function getAuthToken(): string {
@@ -26,71 +31,38 @@ function getOrganizationId(): string {
   return orgId;
 }
 
-// Check if token is about to expire (within 1 minute)
-function isTokenExpiringSoon(): boolean {
-  const authStore = useAuthStore();
-  if (!authStore.tokens?.expiresAt) return false;
+/**
+ * One refresh at a time for the whole tab (and, via a Web Lock in the store,
+ * across tabs). Logout happens here and only here: when the server rejects
+ * the refresh token. Network errors, timeouts and 5xx keep the session.
+ */
+const sessionRefresh = createRefreshCoordinator({
+  refresh: () => useAuthStore().refreshTokens(),
+  onAuthFailure: () => {
+    // Out of the current call stack: logout navigates.
+    setTimeout(() => {
+      useAuthStore().logout("token_expired");
+    }, 0);
+  },
+});
 
-  const timeUntilExpiry = authStore.tokens.expiresAt - Date.now();
-  return timeUntilExpiry < 60000; // Less than 1 minute
-}
+/**
+ * Make sure the access token is good for at least `minValidityMs`.
+ * Rejects only when the token is already expired and no refresh succeeded;
+ * a still-valid token is used even if the refresh could not reach the server.
+ */
+export async function ensureFreshAccessToken(minValidityMs = 60_000): Promise<void> {
+  const tokens = useAuthStore().tokens;
+  if (!tokens?.refreshToken) return;
+  if (tokens.expiresAt - Date.now() > minValidityMs) return;
 
-// Track if we're currently refreshing to avoid multiple refresh attempts
-let isRefreshing = false;
-let refreshPromise: Promise<void> | null = null;
-
-// Refresh the access token
-async function refreshTokenIfNeeded(): Promise<void> {
-  const authStore = useAuthStore();
-
-  // If not authenticated or no refresh token, skip
-  if (!authStore.isAuthenticated || !authStore.tokens?.refreshToken) {
-    return;
+  try {
+    await sessionRefresh.refresh();
+  } catch (error) {
+    const current = useAuthStore().tokens;
+    if (!isDefinitiveAuthFailure(error) && current && current.expiresAt > Date.now()) return;
+    throw error;
   }
-
-  // Check if token is expiring soon
-  if (!isTokenExpiringSoon()) {
-    return;
-  }
-
-  // Check if there's a refresh token available before attempting refresh
-  if (!authStore.tokens?.refreshToken) {
-    console.log("[API] No refresh token available, skipping refresh");
-    if (typeof window !== "undefined") {
-      setTimeout(() => {
-        authStore.logout("token_expired");
-      }, 0);
-    }
-    return Promise.reject(new Error("No refresh token available"));
-  }
-
-  // If already refreshing, wait for the existing refresh to complete
-  if (isRefreshing && refreshPromise) {
-    return refreshPromise;
-  }
-
-  isRefreshing = true;
-
-  refreshPromise = authStore
-    .refreshTokens()
-    .then(() => {
-      console.log("[API] Token refreshed successfully");
-    })
-    .catch((error) => {
-      console.error("[API] Failed to refresh token:", error);
-      // If refresh fails, logout the user
-      if (typeof window !== "undefined") {
-        setTimeout(() => {
-          authStore.logout("token_expired");
-        }, 0);
-      }
-    })
-    .finally(() => {
-      isRefreshing = false;
-      refreshPromise = null;
-    });
-
-  return refreshPromise;
 }
 
 // Error link to handle token expiration
@@ -117,7 +89,6 @@ const errorLink: TRPCLink<AppRouter> = () => {
             });
 
             // The organization was suspended by the operator: lock the dashboard.
-            // FORBIDDEN never matches the auth heuristics below, so no logout.
             if (data?.code === "FORBIDDEN" && data?.type === "ORGANIZATION_SUSPENDED") {
               const userStore = useUserStore();
               userStore.markActiveOrganizationSuspended(data.reason ?? null);
@@ -139,48 +110,8 @@ const errorLink: TRPCLink<AppRouter> = () => {
               return;
             }
 
-            // Check for authentication errors in various formats
-            if (
-              message?.includes("token has expired") ||
-              message?.includes("token expired") ||
-              message?.includes("jwt expired") ||
-              message?.includes("authentication required") ||
-              message?.includes("not authenticated") ||
-              message?.includes("unauthorized") ||
-              data?.code === "UNAUTHORIZED" ||
-              data?.httpStatus === 401
-            ) {
-              // Authentication failed, trigger logout
-              const authStore = useAuthStore();
-
-              console.log(
-                "[API Error Link] Auth error detected, isAuthenticated:",
-                authStore.isAuthenticated,
-                "hasTokens:",
-                !!authStore.tokens,
-              );
-
-              // Logout if we have tokens or are marked as authenticated
-              // This handles cases where auth failed but tokens still exist in storage
-              if (authStore.isAuthenticated || authStore.tokens?.accessToken) {
-                console.log("[API] Authentication failed, logging out user");
-
-                // Use setTimeout to ensure we're not in a reactive context
-                if (typeof window !== "undefined") {
-                  setTimeout(() => {
-                    authStore.logout("token_expired");
-                  }, 0);
-                }
-              } else {
-                // No tokens and not authenticated, just redirect to login
-                console.log("[API] No valid auth state, redirecting to login");
-                if (typeof window !== "undefined") {
-                  setTimeout(() => {
-                    navigateTo("/login");
-                  }, 0);
-                }
-              }
-            }
+            // UNAUTHORIZED is handled by tokenRefreshLink: refresh, then retry.
+            // Only a rejected refresh logs the user out (see sessionRefresh).
 
             // Network-level failure (no response) or 5xx => the server may be down.
             // Trigger an immediate health check so the banner appears without waiting
@@ -204,31 +135,52 @@ const errorLink: TRPCLink<AppRouter> = () => {
   };
 };
 
-// Token refresh link to check and refresh token before requests
-const tokenRefreshLink: TRPCLink<AppRouter> = () => {
+/**
+ * Refresh the access token before a request when it is about to expire, and
+ * once more when a request comes back UNAUTHORIZED (then retry it once). A 401
+ * means the request was never executed, so the retry is safe for mutations.
+ */
+export const tokenRefreshLink: TRPCLink<AppRouter> = () => {
   return ({ next, op }) => {
     return observable((observer) => {
-      // Check and refresh token before making the request
-      refreshTokenIfNeeded()
-        .then(() => {
-          // Continue with the request after token refresh (if needed)
-          const unsubscribe = next(op).subscribe({
-            next(value) {
-              observer.next(value);
-            },
-            error(err) {
-              observer.error(err);
-            },
-            complete() {
-              observer.complete();
-            },
-          });
+      let cancelled = false;
+      let unsubscribe: (() => void) | undefined;
 
-          return unsubscribe;
-        })
-        .catch((error) => {
-          observer.error(error);
+      const forward = (isRetry: boolean) => {
+        const subscription = next(op).subscribe({
+          next(value) {
+            observer.next(value);
+          },
+          error(err) {
+            if (isRetry || !isUnauthorizedError(err) || !useAuthStore().tokens?.refreshToken) {
+              observer.error(err);
+              return;
+            }
+            sessionRefresh.refresh().then(
+              () => {
+                if (!cancelled) forward(true);
+              },
+              () => observer.error(err),
+            );
+          },
+          complete() {
+            observer.complete();
+          },
         });
+        unsubscribe = () => subscription.unsubscribe();
+      };
+
+      ensureFreshAccessToken().then(
+        () => {
+          if (!cancelled) forward(false);
+        },
+        (error) => observer.error(TRPCClientError.from(error)),
+      );
+
+      return () => {
+        cancelled = true;
+        unsubscribe?.();
+      };
     });
   };
 };
@@ -293,6 +245,26 @@ function createHayApi() {
     });
   }
   return _hayApi;
+}
+
+/**
+ * Fetch a private upload (conversation media) through the authenticated
+ * /v1/media/:id route. Browsers can't attach the session to <img src>, so the
+ * bytes are fetched here and rendered from an object URL.
+ * Resolves null when the server has no such upload for this organization.
+ */
+export async function fetchMedia(uploadId: string): Promise<Blob | null> {
+  const response = await fetch(`${getApiBaseUrl()}/media/${encodeURIComponent(uploadId)}`, {
+    headers: {
+      authorization: getAuthToken(),
+      "x-organization-id": getOrganizationId(),
+    },
+  });
+  if (response.status === 404) return null;
+  if (!response.ok) {
+    throw new Error(`Media request failed with status ${response.status}`);
+  }
+  return response.blob();
 }
 
 // Export lazy getters

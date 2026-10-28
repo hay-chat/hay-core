@@ -7,18 +7,26 @@ import { ExecutionLayer } from "./execution.layer";
 import { PlaybookStatus } from "@server/database/entities/playbook.entity";
 import type { Playbook } from "@server/database/entities/playbook.entity";
 import { shouldReselectPlaybook } from "./playbook-gate";
+import { withOverridePlaybook } from "@server/services/playbook-version-override";
 import { agentRepository } from "@server/repositories/agent.repository";
 import { MessageType } from "@server/database/entities/message.entity";
 import { ToolExecutionService } from "@server/services/core/tool-execution.service";
 import { Conversation } from "@server/database/entities/conversation.entity";
 import type { ConversationContext, GuardrailLogEntry, ProcessingPhase } from "./types";
-import { userRepository } from "@server/repositories/user.repository";
 import { LLMService } from "@server/services/core/llm.service";
 import { PromptService } from "@server/services/prompt.service";
 import { createLogger } from "@server/lib/logger";
 import { hasTiptapContent } from "@server/types/tiptap.types";
+import { closureCopy } from "./closure-copy";
+import { availabilityContext, availabilityHandoffLine } from "./handoff-copy";
+import { getAvailability, typicalFirstReplyMinutes } from "@server/services/business-hours.service";
+import { AiReplySuppressedError, isPauseBlocker, recheckAiReply } from "./reply-guard";
+import { isOrganizationAiPaused } from "@server/types/organization-access.types";
+import { sendPausedNotice } from "./paused-notice";
+import { sendSuspendedHoldingReply } from "./suspended-holding-reply";
 import type { ExecutionResult } from "./execution.layer";
 import type { ToolLedgerEntry } from "@server/services/core/action-claim-guardrail.service";
+import { decidedActionsLedger } from "./decided-actions";
 import type { Message } from "@server/database/entities/message.entity";
 import type pino from "pino";
 
@@ -27,7 +35,22 @@ const logger = createLogger("orchestrator-run");
 const LOCK_HEARTBEAT_INTERVAL_MS = 5_000;
 
 /**
+ * Abandon the run if a human took over, or the agent or organization was
+ * paused, since the run started. Called right before anything the shopper
+ * would see, because the gates at the top of runConversation are read once
+ * and a run can take many seconds.
+ */
+async function assertAiMayReply(conversation: Conversation): Promise<void> {
+  const blocker = await recheckAiReply(conversation.id);
+  if (blocker) {
+    throw new AiReplySuppressedError(blocker);
+  }
+}
+
+/**
  * Send a bot message and log how long it took from the start of processing.
+ * Re-checks take-over and pause first, so a reply already in flight is
+ * dropped rather than delivered on top of a human.
  */
 async function sendBotMessage(
   conversation: Conversation,
@@ -40,6 +63,7 @@ async function sendBotMessage(
   log: pino.Logger,
   processingStartedAt: number,
 ): Promise<Message> {
+  await assertAiMayReply(conversation);
   const message = await conversation.addMessage(payload);
   log.info(
     {
@@ -158,6 +182,19 @@ function buildMessageMetadata(
   additionalMetadata?: Record<string, unknown>,
 ): Record<string, unknown> {
   const metadata: Record<string, unknown> = { ...additionalMetadata };
+
+  // Stage 0: Action-claim guardrail. passed=false means the reply sent still
+  // carries (or replaced) an unbacked claim after the retries; the replay
+  // judge reads this (D7-10).
+  if (executionResult.actionClaim) {
+    metadata.actionClaim = {
+      passed: executionResult.actionClaim.passed,
+      claimedActions: executionResult.actionClaim.claimedActions,
+    };
+  }
+  if (executionResult.actionClaimRetryAttempted) {
+    metadata.actionClaimRetryAttempted = true;
+  }
 
   // Stage 1: Company Interest Protection
   if (executionResult.companyInterest) {
@@ -304,7 +341,8 @@ async function saveConfidenceLog(
  * A paused agent never replies, whether the owner switched the agent off or the
  * operator paused the whole organization (e.g. included resolutions used up).
  * A conversation that already holds a shopper message goes to "pending-human"
- * (Needs Attention) so a human picks it up; a conversation with no shopper
+ * (Needs Attention) so a human picks it up, and the shopper is told once that
+ * the team will reply there; a conversation with no shopper
  * message yet (widget just opened) only has its needs_processing flag cleared,
  * so no greeting is sent and the sweep stops.
  */
@@ -343,6 +381,41 @@ async function parkForPausedAgent(
       "pending-human",
       conversation.title,
     );
+    // One fixed line so the shopper knows a person will answer (D11-9).
+    await sendPausedNotice(conversation);
+  }
+}
+
+async function isChannelAiOff(conversation: Conversation): Promise<boolean> {
+  const { resolveChannelAiMode } = await import("@server/types/organization-settings.types");
+  if (resolveChannelAiMode(conversation.organization?.settings, conversation.channel) !== "off") {
+    return false;
+  }
+  const { isTestConversation } =
+    await import("@server/services/close-classification/outcome-rules");
+  return !isTestConversation(conversation.metadata);
+}
+
+/**
+ * Leave the conversation to the team without a word to the shopper: clear
+ * needs_processing so the sweep stops re-enqueuing it, and queue an open
+ * conversation as pending-human so it shows up in Needs Attention.
+ */
+async function parkForTeam(conversation: Conversation, log: pino.Logger): Promise<void> {
+  log.debug({ channel: conversation.channel }, "Skipping - AI is off on this channel");
+  if (!conversation.needs_processing) return;
+  const queue = conversation.status === "open";
+  await conversationRepository.update(conversation.id, conversation.organization_id, {
+    needs_processing: false,
+    ...(queue ? { status: "pending-human" as const } : {}),
+  });
+  if (queue) {
+    await publishStatusChange(
+      conversation.organization_id,
+      conversation.id,
+      "pending-human",
+      conversation.title,
+    );
   }
 }
 
@@ -364,16 +437,24 @@ export const runConversation = async (conversationId: string) => {
 
   // Suspended organizations keep receiving (and storing) messages but get no
   // AI reply. Clear the flag so the sweep stops re-enqueuing this conversation
-  // and the stale-message recovery never escalates it to a human.
+  // and the stale-message recovery never escalates it to a human. An open
+  // conversation is queued for the team (pending-human) so it is waiting in
+  // Needs Attention when the account is reactivated, and on external channels
+  // the shopper is told once that the message arrived (D15-4).
   if (conversation.organization?.suspendedAt) {
     log.info(
       { reason: conversation.organization.suspensionReason },
       "Skipping - organization suspended",
     );
     if (conversation.needs_processing) {
-      await conversationRepository.update(conversation.id, conversation.organization_id, {
-        needs_processing: false,
-      });
+      const updates: Partial<Conversation> = { needs_processing: false };
+      if (conversation.status === "open") updates.status = "pending-human";
+      await conversationRepository.update(conversation.id, conversation.organization_id, updates);
+      try {
+        await sendSuspendedHoldingReply(conversation);
+      } catch (err) {
+        log.warn({ err }, "Could not send the holding reply for a suspended organization");
+      }
     }
     return;
   }
@@ -391,12 +472,32 @@ export const runConversation = async (conversationId: string) => {
     return;
   }
 
+  // Waiting for a person (D5-7): outside the channel's business hours the AI
+  // keeps answering while the conversation stays in the queue; within hours it
+  // stays quiet and the team answers.
+  if (conversation.status === "pending-human") {
+    const { isWithinBusinessHours } = await import("@server/services/business-hours.service");
+    const withinHours = await isWithinBusinessHours({
+      organizationId: conversation.organization_id,
+      channel: conversation.channel,
+    });
+    if (withinHours) {
+      log.debug("Skipping - waiting for the team within business hours");
+      if (conversation.needs_processing) {
+        await conversationRepository.update(conversation.id, conversation.organization_id, {
+          needs_processing: false,
+        });
+      }
+      return;
+    }
+  }
+
   // A paused agent never replies: either the operator paused the organization
   // (usage allowance used up, overage refused) or the owner switched the agent
   // off (agents.enabled = false). Shopper messages are still stored; the
   // conversation is parked in the queue as pending-human so the team sees it,
   // and needs_processing is cleared so the sweep stops re-enqueuing it.
-  if (conversation.organization?.agentPausedAt) {
+  if (isOrganizationAiPaused(conversation.organization)) {
     await parkForPausedAgent(conversation, log, "organization_paused");
     return;
   }
@@ -404,6 +505,17 @@ export const runConversation = async (conversationId: string) => {
     await parkForPausedAgent(conversation, log, "agent_disabled");
     return;
   }
+
+  // AI switched off on this channel (D7-14, "start on Web Chat only"): the
+  // team answers. No notice to the shopper; test conversations still run.
+  if (await isChannelAiOff(conversation)) {
+    await parkForTeam(conversation, log);
+    return;
+  }
+
+  // Spam is held from the AI (D9-6): no reply, no billing.
+  const { holdIfSpam } = await import("@server/services/spam/spam-hold.service");
+  if (await holdIfSpam(conversation, log)) return;
 
   const processingStartedAt = Date.now();
 
@@ -431,7 +543,16 @@ export const runConversation = async (conversationId: string) => {
     }
   }, LOCK_HEARTBEAT_INTERVAL_MS);
 
+  // Whether this run ended in a processing error. Errors are retried by the
+  // sweep with error counting; every other outcome re-checks the flag on exit.
+  let failed = false;
+
   try {
+    // The flag was read before the lock. Another run may have answered in the
+    // meantime, so re-read it now that no other run can.
+    const current = await conversationRepository.findById(conversation.id);
+    conversation.needs_processing = current?.needs_processing === true;
+
     // Increment processing attempts now that we own the lock
     await conversationRepository.updateById(conversation.id, {
       processing_attempts: (conversation.processing_attempts || 0) + 1,
@@ -461,8 +582,9 @@ export const runConversation = async (conversationId: string) => {
     if (!lastCustomerMessage) {
       // Clear needs_processing so the sweep doesn't re-enqueue this conversation
       // in a tight loop. Without this, any row with needs_processing=true but
-      // no customer message becomes a sweep zombie.
-      await conversation.setProcessed(true);
+      // no customer message becomes a sweep zombie. Compare-and-set: a customer
+      // message that landed after the read above keeps the flag.
+      await conversation.markProcessed(null);
       throw new Error("Last customer message not found");
     }
 
@@ -496,7 +618,9 @@ export const runConversation = async (conversationId: string) => {
     // If potential closure detected, validate with full conversation context
     let shouldClose = false;
 
-    if (hasClosureIntent || isGratitudeMessage) {
+    // A conversation waiting in the team's queue (the AI answers it outside
+    // business hours, D5-7) is closed by the team, never by a "thanks, bye".
+    if ((hasClosureIntent || isGratitudeMessage) && conversation.status !== "pending-human") {
       // Get all public messages for full context analysis
       const publicMessages = await conversation.getPublicMessages();
 
@@ -532,9 +656,10 @@ export const runConversation = async (conversationId: string) => {
       const { generateConversationTitle } = await import("./conversation-utils");
       await generateConversationTitle(conversation.id, conversation.organization_id);
 
-      // Update conversation status to resolved
+      // An unhappy close is not a resolution (D5-5): it gets its own status.
+      // The billing outcome is recorded by the repository on this transition.
       await conversationRepository.update(conversation.id, conversation.organization_id, {
-        status: "resolved",
+        status: intent.label === "close_unsatisfied" ? "unresolved" : "resolved",
         ended_at: new Date(),
         resolution_metadata: {
           resolved: intent.label === "close_satisfied",
@@ -569,13 +694,16 @@ export const runConversation = async (conversationId: string) => {
           prompt,
           // Short closing line; falls back to a hardcoded string on error.
           tier: "easy",
+          organizationId: conversation.organization_id,
         });
       } catch (error) {
         log.debug({ err: error }, "Error generating closing message, using fallback");
-        closingMessage =
-          intent.label === "close_satisfied"
-            ? "Great! I'm glad I could help. This conversation has been marked as resolved. Feel free to start a new conversation if you need anything else!"
-            : "I understand. This conversation has been marked as resolved. Please feel free to start a new conversation if you need further assistance.";
+        closingMessage = closureCopy(
+          intent.label === "close_unsatisfied" ? "closeUnsatisfied" : "closeSatisfied",
+          language,
+          conversation.language,
+          conversation.organization?.defaultLanguage,
+        );
       }
 
       await sendBotMessage(
@@ -595,9 +723,8 @@ export const runConversation = async (conversationId: string) => {
       // Set processed and unlock early since we're closing.
       // The finally block will still run — it clears the heartbeat and the
       // ownership-checked unlock is a no-op the second time around.
-      conversation.setProcessed(true);
+      await conversation.markProcessed(lastCustomerMessage.id);
       await updateProcessingState(conversation, "idle");
-      await conversation.unlock(lockerId);
       return; // Exit early since conversation is closed
     }
 
@@ -635,10 +762,11 @@ export const runConversation = async (conversationId: string) => {
     // Run playbook lookup and document retrieval in parallel — they share no
     // data dependency. Document retrieval (vector search) overlaps with the
     // playbook DB fetch.
-    const [activePlaybooks, retrievedDocuments] = await Promise.all([
+    const [livePlaybooks, retrievedDocuments] = await Promise.all([
       playbookRepository.findByStatus(conversation.organization_id, PlaybookStatus.ACTIVE),
       retrievalLayer.getRelevantDocuments(publicMessages, conversation.organization_id),
     ]);
+    const activePlaybooks = await selectablePlaybooks(conversation, livePlaybooks);
 
     log.debug(
       {
@@ -758,13 +886,21 @@ export const runConversation = async (conversationId: string) => {
       }
     }
 
-    conversation.setProcessed(true);
+    await conversation.markProcessed(lastCustomerMessage.id);
   } catch (error: Error | unknown) {
-    if (
+    if (error instanceof AiReplySuppressedError) {
+      // Not a processing failure: a human took over, or the agent or the
+      // organization was paused while this run was thinking. Nothing was sent.
+      log.info({ blocker: error.blocker }, "Dropped in-flight AI reply");
+      if (isPauseBlocker(error.blocker)) {
+        await parkForPausedAgent(conversation, log, error.blocker);
+      }
+    } else if (
       error instanceof Error &&
       !error.message.includes("Conversation does not need processing") &&
       !error.message.includes("Last customer message not found")
     ) {
+      failed = true;
       log.error({ err: error }, "Error in conversation");
 
       // FAILURE: Track error
@@ -802,13 +938,112 @@ export const runConversation = async (conversationId: string) => {
     } catch (unlockError) {
       log.error({ err: unlockError }, "Failed to release lock");
     }
+
+    if (!failed) {
+      await requeueIfStillPending(conversation, log);
+    }
   }
 };
+
+/**
+ * One AI turn after a person decided on a held action (D4-5). There is no new
+ * shopper message: the decision was written into the conversation as a
+ * system note, and the planner answers it (tell the shopper it is done, or
+ * explain the refusal). Skips perception and playbook selection.
+ *
+ * Throws when another run holds the lock, so the queue retries.
+ */
+/** Another run holds the conversation lock; the approval follow-up must be retried. */
+export class ConversationLockedError extends Error {
+  constructor() {
+    super("Conversation is locked; approval follow-up will retry");
+    this.name = "ConversationLockedError";
+  }
+}
+
+export const runApprovalFollowUp = async (conversationId: string): Promise<void> => {
+  const conversation = await conversationRepository.findById(conversationId);
+  if (!conversation?.organization_id) return;
+  const log = logger.child({
+    organizationId: conversation.organization_id,
+    conversationId: conversation.id,
+  });
+
+  if (await recheckAiReply(conversation.id)) {
+    log.debug("Skipping approval follow-up - the AI may not reply");
+    return;
+  }
+
+  const lockerId = await conversation.lock();
+  if (!lockerId) {
+    throw new ConversationLockedError();
+  }
+  const heartbeat = setInterval(() => {
+    conversation.refreshLock(lockerId).catch((err) => log.warn({ err }, "Lock heartbeat error"));
+  }, LOCK_HEARTBEAT_INTERVAL_MS);
+
+  try {
+    await handleExecutionLoop(
+      conversation,
+      Date.now(),
+      conversation.language ?? undefined,
+      await decidedActionsLedger(conversation),
+    );
+  } catch (error) {
+    if (!(error instanceof AiReplySuppressedError)) throw error;
+    log.info({ blocker: error.blocker }, "Dropped approval follow-up reply");
+  } finally {
+    clearInterval(heartbeat);
+    await updateProcessingState(conversation, "idle");
+    try {
+      await conversation.unlock(lockerId);
+    } catch (unlockError) {
+      log.error({ err: unlockError }, "Failed to release lock");
+    }
+    await requeueIfStillPending(conversation, log);
+  }
+};
+
+/**
+ * A customer message that arrived while this run held the lock queued a run
+ * that found the lock taken and gave up, and markProcessed left its flag set.
+ * Queue it again now the lock is free, instead of waiting for the sweep.
+ */
+async function requeueIfStillPending(conversation: Conversation, log: pino.Logger): Promise<void> {
+  try {
+    const current = await conversationRepository.findById(conversation.id);
+    const runnable = current?.status === "open" || current?.status === "pending-human";
+    if (!current?.needs_processing || !runnable || current.assigned_user_id) {
+      return;
+    }
+    const { orchestratorQueueService } =
+      await import("@server/services/orchestrator-queue.service");
+    await orchestratorQueueService.enqueue(
+      conversation.id,
+      conversation.organization_id,
+      "customer_message",
+    );
+    log.debug("Customer message arrived during the run, re-queued");
+  } catch (error) {
+    log.warn({ err: error }, "Re-queue check failed, the sweep will pick it up");
+  }
+}
 
 /**
  * Handle iterative execution loop with tool calls
  * This allows the LLM to call tools, analyze results, and continue the conversation
  */
+
+/** Live playbooks, plus the one a test conversation runs a draft of (D7-5). */
+function selectablePlaybooks(conversation: Conversation, livePlaybooks: Playbook[]) {
+  return withOverridePlaybook(
+    conversation.metadata,
+    conversation.organization_id,
+    livePlaybooks,
+    (playbookId, organizationId) =>
+      playbookRepository.findByIdAndOrganization(playbookId, organizationId),
+  );
+}
 
 /** Run the selector and apply its result to the conversation. */
 async function selectPlaybook(
@@ -869,6 +1104,7 @@ async function handleExecutionLoop(
   conversation: Conversation,
   processingStartedAt: number,
   customerLanguage?: string,
+  decidedActions: ToolLedgerEntry[] = [],
 ) {
   const log = logger.child({
     organizationId: conversation.organization_id,
@@ -884,7 +1120,7 @@ async function handleExecutionLoop(
   let hasToolCallBeenMade = false; // Track if we've sent the initial processing message
   // Ledger of tool calls made during THIS turn (conversation history is not
   // turn-scoped). The action-claim guardrail compares RESPOND claims against it.
-  const toolsCalledThisTurn: ToolLedgerEntry[] = [];
+  const toolsCalledThisTurn: ToolLedgerEntry[] = [...decidedActions];
   // Shared (by reference) with the execution layer so corrective re-plans are
   // budgeted per turn, not per execute() call.
   const turnGuardrailState = { actionClaimRetries: 0, companyInterestRetries: 0 };
@@ -937,6 +1173,10 @@ async function handleExecutionLoop(
     // Reset empty retry counter on successful response
     emptyRetries = 0;
 
+    // The plan took seconds to produce. Before acting on it (tool call or
+    // message), make sure nobody took over and the agent is still on.
+    await assertAiMayReply(conversation);
+
     log.debug(
       {
         step: executionResult.step,
@@ -965,9 +1205,9 @@ async function handleExecutionLoop(
       await recordPlaybookFit(conversation, false);
 
       const retrievalLayer = new RetrievalLayer();
-      const activePlaybooks = await playbookRepository.findByStatus(
-        conversation.organization_id,
-        PlaybookStatus.ACTIVE,
+      const activePlaybooks = await selectablePlaybooks(
+        conversation,
+        await playbookRepository.findByStatus(conversation.organization_id, PlaybookStatus.ACTIVE),
       );
       if (activePlaybooks.length > 0) {
         const publicMessages = await conversation.getPublicMessages();
@@ -1056,6 +1296,7 @@ async function handleExecutionLoop(
       toolsCalledThisTurn.push({
         name: executionResult.tool.name,
         success: toolExecResult1.success,
+        pending: toolExecResult1.pending,
       });
       await maybeEmitProductRecommendation(
         conversation,
@@ -1086,6 +1327,7 @@ async function handleExecutionLoop(
       toolsCalledThisTurn.push({
         name: executionResult.tool.name,
         success: toolExecResult2.success,
+        pending: toolExecResult2.pending,
       });
       await maybeEmitProductRecommendation(
         conversation,
@@ -1125,172 +1367,84 @@ async function handleExecutionLoop(
         );
       });
 
-      // Get agent configuration
-      const agent = await agentRepository.findById(conversation.agent_id!);
-      if (!agent) {
-        log.warn("No agent found for handoff, using default behavior");
-        await conversationRepository.update(conversation.id, conversation.organization_id, {
-          status: "pending-human",
-        });
-
-        // Notify organization via WebSocket/Redis
-        await publishStatusChange(
-          conversation.organization_id,
-          conversation.id,
-          "pending-human",
-          conversation.title,
-        );
-
-        // Use executionResult.userMessage if available (e.g., from confidence guardrail)
-        const handoffMessage =
-          executionResult.userMessage ||
-          "I'm transferring you to a human agent. Someone will be with you shortly.";
-
-        await sendBotMessage(
-          conversation,
-          {
-            content: handoffMessage,
-            type: MessageType.BOT_AGENT,
-            metadata: buildMessageMetadata(executionResult, {
-              isHandoffMessage: true,
-            }),
-          },
-          log,
-          processingStartedAt,
-        );
-        break;
-      }
-
-      // Check if there are online human agents
-      const onlineHumans = await userRepository.findOnlineByOrganization(
+      // Every hand-off queues the conversation for the team.
+      await conversationRepository.update(conversation.id, conversation.organization_id, {
+        status: "pending-human",
+      });
+      await publishStatusChange(
         conversation.organization_id,
+        conversation.id,
+        "pending-human",
+        conversation.title,
       );
-      log.debug(`Found ${onlineHumans.length} online human agents`);
 
-      if (onlineHumans.length > 0) {
-        // Humans are available
-        const availableInstructions = agent.human_handoff_available_instructions;
+      const agent = conversation.agent_id
+        ? await agentRepository.findById(conversation.agent_id)
+        : null;
+      // Business hours + who is reachable on this channel (D5-7): open (someone
+      // reachable), open_nobody_online (team alerted) or closed (back at the
+      // next opening; the AI keeps answering, only the human queue waits).
+      const now = new Date();
+      const scope = { organizationId: conversation.organization_id, channel: conversation.channel };
+      const availability = await getAvailability(scope, now);
+      const handoffAvailability = {
+        ...availability,
+        typicalReplyMinutes:
+          availability.state === "open_nobody_online"
+            ? await typicalFirstReplyMinutes(scope, now)
+            : null,
+      };
+      const handoffType = availability.state === "open" ? "available" : "unavailable";
+      log.debug({ hasAgent: !!agent, availability: availability.state }, "Handing off to the team");
 
-        if (hasTiptapContent(availableInstructions)) {
-          // Execute custom instructions for when humans are available
-          log.debug("Executing handoff instructions for available humans");
-          await conversation.addHandoffInstructions(availableInstructions, "available");
-          // Continue loop to process the handoff instructions
-          continue;
-        } else {
-          // Default behavior: update status and send message
-          log.debug("No custom instructions, using default handoff");
-          await conversationRepository.update(conversation.id, conversation.organization_id, {
-            status: "pending-human",
-          });
-
-          // Notify organization via WebSocket/Redis
-          await publishStatusChange(
-            conversation.organization_id,
-            conversation.id,
-            "pending-human",
-            conversation.title,
-          );
-
-          // Use executionResult.userMessage if available (e.g., from confidence guardrail),
-          // otherwise generate a natural handoff message
-          let handoffMessage: string = executionResult.userMessage || "";
-
-          if (!handoffMessage) {
-            const llmService = new LLMService();
-            const messages = await conversation.getMessages();
-            try {
-              handoffMessage = await llmService.invoke({
-                history: messages,
-                prompt:
-                  "Based on the conversation context, generate a brief, natural message informing the customer that a human agent will be joining the conversation shortly. Keep it friendly and reassuring. Maximum 2 sentences.",
-                // Two-sentence handoff notice; falls back to a hardcoded string on error.
-                tier: "easy",
-              });
-            } catch (error) {
-              log.error({ err: error }, "Error generating handoff message");
-              handoffMessage =
-                "I'm transferring you to a human agent. Someone will be with you shortly.";
-            }
-          }
-
-          try {
-            await sendBotMessage(
-              conversation,
-              {
-                content: handoffMessage,
-                type: MessageType.BOT_AGENT,
-                metadata: buildMessageMetadata(executionResult, {
-                  isHandoffMessage: true,
-                  handoffType: "available",
-                }),
-              },
-              log,
-              processingStartedAt,
-            );
-          } catch (error) {
-            log.error({ err: error }, "Error generating handoff message");
-            await sendBotMessage(
-              conversation,
-              {
-                content: "I'm connecting you with a human agent who will be with you shortly.",
-                type: MessageType.BOT_AGENT,
-                metadata: buildMessageMetadata(executionResult, {
-                  isHandoffMessage: true,
-                  handoffType: "available",
-                }),
-              },
-              log,
-              processingStartedAt,
-            );
-          }
-          break;
-        }
-      } else {
-        // No humans available - still set status to pending-human for queue
-        await conversationRepository.update(conversation.id, conversation.organization_id, {
-          status: "pending-human",
-        });
-
-        // Notify organization via WebSocket/Redis
-        await publishStatusChange(
-          conversation.organization_id,
-          conversation.id,
-          "pending-human",
-          conversation.title,
+      // The merchant's own hand-off instructions for this situation, if any,
+      // are run through the planner on the next iteration, with the facts.
+      const customInstructions =
+        handoffType === "available"
+          ? agent?.human_handoff_available_instructions
+          : agent?.human_handoff_unavailable_instructions;
+      if (hasTiptapContent(customInstructions)) {
+        log.debug({ handoffType }, "Executing custom handoff instructions");
+        await conversation.addHandoffInstructions(
+          customInstructions,
+          handoffType,
+          availabilityContext(handoffAvailability, now),
         );
-
-        const unavailableInstructions = agent.human_handoff_unavailable_instructions;
-
-        if (hasTiptapContent(unavailableInstructions)) {
-          // Execute custom instructions for when humans are not available
-          log.debug("Executing handoff instructions for unavailable humans");
-          await conversation.addHandoffInstructions(unavailableInstructions, "unavailable");
-          // Continue loop to process the handoff instructions
-          continue;
-        } else {
-          // Use executionResult.userMessage if available, otherwise use default
-          const unavailableMessage =
-            executionResult.userMessage ||
-            "I apologize, but no human agents are currently available.";
-
-          log.debug("No custom fallback, using default message");
-          await sendBotMessage(
-            conversation,
-            {
-              content: unavailableMessage,
-              type: MessageType.BOT_AGENT,
-              metadata: buildMessageMetadata(executionResult, {
-                isHandoffMessage: true,
-                handoffType: "unavailable",
-              }),
-            },
-            log,
-            processingStartedAt,
-          );
-          break;
-        }
+        continue;
       }
+
+      // Otherwise the shopper gets a fixed, honest line. The planner's or a
+      // guardrail's own hand-off text is not sent: models keep promising speed
+      // ("please hold on for a moment", "right away") that nobody can keep.
+      // It is kept in metadata for review.
+      await sendBotMessage(
+        conversation,
+        {
+          content: availabilityHandoffLine(
+            handoffAvailability,
+            now,
+            customerLanguage,
+            conversation.language,
+            conversation.organization?.defaultLanguage,
+          ),
+          type: MessageType.BOT_AGENT,
+          metadata: buildMessageMetadata(executionResult, {
+            isHandoffMessage: true,
+            handoffType,
+            availability: {
+              state: availability.state,
+              nextOpening: availability.nextOpening?.toISOString() ?? null,
+              timezone: availability.timezone,
+            },
+            ...(executionResult.userMessage
+              ? { discardedHandoffMessage: executionResult.userMessage }
+              : {}),
+          }),
+        },
+        log,
+        processingStartedAt,
+      );
+      break;
     } else if (executionResult.step === "CLOSE") {
       // Handle conversation closure
       log.debug("CLOSE step detected");
@@ -1422,6 +1576,8 @@ async function maybeEmitProductRecommendation(
     return;
   }
 
+  // Product cards are shopper-visible too.
+  await assertAiMayReply(conversation);
   await conversation.addMessage({
     content: `Recommending ${payload.products.length} product${payload.products.length === 1 ? "" : "s"}`,
     type: MessageType.PRODUCT_RECOMMENDATION,

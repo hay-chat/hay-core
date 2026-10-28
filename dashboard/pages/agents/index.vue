@@ -690,7 +690,7 @@ onMounted(async () => {
 
 // SEO
 useHead({
-  title: "AI Agents - Hay Dashboard",
+  title: "AI Agents - Hay.chat",
   meta: [
     {
       name: "description",

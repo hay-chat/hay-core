@@ -3,7 +3,7 @@
     <div class="container mx-auto py-8 space-y-8">
       <div class="text-center space-y-2">
         <h1 class="text-3xl font-bold">Web Chat Widget Demo</h1>
-        <p class="text-gray-600">Test the Hay webchat widget with DPoP authentication</p>
+        <p class="text-gray-600">Test the Hay.chat webchat widget with DPoP authentication</p>
       </div>
 
       <!-- Info Cards -->
@@ -57,7 +57,7 @@
           <Card>
             <CardContent class="pt-6">
               <p class="text-sm text-gray-600 mb-4">
-                The Hay webchat widget will appear in the bottom-right corner of this page. Click on
+                The Hay.chat webchat widget will appear in the bottom-right corner of this page. Click on
                 it to start a conversation.
               </p>
               <div class="space-y-2 text-sm">

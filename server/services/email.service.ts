@@ -28,6 +28,7 @@ export class EmailService {
   private emailQueue: Map<string, EmailQueueItem> = new Map();
   private retryTimeout: NodeJS.Timeout | null = null;
   private isInitialized = false;
+  private initializing: Promise<void> | null = null;
 
   constructor() {
     this.templateService = new TemplateService();
@@ -40,7 +41,14 @@ export class EmailService {
     if (this.isInitialized) {
       return;
     }
+    // Concurrent first sends share one initialization (one transporter, one retry loop).
+    this.initializing ??= this.initializeOnce().finally(() => {
+      this.initializing = null;
+    });
+    return this.initializing;
+  }
 
+  private async initializeOnce(): Promise<void> {
     try {
       // Initialize template service
       await this.templateService.initialize();
@@ -222,6 +230,10 @@ export class EmailService {
     );
 
     try {
+      // Notification senders (alerts, digests, disputes...) call this without
+      // initializing first; without it no templates or translations are loaded.
+      await this.initialize();
+
       logger.debug({ template: options.template }, "Rendering template");
 
       // Inject default variables for all templates

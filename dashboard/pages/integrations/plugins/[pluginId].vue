@@ -174,6 +174,34 @@
         </Card>
       </template>
 
+      <!-- Channel health (D13-11): generic "channel failing" signal -->
+      <Alert
+        v-if="plugin.channelHealth?.status === 'failing'"
+        variant="danger"
+        :icon="AlertTriangle"
+        data-testid="channel-health-alert"
+      >
+        <AlertTitle>{{ $t("pluginSettings.channelHealth.failingTitle") }}</AlertTitle>
+        <AlertDescription>
+          <p>
+            {{
+              $t(
+                `pluginSettings.channelHealth.reasons.${plugin.channelHealth.reason ?? "delivery_failures"}`,
+                { detail: plugin.channelHealth.detail ?? "" },
+              )
+            }}
+          </p>
+          <p class="text-xs mt-1">
+            {{
+              $t("pluginSettings.channelHealth.since", {
+                time: new Date(plugin.channelHealth.since).toLocaleString(locale),
+              })
+            }}
+            · {{ $t("pluginSettings.channelHealth.alerted") }}
+          </p>
+        </AlertDescription>
+      </Alert>
+
       <!-- Connection Status Alert (only for MCP plugins when enabled) -->
       <Alert
         v-if="isMcpPlugin && enabled && testResult && !testResult.success"
@@ -379,6 +407,18 @@
           />
         </CardContent>
       </Card>
+
+      <!-- OAuth plugin whose client ID/secret are not set: Connect cannot work, say why -->
+      <Alert
+        v-if="enabled && oauthAvailable && !oauthConfigured"
+        :icon="Info"
+        data-testid="oauth-unavailable-alert"
+      >
+        <AlertTitle>{{ $t("pluginSettings.connection.oauthUnavailableTitle") }}</AlertTitle>
+        <AlertDescription>
+          {{ $t("pluginSettings.connection.oauthUnavailable", { name: plugin.name }) }}
+        </AlertDescription>
+      </Alert>
 
       <!-- Plugin Settings Extensions - Before Settings Slot (only when enabled) -->
       <template v-if="enabled">
@@ -1388,7 +1428,11 @@ const handleConnectIntent = async (): Promise<boolean> => {
     // OAuth availability is only reported once an enabled instance exists.
     if (!oauthAvailable.value) await fetchPlugin();
     if (!oauthAvailable.value) {
-      throw new Error("This integration does not support one-click connect");
+      // No OAuth (e.g. a store plugin that connects from its own settings
+      // panel): the link only pre-fills the settings, so stay on the page.
+      toast.success(t("pluginSettings.toast.configSaved"));
+      router.replace({ path: route.path, query: {} });
+      return false;
     }
     const returnTo = typeof route.query.return_to === "string" ? route.query.return_to : undefined;
     const { authorizationUrl } = await Hay.plugins.oauth.initiate.mutate({

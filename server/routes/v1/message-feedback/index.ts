@@ -1,6 +1,9 @@
 import { t, authenticatedProcedure } from "@server/trpc";
 import { z } from "zod";
-import { MessageFeedbackService } from "../../../services/message-feedback.service";
+import {
+  FeedbackMessageNotFoundError,
+  MessageFeedbackService,
+} from "../../../services/message-feedback.service";
 import { FeedbackRating } from "../../../types/message-feedback.types";
 import { TRPCError } from "@trpc/server";
 
@@ -22,8 +25,14 @@ const listFeedbackSchema = z.object({
 
 export const messageFeedbackRouter = t.router({
   create: authenticatedProcedure.input(createFeedbackSchema).mutation(async ({ ctx, input }) => {
-    const feedback = await feedbackService.createFeedback(ctx.organizationId!, ctx.user!.id, input);
-    return feedback;
+    try {
+      return await feedbackService.createFeedback(ctx.organizationId!, ctx.user!.id, input);
+    } catch (error) {
+      if (error instanceof FeedbackMessageNotFoundError) {
+        throw new TRPCError({ code: "NOT_FOUND", message: error.message });
+      }
+      throw error;
+    }
   }),
 
   get: authenticatedProcedure

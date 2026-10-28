@@ -2,12 +2,14 @@ import { defineHayPlugin } from "@hay/plugin-sdk";
 import { GraphClient } from "./graph-client.js";
 import { webhookHandler } from "./webhook.js";
 import { deliverHandler } from "./deliver.js";
+import { SentMessageTracker } from "./echo.js";
 
 /**
  * Instagram Channel Plugin (shared Hay Meta app)
  *
  * Connects an Instagram Professional account to Hay's orchestrator so a Hay org
- * can exchange text DMs (inbound + outbound). MVP is text-only.
+ * can exchange DMs (inbound + outbound), including photos, videos, voice
+ * messages and files (D8-6).
  *
  * Shared-app model: a single Hay-owned Meta app serves every org. App-level
  * values come from the CORE process environment (one app for all tenants):
@@ -31,6 +33,9 @@ export default defineHayPlugin((globalCtx) => {
   // lifecycle hooks via closure.
   let graphClient: GraphClient | null = null;
   let accessToken: string | null = null;
+  // Meta app id, to recognise echoes of Hay.chat's own sends (D11-11).
+  let appId: string | null = null;
+  const tracker = new SentMessageTracker();
 
   return {
     name: "Instagram",
@@ -48,7 +53,7 @@ export default defineHayPlugin((globalCtx) => {
         clientId: {
           type: "string",
           label: "Meta App ID",
-          description: "Hay-managed Meta app id (configured by the platform)",
+          description: "Hay.chat-managed Meta app id (configured by the platform)",
           required: false,
           encrypted: false,
           env: "META_APP_ID",
@@ -56,7 +61,7 @@ export default defineHayPlugin((globalCtx) => {
         clientSecret: {
           type: "string",
           label: "Meta App Secret",
-          description: "Hay-managed Meta app secret (configured by the platform)",
+          description: "Hay.chat-managed Meta app secret (configured by the platform)",
           required: false,
           encrypted: true,
           // Only core needs this (token exchange/refresh); keep it out of the worker.
@@ -146,6 +151,8 @@ export default defineHayPlugin((globalCtx) => {
           getGraphClient: () => graphClient,
           getAccessToken: () => accessToken,
           logger,
+          tracker,
+          ownAppIds: [appId],
         });
       });
 
@@ -155,6 +162,7 @@ export default defineHayPlugin((globalCtx) => {
           getGraphClient: () => graphClient,
           getAccessToken: () => accessToken,
           logger,
+          tracker,
         });
       });
 
@@ -183,6 +191,7 @@ export default defineHayPlugin((globalCtx) => {
 
     async onStart(ctx) {
       ctx.logger.info("Starting Instagram plugin", { orgId: ctx.org.id });
+      appId = ctx.config.getOptional<string>("clientId")?.trim() || null;
 
       const authState = ctx.auth.get();
       const token = authState?.credentials.accessToken;

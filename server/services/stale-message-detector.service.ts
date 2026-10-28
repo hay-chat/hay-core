@@ -1,6 +1,7 @@
 import { AppDataSource } from "../database/data-source";
 import { config } from "../config/env";
 import { createLogger } from "@server/lib/logger";
+import { notSimulationSql } from "./simulation/simulation-kind";
 
 const logger = createLogger("stale-message");
 
@@ -111,6 +112,7 @@ export class StaleMessageDetectorService {
           FROM conversations c
           WHERE c.status IN ('open', 'processing')
             AND c.assigned_user_id IS NULL
+            AND ${notSimulationSql("c")}
         )
         SELECT
           id,

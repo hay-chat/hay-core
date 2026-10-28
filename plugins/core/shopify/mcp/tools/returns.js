@@ -10,8 +10,13 @@
 const { z } = require("zod");
 const { shopifyGql } = require("../lib/client");
 const {
+  returnInstructionsResult,
+  TOOL_DESCRIPTION: RETURN_INSTRUCTIONS_DESCRIPTION,
+} = require("@hay/plugin-sdk/return-instructions");
+const {
   ok,
   fail,
+  toolError,
   unwrapConnection,
   pageInfo,
   toGid,
@@ -19,6 +24,11 @@ const {
 } = require("../lib/format");
 
 function registerReturnTools(server) {
+  // D6-13: the merchant's "How to return" setting, relayed as written.
+  server.tool("shopify_get_return_instructions", RETURN_INSTRUCTIONS_DESCRIPTION, {}, async () =>
+    ok(returnInstructionsResult()),
+  );
+
   server.tool(
     "shopify_get_returnable_items",
     "List the fulfilled line items on an order that are eligible for a return, with the " +
@@ -60,7 +70,8 @@ function registerReturnTools(server) {
             id: orderId,
           });
           if (!probe.order) {
-            throw new Error(
+            throw toolError(
+              "NOT_FOUND",
               `Order ${args.order_id} not found. Get a valid order id from the recentOrders ` +
                 "field of shopify_find_customer / shopify_get_customer.",
             );

@@ -193,7 +193,9 @@ describe("order tools", () => {
     expect(res.data.id).toBe("ord-1");
     expect(res.data.supportSummary.isRefundable).toBe(true);
     expect(res.data.tracking).toHaveLength(1);
-    expect(calls.map((c) => `${c.method} ${c.path}`)).toEqual([
+    // The store-country read (stale tracking) is cached per process; ignore it here.
+    const orderCalls = calls.filter((c) => c.path !== "/site-properties/v4/properties");
+    expect(orderCalls.map((c) => `${c.method} ${c.path}`)).toEqual([
       "POST /ecom/v1/orders/search",
       "GET /ecom/v1/orders/ord-1/transactions",
       "GET /ecom/v1/orders/ord-1/fulfillments",

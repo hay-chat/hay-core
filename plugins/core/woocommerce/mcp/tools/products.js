@@ -3,12 +3,13 @@
  *
  *   woocommerce_search_products  GET /products?search=
  *   woocommerce_get_product      GET /products/{id} (+ /variations for variable products)
+ *   woocommerce_get_product_by_slug  GET /products?slug=  (accepts a storefront URL)
  *   woocommerce_check_inventory  GET /products?sku=  (matches simple products AND variations)
  */
 
 const { z } = require("zod");
 const { wcApi, wcList, WooApiError } = require("../lib/client");
-const { ok, fail } = require("../lib/format");
+const { ok, fail, toolError } = require("../lib/format");
 
 function summarizeProduct(p) {
   return {
@@ -30,6 +31,49 @@ function summarizeProduct(p) {
       option: a.option ?? a.options ?? null,
     })),
   };
+}
+
+/** Full product view: summary, description, categories and every variation. */
+async function productDetail(product) {
+  let variations = [];
+  if (product.type === "variable") {
+    const { items } = await wcList(`/products/${product.id}/variations`, { per_page: 100 });
+    variations = items.map(summarizeProduct);
+  }
+  return {
+    ...summarizeProduct(product),
+    description: product.short_description || product.description || null,
+    categories: (product.categories || []).map((c) => c.name),
+    variations,
+  };
+}
+
+/**
+ * The product slug in a storefront link or a bare slug: the last path segment
+ * of https://shop.com/product/blue-shirt/ (or its ?product= query), so a
+ * shopper can paste the page they are looking at.
+ */
+function safeDecode(value) {
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return "";
+  }
+}
+
+function slugFrom(input) {
+  const raw = String(input || "").trim();
+  if (!/^https?:\/\//i.test(raw) && !raw.includes("/")) return safeDecode(raw);
+  let url;
+  try {
+    url = new URL(/^https?:\/\//i.test(raw) ? raw : `https://placeholder.invalid/${raw}`);
+  } catch {
+    return "";
+  }
+  const fromQuery = url.searchParams.get("product");
+  if (fromQuery) return fromQuery;
+  const segments = url.pathname.split("/").filter(Boolean);
+  return safeDecode(segments[segments.length - 1] || "");
 }
 
 function registerProductTools(server) {
@@ -69,23 +113,44 @@ function registerProductTools(server) {
           product = await wcApi("GET", `/products/${encodeURIComponent(productId)}`);
         } catch (err) {
           if (err instanceof WooApiError && err.status === 404) {
-            throw new Error(
+            throw toolError(
+              "NOT_FOUND",
               `Product ${productId} not found. Find the id with woocommerce_search_products.`,
             );
           }
           throw err;
         }
-        let variations = [];
-        if (product.type === "variable") {
-          const { items } = await wcList(`/products/${product.id}/variations`, { per_page: 100 });
-          variations = items.map(summarizeProduct);
+        return ok(await productDetail(product));
+      } catch (err) {
+        return fail(err);
+      }
+    },
+  );
+
+  server.tool(
+    "woocommerce_get_product_by_slug",
+    "Get a product from its storefront link or slug (e.g. a URL the customer pasted), with price, " +
+      "stock and every variation. Same output as woocommerce_get_product.",
+    {
+      slug_or_url: z
+        .string()
+        .min(1)
+        .describe(
+          'Product page URL (https://shop.com/product/blue-shirt/) or slug ("blue-shirt").',
+        ),
+    },
+    async ({ slug_or_url: input }) => {
+      try {
+        const slug = slugFrom(input);
+        if (!slug) throw toolError("BAD_INPUT", `"${input}" is not a product link or slug.`);
+        const { items } = await wcList("/products", { slug, per_page: 1 });
+        if (!items.length) {
+          throw toolError(
+            "NOT_FOUND",
+            `No product with slug "${slug}". Search by name with woocommerce_search_products.`,
+          );
         }
-        return ok({
-          ...summarizeProduct(product),
-          description: product.short_description || product.description || null,
-          categories: (product.categories || []).map((c) => c.name),
-          variations,
-        });
+        return ok(await productDetail(items[0]));
       } catch (err) {
         return fail(err);
       }
@@ -117,4 +182,4 @@ function registerProductTools(server) {
   );
 }
 
-module.exports = { registerProductTools, summarizeProduct };
+module.exports = { registerProductTools, summarizeProduct, slugFrom };

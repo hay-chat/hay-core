@@ -1,0 +1,18 @@
+{
+  "name": "Bot protection (Cloudflare Turnstile)",
+  "description": "Stops bots from opening webchat conversations. Hay.chat checks each visitor with Cloudflare Turnstile before their first message is accepted.",
+  "config": {
+    "mode": {
+      "label": "Protection",
+      "description": "Invisible checks visitors in the background and only asks for a click when Cloudflare is unsure. Challenge everyone shows the check to every visitor before their first message."
+    },
+    "siteKey": {
+      "label": "Site key",
+      "description": "Provided by Hay.chat."
+    },
+    "secretKey": {
+      "label": "Secret key",
+      "description": "Provided by Hay.chat."
+    }
+  }
+}

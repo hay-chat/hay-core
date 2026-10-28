@@ -9,13 +9,25 @@ export interface HayChatConfig {
   greetingMessage?: string;
   /** Public context passed to the AI prompt. Safe for non-sensitive data only. */
   context?: Record<string, unknown>;
-  /** External ID of the logged-in user in your system. Loads their stored customer context. */
+  /**
+   * External ID of the logged-in user in your system. Links the conversation to
+   * that customer only together with `customerExternalIdSignature`; unsigned,
+   * the visitor is treated as anonymous.
+   */
   customerExternalId?: string;
+  /**
+   * hex HMAC-SHA256 of `customerExternalId`, keyed with the organization's
+   * identity secret (Settings > Webchat). Compute it on your server, never in
+   * the browser, so the secret is never exposed.
+   */
+  customerExternalIdSignature?: string;
   /** Locale for widget UI strings (e.g. "en-us", "pt-br", "fr-fr"). Auto-detected from browser if omitted. */
   locale?: string;
   /**
-   * Called after a conversation is created. Use this to attach server-side secrets.
-   * If it returns a Promise, the widget input waits until it resolves.
+   * Called after a conversation is created, which happens when the visitor
+   * sends their first message (opening the widget creates nothing). Use this
+   * to attach server-side secrets. If it returns a Promise, that first message
+   * is sent only once it resolves.
    */
   onConversationStarted?: (conversation: { id: string }) => void | Promise<void>;
   /** Agent name displayed in the header. Populated from public config. */
@@ -35,6 +47,79 @@ export interface HayChatConfig {
    * unless `grantConsent()` is called earlier in the page lifecycle.
    */
   consent?: "strict" | "implicit";
+  /** Log widget diagnostics to the browser console. Off by default. */
+  debug?: boolean;
+  /**
+   * When the chat itself (everything but the button) is downloaded.
+   * - `'idle'` (default): once the page has finished loading and the browser
+   *   is idle, or earlier if the visitor reaches for the button.
+   * - `'eager'`: straight away.
+   * - `'interaction'`: only when the visitor hovers, focuses, touches or
+   *   clicks the button. Nothing at all is fetched before that, not even the
+   *   widget settings, so a disabled widget shows its button until then.
+   * A visitor with a conversation in progress in this tab always gets it
+   * straight away, so replies show on the badge.
+   */
+  loading?: LoadingMode;
+}
+
+export type LoadingMode = "eager" | "idle" | "interaction";
+
+/** `webchat.getPublicConfig` response, fetched by the loader. */
+export interface PublicConfig {
+  enabled?: boolean;
+  agentName?: string | null;
+  agentAvatarUrl?: string | null;
+  organizationLogoUrl?: string | null;
+  /** Whether AI replies carry the AI label (D14-6). Missing = shown. */
+  aiLabelShown?: boolean;
+  /** The org's label text; null = the localized default. */
+  aiLabelText?: string | null;
+  /** Plugin contributions this widget advertised support for (never code). */
+  contributions?: WidgetContribution[];
+}
+
+/** A declarative plugin contribution, rendered by the widget's own code. */
+export interface WidgetContribution {
+  id: string;
+  type: "challenge@1";
+  props: { provider: string; mode: "invisible" | "challenge_all" };
+}
+
+/** The loader's button, driven by the chat once it is mounted. */
+export interface LauncherBridge {
+  setOpen(open: boolean): void;
+  setUnread(count: number): void;
+}
+
+/** A host API call made before the chat chunk loaded, replayed in order. */
+export type HostCall =
+  | { name: "addContext"; args: [key: string, value: unknown] }
+  | { name: "grantConsent"; args: [] }
+  | { name: "revokeConsent"; args: [] };
+
+/** Contract between widget.js (the loader) and the chat chunk. */
+export interface ChatMountOptions {
+  container: HTMLElement;
+  config: HayChatConfig;
+  publicConfig: PublicConfig | null;
+  launcher: LauncherBridge;
+  hostCalls: HostCall[];
+  /** The visitor clicked the button while the chat was loading. */
+  open: boolean;
+}
+
+export interface ChatHandle {
+  toggle(): void;
+}
+
+/** A file on a message (photo, PDF...). `url` is a signed link that expires. */
+export interface Attachment {
+  id: string;
+  name: string;
+  url: string;
+  type: string;
+  size: number;
 }
 
 export interface Message {
@@ -48,37 +133,19 @@ export interface Message {
   agentType?: string;
   /** Human agent name when message is from a HumanAgent */
   senderName?: string;
+  attachments?: Attachment[];
 }
 
-export interface WebSocketMessage {
-  type: string;
-  [key: string]: unknown;
-}
-
-export interface IdentifyMessage extends WebSocketMessage {
-  type: "identify";
-  customerId: string;
-  conversationId?: string;
-  metadata?: Record<string, unknown>;
-}
-
-export interface ChatMessage extends WebSocketMessage {
-  type: "message";
+/** Shown under the input when the server refuses a message; `text` goes back into the input. */
+export interface SendFailure {
+  reason:
+    | "sendFailed"
+    | "messageTooLong"
+    | "fileTooLarge"
+    | "fileType"
+    | "fileFailed"
+    | "verificationFailed";
   text: string;
-  attachments?: unknown[];
-  timestamp?: number;
-}
-
-export interface TypingMessage extends WebSocketMessage {
-  type: "typing";
-  isTyping: boolean;
-}
-
-export interface LoadHistoryMessage extends WebSocketMessage {
-  type: "load_history";
-  conversationId: string;
-  limit?: number;
-  offset?: number;
 }
 
 declare global {

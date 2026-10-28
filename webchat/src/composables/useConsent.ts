@@ -20,6 +20,14 @@
  *   - `revokeConsent()` wipes every `hay-*` key from localStorage and clears
  *     the DPoP IndexedDB object store. The live in-tab chat keeps working
  *     via sessionStorage.
+ *
+ * Reloads and navigation within the same tab: the chat the visitor asked for
+ * is still the same service, so the interaction (and a revoke) is remembered
+ * in sessionStorage. `SESSION_INTERACTED_KEY` is only ever written after the
+ * visitor sent a message, so finding it on page load proves the service was
+ * requested in this tab; reading it writes nothing. Without this, every page
+ * load started with the gates closed, the stored conversation was never read,
+ * and the shopper's thread was replaced by a new conversation and customer.
  */
 
 import { computed, ref } from "vue";
@@ -34,6 +42,28 @@ const mode = ref<ConsentMode>("implicit");
 const hasInteracted = ref(false);
 // null = neither grant nor revoke has been called yet
 const explicitGrant = ref<boolean | null>(null);
+
+/** Written on the first message; its presence means "interacted in this tab". */
+export const SESSION_INTERACTED_KEY = "hay-interacted";
+/** Written on revoke after an interaction, so a reload keeps honouring it. */
+const SESSION_REVOKED_KEY = "hay-consent-revoked";
+
+function readSession(key: string): string | null {
+  try {
+    return sessionStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+
+function writeSession(key: string, value: string | null): void {
+  try {
+    if (value === null) sessionStorage.removeItem(key);
+    else sessionStorage.setItem(key, value);
+  } catch {
+    // Storage unavailable (private mode, blocked): the in-memory state still works.
+  }
+}
 
 const canUseSession = computed(() => hasInteracted.value || explicitGrant.value === true);
 
@@ -51,8 +81,9 @@ const canUseLocal = computed(() => {
  */
 export function initConsent(configMode: ConsentMode = "implicit"): void {
   mode.value = configMode;
-  hasInteracted.value = false;
-  explicitGrant.value = null;
+  hasInteracted.value = readSession(SESSION_INTERACTED_KEY) === "1";
+  explicitGrant.value =
+    hasInteracted.value && readSession(SESSION_REVOKED_KEY) === "1" ? false : null;
 }
 
 /**
@@ -62,6 +93,7 @@ export function initConsent(configMode: ConsentMode = "implicit"): void {
  */
 export function markInteraction(): void {
   hasInteracted.value = true;
+  writeSession(SESSION_INTERACTED_KEY, "1");
 }
 
 /**
@@ -71,6 +103,7 @@ export function markInteraction(): void {
  */
 export function grantConsent(): void {
   explicitGrant.value = true;
+  if (hasInteracted.value) writeSession(SESSION_REVOKED_KEY, null);
 }
 
 /**
@@ -80,6 +113,7 @@ export function grantConsent(): void {
  */
 export function revokeConsent(): void {
   explicitGrant.value = false;
+  if (hasInteracted.value) writeSession(SESSION_REVOKED_KEY, "1");
   wipePersistentStorage();
 }
 

@@ -1,8 +1,11 @@
 import { t, authenticatedProcedure, scopedProcedure } from "@server/trpc";
-import { pushNotificationService } from "@server/services/push-notification.service";
+import { enableDefaultPlugins } from "@server/services/default-plugins.service";
 import { z } from "zod";
 import { organizationService } from "@server/services/organization.service";
-import { toAccessState } from "@server/services/organization-access.service";
+import {
+  organizationAccessService,
+  toAccessState,
+} from "@server/services/organization-access.service";
 import { TRPCError } from "@trpc/server";
 import { SupportedLanguage } from "@server/types/language.types";
 import {
@@ -10,6 +13,13 @@ import {
   TimeFormat,
   Timezone,
   DEFAULT_CONFIDENCE_GUARDRAIL_CONFIG,
+  resolveActionApprovalConfig,
+  APPROVAL_CATEGORIES,
+  DEFAULT_NEW_ORG_RETENTION_DAYS,
+  resolveMediaSettings,
+  resolveChannelAiMode,
+  CHANNEL_AI_MODES,
+  type ChannelAiMode,
 } from "@server/types/organization-settings.types";
 import type { DeepPartial } from "typeorm";
 import { AppDataSource } from "@server/database/data-source";
@@ -18,16 +28,34 @@ import { llmProviderFactory } from "@server/services/llm/llm-provider.factory";
 import { encryptValue } from "@server/lib/auth/utils/encryption";
 import type { OrgLlmConfig } from "@server/services/llm/provider.types";
 import {
+  AI_REGIONS,
+  describeAiProvider,
+  isEuRegionConfigured,
+  regionFromSettings,
+} from "@server/services/llm/ai-region";
+import {
+  AI_LABEL_MAX_LENGTH,
+  customAiLabel,
+  isEuOrganization,
+} from "@server/services/ai-disclosure";
+import {
   CHAT_MODEL_CATALOG,
   EMBEDDING_MODEL_CATALOG,
   DEFAULT_TIER_MAP,
 } from "@server/services/llm/model-catalog";
 import { UserOrganization } from "@server/entities/user-organization.entity";
+import { User } from "@server/entities/user.entity";
 import { RESOURCES, ACTIONS } from "@server/types/scopes";
+import {
+  loosensActionApproval,
+  moneyApprovalSwitchedOff,
+  SWITCH_OFF_CONFIRMATION,
+} from "@server/services/core/action-policy";
 import { auditLogService } from "@server/services/audit-log.service";
 import { handleUpload } from "@server/lib/upload-helper";
 import { StorageService } from "@server/services/storage.service";
 import { createLogger } from "@server/lib/logger";
+import { notifyOperator } from "@server/services/operator-events.service";
 
 const logger = createLogger("organizations");
 
@@ -79,6 +107,26 @@ const updateLlmConfigSchema = z.object({
   embedding: z.object({ model: z.string().min(1) }),
 });
 
+/** D4-4 / D4-9: which AI write actions wait and who approves. Expiry stays at 48 h. */
+const actionApprovalSchema = z
+  .object({
+    moneyMovesNeedApproval: z.boolean(),
+    thresholdAmount: z.number().min(0).max(1_000_000),
+    approverRoles: z.array(z.enum(["admin", "contributor", "member"])).max(3),
+    categories: z.record(z.enum(APPROVAL_CATEGORIES), z.boolean()),
+    customerConfirmation: z.boolean(),
+    /** Required when the change switches approval off for a money move (typed confirm). */
+    confirmSwitchOff: z.literal(SWITCH_OFF_CONFIRMATION),
+  })
+  .partial();
+
+// A channel id ("web" or a channel plugin's manifest `channel`), never a plugin id.
+const channelIdSchema = z
+  .string()
+  .min(1)
+  .max(64)
+  .regex(/^[a-z0-9][a-z0-9_-]*$/i);
+
 const updateSettingsSchema = z.object({
   name: z.string().min(1).max(100).optional(),
   about: z.string().max(10000).optional(),
@@ -90,6 +138,7 @@ const updateSettingsSchema = z.object({
   testModeDefault: z.boolean().optional(),
   confidenceGuardrail: confidenceGuardrailSchema.optional(),
   retentionDays: z.number().int().min(1).max(3650).nullable().optional(), // Data retention in days (null = disabled)
+  actionApproval: actionApprovalSchema.optional(),
 });
 
 export const organizationsRouter = t.router({
@@ -156,6 +205,7 @@ export const organizationsRouter = t.router({
             maxJobs: 50,
             maxStorageGb: 1,
           },
+          settings: { retentionDays: DEFAULT_NEW_ORG_RETENTION_DAYS },
         });
 
         await organizationRepository.save(organization);
@@ -193,6 +243,7 @@ export const organizationsRouter = t.router({
         } catch (error) {
           logger.error({ err: error }, "Failed to create audit log");
         }
+        void enableDefaultPlugins(result.data.id);
         return result;
       });
     }),
@@ -235,6 +286,7 @@ export const organizationsRouter = t.router({
         logoUrl: organization.logoUrl || null,
         confidenceGuardrail,
         retentionDays: organization.settings?.retentionDays ?? null,
+        actionApproval: resolveActionApprovalConfig(organization.settings),
       };
     },
   ),
@@ -272,6 +324,15 @@ export const organizationsRouter = t.router({
         throw new TRPCError({ code: "NOT_FOUND", message: "Organization not found" });
       }
 
+      // EU-only orgs always run on the managed EU endpoint; a custom provider would
+      // be ignored, so refuse to save one rather than pretend it applies.
+      if (regionFromSettings(organization.settings) === "eu") {
+        throw new TRPCError({
+          code: "PRECONDITION_FAILED",
+          message: "Turn off EU-only AI processing before changing the AI provider",
+        });
+      }
+
       const existing = organization.settings?.llm;
       let apiKeyEncrypted = existing?.chat.apiKeyEncrypted;
       if (input.chat.apiKey && input.chat.apiKey.trim()) {
@@ -299,6 +360,211 @@ export const organizationsRouter = t.router({
       return { success: true };
     }),
 
+  // Where the org's AI calls are processed, and whether the EU endpoint is
+  // configured on this deployment (the UI only offers EU when it is).
+  getAiRegion: scopedProcedure(RESOURCES.ORGANIZATION_SETTINGS, ACTIONS.READ).query(
+    async ({ ctx }) => {
+      const organization = await organizationService.findOne(ctx.organizationId!);
+      if (!organization) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Organization not found" });
+      }
+      return {
+        region: regionFromSettings(organization.settings),
+        euAvailable: isEuRegionConfigured(),
+        hasCustomProvider: !!organization.settings?.llm,
+        provider: describeAiProvider(organization.settings),
+      };
+    },
+  ),
+
+  // Opt the org in or out of EU-only AI processing. Turning EU on is refused while
+  // the EU endpoint is not configured, so an org is never marked EU-only without
+  // an EU endpoint behind it.
+  updateAiRegion: scopedProcedure(RESOURCES.ORGANIZATION_SETTINGS, ACTIONS.UPDATE)
+    .input(z.object({ region: z.enum(AI_REGIONS) }))
+    .mutation(async ({ ctx, input }) => {
+      if (input.region === "eu" && !isEuRegionConfigured()) {
+        throw new TRPCError({
+          code: "PRECONDITION_FAILED",
+          message: "EU AI processing is not available on this deployment",
+        });
+      }
+      const organization = await organizationService.findOne(ctx.organizationId!);
+      if (!organization) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Organization not found" });
+      }
+
+      await organizationService.update(ctx.organizationId!, {
+        settings: { ...(organization.settings || {}), aiRegion: input.region },
+      });
+      llmProviderFactory.invalidate(ctx.organizationId!);
+      logger.info(
+        { organizationId: ctx.organizationId, userId: ctx.user?.id, region: input.region },
+        "AI processing region changed",
+      );
+
+      return { success: true, region: input.region };
+    }),
+
+  // The owner's "Pause AI everywhere" (D11-9), plus whether the operator paused
+  // the AI too (usage_limit), so Home can say why the AI is quiet.
+  getAiPause: scopedProcedure(RESOURCES.ORGANIZATION_SETTINGS, ACTIONS.READ).query(
+    async ({ ctx }) => {
+      const organization = await organizationService.findOne(ctx.organizationId!);
+      if (!organization) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Organization not found" });
+      }
+      let pausedBy: { id: string; name: string } | null = null;
+      if (organization.aiPausedByUserId) {
+        const user = await AppDataSource.getRepository(User).findOne({
+          where: { id: organization.aiPausedByUserId },
+          select: { id: true, firstName: true, lastName: true, email: true },
+        });
+        if (user) {
+          const name = [user.firstName, user.lastName].filter(Boolean).join(" ");
+          pausedBy = { id: user.id, name: name || user.email };
+        }
+      }
+      return {
+        pausedAt: organization.aiPausedAt ?? null,
+        pausedBy,
+        operatorPaused: !!organization.agentPausedAt,
+      };
+    },
+  ),
+
+  setAiPause: scopedProcedure(RESOURCES.ORGANIZATION_SETTINGS, ACTIONS.UPDATE)
+    .input(z.object({ paused: z.boolean() }))
+    .mutation(async ({ ctx, input }) => {
+      const state = await organizationAccessService.setOwnerAiPause({
+        organizationId: ctx.organizationId!,
+        userId: ctx.user!.id,
+        paused: input.paused,
+      });
+      if (!state) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Organization not found" });
+      }
+      return { pausedAt: state.aiPausedAt };
+    }),
+
+  // AI label on AI replies (D14-6): widget badge + first-reply line on other channels.
+  getAiDisclosure: scopedProcedure(RESOURCES.ORGANIZATION_SETTINGS, ACTIONS.READ).query(
+    async ({ ctx }) => {
+      const organization = await organizationService.findOne(ctx.organizationId!);
+      if (!organization) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Organization not found" });
+      }
+      const locked = isEuOrganization(organization);
+      return {
+        label: customAiLabel(organization.settings),
+        // EU orgs always show the label, whatever was saved before.
+        hiddenChannels: locked ? [] : (organization.settings?.aiDisclosure?.hiddenChannels ?? []),
+        locked,
+        // Channels not on "on": "drafts" (D14-7) or "off" (D7-14). Missing = "on".
+        channelAiModes: Object.fromEntries(
+          Object.keys(organization.settings?.channelAiModes ?? {})
+            .map((channel) => [channel, resolveChannelAiMode(organization.settings, channel)])
+            .filter(([, mode]) => mode !== "on"),
+        ) as Record<string, ChannelAiMode>,
+      };
+    },
+  ),
+
+  // Rename the label or hide it on some channels. EU orgs may rename it but not
+  // hide it (EU AI Act art. 50; Roger's D14 answer 5). channelAiModes sets each
+  // channel to "on", "drafts" (AI replies queue for approval, D14 answer 6) or
+  // "off" (the AI does not answer there, D7-14). It replaces the whole map.
+  updateAiDisclosure: scopedProcedure(RESOURCES.ORGANIZATION_SETTINGS, ACTIONS.UPDATE)
+    .input(
+      z.object({
+        label: z.string().trim().max(AI_LABEL_MAX_LENGTH).nullable().optional(),
+        hiddenChannels: z.array(channelIdSchema).max(50).optional(),
+        channelAiModes: z
+          .record(channelIdSchema, z.enum(CHANNEL_AI_MODES))
+          .refine((modes) => Object.keys(modes).length <= 50, "Too many channels")
+          .optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const organization = await organizationService.findOne(ctx.organizationId!);
+      if (!organization) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Organization not found" });
+      }
+      if (input.hiddenChannels?.length && isEuOrganization(organization)) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "The AI label cannot be hidden for organizations serving the EU",
+        });
+      }
+
+      const current = organization.settings?.aiDisclosure ?? {};
+      const aiDisclosure = {
+        ...current,
+        ...(input.label !== undefined ? { label: input.label || null } : {}),
+        ...(input.hiddenChannels !== undefined
+          ? { hiddenChannels: [...new Set(input.hiddenChannels)] }
+          : {}),
+      };
+      // "on" is not stored; a channel missing from the map sends automatically.
+      const channelAiModes =
+        input.channelAiModes !== undefined
+          ? Object.fromEntries(
+              Object.entries(input.channelAiModes).filter(([, mode]) => mode !== "on"),
+            )
+          : organization.settings?.channelAiModes;
+      await organizationService.update(ctx.organizationId!, {
+        settings: { ...(organization.settings || {}), aiDisclosure, channelAiModes },
+      });
+      return { success: true };
+    }),
+
+  // Customer photos and PDFs (D8-11): whether the AI reads them.
+  getMediaSettings: scopedProcedure(RESOURCES.ORGANIZATION_SETTINGS, ACTIONS.READ).query(
+    async ({ ctx }) => {
+      const organization = await organizationService.findOne(ctx.organizationId!);
+      if (!organization) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Organization not found" });
+      }
+      return resolveMediaSettings(organization.settings);
+    },
+  ),
+
+  updateMediaSettings: scopedProcedure(RESOURCES.ORGANIZATION_SETTINGS, ACTIONS.UPDATE)
+    .input(
+      z.object({
+        readImages: z.boolean().optional(),
+        allowIdDocuments: z.boolean().optional(),
+        // D8-15: where complete product-problem cases are emailed; null turns it off.
+        caseEmail: z.string().trim().email().max(254).nullable().optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const organization = await organizationService.findOne(ctx.organizationId!);
+      if (!organization) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Organization not found" });
+      }
+      const media = { ...(organization.settings?.media ?? {}) };
+      if (input.readImages !== undefined) media.readImages = input.readImages;
+      // Letting the AI read ID documents is the owner's call (D8-12). Cards are never readable.
+      if (
+        input.allowIdDocuments !== undefined &&
+        input.allowIdDocuments !== media.allowIdDocuments
+      ) {
+        if (input.allowIdDocuments && ctx.user?.getRole() !== "owner") {
+          throw new TRPCError({
+            code: "FORBIDDEN",
+            message: "Only the organization owner can let the AI read ID documents",
+          });
+        }
+        media.allowIdDocuments = input.allowIdDocuments;
+      }
+      if (input.caseEmail !== undefined) media.caseEmail = input.caseEmail || null;
+      await organizationService.update(ctx.organizationId!, {
+        settings: { ...(organization.settings || {}), media },
+      });
+      return resolveMediaSettings({ media });
+    }),
+
   updateSettings: scopedProcedure(RESOURCES.ORGANIZATION_SETTINGS, ACTIONS.UPDATE)
     .input(updateSettingsSchema)
     .mutation(async ({ ctx, input }) => {
@@ -312,7 +578,45 @@ export const organizationsRouter = t.router({
       }
 
       // Extract settings fields from input as they go into the settings JSONB field
-      const { testModeDefault, confidenceGuardrail, retentionDays, ...topLevelFields } = input;
+      const {
+        testModeDefault,
+        confidenceGuardrail,
+        retentionDays,
+        actionApproval: approvalInput,
+        ...topLevelFields
+      } = input;
+      const { confirmSwitchOff, ...actionApproval } = approvalInput ?? {};
+      const approvalChanged = approvalInput !== undefined;
+
+      // Only the owner may loosen approval: turn it off (master switch, a
+      // category, or the shopper confirmation), raise the amount that needs
+      // approval (a huge threshold is approval switched off), or change who
+      // approves. Tightening (turning approval on, lowering the amount) is fine
+      // for admins.
+      if (
+        approvalChanged &&
+        loosensActionApproval(resolveActionApprovalConfig(organization.settings), actionApproval) &&
+        ctx.user?.getRole() !== "owner"
+      ) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "Only the organization owner can loosen action approval or change who approves",
+        });
+      }
+
+      // Switching approval off for a money move needs the typed confirm, in
+      // the API as well as the dashboard dialog.
+      if (
+        approvalChanged &&
+        !confirmSwitchOff &&
+        moneyApprovalSwitchedOff(resolveActionApprovalConfig(organization.settings), actionApproval)
+          .length > 0
+      ) {
+        throw new TRPCError({
+          code: "PRECONDITION_FAILED",
+          message: "Switching approval off for money moves needs the typed confirmation",
+        });
+      }
 
       // Prepare update payload
       const updatePayload: DeepPartial<Organization> = {
@@ -323,7 +627,8 @@ export const organizationsRouter = t.router({
       if (
         testModeDefault !== undefined ||
         confidenceGuardrail !== undefined ||
-        retentionDays !== undefined
+        retentionDays !== undefined ||
+        approvalChanged
       ) {
         updatePayload.settings = {
           ...(organization.settings || {}),
@@ -342,6 +647,17 @@ export const organizationsRouter = t.router({
 
         if (retentionDays !== undefined) {
           updatePayload.settings.retentionDays = retentionDays;
+        }
+
+        if (approvalChanged) {
+          const currentApproval = organization.settings?.actionApproval || {};
+          updatePayload.settings.actionApproval = {
+            ...currentApproval,
+            ...actionApproval,
+            ...(actionApproval.categories && {
+              categories: { ...(currentApproval.categories || {}), ...actionApproval.categories },
+            }),
+          };
         }
       }
 
@@ -363,6 +679,7 @@ export const organizationsRouter = t.router({
           defaultAgentId: updatedOrg.defaultAgentId,
           testModeDefault: updatedOrg.settings?.testModeDefault || false,
           confidenceGuardrail: updatedOrg.settings?.confidenceGuardrail,
+          actionApproval: resolveActionApprovalConfig(updatedOrg.settings),
         },
       };
     }),
@@ -655,9 +972,8 @@ export const organizationsRouter = t.router({
 
       await userOrgRepository.remove(userOrg);
 
-      // Their devices must stop receiving this organization's alerts
-
-      await pushNotificationService.removeForMember(input.userId, ctx.organizationId!);
+      // Their devices stop receiving this organization's alerts on their own:
+      // alerts fan out only to active members.
 
       // Log audit event
       await auditLogService.logMemberRemove(
@@ -795,6 +1111,12 @@ export const organizationsRouter = t.router({
 
     await organizationService.deleteWithData(organization);
     logger.info({ orgId: organization.id, userId: ctx.user!.id }, "Organization deleted by owner");
+    // A hosted operator stops billing for the deleted workspace (D15-11).
+    await notifyOperator({
+      event: "organization.deleted",
+      organizationId: organization.id,
+      occurredAt: new Date().toISOString(),
+    });
 
     return {
       success: true,
@@ -845,7 +1167,7 @@ export const organizationsRouter = t.router({
       // Get logo URL if exists
       const storageService = new StorageService();
       const logoUrl = userOrg.organization.logoUpload
-        ? storageService.getPublicUrl(userOrg.organization.logoUpload)
+        ? storageService.getUrl(userOrg.organization.logoUpload)
         : null;
 
       return {

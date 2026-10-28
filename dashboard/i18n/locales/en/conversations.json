@@ -3,12 +3,37 @@
     "untitled": "Untitled conversation",
     "delivery": {
       "failed": "Delivery failed",
-      "windowExpired": "Outside the 24-hour window — the customer must message first"
+      "windowExpired": "Outside the 24-hour window — the customer must message first",
+      "codes": {
+        "retriedOut": "The channel didn't accept this reply. Hay.chat retried 3 times and gave up.",
+        "uncertain": "The channel didn't confirm this reply. The customer may not have received it."
+      },
+      "alert": {
+        "title": "A reply could not be delivered",
+        "body": "Hay.chat retried 3 times and gave up. Open the conversation to follow up."
+      }
+    },
+    "attachment": {
+      "loadFailed": "Couldn't load this attachment",
+      "attach": "Attach a file",
+      "remove": "Remove {name}",
+      "uploading": "Uploading {name}…",
+      "uploadFailed": "Couldn't upload {name}. Try again or pick another file.",
+      "tooLarge": "{name} is larger than {size} MB.",
+      "tooMany": "You can send up to {count} files at once.",
+      "analysisPending": "AI is reading this file…",
+      "analysisRead": "AI read: {description}",
+      "analysisFailed": "The AI couldn't read this file",
+      "reveal": "Click to reveal",
+      "withheldId": "ID document: hidden from the AI",
+      "withheldCard": "Payment card: hidden from the AI",
+      "scanning": "Scanning for viruses…",
+      "scanBlocked": "Blocked by the virus scan"
     },
     "page": {
       "title": "Conversations",
       "description": "Monitor and manage all customer conversations",
-      "headTitle": "Conversations - Hay Dashboard",
+      "headTitle": "Conversations - Hay.chat",
       "headDescription": "Monitor and manage all customer conversations"
     },
     "actions": {
@@ -26,13 +51,15 @@
       "activeNow": "Active Now",
       "realTimeConversations": "Real-time conversations",
       "avgResponseTime": "Avg Response Time",
-      "yesterdayChange": "-12% from yesterday"
+      "last7Days": "Last 7 days",
+      "noRepliesLast7Days": "No replies in the last 7 days"
     },
     "filters": {
       "searchPlaceholder": "Search conversations...",
       "allStatus": "All Status",
       "active": "Active",
       "resolved": "Resolved",
+      "unresolved": "Unresolved",
       "escalated": "Escalated",
       "closed": "Closed",
       "today": "Today",
@@ -57,8 +84,10 @@
       "open": "Open",
       "processing": "Processing",
       "pendingHuman": "Needs Attention",
+      "awaitingApproval": "Awaiting Approval",
       "humanTookOver": "Manual Control",
       "resolved": "Resolved",
+      "unresolved": "Unresolved",
       "closed": "Closed",
       "unknown": "Unknown"
     },
@@ -90,6 +119,7 @@
       "export": "Export",
       "exportPdf": "Export as PDF",
       "exportCsv": "Export as CSV",
+      "evidencePack": "Evidence pack for a dispute",
       "exportFailed": "Failed to export conversation. Please try again.",
       "exitSupervision": "Exit Supervision",
       "supervise": "Supervise",
@@ -101,13 +131,23 @@
       "conversationStarted": "Conversation started {date}",
       "youAreHandling": "You are handling this conversation",
       "releaseConversation": "Release Conversation",
-      "closeConversation": "Close Conversation"
+      "closeConversation": "Close Conversation",
+      "simulatedBadge": "Actions are simulated",
+      "liveStoreBadge": "Live store",
+      "useLiveStore": "Use live store",
+      "useSimulatedActions": "Simulate actions",
+      "liveStoreConfirmTitle": "Use your live store?",
+      "liveStoreConfirmDescription": "Refunds, cancellations, address changes and other actions in this test conversation will be sent to your real store. Switch back at any time.",
+      "liveStoreConfirm": "Use live store",
+      "actionModeFailed": "Could not switch the action mode. Try again.",
+      "testingDraft": "Testing playbook draft",
+      "testDraftFailed": "Couldn't start a test of this draft. It may have been published or discarded."
     },
     "pendingHuman": {
       "needsHuman": "This conversation was handed off to a human agent",
       "summaryPending": "Generating conversation summary…",
-      "notConfident": "Hay wasn't confident about answering this question",
-      "handedOff": "Hay decided to hand this conversation to a human agent. Providing more context in the playbooks can be a good place to start to provide more information so Hay can handle similar conversations next time.",
+      "notConfident": "Hay.chat wasn't confident about answering this question",
+      "handedOff": "Hay.chat decided to hand this conversation to a human agent. Providing more context in the playbooks can be a good place to start to provide more information so Hay.chat can handle similar conversations next time.",
       "startNew": "Start New Conversation",
       "editPlaybook": "Edit Playbook",
       "editPlaybooks": "Edit Playbooks"
@@ -198,6 +238,90 @@
         "bodyWithTitle": "Conversation \"{title}\" requires human assistance",
         "bodyDefault": "New conversation requires human assistance"
       }
+    },
+    "agentNotice": {
+      "teamMember": "A team member",
+      "joined": "{name} joined the chat",
+      "returnedToAi": "{name} left the chat. The AI assistant is answering again.",
+      "left": "{name} left the chat and returned it to the queue"
+    },
+    "replyWindow": {
+      "open": "Reply window closes {relative}",
+      "closed": "The reply window has closed. Until the customer writes again, only an approved template reaches them.",
+      "sendTemplate": "Send a template",
+      "composerClosed": "Reply window closed. Send a template instead.",
+      "picker": {
+        "title": "Send a template",
+        "description": "Pick an approved template. When the customer replies, the window opens again.",
+        "loading": "Loading templates…",
+        "loadFailed": "Couldn't load templates. Close this and try again.",
+        "unsupported": "This channel has no templates.",
+        "empty": "No approved templates yet. An admin can check them in the channel's settings.",
+        "template": "Template",
+        "variable": "Value for variable {name}",
+        "preview": "Preview",
+        "send": "Send template",
+        "sent": "Template sent",
+        "failed": "Couldn't send the template"
+      }
+    },
+    "toolStatus": {
+      "success": "Success",
+      "failed": "Failed",
+      "running": "Running",
+      "simulated": "Simulated",
+      "pendingApproval": "Awaiting approval",
+      "rejected": "Declined",
+      "expired": "Expired, not done",
+      "needsConfirmation": "Asking the customer",
+      "unknown": "Unknown"
+    },
+    "pendingAction": {
+      "title": "Hay.chat wants to take this action",
+      "description": "It has not run. Approve to run it now, or decline and the AI will tell the customer.",
+      "approve": "Approve",
+      "reject": "Decline",
+      "confirmReject": "Decline action",
+      "reasonLabel": "Reason (optional)",
+      "reasonPlaceholder": "Shared with the AI so it can explain to the customer",
+      "replyMyself": "I'll reply myself",
+      "failed": "Could not save your decision",
+      "takeoverFailed": "Your decision was saved, but taking over the conversation failed. Use Take Over to handle it yourself.",
+      "conversationClosed": "This conversation is closed, so the action was not run. Reopen the conversation to approve it, or decline it.",
+      "done": {
+        "approve": "Approved",
+        "reject": "Declined",
+        "reply": "You are now handling this conversation"
+      }
+    },
+    "debug": {
+      "aiProcessing": "AI processing",
+      "aiRegionEu": "EU data centres",
+      "aiRegionDefault": "Any region (default AI provider)"
+    },
+    "draftApproval": {
+      "queued": "Waiting for approval",
+      "approve": "Approve & Send",
+      "block": "Block",
+      "dialogTitle": "Review AI reply",
+      "dialogDescription": "Review the reply and edit it if needed before it goes to the customer.",
+      "original": "Original AI reply:",
+      "content": "Reply",
+      "placeholder": "Edit the reply...",
+      "characters": "{count} characters",
+      "blockMessage": "Block reply",
+      "approveEdited": "Approve & Send edited"
+    },
+    "productCase": {
+      "title": "Product problem case complete",
+      "lot": "Lot {lot}",
+      "invoice": "Invoice {invoice}",
+      "forwardPending": "Sending to the store's case email…",
+      "forwardSent": "Emailed to {to}",
+      "forwardSentToast": "Case emailed",
+      "forwardFailed": "The case email could not be sent",
+      "forwardNotConfigured": "No case email set (Settings > Customer Privacy)",
+      "forwardAgain": "Email again"
     }
   }
 }

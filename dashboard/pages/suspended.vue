@@ -27,6 +27,9 @@
           <Button variant="ghost" @click="logout">{{ $t("suspended.logout") }}</Button>
         </div>
 
+        <!-- A locked or cancelled workspace can still take its data out until the purge (D15-7). -->
+        <WorkspaceExportCard v-if="userStore.isAdmin" />
+
         <div v-if="otherOrganizations.length" class="space-y-2">
           <h4 class="text-sm font-medium">{{ $t("suspended.switchOrg") }}</h4>
           <div class="flex flex-col gap-1">

@@ -19,6 +19,7 @@ import { createConfigRuntimeAPI } from "../sdk/config-runtime.js";
 import { createAuthRuntimeAPI } from "../sdk/auth-runtime.js";
 import { createMcpRuntimeAPI } from "../sdk/mcp-runtime.js";
 import { createProductSourceRuntime } from "../sdk/product-source-runtime.js";
+import { createDisputeSourceRuntime } from "../sdk/dispute-source-runtime.js";
 import type { HayLogger } from "../types/index.js";
 import type { HayPluginManifest } from "../types/index.js";
 
@@ -103,12 +104,24 @@ export function createStartContext(
         })
       : undefined;
 
+  const declaresDisputes =
+    Array.isArray(manifest.capabilities) && manifest.capabilities.includes("disputes");
+  const disputesAPI =
+    declaresDisputes && process.env.HAY_API_URL && process.env.HAY_API_TOKEN
+      ? createDisputeSourceRuntime({
+          apiUrl: process.env.HAY_API_URL,
+          apiToken: process.env.HAY_API_TOKEN,
+          logger,
+        })
+      : undefined;
+
   return {
     org: orgData.org,
     config: configAPI,
     auth: authAPI,
     mcp: mcpAPI,
     productSource: productSourceAPI,
+    disputes: disputesAPI,
     logger,
   };
 }

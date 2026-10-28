@@ -13,6 +13,8 @@ import type { HayMcpRuntimeAPI } from "./mcp";
 import type { HayLogger } from "./logger";
 import type { HayOrg } from "./org";
 import type { HayProductSourceRuntimeAPI } from "./products";
+import type { HayPluginStateAPI } from "./state";
+import type { HayDisputeSourceRuntimeAPI } from "./disputes";
 
 /**
  * Global context provided to onInitialize hook.
@@ -91,6 +93,14 @@ export interface HayGlobalContext {
    * Logs are automatically tagged with plugin context.
    */
   logger: HayLogger;
+
+  /**
+   * Persisted key/value state for this worker's organization and plugin, kept
+   * by core across worker and server restarts (e.g. a connect flow waiting on
+   * a third party). Usable from route handlers. Undefined when the worker runs
+   * without core's API (HAY_API_URL / HAY_API_TOKEN), e.g. in local tests.
+   */
+  state?: HayPluginStateAPI;
 }
 
 /**
@@ -176,6 +186,15 @@ export interface HayStartContext {
    * `onStart` (initial bulk sync) or webhook handlers (real-time updates).
    */
   productSource?: HayProductSourceRuntimeAPI;
+
+  /**
+   * Dispute source runtime API.
+   *
+   * Only populated when the plugin declares the `disputes` capability. Used to
+   * report payment disputes (chargebacks) to Hay so the owner is alerted and
+   * can attach the evidence pack as a draft.
+   */
+  disputes?: HayDisputeSourceRuntimeAPI;
 
   /**
    * Logger for plugin messages.

@@ -65,6 +65,23 @@ export class Organization extends BaseEntity {
   @Column({ type: "jsonb", nullable: true })
   accessNotice?: AccessNotice | null;
 
+  // The operator's current billing period (internal.organizations.setBillingPeriod).
+  // The usage page and the exclusion allowance follow it; null = UTC calendar months.
+  @Column({ type: "timestamptz", nullable: true })
+  billingPeriodStart?: Date | null;
+
+  /** Exclusive. */
+  @Column({ type: "timestamptz", nullable: true })
+  billingPeriodEnd?: Date | null;
+
+  // AI paused by the owner ("Pause AI everywhere", D11-9). Same effect as
+  // agentPausedAt, but owned by the team: the operator's sync never clears it.
+  @Column({ type: "timestamptz", nullable: true })
+  aiPausedAt?: Date | null;
+
+  @Column({ type: "uuid", nullable: true })
+  aiPausedByUserId?: string | null;
+
   @Column({ type: "varchar", length: 255, nullable: true })
   website?: string;
 
@@ -86,6 +103,8 @@ export class Organization extends BaseEntity {
     maxApiKeys?: number;
     maxJobs?: number;
     maxStorageGb?: number;
+    /** Simulated conversations per month (D7-7); see config/simulation-caps.ts. */
+    maxSimulationsPerMonth?: number;
   };
 
   @Column({ type: "varchar", length: 255, nullable: true })

@@ -20,6 +20,8 @@
 const { McpServer } = require("@modelcontextprotocol/sdk/server/mcp.js");
 const { StdioServerTransport } = require("@modelcontextprotocol/sdk/server/stdio.js");
 const { z } = require("zod");
+const { applyToolRisk } = require("@hay/plugin-sdk/tool-risk");
+const toolRisk = require("./tool-risk");
 
 const KLAVIYO_BASE_URL = "https://a.klaviyo.com/api";
 const KLAVIYO_REVISION = "2024-10-15";
@@ -119,10 +121,13 @@ function fail(err) {
 // Server
 // ---------------------------------------------------------------------------
 
-const server = new McpServer({
-  name: "klaviyo-mcp-server",
-  version: "1.0.0",
-});
+const server = applyToolRisk(
+  new McpServer({
+    name: "klaviyo-mcp-server",
+    version: "1.0.0",
+  }),
+  toolRisk,
+);
 
 // Common schema fragments reused across many tools.
 const fieldsSchema = z
@@ -503,57 +508,10 @@ You can view and edit a flow in the Klaviyo UI at https://www.klaviyo.com/flow/{
 // ---------------------------------------------------------------------------
 
 server.tool(
-  "upload_image_from_file",
-  `Upload an image from a file. If you want to upload an image from an existing URL or a data URI, use the
-upload_image_from_url tool instead.`,
-  {
-    filePath: z.string().describe("The absolute file path of the image file to upload."),
-    name: z
-      .string()
-      .optional()
-      .describe("A name for the image. Defaults to the filename if omitted."),
-  },
-  async ({ filePath, name }) => {
-    try {
-      const fs = require("fs");
-      const path = require("path");
-      const buffer = fs.readFileSync(filePath);
-      const filename = name || path.basename(filePath);
-      const mime = mimeFromExtension(filename);
-
-      const form = new FormData();
-      form.append("file", new Blob([buffer], { type: mime }), filename);
-      if (name) form.append("name", name);
-
-      // multipart upload uses a different endpoint and content-type
-      const response = await fetch(`${KLAVIYO_BASE_URL}/image-upload/`, {
-        method: "POST",
-        headers: {
-          Authorization: `Klaviyo-API-Key ${PRIVATE_API_KEY}`,
-          revision: KLAVIYO_REVISION,
-          Accept: "application/vnd.api+json",
-        },
-        body: form,
-      });
-      const text = await response.text();
-      if (!response.ok) {
-        throw new Error(
-          `Klaviyo image upload failed: ${response.status} ${response.statusText} ${text}`,
-        );
-      }
-      const json = text ? JSON.parse(text) : null;
-      cleanResult(json?.data);
-      return ok(json);
-    } catch (err) {
-      return fail(err);
-    }
-  },
-);
-
-server.tool(
   "upload_image_from_url",
-  `Upload an image from a URL or data URI. If you want to upload an image from a file, use the
-upload_image_from_file tool instead.`,
+  // No file-path variant: an upload from a host path could send any file readable on the
+  // Hay.chat host to Klaviyo. A URL or a base64 data URI covers every legitimate case.
+  `Upload an image from a public URL or a base64 data URI (data:image/png;base64,...).`,
   {
     imageUrl: z.string().describe("The URL or data URI of the image to upload."),
     name: z
@@ -578,25 +536,6 @@ upload_image_from_file tool instead.`,
     }
   },
 );
-
-function mimeFromExtension(filename) {
-  const ext = filename.toLowerCase().split(".").pop();
-  switch (ext) {
-    case "png":
-      return "image/png";
-    case "jpg":
-    case "jpeg":
-      return "image/jpeg";
-    case "gif":
-      return "image/gif";
-    case "webp":
-      return "image/webp";
-    case "svg":
-      return "image/svg+xml";
-    default:
-      return "application/octet-stream";
-  }
-}
 
 // ---------------------------------------------------------------------------
 // Lists
@@ -1094,7 +1033,7 @@ server.tool(
 // ---------------------------------------------------------------------------
 
 const HTML_PARAM_DESCRIPTION = `The complete HTML of the template. Should include <html> and <body> tags.
-To include an image, first upload the image using the upload_image_from_file or upload_image_from_url tool, then use the returned image URL.
+To include an image, first upload the image using the upload_image_from_url tool, then use the returned image URL.
 Always include an unsubscribe link. Do this by inserting the template string "{% unsubscribe 'Unsubscribe' %}". You can replace 'Unsubscribe' with custom text.
 
 To add an editable region to the template, ensure the hasEditableRegions param is true and add the following:

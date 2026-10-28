@@ -13,6 +13,11 @@ type OrgRow = {
   agentPausedAt: Date | null;
   agentPauseReason: string | null;
   accessNotice: Record<string, unknown> | null;
+  aiPausedAt?: Date | null;
+  aiPausedByUserId?: string | null;
+  billingPeriodStart?: Date | null;
+  billingPeriodEnd?: Date | null;
+  limits?: Record<string, number> | null;
 };
 
 const rows = new Map<string, OrgRow>();
@@ -21,6 +26,11 @@ const mockRepository = {
   save: jest.fn(async (row: OrgRow) => {
     rows.set(row.id, row);
     return row;
+  }),
+  update: jest.fn(async ({ id }: { id: string }, changes: Partial<OrgRow>) => {
+    const row = rows.get(id);
+    if (row) rows.set(id, { ...row, ...changes });
+    return { affected: row ? 1 : 0 };
   }),
 };
 jest.mock("@server/database/data-source", () => ({
@@ -138,6 +148,9 @@ describe("organizationAccessService.setAccessState", () => {
       agentPausedAt: null,
       agentPauseReason: null,
       accessNotice: null,
+      billingPeriod: null,
+      aiPausedAt: null,
+      aiPausedByUserId: null,
     });
   });
 
@@ -196,5 +209,179 @@ describe("organizationAccessService.setAccessState", () => {
       type: ORGANIZATION_ACCESS_CHANGED_EVENT,
       payload: resumed,
     });
+  });
+});
+
+describe("organizationAccessService.setOwnerAiPause (D11-9)", () => {
+  const USER_ID = "33333333-3333-4333-8333-333333333333";
+
+  beforeEach(() => {
+    rows.clear();
+    rows.set(ORG_ID, {
+      id: ORG_ID,
+      suspendedAt: null,
+      suspensionReason: null,
+      suspensionRedirectUrl: null,
+      agentPausedAt: null,
+      agentPauseReason: null,
+      accessNotice: null,
+      aiPausedAt: null,
+      aiPausedByUserId: null,
+    });
+    jest.clearAllMocks();
+  });
+
+  it("pauses with the author, audits who did it and tells every dashboard", async () => {
+    const state = await organizationAccessService.setOwnerAiPause({
+      organizationId: ORG_ID,
+      userId: USER_ID,
+      paused: true,
+    });
+
+    expect(state?.aiPausedAt).toBeInstanceOf(Date);
+    expect(state?.aiPausedByUserId).toBe(USER_ID);
+    expect(rows.get(ORG_ID)?.aiPausedByUserId).toBe(USER_ID);
+    expect(mockAuditLog).toHaveBeenCalledWith(
+      expect.objectContaining({
+        organizationId: ORG_ID,
+        userId: USER_ID,
+        action: "organization.ai_paused",
+      }),
+    );
+    expect(mockSendToOrganization).toHaveBeenCalledWith(ORG_ID, {
+      type: ORGANIZATION_ACCESS_CHANGED_EVENT,
+      payload: expect.objectContaining({ aiPausedByUserId: USER_ID }),
+    });
+  });
+
+  it("keeps the first author when paused again, and audits nothing new", async () => {
+    await organizationAccessService.setOwnerAiPause({
+      organizationId: ORG_ID,
+      userId: USER_ID,
+      paused: true,
+    });
+    jest.clearAllMocks();
+    const state = await organizationAccessService.setOwnerAiPause({
+      organizationId: ORG_ID,
+      userId: "44444444-4444-4444-8444-444444444444",
+      paused: true,
+    });
+    expect(state?.aiPausedByUserId).toBe(USER_ID);
+    expect(mockAuditLog).not.toHaveBeenCalled();
+  });
+
+  it("resumes and audits it", async () => {
+    rows.set(ORG_ID, { ...rows.get(ORG_ID)!, aiPausedAt: new Date(), aiPausedByUserId: USER_ID });
+    const state = await organizationAccessService.setOwnerAiPause({
+      organizationId: ORG_ID,
+      userId: USER_ID,
+      paused: false,
+    });
+    expect(state?.aiPausedAt).toBeNull();
+    expect(mockAuditLog).toHaveBeenCalledWith(
+      expect.objectContaining({ action: "organization.ai_resumed", userId: USER_ID }),
+    );
+  });
+
+  it("is left alone by the operator's access-state sync", async () => {
+    const pausedAt = new Date("2026-10-28T09:00:00Z");
+    rows.set(ORG_ID, { ...rows.get(ORG_ID)!, aiPausedAt: pausedAt, aiPausedByUserId: USER_ID });
+    const state = await organizationAccessService.setAccessState({
+      organizationId: ORG_ID,
+      suspension: null,
+      agentPause: null,
+      notice: null,
+    });
+    expect(state?.aiPausedAt).toEqual(pausedAt);
+  });
+});
+
+describe("organizationAccessService.setBillingPeriod", () => {
+  const period = {
+    start: new Date("2026-10-14T09:30:00Z"),
+    end: new Date("2026-11-14T09:30:00Z"),
+  };
+
+  beforeEach(() => {
+    rows.clear();
+    rows.set(ORG_ID, {
+      id: ORG_ID,
+      suspendedAt: null,
+      suspensionReason: null,
+      suspensionRedirectUrl: null,
+      agentPausedAt: null,
+      agentPauseReason: null,
+      accessNotice: null,
+      billingPeriodStart: null,
+      billingPeriodEnd: null,
+    });
+    jest.clearAllMocks();
+  });
+
+  it("stores the period, returns it in the access state and writes only on a change", async () => {
+    const state = await organizationAccessService.setBillingPeriod({
+      organizationId: ORG_ID,
+      period,
+    });
+    expect(state?.billingPeriod).toEqual(period);
+    expect(mockRepository.update).toHaveBeenCalledTimes(1);
+
+    await organizationAccessService.setBillingPeriod({
+      organizationId: ORG_ID,
+      period: { start: new Date(period.start), end: new Date(period.end) },
+    });
+    expect(mockRepository.update).toHaveBeenCalledTimes(1);
+
+    const cleared = await organizationAccessService.setBillingPeriod({
+      organizationId: ORG_ID,
+      period: null,
+    });
+    expect(cleared?.billingPeriod).toBeNull();
+    expect(mockRepository.update).toHaveBeenCalledTimes(2);
+  });
+
+  it("returns null for an unknown organization", async () => {
+    expect(
+      await organizationAccessService.setBillingPeriod({ organizationId: "nope", period }),
+    ).toBeNull();
+  });
+});
+
+describe("organizationAccessService.setLimits", () => {
+  beforeEach(() => {
+    rows.clear();
+    rows.set(ORG_ID, {
+      id: ORG_ID,
+      suspendedAt: null,
+      suspensionReason: null,
+      suspensionRedirectUrl: null,
+      agentPausedAt: null,
+      agentPauseReason: null,
+      accessNotice: null,
+      limits: { maxUsers: 5 },
+    });
+    jest.clearAllMocks();
+  });
+
+  it("merges the simulation allowance into limits, writes only on a change, null removes it", async () => {
+    expect(
+      await organizationAccessService.setLimits({
+        organizationId: ORG_ID,
+        maxSimulationsPerMonth: 100,
+      }),
+    ).toEqual({ maxUsers: 5, maxSimulationsPerMonth: 100 });
+    expect(rows.get(ORG_ID)?.limits).toEqual({ maxUsers: 5, maxSimulationsPerMonth: 100 });
+
+    await organizationAccessService.setLimits({
+      organizationId: ORG_ID,
+      maxSimulationsPerMonth: 100,
+    });
+    expect(mockRepository.update).toHaveBeenCalledTimes(1);
+
+    await organizationAccessService.setLimits({
+      organizationId: ORG_ID,
+      maxSimulationsPerMonth: null,
+    });
+    expect(rows.get(ORG_ID)?.limits).toEqual({ maxUsers: 5 });
   });
 });
