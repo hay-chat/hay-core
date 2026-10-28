@@ -89,6 +89,10 @@
     "shopify_swap_order_item": {
       "label": "Trocar Item do Pedido",
       "description": "Antes do envio, troca um item por outro tamanho ou cor do mesmo produto. Só com preço igual ou menor e em estoque."
+    },
+    "shopify_create_exchange": {
+      "label": "Criar Troca",
+      "description": "Após a entrega, troca itens por outras variações. Recusa quando o cliente teria que pagar a diferença ou a reposição está sem estoque."
     }
   },
   "config": {

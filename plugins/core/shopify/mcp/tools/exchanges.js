@@ -1,5 +1,9 @@
 // tools/exchanges.js — swap or exchange items on a Shopify order (API 2026-04).
 //
+// shopify_create_exchange (D6-11): after delivery, a Shopify return with exchange line
+// items (returnCreate) that is then processed (returnProcess) so the replacement ships.
+// Refuses when the shopper would owe money.
+//
 // shopify_swap_order_item (D6-10): before dispatch, replace a line item with another
 // variant of the same product (a different size or colour) through an order edit.
 // Server-side bounds: the order has not shipped, the new variant is in stock and
@@ -82,6 +86,65 @@ const EDIT_COMMIT = `
   mutation OrderEditCommit($id: ID!, $staffNote: String) {
     orderEditCommit(id: $id, notifyCustomer: true, staffNote: $staffNote) {
       order { id name }
+      userErrors { field message }
+    }
+  }
+`;
+
+const EXCHANGE_CONTEXT = `
+  query ExchangeContext($orderId: ID!, $variantIds: [ID!]!) {
+    order(id: $orderId) { id name cancelledAt }
+    returnableFulfillments(orderId: $orderId, first: 10) {
+      nodes {
+        returnableFulfillmentLineItems(first: 50) {
+          nodes {
+            quantity
+            fulfillmentLineItem {
+              id
+              lineItem {
+                id
+                title
+                discountedUnitPriceAfterAllDiscountsSet { shopMoney { amount currencyCode } }
+              }
+            }
+          }
+        }
+      }
+    }
+    nodes(ids: $variantIds) {
+      ... on ProductVariant {
+        id
+        title
+        price
+        availableForSale
+        inventoryQuantity
+        inventoryPolicy
+        inventoryItem { tracked }
+        product { title }
+      }
+    }
+  }
+`;
+
+const RETURN_CREATE_EXCHANGE = `
+  mutation CreateExchange($returnInput: ReturnInput!) {
+    returnCreate(returnInput: $returnInput) {
+      return {
+        id
+        status
+        name
+        returnLineItems(first: 50) { nodes { id quantity } }
+        exchangeLineItems(first: 50) { nodes { id quantity lineItems { id title variant { id } } } }
+      }
+      userErrors { field message }
+    }
+  }
+`;
+
+const RETURN_PROCESS = `
+  mutation ProcessExchange($input: ReturnProcessInput!) {
+    returnProcess(input: $input) {
+      return { id status }
       userErrors { field message }
     }
   }
@@ -279,6 +342,166 @@ function registerExchangeTools(server) {
               `${owedToShopper.currencyCode}. No refund was made; use shopify_create_refund if the ` +
               "store refunds the difference."
             : undefined,
+        });
+      } catch (err) {
+        return fail(err);
+      }
+    },
+  );
+  server.tool(
+    "shopify_create_exchange",
+    "Exchange delivered items for other variants (e.g. a different size) (WRITE). Opens a " +
+      "Shopify return with exchange items and processes it, so the replacement is released for " +
+      "fulfillment and the customer is notified. Use fulfillmentLineItem ids from " +
+      "shopify_get_returnable_items. Refuses when a replacement is out of stock or the " +
+      "replacements cost more than the returned items (the shopper would owe money): then hand " +
+      "the conversation to the store team. Confirm items and variants with the customer first. " +
+      "Only say the exchange happened if this tool returns exchanged: true.",
+    {
+      order_id: z.string().describe("Order GID or bare numeric id."),
+      return_line_items: z
+        .array(
+          z.object({
+            fulfillmentLineItemId: z
+              .string()
+              .describe("FulfillmentLineItem GID from shopify_get_returnable_items."),
+            quantity: z.number().int().positive().describe("Quantity coming back."),
+            returnReasonNote: z
+              .string()
+              .optional()
+              .describe("The customer's reason (max 255 chars)."),
+          }),
+        )
+        .min(1)
+        .describe("Items the customer sends back."),
+      exchange_items: z
+        .array(
+          z.object({
+            variantId: z.string().describe("ProductVariant GID or numeric id to send instead."),
+            quantity: z.number().int().positive().describe("Quantity to send."),
+          }),
+        )
+        .min(1)
+        .describe("Replacement items to ship."),
+    },
+    async (args) => {
+      try {
+        const orderId = toGid("Order", args.order_id);
+        const exchangeItems = args.exchange_items.map((e) => ({
+          variantId: toGid("ProductVariant", e.variantId),
+          quantity: e.quantity,
+        }));
+        const ctx = await shopifyGql(EXCHANGE_CONTEXT, {
+          orderId,
+          variantIds: exchangeItems.map((e) => e.variantId),
+        });
+        if (!ctx.order) throw await orderNotFound(args.order_id);
+        if (ctx.order.cancelledAt) {
+          throw refuse(`Order ${ctx.order.name} is cancelled, so it can't be exchanged.`, {
+            reason: "ALREADY_CANCELLED",
+          });
+        }
+
+        // Price what comes back from the returnable items Shopify lists.
+        const returnable = new Map();
+        for (const f of (ctx.returnableFulfillments && ctx.returnableFulfillments.nodes) || []) {
+          for (const r of (f.returnableFulfillmentLineItems &&
+            f.returnableFulfillmentLineItems.nodes) ||
+            []) {
+            returnable.set(r.fulfillmentLineItem.id, r);
+          }
+        }
+        let currency = null;
+        let returnedValue = 0;
+        for (const item of args.return_line_items) {
+          const r = returnable.get(item.fulfillmentLineItemId);
+          if (!r || item.quantity > r.quantity) {
+            throw refuse(
+              `Item ${item.fulfillmentLineItemId} can't be returned in that quantity. Use ` +
+                "shopify_get_returnable_items for what is returnable.",
+              { reason: "NOT_RETURNABLE", fulfillmentLineItemId: item.fulfillmentLineItemId },
+            );
+          }
+          const paid = moneyOf(
+            r.fulfillmentLineItem.lineItem.discountedUnitPriceAfterAllDiscountsSet,
+          );
+          currency = currency || (paid && paid.currencyCode);
+          returnedValue += num(paid && paid.amount) * item.quantity;
+        }
+
+        const variants = new Map((ctx.nodes || []).filter(Boolean).map((v) => [v.id, v]));
+        let exchangeValue = 0;
+        for (const e of exchangeItems) {
+          const v = variants.get(e.variantId);
+          if (!v) throw toolError("NOT_FOUND", `Variant ${e.variantId} not found.`);
+          if (!inStock(v, e.quantity)) {
+            throw refuse(`"${v.product.title} - ${v.title}" is out of stock.`, {
+              reason: "OUT_OF_STOCK",
+              variantId: v.id,
+            });
+          }
+          exchangeValue += num(v.price) * e.quantity;
+        }
+        if (exchangeValue - returnedValue > 0.005) {
+          throw refuse(
+            `The replacements cost ${exchangeValue.toFixed(2)} ${currency || ""} and the returned ` +
+              `items ${returnedValue.toFixed(2)}, so the shopper would owe the difference. Nothing ` +
+              "was changed; hand the conversation to the store team.",
+            { reason: "BALANCE_DUE", exchangeValue, returnedValue },
+          );
+        }
+
+        await requireScopes(["write_returns"]);
+
+        const returnLineItems = args.return_line_items.map((li) => {
+          const item = { fulfillmentLineItemId: li.fulfillmentLineItemId, quantity: li.quantity };
+          if (li.returnReasonNote !== undefined) item.returnReasonNote = li.returnReasonNote;
+          return item;
+        });
+        const created = await shopifyGql(RETURN_CREATE_EXCHANGE, {
+          returnInput: { orderId, returnLineItems, exchangeLineItems: exchangeItems },
+        });
+        assertNoUserErrors(created.returnCreate);
+        const ret = created.returnCreate.return;
+
+        // If processing fails the return still exists (OPEN): say so instead of implying
+        // nothing happened, so the agent hands off rather than retrying into a duplicate.
+        let processed;
+        try {
+          processed = await shopifyGql(RETURN_PROCESS, {
+            input: {
+              returnId: ret.id,
+              returnLineItems: ret.returnLineItems.nodes.map((n) => ({
+                id: n.id,
+                quantity: n.quantity,
+              })),
+              exchangeLineItems: ret.exchangeLineItems.nodes.map((n) => ({
+                id: n.id,
+                quantity: n.quantity,
+              })),
+              notifyCustomer: true,
+            },
+          });
+          assertNoUserErrors(processed.returnProcess);
+        } catch (err) {
+          err.message = `${err.message} Return ${ret.name} was created but not processed; hand the conversation to the store team.`;
+          err.details = { ...(err.details || {}), returnId: ret.id, returnCreated: true };
+          throw err;
+        }
+
+        const difference = returnedValue - exchangeValue;
+        return ok({
+          exchanged: true,
+          return: { id: ret.id, name: ret.name, status: processed.returnProcess.return.status },
+          replacements: ret.exchangeLineItems.nodes.flatMap((n) => n.lineItems || []),
+          customerNotified: true,
+          owedToShopper:
+            difference > 0.005 ? { amount: difference.toFixed(2), currencyCode: currency } : null,
+          note:
+            difference > 0.005
+              ? `The replacements cost less: the store owes the shopper ${difference.toFixed(2)} ` +
+                `${currency || ""}. No refund was made.`
+              : undefined,
         });
       } catch (err) {
         return fail(err);

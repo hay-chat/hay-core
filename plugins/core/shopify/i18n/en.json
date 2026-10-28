@@ -89,6 +89,10 @@
     "shopify_swap_order_item": {
       "label": "Swap Order Item",
       "description": "Before dispatch, swap an item for another size or colour of the same product. Same price or lower, in stock only."
+    },
+    "shopify_create_exchange": {
+      "label": "Create Exchange",
+      "description": "After delivery, exchange items for other variants. Refuses when the shopper would owe money or a replacement is out of stock."
     }
   },
   "config": {
