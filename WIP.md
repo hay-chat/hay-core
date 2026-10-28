@@ -1,3 +1,8 @@
+## 2026-10-28 01:35 — staging — Wave 1 review server fixes merged + tested
+- fecc425 merged claude/w1-review-server (approval auth/threshold owner-only, public metadata whitelist, EU fallback org id, reply window on resume, alert locales, closed-conversation approve refused). e574bef shows that refusal in en/pt-BR.
+- Manual ✓: metadata whitelist; approve on resolved conversation → refused, still pending.
+- Next: when W2 L5 builder ends, full suites alone → tag wave-1-done → PR #104 body → GIFs to Roger; then Wave 2 lanes.
+
 ## 2026-10-28 01:20 — staging — Wave 1 review: plugin fixes merged, server fixes running, W2 L5 started
 - fde9618 merged claude/w1-review-plugins (9 fixes: Shopify/Woo/Nuvemshop coupon dedupe + ownership, Woo refund record-only only for bacs/cod/cheque, Pix/coupon times, approval card, rotatePush needs old auth). woo/shopify/nuvemshop rebuilt, tsc ok.
 - Running: claude/w1-review-server (11 server fixes), claude/w2-commerce (W2 L5).
