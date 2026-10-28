@@ -1,5 +1,7 @@
+import { createRequire } from "node:module";
 import { describe, expect, it } from "vitest";
 import {
+  NOTIFY_TOOL_RISK,
   SEND_EMAIL_TOOL,
   createNotifyServer,
   resolveNotificationRecipients,
@@ -122,6 +124,17 @@ describe("createNotifyServer", () => {
   it("lists only send-email", async () => {
     const server = createNotifyServer(deps());
     expect(await server.listTools()).toEqual([SEND_EMAIL_TOOL]);
+  });
+
+  it("declares a risk class for every listed tool, so core does not hold send-email", async () => {
+    const { withToolRisk, CATEGORY_META_KEY } = createRequire(import.meta.url)(
+      "@hay/plugin-sdk/tool-risk",
+    );
+    const listed = withToolRisk(await createNotifyServer(deps()).listTools(), NOTIFY_TOOL_RISK);
+    for (const tool of listed) {
+      expect(tool.annotations.readOnlyHint).toBe(false);
+      expect(tool._meta[CATEGORY_META_KEY]).toBe("other_write");
+    }
   });
 
   it("reads recipients at call time so config edits apply without a restart", async () => {

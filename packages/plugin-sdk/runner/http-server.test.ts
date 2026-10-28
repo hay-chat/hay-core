@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import type { AddressInfo } from "net";
+import { createServer, type Server as HttpServer } from "http";
 import { PluginHttpServer } from "./http-server.js";
 import { PluginRegistry } from "../sdk/registry.js";
 import type { HayLogger } from "../types/index.js";
@@ -94,5 +95,73 @@ describe("PluginHttpServer body handling", () => {
     });
 
     expect(response.status).toBe(413);
+  });
+});
+
+describe("PluginHttpServer /mcp/list-tools tool risk", () => {
+  let server: PluginHttpServer;
+  let baseUrl: string;
+  let remote: HttpServer;
+
+  beforeAll(async () => {
+    // A hosted MCP server that annotates one read itself and leaves two writes bare.
+    remote = createServer((_req, res) => {
+      res.setHeader("Content-Type", "application/json");
+      res.end(
+        JSON.stringify({
+          jsonrpc: "2.0",
+          id: 1,
+          result: {
+            tools: [
+              { name: "search_docs", annotations: { readOnlyHint: true } },
+              { name: "create_refund" },
+              { name: "brand_new_tool" },
+            ],
+          },
+        }),
+      );
+    });
+    await new Promise<void>((resolve) => remote.listen(0, "127.0.0.1", resolve));
+    const remotePort = (remote.address() as AddressInfo).port;
+
+    server = new PluginHttpServer(0, new PluginRegistry(), silentLogger);
+    server.registerMcpServer({
+      id: "local-mcp",
+      type: "local",
+      instance: { listTools: async () => [{ name: "send-email" }, { name: "lookup" }] },
+      toolRisk: { read: ["lookup"], write: { "send-email": "other_write" } },
+    });
+    server.registerMcpServer({
+      id: "remote-mcp",
+      type: "external",
+      options: { id: "remote-mcp", url: `http://127.0.0.1:${remotePort}` },
+      toolRisk: { write: { create_refund: "refund" } },
+    });
+    await server.start();
+    const address = (server as unknown as { server: { address(): AddressInfo } }).server.address();
+    baseUrl = `http://127.0.0.1:${address.port}`;
+  });
+
+  afterAll(async () => {
+    await server.stop();
+    await new Promise<void>((resolve) => remote.close(() => resolve()));
+  });
+
+  it("merges declared risk and keeps the remote server's own annotations", async () => {
+    const response = await fetch(`${baseUrl}/mcp/list-tools`);
+    const { tools } = (await response.json()) as {
+      tools: Array<{ name: string; serverId: string; annotations?: any; _meta?: any }>;
+    };
+    const byName = Object.fromEntries(tools.map((t) => [t.name, t]));
+
+    expect(byName["send-email"]._meta["chat.hay/category"]).toBe("other_write");
+    expect(byName["send-email"].serverId).toBe("local-mcp");
+    expect(byName.lookup.annotations.readOnlyHint).toBe(true);
+    expect(byName.search_docs.annotations).toEqual({ readOnlyHint: true });
+    expect(byName.create_refund._meta["chat.hay/category"]).toBe("refund");
+    expect(byName.create_refund.serverId).toBe("remote-mcp");
+    // Unknown remote tool: untouched, so core treats it as unclassified (held).
+    expect(byName.brand_new_tool.annotations).toBeUndefined();
+    expect(byName.brand_new_tool._meta).toBeUndefined();
   });
 });

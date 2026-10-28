@@ -1,4 +1,6 @@
 import { McpServer, ResourceTemplate } from "@modelcontextprotocol/sdk/server/mcp.js";
+import toolRiskHelper from "@hay/plugin-sdk/tool-risk";
+import toolRisk from "./tool-risk.js";
 import { zendeskClient } from "./zendesk-client.js";
 import { ticketsTools } from "./tools/tickets.js";
 import { usersTools } from "./tools/users.js";
@@ -14,11 +16,14 @@ import { talkTools } from "./tools/talk.js";
 import { chatTools } from "./tools/chat.js";
 
 // Create an MCP server for Zendesk API
-const server = new McpServer({
-  name: "Zendesk API",
-  version: "1.0.0",
-  description: "MCP Server for interacting with the Zendesk API",
-});
+const server = toolRiskHelper.applyToolRisk(
+  new McpServer({
+    name: "Zendesk API",
+    version: "1.0.0",
+    description: "MCP Server for interacting with the Zendesk API",
+  }),
+  toolRisk,
+);
 
 // Register all tools
 const allTools = [

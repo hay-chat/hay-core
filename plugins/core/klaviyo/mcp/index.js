@@ -20,6 +20,8 @@
 const { McpServer } = require("@modelcontextprotocol/sdk/server/mcp.js");
 const { StdioServerTransport } = require("@modelcontextprotocol/sdk/server/stdio.js");
 const { z } = require("zod");
+const { applyToolRisk } = require("@hay/plugin-sdk/tool-risk");
+const toolRisk = require("./tool-risk");
 
 const KLAVIYO_BASE_URL = "https://a.klaviyo.com/api";
 const KLAVIYO_REVISION = "2024-10-15";
@@ -119,10 +121,13 @@ function fail(err) {
 // Server
 // ---------------------------------------------------------------------------
 
-const server = new McpServer({
-  name: "klaviyo-mcp-server",
-  version: "1.0.0",
-});
+const server = applyToolRisk(
+  new McpServer({
+    name: "klaviyo-mcp-server",
+    version: "1.0.0",
+  }),
+  toolRisk,
+);
 
 // Common schema fragments reused across many tools.
 const fieldsSchema = z

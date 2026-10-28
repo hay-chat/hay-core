@@ -82,6 +82,9 @@ export type {
   McpServerInstance,
   McpInitializerContext,
   ExternalMcpOptions,
+  LocalMcpOptions,
+  ToolRiskSpec,
+  ToolWriteCategory,
   HayMcpRuntimeAPI,
 
   // Cron
