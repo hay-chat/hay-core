@@ -105,6 +105,48 @@
         "wrong_or_risky": "Corrija estes primeiro: fatos errados, promessas arriscadas ou uma afirmação sem ação que a sustente.",
         "knowledge_missing": "Faltou informação da loja para a IA. Adicione ao seu conhecimento ou playbook."
       }
+    },
+    "save": {
+      "button": "Salvar como caso de teste",
+      "title": "Salvar como caso de teste",
+      "description": "A conversa até esta mensagem do cliente fica salva. Antes de publicar um rascunho de playbook, os casos de teste dele rodam contra o rascunho e você é avisado sobre os que falharem.",
+      "name": "Nome (opcional)",
+      "expectedOutcome": "O que uma boa resposta faz (opcional)",
+      "expectedOutcomePlaceholder": "Pede o número do pedido antes de prometer qualquer coisa",
+      "handoff": "Transferência para sua equipe",
+      "handoffEither": "Tanto faz",
+      "handoffMust": "Deve transferir",
+      "handoffMustNot": "Não deve transferir",
+      "submit": "Salvar caso de teste",
+      "saved": "Caso de teste salvo"
+    },
+    "cases": {
+      "title": "Casos de teste",
+      "description": "Salvos a partir de reproduções, respostas editadas ou bloqueadas e feedback. Os casos de teste de um playbook rodam antes de o rascunho ser publicado.",
+      "empty": "Nenhum caso de teste ainda. Salve um a partir de um relatório de teste ou de uma resposta da IA em uma conversa.",
+      "runAll": "Rodar todos os casos de teste",
+      "delete": "Excluir",
+      "deleted": "Caso de teste excluído",
+      "sources": {
+        "replay": "De uma reprodução",
+        "approval_edit": "Resposta editada",
+        "approval_block": "Resposta bloqueada",
+        "feedback": "Feedback",
+        "conversation": "Conversa",
+        "insight": "Insight"
+      }
+    },
+    "regression": {
+      "title": "Casos de teste",
+      "checking": "Verificando casos de teste…",
+      "none": "Este playbook ainda não tem casos de teste. Salve alguns a partir de um relatório de teste ou de uma conversa para verificar rascunhos antes de publicar.",
+      "running": "Rodando os casos de teste contra este rascunho: {done} de {total} concluídos…",
+      "allPassed": "Todos os {count} casos de teste passaram com este rascunho.",
+      "failing": "{failing} de {total} casos de teste falham com este rascunho.",
+      "newFailures": "{count} passavam antes.",
+      "passedBefore": "passava antes",
+      "warnOnly": "Você ainda pode publicar. Veja o relatório para entender o que mudou.",
+      "openReport": "Abrir o relatório de teste"
     }
   }
 }

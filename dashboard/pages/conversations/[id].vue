@@ -503,6 +503,7 @@
                 :message="message as Message"
                 :show-feedback="true"
                 :show-approval="true"
+                :show-save-as-test="true"
                 :show-timestamp="shouldShowTimestamp(conversation?.messages, index)"
                 :bot-avatar-url="botAvatarUrl"
                 :human-avatar-url="humanAvatarUrl"
@@ -510,6 +511,7 @@
                 @message-blocked="handleMessageBlocked"
                 @feedback-submitted="handleFeedbackSubmitted"
                 @retry="retryMessage"
+                @save-as-test="openSaveAsTest"
               />
             </TransitionGroup>
 
@@ -1083,6 +1085,9 @@
       @applied="handleSuggestionApplied"
     />
 
+    <!-- Save an AI reply as a test case (D7-12) -->
+    <SaveTestCaseDialog v-model:open="showSaveAsTest" :target="saveAsTestTarget" />
+
     <!-- AI Suggest Knowledge Edits Dialog (D3-6) -->
     <SuggestKnowledgeDialog
       v-if="conversation"
@@ -1581,6 +1586,15 @@ const handleSuggestionApplied = () => {
   if (conversation.value?.playbook_id) {
     router.push(`/playbooks/${conversation.value.playbook_id}`);
   }
+};
+
+// D7-12: save an AI reply as a test case (approval edits/blocks and feedback
+// decide what a good answer is, on the server).
+const showSaveAsTest = ref(false);
+const saveAsTestTarget = ref<{ kind: "message"; id: string } | null>(null);
+const openSaveAsTest = (messageId: string) => {
+  saveAsTestTarget.value = { kind: "message", id: messageId };
+  showSaveAsTest.value = true;
 };
 
 // AI suggest-edits for knowledge: edit a document the AI used, or add a Q&A
@@ -2305,7 +2319,8 @@ onMounted(async () => {
             updated_at: messageData.timestamp,
             status: messageData.status || "approved",
             metadata: messageData.metadata,
-            attachments: messageData.attachments ?? conversation.value.messages[optimisticIndex].attachments,
+            attachments:
+              messageData.attachments ?? conversation.value.messages[optimisticIndex].attachments,
             deliveryState: "sent",
           };
           return;
@@ -2326,7 +2341,9 @@ onMounted(async () => {
             updated_at: messageData.timestamp,
             status: messageData.status || "approved",
             metadata: messageData.metadata,
-            attachments: messageData.attachments ?? conversation.value.messages[existingMessageIndex].attachments,
+            attachments:
+              messageData.attachments ??
+              conversation.value.messages[existingMessageIndex].attachments,
             deliveryState: "sent",
           };
           return;
