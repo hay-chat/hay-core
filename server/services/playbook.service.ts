@@ -129,6 +129,26 @@ export class PlaybookService {
     organizationId: string,
     instructions: PlaybookInstructions | null | undefined,
   ): Promise<string[]> {
+    const unresolved = await this.findUnresolvedActions(organizationId, instructions);
+    const warnings = (unresolved ?? []).map(
+      (action) =>
+        `Referenced action "${action}" does not match any available tool — the agent will not be able to call it.`,
+    );
+    if (warnings.length > 0) {
+      logger.warn({ organizationId, warnings }, "Playbook references unavailable actions");
+    }
+    return warnings;
+  }
+
+  /**
+   * The referenced actions that resolve to no available tool. Returns null when
+   * the tool registry cannot be loaded: then we cannot tell valid from invalid,
+   * so callers report nothing (no false alarms).
+   */
+  async findUnresolvedActions(
+    organizationId: string,
+    instructions: PlaybookInstructions | null | undefined,
+  ): Promise<string[] | null> {
     const analysis = analyzeTiptapInstructions(toTiptapInstructions(instructions));
     if (analysis.actions.length === 0) {
       return [];
@@ -143,26 +163,15 @@ export class PlaybookService {
       // Validation must never block a save — without the registry we cannot
       // tell valid from invalid, so report nothing rather than false alarms.
       logger.warn({ err: error, organizationId }, "Could not load tools for action validation");
-      return [];
+      return null;
     }
 
-    const warnings: string[] = [];
-    for (const action of analysis.actions) {
+    return analysis.actions.filter((action) => {
       const bareName = action.includes(":") ? action.slice(action.lastIndexOf(":") + 1) : action;
-      const resolves = toolNames.some(
+      return !toolNames.some(
         (name) => name === action || name === bareName || name.endsWith(`:${bareName}`),
       );
-      if (!resolves) {
-        warnings.push(
-          `Referenced action "${action}" does not match any available tool — the agent will not be able to call it.`,
-        );
-      }
-    }
-
-    if (warnings.length > 0) {
-      logger.warn({ organizationId, warnings }, "Playbook references unavailable actions");
-    }
-    return warnings;
+    });
   }
 
   async getPlaybooks(organizationId: string): Promise<Playbook[]> {
@@ -212,7 +221,8 @@ export class PlaybookService {
       ...updateData,
       ...(agents !== undefined && { agents }),
       ...(approvalCategories !== undefined && {
-        approval_categories: approvalCategories.length > 0 ? [...new Set(approvalCategories)] : null,
+        approval_categories:
+          approvalCategories.length > 0 ? [...new Set(approvalCategories)] : null,
       }),
     });
   }

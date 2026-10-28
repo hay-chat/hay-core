@@ -14,6 +14,9 @@ export const INSIGHT_RUN_KINDS = [
   "close_classification",
   "feedback_enrichment",
   "embedding",
+  "cluster_naming",
+  "docs_audit",
+  "backfill_review",
 ] as const;
 export type InsightRunKind = (typeof INSIGHT_RUN_KINDS)[number];
 

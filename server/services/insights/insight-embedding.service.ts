@@ -76,6 +76,7 @@ export class InsightEmbeddingService {
               i.paraphrase, i.detail
        FROM insight_issues i
        WHERE i.enriched_at IS NOT NULL
+         AND i.source <> 'docs_audit'
          AND NOT (i.organization_id = ANY($2::uuid[]))
          AND NOT EXISTS (SELECT 1 FROM insight_issue_embeddings e WHERE e.insight_issue_id = i.id)
        ORDER BY i.created_at ASC
