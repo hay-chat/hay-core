@@ -2,6 +2,7 @@ import { defineHayPlugin } from "@hay/plugin-sdk";
 import { GraphClient } from "./graph-client.js";
 import { webhookHandler } from "./webhook.js";
 import { deliverHandler } from "./deliver.js";
+import { SentMessageTracker } from "./echo.js";
 
 /**
  * Instagram Channel Plugin (shared Hay Meta app)
@@ -32,6 +33,9 @@ export default defineHayPlugin((globalCtx) => {
   // lifecycle hooks via closure.
   let graphClient: GraphClient | null = null;
   let accessToken: string | null = null;
+  // Meta app id, to recognise echoes of Hay.chat's own sends (D11-11).
+  let appId: string | null = null;
+  const tracker = new SentMessageTracker();
 
   return {
     name: "Instagram",
@@ -147,6 +151,8 @@ export default defineHayPlugin((globalCtx) => {
           getGraphClient: () => graphClient,
           getAccessToken: () => accessToken,
           logger,
+          tracker,
+          ownAppIds: [appId],
         });
       });
 
@@ -156,6 +162,7 @@ export default defineHayPlugin((globalCtx) => {
           getGraphClient: () => graphClient,
           getAccessToken: () => accessToken,
           logger,
+          tracker,
         });
       });
 
@@ -184,6 +191,7 @@ export default defineHayPlugin((globalCtx) => {
 
     async onStart(ctx) {
       ctx.logger.info("Starting Instagram plugin", { orgId: ctx.org.id });
+      appId = ctx.config.getOptional<string>("clientId")?.trim() || null;
 
       const authState = ctx.auth.get();
       const token = authState?.credentials.accessToken;

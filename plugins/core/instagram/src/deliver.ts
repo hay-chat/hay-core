@@ -2,6 +2,7 @@ import type { Request, Response } from "express";
 import type { HayLogger } from "@hay/plugin-sdk/types";
 import type { GraphClient, InstagramAttachmentType } from "./graph-client.js";
 import { GraphApiError } from "./graph-client.js";
+import type { SentMessageTracker } from "./echo.js";
 
 export interface DeliverContext {
   /** Resolves the Graph client (built in onStart once credentials exist). */
@@ -9,6 +10,8 @@ export interface DeliverContext {
   /** Resolves the page/IG access token used to send outbound DMs. */
   getAccessToken: () => string | null;
   logger: HayLogger;
+  /** Remembers the mids sent here so their echoes are not mistaken for the owner's (D11-11). */
+  tracker?: SentMessageTracker;
 }
 
 interface DeliverPayload {
@@ -114,13 +117,20 @@ export async function deliverHandler(
 
     // Instagram has no captions: each file is its own DM, then the text.
     const sentIds: string[] = [];
-    try {
+    const sendAll = async () => {
       for (const file of files) {
-        sentIds.push(await graphClient.sendAttachment(recipientPsid, file, accessToken));
+        const mid = await graphClient.sendAttachment(recipientPsid, file, accessToken);
+        ctx.tracker?.remember(mid);
+        sentIds.push(mid);
       }
       if (content) {
-        sentIds.push(await graphClient.sendText(recipientPsid, content, accessToken));
+        const mid = await graphClient.sendText(recipientPsid, content, accessToken);
+        ctx.tracker?.remember(mid);
+        sentIds.push(mid);
       }
+    };
+    try {
+      await (ctx.tracker ? ctx.tracker.track(recipientPsid, sendAll) : sendAll());
     } catch (error) {
       // Part of the message already reached the shopper: report, don't retry.
       if (sentIds.length) {
