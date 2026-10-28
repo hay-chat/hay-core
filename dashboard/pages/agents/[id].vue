@@ -212,6 +212,8 @@
           </CardContent>
         </Card>
 
+        <ReadinessCard v-if="isEditMode && agentId" :agent-id="agentId" />
+
         <Card>
           <CardHeader>
             <CardTitle>Human escalation</CardTitle>

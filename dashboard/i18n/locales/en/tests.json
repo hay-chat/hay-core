@@ -147,6 +147,24 @@
       "passedBefore": "passed before",
       "warnOnly": "You can still publish. Check the report to see what changed.",
       "openReport": "Open the test report"
+    },
+    "readiness": {
+      "title": "Soft-launch readiness",
+      "description": "How your team reviewed this agent's replies while Require Approval was on. Require Approval holds the AI's replies only; actions that change store data follow action approvals.",
+      "approvalOff": "Require Approval is off for this agent, so replies are sent without review.",
+      "week": "Week of {date}",
+      "approved": "Approved as written",
+      "edited": "Edited before sending",
+      "blocked": "Blocked",
+      "noWeeks": "No reviewed replies yet.",
+      "window": "Last {days} days: {reviewed} replies reviewed, {approved} approved as written, {edited} edited, {blocked} blocked.",
+      "waiting": "{count} replies are waiting for review.",
+      "hints": {
+        "approval_off": "Nothing to decide: replies are already sent automatically.",
+        "not_enough_reviews": "Keep reviewing. With at least {min} reviewed replies in {days} days you will see whether it is safe to auto-send.",
+        "too_many_changes": "Your team still changes more than 1 in 20 replies. Improve playbooks or knowledge from the edited replies first.",
+        "ready": "Your team changed fewer than 1 in 20 replies in the last {days} days. It may be safe to switch this agent to Auto-Send. Actions keep following action approvals."
+      }
     }
   }
 }

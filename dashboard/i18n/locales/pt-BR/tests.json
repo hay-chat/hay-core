@@ -147,6 +147,24 @@
       "passedBefore": "passava antes",
       "warnOnly": "Você ainda pode publicar. Veja o relatório para entender o que mudou.",
       "openReport": "Abrir o relatório de teste"
+    },
+    "readiness": {
+      "title": "Prontidão para o lançamento",
+      "description": "Como sua equipe revisou as respostas deste agente enquanto a Aprovação obrigatória estava ativa. A Aprovação obrigatória segura apenas as respostas da IA; ações que alteram dados da loja seguem as aprovações de ações.",
+      "approvalOff": "A Aprovação obrigatória está desativada para este agente, então as respostas são enviadas sem revisão.",
+      "week": "Semana de {date}",
+      "approved": "Aprovadas como escritas",
+      "edited": "Editadas antes do envio",
+      "blocked": "Bloqueadas",
+      "noWeeks": "Nenhuma resposta revisada ainda.",
+      "window": "Últimos {days} dias: {reviewed} respostas revisadas, {approved} aprovadas como escritas, {edited} editadas, {blocked} bloqueadas.",
+      "waiting": "{count} respostas aguardando revisão.",
+      "hints": {
+        "approval_off": "Nada a decidir: as respostas já são enviadas automaticamente.",
+        "not_enough_reviews": "Continue revisando. Com pelo menos {min} respostas revisadas em {days} dias você verá se é seguro enviar automaticamente.",
+        "too_many_changes": "Sua equipe ainda altera mais de 1 em cada 20 respostas. Melhore os playbooks ou o conhecimento a partir das respostas editadas primeiro.",
+        "ready": "Sua equipe alterou menos de 1 em cada 20 respostas nos últimos {days} dias. Pode ser seguro mudar este agente para Envio automático. As ações continuam seguindo as aprovações de ações."
+      }
     }
   }
 }
