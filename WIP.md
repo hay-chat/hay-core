@@ -1,3 +1,9 @@
+## 2026-10-28 04:20 — staging — W2 D8 part A + L13 evidence pack merged, hand-tested, fixes in
+- Merged 7ba8a51 (media ingest) + e78f8ba (evidence pack); migrations + order-links backfill run on hay_staging.
+- Manual ✓: widget photo upload/refusal, Inbox media, composer PDF → widget; evidence pack PDF/ZIP (hashes ok), Export menu entry.
+- Fixes: 81e6221 size as number + sent staff message keeps attachment; f77c85a pack shows the approved amount (not the AI's original) and images no longer overlap text.
+- Next: D8 part B + L7 lanes; then remaining W2 lanes and the Wave 2 review.
+
 ## 2026-10-28 04:00 — claude/w2-evidence-pack (L13) — D2-2..D2-5 done, committed, not pushed
 - D2-2 conversation PDF: store name + full date/time/UTC offset (org tz). D2-3 DisputeEvidenceService (server/services/dispute-evidence). D2-4 order_conversation_links (tool calls via recordAction + Message subscriber + `npm run order-links:backfill`). D2-5 /evidence page, evidencePacks router, PDF/ZIP (manifest + README).
 - Migration AddOrderConversationLinks1785762000000 (run on hay_test only).
