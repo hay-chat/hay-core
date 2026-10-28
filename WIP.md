@@ -1,3 +1,9 @@
+## 2026-10-28 — claude/always-fact-check (worktree, not pushed)
+- Stage 2 fact check now runs on every RESPOND, not only when Stage 1 sets requiresFactCheck (incident: "We absolutely do ship to Portugal" with zero docs went out).
+- Unflagged replies: one grounding-only LLM call (medium tier); >= mediumThreshold passes, below falls into the full assessment/recheck/escalate path (grounding score reused). Flagged replies unchanged.
+- No documents no longer short-circuits grounding to 0: LLM gets an explicit "No documents or tool results were retrieved" placeholder; en/pt/es prompts say claims score 0.0-0.2, claim-free replies 0.9-1.0.
+- Next: review, push, deploy; watch handoff rate and reply latency after deploy.
+
 ## 2026-10-28 — Meta App Review drafts
 - tasks/meta-app-review-messenger.md (1da6b710+): permission texts, reviewer notes, screencast script. Roger: reviewer login, screencast, submit.
 - Gap found: Meta deauthorize/data-deletion only reach the WhatsApp plugin, so Messenger connections are not cleared when a user removes the app.

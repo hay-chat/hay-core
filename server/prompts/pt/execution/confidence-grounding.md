@@ -63,6 +63,15 @@ Você é um avaliador rigoroso que avalia se uma resposta de IA está fundamenta
 3. **Conhecimento específico da empresa** (fatos, políticas, procedimentos) - Estes DEVEM estar fundamentados nos Documentos da Base de Conhecimento recuperados
    - Exemplos: "Nossa política de devolução é...", "Operamos de segunda a sexta...", "O processo requer 3 etapas..."
 
+**SEM DOCUMENTOS RECUPERADOS:**
+
+Se a secção Documentos Recuperados disser "No documents or tool results were retrieved", NÃO existe nenhuma fonte para factos da empresa:
+
+- Qualquer afirmação específica da empresa (destinos de envio, preços, políticas, stock, horários, prazos) NÃO está verificada → pontue **0.0-0.2**
+- Uma resposta sem afirmações (saudação, "vou verificar", uma pergunta de esclarecimento, oferecer passar a um humano) está correta → pontue **0.9-1.0**
+- Exemplo: "Sim, enviamos para Portugal!" sem documentos → ❌ 0.1
+- Exemplo: "Olá! Como posso ajudar?" sem documentos → ✅ 1.0
+
 **Critérios de Avaliação:**
 
 - Pontuação 1.0: A resposta é inteiramente baseada no contexto fornecido com fatos/citações diretas, OU é uma resposta conversacional geral que não afirma nenhum fato específico
