@@ -138,6 +138,61 @@ const jobRegistry: CronJobConfig[] = [
   },
 
   {
+    name: "insight-clustering",
+    description:
+      "Nightly incremental clustering of insight issues: join/create, merge, promotion gate, recurrence (D3-12)",
+    schedule: "15 4 * * *", // Daily at 4:15 AM, after retention
+    handler: async () => {
+      const { insightClusteringService } = await import("./insights/insight-clustering.service");
+      await insightClusteringService.runAll();
+    },
+    singleton: true,
+    enabled: true,
+    timeout: 1800000, // 30 minutes max
+  },
+
+  {
+    name: "insight-weekly-digest",
+    description: "Weekly Insights digest email to owners and admins",
+    schedule: "0 8 * * 1", // Mondays at 8:00 AM, after the docs audit
+    handler: async () => {
+      const { insightDigestService } = await import("./insights/insight-digest.service");
+      await insightDigestService.runAll();
+    },
+    singleton: true,
+    enabled: true,
+    timeout: 1800000, // 30 minutes max
+  },
+
+  {
+    name: "insight-backfill",
+    description:
+      "Insights-only review of the last 30 days of closed conversations when Insights is enabled (D3-18)",
+    schedule: 120000, // Every 2 minutes, 10 conversations per org per run
+    handler: async () => {
+      const { insightBackfillService } = await import("./insights/insight-backfill.service");
+      await insightBackfillService.processPending(10);
+    },
+    singleton: true,
+    enabled: true,
+    skipDatabaseLogging: true,
+    timeout: 600000, // 10 minutes max
+  },
+
+  {
+    name: "insight-docs-audit",
+    description: "Weekly docs audit and broken playbook action check as an Insights input (D3-15)",
+    schedule: "0 5 * * 1", // Mondays at 5:00 AM
+    handler: async () => {
+      const { docsAuditInsightService } = await import("./insights/docs-audit-insight.service");
+      await docsAuditInsightService.runAll();
+    },
+    singleton: true,
+    enabled: true,
+    timeout: 3600000, // 1 hour max
+  },
+
+  {
     name: "pending-action-expiry",
     description:
       "Expire AI actions that got no approval in time and hand the conversation to the team",

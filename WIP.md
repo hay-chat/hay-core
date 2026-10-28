@@ -1,7 +1,17 @@
+## 2026-10-28 08:20 — staging — W3 L12b insights merged, hand-tested
+- Merged claude/w3-insights-b (8e1e14a); migration AddInsightClusters1785840000000 on hay_staging. Fix c3472cb: EmptyState no longer renders an empty button.
+- Hand test: backfill (0 new, correct), min size 5→2 saved, clustering promoted+named 3 positive patterns, detail/evidence/filters, reject+reason in History, reopen; docs audit ran (0 findings); digest once per week. Staging min cluster size left at 2.
+- Guide: seo insights/README.md (7edd633, unpushed). Running: L7b. Next: L13 (+ L5 after L7b).
 ## 2026-10-28 08:00 — staging — W3 L7a test-before-go-live merged, hand-tested
 - Merged claude/w3-golive-a with migrations renumbered to 1785830000000/1785831000000 (run on hay_staging).
 - Hand test: "Test this draft" playground followed the draft; Compare with active diff works; simulations.start run completed (usage logged); simulation conversation hidden from Inbox; testTranscripts paste import OK.
 - Running: L12b. Next: L7b (runs/import UI, D7-9..14, D3-17), migrations 1785850000000+.
+## 2026-10-28 — claude/w3-insights-b (L12b)
+- Done: D3-12 clustering, D3-13 Insights page, D3-14 approve→executor, D3-15 weekly docs audit, D3-16 recurrence/fixed/archive, D3-18 backfill+tuning, weekly digest.
+- Migration AddInsightClusters1785840000000 run on hay_test only. Not pushed.
+- Gaps: docs-audit LLM tokens unmetered; digest claims week before send; no dashboard component tests.
+- Next: orchestrator review/merge to staging, run migration, hand-test.
+
 ## 2026-10-28 07:30 — staging — W3 L12a insights foundations merged, hand-tested
 - Merged claude/w3-insights-a (dcb08c8); 2 migrations on hay_staging; feedback backfill run. Fix d5594f6 bracket placeholders.
 - Running: L7a. Next: L12b (clustering, Insights page, digest).
