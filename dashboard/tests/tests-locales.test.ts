@@ -30,4 +30,14 @@ describe("tests locales", () => {
       expect(strings(read(locale).tests.report).join("\n")).not.toContain("%");
     }
   });
+
+  it("never claims Require Approval holds actions", () => {
+    // D7-13: approval holds replies only; D4 action approvals are separate.
+    const claims = [/approval holds? (the )?actions/i, /segura (também )?(as )?ações/i];
+    for (const locale of ["en", "pt-BR"]) {
+      const text = strings(read(locale)).join("\n");
+      for (const claim of claims) expect(text).not.toMatch(claim);
+      expect(strings(read(locale).tests.readiness).join("\n")).not.toContain("%");
+    }
+  });
 });

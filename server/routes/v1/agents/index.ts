@@ -1,6 +1,7 @@
 import { t, scopedProcedure } from "@server/trpc";
 import { z } from "zod";
 import { AgentService } from "../../../services/agent.service";
+import { softLaunchReadinessService } from "@server/services/soft-launch-readiness.service";
 import { TRPCError } from "@trpc/server";
 import { RESOURCES, ACTIONS } from "@server/types/scopes";
 import { SupportedLanguage } from "@server/types/language.types";
@@ -45,6 +46,27 @@ export const agentsRouter = t.router({
     const agents = await agentService.getAgents(ctx.organizationId!);
     return agents;
   }),
+
+  /**
+   * Soft-launch readiness (D7-13): weekly approve/edit/block counts of the
+   * agent's replies under Require Approval, and whether it may be safe to
+   * turn approval off.
+   */
+  readiness: scopedProcedure(RESOURCES.AGENTS, ACTIONS.READ)
+    .input(
+      z
+        .object({
+          agentId: z.string().uuid().optional(),
+          weeks: z.number().int().min(1).max(26).default(8),
+        })
+        .optional(),
+    )
+    .query(async ({ ctx, input }) =>
+      softLaunchReadinessService.forOrganization(ctx.organizationId!, {
+        agentId: input?.agentId,
+        weeks: input?.weeks ?? 8,
+      }),
+    ),
 
   get: scopedProcedure(RESOURCES.AGENTS, ACTIONS.READ)
     .input(
