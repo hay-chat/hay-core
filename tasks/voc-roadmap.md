@@ -179,6 +179,11 @@ D9-7, D9-10) · L13: D2-2..5 · X: D15-4, D15-6..12, D1-12, D12-3/4, D16-3, D16-
 L12: D3-6, 7, 9, 11..16, 18 · L4/L9: D7-5..14, D3-17 · L13: D2-1 spike, D2-7, D2-8 · L5: D10-7, D10-8, D10-4/5 (after
 lawyer sign-off) · L6/X: D12-9, D12-10.
 
+Lane split (prompts in scratchpad lane-w3-*.md), two at a time: (1) L12a D3-6/7/9/11 + L7a D7-5..8 → (2) L12b D3-12..16/18 + L7b
+D7-9..14, D3-17 → (3) L13 D2-1 spike/D2-7/D2-8 + L5 D10-7/8 → (4) L6 D12-9/10 (website draft PR). D10-4/5 stay blocked on the
+lawyer sign-off. D18/D19/D20 research (Nuvemshop parity, quick check + offline hand-off, plugin setup UX) was written after this plan
+and is not scheduled — ask Roger whether it becomes Wave 4.
+
 Parked: D13-15, D16-10/11, D6-14, D2-10, D7-15, D8-18, D10-9, D11-13, D14-10, fraud flags.
 
 ## Test stores and fixtures
