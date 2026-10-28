@@ -10,7 +10,7 @@ const logger = createLogger("push-notifications");
 
 /** What the dashboard's service worker (dashboard/public/sw.js) receives. */
 export interface PushPayload {
-  kind: "conversation_needs_attention" | "channel_delivery_failed" | "test";
+  kind: "conversation_needs_attention" | "channel_delivery_failed" | "channel_failing" | "test";
   title: string;
   body: string;
   /** Path on the dashboard origin the notification opens, e.g. /conversations/<id>?org=<orgId>. */
@@ -179,6 +179,36 @@ class PushNotificationService {
       body: copy.body,
       url: `/conversations/${args.conversationId}?org=${args.organizationId}`,
       tag: `delivery-failed:${args.conversationId}`,
+    });
+  }
+
+  /**
+   * A channel is failing (channel-health.service, D13-11): every active owner
+   * and admin. Copy is localized by the caller.
+   */
+  async onChannelFailing(args: {
+    organizationId: string;
+    title: string;
+    body: string;
+    url: string;
+    tag: string;
+  }): Promise<void> {
+    if (!this.isConfigured()) return;
+    const subscriptions = await this.repo()
+      .createQueryBuilder("s")
+      .innerJoin(
+        "user_organizations",
+        "uo",
+        "uo.user_id = s.user_id AND uo.organization_id = :organizationId AND uo.is_active = true AND uo.role IN (:...roles)",
+        { organizationId: args.organizationId, roles: ["owner", "admin"] },
+      )
+      .getMany();
+    await this.deliver(subscriptions, {
+      kind: "channel_failing",
+      title: args.title,
+      body: args.body,
+      url: args.url,
+      tag: args.tag,
     });
   }
 

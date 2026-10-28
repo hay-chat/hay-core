@@ -113,6 +113,30 @@ export function threadingFromMessages(
   return { inReplyTo, references, subject };
 }
 
+/**
+ * From address for a reply (D13-9): the merchant's support address once core
+ * reports its domain as the organization's verified sending domain, else the
+ * platform address. A failed lookup falls back to the platform address.
+ */
+export async function senderAddress(
+  settings: { supportAddress: string | null; fromAddress: string },
+  ctx: Pick<ChannelContext, "api" | "logger">,
+): Promise<string> {
+  if (!settings.supportAddress) return settings.fromAddress;
+  try {
+    const { domain } = await ctx.api.query<{ domain: string | null }>("email.sendingDomain", {});
+    const supportDomain = splitAddress(settings.supportAddress).domain.toLowerCase();
+    return domain && domain.toLowerCase() === supportDomain
+      ? settings.supportAddress
+      : settings.fromAddress;
+  } catch (error: unknown) {
+    ctx.logger.warn("Could not read the verified sending domain; using the platform address", {
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return settings.fromAddress;
+  }
+}
+
 export async function deliver(
   payload: unknown,
   ctx: ChannelContext,
@@ -144,7 +168,8 @@ export async function deliver(
   }
 
   const threading = threadingFromMessages(messages, parsed.conversationMetadata);
-  const fromDomain = splitAddress(settings.fromAddress).domain;
+  const fromAddress = await senderAddress(settings, ctx);
+  const fromDomain = splitAddress(fromAddress).domain;
   const ourMessageId = outboundMessageId(parsed.messageId, fromDomain);
 
   // RFC 3834 + the Exchange equivalent: tell the shopper's auto-responders
@@ -201,7 +226,7 @@ export async function deliver(
       subject: replySubject(threading.subject, fallbackSubject),
       body,
       html: textToHtml(body),
-      from: { email: settings.fromAddress, name: settings.storeName },
+      from: { email: fromAddress, name: settings.storeName },
       replyTo: tokenAddress(settings.alias, parsed.conversationId),
       bcc: settings.bccArchive && settings.supportAddress ? [settings.supportAddress] : undefined,
       headers,

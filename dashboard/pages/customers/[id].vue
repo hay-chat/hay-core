@@ -22,6 +22,7 @@
     </div>
 
     <template v-else-if="customer">
+      <CustomerMergeSuggestions :customer-id="customerId" class="mb-4" @merged="load" />
       <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <!-- Profile / contact -->
         <Card class="lg:col-span-1">
@@ -150,8 +151,11 @@ const customer = ref<CustomerDetail | null>(null);
 const conversations = ref<CustomerConversation[]>([]);
 const loading = ref(true);
 
+// "_"-prefixed keys are Hay.chat bookkeeping (e.g. merged identities), not channels.
 const channels = computed(() =>
-  customer.value?.external_metadata ? Object.keys(customer.value.external_metadata) : [],
+  customer.value?.external_metadata
+    ? Object.keys(customer.value.external_metadata).filter((k) => !k.startsWith("_"))
+    : [],
 );
 
 const displayName = computed(() => getCustomerDisplayName(customer.value, channels.value[0]));
@@ -178,7 +182,7 @@ const viewConversation = (id: string) => router.push(`/conversations/${id}`);
 /** D2-5: evidence packs for this customer's orders. */
 const openEvidencePack = () => router.push({ path: "/evidence", query: { customer: customerId } });
 
-onMounted(async () => {
+const load = async () => {
   loading.value = true;
   try {
     const [c, convs] = await Promise.all([
@@ -192,5 +196,7 @@ onMounted(async () => {
   } finally {
     loading.value = false;
   }
-});
+};
+
+onMounted(load);
 </script>

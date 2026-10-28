@@ -317,6 +317,8 @@ export const getPlugin = authenticatedProcedure
       oauthConfigured,
       oauthConnected,
       auth: instance ? instance.authState : undefined,
+      // Generic "channel failing" signal (D13-11); null when never reported.
+      channelHealth: instance?.channelHealth ?? null,
     };
   });
 

@@ -81,6 +81,8 @@ export function fakeApi(
     sendResult?: SendEmailResult;
     sendThrows?: Error;
     queryThrows?: Error;
+    /** What `email.sendingDomain` reports (D13-9). */
+    sendingDomain?: string | null;
     /** media.upload fails for these filenames, as core does for refused types. */
     uploadRejects?: string[];
   } = {},
@@ -118,6 +120,9 @@ export function fakeApi(
       api.queries.push({ procedure, input });
       if (options.queryThrows) {
         throw options.queryThrows;
+      }
+      if (procedure === "email.sendingDomain") {
+        return { domain: options.sendingDomain ?? null } as T;
       }
       return (options.messages ?? []) as T;
     },

@@ -1,0 +1,29 @@
+{
+  "name": "Messenger",
+  "description": "Conecte suas Páginas do Facebook e responda conversas do Messenger com a IA do Hay.chat",
+  "tools": {},
+  "config": {},
+  "setup": {
+    "title": "Guia de Configuração do Messenger",
+    "intro": "Conecte suas Páginas do Facebook ao Hay.chat. Depois de conectadas, as conversas do Messenger com suas Páginas são respondidas pela IA do Hay.chat, e as respostas voltam direto para a conversa no Messenger.",
+    "step1": {
+      "title": "Conecte suas Páginas",
+      "body": "Clique no botão <strong>Conectar</strong> acima e entre com o Facebook. Escolha as Páginas que o Hay.chat deve atender e aprove as permissões solicitadas. O Hay.chat armazena a conexão com segurança, sem tokens para copiar ou colar.",
+      "hint": "Você precisa administrar as Páginas do Facebook que conectar. Para adicionar uma Página depois, conecte novamente e selecione-a."
+    },
+    "step2": {
+      "title": "Fotos, vídeos e mensagens de voz",
+      "body": "O Hay.chat guarda as fotos, vídeos, mensagens de voz e arquivos que os clientes enviam e transcreve as mensagens de voz para que a IA possa respondê-las. Figurinhas, localizações e links compartilhados aparecem como uma nota curta. Sua equipe e a IA podem enviar fotos, vídeos, áudios e PDFs de volta."
+    },
+    "step3": {
+      "title": "Respostas após 24 horas",
+      "body": "O Messenger permite uma resposta livre em até <strong>24 horas</strong> após a última mensagem do cliente. Depois disso, uma resposta escrita por uma pessoa da sua equipe ainda é enviada por até <strong>7 dias</strong>. A IA só responde dentro das 24 horas."
+    },
+    "step4": {
+      "title": "Onde as mensagens aparecem",
+      "body": "Novas conversas do Messenger aparecem na sua caixa de entrada do Hay.chat. Respostas enviadas pela caixa de entrada da Página ou pelo Meta Business Suite também aparecem lá, e a IA para de responder essa conversa.",
+      "hint": "Para atribuir um agente, vá em <strong>Configurações &rarr; Canais</strong> e selecione um agente para o canal do Messenger."
+    },
+    "windowNote": "<strong>Janela de mensagens:</strong> a IA pode responder em até 24 horas após a última mensagem do cliente. Uma pessoa da sua equipe pode responder por até 7 dias. Depois disso, aguarde o cliente escrever novamente."
+  }
+}

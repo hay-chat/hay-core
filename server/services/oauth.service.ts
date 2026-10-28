@@ -881,6 +881,12 @@ export class OAuthService {
         return { ok: false, routingKeyCount: 0 };
       }
 
+      // A fresh connection ends any earlier "channel failing" state (D13-11).
+      const { channelHealthService } = await import("./channel-health.service");
+      await channelHealthService.markOk(organizationId, pluginId).catch((error: unknown) => {
+        logger.warn({ err: error, pluginId, organizationId }, "Could not clear channel health");
+      });
+
       const result = (await response.json()) as {
         routingKeys?: unknown;
         account?: unknown;

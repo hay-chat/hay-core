@@ -1,7 +1,8 @@
 import type { Request, Response } from "express";
 import type { HayLogger } from "@hay/plugin-sdk/types";
-import type { GraphClient, InstagramAttachmentType } from "./graph-client.js";
+import type { GraphClient, InstagramAttachmentType, SendMode } from "./graph-client.js";
 import { GraphApiError } from "./graph-client.js";
+import type { SentMessageTracker } from "./echo.js";
 
 export interface DeliverContext {
   /** Resolves the Graph client (built in onStart once credentials exist). */
@@ -9,12 +10,16 @@ export interface DeliverContext {
   /** Resolves the page/IG access token used to send outbound DMs. */
   getAccessToken: () => string | null;
   logger: HayLogger;
+  /** Remembers the mids sent here so their echoes are not mistaken for the owner's (D11-11). */
+  tracker?: SentMessageTracker;
 }
 
 interface DeliverPayload {
   to: string;
   content: string;
   messageId: string;
+  /** Who wrote it; "HumanAgent" may use Meta's Human Agent tag after 24 hours. */
+  messageType?: string;
   conversationId: string;
   conversationMetadata?: Record<string, any> | null;
   messageMetadata?: Record<string, any> | null;
@@ -39,8 +44,11 @@ export function instagramAttachmentType(mimeType: string): InstagramAttachmentTy
  * subcode ~2534022. We match defensively on code/subcode/message so we don't
  * 500 (and trigger a useless retry) on a permanent, expected failure.
  */
-function is24hWindowError(error: GraphApiError): boolean {
-  if (error.subcode === 2534022) {
+export function is24hWindowError(error: unknown): boolean {
+  if (!(error instanceof GraphApiError)) {
+    return false;
+  }
+  if (error.subcode === 2534022 || error.subcode === 2018278) {
     return true;
   }
   if (error.code === 10 && /24|outside.*window|messaging window/i.test(error.message)) {
@@ -56,6 +64,9 @@ function is24hWindowError(error: GraphApiError): boolean {
  * Flow:
  *   1. Send each attachment as its own DM (Instagram has no captions), D8-17.
  *   2. Send the text via POST /me/messages using the org's access token.
+ *      When Meta refuses because the 24-hour window has closed and a PERSON
+ *      wrote the reply, the whole message is sent again with the HUMAN_AGENT
+ *      tag (allowed up to 7 days). AI replies never use it.
  *   3. Return { success:true, providerMessageId } so Hay stores the Meta mid.
  *
  * Error semantics (chatwoot pattern — never retry permanent provider errors):
@@ -82,7 +93,8 @@ export async function deliverHandler(
       return;
     }
 
-    const { to, content, messageId, conversationId, attachments } = req.body as DeliverPayload;
+    const { to, content, messageId, messageType, conversationId, attachments } =
+      req.body as DeliverPayload;
 
     const files = (Array.isArray(attachments) ? attachments : []).flatMap((file) => {
       const type = instagramAttachmentType(file?.type ?? "");
@@ -114,12 +126,32 @@ export async function deliverHandler(
 
     // Instagram has no captions: each file is its own DM, then the text.
     const sentIds: string[] = [];
-    try {
+    const sendAll = (mode: SendMode) => async () => {
       for (const file of files) {
-        sentIds.push(await graphClient.sendAttachment(recipientPsid, file, accessToken));
+        const mid = await graphClient.sendAttachment(recipientPsid, file, accessToken, mode);
+        ctx.tracker?.remember(mid);
+        sentIds.push(mid);
       }
       if (content) {
-        sentIds.push(await graphClient.sendText(recipientPsid, content, accessToken));
+        const mid = await graphClient.sendText(recipientPsid, content, accessToken, mode);
+        ctx.tracker?.remember(mid);
+        sentIds.push(mid);
+      }
+    };
+    const run = (mode: SendMode) =>
+      ctx.tracker ? ctx.tracker.track(recipientPsid, sendAll(mode)) : sendAll(mode)();
+    try {
+      try {
+        await run("response");
+      } catch (error) {
+        // Nothing went out and the window has closed: a person may still reply.
+        if (sentIds.length || !is24hWindowError(error) || messageType !== "HumanAgent") {
+          throw error;
+        }
+        logger.info("Instagram window closed — resending a person's reply with the Human Agent tag", {
+          messageId,
+        });
+        await run("human_agent");
       }
     } catch (error) {
       // Part of the message already reached the shopper: report, don't retry.

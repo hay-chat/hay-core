@@ -31,6 +31,8 @@ import type {
   RemoteMCPServerConfig,
 } from "@server/types/plugin.types";
 import { createLogger } from "@server/lib/logger";
+import { emailDomainService } from "@server/services/email-domains.service";
+import { channelHealthService } from "@server/services/channel-health.service";
 import type { Conversation } from "@server/database/entities/conversation.entity";
 
 const logger = createLogger("plugin-api-trpc");
@@ -77,6 +79,18 @@ const customerRepository = new CustomerRepository();
 const conversationRepository = new ConversationRepository();
 const messageRepository = new MessageRepository();
 const agentRepository = new AgentRepository();
+
+/**
+ * Conversation metadata for a customer reached through an identity it took
+ * over in a merge (D13-13): replies go to that identity, not the customer's
+ * own external_id (which belongs to another channel).
+ */
+function recipientMetadata(
+  customer: { external_id: string | null },
+  identity: string,
+): Record<string, unknown> {
+  return customer.external_id !== identity ? { customerExternalId: identity } : {};
+}
 
 /**
  * Plugin API Router (tRPC)
@@ -158,6 +172,24 @@ export const pluginApiTrpcRouter = router({
       const organizationId = ctx.pluginAuth.organizationId;
 
       try {
+        // An echo of a message Hay.chat itself sent (the provider id was stored
+        // at delivery) is not a human reply: never store it twice and never let
+        // it take the conversation away from the AI (D13-8, D11-11).
+        if (senderType === "human_agent" && typeof metadata?.mid === "string" && metadata.mid) {
+          const ownSend = await messageRepository.findByProviderMessageIdAndOrganization(
+            metadata.mid,
+            organizationId,
+          );
+          if (ownSend) {
+            return {
+              messageId: null,
+              conversationId: ownSend.conversation_id,
+              processed: false,
+              deduped: true,
+            };
+          }
+        }
+
         // Find or create customer
         let customer = await customerRepository.findByExternalId(from, organizationId);
 
@@ -263,6 +295,10 @@ export const pluginApiTrpcRouter = router({
         };
 
         if (!conversation) {
+          const metadata: Record<string, unknown> = {
+            ...(Object.keys(channelMetadata).length ? { [channel]: channelMetadata } : {}),
+            ...recipientMetadata(customer, from),
+          };
           conversation = await conversationRepository.create({
             organization_id: organizationId,
             customer_id: customer.id,
@@ -270,7 +306,7 @@ export const pluginApiTrpcRouter = router({
             channel,
             status: "open",
             title: title ?? "",
-            metadata: Object.keys(channelMetadata).length ? { [channel]: channelMetadata } : null,
+            metadata: Object.keys(metadata).length ? metadata : null,
           });
         } else if (externalConversationId) {
           // Conversation already exists — store the externalConversationId if
@@ -462,6 +498,7 @@ export const pluginApiTrpcRouter = router({
           );
 
           if (!conversation) {
+            const metadata = recipientMetadata(customer, to);
             conversation = await conversationRepository.create({
               organization_id: organizationId,
               customer_id: customer.id,
@@ -469,6 +506,7 @@ export const pluginApiTrpcRouter = router({
               channel,
               status: "open",
               title: "",
+              metadata: Object.keys(metadata).length ? metadata : null,
             });
           }
         }
@@ -549,6 +587,18 @@ export const pluginApiTrpcRouter = router({
         providerStatus: input.status,
         providerError,
       });
+
+      if (isFailure) {
+        // Best effort: a health check problem never fails the status update.
+        void (async () => {
+          const conversation = await conversationRepository.findById(message.conversation_id);
+          if (conversation) {
+            await channelHealthService.recordDeliveryFailure(organizationId, conversation.channel);
+          }
+        })().catch((error: unknown) => {
+          logger.warn({ err: error, messageId: message.id }, "Channel health check failed");
+        });
+      }
 
       // Status-only event: never `message_received`, which channel-delivery
       // would treat as a new outbound message and re-deliver.
@@ -657,9 +707,53 @@ export const pluginApiTrpcRouter = router({
         "Plugin reported revoked connection",
       );
       scheduleConnectionRevoke(organizationId, pluginId);
+      void channelHealthService
+        .markFailing(organizationId, pluginId, "token_revoked", input.reason)
+        .catch((error: unknown) => {
+          logger.error({ err: error, organizationId, pluginId }, "Channel health update failed");
+        });
 
       return { revoked: true as const };
     }),
+
+  /**
+   * Report the channel's own health (D13-11), e.g. the provider lowered the
+   * account's quality rating. "failing" alerts the org's owners and admins
+   * (throttled); "ok" clears a failure the plugin reported. Core-detected
+   * failures (failed deliveries, revoked connection) are cleared by core.
+   */
+  "channel.reportHealth": pluginProcedure
+    .input(
+      z.object({
+        status: z.enum(["ok", "failing"]),
+        detail: z.string().max(200).optional(),
+      }),
+    )
+    .mutation(async ({ input, ctx }) => {
+      requireCapability(ctx, "messages");
+      const { organizationId, pluginId } = ctx.pluginAuth;
+      if (input.status === "failing") {
+        await channelHealthService.markFailing(
+          organizationId,
+          pluginId,
+          "quality_drop",
+          input.detail,
+        );
+      } else {
+        await channelHealthService.markOk(organizationId, pluginId, ["quality_drop"]);
+      }
+      return { ok: true as const };
+    }),
+
+  /**
+   * The organization's verified custom sending domain (D13-9), or null. Email
+   * plugins send From the merchant's own address only when its domain matches;
+   * the platform address stays the default.
+   */
+  "email.sendingDomain": pluginProcedure.query(async ({ ctx }) => {
+    requireCapability(ctx, "email");
+    return { domain: await emailDomainService.verifiedDomain(ctx.pluginAuth.organizationId) };
+  }),
 
   /**
    * Replace the shared-webhook routing keys owned by the calling plugin instance.

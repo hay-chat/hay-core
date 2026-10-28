@@ -35,6 +35,7 @@ const mockConversationRepo = {
   findActiveByCustomerAndChannel: jest.fn<() => Promise<unknown>>(),
   findByExternalConversationId: jest.fn<(...args: unknown[]) => Promise<unknown>>(),
   findByIdAndOrganization: jest.fn<(...args: unknown[]) => Promise<unknown>>(),
+  findById: jest.fn<(...args: unknown[]) => Promise<unknown>>(),
   create: jest.fn<(...args: unknown[]) => Promise<unknown>>(),
   update: jest.fn<(...args: unknown[]) => Promise<unknown>>(),
   updateById: jest.fn<(...args: unknown[]) => Promise<unknown>>(),
@@ -65,6 +66,14 @@ jest.mock("@server/repositories/organization.repository", () => ({
 }));
 jest.mock("@server/repositories/plugin-instance.repository", () => ({
   pluginInstanceRepository: {},
+}));
+const mockChannelHealth = {
+  recordDeliveryFailure: jest.fn<(...args: unknown[]) => Promise<void>>(async () => undefined),
+  markFailing: jest.fn<(...args: unknown[]) => Promise<void>>(async () => undefined),
+  markOk: jest.fn<(...args: unknown[]) => Promise<void>>(async () => undefined),
+};
+jest.mock("@server/services/channel-health.service", () => ({
+  channelHealthService: mockChannelHealth,
 }));
 jest.mock("@server/repositories/document.repository", () => ({ documentRepository: {} }));
 jest.mock("@server/services/mcp-registry.service", () => ({ mcpRegistryService: {} }));
@@ -227,6 +236,7 @@ describe("pluginApi.messages.receive conversation lookup", () => {
     jest.clearAllMocks();
     mockCustomerRepo.findByExternalId.mockResolvedValue({
       id: "cust-1",
+      external_id: "ana@shopper.com",
       name: "Ana",
       phone: null,
       email: null,
@@ -305,6 +315,34 @@ describe("pluginApi.messages.receive conversation lookup", () => {
       CONVERSATION_ID,
       ORG_ID,
       expect.objectContaining({ status: "pending-human" }),
+    );
+  });
+
+  it("a customer reached through a merged identity gets a conversation that replies to it (D13-13)", async () => {
+    mockCustomerRepo.findByExternalId.mockResolvedValue({
+      id: "cust-1",
+      external_id: "instagram:42",
+      name: "Ana",
+      phone: null,
+      email: null,
+      external_metadata: { _mergedExternalIds: ["ana@shopper.com"] },
+    });
+
+    await caller()["messages.receive"]({
+      from: "ana@shopper.com",
+      content: "Hello again",
+      channel: "email",
+      externalConversationId: "<third@shopper.com>",
+    });
+
+    expect(mockConversationRepo.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        customer_id: "cust-1",
+        metadata: {
+          email: { conversationId: "<third@shopper.com>" },
+          customerExternalId: "ana@shopper.com",
+        },
+      }),
     );
   });
 
@@ -523,6 +561,77 @@ describe("pluginApi.messages.receive replyWindowExpiresAt (D13-2)", () => {
   });
 });
 
+describe("pluginApi.messages.receive human echoes (D13-8, D11-11)", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockCustomerRepo.findByExternalId.mockResolvedValue({
+      id: "cust-1",
+      name: "Ana",
+      phone: null,
+      external_metadata: {},
+    });
+    mockAgentRepo.findByOrganization.mockResolvedValue([{ id: "agent-1", channels: ["whatsapp"] }]);
+    mockConversationRepo.findByIdAndOrganization.mockResolvedValue(null);
+    mockConversationRepo.findByExternalConversationId.mockResolvedValue(null);
+    mockConversationRepo.findActiveByCustomerAndChannel.mockResolvedValue(makeConversation());
+    mockConversationRepo.getMessages.mockResolvedValue([]);
+    mockMessageRepo.findByProviderMessageIdAndOrganization.mockResolvedValue(null);
+    mockMessageRepo.create.mockImplementation(async (data) => ({ id: "msg-new", ...data }));
+  });
+
+  it("stores the owner's app reply as a human message and takes the conversation over", async () => {
+    const result = await caller()["messages.receive"]({
+      from: "+5511999999999",
+      content: "Sent it this morning!",
+      channel: "whatsapp",
+      senderType: "human_agent",
+      metadata: { mid: "wamid.ECHO.1", echo: true },
+    });
+
+    expect(result.processed).toBe(true);
+    expect(mockMessageRepo.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: "HumanAgent",
+        providerMessageId: "wamid.ECHO.1",
+        metadata: expect.objectContaining({ externalOrigin: true }),
+      }),
+    );
+    expect(mockConversationRepo.update).toHaveBeenLastCalledWith(
+      CONVERSATION_ID,
+      ORG_ID,
+      expect.objectContaining({ status: "human-took-over", needs_processing: false }),
+    );
+  });
+
+  it("skips an echo of a message Hay.chat sent itself", async () => {
+    mockMessageRepo.findByProviderMessageIdAndOrganization.mockResolvedValue({
+      id: "bot-msg",
+      conversation_id: CONVERSATION_ID,
+    });
+
+    const result = await caller()["messages.receive"]({
+      from: "instagram:123",
+      content: "AI reply",
+      channel: "instagram",
+      senderType: "human_agent",
+      metadata: { mid: "mid.OWN" },
+    });
+
+    expect(result).toEqual({
+      messageId: null,
+      conversationId: CONVERSATION_ID,
+      processed: false,
+      deduped: true,
+    });
+    expect(mockMessageRepo.findByProviderMessageIdAndOrganization).toHaveBeenCalledWith(
+      "mid.OWN",
+      ORG_ID,
+    );
+    expect(mockMessageRepo.create).not.toHaveBeenCalled();
+    expect(mockConversationRepo.update).not.toHaveBeenCalled();
+  });
+});
+
 describe("pluginApi.messages.updateStatus", () => {
   const storedMessage = (providerStatus: string | null = null) => ({
     id: "msg-1",
@@ -624,6 +733,45 @@ describe("pluginApi.messages.updateStatus", () => {
         payload: expect.objectContaining({ providerStatus: "failed", providerError: error }),
       }),
     );
+  });
+
+  it("feeds a failure into the channel health check (D13-11)", async () => {
+    mockMessageRepo.findByProviderMessageIdAndOrganization.mockResolvedValue(storedMessage("sent"));
+    mockConversationRepo.findById.mockResolvedValue(makeConversation());
+
+    await caller()["messages.updateStatus"]({ providerMessageId: "wamid.1", status: "failed" });
+    await new Promise((resolve) => setImmediate(resolve));
+
+    expect(mockChannelHealth.recordDeliveryFailure).toHaveBeenCalledWith(ORG_ID, "whatsapp");
+  });
+});
+
+describe("pluginApi.channel.reportHealth (D13-11)", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it("marks a quality drop failing and clears only the plugin's own report", async () => {
+    await expect(
+      caller()["channel.reportHealth"]({ status: "failing", detail: "RED" }),
+    ).resolves.toEqual({ ok: true });
+    expect(mockChannelHealth.markFailing).toHaveBeenCalledWith(
+      ORG_ID,
+      expect.any(String),
+      "quality_drop",
+      "RED",
+    );
+
+    await caller()["channel.reportHealth"]({ status: "ok" });
+    expect(mockChannelHealth.markOk).toHaveBeenCalledWith(ORG_ID, expect.any(String), [
+      "quality_drop",
+    ]);
+  });
+
+  it("requires the messages capability", async () => {
+    await expect(
+      caller(ORG_ID, ["customers"])["channel.reportHealth"]({ status: "failing" }),
+    ).rejects.toThrow(/messages/);
   });
 });
 

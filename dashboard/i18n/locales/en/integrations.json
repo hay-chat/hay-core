@@ -260,6 +260,16 @@
       "oauthConnectedTo": "Successfully connected to {name}!",
       "oauthDisconnectedFrom": "Disconnected from {name}",
       "oauthDisconnectFailed": "Failed to disconnect"
+    },
+    "channelHealth": {
+      "failingTitle": "This channel is failing",
+      "since": "Since {time}",
+      "reasons": {
+        "delivery_failures": "{detail} replies could not be delivered in the last hour. Customers on this channel may not be getting answers.",
+        "token_revoked": "The connection was revoked or expired. Reconnect it to receive and send messages again.",
+        "quality_drop": "The provider lowered this channel's quality rating ({detail}). Messaging limits may drop if it keeps falling."
+      },
+      "alerted": "Owners and admins were notified by email and push."
     }
   }
 }

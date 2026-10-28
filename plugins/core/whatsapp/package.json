@@ -10,6 +10,10 @@
     "displayName": "WhatsApp",
     "category": "channel",
     "channel": "whatsapp",
+    "rendering": {
+      "markdown": "whatsapp",
+      "productRecommendations": "text"
+    },
     "capabilities": [
       "messages",
       "customers"

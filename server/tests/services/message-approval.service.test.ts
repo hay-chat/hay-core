@@ -33,6 +33,7 @@ jest.mock("@server/services/plugin-manager.service", () => ({
   pluginManagerService: {
     findPluginIdByChannel: mockFindPluginIdByChannel,
     getOrStartWorker: mockGetOrStartWorker,
+    getChannelRendering: () => ({}),
   },
 }));
 
