@@ -1,3 +1,7 @@
+## 2026-10-28 08:40 — staging — W3 L7b merged, hand-tested
+- Merged claude/w3-golive-b (0528417); migrations 1785850000000/1785851000000/1785852000000 on hay_staging. Fix 27c9561 (risky bucket red only when non-empty).
+- Hand test: Tests page replay → report (1 same answer, judge reason), Save as test case, readiness card copy (replies only), Start on Web Chat only saved channelAiModes. Test agent deleted + channel modes reset afterwards.
+- Guide: seo test-before-go-live (01f7ba5, unpushed). Running: L13 disputes, L5 Mercado Pago. Next: L6, then Wave 3 close.
 ## 2026-10-28 — claude/w3-golive-b (L7b)
 - Done: D7-9 replay runner, D7-10 judge + buckets, D7-11 /tests report (no %), D7-12 test cases + pre-publish warn, D7-13 agent readiness card, D7-14 channel AI "Off" + "Start on Web Chat only" + shared-channel responder rule, D3-17 Insight save-as-test + replay draft (staging merged in, e9e17c8).
 - Migrations (hay_test only): AddSimulationItemExpectations1785850000000, AddSimulationItemVerdicts1785851000000, AddTestCases1785852000000. Not pushed.
