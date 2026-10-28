@@ -33,6 +33,7 @@ import { isAnalyzable, PDF_TYPE, READABLE_IMAGE_TYPES as IMAGE_TYPES } from "./r
 import { toStoredAnalysis, type PrivacySettings } from "./privacy";
 import { redactCardNumbers } from "./redact";
 import { VisionUnavailableError, visionService, type VisionInput } from "./vision.service";
+import { isBotFlagged } from "@server/services/webchat/bot-check";
 
 const logger = createLogger("media-analysis");
 
@@ -240,9 +241,11 @@ export async function processMessageMedia(
 }
 
 /**
- * Files in a conversation held as spam, or whose bot check did not verify the
- * visitor, are not worth a vision call: the AI does not answer spam, and a
- * bot flooding photos would otherwise run up the org's vision cost.
+ * Files in a conversation held as spam, or whose visitor failed the bot check,
+ * are not worth a vision call: the AI does not answer spam, and a bot flooding
+ * photos would otherwise run up the org's vision cost. A check that could not
+ * run (Cloudflare unreachable) says nothing about the shopper and is no reason
+ * to skip.
  */
 async function visionSkipReason(conversationId: string): Promise<"spam" | "unverified" | null> {
   const conversation = await AppDataSource.getRepository(Conversation).findOne({
@@ -250,8 +253,7 @@ async function visionSkipReason(conversationId: string): Promise<"spam" | "unver
     select: { id: true, spam_flagged_at: true, metadata: true },
   });
   if (conversation?.spam_flagged_at) return "spam";
-  const botCheck = conversation?.metadata?.botCheck as { decision?: unknown } | undefined;
-  return botCheck?.decision === "flag" ? "unverified" : null;
+  return isBotFlagged(conversation?.metadata?.botCheck) ? "unverified" : null;
 }
 
 /** Merge the results into the message's current attachments (re-read) and store them. */
