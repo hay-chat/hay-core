@@ -50,10 +50,13 @@ export const testTranscriptsRouter = t.router({
       z.object({
         format: z.enum(fileFormats),
         content: z.string().min(1).max(MAX_IMPORT_CHARS),
+        businessName: z.string().trim().max(255).optional(),
       }),
     )
     .mutation(async ({ ctx, input }) =>
-      store(ctx, input.format, () => TRANSCRIPT_FILE_FORMATS[input.format](input.content)),
+      store(ctx, input.format, () =>
+        TRANSCRIPT_FILE_FORMATS[input.format](input.content, { businessName: input.businessName }),
+      ),
     ),
 
   list: scopedProcedure(RESOURCES.PLAYBOOKS, ACTIONS.READ)

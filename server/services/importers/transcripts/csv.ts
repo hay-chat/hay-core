@@ -22,7 +22,7 @@ export function parseCsv(content: string): string[][] {
   let row: string[] = [];
   let field = "";
   let quoted = false;
-  const text = content.replace(/^﻿/, "");
+  const text = content.replace(/^\uFEFF/, "");
 
   for (let i = 0; i < text.length; i++) {
     const char = text[i];
@@ -66,7 +66,12 @@ export function findColumns<K extends string>(
   header: string[],
   aliases: Record<K, string[]>,
 ): Record<K, number> {
-  const normalized = header.map((h) => h.trim().toLowerCase().replace(/[\s-]+/g, "_"));
+  const normalized = header.map((h) =>
+    h
+      .trim()
+      .toLowerCase()
+      .replace(/[\s-]+/g, "_"),
+  );
   const columns = {} as Record<K, number>;
   for (const key of Object.keys(aliases) as K[]) {
     columns[key] = normalized.findIndex((h) => aliases[key].includes(h));

@@ -1,6 +1,7 @@
 import { describe, it, expect } from "@jest/globals";
 import { parseCsv, parseGenericCsv } from "../../services/importers/transcripts/csv";
 import { parsePastedTranscripts } from "../../services/importers/transcripts/paste";
+import { parseWhatsAppExport } from "../../services/importers/transcripts/whatsapp";
 import {
   normalizeTranscripts,
   TranscriptImportError,
@@ -108,5 +109,44 @@ describe("transcript importers", () => {
       ]);
       expect(() => normalizeTranscripts([{ turns: [] }])).toThrow(/No conversations/);
     });
+  });
+});
+
+describe("WhatsApp export", () => {
+  it("reads an Android export: day-first dates, system lines and media skipped", () => {
+    const txt = [
+      "31/12/2025, 22:15 - Messages and calls are end-to-end encrypted. Tap to learn more.",
+      "31/12/2025, 22:15 - Maria: Oi, cadê meu pedido?",
+      "31/12/2025, 22:16 - Loja Bela: Qual o número do pedido?",
+      "31/12/2025, 22:17 - Maria: <Mídia oculta>",
+      "31/12/2025, 22:17 - Maria: #1001",
+      "é presente",
+    ].join("\n");
+    const [chat] = parseWhatsAppExport(txt, { businessName: "loja bela" });
+    expect(chat.turns.map((t) => [t.role, t.text])).toEqual([
+      ["customer", "Oi, cadê meu pedido?"],
+      ["agent", "Qual o número do pedido?"],
+      ["customer", "#1001\né presente"],
+    ]);
+    expect(chat.turns[0].timestamp).toBe("2025-12-31T22:15:00.000Z");
+  });
+
+  it("reads an iOS export with 12-hour times; first sender is the customer by default", () => {
+    const txt = [
+      "‎[1/2/26, 9:05:10 PM] Joe: Do you ship to Lisbon?",
+      "[1/2/26, 9:06:00 PM] Shop: Yes, in 3 days.",
+      "[1/2/26, 9:06:30 PM] Joe: ‎image omitted",
+    ].join("\n");
+    const [chat] = parseWhatsAppExport(txt);
+    expect(chat.title).toBe("Joe");
+    expect(chat.turns.map((t) => t.role)).toEqual(["customer", "agent"]);
+    expect(chat.turns[0].timestamp).toBe("2026-02-01T21:05:10.000Z");
+  });
+
+  it("refuses text that is not an export, or a business name nobody used", () => {
+    expect(() => parseWhatsAppExport("hello")).toThrow(TranscriptImportError);
+    expect(() =>
+      parseWhatsAppExport("31/12/2025, 22:15 - Maria: Oi", { businessName: "Other" }),
+    ).toThrow(/Nobody named "Other"/);
   });
 });
