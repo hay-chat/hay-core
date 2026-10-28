@@ -14,11 +14,14 @@ import type {
   McpServerInstance,
   McpInitializerContext,
   ExternalMcpOptions,
+  LocalMcpOptions,
   StdioMcpOptions,
+  ToolRiskSpec,
 } from "../types/index.js";
 import type { HayConfigRuntimeAPI, HayAuthRuntimeAPI, HayLogger } from "../types/index.js";
 import { StdioMcpClient } from "./stdio-mcp-client.js";
 import { killProcessGracefully } from "./process-utils.js";
+import { validateToolRiskSpec } from "./tool-risk.js";
 
 /**
  * Directories whose stdio MCP dependencies have already been ensured in this
@@ -80,6 +83,7 @@ interface RegisteredMcpServer {
   type: "local" | "external";
   instance?: McpServerInstance; // Only for local servers
   options?: ExternalMcpOptions; // Only for external servers
+  toolRisk?: ToolRiskSpec; // Declared risk of the server's tools, merged at list time
 }
 
 /**
@@ -145,6 +149,7 @@ export function createMcpRuntimeAPI(options: McpRuntimeAPIOptions): HayMcpRuntim
     async startLocal(
       id: string,
       initializer: (ctx: McpInitializerContext) => Promise<McpServerInstance> | McpServerInstance,
+      localOptions?: LocalMcpOptions,
     ): Promise<void> {
       // Validate inputs
       if (!id || typeof id !== "string") {
@@ -154,6 +159,9 @@ export function createMcpRuntimeAPI(options: McpRuntimeAPIOptions): HayMcpRuntim
       if (typeof initializer !== "function") {
         throw new Error("MCP server initializer must be a function");
       }
+
+      const toolRisk = localOptions?.toolRisk;
+      validateToolRiskSpec(toolRisk);
 
       // Check for duplicate ID
       if (runningServers.has(id)) {
@@ -187,6 +195,7 @@ export function createMcpRuntimeAPI(options: McpRuntimeAPIOptions): HayMcpRuntim
           id,
           type: "local",
           instance,
+          ...(toolRisk ? { toolRisk } : {}),
         };
 
         runningServers.set(id, server);
@@ -226,7 +235,8 @@ export function createMcpRuntimeAPI(options: McpRuntimeAPIOptions): HayMcpRuntim
         throw new Error("Stdio MCP server cwd must be a non-empty string");
       }
 
-      const { id, command, args, cwd, env, timeout } = options;
+      const { id, command, args, cwd, env, timeout, toolRisk } = options;
+      validateToolRiskSpec(toolRisk);
 
       // Check for duplicate ID
       if (runningServers.has(id)) {
@@ -303,6 +313,7 @@ export function createMcpRuntimeAPI(options: McpRuntimeAPIOptions): HayMcpRuntim
           id,
           type: "local",
           instance,
+          ...(toolRisk ? { toolRisk } : {}),
         };
 
         runningServers.set(id, server);
@@ -339,7 +350,8 @@ export function createMcpRuntimeAPI(options: McpRuntimeAPIOptions): HayMcpRuntim
         }
       }
 
-      const { id, url } = options;
+      const { id, url, toolRisk } = options;
+      validateToolRiskSpec(toolRisk);
 
       // Check for duplicate ID
       if (runningServers.has(id)) {
@@ -356,6 +368,7 @@ export function createMcpRuntimeAPI(options: McpRuntimeAPIOptions): HayMcpRuntim
           id,
           type: "external",
           options,
+          ...(toolRisk ? { toolRisk } : {}),
         };
 
         runningServers.set(id, server);

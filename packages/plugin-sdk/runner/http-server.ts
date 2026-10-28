@@ -9,7 +9,7 @@
 
 import express, { type Express, type Request, type Response } from "express";
 import type { Server } from "http";
-import type { HayLogger, HayMcpRuntimeAPI } from "../types/index.js";
+import type { HayLogger, HayMcpRuntimeAPI, ToolRiskSpec } from "../types/index.js";
 import { PluginRegistry } from "../sdk/registry.js";
 import type { HayPluginDefinition } from "../types/plugin.js";
 import {
@@ -21,6 +21,7 @@ import {
 import { createConfigRuntimeAPI } from "../sdk/config-runtime.js";
 import { createAuthRuntimeAPI } from "../sdk/auth-runtime.js";
 import { createCronAuthAPI } from "../sdk/cron-runtime.js";
+import { withToolRisk } from "../sdk/tool-risk.js";
 
 /**
  * Plugin HTTP server instance.
@@ -33,6 +34,7 @@ interface RegisteredMcpServer {
   type: "local" | "external";
   instance?: any; // McpServerInstance for local servers
   options?: any; // ExternalMcpOptions for external servers
+  toolRisk?: ToolRiskSpec; // Plugin-declared risk, merged into tools/list
 }
 
 export const WORKER_BODY_LIMIT = "5mb";
@@ -777,7 +779,7 @@ export class PluginHttpServer {
           // Handle local MCP servers
           if (server.type === "local" && server.instance?.listTools) {
             try {
-              const serverTools = await server.instance.listTools();
+              const serverTools = withToolRisk(await server.instance.listTools(), server.toolRisk);
 
               // Add serverId to each tool
               for (const tool of serverTools) {
@@ -853,9 +855,12 @@ export class PluginHttpServer {
               }
 
               // Extract tools from JSON-RPC result
-              const serverTools = Array.isArray(rpcResponse.result?.tools)
-                ? rpcResponse.result.tools
-                : [];
+              // The server's own annotations (e.g. readOnlyHint) pass through;
+              // the plugin's declaration overrides them for the tools it names.
+              const serverTools = withToolRisk(
+                Array.isArray(rpcResponse.result?.tools) ? rpcResponse.result.tools : [],
+                server.toolRisk,
+              );
 
               // Add serverId to each tool
               for (const tool of serverTools) {
