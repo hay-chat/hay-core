@@ -72,6 +72,27 @@ const getMessagesSchema = z.object({
   offset: z.number().optional().default(0),
 });
 
+/**
+ * The only metadata keys a shopper's browser may set: what the widget sends
+ * about the page. Everything else in conversation metadata is trusted by the
+ * server (dryRun, isPlayground, sourceId, runKind, test_mode, channel ids, ...)
+ * and decides whether writes are simulated or the conversation is billed, so
+ * it never comes from the public widget.
+ */
+const PUBLIC_METADATA_KEYS = ["source", "url", "referrer", "userAgent", "timestamp"] as const;
+const PUBLIC_METADATA_MAX_LENGTH = 2048;
+
+export function publicMetadata(
+  metadata: Record<string, unknown> | undefined,
+): Record<string, string> {
+  const kept: Record<string, string> = {};
+  for (const key of PUBLIC_METADATA_KEYS) {
+    const value = metadata?.[key];
+    if (typeof value === "string") kept[key] = value.slice(0, PUBLIC_METADATA_MAX_LENGTH);
+  }
+  return kept;
+}
+
 export const publicConversationsRouter = t.router({
   // Create a new public conversation with public key registration
   create: publicProcedure.input(createPublicConversationSchema).mutation(async ({ input, ctx }) => {
@@ -133,7 +154,7 @@ export const publicConversationsRouter = t.router({
         status: "open",
         language: input.language || null,
         metadata: {
-          ...input.metadata,
+          ...publicMetadata(input.metadata),
           channel: "web",
           createdAt: new Date().toISOString(),
           ...(input.isPlayground ? { isPlayground: true } : {}),
