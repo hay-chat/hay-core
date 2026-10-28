@@ -34,8 +34,15 @@ import type {
 import { createLogger } from "@server/lib/logger";
 import { emailDomainService } from "@server/services/email-domains.service";
 import { channelHealthService } from "@server/services/channel-health.service";
-import { disputesService } from "@server/services/disputes/disputes.service";
 import type { Conversation } from "@server/database/entities/conversation.entity";
+
+// Channel names become keys of conversation.metadata, so they are kept
+// lowercase: a plugin must not be able to write a core key such as `runKind`.
+const channelNameSchema = z
+  .string()
+  .min(1)
+  .max(64)
+  .regex(/^[a-z0-9][a-z0-9_-]*$/, "Channel names are lowercase letters, digits, - and _");
 
 const logger = createLogger("plugin-api-trpc");
 
@@ -118,7 +125,7 @@ export const pluginApiTrpcRouter = router({
       z.object({
         from: z.string().min(1, "from is required"),
         content: z.string(),
-        channel: z.string().min(1).max(64),
+        channel: channelNameSchema,
         metadata: z.record(z.any()).optional(),
         // Optional sender type — defaults to customer. "human_agent" is used when
         // an external system (e.g. Chatwoot) forwards a message written by a
@@ -439,7 +446,7 @@ export const pluginApiTrpcRouter = router({
       z.object({
         to: z.string().min(1, "to is required"),
         content: z.string().min(1, "content is required"),
-        channel: z.string().min(1).max(64),
+        channel: channelNameSchema,
         conversationId: z.string().uuid().optional(),
         metadata: z.record(z.any()).optional(),
       }),
@@ -805,7 +812,7 @@ export const pluginApiTrpcRouter = router({
   "conversations.updateStatusByExternalId": pluginProcedure
     .input(
       z.object({
-        channel: z.string().min(1).max(64),
+        channel: channelNameSchema,
         externalConversationId: z.string().min(1),
         // Not "awaiting-approval": only the approval hold sets that.
         status: z.enum(["open", "pending-human", "human-took-over", "resolved", "closed"]),
@@ -1314,6 +1321,8 @@ export const pluginApiTrpcRouter = router({
     .mutation(async ({ input, ctx }) => {
       requireCapability(ctx, "disputes");
       const { organizationId, pluginId } = ctx.pluginAuth;
+      // Imported lazily: the disputes service pulls in the audit log and mailer.
+      const { disputesService } = await import("@server/services/disputes/disputes.service");
       const { created } = await disputesService.report(organizationId, pluginId, input);
       return { created };
     }),

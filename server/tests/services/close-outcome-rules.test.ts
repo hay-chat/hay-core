@@ -4,6 +4,7 @@ import {
   collectCloseFacts,
   computeRelevance,
   decideOutcome,
+  isTestConversation,
   needsClassifier,
   type CloseFacts,
 } from "../../services/close-classification/outcome-rules";
@@ -279,5 +280,16 @@ describe("close outcome rules", () => {
     expect(transcript).toBe(
       "Customer: Hi, my parcel is late\nAI: Let me check.\nHuman agent: I found it.",
     );
+  });
+});
+
+describe("isTestConversation", () => {
+  it("treats replay and simulation runs as tests", () => {
+    expect(isTestConversation({ runKind: "simulation" })).toBe(true);
+    expect(isTestConversation({ runKind: "replay" })).toBe(true);
+  });
+
+  it("does not treat a channel's metadata object under runKind as a test", () => {
+    expect(isTestConversation({ runKind: { conversationId: "x" } })).toBe(false);
   });
 });

@@ -227,6 +227,12 @@ describe("pluginApi.messages.receive attachments", () => {
       }),
     ).rejects.toMatchObject({ code: "BAD_REQUEST" });
   });
+
+  it("rejects a channel name that could overwrite a core metadata key", async () => {
+    await expect(
+      caller()["messages.receive"]({ from: "5511999999999", content: "hi", channel: "runKind" }),
+    ).rejects.toMatchObject({ code: "BAD_REQUEST" });
+  });
 });
 
 describe("pluginApi.messages.receive conversation lookup", () => {
