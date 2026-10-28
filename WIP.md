@@ -1,3 +1,8 @@
+## 2026-10-28 05:45 — staging — W2 L7 channels merged, hand-tested
+- Merged claude/w2-channels; 3 migrations on hay_staging; npm install (messenger workspace).
+- Manual ✓: customer merge from /customers; Messenger in Marketplace; Email inbox degrades without Resend. Meta/Resend: tests only (Needs Roger).
+- Running: L1+L6 Turnstile, L9+L10 owner loop. Next: X lane, Wave 2 review.
+
 ## 2026-10-28 05:15 — staging — W2 D8 part B merged, hand-tested, i18n fix
 - Merged claude/w2-media-vision; migration AddUploadScanStatus1785771000000 on hay_staging.
 - Manual ✓ (real OpenAI): photo description + Inbox "AI read"; card photo withheld + blurred, AI declines; product-problem template → draft.
