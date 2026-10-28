@@ -207,3 +207,9 @@
 - **Failure mode**: The widget's "visitor sent a message" consent signal was an in-memory flag, so each reload started with the storage gates closed; the stored conversation was never read and a new conversation and customer replaced the shopper's thread.
 - **Detection signal**: A gate (`hasInteracted`, consent, feature unlock) that guards reading storage but is itself never persisted.
 - **Prevention**: Persist the signal in the tier it unlocks (sessionStorage for the in-tab chat), and test "reload" explicitly: re-run init with module state reset and browser storage kept.
+
+### A bare `@` in a vue-i18n message breaks the whole locale file
+
+- **Failure mode**: A placeholder `quality@yourstore.com` in `settings.json` is linked-message syntax to vue-i18n; the compile error failed the entire en settings file and every dashboard string rendered as its raw key. Typecheck and unit tests passed.
+- **Detection signal**: Raw keys (`nav.inbox`) across the whole UI after a merge; vite "Invalid linked format" in the console.
+- **Prevention**: Write `{'@'}` (also for `{ } |`) in locale strings. `dashboard/tests/locale-messages.test.ts` compiles every message; keep it in the suite.

@@ -1,3 +1,9 @@
+## 2026-10-28 05:15 — staging — W2 D8 part B merged, hand-tested, i18n fix
+- Merged claude/w2-media-vision; migration AddUploadScanStatus1785771000000 on hay_staging.
+- Manual ✓ (real OpenAI): photo description + Inbox "AI read"; card photo withheld + blurred, AI declines; product-problem template → draft.
+- Fix 4e2c01d: bare `@` in a locale string broke the whole en settings file; tests/locale-messages.test.ts now compiles every message.
+- Running: L7 channels, L1+L6 Turnstile. Next: L9+L10 lane, X lane, Wave 2 review.
+
 ## 2026-10-28 05:00 — claude/w2-media-vision — W2 D8 part B built (D8-11..15, D8-4 seam)
 - 6 commits 8139570..24fb747 on staging base; not pushed. Migration AddUploadScanStatus1785771000000 run on hay_test only.
 - Works (tests): vision sidecar on customer photos/PDFs (OPENAI_VISION_MODEL), ID/card withholding + card redaction + Inbox blur, inspect_attachment, product-problem template + complete_product_case, case email, clamd seam (CLAMAV_HOST).
