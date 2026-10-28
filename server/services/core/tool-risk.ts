@@ -27,6 +27,7 @@ export const WRITE_CATEGORIES = [
   "refund",
   "cancel",
   "discount",
+  "exchange",
   "return",
   "address_change",
   "customer_update",
@@ -36,11 +37,12 @@ export const WRITE_CATEGORIES = [
 
 export type WriteCategory = (typeof WRITE_CATEGORIES)[number];
 
-/** Writes that move money or undo a sale. */
+/** Writes that move money or undo a sale (an exchange ships goods or changes what was paid for). */
 export const MONEY_CATEGORIES: ReadonlySet<WriteCategory> = new Set([
   "refund",
   "cancel",
   "discount",
+  "exchange",
 ]);
 
 export type ToolRisk =

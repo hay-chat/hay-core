@@ -113,12 +113,13 @@ export interface McpInitializerContext {
 
 /**
  * Write categories Hay.chat core understands (mirrors `@hay/plugin-sdk/tool-risk`).
- * Refunds, cancels and discounts move money and are held for approval.
+ * Refunds, cancels, discounts and exchanges move money and are held for approval.
  */
 export type ToolWriteCategory =
   | "refund"
   | "cancel"
   | "discount"
+  | "exchange"
   | "return"
   | "address_change"
   | "customer_update"
