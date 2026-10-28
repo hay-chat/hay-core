@@ -480,18 +480,27 @@ export class ConversationRepository extends BaseRepository<Conversation> {
   }
 
   /**
-   * Find the most recent active conversation for a customer on a given channel.
-   * Used by channel plugins (WhatsApp, etc.) to reuse existing conversations
-   * instead of creating duplicates.
+   * Find the most recent active conversation for a customer on a given channel
+   * with the given channel identity. Used by channel plugins (WhatsApp, etc.)
+   * to reuse existing conversations instead of creating duplicates.
+   *
+   * A merged customer can have several identities on one channel (D13-13); a
+   * conversation replies to `metadata.customerExternalId`, else the customer's
+   * own external_id, so only a conversation that replies to `identity` matches.
    */
   async findActiveByCustomerAndChannel(
-    customerId: string,
+    customer: { id: string; external_id: string | null },
+    identity: string,
     channel: string,
     organizationId: string,
   ): Promise<Conversation | null> {
     return await this.getRepository()
       .createQueryBuilder("conversation")
-      .where("conversation.customer_id = :customerId", { customerId })
+      .where("conversation.customer_id = :customerId", { customerId: customer.id })
+      .andWhere(
+        "COALESCE(conversation.metadata ->> 'customerExternalId', CAST(:ownExternalId AS text)) = :identity",
+        { ownExternalId: customer.external_id, identity },
+      )
       .andWhere("conversation.channel = :channel", { channel })
       .andWhere("conversation.organization_id = :organizationId", { organizationId })
       .andWhere("conversation.status IN (:...statuses)", {
