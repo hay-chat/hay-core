@@ -6,6 +6,7 @@ import {
   toPublicAttachments,
   toPublicMessageEvent,
 } from "./webchat/public-message";
+import { isSimulationConversation } from "./simulation/simulation-kind";
 
 const logger = createLogger("websocket");
 
@@ -32,6 +33,8 @@ class ConversationEventsService {
     conversation: MessageBroadcastConversation,
     message: Message,
   ): Promise<void> {
+    // Simulated conversations (D7-7) reach no one: no dashboard, widget or channel.
+    if (isSimulationConversation(conversation.metadata)) return;
     try {
       const { redisService } = await import("./redis.service");
 
@@ -103,6 +106,7 @@ class ConversationEventsService {
    * Broadcast conversation created event
    */
   async broadcastConversationCreated(conversation: Conversation): Promise<void> {
+    if (isSimulationConversation(conversation.metadata)) return;
     try {
       const { redisService } = await import("./redis.service");
 
@@ -151,6 +155,7 @@ class ConversationEventsService {
     conversation: Conversation,
     changedFields?: string[],
   ): Promise<void> {
+    if (isSimulationConversation(conversation.metadata)) return;
     try {
       const { redisService } = await import("./redis.service");
 

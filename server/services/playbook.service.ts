@@ -12,6 +12,19 @@ import { Agent } from "../database/entities/agent.entity";
 import { AppDataSource } from "../database/data-source";
 import { analyzeTiptapInstructions } from "../utils/tiptap-formatter";
 import { createLogger } from "@server/lib/logger";
+import {
+  instructionsToMarkdown,
+  collectMentionReferences,
+  type MentionReferences,
+} from "./playbook-instructions-text";
+
+export interface VersionComparison {
+  active: { id: string; versionNumber: number; status: PlaybookVersionStatus } | null;
+  version: { id: string; versionNumber: number; status: PlaybookVersionStatus };
+  currentMarkdown: string;
+  revisedMarkdown: string;
+  references: MentionReferences;
+}
 
 const logger = createLogger("playbook-service");
 
@@ -277,6 +290,41 @@ export class PlaybookService {
       return null;
     }
     return version;
+  }
+
+  /**
+   * A version next to the live one, as markdown for InstructionsDiff (D7-6).
+   * `versionId` defaults to the draft. The base is always the active version
+   * (empty when the playbook was never published).
+   */
+  async compareWithActive(
+    organizationId: string,
+    playbookId: string,
+    versionId?: string,
+  ): Promise<VersionComparison> {
+    const playbook = await this.playbookRepository.findById(playbookId);
+    if (!playbook || playbook.organization_id !== organizationId) {
+      throw new Error("Playbook not found");
+    }
+    const target = versionId
+      ? await this.playbookVersionRepository.findById(versionId)
+      : await this.playbookVersionRepository.findDraftByPlaybookId(playbookId);
+    if (!target || target.playbook_id !== playbookId) {
+      throw new Error("Version not found");
+    }
+    const active = await this.playbookVersionRepository.findActiveByPlaybookId(playbookId);
+    const summary = (v: PlaybookVersion) => ({
+      id: v.id,
+      versionNumber: v.version_number,
+      status: v.status,
+    });
+    return {
+      active: active ? summary(active) : null,
+      version: summary(target),
+      currentMarkdown: instructionsToMarkdown(active?.instructions ?? null),
+      revisedMarkdown: instructionsToMarkdown(target.instructions),
+      references: collectMentionReferences(active?.instructions ?? null, target.instructions),
+    };
   }
 
   async getDraft(organizationId: string, playbookId: string): Promise<PlaybookVersion | null> {

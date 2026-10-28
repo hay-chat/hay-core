@@ -73,6 +73,18 @@
             {{ t("versioning.history.button") }}
           </Button>
 
+          <Button
+            v-if="isEditMode && draftVersion"
+            variant="outline"
+            size="sm"
+            data-testid="test-draft"
+            :loading="isOpeningTest"
+            @click="testDraft"
+          >
+            <FlaskConical class="h-4 w-4 mr-2" />
+            {{ t("versioning.testDraft") }}
+          </Button>
+
           <!-- Edit mode: Save (identity) + Publish -->
           <template v-if="isEditMode">
             <Button
@@ -88,7 +100,7 @@
               size="sm"
               :loading="isPublishing"
               :disabled="!draftVersion"
-              @click="showPublishDialog = true"
+              @click="openPublishDialog"
             >
               <Upload class="h-4 w-4 mr-2" />
               {{ t("versioning.publish") }}
@@ -316,6 +328,12 @@
       :confirm-text="t('versioning.publishConfirm')"
       @confirm="handlePublish"
     >
+      <VersionDiff
+        v-if="showPublishDialog && playbookId && draftVersion"
+        class="mt-4"
+        :playbook-id="playbookId"
+        :version-id="draftVersion.id"
+      />
       <div class="mt-4">
         <Input
           v-model="publishNote"
@@ -360,6 +378,7 @@ import {
   Circle,
   History,
   Sparkles,
+  FlaskConical,
 } from "lucide-vue-next";
 import type { JSONContent } from "@tiptap/vue-3";
 import type { MCPTool } from "@/components/tiptap/MentionExtension";
@@ -445,6 +464,28 @@ const draftVersion = ref<PlaybookVersion | null>(null);
 const showPublishDialog = ref(false);
 const publishNote = ref("");
 const showVersionHistory = ref(false);
+
+// D7-6: the publish dialog diffs the saved draft, so save pending edits first.
+const openPublishDialog = async () => {
+  await flushAutoSave();
+  showPublishDialog.value = true;
+};
+
+// D7-5: open the playground against the draft (writes simulated there by default).
+const isOpeningTest = ref(false);
+const testDraft = async () => {
+  if (!playbookId.value || !draftVersion.value) return;
+  isOpeningTest.value = true;
+  try {
+    await flushAutoSave();
+    router.push({
+      path: "/conversations/playground",
+      query: { playbookId: playbookId.value, versionId: draftVersion.value.id },
+    });
+  } finally {
+    isOpeningTest.value = false;
+  }
+};
 
 // AI suggest-edits state
 const showSuggestDialog = ref(false);

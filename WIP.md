@@ -7,6 +7,11 @@
 - Gaps: Gemini/Mistral/Grok unpriced (null cost); OpenAI prices unverified.
 - Next: Roger review/merge; L12b builds clustering on insight_issue_embeddings.
 
+## 2026-10-28 07:30 — claude/w3-golive-a — W3 L7a test-before-go-live part A built (not merged)
+- D7-5 draft override + "Test this draft"; D7-6 version diff (history + publish dialog); D7-7 simulation harness (simulations router, caps in config/simulation-caps.ts); D7-8 testTranscripts router (CSV, paste, WhatsApp, Tidio, Gorgias).
+- Migrations 1785810000000 AddSimulationRuns + 1785811000000 AddTestTranscripts run on hay_test only. No new env vars.
+- Gaps: no runs/import UI (L7b), Tidio format unverified, orchestrator follow-up runs of a simulation untracked.
+- Next: orchestrator merges into staging, runs both migrations on hay_staging, hand-tests.
 ## 2026-10-28 07:05 — staging — WAVE 2 DONE (tag wave-2-done)
 - Suites green; PR #104 updated (Waves 0–2); GIFs sent. Next: Wave 3 batch 1 (L12a insights, L7a go-live).
 ## 2026-10-28 06:50 — staging — W2 review fixes merged, hand-tested
