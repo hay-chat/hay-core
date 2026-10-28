@@ -13,7 +13,12 @@ import {
   type SourceConversation,
   type SourceActionLog,
 } from "../../services/dispute-evidence/timeline";
-import { pdfSafe, renderEvidencePdf } from "../../services/dispute-evidence/pdf-renderer";
+import {
+  pdfSafe,
+  renderEvidencePdf,
+  splitEmojiRuns,
+  type EvidenceDocument,
+} from "../../services/dispute-evidence/pdf-renderer";
 import { pdfText } from "../helpers/pdf-text";
 
 const mcp = (value: unknown) => ({ content: [{ type: "text", text: JSON.stringify(value) }] });
@@ -264,6 +269,32 @@ describe("buildTimeline", () => {
     ]);
   });
 
+  it("keeps the policy text the AI saw when it first used the policy", () => {
+    const { conversation, actionLogs } = conversationFixture();
+    const reply = conversation.messages.find((m) => m.id === "m5")!;
+    reply.metadata = {
+      documentsUsed: [{ id: "doc-returns", title: "Returns policy", excerpt: "30 days, then." }],
+    };
+    conversation.messages.push({
+      ...reply,
+      id: "m8",
+      created_at: at("2026-10-02T10:00:00Z"),
+      metadata: {
+        documentsUsed: [{ id: "doc-returns", title: "Returns policy", excerpt: "7 days, now." }],
+      },
+    });
+    const timeline = buildTimeline({
+      conversations: [conversation],
+      actionLogs,
+      takeovers: [],
+      template: "generic",
+      locale: "en",
+      timeZone: "UTC",
+    });
+    const policy = timeline.policies.find((p) => p.documentId === "doc-returns");
+    expect(policy?.excerpt).toBe("30 days, then.");
+  });
+
   it("lists no refund facts for an item-not-received pack", () => {
     const { conversation, actionLogs } = conversationFixture();
     const timeline = buildTimeline({
@@ -305,7 +336,9 @@ describe("renderEvidencePdf", () => {
       customer: { name: "Maria", email: "maria@example.com", phone: null },
       conversations: [{ id: "conv-1", channel: "whatsapp", created_at: conversation.created_at }],
       timeline,
-      policyExcerpts: new Map([["doc-returns", "Você tem 7 dias para devolver."]]),
+      policyExcerpts: new Map([
+        ["doc-returns", { text: "Você tem 7 dias para devolver.", current: false }],
+      ]),
       images: new Map([["img-1", { kind: "image", buffer: image }]]),
     });
     const text = pdfText(pdf);
@@ -320,6 +353,79 @@ describe("renderEvidencePdf", () => {
     expect(text).toContain("Gerado pelo Hay.chat em 2026-10-20 09:00:00 UTC-03:00. Página 1 de");
     expect(text).not.toContain("SYSTEM PROMPT");
     expect(pdf.toString("latin1")).toContain("/Subtype /Image");
+  });
+
+  function englishDocument(overrides: Partial<EvidenceDocument> = {}): EvidenceDocument {
+    const { conversation, actionLogs } = conversationFixture();
+    const timeline = buildTimeline({
+      conversations: [conversation],
+      actionLogs,
+      takeovers: [],
+      template: "generic",
+      locale: "en",
+      timeZone: "UTC",
+    });
+    return {
+      locale: "en",
+      timeZone: "UTC",
+      generatedAt: at("2026-10-20T12:00:00Z"),
+      template: "generic",
+      storeName: "Example Store",
+      order: null,
+      customer: { name: "Maria", email: null, phone: null },
+      conversations: [{ id: "conv-1", channel: "whatsapp", created_at: conversation.created_at }],
+      timeline,
+      policyExcerpts: new Map(),
+      images: new Map(),
+      ...overrides,
+    };
+  }
+
+  it("draws emoji with the bundled emoji font", async () => {
+    const model = englishDocument();
+    model.timeline.entries[0] = { ...model.timeline.entries[0], text: "Box damaged 😡📦 help" };
+    const pdf = await renderEvidencePdf(model);
+    expect(pdf.toString("latin1")).toContain("NotoEmoji");
+    expect(pdfText(pdf)).toContain("Box damaged ");
+  });
+
+  it("stops the timeline at the page cap and says how much was left out", async () => {
+    const model = englishDocument({ maxPages: 3 });
+    const [first] = model.timeline.entries;
+    model.timeline.entries = Array.from({ length: 400 }, (_, index) => ({
+      ...first,
+      text: `Message number ${index}`,
+    }));
+    const pdf = await renderEvidencePdf(model);
+    const text = pdfText(pdf);
+    const pages = pdf.toString("latin1").match(/\/Type \/Page\b/g) ?? [];
+    expect(pages.length).toBeLessThanOrEqual(3);
+    expect(text).toMatch(
+      /\d+ more timeline entries are not shown, to keep this file within 3 pages/,
+    );
+    expect(text).not.toContain("Message number 399");
+  });
+
+  it("marks a policy shown as stored today when its text at the time is unknown", async () => {
+    const pdf = await renderEvidencePdf(
+      englishDocument({
+        policyExcerpts: new Map([
+          ["doc-returns", { text: "Returns within 7 days.", current: true }],
+        ]),
+      }),
+    );
+    const text = pdfText(pdf);
+    expect(text).toContain("Returns within 7 days.");
+    expect(text).toContain("the text at the time was not recorded");
+  });
+
+  it("splits text into emoji and plain runs", () => {
+    expect(splitEmojiRuns("ok 👍🏽 done ❤️")).toEqual([
+      { emoji: false, text: "ok " },
+      { emoji: true, text: "👍🏽" },
+      { emoji: false, text: " done " },
+      { emoji: true, text: "❤️" },
+    ]);
   });
 
   it("makes text drawable by the built-in font", () => {

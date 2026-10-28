@@ -52,7 +52,7 @@ export interface GuardrailLogEntry {
       retrieval: number;
       certainty: number;
     };
-    documentsUsed: Array<{ id: string; title: string; similarity: number }>;
+    documentsUsed: Array<{ id: string; title: string; similarity: number; excerpt?: string }>;
     recheckAttempted: boolean;
     recheckCount: number;
     details: string;
@@ -89,7 +89,7 @@ export interface ConfidenceLogEntry {
     retrieval: number;
     certainty: number;
   };
-  documentsUsed: Array<{ id: string; title: string; similarity: number }>;
+  documentsUsed: Array<{ id: string; title: string; similarity: number; excerpt?: string }>;
   recheckAttempted: boolean;
   recheckCount: number;
   details: string;
