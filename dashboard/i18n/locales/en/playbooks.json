@@ -150,7 +150,15 @@
       "discardSuccess": "Draft discarded",
       "discardFailed": "Failed to discard draft"
     },
-    "testDraft": "Test this draft"
+    "testDraft": "Test this draft",
+    "diff": {
+      "compareWithActive": "Compare with active",
+      "hide": "Hide changes",
+      "against": "Changes compared with the active version (v{version})",
+      "neverPublished": "Never published: everything below is new",
+      "noChanges": "Same instructions as the active version",
+      "loadFailed": "Couldn't load the changes"
+    }
   },
   "loading": {
     "loadingPlaybook": "Loading playbook...",

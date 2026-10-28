@@ -82,6 +82,30 @@
             </div>
           </div>
 
+          <!-- D7-6: compare any non-active version with the active one -->
+          <div v-if="version.status !== 'active'">
+            <Button
+              variant="ghost"
+              size="sm"
+              class="h-7 px-2 text-xs"
+              :data-testid="`compare-${version.id}`"
+              @click="toggleCompare(version.id)"
+            >
+              <GitCompare class="h-3 w-3 mr-1.5" />
+              {{
+                comparingId === version.id
+                  ? t("versioning.diff.hide")
+                  : t("versioning.diff.compareWithActive")
+              }}
+            </Button>
+            <VersionDiff
+              v-if="comparingId === version.id"
+              class="mt-2"
+              :playbook-id="playbookId"
+              :version-id="version.id"
+            />
+          </div>
+
           <!-- Publish note -->
           <div
             v-if="version.publish_note"
@@ -133,7 +157,7 @@
 
 <script setup lang="ts">
 import { ref, watch } from "vue";
-import { RotateCcw, User2, Clock, Trash2 } from "lucide-vue-next";
+import { RotateCcw, User2, Clock, Trash2, GitCompare } from "lucide-vue-next";
 import type { PlaybookVersion } from "~/types/playbook";
 import { useToast } from "~/composables/useToast";
 import { HayApi } from "@/utils/api";
@@ -182,11 +206,18 @@ const fetchVersions = async () => {
   }
 };
 
+// Which version is expanded into a diff against the active one (one at a time)
+const comparingId = ref<string | null>(null);
+const toggleCompare = (versionId: string) => {
+  comparingId.value = comparingId.value === versionId ? null : versionId;
+};
+
 // Fetch versions when sheet opens
 watch(
   () => props.open,
   (isOpen) => {
     if (isOpen) {
+      comparingId.value = null;
       fetchVersions();
     }
   },
