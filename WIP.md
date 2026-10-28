@@ -1,3 +1,10 @@
+## 2026-10-28 — master (homeserver /srv/hay-core) — prod keys live, backoffice #7 merged
+- hay-core prod env from Infisical (`ALLOW_REMOVED=1 ./deploy.sh --env-only`): TURNSTILE_*, OPERATOR_EVENTS_URL, RESEND_EVENTS_WEBHOOK_SECRET set; SMTP_FROM_NAME=Hay.chat; JWT_REFRESH_EXPIRES_IN removed. Health ok.
+- Turnstile: plugin already on for all 101 orgs (enable-defaults ran 16:20); challenge frame now 200 with the Cloudflare script.
+- No pending core migrations; build log clean. Boot warns: atlassian/notion router `Cannot find module '@server/trpc'`, 11 plugins not_found, legacy decrypt warnings (all pre-existing).
+- hay-backoffice main: PR #7 merged (74b3f76, D15-7..11 incl. POST /webhooks/hay-core) + a5015d6 migrations run on boot. Pushed; DO deploy not yet observed.
+- Next: confirm backoffice deploy (route answers JSON, not basic-auth 401) + HAY_INTERNAL_API_SECRET on DO; then step 3 Stripe test mode.
+
 ## 2026-10-28 — staging — everything PR'd for Roger to merge
 - hay-core PR #104 (staging→master) retitled "VOC roadmap Waves 0–4", Wave 4 section + merge order added. MERGEABLE.
 - New PRs: hay-backoffice #8 (Lane A) #9 (plan email), hay-website #48 (→ #46 branch) #49 (homepage perf), hay-docs #23, hay-shopify-app #2.

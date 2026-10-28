@@ -285,8 +285,9 @@ Roger said "Do it now" for every gap. Not started; lanes below.
 - **Lane R: release document** (Roger, 2026-10-28). Marketing-first release notes for Waves 0–3: themed sections, merchant problem → what's new, best recordings from seo `_test-gifs` as small MP4s, "coming soon" for anything unverified. Draft in the scratchpad, then published as an artifact for Roger's review.
 
 ## Still on Roger
-- Run: `ssh homeserver 'grep -n -i -E "build|plugin|sdk" /srv/hay-core/deploy.sh'`. Does deploy rebuild packages/plugin-sdk + stripe/shopify/mercadopago/woocommerce plugins?
-- Resend: Roger thinks it's done. Check Infisical prod has `RESEND_API_KEY` + `RESEND_EVENTS_WEBHOOK_SECRET` (`~/bin/infisical-env.py check`).
+- [x] Post-deploy checks (2026-10-28): deploy.sh = pull + Infisical export + `compose up --build` (no migration step); no pending migrations; plugin build clean; Turnstile enabled for all 101 orgs.
+- [x] Prod keys (2026-10-28): Turnstile, Resend webhook secret, OPERATOR_EVENTS_URL, SMTP_FROM_NAME=Hay.chat set; JWT_REFRESH_EXPIRES_IN removed. Optional Meta / Mercado Pago / OpenAI EU still unset.
+- [ ] Backoffice: #7 merged + migrations on boot (a5015d6); confirm DO deploy + `HAY_INTERNAL_API_SECRET` = core `INTERNAL_API_SECRET`.
 - Confirm the simulation-cap reading (20 % of plan resolutions, max 500).
 - (Lane B) Stripe `create_refund` is hosted MCP, amount in cents → approvals likely show 1000 for $10. Fix via wrapper tool or plugin-declared amount unit? Default: plugin-declared unit.
 - (Lane B) Destructive writes run when the approval master switch is off. Hold them anyway? Default: hold (one line in `decideGate`).
