@@ -7,6 +7,10 @@ import {
   TranscriptImportError,
   type TestTranscript,
 } from "@server/services/importers/transcripts";
+import {
+  fetchGorgiasTranscripts,
+  GORGIAS_MAX_TICKETS,
+} from "@server/services/importers/transcripts/gorgias";
 import { testTranscriptService } from "@server/services/test-transcript.service";
 
 /**
@@ -57,6 +61,23 @@ export const testTranscriptsRouter = t.router({
       store(ctx, input.format, () =>
         TRANSCRIPT_FILE_FORMATS[input.format](input.content, { businessName: input.businessName }),
       ),
+    ),
+
+  /**
+   * Pull the most recent Gorgias tickets. The email and API key are used for
+   * this call only; they are not stored.
+   */
+  importGorgias: scopedProcedure(RESOURCES.PLAYBOOKS, ACTIONS.UPDATE)
+    .input(
+      z.object({
+        subdomain: z.string().trim().min(1).max(255),
+        email: z.string().trim().email().max(255),
+        apiKey: z.string().trim().min(1).max(500),
+        limit: z.number().int().min(1).max(GORGIAS_MAX_TICKETS).default(50),
+      }),
+    )
+    .mutation(async ({ ctx, input }) =>
+      store(ctx, "gorgias", () => fetchGorgiasTranscripts(input)),
     ),
 
   list: scopedProcedure(RESOURCES.PLAYBOOKS, ACTIONS.READ)
