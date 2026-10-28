@@ -1,3 +1,10 @@
+## 2026-10-28 — claude/w2-usage-ledger (L9+L2 Wave 2) — D1-5, D1-6 done, committed, not pushed
+- Settings > Usage (/settings/usage, owner/admin): live billable count per UTC calendar month, breakdown by outcome, ledger with CSV + Exclude (reason required).
+- Exclusion: instant up to max(1, floor(5 %)) of the month's billable; beyond = pending_review (still billed). Audited in audit_logs + row columns. billableResolutions skips excluded.
+- Migration AddResolutionExclusions1785750000000 (run on hay_test). New `billing` scope (admin wildcard only). run.ts untouched.
+- Gaps: core has no plan/allowance/overage nor billing period dates (TODO in usage.vue/service); Hay.chat review queue has no UI; credits for post-report exclusions = backoffice.
+- Next: merge into staging, run migration, hand-test.
+
 ## 2026-10-28 03:15 — staging — W2 L3 + L4 merged, hand-tested, fixes in
 - Merged L3 (ccf449e, business hours/hand-off/email follow-up) + L4 (d43ea72, approvals UI, shopper confirm, action log). Migrations run on hay_staging.
 - Manual ✓: closed hand-off + email capture + follow-up path; confirm → held refund → lowered to 10.00 → Woo refund 10.00 → AI told shopper; Action log filters; Settings > Actions typed confirm; playbook override; failure reason card.
