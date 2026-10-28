@@ -6,8 +6,9 @@
  *
  * Endpoint (Roger's D8 answer 2, "OpenAI via the EU endpoint"):
  * - the EU endpoint whenever it is configured, for every organization;
- * - otherwise the org's managed OpenAI endpoint, which throws for EU-only orgs
- *   (fail closed, same rule as every other EU call) and is skipped.
+ * - otherwise the default managed OpenAI endpoint, for every organization,
+ *   EU-only orgs included. Roger (2026-10-28): don't block vision just because
+ *   an org is EU while no EU inference exists; EU inference is decided later.
  *
  * Usage is reported through the LLM usage seam (services/llm/usage-sink).
  *
@@ -20,7 +21,6 @@ import { config } from "@server/config/env";
 import { createLogger } from "@server/lib/logger";
 import { MEDIA_CLASSES, type MediaClass } from "@server/database/entities/message.entity";
 import { isEuRegionConfigured, type AiRegion } from "@server/services/llm/ai-region";
-import { llmProviderFactory } from "@server/services/llm/llm-provider.factory";
 import { emitUsage } from "@server/services/llm/usage-sink";
 
 const logger = createLogger("vision");
@@ -108,8 +108,8 @@ interface Endpoint {
 class VisionService {
   private readonly clients = new Map<string, OpenAI>();
 
-  /** The endpoint for this org, or null when vision can't run (no key, EU fail-closed). */
-  private async endpoint(organizationId: string): Promise<Endpoint | null> {
+  /** The vision endpoint, or null when no OpenAI key is configured. Same for every org. */
+  private endpoint(): Endpoint | null {
     if (isEuRegionConfigured()) {
       return {
         apiKey: config.aiRegion.eu.apiKey,
@@ -117,16 +117,12 @@ class VisionService {
         region: "eu",
       };
     }
-    try {
-      const endpoint = await llmProviderFactory.managedOpenAIEndpoint(organizationId);
-      return endpoint.apiKey ? endpoint : null;
-    } catch (error) {
-      logger.warn(
-        { organizationId, error: error instanceof Error ? error.message : String(error) },
-        "Skipping vision: no AI endpoint for this organization's region",
-      );
-      return null;
-    }
+    if (!config.openai.apiKey) return null;
+    return {
+      apiKey: config.openai.apiKey,
+      baseURL: config.openai.baseUrl || undefined,
+      region: "default",
+    };
   }
 
   private client(endpoint: Endpoint): OpenAI {
@@ -159,7 +155,7 @@ class VisionService {
     input: VisionInput,
     question?: string,
   ): Promise<VisionResult> {
-    const endpoint = await this.endpoint(organizationId);
+    const endpoint = this.endpoint();
     if (!endpoint)
       throw new VisionUnavailableError("vision is not available for this organization");
 

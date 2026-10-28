@@ -731,7 +731,7 @@
       "statusDefault": "Processamento de IA: provedor de IA padrão do Hay.chat, que pode rodar fora da UE.",
       "unavailable": "O processamento somente na UE ainda não está disponível. Ele aparecerá aqui quando estiver pronto.",
       "misconfiguredTitle": "Somente UE está ativo, mas o endpoint na UE não está disponível",
-      "misconfiguredDescription": "Respostas de IA, buscas e transcrições estão pausadas para esta organização em vez de serem processadas fora da UE. Fale com o suporte do Hay.chat ou desative Somente UE para voltar ao provedor padrão.",
+      "misconfiguredDescription": "Respostas de IA, buscas e transcrições estão pausadas para esta organização em vez de serem processadas fora da UE. Fotos e PDFs enviados pelos clientes continuam sendo lidos, no provedor padrão. Fale com o suporte do Hay.chat ou desative Somente UE para voltar ao provedor padrão.",
       "customProviderPaused": "Somente UE está ativo, então o provedor e os modelos abaixo não são usados. Eles ficam salvos e voltam a valer se você desativar Somente UE.",
       "saveSuccessEu": "A IA agora roda somente na UE",
       "saveSuccessDefault": "A IA agora roda no provedor padrão",
