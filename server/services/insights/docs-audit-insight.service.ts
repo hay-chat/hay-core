@@ -8,6 +8,8 @@ import type { AuditResult } from "@server/services/docs-audit.service";
 import type { InsightActionType } from "@server/services/close-classification/outcome-rules";
 import { insightClusteringService } from "./insight-clustering.service";
 import { insightRunsService } from "./insight-runs.service";
+import type { TokenUsage } from "./llm-pricing";
+import { withUsageCollector, type UsageEvent } from "@server/services/llm/usage-sink";
 import { DOCS_AUDIT_SCORE_THRESHOLD, getOrganizationThresholds } from "./insight-settings";
 
 const logger = createLogger("docs-audit-insights");
@@ -94,10 +96,37 @@ export class DocsAuditInsightService {
 
   async auditOrganization(organizationId: string): Promise<{ findings: number }> {
     const started = Date.now();
-    const findings = [
-      ...(await this.brokenActionFindings(organizationId)),
-      ...(await this.documentFindings(organizationId)),
-    ];
+    // The audit's LLM calls are recorded on its insight run (F6), like the other jobs.
+    const usage: TokenUsage = { promptTokens: 0, cachedPromptTokens: 0, completionTokens: 0 };
+    let model: string | null = null;
+    const collect = (event: UsageEvent) => {
+      if (event.kind !== "chat") return;
+      usage.promptTokens += event.usage.promptTokens || 0;
+      usage.cachedPromptTokens += event.usage.cachedPromptTokens || 0;
+      usage.completionTokens += event.usage.completionTokens || 0;
+      model = event.model;
+    };
+    const record = (succeeded: boolean, items: number) =>
+      insightRunsService.record({
+        organizationId,
+        kind: "docs_audit",
+        model,
+        usage: model ? usage : null,
+        durationMs: Date.now() - started,
+        succeeded,
+        items,
+      });
+
+    let findings: DocsAuditFinding[];
+    try {
+      findings = await withUsageCollector(collect, async () => [
+        ...(await this.brokenActionFindings(organizationId)),
+        ...(await this.documentFindings(organizationId)),
+      ]);
+    } catch (error) {
+      await record(false, 0);
+      throw error;
+    }
     for (const finding of findings) {
       await this.recordFinding(organizationId, finding);
     }
@@ -107,15 +136,7 @@ export class DocsAuditInsightService {
        ON CONFLICT (organization_id) DO UPDATE SET docs_audit_last_run_at = now(), updated_at = now()`,
       [organizationId],
     );
-    await insightRunsService.record({
-      organizationId,
-      kind: "docs_audit",
-      model: null,
-      usage: null,
-      durationMs: Date.now() - started,
-      succeeded: true,
-      items: findings.length,
-    });
+    await record(true, findings.length);
     return { findings: findings.length };
   }
 
