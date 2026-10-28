@@ -55,8 +55,8 @@
       </CardContent>
     </Card>
 
-    <!-- Behavior -->
-    <Card>
+    <!-- Behavior: the greeting only matters while Web Chat is on -->
+    <Card v-if="settingsForm.isEnabled" data-testid="webchat-greeting-card">
       <CardHeader>
         <CardTitle>{{ $t("webchat.widgetBehavior") }}</CardTitle>
         <CardDescription>{{ $t("webchat.widgetBehaviorDescription") }}</CardDescription>
@@ -307,6 +307,12 @@ const hasChanges = computed(() => {
 
 const installationCode = computed(() => {
   const organizationId = userStore.activeOrganizationId || "YOUR_ORG_ID";
+  // With Web Chat off there is no greeting to show, so the snippet leaves it out.
+  const greetingConfig = settingsForm.value.isEnabled
+    ? `,
+    showGreeting: ${settingsForm.value.showGreeting},
+    greetingMessage: '${settingsForm.value.greetingMessage}'`
+    : "";
   return `<${"script"}>
   window.HayChat = window.HayChat || {};
   window.HayChat.config = {
@@ -315,9 +321,7 @@ const installationCode = computed(() => {
     widgetTitle: '${settingsForm.value.widgetTitle}',
     widgetSubtitle: '${settingsForm.value.widgetSubtitle}',
     position: '${settingsForm.value.position}',
-    theme: '${settingsForm.value.theme}',
-    showGreeting: ${settingsForm.value.showGreeting},
-    greetingMessage: '${settingsForm.value.greetingMessage}'
+    theme: '${settingsForm.value.theme}'${greetingConfig}
   };
 </${"script"}>
 <${"script"} src="${apiBaseUrl}/v1/webchat/widget.js" async></${"script"}>`;

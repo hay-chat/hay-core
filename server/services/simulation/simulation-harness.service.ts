@@ -17,6 +17,7 @@
  * the replay runner and judge (lane L7b) build on that.
  */
 
+import type { EntityManager } from "typeorm";
 import { AppDataSource } from "@server/database/data-source";
 import { Conversation } from "@server/database/entities/conversation.entity";
 import { Message, MessageDirection, MessageType } from "@server/database/entities/message.entity";
@@ -162,12 +163,16 @@ export class SimulationHarnessService {
   }
 
   /** This month's simulated conversations against the organization's cap. */
-  async getAllowance(organizationId: string): Promise<SimulationAllowance> {
-    const organization = await AppDataSource.getRepository(Organization).findOne({
+  async getAllowance(
+    organizationId: string,
+    manager: EntityManager = AppDataSource.manager,
+  ): Promise<SimulationAllowance> {
+    const organization = await manager.getRepository(Organization).findOne({
       where: { id: organizationId },
     });
     const limit = organization?.limits?.maxSimulationsPerMonth ?? SIMULATION_CAPS.defaultPerMonth;
-    const used = await this.items
+    const used = await manager
+      .getRepository(SimulationRunItem)
       .createQueryBuilder("item")
       .where("item.organization_id = :organizationId", { organizationId })
       .andWhere("item.created_at >= :since", { since: startOfMonthUtc() })
@@ -195,15 +200,20 @@ export class SimulationHarnessService {
       if (!version) throw new SimulationError("NOT_FOUND", "Playbook version not found");
     }
 
-    const allowance = await this.getAllowance(input.organizationId);
-    if (input.cases.length > allowance.remaining) {
-      throw new SimulationError(
-        "LIMIT_REACHED",
-        `This run needs ${input.cases.length} simulated conversations; ${allowance.remaining} of ${allowance.limit} are left this month`,
-      );
-    }
-
     const run = await AppDataSource.transaction(async (manager) => {
+      // One start per organization at a time, so two concurrent starts can't
+      // both pass the allowance check and together exceed the monthly cap.
+      await manager.query(`SELECT pg_advisory_xact_lock(hashtext($1))`, [
+        `simulation-allowance:${input.organizationId}`,
+      ]);
+      const allowance = await this.getAllowance(input.organizationId, manager);
+      if (input.cases.length > allowance.remaining) {
+        throw new SimulationError(
+          "LIMIT_REACHED",
+          `This run needs ${input.cases.length} simulated conversations; ${allowance.remaining} of ${allowance.limit} are left this month`,
+        );
+      }
+
       const created = await manager.getRepository(SimulationRun).save(
         manager.getRepository(SimulationRun).create({
           organization_id: input.organizationId,
@@ -317,6 +327,42 @@ export class SimulationHarnessService {
       await this.dispatchNext(item.run_id);
     }
     return stale.length;
+  }
+
+  /**
+   * Simulation items follow the organization's retention (F2). Their seed turns,
+   * expectations (reference replies, titles), verdicts and errors can quote
+   * shoppers, so past the cutoff they are emptied. The rows stay, with status
+   * and usage, so the monthly allowance still counts them; the simulated
+   * conversations themselves are anonymized by the conversation retention job.
+   */
+  async scrubExpired(now: Date = new Date()): Promise<number> {
+    const organizations = await AppDataSource.getRepository(Organization)
+      .createQueryBuilder("org")
+      .where("(org.settings->>'retentionDays')::int > 0")
+      .getMany();
+    let scrubbed = 0;
+    for (const org of organizations) {
+      const retentionDays = org.settings?.retentionDays;
+      if (!retentionDays || retentionDays <= 0) continue;
+      const cutoff = new Date(now.getTime() - retentionDays * 24 * 60 * 60 * 1000);
+      try {
+        const [, affected] = (await AppDataSource.query(
+          `UPDATE simulation_run_items
+              SET seed = '[]'::jsonb, expectations = NULL, verdict = NULL,
+                  source_ref = NULL, error = NULL, updated_at = now()
+            WHERE organization_id = $1 AND created_at < $2
+              AND status NOT IN ('pending', 'running')
+              AND (seed <> '[]'::jsonb OR expectations IS NOT NULL OR verdict IS NOT NULL
+                   OR source_ref IS NOT NULL OR error IS NOT NULL)`,
+          [org.id, cutoff],
+        )) as [unknown, number];
+        scrubbed += affected ?? 0;
+      } catch (error) {
+        logger.error({ error, organizationId: org.id }, "Failed to scrub expired simulation items");
+      }
+    }
+    return scrubbed;
   }
 
   /**

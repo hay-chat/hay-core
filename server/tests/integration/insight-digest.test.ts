@@ -117,6 +117,33 @@ describe("weekly insights digest", () => {
     expect(mockSendTemplateEmail).toHaveBeenCalledTimes(1);
   });
 
+  it("does not mark the week sent when every email fails, so the next run retries (F7)", async () => {
+    await cluster();
+    mockSendTemplateEmail.mockResolvedValueOnce({ success: false });
+    expect(await service.sendForOrganization(orgId)).toBe(false);
+    const [state] = await AppDataSource.query(
+      `SELECT digest_last_sent_at FROM insight_org_state WHERE organization_id = $1`,
+      [orgId],
+    );
+    expect(state.digest_last_sent_at).toBeNull();
+
+    mockSendTemplateEmail.mockRejectedValueOnce(new Error("SMTP down"));
+    expect(await service.sendForOrganization(orgId)).toBe(false);
+
+    expect(await service.sendForOrganization(orgId)).toBe(true);
+    expect(mockSendTemplateEmail).toHaveBeenCalledTimes(3);
+  });
+
+  it("sends once when two runs start together", async () => {
+    await cluster();
+    const results = await Promise.all([
+      service.sendForOrganization(orgId),
+      service.sendForOrganization(orgId),
+    ]);
+    expect(results.filter(Boolean)).toHaveLength(1);
+    expect(mockSendTemplateEmail).toHaveBeenCalledTimes(1);
+  });
+
   it("respects the owner's opt-out and skips quiet weeks", async () => {
     await updateOrganizationThresholds(orgId, { digestEnabled: false });
     await cluster();

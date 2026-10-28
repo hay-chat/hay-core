@@ -2,7 +2,8 @@
  * Feedback → insight issues (D3-9).
  *
  * 1. `createPendingIssue` runs in the same transaction as the
- *    `message_feedback` insert: every rating becomes one insight issue
+ *    `message_feedback` insert: every rating of a real conversation (not
+ *    playground, test or simulation; F3) becomes one insight issue
  *    (`source = user_feedback`, unique on the feedback id) with the polarity
  *    from the rating, the redacted staff comment and a redacted excerpt of the
  *    rated reply. `enriched_at` is NULL: pending.
@@ -26,6 +27,7 @@ import { Conversation } from "@server/database/entities/conversation.entity";
 import { LLMService } from "@server/services/core/llm.service";
 import { PromptService } from "@server/services/prompt.service";
 import { createLogger } from "@server/lib/logger";
+import { isTestConversation } from "@server/services/close-classification/outcome-rules";
 import { insightRunsService } from "./insight-runs.service";
 import { FeedbackRating } from "@server/types/message-feedback.types";
 import {
@@ -105,13 +107,18 @@ export async function findRatedMessage(
 export class FeedbackInsightService {
   private llmService = new LLMService();
 
-  /** Insert the pending issue for a feedback row. Idempotent (unique feedback id). */
+  /**
+   * Insert the pending issue for a feedback row. Idempotent (unique feedback id).
+   * Ratings of playground, test and simulation conversations create none: they
+   * rate a staff experiment, not a shopper's experience. Returns whether one was written.
+   */
   async createPendingIssue(
     feedback: MessageFeedback,
     rated: { message: Message; conversation: Conversation },
     manager: EntityManager = AppDataSource.manager,
-  ): Promise<void> {
+  ): Promise<boolean> {
     const { message, conversation } = rated;
+    if (isTestConversation(conversation.metadata)) return false;
     const negative = feedback.rating === FeedbackRating.BAD;
     await manager
       .getRepository(InsightIssue)
@@ -147,6 +154,7 @@ export class FeedbackInsightService {
       })
       .orIgnore()
       .execute();
+    return true;
   }
 
   /** Lease and enrich up to `limit` pending feedback issues. */
@@ -340,12 +348,12 @@ export class FeedbackInsightService {
         const rated = feedback
           ? await findRatedMessage(feedback.organizationId, feedback.messageId)
           : null;
-        if (!feedback || !rated) {
-          // A rating of a message outside its organization: never turned into an issue.
+        // A rating of a message outside its organization, or of a test
+        // conversation: never turned into an issue.
+        if (!feedback || !rated || !(await this.createPendingIssue(feedback, rated))) {
           skippedIds.push(id);
           continue;
         }
-        await this.createPendingIssue(feedback, rated);
         created++;
       }
     }

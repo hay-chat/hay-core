@@ -48,7 +48,7 @@ export const insightsRouter = t.router({
       // The first visit to the page enables Insights: backfill the last 30 days (D3-18).
       await insightBackfillService.request(organizationId);
       const [result, backfill, thresholds] = await Promise.all([
-        insightsService.list(organizationId, input),
+        insightsService.list(organizationId, { ...input, includeArchiveSuggested: true }),
         insightBackfillService.status(organizationId),
         getOrganizationThresholds(organizationId),
       ]);

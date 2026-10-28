@@ -14,7 +14,12 @@
     },
     "actions": {
       "pause": "Pause",
-      "resume": "Resume"
+      "resume": "Resume",
+      "delete": "Delete Agent",
+      "setAsDefault": "Set as Default",
+      "cancel": "Cancel",
+      "save": "Save Changes",
+      "create": "Create Agent"
     },
     "enabled": {
       "label": "Agent active",
@@ -43,6 +48,88 @@
       "description": "Choose which channels this agent handles. A channel can be assigned to more than one agent; then the default agent answers if it is one of them, otherwise the oldest enabled agent.",
       "note": "{channel} is also assigned to {agents}. {responder} answers there: the default agent if it is one of them, otherwise the oldest.",
       "noResponder": "nobody"
+    },
+    "page": {
+      "title": "Agent",
+      "description": "Configure a new AI agent for your organization",
+      "backToList": "Back to list",
+      "loading": "Loading agent...",
+      "leavePage": "Leave Page",
+      "editTitle": "Edit Agent - Hay.chat",
+      "createTitle": "Create Agent - Hay.chat",
+      "editDescription": "Edit your AI agent configuration",
+      "createDescription": "Create a new AI agent"
+    },
+    "form": {
+      "cardTitle": "Agent",
+      "cardDescription": "Define the agent's behavior and how it should respond to users.",
+      "name": {
+        "label": "Name",
+        "placeholder": "e.g., Customer Support Agent",
+        "required": "Agent name is required",
+        "tooLong": "Agent name must be less than 255 characters"
+      },
+      "description": {
+        "label": "Description",
+        "helperText": "This is an internal description and it won't be visible to the user nor the agent.",
+        "placeholder": "Describe what this agent does..."
+      },
+      "instructions": {
+        "label": "Instructions",
+        "hint": "Define the general agent's behavior and how it should respond to users. DO NOT include any specific instructions for the agent to follow - use the Playbooks to define that."
+      },
+      "initialGreeting": {
+        "label": "Initial Greeting Message",
+        "helperText": "The first message customers will see when starting a conversation. If left empty, a default greeting will be used. This message will be automatically translated to match the conversation's language.",
+        "placeholder": "Hello! How can I help you today?"
+      },
+      "tone": {
+        "label": "Tone",
+        "professional": "Professional",
+        "casual": "Casual",
+        "enthusiastic": "Enthusiastic",
+        "placeholder": "Describe the communication tone (e.g., professional, friendly, casual)...",
+        "presets": {
+          "professional": "Your tone is professional, calm, and concise. You communicate clearly, use complete sentences, and avoid slang or emojis. You sound confident but approachable — like a well-trained support specialist who respects the customer's time. You empathize when appropriate, but always keep focus on solving the issue efficiently.\n\nExample: \"I understand how that could be frustrating. Let's take a look at your order status together. Could you please confirm your order number?\"",
+          "casual": "You sound like a real person chatting over text — relaxed, warm, and approachable. Use contractions, simple phrasing, and occasional emojis when it fits the vibe. Keep answers helpful but conversational, like a teammate helping out a friend.\n\nExample: \"Hey there! Totally get it — that happens sometimes 😅 Let me check your order real quick so we can sort this out.\"",
+          "enthusiastic": "You make every customer interaction feel exciting and positive. You use exclamation marks moderately, express enthusiasm for helping, and celebrate small wins. You make the customer feel heard and valued while keeping replies short and impactful.\n\nExample: \"Great question! Let's get this sorted out right away 🎉 I just need your email to find your order!\""
+        }
+      },
+      "avoid": {
+        "label": "Things to Avoid",
+        "placeholder": "List things the agent should avoid (e.g., technical jargon, certain topics)..."
+      },
+      "trigger": {
+        "label": "Trigger Conditions",
+        "placeholder": "Define when this agent should be triggered (e.g., specific keywords, conditions)..."
+      },
+      "createdAt": "Created: {date}",
+      "updatedAt": "Last updated: {date}"
+    },
+    "channels": {
+      "title": "Channels",
+      "webChat": "Web Chat"
+    },
+    "approval": {
+      "title": "Message Approval",
+      "description": "Choose whether AI responses are sent automatically or require manual review before reaching customers.",
+      "inherit": "Inherit from Organization",
+      "require": "Require Approval",
+      "autoSend": "Auto-Send",
+      "playgroundNote": "Note: Playground conversations always send automatically regardless of this setting."
+    },
+    "escalation": {
+      "title": "Human escalation",
+      "description": "Define the instructions for the agent to follow when a human agent is available or unavailable.",
+      "availableLabel": "If any human agent is available",
+      "availableHint": "Define the instructions for the agent to follow when a human agent is available. Leave empty to simply change status to 'pending-human'.",
+      "unavailableLabel": "If all human agents are unavailable",
+      "unavailableHint": "Define the instructions for the agent to follow when no human agents are available (e.g., create a ticket, ask for email)."
+    },
+    "deleteDialog": {
+      "title": "Delete Agent",
+      "description": "Are you sure you want to delete \"{name}\"? This action cannot be undone.",
+      "confirm": "Delete"
     }
   }
 }
