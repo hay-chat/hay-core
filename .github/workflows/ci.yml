@@ -1,10 +1,11 @@
 name: CI
 
+# staging runs only the webchat job (perf budget); the other jobs gate master.
 on:
   push:
-    branches: [main, master]
+    branches: [main, master, staging]
   pull_request:
-    branches: [main, master]
+    branches: [main, master, staging]
 
 # Cancel superseded runs on the same ref to save CI minutes.
 concurrency:
@@ -16,6 +17,7 @@ jobs:
   # high-signal gates that should pass before any PR merges.
   quality:
     name: Lint & Typecheck
+    if: github.ref_name != 'staging' && github.base_ref != 'staging'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -35,6 +37,7 @@ jobs:
   # provisioned as services; integration tests run real queries against them.
   server-tests:
     name: Server Tests
+    if: github.ref_name != 'staging' && github.base_ref != 'staging'
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
