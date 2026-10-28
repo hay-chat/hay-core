@@ -29,6 +29,7 @@ module.exports = {
     shopify_add_order_note: "note",
     shopify_create_coupon: "discount",
     shopify_swap_order_item: "exchange",
+    shopify_create_exchange: "exchange",
   },
   // Enforces the merchant's coupon cap itself; above it, core holds the call.
   capped: ["shopify_create_coupon"],
