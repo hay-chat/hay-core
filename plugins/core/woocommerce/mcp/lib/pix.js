@@ -92,21 +92,33 @@ function httpUrl(value) {
   return typeof value === "string" && /^https?:\/\//i.test(value) ? value : null;
 }
 
-/** ISO 8601 for a date string, epoch seconds/ms, or null when unparseable. */
-function isoDate(value) {
-  if (value === null || value === undefined || value === "") return null;
+const NAIVE_LOCAL = /^(\d{4}-\d{2}-\d{2})[ T](\d{2}:\d{2}(?::\d{2})?)$/;
+
+/**
+ * The expiry as `{ expiresAt, expiresAtIsLocal }`. A zoned string or epoch
+ * seconds/ms becomes a UTC ISO string. A WordPress "Y-m-d H:i:s" without a zone
+ * is the store's local time: it is returned as "Y-m-dTH:i:s" unchanged and
+ * flagged local, because parsing it would apply this server's zone instead.
+ */
+function expiry(value) {
+  const none = { expiresAt: null, expiresAtIsLocal: false };
+  if (value === null || value === undefined || value === "") return none;
+  const raw = String(value).trim();
+  const local = NAIVE_LOCAL.exec(raw);
+  if (local) return { expiresAt: `${local[1]}T${local[2]}`, expiresAtIsLocal: true };
   let date;
-  if (typeof value === "number" || /^\d+$/.test(String(value))) {
-    const n = Number(value);
+  if (typeof value === "number" || /^\d+$/.test(raw)) {
+    const n = Number(raw);
     date = new Date(n < 1e12 ? n * 1000 : n);
   } else {
-    // WordPress "Y-m-d H:i:s" without a zone: keep it as the store's local time.
-    date = new Date(String(value).replace(" ", "T"));
+    date = new Date(raw);
   }
-  return Number.isNaN(date.getTime()) ? null : date.toISOString();
+  return Number.isNaN(date.getTime())
+    ? none
+    : { expiresAt: date.toISOString(), expiresAtIsLocal: false };
 }
 
-/** @returns {{provider, copyPaste, qrImageUrl, expiresAt} | null} */
+/** @returns {{provider, copyPaste, qrImageUrl, expiresAt, expiresAtIsLocal} | null} */
 function parsePix(metaData) {
   const meta = new Map();
   for (const m of metaData || []) {
@@ -131,7 +143,7 @@ function parsePix(metaData) {
       provider: spec.provider,
       copyPaste,
       qrImageUrl: httpUrl(pick(spec.qrImageUrl)),
-      expiresAt: isoDate(pick(spec.expiresAt)),
+      ...expiry(pick(spec.expiresAt)),
     };
   }
   return null;
