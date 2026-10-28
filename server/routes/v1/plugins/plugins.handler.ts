@@ -16,7 +16,12 @@ import type { HayPluginManifest } from "@server/types/plugin.types";
 import type { AuthMethodDescriptor, ConfigFieldDescriptor } from "@server/types/plugin-sdk.types";
 import { MCPClientFactory } from "@server/services/mcp-client-factory.service";
 import { PluginStatus } from "@server/entities/plugin-registry.entity";
-import { separateConfigAndAuth, hasAuthChanges, extractAuthState } from "@server/lib/plugin-utils";
+import {
+  mergeWithStoredConfig,
+  separateConfigAndAuth,
+  hasAuthChanges,
+  extractAuthState,
+} from "@server/lib/plugin-utils";
 import { fetchToolsFromWorker, fetchAndStoreTools } from "@server/services/plugin-tools.service";
 import { readFile } from "fs/promises";
 import { join, resolve } from "path";
@@ -604,38 +609,18 @@ export const configurePlugin = authenticatedProcedure
     const pluginRegistry = await pluginRegistryRepository.findByPluginId(input.pluginId);
     const metadata = pluginRegistry?.metadata; // Metadata from /metadata endpoint
 
-    // When updating configuration, we need to handle partial updates properly
-    let finalConfig = input.configuration;
     const configSchema = metadata?.configSchema || manifest.configSchema;
-
-    if (instance && instance.config) {
-      // Get existing decrypted config
-      const existingDecrypted = decryptConfig(instance.config);
-
-      // Merge with new config, preserving non-updated encrypted fields
-      for (const [key, value] of Object.entries(input.configuration)) {
-        // If the value is masked (all asterisks), keep the existing value
-        if (typeof value === "string" && /^\*+$/.test(value)) {
-          finalConfig[key] = existingDecrypted[key];
-        }
-      }
-
-      // Also preserve any fields not included in the update
-      // BUT: don't preserve fields that have env fallbacks (allow reset to env)
-      for (const [key, value] of Object.entries(existingDecrypted)) {
-        if (!(key in finalConfig)) {
-          // Check if field has env fallback
-          const fieldSchema = configSchema?.[key];
-          const hasEnvFallback = fieldSchema?.env && process.env[fieldSchema.env];
-
-          // Only preserve if no env fallback (can't reset to env)
-          if (!hasEnvFallback) {
-            finalConfig[key] = value;
-          }
-          // Otherwise, omit it to allow falling back to env
-        }
-      }
-    }
+    // Masked or omitted fields keep their stored value (config or auth credentials).
+    const finalConfig = instance
+      ? mergeWithStoredConfig(
+          input.configuration,
+          {
+            ...(instance.config ? decryptConfig(instance.config) : {}),
+            ...(instance.authState?.credentials ?? {}),
+          },
+          configSchema as Record<string, ConfigFieldDescriptor> | undefined,
+        )
+      : input.configuration;
 
     // Separate config and auth
     const { config, authState } = separateConfigAndAuth(finalConfig, metadata);
