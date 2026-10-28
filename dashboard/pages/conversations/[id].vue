@@ -562,7 +562,27 @@
             :expires-at="conversation.reply_window_expires_at"
             :can-send="isTakenOverByCurrentUser"
           />
+          <ComposerAttachments
+            v-if="conversation && !isPlaygroundMode"
+            ref="composerAttachments"
+            v-model="pendingAttachments"
+            :conversation-id="conversation.id"
+          />
           <form class="flex gap-2 md:gap-3" @submit.prevent="sendMessage">
+            <Button
+              v-if="conversation && !isPlaygroundMode"
+              type="button"
+              variant="ghost"
+              size="icon"
+              class="flex-shrink-0"
+              data-testid="composer-attach"
+              :aria-label="$t('conversations.attachment.attach')"
+              :title="$t('conversations.attachment.attach')"
+              :disabled="isReplyWindowClosed || pendingAttachments.length >= MAX_COMPOSER_FILES"
+              @click="composerAttachments?.open()"
+            >
+              <Paperclip class="h-4 w-4" />
+            </Button>
             <Input
               v-model="newMessage"
               :placeholder="
@@ -579,7 +599,8 @@
             <Button
               type="submit"
               :disabled="
-                !newMessage.trim() ||
+                (!newMessage.trim() && !readyAttachments.length) ||
+                isUploadingAttachments ||
                 isSendingMessage ||
                 (isPlaygroundMode && !conversation) ||
                 isReplyWindowClosed
@@ -1035,6 +1056,7 @@ import {
   PanelRight,
   FlaskConical,
   Zap,
+  Paperclip,
 } from "lucide-vue-next";
 import { createReusableTemplate, useMediaQuery } from "@vueuse/core";
 import { TRPCClientError } from "@trpc/client";
@@ -1049,6 +1071,7 @@ import { MessageType, type Message } from "~/types/message";
 import { parseUTCDate } from "~/utils/date";
 import type { AssignedUser } from "@/composables/useConversationTakeover";
 import type { RouterOutputs } from "@/types/trpc";
+import type { ComposerAttachmentItem } from "@/components/conversations/ComposerAttachments.vue";
 
 // i18n
 const { t } = useI18n();
@@ -1188,6 +1211,16 @@ const supervisionMode = ref(false);
 const humanTakeover = ref(false);
 const isTyping = ref(false);
 const newMessage = ref("");
+// D8-16: files a person adds to their reply (uploaded as soon as picked)
+const MAX_COMPOSER_FILES = 10;
+const pendingAttachments = ref<ComposerAttachmentItem[]>([]);
+const composerAttachments = ref<{ open: () => void }>();
+const readyAttachments = computed(() =>
+  pendingAttachments.value.flatMap((item) => (item.attachment ? [item.attachment] : [])),
+);
+const isUploadingAttachments = computed(() =>
+  pendingAttachments.value.some((item) => !item.attachment),
+);
 const messagesContainer = ref<HTMLElement>();
 // Deep link from the feedback page: /conversations/:id?message=<messageId>
 const highlightedMessageId = computed(() =>
@@ -1659,11 +1692,14 @@ const confirmClose = async () => {
 const isSendingMessage = ref(false);
 
 const sendMessage = async () => {
-  if (!newMessage.value.trim() || isSendingMessage.value) return;
+  const attachments = isPlaygroundMode.value ? [] : readyAttachments.value;
+  if ((!newMessage.value.trim() && !attachments.length) || isSendingMessage.value) return;
+  if (isUploadingAttachments.value) return;
 
   isSendingMessage.value = true;
   const messageContent = newMessage.value;
   newMessage.value = ""; // Clear immediately to prevent double-send
+  pendingAttachments.value = [];
 
   // Generate temporary ID for optimistic message
   const tempId = `temp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
@@ -1683,6 +1719,7 @@ const sendMessage = async () => {
     updated_at: new Date().toISOString(),
     status: "approved",
     deliveryState: "pending",
+    ...(attachments.length ? { attachments } : {}),
   };
 
   // Add optimistic message to the appropriate list
@@ -1700,6 +1737,7 @@ const sendMessage = async () => {
       conversationId: conversationId.value,
       content: messageContent,
       role,
+      ...(attachments.length ? { attachmentIds: attachments.map((a) => a.id) } : {}),
     });
 
     // Play message sent sound
@@ -1769,8 +1807,13 @@ const retryMessage = async (messageId: string) => {
   // Remove the failed message
   messagesList.splice(messageIndex, 1);
 
-  // Resend by setting the newMessage and calling sendMessage
+  // Resend by setting the newMessage (and its files, still unsent uploads) and calling sendMessage
   newMessage.value = messageContent;
+  pendingAttachments.value = (failedMessage.attachments ?? []).map((attachment) => ({
+    key: attachment.id,
+    name: attachment.name,
+    attachment,
+  }));
   await sendMessage();
 };
 

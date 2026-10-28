@@ -14,7 +14,13 @@
       }
     },
     "attachment": {
-      "loadFailed": "Não foi possível carregar este anexo"
+      "loadFailed": "Não foi possível carregar este anexo",
+      "attach": "Anexar um arquivo",
+      "remove": "Remover {name}",
+      "uploading": "Enviando {name}…",
+      "uploadFailed": "Não foi possível enviar {name}. Tente de novo ou escolha outro arquivo.",
+      "tooLarge": "{name} tem mais de {size} MB.",
+      "tooMany": "Você pode enviar até {count} arquivos por vez."
     },
     "page": {
       "title": "Conversas",

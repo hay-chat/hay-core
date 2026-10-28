@@ -13,6 +13,14 @@ import { ConversationRepository } from "@server/repositories/conversation.reposi
 import { messageApprovalService } from "../../../services/message-approval.service";
 import { createLogger } from "@server/lib/logger";
 import { agentFirstName } from "../../../services/webchat/public-message";
+import { decodeBase64 } from "../../../services/webchat/widget-attachments";
+import {
+  STAFF_ATTACHMENT_MAX_COUNT,
+  StaffAttachmentRejectedError,
+  staffAttachmentsFromUploads,
+  storeStaffAttachment,
+} from "../../../services/staff-attachments";
+import { config } from "@server/config/env";
 import { ConversationExportService } from "../../../services/conversation-export.service";
 import { AppDataSource } from "../../../database/data-source";
 import {
@@ -115,11 +123,22 @@ const addMessageSchema = z.object({
   message: messageSchema,
 });
 
-const sendMessageSchema = z.object({
-  conversationId: z.string().uuid(),
-  content: z.string(),
-  role: z.enum(["user", "assistant"]).optional().default("user"),
-});
+const sendMessageSchema = z
+  .object({
+    conversationId: z.string().uuid(),
+    content: z.string(),
+    role: z.enum(["user", "assistant"]).optional().default("user"),
+    /** D8-16: files from `uploadAttachment`, sent by a person who took over. */
+    attachmentIds: z.array(z.string().uuid()).max(STAFF_ATTACHMENT_MAX_COUNT).optional(),
+  })
+  .refine((input) => input.content.trim() !== "" || (input.attachmentIds?.length ?? 0) > 0, {
+    message: "A message needs text or a file",
+    path: ["content"],
+  });
+
+/** Base64 length of the largest conversation-media file, so zod refuses bigger bodies first. */
+const STAFF_ATTACHMENT_MAX_BASE64_LENGTH =
+  Math.ceil(config.storage.limits.conversationMediaMaxFileSize / 3) * 4;
 
 export const conversationsRouter = t.router({
   list: createListProcedure(conversationListInputSchema, conversationRepository),
@@ -632,6 +651,27 @@ export const conversationsRouter = t.router({
       messageType = MessageType.CUSTOMER;
     }
 
+    // D8-16: only a person who took over sends files (delivered by the channel).
+    let attachments: Awaited<ReturnType<typeof staffAttachmentsFromUploads>> = [];
+    if (input.attachmentIds?.length) {
+      if (messageType !== MessageType.HUMAN_AGENT) {
+        throw new TRPCError({
+          code: "PRECONDITION_FAILED",
+          message: "Take over the conversation before sending files",
+        });
+      }
+      try {
+        attachments = await staffAttachmentsFromUploads({
+          organizationId: conversation.organization_id,
+          userId: ctx.user!.id,
+          uploadIds: input.attachmentIds,
+        });
+      } catch (error) {
+        if (!(error instanceof StaffAttachmentRejectedError)) throw error;
+        throw new TRPCError({ code: "BAD_REQUEST", message: error.message });
+      }
+    }
+
     // The widget shows a person's reply as "10:42 · Marina" (first name only)
     let senderFirstName: string | undefined;
     if (messageType === MessageType.HUMAN_AGENT) {
@@ -643,6 +683,7 @@ export const conversationsRouter = t.router({
     const message = await conversation.addMessage({
       content: input.content,
       type: messageType,
+      ...(attachments.length ? { attachments } : {}),
       metadata: {
         sender: input.role || "user",
         sentByUserId: ctx.user?.id,
@@ -652,6 +693,51 @@ export const conversationsRouter = t.router({
 
     return message;
   }),
+
+  /**
+   * D8-16: store a file a person picked in the Inbox composer. Sent with the
+   * next `sendMessage` (attachmentIds); unsent files are swept after a day.
+   */
+  uploadAttachment: authenticatedProcedure
+    .input(
+      z.object({
+        conversationId: z.string().uuid(),
+        data: z.string().min(1).max(STAFF_ATTACHMENT_MAX_BASE64_LENGTH),
+        mimeType: z.string().min(1).max(100),
+        fileName: z.string().min(1).max(255),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const conversation = await conversationRepository.findById(input.conversationId);
+      if (!conversation || conversation.organization_id !== ctx.organizationId) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Conversation not found" });
+      }
+      if (
+        conversation.status !== "human-took-over" ||
+        conversation.assigned_user_id !== ctx.user?.id
+      ) {
+        throw new TRPCError({
+          code: "PRECONDITION_FAILED",
+          message: "Take over the conversation before sending files",
+        });
+      }
+      const buffer = decodeBase64(input.data);
+      if (!buffer) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Invalid file data" });
+      }
+      try {
+        return await storeStaffAttachment({
+          organizationId: conversation.organization_id,
+          userId: ctx.user!.id,
+          buffer,
+          mimeType: input.mimeType,
+          filename: input.fileName,
+        });
+      } catch (error) {
+        if (!(error instanceof StaffAttachmentRejectedError)) throw error;
+        throw new TRPCError({ code: "BAD_REQUEST", message: error.message });
+      }
+    }),
 
   /**
    * D13-3: templates the conversation's channel can send now (e.g. WhatsApp
