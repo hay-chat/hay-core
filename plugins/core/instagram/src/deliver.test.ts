@@ -77,8 +77,9 @@ describe("Instagram outbound attachments", () => {
       "123",
       { type: "image", url: photo.url },
       "token",
+      "response",
     );
-    expect(graph.sendText).toHaveBeenCalledWith("123", "Here is your label", "token");
+    expect(graph.sendText).toHaveBeenCalledWith("123", "Here is your label", "token", "response");
     expect(graph.sendAttachment.mock.invocationCallOrder[0]).toBeLessThan(
       graph.sendText.mock.invocationCallOrder[0],
     );
@@ -118,5 +119,60 @@ describe("Instagram outbound attachments", () => {
       statusCode: 200,
       body: { success: false, error: "partial_delivery", providerMessageId: "mid.file.1" },
     });
+  });
+});
+
+describe("deliverHandler echo tracking (D11-11)", () => {
+  it("remembers every mid it sent", async () => {
+    const { SentMessageTracker } = await import("./echo.js");
+    const tracker = new SentMessageTracker();
+    const graph = client();
+    const { response } = res();
+    await deliverHandler(
+      { body: { to: "instagram:123", messageId: "m1", conversationId: "c1", content: "hi", attachments: [photo] } } as Request,
+      response,
+      { getGraphClient: () => graph, getAccessToken: () => "token", logger, tracker },
+    );
+    expect(await tracker.isOwn("mid.file.1", "123")).toBe(true);
+    expect(await tracker.isOwn("mid.text.2", "123")).toBe(true);
+    expect(await tracker.isOwn("mid.other", "123")).toBe(false);
+  });
+});
+
+describe("Human Agent tag after 24 hours (D13-14)", () => {
+  const windowClosed = () => new GraphApiError("outside of allowed window", 400, 10, 2534022);
+
+  it("resends a person's reply with the Human Agent tag when the window has closed", async () => {
+    const graph = client({
+      sendText: vi.fn(async (_to: string, _text: string, _token: string, mode: string) => {
+        if (mode === "response") throw windowClosed();
+        return "mid.tagged";
+      }),
+    });
+    const out = await deliver(graph, { content: "Sorry for the wait", messageType: "HumanAgent" });
+    expect(graph.sendText).toHaveBeenLastCalledWith("123", "Sorry for the wait", "token", "human_agent");
+    expect(out.body).toEqual({ success: true, providerMessageId: "mid.tagged" });
+  });
+
+  it("never tags an AI reply", async () => {
+    const graph = client({
+      sendText: vi.fn(async () => {
+        throw windowClosed();
+      }),
+    });
+    const out = await deliver(graph, { content: "hi", messageType: "BotAgent" });
+    expect(graph.sendText).toHaveBeenCalledTimes(1);
+    expect(out.body).toEqual({ success: false, error: "24h_window_expired" });
+  });
+
+  it("reports the closed window when the tagged send is refused too", async () => {
+    const graph = client({
+      sendText: vi.fn(async () => {
+        throw windowClosed();
+      }),
+    });
+    const out = await deliver(graph, { content: "hi", messageType: "HumanAgent" });
+    expect(graph.sendText).toHaveBeenCalledTimes(2);
+    expect(out.body).toEqual({ success: false, error: "24h_window_expired" });
   });
 });

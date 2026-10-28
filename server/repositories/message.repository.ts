@@ -69,6 +69,31 @@ export class MessageRepository {
       .getOne();
   }
 
+  /**
+   * An outbound message by provider id across organizations, with its
+   * conversation's organization. Only for provider callbacks that carry no
+   * organization (account-wide email event webhooks, D13-10).
+   */
+  async findOutboundByProviderMessageIds(
+    providerMessageIds: string[],
+  ): Promise<{ message: Message; organizationId: string; channel: string } | null> {
+    if (providerMessageIds.length === 0) return null;
+    const message = await this.getRepository()
+      .createQueryBuilder("message")
+      .innerJoinAndSelect("message.conversation", "conversation")
+      .where("message.provider_message_id IN (:...providerMessageIds)", { providerMessageIds })
+      .andWhere("message.type IN (:...types)", {
+        types: [MessageType.BOT_AGENT, MessageType.HUMAN_AGENT],
+      })
+      .getOne();
+    if (!message) return null;
+    return {
+      message,
+      organizationId: message.conversation.organization_id,
+      channel: message.conversation.channel,
+    };
+  }
+
   async findByConversation(conversationId: string): Promise<Message[]> {
     return await this.getRepository().find({
       where: { conversation_id: conversationId },

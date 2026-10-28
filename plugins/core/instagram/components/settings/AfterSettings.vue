@@ -1,74 +1,19 @@
 <template>
   <div class="instagram-setup-guide">
     <div class="tutorial-header">
-      <h3>Instagram Setup Guide</h3>
-      <p>
-        Connect your Instagram Professional account to Hay.chat. Once connected, direct messages sent to
-        your account are routed through Hay.chat's AI, and replies are delivered straight back to the
-        Instagram thread.
-      </p>
+      <h3>{{ t("title") }}</h3>
+      <p>{{ t("intro") }}</p>
     </div>
 
     <div class="tutorial-steps">
-      <!-- Step 1: Connect via OAuth -->
-      <div class="tutorial-step">
+      <div v-for="(step, index) in steps" :key="step" class="tutorial-step">
         <div class="step-header">
-          <span class="step-number">1</span>
-          <h4>Connect your Instagram account</h4>
+          <span class="step-number">{{ index + 1 }}</span>
+          <h4>{{ t(`${step}.title`) }}</h4>
         </div>
-        <p>
-          Click the <strong>Connect</strong> button above to sign in with
-          <strong>Facebook Login for Business</strong>. Choose the Facebook Page and the linked
-          Instagram Professional account you want Hay.chat to manage, then approve the requested
-          permissions. Hay.chat stores the connection securely &mdash; there are no tokens to copy or
-          paste.
-        </p>
-        <p class="hint">
-          You need an Instagram Professional account (Business or Creator) that is linked to a
-          Facebook Page you manage.
-        </p>
-      </div>
-
-      <!-- Step 2: Media -->
-      <div class="tutorial-step">
-        <div class="step-header">
-          <span class="step-number">2</span>
-          <h4>Photos, videos and voice messages</h4>
-        </div>
-        <p>
-          Hay.chat keeps the photos, videos, voice messages and files shoppers send, and transcribes
-          voice messages so the AI can answer them. Story mentions, reels and shared posts show as a
-          short note. Reactions are not shown.
-        </p>
-      </div>
-
-      <!-- Step 3: 24-hour window -->
-      <div class="tutorial-step">
-        <div class="step-header">
-          <span class="step-number">3</span>
-          <h4>Reply within 24 hours</h4>
-        </div>
-        <p>
-          Instagram only lets businesses send a free-form reply within <strong>24 hours</strong> of
-          the customer's last message. After that window closes, the customer must message you again
-          before Hay.chat can respond.
-        </p>
-      </div>
-
-      <!-- Step 4: Where messages appear -->
-      <div class="tutorial-step">
-        <div class="step-header">
-          <span class="step-number">4</span>
-          <h4>Where messages appear</h4>
-        </div>
-        <p>
-          Once connected, new Instagram DMs show up as conversations in your Hay.chat inbox. The AI agent
-          assigned to the Instagram channel responds automatically.
-        </p>
-        <p class="hint">
-          To assign an agent, go to <strong>Settings &rarr; Channels</strong> and select an agent
-          for the Instagram channel.
-        </p>
+        <!-- Static strings from this plugin's own i18n files. -->
+        <p v-html="t(`${step}.body`)"></p>
+        <p v-if="t(`${step}.hint`) !== `${step}.hint`" class="hint" v-html="t(`${step}.hint`)"></p>
       </div>
     </div>
 
@@ -88,36 +33,32 @@
             d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
           ></path>
         </svg>
-        <div>
-          <strong>24-hour messaging window:</strong> Instagram requires businesses to respond within
-          24 hours of the customer's last message. After 24 hours, you must wait for the customer to
-          send a new message before replying.
-        </div>
+        <div v-html="t('windowNote')"></div>
       </div>
     </div>
   </div>
 </template>
 
 <script lang="ts">
-import { defineComponent } from "vue";
+import { computed, defineComponent } from "vue";
+import { createTranslator } from "./messages";
 
 export default defineComponent({
   name: "InstagramAfterSettings",
   props: {
-    plugin: {
-      type: Object,
-      default: () => ({}),
-    },
-    config: {
-      type: Object,
-      default: () => ({}),
-    },
-    apiBaseUrl: {
-      type: String,
-      default: "http://localhost:3001",
-    },
+    plugin: { type: Object, default: () => ({}) },
+    config: { type: Object, default: () => ({}) },
+    apiBaseUrl: { type: String, default: "http://localhost:3001" },
+    locale: { type: String, default: "en" },
   },
   emits: ["update:config"],
+  setup(props) {
+    const translator = computed(() => createTranslator(props.locale));
+    return {
+      t: (key: string) => translator.value(key),
+      steps: ["step1", "step2", "step3", "step4"],
+    };
+  },
 });
 </script>
 

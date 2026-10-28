@@ -16,14 +16,14 @@
       "body": "O Hay.chat guarda as fotos, vídeos, mensagens de voz e arquivos que os clientes enviam e transcreve as mensagens de voz para que a IA possa respondê-las. Menções em stories, reels e posts compartilhados aparecem como uma nota curta. Reações não são exibidas. Sua equipe e a IA podem enviar fotos, vídeos, áudios e PDFs de volta."
     },
     "step3": {
-      "title": "Responda em até 24 horas",
-      "body": "O Instagram só permite que empresas enviem uma resposta livre dentro de <strong>24 horas</strong> após a última mensagem do cliente. Após esse período, o cliente precisa enviar uma nova mensagem antes que o Hay.chat possa responder."
+      "title": "Respostas após 24 horas",
+      "body": "O Instagram permite uma resposta livre em até <strong>24 horas</strong> após a última mensagem do cliente. Depois disso, uma resposta escrita por uma pessoa da sua equipe ainda é enviada por até <strong>7 dias</strong>. A IA só responde dentro das 24 horas."
     },
     "step4": {
       "title": "Onde as mensagens aparecem",
       "body": "Uma vez conectado, novas DMs do Instagram aparecem como conversas na sua caixa de entrada do Hay.chat. O agente de IA atribuído ao canal do Instagram responde automaticamente.",
       "hint": "Para atribuir um agente, vá em <strong>Configurações &rarr; Canais</strong> e selecione um agente para o canal do Instagram."
     },
-    "windowNote": "<strong>Janela de mensagens de 24 horas:</strong> O Instagram exige que as empresas respondam dentro de 24 horas após a última mensagem do cliente. Após 24 horas, você deve aguardar o cliente enviar uma nova mensagem antes de responder."
+    "windowNote": "<strong>Janela de mensagens:</strong> a IA pode responder em até 24 horas após a última mensagem do cliente. Uma pessoa da sua equipe pode responder por até 7 dias. Depois disso, aguarde o cliente escrever novamente."
   }
 }

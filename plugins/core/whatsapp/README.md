@@ -50,7 +50,7 @@ Customer identity (D3): `external_id` is `+<wa_id>` in E.164. Users who hide the
 behind a WhatsApp username have only a business-scoped user id, so they get
 `whatsapp:bsuid:<user_id>` and are messaged with `recipient`.
 
-Not yet: templates with media headers or variable button links, coexistence echoes and history
+Not yet: templates with media headers or variable button links, and coexistence history import. Coexistence echoes (replies the owner types in the WhatsApp Business app) are stored as human messages and stop the AI from answering over them
 import (Phase 4), typing indicators and read receipts, interactive messages sent by the agent.
 
 ## Connecting a number

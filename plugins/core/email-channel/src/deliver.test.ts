@@ -68,6 +68,21 @@ describe("deliver", () => {
     expect(api.sent[0].html).toContain("<p>It shipped yesterday.</p>");
   });
 
+  it("sends from the support address only once its domain is verified (D13-9)", async () => {
+    const verified = fakeApi({ messages, sendingDomain: "acme.com" });
+    await deliver(payload(), fakeContext({ api: verified }));
+    expect(verified.sent[0].from).toEqual({ email: "support@acme.com", name: "Acme Support" });
+    expect(verified.sent[0].messageId).toBe("<hay-m2@acme.com>");
+
+    const otherDomain = fakeApi({ messages, sendingDomain: "other.com" });
+    await deliver(payload(), fakeContext({ api: otherDomain }));
+    expect(otherDomain.sent[0].from?.email).toBe("support@updates.hay.test");
+
+    const none = fakeApi({ messages });
+    await deliver(payload(), fakeContext({ api: none }));
+    expect(none.sent[0].from?.email).toBe("support@updates.hay.test");
+  });
+
   it("BCCs the support address when the archive option is on", async () => {
     const api = fakeApi({ messages });
     const ctx = fakeContext({ api, settings: { ...settings, bccArchive: true } });
