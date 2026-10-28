@@ -11,7 +11,9 @@
     "category": "integration",
     "capabilities": [
       "mcp",
-      "auth"
+      "auth",
+      "cron",
+      "disputes"
     ]
   },
   "scripts": {
