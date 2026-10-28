@@ -268,6 +268,7 @@
       "reasonPlaceholder": "Compartilhado com a IA para explicar ao cliente",
       "replyMyself": "Vou responder eu mesmo",
       "failed": "Não foi possível salvar sua decisão",
+      "takeoverFailed": "Sua decisão foi salva, mas não foi possível assumir a conversa. Use Assumir para atender você mesmo.",
       "done": {
         "approve": "Aprovada",
         "reject": "Recusada",
