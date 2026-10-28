@@ -27,6 +27,16 @@
             {{ $t("documents.detail.edit") }}
           </Button>
           <Button
+            v-if="isEditorAuthored && !isEditing"
+            variant="outline"
+            size="sm"
+            data-testid="improve-document-button"
+            @click="showSuggestDialog = true"
+          >
+            <Sparkles class="h-4 w-4 mr-2" />
+            {{ $t("suggest.improveButton") }}
+          </Button>
+          <Button
             variant="outline"
             size="sm"
             class="text-destructive hover:text-destructive"
@@ -182,6 +192,13 @@
       </Card>
     </template>
 
+    <SuggestKnowledgeDialog
+      v-if="document"
+      v-model:open="showSuggestDialog"
+      :document-id="document.id"
+      @applied="fetchDocument"
+    />
+
     <ConfirmDialog
       v-model:open="showDeleteDialog"
       :title="$t('documents.deleteDialog.title')"
@@ -210,6 +227,7 @@ import {
   Globe,
   ExternalLink,
   Pencil,
+  Sparkles,
   Trash2,
 } from "lucide-vue-next";
 
@@ -393,6 +411,7 @@ const visitSource = () => {
 
 const deleting = ref(false);
 const showDeleteDialog = ref(false);
+const showSuggestDialog = ref(false);
 
 const confirmDelete = async () => {
   if (!document.value || deleting.value) return;

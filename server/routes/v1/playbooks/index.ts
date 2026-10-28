@@ -510,13 +510,18 @@ export const playbooksRouter = t.router({
       }
 
       // Render the prompt template
-      const prompt = await promptService.getPrompt("playbook/generate-instructions", {
-        purpose: input.purpose,
-        actions: input.actions,
-        documents,
-        escalationRules: input.escalationRules,
-        boundaries: input.boundaries,
-      });
+      const prompt = await promptService.getPrompt(
+        "playbook/generate-instructions",
+        {
+          purpose: input.purpose,
+          actions: input.actions,
+          documents,
+          escalationRules: input.escalationRules,
+          boundaries: input.boundaries,
+        },
+        // The org's language picks the prompt (pt orgs get a Portuguese playbook).
+        { organizationId: ctx.organizationId! },
+      );
 
       const jsonSchema = {
         type: "object",

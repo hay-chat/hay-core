@@ -348,5 +348,29 @@
         "webConnectFailedMessage": "Please check the URL and try again."
       }
     }
+  },
+  "knowledgeSuggest": {
+    "title": "Improve knowledge with AI",
+    "descriptionConversation": "Analyze this conversation and propose a fix to the knowledge the AI answers from: an edit to a document it used, or a new Q&A. You can add optional feedback to guide the suggestion.",
+    "descriptionDocument": "Describe what is wrong or missing and the AI will propose a revised version of this document.",
+    "feedbackLabel": "Feedback",
+    "feedbackPlaceholderOptional": "Optional: what the AI got wrong, or the right answer…",
+    "feedbackPlaceholderRequired": "Describe what you want to change…",
+    "loading": "Reading the conversation and the knowledge base…",
+    "noChangesText": "The knowledge base already covers this well.",
+    "modeEdit": "Edit document",
+    "modeAdd": "New Q&A",
+    "editHint": "Saving updates the document right away; the AI uses it in its next replies.",
+    "addHint": "Adding creates a published Q&A document; the AI uses it in its next replies.",
+    "staleWarning": "The document changed since this suggestion was generated. Saving will overwrite those changes — click Save again to confirm.",
+    "save": "Save document",
+    "addQa": "Add Q&A",
+    "savedToast": "Document updated",
+    "addedToast": "Q&A added to the knowledge base",
+    "improveFromConversation": "Improve knowledge",
+    "textLabel": "Text to save",
+    "editText": "Edit text",
+    "showChanges": "Show changes",
+    "placeholderWarning": "Fill in every \"[to confirm: …]\" with the right information (Edit text) before saving."
   }
 }

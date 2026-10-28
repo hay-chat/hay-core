@@ -1,3 +1,9 @@
+## 2026-10-28 — claude/w3-insights-a (L12a)
+- Done: D3-6 Knowledge Improve, D3-7 insight schema+embeddings, D3-9 feedback→issues+enrichment+backfill, D3-11 insight_runs ledger + insights.metrics.
+- Migrations 1785810000000, 1785811000000 run on hay_test only. Not pushed.
+- Gaps: Gemini/Mistral/Grok unpriced (null cost); OpenAI prices unverified.
+- Next: Roger review/merge; L12b builds clustering on insight_issue_embeddings.
+
 ## 2026-10-28 07:05 — staging — WAVE 2 DONE (tag wave-2-done)
 - Suites green; PR #104 updated (Waves 0–2); GIFs sent. Next: Wave 3 batch 1 (L12a insights, L7a go-live).
 ## 2026-10-28 06:50 — staging — W2 review fixes merged, hand-tested

@@ -32,6 +32,7 @@ import { LLMService } from "@server/services/core/llm.service";
 import { PromptService } from "@server/services/prompt.service";
 import { redactString } from "@server/lib/logger/redaction";
 import { createLogger } from "@server/lib/logger";
+import { insightRunsService } from "@server/services/insights/insight-runs.service";
 import {
   INSIGHT_ACTION_TYPES,
   INSIGHT_POLARITIES,
@@ -117,7 +118,8 @@ function pick<T extends string>(value: unknown, allowed: ReadonlyArray<T>, fallb
   return allowed.includes(value as T) ? (value as T) : fallback;
 }
 
-function clean(value: unknown, maxLength: number): string | null {
+/** Trim, PII-redact and cap a model-written text field; empty becomes null. */
+export function redactInsightText(value: unknown, maxLength: number): string | null {
   if (typeof value !== "string") return null;
   const text = redactString(value.trim()).slice(0, maxLength);
   return text.length > 0 ? text : null;
@@ -327,6 +329,7 @@ export class CloseClassifierService {
       return;
     }
 
+    const startedAt = Date.now();
     try {
       const prompt = await this.promptService.getPrompt(
         "conversation/close-classification",
@@ -358,9 +361,25 @@ export class CloseClassifierService {
         model: result.model,
         usage: result.usage as unknown as Record<string, unknown>,
       });
+      await insightRunsService.record({
+        organizationId: row.organization_id,
+        kind: "close_classification",
+        model: result.model,
+        usage: result.usage,
+        durationMs: Date.now() - startedAt,
+        succeeded: true,
+      });
       log.debug({ outcome: decision.outcome, billable: decision.billable }, "Classified close");
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
+      await insightRunsService.record({
+        organizationId: row.organization_id,
+        kind: "close_classification",
+        model: null,
+        usage: null,
+        durationMs: Date.now() - startedAt,
+        succeeded: false,
+      });
       if (attempt >= MAX_ATTEMPTS) {
         log.warn({ err: error, attempt }, "Close classifier gave up; keeping the rule outcome");
         await this.finalizeWithRule(row, conversation, message);
@@ -422,7 +441,7 @@ export class CloseClassifierService {
           billable: decision.billable,
           ai_resolved: decision.aiResolved,
           classified_by: "llm",
-          classification_reason: clean(response.outcome_reason, 500),
+          classification_reason: redactInsightText(response.outcome_reason, 500),
           classified_at: new Date(),
           claimed_until: null,
           last_error: null,
@@ -453,11 +472,12 @@ export class CloseClassifierService {
               handedOff: row.handed_off,
               actionType: response.action_type,
             }),
-            summary: clean(response.summary, 1000) ?? "",
-            root_cause: clean(response.root_cause, 500),
-            area: clean(response.area, 64),
-            snippet: clean(response.snippet, 300),
-            paraphrase: clean(response.paraphrase, 500),
+            summary: redactInsightText(response.summary, 1000) ?? "",
+            root_cause: redactInsightText(response.root_cause, 500),
+            area: redactInsightText(response.area, 64),
+            snippet: redactInsightText(response.snippet, 300),
+            paraphrase: redactInsightText(response.paraphrase, 500),
+            enriched_at: new Date(),
             signals: {
               outcome: decision.outcome,
               billable: decision.billable,
