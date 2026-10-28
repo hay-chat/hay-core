@@ -104,6 +104,56 @@
         "refund": "refund",
         "discount": "discount"
       }
+    },
+    "toolErrors": {
+      "generic": "This action failed.",
+      "codes": {
+        "BAD_INPUT": "The AI sent details the store could not accept, such as a wrong order number or format.",
+        "NOT_FOUND": "The store could not find the order, customer or item the AI asked for.",
+        "PRECONDITION": "The order's current state does not allow this action.",
+        "PROVIDER_REFUSED": "The store refused the request.",
+        "AUTH_FAILED": "The connection to this integration expired or was revoked. Reconnect it in Integrations.",
+        "SCOPE_MISSING": "The integration is missing a permission this action needs. Reconnect it in Integrations and allow the access it asks for.",
+        "RATE_LIMITED": "The store is getting too many requests right now. It should work again in a few minutes.",
+        "PROVIDER_DOWN": "The store's service did not respond. Try again later.",
+        "OUTCOME_UNKNOWN": "The store did not confirm whether this went through. Check the order in your store before trying again.",
+        "NEEDS_APPROVAL": "This is above the limit set for the integration, so it needs a person's approval.",
+        "INTERNAL": "Something unexpected went wrong while running this action.",
+        "APPROVAL_REJECTED": "A team member declined this request."
+      },
+      "reasons": {
+        "ALREADY_HAS_COUPON": "This customer already has an unused coupon.",
+        "GOODWILL_CHECK_INCOMPLETE": "It could not be confirmed that this customer has no unused goodwill coupon, so none was created.",
+        "EXCEEDS_REFUNDABLE": "The amount is more than what can still be refunded on this order.",
+        "CUSTOMER_MISMATCH": "The order does not belong to this customer.",
+        "ALREADY_CANCELLED": "The order was already cancelled.",
+        "ALREADY_SHIPPED": "The order has already shipped.",
+        "NOT_SUPPORTED": "The store does not support this action.",
+        "RECORD_ONLY_NOT_ALLOWED": "This order was paid through a payment gateway, so a refund cannot just be recorded without paying the money back.",
+        "OUT_OF_STOCK": "The item is out of stock.",
+        "NO_EMAIL": "There is no email address to send to.",
+        "NO_CUSTOMER": "No customer is linked to this order.",
+        "NO_ACCOUNT": "This customer has no account in the store.",
+        "NOT_PAID": "The order has not been paid.",
+        "IDENTITY_MISMATCH": "The customer's details do not match the order.",
+        "FULFILLMENT_IN_PROGRESS": "The order is already being prepared for shipping.",
+        "EMAIL_MISMATCH": "The email given does not match the order.",
+        "COUPON_CREATE_FAILED": "The store could not create the coupon.",
+        "COUPONS_DISABLED": "Coupons are turned off in the store.",
+        "BALANCE_DUE": "The change would leave the customer with an amount to pay, so nothing was changed.",
+        "ALREADY_REFUNDED": "This was already refunded.",
+        "UNSUPPORTED_WC_VERSION": "The store's software version does not support this action.",
+        "PRICE_HIGHER": "The new item costs more than what the customer paid.",
+        "PENDING_REFUND": "A refund is already in progress for this order.",
+        "NOT_RETURNABLE": "This item cannot be returned.",
+        "NOT_REFUNDABLE": "This order cannot be refunded.",
+        "NOT_PRE_DISPATCH": "The order has moved past the stage where it can still be changed.",
+        "NOT_PENDING": "The order is not awaiting payment, so there is no payment link to send.",
+        "FULLY_REFUNDED": "The order has already been fully refunded.",
+        "EMAIL_FAILED": "The email could not be sent.",
+        "DIFFERENT_PRODUCT": "A swap can only change the size or colour of the same product.",
+        "ALREADY_DISPATCHED": "The order has already been dispatched."
+      }
     }
   }
 }

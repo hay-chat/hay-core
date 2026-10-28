@@ -109,6 +109,7 @@
             :tool-status="message.metadata?.toolStatus"
             :latency="message.metadata?.toolLatencyMs"
             :executed-at="message.metadata?.toolExecutedAt"
+            :tool-error-code="message.metadata?.toolErrorCode"
           />
           <PendingActionCard
             v-if="

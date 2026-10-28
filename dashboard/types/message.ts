@@ -45,6 +45,8 @@ export interface Message {
     toolStatus?: string;
     pendingActionId?: string;
     toolExecutedAt?: string;
+    /** tool-errors code of a failed call (D6-6). */
+    toolErrorCode?: string;
     // Playbook & Document metadata
     isPlaybook?: boolean;
     playbookId?: string;
