@@ -41,8 +41,11 @@ export const disputesRouter = t.router({
     return { disputes: disputes.map(toResponse) };
   }),
 
-  /** Attach the evidence pack to the dispute on its platform, as a draft. Never submits. */
-  attachEvidence: scopedProcedure(RESOURCES.CONVERSATIONS, ACTIONS.UPDATE)
+  /**
+   * Attach the evidence pack to the dispute on its platform, as a draft. Never submits.
+   * Owners and admins only: the pack sends customer conversations to the payment platform.
+   */
+  attachEvidence: scopedProcedure(RESOURCES.ORGANIZATION_SETTINGS, ACTIONS.UPDATE)
     .input(z.object({ disputeId: z.string().uuid() }))
     .mutation(async ({ ctx, input }) => {
       return disputesService.attachEvidence(

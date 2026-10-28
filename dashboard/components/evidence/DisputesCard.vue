@@ -62,7 +62,7 @@
               {{ $t("evidence.disputes.download") }}
             </Button>
             <Button
-              v-if="dispute.status === 'needs_response' && dispute.orderKey"
+              v-if="userStore.isAdmin && dispute.status === 'needs_response' && dispute.orderKey"
               size="sm"
               data-testid="dispute-attach"
               @click="openConfirm(dispute)"
@@ -94,9 +94,7 @@
     <ConfirmDialog
       :open="confirming !== null"
       :title="$t('evidence.disputes.confirmTitle')"
-      :description="
-        $t('evidence.disputes.confirmDescription', { platform: confirmPlatform })
-      "
+      :description="$t('evidence.disputes.confirmDescription', { platform: confirmPlatform })"
       :confirm-text="$t('evidence.disputes.confirm')"
       :loading="attaching"
       @update:open="(open) => !open && (confirming = null)"
@@ -110,6 +108,7 @@ import { ref, onMounted } from "vue";
 import { ExternalLink, Paperclip } from "lucide-vue-next";
 import { Hay } from "@/utils/api";
 import { useToast } from "@/composables/useToast";
+import { useUserStore } from "@/stores/user";
 import type { RouterOutputs } from "@/types/trpc";
 
 /**
@@ -124,6 +123,7 @@ const emit = defineEmits<{ "select-order": [orderKey: string, pluginId: string |
 
 const { t, te } = useI18n();
 const toast = useToast();
+const userStore = useUserStore();
 const { formatDateTime } = useOrgDateTime();
 
 const disputes = ref<Dispute[]>([]);
