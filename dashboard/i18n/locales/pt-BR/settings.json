@@ -416,7 +416,7 @@
       "allowIdDocumentsHint": "Desligado por padrão: fotos de RG, CNH, passaporte e outros documentos ficam ocultas para a IA e desfocadas na Caixa de entrada. Só o proprietário da organização pode ligar. Fotos de cartão de pagamento sempre ficam ocultas para a IA, e números de cartão são removidos de tudo o que ela lê.",
       "ownerOnly": "Só o proprietário da organização pode alterar isto.",
       "caseEmail": "E-mail para casos de produto",
-      "caseEmailPlaceholder": "qualidade@sualoja.com.br",
+      "caseEmailPlaceholder": "qualidade{'@'}sualoja.com.br",
       "caseEmailHint": "Quando a IA completa um caso de problema com produto, o Hay.chat envia o resumo e os links das fotos e da nota fiscal para este endereço. Deixe vazio para ver os casos só na Caixa de entrada.",
       "caseEmailInvalid": "Informe um e-mail válido para os casos de produto",
       "save": "Salvar",
