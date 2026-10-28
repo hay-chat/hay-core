@@ -201,75 +201,95 @@ Parked: D13-15, D16-10/11, D6-14, D2-10, D7-15, D8-18, D10-9, D11-13, D14-10, fr
 Staging seed: org/user created via `auth.register` (credentials in `../hay-core-staging/.staging-login`, untracked).
 
 ## Needs Roger
-_Open items are also in the questionnaire https://claude.ai/artifact/PGDLNwQ2oSg71qpH4vQHKc (answers stored there, collection `answers`)._
-- [W3 close] Disputes: matchOrder falls back to a text-mention order group when no plugin knows the order (could pick the wrong store's order with the same number) — decide whether to require a plugin match. Simulation monthly cap can be exceeded by concurrent starts (no lock). Feedback on playground messages may still create insight issues (no UI path confirmed). Dashboard vitest picks up 3 Playwright spec files (pre-existing).
-- [W3 L6 Perf] hay-website draft PR #47 (D12-10 /widget-performance/): approve naming competitors (Tidio, Gorgias, Crisp) and describing Crisp's user-agent skip list; decide publish now with 27 Oct numbers vs re-measure after compression + loader reach prod (recommended: re-measure first); confirm the honest 'Tidio adds less blocking time (18 vs 36 ms)' line; byline (none, like /security/). Page links to webchat/scripts/perf/lighthouse.mjs on master, 404 until D12-9 reaches master. CI webchat job runs only on master pushes/PRs. New ticket (not built): hay.chat homepage FCP 3.8 s / LCP 6.4 s / score 64 with widget blocked — render-blocking Google Fonts CSS, styles css, homepage js main-thread 1.5 s; weakens any public speed claim.
-- [W3 L13 Disputes] Add the 3 dispute scopes (incl. read_shopify_payments_dispute_evidences) to the hay-shopify-app toml; protected scopes need Shopify approval, ship with D6 re-consent. Run a real Stripe test dispute (card 4000000000000259) and a Shopify Payments dev store test (Shopify mock-tested only; file upload is a legacy REST call; 'Open in Shopify' link points at the order page, unverified). Webhooks need a public https HAY_API_URL, otherwise only the 6h sync. Confirm defaults: members+ can attach; reminder 48h before due; 120-day sync; reason→template mapping; Stripe MCP `update_dispute` can still submit but is held for approval. Rebuild plugin-sdk + stripe + shopify plugins after merging. Follow-up: disputesService.report returns alertedAt stale (DB is right).
-- [W3 L5 Mercado Pago] Register Hay.chat's Mercado Pago app with PKCE; set MERCADOPAGO_CLIENT_ID/SECRET (redirect ${API_URL}/oauth/callback, scopes read write offline_access). Unverified without a real account: token exchange accepting form-encoded POST, whether `platform_id=mp` is needed, what Shopify's transaction paymentId holds for MP payments. Defaults: Pix resend only when payer email/phone on the MP payment matches; duplicate-refund guard 10 min same amount; no webhooks/refund polling (status read on demand). Next providers (research note packages/plugin-sdk/payment-provider/NEXT_PROVIDERS.md, partly unverified): PagBank → Pagar.me → Asaas. Rebuild plugin-sdk after merging (`cd packages/plugin-sdk && npm run build`). Then a real test-account run.
-- [W3 L7b] Defaults to confirm: readiness says safe at ≥50 reviewed replies in 14 days with ≤1 in 20 edited/blocked; the publish dialog runs test cases automatically (uses the simulation allowance); judge failure leaves a turn unjudged; test cases follow org retention; an Off channel sends nothing and queues pending-human. Channel routing changed: assigned enabled agents (default first, else oldest) → default agent → oldest enabled agent (was newest; a disabled agent no longer keeps its channel). Breaking API: organizations.get/updateAiDisclosure use `channelAiModes`, `draftsChannels` removed. Gaps: simulation items not covered by retention; Web Chat greeting still shows when Web Chat is Off; agent page's old English strings still hard-coded.
-- [W3 L12b Insights] Defaults to confirm: the first visit to Insights starts the 30-day backfill (LLM cost) and any role that can see Insights triggers it; lifecycle + approve need PLAYBOOKS UPDATE, settings need ORGANIZATION_SETTINGS UPDATE; docs audit only for orgs with a conversation in the last 30 days; a recurrence reopens the insight as new. Gaps: docs-audit LLM calls don't record token usage; digest marks the week sent before sending (all sends fail → that week lost); archive-suggested items only show with the 90-day window; no dashboard component tests. Optional env: INSIGHTS_MIN_CLUSTER_SIZE/JOIN_THRESHOLD/MERGE_THRESHOLD/WINDOW_DAYS. Follow-up: shared `notification` MJML template logs a padding warning and 'No translations found' (pre-existing, every notification email).
-- [W3 L7a] Simulation caps are placeholders (200 runs/month, 3M tokens per org in `server/config/simulation-caps.ts`) — set real per-plan numbers. Tidio importer was built from docs; check it against a real Tidio export. Gorgias imports run inside the request with a 100-ticket cap. Orchestrator follow-up work on a simulation conversation isn't counted toward usage. No runs/import UI until L7b.
-- [W2 D8 media] Defaults: widget signed links last 24 h, hand-off (Chatwoot/escalate) links 7 days; widget limits 10 files/conversation and 30/IP per 10 min, image/PDF ≤ 10 MB; `CONVERSATION_MEDIA_MAX_SIZE_MB` (default 25) caps channel media; media kept 180 days by default. `send_attachment` counts as read-only (never held). The 11 non-en/pt widget locales are the builder's translations. Not tested (need real channels): Instagram inbound/outbound media + voice transcripts, email inline images, WhatsApp media limits, Chatwoot hand-off links. The AI can't see photos yet (vision = D8-11..15) but may still propose a refund from one — approval catches it.
-- [W2 L7] Meta: add the Messenger product to the Meta app; Page webhook `/v1/plugins/hay-channel-messenger-meta/webhook` (fields messages, message_echoes); Facebook Login redirect `${API_URL}/oauth/callback`; deauthorize + data-deletion URLs (in .env.example); App Review pages_messaging, pages_manage_metadata, pages_show_list + Human Agent (Messenger and Instagram); set META_MESSENGER_APP_ID/SECRET. Resend: API key, events webhook → D13-10 endpoint with RESEND_EVENTS_WEBHOOK_SECRET (503 while empty), SMTP relay via Resend so custom domains apply. Then real tests: reply from WhatsApp Business app / Instagram app (AI stays quiet), domain verify + From, a bounce, Messenger end to end. Default to confirm: Human Agent tag only on a person's reply and only after Meta refuses the normal send. Messenger thumbnail is a drawn SVG.
-- [W2 D8 part B] Defaults to confirm: EU orgs get vision only through the EU endpoint (none configured = no vision, fail closed); anything the model flags sensitive is withheld, not only ID/card; pending photos blurred a few seconds in the Inbox; case email en/pt-BR only; blocked file 403, still-scanning waits 10 s then 423. Set `OPENAI_VISION_MODEL` (default gpt-4.1-mini) in prod env; `CLAMAV_HOST` optional. Real-mailbox test of the case email (SMTP off on staging).
-- [W2 D2 evidence pack] Defaults: every template includes the full timeline (templates only reorder key facts/policies); any user with conversation:read (agents too) can export; plugin output listing > 3 orders links none; playground calls not indexed. Gaps: emoji dropped in PDF (built-in font); remote http attachments not fetched; no page cap; policy excerpts show the document's current text, not the text at the time. The pack never claims an outcome — confirm the README/disclaimer wording.
-- [W2 D1-5/6] Usage page and the 5 % exclusion cap use the UTC calendar month (core doesn't know the billing period; TODO to take it from the access state). Min 1 instant exclusion/month. Exclusions allowed for current + previous month. X follow-ups: backoffice must bill from `billableResolutions` (not `resolvedConversations`) or exclusions don't change the invoice; credit exclusions made after overage was reported; Hay.chat-side UI/API to approve/deny `pending_review` exclusion requests (today: set exclusion_status='excluded' + excluded_at by hand).
-- [W2 L3] Email replies from the D5-9 follow-up do not come back into the conversation (no core inbound email); the resume link only restores the chat in the same browser. Teams are not modelled, so schedules are per channel. "Shopper has left" = zero widget sockets on this server (single instance). Closures are whole days only. OK for now?
-- [W2 L4] Approval scope: threshold applies to refunds and discounts only; typed confirm is UI-only (API accepts the change); shopper confirmation checks only the next turn; order notes and resent emails also ask the shopper to confirm; graduation nudge ignores currency and needs 5 approvals in 30 days; bulk approve includes cancels; playbook approval overrides have no version history. Shopify refunds lowered in the inbox may not match line items. Confirm these defaults.
-- [W2 L11] Confirm: EU heuristic = aiRegion eu OR Europe/* timezone; `[label]` first-line format on non-web channels; disclosure controls live on Customer Privacy; drafts-only allowed on Web Chat too; existing orgs keep their retention (suggest opt-in prompt to 365 d). D14-1, D14-3 still pending your answers.
-- [W2 L5] Shopify re-consent: add write_order_edits, write_discounts + dispute scopes to hay-shopify-app `shopify.app.toml`, run `shopify app deploy`. Then real-store checks (Shopify swap/exchange/payment link, Nuvemshop marketplace/returns).
-- [W2 L5] D16-2 one-click Woo connect needs an HTTPS HAY_API_URL to test (tunnel or staging host); keys travel through the admin's browser redirect — confirm acceptable. Pending connects are lost on worker restart.
-- [W2 L5] Product: swaps/exchanges don't refund a price difference to the shopper (only BALANCE_DUE). Shopify has no "resend confirmation" API. VillaTheme/YITH meta keys and marketplace order-id patterns are from docs, unverified on real stores.
-
-- **Alert copy (Wave 1 review):** push/email alerts now have Spanish copy (`services/notification-locale.ts`) — needs a native-speaker check. Browsers holding the old service worker can't rotate push until the device re-registers (one-off, after deploy).
-- **L5 (on staging):** Shopify merchants must re-consent for the new `write_discounts` scope before Shopify coupons work. Real-store checks I could not do locally: Shopify discount title search, `context.customers`, Fulfillment events, paymentId; Pix meta keys for Pagar.me/Asaas; Nuvemshop coupons. Known gaps: catalogue deletions not synced; Wix/Magento have no stale flag; Woo stale flag needs a tracking plugin; the one-coupon-per-customer check scans the latest 100 coupons.
-- **L4 defaults (on staging):** approval on by default, threshold 0 (every refund/cancel/discount held), unclassified writes held, the shopper is told the action was requested (not done) and gets the decision in the chat, a requested approval is billed. OK?
-- **Risk classes to confirm:** left unclassified on purpose (always held): Klaviyo `upload_image_from_file` (uploads any host file path — security follow-up), Stripe `update_subscription`, `create_invoice`, `create_invoice_item`, `finalize_invoice`. Not held (`other_write`): Zendesk deletes + helpdesk config, Twenty `delete_record`, Cal.com `cancel_booking`. Hold destructive writes too?
-- **Infisical prod:** if `SMTP_FROM_NAME=Hay` is set there, change it to `Hay.chat` (code default changed).
-- hay-backoffice#6: merge after #3; run AddUsageForecast1785300000000, AddSpendCap1785400000000, AddManualSuspensionAndAuditLog1785500000000; add `invoice.upcoming` to the Stripe webhook (upcoming renewal events = 7 days); optional SUPPORT_EMAIL. Note: trials that ended in the last 7 days unlock into grace on deploy.
-- Real-phone push test after deploy (L10). Real WABA checks for L7 (template sync/approval, 131047 hand-off template, 24 h window).
-- **Email merge (on staging):** after deploying, run `migration:run` on prod (MergeEmailPluginIntoEmailInbox1785300000000; irreversible; run AFTER new code is live; deploy must rebuild plugins). Merchant-visible: "Email" plugin disappears; notifications now from "<store>" <support@updates.hay.chat>; support address optional in form. hay-docs may still list the Email plugin.
-- **Suggest-integration:** deploy hay-backoffice#5 BEFORE hay-website#45 (form posts to the new endpoint). No new env (uses CONTACT_NOTIFY_EMAIL, reCAPTCHA keys). hay-website build's `check:schema` fails on 3 pre-existing /docs/technical/ pages.
-- **Billing retro credits (D1-3):** retroactive credits for past over-billing need D1-0 sizing + a re-classify script (hay-core) + Stripe credit notes (backoffice); not built.
-- **EU (D14-4 on staging):** apply for OpenAI EU data residency; confirm gpt-4.1, gpt-4o-mini, text-embedding-3-small, gpt-4o-mini-transcribe on the EU project; then set `OPENAI_EU_BASE_URL`/`OPENAI_EU_API_KEY` (+ optional `OPENAI_EU_TIER_*`) in Infisical prod. Switch hidden until set. Note: orgs with their own provider now really get it on perception/guardrail/planner calls (were silently on env default).
-- **Billing verdict check:** in a hand-off where the human answered the original request and the AI answered a later question, the classifier billed it as AI-resolved. OK, or should a human-answered original request make it `human`?
-- **Shopify cancel default (D6-1):** cancelling no longer refunds unless the agent passes `refund_to_original_payment: true` (explicit false sent otherwise). Should Shopify cancels refund by default?
-- **Before deploying Wave 0 (answered 2026-10-27):** (a) allowed-domains enforcement: Roger OK. (b) Proxy checked read-only on homeserver: Traefik v3.6 (`coolify-proxy`) static config has no `forwardedHeaders.trustedIPs`/`insecure`, so it ignores client X-Forwarded-For and sets its own; eu.hay.chat → 94.63.38.3 (house IP, no Cloudflare proxy, no cf-ray) → per-IP limits see the real visitor IP. (Dynamic dir `/data/coolify/proxy/dynamic` unreadable without sudo, but entrypoint forwarded-header trust can't be set there.) (c) D8 media switch-over: Roger asked me to do it after he deploys. Plan: run a one-off script inside `hay-server` (it already has `@aws-sdk/client-s3` + its S3 env) that sets ACL private on `uploads/*/{conversation-media,documents,plugin-zips}/`; then `doctl compute cdn flush` for the prod bucket's CDN (CDNs exist for hay-ams.ams3 and hay.sfo3); verify an old media URL returns 403 and an old WhatsApp photo still renders. Needs permission to run commands inside the prod container (the classifier blocked reading its env).
-- **Copy:** neutral hand-off line until D5-6/7 — en "I've passed this to the team. They'll reply to you here in this chat." / pt "Encaminhei sua mensagem para a equipe. Eles vão te responder aqui neste chat." OK? Planner local time is hour-precision to keep prompt caching.
-- **X-ticket PRs to review/merge/deploy:** hay-backoffice#3 (D1-4; prod `npm run migration:run` `1785200000000-TrackReportedOverage`; backfill bills nothing new; deployable before hay-core), hay-backoffice#4 (set `STRIPE_PORTAL_CONFIGURATION_ID=bpc_…` in prod), hay-website#44, hay-shopify-app#1 (`shopify app deploy`, check haychat-2 widget still styled).
-- **WP plugin 1.0.1:** apply `/Users/rogerjunior/Documents/code/hay/haychat-svn-patches/1.0.1-d12-2-no-render-blocking.patch` in haychat-svn (`patch -p0` from the svn root), `svn cp trunk tags/1.0.1`, svn commit (= WP.org release). php not installed here, so not linted.
-- **Sessions (D11-3):** a reused old refresh token after the 2-min grace now ends the whole session (reuse detection, beyond the D-file); confirm prod `JWT_REFRESH_EXPIRES_IN` is 30d before the legacy branch is removed; basic auth no longer returns X-Access-Token headers.
-
-- Prod: D1-0 over-billing query; D14-1 prod `LLM_*` values; D8 confirm Spaces before switching media private; D3
-  whether 26 Oct features are on for every org.
-- OpenAI EU data-residency application (D14). WhatsApp App Review status (D13-6).
-- Lawyer: Art. 132 deadline counting (D10); captcha under strict consent (D9).
-- Shopify re-consent rollout + merchant comms; Stripe credits for past over-billing; price-change notice sends.
-- Merge each wave PR to master; every deploy.
-- Connect test stores to the **local staging server**: Shopify haychat-2 app/token, Nuvemshop app/token, WhatsApp test
-  number (channel tickets).
-- Confirm it's OK that staging uses the `OPENAI_API_KEY` from the main checkout's `.env` (nothing else copied).
-
-- [W2 L1+L6] Bot protection: set TURNSTILE_SITE_KEY/SECRET_KEY (real Hay.chat-owned pair) in prod; add the API hostname to the Turnstile widget; the plugin is defaultEnabled but existing orgs must enable it (Integrations → Bot protection) — decide whether to enable it for everyone. Check the challenge frame isn't blocked by CSP on real stores (frame-src of the API host). Legal: the strict-consent mode and adding Cloudflare to the PRIVACY.md sub-processors list. UNDER_ATTACK_CREATE_THRESHOLD default 30/5 min — confirm.
-
-- [W2 L9+L10] Real iPhone test: set VAPID keys, add Hay.chat to the Home Screen, turn on alerts, check a hand-off push, the 10-minute re-alert then email, and the lock-screen privacy text. Defaults to confirm: the paused notice is held on drafts-only channels and in test mode; privacy is per user (all devices); the paused notice carries the AI label in the widget. Maskable icon is a generated placeholder — needs a designer asset.
-
-- [W2 X] Prod steps: run backoffice migration 1785600000000-AddPlanChangeAndCancellation; hay-core env OPERATOR_EVENTS_URL=https://<backoffice>/webhooks/hay-core and INTERNAL_API_SECRET = the backoffice's HAY_INTERNAL_API_SECRET; backoffice LOGIN_URL; leave ANNUAL_EARLY_TERMINATION_FEE_ENABLED off until tested. Ship hay-core + hay-backoffice#7 first, then hay-website#46 (after #44).
-- [W2 X] Test in Stripe test mode: annual cancel → 10 % fee invoice item; downgrade → subscription schedule at renewal; cancel → resume. Only Stripe-mocked tests so far.
-- [W2 X] Legal: refund policy §2–5 and terms §10 wording in hay-website#46; handoff-billing pricing copy; shopify.njk still has an H3 "A Shopify helpdesk" (we never call it a helpdesk) — change it.
-- [W2 X] Gaps: chat attachments are not in the export ZIP; no plan-change email when the change is made in the Stripe portal; a failed deletion event is not retried; the D15-4 holding reply was mock-tested only (check it respects drafts-only channels and test mode). WP plugin 1.1.0 = patch file; release and test on a real WP site are yours.
-- [W2 review] Known gaps after fixes: files skipped on spam/bot-flagged chats aren't analysed after "Not spam"; the bot-flag vision skip also hits real shoppers when Cloudflare is down; "Not spam" doesn't undo spam found by the LLM close classifier. Refund tools don't send a currency, so amounts show without a symbol (lowering still works).
-- [W3 L12a] Defaults to confirm: Improve only edits editor-written documents (synced ones get a new published Q&A instead); insight_runs kept forever; Gemini/Mistral/Grok runs have no price (cost null, counted as unpriced).
-- [W2 review] Prod proxy: does the homeserver/Cloudflare edge overwrite X-Forwarded-For? `server/lib/client-ip.ts` trusts the first entry, so if the edge passes client values through, every per-IP widget limit is spoofable. If Cloudflare fronts everything, switch to CF-Connecting-IP (or a trusted-hop count).
-- [W2 review] Exclusion allowance: `Math.max(1, floor(5 %))` lets a store with 3 resolutions exclude 1 (33 %). Keep the minimum of one, or make it a strict 5 %?
-- [W2 review] Before deploying: migration AddUploadConversationLinks1785752000000 adds FKs without NOT VALID and backfills all messages in one transaction — check the prod messages/uploads table size; on a big table run it in a quiet window.
-- [W2 review] Follow-up: public `create` links any `customerExternalId` to that customer (pre-existing) and their external_metadata reaches the LLM prompt — needs a signed/HMAC'd external id from the store. Product/security decision on the signing scheme.
+All 86 items were answered on 2026-10-28 (questionnaire https://claude.ai/artifact/PGDLNwQ2oSg71qpH4vQHKc, collection `answers`). What is still on Roger is under "Still on Roger" below.
 
 ## Roger's answers (2026-10-28)
-- PR #104 scope: merge all of Waves 0–3 in one PR (not Wave 0 only). Deploy stays a separate, gated step.
-- Billing (D1-3): 72 h reversal applies to confirmed AND assumed outcomes; a staff `closed` on an AI-resolved chat bills. Pricing copy D1-12 is in hay-website#46 and ships in the same release as hay-core. Wave 0 "keep billing inactivity closes" question dropped (D1-3 replaced it).
-- Breaking API `channelAiModes`: not breaking. `draftsChannels` never reached master/prod and no other repo uses it. Dropped.
-- Root lockfile: checked 2026-10-28. Clean clone of staging + `npm install` exits 0 and leaves package-lock.json unchanged. Done.
+**Merge / deploy**
+- PR #104: merge all of Waves 0–3 in one PR; deploy is a separate gated step.
+- `channelAiModes` not breaking (`draftsChannels` never reached master). Root lockfile clean (fresh clone + `npm install`, no diff).
+- Shopify scopes: two steps. Now: `write_order_edits`, `write_discounts` (toml PR). Later, after Shopify approves the protected ones: the 3 dispute scopes.
+- Release runbook: yes. Already merged: backoffice #3–#6, website #44, #45. Open: backoffice #7, website #46, #47, hay-shopify-app#1.
+- Deploy rebuild: Claude to check deploy.sh. The read-only ssh read was blocked by the classifier, so Roger runs it (see Still on Roger).
+- AddUploadConversationLinks: tables small, run normally. Email merge: ship it, fix hay-docs.
+**Money / safety**
+- Billing: 72 h reversal for confirmed + assumed; staff close on an AI-resolved chat bills; human answered the original request + AI a later one → stays AI-resolved (billed).
+- Exclusions: keep minimum of 1; tie the period to the billing period (not calendar month); build both the backoffice billing fix and the approve/deny UI now.
+- Retro credits: size first (D1-0 query), then decide.
+- Approvals: keep L4 defaults; keep W2 L4 scope but enforce typed confirm in the API; hold destructive writes (new class).
+- Shopify cancel: refund by default (Roger asked whether that could be a problem; see ticket B3 for the guard).
+- Disputes: require a plugin match (drop text fallback); keep defaults (owners/admins attach, 48 h, 120 d, templates, update_dispute held).
+- Simulation caps per plan: "20 % capped at 500" (read as 20 % of the plan's monthly resolutions, max 500. Confirm).
+- Swaps: no price-difference refund; hand off to a human.
+- Customer ids: HMAC-signed external id from the store.
+- Turnstile: enable for every org now.
+- Media, MP, Woo connect, sessions defaults: keep.
+- Vision EU: change. Don't block vision just because an org is EU (no EU inference exists yet). EU inference to be discussed separately.
+**Copy**
+- Hand-off line OK; evidence pack wording OK; perf page content approved, publish after a prod re-measure AND the hay.chat homepage fix; Messenger tag keep; push defaults keep (ticket the icon); shopify.njk H3: fix now.
+**Defaults**
+- L3, L7a OK for now; L7b, L12a, L12b keep all; staging OpenAI key OK.
+- L11 keep, no retention prompt. No live customers, so a future default change can be applied to all orgs automatically.
+
+## Tickets from Roger's answers
+Roger said "Do it now" for every gap. Not started; lanes below.
+- **Lane A: billing & exclusions** (hay-core + hay-backoffice)
+  - A1 Exclusion cap + usage page use the billing period from the access state (replace UTC calendar month; remove the TODO).
+  - A2 Backoffice bills from `billableResolutions` and credits exclusions made after overage was reported.
+  - A3 Hay.chat approve/deny UI + API for `pending_review` exclusions.
+  - A4 Simulation allowance per plan = 20 % of plan resolutions, capped at 500 (backoffice sets `limits.maxSimulationsPerMonth`). Pending Roger confirming the reading.
+- **Lane B: approvals & tool safety**
+  - B1 Enforce typed confirm in the API.
+  - B2 Destructive risk class, always held: Zendesk deletes/helpdesk config, Twenty `delete_record`, Cal.com `cancel_booking`.
+  - B3 Shopify cancel refunds by default (`refund_to_original_payment` default true) when the order is unfulfilled and has one payment method; otherwise the agent must pass it explicitly. Approval still holds every cancel (threshold 0).
+  - B4 Refund tools send a currency.
+  - B5 Klaviyo `upload_image_from_file`: no host file paths (URL/base64 only).
+- **Lane C: disputes**
+  - C1 `matchOrder` requires a plugin match (drop the text-mention fallback).
+  - C2 `disputesService.report` returns a fresh `alertedAt`.
+  - C3 Write a rationale doc for Roger: why disputes, what we do, what we never do.
+- **Lane D: abuse & identity**
+  - D1 HMAC-signed `customerExternalId` (per-org secret; unsigned → fresh customer).
+  - D2 Enable Turnstile for all existing orgs (data script). CSP on real stores still unchecked.
+  - D3 Spam/bot gaps: analyse files after "Not spam"; vision skip when Cloudflare is down; "Not spam" undoes LLM-classifier spam.
+- **Lane E: vision** E1 EU orgs get vision on the default endpoint when no EU endpoint is configured (stop failing closed).
+- **Lane F: simulations, tests, insights**
+  - Monthly-cap lock on concurrent starts.
+  - Simulation items covered by retention.
+  - Playground feedback creates no insight issues.
+  - Web Chat greeting hidden when Web Chat is Off.
+  - Agent page strings to i18n.
+  - Docs-audit records token usage.
+  - Digest marks sent only after sending.
+  - Archive-suggested outside the 90-day window.
+  - Insights component tests.
+  - Gorgias import in the background (no 100 cap).
+- **Lane G: exports & lifecycle**
+  - Chat attachments in the export ZIP.
+  - Plan-change email for portal changes (backoffice).
+  - Retry failed deletion events.
+  - Verify the D15-4 holding reply on drafts-only + test mode.
+  - Evidence PDF: emoji font, fetch remote attachments, page cap, policy text at the time.
+- **Lane H: commerce plugins** Catalogue deletions synced; Wix/Magento stale flag; coupon-per-customer check beyond 100; Woo pending connects survive restart.
+- **Lane I: tooling, docs, web**
+  - Dashboard vitest excludes Playwright specs.
+  - CI webchat job on staging too.
+  - MJML notification padding + translations warning.
+  - hay-docs: remove the Email plugin.
+  - PR #104 body: drop the X-Forwarded-For line.
+  - shopify.njk H3 → "Every Shopify conversation in one place" (in #46).
+  - hay.chat homepage FCP/LCP (fonts/CSS render-blocking, main-thread JS).
+  - hay-shopify-app toml PR (step 1 scopes).
+  - Release runbook `tasks/release-waves-0-3.md`.
+  - Maskable icon (designer asset).
+
+## Still on Roger
+- Run: `ssh homeserver 'grep -n -i -E "build|plugin|sdk" /srv/hay-core/deploy.sh'`. Does deploy rebuild packages/plugin-sdk + stripe/shopify/mercadopago/woocommerce plugins?
+- Resend: Roger thinks it's done. Check Infisical prod has `RESEND_API_KEY` + `RESEND_EVENTS_WEBHOOK_SECRET` (`~/bin/infisical-env.py check`).
+- Confirm the simulation-cap reading (20 % of plan resolutions, max 500).
+- Deferred to a Claude-in-Chrome session: prod env keys (Turnstile, VAPID, OPERATOR_EVENTS_URL/INTERNAL_API_SECRET, SMTP_FROM_NAME, JWT_REFRESH_EXPIRES_IN check, Meta, MP, OpenAI EU), Meta Messenger setup + App Review, Mercado Pago app, OpenAI EU application, Stripe test-mode plan changes, WABA checks, real-store checks, connecting test stores to staging.
+- Deferred: disputes real tests (after the C3 rationale doc), iPhone push test (can run before deploy: staging over an https tunnel + VAPID keys), WP 1.0.1/1.1.0 svn release, lawyer questions, read-only prod checks (D1-0, D14-1, D3), merchant comms, Spanish alert + widget locale native checks, legal copy in website #46.
+- After deploy: Claude does the D8 media-private switch (needs Roger's go-ahead then).
+- Discuss: EU inference strategy.
 
 ## Follow-ups logged (not in Wave 0 scope)
 - L7: Messenger long-lived user token (~60 d) has no refresh and page tokens are lost on worker restart (reconnect needed); after a same-channel merge new messages can join the target's active conversation; merge suggestions only on hidden /customers pages (add to conversation panel); Resend message_id field name unverified; WhatsApp quality updates for multi-number accounts; complaints not shown in UI; Instagram setup step 1 still mentions Facebook Login.
