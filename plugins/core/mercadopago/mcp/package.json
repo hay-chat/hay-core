@@ -1,0 +1,15 @@
+{
+  "name": "mercadopago-mcp-server",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Local Node MCP server for Mercado Pago: the Hay.chat payment_provider contract (payments, Pix resend, bounded refunds, refund status). Spawned over stdio by the Mercado Pago plugin.",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "@hay/plugin-sdk": "file:../../../../packages/plugin-sdk",
+    "@modelcontextprotocol/sdk": "^1.25.2",
+    "zod": "^3.25.76"
+  }
+}

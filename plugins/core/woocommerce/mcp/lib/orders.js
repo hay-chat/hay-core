@@ -11,7 +11,7 @@
 
 const { wcApi, wcList, WooApiError } = require("./client");
 const { num, round2, toolError } = require("./format");
-const { parsePix } = require("./pix");
+const { parsePix, parsePaymentReferences } = require("./pix");
 const { staleTracking, stalestShipment } = require("@hay/plugin-sdk/stale-tracking");
 const { readReturnInstructions } = require("@hay/plugin-sdk/return-instructions");
 const { orderNotFoundError } = require("@hay/plugin-sdk/marketplace-orders");
@@ -325,6 +325,7 @@ function paymentFields(order) {
     paymentUrl: unpaid ? order.payment_url || null : null,
     createdVia: order.created_via || null,
     pix: unpaid ? parsePix(order.meta_data) : null,
+    paymentReferences: parsePaymentReferences(order.meta_data),
   };
 }
 
