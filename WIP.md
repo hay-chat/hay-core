@@ -1,3 +1,9 @@
+## 2026-10-28 08:50 — claude/w3-disputes (worktree hay-core-w3-disputes) — W3 L13 chargeback disputes, unmerged
+- Commits: 886a022 D2-1 spike (plugins/core/shopify/DISPUTES.md), 2f2e354 SDK `disputes` capability, cce1bd7 core (disputes table, pluginApi disputes.report, owner alert + 48h reminder, Evidence page Disputes card), e393260 Stripe intake + draft (submit=false), fe12072 Shopify intake + attach (never submits).
+- Migration AddDisputes1785860000000 (ran on hay_test only). No new env vars. SDK changed: rebuild on staging.
+- Verified: server tsc + jest (disputes, proxy) green; SDK 205, Stripe 13, Shopify 88 vitest green; dashboard typecheck 0.
+- Half-built: nothing in code. Needs Roger: hay-shopify-app toml dispute scopes (bundle with D6 re-consent), Shopify Payments dev-store test, Stripe test-mode hand test.
+- Next: merge into staging, run migration on hay_staging, rebuild SDK + stripe/shopify, hand-test with a Stripe test dispute card.
 ## 2026-10-28 08:20 — staging — W3 L12b insights merged, hand-tested
 - Merged claude/w3-insights-b (8e1e14a); migration AddInsightClusters1785840000000 on hay_staging. Fix c3472cb: EmptyState no longer renders an empty button.
 - Hand test: backfill (0 new, correct), min size 5→2 saved, clustering promoted+named 3 positive patterns, detail/evidence/filters, reject+reason in History, reopen; docs audit ran (0 findings); digest once per week. Staging min cluster size left at 2.
