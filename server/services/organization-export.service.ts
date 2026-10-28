@@ -9,11 +9,13 @@
  *   customers.jsonl     / customers.csv
  *   documents.jsonl, playbooks.jsonl, playbook_versions.jsonl, agents.jsonl,
  *   webchat_settings.jsonl, business_hours.jsonl, organization.json, README.txt
+ *   attachments.jsonl + attachments/<upload id>-<name>: the chat files still stored
  *
  * Only columns a merchant would recognise are exported: processing locks,
  * encryption keys and similar internals stay out. Plugin credentials, API keys
- * and users' passwords are never exported. Message attachments are listed (name,
- * type, size) but the files themselves are not in the ZIP.
+ * and users' passwords are never exported. Chat attachment files (G1) are added
+ * up to MAX_ATTACHMENT_BYTES in total; the rest are listed in attachments.jsonl
+ * with the reason they were left out.
  */
 import { createWriteStream, type WriteStream } from "fs";
 import * as fs from "fs/promises";
@@ -23,7 +25,7 @@ import * as archiver from "archiver";
 import { AppDataSource } from "@server/database/data-source";
 import { Job, JobPriority, JobStatus } from "@server/entities/job.entity";
 import { auditLogService } from "./audit-log.service";
-import { storageService } from "./storage.service";
+import { CONVERSATION_MEDIA_FOLDER, storageService } from "./storage.service";
 import { signMediaUrl } from "./media-url.service";
 import { createLogger } from "@server/lib/logger";
 
@@ -40,6 +42,8 @@ export const DOWNLOAD_LINK_TTL_SECONDS = 15 * 60;
 const STALE_PROCESSING_MS = 2 * 60 * 60 * 1000;
 const PAGE_SIZE = 1000;
 const MAX_EXPORT_BYTES = 2 * 1024 * 1024 * 1024;
+/** Attachment files stop being added past this total, so the ZIP stays under MAX_EXPORT_BYTES. */
+export const MAX_ATTACHMENT_BYTES = 1536 * 1024 * 1024;
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 type Row = Record<string, unknown>;
@@ -340,6 +344,10 @@ export class OrganizationExportService {
         files.push(...written.files);
       }
 
+      const attachments = await this.exportAttachments(organizationId, dir);
+      counts.attachments = attachments.included;
+      files.push(...attachments.files);
+
       const organization = await this.organizationRow(organizationId);
       await fs.writeFile(
         path.join(dir, "organization.json"),
@@ -417,6 +425,81 @@ export class OrganizationExportService {
     return { count, files: [`${table.name}.jsonl`, ...(csv ? [`${table.name}.csv`] : [])] };
   }
 
+  /**
+   * Chat attachments (G1): the organization's conversation-media uploads that
+   * belong to a kept conversation, either linked to it or referenced by one of
+   * its messages (messages stored before linking existed). Each file is read
+   * through storageService (S3 or local disk); a file missing from storage or
+   * past the size budget is listed in attachments.jsonl with the reason.
+   */
+  async exportAttachments(
+    organizationId: string,
+    dir: string,
+    maxBytes = MAX_ATTACHMENT_BYTES,
+  ): Promise<{ included: number; files: string[] }> {
+    const index = createWriteStream(path.join(dir, "attachments.jsonl"));
+    const files = ["attachments.jsonl"];
+    let included = 0;
+    let totalBytes = 0;
+    let cursor: string | null = null;
+    try {
+      for (;;) {
+        const rows: Row[] = await AppDataSource.query(
+          `SELECT u.id, u.original_name, u.mime_type, u.size, u.conversation_id, u.message_id,
+                  u.created_at
+             FROM uploads u
+            WHERE u.organization_id = $1 AND u.folder = $2
+              AND (
+                u.conversation_id IN (
+                  SELECT c.id FROM conversations c
+                   WHERE c.organization_id = $1 AND c.deleted_at IS NULL)
+                OR u.id::text IN (
+                  SELECT a->>'id'
+                    FROM messages m
+                    JOIN conversations c ON c.id = m.conversation_id
+                    CROSS JOIN LATERAL jsonb_array_elements(
+                      CASE WHEN jsonb_typeof(m.attachments) = 'array'
+                        THEN m.attachments ELSE '[]'::jsonb END) a
+                   WHERE c.organization_id = $1 AND c.deleted_at IS NULL)
+              )
+              ${cursor ? "AND u.id > $3" : ""}
+            ORDER BY u.id LIMIT ${PAGE_SIZE}`,
+          cursor
+            ? [organizationId, CONVERSATION_MEDIA_FOLDER, cursor]
+            : [organizationId, CONVERSATION_MEDIA_FOLDER],
+        );
+        for (const row of rows) {
+          const id = String(row.id);
+          const size = Number(row.size) || 0;
+          const entry: Row = { ...row, file: null, included: false, reason: null };
+          if (totalBytes + size > maxBytes) {
+            entry.reason = "export_size_limit";
+          } else {
+            try {
+              const { buffer } = await storageService.download(id);
+              const file = `attachments/${id}-${safeFileName(String(row.original_name ?? ""))}`;
+              await fs.mkdir(path.join(dir, "attachments"), { recursive: true });
+              await fs.writeFile(path.join(dir, file), buffer);
+              files.push(file);
+              totalBytes += buffer.length;
+              included++;
+              Object.assign(entry, { file, included: true });
+            } catch (error) {
+              logger.debug({ err: error, uploadId: id }, "Attachment not in storage");
+              entry.reason = "file_not_found";
+            }
+          }
+          await write(index, JSON.stringify(entry) + "\n");
+        }
+        if (rows.length < PAGE_SIZE) break;
+        cursor = String(rows[rows.length - 1].id);
+      }
+    } finally {
+      await close(index);
+    }
+    return { included, files };
+  }
+
   private async organizationRow(organizationId: string): Promise<Row | null> {
     const [row] = (await AppDataSource.query(
       `SELECT id, name, slug, description, about, website, contact_email, default_language, timezone,
@@ -467,6 +550,16 @@ export class OrganizationExportService {
   }
 }
 
+/** A file name safe inside a ZIP on any OS. */
+function safeFileName(name: string): string {
+  const cleaned = name
+    .normalize("NFKD")
+    .replace(/[^\w.-]+/g, "_")
+    .replace(/^[._]+/, "")
+    .slice(0, 80);
+  return cleaned || "file";
+}
+
 function zipFiles(dir: string, files: string[], zipPath: string): Promise<void> {
   return new Promise((resolve, reject) => {
     const output = createWriteStream(zipPath);
@@ -496,9 +589,12 @@ export function readme(generatedAt: Date, counts: Record<string, number>): strin
         `  ${table.name}.jsonl${table.csv ? ` and ${table.name}.csv` : ""}: ${counts[table.name] ?? 0} rows`,
     ),
     "  organization.json: your organization's name and settings",
+    `  attachments/: ${counts.attachments ?? 0} files sent in your conversations`,
+    "  attachments.jsonl: every chat file, the conversation and message it belongs",
+    "    to, and its path in attachments/ (or why it was left out: the file was",
+    "    already deleted, or the export reached its size limit)",
     "",
-    "Not included: message attachment files (the messages list their name, type",
-    "and size), plugin credentials, API keys and passwords.",
+    "Not included: plugin credentials, API keys and passwords.",
     "",
   ];
   return lines.join("\n");
