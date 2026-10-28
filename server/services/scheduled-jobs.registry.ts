@@ -152,6 +152,19 @@ const jobRegistry: CronJobConfig[] = [
   },
 
   {
+    name: "insight-weekly-digest",
+    description: "Weekly Insights digest email to owners and admins",
+    schedule: "0 8 * * 1", // Mondays at 8:00 AM, after the docs audit
+    handler: async () => {
+      const { insightDigestService } = await import("./insights/insight-digest.service");
+      await insightDigestService.runAll();
+    },
+    singleton: true,
+    enabled: true,
+    timeout: 1800000, // 30 minutes max
+  },
+
+  {
     name: "insight-backfill",
     description:
       "Insights-only review of the last 30 days of closed conversations when Insights is enabled (D3-18)",
