@@ -4,9 +4,11 @@ import type { Organization } from "@server/entities/organization.entity";
 /**
  * Procedure paths that keep working while an organization is suspended, so the
  * dashboard can still show the lock page, send the owner to the external
- * billing page, switch to another organization or log out.
+ * billing page, switch to another organization or log out. The workspace
+ * export stays open too: a locked or cancelled owner can take their data out
+ * until the day-90 purge (D15-7).
  */
-export const SUSPENSION_EXEMPT_PREFIXES = ["auth.", "internal."];
+export const SUSPENSION_EXEMPT_PREFIXES = ["auth.", "internal.", "organizationExport."];
 export const SUSPENSION_EXEMPT_PATHS = new Set([
   "organizations.switchOrganization",
   "organizations.getSettings",

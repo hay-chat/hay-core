@@ -11,7 +11,7 @@ const logger = createLogger("job-queue");
  * inline by their initiating route and must NOT be listed here, or the worker
  * would race the inline processor.
  */
-const BACKGROUND_JOB_TYPES = ["document_source_sync"];
+const BACKGROUND_JOB_TYPES = ["document_source_sync", "organization_export"];
 
 /** Partial job state changes published on the job-updates channel. */
 interface JobUpdate {
@@ -188,6 +188,12 @@ export class JobQueueService {
           // (success/partial/failed) via the document-source repository. We
           // mark the Job row complete here so the queue doesn't re-claim it.
           await this.completeJob(job.id, job.organizationId, { ok: true });
+          return;
+        }
+        case "organization_export": {
+          const { organizationExportService } = await import("./organization-export.service");
+          const result = await organizationExportService.processJob(job);
+          await this.completeJob(job.id, job.organizationId, result);
           return;
         }
         default:

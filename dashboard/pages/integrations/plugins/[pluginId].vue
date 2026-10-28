@@ -1416,7 +1416,11 @@ const handleConnectIntent = async (): Promise<boolean> => {
     // OAuth availability is only reported once an enabled instance exists.
     if (!oauthAvailable.value) await fetchPlugin();
     if (!oauthAvailable.value) {
-      throw new Error("This integration does not support one-click connect");
+      // No OAuth (e.g. a store plugin that connects from its own settings
+      // panel): the link only pre-fills the settings, so stay on the page.
+      toast.success(t("pluginSettings.toast.configSaved"));
+      router.replace({ path: route.path, query: {} });
+      return false;
     }
     const returnTo = typeof route.query.return_to === "string" ? route.query.return_to : undefined;
     const { authorizationUrl } = await Hay.plugins.oauth.initiate.mutate({

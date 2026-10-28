@@ -204,6 +204,8 @@ export class Message {
     isInactivityWarning?: boolean;
     /** "Our team will reply here", sent once while the AI is paused (D11-9). */
     isPausedNotice?: boolean;
+    /** "We've received it", sent once while the organization is locked (D15-4). */
+    isSuspendedHoldingReply?: boolean;
     warningTimestamp?: string;
     reason?: string;
     inactivity_duration_ms?: number;

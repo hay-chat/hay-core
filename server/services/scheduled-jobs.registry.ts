@@ -290,6 +290,18 @@ const jobRegistry: CronJobConfig[] = [
   },
 
   {
+    name: "cleanup-expired-organization-exports",
+    description: "Delete full organization export ZIPs past their 7-day retention (D15-6)",
+    schedule: "30 2 * * *", // Daily at 2:30 AM
+    handler: async () => {
+      const { organizationExportService } = await import("./organization-export.service");
+      await organizationExportService.cleanupExpired();
+    },
+    timeout: 600000,
+    enabled: true,
+  },
+
+  {
     name: "conversation-retention-anonymize",
     description: "Anonymize expired conversations based on organization retention policies",
     schedule: "0 3 * * *", // Daily at 3 AM

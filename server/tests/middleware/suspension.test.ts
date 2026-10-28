@@ -24,6 +24,9 @@ describe("isSuspensionExempt", () => {
       "organizations.getSettings",
       "organizations.delete",
       "plugins.getMenuItems",
+      "organizationExport.status",
+      "organizationExport.request",
+      "organizationExport.downloadLink",
     ]) {
       expect(isSuspensionExempt(path)).toBe(true);
     }
