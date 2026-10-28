@@ -15,6 +15,8 @@ export interface HayPluginManifest {
   entry: string;
   channel?: string; // For channel-type plugins: which conversation channel this plugin handles (e.g., "whatsapp")
   autoActivate?: boolean;
+  /** Enabled automatically for newly created organizations (package.json hay-plugin.defaultEnabled). */
+  defaultEnabled?: boolean;
   invisible?: boolean;
   menuItems?: Array<{
     id: string;

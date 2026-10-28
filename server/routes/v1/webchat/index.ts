@@ -1,4 +1,5 @@
 import { router, scopedProcedure, publicProcedure } from "@server/trpc";
+import { webchatExtensionsService } from "@server/services/webchat/webchat-extensions.service";
 import { z } from "zod";
 import { webchatSettingsService } from "@server/services/webchat/webchat-settings.service";
 import { organizationRepository } from "@server/repositories/organization.repository";
@@ -77,6 +78,8 @@ export const webchatRouter = router({
     .input(
       z.object({
         organizationId: z.string().uuid(),
+        // Contribution types this widget build can render (e.g. "challenge@1").
+        supports: z.array(z.string().max(40)).max(20).optional(),
       }),
     )
     .query(async ({ input }) => {
@@ -91,10 +94,17 @@ export const webchatRouter = router({
         return { enabled: false as const };
       }
 
-      const config = await webchatSettingsService.getPublicConfig(input.organizationId);
+      const [config, contributions] = await Promise.all([
+        webchatSettingsService.getPublicConfig(input.organizationId),
+        webchatExtensionsService.getPublicContributions(input.organizationId, input.supports ?? [], {
+          underAttack: false,
+        }),
+      ]);
       return {
         enabled: true as const,
         ...config,
+        // Plugin contributions the widget can render (declarative, never code).
+        contributions,
         // AI label on AI replies (D14-6). A null text means the widget's localized default.
         aiLabelShown: isAiLabelShown(organization, "web"),
         aiLabelText: customAiLabel(organization.settings),

@@ -9,7 +9,12 @@
 
 import express, { type Express, type Request, type Response } from "express";
 import type { Server } from "http";
-import type { HayLogger, HayMcpRuntimeAPI, ToolRiskSpec } from "../types/index.js";
+import type {
+  HayLogger,
+  HayMcpRuntimeAPI,
+  ToolRiskSpec,
+  WebchatGateEvent,
+} from "../types/index.js";
 import { PluginRegistry } from "../sdk/registry.js";
 import type { HayPluginDefinition } from "../types/plugin.js";
 import {
@@ -78,6 +83,7 @@ export class PluginHttpServer {
     this.setupMetadataEndpoint();
     this.setupLifecycleEndpoints();
     this.setupCronEndpoint();
+    this.setupWebchatGateEndpoint();
     this.setupMcpEndpoints();
     this.setupPluginRoutes();
     this.setupErrorHandler();
@@ -230,6 +236,7 @@ export class PluginHttpServer {
           },
           crons: this.registry.getCronJobDescriptors(),
           webhookRouting: this.registry.getWebhookRouting(),
+          webchat: this.registry.getWebchatMetadata(),
         };
 
         res.json(metadata);
@@ -575,6 +582,57 @@ export class PluginHttpServer {
         const errorMsg = err instanceof Error ? err.message : String(err);
         this.logger.error(`Error in cron job ${jobName}`, { error: errorMsg });
         res.status(500).json({ success: false, error: errorMsg });
+      }
+    });
+  }
+
+  /**
+   * Setup the webchat gate endpoint.
+   *
+   * `POST /webchat/gate/:event` is invoked synchronously by Hay Core before a
+   * widget action. Core sends the resolved org config and the gate input, and
+   * enforces the timeout + failure policy on its side. A malformed handler
+   * result is reported as an error so Core applies the failure policy.
+   */
+  private setupWebchatGateEndpoint(): void {
+    this.app.post("/webchat/gate/:event", async (req: Request, res: Response): Promise<void> => {
+      const event = req.params.event;
+      try {
+        const gate = this.registry.getWebchatGate(event as WebchatGateEvent);
+        if (!gate) {
+          res.status(404).json({ error: `Webchat gate not found: ${event}` });
+          return;
+        }
+        if (!this.orgId || !this.manifest) {
+          res.status(400).json({ error: "Runtime data not set" });
+          return;
+        }
+
+        const { config, input } = req.body ?? {};
+        const configAPI = createConfigRuntimeAPI({
+          orgConfig: { ...(this.orgConfig ?? {}), ...(config ?? {}) },
+          registry: this.registry,
+          manifest: { env: this.manifest.env },
+          logger: this.logger,
+        });
+
+        const result = await gate.handler(
+          { org: { id: this.orgId }, config: configAPI, logger: this.logger },
+          { ...(input ?? {}), event: gate.event },
+        );
+
+        if (!result || !["allow", "deny", "flag"].includes(result.decision)) {
+          res.status(500).json({ error: "Webchat gate returned an invalid decision" });
+          return;
+        }
+        res.json({
+          decision: result.decision,
+          ...(typeof result.reason === "string" ? { reason: result.reason.slice(0, 100) } : {}),
+        });
+      } catch (err) {
+        const errorMsg = err instanceof Error ? err.message : String(err);
+        this.logger.error(`Error in webchat gate ${event}`, { error: errorMsg });
+        res.status(500).json({ error: errorMsg });
       }
     });
   }

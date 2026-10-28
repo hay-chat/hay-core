@@ -1,4 +1,5 @@
 import { t, authenticatedProcedure, scopedProcedure } from "@server/trpc";
+import { enableDefaultPlugins } from "@server/services/default-plugins.service";
 import { z } from "zod";
 import { organizationService } from "@server/services/organization.service";
 import { toAccessState } from "@server/services/organization-access.service";
@@ -228,6 +229,7 @@ export const organizationsRouter = t.router({
         } catch (error) {
           logger.error({ err: error }, "Failed to create audit log");
         }
+        void enableDefaultPlugins(result.data.id);
         return result;
       });
     }),

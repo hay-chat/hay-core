@@ -95,6 +95,16 @@ export type {
   CronJobOptions,
   CronJobDescriptor,
 
+  // Webchat
+  WebchatContributionType,
+  WebchatContributionOptions,
+  WebchatGateEvent,
+  WebchatGateInput,
+  WebchatGateResult,
+  HayWebchatGateContext,
+  WebchatGateHandler,
+  WebchatGateOptions,
+
   // Other
   HayLogger,
   HayOrg,

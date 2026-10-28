@@ -64,6 +64,18 @@ jest.mock("@server/services/public-widget-limits", () => ({
   isPublicWidgetRateLimited: mockRateLimited,
 }));
 
+type GateOutcomeMock = {
+  decision: "allow" | "deny" | "flag";
+  results: Array<{ pluginId: string; decision: string; reason?: string }>;
+};
+const mockRunGates = jest.fn<(...args: unknown[]) => Promise<GateOutcomeMock>>(async () => ({
+  decision: "allow",
+  results: [],
+}));
+jest.mock("@server/services/webchat/webchat-extensions.service", () => ({
+  webchatExtensionsService: { runGates: mockRunGates },
+}));
+
 import { publicConversationsRouter } from "@server/routes/v1/public-conversations";
 
 const ORG_ID = "11111111-1111-4111-8111-111111111111";
@@ -310,5 +322,47 @@ describe("publicConversations.sendAttachment guards (D8-9)", () => {
       callerFor().sendAttachment({ ...attachmentInput, mimeType: "video/mp4" as never }),
     ).rejects.toMatchObject({ code: "BAD_REQUEST" });
     expect(mockRateLimited).not.toHaveBeenCalled();
+  });
+});
+
+describe("publicConversations.create plugin gates", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockFindOrganization.mockResolvedValue({ id: ORG_ID, suspendedAt: null, settings: {} });
+    mockIsEnabled.mockResolvedValue(true);
+    mockGetSettings.mockResolvedValue({ allowedDomains: ["*"] });
+    mockRateLimited.mockResolvedValue(false);
+  });
+
+  it("passes the challenge token and page host to the gates", async () => {
+    await callerFor({ origin: "https://shop.example.com" }).create({
+      ...createInput,
+      challengeToken: "tok",
+    });
+    expect(mockRunGates).toHaveBeenCalledWith(
+      ORG_ID,
+      "conversation.create",
+      expect.objectContaining({ token: "tok", pageHostname: "shop.example.com" }),
+    );
+  });
+
+  it("refuses with VERIFICATION_FAILED and creates nothing when a gate denies", async () => {
+    mockRunGates.mockResolvedValueOnce({
+      decision: "deny",
+      results: [{ pluginId: "p", decision: "deny", reason: "invalid_token" }],
+    });
+    await expect(callerFor().create(createInput)).rejects.toMatchObject({
+      code: "FORBIDDEN",
+      message: "VERIFICATION_FAILED",
+    });
+    expect(mockCreateConversation).not.toHaveBeenCalled();
+  });
+
+  it("creates a flagged conversation and records the bot check", async () => {
+    const results = [{ pluginId: "p", decision: "flag", reason: "provider_unavailable" }];
+    mockRunGates.mockResolvedValueOnce({ decision: "flag", results });
+    await callerFor().create(createInput);
+    const data = mockCreateConversation.mock.calls[0][1] as { metadata: Record<string, unknown> };
+    expect(data.metadata.botCheck).toMatchObject({ decision: "flag", results });
   });
 });
