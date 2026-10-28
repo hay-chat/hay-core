@@ -42,10 +42,12 @@ describe("actions.approve", () => {
   it("passes an API key caller as no user plus its key id", async () => {
     mockApprove.mockResolvedValue({ action: { id: ACTION_ID }, transitioned: true });
     await apiKeyCaller().approve({ id: ACTION_ID });
-    expect(mockApprove).toHaveBeenCalledWith(ACTION_ID, ORG_ID, {
-      userId: null,
-      apiKeyId: "key-1",
-    });
+    expect(mockApprove).toHaveBeenCalledWith(
+      ACTION_ID,
+      ORG_ID,
+      { userId: null, apiKeyId: "key-1" },
+      undefined,
+    );
   });
 
   it("reports a closed conversation as a precondition error", async () => {
