@@ -24,6 +24,12 @@ import {
   signAttachmentUrls,
 } from "./media-url.service";
 import { aiDisclosureLine } from "./ai-disclosure";
+import { resolveChannelAiMode } from "@server/types/organization-settings.types";
+import {
+  renderForChannel,
+  renderProductList,
+  type RecommendedProductLike,
+} from "@server/lib/channel-rendering";
 import type { Conversation } from "@server/database/entities/conversation.entity";
 import {
   MessageType,
@@ -148,9 +154,16 @@ export class ChannelDeliveryService {
     const { conversationId, payload } = event;
     if (!conversationId || !payload) return;
 
-    // Only deliver bot or human-agent messages (not customer messages, system, etc.)
-    const outboundTypes = ["BotAgent", "HumanAgent"];
+    // Only deliver bot or human-agent messages and product cards (not customer
+    // messages, system, etc.). Cards reach only channels that declare a text
+    // rendering for them (D13-12).
+    const outboundTypes: string[] = [
+      MessageType.BOT_AGENT,
+      MessageType.HUMAN_AGENT,
+      MessageType.PRODUCT_RECOMMENDATION,
+    ];
     if (!payload.type || !outboundTypes.includes(payload.type)) return;
+    const isProductCards = payload.type === MessageType.PRODUCT_RECOMMENDATION;
 
     // Skip messages that originated from the external channel itself — these
     // arrive via the plugin webhook (e.g. a Chatwoot agent replies) and must
@@ -199,6 +212,10 @@ export class ChannelDeliveryService {
         return;
       }
 
+      // Product cards are written by the AI outside the reply gate: hold them
+      // while the AI's replies on this channel wait for review.
+      if (isProductCards && this.aiRepliesHeldForReview(conversation)) return;
+
       // AI disclosure (D14-7): the first AI reply on a channel opens with the
       // org's AI label, unless the org hid it there (never for EU orgs).
       const disclosure =
@@ -227,10 +244,34 @@ export class ChannelDeliveryService {
         language: conversation.language ?? null,
         messageMetadata: (payload.metadata ?? null) as Record<string, unknown> | null,
         attachments: payload.attachments ?? [],
+        products: isProductCards ? this.recommendedProducts(payload.metadata) : undefined,
       });
     } catch (error) {
       logger.error({ err: error, conversationId }, "Channel delivery failed");
     }
+  }
+
+  /** The products of a ProductRecommendation message (from its metadata). */
+  private recommendedProducts(
+    metadata: ChannelEventPayload["metadata"] | undefined,
+  ): RecommendedProductLike[] {
+    const recommendation = metadata?.productRecommendation as { products?: unknown } | undefined;
+    return Array.isArray(recommendation?.products)
+      ? (recommendation.products as RecommendedProductLike[])
+      : [];
+  }
+
+  /**
+   * True when AI replies on this conversation's channel are queued for a person
+   * to approve: test mode (agent, else org default) or a "drafts only" channel.
+   * Mirrors the gate in Conversation.addMessage.
+   */
+  private aiRepliesHeldForReview(conversation: Conversation): boolean {
+    const settings = conversation.organization?.settings;
+    if (resolveChannelAiMode(settings, conversation.channel) === "drafts") return true;
+    const testMode = conversation.agent?.testMode;
+    if (testMode !== null && testMode !== undefined) return testMode;
+    return settings?.testModeDefault === true;
   }
 
   /**
@@ -394,6 +435,8 @@ export class ChannelDeliveryService {
     language: string | null;
     messageMetadata: Record<string, unknown> | null;
     attachments: MessageAttachment[];
+    /** Set for a ProductRecommendation message: its products, sent as a text list. */
+    products?: RecommendedProductLike[];
   }): Promise<void> {
     const { organizationId, channel, messageId, conversationId, attachments } = args;
 
@@ -404,6 +447,17 @@ export class ChannelDeliveryService {
       return;
     }
 
+    // What the channel can show (D13-12): product cards become a text list
+    // with links, Markdown is stripped or converted.
+    const rendering = pluginManagerService.getChannelRendering(pluginId);
+    let content = args.content;
+    if (args.products) {
+      if (rendering.productRecommendations !== "text") return;
+      content = renderProductList(args.products, args.language);
+      if (!content) return;
+    }
+    content = renderForChannel(content, rendering);
+
     // Private uploads need a signature: the worker fetches each file with a plain GET.
     // Signed once: the TTL outlives every retry.
     const deliverableAttachments = await signAttachmentUrls(
@@ -413,7 +467,7 @@ export class ChannelDeliveryService {
     );
     const body = JSON.stringify({
       to: args.to,
-      content: args.content,
+      content,
       messageId,
       conversationId,
       conversationMetadata: args.conversationMetadata,
