@@ -17,6 +17,15 @@ jest.mock("@server/services/orchestrator-queue.service", () => ({
   orchestratorQueueService: { enqueue: mockEnqueue },
 }));
 
+const mockMarkOutcomes = jest.fn<(...args: unknown[]) => Promise<number>>(async () => 1);
+const mockClearOutcomes = jest.fn<(...args: unknown[]) => Promise<number>>(async () => 1);
+jest.mock("@server/services/resolution-ledger.service", () => ({
+  resolutionLedgerService: {
+    markConversationSpam: mockMarkOutcomes,
+    clearConversationSpam: mockClearOutcomes,
+  },
+}));
+
 import { listSpam, markNotSpam, markSpam } from "@server/services/spam/spam-review.service";
 
 const conversation = (overrides: Record<string, unknown> = {}) => ({
@@ -70,6 +79,7 @@ describe("spam review", () => {
     expect(update).toMatchObject({ spam_flagged_at: null, spam_reason: null, needs_processing: true });
     expect(update.metadata.spamCheck).toMatchObject({ clearedBy: "u1", signals: ["links"] });
     expect(mockEnqueue).toHaveBeenCalledWith("c1", "o1", "ai_return");
+    expect(mockClearOutcomes).toHaveBeenCalledWith({ organizationId: "o1", conversationId: "c1", userId: "u1" });
   });
 
   it("Not spam leaves closed or human-handled conversations alone", async () => {
@@ -85,15 +95,16 @@ describe("spam review", () => {
     mockFindById.mockResolvedValueOnce(
       conversation({ spam_flagged_at: null, metadata: { spamCheck: { clearedAt: "x", clearedBy: "u1" } } }),
     );
-    await markSpam("o1", "c1");
+    await markSpam("o1", "c1", "u1");
     const update = mockUpdate.mock.calls[0][2] as Record<string, any>;
     expect(update).toMatchObject({ spam_reason: "staff", needs_processing: false });
     expect(update.spam_flagged_at).toBeInstanceOf(Date);
     expect(update.metadata.spamCheck).toEqual({});
+    expect(mockMarkOutcomes).toHaveBeenCalledWith({ organizationId: "o1", conversationId: "c1", userId: "u1" });
   });
 
   it("refuses conversations from another organization", async () => {
     mockFindById.mockResolvedValueOnce(conversation({ organization_id: "other" }));
-    await expect(markSpam("o1", "c1")).rejects.toMatchObject({ code: "NOT_FOUND" });
+    await expect(markSpam("o1", "c1", "u1")).rejects.toMatchObject({ code: "NOT_FOUND" });
   });
 });

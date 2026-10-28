@@ -124,9 +124,19 @@ export function loosensActionApproval(
   return false;
 }
 
+/** A currency code the call states, if any (`currency` or `transactions[0].currency`). */
+export function extractCurrency(args: Record<string, unknown>): string | null {
+  const first = Array.isArray(args.transactions)
+    ? (args.transactions[0] as Record<string, unknown> | undefined)
+    : undefined;
+  const value = args.currency ?? first?.currency;
+  return typeof value === "string" && /^[A-Za-z]{3}$/.test(value) ? value.toUpperCase() : null;
+}
+
 /**
  * Where an approver may lower the amount (D4-6): a top-level `amount`, or a
- * single `transactions[0].amount`. Split refunds (several transactions) and
+ * single `transactions[0].amount`. The lowered amount keeps the call's own
+ * unit, so no currency is needed. Split refunds (several transactions) and
  * calls without an amount are approved as they are.
  */
 export function amountEditable(args: Record<string, unknown>): boolean {

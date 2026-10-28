@@ -281,7 +281,8 @@ export const pluginApiTrpcRouter = router({
         }
         if (!conversation && !externalConversationId) {
           conversation = await conversationRepository.findActiveByCustomerAndChannel(
-            customer.id,
+            customer,
+            from,
             channel,
             organizationId,
           );
@@ -492,7 +493,8 @@ export const pluginApiTrpcRouter = router({
 
           // Find active conversation or create a new one
           conversation = await conversationRepository.findActiveByCustomerAndChannel(
-            customer.id,
+            customer,
+            to,
             channel,
             organizationId,
           );

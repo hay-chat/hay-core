@@ -25,8 +25,29 @@ jest.mock("@server/services/webchat/webchat-settings.service", () => {
   };
 });
 
+const mockUpdateConversation = jest.fn<(...args: unknown[]) => Promise<void>>(async () => undefined);
+jest.mock("@server/repositories/conversation.repository", () => ({
+  conversationRepository: { updateById: (...args: unknown[]) => mockUpdateConversation(...args) },
+}));
+const mockFindCustomer = jest.fn<(...args: unknown[]) => Promise<unknown>>();
+const mockUpdateCustomer = jest.fn<(...args: unknown[]) => Promise<void>>(async () => undefined);
+const mockCreateCustomer = jest.fn<(...args: unknown[]) => Promise<{ id: string }>>(async () => ({
+  id: "cust-new",
+}));
+jest.mock("@server/repositories/customer.repository", () => ({
+  CustomerRepository: jest.fn(() => ({
+    findByIdAndOrganization: (...args: unknown[]) => mockFindCustomer(...args),
+    update: (...args: unknown[]) => mockUpdateCustomer(...args),
+    create: (...args: unknown[]) => mockCreateCustomer(...args),
+  })),
+}));
+
 import type { Conversation } from "@server/database/entities/conversation.entity";
-import { emailHumanReplyIfAway, resumeUrl } from "@server/services/web-follow-up.service";
+import {
+  emailHumanReplyIfAway,
+  resumeUrl,
+  saveHandoffEmail,
+} from "@server/services/web-follow-up.service";
 
 const CONVERSATION_ID = "11111111-1111-4111-8111-111111111111";
 
@@ -110,5 +131,51 @@ describe("emailHumanReplyIfAway", () => {
       await emailHumanReplyIfAway(conversation({ channel: "whatsapp" }), { content: "Hi" }),
     ).toBe(false);
     expect(mockSendTemplateEmail).not.toHaveBeenCalled();
+  });
+});
+
+describe("hand-off email (D5-8)", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockConnected.mockReturnValue(0);
+    mockRedisSet.mockResolvedValue("OK");
+    mockSendTemplateEmail.mockResolvedValue({ success: true });
+  });
+
+  it("stores it on the conversation and never overwrites the customer's email", async () => {
+    mockFindCustomer.mockResolvedValue({ id: "cust-1", email: "victim@example.com" });
+    await saveHandoffEmail(
+      conversation({ customer_id: "cust-1", metadata: { url: "https://shop.com/" } }),
+      "attacker@example.com",
+    );
+    expect(mockUpdateConversation).toHaveBeenCalledWith(CONVERSATION_ID, {
+      metadata: expect.objectContaining({
+        url: "https://shop.com/",
+        contactEmail: "attacker@example.com",
+      }),
+    });
+    expect(mockUpdateCustomer).not.toHaveBeenCalled();
+    expect(mockCreateCustomer).not.toHaveBeenCalled();
+  });
+
+  it("fills the customer's email only when it has none", async () => {
+    mockFindCustomer.mockResolvedValue({ id: "cust-1", email: null, external_metadata: null });
+    await saveHandoffEmail(conversation({ customer_id: "cust-1" }), "ana@example.com");
+    expect(mockUpdateCustomer).toHaveBeenCalledWith(
+      "cust-1",
+      "org-1",
+      expect.objectContaining({ email: "ana@example.com" }),
+    );
+  });
+
+  it("emails the address left in this chat before the customer's own", async () => {
+    await emailHumanReplyIfAway(
+      conversation({
+        metadata: { url: "https://shop.com/", contactEmail: "left@example.com" },
+        customer: { email: "other@example.com" },
+      }),
+      { content: "Hi" },
+    );
+    expect(mockSendTemplateEmail.mock.calls[0][0].to).toBe("left@example.com");
   });
 });

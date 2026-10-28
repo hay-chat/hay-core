@@ -353,6 +353,29 @@ describe("ToolExecutionService approval gate", () => {
     expect(mockRecord.mock.calls[0][0].errorCode).toBe("APPROVAL_REJECTED");
   });
 
+  it("does not run a call still pending approval after the threshold was raised", async () => {
+    mockFindOrg.mockResolvedValue({ settings: { actionApproval: { thresholdAmount: 50, ...NO_CONFIRM } } });
+    mockFindEarlierRequest.mockResolvedValue({ id: "pa-0", status: "pending" });
+    const res = await new ToolExecutionService().handleToolExecution(makeConversation(), {
+      name: "shop:create_refund",
+      args: { amount: "20.00" },
+    });
+    expect(mockCallTool).not.toHaveBeenCalled();
+    expect(mockHold).not.toHaveBeenCalled();
+    expect(res).toMatchObject({ pending: true, result: { pendingActionId: "pa-0" } });
+  });
+
+  it("does not run a call the team declined after the threshold was raised", async () => {
+    mockFindOrg.mockResolvedValue({ settings: { actionApproval: { thresholdAmount: 50, ...NO_CONFIRM } } });
+    mockFindEarlierRequest.mockResolvedValue({ id: "pa-0", status: "rejected", decision_note: null });
+    const res = await new ToolExecutionService().handleToolExecution(makeConversation(), {
+      name: "shop:create_refund",
+      args: { amount: "20.00" },
+    });
+    expect(mockCallTool).not.toHaveBeenCalled();
+    expect(res).toMatchObject({ success: false, result: { status: "rejected" } });
+  });
+
   it("simulates instead of holding in a dry-run conversation", async () => {
     const res = await new ToolExecutionService().handleToolExecution(
       makeConversation({ dryRun: true }),
