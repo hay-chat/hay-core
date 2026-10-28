@@ -18,7 +18,7 @@ import type { Conversation } from "@server/database/entities/conversation.entity
 import { MessageType } from "@server/database/entities/message.entity";
 import type { PendingAction } from "@server/database/entities/pending-action.entity";
 import { conversationRepository } from "@server/repositories/conversation.repository";
-import { pendingActionService } from "./pending-action.service";
+import { pendingActionService, type Decider } from "./pending-action.service";
 import { ToolExecutionService } from "./core/tool-execution.service";
 import { MessageService } from "./core/message.service";
 import { createLogger } from "@server/lib/logger";
@@ -42,8 +42,12 @@ export class ActionDecisionService {
   private toolExecution = new ToolExecutionService();
   private messages = new MessageService();
 
-  async approve(id: string, organizationId: string, userId: string): Promise<DecisionResult> {
-    const { action, transitioned } = await pendingActionService.approve(id, organizationId, userId);
+  async approve(id: string, organizationId: string, decider: Decider): Promise<DecisionResult> {
+    const { action, transitioned } = await pendingActionService.approve(
+      id,
+      organizationId,
+      decider,
+    );
     if (!action || !transitioned) return { action, transitioned };
 
     const conversation = await conversationRepository.findById(action.conversation_id);
@@ -78,10 +82,10 @@ export class ActionDecisionService {
   async reject(
     id: string,
     organizationId: string,
-    userId: string,
+    decider: Decider,
     reason: string | null,
   ): Promise<DecisionResult> {
-    const decision = await pendingActionService.reject(id, organizationId, userId, reason);
+    const decision = await pendingActionService.reject(id, organizationId, decider, reason);
     const { action } = decision;
     if (!action || !decision.transitioned) return decision;
 
@@ -102,11 +106,11 @@ export class ActionDecisionService {
   }
 
   /** "I'll reply myself": close the request and put the conversation in the team's queue. */
-  async replyMyself(id: string, organizationId: string, userId: string): Promise<DecisionResult> {
+  async replyMyself(id: string, organizationId: string, decider: Decider): Promise<DecisionResult> {
     const decision = await pendingActionService.reject(
       id,
       organizationId,
-      userId,
+      decider,
       HANDLED_BY_TEAM_NOTE,
     );
     const { action } = decision;
