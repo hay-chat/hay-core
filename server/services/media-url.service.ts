@@ -29,6 +29,12 @@ const PUBLIC_UPLOAD_FOLDERS = new Set(["organizations", "avatars", "document-ima
 /** Lifetime of a signed URL handed to a channel worker for one delivery. */
 export const DELIVERY_SIGNED_URL_TTL_SECONDS = 15 * 60;
 
+/**
+ * Lifetime of the signed links in a handoff (D8-10): the human agent may open
+ * the escalated conversation days later in another tool (e.g. Chatwoot).
+ */
+export const HANDOFF_SIGNED_URL_TTL_SECONDS = 7 * 24 * 60 * 60;
+
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export function isUuid(value: unknown): value is string {

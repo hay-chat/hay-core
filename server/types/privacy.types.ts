@@ -192,17 +192,3 @@ export interface ExportPackageData {
     [key: string]: unknown;
   };
 }
-
-/**
- * Result statistics for attachment file deletion operations
- * Used during GDPR customer erasure
- */
-export interface AttachmentDeletionResult {
-  deleted: number;
-  failed: number;
-  errors: Array<{
-    messageId: string;
-    attachmentId: string;
-    error: string;
-  }>;
-}

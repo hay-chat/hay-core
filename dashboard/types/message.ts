@@ -73,6 +73,8 @@ export interface Message {
     agentFirstName?: string;
     // Product recommendation payload (type === "ProductRecommendation")
     productRecommendation?: ProductRecommendationPayload;
+    // Content is only the "[Customer sent …]" line the AI reads (D8-6..9); staff see the files
+    mediaPlaceholder?: boolean;
   } | null;
   sentiment?: MessageSentiment | null;
   intent?: MessageIntent | null;

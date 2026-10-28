@@ -67,6 +67,7 @@ describe("toPublicMessage", () => {
       sender: "Hay.chat",
       direction: "out",
       createdAt: message.created_at,
+      attachments: [],
       metadata: { isClosureMessage: true, productRecommendation: { products: [{ id: "p1" }] } },
     });
     expect(JSON.stringify(result)).not.toContain("replaced low-confidence");
@@ -145,5 +146,24 @@ describe("agent join/leave notices", () => {
     expect(agentFirstName({ firstName: " Marina " })).toBe("Marina");
     expect(agentFirstName({ firstName: "" })).toBeUndefined();
     expect(agentFirstName(null)).toBeUndefined();
+  });
+
+  it("passes the media placeholder flag and only the attachments it is given (D8-9)", () => {
+    expect(toPublicMessageMetadata({ mediaPlaceholder: true, transcript: "x" })).toEqual({
+      mediaPlaceholder: true,
+    });
+    const event = toPublicMessageEvent(
+      "c1",
+      {
+        id: "m3",
+        type: "Customer",
+        content: "[Customer sent a photo]",
+        attachments: [{ url: "raw" }],
+      },
+      [{ id: "u1", name: "p.jpg", url: "https://signed", type: "image/jpeg", size: 1 }],
+    );
+    expect((event.data as { attachments: unknown[] }).attachments).toEqual([
+      { id: "u1", name: "p.jpg", url: "https://signed", type: "image/jpeg", size: 1 },
+    ]);
   });
 });

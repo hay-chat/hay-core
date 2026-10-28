@@ -14,7 +14,13 @@
       }
     },
     "attachment": {
-      "loadFailed": "Couldn't load this attachment"
+      "loadFailed": "Couldn't load this attachment",
+      "attach": "Attach a file",
+      "remove": "Remove {name}",
+      "uploading": "Uploading {name}…",
+      "uploadFailed": "Couldn't upload {name}. Try again or pick another file.",
+      "tooLarge": "{name} is larger than {size} MB.",
+      "tooMany": "You can send up to {count} files at once."
     },
     "page": {
       "title": "Conversations",

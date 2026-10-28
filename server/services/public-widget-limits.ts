@@ -20,6 +20,10 @@ export const PUBLIC_WIDGET_LIMITS = {
   messagePerConversation: { max: 20, windowSeconds: 60 },
   /** Messages per IP, across conversations. */
   messagePerIp: { max: 60, windowSeconds: 60 },
+  /** Files (photos, PDFs) per conversation. Each is up to 10 MB of storage. */
+  attachmentPerConversation: { max: 10, windowSeconds: 10 * 60 },
+  /** Files per IP, across conversations. */
+  attachmentPerIp: { max: 30, windowSeconds: 10 * 60 },
 } as const;
 
 type LimitRule = Exclude<keyof typeof PUBLIC_WIDGET_LIMITS, "maxMessageLength">;

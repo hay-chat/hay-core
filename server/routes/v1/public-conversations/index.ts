@@ -13,11 +13,19 @@ import {
   matchesAllowedDomains,
 } from "../../../services/webchat/webchat-settings.service";
 import { config } from "@server/config/env";
-import { toPublicMessage } from "../../../services/webchat/public-message";
+import { toPublicAttachments, toPublicMessage } from "../../../services/webchat/public-message";
 import {
   PUBLIC_WIDGET_LIMITS,
   isPublicWidgetRateLimited,
 } from "../../../services/public-widget-limits";
+import {
+  WIDGET_ATTACHMENT_MAX_BASE64_LENGTH,
+  WIDGET_ATTACHMENT_TYPES,
+  WidgetAttachmentRejectedError,
+  decodeBase64,
+  describeCustomerAttachments,
+  storeWidgetAttachment,
+} from "../../../services/webchat/widget-attachments";
 
 const logger = createLogger("public-conversations");
 
@@ -56,6 +64,19 @@ const createPublicConversationSchema = z.object({
 const sendMessageSchema = z.object({
   conversationId: z.string().uuid(),
   content: z.string().min(1).max(PUBLIC_WIDGET_LIMITS.maxMessageLength),
+  proof: z.string(), // DPoP proof
+  method: z.string(),
+  url: z.string(),
+  context: z.record(z.any()).optional(),
+});
+
+// Schema for sending a photo or PDF, with an optional caption (D8-9)
+const sendAttachmentSchema = z.object({
+  conversationId: z.string().uuid(),
+  data: z.string().min(1).max(WIDGET_ATTACHMENT_MAX_BASE64_LENGTH), // base64
+  mimeType: z.enum(WIDGET_ATTACHMENT_TYPES),
+  filename: z.string().min(1).max(255),
+  caption: z.string().max(PUBLIC_WIDGET_LIMITS.maxMessageLength).optional(),
   proof: z.string(), // DPoP proof
   method: z.string(),
   url: z.string(),
@@ -248,10 +269,18 @@ export const publicConversationsRouter = t.router({
         ? await conversationRepository.getMessages(input.conversationId)
         : await conversationRepository.getWidgetMessages(input.conversationId);
 
-      // Filter to only return customer-facing messages
-      const filteredMessages = messages
-        .slice(input.offset, input.offset + input.limit)
-        .map((msg) => toPublicMessage(msg, { isPlayground }));
+      // Filter to only return customer-facing messages; files get signed links
+      const organizationId = conversation?.organization_id;
+      const filteredMessages = await Promise.all(
+        messages.slice(input.offset, input.offset + input.limit).map(async (msg) =>
+          toPublicMessage(msg, {
+            isPlayground,
+            attachments: organizationId
+              ? await toPublicAttachments(msg.attachments, organizationId)
+              : [],
+          }),
+        ),
+      );
 
       return {
         messages: filteredMessages,
@@ -362,6 +391,114 @@ export const publicConversationsRouter = t.router({
         message: "Failed to send message",
       });
     }
+  }),
+
+  // D8-9: the shopper sends a photo or PDF (requires DPoP proof). The file and
+  // its message are stored in the conversation's organization in one call.
+  sendAttachment: publicProcedure.input(sendAttachmentSchema).mutation(async ({ input, ctx }) => {
+    // Per IP before DPoP so a flood never reaches signature verification.
+    if (
+      await isPublicWidgetRateLimited([{ rule: "attachmentPerIp", id: clientIp(ctx.ipAddress) }])
+    ) {
+      throw tooManyRequests();
+    }
+
+    // The proof shows the caller holds this conversation's key: it is the
+    // ownership check. The organization is the conversation's, never the input's.
+    const verified = await verifyDPoPForRequest(
+      input.conversationId,
+      input.proof,
+      input.method,
+      input.url,
+    );
+    if (!verified.success) {
+      if (verified.newNonce && verified.error === "Invalid or expired nonce") {
+        return {
+          messageId: null,
+          nonce: verified.newNonce,
+          createdAt: null,
+          attachment: null,
+          error: "NONCE_EXPIRED",
+          errorMessage: verified.error,
+        };
+      }
+      throw new TRPCError({
+        code: "UNAUTHORIZED",
+        message: verified.error || "Invalid DPoP proof",
+      });
+    }
+
+    if (
+      await isPublicWidgetRateLimited([
+        { rule: "attachmentPerConversation", id: input.conversationId },
+      ])
+    ) {
+      throw tooManyRequests();
+    }
+
+    const conversation = await conversationRepository.findById(input.conversationId);
+    if (!conversation) {
+      throw new TRPCError({ code: "NOT_FOUND", message: "Conversation not found" });
+    }
+    const organizationId = conversation.organization_id;
+
+    // Same gate as starting a chat: the organization must still offer webchat.
+    const organization = await organizationRepository.findById(organizationId);
+    if (
+      !organization ||
+      organization.suspendedAt ||
+      !(await webchatSettingsService.isEnabled(organizationId))
+    ) {
+      throw new TRPCError({ code: "FORBIDDEN", message: "Webchat is not available" });
+    }
+
+    const buffer = decodeBase64(input.data);
+    if (!buffer) {
+      throw new TRPCError({ code: "BAD_REQUEST", message: "Invalid file data" });
+    }
+
+    let attachment;
+    try {
+      attachment = await storeWidgetAttachment({
+        organizationId,
+        buffer,
+        mimeType: input.mimeType,
+        filename: input.filename,
+      });
+    } catch (error) {
+      if (error instanceof WidgetAttachmentRejectedError) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: error.message });
+      }
+      logger.error({ err: error }, "Error storing widget attachment");
+      throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to send file" });
+    }
+
+    const caption = input.caption?.trim();
+    const message = await conversation.addMessage({
+      content: caption || describeCustomerAttachments([attachment]),
+      type: MessageType.CUSTOMER,
+      attachments: [attachment],
+      metadata: {
+        direction: MessageDirection.IN,
+        timestamp: new Date().toISOString(),
+        ...(caption ? {} : { mediaPlaceholder: true }),
+      },
+    });
+
+    if (input.context && Object.keys(input.context).length > 0) {
+      const merged = { ...(conversation.context ?? {}), ...input.context };
+      await conversationRepository.updateById(conversation.id, { context: merged });
+    }
+
+    const [publicAttachment] = await toPublicAttachments([attachment], organizationId);
+    return {
+      messageId: message.id,
+      nonce: verified.newNonce,
+      createdAt: message.created_at,
+      attachment: publicAttachment ?? null,
+      error: null,
+      errorMessage: null,
+    };
   }),
 
   // D5-8: the shopper leaves an email at hand-off so the team's reply can reach

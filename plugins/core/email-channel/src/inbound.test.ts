@@ -188,7 +188,7 @@ describe("handleInbound", () => {
     });
   });
 
-  it("uploads real attachments, skips inline ones and passes them to messages.receive", async () => {
+  it("uploads real attachments, skips small inline images and passes them to messages.receive", async () => {
     const { ctx, api } = setup(
       receivedEmail({
         id: "e-att",
@@ -200,6 +200,7 @@ describe("handleInbound", () => {
             filename: "logo.png",
             content_type: "image/png",
             content_disposition: "inline",
+            size: 2048,
           },
         ],
       }),
@@ -219,6 +220,7 @@ describe("handleInbound", () => {
             filename: "logo.png",
             content_type: "image/png",
             content_disposition: "inline",
+            size: 2048,
             download_url: "https://files.resend.test/a2",
           },
         ],
@@ -234,6 +236,101 @@ describe("handleInbound", () => {
     expect(receive?.input.attachments).toEqual([
       expect.objectContaining({ name: "receipt.pdf", url: "https://cdn.hay.test/receipt.pdf" }),
     ]);
+  });
+
+  it("ingests a pasted screenshot but not a tracking pixel of unknown size (D8-7)", async () => {
+    const screenshot = "x".repeat(30 * 1024);
+    const { ctx, api } = setup(
+      receivedEmail({
+        id: "e-inline",
+        text: "This is what I see",
+        attachments: [{ id: "s", filename: "image001.png", content_type: "image/png" }],
+      }),
+      {},
+      {
+        "https://files.resend.test/shot": { body: screenshot, type: "image/png" },
+        "https://files.resend.test/pixel": { body: "GIF89a", type: "image/gif" },
+      },
+      {
+        "e-inline": [
+          {
+            id: "s",
+            filename: "image001.png",
+            content_type: "image/png",
+            content_disposition: "inline",
+            size: screenshot.length,
+            download_url: "https://files.resend.test/shot",
+          },
+          {
+            id: "p",
+            filename: "pixel.gif",
+            content_type: "image/gif",
+            content_disposition: "inline",
+            download_url: "https://files.resend.test/pixel",
+          },
+          {
+            id: "c",
+            filename: "part.css",
+            content_type: "text/css",
+            content_disposition: "inline",
+            size: 40 * 1024,
+            download_url: "https://files.resend.test/css",
+          },
+        ],
+      },
+    );
+    await handleInbound(event("e-inline"), ctx);
+
+    const uploads = api.mutations.filter((call) => call.procedure === "media.upload");
+    expect(uploads.map((call) => call.input.filename)).toEqual(["image001.png"]);
+    const receive = api.mutations.find((call) => call.procedure === "messages.receive");
+    expect(receive?.input.content).toBe("This is what I see");
+    expect((receive?.input.metadata as Record<string, unknown>).rejectedAttachments).toBeUndefined();
+  });
+
+  it("reports refused attachments in metadata and never sends an empty turn (D8-7)", async () => {
+    const { ctx, api } = setup(
+      receivedEmail({
+        id: "e-heic",
+        text: "",
+        html: "",
+        attachments: [{ id: "h", filename: "IMG_0001.HEIC", content_type: "image/heic" }],
+      }),
+      { uploadRejects: ["IMG_0001.HEIC"] },
+      {
+        "https://files.resend.test/heic": { body: "heic", type: "image/heic" },
+        "https://files.resend.test/pdf": { body: "%PDF", type: "application/pdf" },
+      },
+      {
+        "e-heic": [
+          {
+            id: "h",
+            filename: "IMG_0001.HEIC",
+            content_type: "image/heic",
+            download_url: "https://files.resend.test/heic",
+          },
+          {
+            id: "d",
+            filename: "invoice.pdf",
+            content_type: "application/pdf",
+            download_url: "https://files.resend.test/pdf",
+          },
+        ],
+      },
+    );
+    const summary = await handleInbound(event("e-heic"), ctx);
+
+    expect(summary.outcome).toBe("processed");
+    const receive = api.mutations.find((call) => call.procedure === "messages.receive");
+    expect(receive?.input.content).toBe(
+      "[Customer sent a file]\n[Customer sent attachments Hay.chat could not accept: IMG_0001.HEIC]",
+    );
+    expect(receive?.input.metadata).toMatchObject({
+      rejectedAttachments: [
+        { filename: "IMG_0001.HEIC", type: "image/heic", reason: "not_accepted" },
+      ],
+    });
+    expect((receive?.input.metadata as Record<string, unknown>).mediaPlaceholder).toBeUndefined();
   });
 
   it("reports dedupes and ignores non-email events or unconfigured channels", async () => {
