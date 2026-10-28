@@ -5,13 +5,17 @@
  * Hay.chat" footer with page numbers on every page.
  *
  * Images arrive already prepared (JPEG, downscaled) or marked as left out;
- * the 4 MB cap is the caller's loop (see dispute-evidence.service).
+ * the 4 MB cap is the caller's loop (see dispute-evidence.service). The
+ * timeline stops at a page cap with a note (G5). Emoji are drawn with Noto
+ * Emoji (monochrome, OFL, assets/fonts) next to Helvetica (G5).
  */
+import { existsSync } from "fs";
+import * as path from "path";
 import PDFDocument from "pdfkit";
 import type { MessageAttachment } from "@server/database/entities/message.entity";
 import { formatZonedDateTime } from "@server/utils/zoned-datetime";
 import { evidenceCopy, fillCopy, type EvidenceLocale, type EvidenceTemplate } from "./copy";
-import type { EvidenceTimeline, TimelineEntry } from "./timeline";
+import { POLICY_EXCERPT_CHARS, type EvidenceTimeline, type TimelineEntry } from "./timeline";
 
 export type PreparedImage = { kind: "image"; buffer: Buffer } | { kind: "omitted" | "unavailable" };
 
@@ -31,20 +35,63 @@ export interface EvidenceDocument {
   conversations: Array<{ id: string; channel: string; created_at: Date }>;
   timeline: EvidenceTimeline;
   /** Policy text by document id (already trimmed to an excerpt). */
-  policyExcerpts: Map<string, string>;
+  policyExcerpts: Map<string, PolicyExcerpt>;
   /** Prepared image by attachment id; images not in the map are treated as unavailable. */
   images: Map<string, PreparedImage>;
+  /** Page cap; defaults to EVIDENCE_PDF_MAX_PAGES. */
+  maxPages?: number;
 }
+
+/** `current`: read from the document today, the text at the time was not recorded. */
+export interface PolicyExcerpt {
+  text: string;
+  current: boolean;
+}
+
+/**
+ * Most pages the PDF may have. Stripe's dispute evidence is limited to 50
+ * pages in total; the timeline stops early enough to leave room for the
+ * policies section.
+ */
+export const EVIDENCE_PDF_MAX_PAGES = 50;
+/** Pages kept free for the policies section when the timeline is cut. */
+const POLICY_PAGES_RESERVED = 2;
+
+/** Monochrome emoji font; in dist/ the build copies assets/ next to the code. */
+const EMOJI_FONT_CANDIDATES = [
+  path.join(__dirname, "../../assets/fonts/NotoEmoji-Regular.ttf"),
+  path.join(__dirname, "../../../assets/fonts/NotoEmoji-Regular.ttf"),
+];
+const EMOJI_FONT = "NotoEmoji";
+const emojiFontPath = EMOJI_FONT_CANDIDATES.find((candidate) => existsSync(candidate)) ?? null;
 
 const MARGIN = 56;
 const BODY = 12;
 const SMALL = 10;
 const GREY = "#444444";
-const POLICY_EXCERPT_CHARS = 1500;
 const IMAGE_MAX = { width: 260, height: 260 };
 
 // Characters the PDF standard fonts (WinAnsi) can draw beyond Latin-1.
 const WIN_ANSI_EXTRA = "€‚ƒ„…†‡ˆ‰Š‹ŒŽ‘’“”•–—˜™š›œžŸ";
+
+/** One emoji (with skin tone, variation selector, keycap and ZWJ joins) or a flag. */
+const EMOJI_RUN =
+  /(?:\p{Regional_Indicator}{2}|(?:\p{Extended_Pictographic}|[#*0-9]\uFE0F?\u20E3)(?:\p{Emoji_Modifier}|\uFE0F|\u20E3)*(?:\u200D\p{Extended_Pictographic}(?:\p{Emoji_Modifier}|\uFE0F)*)*)+/gu;
+
+/** Text split into plain and emoji runs, in order; empty runs dropped. */
+export function splitEmojiRuns(value: string): Array<{ emoji: boolean; text: string }> {
+  const normalized = value.normalize("NFC");
+  const runs: Array<{ emoji: boolean; text: string }> = [];
+  let last = 0;
+  for (const match of normalized.matchAll(EMOJI_RUN)) {
+    const index = match.index ?? 0;
+    if (index > last) runs.push({ emoji: false, text: normalized.slice(last, index) });
+    runs.push({ emoji: true, text: match[0] });
+    last = index + match[0].length;
+  }
+  if (last < normalized.length) runs.push({ emoji: false, text: normalized.slice(last) });
+  return runs;
+}
 
 /**
  * Text the built-in Helvetica can draw. Emoji and joiners are dropped; any
@@ -75,6 +122,10 @@ export function renderEvidencePdf(model: EvidenceDocument): Promise<Buffer> {
     bufferPages: true,
     info: { Title: copy.title, Creator: "Hay.chat", Producer: "Hay.chat" },
   });
+  const hasEmojiFont = emojiFontPath !== null;
+  if (emojiFontPath) doc.registerFont(EMOJI_FONT, emojiFontPath);
+  const maxPages = model.maxPages ?? EVIDENCE_PDF_MAX_PAGES;
+  const pageCount = () => doc.bufferedPageRange().count;
   const chunks: Buffer[] = [];
   const done = new Promise<Buffer>((resolve, reject) => {
     doc.on("data", (chunk: Buffer) => chunks.push(chunk));
@@ -83,27 +134,51 @@ export function renderEvidencePdf(model: EvidenceDocument): Promise<Buffer> {
   });
   const width = doc.page.width - MARGIN * 2;
 
+  // The text font in use, so an emoji run can switch to the emoji font and back.
+  let currentFont = "Helvetica";
+  const font = (name: string) => {
+    currentFont = name;
+    return doc.font(name);
+  };
+  /** Write text in the flow; emoji runs use the emoji font when it is installed. */
+  const write = (value: string, options: PDFKit.Mixins.TextOptions) => {
+    const runs = hasEmojiFont ? splitEmojiRuns(value) : [];
+    if (!runs.some((run) => run.emoji)) {
+      doc.text(pdfSafe(value), options);
+      return;
+    }
+    const base = currentFont;
+    runs.forEach((run, index) => {
+      doc.font(run.emoji ? EMOJI_FONT : base);
+      doc.text(run.emoji ? run.text : pdfSafe(run.text), {
+        ...options,
+        continued: index < runs.length - 1 ? true : options.continued,
+      });
+    });
+    doc.font(base);
+  };
   const text = (value: string, options: PDFKit.Mixins.TextOptions = {}) =>
-    doc.text(pdfSafe(value), { width, ...options });
+    write(value, { width, ...options });
   const heading = (value: string) => {
     doc.moveDown(1);
-    doc.font("Helvetica-Bold").fontSize(15).fillColor("black");
+    font("Helvetica-Bold").fontSize(15).fillColor("black");
     text(value);
     doc.moveDown(0.4);
-    doc.font("Helvetica").fontSize(BODY);
+    font("Helvetica").fontSize(BODY);
   };
   const field = (label: string, value: string | null | undefined) => {
     if (!value) return;
-    doc.font("Helvetica-Bold").fontSize(BODY).fillColor("black");
+    font("Helvetica-Bold").fontSize(BODY).fillColor("black");
     doc.text(pdfSafe(`${label}: `), { continued: true, width });
-    doc.font("Helvetica").text(pdfSafe(value));
+    font("Helvetica");
+    write(value, {});
   };
 
   // --- Cover ---
-  doc.font("Helvetica-Bold").fontSize(20).fillColor("black");
+  font("Helvetica-Bold").fontSize(20).fillColor("black");
   text(copy.title);
   doc.moveDown(0.6);
-  doc.font("Helvetica").fontSize(BODY);
+  font("Helvetica").fontSize(BODY);
   field(copy.cover.store, model.storeName);
   if (model.template !== "generic") field(copy.cover.reason, copy.templates[model.template]);
   if (model.order) {
@@ -160,20 +235,33 @@ export function renderEvidencePdf(model: EvidenceDocument): Promise<Buffer> {
   doc.fillColor("black").fontSize(BODY);
   const conversationsById = new Map(model.conversations.map((c) => [c.id, c]));
   let currentConversation: string | null = null;
-  for (const entry of model.timeline.entries) {
+  // Cut the timeline at the page cap, keeping room for the policies.
+  const timelinePageLimit =
+    maxPages - (model.timeline.policies.length > 0 ? POLICY_PAGES_RESERVED : 0);
+  const entries = model.timeline.entries;
+  for (let index = 0; index < entries.length; index++) {
+    if (pageCount() >= timelinePageLimit) {
+      // Page cap reached: say how much was left out instead of going on.
+      doc.moveDown(0.8);
+      font("Helvetica-Oblique").fontSize(SMALL).fillColor(GREY);
+      text(fillCopy(copy.timelineTruncated, { count: entries.length - index, pages: maxPages }));
+      font("Helvetica").fontSize(BODY).fillColor("black");
+      break;
+    }
+    const entry = entries[index];
     if (entry.conversationId !== currentConversation) {
       currentConversation = entry.conversationId;
       const conversation = conversationsById.get(entry.conversationId);
       if (conversation) {
         doc.moveDown(0.6);
-        doc.font("Helvetica-Bold").fontSize(13);
+        font("Helvetica-Bold").fontSize(13);
         text(
           fillCopy(copy.conversationHeader, {
             channel: channelLabel(conversation.channel, model.locale),
             at: at(conversation.created_at),
           }),
         );
-        doc.font("Helvetica").fontSize(BODY);
+        font("Helvetica").fontSize(BODY);
       }
     }
     renderEntry(entry);
@@ -187,13 +275,20 @@ export function renderEvidencePdf(model: EvidenceDocument): Promise<Buffer> {
     doc.fillColor("black").fontSize(BODY);
     for (const policy of model.timeline.policies) {
       doc.moveDown(0.5);
-      doc.font("Helvetica-Bold");
+      font("Helvetica-Bold");
       text(policy.title);
-      doc.font("Helvetica").fillColor(GREY).fontSize(SMALL);
+      font("Helvetica").fillColor(GREY).fontSize(SMALL);
       text(fillCopy(copy.policyFirstShown, { at: at(policy.firstUsedAt) }));
       doc.fillColor("black").fontSize(BODY);
       const excerpt = model.policyExcerpts.get(policy.documentId);
-      if (excerpt) text(excerpt.slice(0, POLICY_EXCERPT_CHARS));
+      if (excerpt) {
+        text(excerpt.text.slice(0, POLICY_EXCERPT_CHARS));
+        if (excerpt.current) {
+          doc.fillColor(GREY).fontSize(SMALL);
+          text(copy.policyCurrentText);
+          doc.fillColor("black").fontSize(BODY);
+        }
+      }
     }
   }
 
@@ -203,7 +298,7 @@ export function renderEvidencePdf(model: EvidenceDocument): Promise<Buffer> {
     doc.switchToPage(i);
     const bottom = doc.page.margins.bottom;
     doc.page.margins.bottom = 0;
-    doc.font("Helvetica").fontSize(SMALL).fillColor(GREY);
+    font("Helvetica").fontSize(SMALL).fillColor(GREY);
     doc.text(
       pdfSafe(
         fillCopy(copy.footer, {
@@ -224,9 +319,9 @@ export function renderEvidencePdf(model: EvidenceDocument): Promise<Buffer> {
   function renderEntry(entry: TimelineEntry) {
     doc.moveDown(0.5);
     if (entry.kind === "message") {
-      doc.font("Helvetica-Bold").fontSize(BODY).fillColor("black");
+      font("Helvetica-Bold").fontSize(BODY).fillColor("black");
       text(`${at(entry.at)} - ${copy.author[entry.author]}`);
-      doc.font("Helvetica");
+      font("Helvetica");
       if (entry.text.trim()) text(entry.text);
       if (entry.receipt) {
         doc.fillColor(GREY).fontSize(SMALL);
@@ -241,9 +336,9 @@ export function renderEvidencePdf(model: EvidenceDocument): Promise<Buffer> {
       for (const attachment of entry.attachments) renderAttachment(attachment);
       return;
     }
-    doc.font("Helvetica-Oblique").fontSize(BODY).fillColor("black");
+    font("Helvetica-Oblique").fontSize(BODY).fillColor("black");
     text(`${at(entry.at)} - ${entry.text}`);
-    doc.font("Helvetica");
+    font("Helvetica");
   }
 
   function renderAttachment(attachment: MessageAttachment) {
