@@ -41,6 +41,7 @@
       "exclude": "Exclude",
       "reasonLabel": "Reason: {reason}",
       "requestedBy": "Requested by {who} on {date}",
+      "excludedBy": "Excluded by {who} on {date}",
       "previous": "Previous",
       "next": "Next",
       "pageOf": "Page {page} of {pages}",
@@ -57,7 +58,7 @@
     },
     "excludeDialog": {
       "title": "Exclude this resolution",
-      "instant": "It leaves this month's count right away. {left} self-serve exclusions left this month.",
+      "instant": "It leaves this month's count right away. After this one, {left} self-serve exclusions are left this month.",
       "review": "You have used this month's self-serve exclusions (5 % of resolutions). This request goes to Hay.chat for review, and the resolution stays counted until then.",
       "reason": "Reason (required)",
       "reasonPlaceholder": "For example: this was our own test, or the shopper needed a person",

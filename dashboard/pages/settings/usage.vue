@@ -133,10 +133,15 @@
                   <template v-if="item.exclusionRequestedAt">
                     ·
                     {{
-                      $t("usage.ledger.requestedBy", {
-                        who: item.exclusionRequestedBy ?? "-",
-                        date: formatDateTime(item.exclusionRequestedAt),
-                      })
+                      $t(
+                        item.status === "excluded"
+                          ? "usage.ledger.excludedBy"
+                          : "usage.ledger.requestedBy",
+                        {
+                          who: item.exclusionRequestedBy ?? "-",
+                          date: formatDateTime(item.exclusionRequestedAt),
+                        },
+                      )
                     }}
                   </template>
                 </p>

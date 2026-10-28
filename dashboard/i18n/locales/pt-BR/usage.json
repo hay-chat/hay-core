@@ -41,6 +41,7 @@
       "exclude": "Excluir",
       "reasonLabel": "Motivo: {reason}",
       "requestedBy": "Solicitado por {who} em {date}",
+      "excludedBy": "Excluída por {who} em {date}",
       "previous": "Anterior",
       "next": "Próxima",
       "pageOf": "Página {page} de {pages}",
@@ -57,7 +58,7 @@
     },
     "excludeDialog": {
       "title": "Excluir esta resolução",
-      "instant": "Ela sai da contagem deste mês na hora. Restam {left} exclusões por conta própria neste mês.",
+      "instant": "Ela sai da contagem deste mês na hora. Depois desta, restam {left} exclusões por conta própria neste mês.",
       "review": "Você já usou as exclusões por conta própria deste mês (5 % das resoluções). Este pedido vai para análise do Hay.chat e a resolução continua contada até lá.",
       "reason": "Motivo (obrigatório)",
       "reasonPlaceholder": "Por exemplo: foi um teste nosso, ou o cliente precisava de uma pessoa",
