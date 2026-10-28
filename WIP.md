@@ -1,3 +1,11 @@
+## 2026-10-28 — claude/w4-i-tooling (worktree hay-core-w4-i-tooling) — Lane I committed, NOT pushed
+- I2 CI: webchat job runs on staging push/PR; quality + server-tests stay master-only. I1 dropped (Lane F did it).
+- I3 emails: notification template shows its blocks (pass 1 no longer eats {{#if}}), {{else}}, escaped values, callouts as divs, initialize() before send; 0 MJML warnings; jest 11 suites/89 pass.
+- I8 tasks/release-waves-0-3.md: 38 migrations, env names, plugin build gotchas, backoffice order + conflicts, hand-tests, rollback; deploy.sh steps "Roger to confirm".
+- Other repos (local only): hay-docs claude/w4-i-email-docs (I4), hay-website claude/w4-i-shopify-h3 (I5, on PR #46), claude/w4-i-home-perf (I6, LH mobile median LCP 6.2 s -> 2.1 s), hay-shopify-app claude/w4-i-shopify-scopes (I7).
+- I9 maskable icon: on Roger (designer asset).
+- Next: review + merge into staging; push satellite branches/PRs; dashboard has no npm "test" script on staging.
+
 ## 2026-10-28 — staging — Lanes E+F and H merged
 - claude/w4-ef merged (841f8fd8; dashboard devDeps @vue/test-utils + jsdom, lockfile changed); claude/w4-h-commerce merged (8e5e46e1; migration AddPluginStates on hay_test + hay_staging).
 - Full server jest after E+F: 1718 pass, 2 fail (scheduler, conversation-media) that pass alone → shared-DB flakes. Dashboard tc + vitest 68/68. Lane H DB tests 8/8, Woo 128/128, server tsc clean.
