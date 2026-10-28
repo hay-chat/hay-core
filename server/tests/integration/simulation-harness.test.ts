@@ -186,6 +186,24 @@ describe("simulation harness", () => {
     ).rejects.toMatchObject({ code: "LIMIT_REACHED" });
   });
 
+  it("holds the monthly cap when runs start at the same time (F1)", async () => {
+    await AppDataSource.getRepository(Organization).update(orgId, {
+      limits: { maxSimulationsPerMonth: 3 },
+    });
+    // Open pooled connections first so the starts really run side by side.
+    await Promise.all(Array.from({ length: 5 }, () => AppDataSource.query("SELECT pg_sleep(0.05)")));
+    const results = await Promise.allSettled(
+      Array.from({ length: 5 }, () =>
+        simulationHarnessService.startRun({ organizationId: orgId, cases: twoCases }),
+      ),
+    );
+    expect(results.filter((r) => r.status === "fulfilled")).toHaveLength(1);
+    for (const r of results.filter((r) => r.status === "rejected")) {
+      expect((r as PromiseRejectedResult).reason).toMatchObject({ code: "LIMIT_REACHED" });
+    }
+    expect((await simulationHarnessService.getAllowance(orgId)).used).toBe(2);
+  });
+
   it("refuses a case that does not end with a customer turn", async () => {
     await expect(
       simulationHarnessService.startRun({
