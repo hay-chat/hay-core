@@ -12,6 +12,7 @@ import {
   resolveActionApprovalConfig,
   APPROVAL_CATEGORIES,
   DEFAULT_NEW_ORG_RETENTION_DAYS,
+  resolveMediaSettings,
 } from "@server/types/organization-settings.types";
 import type { DeepPartial } from "typeorm";
 import { AppDataSource } from "@server/database/data-source";
@@ -450,6 +451,32 @@ export const organizationsRouter = t.router({
         settings: { ...(organization.settings || {}), aiDisclosure, channelAiModes },
       });
       return { success: true };
+    }),
+
+  // Customer photos and PDFs (D8-11): whether the AI reads them.
+  getMediaSettings: scopedProcedure(RESOURCES.ORGANIZATION_SETTINGS, ACTIONS.READ).query(
+    async ({ ctx }) => {
+      const organization = await organizationService.findOne(ctx.organizationId!);
+      if (!organization) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Organization not found" });
+      }
+      return resolveMediaSettings(organization.settings);
+    },
+  ),
+
+  updateMediaSettings: scopedProcedure(RESOURCES.ORGANIZATION_SETTINGS, ACTIONS.UPDATE)
+    .input(z.object({ readImages: z.boolean().optional() }))
+    .mutation(async ({ ctx, input }) => {
+      const organization = await organizationService.findOne(ctx.organizationId!);
+      if (!organization) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Organization not found" });
+      }
+      const media = { ...(organization.settings?.media ?? {}) };
+      if (input.readImages !== undefined) media.readImages = input.readImages;
+      await organizationService.update(ctx.organizationId!, {
+        settings: { ...(organization.settings || {}), media },
+      });
+      return resolveMediaSettings({ media });
     }),
 
   updateSettings: scopedProcedure(RESOURCES.ORGANIZATION_SETTINGS, ACTIONS.UPDATE)

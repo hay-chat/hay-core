@@ -406,6 +406,16 @@
       "modeOn": "Enviar automaticamente",
       "modeDrafts": "Somente rascunhos (uma pessoa aprova)",
       "draftsHint": "Somente rascunhos: as respostas da IA ficam aguardando na conversa até alguém da sua equipe aprovar ou bloquear."
+    },
+    "media": {
+      "title": "Fotos e arquivos dos clientes",
+      "description": "Fotos e PDFs que os clientes enviam nas conversas.",
+      "readImages": "Ler imagens",
+      "readImagesHint": "A IA olha as fotos e PDFs que os clientes enviam (por exemplo um produto danificado, um número de lote ou uma nota fiscal) e usa o que vê na resposta. Os arquivos são lidos pela OpenAI, pelo endpoint da UE quando esta instalação tiver um.",
+      "save": "Salvar",
+      "saveSuccess": "Configurações de arquivos salvas",
+      "saveFailed": "Falha ao salvar as configurações de arquivos",
+      "loadFailed": "Falha ao carregar as configurações de arquivos"
     }
   },
   "security": {

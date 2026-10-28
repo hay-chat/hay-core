@@ -2,6 +2,8 @@ import OpenAI, { toFile } from "openai";
 import { config } from "../config/env";
 import { createLogger } from "@server/lib/logger";
 import { llmProviderFactory } from "@server/services/llm/llm-provider.factory";
+import { emitUsage } from "@server/services/llm/usage-sink";
+import type { AiRegion } from "@server/services/llm/ai-region";
 
 const logger = createLogger("transcription");
 
@@ -41,7 +43,25 @@ export interface TranscribeInput {
  * Best effort: every failure path returns null so callers can treat a missing
  * transcript as "no transcript" without failing the surrounding operation.
  */
-// TODO: meter usage (HAY-251)
+/**
+ * Token usage the API returns for gpt-4o(-mini)-transcribe. Not in the SDK
+ * types yet, so it is read defensively.
+ */
+function transcriptionUsage(
+  result: unknown,
+): { input: number; output: number; total: number } | null {
+  const usage = (result as { usage?: unknown } | null)?.usage as
+    | { input_tokens?: unknown; output_tokens?: unknown; total_tokens?: unknown }
+    | undefined;
+  if (!usage || typeof usage.total_tokens !== "number") return null;
+  return {
+    input: typeof usage.input_tokens === "number" ? usage.input_tokens : 0,
+    output: typeof usage.output_tokens === "number" ? usage.output_tokens : 0,
+    total: usage.total_tokens,
+  };
+}
+
+// Usage goes through the LLM usage seam (D8-5). TODO: HAY-251 meters it per org.
 export class TranscriptionService {
   /** One client per endpoint (default or EU), keyed by base URL. */
   private readonly clients = new Map<string, OpenAI>();
@@ -51,7 +71,9 @@ export class TranscriptionService {
    * nothing: when EU is not configured, the factory throws and we skip the
    * transcript rather than send the audio to the default endpoint.
    */
-  private async getClient(organizationId: string): Promise<OpenAI | null> {
+  private async getClient(
+    organizationId: string,
+  ): Promise<{ client: OpenAI; region: AiRegion } | null> {
     let endpoint;
     try {
       endpoint = await llmProviderFactory.managedOpenAIEndpoint(organizationId);
@@ -72,7 +94,7 @@ export class TranscriptionService {
       client = new OpenAI({ apiKey: endpoint.apiKey, baseURL: endpoint.baseURL });
       this.clients.set(key, client);
     }
-    return client;
+    return { client, region: endpoint.region };
   }
 
   async transcribe({
@@ -81,10 +103,11 @@ export class TranscriptionService {
     filename,
     organizationId,
   }: TranscribeInput): Promise<string | null> {
-    const client = await this.getClient(organizationId);
-    if (!client) {
+    const resolved = await this.getClient(organizationId);
+    if (!resolved) {
       return null;
     }
+    const { client, region } = resolved;
 
     const model = config.openai.models.transcription.model;
     try {
@@ -95,6 +118,21 @@ export class TranscriptionService {
         { file, model },
         { timeout: TRANSCRIPTION_TIMEOUT_MS },
       );
+      const usage = transcriptionUsage(result);
+      emitUsage({
+        kind: "transcription",
+        usage: {
+          promptTokens: usage?.input ?? 0,
+          cachedPromptTokens: 0,
+          completionTokens: usage?.output ?? 0,
+          totalTokens: usage?.total ?? 0,
+          estimated: !usage,
+        },
+        model,
+        provider: "openai",
+        organizationId,
+        region,
+      });
       const text = result.text?.trim();
       return text ? text : null;
     } catch (error) {

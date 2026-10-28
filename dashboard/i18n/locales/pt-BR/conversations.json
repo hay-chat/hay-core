@@ -20,7 +20,10 @@
       "uploading": "Enviando {name}…",
       "uploadFailed": "Não foi possível enviar {name}. Tente de novo ou escolha outro arquivo.",
       "tooLarge": "{name} tem mais de {size} MB.",
-      "tooMany": "Você pode enviar até {count} arquivos por vez."
+      "tooMany": "Você pode enviar até {count} arquivos por vez.",
+      "analysisPending": "A IA está lendo este arquivo…",
+      "analysisRead": "A IA leu: {description}",
+      "analysisFailed": "A IA não conseguiu ler este arquivo"
     },
     "page": {
       "title": "Conversas",

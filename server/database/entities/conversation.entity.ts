@@ -983,6 +983,14 @@ The following tools are available for you to use. You MUST return only valid JSO
       }
     }
 
+    // A customer's photos and PDFs get the vision pass (D8-11). Marked pending
+    // before the row is saved, so the first broadcast already says "reading".
+    let attachments = messageData.attachments;
+    if (messageData.type === MessageType.CUSTOMER && hasAttachments) {
+      const { markAnalysisPending } = await import("../../services/media-analysis/pipeline");
+      attachments = markAnalysisPending(attachments);
+    }
+
     // CRITICAL: Save the message to database FIRST before broadcasting
     // This ensures the message is committed to the database before any WebSocket clients
     // receive the broadcast and potentially try to query for it
@@ -992,7 +1000,7 @@ The following tools are available for you to use. You MUST return only valid JSO
       type: messageData.type as MessageType,
       metadata,
       sender: messageData.sender,
-      attachments: messageData.attachments,
+      attachments,
       providerMessageId: messageData.providerMessageId ?? null,
       status: messageStatus,
       reviewRequired,
@@ -1013,6 +1021,12 @@ The following tools are available for you to use. You MUST return only valid JSO
       } catch (error) {
         logger.error({ err: error, conversationId: this.id }, "Failed to link message uploads");
       }
+    }
+
+    // Read the files in the background; the AI turn waits briefly for them.
+    if (attachments?.some((attachment) => attachment.analysis?.status === "pending")) {
+      const { scheduleMessageMedia } = await import("../../services/media-analysis/pipeline");
+      scheduleMessageMedia(message.id, this.organization_id);
     }
 
     // Customer message: status, cooldown and processing flag. This runs only

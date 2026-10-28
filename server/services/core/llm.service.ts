@@ -5,6 +5,7 @@ import path from "path";
 import { createLogger } from "@server/lib/logger";
 import { llmProviderFactory } from "@server/services/llm/llm-provider.factory";
 import { emitUsage } from "@server/services/llm/usage-sink";
+import { describeAttachmentsForAgent } from "@server/services/media-analysis/agent-view";
 import {
   buildRepairMessages,
   StructuredOutputError,
@@ -379,6 +380,12 @@ export class LLMService {
           toolInput !== undefined ? `\nArguments sent:\n${JSON.stringify(toolInput, null, 2)}` : "";
 
         content = `Tool: ${message.metadata.toolName || "unknown"}\nStatus: ${message.metadata.toolStatus || "unknown"}${inputLine}\nResult:\n${JSON.stringify(formattedOutput, null, 2)}`;
+      }
+
+      // What the vision pass read from the customer's photos and PDFs (D8-11).
+      if (message.type === MessageType.CUSTOMER && message.attachments?.length) {
+        const files = describeAttachmentsForAgent(message.attachments);
+        if (files) content = content ? `${content}\n${files}` : files;
       }
 
       return {
