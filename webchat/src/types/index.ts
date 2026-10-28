@@ -61,6 +61,10 @@ export interface PublicConfig {
   agentName?: string | null;
   agentAvatarUrl?: string | null;
   organizationLogoUrl?: string | null;
+  /** Whether AI replies carry the AI label (D14-6). Missing = shown. */
+  aiLabelShown?: boolean;
+  /** The org's label text; null = the localized default. */
+  aiLabelText?: string | null;
 }
 
 /** The loader's button, driven by the chat once it is mounted. */

@@ -80,4 +80,17 @@ describe("Widget", () => {
     });
     expect(wrapper.findComponent({ name: "ChatWindow" }).props("agentName")).toBe("Ana");
   });
+
+  it("labels AI replies by default, with the org's text, or not at all when hidden", () => {
+    chat.isOpen.value = true;
+    const aiLabel = (publicConfig: Record<string, unknown> | null) =>
+      shallowMount(Widget, { props: { config, publicConfig, launcher: launcher() } })
+        .findComponent({ name: "ChatWindow" })
+        .props("aiLabel");
+
+    expect(aiLabel(null)).toBe("AI assistant");
+    expect(aiLabel({ aiLabelShown: true, aiLabelText: null })).toBe("AI assistant");
+    expect(aiLabel({ aiLabelShown: true, aiLabelText: "Aurora bot" })).toBe("Aurora bot");
+    expect(aiLabel({ aiLabelShown: false, aiLabelText: "Aurora bot" })).toBeNull();
+  });
 });

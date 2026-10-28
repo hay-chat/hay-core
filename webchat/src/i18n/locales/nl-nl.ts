@@ -10,6 +10,7 @@ export default {
   "chat.startNew": "Nieuw Gesprek Starten",
   "chat.poweredBy": "Mogelijk gemaakt door",
   "chat.conversationClosed": "Gesprek Gesloten",
+  "chat.aiLabel": "AI-assistent",
   "input.placeholder": "Typ een bericht...",
   "input.send": "Bericht verzenden",
   "error.sendFailed": "Uw bericht kon niet worden verzonden. Probeer het zo meteen opnieuw.",

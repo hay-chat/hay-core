@@ -10,6 +10,7 @@ export default {
   "chat.startNew": "Yeni Görüşme Başlat",
   "chat.poweredBy": "Altyapı",
   "chat.conversationClosed": "Görüşme Kapandı",
+  "chat.aiLabel": "Yapay zekâ asistanı",
   "input.placeholder": "Bir mesaj yazın...",
   "input.send": "Mesaj gönder",
   "error.sendFailed": "Mesajınız gönderilemedi. Lütfen birazdan tekrar deneyin.",

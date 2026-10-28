@@ -10,6 +10,7 @@ export default {
   "chat.startNew": "Neue Unterhaltung starten",
   "chat.poweredBy": "Bereitgestellt von",
   "chat.conversationClosed": "Unterhaltung beendet",
+  "chat.aiLabel": "KI-Assistent",
   "input.placeholder": "Nachricht eingeben...",
   "input.send": "Nachricht senden",
   "error.sendFailed":

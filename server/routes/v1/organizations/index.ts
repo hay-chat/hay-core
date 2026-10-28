@@ -24,6 +24,11 @@ import {
   regionFromSettings,
 } from "@server/services/llm/ai-region";
 import {
+  AI_LABEL_MAX_LENGTH,
+  customAiLabel,
+  isEuOrganization,
+} from "@server/services/ai-disclosure";
+import {
   CHAT_MODEL_CATALOG,
   EMBEDDING_MODEL_CATALOG,
   DEFAULT_TIER_MAP,
@@ -93,6 +98,13 @@ const actionApprovalSchema = z
     approverRoles: z.array(z.enum(["admin", "contributor", "member"])).max(3),
   })
   .partial();
+
+// A channel id ("web" or a channel plugin's manifest `channel`), never a plugin id.
+const channelIdSchema = z
+  .string()
+  .min(1)
+  .max(64)
+  .regex(/^[a-z0-9][a-z0-9_-]*$/i);
 
 const updateSettingsSchema = z.object({
   name: z.string().min(1).max(100).optional(),
@@ -369,6 +381,58 @@ export const organizationsRouter = t.router({
       );
 
       return { success: true, region: input.region };
+    }),
+
+  // AI label on AI replies (D14-6): widget badge + first-reply line on other channels.
+  getAiDisclosure: scopedProcedure(RESOURCES.ORGANIZATION_SETTINGS, ACTIONS.READ).query(
+    async ({ ctx }) => {
+      const organization = await organizationService.findOne(ctx.organizationId!);
+      if (!organization) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Organization not found" });
+      }
+      const locked = isEuOrganization(organization);
+      return {
+        label: customAiLabel(organization.settings),
+        // EU orgs always show the label, whatever was saved before.
+        hiddenChannels: locked ? [] : (organization.settings?.aiDisclosure?.hiddenChannels ?? []),
+        locked,
+      };
+    },
+  ),
+
+  // Rename the label or hide it on some channels. EU orgs may rename it but not
+  // hide it (EU AI Act art. 50; Roger's D14 answer 5).
+  updateAiDisclosure: scopedProcedure(RESOURCES.ORGANIZATION_SETTINGS, ACTIONS.UPDATE)
+    .input(
+      z.object({
+        label: z.string().trim().max(AI_LABEL_MAX_LENGTH).nullable().optional(),
+        hiddenChannels: z.array(channelIdSchema).max(50).optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const organization = await organizationService.findOne(ctx.organizationId!);
+      if (!organization) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Organization not found" });
+      }
+      if (input.hiddenChannels?.length && isEuOrganization(organization)) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "The AI label cannot be hidden for organizations serving the EU",
+        });
+      }
+
+      const current = organization.settings?.aiDisclosure ?? {};
+      const aiDisclosure = {
+        ...current,
+        ...(input.label !== undefined ? { label: input.label || null } : {}),
+        ...(input.hiddenChannels !== undefined
+          ? { hiddenChannels: [...new Set(input.hiddenChannels)] }
+          : {}),
+      };
+      await organizationService.update(ctx.organizationId!, {
+        settings: { ...(organization.settings || {}), aiDisclosure },
+      });
+      return { success: true };
     }),
 
   updateSettings: scopedProcedure(RESOURCES.ORGANIZATION_SETTINGS, ACTIONS.UPDATE)

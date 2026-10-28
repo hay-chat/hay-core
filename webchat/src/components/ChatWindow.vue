@@ -128,6 +128,7 @@
       :messages="messages"
       :is-typing="isTyping"
       :greeting-message="showGreeting && messages.length === 0 ? greetingMessage : undefined"
+      :ai-label="aiLabel"
     />
 
     <!-- Closed Conversation Footer (replaces input when closed) -->
@@ -209,6 +210,7 @@ const props = defineProps<{
   currentAgentType?: string;
   currentAgentName?: string;
   sendFailure?: SendFailure | null;
+  aiLabel?: string | null;
 }>();
 
 defineEmits<{

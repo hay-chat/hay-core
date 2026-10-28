@@ -19,6 +19,7 @@
         :current-agent-type="currentAgentType"
         :current-agent-name="currentAgentName || undefined"
         :send-failure="sendFailure"
+        :ai-label="aiLabel"
         @close="closeChat"
         @send="sendMessage"
         @start-typing="startTyping"
@@ -75,6 +76,14 @@ const resolvedAvatarUrl = computed(() =>
 
 const resolvedLogoUrl = computed(() =>
   resolveUrl(props.config.organizationLogoUrl || props.publicConfig?.organizationLogoUrl),
+);
+
+// AI label on AI replies (D14-6): on unless the org hid it; the org's text or
+// the localized default. Shown when the config could not be fetched.
+const aiLabel = computed(() =>
+  props.publicConfig?.aiLabelShown === false
+    ? null
+    : props.publicConfig?.aiLabelText || t("chat.aiLabel"),
 );
 
 const resolvedAgentName = computed(

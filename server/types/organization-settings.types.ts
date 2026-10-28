@@ -350,6 +350,18 @@ export function resolveActionApprovalConfig(
 }
 
 /**
+ * AI disclosure label (D14-6/D14-7): the badge on AI replies in the widget and the
+ * first-reply line on other channels. On everywhere by default. EU organizations
+ * can rename it but not hide it (see services/ai-disclosure.ts).
+ */
+export interface AiDisclosureConfig {
+  /** Custom label text. Empty or missing = the localized default ("AI assistant"). */
+  label?: string | null;
+  /** Channel ids ("web" = widget) where the label is hidden. Ignored for EU orgs. */
+  hiddenChannels?: string[];
+}
+
+/**
  * Organization Settings JSONB structure
  * This type defines the complete structure of the settings field in the Organization entity
  */
@@ -364,5 +376,6 @@ export interface OrganizationSettings {
   llm?: OrgLlmConfig; // Per-org LLM chat provider + tier→model map (embeddings stay managed)
   aiRegion?: AiRegion; // Where AI calls are processed; "eu" routes everything to the EU endpoint
   actionApproval?: Partial<ActionApprovalConfig>; // Which AI write actions wait for a person
+  aiDisclosure?: AiDisclosureConfig; // AI label on replies, per channel
   [key: string]: unknown;
 }
