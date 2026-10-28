@@ -58,9 +58,9 @@ export class ConversationOutcome {
   @Column({ type: "boolean" })
   handed_off!: boolean;
 
-  /** rule (deterministic, also the LLM-failure default), llm, or backfill. */
+  /** rule (deterministic, also the LLM-failure default), llm, backfill, or staff (marked spam). */
   @Column({ type: "varchar", length: 16 })
-  classified_by!: "rule" | "llm" | "backfill";
+  classified_by!: "rule" | "llm" | "backfill" | "staff";
 
   /** Short PII-free explanation from the classifier. */
   @Column({ type: "text", nullable: true })

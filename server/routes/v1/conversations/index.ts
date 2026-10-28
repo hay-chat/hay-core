@@ -211,7 +211,7 @@ export const conversationsRouter = t.router({
     .input(z.object({ conversationId: z.string().uuid() }))
     .mutation(async ({ ctx, input }) => {
       const { markSpam } = await import("@server/services/spam/spam-review.service");
-      await markSpam(ctx.organizationId!, input.conversationId);
+      await markSpam(ctx.organizationId!, input.conversationId, ctx.user!.id);
       return { success: true };
     }),
 

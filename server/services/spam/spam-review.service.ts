@@ -4,11 +4,14 @@
  *  - "Not spam" clears the flag, stops future screening and gives the
  *    conversation back to the AI when the shopper is still waiting.
  *  - "Mark as spam" flags it (never billed, D9-5) and holds it from the AI.
+ *    Closes it already had stop billing (within the correctable periods);
+ *    "Not spam" sends them back to the close classifier.
  */
 
 import { TRPCError } from "@trpc/server";
 import { AppDataSource } from "@server/database/data-source";
 import { conversationRepository } from "@server/repositories/conversation.repository";
+import { resolutionLedgerService } from "@server/services/resolution-ledger.service";
 import type { SpamCheckRecord } from "@server/services/spam/spam-hold.service";
 
 /** Reasons the Spam view can explain. Anything else shows as "other". */
@@ -105,7 +108,11 @@ async function findInOrg(organizationId: string, conversationId: string) {
   return conversation;
 }
 
-export async function markSpam(organizationId: string, conversationId: string): Promise<void> {
+export async function markSpam(
+  organizationId: string,
+  conversationId: string,
+  userId: string,
+): Promise<void> {
   const conversation = await findInOrg(organizationId, conversationId);
   if (conversation.spam_flagged_at) return;
   const spamCheck = { ...((conversation.metadata?.spamCheck as object) ?? {}) } as Partial<SpamCheckRecord>;
@@ -117,6 +124,8 @@ export async function markSpam(organizationId: string, conversationId: string): 
     needs_processing: false,
     metadata: { ...(conversation.metadata ?? {}), spamCheck },
   });
+  // A conversation already closed and classified must stop billing too.
+  await resolutionLedgerService.markConversationSpam({ organizationId, conversationId, userId });
 }
 
 /** Returns whether the AI was asked to answer the waiting shopper. */
@@ -143,6 +152,9 @@ export async function markNotSpam(
     metadata: { ...(conversation.metadata ?? {}), spamCheck },
     ...(reengage ? { needs_processing: true } : {}),
   });
+
+  // Closes that were spam only because of the flag get classified again.
+  await resolutionLedgerService.clearConversationSpam({ organizationId, conversationId, userId });
 
   if (reengage) {
     const { orchestratorQueueService } = await import("@server/services/orchestrator-queue.service");

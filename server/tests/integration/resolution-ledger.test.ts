@@ -5,6 +5,7 @@ import { Organization } from "../../entities/organization.entity";
 import { User } from "../../entities/user.entity";
 import { AuditLog } from "../../entities/audit-log.entity";
 import { ConversationOutcome } from "../../database/entities/conversation-outcome.entity";
+import { Conversation } from "../../database/entities/conversation.entity";
 import type { ConversationOutcomeKind } from "../../services/close-classification/outcome-rules";
 import { AnalyticsService } from "../../services/analytics.service";
 import {
@@ -86,10 +87,69 @@ describe("resolution ledger and exclusions (D1-5, D1-6)", () => {
 
   afterAll(async () => {
     await AppDataSource.getRepository(ConversationOutcome).delete({ organization_id: orgId });
+    await AppDataSource.getRepository(Conversation).delete({ organization_id: orgId });
     await AppDataSource.getRepository(AuditLog).delete({ organizationId: orgId });
     await AppDataSource.getRepository(Organization).delete({ id: orgId });
     await AppDataSource.getRepository(User).delete({ id: userId });
     if (AppDataSource.isInitialized) await AppDataSource.destroy();
+  });
+
+  it("marking a classified conversation as spam stops billing it; Not spam re-classifies", async () => {
+    const conversation = await AppDataSource.getRepository(Conversation).save(
+      AppDataSource.getRepository(Conversation).create({
+        title: "closed",
+        organization_id: orgId,
+        status: "resolved",
+        metadata: {},
+      }),
+    );
+    const [billed] = await seed(1, { conversation_id: conversation.id });
+    // A close from two periods back has been billed and is left alone.
+    const old = new Date(Date.UTC(period.start.getUTCFullYear(), period.start.getUTCMonth() - 2, 5));
+    const [closedPeriod] = await seed(1, { conversation_id: conversation.id, closed_at: old });
+    expect(await billableCount()).toBe(1);
+
+    const marked = await service.markConversationSpam({
+      organizationId: orgId,
+      conversationId: conversation.id,
+      userId,
+    });
+    expect(marked).toBe(1);
+    expect(await billableCount()).toBe(0);
+    const repo = AppDataSource.getRepository(ConversationOutcome);
+    expect(await repo.findOneByOrFail({ id: billed.id })).toMatchObject({
+      outcome: "spam",
+      billable: false,
+      classified_by: "staff",
+    });
+    expect(await repo.findOneByOrFail({ id: closedPeriod.id })).toMatchObject({
+      outcome: "assumed",
+      billable: true,
+    });
+    const audit = await AppDataSource.getRepository(AuditLog).findOneByOrFail({
+      organizationId: orgId,
+      action: "conversation.spam.marked",
+    });
+    expect(audit.changes).toMatchObject({
+      outcomes: [{ outcomeId: billed.id, outcome: { from: "assumed", to: "spam" } }],
+    });
+
+    await service.clearConversationSpam({
+      organizationId: orgId,
+      conversationId: conversation.id,
+      userId,
+    });
+    expect(await repo.findOneByOrFail({ id: billed.id })).toMatchObject({
+      classified_at: null,
+      classified_by: "rule",
+      attempts: 0,
+    });
+    expect(
+      await AppDataSource.getRepository(AuditLog).countBy({
+        organizationId: orgId,
+        action: "conversation.spam.cleared",
+      }),
+    ).toBe(1);
   });
 
   it("allowance is 5 % of the period, at least one", () => {
