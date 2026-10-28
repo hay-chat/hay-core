@@ -2233,6 +2233,16 @@ please contact ${supportContact}.
         );
       }
 
+      // The hand-off email the shopper left lives on the conversation (D5-8).
+      if (conversationIds.length > 0) {
+        await manager.query(
+          `UPDATE conversations
+           SET metadata = metadata - 'contactEmail' - 'contactEmailConsentAt'
+           WHERE id = ANY($1) AND metadata IS NOT NULL`,
+          [conversationIds],
+        );
+      }
+
       // Update conversations to remove customer reference and anonymize
       await conversationRepository.update(
         { customer_id: customerId, organization_id: organizationId },
