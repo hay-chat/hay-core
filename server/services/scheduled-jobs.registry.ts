@@ -307,6 +307,24 @@ const jobRegistry: CronJobConfig[] = [
     enabled: true,
   },
 
+  {
+    name: "conversation-media-sweep",
+    description:
+      "Delete conversation media past its retention (retentionDays, or 180 days when unset) and orphaned uploads",
+    schedule: "30 3 * * *", // Daily at 3:30 AM, after conversation retention
+    handler: async () => {
+      const { sweepConversationMedia } = await import("./conversation-media.service");
+      await sweepConversationMedia();
+    },
+    // NOTE: media in conversations on legal hold is kept; orphans are uploads
+    // no message used for 24 h (see conversation-media.service)
+    timeout: 1800000,
+    retryOnFailure: true,
+    maxRetries: 3,
+    singleton: true,
+    enabled: true,
+  },
+
   // ============================================================
   // GIT PLUGIN SYNC
   // ============================================================

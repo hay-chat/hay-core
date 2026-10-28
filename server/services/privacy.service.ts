@@ -27,9 +27,10 @@ import * as fs from "fs/promises";
 import * as path from "path";
 import * as archiver from "archiver";
 import { getDashboardUrl } from "@server/config/env";
-import { IsNull, In, EntityManager } from "typeorm";
-import type { AttachmentDeletionResult, ExportPackageData } from "@server/types/privacy.types";
+import { IsNull, In } from "typeorm";
+import type { ExportPackageData } from "@server/types/privacy.types";
 import { storageService } from "@server/services/storage.service";
+import { deleteConversationMedia } from "@server/services/conversation-media.service";
 import { isUuid } from "@server/services/media-url.service";
 
 /**
@@ -2131,81 +2132,6 @@ please contact ${supportContact}.
   }
 
   /**
-   * Delete message attachment files from storage
-   * Used during customer data erasure to remove actual files
-   *
-   * @param messageIds - Array of message IDs to process
-   * @param manager - Transaction manager for database queries
-   * @returns Statistics about deletion success/failure
-   */
-  private async deleteMessageAttachments(
-    messageIds: string[],
-    manager: EntityManager,
-  ): Promise<AttachmentDeletionResult> {
-    if (!messageIds.length) {
-      return { deleted: 0, failed: 0, errors: [] };
-    }
-
-    const messageRepository = manager.getRepository(Message);
-    const messages = await messageRepository.find({
-      where: { id: In(messageIds) },
-      select: ["id", "attachments"],
-    });
-
-    let deleted = 0;
-    let failed = 0;
-    const errors: Array<{ messageId: string; attachmentId: string; error: string }> = [];
-
-    for (const message of messages) {
-      if (!message.attachments || message.attachments.length === 0) continue;
-
-      for (const attachment of message.attachments) {
-        try {
-          // Only delete local files (not external URLs)
-          if (
-            attachment.url &&
-            (attachment.url.startsWith("/") || attachment.url.startsWith("./"))
-          ) {
-            // Extract path from URL (e.g., "/uploads/org/folder/file.jpg" -> "org/folder/file.jpg")
-            const pathMatch = attachment.url.match(/\/uploads\/(.+)/);
-
-            if (pathMatch) {
-              const filePath = pathMatch[1];
-              const fullPath = path.join(process.cwd(), "server", "uploads", filePath);
-
-              // Attempt to delete from storage
-              await fs.unlink(fullPath);
-              deleted++;
-
-              logger.debug(
-                { messageId: message.id, attachmentId: attachment.id, filePath },
-                "Deleted attachment file",
-              );
-            }
-          }
-        } catch (error) {
-          failed++;
-          const errorMessage = error instanceof Error ? error.message : "Unknown error";
-
-          errors.push({
-            messageId: message.id,
-            attachmentId: attachment.id || "unknown",
-            error: errorMessage,
-          });
-
-          // Log but don't fail transaction - file might already be deleted
-          logger.debug(
-            { messageId: message.id, attachmentId: attachment.id, error: errorMessage },
-            "Failed to delete attachment file (continuing)",
-          );
-        }
-      }
-    }
-
-    return { deleted, failed, errors };
-  }
-
-  /**
    * Execute customer data deletion
    * Soft delete customer, anonymize conversations and messages, delete embeddings
    * GDPR Article 17 - Right to Erasure
@@ -2242,31 +2168,18 @@ please contact ${supportContact}.
         allMessageIds.push(...messages.map((m) => m.id));
       }
 
-      // Delete message attachment files from storage
+      // Delete the customer's media files from storage (S3 or disk) with their
+      // upload rows (D8-3). Files can't be restored, so this runs outside the
+      // transaction and failures are logged, never block the erasure.
+      const mediaResult = await deleteConversationMedia({
+        organizationId,
+        conversationIds,
+        customerId,
+      });
       logger.debug(
-        { customerId, messageCount: allMessageIds.length },
-        "Deleting message attachment files",
+        { customerId, deleted: mediaResult.deleted, failed: mediaResult.failed },
+        "Customer media deletion completed",
       );
-
-      const attachmentDeletionResult = await this.deleteMessageAttachments(allMessageIds, manager);
-
-      logger.debug(
-        {
-          customerId,
-          deleted: attachmentDeletionResult.deleted,
-          failed: attachmentDeletionResult.failed,
-          errors: attachmentDeletionResult.errors.length,
-        },
-        "Attachment deletion completed",
-      );
-
-      // Log errors if any
-      if (attachmentDeletionResult.errors.length > 0) {
-        logger.debug(
-          { customerId, errors: attachmentDeletionResult.errors },
-          "Attachment deletion errors",
-        );
-      }
 
       // Delete embeddings associated with conversations and messages
       // This ensures no orphaned vectors remain (GDPR compliance)
