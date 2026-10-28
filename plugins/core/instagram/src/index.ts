@@ -7,7 +7,8 @@ import { deliverHandler } from "./deliver.js";
  * Instagram Channel Plugin (shared Hay Meta app)
  *
  * Connects an Instagram Professional account to Hay's orchestrator so a Hay org
- * can exchange text DMs (inbound + outbound). MVP is text-only.
+ * can exchange DMs (inbound + outbound), including photos, videos, voice
+ * messages and files (D8-6).
  *
  * Shared-app model: a single Hay-owned Meta app serves every org. App-level
  * values come from the CORE process environment (one app for all tenants):

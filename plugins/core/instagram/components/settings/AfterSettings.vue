@@ -29,16 +29,16 @@
         </p>
       </div>
 
-      <!-- Step 2: Text-only MVP -->
+      <!-- Step 2: Media -->
       <div class="tutorial-step">
         <div class="step-header">
           <span class="step-number">2</span>
-          <h4>Text-only messages (MVP)</h4>
+          <h4>Photos, videos and voice messages</h4>
         </div>
         <p>
-          In this first release, Hay.chat handles <strong>text</strong> direct messages only. Inbound
-          media (images, stories, reactions) is ignored, and Hay.chat's replies are sent as plain text.
-          Rich content support is coming in a later update.
+          Hay.chat keeps the photos, videos, voice messages and files shoppers send, and transcribes
+          voice messages so the AI can answer them. Story mentions, reels and shared posts show as a
+          short note. Reactions are not shown.
         </p>
       </div>
 
