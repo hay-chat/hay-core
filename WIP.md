@@ -1,3 +1,10 @@
+## 2026-10-28 — claude/w2-commerce (L5 Wave 2) — all 10 tickets done, committed, not pushed
+- SDK: exchange write category (core MONEY_CATEGORIES, tiny core change), return-instructions, identity, marketplace-orders modules.
+- Shopify: re-consent scopes + runtime SCOPE_MISSING ("re-approve Hay.chat"); D6-10 swap_order_item; D6-11 create_exchange; D10-3 send_payment_link.
+- Woo: D6-12 resend confirmation (+Magento), D10-3 resend_pix, D16-8 tracking (VillaTheme/YITH/notes). D6-13 return instructions + D10-6 marketplace routing on Woo/Shopify/Nuvemshop.
+- D16-2 f7ac632: Woo wc-auth one-click connect (worker routes + AfterSettings UI bundle; keys now optional in schema). Needs HTTPS HAY_API_URL.
+- Next: merge into staging, real-store checks (see final report Needs Roger), tunnel test of D16-2.
+
 ## 2026-10-28 00:55 — staging — L5 commerce merged + tested
 - b0b59ab merged claude/w1-commerce; SDK + 10 plugins rebuilt, tsc ok.
 - Manual ✓ (Woo :8085): 10% coupon created and restricted; second coupon refused (ALREADY_HAS_COUPON); 25% held then approved → created; EUR totals in EUR; bank-transfer refund approved with refund_payment=false.
