@@ -38,6 +38,7 @@ import { PushSubscription } from "./entities/push-subscription.entity";
 import { NotificationDelivery } from "./entities/notification-delivery.entity";
 import { ActionLog } from "./entities/action-log.entity";
 import { PendingAction } from "./entities/pending-action.entity";
+import { BusinessHoursSchedule } from "./entities/business-hours-schedule.entity";
 import { SnakeNamingStrategy } from "./naming-strategy";
 import { config } from "../config/env";
 import { createLogger } from "@server/lib/logger";
@@ -101,6 +102,7 @@ export const AppDataSource = new DataSource({
     InsightIssue,
     ActionLog,
     PendingAction,
+    BusinessHoursSchedule,
   ],
   migrations: __filename.includes("dist")
     ? [__dirname + "/migrations/*.js"] // Production: compiled JS files in same relative location

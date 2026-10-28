@@ -22,7 +22,8 @@
     "llmProviders": "AI Models",
     "customerPrivacy": "Customer Privacy",
     "myProfile": "My Profile",
-    "openMenu": "Open menu"
+    "openMenu": "Open menu",
+    "businessHours": "Business Hours"
   },
   "user": {
     "status": "Status",
