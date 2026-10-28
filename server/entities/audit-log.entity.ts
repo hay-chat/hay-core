@@ -59,6 +59,7 @@ export type AuditAction =
   | "product.update"
   | "product.delete"
   | "product.sync"
+  | "product.prune"
   | "permission.denied"
   | "retention.cleanup"
   | "billing.resolution.exclude"

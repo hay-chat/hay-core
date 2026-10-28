@@ -46,6 +46,7 @@ import { PendingAction } from "./entities/pending-action.entity";
 import { BusinessHoursSchedule } from "./entities/business-hours-schedule.entity";
 import { OrderConversationLink } from "./entities/order-conversation-link.entity";
 import { Dispute } from "./entities/dispute.entity";
+import { PluginState } from "./entities/plugin-state.entity";
 import { EmailSendingDomain } from "./entities/email-sending-domain.entity";
 import { CustomerMergeDismissal } from "./entities/customer-merge-dismissal.entity";
 import { OrderLinkMessageSubscriber } from "./subscribers/order-link-message.subscriber";
@@ -115,6 +116,7 @@ export const AppDataSource = new DataSource({
     BusinessHoursSchedule,
     OrderConversationLink,
     Dispute,
+    PluginState,
     EmailSendingDomain,
     CustomerMergeDismissal,
     SimulationRun,

@@ -12,6 +12,7 @@
  *   GET  /ecom/v1/orders/{id}/fulfillments           (fulfillments[] with trackingInfo)
  */
 
+const { staleTracking, stalestShipment } = require("@hay/plugin-sdk/stale-tracking");
 const { wixApi } = require("./client");
 const { cursorInfo, amountOf, round2 } = require("./format");
 
@@ -171,6 +172,46 @@ function contactOf(details) {
   };
 }
 
+let storeCountryPromise = null;
+
+/**
+ * The site's business country (Site Properties), cached per MCP process; null
+ * when the key cannot read it (the shorter domestic threshold then applies).
+ */
+function getStoreCountry() {
+  if (!storeCountryPromise) {
+    storeCountryPromise = wixApi("GET", "/site-properties/v4/properties")
+      .then((res) => res?.properties?.address?.country || null)
+      .catch(() => {
+        storeCountryPromise = null; // retry on the next order read
+        return null;
+      });
+  }
+  return storeCountryPromise;
+}
+
+/**
+ * D6-9 stale flag: days since each fulfilment was created. Wix fulfilments
+ * carry no carrier events or delivery confirmation, so a fulfilment older
+ * than the threshold is flagged while the order is not cancelled.
+ */
+function trackingStaleness(order, tracking, originCountry, now) {
+  const destinationCountry =
+    order.shippingInfo?.logistics?.shippingDestination?.address?.country ?? null;
+  const results =
+    order.status === "CANCELED"
+      ? []
+      : tracking
+          .filter((t) => t.createdDate)
+          .map((t) =>
+            staleTracking({ shippedAt: t.createdDate, originCountry, destinationCountry, now }),
+          );
+  return (
+    stalestShipment(results) ||
+    staleTracking({ shippedAt: null, originCountry, destinationCountry, now })
+  );
+}
+
 /**
  * Merge order + transactions + fulfilments and derive the support summary.
  * Projects the fields a support conversation needs (the raw Wix order carries
@@ -178,7 +219,12 @@ function contactOf(details) {
  * `transactions` / `fulfillments` may be null when a secondary read failed —
  * the summary then degrades (flags still computed from the order itself).
  */
-function enrichOrder(order, transactions, fulfillments) {
+function enrichOrder(
+  order,
+  transactions,
+  fulfillments,
+  { originCountry = null, now = Date.now() } = {},
+) {
   const payments = transactions ? paymentBalances(transactions) : [];
   const paidFromTx = round2(payments.reduce((s, p) => s + p.paid, 0));
   const refundedFromTx = round2(payments.reduce((s, p) => s + p.refunded, 0));
@@ -242,13 +288,14 @@ function enrichOrder(order, transactions, fulfillments) {
       addressChangeable: notCanceled && unfulfilled,
       deliveredAt: null, // Wix does not expose delivery confirmation on fulfilments.
       shippedAt: tracking.length ? tracking[0].createdDate : null,
+      tracking: trackingStaleness(order, tracking, originCountry, now),
     },
   };
 }
 
 /** Read the three endpoints a support flow needs; secondary reads degrade to null. */
 async function loadEnrichedOrder(order) {
-  const [transactions, fulfillments] = await Promise.all([
+  const [transactions, fulfillments, originCountry] = await Promise.all([
     getTransactions(order.id).catch((err) => {
       console.error(`[wix] transactions read failed for ${order.id}: ${err.message}`);
       return null;
@@ -257,8 +304,9 @@ async function loadEnrichedOrder(order) {
       console.error(`[wix] fulfillments read failed for ${order.id}: ${err.message}`);
       return null;
     }),
+    getStoreCountry(),
   ]);
-  return enrichOrder(order, transactions, fulfillments);
+  return enrichOrder(order, transactions, fulfillments, { originCountry });
 }
 
 module.exports = {

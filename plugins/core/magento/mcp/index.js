@@ -11,6 +11,7 @@
  * Env (injected by the plugin worker):
  *   MAGENTO_BASE_URL   e.g. https://store.example.com/rest/V1
  *   MAGENTO_API_TOKEN  integration access token
+ *   STALE_TRACKING_DOMESTIC_DAYS, STALE_TRACKING_INTERNATIONAL_DAYS (optional, D6-9)
  */
 
 const { McpServer } = require("@modelcontextprotocol/sdk/server/mcp.js");

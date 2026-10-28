@@ -63,6 +63,14 @@
     "apiToken": {
       "label": "Token da API",
       "description": "Token de acesso da integração Magento (Sistema → Integrações) com acesso a Vendas, Catálogo e Clientes"
+    },
+    "staleTrackingDomesticDays": {
+      "label": "Rastreio parado: nacional (dias)",
+      "description": "Considera uma entrega nacional parada quando o rastreio não se move há mais do que este número de dias."
+    },
+    "staleTrackingInternationalDays": {
+      "label": "Rastreio parado: internacional (dias)",
+      "description": "Considera uma entrega internacional parada quando o rastreio não se move há mais do que este número de dias."
     }
   }
 }

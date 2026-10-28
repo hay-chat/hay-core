@@ -13,14 +13,24 @@ import { randomBytes } from "node:crypto";
  *    and holds them until the settings UI collects them (`/ui/wc-auth/status`)
  *    and saves them into the plugin config.
  *
+ * Sessions live in core's plugin state store (encrypted, 15-minute TTL), not in
+ * worker memory, so a connect survives a worker or server restart while the
+ * store owner is in their WordPress admin.
+ *
  * Plugins cannot write their own config, so the authenticated settings UI does
  * the save; keys never leave this worker except to that org's admin session.
  */
 
 /** A pending connect expires after this long. */
 export const SESSION_TTL_MS = 15 * 60 * 1000;
-/** Most simultaneous pending connects kept per worker (one org). */
-const MAX_SESSIONS = 20;
+const NONCE_RE = /^[a-f0-9]{48}$/;
+
+/** The persisted key/value store sessions live in (`HayGlobalContext.state`). */
+export interface WcAuthStore {
+  get<T = unknown>(key: string): Promise<T | null>;
+  set(key: string, value: unknown, options?: { ttlMs?: number }): Promise<void>;
+  delete(key: string): Promise<void>;
+}
 
 export interface WcKeys {
   consumerKey: string;
@@ -34,7 +44,6 @@ type SessionState =
   | { state: "error"; code: string; message: string };
 
 interface Session {
-  createdAt: number;
   siteUrl: string;
   result: SessionState;
 }
@@ -139,21 +148,20 @@ export async function verifyKeys(
   }
 }
 
+const sessionKey = (nonce: string) => `wc-auth:${nonce}`;
+
 export class WcAuthSessions {
-  private sessions = new Map<string, Session>();
+  constructor(private store: WcAuthStore) {}
 
-  constructor(private now: () => number = Date.now) {}
+  private async load(nonce: unknown): Promise<Session | null> {
+    if (typeof nonce !== "string" || !NONCE_RE.test(nonce)) return null;
+    return this.store.get<Session>(sessionKey(nonce));
+  }
 
-  start(siteUrl: string): string {
-    this.prune();
-    if (this.sessions.size >= MAX_SESSIONS) {
-      const oldest = [...this.sessions.entries()].sort(
-        (a, b) => a[1].createdAt - b[1].createdAt,
-      )[0];
-      if (oldest) this.sessions.delete(oldest[0]);
-    }
+  async start(siteUrl: string): Promise<string> {
     const nonce = randomBytes(24).toString("hex");
-    this.sessions.set(nonce, { createdAt: this.now(), siteUrl, result: { state: "pending" } });
+    const session: Session = { siteUrl, result: { state: "pending" } };
+    await this.store.set(sessionKey(nonce), session, { ttlMs: SESSION_TTL_MS });
     return nonce;
   }
 
@@ -162,10 +170,9 @@ export class WcAuthSessions {
    * pending session with valid, read/write keys.
    */
   async receive(body: unknown, fetchImpl: typeof fetch = fetch): Promise<void> {
-    this.prune();
     const payload = (body ?? {}) as Record<string, unknown>;
     const nonce = String(payload.user_id ?? "");
-    const session = nonce ? this.sessions.get(nonce) : undefined;
+    const session = await this.load(nonce);
     if (!session || session.result.state !== "pending") {
       throw new WcAuthError(
         "UNKNOWN_SESSION",
@@ -197,30 +204,25 @@ export class WcAuthSessions {
         error instanceof WcAuthError ? error : new WcAuthError("VERIFY_FAILED", String(error));
       session.result = { state: "error", code: err.code, message: err.message };
       throw err;
+    } finally {
+      // Keys (or the error) wait up to another TTL for the settings UI to collect them.
+      await this.store.set(sessionKey(nonce), session, { ttlMs: SESSION_TTL_MS });
     }
   }
 
-  /** Poll a session. A connected result is handed out once, then forgotten. */
-  status(nonce: unknown): StatusResult {
-    this.prune();
-    const session = typeof nonce === "string" ? this.sessions.get(nonce) : undefined;
+  /** Poll a session. A connected or failed result is handed out once, then forgotten. */
+  async status(nonce: unknown): Promise<StatusResult> {
+    const session = await this.load(nonce);
     if (!session) return { state: "unknown" };
     const result = session.result;
     if (result.state === "connected") {
-      this.sessions.delete(nonce as string);
+      await this.store.delete(sessionKey(nonce as string));
       return { state: "connected", ...result.keys };
     }
     if (result.state === "error") {
-      this.sessions.delete(nonce as string);
+      await this.store.delete(sessionKey(nonce as string));
       return result;
     }
     return result;
-  }
-
-  private prune(): void {
-    const cutoff = this.now() - SESSION_TTL_MS;
-    for (const [nonce, session] of this.sessions) {
-      if (session.createdAt < cutoff) this.sessions.delete(nonce);
-    }
   }
 }

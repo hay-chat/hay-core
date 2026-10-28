@@ -102,6 +102,12 @@ export type { PluginPage } from "./ui";
 export type { HayRegisterAPI, UIRegistrationAPI } from "./register";
 
 // ============================================================================
+// Plugin state (persisted per org + plugin)
+// ============================================================================
+
+export type { HayPluginStateAPI, HayPluginStateSetOptions } from "./state";
+
+// ============================================================================
 // Webhook Routing (shared-app fan-out)
 // ============================================================================
 
