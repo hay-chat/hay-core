@@ -139,7 +139,9 @@
       "liveStoreConfirmTitle": "Use your live store?",
       "liveStoreConfirmDescription": "Refunds, cancellations, address changes and other actions in this test conversation will be sent to your real store. Switch back at any time.",
       "liveStoreConfirm": "Use live store",
-      "actionModeFailed": "Could not switch the action mode. Try again."
+      "actionModeFailed": "Could not switch the action mode. Try again.",
+      "testingDraft": "Testing playbook draft",
+      "testDraftFailed": "Couldn't start a test of this draft. It may have been published or discarded."
     },
     "pendingHuman": {
       "needsHuman": "This conversation was handed off to a human agent",

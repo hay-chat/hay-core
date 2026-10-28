@@ -149,7 +149,8 @@
       "discardConfirm": "Discard draft",
       "discardSuccess": "Draft discarded",
       "discardFailed": "Failed to discard draft"
-    }
+    },
+    "testDraft": "Test this draft"
   },
   "loading": {
     "loadingPlaybook": "Loading playbook...",
