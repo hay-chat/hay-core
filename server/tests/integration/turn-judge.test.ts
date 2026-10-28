@@ -202,3 +202,45 @@ describe("harness judging", () => {
     expect(mockInvoke).not.toHaveBeenCalled();
   });
 });
+
+describe("replay report", () => {
+  const { buildReplayReport } = jest.requireActual<
+    typeof import("../../services/simulation/replay-report")
+  >("../../services/simulation/replay-report");
+
+  const item = (over: Record<string, unknown>) =>
+    ({
+      id: "i",
+      status: "completed",
+      seed: [{ role: "customer", text: "Where is 1001?" }],
+      source_ref: "conversation:d7110000-0000-4000-8000-000000000001:0",
+      expectations: { referenceReply: "Tomorrow", replay: true },
+      conversation_id: "c",
+      verdict: null,
+      bucket: null,
+      ...over,
+    }) as never;
+
+  it("counts buckets out of the judged sample, with examples next to the human reply", () => {
+    const verdict = scoreTurn(facts(), { referenceReply: "Tomorrow" }, goodJudge);
+    const report = buildReplayReport({ id: "r" } as never, [
+      ...Array.from({ length: 7 }, (_, i) => item({ id: `a${i}`, verdict, bucket: "answered" })),
+      item({ id: "p", status: "pending" }),
+      item({ id: "f", status: "failed" }),
+    ]);
+    expect(report.sampleSize).toBe(7);
+    expect(report.inProgress).toBe(1);
+    expect(report.notJudged).toBe(1);
+    expect(report.agreement).toEqual({ same: 7, partial: 0, different: 0 });
+    const answered = report.buckets.find((b) => b.bucket === "answered")!;
+    expect(answered.count).toBe(7);
+    expect(answered.examples).toHaveLength(5);
+    expect(answered.examples[0]).toMatchObject({
+      customerMessage: "Where is 1001?",
+      reply: "It ships tomorrow.",
+      referenceReply: "Tomorrow",
+      sourceConversationId: "d7110000-0000-4000-8000-000000000001",
+    });
+    expect(report).not.toHaveProperty("percent");
+  });
+});

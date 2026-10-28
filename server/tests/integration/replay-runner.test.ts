@@ -175,6 +175,35 @@ describe("replay runner", () => {
     expect(item.expectations?.originalAt).toBe(new Date(base).toISOString());
   });
 
+  it("replays the most recently closed real conversations", async () => {
+    const repo = AppDataSource.getRepository(Conversation);
+    const real = await repo.save({
+      organization_id: orgId,
+      title: "Real",
+      channel: "web",
+      status: "closed",
+      context: {},
+      metadata: {},
+    });
+    await repo.save({
+      organization_id: orgId,
+      title: "Playground",
+      channel: "web",
+      status: "closed",
+      context: {},
+      metadata: { isPlayground: true },
+    });
+    await AppDataSource.getRepository(Message).insert({
+      conversation_id: real.id,
+      content: "Hello?",
+      type: MessageType.CUSTOMER,
+    });
+
+    expect(await replayService.recentConversationIds(orgId, 5)).toEqual([real.id]);
+    const run = await replayService.start({ organizationId: orgId, recentConversations: 5 });
+    expect(run.item_count).toBe(1);
+  });
+
   it("refuses test conversations and other organizations' transcripts", async () => {
     const playground = await AppDataSource.getRepository(Conversation).save({
       organization_id: orgId,

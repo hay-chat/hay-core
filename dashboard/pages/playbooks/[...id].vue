@@ -85,6 +85,16 @@
             {{ t("versioning.testDraft") }}
           </Button>
 
+          <Button
+            v-if="isEditMode && draftVersion"
+            variant="outline"
+            size="sm"
+            data-testid="replay-draft"
+            @click="replayDraft"
+          >
+            {{ t("versioning.replayDraft") }}
+          </Button>
+
           <!-- Edit mode: Save (identity) + Publish -->
           <template v-if="isEditMode">
             <Button
@@ -485,6 +495,16 @@ const testDraft = async () => {
   } finally {
     isOpeningTest.value = false;
   }
+};
+
+// D7-11: replay past conversations against the draft.
+const replayDraft = async () => {
+  if (!playbookId.value || !draftVersion.value) return;
+  await flushAutoSave();
+  router.push({
+    path: "/tests",
+    query: { playbookId: playbookId.value, versionId: draftVersion.value.id },
+  });
 };
 
 // AI suggest-edits state

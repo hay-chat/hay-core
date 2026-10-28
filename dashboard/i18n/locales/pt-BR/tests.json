@@ -1,0 +1,110 @@
+{
+  "tests": {
+    "headTitle": "Testes - Hay.chat",
+    "title": "Testes",
+    "description": "Reproduza conversas antigas com seu agente de IA antes que ele fale com clientes. As respostas nunca são enviadas, as ações que alteram dados são simuladas e os testes nunca são cobrados.",
+    "allowance": "{remaining} de {limit} respostas de teste grátis restantes este mês",
+    "draft": {
+      "title": "Testando um rascunho de playbook",
+      "description": "As respostas usam o rascunho de {name}, não a versão publicada.",
+      "clear": "Testar os playbooks publicados"
+    },
+    "replay": {
+      "title": "Reproduzir conversas antigas",
+      "description": "Cada mensagem do cliente é respondida uma vez pela IA, com o histórico real até aquele ponto. A resposta da IA é comparada com o que sua equipe realmente enviou.",
+      "source": "Conversas para reproduzir",
+      "sources": {
+        "recent": "Minhas conversas encerradas mais recentes",
+        "transcripts": "Conversas importadas"
+      },
+      "recentCount": "Quantas conversas",
+      "maxTurns": "Mensagens do cliente a reproduzir por conversa",
+      "label": "Nome (opcional)",
+      "start": "Iniciar reprodução",
+      "started": "Reprodução iniciada",
+      "noTranscripts": "Nenhuma conversa importada ainda. Importe algumas de outra ferramenta primeiro.",
+      "selectedTranscripts": "Nenhuma conversa selecionada | {count} conversa selecionada | {count} conversas selecionadas"
+    },
+    "import": {
+      "button": "Importar conversas",
+      "title": "Importar conversas antigas",
+      "description": "Cole conversas ou envie uma exportação de outra ferramenta. Elas ficam guardadas pelo período de retenção da sua organização e são usadas só em testes.",
+      "format": "Formato",
+      "formats": {
+        "paste": "Texto colado",
+        "csv": "CSV (qualquer ferramenta)",
+        "whatsapp": "Exportação de conversa do WhatsApp",
+        "tidio": "Exportação CSV do Tidio",
+        "gorgias": "Gorgias (tickets recentes)"
+      },
+      "content": "Conversas",
+      "contentPlaceholder": "Cliente: Onde está meu pedido?\nAtendente: Pode me passar o número do pedido?",
+      "file": "Ou escolha um arquivo",
+      "businessName": "Seu nome na conversa do WhatsApp",
+      "gorgiasSubdomain": "Subdomínio do Gorgias",
+      "gorgiasEmail": "E-mail do usuário no Gorgias",
+      "gorgiasApiKey": "Chave de API do Gorgias",
+      "gorgiasHelp": "O e-mail e a chave de API são usados só nesta importação e não ficam guardados.",
+      "submit": "Importar",
+      "done": "Nenhuma conversa importada | {count} conversa importada | {count} conversas importadas"
+    },
+    "runs": {
+      "title": "Execuções de teste",
+      "empty": "Nenhum teste executado ainda.",
+      "open": "Abrir relatório",
+      "kinds": {
+        "replay": "Reprodução",
+        "test_cases": "Casos de teste",
+        "simulation": "Simulação"
+      },
+      "status": {
+        "running": "Em andamento",
+        "completed": "Concluído",
+        "cancelled": "Cancelado",
+        "capped": "Parado no limite de tokens"
+      },
+      "progress": "{done} de {total} respondidas"
+    },
+    "report": {
+      "headTitle": "Relatório de teste - Hay.chat",
+      "title": "Relatório de teste",
+      "back": "Todos os testes",
+      "cancel": "Parar execução",
+      "estimated": "Estimativa a partir de {count} mensagens de clientes reproduzidas. Uma amostra de conversas antigas mostra o que corrigir; não prevê uma taxa exata.",
+      "inProgress": "{count} ainda sendo respondidas…",
+      "notJudged": "{count} não puderam ser respondidas ou avaliadas.",
+      "agreement": "Comparado com o que sua equipe enviou: {same} com a mesma resposta, {partial} parcialmente iguais, {different} diferentes.",
+      "empty": "Nada neste grupo.",
+      "showing": "Mostrando {shown} de {count}",
+      "customer": "Cliente",
+      "aiReply": "Resposta da IA",
+      "humanReply": "O que sua equipe enviou",
+      "expected": "Resultado esperado",
+      "noReply": "Sem resposta",
+      "noHumanReply": "O cliente deu a última palavra",
+      "mockedCalls": "Teria chamado (simulado, nada foi alterado):",
+      "storeDataChanged": "Os dados da loja mudaram desde então: a IA leu os pedidos e o estoque de hoje, não o que valia na época.",
+      "judge": "Por quê",
+      "improvePlaybook": "Melhorar playbook",
+      "improveKnowledge": "Melhorar conhecimento",
+      "viewConversation": "Ver conversa",
+      "passed": "Passou",
+      "failed": "Falhou",
+      "unknown": "Não avaliado",
+      "buckets": {
+        "answered": "Teria respondido",
+        "handed_off": "Teria transferido",
+        "needed_action": "Teria precisado de uma ação",
+        "wrong_or_risky": "Resposta parece errada ou arriscada",
+        "knowledge_missing": "Falta conhecimento"
+      },
+      "bucketHelp": {
+        "answered": "A IA respondeu sozinha.",
+        "handed_off": "A IA passou a conversa para sua equipe.",
+        "needed_action": "A IA teria alterado algo na sua loja. A chamada foi simulada.",
+        "wrong_or_risky": "Corrija estes primeiro: fatos errados, promessas arriscadas ou uma afirmação sem ação que a sustente.",
+        "knowledge_missing": "Faltou informação da loja para a IA. Adicione ao seu conhecimento ou playbook."
+      }
+    }
+  }
+}

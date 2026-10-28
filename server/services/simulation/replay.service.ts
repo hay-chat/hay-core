@@ -56,6 +56,8 @@ export interface StartReplayInput {
   playbookVersionOverride?: PlaybookVersionOverride | null;
   transcriptIds?: string[];
   conversationIds?: string[];
+  /** Also replay the organization's N most recently closed conversations. */
+  recentConversations?: number | null;
   /** Replay at most this many customer turns per conversation (the first ones). */
   maxTurnsPerConversation?: number | null;
 }
@@ -193,9 +195,33 @@ export class ReplayService {
     return sources;
   }
 
+  /** The N most recently closed real conversations (not playground, not simulations). */
+  async recentConversationIds(organizationId: string, count: number): Promise<string[]> {
+    const rows = await AppDataSource.getRepository(Conversation)
+      .createQueryBuilder("c")
+      .select(["c.id", "c.metadata"])
+      .where("c.organization_id = :organizationId", { organizationId })
+      .andWhere("c.status = 'closed'")
+      .andWhere("c.deleted_at IS NULL")
+      .orderBy("c.updated_at", "DESC")
+      // Test conversations are filtered below; read extra to make up for them.
+      .take(Math.min(count * 3, 600))
+      .getMany();
+    return rows
+      .filter((c) => !isTestConversation(c.metadata))
+      .slice(0, count)
+      .map((c) => c.id);
+  }
+
   /** Turn the sources into one case per customer turn and start the run. */
   async start(input: StartReplayInput): Promise<SimulationRun> {
-    const sources = await this.loadSources(input.organizationId, input);
+    const recent = input.recentConversations
+      ? await this.recentConversationIds(input.organizationId, input.recentConversations)
+      : [];
+    const sources = await this.loadSources(input.organizationId, {
+      transcriptIds: input.transcriptIds,
+      conversationIds: [...(input.conversationIds ?? []), ...recent],
+    });
     if (sources.length === 0) {
       throw new SimulationError("BAD_REQUEST", "Pick at least one conversation to replay");
     }
