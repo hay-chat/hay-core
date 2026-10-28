@@ -1,4 +1,9 @@
 import { defineHayPlugin } from "@hay/plugin-sdk";
+import { bulkSync, createWooGet } from "./catalog.js";
+
+/** Re-sync the catalog this often while the worker runs (core keeps it alive). */
+const CATALOG_RESYNC_MS = 6 * 60 * 60 * 1000;
+let resyncTimer: ReturnType<typeof setInterval> | undefined;
 
 /**
  * WooCommerce Plugin
@@ -10,6 +15,10 @@ import { defineHayPlugin } from "@hay/plugin-sdk";
  *
  * Spawns a local Node MCP server (./mcp/index.js) that calls the WooCommerce
  * REST API (wc/v3) with the store's consumer key + secret.
+ *
+ * With the `products` capability, `onStart` also mirrors the catalog (products
+ * and variations) into core via `ctx.productSource` so `recommend_products`
+ * works, and re-syncs every few hours while the worker runs (./catalog.ts).
  */
 export default defineHayPlugin((globalCtx) => ({
   name: "WooCommerce",
@@ -146,6 +155,28 @@ export default defineHayPlugin((globalCtx) => ({
       ctx.logger.error("Failed to start WooCommerce MCP server:", error);
       throw error;
     }
+
+    // Products capability: mirror the catalog into core for `recommend_products`.
+    // Runs in the background so it never blocks startup.
+    if (ctx.productSource) {
+      const productSource = ctx.productSource;
+      const wooGet = createWooGet({ siteUrl, consumerKey, consumerSecret });
+      const logger = {
+        info: (msg: string, c?: Record<string, unknown>) => ctx.logger.info(msg, c),
+      };
+      const sync = () =>
+        bulkSync(wooGet, productSource, logger).catch((err) =>
+          ctx.logger.error("WooCommerce catalog sync failed", err),
+        );
+      void sync();
+      if (resyncTimer) clearInterval(resyncTimer);
+      resyncTimer = setInterval(sync, CATALOG_RESYNC_MS);
+    } else {
+      ctx.logger.info(
+        "WooCommerce: productSource runtime not available — skipping catalog sync " +
+          "(capability not negotiated or plugin-api credentials missing).",
+      );
+    }
   },
 
   async onConfigUpdate(ctx) {
@@ -154,6 +185,8 @@ export default defineHayPlugin((globalCtx) => ({
   },
 
   async onDisable(ctx) {
+    if (resyncTimer) clearInterval(resyncTimer);
+    resyncTimer = undefined;
     ctx.logger.info("WooCommerce plugin disabled for org", { orgId: ctx.org.id });
   },
 }));
