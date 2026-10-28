@@ -13,6 +13,17 @@ interface EscalatePayload {
   conversationId: string;
   conversationMetadata?: Record<string, any> | null;
   reason?: string;
+  /** Files the customer sent, as signed links valid for 7 days (D8-10). */
+  attachments?: Array<{ name?: string; url?: string; type?: string }>;
+}
+
+/** Note lines listing the customer's files, so the human agent can open them. */
+export function attachmentNoteLines(attachments: EscalatePayload["attachments"]): string {
+  const links = (Array.isArray(attachments) ? attachments : [])
+    .filter((file) => typeof file?.url === "string" && /^https:\/\//.test(file.url))
+    .map((file) => `- ${file.name || "file"}: ${file.url}`);
+  if (!links.length) return "";
+  return `\n\nFiles the customer sent (links expire in 7 days):\n${links.join("\n")}`;
 }
 
 /**
@@ -43,7 +54,8 @@ export async function escalateHandler(
       return;
     }
 
-    const { conversationId, conversationMetadata, reason } = req.body as EscalatePayload;
+    const { conversationId, conversationMetadata, reason, attachments } =
+      req.body as EscalatePayload;
 
     const chatwootConversationId =
       conversationMetadata?.chatwoot?.conversationId ??
@@ -65,7 +77,8 @@ export async function escalateHandler(
     try {
       const note =
         `🤖 Hay.chat AI handed this conversation off to a human agent.` +
-        (reason ? ` Reason: ${reason}.` : "");
+        (reason ? ` Reason: ${reason}.` : "") +
+        attachmentNoteLines(attachments);
       await api.sendMessage(chatwootConversationId, note, { private: true });
     } catch (noteErr: any) {
       logger.warn("Failed to post handoff internal note — continuing", {

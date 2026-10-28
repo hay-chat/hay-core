@@ -77,6 +77,30 @@ export async function generateConversationTitle(
   }
 }
 
+/** "photo", "PDF", "video", "audio" or "file", for the transcript the summary is written from. */
+function attachmentKind(type: string): string {
+  if (type.startsWith("image/")) return "photo";
+  if (type === "application/pdf") return "PDF";
+  if (type.startsWith("video/")) return "video";
+  if (type.startsWith("audio/")) return "audio";
+  return "file";
+}
+
+/**
+ * One transcript line for the hand-off summary (D8-10). Files are listed so
+ * the summary can tell the agent what the customer sent:
+ * `Customer: It arrived broken [Attachments: box.jpg (photo), invoice.pdf (PDF)]`.
+ */
+export function handoffTranscriptLine(
+  message: Pick<Message, "type" | "content" | "attachments">,
+): string {
+  const speaker = message.type === MessageType.CUSTOMER ? "Customer" : "Assistant";
+  const files = (message.attachments ?? [])
+    .map((attachment) => `${attachment.name || "file"} (${attachmentKind(attachment.type ?? "")})`)
+    .join(", ");
+  return `${speaker}: ${message.content}${files ? ` [Attachments: ${files}]` : ""}`;
+}
+
 /**
  * Generate a handoff summary for a human agent taking over the conversation.
  * Called when a conversation flips to pending-human.
@@ -108,7 +132,7 @@ export async function generateHandoffSummary(
 
     const conversationContext = publicMessages
       .slice(-15) // Most recent messages carry the handoff context
-      .map((m) => `${m.type === MessageType.CUSTOMER ? "Customer" : "Assistant"}: ${m.content}`)
+      .map(handoffTranscriptLine)
       .join("\n");
 
     const prompt = await promptService.getPrompt(
