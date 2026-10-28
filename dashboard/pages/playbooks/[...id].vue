@@ -100,7 +100,7 @@
               size="sm"
               :loading="isPublishing"
               :disabled="!draftVersion"
-              @click="showPublishDialog = true"
+              @click="openPublishDialog"
             >
               <Upload class="h-4 w-4 mr-2" />
               {{ t("versioning.publish") }}
@@ -328,6 +328,12 @@
       :confirm-text="t('versioning.publishConfirm')"
       @confirm="handlePublish"
     >
+      <VersionDiff
+        v-if="showPublishDialog && playbookId && draftVersion"
+        class="mt-4"
+        :playbook-id="playbookId"
+        :version-id="draftVersion.id"
+      />
       <div class="mt-4">
         <Input
           v-model="publishNote"
@@ -458,6 +464,12 @@ const draftVersion = ref<PlaybookVersion | null>(null);
 const showPublishDialog = ref(false);
 const publishNote = ref("");
 const showVersionHistory = ref(false);
+
+// D7-6: the publish dialog diffs the saved draft, so save pending edits first.
+const openPublishDialog = async () => {
+  await flushAutoSave();
+  showPublishDialog.value = true;
+};
 
 // D7-5: open the playground against the draft (writes simulated there by default).
 const isOpeningTest = ref(false);
