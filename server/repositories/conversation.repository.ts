@@ -853,7 +853,9 @@ export class ConversationRepository extends BaseRepository<Conversation> {
       queryBuilder.andWhere("outcome.closed_at >= :startDate", { startDate: filters.startDate });
     }
     if (filters.endDate) {
-      queryBuilder.andWhere("outcome.closed_at <= :endDate", { endDate: filters.endDate });
+      // End-exclusive like the ledger: billing periods share their boundary
+      // instant, so an inclusive end would count that resolution twice.
+      queryBuilder.andWhere("outcome.closed_at < :endDate", { endDate: filters.endDate });
     }
     return await queryBuilder.getCount();
   }

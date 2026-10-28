@@ -415,6 +415,28 @@ describe("close classifier (D1-3 + D3-8)", () => {
     });
   });
 
+  it("a resolution closed on a period boundary bills in the next period only", async () => {
+    const conversation = await conversationWithAnswer();
+    await inactivityClose(conversation, true);
+    await closeClassifierService.processPending(10);
+    const outcome = await outcomeFor(conversation.id);
+    const boundary = new Date(Date.now() - 24 * 3600 * 1000);
+    await outcomes().update({ id: outcome.id }, { closed_at: boundary });
+    const day = 24 * 3600 * 1000;
+
+    const previous = await repository.countBillableResolutions({
+      organizationId: orgId,
+      startDate: new Date(boundary.getTime() - 30 * day),
+      endDate: boundary,
+    });
+    const next = await repository.countBillableResolutions({
+      organizationId: orgId,
+      startDate: boundary,
+      endDate: new Date(boundary.getTime() + 30 * day),
+    });
+    expect([previous, next]).toEqual([0, 1]);
+  });
+
   it("spam is never billed: flagged before close (no LLM call) or found by the classifier", async () => {
     const flagged = await conversationWithAnswer({
       spam_flagged_at: new Date(),
