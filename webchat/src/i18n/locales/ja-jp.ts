@@ -10,6 +10,7 @@ export default {
   "chat.startNew": "新しい会話を始める",
   "chat.poweredBy": "Powered by",
   "chat.conversationClosed": "会話終了",
+  "chat.aiLabel": "AIアシスタント",
   "input.placeholder": "メッセージを入力...",
   "input.send": "メッセージを送信",
   "error.sendFailed": "メッセージを送信できませんでした。しばらくしてからもう一度お試しください。",

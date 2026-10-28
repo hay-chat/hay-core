@@ -10,6 +10,7 @@ export default {
   "chat.startNew": "Iniciar Nova Conversa",
   "chat.poweredBy": "Desenvolvido por",
   "chat.conversationClosed": "Conversa Encerrada",
+  "chat.aiLabel": "Assistente de IA",
   "input.placeholder": "Escreva uma mensagem...",
   "input.send": "Enviar mensagem",
   "error.sendFailed": "Não foi possível enviar a sua mensagem. Tente novamente dentro de momentos.",

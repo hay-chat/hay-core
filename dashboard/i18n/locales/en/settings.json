@@ -385,6 +385,22 @@
       "providerLabel": "Provider",
       "change": "Change in AI Models",
       "loadFailed": "Failed to load AI processing details"
+    },
+    "aiLabel": {
+      "title": "AI label",
+      "description": "Tell shoppers when a reply comes from AI. In Web Chat the label sits on every AI reply; on other channels it opens the first AI reply.",
+      "labelText": "Label text",
+      "labelPlaceholder": "AI assistant",
+      "labelHint": "Leave empty to use \"AI assistant\" in the shopper's language. Keep it clear that replies come from AI.",
+      "lockedTitle": "Always shown for EU shoppers",
+      "lockedDescription": "Your organization serves the EU (EU-only AI processing or a European time zone), so the EU AI Act requires telling shoppers they are talking to AI. You can rename the label but not hide it.",
+      "channelsTitle": "Where the label is shown",
+      "showLabel": "Show label",
+      "webChat": "Web Chat",
+      "save": "Save AI label",
+      "saveSuccess": "AI label saved",
+      "saveFailed": "Failed to save the AI label",
+      "loadFailed": "Failed to load the AI label settings"
     }
   },
   "security": {

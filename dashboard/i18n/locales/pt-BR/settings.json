@@ -385,6 +385,22 @@
       "providerLabel": "Provedor",
       "change": "Alterar em Modelos de IA",
       "loadFailed": "Falha ao carregar os detalhes do processamento de IA"
+    },
+    "aiLabel": {
+      "title": "Etiqueta de IA",
+      "description": "Avise os clientes quando uma resposta vem da IA. No Web Chat a etiqueta aparece em cada resposta da IA; nos outros canais ela abre a primeira resposta da IA.",
+      "labelText": "Texto da etiqueta",
+      "labelPlaceholder": "Assistente de IA",
+      "labelHint": "Deixe vazio para usar \"Assistente de IA\" no idioma do cliente. Deixe claro que as respostas vêm da IA.",
+      "lockedTitle": "Sempre visível para clientes da UE",
+      "lockedDescription": "Sua organização atende a UE (processamento de IA somente na UE ou fuso horário europeu), então o AI Act da UE exige avisar os clientes que estão falando com uma IA. Você pode renomear a etiqueta, mas não ocultá-la.",
+      "channelsTitle": "Onde a etiqueta aparece",
+      "showLabel": "Mostrar etiqueta",
+      "webChat": "Web Chat",
+      "save": "Salvar etiqueta de IA",
+      "saveSuccess": "Etiqueta de IA salva",
+      "saveFailed": "Falha ao salvar a etiqueta de IA",
+      "loadFailed": "Falha ao carregar as configurações da etiqueta de IA"
     }
   },
   "security": {

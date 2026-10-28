@@ -22,6 +22,10 @@
         {{ agentNoticeText(message, t) }}
       </div>
       <template v-else>
+        <!-- AI disclosure (EU AI Act art. 50): label on every AI reply unless the org hid it -->
+        <div v-if="aiLabel && message.agentType === 'BotAgent'" class="hay-message__ai-badge">
+          {{ aiLabel }}
+        </div>
         <div v-if="message.metadata?.isClosureMessage" class="hay-message__closure-badge">
           {{ t("chat.conversationClosed") }}
         </div>
@@ -106,6 +110,8 @@ const props = defineProps<{
   messages: Message[];
   isTyping: boolean;
   greetingMessage?: string;
+  /** Label on AI replies; null or empty hides it. */
+  aiLabel?: string | null;
 }>();
 
 const messageListRef = ref<HTMLElement | null>(null);
@@ -361,6 +367,17 @@ watch(
 
 .hay-message__content--rich p:not(:last-child):not(:only-child) {
   margin-bottom: 12px;
+}
+
+.hay-message__ai-badge {
+  align-self: flex-start;
+  margin-bottom: 4px;
+  padding: 1px 8px;
+  border: 1px solid var(--color-neutral-200);
+  border-radius: 999px;
+  font-size: 11px;
+  line-height: 16px;
+  color: var(--color-neutral-500);
 }
 
 .hay-message__time {
