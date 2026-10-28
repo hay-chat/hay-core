@@ -73,7 +73,11 @@ export type AttachResult =
   | { ok: false; code: AttachErrorCode; message: string };
 
 const workerResponseSchema = z.union([
-  z.object({ ok: z.literal(true), providerUrl: z.string().optional() }),
+  z.object({
+    ok: z.literal(true),
+    // Rendered as a link in the dashboard: https only, anything else is dropped.
+    providerUrl: z.string().url().max(2048).startsWith("https://").optional().catch(undefined),
+  }),
   z.object({
     ok: z.literal(false),
     code: z.enum([
