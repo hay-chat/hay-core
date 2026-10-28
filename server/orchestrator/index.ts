@@ -181,28 +181,10 @@ export class Orchestrator {
                 { timeSinceLastMessage, warningThreshold },
                 "Conversation reached warning threshold, sending warning",
               );
-              const warned = await sendInactivityWarning(
-                conversation.id,
-                conversation.organization_id,
-              );
-
-              if (warned) {
-                // Mark conversation as needing processing to handle potential response
-                await this.conversationRepository.update(
-                  conversation.id,
-                  conversation.organization_id,
-                  { needs_processing: true },
-                );
-
-                // Enqueue for RabbitMQ processing
-                const { orchestratorQueueService } =
-                  await import("@server/services/orchestrator-queue.service");
-                await orchestratorQueueService.enqueue(
-                  conversation.id,
-                  conversation.organization_id,
-                  "inactivity",
-                );
-              }
+              // No re-queue after the nudge: a customer reply enqueues the run itself,
+              // and running now re-answers the last customer message (185 of 202
+              // warnings in prod were followed by a repeated bot reply).
+              await sendInactivityWarning(conversation.id, conversation.organization_id);
             }
           }
 

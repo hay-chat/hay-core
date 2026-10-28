@@ -111,7 +111,7 @@ describe("checkInactivity", () => {
     mockInvoke.mockResolvedValue("Do you still need help with your order?");
   });
 
-  it("nudges an idle conversation the AI is handling", async () => {
+  it("nudges an idle conversation the AI is handling, without re-running the AI", async () => {
     given(makeConversation(WARN_AT));
 
     await new Orchestrator().checkInactivity();
@@ -119,7 +119,8 @@ describe("checkInactivity", () => {
     expect(addMessage).toHaveBeenCalledWith(
       expect.objectContaining({ metadata: expect.objectContaining({ isInactivityWarning: true }) }),
     );
-    expect(mockEnqueue).toHaveBeenCalled();
+    // Re-running would answer the last customer message a second time.
+    expect(mockEnqueue).not.toHaveBeenCalled();
   });
 
   it.each([
