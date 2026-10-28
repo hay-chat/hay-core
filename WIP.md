@@ -1,3 +1,7 @@
+## 2026-10-28 — staging — Needs Roger list fully answered
+- All 86 items answered (questionnaire artifact); recorded in tasks/voc-roadmap.md: "Roger's answers", "Tickets from Roger's answers" (lanes A–I, all "do it now"), "Still on Roger".
+- Nothing built yet. Prod reads (deploy.sh) blocked by classifier → on Roger.
+- Next: Roger picks how to run lanes A–I (worktrees claude/<lane>), then build → merge to staging → hand-test.
 ## 2026-10-28 — staging — Needs Roger interview → questionnaire artifact
 - Answered in chat (in tasks/voc-roadmap.md "Roger's answers"): PR #104 = all Waves 0–3; 72 h reversal both outcome types; staff close bills; channelAiModes not breaking; lockfile clean (npm install on clean clone, no diff).
 - Remaining ~80 items (blockers, money/safety, copy, defaults, actions, gaps) are in https://claude.ai/artifact/PGDLNwQ2oSg71qpH4vQHKc; answers saved in its db collection `answers` (doc id = item id).
