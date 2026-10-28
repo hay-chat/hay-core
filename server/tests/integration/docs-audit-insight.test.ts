@@ -19,6 +19,7 @@ import {
   findingsFromAudit,
 } from "../../services/insights/docs-audit-insight.service";
 import { insightsService } from "../../services/insights/insights.service";
+import { emitUsage } from "../../services/llm/usage-sink";
 
 const audit = (score: number): AuditResult => ({
   overallScore: score,
@@ -91,6 +92,7 @@ describe("docs audit as an insights input (D3-15)", () => {
     await AppDataSource.query(`DELETE FROM insight_clusters WHERE organization_id = $1`, [orgId]);
     await AppDataSource.query(`DELETE FROM insight_issues WHERE organization_id = $1`, [orgId]);
     await AppDataSource.query(`DELETE FROM playbooks WHERE organization_id = $1`, [orgId]);
+    await AppDataSource.query(`DELETE FROM insight_runs WHERE organization_id = $1`, [orgId]);
     mockTools.mockReset();
   });
 
@@ -99,6 +101,7 @@ describe("docs audit as an insights input (D3-15)", () => {
     await AppDataSource.query(`DELETE FROM insight_issues WHERE organization_id = $1`, [orgId]);
     await AppDataSource.query(`DELETE FROM playbooks WHERE organization_id = $1`, [orgId]);
     await AppDataSource.query(`DELETE FROM insight_org_state WHERE organization_id = $1`, [orgId]);
+    await AppDataSource.query(`DELETE FROM insight_runs WHERE organization_id = $1`, [orgId]);
     await AppDataSource.getRepository(Organization).delete({ id: orgId });
     if (AppDataSource.isInitialized) await AppDataSource.destroy();
   });
@@ -162,5 +165,39 @@ describe("docs audit as an insights input (D3-15)", () => {
 
     mockTools.mockResolvedValue([{ pluginId: "shopify", name: "create_refund" }]);
     expect(await service.brokenActionFindings(orgId)).toEqual([]);
+  });
+
+  it("records the audit's LLM token usage on its insight run (F6)", async () => {
+    mockTools.mockResolvedValue([]);
+    const usage = {
+      promptTokens: 1000,
+      cachedPromptTokens: 200,
+      completionTokens: 300,
+      totalTokens: 1300,
+      estimated: false,
+    };
+    const spy = jest.spyOn(service, "documentFindings").mockImplementation(async () => {
+      for (let i = 0; i < 2; i++) {
+        emitUsage({ kind: "chat", usage, model: "gpt-4o-mini", provider: "openai" });
+      }
+      return [];
+    });
+
+    await service.auditOrganization(orgId);
+    spy.mockRestore();
+
+    const [run] = await AppDataSource.query(
+      `SELECT kind, model, prompt_tokens, cached_prompt_tokens, completion_tokens, succeeded
+         FROM insight_runs WHERE organization_id = $1`,
+      [orgId],
+    );
+    expect(run).toMatchObject({
+      kind: "docs_audit",
+      model: "gpt-4o-mini",
+      prompt_tokens: 2000,
+      cached_prompt_tokens: 400,
+      completion_tokens: 600,
+      succeeded: true,
+    });
   });
 });
