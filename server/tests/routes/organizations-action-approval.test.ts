@@ -75,3 +75,43 @@ describe("organizations.updateSettings action approval threshold", () => {
     );
   });
 });
+
+describe("organizations.updateSettings action approval categories (D4-9)", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    const org = {
+      id: ORG_ID,
+      name: "Shop",
+      settings: { actionApproval: { categories: { note: true } } },
+    };
+    mockFindOne.mockResolvedValue(org);
+    mockUpdate.mockImplementation(async (_id, data) => ({ ...org, ...(data as object) }));
+  });
+
+  it("refuses an admin switching approval off for a money category or the confirmation", async () => {
+    await expect(
+      callerAs("admin").updateSettings({ actionApproval: { categories: { refund: false } } }),
+    ).rejects.toMatchObject({ code: "FORBIDDEN" });
+    await expect(
+      callerAs("admin").updateSettings({ actionApproval: { customerConfirmation: false } }),
+    ).rejects.toMatchObject({ code: "FORBIDDEN" });
+    expect(mockUpdate).not.toHaveBeenCalled();
+  });
+
+  it("lets an admin tighten, and merges categories instead of replacing them", async () => {
+    await callerAs("admin").updateSettings({ actionApproval: { categories: { return: true } } });
+    expect(mockUpdate).toHaveBeenCalledWith(
+      ORG_ID,
+      expect.objectContaining({
+        settings: expect.objectContaining({
+          actionApproval: expect.objectContaining({ categories: { note: true, return: true } }),
+        }),
+      }),
+    );
+  });
+
+  it("lets the owner switch a money category off", async () => {
+    await callerAs("owner").updateSettings({ actionApproval: { categories: { refund: false } } });
+    expect(mockUpdate).toHaveBeenCalledTimes(1);
+  });
+});

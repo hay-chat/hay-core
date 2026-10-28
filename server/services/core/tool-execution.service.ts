@@ -19,6 +19,8 @@ import { decideGate, extractAmount, NEEDS_APPROVAL_CODE } from "./action-policy"
 import { pendingActionService } from "../pending-action.service";
 import { organizationRepository } from "@server/repositories/organization.repository";
 import { resolveActionApprovalConfig } from "@server/types/organization-settings.types";
+import { AppDataSource } from "@server/database/data-source";
+import { Playbook } from "@server/database/entities/playbook.entity";
 
 const logger = createLogger("tool-execution");
 
@@ -248,10 +250,21 @@ export class ToolExecutionService {
     const { conversation, toolCall, target } = call;
     const organization = await organizationRepository.findById(conversation.organization_id);
     const config = resolveActionApprovalConfig(organization?.settings);
-    const decision = decideGate(target.risk, toolCall.args, config);
+    const playbookCategories = await this.playbookApprovalCategories(conversation);
+    const decision = decideGate(target.risk, toolCall.args, config, playbookCategories);
     if (decision.kind === "allow") return null;
 
     return this.holdForApproval(call, decision.reason, decision.amount, config.expiryHours);
+  }
+
+  /** The categories the conversation's active playbook always holds (D4-9). */
+  private async playbookApprovalCategories(conversation: Conversation): Promise<string[]> {
+    if (!conversation.playbook_id) return [];
+    const playbook = await AppDataSource.getRepository(Playbook).findOne({
+      where: { id: conversation.playbook_id, organization_id: conversation.organization_id },
+      select: { id: true, approval_categories: true },
+    });
+    return Array.isArray(playbook?.approval_categories) ? playbook.approval_categories : [];
   }
 
   /**

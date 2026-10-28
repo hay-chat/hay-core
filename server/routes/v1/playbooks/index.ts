@@ -4,6 +4,7 @@ import { PlaybookService } from "../../../services/playbook.service";
 import { PlaybookStatus } from "../../../database/entities/playbook.entity";
 import { TRPCError } from "@trpc/server";
 import { RESOURCES, ACTIONS } from "@server/types/scopes";
+import { APPROVAL_CATEGORIES } from "@server/types/organization-settings.types";
 import { LLMService } from "../../../services/core/llm.service";
 import { PromptService } from "../../../services/prompt.service";
 import { PlaybookSuggestionService } from "../../../services/playbook-suggestion.service";
@@ -71,6 +72,8 @@ const updatePlaybookSchema = z.object({
   instructions: instructionsSchema.optional(),
   status: playbookStatusEnum.optional(),
   agentIds: z.array(z.string().uuid()).optional(),
+  // D4-9: categories that always need approval while this playbook runs (tighten-only).
+  approvalCategories: z.array(z.enum(APPROVAL_CATEGORIES)).max(APPROVAL_CATEGORIES.length).optional(),
 });
 
 export const playbooksRouter = t.router({

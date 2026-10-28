@@ -1,0 +1,65 @@
+{
+  "aiActions": {
+    "categories": {
+      "refund": "Refunds",
+      "cancel": "Cancellations",
+      "discount": "Discounts and coupons",
+      "exchange": "Exchanges and item swaps",
+      "return": "Returns",
+      "address_change": "Address changes",
+      "customer_update": "Customer detail changes",
+      "note": "Order notes and resent emails",
+      "other_write": "Other actions"
+    },
+    "settings": {
+      "title": "Actions",
+      "headTitle": "Actions settings - Hay.chat",
+      "description": "Choose which actions Hay.chat must ask a person about before it runs them in your store.",
+      "approval": {
+        "title": "Approval before actions run",
+        "description": "When an action needs approval, Hay.chat tells the customer it has requested it and waits. A person approves or declines it from the conversation or the Inbox.",
+        "master": "Ask a person before these actions run",
+        "masterOffHint": "Approval is off. Hay.chat runs every action straight away, except those a playbook asks approval for.",
+        "categoriesLabel": "Needs approval",
+        "moneyBadge": "Money",
+        "unclassifiedNote": "Actions from integrations that do not say what they do always need approval while approval is on."
+      },
+      "threshold": {
+        "label": "Auto-approve refunds and discounts up to",
+        "help": "In the order's currency. Refunds and discounts at or below this amount run without approval. 0 means every one needs approval. Cancellations always need approval while they are switched on."
+      },
+      "confirmation": {
+        "title": "Customer confirmation",
+        "description": "Before an action, Hay.chat tells the customer exactly what it will do and asks \"Shall I go ahead?\". It only continues after the customer replies.",
+        "label": "Ask the customer to confirm first",
+        "cancelNote": "Always on for cancellations. Order notes and resent emails are not asked about."
+      },
+      "approvers": {
+        "title": "Who can approve",
+        "description": "The owner can always approve. Choose which other roles can approve or decline actions.",
+        "admin": "Admins",
+        "member": "Members",
+        "contributor": "Contributors"
+      },
+      "ownerOnly": "Only the organization owner can switch approval off, raise the auto-approve amount or change who approves. You can still switch approval on.",
+      "save": "Save changes",
+      "saved": "Actions settings saved",
+      "saveFailed": "Could not save actions settings",
+      "loadFailed": "Could not load actions settings",
+      "typedConfirm": {
+        "title": "Switch approval off?",
+        "description": "These actions will run without anyone seeing them first: {list}.",
+        "instruction": "Type {word} to confirm.",
+        "word": "TURN OFF",
+        "confirm": "Switch off approval"
+      }
+    },
+    "playbook": {
+      "title": "Approval in this playbook",
+      "description": "While this playbook is active, these actions always wait for a person, even under the auto-approve amount or when approval is off in Settings > Actions. A playbook can only add approval, never remove it.",
+      "orgRequired": "Already needs approval in Settings > Actions",
+      "saved": "Approval settings saved",
+      "saveFailed": "Could not save approval settings"
+    }
+  }
+}

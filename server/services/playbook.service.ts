@@ -178,9 +178,10 @@ export class PlaybookService {
       instructions?: PlaybookInstructions;
       status?: PlaybookStatus;
       agentIds?: string[];
+      approvalCategories?: string[];
     },
   ): Promise<Playbook | null> {
-    const { agentIds, ...updateData } = data;
+    const { agentIds, approvalCategories, ...updateData } = data;
 
     let agents: Agent[] | undefined;
     if (agentIds !== undefined) {
@@ -197,6 +198,9 @@ export class PlaybookService {
     return await this.playbookRepository.update(playbookId, organizationId, {
       ...updateData,
       ...(agents !== undefined && { agents }),
+      ...(approvalCategories !== undefined && {
+        approval_categories: approvalCategories.length > 0 ? [...new Set(approvalCategories)] : null,
+      }),
     });
   }
 

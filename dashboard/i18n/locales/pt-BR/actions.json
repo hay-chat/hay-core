@@ -1,0 +1,65 @@
+{
+  "aiActions": {
+    "categories": {
+      "refund": "Reembolsos",
+      "cancel": "Cancelamentos",
+      "discount": "Descontos e cupons",
+      "exchange": "Trocas de itens",
+      "return": "Devoluções",
+      "address_change": "Alterações de endereço",
+      "customer_update": "Alterações nos dados do cliente",
+      "note": "Notas no pedido e reenvio de e-mails",
+      "other_write": "Outras ações"
+    },
+    "settings": {
+      "title": "Ações",
+      "headTitle": "Configurações de ações - Hay.chat",
+      "description": "Escolha quais ações o Hay.chat precisa consultar uma pessoa antes de executar na sua loja.",
+      "approval": {
+        "title": "Aprovação antes das ações",
+        "description": "Quando uma ação precisa de aprovação, o Hay.chat avisa o cliente que fez a solicitação e aguarda. Uma pessoa aprova ou recusa pela conversa ou pela Caixa de entrada.",
+        "master": "Consultar uma pessoa antes destas ações",
+        "masterOffHint": "A aprovação está desligada. O Hay.chat executa todas as ações na hora, exceto as que um playbook pede para aprovar.",
+        "categoriesLabel": "Precisa de aprovação",
+        "moneyBadge": "Dinheiro",
+        "unclassifiedNote": "Ações de integrações que não informam o que fazem sempre precisam de aprovação enquanto a aprovação estiver ligada."
+      },
+      "threshold": {
+        "label": "Aprovar automaticamente reembolsos e descontos até",
+        "help": "Na moeda do pedido. Reembolsos e descontos até este valor são executados sem aprovação. 0 significa que todos precisam de aprovação. Cancelamentos sempre precisam de aprovação enquanto estiverem ligados."
+      },
+      "confirmation": {
+        "title": "Confirmação do cliente",
+        "description": "Antes de uma ação, o Hay.chat diz ao cliente exatamente o que vai fazer e pergunta \"Posso seguir?\". Só continua depois que o cliente responde.",
+        "label": "Pedir a confirmação do cliente antes",
+        "cancelNote": "Sempre ligado para cancelamentos. Notas no pedido e reenvio de e-mails não são perguntados."
+      },
+      "approvers": {
+        "title": "Quem pode aprovar",
+        "description": "O proprietário sempre pode aprovar. Escolha quais outras funções podem aprovar ou recusar ações.",
+        "admin": "Administradores",
+        "member": "Membros",
+        "contributor": "Colaboradores"
+      },
+      "ownerOnly": "Só o proprietário da organização pode desligar a aprovação, aumentar o valor de aprovação automática ou mudar quem aprova. Você ainda pode ligar a aprovação.",
+      "save": "Salvar alterações",
+      "saved": "Configurações de ações salvas",
+      "saveFailed": "Não foi possível salvar as configurações de ações",
+      "loadFailed": "Não foi possível carregar as configurações de ações",
+      "typedConfirm": {
+        "title": "Desligar a aprovação?",
+        "description": "Estas ações serão executadas sem que ninguém as veja antes: {list}.",
+        "instruction": "Digite {word} para confirmar.",
+        "word": "DESLIGAR",
+        "confirm": "Desligar aprovação"
+      }
+    },
+    "playbook": {
+      "title": "Aprovação neste playbook",
+      "description": "Enquanto este playbook estiver ativo, estas ações sempre aguardam uma pessoa, mesmo abaixo do valor de aprovação automática ou com a aprovação desligada em Configurações > Ações. Um playbook só pode adicionar aprovação, nunca remover.",
+      "orgRequired": "Já precisa de aprovação em Configurações > Ações",
+      "saved": "Configurações de aprovação salvas",
+      "saveFailed": "Não foi possível salvar as configurações de aprovação"
+    }
+  }
+}
