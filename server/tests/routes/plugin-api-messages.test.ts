@@ -511,6 +511,24 @@ describe("pluginApi.messages.receive holdForHuman", () => {
     );
     expect(statuses).not.toContain("pending-human");
   });
+
+  it("parks the conversation for a human when the org has no agent", async () => {
+    mockAgentRepo.findByOrganization.mockResolvedValue([]);
+
+    const result = await caller()["messages.receive"]({
+      from: "ana@shopper.com",
+      content: "hello?",
+      channel: "email",
+    });
+
+    expect(result.processed).toBe(true);
+    expect(mockMessageRepo.create).toHaveBeenCalled();
+    expect(mockConversationRepo.update).toHaveBeenLastCalledWith(
+      CONVERSATION_ID,
+      ORG_ID,
+      expect.objectContaining({ status: "pending-human", needs_processing: false }),
+    );
+  });
 });
 
 describe("pluginApi.messages.receive replyWindowExpiresAt (D13-2)", () => {
