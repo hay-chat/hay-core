@@ -270,6 +270,11 @@ const navMain = computed(() => {
         isActive: route.path === "/settings/actions",
       },
       {
+        title: t("nav.usage"),
+        url: "/settings/usage",
+        isActive: route.path === "/settings/usage",
+      },
+      {
         title: t("nav.users"),
         url: "/settings/users",
         isActive: route.path === "/settings/users",

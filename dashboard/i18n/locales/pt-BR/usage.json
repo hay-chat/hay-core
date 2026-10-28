@@ -1,0 +1,71 @@
+{
+  "usage": {
+    "headTitle": "Uso - Hay.chat",
+    "title": "Uso",
+    "description": "Resoluções que o Hay.chat conta para a cobrança e o extrato por trás do número.",
+    "refresh": "Atualizar",
+    "month": "Mês",
+    "loadFailed": "Não foi possível carregar o uso",
+    "meter": {
+      "title": "Resoluções cobráveis",
+      "period": "{start} a {end}",
+      "periodNote": "Contado por mês do calendário (UTC). Sua fatura pode usar outras datas de período.",
+      "planNote": "A franquia do seu plano e eventuais cobranças de resoluções extras estão na sua página de cobrança.",
+      "paused": "O agente de IA está pausado porque as resoluções do plano acabaram. As conversas aguardam sua equipe."
+    },
+    "breakdown": {
+      "title": "Detalhamento",
+      "billed": "Cobradas",
+      "pendingReview": "das quais enviadas ao Hay.chat para análise",
+      "reversed": "Estornadas: o cliente voltou em até 72 h",
+      "excluded": "Excluídas pela sua equipe",
+      "notBilledTitle": "Não cobradas",
+      "outcomes": {
+        "human": "Transferidas, não resolvidas pela IA",
+        "unhappy": "Cliente saiu insatisfeito",
+        "abandoned": "Sem pergunta real ou sem resposta real",
+        "test": "Testes e playground",
+        "spam": "Spam"
+      }
+    },
+    "ledger": {
+      "title": "Extrato de resoluções",
+      "description": "Cada resolução contada neste mês, com o motivo de ter sido contada.",
+      "export": "Exportar CSV",
+      "exportFailed": "Não foi possível exportar o extrato",
+      "exclusionsUsed": "Exclusões por conta própria neste mês: {used} de {allowance}",
+      "exclusionsClosed": "Resoluções deste mês não podem mais ser excluídas aqui.",
+      "empty": "Nenhuma resolução cobrável neste mês.",
+      "openConversation": "Abrir conversa",
+      "conversationDeleted": "Conversa excluída",
+      "exclude": "Excluir",
+      "reasonLabel": "Motivo: {reason}",
+      "requestedBy": "Solicitado por {who} em {date}",
+      "previous": "Anterior",
+      "next": "Próxima",
+      "pageOf": "Página {page} de {pages}",
+      "outcomes": {
+        "confirmed": "O cliente confirmou que foi resolvido",
+        "assumed": "A IA respondeu e o cliente não voltou"
+      },
+      "statuses": {
+        "billed": "Cobrada",
+        "reversed": "Estornada",
+        "excluded": "Excluída",
+        "pending_review": "Enviada ao Hay.chat para análise"
+      }
+    },
+    "excludeDialog": {
+      "title": "Excluir esta resolução",
+      "instant": "Ela sai da contagem deste mês na hora. Restam {left} exclusões por conta própria neste mês.",
+      "review": "Você já usou as exclusões por conta própria deste mês (5 % das resoluções). Este pedido vai para análise do Hay.chat e a resolução continua contada até lá.",
+      "reason": "Motivo (obrigatório)",
+      "reasonPlaceholder": "Por exemplo: foi um teste nosso, ou o cliente precisava de uma pessoa",
+      "confirm": "Excluir",
+      "confirmReview": "Enviar para análise",
+      "excluded": "Resolução excluída",
+      "sentForReview": "Enviada ao Hay.chat para análise",
+      "failed": "Não foi possível excluir a resolução"
+    }
+  }
+}
