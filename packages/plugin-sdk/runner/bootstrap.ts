@@ -205,6 +205,7 @@ export function loadManifest(pluginPath: string): ValidatedManifest {
     "cron",
     "email",
     "webchat",
+    "disputes",
   ];
   for (const cap of manifest.capabilities) {
     if (!validCapabilities.includes(cap)) {
