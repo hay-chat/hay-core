@@ -47,6 +47,14 @@
     "siteId": {
       "label": "ID do site",
       "description": "O ID do site Wix ao qual a chave está vinculada (na URL do painel ou via API Query Sites)."
+    },
+    "staleTrackingDomesticDays": {
+      "label": "Rastreio parado: nacional (dias)",
+      "description": "Considera uma entrega nacional parada quando o rastreio não se move há mais do que este número de dias."
+    },
+    "staleTrackingInternationalDays": {
+      "label": "Rastreio parado: internacional (dias)",
+      "description": "Considera uma entrega internacional parada quando o rastreio não se move há mais do que este número de dias."
     }
   }
 }
