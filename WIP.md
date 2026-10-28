@@ -1,3 +1,11 @@
+## 2026-10-28 — claude/w4-g-exports (worktree hay-core-w4-g-exports) — Lane G committed, NOT pushed
+- G1 3a71e7d8 export ZIP includes conversation-media attachments (1.5 GB budget, attachments.jsonl index).
+- G3 48af7bf8 operator_events outbox + operator-event-retry cron (1m..24h, 7 attempts) — migration 1785895000000 (run on hay_test + hay_staging).
+- G4 4af68968 suspended-workspace holding reply bypasses the drafts-only/test-mode approval gate.
+- G5 a45d5057 evidence PDF: Noto Emoji font, SSRF-safe remote attachment fetch (10 MB/20 files), 50-page cap, policy text as used.
+- G2 lives in hay-backoffice-w4-g (claude/w4-g-plan-email, 5aadb2d); template is backoffice-only.
+- Next: review + PR both branches; Roger: confirm 50-page cap, sendPausedNotice same bypass?
+
 ## 2026-10-28 — staging — Lanes B, C, D merged
 - Merged claude/w4-b-approvals (4544ef9d), claude/w4-c-disputes (0232fb97), claude/w4-d-abuse (a0b1a115).
 - Migration AddWebchatIdentitySecret run on local hay_staging + hay_test (Docker hay-staging-postgres-1 :5433 started).
