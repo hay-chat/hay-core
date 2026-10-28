@@ -1,3 +1,10 @@
+## 2026-10-28 — claude/w1-commerce (L5) — coupons + generic over-cap approval done; staging 255683b merged
+- 7c10840 D16-6: capped tools (_meta chat.hay/capEnforced) skip the money hold; plugin NEEDS_APPROVAL → pending action (over_cap); approved re-run gets hay_approval_id. SDK coupon-policy (10%, fixed off, 30 d).
+- 694eed4 D16-4/5: woocommerce_create_coupon, shopify_create_coupon (+write_discounts scope), Nuvemshop on shared policy (order required).
+- 3c0c9d1: Woo totals.currency, gatewayCanRefund + refund_payment=false guidance. 5340c50: staging merge, SDK tool-risk reconciled (capped in ToolRiskSpec).
+- Earlier: Nuvemshop merge, D16-1, D16-7, D10-1, D10-2 (Pix), D6-9 stale tracking. Not pushed.
+- Next: orchestrator merges L5; Roger: Shopify re-consent for write_discounts; real-store checks (Shopify discount title search, Pix keys).
+
 ## 2026-10-28 00:30 — staging — approval follow-ups truthful + risk lane merged
 - a43ac55: after approve/decline the follow-up turn seeds the claim-check ledger with the decision; decline → AI explains (no hand-off), approve → Woo refund #19 ran and AI says done. ef5e57a: held call reported as "requested".
 - Risk lane merged: SDK toolRisk + 7 plugins declare risk; SDK/plugins rebuilt; tests green.
