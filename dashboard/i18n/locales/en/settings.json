@@ -421,7 +421,11 @@
       "aiReplies": "AI replies",
       "modeOn": "Send automatically",
       "modeDrafts": "Drafts only (a person approves)",
-      "draftsHint": "Drafts only: AI replies wait in the conversation until someone on your team approves or blocks them."
+      "draftsHint": "Drafts only: AI replies wait in the conversation until someone on your team approves or blocks them.",
+      "modeOff": "Off (your team replies)",
+      "offHint": "Off: the AI does not answer on this channel. Messages wait for your team in Needs Attention, with no automatic reply.",
+      "webChatOnly": "Start on Web Chat only",
+      "webChatOnlyDone": "Every channel except Web Chat is set to Off. Save to apply."
     },
     "media": {
       "title": "Customer photos and files",

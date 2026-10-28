@@ -370,6 +370,20 @@
             </div>
           </CardContent>
         </Card>
+
+        <!-- Channel-scoped go-live (D7-14): not a tracked step, just the advice. -->
+        <Card data-testid="go-live-one-channel">
+          <CardHeader>
+            <CardTitle class="text-lg">{{ $t("dashboard.gettingStarted.goLive.title") }}</CardTitle>
+          </CardHeader>
+          <CardContent class="!pt-0 space-y-4">
+            <p>{{ $t("dashboard.gettingStarted.goLive.description") }}</p>
+            <Button variant="outline" @click="navigateTo('/settings/customer-privacy')">
+              {{ $t("dashboard.gettingStarted.goLive.button") }}
+              <ArrowRight class="w-3 h-3 ml-2" />
+            </Button>
+          </CardContent>
+        </Card>
       </div>
     </div>
   </Page>

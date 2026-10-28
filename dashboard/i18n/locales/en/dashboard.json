@@ -113,6 +113,11 @@
       "startChat": "Start Playground Chat",
       "viewConversations": "View Conversations",
       "locked": "Finish the previous steps before doing this. Hay.chat will work better this way."
+    },
+    "goLive": {
+      "title": "Go live on one channel first",
+      "description": "Many stores start with the AI on Web Chat only and keep WhatsApp, Instagram and email with the team. When you are happy with the replies, switch the other channels on one by one.",
+      "button": "Choose channels for the AI"
     }
   }
   }

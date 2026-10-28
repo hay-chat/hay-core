@@ -19,12 +19,15 @@ const seedTurnSchema = z.object({
   text: z.string().min(1).max(10_000),
 });
 
+export const playbookVersionOverrideSchema = z.object({
+  playbookId: z.string().uuid(),
+  versionId: z.string().uuid(),
+});
+
 const startSchema = z.object({
   label: z.string().max(255).optional(),
   agentId: z.string().uuid().optional(),
-  playbookVersionOverride: z
-    .object({ playbookId: z.string().uuid(), versionId: z.string().uuid() })
-    .optional(),
+  playbookVersionOverride: playbookVersionOverrideSchema.optional(),
   cases: z
     .array(
       z.object({
@@ -36,7 +39,8 @@ const startSchema = z.object({
     .max(SIMULATION_CAPS.maxItemsPerRun),
 });
 
-function toTrpcError(error: unknown): never {
+/** Map a harness refusal to a tRPC error (shared by replays and test cases). */
+export function toTrpcError(error: unknown): never {
   if (error instanceof SimulationError) {
     throw new TRPCError({
       code: error.code === "LIMIT_REACHED" ? "FORBIDDEN" : error.code,

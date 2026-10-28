@@ -393,19 +393,24 @@ export interface AiDisclosureConfig {
 }
 
 /**
- * Per-channel AI mode (D14-7). "drafts" = the AI writes the reply and a person
- * approves it before it is sent (the same queue as Require Approval / test
- * mode). Keyed by channel id ("web" or a channel plugin's manifest `channel`).
- * Missing = "on".
+ * Per-channel AI mode. Keyed by channel id ("web" or a channel plugin's
+ * manifest `channel`). Missing = "on".
+ * - "on": AI replies go out (subject to Require Approval).
+ * - "drafts" (D14-7): the AI writes the reply and a person approves it before
+ *   it is sent (the same queue as Require Approval / test mode).
+ * - "off" (D7-14): the AI does not answer on this channel at all; shopper
+ *   messages wait for the team. Lets a store go live on one channel first
+ *   ("start on Web Chat only").
  */
-export const CHANNEL_AI_MODES = ["on", "drafts"] as const;
+export const CHANNEL_AI_MODES = ["on", "drafts", "off"] as const;
 export type ChannelAiMode = (typeof CHANNEL_AI_MODES)[number];
 
 export function resolveChannelAiMode(
   settings: OrganizationSettings | null | undefined,
   channel: string,
 ): ChannelAiMode {
-  return settings?.channelAiModes?.[channel] === "drafts" ? "drafts" : "on";
+  const mode = settings?.channelAiModes?.[channel];
+  return mode && (CHANNEL_AI_MODES as readonly string[]).includes(mode) ? mode : "on";
 }
 
 /**
