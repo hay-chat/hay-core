@@ -153,7 +153,7 @@ describe("nuvemshop_create_coupon", () => {
       reason: "late",
       order_id: "900",
     });
-    expect(res2.text).toMatch(/already received a Hay goodwill coupon/);
+    expect(res2.text).toMatch(/already received a Hay.chat goodwill coupon/);
     expect(second.calls.some((c) => c.method === "POST")).toBe(false);
   });
 });

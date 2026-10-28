@@ -13,7 +13,7 @@
 
 const { z } = require("zod");
 const { nsApi } = require("../lib/client");
-const { ok, fail, READ, WRITE, DESTRUCTIVE } = require("../lib/format");
+const { ok, fail, toolError, READ, WRITE, DESTRUCTIVE } = require("../lib/format");
 const {
   HOW_TO_REFUND,
   resolveOrder,
@@ -41,11 +41,15 @@ const MONEY_IN_PLAY = new Set(["paid", "partially_paid", "partially_refunded", "
 /** Refuse once anything has shipped: status, label or tracking recorded. */
 function assertPreDispatch(order, tracking, action) {
   if (order.status === "cancelled") {
-    throw new Error(`Order #${order.number} is already cancelled; cannot ${action}.`);
+    throw toolError(
+      "PRECONDITION",
+      `Order #${order.number} is already cancelled; cannot ${action}.`,
+    );
   }
   const { preDispatch, reason } = dispatchState(order, tracking);
   if (!preDispatch) {
-    throw new Error(
+    throw toolError(
+      "PRECONDITION",
       `Order #${order.number} can no longer ${action}: ${reason}. It has left (or is leaving) ` +
         "the warehouse. Escalate to the merchant/carrier instead.",
     );
@@ -154,7 +158,8 @@ function registerOrderTools(server) {
             order.payment_status === "authorized"
               ? "has an active card authorization that cancelling will NOT release"
               : `is ${order.payment_status.replace("_", " ")}; cancelling will NOT refund it`;
-          throw new Error(
+          throw toolError(
+            "PRECONDITION",
             `Order #${order.number} (${order.total} ${order.currency} via ` +
               `${order.gateway_name || order.gateway || "the payment provider"}) ${detail}. Tell ` +
               "the customer the money is handled separately, then retry with " +
@@ -236,7 +241,8 @@ function registerOrderTools(server) {
           (fo) => fo.id && PRE_DISPATCH_FO.has(fo.status) && fo.shipping?.type !== "pickup",
         );
         if (!targets.length) {
-          throw new Error(
+          throw toolError(
+            "PRECONDITION",
             `Order #${order.number} has no shippable fulfillment order the API can re-address ` +
               "(store pickup, digital, or a store whose API version has no fulfillment orders). " +
               "Nuvemshop's order endpoint cannot change the address; escalate to the merchant.",
@@ -262,7 +268,7 @@ function registerOrderTools(server) {
         if (a.recipient_name) recipient.name = a.recipient_name;
         if (a.recipient_phone) recipient.phone = a.recipient_phone;
         if (!Object.keys(changes).length && !Object.keys(recipient).length) {
-          throw new Error("Pass at least one address field to change.");
+          throw toolError("BAD_INPUT", "Pass at least one address field to change.");
         }
 
         const results = [];

@@ -79,6 +79,7 @@ describe("nuvemshop_find_customer", () => {
     const none = await server.call("nuvemshop_find_customer", {});
     expect(none.isError).toBe(true);
     expect(none.text).toMatch(/cannot search customers by phone/);
+    expect(none.error.code).toBe("BAD_INPUT");
   });
 });
 

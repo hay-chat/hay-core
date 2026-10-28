@@ -43,6 +43,7 @@ describe("nuvemshop_get_payment_link", () => {
     });
     expect(res.isError).toBe(true);
     expect(res.text).toMatch(/does not match/);
+    expect(res.error.code).toBe("PRECONDITION");
     expect(res.text).not.toMatch(/PIXCODE/);
   });
 

@@ -15,7 +15,7 @@
 
 const { z } = require("zod");
 const { nsApi } = require("../lib/client");
-const { ok, fail, num, round2, READ, WRITE } = require("../lib/format");
+const { ok, fail, toolError, num, round2, READ, WRITE } = require("../lib/format");
 const {
   HOW_TO_REFUND,
   resolveOrder,
@@ -113,7 +113,8 @@ function registerRefundTools(server) {
         const order = await resolveOrder(args);
         const ref = `#${order.number}`;
         if (!PAID_STATUSES.has(order.payment_status)) {
-          throw new Error(
+          throw toolError(
+            "PRECONDITION",
             `Order ${ref} has no captured payment (payment_status "${order.payment_status}"); ` +
               "there is nothing to refund." +
               (order.payment_status === "authorized"
@@ -122,7 +123,8 @@ function registerRefundTools(server) {
           );
         }
         if (order.payment_status === "refunded") {
-          throw new Error(
+          throw toolError(
+            "PRECONDITION",
             `Order ${ref} is already fully refunded (${order.total} ${order.currency}).`,
           );
         }
@@ -131,15 +133,16 @@ function registerRefundTools(server) {
         const refunded = transactionRefunded(transactions);
         const remaining = refunded === null ? total : round2(Math.max(0, total - refunded));
         if (remaining <= 0) {
-          throw new Error(`Order ${ref} has nothing left to refund.`);
+          throw toolError("PRECONDITION", `Order ${ref} has nothing left to refund.`);
         }
         const amount =
           args.amount !== undefined ? Number(String(args.amount).replace(",", ".")) : remaining;
         if (!Number.isFinite(amount) || amount <= 0) {
-          throw new Error(`Invalid refund amount "${args.amount}".`);
+          throw toolError("BAD_INPUT", `Invalid refund amount "${args.amount}".`);
         }
         if (amount > remaining + 0.001) {
-          throw new Error(
+          throw toolError(
+            "PRECONDITION",
             `Refund of ${amount.toFixed(2)} exceeds the ${refunded === null ? "order total" : "remaining balance"} ` +
               `of ${remaining.toFixed(2)} ${order.currency} for order ${ref}.`,
           );

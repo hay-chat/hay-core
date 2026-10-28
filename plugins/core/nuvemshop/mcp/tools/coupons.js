@@ -9,7 +9,7 @@
  *   - single use (max_uses 1), short expiry (≤ couponMaxDays), does not combine
  *     with other promotions, does not discount shipping;
  *   - the code is generated here (the agent cannot pick a vanity code);
- *   - when tied to an order: at most one Hay coupon per order, recorded on the
+ *   - when tied to an order: at most one Hay.chat coupon per order, recorded on the
  *     order note.
  *
  * Nuvemshop coupons cannot be restricted to one customer's email
@@ -23,7 +23,7 @@
 const crypto = require("node:crypto");
 const { z } = require("zod");
 const { nsApi } = require("../lib/client");
-const { ok, fail, WRITE } = require("../lib/format");
+const { ok, fail, toolError, WRITE } = require("../lib/format");
 const { resolveOrder } = require("../lib/orders");
 const { appendOwnerNote } = require("./orders");
 
@@ -108,14 +108,16 @@ function registerCouponTools(server) {
       try {
         const policy = couponPolicy();
         if (!policy.enabled) {
-          throw new Error(
+          throw toolError(
+            "PRECONDITION",
             "Coupons are turned off for this store. Hand off to a person if a goodwill gesture is needed.",
           );
         }
         const cap = args.type === "percentage" ? policy.maxPercent : policy.maxAmount;
         const unit = args.type === "percentage" ? "%" : " (store currency)";
         if (!cap) {
-          throw new Error(
+          throw toolError(
+            "PRECONDITION",
             `${args.type === "percentage" ? "Percentage" : "Fixed-amount"} coupons are not enabled ` +
               "by the merchant's coupon cap. " +
               (args.type === "percentage" && policy.maxAmount
@@ -126,7 +128,8 @@ function registerCouponTools(server) {
           );
         }
         if (args.value > cap) {
-          throw new Error(
+          throw toolError(
+            "PRECONDITION",
             `A ${args.value}${unit} coupon is above the merchant's cap of ${cap}${unit}. It needs ` +
               "a person's approval: hand off instead of creating it.",
           );
@@ -137,8 +140,9 @@ function registerCouponTools(server) {
         if (args.order_id || args.order_number) {
           order = await resolveOrder(args);
           if (String(order.owner_note || "").includes(COUPON_MARKER)) {
-            throw new Error(
-              `Order #${order.number} already received a Hay goodwill coupon. One per order; ` +
+            throw toolError(
+              "PRECONDITION",
+              `Order #${order.number} already received a Hay.chat goodwill coupon. One per order; ` +
                 "hand off if the customer needs more.",
             );
           }

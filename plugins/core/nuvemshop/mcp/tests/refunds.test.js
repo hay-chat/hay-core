@@ -108,6 +108,7 @@ describe("nuvemshop_request_refund", () => {
     });
     expect(res.isError).toBe(true);
     expect(res.text).toMatch(/exceeds the remaining balance of 20\.00 BRL/);
+    expect(res.error.code).toBe("PRECONDITION");
     expect(calls.some((c) => c.method === "PUT")).toBe(false);
   });
 

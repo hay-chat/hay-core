@@ -31,7 +31,10 @@ describe("nsApi", () => {
         reply: () => ({ status: 500, body: { description: "boom" } }),
       },
     ]);
-    await expect(nsApi("POST", "/coupons", { body: {} })).rejects.toThrow(/HTTP 500: boom/);
+    const err = await nsApi("POST", "/coupons", { body: {} }).catch((e) => e);
+    expect(err.message).toMatch(/HTTP 500: boom/);
+    // A failed write may still have been applied.
+    expect(err.code).toBe("OUTCOME_UNKNOWN");
     expect(calls).toHaveLength(1);
   });
 
@@ -41,7 +44,9 @@ describe("nsApi", () => {
       n += 1;
       throw new Error("The operation was aborted due to timeout");
     };
-    await expect(nsApi("POST", "/orders/1/cancel", { body: {} })).rejects.toThrow(/timeout/);
+    const err = await nsApi("POST", "/orders/1/cancel", { body: {} }).catch((e) => e);
+    expect(err.code).toBe("OUTCOME_UNKNOWN");
+    expect(err.details.cause).toMatch(/timeout/);
     expect(n).toBe(1);
   });
 
@@ -77,10 +82,13 @@ describe("nsApi", () => {
       { method: "GET", path: `${BASE}/store`, reply: () => ({ status: 401, body: {} }) },
       { method: "GET", path: `${BASE}/orders`, reply: () => ({ status: 402, body: {} }) },
     ]);
-    await expect(nsApi("GET", "/store")).rejects.toThrow(/reconnect the plugin/);
+    const auth = await nsApi("GET", "/store").catch((e) => e);
+    expect(auth.message).toMatch(/reconnect the plugin/);
+    expect(auth.code).toBe("AUTH_FAILED");
     const err = await nsApi("GET", "/orders").catch((e) => e);
     expect(err).toBeInstanceOf(NuvemshopApiError);
     expect(err.status).toBe(402);
+    expect(err.code).toBe("PROVIDER_REFUSED");
     expect(err.message).toMatch(/subscription is unpaid/);
   });
 

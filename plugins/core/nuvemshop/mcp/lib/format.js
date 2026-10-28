@@ -7,18 +7,19 @@
  * flattens them to one language so the agent reads a single translation.
  */
 
+const { toolError, toolErrorResult } = require("@hay/plugin-sdk/tool-errors");
 const { mainLanguage } = require("./client");
 
 function ok(payload) {
   return { content: [{ type: "text", text: JSON.stringify(payload ?? null, null, 2) }] };
 }
 
-function fail(err) {
-  return {
-    content: [{ type: "text", text: `Error: ${err?.message || String(err)}` }],
-    isError: true,
-  };
-}
+/**
+ * Wrap anything thrown in a tool handler as an MCP error result: JSON
+ * `{ code, retryable, message, details? }` from the shared plugin-SDK vocabulary.
+ * Uncoded errors become INTERNAL, so every expected failure must throw a ToolError.
+ */
+const fail = toolErrorResult;
 
 /** Nuvemshop money fields are decimal strings; read as float, 0 when absent. */
 function num(value) {
@@ -71,6 +72,7 @@ const DESTRUCTIVE = Object.freeze({
 });
 
 module.exports = {
+  toolError,
   READ,
   WRITE,
   DESTRUCTIVE,
