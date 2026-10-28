@@ -15,12 +15,17 @@ describe("parsePix (D10-2)", () => {
       {
         qrImageUrl: "https://api.pagseguro.com/qrcode/QRCO_1/png",
         expiresAt: "2026-10-31T02:59:00.000Z",
+        expiresAtIsLocal: false,
       },
     ],
     [
       "pagbank_connect",
       fx.pagbankConnect,
-      { qrImageUrl: "https://sandbox.api.pagseguro.com/qrcode/QRCO_2/png" },
+      {
+        qrImageUrl: "https://sandbox.api.pagseguro.com/qrcode/QRCO_2/png",
+        expiresAt: "2026-10-30T23:59:00",
+        expiresAtIsLocal: true,
+      },
     ],
     [
       "pagarme",
@@ -30,7 +35,12 @@ describe("parsePix (D10-2)", () => {
         expiresAt: "2026-10-30T23:59:00.000Z",
       },
     ],
-    ["asaas", fx.asaas, { qrImageUrl: null, expiresAt: expect.stringMatching(/^2026-10-3/) }],
+    [
+      "asaas",
+      fx.asaas,
+      // Naive store-local time: returned unchanged and flagged, never shifted by the server zone.
+      { qrImageUrl: null, expiresAt: "2026-10-30T23:59:59", expiresAtIsLocal: true },
+    ],
   ])("reads the %s plugin's meta", (provider, meta, extra) => {
     expect(parsePix(meta)).toMatchObject({ provider, copyPaste: fx.CODE, ...extra });
   });
