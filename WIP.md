@@ -1,3 +1,5 @@
+## 2026-10-28 07:05 — staging — WAVE 2 DONE (tag wave-2-done)
+- Suites green; PR #104 updated (Waves 0–2); GIFs sent. Next: Wave 3 batch 1 (L12a insights, L7a go-live).
 ## 2026-10-28 06:50 — staging — W2 review fixes merged, hand-tested
 - Merged claude/w2-review-fixes (a3a4897), no migrations. Manual ✓ #1 Turnstile deny, #2 Mark as spam unbills classified, #3 hand-off email kept on conversation.
 - Next: full suites alone, tag wave-2-done, PR #104, Wave 3 lanes.
