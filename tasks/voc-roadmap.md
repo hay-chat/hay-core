@@ -294,7 +294,7 @@ Roger said "Do it now" for every gap. Not started; lanes below.
 - [ ] **Tomorrow — Claude:** shared Meta deauthorize/data-deletion callback (today only the WhatsApp plugin gets it, so a Messenger connection survives "remove app"). Also: Messenger setup-guide panel ("AfterSettings") spins forever.
 - [ ] Cleanup of the Stripe live test: cancel sub_1UVbfHL8O3lIr2V8pSy7KSoQ now without proration, delete pending invoice items on cus_VWee4tKoh7CoM2, refund the €50.
 - [x] Inactivity nudge no longer re-runs the AI (6351d2d7): it re-answered the last customer message (185/202 nudges in prod), sometimes handing off for no visible reason. All channels.
-- [ ] Decide: AI answered "we ship to Portugal" with 0 documents. Fact grounding only runs when an LLM classifier flags a claim (`execution.layer.ts:602`). Proposal: force the grounding check when retrieval returned 0 docs (more hand-offs for orgs without docs).
+- [x] Fact check on every reply (ffd1f715, deployed 2026-10-28; Roger: "no made-up facts, ever"). Unflagged replies get a grounding-only check; with no docs, claims score low and greetings pass. Cost: +1 medium LLM call per unflagged reply. Retest: ask the no-docs demo org "do you ship to Portugal?".
 - [ ] WABA checks: waiting on Meta approval (Roger, 2026-10-28).
 - [ ] VAT: skipped for now (Hay registered in Brazil; B2B reverse charge). Lawyer: confirm no EU/UK consumer sales → no OSS needed; Brazil ISS/nota fiscal. Fix Stripe head office (says PT).
 - [ ] Billing UX: redesign + country picker (USD fallback) + cancel page with 50% once retention offer — agents running; retest live after.
