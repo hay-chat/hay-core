@@ -593,3 +593,107 @@ describe("marketplace orders in not-found (D10-6)", () => {
     expect(res.error.message).toMatch(/Minhas compras/);
   });
 });
+
+describe("wider tracking sources (D16-8)", () => {
+  const { getTracking, trackingNumberInNote } = require("../lib/orders");
+  const base = { ...ORDER, id: 40, meta_data: [], line_items: [{ id: 1, meta_data: [] }] };
+
+  it("reads VillaTheme per-line-item tracking (JSON string, newest last)", async () => {
+    mockFetch([]);
+    const order = {
+      ...base,
+      line_items: [
+        {
+          id: 101,
+          meta_data: [
+            {
+              key: "_vi_wot_order_item_tracking_data",
+              value: JSON.stringify([
+                { tracking_number: "OLD1", carrier_name: "Correios", time: 1761000000 },
+                {
+                  tracking_number: "QB123456789BR",
+                  carrier_name: "Correios",
+                  carrier_url: "https://rastreamento.correios.com.br/?objetos={tracking_number}",
+                  time: 1761500000,
+                },
+              ]),
+            },
+          ],
+        },
+      ],
+    };
+    expect(await getTracking(order)).toEqual([
+      expect.objectContaining({
+        trackingNumber: "QB123456789BR",
+        carrier: "Correios",
+        trackingUrl: "https://rastreamento.correios.com.br/?objetos=QB123456789BR",
+        source: "villatheme",
+        lineItemId: 101,
+      }),
+    ]);
+  });
+
+  it("reads YITH keys including the carrier the generic fallback misses", async () => {
+    mockFetch([]);
+    const order = {
+      ...base,
+      meta_data: [
+        { key: "ywot_tracking_code", value: "LB987654321BR" },
+        { key: "ywot_carrier_name", value: "Jadlog" },
+        { key: "ywot_pick_up_date", value: "2026-10-20" },
+      ],
+    };
+    expect(await getTracking(order)).toEqual([
+      expect.objectContaining({
+        trackingNumber: "LB987654321BR",
+        carrier: "Jadlog",
+        shippedAt: "2026-10-20",
+        source: "yith",
+      }),
+    ]);
+  });
+
+  it("falls back to a tracking number in the order notes", async () => {
+    const { calls } = mockFetch([
+      {
+        method: "GET",
+        path: `${WC}/orders/40/notes`,
+        reply: () => [
+          {
+            id: 2,
+            note: "Order status changed from Pending to Processing.",
+            date_created_gmt: "2026-10-20T10:00:00",
+          },
+          {
+            id: 1,
+            note: "Order shipped via USPS with tracking number 9400111899223344556677.",
+            date_created_gmt: "2026-10-21T10:00:00",
+          },
+        ],
+      },
+    ]);
+    expect(await getTracking(base)).toEqual([
+      expect.objectContaining({
+        trackingNumber: "9400111899223344556677",
+        source: "order_note",
+        shippedAt: "2026-10-21T10:00:00Z",
+      }),
+    ]);
+    expect(calls.some((c) => c.path === `${WC}/orders/40/notes`)).toBe(true);
+  });
+
+  it("finds tracking numbers in common note wordings and ignores plain notes", () => {
+    expect(trackingNumberInNote("Código de rastreio: QB123456789BR")).toBe("QB123456789BR");
+    expect(trackingNumberInNote("Seu pedido foi postado. <a href='x'>AA123456789BR</a>")).toBe(
+      "AA123456789BR",
+    );
+    expect(trackingNumberInNote("Tracking #: 1Z999AA10123456784")).toBe("1Z999AA10123456784");
+    expect(trackingNumberInNote("Tracking info updated by the warehouse")).toBeNull();
+    expect(trackingNumberInNote("Payment received.")).toBeNull();
+  });
+
+  it("returns an empty list when nothing is recorded anywhere", async () => {
+    mockFetch([{ method: "GET", path: `${WC}/orders/40/notes`, reply: () => [] }]);
+    expect(await getTracking(base)).toEqual([]);
+  });
+});
