@@ -1,3 +1,9 @@
+## 2026-10-28 — claude/w2-channels (L7) — all L7 tickets committed (D13-8..14, D11-10/11), not pushed
+- D13-14: plugins/core/messenger (hay-channel-messenger-meta; Facebook Login, Page tokens from /me/accounts, route by Page id, customer id messenger:<page>:<psid>, owner Page-inbox echoes → human_agent). Human Agent tag retry for a person's reply after 24 h in messenger + instagram; core /deliver now sends messageType.
+- New env: META_MESSENGER_APP_ID / META_MESSENGER_APP_SECRET (.env.example). package-lock gained the messenger workspace entry.
+- Verified: server tsc + jest 139 suites/1378 pass; dashboard typecheck 0; messenger 34, instagram 21, whatsapp 140, email-channel 61 vitest + builds.
+- Next: Roger configures Meta (Messenger product, Page webhook, App Review incl. Human Agent), then hand-test on staging; merge L7.
+
 ## 2026-10-28 — claude/w2-channels (L7) — D13-8..D13-13 + D11-10/11 committed, not pushed
 - Done: WhatsApp/IG echoes as human msgs; optional Resend sending domain; Resend bounce webhook; channel health (email+push+plugin page); channel-aware rendering (hay-plugin.rendering); suggested customer merge (/customers pages).
 - Migrations (hay_test only): AddEmailSendingDomains1785780000000, AddPluginInstanceChannelHealth1785781000000, AddCustomerMergeDismissals1785782000000.
