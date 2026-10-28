@@ -26,6 +26,7 @@ import { Conversation } from "@server/database/entities/conversation.entity";
 import { LLMService } from "@server/services/core/llm.service";
 import { PromptService } from "@server/services/prompt.service";
 import { createLogger } from "@server/lib/logger";
+import { insightRunsService } from "./insight-runs.service";
 import { FeedbackRating } from "@server/types/message-feedback.types";
 import {
   INSIGHT_ACTION_TYPES,
@@ -252,6 +253,14 @@ export class FeedbackInsightService {
         })
         .where("id = :id AND enriched_at IS NULL", { id: issue.id })
         .execute();
+      await insightRunsService.record({
+        organizationId: issue.organization_id,
+        kind: "feedback_enrichment",
+        model: result.model,
+        usage: result.usage,
+        durationMs: Date.now() - startedAt,
+        succeeded: true,
+      });
       return {
         organizationId: issue.organization_id,
         model: result.model,
@@ -274,6 +283,14 @@ export class FeedbackInsightService {
           },
         );
       }
+      await insightRunsService.record({
+        organizationId: issue.organization_id,
+        kind: "feedback_enrichment",
+        model: null,
+        usage: null,
+        durationMs: Date.now() - startedAt,
+        succeeded: false,
+      });
       return {
         organizationId: issue.organization_id,
         model: null,

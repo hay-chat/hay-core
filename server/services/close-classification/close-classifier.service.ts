@@ -32,6 +32,7 @@ import { LLMService } from "@server/services/core/llm.service";
 import { PromptService } from "@server/services/prompt.service";
 import { redactString } from "@server/lib/logger/redaction";
 import { createLogger } from "@server/lib/logger";
+import { insightRunsService } from "@server/services/insights/insight-runs.service";
 import {
   INSIGHT_ACTION_TYPES,
   INSIGHT_POLARITIES,
@@ -328,6 +329,7 @@ export class CloseClassifierService {
       return;
     }
 
+    const startedAt = Date.now();
     try {
       const prompt = await this.promptService.getPrompt(
         "conversation/close-classification",
@@ -359,9 +361,25 @@ export class CloseClassifierService {
         model: result.model,
         usage: result.usage as unknown as Record<string, unknown>,
       });
+      await insightRunsService.record({
+        organizationId: row.organization_id,
+        kind: "close_classification",
+        model: result.model,
+        usage: result.usage,
+        durationMs: Date.now() - startedAt,
+        succeeded: true,
+      });
       log.debug({ outcome: decision.outcome, billable: decision.billable }, "Classified close");
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
+      await insightRunsService.record({
+        organizationId: row.organization_id,
+        kind: "close_classification",
+        model: null,
+        usage: null,
+        durationMs: Date.now() - startedAt,
+        succeeded: false,
+      });
       if (attempt >= MAX_ATTEMPTS) {
         log.warn({ err: error, attempt }, "Close classifier gave up; keeping the rule outcome");
         await this.finalizeWithRule(row, conversation, message);
