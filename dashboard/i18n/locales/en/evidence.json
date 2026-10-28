@@ -55,7 +55,7 @@
     },
     "disputes": {
       "title": "Payment disputes",
-      "description": "Chargebacks your connected payment platforms reported. Attach the evidence pack as a draft, then review and submit it on the platform.",
+      "description": "Chargebacks your connected payment platforms reported. Attach the evidence pack, then review it on the platform before the due date.",
       "order": "Order {order}",
       "noOrderLabel": "Order unknown",
       "status": {
@@ -65,18 +65,18 @@
         "lost": "Lost",
         "closed": "Closed"
       },
-      "drafted": "Evidence attached as draft",
+      "drafted": "Evidence attached, not submitted",
       "dueBy": "Evidence due {at}",
       "noOrder": "No conversation mentions this order yet, so there is nothing to attach.",
       "download": "Download pack",
-      "attach": "Attach as draft",
+      "attach": "Attach evidence",
       "attachAgain": "Attach again",
       "open": "Open in {platform}",
-      "confirmTitle": "Attach the evidence pack as a draft?",
-      "confirmDescription": "Hay.chat uploads the evidence PDF to this dispute on {platform} and adds a short note. Nothing is submitted: you review the response and submit it on {platform} yourself. Files you added there are kept.",
-      "confirm": "Attach as draft",
+      "confirmTitle": "Attach the evidence pack to this dispute?",
+      "confirmDescription": "Hay.chat uploads the evidence PDF to this dispute on {platform} and adds a short note. Hay.chat never submits the response, but some platforms (Shopify Payments, for example) send saved evidence automatically on the due date, so review it on {platform} before then. Files you added there are kept.",
+      "confirm": "Attach evidence",
       "attached": "Evidence attached to the dispute on {platform}",
-      "attachedHelp": "It is a draft. Review it and submit the response on {platform} before the deadline.",
+      "attachedHelp": "Saved on {platform}, not submitted by Hay.chat. Review it there before the due date: some platforms send saved evidence automatically on that date.",
       "reasons": {
         "product_not_received": "Item not received",
         "product_unacceptable": "Not as described",
