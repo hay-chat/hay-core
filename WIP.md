@@ -1,3 +1,9 @@
+## 2026-10-28 — staging — all Wave 4 lanes (A–I) merged
+- Lane I merged (179a31b1) + dashboard `test` script (ffa89285). Every lane A–I is on staging and pushed.
+- Satellite branches (backoffice ×2, website ×2, docs, shopify-app) committed locally only; list + defaults in tasks/voc-roadmap.md "Still on Roger".
+- Not done: dashboard hand-tests of Wave 4; `plugins:enable-defaults` on staging; backoffice migration AddCreditedOverage (no local DB).
+- Next: Roger reviews "Still on Roger" + release draft (https://claude.ai/artifact/Ugfwub6xvdyzrZZMixWqCT) + runbook; then open satellite PRs.
+
 ## 2026-10-28 — claude/w4-i-tooling (worktree hay-core-w4-i-tooling) — Lane I committed, NOT pushed
 - I2 CI: webchat job runs on staging push/PR; quality + server-tests stay master-only. I1 dropped (Lane F did it).
 - I3 emails: notification template shows its blocks (pass 1 no longer eats {{#if}}), {{else}}, escaped values, callouts as divs, initialize() before send; 0 MJML warnings; jest 11 suites/89 pass.

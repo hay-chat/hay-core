@@ -312,6 +312,14 @@ Roger said "Do it now" for every gap. Not started; lanes below.
 - (Lane F) "Web Chat Off" read as the Enable Web Chat switch on Settings > Web Chat (not the AI channel mode). Default: keep.
 - (Lane H) Catalogue prune deletes products the store no longer returns (not soft delete); Magento stale flag always uses the domestic threshold (no origin country over REST). Default: keep both.
 - (Lane H) New generic plugin state store (encrypted KV, TTL) open to every plugin, scoped by token to org + plugin. Default: keep open.
+- (Lane I) Notification emails were silently dropping every {{#if}} block in prod; now fixed, so all notifications show more content (escaped). Default: ship.
+- (Lane I) Release runbook `tasks/release-waves-0-3.md`: confirm the deploy.sh steps marked "Roger to confirm" before merging PR #104.
+- (Lane I) Satellite branches, local only, need PRs:
+  - hay-backoffice `claude/w4-a-billing` + `claude/w4-g-plan-email` (from main; conflict with #7 in stripe-webhook-handler). Default: retarget #7 to main, merge it, rebase both.
+  - hay-website `claude/w4-i-shopify-h3` (on top of #46's branch; #46 conflicts with main) and `claude/w4-i-home-perf` (mobile Lighthouse median 71→98, LCP 6.2→2.1 s).
+  - hay-docs `claude/w4-i-email-docs` (Email plugin page removed → add a website redirect to email-inbox).
+  - hay-shopify-app `claude/w4-i-shopify-scopes` (write_order_edits, write_discounts).
+- (Lane I) Maskable icon needs a designer asset.
 - Deferred to a Claude-in-Chrome session: prod env keys (Turnstile, VAPID, OPERATOR_EVENTS_URL/INTERNAL_API_SECRET, SMTP_FROM_NAME, JWT_REFRESH_EXPIRES_IN check, Meta, MP, OpenAI EU), Meta Messenger setup + App Review, Mercado Pago app, OpenAI EU application, Stripe test-mode plan changes, WABA checks, real-store checks, connecting test stores to staging.
 - Deferred: disputes real tests (after the C3 rationale doc), iPhone push test (can run before deploy: staging over an https tunnel + VAPID keys), WP 1.0.1/1.1.0 svn release, lawyer questions, read-only prod checks (D1-0, D14-1, D3), merchant comms, Spanish alert + widget locale native checks, legal copy in website #46.
 - After deploy: Claude does the D8 media-private switch (needs Roger's go-ahead then).
