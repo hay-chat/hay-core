@@ -111,5 +111,5 @@ export async function storeWidgetAttachment(params: {
     throw new WidgetAttachmentRejectedError("File type not accepted");
   }
 
-  return { id: stored.upload.id, name, url: stored.url, type, size: stored.upload.size };
+  return { id: stored.upload.id, name, url: stored.url, type, size: Number(stored.upload.size) };
 }

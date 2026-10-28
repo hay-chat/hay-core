@@ -623,7 +623,7 @@ export const pluginApiTrpcRouter = router({
         name: input.filename,
         url: stored.url,
         type: stored.upload.mimeType,
-        size: stored.upload.size,
+        size: Number(stored.upload.size),
       };
 
       if (!input.transcribe || !attachment.type.startsWith("audio/")) {

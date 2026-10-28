@@ -2144,6 +2144,7 @@ onMounted(async () => {
             updated_at: messageData.timestamp,
             status: messageData.status || "approved",
             metadata: messageData.metadata,
+            attachments: messageData.attachments ?? conversation.value.messages[optimisticIndex].attachments,
             deliveryState: "sent",
           };
           return;
@@ -2164,6 +2165,7 @@ onMounted(async () => {
             updated_at: messageData.timestamp,
             status: messageData.status || "approved",
             metadata: messageData.metadata,
+            attachments: messageData.attachments ?? conversation.value.messages[existingMessageIndex].attachments,
             deliveryState: "sent",
           };
           return;
