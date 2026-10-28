@@ -336,7 +336,8 @@ export interface ActionApprovalConfig {
   /**
    * Per write category: true = needs approval (D4-9). A missing category uses
    * the default: money moves (refund, cancel, discount, exchange) need approval,
-   * the rest do not. Tools that do not declare a category are always held.
+   * the rest do not. Destructive tools and tools that do not declare a category
+   * are always held.
    */
   categories: Partial<Record<ApprovalCategory, boolean>>;
   /**
@@ -350,7 +351,10 @@ export interface ActionApprovalConfig {
   expiryHours: number;
 }
 
-/** Write categories the owner can switch approval on or off for (not "other_write"). */
+/**
+ * Write categories the owner can switch approval on or off for. Not
+ * "destructive" or "other_write": those are always held while approval is on.
+ */
 export const APPROVAL_CATEGORIES = [
   "refund",
   "cancel",

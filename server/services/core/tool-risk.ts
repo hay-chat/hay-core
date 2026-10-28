@@ -32,10 +32,17 @@ export const WRITE_CATEGORIES = [
   "address_change",
   "customer_update",
   "note",
+  "destructive",
   "other_write",
 ] as const;
 
 export type WriteCategory = (typeof WRITE_CATEGORIES)[number];
+
+/**
+ * Deletes data or changes account configuration. Always held while approval is
+ * on, like an unclassified write; the owner cannot switch it off per category.
+ */
+export const DESTRUCTIVE_CATEGORY: WriteCategory = "destructive";
 
 /** Writes that move money or undo a sale (an exchange ships goods or changes what was paid for). */
 export const MONEY_CATEGORIES: ReadonlySet<WriteCategory> = new Set([

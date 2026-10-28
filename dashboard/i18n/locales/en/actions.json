@@ -9,6 +9,7 @@
       "address_change": "Address changes",
       "customer_update": "Customer detail changes",
       "note": "Order notes and resent emails",
+      "destructive": "Deletions and setup changes",
       "other_write": "Other actions"
     },
     "settings": {
@@ -22,7 +23,7 @@
         "masterOffHint": "Approval is off. Hay.chat runs every action straight away, except those a playbook asks approval for.",
         "categoriesLabel": "Needs approval",
         "moneyBadge": "Money",
-        "unclassifiedNote": "Actions from integrations that do not say what they do always need approval while approval is on."
+        "unclassifiedNote": "Deletions, setup changes and actions from integrations that do not say what they do always need approval while approval is on."
       },
       "threshold": {
         "label": "Auto-approve refunds and discounts up to",
