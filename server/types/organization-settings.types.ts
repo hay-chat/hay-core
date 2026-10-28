@@ -409,6 +409,30 @@ export function resolveChannelAiMode(
 }
 
 /**
+ * Customer files (D8-11/12/15). Missing values mean the defaults below, so
+ * existing organizations read images unless they turned it off.
+ */
+export interface MediaSettings {
+  /** The AI reads customer photos and PDFs (vision pass). Default on. */
+  readImages?: boolean;
+  /** The AI may see ID documents (owner only). Payment cards are never shown. Default off. */
+  allowIdDocuments?: boolean;
+  /** Where complete product-problem cases are emailed. Unset = Inbox only. */
+  caseEmail?: string | null;
+}
+
+export function resolveMediaSettings(
+  settings: OrganizationSettings | null | undefined,
+): Required<MediaSettings> {
+  const media = settings?.media;
+  return {
+    readImages: media?.readImages !== false,
+    allowIdDocuments: media?.allowIdDocuments === true,
+    caseEmail: typeof media?.caseEmail === "string" && media.caseEmail ? media.caseEmail : null,
+  };
+}
+
+/**
  * Organization Settings JSONB structure
  * This type defines the complete structure of the settings field in the Organization entity
  */
@@ -425,6 +449,7 @@ export interface OrganizationSettings {
   actionApproval?: Partial<ActionApprovalConfig>; // Which AI write actions wait for a person
   aiDisclosure?: AiDisclosureConfig; // AI label on replies, per channel
   channelAiModes?: Record<string, ChannelAiMode>; // Per-channel AI mode; missing = "on"
+  media?: MediaSettings; // Customer photos/PDFs: AI reading, ID documents, case email
   [key: string]: unknown;
 }
 

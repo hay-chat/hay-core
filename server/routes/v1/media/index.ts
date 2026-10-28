@@ -5,6 +5,7 @@ import { createLogger } from "@server/lib/logger";
 import { Upload } from "@server/entities/upload.entity";
 import { storageService } from "@server/services/storage.service";
 import { isUuid, verifyMediaSignature } from "@server/services/media-url.service";
+import { isScanCleared, waitForScans } from "@server/services/media-scan.service";
 import { ACTIONS, RESOURCES } from "@server/types/scopes";
 
 /**
@@ -18,11 +19,17 @@ import { ACTIONS, RESOURCES } from "@server/types/scopes";
  * Everything else gets 401 (no credentials) or 404 (credentials that don't
  * cover this upload), so upload ids from other organizations are not
  * distinguishable from missing ones.
+ *
+ * Virus scan (D8-4): a document still being scanned is held (the request waits
+ * a few seconds, then 423); infected files and failed scans get 403.
  */
 
 const logger = createLogger("media-route");
 
 const router = Router();
+
+/** How long a request waits for a pending scan before answering 423. */
+const SCAN_HOLD_MS = 10_000;
 
 /** Types a browser may render in place; everything else is forced to download. */
 function isInlineType(mimeType: string): boolean {
@@ -108,6 +115,19 @@ router.get("/:id", async (req: Request, res: Response) => {
     }
     if (access === "denied") {
       res.status(404).json({ error: "Not found" });
+      return;
+    }
+
+    let scanStatus = upload.scanStatus;
+    if (scanStatus === "pending") {
+      scanStatus = (await waitForScans([upload.id], SCAN_HOLD_MS)).get(upload.id) ?? null;
+    }
+    if (scanStatus === "pending") {
+      res.status(423).set("Retry-After", "5").json({ error: "File is being scanned" });
+      return;
+    }
+    if (!isScanCleared(scanStatus)) {
+      res.status(403).json({ error: "File blocked by the virus scan" });
       return;
     }
 

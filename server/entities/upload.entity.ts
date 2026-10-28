@@ -58,4 +58,11 @@ export class Upload extends BaseEntity {
 
   @Column({ type: "uuid", nullable: true })
   customerId?: string | null;
+
+  // D8-4: virus scan (services/media-scan.service). NULL/"skipped"/"clean" are
+  // served; "pending", "infected" and "error" are held.
+  @Column({ type: "varchar", length: 20, nullable: true })
+  scanStatus?: ScanStatus | null;
 }
+
+export type ScanStatus = "skipped" | "pending" | "clean" | "infected" | "error";

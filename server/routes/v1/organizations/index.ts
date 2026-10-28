@@ -12,6 +12,7 @@ import {
   resolveActionApprovalConfig,
   APPROVAL_CATEGORIES,
   DEFAULT_NEW_ORG_RETENTION_DAYS,
+  resolveMediaSettings,
 } from "@server/types/organization-settings.types";
 import type { DeepPartial } from "typeorm";
 import { AppDataSource } from "@server/database/data-source";
@@ -450,6 +451,50 @@ export const organizationsRouter = t.router({
         settings: { ...(organization.settings || {}), aiDisclosure, channelAiModes },
       });
       return { success: true };
+    }),
+
+  // Customer photos and PDFs (D8-11): whether the AI reads them.
+  getMediaSettings: scopedProcedure(RESOURCES.ORGANIZATION_SETTINGS, ACTIONS.READ).query(
+    async ({ ctx }) => {
+      const organization = await organizationService.findOne(ctx.organizationId!);
+      if (!organization) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Organization not found" });
+      }
+      return resolveMediaSettings(organization.settings);
+    },
+  ),
+
+  updateMediaSettings: scopedProcedure(RESOURCES.ORGANIZATION_SETTINGS, ACTIONS.UPDATE)
+    .input(
+      z.object({
+        readImages: z.boolean().optional(),
+        allowIdDocuments: z.boolean().optional(),
+        // D8-15: where complete product-problem cases are emailed; null turns it off.
+        caseEmail: z.string().trim().email().max(254).nullable().optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const organization = await organizationService.findOne(ctx.organizationId!);
+      if (!organization) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Organization not found" });
+      }
+      const media = { ...(organization.settings?.media ?? {}) };
+      if (input.readImages !== undefined) media.readImages = input.readImages;
+      // Letting the AI read ID documents is the owner's call (D8-12). Cards are never readable.
+      if (input.allowIdDocuments !== undefined && input.allowIdDocuments !== media.allowIdDocuments) {
+        if (input.allowIdDocuments && ctx.user?.getRole() !== "owner") {
+          throw new TRPCError({
+            code: "FORBIDDEN",
+            message: "Only the organization owner can let the AI read ID documents",
+          });
+        }
+        media.allowIdDocuments = input.allowIdDocuments;
+      }
+      if (input.caseEmail !== undefined) media.caseEmail = input.caseEmail || null;
+      await organizationService.update(ctx.organizationId!, {
+        settings: { ...(organization.settings || {}), media },
+      });
+      return resolveMediaSettings({ media });
     }),
 
   updateSettings: scopedProcedure(RESOURCES.ORGANIZATION_SETTINGS, ACTIONS.UPDATE)

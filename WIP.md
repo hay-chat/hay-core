@@ -1,3 +1,9 @@
+## 2026-10-28 05:00 — claude/w2-media-vision — W2 D8 part B built (D8-11..15, D8-4 seam)
+- 6 commits 8139570..24fb747 on staging base; not pushed. Migration AddUploadScanStatus1785771000000 run on hay_test only.
+- Works (tests): vision sidecar on customer photos/PDFs (OPENAI_VISION_MODEL), ID/card withholding + card redaction + Inbox blur, inspect_attachment, product-problem template + complete_product_case, case email, clamd seam (CLAMAV_HOST).
+- Not hand-tested against real OpenAI/clamd/SMTP yet.
+- Next: merge into staging, run migration on hay_staging, hand-test per the lane report.
+
 ## 2026-10-28 04:20 — staging — W2 D8 part A + L13 evidence pack merged, hand-tested, fixes in
 - Merged 7ba8a51 (media ingest) + e78f8ba (evidence pack); migrations + order-links backfill run on hay_staging.
 - Manual ✓: widget photo upload/refusal, Inbox media, composer PDF → widget; evidence pack PDF/ZIP (hashes ok), Export menu entry.

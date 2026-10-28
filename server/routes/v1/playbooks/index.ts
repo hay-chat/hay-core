@@ -10,6 +10,7 @@ import { PromptService } from "../../../services/prompt.service";
 import { PlaybookSuggestionService } from "../../../services/playbook-suggestion.service";
 import { documentRepository } from "../../../repositories/document.repository";
 import { In } from "typeorm";
+import { listPlaybookTemplates } from "../../../services/product-case/templates";
 
 const playbookService = new PlaybookService();
 
@@ -77,6 +78,11 @@ const updatePlaybookSchema = z.object({
 });
 
 export const playbooksRouter = t.router({
+  // D8-14: ready-made playbooks; the dashboard creates a draft from one.
+  templates: scopedProcedure(RESOURCES.PLAYBOOKS, ACTIONS.READ)
+    .input(z.object({ locale: z.enum(["en", "pt-BR"]).default("en") }))
+    .query(({ input }) => listPlaybookTemplates(input.locale)),
+
   list: scopedProcedure(RESOURCES.PLAYBOOKS, ACTIONS.READ).query(async ({ ctx }) => {
     const playbooks = await playbookService.getPlaybooks(ctx.organizationId!);
     return playbooks;

@@ -6,6 +6,25 @@
         <Button variant="outline" size="icon" @click="router.push('/playbooks/new')">
           <Plus class="h-4 w-4" />
         </Button>
+        <DropdownMenu>
+          <DropdownMenuTrigger as-child>
+            <Button variant="outline" :loading="creatingFromTemplate" @click="loadTemplates">
+              <LayoutTemplate class="h-4 w-4 mr-2" />
+              {{ t("templates.button") }}
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" class="max-w-sm">
+            <DropdownMenuItem
+              v-for="template in templates"
+              :key="template.id"
+              class="flex-col items-start"
+              @click="createFromTemplate(template)"
+            >
+              <span class="font-medium">{{ template.title }}</span>
+              <span class="text-xs text-muted-foreground">{{ template.description }}</span>
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
         <Button @click="router.push('/playbooks/wizard')">
           <Sparkles class="h-4 w-4 mr-2" />
           {{ t("actions.generatePlaybook") }}
@@ -252,6 +271,7 @@ import {
   Copy,
   Trash2,
   Sparkles,
+  LayoutTemplate,
 } from "lucide-vue-next";
 
 import { useRouter } from "vue-router";
@@ -260,11 +280,52 @@ import type { Playbook } from "~/types/playbook";
 import { HayApi } from "@/utils/api";
 import DataPagination from "@/components/DataPagination.vue";
 import MetricCard from "@/components/MetricCard.vue";
+import { markdownToTiptapJSON } from "@/utils/markdownToTiptap";
+import { PlaybookStatus } from "~/types/playbook";
+import type { RouterOutputs } from "@/types/trpc";
 
-const { t } = useI18n();
+const { t, locale } = useI18n();
 const toast = useToast();
 const router = useRouter();
 const { formatDateTime } = useOrgDateTime();
+
+// Ready-made playbooks (D8-14): created as a draft, then opened in the editor.
+type PlaybookTemplate = RouterOutputs["playbooks"]["templates"][number];
+const templates = ref<PlaybookTemplate[]>([]);
+const creatingFromTemplate = ref(false);
+
+const loadTemplates = async () => {
+  if (templates.value.length) return;
+  try {
+    templates.value = await HayApi.playbooks.templates.query({
+      locale: locale.value === "pt-BR" ? "pt-BR" : "en",
+    });
+  } catch (error) {
+    console.error("Failed to load playbook templates:", error);
+    toast.error(t("templates.loadFailed"));
+  }
+};
+
+const createFromTemplate = async (template: PlaybookTemplate) => {
+  creatingFromTemplate.value = true;
+  try {
+    const document = markdownToTiptapJSON(template.instructions);
+    const created = await HayApi.playbooks.create.mutate({
+      title: template.title,
+      trigger: template.trigger,
+      description: template.description,
+      instructions: { ...document, type: document.type ?? "doc" },
+      status: PlaybookStatus.DRAFT,
+    });
+    toast.success(t("templates.created"));
+    router.push(`/playbooks/${created.id}`);
+  } catch (error) {
+    console.error("Failed to create playbook from template:", error);
+    toast.error(t("templates.createFailed"));
+  } finally {
+    creatingFromTemplate.value = false;
+  }
+};
 
 // Reactive state
 const loading = ref(true);

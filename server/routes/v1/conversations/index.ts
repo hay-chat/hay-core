@@ -1172,6 +1172,22 @@ export const conversationsRouter = t.router({
    * Switch a playground conversation between simulated actions (dry-run, the
    * default) and the live store. Only playground conversations can be switched.
    */
+  // D8-15: send a complete product-problem case to the store's case address again.
+  forwardProductCase: scopedProcedure(RESOURCES.CONVERSATIONS, ACTIONS.UPDATE)
+    .input(z.object({ conversationId: z.string().uuid() }))
+    .mutation(async ({ ctx, input }) => {
+      const conversation = await conversationRepository.findById(input.conversationId);
+      if (!conversation || conversation.organization_id !== ctx.organizationId) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Conversation not found" });
+      }
+      const { forwardProductCase } = await import("../../../services/product-case/forward");
+      const forward = await forwardProductCase(conversation.id, ctx.organizationId!);
+      if (!forward) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "This conversation has no complete product case" });
+      }
+      return forward;
+    }),
+
   setDryRun: scopedProcedure(RESOURCES.CONVERSATIONS, ACTIONS.UPDATE)
     .input(z.object({ conversationId: z.string().uuid(), dryRun: z.boolean() }))
     .mutation(async ({ ctx, input }) => {

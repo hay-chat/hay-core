@@ -207,6 +207,9 @@ export class ExecutionLayer {
         "Starting execution for conversation",
       );
 
+      // Give the vision pass a few seconds to read photos the customer just sent (D8-11).
+      const { waitForMediaAnalysis } = await import("@server/services/media-analysis/pipeline");
+      await waitForMediaAnalysis(conversation.id);
       const messages = await conversation.getMessages();
 
       // Always-available core tools (e.g. recommend_products) get merged with
