@@ -1,6 +1,6 @@
 <template>
   <div class="input-wrapper">
-    <div v-if="label && type !== 'switch'" class="label-container">
+    <div v-if="label && type !== 'switch' && type !== 'checkbox'" class="label-container">
       <Label :for="inputId">{{ label }}</Label>
       <span
         v-if="characterLimit && (type === 'text' || type === 'textarea')"
