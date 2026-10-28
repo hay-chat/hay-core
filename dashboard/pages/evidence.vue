@@ -1,5 +1,7 @@
 <template>
   <Page :title="$t('evidence.title')" :description="$t('evidence.description')">
+    <DisputesCard :highlight-id="highlightDispute" @select-order="selectFromDispute" />
+
     <Card>
       <CardContent class="pt-6">
         <div v-if="context" class="flex flex-wrap items-center justify-between gap-2">
@@ -206,6 +208,7 @@ const { formatDateTime } = useOrgDateTime();
 
 useHead({ title: t("evidence.headTitle") });
 
+const highlightDispute = typeof route.query.dispute === "string" ? route.query.dispute : null;
 const query = ref(typeof route.query.order === "string" ? route.query.order : "");
 const orders = ref<Order[]>([]);
 const retentionDays = ref<number | null>(null);
@@ -279,6 +282,15 @@ function search() {
   if (!value) return;
   router.replace({ query: { order: value } });
   load({ query: value });
+}
+
+/** "Download" on a dispute: search its order and select the platform's match. */
+async function selectFromDispute(orderKey: string, pluginId: string | null) {
+  query.value = orderKey;
+  router.replace({ query: { order: orderKey } });
+  await load({ query: orderKey });
+  const match = orders.value.find((o) => o.orderKey === orderKey && o.pluginId === pluginId);
+  if (match) selectOrder(match);
 }
 
 function clearContext() {

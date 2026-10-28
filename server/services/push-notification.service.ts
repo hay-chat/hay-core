@@ -10,7 +10,12 @@ const logger = createLogger("push-notifications");
 
 /** What the dashboard's service worker (dashboard/public/sw.js) receives. */
 export interface PushPayload {
-  kind: "conversation_needs_attention" | "channel_delivery_failed" | "channel_failing" | "test";
+  kind:
+    | "conversation_needs_attention"
+    | "channel_delivery_failed"
+    | "channel_failing"
+    | "dispute_opened"
+    | "test";
   title: string;
   body: string;
   /** Path on the dashboard origin the notification opens, e.g. /conversations/<id>?org=<orgId>. */
@@ -193,6 +198,27 @@ class PushNotificationService {
     url: string;
     tag: string;
   }): Promise<void> {
+    await this.toOwnersAndAdmins({ kind: "channel_failing", ...args });
+  }
+
+  /**
+   * A payment dispute needs a response (disputes.service, D2-7/D2-8): every
+   * active owner and admin. Copy is localized by the caller.
+   */
+  async onDisputeOpened(args: {
+    organizationId: string;
+    title: string;
+    body: string;
+    url: string;
+    tag: string;
+  }): Promise<void> {
+    await this.toOwnersAndAdmins({ kind: "dispute_opened", ...args });
+  }
+
+  private async toOwnersAndAdmins({
+    organizationId,
+    ...payload
+  }: PushPayload & { organizationId: string }): Promise<void> {
     if (!this.isConfigured()) return;
     const subscriptions = await this.repo()
       .createQueryBuilder("s")
@@ -200,16 +226,10 @@ class PushNotificationService {
         "user_organizations",
         "uo",
         "uo.user_id = s.user_id AND uo.organization_id = :organizationId AND uo.is_active = true AND uo.role IN (:...roles)",
-        { organizationId: args.organizationId, roles: ["owner", "admin"] },
+        { organizationId, roles: ["owner", "admin"] },
       )
       .getMany();
-    await this.deliver(subscriptions, {
-      kind: "channel_failing",
-      title: args.title,
-      body: args.body,
-      url: args.url,
-      tag: args.tag,
-    });
+    await this.deliver(subscriptions, payload);
   }
 
   /** The "send a test" button: the caller's own devices only. */

@@ -165,6 +165,20 @@ const jobRegistry: CronJobConfig[] = [
   },
 
   {
+    name: "dispute-evidence-reminder",
+    description:
+      "Remind owners and admins once when a payment dispute's evidence is due within 48h and nothing is attached (D2-7)",
+    schedule: "15 * * * *", // Hourly
+    handler: async () => {
+      const { disputesService } = await import("./disputes/disputes.service");
+      await disputesService.sendReminders();
+    },
+    singleton: true,
+    enabled: true,
+    timeout: 300000, // 5 minutes max
+  },
+
+  {
     name: "insight-backfill",
     description:
       "Insights-only review of the last 30 days of closed conversations when Insights is enabled (D3-18)",

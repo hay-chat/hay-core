@@ -3,6 +3,10 @@
  * from the latest plugin tool answer that described this order. Generic field
  * names only; whatever is missing is left off the cover.
  */
+import { In } from "typeorm";
+import { AppDataSource } from "@server/database/data-source";
+import { Message, MessageType } from "@server/database/entities/message.entity";
+import type { OrderGroup } from "../order-links/order-link.service";
 import { asRecord, parseToolOutput, type JsonRecord } from "./tool-output";
 import { normalizeOrderToken } from "../order-links/order-extract";
 
@@ -55,4 +59,20 @@ export function orderSummaryFrom(output: unknown, tokens: Set<string>): OrderSum
     return { total, placedAt: (date as string | undefined) ?? null };
   }
   return null;
+}
+
+/** Total and date from the latest tool answer in these conversations that described the order. */
+export async function orderSummaryForGroup(conversationIds: string[], group: OrderGroup) {
+  const tokens = new Set([group.orderKey, ...(group.orderLabel ? [group.orderLabel] : [])]);
+  const toolMessages = await AppDataSource.getRepository(Message).find({
+    where: { conversation_id: In(conversationIds), type: MessageType.TOOL },
+    order: { created_at: "DESC" },
+    take: 200,
+  });
+  for (const message of toolMessages) {
+    if (message.metadata?.toolStatus !== "SUCCESS") continue;
+    const summary = orderSummaryFrom(message.metadata?.toolOutput, tokens);
+    if (summary) return summary;
+  }
+  return { total: null, placedAt: null };
 }
