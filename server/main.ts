@@ -375,6 +375,10 @@ async function startServer() {
     return res.redirect(`${dashboardUrl}/settings/git-connections?${params.toString()}`);
   });
 
+  // Resend email events (bounces, complaints, deliveries) — D13-10
+  const emailEventsRouter = await import("@server/routes/email-events");
+  server.use(emailEventsRouter.default);
+
   // Well-known endpoints for OAuth Client Metadata Document (CIMD)
   const wellKnownRouter = await import("@server/routes/well-known");
   server.use(wellKnownRouter.default);
