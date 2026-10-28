@@ -198,7 +198,9 @@
       "needsAuth": "Needs Authentication",
       "configureCredentials": "Please configure your credentials",
       "connectionFailed": "Connection failed",
-      "tryAgain": "Try Again"
+      "tryAgain": "Try Again",
+      "oauthUnavailableTitle": "Connecting is not available yet",
+      "oauthUnavailable": "{name} can't be connected until its OAuth app is set up on this Hay.chat server. An administrator needs to add the client ID and secret for this integration."
     },
     "about": "About",
     "capabilities": {

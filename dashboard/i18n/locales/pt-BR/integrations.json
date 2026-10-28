@@ -198,7 +198,9 @@
       "needsAuth": "Necessita Autenticação",
       "configureCredentials": "Por favor, configure suas credenciais",
       "connectionFailed": "Conexão falhou",
-      "tryAgain": "Tentar Novamente"
+      "tryAgain": "Tentar Novamente",
+      "oauthUnavailableTitle": "A conexão ainda não está disponível",
+      "oauthUnavailable": "Não é possível conectar {name} até que o app OAuth esteja configurado neste servidor do Hay.chat. Um administrador precisa adicionar o client ID e o secret desta integração."
     },
     "about": "Sobre",
     "capabilities": {

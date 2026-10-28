@@ -3,7 +3,7 @@ import { createRequire } from "node:module";
 
 const require = createRequire(import.meta.url);
 const fx = require("./fixtures/pix-meta");
-const { parsePix } = require("../lib/pix");
+const { parsePix, parsePaymentReferences } = require("../lib/pix");
 const { enrichOrder } = require("../lib/orders");
 
 describe("parsePix (D10-2)", () => {
@@ -96,6 +96,27 @@ describe("enrichOrder payment fields (D10-2)", () => {
     expect(e).toMatchObject({ needsPayment: false, paymentUrl: null, pix: null });
   });
 
+  it("keeps the Mercado Pago payment ids on a paid order (D10-7), from the allowlisted key only", () => {
+    const e = enrichOrder(
+      {
+        ...base,
+        status: "processing",
+        needs_payment: false,
+        date_paid: "2026-10-01T10:00:00",
+        meta_data: [
+          { key: "_Mercado_Pago_Payment_IDs", value: "1325046583, 1325046590" },
+          { key: "_mp_access_token", value: "APP_USR-secret" },
+        ],
+      },
+      [],
+    );
+    expect(e.paymentReferences).toEqual([
+      { provider: "mercadopago", paymentId: "1325046583" },
+      { provider: "mercadopago", paymentId: "1325046590" },
+    ]);
+    expect(JSON.stringify(e)).not.toContain("APP_USR-secret");
+  });
+
   it("dates refunds from the refund list", () => {
     const e = enrichOrder(
       {
@@ -110,5 +131,17 @@ describe("enrichOrder payment fields (D10-2)", () => {
     expect(e.refunds).toEqual([
       { id: 30, reason: "", total: "-10.00", dateCreated: "2026-10-04T09:00:00" },
     ]);
+  });
+});
+
+describe("parsePaymentReferences (D10-7)", () => {
+  it("ignores junk, duplicates and unknown keys", () => {
+    expect(
+      parsePaymentReferences([
+        { key: "_Mercado_Pago_Payment_IDs", value: "abc, 12, 1325046583,1325046583" },
+        { key: "payment_id", value: "9999999999" },
+      ]),
+    ).toEqual([{ provider: "mercadopago", paymentId: "1325046583" }]);
+    expect(parsePaymentReferences(undefined)).toEqual([]);
   });
 });
