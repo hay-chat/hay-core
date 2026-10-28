@@ -204,6 +204,31 @@ describe("simulation harness", () => {
     expect((await simulationHarnessService.getAllowance(orgId)).used).toBe(2);
   });
 
+  it("empties simulation items past the organization's retention, keeping them counted (F2)", async () => {
+    await AppDataSource.getRepository(Organization).update(orgId, {
+      settings: { retentionDays: 30 },
+    });
+    const run = await simulationHarnessService.startRun({ organizationId: orgId, cases: twoCases });
+    const [first, second] = await itemsOf(run.id);
+    await AppDataSource.getRepository(SimulationRunItem).update(second.id, {
+      expectations: { referenceReply: "Your order 1001 ships today" },
+    });
+    await simulationHarnessService.cancelRun(orgId, run.id); // second case: skipped
+    // Both items are old; the one still running must be left alone.
+    await AppDataSource.query(
+      `UPDATE simulation_run_items SET created_at = now() - interval '40 days' WHERE run_id = $1`,
+      [run.id],
+    );
+
+    expect(await simulationHarnessService.scrubExpired()).toBe(1);
+    const [stillRunning, old] = await itemsOf(run.id);
+    expect(stillRunning.id).toBe(first.id);
+    expect(stillRunning.seed).toHaveLength(3);
+    expect(old).toMatchObject({ seed: [], expectations: null, verdict: null, source_ref: null });
+    expect(await simulationHarnessService.scrubExpired()).toBe(0);
+    await AppDataSource.getRepository(Organization).update(orgId, { settings: {} });
+  });
+
   it("refuses a case that does not end with a customer turn", async () => {
     await expect(
       simulationHarnessService.startRun({
