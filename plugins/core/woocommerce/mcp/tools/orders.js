@@ -220,4 +220,4 @@ function registerOrderTools(server) {
   );
 }
 
-module.exports = { registerOrderTools, assertPreDispatch };
+module.exports = { registerOrderTools, assertPreDispatch, ORDER_REF };

@@ -21,6 +21,7 @@ module.exports = {
     woocommerce_create_refund: "refund",
     woocommerce_update_order_shipping_address: "address_change",
     woocommerce_add_order_note: "note",
+    woocommerce_resend_order_confirmation: "note",
     woocommerce_update_customer: "customer_update",
     woocommerce_update_customer_address: "customer_update",
     woocommerce_create_coupon: "discount",
