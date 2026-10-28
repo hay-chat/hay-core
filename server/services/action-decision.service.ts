@@ -18,7 +18,7 @@ import type { Conversation } from "@server/database/entities/conversation.entity
 import { MessageType } from "@server/database/entities/message.entity";
 import type { PendingAction } from "@server/database/entities/pending-action.entity";
 import { conversationRepository } from "@server/repositories/conversation.repository";
-import { pendingActionService, type Decider } from "./pending-action.service";
+import { HANDLED_BY_TEAM_NOTE, pendingActionService, type Decider } from "./pending-action.service";
 import { ToolExecutionService } from "./core/tool-execution.service";
 import { MessageService } from "./core/message.service";
 import { createLogger } from "@server/lib/logger";
@@ -26,9 +26,6 @@ import { handoffCopy } from "@server/orchestrator/handoff-copy";
 import { getAiReplyBlocker } from "@server/orchestrator/reply-guard";
 
 const logger = createLogger("action-decision");
-
-/** Stored on a rejected action closed by "I'll reply myself". */
-export const HANDLED_BY_TEAM_NOTE = "handled_by_team";
 
 const CLOSED_STATUSES: ReadonlyArray<Conversation["status"]> = ["resolved", "unresolved", "closed"];
 

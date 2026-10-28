@@ -33,6 +33,12 @@ export interface HoldInput {
   expiryHours: number;
 }
 
+/**
+ * decision_note on a request closed by "I'll reply myself": rejected so it
+ * never runs, but handed to the team rather than declined.
+ */
+export const HANDLED_BY_TEAM_NOTE = "handled_by_team";
+
 /** Result of a decision: the row as it is now, and whether this call moved it. */
 export interface Transition {
   action: PendingAction | null;
@@ -135,11 +141,11 @@ export class PendingActionService {
     );
   }
 
-  /** Was this exact tool already declined in this conversation? */
   /**
    * The latest request in this conversation for the same tool with the same
    * args that is still waiting or was turned down, if any. Lets the gate
-   * answer a repeated call without opening a second request.
+   * answer a repeated call without opening a second request. A request handed
+   * to the team ("I'll reply myself") was not declined, so it does not count.
    */
   async findEarlierRequest(
     conversationId: string,
@@ -151,6 +157,9 @@ export class PendingActionService {
       .where("pa.conversation_id = :conversationId", { conversationId })
       .andWhere("pa.tool_name = :toolName", { toolName })
       .andWhere("pa.status IN (:...statuses)", { statuses: ["pending", "rejected"] })
+      .andWhere("pa.decision_note IS DISTINCT FROM :handledByTeam", {
+        handledByTeam: HANDLED_BY_TEAM_NOTE,
+      })
       .andWhere("pa.args = CAST(:args AS jsonb)", { args: JSON.stringify(args) })
       .orderBy("pa.created_at", "DESC")
       .getOne();
