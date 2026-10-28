@@ -22,9 +22,20 @@ const mockFindAgent = jest.fn<(id: string) => Promise<unknown>>();
 jest.mock("@server/repositories/agent.repository", () => ({
   agentRepository: { findById: (id: string) => mockFindAgent(id) },
 }));
-const mockFindOnline = jest.fn<() => Promise<unknown[]>>();
-jest.mock("@server/repositories/user.repository", () => ({
-  userRepository: { findOnlineByOrganization: () => mockFindOnline() },
+type MockAvailability = {
+  state: "open" | "open_nobody_online" | "closed";
+  nextOpening: Date | null;
+  localTime: string;
+  timezone: string;
+  hasSchedule: boolean;
+};
+const mockGetAvailability = jest.fn<() => Promise<MockAvailability>>();
+const mockTypicalReply = jest.fn<() => Promise<number | null>>();
+const mockWithinHours = jest.fn<() => Promise<boolean>>();
+jest.mock("@server/services/business-hours.service", () => ({
+  getAvailability: () => mockGetAvailability(),
+  typicalFirstReplyMinutes: () => mockTypicalReply(),
+  isWithinBusinessHours: () => mockWithinHours(),
 }));
 jest.mock("@server/services/conversation-secret.service", () => ({
   conversationSecretService: { deleteSecrets: jest.fn() },
@@ -118,7 +129,7 @@ function makeConversation(agentId: string | null) {
     })),
     getPublicMessages: jest.fn(async () => []),
     addMessage: jest.fn(async (payload: { content: string }) => ({ id: "new", ...payload })),
-    addHandoffInstructions: jest.fn(async (_doc: unknown, _type: string) => undefined),
+    addHandoffInstructions: jest.fn(async (_doc: unknown, _type: string, _context?: string) => undefined),
     markProcessed: jest.fn(async () => true),
   };
 }
@@ -129,7 +140,17 @@ function given(agent: Record<string, unknown> | null, onlineHumans: number) {
   conversation = makeConversation(agent ? AGENT_ID : null);
   mockFindById.mockImplementation(async () => conversation);
   mockFindAgent.mockResolvedValue(agent);
-  mockFindOnline.mockResolvedValue(Array.from({ length: onlineHumans }, (_, i) => ({ id: i })));
+  setAvailability(onlineHumans > 0 ? "open" : "open_nobody_online");
+}
+
+function setAvailability(state: MockAvailability["state"], nextOpening: Date | null = null) {
+  mockGetAvailability.mockResolvedValue({
+    state,
+    nextOpening,
+    localTime: "2026-10-30T20:00",
+    timezone: "Europe/Lisbon",
+    hasSchedule: state === "closed",
+  });
 }
 
 const botMessages = () =>
@@ -146,6 +167,8 @@ describe("hand-off line", () => {
       userMessage: PLANNER_LINE,
       handoffReason: "Customer asked for a human",
     });
+    mockTypicalReply.mockResolvedValue(null);
+    mockWithinHours.mockResolvedValue(true);
   });
 
   it("uses the honest line, not the planner's, when the org has no agent and nobody is online", async () => {
@@ -218,8 +241,77 @@ describe("hand-off line", () => {
       expect(mockUpdate).toHaveBeenCalledWith(CONVERSATION_ID, ORG_ID, {
         status: "pending-human",
       });
-      expect(conversation.addHandoffInstructions).toHaveBeenCalledWith(INSTRUCTIONS, handoffType);
+      expect(conversation.addHandoffInstructions).toHaveBeenCalledWith(
+        INSTRUCTIONS,
+        handoffType,
+        expect.stringMatching(/business hours/),
+      );
       expect(botMessages().map((m) => m.content)).toEqual(["What's your email?"]);
     },
   );
+
+  it("tells the shopper the team usually replies within the median time when known (D5-7)", async () => {
+    given({ id: AGENT_ID }, 0);
+    mockTypicalReply.mockResolvedValue(12);
+
+    await runConversation(CONVERSATION_ID);
+
+    const [line] = botMessages().map((m) => m.content);
+    expect(line).toMatch(/alerted them/);
+    expect(line).toMatch(/usually reply within about 12 minutes/);
+  });
+
+  it("says when the team is back outside business hours (D5-7)", async () => {
+    given({ id: AGENT_ID }, 0);
+    // Fri 30 Oct 2026 20:00 Lisbon → back Mon 2 Nov 09:00
+    setAvailability("closed", new Date("2026-11-02T09:00:00Z"));
+
+    await runConversation(CONVERSATION_ID);
+
+    const [message] = botMessages();
+    expect(message.content).toMatch(/away right now and back on Monday at 09:00 \(Lisbon time\)/);
+    expect(message.content).toMatch(/keep helping/);
+    expect(message.metadata).toEqual(
+      expect.objectContaining({
+        handoffType: "unavailable",
+        availability: expect.objectContaining({
+          state: "closed",
+          nextOpening: "2026-11-02T09:00:00.000Z",
+        }),
+      }),
+    );
+    expect(mockUpdate).toHaveBeenCalledWith(CONVERSATION_ID, ORG_ID, { status: "pending-human" });
+  });
+});
+
+describe("conversation waiting for a person (D5-7)", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    customerLanguage = "en";
+    mockExecute.mockResolvedValue({ step: "RESPOND", userMessage: "Our store opens at 9." });
+    mockTypicalReply.mockResolvedValue(null);
+  });
+
+  it("stays quiet within business hours and clears the processing flag", async () => {
+    given({ id: AGENT_ID }, 0);
+    conversation.status = "pending-human";
+    mockWithinHours.mockResolvedValue(true);
+
+    await runConversation(CONVERSATION_ID);
+
+    expect(mockExecute).not.toHaveBeenCalled();
+    expect(botMessages()).toEqual([]);
+    expect(mockUpdate).toHaveBeenCalledWith(CONVERSATION_ID, ORG_ID, { needs_processing: false });
+  });
+
+  it("keeps answering outside business hours", async () => {
+    given({ id: AGENT_ID }, 0);
+    conversation.status = "pending-human";
+    mockWithinHours.mockResolvedValue(false);
+
+    await runConversation(CONVERSATION_ID);
+
+    expect(mockExecute).toHaveBeenCalled();
+    expect(botMessages().map((m) => m.content)).toEqual(["Our store opens at 9."]);
+  });
 });

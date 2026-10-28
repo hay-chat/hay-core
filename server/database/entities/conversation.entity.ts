@@ -660,6 +660,8 @@ The following tools are available for you to use. You MUST return only valid JSO
   async addHandoffInstructions(
     instructions: TiptapDoc,
     handoffType: "available" | "unavailable",
+    /** Facts about business hours and who is reachable (D5-7); replaces the generic line. */
+    availabilityContext?: string,
   ): Promise<void> {
     const { conversationRepository } = await import("../../repositories/conversation.repository");
 
@@ -749,7 +751,7 @@ The following tools are available for you to use. You MUST return only valid JSO
 
     let content = `From this message forward you should follow these handoff instructions:
 
-**Handoff Context:** ${handoffType === "available" ? "Human agents are available" : "No human agents available"}
+**Handoff Context:** ${availabilityContext ?? (handoffType === "available" ? "Human agents are available" : "No human agents available")}
 
 **Instructions:**
 ${instructionText}`;
@@ -1030,8 +1032,17 @@ The following tools are available for you to use. You MUST return only valid JSO
         newStatus = "awaiting-approval";
       }
 
-      // Update conversation with cooldown and processing status
-      const shouldProcess = newStatus === "open";
+      // Update conversation with cooldown and processing status. A conversation
+      // waiting for a person still gets AI answers outside the channel's
+      // business hours (D5-7): only the human queue waits for opening time.
+      let shouldProcess = newStatus === "open";
+      if (newStatus === "pending-human" && !this.assigned_user_id) {
+        const { isWithinBusinessHours } = await import("../../services/business-hours.service");
+        shouldProcess = !(await isWithinBusinessHours({
+          organizationId: this.organization_id,
+          channel: this.channel,
+        }));
+      }
       await conversationRepository.update(this.id, this.organization_id, {
         status: newStatus,
         needs_processing: shouldProcess,
