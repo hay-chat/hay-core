@@ -181,11 +181,11 @@ export function useChat(config: HayChatConfig, options: UseChatOptions = {}) {
         ? await challenge.run(options.challenge)
         : undefined;
 
-      // Create conversation via HTTP, passing current context and customerExternalId
+      // Create conversation via HTTP, passing current context and the signed customer id
       const conversationData = await conversation.createConversation(
         newKeypair.publicJwk,
         getContext(),
-        config.customerExternalId,
+        { externalId: config.customerExternalId, signature: config.customerExternalIdSignature },
         challengeResult,
       );
       if (!conversationData) {

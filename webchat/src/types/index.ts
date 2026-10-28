@@ -9,8 +9,18 @@ export interface HayChatConfig {
   greetingMessage?: string;
   /** Public context passed to the AI prompt. Safe for non-sensitive data only. */
   context?: Record<string, unknown>;
-  /** External ID of the logged-in user in your system. Loads their stored customer context. */
+  /**
+   * External ID of the logged-in user in your system. Links the conversation to
+   * that customer only together with `customerExternalIdSignature`; unsigned,
+   * the visitor is treated as anonymous.
+   */
   customerExternalId?: string;
+  /**
+   * hex HMAC-SHA256 of `customerExternalId`, keyed with the organization's
+   * identity secret (Settings > Webchat). Compute it on your server, never in
+   * the browser, so the secret is never exposed.
+   */
+  customerExternalIdSignature?: string;
   /** Locale for widget UI strings (e.g. "en-us", "pt-br", "fr-fr"). Auto-detected from browser if omitted. */
   locale?: string;
   /**
