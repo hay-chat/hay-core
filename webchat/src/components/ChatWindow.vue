@@ -141,6 +141,12 @@
       :save-email="saveContactEmail"
     />
 
+    <ChallengeFrame
+      v-if="setChallengeHost"
+      :interactive="challengeInteractive ?? false"
+      :set-host="setChallengeHost"
+    />
+
     <!-- Closed Conversation Footer (replaces input when closed) -->
     <div v-if="isConversationClosed" class="hay-chat-closed-footer">
       <div class="hay-chat-closed-footer__content">
@@ -200,6 +206,7 @@ import { computed } from "vue";
 import MessageList from "./MessageList.vue";
 import MessageInput from "./MessageInput.vue";
 import WaitingBanner from "./WaitingBanner.vue";
+import ChallengeFrame from "./ChallengeFrame.vue";
 import { useI18n } from "@/i18n";
 import type { Message, SendFailure } from "@/types";
 
@@ -230,6 +237,10 @@ const props = defineProps<{
   waitingDetail?: string | null;
   contactSaved?: boolean;
   saveContactEmail?: (email: string) => Promise<boolean>;
+  /** Mount point for the Hay.chat security check frame (challenge@1). */
+  setChallengeHost?: (el: HTMLElement | null) => void;
+  /** The security check needs the shopper to interact. */
+  challengeInteractive?: boolean;
 }>();
 
 defineEmits<{

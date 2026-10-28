@@ -42,7 +42,10 @@ export function mockFetch(routes: Record<string, Route>) {
   return fn;
 }
 
-export async function mountChat(config: Partial<HayChatConfig> = {}) {
+export async function mountChat(
+  config: Partial<HayChatConfig> = {},
+  options: import("../useChat").UseChatOptions = {},
+) {
   const { useChat } = await import("../useChat");
   let chat!: ReturnType<typeof useChat>;
   const app = createApp({
@@ -53,7 +56,7 @@ export async function mountChat(config: Partial<HayChatConfig> = {}) {
         showGreeting: true,
         greetingMessage: "Hello! How can we help you today?",
         ...config,
-      });
+      }, options);
       return () => null;
     },
   });

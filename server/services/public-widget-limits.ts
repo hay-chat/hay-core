@@ -22,6 +22,8 @@ export const PUBLIC_WIDGET_LIMITS = {
   messagePerIp: { max: 60, windowSeconds: 60 },
   /** Files (photos, PDFs) per conversation. Each is up to 10 MB of storage. */
   attachmentPerConversation: { max: 10, windowSeconds: 10 * 60 },
+  /** Challenge page loads per IP (one per first message; retries included). */
+  challengePerIp: { max: 60, windowSeconds: 10 * 60 },
   /** Files per IP, across conversations. */
   attachmentPerIp: { max: 30, windowSeconds: 10 * 60 },
 } as const;
