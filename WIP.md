@@ -1,3 +1,8 @@
+## 2026-10-28 00:55 — staging — L5 commerce merged + tested
+- b0b59ab merged claude/w1-commerce; SDK + 10 plugins rebuilt, tsc ok.
+- Manual ✓ (Woo :8085): 10% coupon created and restricted; second coupon refused (ALREADY_HAS_COUPON); 25% held then approved → created; EUR totals in EUR; bank-transfer refund approved with refund_payment=false.
+- Next: Wave 1 close: review agent over wave-0-done..staging, fixes, full suites, tag wave-1-done, PR #104 body, send GIFs.
+
 ## 2026-10-28 — claude/w1-commerce (L5) — coupons + generic over-cap approval done; staging 255683b merged
 - 7c10840 D16-6: capped tools (_meta chat.hay/capEnforced) skip the money hold; plugin NEEDS_APPROVAL → pending action (over_cap); approved re-run gets hay_approval_id. SDK coupon-policy (10%, fixed off, 30 d).
 - 694eed4 D16-4/5: woocommerce_create_coupon, shopify_create_coupon (+write_discounts scope), Nuvemshop on shared policy (order required).
