@@ -8,8 +8,23 @@ import {
   Unique,
 } from "typeorm";
 
-/** Which rung of the alert ladder a row records (D11-8). */
-export type NotificationStep = "initial" | "repush" | "email";
+/**
+ * Which alert a row records.
+ * - initial / repush / email: the ladder of a hand-off to a person (D11-8).
+ * - customer_reply: the shopper wrote in a conversation a person holds (D11-7).
+ * - followup: another shopper message on a conversation already waiting (D11-7).
+ * - unanswered / unanswered_email: a held conversation's last shopper message
+ *   got no reply from a person for 10 minutes (D11-7); email only when the push
+ *   reached no device.
+ */
+export type NotificationStep =
+  | "initial"
+  | "repush"
+  | "email"
+  | "customer_reply"
+  | "followup"
+  | "unanswered"
+  | "unanswered_email";
 export type NotificationChannel = "push" | "email";
 /**
  * - pending: claimed, being sent
@@ -21,8 +36,9 @@ export type NotificationStatus = "pending" | "sent" | "failed" | "no_device";
 
 /**
  * One alert step for one recipient about a conversation waiting for a human.
- * `cycle_started_at` is when the conversation entered pending-human; a new
- * hand-off starts a new cycle. Unique per (conversation, cycle, step, user) so
+ * `cycle_started_at` is when the conversation entered pending-human (a new
+ * hand-off starts a new cycle); for shopper-message alerts it is the start of
+ * the collapse window, and for "unanswered" the time of the unanswered message. Unique per (conversation, cycle, step, user) so
  * a step is claimed (inserted) before it is sent, and never sent twice.
  */
 @Entity("notification_deliveries")
