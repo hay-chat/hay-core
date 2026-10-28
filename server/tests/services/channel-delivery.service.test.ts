@@ -185,6 +185,16 @@ describe("channelDeliveryService /deliver", () => {
     expect(deliverBody()).toMatchObject({ content: "", attachments: [attachment] });
   });
 
+  it("sends a merged conversation to the identity it started with (D13-13)", async () => {
+    mockConversationRepo.findById.mockResolvedValue({
+      ...conversation,
+      metadata: { ...conversation.metadata, customerExternalId: "+5511888888888" },
+      customer: { external_id: "instagram:123" },
+    });
+    await dispatch(outboundEvent({}));
+    expect(deliverBody().to).toBe("+5511888888888");
+  });
+
   it("sends an empty attachments array when the message has none", async () => {
     await dispatch(outboundEvent({}));
 

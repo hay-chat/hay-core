@@ -235,6 +235,7 @@ describe("pluginApi.messages.receive conversation lookup", () => {
     jest.clearAllMocks();
     mockCustomerRepo.findByExternalId.mockResolvedValue({
       id: "cust-1",
+      external_id: "ana@shopper.com",
       name: "Ana",
       phone: null,
       email: null,
@@ -313,6 +314,34 @@ describe("pluginApi.messages.receive conversation lookup", () => {
       CONVERSATION_ID,
       ORG_ID,
       expect.objectContaining({ status: "pending-human" }),
+    );
+  });
+
+  it("a customer reached through a merged identity gets a conversation that replies to it (D13-13)", async () => {
+    mockCustomerRepo.findByExternalId.mockResolvedValue({
+      id: "cust-1",
+      external_id: "instagram:42",
+      name: "Ana",
+      phone: null,
+      email: null,
+      external_metadata: { _mergedExternalIds: ["ana@shopper.com"] },
+    });
+
+    await caller()["messages.receive"]({
+      from: "ana@shopper.com",
+      content: "Hello again",
+      channel: "email",
+      externalConversationId: "<third@shopper.com>",
+    });
+
+    expect(mockConversationRepo.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        customer_id: "cust-1",
+        metadata: {
+          email: { conversationId: "<third@shopper.com>" },
+          customerExternalId: "ana@shopper.com",
+        },
+      }),
     );
   });
 

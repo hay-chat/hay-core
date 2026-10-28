@@ -198,8 +198,15 @@ export class ChannelDeliveryService {
       const organizationId = conversation.organization_id;
 
       // Get the customer's external_id (phone number for WhatsApp, contact id for Chatwoot, etc.)
+      // The shopper's identity on this channel: a merged conversation keeps the
+      // identity it started with (D13-13), else the customer's external_id.
       const customer = conversation.customer;
-      if (!customer?.external_id) {
+      const stampedRecipient = conversation.metadata?.customerExternalId;
+      const recipient =
+        typeof stampedRecipient === "string" && stampedRecipient
+          ? stampedRecipient
+          : customer?.external_id;
+      if (!recipient) {
         logger.warn({ conversationId, channel }, "No customer external_id for delivery");
         return;
       }
@@ -226,7 +233,7 @@ export class ChannelDeliveryService {
           conversationId,
           channel,
           messageId,
-          to: customer.external_id,
+          to: recipient,
           aiDisclosure: !!disclosure,
         },
         "Delivering message via channel plugin",
@@ -235,7 +242,7 @@ export class ChannelDeliveryService {
       await this.deliverViaPlugin({
         organizationId,
         channel,
-        to: customer.external_id,
+        to: recipient,
         content: disclosure ? (content ? `${disclosure}\n\n${content}` : disclosure) : content,
         aiDisclosed: !!disclosure,
         messageId,

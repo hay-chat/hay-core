@@ -81,6 +81,18 @@ const messageRepository = new MessageRepository();
 const agentRepository = new AgentRepository();
 
 /**
+ * Conversation metadata for a customer reached through an identity it took
+ * over in a merge (D13-13): replies go to that identity, not the customer's
+ * own external_id (which belongs to another channel).
+ */
+function recipientMetadata(
+  customer: { external_id: string | null },
+  identity: string,
+): Record<string, unknown> {
+  return customer.external_id !== identity ? { customerExternalId: identity } : {};
+}
+
+/**
  * Plugin API Router (tRPC)
  *
  * This router provides endpoints for plugins to interact with the Hay platform.
@@ -283,6 +295,10 @@ export const pluginApiTrpcRouter = router({
         };
 
         if (!conversation) {
+          const metadata: Record<string, unknown> = {
+            ...(Object.keys(channelMetadata).length ? { [channel]: channelMetadata } : {}),
+            ...recipientMetadata(customer, from),
+          };
           conversation = await conversationRepository.create({
             organization_id: organizationId,
             customer_id: customer.id,
@@ -290,7 +306,7 @@ export const pluginApiTrpcRouter = router({
             channel,
             status: "open",
             title: title ?? "",
-            metadata: Object.keys(channelMetadata).length ? { [channel]: channelMetadata } : null,
+            metadata: Object.keys(metadata).length ? metadata : null,
           });
         } else if (externalConversationId) {
           // Conversation already exists — store the externalConversationId if
@@ -482,6 +498,7 @@ export const pluginApiTrpcRouter = router({
           );
 
           if (!conversation) {
+            const metadata = recipientMetadata(customer, to);
             conversation = await conversationRepository.create({
               organization_id: organizationId,
               customer_id: customer.id,
@@ -489,6 +506,7 @@ export const pluginApiTrpcRouter = router({
               channel,
               status: "open",
               title: "",
+              metadata: Object.keys(metadata).length ? metadata : null,
             });
           }
         }
