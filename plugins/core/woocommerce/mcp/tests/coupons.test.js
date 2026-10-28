@@ -94,7 +94,9 @@ describe("woocommerce_create_coupon", () => {
       meta_data: [{ key: "_hay_goodwill", value: "late parcel" }],
     });
     expect(post.body.code).toMatch(/^HAY[A-Z2-9]{8}$/);
-    const days = (Date.parse(`${post.body.date_expires}Z`) - Date.now()) / 86400000;
+    // Explicit UTC: WooCommerce would read a bare timestamp as store-local time.
+    expect(post.body.date_expires).toMatch(/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ$/);
+    const days = (Date.parse(post.body.date_expires) - Date.now()) / 86400000;
     expect(Math.round(days)).toBe(30);
     expect(res.data).toMatchObject({
       created: true,
@@ -167,7 +169,7 @@ describe("woocommerce_create_coupon", () => {
     process.env.WOOCOMMERCE_COUPON_MAX_DAYS = "7";
     const { calls } = mockFetch(routes());
     await server.call("woocommerce_create_coupon", { ...BASE_ARGS, valid_days: 90 });
-    const days = (Date.parse(`${posts(calls)[0].body.date_expires}Z`) - Date.now()) / 86400000;
+    const days = (Date.parse(posts(calls)[0].body.date_expires) - Date.now()) / 86400000;
     expect(Math.round(days)).toBe(7);
   });
 
