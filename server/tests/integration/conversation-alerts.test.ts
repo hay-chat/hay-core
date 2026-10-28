@@ -33,7 +33,7 @@ jest.mock("../../services/email.service", () => ({
   emailService: {
     sendTemplateEmail: (options: Record<string, unknown>) => mockSendTemplateEmail(options),
   },
-  getOrganizationLocale: async () => "pt-BR",
+  getOrganizationLocale: async () => "pt", // org languages are short codes
 }));
 jest.mock("../../services/business-hours.service", () => ({
   isWithinBusinessHours: () => mockWithinHours(),

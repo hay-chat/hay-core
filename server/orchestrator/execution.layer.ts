@@ -1390,6 +1390,8 @@ export class ExecutionLayer {
       const composed = await this.llmService.invoke<string>({
         prompt,
         temperature: 0.3,
+        // Keeps the call on the org's provider and AI region (EU-only orgs).
+        organizationId: conversation.organization_id,
         // Composing a fallback reply from recent history; falls back to a
         // hardcoded message when this returns empty.
         tier: "medium",

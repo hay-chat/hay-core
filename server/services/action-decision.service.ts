@@ -18,7 +18,7 @@ import type { Conversation } from "@server/database/entities/conversation.entity
 import { MessageType } from "@server/database/entities/message.entity";
 import type { PendingAction } from "@server/database/entities/pending-action.entity";
 import { conversationRepository } from "@server/repositories/conversation.repository";
-import { pendingActionService } from "./pending-action.service";
+import { HANDLED_BY_TEAM_NOTE, pendingActionService, type Decider } from "./pending-action.service";
 import { ToolExecutionService } from "./core/tool-execution.service";
 import { MessageService } from "./core/message.service";
 import { createLogger } from "@server/lib/logger";
@@ -27,23 +27,51 @@ import { getAiReplyBlocker } from "@server/orchestrator/reply-guard";
 
 const logger = createLogger("action-decision");
 
-/** Stored on a rejected action closed by "I'll reply myself". */
-export const HANDLED_BY_TEAM_NOTE = "handled_by_team";
+/** Same bound as the queue worker's retries (MAX_RETRY_ATTEMPTS). */
+const FOLLOW_UP_ATTEMPTS = 3;
 
 const CLOSED_STATUSES: ReadonlyArray<Conversation["status"]> = ["resolved", "unresolved", "closed"];
+
+/** The channel's reply window (if it has one) has already closed. */
+function replyWindowClosed(conversation: Conversation, now = new Date()): boolean {
+  const expiresAt = conversation.reply_window_expires_at;
+  return !!expiresAt && new Date(expiresAt).getTime() <= now.getTime();
+}
 
 export interface DecisionResult {
   action: PendingAction | null;
   /** False when someone else already decided (double click, two approvers). */
   transitioned: boolean;
+  /**
+   * Set when the action was not run on purpose: the conversation is closed,
+   * so the shopper could not be told the result. It stays pending.
+   */
+  blocked?: "conversation_closed";
 }
 
 export class ActionDecisionService {
   private toolExecution = new ToolExecutionService();
+  /** Delay between in-process follow-up attempts while the conversation is locked. */
+  followUpRetryMs = 10_000;
   private messages = new MessageService();
 
-  async approve(id: string, organizationId: string, userId: string): Promise<DecisionResult> {
-    const { action, transitioned } = await pendingActionService.approve(id, organizationId, userId);
+  async approve(id: string, organizationId: string, decider: Decider): Promise<DecisionResult> {
+    // Never move money on a closed conversation: the shopper may not be
+    // reachable to hear the result. The request stays pending (it can still be
+    // declined, or approved once the conversation is reopened).
+    const pending = await pendingActionService.findById(id, organizationId);
+    if (pending?.status === "pending") {
+      const current = await conversationRepository.findById(pending.conversation_id);
+      if (current && CLOSED_STATUSES.includes(current.status)) {
+        return { action: pending, transitioned: false, blocked: "conversation_closed" };
+      }
+    }
+
+    const { action, transitioned } = await pendingActionService.approve(
+      id,
+      organizationId,
+      decider,
+    );
     if (!action || !transitioned) return { action, transitioned };
 
     const conversation = await conversationRepository.findById(action.conversation_id);
@@ -71,17 +99,18 @@ export class ActionDecisionService {
       : `A team member approved the action ${action.tool_name}, but it FAILED when it ran: ` +
         `${result.error ?? "unknown error"}. It was NOT done. Tell the customer it did not go ` +
         `through and offer to hand them to the team. Do not retry it.`;
-    await this.resume(conversation, action, note);
+    const outcome = result.success ? "approved and done" : "approved, but it failed";
+    await this.resume(conversation, action, note, outcome);
     return { action: final ?? action, transitioned };
   }
 
   async reject(
     id: string,
     organizationId: string,
-    userId: string,
+    decider: Decider,
     reason: string | null,
   ): Promise<DecisionResult> {
-    const decision = await pendingActionService.reject(id, organizationId, userId, reason);
+    const decision = await pendingActionService.reject(id, organizationId, decider, reason);
     const { action } = decision;
     if (!action || !decision.transitioned) return decision;
 
@@ -97,16 +126,16 @@ export class ActionDecisionService {
       `A team member DECLINED the action ${action.tool_name}. It was NOT done.${why} ` +
       `Explain this to the customer kindly, using the reason if there is one, and offer ` +
       `another option if one fits. Do not request it again.`;
-    await this.resume(conversation, action, note);
+    await this.resume(conversation, action, note, "declined");
     return decision;
   }
 
   /** "I'll reply myself": close the request and put the conversation in the team's queue. */
-  async replyMyself(id: string, organizationId: string, userId: string): Promise<DecisionResult> {
+  async replyMyself(id: string, organizationId: string, decider: Decider): Promise<DecisionResult> {
     const decision = await pendingActionService.reject(
       id,
       organizationId,
-      userId,
+      decider,
       HANDLED_BY_TEAM_NOTE,
     );
     const { action } = decision;
@@ -134,6 +163,7 @@ export class ActionDecisionService {
     conversation: Conversation,
     action: PendingAction,
     note: string,
+    outcome: string,
   ): Promise<void> {
     if (CLOSED_STATUSES.includes(conversation.status)) return;
 
@@ -145,11 +175,32 @@ export class ActionDecisionService {
 
     if (conversation.status === "awaiting-approval") {
       if (await pendingActionService.hasPending(conversation.id)) return;
+    } else if (conversation.status !== "open") {
+      return;
+    }
+
+    // The channel only accepts replies inside its window (e.g. 24 h after the
+    // shopper's last message) and a decision can take up to 48 h. Past it, an
+    // AI turn would be refused by the channel, so the team follows up instead.
+    if (replyWindowClosed(conversation)) {
+      await conversationRepository.update(conversation.id, conversation.organization_id, {
+        status: "pending-human",
+      });
+      await conversation.addMessage({
+        content:
+          `The team's decision on ${action.tool_name}: ${outcome}. The channel's reply window ` +
+          `had already closed, so the AI cannot message the customer about it. The ` +
+          `conversation was passed to the team to follow up.`,
+        type: MessageType.SYSTEM,
+        metadata: { pendingActionId: action.id, isApprovalDecision: true },
+      });
+      return;
+    }
+
+    if (conversation.status === "awaiting-approval") {
       await conversationRepository.update(conversation.id, conversation.organization_id, {
         status: "open",
       });
-    } else if (conversation.status !== "open") {
-      return;
     }
 
     const { orchestratorQueueService } = await import("./orchestrator-queue.service");
@@ -161,12 +212,31 @@ export class ActionDecisionService {
     if (!queued) {
       // No queue (RabbitMQ down or not configured): run the turn here, after
       // the response, so the approver is not kept waiting on the LLM.
-      const { runApprovalFollowUp } = await import("@server/orchestrator/run");
-      setImmediate(() => {
-        runApprovalFollowUp(conversation.id).catch((err) =>
-          logger.error({ err, conversationId: conversation.id }, "Approval follow-up failed"),
+      setImmediate(() => void this.runFollowUpInProcess(conversation.id, 1));
+    }
+  }
+
+  /**
+   * The in-process follow-up. If another run holds the conversation lock (a
+   * shopper message being answered), retry like the queue worker does
+   * (MAX_RETRY_ATTEMPTS, 10 s apart). needs_processing is not an option here:
+   * the sweep that picks it up only runs with RabbitMQ, and a normal turn
+   * would answer the shopper's last message, not the decision.
+   */
+  private async runFollowUpInProcess(conversationId: string, attempt: number): Promise<void> {
+    const { runApprovalFollowUp, ConversationLockedError } =
+      await import("@server/orchestrator/run");
+    try {
+      await runApprovalFollowUp(conversationId);
+    } catch (err) {
+      if (err instanceof ConversationLockedError && attempt < FOLLOW_UP_ATTEMPTS) {
+        setTimeout(
+          () => void this.runFollowUpInProcess(conversationId, attempt + 1),
+          this.followUpRetryMs,
         );
-      });
+        return;
+      }
+      logger.error({ err, conversationId, attempt }, "Approval follow-up failed");
     }
   }
 

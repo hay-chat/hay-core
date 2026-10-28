@@ -110,18 +110,33 @@ describe("MergeEmailPluginIntoEmailInbox1785300000000", () => {
     return insertRegistry(NEW, "Email inbox");
   };
 
-  it("deletes old installs when Email inbox is not in the registry", async () => {
+  it("changes nothing when Email inbox is not in the registry", async () => {
     if (await registryId(NEW)) {
       // Another suite registered Email inbox in this database; the move/merge tests cover it.
       return;
     }
     const oldId = await insertRegistry(OLD, "Email");
-    await insertInstance(onlyOldOrg, oldId, { recipients: "ops@acme.com" });
+    const instance = await insertInstance(onlyOldOrg, oldId, { recipients: "ops@acme.com" });
+    const conversation = (
+      await q<{ id: string }>(
+        `INSERT INTO conversations (title, organization_id, enabled_tools)
+         VALUES ('c', $1, $2) RETURNING id`,
+        [onlyOldOrg, ["hay-plugin-email:send-email"]],
+      )
+    )[0].id;
 
     await runMigration();
 
-    expect(await instancesOf(onlyOldOrg)).toEqual([]);
-    expect(await registryId(OLD)).toBeNull();
+    const rows = await instancesOf(onlyOldOrg);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ id: instance, plugin_id: oldId });
+    expect(rows[0].config).toEqual({ recipients: "ops@acme.com" });
+    expect(await registryId(OLD)).toBe(oldId);
+    const [conv] = await q<{ enabled_tools: string[] }>(
+      `SELECT enabled_tools FROM conversations WHERE id = $1`,
+      [conversation],
+    );
+    expect(conv.enabled_tools).toEqual(["hay-plugin-email:send-email"]);
   });
 
   it("merges into an existing inbox, moves lone installs and leaves inbox-only orgs alone", async () => {

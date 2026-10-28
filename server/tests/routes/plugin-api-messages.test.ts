@@ -625,3 +625,18 @@ describe("pluginApi.messages.updateStatus", () => {
     );
   });
 });
+
+describe("pluginApi.conversations.updateStatusByExternalId", () => {
+  beforeEach(() => jest.clearAllMocks());
+
+  it("cannot park a conversation in awaiting-approval", async () => {
+    await expect(
+      caller()["conversations.updateStatusByExternalId"]({
+        channel: "whatsapp",
+        externalConversationId: "ext-1",
+        status: "awaiting-approval" as "open",
+      }),
+    ).rejects.toMatchObject({ code: "BAD_REQUEST" });
+    expect(mockConversationRepo.findByExternalConversationId).not.toHaveBeenCalled();
+  });
+});

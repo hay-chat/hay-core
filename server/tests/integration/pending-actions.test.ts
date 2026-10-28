@@ -8,15 +8,24 @@ import { Organization } from "../../entities/organization.entity";
 import { User } from "../../entities/user.entity";
 import { Conversation } from "../../database/entities/conversation.entity";
 import { PendingAction } from "../../database/entities/pending-action.entity";
-import { pendingActionService, canApproveActions } from "../../services/pending-action.service";
+import {
+  pendingActionService,
+  canApproveActions,
+  deciderOf,
+} from "../../services/pending-action.service";
 import type { AuthUser } from "../../lib/auth/AuthUser";
 
 jest.mock("../../services/redis.service", () => ({
   redisService: { isConnected: () => false },
 }));
+const mockTrigger = jest.fn(async (..._args: unknown[]) => undefined);
+jest.mock("../../services/hooks/hook-manager", () => ({
+  hookManager: { trigger: (...args: unknown[]) => mockTrigger(...args) },
+}));
 
 const orgId = "da4e0000-0000-4000-8000-000000000001";
 const userId = "da4e0000-0000-4000-8000-0000000000aa";
+const decider = { userId };
 
 async function holdOne(conversationId: string, overrides: Partial<{ expiryHours: number }> = {}) {
   return pendingActionService.hold({
@@ -84,9 +93,9 @@ describe("pending actions (D4-3)", () => {
   it("approves once: concurrent approvals move the row exactly once", async () => {
     const action = await holdOne(conversationId);
     const results = await Promise.all([
-      pendingActionService.approve(action.id, orgId, userId),
-      pendingActionService.approve(action.id, orgId, userId),
-      pendingActionService.approve(action.id, orgId, userId),
+      pendingActionService.approve(action.id, orgId, decider),
+      pendingActionService.approve(action.id, orgId, decider),
+      pendingActionService.approve(action.id, orgId, decider),
     ]);
     expect(results.filter((r) => r.transitioned)).toHaveLength(1);
     expect(results.every((r) => r.action?.status === "approved")).toBe(true);
@@ -95,17 +104,19 @@ describe("pending actions (D4-3)", () => {
     expect(executed?.status).toBe("executed");
     // Already executed: neither a re-execute nor a reject moves it.
     expect(await pendingActionService.markExecuted(results[0].action!)).toBeNull();
-    expect((await pendingActionService.reject(action.id, orgId, userId, "late")).transitioned).toBe(
-      false,
-    );
+    expect(
+      (await pendingActionService.reject(action.id, orgId, decider, "late")).transitioned,
+    ).toBe(false);
   });
 
   it("rejects with a reason and refuses a later approval", async () => {
     const action = await holdOne(conversationId);
-    const rejected = await pendingActionService.reject(action.id, orgId, userId, "Too large");
+    const rejected = await pendingActionService.reject(action.id, orgId, decider, "Too large");
     expect(rejected).toMatchObject({ transitioned: true, action: { status: "rejected" } });
     expect(rejected.action?.decision_note).toBe("Too large");
-    expect((await pendingActionService.approve(action.id, orgId, userId)).transitioned).toBe(false);
+    expect((await pendingActionService.approve(action.id, orgId, decider)).transitioned).toBe(
+      false,
+    );
     const same = { order_id: "1001", amount: "25.00" };
     expect(
       (await pendingActionService.findEarlierRequest(conversationId, "shop:create_refund", same))
@@ -122,7 +133,9 @@ describe("pending actions (D4-3)", () => {
 
   it("does not approve an action past its deadline, and expires it", async () => {
     const action = await holdOne(conversationId, { expiryHours: -1 });
-    expect((await pendingActionService.approve(action.id, orgId, userId)).transitioned).toBe(false);
+    expect((await pendingActionService.approve(action.id, orgId, decider)).transitioned).toBe(
+      false,
+    );
     const expired = await pendingActionService.expireDue();
     expect(expired.map((row) => row.id)).toContain(action.id);
     expect((await pendingActionService.findById(action.id, orgId))?.status).toBe("expired");
@@ -130,10 +143,28 @@ describe("pending actions (D4-3)", () => {
     expect((await pendingActionService.expireDue()).map((row) => row.id)).not.toContain(action.id);
   });
 
+  it("an API key decision stores no user and keeps the key id in the event", async () => {
+    const action = await holdOne(conversationId);
+    const decided = await pendingActionService.approve(
+      action.id,
+      orgId,
+      deciderOf({ authMethod: "apikey", apiKeyId: "key-1", id: "api-token-key-1" } as AuthUser),
+    );
+    expect(decided).toMatchObject({ transitioned: true, action: { decided_by: null } });
+    expect(mockTrigger).toHaveBeenCalledWith(
+      "action_approved",
+      expect.objectContaining({
+        metadata: expect.objectContaining({ userId: null, apiKeyId: "key-1" }),
+      }),
+    );
+  });
+
   it("does not let another organization decide", async () => {
     const action = await holdOne(conversationId);
     const other = "da4e0000-0000-4000-8000-000000000999";
-    expect((await pendingActionService.approve(action.id, other, userId)).transitioned).toBe(false);
+    expect((await pendingActionService.approve(action.id, other, decider)).transitioned).toBe(
+      false,
+    );
   });
 });
 

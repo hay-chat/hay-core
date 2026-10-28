@@ -15,6 +15,7 @@ import {
 import { createLogger } from "@server/lib/logger";
 import { pushNotificationService, type PushPayload } from "./push-notification.service";
 import { isWithinBusinessHours } from "./business-hours.service";
+import { organizationNotificationLocale, type NotificationLocale } from "./notification-locale";
 
 const logger = createLogger("conversation-alerts");
 
@@ -84,10 +85,8 @@ export function isAlertRecipient(member: MemberCandidate): boolean {
   return member.membershipActive && member.userActive && member.status === "available";
 }
 
-type Locale = "en" | "pt-BR";
-
 const COPY: Record<
-  Locale,
+  NotificationLocale,
   {
     pushTitle: string;
     repushTitle: string;
@@ -129,21 +128,28 @@ const COPY: Record<
     emailFooter:
       "Você recebe este e-mail porque está como Disponível no Hay.chat. Mude para Ausente para parar estes alertas.",
   },
+  es: {
+    pushTitle: "Un cliente necesita a una persona",
+    repushTitle: "Un cliente sigue esperando a una persona",
+    untitled: "Nueva conversación",
+    summaryPending: "Toca para abrir la conversación y atenderla.",
+    emailSubject: (who) => `${who} sigue esperando una respuesta`,
+    emailTitle: "Un cliente sigue esperando",
+    emailMessage: (who, minutes) =>
+      `${who} pidió hablar con una persona hace ${minutes} minutos y nadie de tu equipo ha respondido todavía.`,
+    summaryLabel: "Resumen",
+    emailButton: "Abrir la conversación",
+    emailFooter:
+      "Recibes este correo porque estás como Disponible en Hay.chat. Cambia a Ausente para dejar de recibir estas alertas.",
+  },
 };
-
-/** Users have no language of their own yet, so the organization's language decides. */
-async function localeFor(organizationId: string): Promise<Locale> {
-  const { getOrganizationLocale } = await import("./email.service");
-  const locale = await getOrganizationLocale(organizationId);
-  return locale === "pt-BR" ? "pt-BR" : "en";
-}
 
 function conversationPath(conversation: Pick<Conversation, "id" | "organization_id">): string {
   // `org` lets the dashboard switch to the right organization for multi-org users
   return `/conversations/${conversation.id}?org=${conversation.organization_id}`;
 }
 
-function customerLabel(conversation: Conversation, locale: Locale): string {
+function customerLabel(conversation: Conversation, locale: NotificationLocale): string {
   return conversation.customer?.name || conversation.title || COPY[locale].untitled;
 }
 
@@ -252,7 +258,7 @@ class ConversationAlertService {
       return;
     }
 
-    const locale = await localeFor(conversation.organization_id);
+    const locale = await organizationNotificationLocale(conversation.organization_id);
     const copy = COPY[locale];
     const who = customerLabel(conversation, locale);
     const payload: PushPayload = {
@@ -290,7 +296,7 @@ class ConversationAlertService {
     if (recipients.length === 0) return;
 
     const { emailService } = await import("./email.service");
-    const locale = await localeFor(conversation.organization_id);
+    const locale = await organizationNotificationLocale(conversation.organization_id);
     const copy = COPY[locale];
     const who = customerLabel(conversation, locale);
     const minutes = Math.max(1, Math.round((now.getTime() - cycleStartedAt.getTime()) / 60000));
