@@ -53,8 +53,8 @@ const WIN_ANSI_EXTRA = "€‚ƒ„…†‡ˆ‰Š‹ŒŽ‘’“”•–—�
 export function pdfSafe(text: string): string {
   return text
     .normalize("NFC")
-    .replace(/\p{Extended_Pictographic}|[‍︎️]|\p{Emoji_Modifier}/gu, "")
-    .replace(/[^\n\t -~ -ÿ]/g, (char) => (WIN_ANSI_EXTRA.includes(char) ? char : "?"));
+    .replace(/\p{Extended_Pictographic}|\u200D|\uFE0E|\uFE0F|\p{Emoji_Modifier}/gu, "")
+    .replace(/[^\n\t\x20-\x7E\xA0-\xFF]/g, (char) => (WIN_ANSI_EXTRA.includes(char) ? char : "?"));
 }
 
 export function channelLabel(channel: string, locale: EvidenceLocale): string {
