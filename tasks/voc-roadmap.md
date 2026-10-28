@@ -287,7 +287,10 @@ Roger said "Do it now" for every gap. Not started; lanes below.
 ## Still on Roger
 - [x] Post-deploy checks (2026-10-28): deploy.sh = pull + Infisical export + `compose up --build` (no migration step); no pending migrations; plugin build clean; Turnstile enabled for all 101 orgs.
 - [x] Prod keys (2026-10-28): Turnstile, Resend webhook secret, OPERATOR_EVENTS_URL, SMTP_FROM_NAME=Hay.chat set; JWT_REFRESH_EXPIRES_IN removed. Optional Meta / Mercado Pago / OpenAI EU still unset.
-- [ ] Backoffice: #7 merged + migrations on boot (a5015d6); confirm DO deploy + `HAY_INTERNAL_API_SECRET` = core `INTERNAL_API_SECRET`.
+- [x] Backoffice (2026-10-28): #7 merged + migrations on boot (a5015d6), deployed on the homeserver (/srv/hay, not DO); secrets match.
+- [x] Stripe live test (2026-10-28): checkout, upgrade, booked downgrade, overage credit all OK; double plan-change email fixed (backoffice d0bae68). Portal can't change plans in live → copy OK.
+- [ ] VAT: skipped for now (Hay registered in Brazil; B2B reverse charge). Lawyer: confirm no EU/UK consumer sales → no OSS needed; Brazil ISS/nota fiscal. Fix Stripe head office (says PT).
+- [ ] Billing UX: redesign + country picker (USD fallback) + cancel page with 50% once retention offer — agents running; retest live after.
 - Confirm the simulation-cap reading (20 % of plan resolutions, max 500).
 - (Lane B) Stripe `create_refund` is hosted MCP, amount in cents → approvals likely show 1000 for $10. Fix via wrapper tool or plugin-declared amount unit? Default: plugin-declared unit.
 - (Lane B) Destructive writes run when the approval master switch is off. Hold them anyway? Default: hold (one line in `decideGate`).

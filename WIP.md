@@ -1,3 +1,11 @@
+## 2026-10-28 — master (homeserver) — Stripe live test done, billing fixes shipped
+- Live test on "My Store" (roger+demo@hay.chat), sub_1UVbfHL8O3lIr2V8pSy7KSoQ: checkout Solo EUR ✅, upgrade → Starter ✅ (2 emails → fixed backoffice d0bae68), downgrade booked for 28 Nov via schedule ✅ (1 email), overage credit −€2 on next invoice ✅.
+- Live portal has plan changes disabled → "applies now" copy is fine. Live billing page was broken since 10-26 (website ecdbb32 fixed). Plugin routers fixed (3ce94dd2, deployed).
+- VAT: Stripe automatic tax never enabled, no registrations, prices tax_behavior unspecified. Roger: prices exclusive; Hay registered in Brazil → skip VAT for now (lawyer question). Stripe head office says PT — Roger to check.
+- Running (agents): billing page redesign + plan-change dialog + country picker (fallback USD); cancel page with reason step + one-time 50% retention offer.
+- Cleanup owed by Roger after retest: cancel the test sub (no proration), delete pending invoice items on cus_VWee4tKoh7CoM2, refund €50.
+- Next: retest new billing UI live, then step 4 (Meta).
+
 ## 2026-10-28 — master — fix: atlassian/notion routers load in prod
 - Root cause: plugin router.cjs bundles keep `@server/*` external (must share the server's tRPC `t`/singletons); tsc-alias only rewrites server/dist, so `node dist/main.js` couldn't resolve `require('@server/trpc')`. tsx/ts-node resolved it, hence CLI worked.
 - Fix: server/lib/plugin-router-alias.ts registers `@server/*` → server root via tsconfig-paths (runtime dep) before plugin-manager loads a router. Test: server/tests/lib/plugin-router-alias.test.ts (plain node child process, prod-like layout).
