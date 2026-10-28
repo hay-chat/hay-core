@@ -532,6 +532,16 @@ curl http://localhost:3001/v1/privacy/downloadExport?requestId=REQUEST_ID&downlo
 
 ---
 
+## Sub-processors
+
+Third parties that process visitor data on behalf of Hay.chat customers.
+
+| Sub-processor | Purpose | Data | When |
+| --- | --- | --- | --- |
+| Cloudflare, Inc. (Turnstile) | Bot protection on the webchat widget | Visitor IP address, browser and device signals collected by the challenge, the Hay.chat API hostname. No message content. | When a visitor sends their first webchat message and the org has bot protection on (default for new orgs, invisible mode). Strict consent mode still runs it after the first message, as a strictly necessary security measure. |
+
+<!-- TODO: list the other sub-processors (AI providers, email, hosting) here. -->
+
 ## Data Retention Policy
 
 | Data Type                 | Retention Period        | Notes                                                                               |

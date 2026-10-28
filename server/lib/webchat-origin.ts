@@ -26,3 +26,11 @@ export function isDashboardHost(hostname: string | null): boolean {
   const dashboardHost = config.domain.dashboard.replace(/:\d+$/, "").toLowerCase();
   return !!hostname && !!dashboardHost && matchesAllowedDomains([dashboardHost], hostname);
 }
+
+/**
+ * Hostname (no port) the challenge frame is served from. Challenge providers
+ * report this hostname when a token is verified, so gates compare against it.
+ */
+export function challengeFrameHostname(): string {
+  return config.domain.api.replace(/:\d+$/, "").toLowerCase();
+}
