@@ -15,6 +15,8 @@
 
 const { McpServer } = require("@modelcontextprotocol/sdk/server/mcp.js");
 const { StdioServerTransport } = require("@modelcontextprotocol/sdk/server/stdio.js");
+const { applyToolRisk } = require("@hay/plugin-sdk/tool-risk");
+const toolRisk = require("./tool-risk");
 
 const { registerPeopleTools } = require("./tools/people");
 const { registerCompanyTools } = require("./tools/companies");
@@ -23,7 +25,7 @@ const { registerTaskTools } = require("./tools/tasks");
 const { registerMetadataTools } = require("./tools/metadata");
 const { registerRecordTools } = require("./tools/records");
 
-const server = new McpServer({ name: "twenty-crm", version: "1.0.0" });
+const server = applyToolRisk(new McpServer({ name: "twenty-crm", version: "1.0.0" }), toolRisk);
 
 registerPeopleTools(server);
 registerCompanyTools(server);
