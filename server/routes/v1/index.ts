@@ -33,6 +33,7 @@ import { usageRouter } from "./usage";
 import { organizationExportRouter } from "./organization-export";
 import { evidencePacksRouter } from "./evidence-packs";
 import { emailDomainsRouter } from "./email-domains";
+import { simulationsRouter } from "./simulations";
 
 // Core routers - always available
 const coreRouters = {
@@ -69,6 +70,7 @@ const coreRouters = {
   organizationExport: organizationExportRouter,
   evidencePacks: evidencePacksRouter,
   emailDomains: emailDomainsRouter,
+  simulations: simulationsRouter,
 };
 
 // Create v1Router with core + plugin routers

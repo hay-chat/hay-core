@@ -1,4 +1,4 @@
-import { Brackets, Repository, SelectQueryBuilder, In, IsNull } from "typeorm";
+import { Brackets, Repository, SelectQueryBuilder, In } from "typeorm";
 import type { QueryDeepPartialEntity } from "typeorm";
 import { v4 as uuidv4 } from "uuid";
 import { Conversation } from "../database/entities/conversation.entity";
@@ -10,6 +10,7 @@ import type { ListParams } from "../trpc/middleware/pagination";
 import { Message, MessageType } from "@server/database/entities/message.entity";
 import { createLogger } from "@server/lib/logger";
 import { AGENT_SYSTEM_EVENTS } from "@server/services/webchat/public-message";
+import { notSimulationSql } from "../services/simulation/simulation-kind";
 
 const LOCK_DURATION_MS = 15_000;
 
@@ -109,17 +110,24 @@ export class ConversationRepository extends BaseRepository<Conversation> {
   }
 
   async findByAgent(agentId: string, organizationId: string): Promise<Conversation[]> {
-    return await this.getRepository().find({
-      where: { agent_id: agentId, organization_id: organizationId, deleted_at: IsNull() },
-      order: { created_at: "DESC" },
-    });
+    return await this.getRepository()
+      .createQueryBuilder("conversation")
+      .where("conversation.agent_id = :agentId", { agentId })
+      .andWhere("conversation.organization_id = :organizationId", { organizationId })
+      .andWhere("conversation.deleted_at IS NULL")
+      .andWhere(notSimulationSql("conversation"))
+      .orderBy("conversation.created_at", "DESC")
+      .getMany();
   }
 
   override async findByOrganization(organizationId: string): Promise<Conversation[]> {
-    return await this.getRepository().find({
-      where: { organization_id: organizationId, deleted_at: IsNull() },
-      order: { created_at: "DESC" },
-    });
+    return await this.getRepository()
+      .createQueryBuilder("conversation")
+      .where("conversation.organization_id = :organizationId", { organizationId })
+      .andWhere("conversation.deleted_at IS NULL")
+      .andWhere(notSimulationSql("conversation"))
+      .orderBy("conversation.created_at", "DESC")
+      .getMany();
   }
 
   override async update(
@@ -272,6 +280,8 @@ export class ConversationRepository extends BaseRepository<Conversation> {
         .createQueryBuilder("conversation")
         .where("conversation.needs_processing = :needsProcessing", { needsProcessing: true })
         .andWhere("conversation.updated_at < :threshold", { threshold })
+        // Simulation runs track their own conversations (D7-7)
+        .andWhere(notSimulationSql("conversation"))
         .andWhere("conversation.status IN (:...statuses)", {
           statuses: ["open", "processing"],
         })
@@ -320,7 +330,8 @@ export class ConversationRepository extends BaseRepository<Conversation> {
       .where("entity.organization_id = :organizationId", {
         organizationId,
       })
-      .andWhere("entity.deleted_at IS NULL");
+      .andWhere("entity.deleted_at IS NULL")
+      .andWhere(notSimulationSql("entity"));
 
     // Add base where conditions if provided
     if (baseWhere) {
@@ -549,18 +560,23 @@ export class ConversationRepository extends BaseRepository<Conversation> {
       })
       .andWhere("(conversation.cooldown_until IS NULL OR conversation.cooldown_until <= :now)", {
         now: new Date(),
-      });
+      })
+      .andWhere(notSimulationSql("conversation"));
 
     const results = await query.getMany();
 
     return results;
   }
 
+  /** Open conversations for the inactivity check; simulations never time out (D7-7). */
   async findAllOpenConversations(): Promise<Conversation[]> {
-    return await this.getRepository().find({
-      where: { status: "open", deleted_at: IsNull() },
-      order: { created_at: "DESC" },
-    });
+    return await this.getRepository()
+      .createQueryBuilder("conversation")
+      .where("conversation.status = 'open'")
+      .andWhere("conversation.deleted_at IS NULL")
+      .andWhere(notSimulationSql("conversation"))
+      .orderBy("conversation.created_at", "DESC")
+      .getMany();
   }
 
   async getPublicMessages(conversationId: string): Promise<Message[]> {
@@ -734,6 +750,7 @@ export class ConversationRepository extends BaseRepository<Conversation> {
         AND created_at >= $2
         AND created_at <= $3
         AND deleted_at IS NULL
+        AND ${notSimulationSql("conversations")}
       GROUP BY DATE(created_at)
       ORDER BY DATE(created_at) ASC
     `;
@@ -793,7 +810,8 @@ export class ConversationRepository extends BaseRepository<Conversation> {
       .where("conversation.organization_id = :organizationId", {
         organizationId: filters.organizationId,
       })
-      .andWhere("conversation.deleted_at IS NULL");
+      .andWhere("conversation.deleted_at IS NULL")
+      .andWhere(notSimulationSql("conversation"));
 
     if (filters.startDate) {
       queryBuilder.andWhere("conversation.created_at >= :startDate", {

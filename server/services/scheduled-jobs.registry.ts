@@ -167,6 +167,20 @@ const jobRegistry: CronJobConfig[] = [
   },
 
   {
+    name: "simulation-sweep",
+    description: "Fail simulated conversations stuck past their timeout and move their runs on",
+    schedule: 60000, // Every 60 seconds
+    handler: async () => {
+      const { simulationHarnessService } =
+        await import("./simulation/simulation-harness.service");
+      await simulationHarnessService.sweepStaleItems();
+    },
+    singleton: true,
+    enabled: true,
+    skipDatabaseLogging: true,
+  },
+
+  {
     name: "orchestrator-inactivity-check",
     description: "Check for inactive conversations",
     schedule: 300000, // Every 5 minutes

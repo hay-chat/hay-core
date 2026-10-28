@@ -16,6 +16,7 @@ import { createLogger } from "@server/lib/logger";
 import { pushNotificationService, type PushPayload } from "./push-notification.service";
 import { isWithinBusinessHours } from "./business-hours.service";
 import { organizationNotificationLocale, type NotificationLocale } from "./notification-locale";
+import { isSimulationConversation } from "./simulation/simulation-kind";
 
 const logger = createLogger("conversation-alerts");
 
@@ -289,6 +290,7 @@ class ConversationAlertService {
   /** Called by the conversation repository on every status transition. */
   async onConversationStatusChanged(conversation: Conversation): Promise<void> {
     if (conversation.status !== "pending-human") return;
+    if (isSimulationConversation(conversation.metadata)) return;
     await this.pushStep(conversation, new Date(), "initial");
   }
 
@@ -478,6 +480,7 @@ class ConversationAlertService {
     previousStatus: ConversationStatus,
     message: { content: string; created_at: Date },
   ): Promise<void> {
+    if (isSimulationConversation(conversation.metadata)) return;
     const alert = await customerMessageAlert({
       previousStatus,
       assignedUserId: conversation.assigned_user_id,

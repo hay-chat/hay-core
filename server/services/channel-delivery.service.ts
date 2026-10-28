@@ -38,6 +38,7 @@ import {
   type MessageProviderError,
 } from "@server/database/entities/message.entity";
 import { toPublicAttachments, type PublicAttachment } from "./webchat/public-message";
+import { isSimulationConversation } from "./simulation/simulation-kind";
 
 const logger = createLogger("channel-delivery");
 
@@ -180,6 +181,8 @@ export class ChannelDeliveryService {
         logger.warn({ conversationId }, "Conversation not found for channel delivery");
         return;
       }
+      // Simulated conversations (D7-7) are never delivered.
+      if (isSimulationConversation(conversation.metadata)) return;
 
       // Web channel: the WebSocket service delivers it. A human reply to a
       // shopper who has left goes out by email (D5-9).
@@ -343,6 +346,7 @@ export class ChannelDeliveryService {
       const conversation = await conversationRepository.findById(conversationId);
       if (!conversation) return;
       if (conversation.channel === "web") return;
+      if (isSimulationConversation(conversation.metadata)) return;
 
       const pluginId = await pluginManagerService.findPluginIdByChannel(
         conversation.organization_id,
