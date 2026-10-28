@@ -1,4 +1,4 @@
-import { mkdtempSync, writeFileSync, rmSync } from "node:fs";
+import { mkdtempSync, writeFileSync, rmSync, readdirSync, existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
@@ -43,14 +43,29 @@ describe("loadManifest capabilities", () => {
         "products",
         "cron",
         "email",
+        "webchat",
+        "disputes",
       ]),
     );
-    expect(manifest.capabilities).toContain("email");
+    expect(manifest.capabilities).toContain("disputes");
   });
 
   it("rejects an unknown capability by name", () => {
     expect(() => loadManifest(pluginDir(["messages", "telepathy"]))).toThrow(
       /Invalid capability "telepathy"/,
     );
+  });
+
+  // The runner's list drifted once: "disputes" reached the manifest type and the
+  // server but not this check, so the Shopify worker refused to start in prod.
+  it("loads every core plugin manifest", () => {
+    const coreDir = join(__dirname, "../../../plugins/core");
+    const plugins = readdirSync(coreDir).filter((name) =>
+      existsSync(join(coreDir, name, "package.json")),
+    );
+    expect(plugins.length).toBeGreaterThan(0);
+    for (const name of plugins) {
+      expect(() => loadManifest(join(coreDir, name)), name).not.toThrow();
+    }
   });
 });
