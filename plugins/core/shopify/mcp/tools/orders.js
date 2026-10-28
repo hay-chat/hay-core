@@ -4,6 +4,7 @@
 
 const { z } = require("zod");
 const { shopifyGql } = require("../lib/client");
+const { staleTracking, stalestShipment } = require("@hay/plugin-sdk/stale-tracking");
 const {
   ok,
   fail,
@@ -50,9 +51,13 @@ const ORDER_SUPPORT_FIELDS = `
   fulfillments(first: 10) {
     status
     displayStatus
+    createdAt
     deliveredAt
     estimatedDeliveryAt
     trackingInfo { number url company }
+    events(first: 1, sortKey: HAPPENED_AT, reverse: true) {
+      edges { node { happenedAt status } }
+    }
   }
   lineItems(first: 100) {
     edges { node { id title quantity sku } }
@@ -99,6 +104,10 @@ function paymentFields(order) {
     })),
   };
 }
+
+// The store's country, to tell domestic from international shipments (D6-9).
+const SHOP_COUNTRY = "shop { billingAddress { countryCodeV2 } }";
+const shopCountry = (data) => data?.shop?.billingAddress?.countryCodeV2 ?? null;
 
 // Fulfillment statuses under which changing the shipping address still makes
 // sense — nothing has left the warehouse yet.
@@ -147,7 +156,31 @@ function cancelBlocker(order) {
  * same pre-dispatch guard as shopify_cancel_order (Shopify exposes no cancelable
  * field); `orderCancel` remains the final word via its userErrors.
  */
-function enrichOrder(order) {
+/**
+ * D6-9 stale flag over the shipments still on their way: days since the latest
+ * carrier event (Fulfillment.events), else since the fulfillment was created.
+ */
+function orderStaleTracking(order, originCountry, now) {
+  const inTransit = (order.fulfillments || []).filter(
+    (f) =>
+      !VOID_FULFILLMENT_STATUSES.has(f.status) && !f.deliveredAt && f.displayStatus !== "DELIVERED",
+  );
+  const results = inTransit.map((f) =>
+    staleTracking({
+      shippedAt: f.createdAt || null,
+      lastEventAt: unwrapConnection(f.events)[0]?.happenedAt || null,
+      originCountry,
+      destinationCountry: order.shippingAddress?.countryCode,
+      now,
+    }),
+  );
+  return (
+    stalestShipment(results) ||
+    staleTracking({ shippedAt: null, originCountry, destinationCountry: null, now })
+  );
+}
+
+function enrichOrder(order, originCountry = null, now = Date.now()) {
   if (!order) return null;
   const deliveredAt =
     (order.fulfillments || [])
@@ -159,6 +192,10 @@ function enrichOrder(order) {
   return {
     ...order,
     ...paymentFields(order),
+    fulfillments: (order.fulfillments || []).map(({ events, ...f }) => ({
+      ...f,
+      lastEvent: unwrapConnection(events)[0] ?? null,
+    })),
     lineItems: unwrapConnection(order.lineItems),
     supportSummary: {
       isCancellable: cancelBlocker(order) === null,
@@ -167,6 +204,7 @@ function enrichOrder(order) {
       remainingRefundable: order.netPaymentSet ? order.netPaymentSet.shopMoney : null,
       deliveredAt,
       addressChangeable: PRE_DISPATCH_STATUSES.has(order.displayFulfillmentStatus),
+      tracking: orderStaleTracking(order, originCountry, now),
     },
   };
 }
@@ -208,7 +246,7 @@ function registerOrderTools(server) {
     "Get an order with line items, totals, shipping address, tracking, payment transactions " +
       "(gateway, kind, status, paymentId), refunds with dates, sourceName, tags, custom " +
       "attributes, and a supportSummary (isCancellable, isRefundable, remainingRefundable, " +
-      "deliveredAt, addressChangeable).",
+      "deliveredAt, addressChangeable, tracking: isStale/daysSinceLastUpdate/staleReason).",
     {
       order_id: z.string().describe("Order GID (gid://shopify/Order/123) or bare numeric id."),
     },
@@ -218,11 +256,12 @@ function registerOrderTools(server) {
         const QUERY = `
           query GetOrder($id: ID!) {
             order(id: $id) { ${ORDER_SUPPORT_FIELDS} }
+            ${SHOP_COUNTRY}
           }
         `;
         const data = await shopifyGql(QUERY, { id });
         if (!data.order) throw await orderNotFound(args.order_id);
-        return ok(enrichOrder(data.order));
+        return ok(enrichOrder(data.order, shopCountry(data)));
       } catch (err) {
         return fail(err);
       }
@@ -245,6 +284,7 @@ function registerOrderTools(server) {
             orders(first: 1, query: $query) {
               edges { node { ${ORDER_SUPPORT_FIELDS} } }
             }
+            ${SHOP_COUNTRY}
           }
         `;
         const data = await shopifyGql(QUERY, { query: `name:"${args.name}"` });
@@ -256,7 +296,7 @@ function registerOrderTools(server) {
               '(e.g. "#1001"); or find the order via the customer\'s recentOrders.',
           );
         }
-        return ok(enrichOrder(first));
+        return ok(enrichOrder(first, shopCountry(data)));
       } catch (err) {
         return fail(err);
       }

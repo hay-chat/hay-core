@@ -15,6 +15,7 @@ const {
   resolveOrder,
   getTracking,
   getRefundDetails,
+  getStoreCountry,
   enrichOrder,
   PRE_DISPATCH_STATUSES,
 } = require("../lib/orders");
@@ -71,17 +72,19 @@ function registerOrderTools(server) {
     "Get an order by id or number with line items, totals, addresses, payment method and " +
       "transaction id, refunds with dates, shipment tracking, and for an unpaid order its " +
       "payment link and Pix copy-paste code (pix) when the store's gateway saved one, " +
-      "and a supportSummary (isCancellable, isRefundable, remainingRefundable, addressChangeable). " +
+      "and a supportSummary (isCancellable, isRefundable, remainingRefundable, addressChangeable, " +
+      "tracking: isStale/daysSinceLastUpdate/staleReason). " +
       "One call answers status, refund and cancellation questions.",
     ORDER_REF,
     async (args) => {
       try {
         const order = await resolveOrder(args);
-        const [tracking, refundDetails] = await Promise.all([
+        const [tracking, refundDetails, originCountry] = await Promise.all([
           getTracking(order),
           getRefundDetails(order),
+          getStoreCountry(),
         ]);
-        return ok(enrichOrder(order, tracking, refundDetails));
+        return ok(enrichOrder(order, tracking, { refundDetails, originCountry }));
       } catch (err) {
         return fail(err);
       }

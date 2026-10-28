@@ -12,6 +12,7 @@
 const { wcApi, wcList, WooApiError } = require("./client");
 const { num, round2, toolError } = require("./format");
 const { parsePix } = require("./pix");
+const { staleTracking, stalestShipment } = require("@hay/plugin-sdk/stale-tracking");
 
 /** Statuses under which nothing has left the warehouse yet. */
 const PRE_DISPATCH_STATUSES = new Set(["pending", "on-hold", "processing"]);
@@ -210,7 +211,46 @@ function paymentFields(order) {
   };
 }
 
-function enrichOrder(order, tracking, refundDetails = []) {
+let storeCountryPromise = null;
+
+/** The store's base country ("BR:SP" → "BR"), cached per MCP process; null when unreadable. */
+function getStoreCountry() {
+  if (!storeCountryPromise) {
+    storeCountryPromise = wcApi("GET", "/settings/general/woocommerce_default_country")
+      .then((setting) => String(setting?.value || "").split(":")[0] || null)
+      .catch(() => {
+        storeCountryPromise = null; // retry on the next order read
+        return null;
+      });
+  }
+  return storeCountryPromise;
+}
+
+/**
+ * D6-9: days since the tracking plugin recorded the shipment. WooCommerce has no
+ * carrier events or delivery confirmation, so only shipments with a recorded
+ * tracking row count; a "completed" order without tracking is not flagged (for
+ * many stores completed means delivered).
+ */
+function trackingStaleness(order, rows, originCountry, now) {
+  const results = rows
+    .filter((r) => r.shippedAt)
+    .map((r) =>
+      staleTracking({
+        shippedAt: r.shippedAt,
+        originCountry,
+        destinationCountry: order.shipping?.country || order.billing?.country,
+        now,
+      }),
+    );
+  return stalestShipment(results) || staleTracking({ shippedAt: null, originCountry, now });
+}
+
+function enrichOrder(
+  order,
+  tracking,
+  { refundDetails = [], originCountry = null, now = Date.now() } = {},
+) {
   const total = num(order.total);
   const refunded = refundedTotal(order);
   const remaining = round2(Math.max(0, total - refunded));
@@ -270,6 +310,7 @@ function enrichOrder(order, tracking, refundDetails = []) {
       addressChangeable: preDispatch,
       shippedAt: rows.find((r) => r.shippedAt)?.shippedAt ?? order.date_completed ?? null,
       deliveredAt: null, // WooCommerce has no delivery confirmation.
+      tracking: trackingStaleness(order, rows, originCountry, now),
     },
   };
 }
@@ -286,4 +327,5 @@ module.exports = {
   refundedTotal,
   enrichOrder,
   getRefundDetails,
+  getStoreCountry,
 };

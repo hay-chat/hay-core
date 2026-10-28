@@ -17,6 +17,7 @@
 
 const { nsApi, nsList, NuvemshopApiError } = require("./client");
 const { num, round2, toolError } = require("./format");
+const { staleTracking, stalestShipment } = require("@hay/plugin-sdk/stale-tracking");
 
 /** Fulfillment-order statuses under which nothing has left the warehouse. */
 const PRE_DISPATCH_FO = new Set(["UNPACKED", "IN_PREPARATION", "PACKED"]);
@@ -283,7 +284,43 @@ function summarizeOrder(order) {
   };
 }
 
-function enrichOrder(order, tracking, transactions) {
+let storeCountryPromise = null;
+
+/** The store's country (GET /store), cached per MCP process; null when unreadable. */
+function getStoreCountry() {
+  if (!storeCountryPromise) {
+    storeCountryPromise = nsApi("GET", "/store")
+      .then((store) => store?.country || null)
+      .catch(() => {
+        storeCountryPromise = null; // retry on the next order read
+        return null;
+      });
+  }
+  return storeCountryPromise;
+}
+
+/** D6-9: the stalest shipment still on its way (latest carrier event, else dispatch). */
+function trackingStaleness(order, tracking, originCountry, now) {
+  const results = tracking
+    .filter((t) => t.dispatchedAt && !t.deliveredAt)
+    .map((t) =>
+      staleTracking({
+        shippedAt: t.dispatchedAt,
+        lastEventAt: t.latestEvent?.happenedAt || null,
+        originCountry,
+        destinationCountry: order.shipping_address?.country,
+        now,
+      }),
+    );
+  return stalestShipment(results) || staleTracking({ shippedAt: null, originCountry, now });
+}
+
+function enrichOrder(
+  order,
+  tracking,
+  transactions,
+  { originCountry = null, now = Date.now() } = {},
+) {
   const { preDispatch } = dispatchState(order, tracking);
   const payment = paymentInfo(order);
   const total = num(order.total);
@@ -352,11 +389,13 @@ function enrichOrder(order, tracking, transactions) {
       awaitingPayment: payment.awaitingPayment,
       shippedAt: tracking.find((t) => t.dispatchedAt)?.dispatchedAt ?? null,
       deliveredAt: tracking.find((t) => t.deliveredAt)?.deliveredAt ?? null,
+      tracking: trackingStaleness(order, tracking, originCountry, now),
     },
   };
 }
 
 module.exports = {
+  getStoreCountry,
   HOW_TO_REFUND,
   PRE_DISPATCH_FO,
   orderNotFound,

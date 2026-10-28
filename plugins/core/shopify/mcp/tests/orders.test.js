@@ -3,7 +3,7 @@ import { createRequire } from "node:module";
 
 const require = createRequire(import.meta.url);
 const { createFakeServer, mockShopify } = require("./harness");
-const { registerOrderTools, cancelBlocker } = require("../tools/orders");
+const { registerOrderTools, cancelBlocker, enrichOrder } = require("../tools/orders");
 const { registerFulfillmentTools } = require("../tools/fulfillments");
 
 const ORDER_GID = "gid://shopify/Order/1001";
@@ -434,5 +434,79 @@ describe("shopify_get_order payment and source fields (D10-1)", () => {
       transactions: [],
       refunds: [],
     });
+  });
+});
+
+describe("supportSummary.tracking (D6-9)", () => {
+  const now = new Date("2026-10-28T12:00:00Z");
+  const fulfillment = (overrides) => ({
+    status: "SUCCESS",
+    displayStatus: "IN_TRANSIT",
+    createdAt: "2026-10-10T00:00:00Z",
+    deliveredAt: null,
+    events: { edges: [] },
+    ...overrides,
+  });
+  const order = (fulfillments, countryCode = "BR") => ({
+    id: ORDER_GID,
+    name: "#1001",
+    displayFulfillmentStatus: "FULFILLED",
+    shippingAddress: { countryCode },
+    fulfillments,
+    lineItems: { edges: [] },
+  });
+
+  it("flags a shipment whose latest Fulfillment event is older than the threshold", () => {
+    const e = enrichOrder(
+      order([
+        fulfillment({
+          events: {
+            edges: [{ node: { happenedAt: "2026-10-20T00:00:00Z", status: "IN_TRANSIT" } }],
+          },
+        }),
+      ]),
+      "BR",
+      now,
+    );
+    expect(e.supportSummary.tracking).toMatchObject({
+      isStale: true,
+      staleReason: "NO_CARRIER_UPDATE",
+      lastEventAt: "2026-10-20T00:00:00Z",
+      daysSinceLastUpdate: 8,
+    });
+    expect(e.fulfillments[0].lastEvent).toEqual({
+      happenedAt: "2026-10-20T00:00:00Z",
+      status: "IN_TRANSIT",
+    });
+  });
+
+  it("is not stale while events keep coming, or once delivered", () => {
+    const moving = fulfillment({
+      events: { edges: [{ node: { happenedAt: "2026-10-27T00:00:00Z" } }] },
+    });
+    expect(enrichOrder(order([moving]), "BR", now).supportSummary.tracking.isStale).toBe(false);
+    const delivered = fulfillment({ displayStatus: "DELIVERED" });
+    expect(enrichOrder(order([delivered]), "BR", now).supportSummary.tracking.isStale).toBe(false);
+  });
+
+  it("gives international shipments the 10-day threshold", () => {
+    const e = enrichOrder(
+      order([fulfillment({ createdAt: "2026-10-21T00:00:00Z" })], "PT"),
+      "BR",
+      now,
+    );
+    expect(e.supportSummary.tracking).toMatchObject({ international: true, isStale: false });
+  });
+
+  it("asks Shopify for the shop country and the latest fulfillment event", async () => {
+    const { calls } = mockShopify({
+      GetOrder: () => ({
+        order: order([]),
+        shop: { billingAddress: { countryCodeV2: "BR" } },
+      }),
+    });
+    await server.call("shopify_get_order", { order_id: "1001" });
+    expect(calls[0].query).toContain("sortKey: HAPPENED_AT");
+    expect(calls[0].query).toContain("countryCodeV2");
   });
 });

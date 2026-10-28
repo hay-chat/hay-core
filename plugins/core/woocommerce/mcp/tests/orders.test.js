@@ -92,6 +92,7 @@ describe("enrichOrder", () => {
       addressChangeable: true,
       shippedAt: null,
       deliveredAt: null,
+      tracking: expect.objectContaining({ isStale: false, shippedAt: null }),
     });
     expect(e.lineItems[0]).toMatchObject({ id: 101, sku: "HAT-1", quantity: 2 });
     expect(e.shippingMethod).toBe("Flat rate");
@@ -197,7 +198,8 @@ describe("order tools", () => {
     expect(res.data.tracking).toEqual([
       expect.objectContaining({ trackingNumber: "JD1", carrier: "DHL", source: "wc/v3" }),
     ]);
-    expect(calls.map((c) => c.path)).toEqual([
+    // The store-country lookup (stale-tracking threshold) is a cached side read.
+    expect(calls.map((c) => c.path).filter((p) => !p.includes("/settings/"))).toEqual([
       `${WC}/orders/12`,
       `${WC}/orders/12/shipment-trackings`,
     ]);
@@ -238,7 +240,7 @@ describe("order tools", () => {
     expect(res.data.tracking).toEqual([
       expect.objectContaining({ trackingNumber: "1Z", carrier: "ups", source: "meta" }),
     ]);
-    expect(calls.map((c) => c.path)).toEqual([
+    expect(calls.map((c) => c.path).filter((p) => !p.includes("/settings/"))).toEqual([
       `${WC}/orders/12`,
       `${WC}/orders`,
       `${WC}/orders/5000/shipment-trackings`,

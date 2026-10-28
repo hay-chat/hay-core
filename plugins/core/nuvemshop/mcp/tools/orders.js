@@ -19,6 +19,7 @@ const {
   resolveOrder,
   getFulfillments,
   getTransactions,
+  getStoreCountry,
   dispatchState,
   enrichOrder,
   PRE_DISPATCH_FO,
@@ -62,7 +63,7 @@ function assertPreDispatch(order, tracking, action) {
  */
 async function appendOwnerNote(order, line) {
   const stamp = new Date().toISOString().slice(0, 16).replace("T", " ");
-  const entry = `[Hay ${stamp} UTC] ${line}`;
+  const entry = `[Hay.chat ${stamp} UTC] ${line}`;
   const existing = order.owner_note ? String(order.owner_note).trimEnd() : "";
   const note = existing ? `${existing}\n${entry}` : entry;
   const updated = await nsApi("PUT", `/orders/${order.id}`, { body: { owner_note: note } });
@@ -77,16 +78,19 @@ function registerOrderTools(server) {
         "Get an order by id or number with line items, totals, payment (method, Pix status, " +
         "gateway), shipping address, tracking and a supportSummary (isCancellable, " +
         "addressChangeable, isPaid, refundState, remainingRefundable, awaitingPayment, " +
-        "deliveredAt). One call answers status, payment, refund and cancellation questions.",
+        "deliveredAt, tracking: isStale/daysSinceLastUpdate/staleReason). One call answers status, payment, refund and cancellation questions.",
       inputSchema: ORDER_REF,
       annotations: READ,
     },
     async (args) => {
       try {
         const order = await resolveOrder(args);
-        const { rows } = await getFulfillments(order);
-        const transactions = await getTransactions(order);
-        return ok(enrichOrder(order, rows, transactions));
+        const [{ rows }, transactions, originCountry] = await Promise.all([
+          getFulfillments(order),
+          getTransactions(order),
+          getStoreCountry(),
+        ]);
+        return ok(enrichOrder(order, rows, transactions, { originCountry }));
       } catch (err) {
         return fail(err);
       }

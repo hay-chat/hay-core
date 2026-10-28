@@ -79,6 +79,14 @@
     "consumerSecret": {
       "label": "Consumer Secret",
       "description": "Consumer Secret da API REST do WooCommerce"
+    },
+    "staleTrackingDomesticDays": {
+      "label": "Rastreio parado: nacional (dias)",
+      "description": "Considera uma entrega nacional parada quando o rastreio não se move há mais do que este número de dias."
+    },
+    "staleTrackingInternationalDays": {
+      "label": "Rastreio parado: internacional (dias)",
+      "description": "Considera uma entrega internacional parada quando o rastreio não se move há mais do que este número de dias."
     }
   }
 }

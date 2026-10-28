@@ -99,6 +99,14 @@
     "couponMaxDays": {
       "label": "Coupon validity (days)",
       "description": "Coupons the agent creates expire after at most this many days."
+    },
+    "staleTrackingDomesticDays": {
+      "label": "Stale tracking: domestic (days)",
+      "description": "Treat a domestic shipment as stuck when its tracking has not moved for more than this many days."
+    },
+    "staleTrackingInternationalDays": {
+      "label": "Stale tracking: international (days)",
+      "description": "Treat an international shipment as stuck when its tracking has not moved for more than this many days."
     }
   }
 }
