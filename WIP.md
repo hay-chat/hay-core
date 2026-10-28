@@ -1,3 +1,10 @@
+## 2026-10-28 — claude/w4-b-approvals (Lane B)
+- Done B1–B6, one commit each: API refuses switching money approval off without `actionApproval.confirmSwitchOff` ("SWITCH OFF APPROVAL", dashboard sends it after the typed word); new `destructive` risk class (SDK + core, hold reason `destructive_write`, not a per-category toggle) for Zendesk deletes/helpdesk config, Twenty delete_record, Cal.com cancel_booking, Stripe update_dispute (B6).
+- B3 Shopify cancel defaults refund=true only for unfulfilled + PAID + one gateway, else BAD_INPUT REFUND_CHOICE_REQUIRED. B4 Shopify/Woo/Magento/Wix/Mercado Pago refunds take a required `currency` (mismatch refused). B5 Klaviyo upload_image_from_file removed (URL/data-URI tool stays).
+- No migrations. Not covered: Stripe hosted create_refund (no currency arg, amount in cents shown as major units).
+- Verified: server tsc + 7 jest suites 82 ✓, dashboard typecheck ✓, SDK 213 ✓, plugins zendesk/twenty/calcom/shopify/woo/magento/wix/mercadopago/klaviyo/stripe ✓.
+- Next: orchestrator merges to staging, rebuild plugin-sdk + affected plugins, hand-test the Settings > Actions switch-off and a held Zendesk delete.
+
 ## 2026-10-28 — staging — Needs Roger list fully answered
 - All 86 items answered (questionnaire artifact); recorded in tasks/voc-roadmap.md: "Roger's answers", "Tickets from Roger's answers" (lanes A–I, all "do it now"), "Still on Roger".
 - Nothing built yet. Prod reads (deploy.sh) blocked by classifier → on Roger.
