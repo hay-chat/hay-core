@@ -1,7 +1,7 @@
 <template>
   <div class="hay-message-input">
     <p v-if="failure" class="hay-message-input__error" role="alert">
-      {{ failure.reason === "messageTooLong" ? t("error.messageTooLong") : t("error.sendFailed") }}
+      {{ t(FAILURE_KEYS[failure.reason]) }}
     </p>
     <Transition name="hay-counter">
       <span
@@ -16,6 +16,40 @@
       </span>
     </Transition>
     <div class="hay-message-input__wrapper">
+      <button
+        type="button"
+        @click="fileInputRef?.click()"
+        :disabled="!isReady"
+        class="hay-message-input__attach"
+        :aria-label="t('input.attach')"
+        :title="t('input.attach')"
+      >
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          width="16"
+          height="16"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          aria-hidden="true"
+        >
+          <path
+            d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48"
+          ></path>
+        </svg>
+      </button>
+      <input
+        ref="fileInputRef"
+        type="file"
+        :accept="WIDGET_ATTACHMENT_ACCEPT"
+        class="hay-message-input__file"
+        tabindex="-1"
+        aria-hidden="true"
+        @change="handleFile"
+      />
       <textarea
         v-model="messageText"
         @keydown="handleKeydown"
@@ -56,6 +90,8 @@
 import { ref, nextTick, watch } from "vue";
 import { useI18n } from "@/i18n";
 import type { SendFailure } from "@/types";
+import type { TranslationKey } from "@/i18n";
+import { WIDGET_ATTACHMENT_ACCEPT } from "@/utils/attachments";
 
 const t = useI18n();
 
@@ -66,6 +102,8 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   send: [message: string];
+  /** A photo or PDF, with what was typed as its caption. */
+  attach: [file: File, caption: string];
   startTyping: [];
   stopTyping: [];
 }>();
@@ -73,6 +111,15 @@ const emit = defineEmits<{
 const MAX_LENGTH = 1000;
 const messageText = ref("");
 const textareaRef = ref<HTMLTextAreaElement | null>(null);
+const fileInputRef = ref<HTMLInputElement | null>(null);
+
+const FAILURE_KEYS: Record<SendFailure["reason"], TranslationKey> = {
+  sendFailed: "error.sendFailed",
+  messageTooLong: "error.messageTooLong",
+  fileTooLarge: "error.fileTooLarge",
+  fileType: "error.fileType",
+  fileFailed: "error.fileFailed",
+};
 const isShaking = ref(false);
 let shakeTimeout: ReturnType<typeof setTimeout> | null = null;
 
@@ -130,6 +177,21 @@ const handleKeydown = (event: KeyboardEvent) => {
   ) {
     triggerShake();
   }
+};
+
+// The typed text goes with the file as its caption.
+const handleFile = (event: Event) => {
+  const input = event.target as HTMLInputElement;
+  const file = input.files?.[0];
+  input.value = ""; // picking the same file again fires change again
+  if (!file || !props.isReady) return;
+
+  emit("attach", file, messageText.value);
+  emit("stopTyping");
+  messageText.value = "";
+  nextTick(() => {
+    if (textareaRef.value) textareaRef.value.style.height = "auto";
+  });
 };
 
 const handleSend = () => {
@@ -216,7 +278,7 @@ const handleSend = () => {
   align-items: center;
   background: var(--color-neutral-100);
   border-radius: 8px;
-  padding: 4px 4px 4px 16px;
+  padding: 4px 4px 4px 4px;
   transition: border-color 0.2s;
   gap: 4px;
 }
@@ -267,6 +329,34 @@ const handleSend = () => {
 
 .hay-message-input__button:hover:not(:disabled) {
   background: var(--hay-primary-dark);
+}
+
+.hay-message-input__attach {
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  background: transparent;
+  border: none;
+  color: var(--color-neutral-500, #64748b);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  align-self: flex-end;
+}
+
+.hay-message-input__attach:hover:not(:disabled) {
+  color: var(--hay-primary);
+}
+
+.hay-message-input__attach:disabled {
+  color: var(--color-neutral-400);
+  cursor: not-allowed;
+}
+
+.hay-message-input__file {
+  display: none;
 }
 
 .hay-message-input__button:disabled {

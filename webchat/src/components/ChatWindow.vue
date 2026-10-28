@@ -157,6 +157,7 @@
       :is-ready="isReady"
       :failure="sendFailure"
       @send="$emit('send', $event)"
+      @attach="(file, caption) => $emit('attach', file, caption)"
       @start-typing="$emit('startTyping')"
       @stop-typing="$emit('stopTyping')"
     />
@@ -234,6 +235,7 @@ const props = defineProps<{
 defineEmits<{
   close: [];
   send: [message: string];
+  attach: [file: File, caption: string];
   startTyping: [];
   stopTyping: [];
   startNewConversation: [];

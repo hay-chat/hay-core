@@ -345,6 +345,8 @@ describe("WebSocket message events for webchat clients", () => {
         metadata: { originalMessage: "replaced answer", confidence: 0.3, isClosureMessage: true },
       },
     });
+    // Attachments are signed before the send, so it happens on a later tick.
+    await new Promise((resolve) => setImmediate(resolve));
 
     expect(ws.last()).toEqual({
       type: "message",

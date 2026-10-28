@@ -1,4 +1,4 @@
-import type { HayChatConfig } from "@/types";
+import type { Attachment, HayChatConfig } from "@/types";
 import { resolveLocale } from "@/i18n/resolve";
 
 interface ConversationMetadata {
@@ -20,6 +20,7 @@ interface Message {
   content: string;
   type: string;
   createdAt: string;
+  attachments?: Attachment[];
   metadata?: {
     isClosureMessage?: boolean;
     [key: string]: unknown;
@@ -33,6 +34,14 @@ interface GetMessagesResponse {
   status?: string;
   isClosed?: boolean;
   error?: string;
+}
+
+interface SendAttachmentResponse {
+  messageId: string | null;
+  nonce: string;
+  createdAt: string | null;
+  attachment: Attachment | null;
+  error?: string | null;
 }
 
 interface SendMessageResponse {
@@ -199,6 +208,38 @@ export function useConversation(config: HayChatConfig) {
   };
 
   /**
+   * Send a photo or PDF, with an optional caption (D8-9). The file goes as
+   * base64 in the JSON body, like every other public call.
+   */
+  const sendAttachment = async (params: {
+    conversationId: string;
+    data: string;
+    mimeType: string;
+    filename: string;
+    caption?: string;
+    proof: string;
+    method: string;
+    url: string;
+    context?: Record<string, unknown>;
+  }): Promise<SendAttachmentResponse> => {
+    const { context, caption, ...rest } = params;
+    const response = await fetch(`${baseUrl}/v1/publicConversations.sendAttachment`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        ...rest,
+        ...(caption ? { caption } : {}),
+        ...(context && Object.keys(context).length > 0 ? { context } : {}),
+      }),
+    });
+    if (!response.ok) {
+      throw new WidgetRequestError(response.status);
+    }
+    const data = await response.json();
+    return data.result.data;
+  };
+
+  /**
    * Leave an email for the team's reply (D5-8). Resolves to the server answer,
    * which may carry NONCE_EXPIRED with a fresh nonce.
    */
@@ -225,6 +266,7 @@ export function useConversation(config: HayChatConfig) {
     createConversation,
     getMessages,
     sendMessage,
+    sendAttachment,
     setContactEmail,
   };
 }

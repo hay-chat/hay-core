@@ -65,7 +65,7 @@
            single, image-free segment). -->
         <template v-else-if="message.sender === 'agent'">
           <div
-            v-for="(segment, i) in splitMarkdownImages(message.content)"
+            v-for="(segment, i) in showsText(message) ? splitMarkdownImages(message.content) : []"
             :key="i"
             class="hay-message__content hay-message__content--rich"
             :class="{ 'hay-message__content--image': isImageSegment(segment) }"
@@ -80,9 +80,48 @@
           </div>
         </template>
         <!-- User messages: plain text -->
-        <template v-else>
+        <template v-else-if="showsText(message)">
           <div class="hay-message__content">{{ message.content }}</div>
         </template>
+        <!-- Files: photos inline, other files as a link (signed, expiring URLs) -->
+        <div v-if="message.attachments?.length" class="hay-message__attachments">
+          <template v-for="attachment in message.attachments" :key="attachment.id">
+            <a
+              v-if="isImageAttachment(attachment.type) && attachment.url"
+              :href="attachment.url"
+              target="_blank"
+              rel="noopener noreferrer"
+              class="hay-message__attachment-image"
+              :class="{ 'hay-message__attachment--pending': message.metadata?.pending }"
+            >
+              <img :src="attachment.url" :alt="attachment.name || t('attachment.photo')" />
+            </a>
+            <a
+              v-else-if="attachment.url"
+              :href="attachment.url"
+              target="_blank"
+              rel="noopener noreferrer"
+              class="hay-message__attachment-file"
+            >
+              <span class="hay-message__attachment-name">{{
+                attachment.name || t("attachment.file")
+              }}</span>
+              <span class="hay-message__attachment-size">{{
+                formatFileSize(attachment.size)
+              }}</span>
+            </a>
+            <span v-else class="hay-message__attachment-file">
+              <span class="hay-message__attachment-name">{{
+                attachment.name || t("attachment.file")
+              }}</span>
+              <span class="hay-message__attachment-size">{{
+                message.metadata?.pending
+                  ? t("attachment.sending")
+                  : formatFileSize(attachment.size)
+              }}</span>
+            </span>
+          </template>
+        </div>
         <div class="hay-message__time">{{ timeLabel(message) }}</div>
       </template>
     </div>
@@ -103,6 +142,7 @@ import type { Message } from "@/types";
 import { parseMarkdown, wrapWordsForAnimation, splitMarkdownImages } from "@/utils/markdown";
 import { useI18n } from "@/i18n";
 import { agentFirstName, agentNoticeText } from "@/utils/agentNotice";
+import { formatFileSize, isImageAttachment } from "@/utils/attachments";
 
 const t = useI18n();
 
@@ -153,6 +193,12 @@ const vHeightAnimate: Directive<HTMLElement, boolean> = {
     const animation = animateHeight(el);
     scrollDuringAnimation(animation);
   },
+};
+
+// A "[Customer sent a photo]" line is for the AI; the shopper sees the photo.
+const showsText = (message: Message): boolean => {
+  if (!message.content) return false;
+  return !(message.metadata?.mediaPlaceholder === true && message.attachments?.length);
 };
 
 const renderMarkdown = (content: string): string => {
@@ -301,6 +347,65 @@ watch(
 .hay-message--agent .hay-message__content {
   color: var(--color-neutral-800);
   border-bottom-left-radius: 4px;
+}
+
+.hay-message__attachments {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.hay-message--user .hay-message__attachments {
+  align-items: flex-end;
+}
+
+.hay-message__attachments:first-child {
+  margin-top: 0;
+}
+
+.hay-message__attachment-image img {
+  display: block;
+  max-width: 220px;
+  max-height: 260px;
+  width: auto;
+  height: auto;
+  border-radius: 12px;
+  object-fit: cover;
+}
+
+.hay-message__attachment--pending {
+  opacity: 0.6;
+}
+
+.hay-message__attachment-file {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-width: 240px;
+  padding: 8px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--color-neutral-200, #e2e8f0);
+  background: var(--color-neutral-50, #f8fafc);
+  color: var(--color-neutral-800);
+  font-size: 13px;
+  text-decoration: none;
+}
+
+a.hay-message__attachment-file:hover {
+  border-color: var(--hay-primary);
+}
+
+.hay-message__attachment-name {
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hay-message__attachment-size {
+  font-size: 11px;
+  color: var(--color-neutral-500, #64748b);
 }
 
 /* Stacked segment bubbles (one per image) read as separate messages. */

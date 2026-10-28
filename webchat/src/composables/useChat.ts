@@ -15,6 +15,11 @@ import { debugLog } from "@/utils/debug";
 import { resumeConversationId } from "@/utils/resume";
 import type { HayChatConfig, Message, SendFailure } from "@/types";
 import { insertMessage, parseServerTime } from "@/utils/messageOrder";
+import {
+  WIDGET_ATTACHMENT_MAX_BYTES,
+  isAcceptedAttachmentType,
+  readFileAsBase64,
+} from "@/utils/attachments";
 
 interface Keypair {
   privateKey: CryptoKey;
@@ -336,6 +341,7 @@ export function useChat(config: HayChatConfig) {
         metadata: msg.metadata,
         agentType: msg.type,
         senderName: msg.sender || undefined,
+        attachments: msg.attachments ?? [],
       });
 
       // Track agent type from messages
@@ -640,7 +646,12 @@ export function useChat(config: HayChatConfig) {
 
   // Merge server messages into existing messages (additive only - never removes messages)
   const mergeMessages = (serverMessages: any[]) => {
-    const existingIds = new Set(messages.value.map((m) => m.id));
+    // A file the shopper sent keeps its local id; the server's id is in metadata.serverId.
+    const existingIds = new Set(
+      messages.value.flatMap((m) =>
+        typeof m.metadata?.serverId === "string" ? [m.id, m.metadata.serverId] : [m.id],
+      ),
+    );
     let added = 0;
 
     for (const msg of serverMessages) {
@@ -656,6 +667,7 @@ export function useChat(config: HayChatConfig) {
         metadata: msg.metadata,
         agentType: msg.type,
         senderName: msg.sender || undefined,
+        attachments: msg.attachments ?? [],
       };
 
       // Track agent type from new messages
@@ -671,8 +683,14 @@ export function useChat(config: HayChatConfig) {
       // destroy and recreate the DOM element, which triggers a visual flash.
       // Just skip the server duplicate; the temp message already shows correctly.
       if (sender === "user") {
+        const fileNames = (msg.attachments ?? []).map((a: { name: string }) => a.name);
         const hasTempMatch = messages.value.some(
-          (m) => m.id.startsWith("temp-") && m.sender === "user" && m.content === msg.content,
+          (m) =>
+            m.id.startsWith("temp-") &&
+            m.sender === "user" &&
+            (fileNames.length
+              ? (m.attachments ?? []).some((a) => fileNames.includes(a.name))
+              : m.content === msg.content),
         );
         if (hasTempMatch) {
           continue;
@@ -924,6 +942,110 @@ export function useChat(config: HayChatConfig) {
     }
   };
 
+  // Send a photo or PDF (D8-9), with what the shopper had typed as its
+  // caption. Queued behind text messages so the order is kept.
+  const sendAttachment = (file: File, caption = ""): Promise<void> => {
+    const run = sendChain.then(() => sendAttachmentNow(file, caption));
+    sendChain = run.catch(() => {});
+    return run;
+  };
+
+  const postAttachment = async (file: File, data: string, caption: string) => {
+    const url = `${config.baseUrl}/v1/publicConversations.sendAttachment`;
+    const proof = await createDPoPProof(
+      "POST",
+      url,
+      keypair.value!.privateKey,
+      keypair.value!.publicJwk,
+      nonce.value || "initial",
+    );
+    if (!proof) throw new Error("Failed to create DPoP proof");
+    const result = await conversation.sendAttachment({
+      conversationId: conversationId.value!,
+      data,
+      mimeType: file.type,
+      filename: file.name,
+      caption,
+      proof,
+      method: "POST",
+      url,
+      context: getContext(),
+    });
+    if (result.nonce) nonce.value = result.nonce;
+    return result;
+  };
+
+  const sendAttachmentNow = async (file: File, rawCaption: string): Promise<void> => {
+    const caption = rawCaption.trim();
+    // Sending a file is an explicit request for the chat service, like a message.
+    markInteraction();
+    sendFailure.value = null;
+
+    if (!isAcceptedAttachmentType(file.type)) {
+      sendFailure.value = { reason: "fileType", text: caption };
+      return;
+    }
+    if (file.size > WIDGET_ATTACHMENT_MAX_BYTES) {
+      sendFailure.value = { reason: "fileTooLarge", text: caption };
+      return;
+    }
+
+    if (isConversationClosed.value) {
+      await clearConversation();
+      pinGreeting(Date.now());
+    }
+
+    const tempMessageId = `temp-${Date.now()}`;
+    // Photos show from the shopper's own copy straight away (and keep doing
+    // so: swapping in the server link would reload the image).
+    const previewUrl = file.type.startsWith("image/") ? URL.createObjectURL(file) : "";
+    messages.value.push({
+      id: tempMessageId,
+      sender: "user",
+      content: caption,
+      timestamp: Date.now(),
+      metadata: { pending: true },
+      attachments: [
+        { id: tempMessageId, name: file.name, url: previewUrl, type: file.type, size: file.size },
+      ],
+    });
+
+    try {
+      await initialize();
+      if (!(await ensureConversation())) {
+        throw lastCreateError ?? new Error("Failed to create conversation");
+      }
+      isSending.value = true;
+
+      const data = await readFileAsBase64(file);
+      let result = await postAttachment(file, data, caption);
+      if (result.error === "NONCE_EXPIRED") {
+        result = await postAttachment(file, data, caption);
+      }
+      if (result.error || !result.messageId) throw new Error("Failed to send file");
+
+      const index = messages.value.findIndex((m) => m.id === tempMessageId);
+      if (index !== -1) {
+        const stored = result.attachment;
+        messages.value[index] = {
+          ...messages.value[index],
+          metadata: { serverId: result.messageId },
+          attachments: stored ? [{ ...stored, url: previewUrl || stored.url }] : [],
+        };
+      }
+    } catch (error) {
+      console.error("[Webchat] Failed to send file:", error);
+      const index = messages.value.findIndex((m) => m.id === tempMessageId);
+      if (index !== -1) messages.value.splice(index, 1);
+      if (previewUrl) URL.revokeObjectURL(previewUrl);
+      const refusedFile =
+        error instanceof WidgetRequestError && (error.status === 400 || error.status === 413);
+      sendFailure.value = { reason: refusedFile ? "fileFailed" : "sendFailed", text: caption };
+    } finally {
+      isSending.value = false;
+    }
+  };
+
   // Watch for new messages to detect closure
   const checkMessageForClosure = (message: any) => {
     if (message.metadata?.isClosureMessage === true) {
@@ -1038,6 +1160,7 @@ export function useChat(config: HayChatConfig) {
     openChat,
     closeChat,
     sendMessage,
+    sendAttachment,
     startTyping,
     stopTyping,
     disconnect: disconnectAll,

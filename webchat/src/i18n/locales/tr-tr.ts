@@ -26,7 +26,8 @@ export default {
   "waiting.title": "Bir kişiyi bekliyorsunuz",
   "waiting.typical": "Genellikle {time} içinde yanıt verir",
   "waiting.alerted": "Ekibe haber verdik.",
-  "waiting.closed": "Ekip {when} dönüyor. O zamana kadar yapay zekâ asistanı yardım etmeye devam edebilir.",
+  "waiting.closed":
+    "Ekip {when} dönüyor. O zamana kadar yapay zekâ asistanı yardım etmeye devam edebilir.",
   "waiting.minutes": "~{n} dk",
   "waiting.hours": "~{n} sa",
   "contact.prompt": "E-postanızı bırakın, ayrılmış olursanız ekibin yanıtını oraya gönderelim.",
@@ -34,6 +35,14 @@ export default {
   "contact.placeholder": "siz@ornek.com",
   "contact.submit": "Bana haber ver",
   "contact.consent": "E-postanızı yalnızca bu konuşmayı yanıtlamak için kullanacağız.",
-  "contact.saved": "Teşekkürler! Ekip yanıt verdiğinde ayrılmış olursanız size e-posta göndereceğiz.",
+  "contact.saved":
+    "Teşekkürler! Ekip yanıt verdiğinde ayrılmış olursanız size e-posta göndereceğiz.",
   "contact.failed": "E-postanız kaydedilemedi. Lütfen kontrol edip tekrar deneyin.",
+  "input.attach": "Fotoğraf veya PDF ekle",
+  "error.fileTooLarge": "Bu dosya çok büyük. En fazla 10 MB fotoğraf ve PDF.",
+  "error.fileType": "Fotoğraf (JPG, PNG, GIF, WebP) veya PDF gönderebilirsiniz.",
+  "error.fileFailed": "Dosyanız gönderilemedi. Lütfen başka bir dosya deneyin.",
+  "attachment.photo": "Fotoğraf",
+  "attachment.file": "Dosya",
+  "attachment.sending": "Gönderiliyor...",
 } as const;

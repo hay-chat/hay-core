@@ -35,4 +35,11 @@ export default {
   "contact.consent": "我们只会使用您的邮箱回复此对话。",
   "contact.saved": "谢谢！如果团队回复时您已离开，我们会给您发送邮件。",
   "contact.failed": "无法保存您的邮箱，请检查后重试。",
+  "input.attach": "附加照片或 PDF",
+  "error.fileTooLarge": "文件过大。照片和 PDF 最大 10 MB。",
+  "error.fileType": "您可以发送照片（JPG、PNG、GIF、WebP）或 PDF。",
+  "error.fileFailed": "无法发送您的文件，请换一个文件试试。",
+  "attachment.photo": "照片",
+  "attachment.file": "文件",
+  "attachment.sending": "正在发送...",
 } as const;

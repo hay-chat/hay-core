@@ -271,3 +271,44 @@ describe("publicConversations rate limits", () => {
     expect(mockRateLimited).not.toHaveBeenCalled();
   });
 });
+
+describe("publicConversations.sendAttachment guards (D8-9)", () => {
+  beforeEach(() => jest.clearAllMocks());
+
+  const attachmentInput = {
+    conversationId: "22222222-2222-4222-8222-222222222222",
+    data: Buffer.from("abc").toString("base64"),
+    mimeType: "image/jpeg" as const,
+    filename: "photo.jpg",
+    proof: "proof",
+    method: "POST",
+    url: "http://localhost:3001/v1/publicConversations.sendAttachment",
+  };
+
+  it("is limited per IP before the proof is checked", async () => {
+    mockRateLimited.mockResolvedValue(true);
+    await expect(
+      callerFor({}, "198.51.100.4").sendAttachment(attachmentInput),
+    ).rejects.toMatchObject({ code: "TOO_MANY_REQUESTS" });
+    expect(mockRateLimited).toHaveBeenCalledTimes(1);
+    expect(mockRateLimited).toHaveBeenCalledWith([{ rule: "attachmentPerIp", id: "198.51.100.4" }]);
+  });
+
+  it("requires a valid proof for the conversation (ownership) before anything is stored", async () => {
+    mockRateLimited.mockResolvedValue(false);
+    await expect(callerFor().sendAttachment(attachmentInput)).rejects.toMatchObject({
+      code: "UNAUTHORIZED",
+    });
+    expect(mockRateLimited).not.toHaveBeenCalledWith([
+      { rule: "attachmentPerConversation", id: attachmentInput.conversationId },
+    ]);
+  });
+
+  it("refuses types other than images and PDF", async () => {
+    mockRateLimited.mockResolvedValue(false);
+    await expect(
+      callerFor().sendAttachment({ ...attachmentInput, mimeType: "video/mp4" as never }),
+    ).rejects.toMatchObject({ code: "BAD_REQUEST" });
+    expect(mockRateLimited).not.toHaveBeenCalled();
+  });
+});
