@@ -12,8 +12,8 @@
       "hint": "Você precisa de uma conta profissional do Instagram (Comercial ou Criador de conteúdo) vinculada a uma Página do Facebook que você administra."
     },
     "step2": {
-      "title": "Apenas mensagens de texto (MVP)",
-      "body": "Nesta primeira versão, o Hay.chat processa apenas mensagens diretas de <strong>texto</strong>. Mídias recebidas (imagens, stories, reações) são ignoradas, e as respostas do Hay.chat são enviadas como texto simples. O suporte a conteúdo rico chegará em uma atualização futura."
+      "title": "Fotos, vídeos e mensagens de voz",
+      "body": "O Hay.chat guarda as fotos, vídeos, mensagens de voz e arquivos que os clientes enviam e transcreve as mensagens de voz para que a IA possa respondê-las. Menções em stories, reels e posts compartilhados aparecem como uma nota curta. Reações não são exibidas. Sua equipe e a IA podem enviar fotos, vídeos, áudios e PDFs de volta."
     },
     "step3": {
       "title": "Responda em até 24 horas",

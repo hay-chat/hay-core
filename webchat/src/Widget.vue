@@ -27,6 +27,7 @@
         :save-contact-email="saveContactEmail"
         @close="closeChat"
         @send="sendMessage"
+        @attach="sendAttachment"
         @start-typing="startTyping"
         @stop-typing="stopTyping"
         @start-new-conversation="startNewConversation"
@@ -119,6 +120,7 @@ const {
   openChat,
   closeChat,
   sendMessage,
+  sendAttachment,
   startTyping,
   stopTyping,
   startNewConversation,

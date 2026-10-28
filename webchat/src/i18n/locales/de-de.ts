@@ -31,11 +31,21 @@ export default {
   "waiting.closed": "Das Team ist {when} zurück. Bis dahin hilft der KI-Assistent gern weiter.",
   "waiting.minutes": "~{n} Min.",
   "waiting.hours": "~{n} Std.",
-  "contact.prompt": "Hinterlassen Sie Ihre E-Mail-Adresse, dann senden wir Ihnen die Antwort des Teams, falls Sie nicht mehr hier sind.",
+  "contact.prompt":
+    "Hinterlassen Sie Ihre E-Mail-Adresse, dann senden wir Ihnen die Antwort des Teams, falls Sie nicht mehr hier sind.",
   "contact.label": "E-Mail",
   "contact.placeholder": "sie@beispiel.de",
   "contact.submit": "Benachrichtigen",
   "contact.consent": "Wir verwenden Ihre E-Mail-Adresse nur, um auf dieses Gespräch zu antworten.",
-  "contact.saved": "Danke! Falls Sie nicht mehr hier sind, wenn das Team antwortet, schicken wir Ihnen eine E-Mail.",
-  "contact.failed": "Ihre E-Mail-Adresse konnte nicht gespeichert werden. Bitte prüfen Sie sie und versuchen Sie es erneut.",
+  "contact.saved":
+    "Danke! Falls Sie nicht mehr hier sind, wenn das Team antwortet, schicken wir Ihnen eine E-Mail.",
+  "contact.failed":
+    "Ihre E-Mail-Adresse konnte nicht gespeichert werden. Bitte prüfen Sie sie und versuchen Sie es erneut.",
+  "input.attach": "Foto oder PDF anhängen",
+  "error.fileTooLarge": "Diese Datei ist zu groß. Fotos und PDFs bis 10 MB.",
+  "error.fileType": "Sie können Fotos (JPG, PNG, GIF, WebP) oder PDFs senden.",
+  "error.fileFailed": "Ihre Datei konnte nicht gesendet werden. Bitte versuchen Sie eine andere.",
+  "attachment.photo": "Foto",
+  "attachment.file": "Datei",
+  "attachment.sending": "Wird gesendet...",
 } as const;

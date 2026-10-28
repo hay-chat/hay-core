@@ -16,7 +16,10 @@ jest.mock("@server/config/env", () => ({
         secretAccessKey: "secret",
       },
       local: { uploadDir: "/tmp/hay-test-uploads", baseUrl: "http://localhost/uploads" },
-      limits: { maxFileSize: 10 * 1024 * 1024 },
+      limits: {
+        maxFileSize: 10 * 1024 * 1024,
+        conversationMediaMaxFileSize: 25 * 1024 * 1024,
+      },
     },
     plugins: { maxUploadSizeMB: 50 },
   },
@@ -109,6 +112,21 @@ describe("StorageService private uploads", () => {
       organizationId: ORG_ID,
     });
     expect(mockS3Params).toHaveLength(1);
+  });
+
+  it("caps conversation media at its own limit, not the general upload limit (D8-8)", async () => {
+    const storage = new StorageService();
+    const upload = (bytes: number) =>
+      storage.upload({
+        buffer: Buffer.alloc(bytes, "a"),
+        originalName: "notes.txt",
+        mimeType: "text/plain",
+        folder: "conversation-media",
+        organizationId: ORG_ID,
+      });
+
+    await expect(upload(16 * 1024 * 1024)).resolves.toBeDefined();
+    await expect(upload(26 * 1024 * 1024)).rejects.toThrow(/File too large/);
   });
 
   it("keeps organization logos publicly readable with a direct URL", async () => {

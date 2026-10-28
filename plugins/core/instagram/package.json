@@ -25,7 +25,8 @@
     "build:ui": "vite build --config vite.config.ui.ts",
     "start": "node dist/index.js",
     "dev": "npm run build:ui && tsc",
-    "dev:ui": "vite build --watch --config vite.config.ui.ts"
+    "dev:ui": "vite build --watch --config vite.config.ui.ts",
+    "test": "vitest run"
   },
   "dependencies": {
     "@hay/plugin-sdk": "file:../../../packages/plugin-sdk"
@@ -35,6 +36,7 @@
     "@vitejs/plugin-vue": "^5.0.0",
     "typescript": "^5.3.3",
     "vite": "^5.0.0",
+    "vitest": "^1.1.0",
     "vue": "^3.4.0"
   }
 }

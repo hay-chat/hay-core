@@ -7,6 +7,8 @@ import { User } from "./user.entity";
 @Index("idx_uploads_organization_id", ["organizationId"])
 @Index("idx_uploads_folder", ["folder"])
 @Index("idx_uploads_created_at", ["createdAt"])
+@Index("idx_uploads_conversation_id", ["conversationId"])
+@Index("idx_uploads_customer_id", ["customerId"])
 export class Upload extends BaseEntity {
   @Column({ type: "varchar", length: 500 })
   filename!: string;
@@ -44,4 +46,16 @@ export class Upload extends BaseEntity {
 
   @Column({ type: "uuid", nullable: true })
   uploadedById?: string;
+
+  // Conversation media only (D8-3): what the file belongs to, so retention and
+  // erasure can delete it and the orphan sweep can find files no message uses.
+  // Set when a message carrying the upload is stored (conversation-media.service).
+  @Column({ type: "uuid", nullable: true })
+  conversationId?: string | null;
+
+  @Column({ type: "uuid", nullable: true })
+  messageId?: string | null;
+
+  @Column({ type: "uuid", nullable: true })
+  customerId?: string | null;
 }

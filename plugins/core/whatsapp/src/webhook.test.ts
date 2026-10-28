@@ -279,12 +279,18 @@ describe("handleWebhook — media", () => {
     expect(input.metadata).toMatchObject({ voiceNote: true, type: "audio" });
   });
 
-  it("sends an attachment-only document with empty content", async () => {
+  it("gives a captionless document a metadata line instead of an empty turn (D8-8)", async () => {
     const { input, t } = await receiveOne(p.documentMessage);
 
     expect(t.calls("media.upload")[0]).toMatchObject({ filename: "invoice.pdf" });
-    expect(input.content).toBe("");
+    expect(input.content).toBe("[Customer sent a document: invoice.pdf]");
+    expect(input.metadata).toMatchObject({ mediaPlaceholder: true });
     expect(input.attachments).toEqual([upload]);
+  });
+
+  it("keeps a caption as the content and marks no placeholder", async () => {
+    const { input } = await receiveOne(p.imageMessage);
+    expect(input.metadata).not.toHaveProperty("mediaPlaceholder");
   });
 
   it("falls back to a placeholder when the media cannot be downloaded", async () => {

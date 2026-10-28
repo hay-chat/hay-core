@@ -12,8 +12,8 @@
       "hint": "You need an Instagram Professional account (Business or Creator) that is linked to a Facebook Page you manage."
     },
     "step2": {
-      "title": "Text-only messages (MVP)",
-      "body": "In this first release, Hay.chat handles <strong>text</strong> direct messages only. Inbound media (images, stories, reactions) is ignored, and Hay.chat's replies are sent as plain text. Rich content support is coming in a later update."
+      "title": "Photos, videos and voice messages",
+      "body": "Hay.chat keeps the photos, videos, voice messages and files shoppers send, and transcribes voice messages so the AI can answer them. Story mentions, reels and shared posts show as a short note. Reactions are not shown. Your team and the AI can send photos, videos, audio and PDFs back."
     },
     "step3": {
       "title": "Reply within 24 hours",

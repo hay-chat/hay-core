@@ -25,7 +25,8 @@ export default {
   "waiting.title": "Esperando a una persona",
   "waiting.typical": "Suele responder en {time}",
   "waiting.alerted": "Hemos avisado al equipo.",
-  "waiting.closed": "El equipo vuelve {when}. Hasta entonces, el asistente de IA puede seguir ayudando.",
+  "waiting.closed":
+    "El equipo vuelve {when}. Hasta entonces, el asistente de IA puede seguir ayudando.",
   "waiting.minutes": "~{n} min",
   "waiting.hours": "~{n} h",
   "contact.prompt": "Deja tu correo y te enviaremos allí la respuesta del equipo si ya te has ido.",
@@ -35,4 +36,11 @@ export default {
   "contact.consent": "Solo usaremos tu correo para responder a esta conversación.",
   "contact.saved": "¡Gracias! Si ya te has ido cuando el equipo responda, te enviaremos un correo.",
   "contact.failed": "No se pudo guardar tu correo. Revísalo e inténtalo de nuevo.",
+  "input.attach": "Adjuntar foto o PDF",
+  "error.fileTooLarge": "Ese archivo es demasiado grande. Fotos y PDF de hasta 10 MB.",
+  "error.fileType": "Puedes enviar fotos (JPG, PNG, GIF, WebP) o PDF.",
+  "error.fileFailed": "No se pudo enviar tu archivo. Prueba con otro.",
+  "attachment.photo": "Foto",
+  "attachment.file": "Archivo",
+  "attachment.sending": "Enviando...",
 } as const;

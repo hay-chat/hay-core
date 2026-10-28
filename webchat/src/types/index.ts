@@ -94,6 +94,15 @@ export interface ChatHandle {
   toggle(): void;
 }
 
+/** A file on a message (photo, PDF...). `url` is a signed link that expires. */
+export interface Attachment {
+  id: string;
+  name: string;
+  url: string;
+  type: string;
+  size: number;
+}
+
 export interface Message {
   id: string;
   content: string;
@@ -105,11 +114,12 @@ export interface Message {
   agentType?: string;
   /** Human agent name when message is from a HumanAgent */
   senderName?: string;
+  attachments?: Attachment[];
 }
 
 /** Shown under the input when the server refuses a message; `text` goes back into the input. */
 export interface SendFailure {
-  reason: "sendFailed" | "messageTooLong";
+  reason: "sendFailed" | "messageTooLong" | "fileTooLarge" | "fileType" | "fileFailed";
   text: string;
 }
 

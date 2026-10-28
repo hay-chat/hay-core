@@ -8,6 +8,14 @@
 - Migration AddResolutionExclusions1785750000000 (run on hay_test). New `billing` scope (admin wildcard only). run.ts untouched.
 - Gaps: core has no plan/allowance/overage nor billing period dates (TODO in usage.vue/service); Hay.chat review queue has no UI; credits for post-report exclusions = backoffice.
 - Next: merge into staging, run migration, hand-test.
+## 2026-10-28 — claude/w2-media-ingest (L8+L7 part A) — D8-3,6,7,8,9,10,16,17 done, committed, not pushed
+- D8-3 media lifecycle (migration AddUploadConversationLinks1785752000000, 180-day default, orphan sweep); D8-6 Instagram inbound + voice transcripts; D8-7 email inline images; D8-8 media cap (CONVERSATION_MEDIA_MAX_SIZE_MB=25) + WhatsApp Meta limits.
+- D8-9 widget paperclip (image/PDF <=10 MB, publicConversations.sendAttachment, DPoP + rate limits, 24 h signed links, 13 locales).
+- D8-10 handoff summary lists files; /escalate carries 7-day signed links; Chatwoot note lists them.
+- D8-16 Inbox composer attachments (conversations.uploadAttachment + sendMessage.attachmentIds). D8-17 send_attachment core tool (tool-result URLs only, SSRF-checked) + Instagram outbound media.
+- Verified: server tsc + jest (1299 pass; 1 failure in tests/routes/actions.test.ts was already there, file untouched), webchat vitest/vue-tsc, dashboard typecheck, whatsapp/email/instagram/chatwoot build + tests.
+- Gaps: no dashboard component tests; swept files leave dead attachment entries (404); scanning/metering/vision (D8-4/5/11-15) not built.
+- Next: merge into staging, run migration on hay_staging, test each ticket by hand.
 
 ## 2026-10-28 03:15 — staging — W2 L3 + L4 merged, hand-tested, fixes in
 - Merged L3 (ccf449e, business hours/hand-off/email follow-up) + L4 (d43ea72, approvals UI, shopper confirm, action log). Migrations run on hay_staging.

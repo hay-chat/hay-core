@@ -110,7 +110,10 @@ export class StorageService {
     let { buffer, mimeType } = options;
     let extension: string;
     if (options.folder === CONVERSATION_MEDIA_FOLDER) {
-      this.validateSize(buffer.length, options.maxSize);
+      this.validateSize(
+        buffer.length,
+        options.maxSize ?? config.storage.limits.conversationMediaMaxFileSize,
+      );
       ({ buffer, mimeType } = await sanitizeConversationMedia(buffer, mimeType));
       extension = CONVERSATION_MEDIA_TYPES[mimeType];
     } else {

@@ -35,4 +35,11 @@ export default {
   "contact.consent": "이메일은 이 대화에 답변하는 데에만 사용합니다.",
   "contact.saved": "감사합니다! 팀이 답변할 때 자리를 비우셨다면 이메일을 보내 드리겠습니다.",
   "contact.failed": "이메일을 저장하지 못했습니다. 확인 후 다시 시도해 주세요.",
+  "input.attach": "사진 또는 PDF 첨부",
+  "error.fileTooLarge": "파일이 너무 큽니다. 사진과 PDF는 최대 10MB입니다.",
+  "error.fileType": "사진(JPG, PNG, GIF, WebP) 또는 PDF를 보낼 수 있습니다.",
+  "error.fileFailed": "파일을 보내지 못했습니다. 다른 파일을 시도해 주세요.",
+  "attachment.photo": "사진",
+  "attachment.file": "파일",
+  "attachment.sending": "보내는 중...",
 } as const;
