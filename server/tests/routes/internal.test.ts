@@ -13,11 +13,13 @@ jest.mock("@server/lib/logger", () => ({ createLogger: () => mockLogger }));
 const mockSetAccessState = jest.fn();
 const mockGetAccessState = jest.fn();
 const mockSetBillingPeriod = jest.fn();
+const mockSetLimits = jest.fn();
 jest.mock("@server/services/organization-access.service", () => ({
   organizationAccessService: {
     setAccessState: mockSetAccessState,
     getAccessState: mockGetAccessState,
     setBillingPeriod: mockSetBillingPeriod,
+    setLimits: mockSetLimits,
   },
 }));
 
@@ -195,6 +197,26 @@ describe("internal.organizations", () => {
       internalRouter
         .createCaller(ctx())
         .organizations.setBillingPeriod({ organizationId: ORG_ID, period: null }),
+    ).rejects.toMatchObject({ code: "NOT_FOUND" });
+  });
+
+  it("sets the simulation allowance and validates it", async () => {
+    mockSetLimits.mockResolvedValueOnce({ maxSimulationsPerMonth: 100 });
+    await expect(
+      internalRouter
+        .createCaller(ctx())
+        .organizations.setLimits({ organizationId: ORG_ID, maxSimulationsPerMonth: 100 }),
+    ).resolves.toEqual({ maxSimulationsPerMonth: 100 });
+    await expect(
+      internalRouter
+        .createCaller(ctx())
+        .organizations.setLimits({ organizationId: ORG_ID, maxSimulationsPerMonth: -1 }),
+    ).rejects.toMatchObject({ code: "BAD_REQUEST" });
+    mockSetLimits.mockResolvedValueOnce(null);
+    await expect(
+      internalRouter
+        .createCaller(ctx())
+        .organizations.setLimits({ organizationId: ORG_ID, maxSimulationsPerMonth: null }),
     ).rejects.toMatchObject({ code: "NOT_FOUND" });
   });
 

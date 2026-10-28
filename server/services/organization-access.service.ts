@@ -159,6 +159,35 @@ class OrganizationAccessService {
   }
 
   /**
+   * Plan limits the operator sets (Lane A4): today the monthly simulation
+   * allowance. Merged into `organization.limits`; null removes it (core
+   * default applies). Re-sent on every usage run, so only a change is written.
+   */
+  async setLimits(input: {
+    organizationId: string;
+    maxSimulationsPerMonth: number | null;
+  }): Promise<Organization["limits"] | null> {
+    const organization = await this.repository.findOneBy({ id: input.organizationId });
+    if (!organization) return null;
+
+    const current = organization.limits?.maxSimulationsPerMonth ?? null;
+    if (current === input.maxSimulationsPerMonth) return organization.limits ?? {};
+
+    const limits = { ...(organization.limits ?? {}) };
+    if (input.maxSimulationsPerMonth === null) delete limits.maxSimulationsPerMonth;
+    else limits.maxSimulationsPerMonth = input.maxSimulationsPerMonth;
+    await this.repository.update({ id: organization.id }, { limits });
+    logger.info(
+      {
+        organizationId: organization.id,
+        maxSimulationsPerMonth: { from: current, to: input.maxSimulationsPerMonth },
+      },
+      "Organization limits updated by the operator",
+    );
+    return limits;
+  }
+
+  /**
    * The owner's "Pause AI everywhere" (D11-9). Pausing keeps the original
    * timestamp and author when already paused. Audited with who did it, and
    * pushed to every open dashboard so the banner appears everywhere at once.
