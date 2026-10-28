@@ -4,7 +4,7 @@
  * Shoppers often give an order number from Mercado Livre, Shopee, Amazon, Magalu
  * or TikTok Shop. Those orders live on the marketplace, not in the store, so the
  * agent should say so plainly and point to that marketplace's after-sale flow
- * instead of asking for the number again. Product problems (a defect, an allergy)
+ * instead of asking for the number again. Product problems (a defect, damage)
  * are still the brand's to handle.
  *
  * The ID patterns are common knowledge and UNVERIFIED against real IDs:
@@ -101,8 +101,8 @@ function orderNotFoundError(ref, message) {
     "NOT_FOUND",
     `Order ${ref} is not in this store and ${likely} a ${marketplace.label} order. Tell the ` +
       `customer plainly that orders bought on ${marketplace.label} are handled there: ` +
-      `${marketplace.afterSale} If the problem is with the product itself (a defect, an ` +
-      "allergy), still help or hand the conversation to the store team. If the customer says " +
+      `${marketplace.afterSale} If the problem is with the product itself (a defect or ` +
+      "damage), still help or hand the conversation to the store team. If the customer says " +
       `it was not a ${marketplace.label} order: ${message}`,
     { details: { marketplace: marketplace.id, matchedBy: marketplace.matchedBy } },
   );
