@@ -180,7 +180,9 @@
           </div>
           <template v-else>
             <p v-if="sendingDomain.domain !== supportDomain" class="notice notice-warning small">
-              {{ t("domain.mismatch", { domain: sendingDomain.domain, platform: status.fromAddress }) }}
+              {{
+                t("domain.mismatch", { domain: sendingDomain.domain, platform: status.fromAddress })
+              }}
             </p>
             <p v-else-if="sendingDomain.verified" class="success-line">
               {{ t("domain.verifiedLine", { support: status.supportAddress }) }}
@@ -198,10 +200,17 @@
                     </tr>
                   </thead>
                   <tbody>
-                    <tr v-for="record in sendingDomain.records" :key="`${record.type}-${record.name}-${record.value}`">
+                    <tr
+                      v-for="record in sendingDomain.records"
+                      :key="`${record.type}-${record.name}-${record.value}`"
+                    >
                       <td>{{ record.type }}</td>
-                      <td><code class="inline">{{ record.name }}</code></td>
-                      <td><code class="inline dns-value">{{ record.value }}</code></td>
+                      <td>
+                        <code class="inline">{{ record.name }}</code>
+                      </td>
+                      <td>
+                        <code class="inline dns-value">{{ record.value }}</code>
+                      </td>
                       <td>{{ record.priority ?? "" }}</td>
                     </tr>
                   </tbody>

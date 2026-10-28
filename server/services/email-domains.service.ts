@@ -75,7 +75,10 @@ async function resend<T>(method: string, path: string, body?: unknown): Promise<
   });
   const text = await response.text();
   if (!response.ok) {
-    logger.warn({ method, path, status: response.status, body: text.slice(0, 500) }, "Resend call failed");
+    logger.warn(
+      { method, path, status: response.status, body: text.slice(0, 500) },
+      "Resend call failed",
+    );
     throw new EmailDomainError(`Resend returned ${response.status}`, "provider_error");
   }
   return (text ? JSON.parse(text) : {}) as T;
