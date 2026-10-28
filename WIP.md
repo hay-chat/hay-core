@@ -1,3 +1,11 @@
+## 2026-10-28 05:50 — claude/w2-owner-loop (L9+L10) — D11-7, D11-9, D11-12 committed, not pushed
+- 5f7c764 D11-7 shopper-reply / follow-up / 10-min unanswered alerts (push then email, Available only, business hours).
+- 78435a7 D11-9 owner "Pause AI everywhere" (Home card + red banner, audit organization.ai_paused/resumed), one "our team will reply here" line per paused conversation.
+- 228526f D11-12 iOS Add to Home Screen guide, apple-touch + maskable icons, per-user lock-screen privacy (Profile > push card).
+- Migrations (run on hay_test only): AddOrganizationAiPause1785795000000, AddUserAlertPreviewPrivacy1785796000000. No new env vars.
+- Verified: server tsc + 25 jest suites/178 pass; dashboard typecheck 0; vitest pass (3 Playwright specs fail under vitest, pre-existing).
+- Next: merge into staging, run both migrations on hay_staging, hand-test on a real iPhone.
+
 ## 2026-10-28 05:15 — staging — W2 D8 part B merged, hand-tested, i18n fix
 - Merged claude/w2-media-vision; migration AddUploadScanStatus1785771000000 on hay_staging.
 - Manual ✓ (real OpenAI): photo description + Inbox "AI read"; card photo withheld + blurred, AI declines; product-problem template → draft.
