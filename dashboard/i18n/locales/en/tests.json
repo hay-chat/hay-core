@@ -165,6 +165,11 @@
         "too_many_changes": "Your team still changes more than 1 in 20 replies. Improve playbooks or knowledge from the edited replies first.",
         "ready": "Your team changed fewer than 1 in 20 replies in the last {days} days. It may be safe to switch this agent to Auto-Send. Actions keep following action approvals."
       }
+    },
+    "insight": {
+      "replayDraft": "Replay these conversations against the draft",
+      "replayDraftHint": "Before you publish the fix, see how the draft answers the conversations behind this insight. Replays are free and nothing is sent to shoppers.",
+      "noDraft": "Save the suggested playbook changes as a draft first."
     }
   }
 }

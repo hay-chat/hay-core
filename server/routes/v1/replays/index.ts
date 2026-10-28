@@ -54,6 +54,47 @@ export const replaysRouter = t.router({
       }
     }),
 
+  /**
+   * Replay before apply (D3-17): replay the conversations behind an Insight
+   * against the playbook draft that is meant to fix it, before publishing.
+   */
+  startForInsight: scopedProcedure(RESOURCES.PLAYBOOKS, ACTIONS.UPDATE)
+    .input(
+      z.object({
+        insightId: z.string().uuid(),
+        playbookVersionOverride: playbookVersionOverrideSchema.optional(),
+        label: z.string().max(255).optional(),
+        maxConversations: z.number().int().min(1).max(50).default(20),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const conversationIds = await replayService.insightConversationIds(
+        ctx.organizationId!,
+        input.insightId,
+        input.maxConversations,
+      );
+      if (conversationIds.length === 0) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "This insight has no conversations to replay",
+        });
+      }
+      try {
+        return await replayService.start({
+          organizationId: ctx.organizationId!,
+          createdById: ctx.user?.id ?? null,
+          label: input.label ?? null,
+          agentId: null,
+          playbookVersionOverride: input.playbookVersionOverride ?? null,
+          conversationIds,
+          recentConversations: null,
+          maxTurnsPerConversation: null,
+        });
+      } catch (error) {
+        toTrpcError(error);
+      }
+    }),
+
   /** Buckets with examples and the sample size (D7-11). No headline %. */
   report: scopedProcedure(RESOURCES.PLAYBOOKS, ACTIONS.READ)
     .input(z.object({ runId: z.string().uuid() }))
