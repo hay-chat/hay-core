@@ -1,3 +1,8 @@
+## 2026-10-28 00:30 — staging — approval follow-ups truthful + risk lane merged
+- a43ac55: after approve/decline the follow-up turn seeds the claim-check ledger with the decision; decline → AI explains (no hand-off), approve → Woo refund #19 ran and AI says done. ef5e57a: held call reported as "requested".
+- Risk lane merged: SDK toolRisk + 7 plugins declare risk; SDK/plugins rebuilt; tests green.
+- Next: L5 (claude/w1-commerce) merge + Woo/coupon test; then Wave 1 review agent, full suites, tag wave-1-done, PR #104 body, feature guides.
+
 ## 2026-10-28 — claude/w1-tool-risk-all-plugins — D4-2 risk classes for all core plugins (not merged)
 - SDK: optional `toolRisk {read, write}` on mcp.startLocal/startLocalStdio/startExternal; worker merges it into /mcp/list-tools (declaration wins; hosted readOnlyHint passes through; unknown writes stay held). Core unchanged.
 - calcom, klaviyo, twenty, zendesk: local `applyToolRisk` + mcp/tests/tool-risk.test.js. atlassian, email-channel (send-email), stripe: SDK declaration. hubspot: remote annotations only. notion/chatwoot/instagram/whatsapp: no agent tools.
