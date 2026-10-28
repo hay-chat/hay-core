@@ -111,9 +111,18 @@ describe("magento_create_refund", () => {
     registerRefundTools(server);
   });
 
+  it("refuses a currency that is not the order's, before refunding", async () => {
+    const { calls } = mockFetch(routes(ORDER));
+    const res = await server.call("magento_create_refund", { currency: "USD", order_id: "12" });
+    expect(res.isError).toBe(true);
+    expect(res.text).toMatch(/is in EUR, not USD/);
+    expect(calls.some((c) => c.method === "POST")).toBe(false);
+  });
+
   it("refunds online through the paid invoice by default, shipping included, and reports the delta", async () => {
     const { calls } = mockFetch(routes(ORDER));
     const res = await server.call("magento_create_refund", {
+      currency: "EUR",
       order_id: "12",
       reason: "damaged",
       notify_customer: true,
@@ -143,6 +152,7 @@ describe("magento_create_refund", () => {
   it("full refund without shipping when refund_shipping=false", async () => {
     const { calls } = mockFetch(routes(ORDER));
     const res = await server.call("magento_create_refund", {
+      currency: "EUR",
       order_id: "12",
       refund_shipping: false,
     });
@@ -154,6 +164,7 @@ describe("magento_create_refund", () => {
   it("refunds specific items with restock and the remaining shipping", async () => {
     const { calls } = mockFetch(routes({ ...ORDER, shipping_refunded: 3, total_refunded: 3 }));
     const res = await server.call("magento_create_refund", {
+      currency: "EUR",
       order_id: "12",
       items: [{ item_id: "101", quantity: 2 }],
       restock: true,
@@ -167,6 +178,7 @@ describe("magento_create_refund", () => {
 
     const { calls: calls2 } = mockFetch(routes(ORDER));
     await server.call("magento_create_refund", {
+      currency: "EUR",
       order_id: "12",
       items: [{ item_id: "101", quantity: 1 }],
     });
@@ -175,7 +187,11 @@ describe("magento_create_refund", () => {
 
   it("books an arbitrary partial amount as a positive adjustment with zero-qty items", async () => {
     const { calls } = mockFetch(routes(ORDER));
-    const res = await server.call("magento_create_refund", { order_id: "12", amount: "10.00" });
+    const res = await server.call("magento_create_refund", {
+      currency: "EUR",
+      order_id: "12",
+      amount: "10.00",
+    });
     expect(res.data).toMatchObject({
       amount: { amount: "10.00" },
       remainingRefundable: { amount: "50.00" },
@@ -191,27 +207,34 @@ describe("magento_create_refund", () => {
 
   it("caps at paid minus refunded and refuses unpaid, cancelled and fully refunded orders", async () => {
     const { calls } = mockFetch(routes({ ...ORDER, total_refunded: 50 }));
-    const tooMuch = await server.call("magento_create_refund", { order_id: "12", amount: "15" });
+    const tooMuch = await server.call("magento_create_refund", {
+      currency: "EUR",
+      order_id: "12",
+      amount: "15",
+    });
     expect(tooMuch.text).toMatch(/exceeds the remaining refundable balance of 10.00 EUR/);
     expect(calls.some((c) => c.method === "POST")).toBe(false);
 
     mockFetch(routes({ ...ORDER, total_paid: 0, total_invoiced: 0, state: "new" }));
-    expect((await server.call("magento_create_refund", { order_id: "12" })).text).toMatch(
-      /no recorded payment/,
-    );
+    expect(
+      (await server.call("magento_create_refund", { currency: "EUR", order_id: "12" })).text,
+    ).toMatch(/no recorded payment/);
     mockFetch(routes({ ...ORDER, state: "canceled" }));
-    expect((await server.call("magento_create_refund", { order_id: "12" })).text).toMatch(
-      /cancelled; nothing to refund/,
-    );
+    expect(
+      (await server.call("magento_create_refund", { currency: "EUR", order_id: "12" })).text,
+    ).toMatch(/cancelled; nothing to refund/);
     mockFetch(routes({ ...ORDER, total_refunded: 60 }));
-    expect((await server.call("magento_create_refund", { order_id: "12" })).text).toMatch(
-      /already fully refunded/,
-    );
+    expect(
+      (await server.call("magento_create_refund", { currency: "EUR", order_id: "12" })).text,
+    ).toMatch(/already fully refunded/);
   });
 
   it("never falls back to offline on its own: no paid invoice or gateway failure → explicit instruction", async () => {
     const { calls } = mockFetch(routes(ORDER, { invoices: [] }));
-    const noInvoice = await server.call("magento_create_refund", { order_id: "12" });
+    const noInvoice = await server.call("magento_create_refund", {
+      currency: "EUR",
+      order_id: "12",
+    });
     expect(noInvoice.isError).toBe(true);
     expect(noInvoice.text).toMatch(/no paid invoice.*online=false/s);
     expect(calls.some((c) => c.method === "POST")).toBe(false);
@@ -225,9 +248,9 @@ describe("magento_create_refund", () => {
         ],
       }),
     );
-    expect((await server.call("magento_create_refund", { order_id: "12" })).text).toMatch(
-      /no paid invoice/,
-    );
+    expect(
+      (await server.call("magento_create_refund", { currency: "EUR", order_id: "12" })).text,
+    ).toMatch(/no paid invoice/);
     expect(calls2.some((c) => c.method === "POST")).toBe(false);
 
     mockFetch(
@@ -241,7 +264,10 @@ describe("magento_create_refund", () => {
         }),
       }),
     );
-    const declined = await server.call("magento_create_refund", { order_id: "12" });
+    const declined = await server.call("magento_create_refund", {
+      currency: "EUR",
+      order_id: "12",
+    });
     expect(declined.isError).toBe(true);
     expect(declined.text).toMatch(/gateway declined/);
     expect(declined.text).toMatch(/online=false/);
@@ -249,7 +275,11 @@ describe("magento_create_refund", () => {
 
   it("records an offline credit memo against the order when online=false", async () => {
     const { calls } = mockFetch(routes(ORDER));
-    const res = await server.call("magento_create_refund", { order_id: "12", online: false });
+    const res = await server.call("magento_create_refund", {
+      currency: "EUR",
+      order_id: "12",
+      online: false,
+    });
     expect(res.data).toMatchObject({ refunded: true, online: false, amount: { amount: "60.00" } });
     const post = calls.find((c) => c.method === "POST");
     expect(post.path).toBe(`${V1}/order/12/refund`);

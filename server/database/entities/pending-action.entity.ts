@@ -26,7 +26,8 @@ export type PendingActionStatus =
 /**
  * Why the call was held: by the policy gate (money_move, category_policy = a
  * non-money category the org requires approval for, playbook_policy = the
- * active playbook requires it, unclassified_write), or because a cap-enforcing
+ * active playbook requires it, unclassified_write, destructive_write = a
+ * delete or account configuration change), or because a cap-enforcing
  * plugin refused it as above the merchant's cap (over_cap).
  */
 export type PendingActionHoldReason =
@@ -34,6 +35,7 @@ export type PendingActionHoldReason =
   | "category_policy"
   | "playbook_policy"
   | "unclassified_write"
+  | "destructive_write"
   | "over_cap";
 
 /**

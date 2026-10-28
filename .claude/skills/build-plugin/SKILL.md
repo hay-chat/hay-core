@@ -71,7 +71,8 @@ archetypes you're not using.
 - Channel outbound: non-retryable provider errors → `200 { success:false }` (no retry storms).
 - **Tool risk**: give **every** tool a risk class, or Hay.chat holds each call for human approval
   as an unknown write. Reads → `read`; writes → a category (`refund`/`cancel`/`discount` move money
-  and are held; `note`, `customer_update`, `address_change`, `return`, `other_write` run). Local
+  and are held; `destructive` (deletes, account/helpdesk configuration, cancelled bookings, dispute evidence) is
+  always held; `note`, `customer_update`, `address_change`, `return`, `other_write` run). Local
   `mcp/` server: `applyToolRisk(server, require("./tool-risk"))` from `@hay/plugin-sdk/tool-risk`
   (wix, calcom). Hosted or in-process server: pass `toolRisk: { read, write }` to
   `startExternal`/`startLocalStdio`/`startLocal` (stripe, atlassian); undeclared hosted tools keep

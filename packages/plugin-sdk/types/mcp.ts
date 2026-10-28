@@ -114,6 +114,7 @@ export interface McpInitializerContext {
 /**
  * Write categories Hay.chat core understands (mirrors `@hay/plugin-sdk/tool-risk`).
  * Refunds, cancels, discounts and exchanges move money and are held for approval.
+ * `destructive` (deletes, account configuration) is always held while approval is on.
  */
 export type ToolWriteCategory =
   | "refund"
@@ -124,6 +125,7 @@ export type ToolWriteCategory =
   | "address_change"
   | "customer_update"
   | "note"
+  | "destructive"
   | "other_write";
 
 /**

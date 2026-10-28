@@ -153,6 +153,7 @@ import { useToast } from "@/composables/useToast";
 import {
   APPROVAL_CATEGORIES as CATEGORIES,
   MONEY_CATEGORIES as MONEY,
+  SWITCH_OFF_CONFIRMATION,
   type ApprovalCategory,
 } from "@/utils/action-categories";
 
@@ -257,6 +258,8 @@ async function persist() {
         customerConfirmation: after.customerConfirmation,
         // Only sent when changed: changing approvers is owner-only.
         ...(approverRolesChanged && { approverRoles: after.approverRoles }),
+        // The server refuses a money switch-off without it (the typed confirm above).
+        ...(switchedOff.value.length > 0 && { confirmSwitchOff: SWITCH_OFF_CONFIRMATION }),
       },
     });
     saved.value = toForm(result.data.actionApproval);

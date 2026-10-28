@@ -66,6 +66,7 @@ describe("tool-risk declarations", () => {
       address_change: true,
       customer_update: true,
       note: true,
+      destructive: true,
       other_write: true,
     };
     expect(Object.keys(typed).sort()).toEqual(Object.keys(WRITE_CATEGORIES).sort());

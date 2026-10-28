@@ -111,7 +111,42 @@ describe("organizations.updateSettings action approval categories (D4-9)", () =>
   });
 
   it("lets the owner switch a money category off", async () => {
-    await callerAs("owner").updateSettings({ actionApproval: { categories: { refund: false } } });
+    await callerAs("owner").updateSettings({
+      actionApproval: { categories: { refund: false }, confirmSwitchOff: "SWITCH OFF APPROVAL" },
+    });
+    expect(mockUpdate).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("organizations.updateSettings typed confirm for money approval (B1)", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    const org = { id: ORG_ID, name: "Shop", settings: {} };
+    mockFindOne.mockResolvedValue(org);
+    mockUpdate.mockImplementation(async (_id, data) => ({ ...org, ...(data as object) }));
+  });
+
+  it("refuses switching money approval off without the confirmation, even for the owner", async () => {
+    await expect(
+      callerAs("owner").updateSettings({ actionApproval: { moneyMovesNeedApproval: false } }),
+    ).rejects.toMatchObject({ code: "PRECONDITION_FAILED" });
+    await expect(
+      callerAs("owner").updateSettings({ actionApproval: { categories: { cancel: false } } }),
+    ).rejects.toMatchObject({ code: "PRECONDITION_FAILED" });
+    expect(mockUpdate).not.toHaveBeenCalled();
+  });
+
+  it("switches off with the confirmation and does not store it", async () => {
+    await callerAs("owner").updateSettings({
+      actionApproval: { moneyMovesNeedApproval: false, confirmSwitchOff: "SWITCH OFF APPROVAL" },
+    });
+    const saved = (mockUpdate.mock.calls[0][1] as { settings: { actionApproval: object } }).settings
+      .actionApproval;
+    expect(saved).toEqual({ moneyMovesNeedApproval: false });
+  });
+
+  it("needs no confirmation for non-money categories", async () => {
+    await callerAs("owner").updateSettings({ actionApproval: { categories: { note: false } } });
     expect(mockUpdate).toHaveBeenCalledTimes(1);
   });
 });

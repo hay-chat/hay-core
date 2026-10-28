@@ -25,3 +25,9 @@ export const MONEY_CATEGORIES: ReadonlySet<string> = new Set([
 
 /** Categories the auto-approve amount applies to (server THRESHOLD_CATEGORIES). */
 export const THRESHOLD_CATEGORIES: ReadonlySet<string> = new Set(["refund", "discount"]);
+
+/**
+ * Sent with a save that switches approval off for a money move, once the person
+ * typed the confirm word (server SWITCH_OFF_CONFIRMATION in core/action-policy).
+ */
+export const SWITCH_OFF_CONFIRMATION = "SWITCH OFF APPROVAL";

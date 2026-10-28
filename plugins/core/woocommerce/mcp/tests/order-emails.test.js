@@ -56,7 +56,10 @@ describe("woocommerce_resend_order_confirmation", () => {
         [OLD_NOTE],
         [
           { id: 3, note: "Order details sent to ana@example.com." },
-          { id: 2, note: 'Email "Order details" failed to send: Could not instantiate mail function..' },
+          {
+            id: 2,
+            note: 'Email "Order details" failed to send: Could not instantiate mail function..',
+          },
           OLD_NOTE,
         ],
       ),
@@ -76,7 +79,10 @@ describe("woocommerce_resend_order_confirmation", () => {
     const oldFailure = { id: 1, note: 'Email "Order details" failed to send: SMTP down' };
     mockFetch([
       { method: "GET", path: `${WC}/orders/12`, reply: () => ORDER },
-      notesRoute([oldFailure], [{ id: 2, note: "Order details sent to ana@example.com." }, oldFailure]),
+      notesRoute(
+        [oldFailure],
+        [{ id: 2, note: "Order details sent to ana@example.com." }, oldFailure],
+      ),
       { method: "POST", path: `${WC}/orders/12/actions/send_order_details`, reply: () => ({}) },
     ]);
     const res = await server.call("woocommerce_resend_order_confirmation", { order_id: "12" });

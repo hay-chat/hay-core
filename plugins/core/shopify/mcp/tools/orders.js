@@ -154,6 +154,22 @@ function cancelBlocker(order) {
 }
 
 /**
+ * The refund choice a cancel makes when the agent does not pass one: refund to
+ * the original payment only when the order is unfulfilled and fully paid with a
+ * single payment method, where that is plainly what the shopper expects. Null
+ * otherwise: split payments, partial payments or partial fulfilment need an
+ * explicit choice. Needs `displayFulfillmentStatus displayFinancialStatus paymentGatewayNames`.
+ */
+function defaultCancelRefund(order) {
+  const singleMethod = (order.paymentGatewayNames || []).length === 1;
+  return order.displayFulfillmentStatus === "UNFULFILLED" &&
+    order.displayFinancialStatus === "PAID" &&
+    singleMethod
+    ? true
+    : null;
+}
+
+/**
  * Flatten line items and add a derived support summary. `isCancellable` uses the
  * same pre-dispatch guard as shopify_cancel_order (Shopify exposes no cancelable
  * field); `orderCancel` remains the final word via its userErrors.
@@ -527,7 +543,9 @@ function registerOrderTools(server) {
     "shopify_cancel_order",
     "Cancel an order before it ships (WRITE). Optionally restock, refund the payment, and " +
       "notify the customer. Refuses with code PRECONDITION if anything has shipped or is " +
-      "being fulfilled, or if the order is already cancelled.",
+      "being fulfilled, or if the order is already cancelled. Refunds by default only when the " +
+      "order is unfulfilled and paid with a single payment method; for any other order you " +
+      "must pass refund_to_original_payment yourself, or the call is refused with BAD_INPUT.",
     {
       order_id: z.string().describe("Order GID or bare numeric id."),
       reason: z
@@ -539,8 +557,9 @@ function registerOrderTools(server) {
         .optional()
         .describe(
           "If true, refund the payment to the original payment method as part of the " +
-            "cancellation. If false or omitted, nothing is refunded (authorized-only payments " +
-            "are still voided by Shopify).",
+            "cancellation. If false, nothing is refunded (authorized-only payments are still " +
+            "voided by Shopify). If omitted, defaults to true for an unfulfilled order paid " +
+            "with a single payment method; for any other order it is required.",
         ),
       notify_customer: z
         .boolean()
@@ -560,6 +579,8 @@ function registerOrderTools(server) {
               name
               cancelledAt
               displayFulfillmentStatus
+              displayFinancialStatus
+              paymentGatewayNames
               fulfillments(first: 20) { status displayStatus }
             }
           }
@@ -571,6 +592,22 @@ function registerOrderTools(server) {
           const { message, ...details } = blocker;
           throw toolError("PRECONDITION", message, { details });
         }
+        const refund = args.refund_to_original_payment ?? defaultCancelRefund(check.order);
+        if (refund === null) {
+          throw toolError(
+            "BAD_INPUT",
+            `Order ${check.order.name} is not an unfulfilled order paid with one payment method, ` +
+              "so say whether to refund it: pass refund_to_original_payment true or false.",
+            {
+              details: {
+                reason: "REFUND_CHOICE_REQUIRED",
+                displayFulfillmentStatus: check.order.displayFulfillmentStatus,
+                displayFinancialStatus: check.order.displayFinancialStatus,
+                paymentGatewayNames: check.order.paymentGatewayNames || [],
+              },
+            },
+          );
+        }
 
         // Verified 2026-04 (shopify.dev/docs/api/admin-graphql/2026-04/mutations/orderCancel):
         // orderId/reason/restock are required; refundMethod is a nullable
@@ -581,7 +618,7 @@ function registerOrderTools(server) {
           orderId,
           reason: args.reason,
           restock: args.restock,
-          refundMethod: { originalPaymentMethodsRefund: args.refund_to_original_payment === true },
+          refundMethod: { originalPaymentMethodsRefund: refund },
           notify: args.notify_customer ?? null,
           note: args.staff_note ?? null,
         };
@@ -664,6 +701,13 @@ function registerOrderTools(server) {
         )
         .optional()
         .describe("Transactions to process for the refund (from shopify_calculate_refund)."),
+      currency: z
+        .string()
+        .regex(/^[A-Za-z]{3}$/)
+        .describe(
+          'The order\'s currency code (ISO 4217, e.g. "USD"), as shopify_calculate_refund shows it. The person ' +
+            "approving the refund sees the amount in it; a different currency is refused.",
+        ),
       idempotency_key: z
         .string()
         .describe("UUID idempotency key; required by Shopify 2026-04 for refund mutations."),
@@ -692,6 +736,15 @@ function registerOrderTools(server) {
             `Order ${check.order.name} is not refundable (already fully refunded or no ` +
               "eligible payment transactions).",
             { details: { reason: "NOT_REFUNDABLE" } },
+          );
+        }
+        const orderCurrency = check.order.netPaymentSet.shopMoney.currencyCode;
+        if (args.currency.toUpperCase() !== orderCurrency) {
+          throw toolError(
+            "BAD_INPUT",
+            `Order ${check.order.name} is in ${orderCurrency}, not ${args.currency}. ` +
+              `Pass currency "${orderCurrency}".`,
+            { details: { reason: "CURRENCY_MISMATCH", currency: orderCurrency } },
           );
         }
         if (args.transactions && args.transactions.length > 0) {

@@ -262,12 +262,27 @@ function registerPaymentTools(server) {
           .describe(
             "Amount to refund in the payment currency. Omit for the full remaining amount.",
           ),
+        currency: z
+          .string()
+          .regex(/^[A-Za-z]{3}$/)
+          .describe(
+            'The payment\'s currency code (e.g. "BRL"), as mercadopago_get_payment shows it. ' +
+              "The person approving the refund sees the amount in it; a different currency is refused.",
+          ),
       },
     },
-    async ({ payment_id, amount }) => {
+    async ({ payment_id, amount, currency }) => {
       try {
         const payment = await getPayment(payment_id);
         const p = normalizePayment(payment);
+        const paymentCurrency = String(payment.currency_id || "").toUpperCase();
+        if (paymentCurrency && currency.toUpperCase() !== paymentCurrency) {
+          throw toolError(
+            "BAD_INPUT",
+            `This payment is in ${paymentCurrency}, not ${currency}. Pass currency "${paymentCurrency}".`,
+            { details: { reason: "CURRENCY_MISMATCH", currency: paymentCurrency } },
+          );
+        }
         if (p.status === "in_dispute") {
           throw toolError(
             "PRECONDITION",

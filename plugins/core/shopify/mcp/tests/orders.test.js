@@ -68,6 +68,12 @@ describe("cancelBlocker", () => {
 });
 
 describe("shopify_cancel_order", () => {
+  const paidOrder = (overrides = {}) =>
+    unfulfilledOrder({
+      displayFinancialStatus: "PAID",
+      paymentGatewayNames: ["shopify_payments"],
+      ...overrides,
+    });
   const CANCEL_OK = {
     orderCancel: {
       job: { id: "gid://shopify/Job/1", done: false },
@@ -79,7 +85,7 @@ describe("shopify_cancel_order", () => {
   it("refuses a shipped order with a structured PRECONDITION error and never calls orderCancel", async () => {
     const { calls } = mockShopify({
       CheckCancellable: () => ({
-        order: unfulfilledOrder({
+        order: paidOrder({
           displayFulfillmentStatus: "FULFILLED",
           fulfillments: [{ status: "SUCCESS", displayStatus: "IN_TRANSIT" }],
         }),
@@ -114,9 +120,9 @@ describe("shopify_cancel_order", () => {
     expect(res.data).toMatchObject({ code: "NOT_FOUND" });
   });
 
-  it("cancels an unfulfilled order with an explicit no-refund method by default", async () => {
+  it("refunds by default an unfulfilled order paid with one payment method", async () => {
     const { calls } = mockShopify({
-      CheckCancellable: () => ({ order: unfulfilledOrder() }),
+      CheckCancellable: () => ({ order: paidOrder() }),
       CancelOrder: () => CANCEL_OK,
     });
     const res = await server.call("shopify_cancel_order", {
@@ -131,7 +137,7 @@ describe("shopify_cancel_order", () => {
       orderId: ORDER_GID,
       reason: "CUSTOMER",
       restock: true,
-      refundMethod: { originalPaymentMethodsRefund: false },
+      refundMethod: { originalPaymentMethodsRefund: true },
       notify: null,
       note: null,
     });
@@ -141,10 +147,51 @@ describe("shopify_cancel_order", () => {
     expect(cancel.query).toMatch(/staffNote: \$note/);
   });
 
+  it("refuses to guess the refund for a split, partial or unpaid order", async () => {
+    for (const overrides of [
+      { paymentGatewayNames: ["gift_card", "shopify_payments"] },
+      { displayFinancialStatus: "PARTIALLY_PAID" },
+      { displayFulfillmentStatus: "ON_HOLD" },
+    ]) {
+      const { calls } = mockShopify({
+        CheckCancellable: () => ({ order: paidOrder(overrides) }),
+        CancelOrder: () => CANCEL_OK,
+      });
+      const res = await server.call("shopify_cancel_order", {
+        order_id: "1001",
+        reason: "CUSTOMER",
+        restock: true,
+      });
+      expect(res.isError).toBe(true);
+      expect(res.data).toMatchObject({
+        code: "BAD_INPUT",
+        details: { reason: "REFUND_CHOICE_REQUIRED" },
+      });
+      expect(calls.map((c) => c.op)).toEqual(["CheckCancellable"]);
+    }
+  });
+
+  it("cancels without a refund when the agent passes false", async () => {
+    const { calls } = mockShopify({
+      CheckCancellable: () => ({
+        order: paidOrder({ paymentGatewayNames: ["gift_card", "shopify_payments"] }),
+      }),
+      CancelOrder: () => CANCEL_OK,
+    });
+    await server.call("shopify_cancel_order", {
+      order_id: "1001",
+      reason: "CUSTOMER",
+      restock: true,
+      refund_to_original_payment: false,
+    });
+    const cancel = calls.find((c) => c.op === "CancelOrder");
+    expect(cancel.variables.refundMethod).toEqual({ originalPaymentMethodsRefund: false });
+  });
+
   it("passes originalPaymentMethodsRefund: true when a refund is requested", async () => {
     const { calls } = mockShopify({
       CheckCancellable: () => ({
-        order: unfulfilledOrder({ displayFulfillmentStatus: "ON_HOLD" }),
+        order: paidOrder({ displayFulfillmentStatus: "ON_HOLD" }),
       }),
       CancelOrder: () => CANCEL_OK,
     });
@@ -166,7 +213,7 @@ describe("shopify_cancel_order", () => {
 
   it("still surfaces Shopify's own refusal", async () => {
     mockShopify({
-      CheckCancellable: () => ({ order: unfulfilledOrder() }),
+      CheckCancellable: () => ({ order: paidOrder() }),
       CancelOrder: () => ({
         orderCancel: {
           job: null,
@@ -185,6 +232,32 @@ describe("shopify_cancel_order", () => {
       code: "PROVIDER_REFUSED",
       message: "Shopify refused: Has open return",
     });
+  });
+});
+
+describe("shopify_create_refund currency (B4)", () => {
+  const refundable = {
+    order: {
+      id: ORDER_GID,
+      name: "#1001",
+      refundable: true,
+      netPaymentSet: { shopMoney: { amount: "50.00", currencyCode: "BRL" } },
+    },
+  };
+
+  it("refuses a currency that is not the order's, before refunding", async () => {
+    const { calls } = mockShopify({ CheckRefundable: () => refundable });
+    const res = await server.call("shopify_create_refund", {
+      order_id: "1001",
+      currency: "USD",
+      idempotency_key: "11111111-1111-4111-8111-111111111111",
+    });
+    expect(res.isError).toBe(true);
+    expect(res.data).toMatchObject({
+      code: "BAD_INPUT",
+      details: { reason: "CURRENCY_MISMATCH", currency: "BRL" },
+    });
+    expect(calls.map((c) => c.op)).toEqual(["CheckRefundable"]);
   });
 });
 
