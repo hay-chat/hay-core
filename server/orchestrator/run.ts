@@ -445,6 +445,10 @@ export const runConversation = async (conversationId: string) => {
     return;
   }
 
+  // Spam is held from the AI (D9-6): no reply, no billing.
+  const { holdIfSpam } = await import("@server/services/spam/spam-hold.service");
+  if (await holdIfSpam(conversation, log)) return;
+
   const processingStartedAt = Date.now();
 
   // 00. Acquire processing lock before doing any work or incrementing attempt
@@ -1311,10 +1315,7 @@ async function handleExecutionLoop(
             : null,
       };
       const handoffType = availability.state === "open" ? "available" : "unavailable";
-      log.debug(
-        { hasAgent: !!agent, availability: availability.state },
-        "Handing off to the team",
-      );
+      log.debug({ hasAgent: !!agent, availability: availability.state }, "Handing off to the team");
 
       // The merchant's own hand-off instructions for this situation, if any,
       // are run through the planner on the next iteration, with the facts.

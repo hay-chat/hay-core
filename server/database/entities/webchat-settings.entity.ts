@@ -74,6 +74,13 @@ export class WebchatSettings {
   @Column({ type: "boolean", name: "is_enabled", default: true })
   isEnabled!: boolean;
 
+  // Spam (D9-6 / D9-7)
+  @Column({ type: "boolean", name: "spam_classifier_enabled", default: false })
+  spamClassifierEnabled!: boolean;
+
+  @Column({ type: "text", name: "spam_guidance", nullable: true })
+  spamGuidance!: string | null;
+
   // Advanced
   @Column({ type: "text", name: "custom_css", nullable: true })
   customCss!: string | null;
