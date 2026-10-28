@@ -129,6 +129,9 @@ describe("disputes (D2-7, D2-8)", () => {
     expect(first.dispute.orderPluginId).toBe("shopify");
     expect(first.dispute.orderLabel).toBe("#1001");
     expect(first.dispute.currency).toBe("USD");
+    const stored = await disputes().findOneByOrFail({ id: first.dispute.id });
+    expect(stored.alertedAt).not.toBeNull();
+    expect(first.dispute.alertedAt).toEqual(stored.alertedAt);
     expect(onDisputeOpened).toHaveBeenCalledTimes(1);
     expect(onDisputeOpened.mock.calls[0][0]).toMatchObject({
       organizationId: orgId,
