@@ -426,7 +426,7 @@
                 }"
                 :message="message as Message"
                 :show-feedback="true"
-                :show-approval="isTestMode"
+                :show-approval="true"
                 :show-timestamp="shouldShowTimestamp(conversation?.messages, index)"
                 :bot-avatar-url="botAvatarUrl"
                 :human-avatar-url="humanAvatarUrl"

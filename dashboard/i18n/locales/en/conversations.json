@@ -280,6 +280,19 @@
       "aiProcessing": "AI processing",
       "aiRegionEu": "EU data centres",
       "aiRegionDefault": "Any region (default AI provider)"
+    },
+    "draftApproval": {
+      "queued": "Waiting for approval",
+      "approve": "Approve & Send",
+      "block": "Block",
+      "dialogTitle": "Review AI reply",
+      "dialogDescription": "Review the reply and edit it if needed before it goes to the customer.",
+      "original": "Original AI reply:",
+      "content": "Reply",
+      "placeholder": "Edit the reply...",
+      "characters": "{count} characters",
+      "blockMessage": "Block reply",
+      "approveEdited": "Approve & Send edited"
     }
   }
 }
