@@ -72,10 +72,11 @@ const mockFindConversation = jest.fn<(...args: unknown[]) => Promise<unknown>>(a
   spam_flagged_at: null,
   metadata: {},
 }));
+const mockQuery = jest.fn<(...args: unknown[]) => Promise<unknown[]>>(async () => []);
 jest.mock("@server/database/data-source", () => ({
   AppDataSource: {
     getRepository: () => ({ findOne: (...args: unknown[]) => mockFindConversation(...args) }),
-    query: jest.fn(async () => []),
+    query: (...args: unknown[]) => mockQuery(...args),
   },
 }));
 
@@ -84,6 +85,7 @@ import {
   markAnalysisPending,
   markMediaPending,
   processMessageMedia,
+  reanalyzeHeldMedia,
 } from "../../services/media-analysis/pipeline";
 import {
   describeAttachmentForAgent,
@@ -301,6 +303,48 @@ describe("processMessageMedia", () => {
     expect(storedAttachments()[0].analysis).toEqual({ status: "skipped", reason: "unverified" });
     expect(mockDownload).not.toHaveBeenCalled();
     expect(mockChatCreate).not.toHaveBeenCalled();
+  });
+
+  it("reads an unverified visitor's files once staff marked it Not spam", async () => {
+    mockFindMessage.mockResolvedValue(message(markAnalysisPending([photo()])!));
+    mockFindConversation.mockResolvedValueOnce({
+      id: "conv-1",
+      spam_flagged_at: null,
+      metadata: { botCheck: { decision: "flag" }, spamCheck: { clearedAt: "2026-10-28T10:00:00Z" } },
+    });
+    mockChatCreate.mockResolvedValueOnce(visionReply(DAMAGE) as never);
+    await processMessageMedia("msg-1", ORG);
+    expect(storedAttachments()[0].analysis).toMatchObject({ status: "done" });
+  });
+
+  it("re-reads the files skipped while the conversation was held (Not spam)", async () => {
+    const skipped = photo({ analysis: { status: "skipped", reason: "spam" } });
+    const disabled = pdf({ analysis: { status: "skipped", reason: "disabled" } });
+    let stored: MessageAttachment[] = [skipped, disabled];
+    mockQuery.mockResolvedValueOnce([{ id: "msg-1" }]);
+    mockFindMessage.mockImplementation(async () => message(stored));
+    mockUpdateMessage.mockImplementation(async (...args: unknown[]) => {
+      stored = (args[1] as { attachments: MessageAttachment[] }).attachments;
+    });
+    mockChatCreate.mockResolvedValueOnce(visionReply(DAMAGE) as never);
+
+    await expect(reanalyzeHeldMedia("conv-1", ORG)).resolves.toBe(1);
+
+    expect(mockQuery.mock.calls[0][1]).toEqual(["conv-1"]);
+    // First update marks it pending (Inbox shows it being read), the second stores the result.
+    const first = (mockUpdateMessage.mock.calls[0][1] as { attachments: MessageAttachment[] })
+      .attachments;
+    expect(first[0].analysis?.status).toBe("pending");
+    expect(first[1].analysis).toEqual({ status: "skipped", reason: "disabled" });
+    expect(stored[0].analysis).toMatchObject({ status: "done", class: "damage" });
+    expect(stored[1].analysis).toEqual({ status: "skipped", reason: "disabled" });
+    expect(mockChatCreate).toHaveBeenCalledTimes(1);
+  });
+
+  it("re-reads nothing when no file was held", async () => {
+    mockQuery.mockResolvedValueOnce([]);
+    await expect(reanalyzeHeldMedia("conv-1", ORG)).resolves.toBe(0);
+    expect(mockUpdateMessage).not.toHaveBeenCalled();
   });
 
   it("reads files when the bot check could not run (Cloudflare unreachable)", async () => {

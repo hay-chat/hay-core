@@ -253,7 +253,65 @@ async function visionSkipReason(conversationId: string): Promise<"spam" | "unver
     select: { id: true, spam_flagged_at: true, metadata: true },
   });
   if (conversation?.spam_flagged_at) return "spam";
+  // Staff marked it "Not spam": a person vouched for the shopper.
+  const spamCheck = conversation?.metadata?.spamCheck as { clearedAt?: unknown } | undefined;
+  if (spamCheck?.clearedAt) return null;
   return isBotFlagged(conversation?.metadata?.botCheck) ? "unverified" : null;
+}
+
+/** Skip reasons that a "Not spam" from staff takes back. */
+const HELD_SKIP_REASONS: ReadonlyArray<string> = ["spam", "unverified"];
+
+function isHeldSkip(attachment: MessageAttachment): boolean {
+  return (
+    attachment.analysis?.status === "skipped" &&
+    HELD_SKIP_REASONS.includes(attachment.analysis.reason ?? "")
+  );
+}
+
+/**
+ * Staff marked the conversation "Not spam" (D3): the customer files the pass
+ * skipped because it was held as spam or unverified are marked pending again
+ * (the Inbox shows them as being read) and analysed. Resolves once every file
+ * is settled; never throws. Returns how many messages were re-read.
+ */
+export async function reanalyzeHeldMedia(
+  conversationId: string,
+  organizationId: string,
+): Promise<number> {
+  const rows: Array<{ id: string }> = await AppDataSource.query(
+    `SELECT id FROM messages
+     WHERE conversation_id = $1
+       AND type = 'Customer'
+       AND (attachments @> '[{"analysis":{"status":"skipped","reason":"spam"}}]'::jsonb
+         OR attachments @> '[{"analysis":{"status":"skipped","reason":"unverified"}}]'::jsonb)
+     ORDER BY created_at ASC`,
+    [conversationId],
+  );
+
+  const now = new Date().toISOString();
+  const marked: string[] = [];
+  for (const { id } of rows) {
+    const message = await messageRepository.findByIdAndOrganization(id, organizationId);
+    if (!message?.attachments?.some(isHeldSkip)) continue;
+    const attachments = message.attachments.map((attachment) =>
+      isHeldSkip(attachment)
+        ? { ...attachment, analysis: { status: "pending" as const, startedAt: now } }
+        : attachment,
+    );
+    await messageRepository.update(message.id, { attachments });
+    await publishMediaUpdate(organizationId, conversationId, message.id, attachments);
+    marked.push(message.id);
+  }
+
+  await Promise.all(
+    marked.map((messageId) =>
+      processMessageMedia(messageId, organizationId).catch((error) => {
+        logger.error({ err: error, messageId }, "Media analysis crashed");
+      }),
+    ),
+  );
+  return marked.length;
 }
 
 /** Merge the results into the message's current attachments (re-read) and store them. */
