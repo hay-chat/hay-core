@@ -34,6 +34,12 @@ jest.mock("@server/services/webchat/webchat-settings.service", () => ({
   },
 }));
 
+jest.mock("@server/services/webchat/under-attack.service", () => ({
+  isUnderAttack: async () => false,
+  setUnderAttack: jest.fn(),
+  stateOf: jest.fn(),
+}));
+
 import { organizationsRouter } from "@server/routes/v1/organizations";
 import { webchatRouter } from "@server/routes/v1/webchat";
 import { isAiLabelShown, isEuOrganization } from "@server/services/ai-disclosure";

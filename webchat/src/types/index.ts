@@ -65,6 +65,15 @@ export interface PublicConfig {
   aiLabelShown?: boolean;
   /** The org's label text; null = the localized default. */
   aiLabelText?: string | null;
+  /** Plugin contributions this widget advertised support for (never code). */
+  contributions?: WidgetContribution[];
+}
+
+/** A declarative plugin contribution, rendered by the widget's own code. */
+export interface WidgetContribution {
+  id: string;
+  type: "challenge@1";
+  props: { provider: string; mode: "invisible" | "challenge_all" };
 }
 
 /** The loader's button, driven by the chat once it is mounted. */
@@ -119,7 +128,13 @@ export interface Message {
 
 /** Shown under the input when the server refuses a message; `text` goes back into the input. */
 export interface SendFailure {
-  reason: "sendFailed" | "messageTooLong" | "fileTooLarge" | "fileType" | "fileFailed";
+  reason:
+    | "sendFailed"
+    | "messageTooLong"
+    | "fileTooLarge"
+    | "fileType"
+    | "fileFailed"
+    | "verificationFailed";
   text: string;
 }
 

@@ -171,6 +171,7 @@ export const conversationsRouter = t.router({
         WHERE c.organization_id = $1
           AND c.deleted_at IS NULL
           AND c.status IN ('pending-human', 'human-took-over')
+          AND c.spam_flagged_at IS NULL
         ORDER BY COALESCE(c.last_message_at, c.updated_at) ASC
         LIMIT 200
       `,
@@ -196,6 +197,31 @@ export const conversationsRouter = t.router({
       handling: rows.filter((r) => r.status === "human-took-over").map(toView),
     };
   }),
+
+  /** Spam view (D9-7): spam-flagged conversations, newest first, with reasons. */
+  spam: scopedProcedure(RESOURCES.CONVERSATIONS, ACTIONS.READ)
+    .input(z.object({ limit: z.number().int().min(1).max(200).default(100) }).optional())
+    .query(async ({ ctx, input }) => {
+      const { listSpam } = await import("@server/services/spam/spam-review.service");
+      return listSpam(ctx.organizationId!, input?.limit ?? 100);
+    }),
+
+  /** Flag a conversation as spam: never billed, held from the AI. */
+  markSpam: scopedProcedure(RESOURCES.CONVERSATIONS, ACTIONS.UPDATE)
+    .input(z.object({ conversationId: z.string().uuid() }))
+    .mutation(async ({ ctx, input }) => {
+      const { markSpam } = await import("@server/services/spam/spam-review.service");
+      await markSpam(ctx.organizationId!, input.conversationId);
+      return { success: true };
+    }),
+
+  /** Clear a spam flag; the AI answers again if the shopper is still waiting. */
+  notSpam: scopedProcedure(RESOURCES.CONVERSATIONS, ACTIONS.UPDATE)
+    .input(z.object({ conversationId: z.string().uuid() }))
+    .mutation(async ({ ctx, input }) => {
+      const { markNotSpam } = await import("@server/services/spam/spam-review.service");
+      return markNotSpam(ctx.organizationId!, input.conversationId, ctx.user!.id);
+    }),
 
   /**
    * Active conversations for dashboard widgets.

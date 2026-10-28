@@ -130,4 +130,36 @@ describe("useChat refused sends", () => {
     expect(pending?.metadata).toMatchObject({ pending: true, error: true });
     unmount();
   });
+
+  it("says the message could not be verified when a bot check refuses the create", async () => {
+    const fetchMock = mockFetch({
+      "publicConversations.create": () => ({
+        status: 403,
+        error: { message: "VERIFICATION_FAILED" },
+      }),
+      "publicConversations.sendMessage": sent,
+    });
+    const { chat, unmount } = await mountChat(
+      {},
+      {
+        challenge: {
+          id: "turnstile.challenge",
+          type: "challenge@1",
+          props: { provider: "turnstile", mode: "invisible" },
+        },
+      },
+    );
+    await initialize(chat);
+
+    await chat.sendMessage("hello");
+
+    expect(chat.sendFailure.value).toEqual({ reason: "verificationFailed", text: "hello" });
+    // No frame host was mounted, so the widget reports why it has no token.
+    const createBody = JSON.parse(
+      String(fetchMock.mock.calls.find(([url]) => String(url).includes("create"))?.[1]?.body),
+    );
+    expect(createBody.challengeError).toBe("unavailable");
+    expect(createBody.challengeToken).toBeUndefined();
+    unmount();
+  });
 });

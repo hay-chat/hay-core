@@ -74,6 +74,20 @@ export class WebchatSettings {
   @Column({ type: "boolean", name: "is_enabled", default: true })
   isEnabled!: boolean;
 
+  // Spam (D9-6 / D9-7)
+  @Column({ type: "boolean", name: "spam_classifier_enabled", default: false })
+  spamClassifierEnabled!: boolean;
+
+  @Column({ type: "text", name: "spam_guidance", nullable: true })
+  spamGuidance!: string | null;
+
+  // Under-attack mode (D9-10): everyone is challenged until this time.
+  @Column({ type: "timestamptz", name: "under_attack_until", nullable: true })
+  underAttackUntil!: Date | null;
+
+  @Column({ type: "varchar", length: 20, name: "under_attack_source", nullable: true })
+  underAttackSource!: "owner" | "auto" | null;
+
   // Advanced
   @Column({ type: "text", name: "custom_css", nullable: true })
   customCss!: string | null;

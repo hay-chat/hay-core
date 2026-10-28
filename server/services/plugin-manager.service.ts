@@ -30,6 +30,8 @@ interface HayPluginBlock {
   channel?: string;
   rendering?: HayPluginManifest["rendering"];
   autoActivate?: boolean;
+  /** Enable this plugin automatically for newly created organizations. */
+  defaultEnabled?: boolean;
   trpcRouter?: string;
   documentImporter?: boolean;
 }
@@ -246,6 +248,7 @@ export class PluginManagerService {
         channel: hayPlugin.channel || undefined, // For channel-type plugins
         rendering: hayPlugin.rendering || undefined, // What the channel can show (D13-12)
         autoActivate: hayPlugin.autoActivate === true, // Eagerly load router at boot
+        defaultEnabled: hayPlugin.defaultEnabled === true, // Enabled for new orgs
         trpcRouter: hayPlugin.trpcRouter || undefined, // Optional plugin-side tRPC router file
       };
 

@@ -19,6 +19,8 @@ export interface HayPluginManifest {
   /** What a channel can show (D13-12): see server/lib/channel-rendering.ts. */
   rendering?: ChannelRendering;
   autoActivate?: boolean;
+  /** Enabled automatically for newly created organizations (package.json hay-plugin.defaultEnabled). */
+  defaultEnabled?: boolean;
   invisible?: boolean;
   menuItems?: Array<{
     id: string;

@@ -1,4 +1,7 @@
 import { router, scopedProcedure, publicProcedure } from "@server/trpc";
+import { webchatExtensionsService } from "@server/services/webchat/webchat-extensions.service";
+import { isUnderAttack, setUnderAttack, stateOf } from "@server/services/webchat/under-attack.service";
+import { config } from "@server/config/env";
 import { z } from "zod";
 import { webchatSettingsService } from "@server/services/webchat/webchat-settings.service";
 import { organizationRepository } from "@server/repositories/organization.repository";
@@ -45,8 +48,23 @@ export const webchatRouter = router({
    * Get webchat settings for the current organization
    */
   getSettings: scopedProcedure("webchat", "read").query(async ({ ctx }) => {
-    return await webchatSettingsService.getSettings(ctx.organizationId!);
+    const settings = await webchatSettingsService.getSettings(ctx.organizationId!);
+    return {
+      ...settings,
+      underAttack: stateOf(settings),
+      underAttackHours: config.underAttack.hours,
+    };
   }),
+
+  /**
+   * Under-attack mode (D9-10): challenge every visitor for the next
+   * UNDER_ATTACK_HOURS, or switch it off early.
+   */
+  setUnderAttack: scopedProcedure("webchat", "write")
+    .input(z.object({ enabled: z.boolean() }))
+    .mutation(async ({ ctx, input }) => {
+      return await setUnderAttack(ctx.organizationId!, input.enabled);
+    }),
 
   /**
    * Update webchat settings
@@ -63,6 +81,8 @@ export const webchatRouter = router({
         allowedDomains: z.array(z.string()).optional(),
         isEnabled: z.boolean().optional(),
         customCss: z.string().nullable().optional(),
+        spamClassifierEnabled: z.boolean().optional(),
+        spamGuidance: z.string().max(2000).nullable().optional(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
@@ -77,6 +97,8 @@ export const webchatRouter = router({
     .input(
       z.object({
         organizationId: z.string().uuid(),
+        // Contribution types this widget build can render (e.g. "challenge@1").
+        supports: z.array(z.string().max(40)).max(20).optional(),
       }),
     )
     .query(async ({ input }) => {
@@ -91,10 +113,18 @@ export const webchatRouter = router({
         return { enabled: false as const };
       }
 
-      const config = await webchatSettingsService.getPublicConfig(input.organizationId);
+      const underAttack = await isUnderAttack(input.organizationId);
+      const [config, contributions] = await Promise.all([
+        webchatSettingsService.getPublicConfig(input.organizationId),
+        webchatExtensionsService.getPublicContributions(input.organizationId, input.supports ?? [], {
+          underAttack,
+        }),
+      ]);
       return {
         enabled: true as const,
         ...config,
+        // Plugin contributions the widget can render (declarative, never code).
+        contributions,
         // AI label on AI replies (D14-6). A null text means the widget's localized default.
         aiLabelShown: isAiLabelShown(organization, "web"),
         aiLabelText: customAiLabel(organization.settings),

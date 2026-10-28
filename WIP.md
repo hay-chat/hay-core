@@ -9,6 +9,11 @@
 - Migrations (run on hay_test only): AddOrganizationAiPause1785795000000, AddUserAlertPreviewPrivacy1785796000000. No new env vars.
 - Verified: server tsc + 25 jest suites/178 pass; dashboard typecheck 0; vitest pass (3 Playwright specs fail under vitest, pre-existing).
 - Next: merge into staging, run both migrations on hay_staging, hand-test on a real iPhone.
+## 2026-10-28 — claude/w2-turnstile — W2 L1+L6 built (D9-11, D9-8, D9-9, D9-6, D9-7, D9-10)
+- 6 commits 55fd488..98d6525 on base 82d2026; not pushed. Migrations AddWebchatSpamSettings1785783300000 + AddWebchatUnderAttack1785783400000 run on hay_test only.
+- Works (tests): webchat plugin extension point (contributions + gates), Hay.chat-hosted challenge frame, plugins/core/turnstile (default-on, invisible), spam heuristics + optional AI check holding web spam from the AI, /spam view + Not spam/Mark as spam, under-attack mode (owner toggle + auto at 30 creates/5 min, 4 h).
+- Not hand-tested in a browser; needs TURNSTILE_* test keys in staging env and the plugin enabled for existing orgs.
+- Next: merge into staging, run both migrations on hay_staging, hand-test per the lane report.
 
 ## 2026-10-28 05:15 — staging — W2 D8 part B merged, hand-tested, i18n fix
 - Merged claude/w2-media-vision; migration AddUploadScanStatus1785771000000 on hay_staging.

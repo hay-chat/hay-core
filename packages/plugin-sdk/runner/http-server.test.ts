@@ -165,3 +165,72 @@ describe("PluginHttpServer /mcp/list-tools tool risk", () => {
     expect(byName.brand_new_tool._meta).toBeUndefined();
   });
 });
+
+describe("PluginHttpServer webchat gate endpoint", () => {
+  let server: PluginHttpServer;
+  let baseUrl: string;
+
+  beforeAll(async () => {
+    const registry = new PluginRegistry();
+    registry.registerConfig({ mode: { type: "string" } });
+    registry.registerWebchatGate({
+      event: "conversation.create",
+      timeoutMs: 3000,
+      failurePolicy: "open",
+      handler: (ctx, input) => ({
+        decision: input.token === "good" ? "allow" : "deny",
+        reason: `${ctx.org.id}:${String(ctx.config.get("mode"))}:${input.event}`,
+      }),
+    });
+    registry.registerWebchatGate({
+      event: "message.send",
+      timeoutMs: 3000,
+      failurePolicy: "open",
+      handler: () => ({ decision: "maybe" }) as never,
+    });
+    server = new PluginHttpServer(0, registry, silentLogger);
+    server.setRuntimeData({
+      orgId: "org-1",
+      manifest: { env: [] },
+      mcpRuntime: {} as never,
+      orgConfig: {},
+      orgAuth: null,
+    });
+    await server.start();
+    const address = (server as unknown as { server: { address(): AddressInfo } }).server.address();
+    baseUrl = `http://127.0.0.1:${address.port}`;
+  });
+
+  afterAll(async () => {
+    await server.stop();
+  });
+
+  const post = (event: string, body: unknown) =>
+    fetch(`${baseUrl}/webchat/gate/${event}`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(body),
+    });
+
+  it("runs the handler with the config Core sent and returns its decision", async () => {
+    const response = await post("conversation.create", {
+      config: { mode: "invisible" },
+      input: { token: "good", event: "message.send" },
+    });
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({
+      decision: "allow",
+      reason: "org-1:invisible:conversation.create",
+    });
+  });
+
+  it("returns 500 for an invalid decision so Core applies the failure policy", async () => {
+    const response = await post("message.send", { config: {}, input: {} });
+    expect(response.status).toBe(500);
+  });
+
+  it("returns 404 for an event without a gate", async () => {
+    const response = await post("page.view", { config: {}, input: {} });
+    expect(response.status).toBe(404);
+  });
+});

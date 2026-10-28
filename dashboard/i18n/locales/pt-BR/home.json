@@ -78,6 +78,47 @@
       "stepAdd": "Role para baixo e toque em \"Adicionar à Tela de Início\" e depois em \"Adicionar\"",
       "stepOpen": "Abra o Hay.chat pelo novo ícone na Tela de Início e ative os alertas",
       "dismiss": "Ocultar estes passos"
+    },
+    "spam": {
+      "title": "Spam",
+      "headTitle": "Spam - Hay.chat",
+      "description": "Conversas retidas como spam. A IA do Hay.chat não responde a elas e elas nunca entram na sua cobrança.",
+      "link": "Spam",
+      "empty": {
+        "title": "Nenhum spam",
+        "description": "Quando o Hay.chat retém uma conversa como spam, ela aparece aqui para você conferir."
+      },
+      "error": "Não foi possível carregar o spam",
+      "notSpam": "Não é spam",
+      "open": "Abrir",
+      "flagged": "Retida há {time}",
+      "noPreview": "Sem mensagem",
+      "unknownCustomer": "Visitante",
+      "notSpamDone": "Removida do spam",
+      "notSpamReengaged": "Removida do spam. A IA do Hay.chat está respondendo agora.",
+      "markSpam": "Marcar como spam",
+      "markSpamDone": "Marcada como spam. A IA do Hay.chat não vai responder.",
+      "actionFailed": "Não foi possível atualizar a conversa",
+      "sources": {
+        "detector": "Detector de spam",
+        "staff": "Marcada pela sua equipe",
+        "close_classifier": "Identificada no encerramento",
+        "other": "Spam"
+      },
+      "signals": {
+        "links": "Muitos links",
+        "link_only": "Só um link",
+        "repeated": "Texto repetido",
+        "too_long": "Mensagem muito longa",
+        "no_text": "Sem palavras",
+        "known_pattern": "Frases típicas de spam",
+        "unverified": "Verificação anti-bot falhou"
+      },
+      "classifier": "Verificação por IA: {reason}",
+      "banner": {
+        "title": "Retida como spam",
+        "description": "A IA do Hay.chat não está respondendo a esta conversa e ela não entra na sua cobrança."
+      }
     }
   }
 }

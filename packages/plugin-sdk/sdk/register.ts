@@ -18,9 +18,22 @@ import type {
   PluginPage,
   CronJobOptions,
   WebhookRoutingDescriptor,
+  RegisterWebchatAPI,
+  WebchatContributionOptions,
+  WebchatGateEvent,
+  WebchatGateHandler,
+  WebchatGateOptions,
 } from "../types/index.js";
 import { PluginRegistry } from "./registry.js";
 import type { HayLogger } from "../types/index.js";
+
+/** Default gate timeout (ms) when the plugin does not declare one. */
+export const WEBCHAT_GATE_DEFAULT_TIMEOUT_MS = 3000;
+/** Maximum gate timeout (ms): a gate blocks a shopper's first message. */
+export const WEBCHAT_GATE_MAX_TIMEOUT_MS = 5000;
+
+const WEBCHAT_CONTRIBUTION_TYPES = ["challenge@1"] as const;
+const WEBCHAT_GATE_EVENTS: WebchatGateEvent[] = ["conversation.create", "message.send"];
 
 /**
  * Plugin manifest structure (minimal).
@@ -106,6 +119,23 @@ export function createRegisterAPI(options: RegisterAPIOptions): HayRegisterAPI {
     },
   };
 
+  const webchat: RegisterWebchatAPI = {
+    contribution(contribution: WebchatContributionOptions): void {
+      validateWebchatContribution(contribution, registry);
+      registry.registerWebchatContribution(contribution);
+      logger.debug("Registered webchat contribution", {
+        id: contribution.id,
+        type: contribution.type,
+      });
+    },
+
+    gate(event: WebchatGateEvent, handler: WebchatGateHandler, gateOptions?: WebchatGateOptions) {
+      const { timeoutMs, failurePolicy } = validateWebchatGate(event, handler, gateOptions);
+      registry.registerWebchatGate({ event, handler, timeoutMs, failurePolicy });
+      logger.debug("Registered webchat gate", { event, timeoutMs, failurePolicy });
+    },
+  };
+
   // Create main register API
   const registerAPI: HayRegisterAPI = {
     route(method: HttpMethod, path: string, handler: RouteHandler): void {
@@ -156,6 +186,8 @@ export function createRegisterAPI(options: RegisterAPIOptions): HayRegisterAPI {
         itemsPath: descriptor.routeKeyPath.itemsPath,
       });
     },
+
+    webchat,
   };
 
   return registerAPI;
@@ -207,6 +239,83 @@ function validateCronOptions(options: CronJobOptions): void {
       throw new Error('Cron job retryPolicy.backoff must be "fixed" or "exponential"');
     }
   }
+}
+
+/**
+ * Validate a webchat contribution.
+ *
+ * Only shape is checked here; Core validates the resolved props against the
+ * schema it owns for each contribution type.
+ *
+ * @internal
+ */
+function validateWebchatContribution(
+  contribution: WebchatContributionOptions,
+  registry: PluginRegistry,
+): void {
+  if (!contribution || typeof contribution !== "object") {
+    throw new Error("Webchat contribution must be an object");
+  }
+  if (!contribution.id || !/^[a-z0-9_-]+$/i.test(contribution.id)) {
+    throw new Error(
+      "Webchat contribution id must contain only letters, numbers, hyphens and underscores",
+    );
+  }
+  if (!(WEBCHAT_CONTRIBUTION_TYPES as readonly string[]).includes(contribution.type)) {
+    throw new Error(
+      `Webchat contribution type "${contribution.type}" is not supported. Use one of: ${WEBCHAT_CONTRIBUTION_TYPES.join(", ")}`,
+    );
+  }
+  if (!contribution.props || typeof contribution.props !== "object") {
+    throw new Error("Webchat contribution props must be an object");
+  }
+  for (const [key, value] of Object.entries(contribution.props)) {
+    if (typeof value === "object" && value !== null) {
+      if (typeof value.name !== "string" || !registry.hasConfigField(value.name)) {
+        throw new Error(
+          `Webchat contribution prop "${key}" references unknown config field "${value?.name}". Register config before contributions.`,
+        );
+      }
+      if (registry.getConfigField(value.name)?.encrypted) {
+        throw new Error(
+          `Webchat contribution prop "${key}" references encrypted config field "${value.name}"; contribution props are public`,
+        );
+      }
+    } else if (!["string", "number", "boolean"].includes(typeof value)) {
+      throw new Error(`Webchat contribution prop "${key}" must be a string, number, boolean or config field reference`);
+    }
+  }
+}
+
+/**
+ * Validate a webchat gate and apply defaults.
+ *
+ * @internal
+ */
+function validateWebchatGate(
+  event: WebchatGateEvent,
+  handler: WebchatGateHandler,
+  options: WebchatGateOptions | undefined,
+): { timeoutMs: number; failurePolicy: "open" | "closed" } {
+  if (!WEBCHAT_GATE_EVENTS.includes(event)) {
+    throw new Error(
+      `Webchat gate event "${event}" is not supported. Use one of: ${WEBCHAT_GATE_EVENTS.join(", ")}`,
+    );
+  }
+  if (typeof handler !== "function") {
+    throw new Error("Webchat gate handler must be a function");
+  }
+  const timeoutMs = options?.timeoutMs ?? WEBCHAT_GATE_DEFAULT_TIMEOUT_MS;
+  if (typeof timeoutMs !== "number" || timeoutMs <= 0 || timeoutMs > WEBCHAT_GATE_MAX_TIMEOUT_MS) {
+    throw new Error(
+      `Webchat gate timeoutMs must be between 1 and ${WEBCHAT_GATE_MAX_TIMEOUT_MS} ms`,
+    );
+  }
+  const failurePolicy = options?.failurePolicy ?? "open";
+  if (failurePolicy !== "open" && failurePolicy !== "closed") {
+    throw new Error('Webchat gate failurePolicy must be "open" or "closed"');
+  }
+  return { timeoutMs, failurePolicy };
 }
 
 /**

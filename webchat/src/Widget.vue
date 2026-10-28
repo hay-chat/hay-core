@@ -25,6 +25,8 @@
         :waiting-detail="waitingLine"
         :contact-saved="contactEmailSaved"
         :save-contact-email="saveContactEmail"
+        :set-challenge-host="challengeContribution ? setChallengeHost : undefined"
+        :challenge-interactive="isChallengeInteractive"
         @close="closeChat"
         @send="sendMessage"
         @attach="sendAttachment"
@@ -104,6 +106,10 @@ const resolvedAgentName = computed(
   () => props.config.agentName || props.publicConfig?.agentName || undefined,
 );
 
+// The org's bot check, when one is on (declarative challenge@1 contribution).
+const challengeContribution =
+  props.publicConfig?.contributions?.find((c) => c.type === "challenge@1") ?? null;
+
 const {
   isOpen,
   isInitialized,
@@ -116,6 +122,8 @@ const {
   conversationStatus,
   contactEmailSaved,
   sendFailure,
+  challengeHost,
+  isChallengeInteractive,
   toggleChat,
   openChat,
   closeChat,
@@ -132,7 +140,11 @@ const {
   // localised default the empty state shows.
   showGreeting: props.config.showGreeting ?? true,
   greetingMessage: props.config.greetingMessage || t("widget.defaultGreeting"),
-});
+}, { challenge: challengeContribution });
+
+function setChallengeHost(el: HTMLElement | null) {
+  challengeHost.value = el;
+}
 
 // Business hours (D5-7) and the waiting state (D5-10).
 const locale = resolveLocale(props.config.locale);

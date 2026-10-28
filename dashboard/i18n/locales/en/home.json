@@ -78,6 +78,47 @@
       "stepAdd": "Scroll down and tap \"Add to Home Screen\", then \"Add\"",
       "stepOpen": "Open Hay.chat from the new icon on your Home Screen and turn on alerts",
       "dismiss": "Hide these steps"
+    },
+    "spam": {
+      "title": "Spam",
+      "headTitle": "Spam - Hay.chat",
+      "description": "Conversations held as spam. Hay.chat's AI doesn't answer them and they never count toward your bill.",
+      "link": "Spam",
+      "empty": {
+        "title": "No spam",
+        "description": "When Hay.chat holds a conversation as spam it shows up here, so you can check it."
+      },
+      "error": "Couldn't load spam",
+      "notSpam": "Not spam",
+      "open": "Open",
+      "flagged": "Held {time} ago",
+      "noPreview": "No message",
+      "unknownCustomer": "Visitor",
+      "notSpamDone": "Moved out of spam",
+      "notSpamReengaged": "Moved out of spam. Hay.chat's AI is answering now.",
+      "markSpam": "Mark as spam",
+      "markSpamDone": "Marked as spam. Hay.chat's AI won't answer it.",
+      "actionFailed": "Couldn't update the conversation",
+      "sources": {
+        "detector": "Spam detector",
+        "staff": "Marked by your team",
+        "close_classifier": "Found at close",
+        "other": "Spam"
+      },
+      "signals": {
+        "links": "Many links",
+        "link_only": "Only a link",
+        "repeated": "Repeated text",
+        "too_long": "Very long message",
+        "no_text": "No words",
+        "known_pattern": "Known spam phrases",
+        "unverified": "Bot check failed"
+      },
+      "classifier": "AI check: {reason}",
+      "banner": {
+        "title": "Held as spam",
+        "description": "Hay.chat's AI isn't answering this conversation and it doesn't count toward your bill."
+      }
     }
   }
 }

@@ -123,6 +123,14 @@
         <ChevronRight class="h-4 w-4" />
       </NuxtLink>
       <NuxtLink
+        to="/spam"
+        class="inline-flex min-h-11 items-center gap-1 text-primary hover:underline sm:min-h-0"
+        data-testid="inbox-spam-link"
+      >
+        {{ $t("home.spam.link") }}
+        <ChevronRight class="h-4 w-4" />
+      </NuxtLink>
+      <NuxtLink
         to="/dashboard"
         class="inline-flex min-h-11 items-center gap-1 text-primary hover:underline sm:min-h-0"
       >

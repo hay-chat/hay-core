@@ -42,4 +42,7 @@ export default {
   "attachment.photo": "사진",
   "attachment.file": "파일",
   "attachment.sending": "보내는 중...",
+  "error.verificationFailed": "We couldn't verify your message. Please refresh the page and try again.",
+  "challenge.label": "Security check",
+  "challenge.prompt": "Quick security check before we send your message.",
 } as const;
