@@ -1,3 +1,9 @@
+## 2026-10-28 — staging — Lane R release doc drafted
+- Draft release notes (Waves 0–3) published privately: https://claude.ai/artifact/Ugfwub6xvdyzrZZMixWqCT (16 staging clips inline).
+- Source: session scratchpad release/release.md + tools/build_release.py (not in repo).
+- Turnstile copy already says "on for every workspace" (assumes D2 lands before release).
+- Lanes B/C/D agents still running in claude/w4-{b-approvals,c-disputes,d-abuse}; next: review + merge into staging, then Lane A.
+
 ## 2026-10-28 — staging — Needs Roger list fully answered
 - All 86 items answered (questionnaire artifact); recorded in tasks/voc-roadmap.md: "Roger's answers", "Tickets from Roger's answers" (lanes A–I, all "do it now"), "Still on Roger".
 - Nothing built yet. Prod reads (deploy.sh) blocked by classifier → on Roger.
