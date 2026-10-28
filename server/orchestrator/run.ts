@@ -12,13 +12,13 @@ import { MessageType } from "@server/database/entities/message.entity";
 import { ToolExecutionService } from "@server/services/core/tool-execution.service";
 import { Conversation } from "@server/database/entities/conversation.entity";
 import type { ConversationContext, GuardrailLogEntry, ProcessingPhase } from "./types";
-import { userRepository } from "@server/repositories/user.repository";
 import { LLMService } from "@server/services/core/llm.service";
 import { PromptService } from "@server/services/prompt.service";
 import { createLogger } from "@server/lib/logger";
 import { hasTiptapContent } from "@server/types/tiptap.types";
 import { closureCopy } from "./closure-copy";
-import { handoffCopy, type HandoffCopyKey } from "./handoff-copy";
+import { availabilityContext, availabilityHandoffLine } from "./handoff-copy";
+import { getAvailability, typicalFirstReplyMinutes } from "@server/services/business-hours.service";
 import { AiReplySuppressedError, isPauseBlocker, recheckAiReply } from "./reply-guard";
 import type { ExecutionResult } from "./execution.layer";
 import type { ToolLedgerEntry } from "@server/services/core/action-claim-guardrail.service";
@@ -411,6 +411,26 @@ export const runConversation = async (conversationId: string) => {
     return;
   }
 
+  // Waiting for a person (D5-7): outside the channel's business hours the AI
+  // keeps answering while the conversation stays in the queue; within hours it
+  // stays quiet and the team answers.
+  if (conversation.status === "pending-human") {
+    const { isWithinBusinessHours } = await import("@server/services/business-hours.service");
+    const withinHours = await isWithinBusinessHours({
+      organizationId: conversation.organization_id,
+      channel: conversation.channel,
+    });
+    if (withinHours) {
+      log.debug("Skipping - waiting for the team within business hours");
+      if (conversation.needs_processing) {
+        await conversationRepository.update(conversation.id, conversation.organization_id, {
+          needs_processing: false,
+        });
+      }
+      return;
+    }
+  }
+
   // A paused agent never replies: either the operator paused the organization
   // (usage allowance used up, overage refused) or the owner switched the agent
   // off (agents.enabled = false). Shopper messages are still stored; the
@@ -526,7 +546,9 @@ export const runConversation = async (conversationId: string) => {
     // If potential closure detected, validate with full conversation context
     let shouldClose = false;
 
-    if (hasClosureIntent || isGratitudeMessage) {
+    // A conversation waiting in the team's queue (the AI answers it outside
+    // business hours, D5-7) is closed by the team, never by a "thanks, bye".
+    if ((hasClosureIntent || isGratitudeMessage) && conversation.status !== "pending-human") {
       // Get all public messages for full context analysis
       const publicMessages = await conversation.getPublicMessages();
 
@@ -917,7 +939,8 @@ export const runApprovalFollowUp = async (conversationId: string): Promise<void>
 async function requeueIfStillPending(conversation: Conversation, log: pino.Logger): Promise<void> {
   try {
     const current = await conversationRepository.findById(conversation.id);
-    if (!current?.needs_processing || current.status !== "open" || current.assigned_user_id) {
+    const runnable = current?.status === "open" || current?.status === "pending-human";
+    if (!current?.needs_processing || !runnable || current.assigned_user_id) {
       return;
     }
     const { orchestratorQueueService } =
@@ -1020,14 +1043,6 @@ async function handleExecutionLoop(
   // One playbook re-selection per turn, so a planner that keeps saying "doesn't fit"
   // can't ping-pong between playbooks.
   let playbookReselected = false;
-  // Fixed hand-off lines in the customer's language (no time promises).
-  const fixedHandoffLine = (key: HandoffCopyKey) =>
-    handoffCopy(
-      key,
-      customerLanguage,
-      conversation.language,
-      conversation.organization?.defaultLanguage,
-    );
 
   while (iterations < MAX_ITERATIONS) {
     iterations++;
@@ -1282,24 +1297,38 @@ async function handleExecutionLoop(
       const agent = conversation.agent_id
         ? await agentRepository.findById(conversation.agent_id)
         : null;
-      const onlineHumans = await userRepository.findOnlineByOrganization(
-        conversation.organization_id,
-      );
-      const someoneOnline = onlineHumans.length > 0;
-      const handoffType = someoneOnline ? "available" : "unavailable";
+      // Business hours + who is reachable on this channel (D5-7): open (someone
+      // reachable), open_nobody_online (team alerted) or closed (back at the
+      // next opening; the AI keeps answering, only the human queue waits).
+      const now = new Date();
+      const scope = { organizationId: conversation.organization_id, channel: conversation.channel };
+      const availability = await getAvailability(scope, now);
+      const handoffAvailability = {
+        ...availability,
+        typicalReplyMinutes:
+          availability.state === "open_nobody_online"
+            ? await typicalFirstReplyMinutes(scope, now)
+            : null,
+      };
+      const handoffType = availability.state === "open" ? "available" : "unavailable";
       log.debug(
-        { hasAgent: !!agent, onlineHumans: onlineHumans.length },
+        { hasAgent: !!agent, availability: availability.state },
         "Handing off to the team",
       );
 
       // The merchant's own hand-off instructions for this situation, if any,
-      // are run through the planner on the next iteration.
-      const customInstructions = someoneOnline
-        ? agent?.human_handoff_available_instructions
-        : agent?.human_handoff_unavailable_instructions;
+      // are run through the planner on the next iteration, with the facts.
+      const customInstructions =
+        handoffType === "available"
+          ? agent?.human_handoff_available_instructions
+          : agent?.human_handoff_unavailable_instructions;
       if (hasTiptapContent(customInstructions)) {
         log.debug({ handoffType }, "Executing custom handoff instructions");
-        await conversation.addHandoffInstructions(customInstructions, handoffType);
+        await conversation.addHandoffInstructions(
+          customInstructions,
+          handoffType,
+          availabilityContext(handoffAvailability, now),
+        );
         continue;
       }
 
@@ -1310,11 +1339,22 @@ async function handleExecutionLoop(
       await sendBotMessage(
         conversation,
         {
-          content: fixedHandoffLine(someoneOnline ? "handoffQueued" : "handoffNobodyOnline"),
+          content: availabilityHandoffLine(
+            handoffAvailability,
+            now,
+            customerLanguage,
+            conversation.language,
+            conversation.organization?.defaultLanguage,
+          ),
           type: MessageType.BOT_AGENT,
           metadata: buildMessageMetadata(executionResult, {
             isHandoffMessage: true,
             handoffType,
+            availability: {
+              state: availability.state,
+              nextOpening: availability.nextOpening?.toISOString() ?? null,
+              timezone: availability.timezone,
+            },
             ...(executionResult.userMessage
               ? { discardedHandoffMessage: executionResult.userMessage }
               : {}),

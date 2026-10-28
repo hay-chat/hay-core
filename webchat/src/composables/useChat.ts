@@ -12,6 +12,7 @@ import {
 } from "./useDPoP";
 import { safeStorage, useConsent } from "./useConsent";
 import { debugLog } from "@/utils/debug";
+import { resumeConversationId } from "@/utils/resume";
 import type { HayChatConfig, Message, SendFailure } from "@/types";
 import { insertMessage, parseServerTime } from "@/utils/messageOrder";
 
@@ -46,6 +47,9 @@ export function useChat(config: HayChatConfig) {
   const lastReadMessageId = ref<string | null>(null);
   const currentAgentType = ref<"BotAgent" | "HumanAgent">("BotAgent");
   const currentAgentName = ref<string | null>(null);
+  // Server status of the conversation ("pending-human" while it waits for a person).
+  const conversationStatus = ref<string | null>(null);
+  const contactEmailSaved = ref(false);
 
   // Populated inside initialize() via safeStorage — see comment above.
   const existingConversationId = ref<string | null>(null);
@@ -282,6 +286,8 @@ export function useChat(config: HayChatConfig) {
           loadMessagesIntoUI(retryData.messages);
         }
 
+        conversationStatus.value = retryData.status ?? null;
+
         // Check if conversation is closed
         if (retryData.isClosed) {
           isConversationClosed.value = true;
@@ -293,6 +299,8 @@ export function useChat(config: HayChatConfig) {
         if (messagesData.messages && messagesData.messages.length > 0) {
           loadMessagesIntoUI(messagesData.messages);
         }
+
+        conversationStatus.value = messagesData.status ?? null;
 
         // Check if conversation is closed
         if (messagesData.isClosed) {
@@ -414,7 +422,10 @@ export function useChat(config: HayChatConfig) {
       // Populate any cached state from storage — only returns data when the
       // consent gate is open (pre-granted or post-interaction).
       lastReadMessageId.value = safeStorage.session.getItem("hay-last-read-message-id");
-      existingConversationId.value = safeStorage.session.getItem("hay-conversation-id");
+      // A follow-up email link (D5-9) names the conversation to reopen.
+      const resumeId = resumeConversationId();
+      if (resumeId) safeStorage.session.setItem("hay-conversation-id", resumeId);
+      existingConversationId.value = resumeId ?? safeStorage.session.getItem("hay-conversation-id");
 
       // Generate or retrieve customer ID. When the persistent-storage gate is
       // closed, the ID lives only in memory and the canUseLocal watcher will
@@ -470,6 +481,8 @@ export function useChat(config: HayChatConfig) {
 
   // Set status change callback for conversation status updates
   setStatusChangeCallback((status: string, _payload: any) => {
+    conversationStatus.value = status;
+
     // Handle conversation closure
     if (status === "closed" || status === "resolved" || status === "unresolved") {
       isConversationClosed.value = true;
@@ -614,6 +627,8 @@ export function useChat(config: HayChatConfig) {
     messages.value = [];
     isConversationClosed.value = false;
     lastReadMessageId.value = null;
+    conversationStatus.value = null;
+    contactEmailSaved.value = false;
   };
 
   // Start over after a closed conversation. The new conversation is created
@@ -722,6 +737,10 @@ export function useChat(config: HayChatConfig) {
 
         // Merge new messages into existing ones (additive only)
         mergeMessages(messagesData.messages);
+      }
+
+      if (messagesData?.status) {
+        conversationStatus.value = messagesData.status;
       }
 
       // Update conversation closed state
@@ -957,6 +976,36 @@ export function useChat(config: HayChatConfig) {
     }).length;
   });
 
+  // Leave an email so the team's reply reaches the shopper after they leave (D5-8).
+  const saveContactEmail = async (email: string, retried = false): Promise<boolean> => {
+    if (!conversationId.value || !keypair.value) return false;
+    const url = `${config.baseUrl}/v1/publicConversations.setContactEmail`;
+    const proof = await createDPoPProof(
+      "POST",
+      url,
+      keypair.value.privateKey,
+      keypair.value.publicJwk,
+      nonce.value || "initial",
+    );
+    if (!proof) return false;
+    try {
+      const result = await conversation.setContactEmail(
+        conversationId.value,
+        email,
+        proof,
+        "POST",
+        url,
+      );
+      if (result.nonce) nonce.value = result.nonce;
+      if (result.error === "NONCE_EXPIRED" && !retried) return saveContactEmail(email, true);
+      contactEmailSaved.value = result.saved;
+      return result.saved;
+    } catch (error) {
+      console.error("[Webchat] Failed to save contact email:", error);
+      return false;
+    }
+  };
+
   // Enhanced disconnect that also stops retry loop and polling
   const disconnectAll = () => {
     disconnect();
@@ -979,6 +1028,8 @@ export function useChat(config: HayChatConfig) {
     isConversationClosed,
     currentAgentType,
     currentAgentName,
+    conversationStatus,
+    contactEmailSaved,
 
     // Actions
     initialize,
@@ -992,5 +1043,6 @@ export function useChat(config: HayChatConfig) {
     disconnect: disconnectAll,
     checkMessageForClosure,
     startNewConversation,
+    saveContactEmail,
   };
 }

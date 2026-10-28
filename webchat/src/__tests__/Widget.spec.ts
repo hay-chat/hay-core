@@ -18,6 +18,9 @@ const chat = {
   currentAgentType: ref(null),
   currentAgentName: ref(null),
   sendFailure: ref(null),
+  conversationStatus: ref<string | null>(null),
+  contactEmailSaved: ref(false),
+  saveContactEmail: vi.fn(),
   toggleChat: vi.fn(),
   openChat: vi.fn(),
   closeChat: vi.fn(),
@@ -92,5 +95,46 @@ describe("Widget", () => {
     expect(aiLabel({ aiLabelShown: true, aiLabelText: null })).toBe("AI assistant");
     expect(aiLabel({ aiLabelShown: true, aiLabelText: "Aurora bot" })).toBe("Aurora bot");
     expect(aiLabel({ aiLabelShown: false, aiLabelText: "Aurora bot" })).toBeNull();
+  });
+
+  it("shows the business-hours status and the waiting state (D5-7, D5-10)", async () => {
+    const fetchMock = vi.fn(async () => ({
+      ok: true,
+      json: async () => ({
+        result: {
+          data: {
+            state: "open_nobody_online",
+            nextOpening: null,
+            timezone: "Europe/Lisbon",
+            hasSchedule: true,
+            typicalReplyMinutes: 12,
+          },
+        },
+      }),
+    }));
+    vi.stubGlobal("fetch", fetchMock);
+    chat.isOpen.value = false;
+    chat.conversationStatus.value = "pending-human";
+    const wrapper = shallowMount(Widget, {
+      props: { config, publicConfig: null, launcher: launcher() },
+    });
+    chat.isOpen.value = true;
+    await vi.waitFor(() =>
+      expect(wrapper.findComponent({ name: "ChatWindow" }).props("availabilityStatus")).toBe(
+        "Open now",
+      ),
+    );
+    const window = wrapper.findComponent({ name: "ChatWindow" });
+    expect(window.props("isWaitingForHuman")).toBe(true);
+    expect(window.props("waitingDetail")).toBe(
+      "We've alerted the team. Usually replies in ~12 min",
+    );
+
+    chat.currentAgentType.value = "HumanAgent" as never;
+    await nextTick();
+    expect(window.props("isWaitingForHuman")).toBe(false);
+    chat.currentAgentType.value = null;
+    chat.conversationStatus.value = null;
+    vi.unstubAllGlobals();
   });
 });

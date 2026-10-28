@@ -533,8 +533,10 @@ export class ConversationRepository extends BaseRepository<Conversation> {
       .andWhere("conversation.needs_processing = :needsProcessing", {
         needsProcessing: true,
       })
+      // pending-human only gets needs_processing outside business hours (D5-7);
+      // runConversation re-checks the hours before answering.
       .andWhere("conversation.status IN (:...statuses)", {
-        statuses: ["open", "processing"],
+        statuses: ["open", "processing", "pending-human"],
       })
       .andWhere("(conversation.cooldown_until IS NULL OR conversation.cooldown_until <= :now)", {
         now: new Date(),
