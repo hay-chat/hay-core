@@ -72,41 +72,34 @@ interface CustomerConversationRow {
   message_count: number | string | null;
 }
 
+/**
+ * Statuses a client may set. "awaiting-approval" is not one: only holding an
+ * action (and deciding it) moves a conversation in and out of it; set from
+ * outside it would leave the conversation with no AI reply and no auto-close.
+ */
+const settableStatusSchema = z.enum([
+  "open",
+  "processing",
+  "pending-human",
+  "human-took-over",
+  "resolved",
+  "unresolved",
+  "closed",
+]);
+
 const createConversationSchema = z.object({
   title: z.string().min(1).max(255).optional(),
   agentId: z.string().uuid().optional(),
   language: z.string().optional(),
   metadata: z.record(z.any()).optional(),
-  status: z
-    .enum([
-      "open",
-      "processing",
-      "pending-human",
-      "awaiting-approval",
-      "human-took-over",
-      "resolved",
-      "unresolved",
-      "closed",
-    ])
-    .optional(),
+  status: settableStatusSchema.optional(),
   customerId: z.string().uuid().optional(),
   organizationId: z.string().uuid().optional(),
 });
 
 const updateConversationSchema = z.object({
   title: z.string().min(1).max(255).optional(),
-  status: z
-    .enum([
-      "open",
-      "processing",
-      "pending-human",
-      "awaiting-approval",
-      "human-took-over",
-      "resolved",
-      "unresolved",
-      "closed",
-    ])
-    .optional(),
+  status: settableStatusSchema.optional(),
   metadata: z.record(z.any()).optional(),
   customer_id: z.string().uuid().optional(),
 });
