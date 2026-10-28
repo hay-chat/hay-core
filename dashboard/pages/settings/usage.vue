@@ -260,6 +260,7 @@ const STATUS_VARIANT: Record<
   reversed: "secondary",
   excluded: "outline",
   pending_review: "warning",
+  denied: "secondary",
 };
 const PAGE_SIZE = 25;
 const MIN_REASON = 3;

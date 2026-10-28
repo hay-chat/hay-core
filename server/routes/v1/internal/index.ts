@@ -9,6 +9,7 @@ import {
   SUSPENSION_REASONS,
   accessNoticeSchema,
 } from "@server/types/organization-access.types";
+import { resolutionLedgerService } from "@server/services/resolution-ledger.service";
 import { createLogger } from "@server/lib/logger";
 
 const logger = createLogger("internal");
@@ -92,6 +93,34 @@ const internalOrganizationsRouter = router({
   }),
 });
 
+/**
+ * Exclusions over the self-serve allowance wait for Hay.chat staff (Lane A3).
+ * Staff work from the operator's admin UI; core only sees the shared secret,
+ * so the operator passes the staff login as `reviewer` for the audit trail.
+ */
+const internalResolutionsRouter = router({
+  listPendingExclusions: internalProcedure
+    .input(
+      z.object({
+        organizationId: z.string().uuid().optional(),
+        limit: z.number().int().min(1).max(500).default(100),
+      }),
+    )
+    .query(({ input }) => resolutionLedgerService.listPendingExclusions(input)),
+
+  reviewExclusion: internalProcedure
+    .input(
+      organizationIdInput.extend({
+        outcomeId: z.string().uuid(),
+        decision: z.enum(["approve", "deny"]),
+        reviewer: z.string().trim().min(1).max(255),
+        note: z.string().trim().max(1000).optional(),
+      }),
+    )
+    .mutation(({ input }) => resolutionLedgerService.reviewExclusion(input)),
+});
+
 export const internalRouter = router({
   organizations: internalOrganizationsRouter,
+  resolutions: internalResolutionsRouter,
 });

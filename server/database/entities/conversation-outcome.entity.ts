@@ -9,7 +9,7 @@ import {
 } from "typeorm";
 import type { ConversationOutcomeKind } from "../../services/close-classification/outcome-rules";
 
-export type ResolutionExclusionStatus = "excluded" | "pending_review";
+export type ResolutionExclusionStatus = "excluded" | "pending_review" | "denied";
 
 /**
  * One row per close of a conversation (D1-3): the billing outcome, written at
@@ -90,7 +90,8 @@ export class ConversationOutcome {
   /**
    * Merchant exclusion (D1-6). `excluded` drops the row from the billable
    * count (`excluded_at` set); `pending_review` was over the self-serve
-   * allowance and waits for Hay.chat, still billed.
+   * allowance and waits for Hay.chat, still billed; `denied` = Hay.chat said
+   * no, still billed.
    */
   @Column({ type: "varchar", length: 16, nullable: true })
   exclusion_status!: ResolutionExclusionStatus | null;
@@ -107,6 +108,17 @@ export class ConversationOutcome {
   /** When the exclusion took effect; null while pending review. */
   @Column({ type: "timestamptz", nullable: true })
   excluded_at!: Date | null;
+
+  /** Hay.chat staff decision on a `pending_review` exclusion (Lane A3). */
+  @Column({ type: "timestamptz", nullable: true })
+  exclusion_reviewed_at!: Date | null;
+
+  /** The staff login from the backoffice (not a core user). */
+  @Column({ type: "varchar", length: 255, nullable: true })
+  exclusion_reviewed_by!: string | null;
+
+  @Column({ type: "text", nullable: true })
+  exclusion_review_note!: string | null;
 
   @Column({ type: "varchar", length: 128, nullable: true })
   llm_model!: string | null;

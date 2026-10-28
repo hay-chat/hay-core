@@ -33,7 +33,7 @@ export const USAGE_PERIODS_SHOWN = 12;
 
 const CSV_MAX_ROWS = 50_000;
 
-export type LedgerStatus = "billed" | "reversed" | "excluded" | "pending_review";
+export type LedgerStatus = "billed" | "reversed" | "excluded" | "pending_review" | "denied";
 
 /** The operator's current billing period, as stored on the organization. */
 export interface BillingPeriodAnchor {
@@ -77,6 +77,21 @@ export interface LedgerItem {
   closeReason: string | null;
   classificationReason: string | null;
   status: LedgerStatus;
+  exclusionReason: string | null;
+  exclusionRequestedAt: Date | null;
+  exclusionRequestedBy: string | null;
+}
+
+export interface PendingExclusion {
+  id: string;
+  organizationId: string;
+  organizationName: string | null;
+  conversationId: string | null;
+  conversationTitle: string | null;
+  closedAt: Date;
+  outcome: ConversationOutcomeKind;
+  closeReason: string | null;
+  classificationReason: string | null;
   exclusionReason: string | null;
   exclusionRequestedAt: Date | null;
   exclusionRequestedBy: string | null;
@@ -180,6 +195,7 @@ export function ledgerStatus(row: {
   if (row.reversed_at) return "reversed";
   if (row.excluded_at) return "excluded";
   if (row.exclusion_status === "pending_review") return "pending_review";
+  if (row.exclusion_status === "denied") return "denied";
   return "billed";
 }
 
@@ -193,6 +209,7 @@ function csvCell(value: string | null | undefined): string {
 interface PeriodCounts {
   /** Billable and not reversed, excluded ones included: the allowance base. */
   base: number;
+  /** Self-serve exclusions; ones Hay.chat approved on review do not use the allowance. */
   excluded: number;
 }
 
@@ -205,7 +222,10 @@ async function periodCounts(
     .getRepository(ConversationOutcome)
     .createQueryBuilder("o")
     .select("COUNT(*) FILTER (WHERE o.reversed_at IS NULL)", "base")
-    .addSelect("COUNT(*) FILTER (WHERE o.exclusion_status = 'excluded')", "excluded")
+    .addSelect(
+      "COUNT(*) FILTER (WHERE o.exclusion_status = 'excluded' AND o.exclusion_reviewed_at IS NULL)",
+      "excluded",
+    )
     .where("o.organization_id = :organizationId", { organizationId })
     .andWhere("o.billable = true")
     .andWhere("o.closed_at >= :start AND o.closed_at < :end", {
@@ -237,6 +257,7 @@ export class ResolutionLedgerService {
       .addSelect("o.reversed_at IS NOT NULL", "reversed")
       .addSelect("o.excluded_at IS NOT NULL", "excluded")
       .addSelect("o.exclusion_status = 'pending_review'", "pending")
+      .addSelect("o.exclusion_reviewed_at IS NOT NULL", "reviewed")
       .addSelect("COUNT(*)", "count")
       .where("o.organization_id = :organizationId", { organizationId })
       .andWhere("o.closed_at >= :start AND o.closed_at < :end", {
@@ -248,12 +269,14 @@ export class ResolutionLedgerService {
       .addGroupBy("reversed")
       .addGroupBy("excluded")
       .addGroupBy("pending")
+      .addGroupBy("reviewed")
       .getRawMany<{
         outcome: ConversationOutcomeKind;
         billable: boolean;
         reversed: boolean;
         excluded: boolean;
         pending: boolean | null;
+        reviewed: boolean;
         count: string;
       }>();
 
@@ -284,10 +307,10 @@ export class ResolutionLedgerService {
         if (row.pending) breakdown.pendingReview += count;
       }
     }
-    // Exclusions used count every excluded row, reversed later or not, like
-    // the allowance check does.
+    // Exclusions used count every self-serve excluded row, reversed later or
+    // not, like the allowance check does.
     const exclusionsUsed = rows
-      .filter((row) => row.billable && row.excluded)
+      .filter((row) => row.billable && row.excluded && !row.reviewed)
       .reduce((sum, row) => sum + Number(row.count), 0);
     const base = breakdown.billed + breakdown.excluded;
 
@@ -470,6 +493,151 @@ export class ResolutionLedgerService {
       );
 
       return { status, used: counts.excluded + (instant ? 1 : 0), allowance };
+    });
+  }
+
+  /**
+   * Exclusion requests waiting for Hay.chat (Lane A3), oldest first, across
+   * organizations unless one is given. For the operator's staff queue only.
+   */
+  async listPendingExclusions(input: {
+    organizationId?: string;
+    limit: number;
+  }): Promise<PendingExclusion[]> {
+    const query = AppDataSource.getRepository(ConversationOutcome)
+      .createQueryBuilder("o")
+      .leftJoin("organizations", "org", "org.id = o.organization_id")
+      .leftJoin("conversations", "c", "c.id = o.conversation_id")
+      .leftJoin("users", "u", "u.id = o.exclusion_requested_by")
+      .select([
+        "o.id AS id",
+        "o.organization_id AS organization_id",
+        "org.name AS organization_name",
+        "o.conversation_id AS conversation_id",
+        "c.title AS conversation_title",
+        "o.closed_at AS closed_at",
+        "o.outcome AS outcome",
+        "o.close_reason AS close_reason",
+        "o.classification_reason AS classification_reason",
+        "o.exclusion_reason AS exclusion_reason",
+        "o.exclusion_requested_at AS exclusion_requested_at",
+        "u.email AS requested_by_email",
+      ])
+      .where("o.exclusion_status = 'pending_review'")
+      .orderBy("o.exclusion_requested_at", "ASC")
+      .addOrderBy("o.id", "ASC")
+      .limit(input.limit);
+    if (input.organizationId) {
+      query.andWhere("o.organization_id = :organizationId", {
+        organizationId: input.organizationId,
+      });
+    }
+    const raw = await query.getRawMany<{
+      id: string;
+      organization_id: string;
+      organization_name: string | null;
+      conversation_id: string | null;
+      conversation_title: string | null;
+      closed_at: Date;
+      outcome: ConversationOutcomeKind;
+      close_reason: string | null;
+      classification_reason: string | null;
+      exclusion_reason: string | null;
+      exclusion_requested_at: Date | null;
+      requested_by_email: string | null;
+    }>();
+    return raw.map((row) => ({
+      id: row.id,
+      organizationId: row.organization_id,
+      organizationName: row.organization_name,
+      conversationId: row.conversation_id,
+      conversationTitle: row.conversation_title,
+      closedAt: new Date(row.closed_at),
+      outcome: row.outcome,
+      closeReason: row.close_reason,
+      classificationReason: row.classification_reason,
+      exclusionReason: row.exclusion_reason,
+      exclusionRequestedAt: row.exclusion_requested_at
+        ? new Date(row.exclusion_requested_at)
+        : null,
+      exclusionRequestedBy: row.requested_by_email,
+    }));
+  }
+
+  /**
+   * Hay.chat staff decide on an exclusion over the allowance (Lane A3).
+   * Approve: excluded, leaves the billable count (the operator credits it if
+   * overage was already reported). Deny: stays billed and cannot be requested
+   * again. Only a `pending_review` row can be decided, once; the decision is
+   * kept on the row and written to audit_logs in the same transaction.
+   */
+  async reviewExclusion(input: {
+    organizationId: string;
+    outcomeId: string;
+    decision: "approve" | "deny";
+    /** The staff login, from the operator. */
+    reviewer: string;
+    note?: string;
+    now?: Date;
+  }): Promise<{ status: ResolutionExclusionStatus }> {
+    const now = input.now ?? new Date();
+    const note = input.note?.trim() || null;
+    return AppDataSource.transaction(async (manager) => {
+      const row = await manager
+        .getRepository(ConversationOutcome)
+        .createQueryBuilder("o")
+        .setLock("pessimistic_write")
+        .where("o.id = :id AND o.organization_id = :organizationId", {
+          id: input.outcomeId,
+          organizationId: input.organizationId,
+        })
+        .getOne();
+      if (!row) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Resolution not found" });
+      }
+      if (row.exclusion_status !== "pending_review") {
+        throw new TRPCError({
+          code: "CONFLICT",
+          message: "This exclusion is not waiting for review",
+        });
+      }
+
+      const approve = input.decision === "approve";
+      const status: ResolutionExclusionStatus = approve ? "excluded" : "denied";
+      await manager.getRepository(ConversationOutcome).update(
+        { id: row.id },
+        {
+          exclusion_status: status,
+          excluded_at: approve ? now : null,
+          exclusion_reviewed_at: now,
+          exclusion_reviewed_by: input.reviewer,
+          exclusion_review_note: note,
+        },
+      );
+
+      await manager.getRepository(AuditLog).save(
+        AuditLog.createLog({
+          organizationId: input.organizationId,
+          action: approve
+            ? "billing.resolution.exclusion_approved"
+            : "billing.resolution.exclusion_denied",
+          resource: "conversation_outcome",
+          changes: { exclusion_status: { from: "pending_review", to: status } },
+          metadata: {
+            source: "operator",
+            reviewer: input.reviewer,
+            note,
+            outcomeId: row.id,
+            conversationId: row.conversation_id,
+            closedAt: row.closed_at.toISOString(),
+            requestedBy: row.exclusion_requested_by,
+            reason: row.exclusion_reason,
+          },
+          status: "success",
+        }),
+      );
+
+      return { status };
     });
   }
 

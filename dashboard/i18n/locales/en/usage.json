@@ -54,7 +54,8 @@
         "billed": "Billed",
         "reversed": "Reversed",
         "excluded": "Excluded",
-        "pending_review": "Sent to Hay.chat for review"
+        "pending_review": "Sent to Hay.chat for review",
+        "denied": "Billed: Hay.chat declined the exclusion"
       }
     },
     "excludeDialog": {

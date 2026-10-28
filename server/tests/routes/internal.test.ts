@@ -21,6 +21,15 @@ jest.mock("@server/services/organization-access.service", () => ({
   },
 }));
 
+const mockListPendingExclusions = jest.fn();
+const mockReviewExclusion = jest.fn();
+jest.mock("@server/services/resolution-ledger.service", () => ({
+  resolutionLedgerService: {
+    listPendingExclusions: mockListPendingExclusions,
+    reviewExclusion: mockReviewExclusion,
+  },
+}));
+
 const mockFindOne = jest.fn();
 const mockDeleteWithData = jest.fn();
 jest.mock("@server/services/organization.service", () => ({
@@ -203,5 +212,42 @@ describe("internal.organizations", () => {
     await expect(
       internalRouter.createCaller(ctx()).organizations.delete({ organizationId: ORG_ID }),
     ).rejects.toMatchObject({ code: "NOT_FOUND" });
+  });
+
+  it("lists pending exclusions and passes a review decision with the reviewer through", async () => {
+    mockListPendingExclusions.mockResolvedValueOnce([]);
+    await internalRouter.createCaller(ctx()).resolutions.listPendingExclusions({});
+    expect(mockListPendingExclusions).toHaveBeenCalledWith({ limit: 100 });
+
+    mockReviewExclusion.mockResolvedValueOnce({ status: "denied" });
+    const outcomeId = "22222222-2222-4222-8222-222222222222";
+    await expect(
+      internalRouter.createCaller(ctx()).resolutions.reviewExclusion({
+        organizationId: ORG_ID,
+        outcomeId,
+        decision: "deny",
+        reviewer: "  roger  ",
+      }),
+    ).resolves.toEqual({ status: "denied" });
+    expect(mockReviewExclusion).toHaveBeenCalledWith({
+      organizationId: ORG_ID,
+      outcomeId,
+      decision: "deny",
+      reviewer: "roger",
+    });
+
+    await expect(
+      internalRouter.createCaller(ctx()).resolutions.reviewExclusion({
+        organizationId: ORG_ID,
+        outcomeId,
+        decision: "approve",
+        reviewer: " ",
+      }),
+    ).rejects.toMatchObject({ code: "BAD_REQUEST" });
+    await expect(
+      internalRouter
+        .createCaller(ctx("wrong"))
+        .resolutions.listPendingExclusions({ organizationId: ORG_ID }),
+    ).rejects.toMatchObject({ code: "UNAUTHORIZED" });
   });
 });
