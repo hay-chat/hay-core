@@ -57,6 +57,14 @@ export interface ConfidenceContext {
 }
 
 /**
+ * Stand-in for the documents section of the grounding prompt when nothing was
+ * retrieved. The prompts (en/pt/es) reference this exact text: with it, any
+ * specific company claim scores low and a claim-free reply scores high.
+ */
+export const NO_DOCUMENTS_PLACEHOLDER =
+  "No documents or tool results were retrieved for this conversation.";
+
+/**
  * Service responsible for evaluating confidence in AI responses
  * and implementing guardrails to prevent hallucinated or low-quality responses.
  */
@@ -96,12 +104,14 @@ export class ConfidenceGuardrailService {
   async assessConfidence(
     context: ConfidenceContext,
     config?: Partial<ConfidenceConfig>,
+    precomputed?: { grounding?: number },
   ): Promise<ConfidenceAssessment> {
     const fullConfig = { ...ConfidenceGuardrailService.DEFAULT_CONFIG, ...config };
 
-    // Calculate individual confidence components
+    // Calculate individual confidence components. A grounding score the caller
+    // already obtained via assessGrounding() is reused, not re-asked.
     const breakdown: ConfidenceBreakdown = {
-      grounding: await this.calculateGroundingScore(context),
+      grounding: precomputed?.grounding ?? (await this.calculateGroundingScore(context)),
       retrieval: this.calculateRetrievalScore(context),
       certainty: await this.calculateCertaintyScore(context),
     };
@@ -146,6 +156,16 @@ export class ConfidenceGuardrailService {
   }
 
   /**
+   * Grounding-only check (one LLM call): are the company claims in the
+   * response backed by the retrieved documents / tool results? Used to
+   * fact-check every reply cheaply, including the ones Stage 1 did not flag.
+   * A claim-free reply scores high even when nothing was retrieved.
+   */
+  async assessGrounding(context: ConfidenceContext): Promise<number> {
+    return this.calculateGroundingScore(context);
+  }
+
+  /**
    * Calculate grounding score: Does the response use information from context
    * or is it based on the LLM's general knowledge?
    *
@@ -154,17 +174,18 @@ export class ConfidenceGuardrailService {
    * or if it's coming from the previous knowledge of the AI"
    */
   private async calculateGroundingScore(context: ConfidenceContext): Promise<number> {
-    // If no documents were retrieved, the response cannot be grounded
-    if (context.retrievedDocuments.length === 0) {
-      return 0.0;
-    }
-
-    // Prepare the context from retrieved documents
-    const documentContext = context.retrievedDocuments
-      .map((doc, idx) => {
-        return `[Document ${idx + 1}: ${doc.document.title}]\n${doc.document.content}\n`;
-      })
-      .join("\n---\n\n");
+    // With no documents we still ask the LLM, telling it explicitly that
+    // nothing was retrieved: a specific company claim then scores low, while a
+    // claim-free reply (greeting, "let me check") scores high. Returning 0.0
+    // here would escalate every greeting in an org with no documents.
+    const documentContext =
+      context.retrievedDocuments.length === 0
+        ? NO_DOCUMENTS_PLACEHOLDER
+        : context.retrievedDocuments
+            .map((doc, idx) => {
+              return `[Document ${idx + 1}: ${doc.document.title}]\n${doc.document.content}\n`;
+            })
+            .join("\n---\n\n");
 
     // Get prompt from PromptService
     const evaluationPrompt = await this.promptService.getPrompt("execution/confidence-grounding", {

@@ -455,7 +455,8 @@ export class ExecutionLayer {
   /**
    * Apply two-stage guardrails to execution result
    * Stage 1: Company Interest Protection (blocks harmful responses)
-   * Stage 2: Fact Grounding (verifies company claims if needed)
+   * Stage 2: Fact Grounding (every reply; full assessment when Stage 1 flags
+   *          company claims, grounding-only otherwise)
    */
   private async applyConfidenceGuardrails(
     result: ExecutionResult,
@@ -598,13 +599,23 @@ export class ExecutionLayer {
       };
     }
 
-    // STAGE 2: Fact Grounding (only if Stage 1 requires it)
-    if (companyInterestAssessment.requiresFactCheck) {
-      log.debug("Stage 2: Assessing fact grounding (company claims detected)");
+    // STAGE 2: Fact Grounding — runs on EVERY reply. Stage 1's
+    // requiresFactCheck is a classifier and sometimes misses a fabricated
+    // claim ("We absolutely do ship to Portugal" with zero documents), so it
+    // only picks how heavy the check is:
+    // - flagged: full assessment (grounding + retrieval + certainty).
+    // - not flagged: grounding-only score. A high score passes the reply
+    //   untouched, so low retrieval quality alone never escalates a
+    //   claim-free reply; a low score falls into the same full assessment →
+    //   recheck → escalate/fallback path as a flagged reply.
+    const confidenceAssessment = companyInterestAssessment.requiresFactCheck
+      ? await this.assessResponseConfidence(conversation, result.userMessage!)
+      : await this.assessUnflaggedResponseGrounding(conversation, result.userMessage!);
 
-      const confidenceAssessment = await this.assessResponseConfidence(
-        conversation,
-        result.userMessage!,
+    if (confidenceAssessment) {
+      log.debug(
+        { flaggedByStage1: companyInterestAssessment.requiresFactCheck },
+        "Stage 2: Fact grounding needs full handling",
       );
 
       result.confidence = confidenceAssessment;
@@ -690,8 +701,6 @@ export class ExecutionLayer {
           result.userMessage = fallbackMessage;
         }
       }
-    } else {
-      log.debug("Stage 2 SKIPPED: No fact checking required (no company claims)");
     }
 
     return result;
@@ -896,6 +905,52 @@ export class ExecutionLayer {
     conversation: Conversation,
     response: string,
   ): Promise<ConfidenceAssessment> {
+    const context = await this.buildConfidenceContext(conversation, response);
+    const config = await this.getConfidenceConfig(conversation);
+    return await this.confidenceService.assessConfidence(context, config);
+  }
+
+  /**
+   * Stage 2 for replies Stage 1 did not flag: one grounding-only LLM call.
+   * Returns null when the reply is grounded (or makes no company claims), so
+   * it passes as-is. When grounding falls in the low tier (below
+   * mediumThreshold), returns the full assessment — reusing the grounding
+   * score — so the caller applies the usual recheck/escalation handling.
+   */
+  private async assessUnflaggedResponseGrounding(
+    conversation: Conversation,
+    response: string,
+  ): Promise<ConfidenceAssessment | null> {
+    const context = await this.buildConfidenceContext(conversation, response);
+    const config = await this.getConfidenceConfig(conversation);
+    const grounding = await this.confidenceService.assessGrounding(context);
+
+    logger.debug(
+      {
+        organizationId: conversation.organization_id,
+        conversationId: conversation.id,
+        grounding,
+        threshold: config.mediumThreshold,
+        documentCount: context.retrievedDocuments.length,
+      },
+      "Stage 2: Grounding-only check (not flagged by Stage 1)",
+    );
+
+    if (grounding >= config.mediumThreshold) {
+      return null;
+    }
+
+    return await this.confidenceService.assessConfidence(context, config, { grounding });
+  }
+
+  /**
+   * Gather what a response can be grounded in: retrieved KB documents, recent
+   * successful tool results and the active playbook.
+   */
+  private async buildConfidenceContext(
+    conversation: Conversation,
+    response: string,
+  ): Promise<ConfidenceContext> {
     const log = logger.child({
       organizationId: conversation.organization_id,
       conversationId: conversation.id,
@@ -1030,19 +1085,13 @@ export class ExecutionLayer {
     // Build confidence context. The guardrail service only reads id/title/content
     // from each document, which both real Document entities and the synthetic
     // tool-result documents provide via ConfidenceDocument.
-    const context: ConfidenceContext = {
+    return {
       response,
       retrievedDocuments: retrievedDocs as Array<{ document: Document; similarity: number }>,
       conversationHistory,
       customerQuery: lastCustomerMessage.content,
       organizationId: conversation.organization_id,
     };
-
-    // Get configuration
-    const config = await this.getConfidenceConfig(conversation);
-
-    // Perform confidence assessment
-    return await this.confidenceService.assessConfidence(context, config);
   }
 
   /**

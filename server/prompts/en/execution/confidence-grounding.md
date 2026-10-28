@@ -88,6 +88,15 @@ Don't penalize for general knowledge or clarifications
 - ❌ DON'T penalize: "Ticket volume means number of tickets" (general term)
 - ✅ DO check: "Our ticket volume is 1000/month" (specific company fact)
 
+### Rule 4: No Documents Retrieved = Nothing Can Verify a Company Claim
+
+If the Retrieved Documents section says "No documents or tool results were retrieved", there is NO source for any company fact
+
+- Any specific company claim (shipping destinations, prices, policies, stock, hours, timelines) is UNVERIFIED → score **0.0-0.2**
+- A claim-free reply (greeting, "let me check", a clarifying question, offering a handoff) is fine → score **0.9-1.0**
+- Example: "We absolutely do ship to Portugal!" with no documents → ❌ 0.1
+- Example: "Hi! How can I help you today?" with no documents → ✅ 1.0
+
 ---
 
 ## EVALUATION STEPS
@@ -142,6 +151,12 @@ Don't penalize for general knowledge or clarifications
 **Knowledge Base**: (no return policy doc)
 **Response**: "Our return policy allows returns within 30 days."
 **Score**: `{"score": 0.2, "reasoning": "Making specific company claim not found in documents"}`
+
+### Example 4b: Company Claim With No Documents At All (LOW SCORE)
+
+**Retrieved Documents**: "No documents or tool results were retrieved"
+**Response**: "We absolutely do ship to Portugal! Delivery takes 3-5 days."
+**Score**: `{"score": 0.1, "reasoning": "Specific shipping claims with no document or tool result to support them"}`
 
 ### Example 5: General Clarification (HIGH SCORE)
 
