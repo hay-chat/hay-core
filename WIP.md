@@ -1,3 +1,11 @@
+## 2026-10-28 — claude/w4-ef (worktree hay-core-w4-ef) — Lanes E + F built, not merged
+- Commits one per ticket: E1 2859dbfb, F1 9d9b4953, F2 cb22df0b, F3 c394c5b1, F6 36066d8a, F7 4de3f9f2, F8 f7d14ddf, F10 4f530218, F4 52b581cf, F5 59197686, F9 (dashboard component tests + vitest.config). No migrations.
+- Verified: server tsc clean; jest 8 suites / 65 pass (media-analysis, gorgias, simulation-harness, feedback-insights, test-transcripts, insights-service, docs-audit-insight, insight-digest on hay_test); dashboard typecheck 0; dashboard vitest 16 files / 68 pass.
+- F9 adds dashboard devDeps @vue/test-utils + jsdom (same as webchat) and dashboard/vitest.config.ts (excludes Playwright *.spec.ts).
+- F10: Gorgias import now a background job (cap 1000, 429 retry); a server restart leaves the job PROCESSING (TODO in test-transcript.service).
+- F4 reading: greeting card + snippet greeting lines hidden when Settings > Web Chat "Enable" is off (not the agent page).
+- Not hand-tested in the browser. Next: review + merge claude/w4-ef into staging, `npm install` there (lockfile changed), hand-test Gorgias import + agent page pt-BR.
+
 ## 2026-10-28 — staging — Lanes B, C, D merged
 - Merged claude/w4-b-approvals (4544ef9d), claude/w4-c-disputes (0232fb97), claude/w4-d-abuse (a0b1a115).
 - Migration AddWebchatIdentitySecret run on local hay_staging + hay_test (Docker hay-staging-postgres-1 :5433 started).
