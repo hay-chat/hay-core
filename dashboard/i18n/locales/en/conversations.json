@@ -307,6 +307,17 @@
       "characters": "{count} characters",
       "blockMessage": "Block reply",
       "approveEdited": "Approve & Send edited"
+    },
+    "productCase": {
+      "title": "Product problem case complete",
+      "lot": "Lot {lot}",
+      "invoice": "Invoice {invoice}",
+      "forwardPending": "Sending to the store's case email…",
+      "forwardSent": "Emailed to {to}",
+      "forwardSentToast": "Case emailed",
+      "forwardFailed": "The case email could not be sent",
+      "forwardNotConfigured": "No case email set (Settings > Customer Privacy)",
+      "forwardAgain": "Email again"
     }
   }
 }

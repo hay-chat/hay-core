@@ -469,6 +469,8 @@ export const organizationsRouter = t.router({
       z.object({
         readImages: z.boolean().optional(),
         allowIdDocuments: z.boolean().optional(),
+        // D8-15: where complete product-problem cases are emailed; null turns it off.
+        caseEmail: z.string().trim().email().max(254).nullable().optional(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
@@ -488,6 +490,7 @@ export const organizationsRouter = t.router({
         }
         media.allowIdDocuments = input.allowIdDocuments;
       }
+      if (input.caseEmail !== undefined) media.caseEmail = input.caseEmail || null;
       await organizationService.update(ctx.organizationId!, {
         settings: { ...(organization.settings || {}), media },
       });
