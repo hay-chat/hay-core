@@ -296,6 +296,7 @@ Roger said "Do it now" for every gap. Not started; lanes below.
 - [x] Inactivity nudge no longer re-runs the AI (6351d2d7): it re-answered the last customer message (185/202 nudges in prod), sometimes handing off for no visible reason. All channels.
 - [x] Fact check on every reply (ffd1f715, deployed 2026-10-28; Roger: "no made-up facts, ever"). Unflagged replies get a grounding-only check; with no docs, claims score low and greetings pass. Cost: +1 medium LLM call per unflagged reply. Retest: ask the no-docs demo org "do you ship to Portugal?".
 - [ ] WABA checks: waiting on Meta approval (Roger, 2026-10-28).
+- [x] Mercado Pago (2026-10-28): app "Hay chat" 6936833619301345 on Roger's company account (redirect eu.hay.chat/oauth/callback, PKCE, read/write/offline_access, production activated). Client id/secret in Infisical prod. My Store connected via OAuth (Roger's real account, approved by Roger): Connected, 5 tools. Follow-ups: auth.mercadopago.com asks for the country first (use the .com.br host for BR orgs?); the connected card doesn't name the account.
 - [ ] VAT: skipped for now (Hay registered in Brazil; B2B reverse charge). Lawyer: confirm no EU/UK consumer sales → no OSS needed; Brazil ISS/nota fiscal. Fix Stripe head office (says PT).
 - [ ] Billing UX: redesign + country picker (USD fallback) + cancel page with 50% once retention offer — agents running; retest live after.
 - Confirm the simulation-cap reading (20 % of plan resolutions, max 500).
