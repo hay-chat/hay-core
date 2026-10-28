@@ -183,6 +183,19 @@ function buildMessageMetadata(
 ): Record<string, unknown> {
   const metadata: Record<string, unknown> = { ...additionalMetadata };
 
+  // Stage 0: Action-claim guardrail. passed=false means the reply sent still
+  // carries (or replaced) an unbacked claim after the retries; the replay
+  // judge reads this (D7-10).
+  if (executionResult.actionClaim) {
+    metadata.actionClaim = {
+      passed: executionResult.actionClaim.passed,
+      claimedActions: executionResult.actionClaim.claimedActions,
+    };
+  }
+  if (executionResult.actionClaimRetryAttempted) {
+    metadata.actionClaimRetryAttempted = true;
+  }
+
   // Stage 1: Company Interest Protection
   if (executionResult.companyInterest) {
     metadata.companyInterest = {
