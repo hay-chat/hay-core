@@ -580,3 +580,16 @@ describe("return instructions (D6-13)", () => {
     expect(res.data.relay).toMatch(/hand the conversation/);
   });
 });
+
+describe("marketplace orders in not-found (D10-6)", () => {
+  it("routes a Mercado Livre order id to Minhas compras", async () => {
+    mockFetch([]); // every request 404s
+    const { registerOrderTools: register } = require("../tools/orders");
+    const server = createFakeServer();
+    register(server);
+    const res = await server.call("woocommerce_get_order", { order_id: "2000012345678901" });
+    expect(res.error.code).toBe("NOT_FOUND");
+    expect(res.error.details).toMatchObject({ marketplace: "mercado_livre" });
+    expect(res.error.message).toMatch(/Minhas compras/);
+  });
+});

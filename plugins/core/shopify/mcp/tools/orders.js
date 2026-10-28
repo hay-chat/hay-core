@@ -6,6 +6,7 @@ const { z } = require("zod");
 const { shopifyGql } = require("../lib/client");
 const { staleTracking, stalestShipment } = require("@hay/plugin-sdk/stale-tracking");
 const { readReturnInstructions } = require("@hay/plugin-sdk/return-instructions");
+const { orderNotFoundError } = require("@hay/plugin-sdk/marketplace-orders");
 const {
   ok,
   fail,
@@ -236,8 +237,8 @@ async function orderNotFound(rawId) {
   } catch {
     // Probe is best-effort; fall through to the generic message.
   }
-  return toolError(
-    "NOT_FOUND",
+  return orderNotFoundError(
+    rawId,
     `Order ${rawId} not found. Get a valid order id from the recentOrders field of ` +
       'shopify_find_customer / shopify_get_customer, or use shopify_get_order_by_name ("#1001").',
   );
@@ -293,8 +294,8 @@ function registerOrderTools(server) {
         const data = await shopifyGql(QUERY, { query: `name:"${args.name}"` });
         const first = unwrapConnection(data.orders)[0];
         if (!first) {
-          throw toolError(
-            "NOT_FOUND",
+          throw orderNotFoundError(
+            args.name,
             `No order named "${args.name}" found. Order names usually include the "#" prefix ` +
               '(e.g. "#1001"); or find the order via the customer\'s recentOrders.',
           );

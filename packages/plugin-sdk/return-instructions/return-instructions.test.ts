@@ -9,8 +9,12 @@ describe("return instructions", () => {
   });
 
   it("returns the trimmed, length-capped text to relay", () => {
-    const res = returnInstructionsResult({ RETURN_INSTRUCTIONS: "  Go to https://x.test/returns \n" });
+    const res = returnInstructionsResult({
+      RETURN_INSTRUCTIONS: "  Go to https://x.test/returns \n",
+    });
     expect(res).toMatchObject({ configured: true, instructions: "Go to https://x.test/returns" });
-    expect(readReturnInstructions({ RETURN_INSTRUCTIONS: "a".repeat(5000) })).toHaveLength(MAX_LENGTH);
+    expect(readReturnInstructions({ RETURN_INSTRUCTIONS: "a".repeat(5000) })).toHaveLength(
+      MAX_LENGTH,
+    );
   });
 });

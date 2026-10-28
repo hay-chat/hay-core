@@ -19,6 +19,7 @@ const { nsApi, nsList, NuvemshopApiError } = require("./client");
 const { num, round2, toolError } = require("./format");
 const { staleTracking, stalestShipment } = require("@hay/plugin-sdk/stale-tracking");
 const { readReturnInstructions } = require("@hay/plugin-sdk/return-instructions");
+const { orderNotFoundError, detectMarketplace } = require("@hay/plugin-sdk/marketplace-orders");
 
 /** Fulfillment-order statuses under which nothing has left the warehouse. */
 const PRE_DISPATCH_FO = new Set(["UNPACKED", "IN_PREPARATION", "PACKED"]);
@@ -37,8 +38,8 @@ const HOW_TO_REFUND =
   "payment_status becomes 'refunded' or 'partially_refunded' here.";
 
 function orderNotFound(ref) {
-  return toolError(
-    "NOT_FOUND",
+  return orderNotFoundError(
+    ref,
     `Order ${ref} not found. The internal order id differs from the number the customer ` +
       "sees: pass the customer's number as order_number, or find their orders with " +
       "nuvemshop_list_customer_orders (email).",
@@ -69,6 +70,10 @@ async function resolveOrder({ order_id: orderId, order_number: orderNumber }) {
 
   const wanted = String(orderNumber).replace(/^#/, "").trim();
   if (!/^\d+$/.test(wanted)) {
+    // A marketplace reference (Amazon 3-7-7, Shopee, a marketplace name) is not a typo.
+    if (detectMarketplace(orderNumber)) {
+      throw orderNotFoundError(orderNumber, "Ask for the store's order number instead.");
+    }
     throw toolError(
       "BAD_INPUT",
       `"${orderNumber}" is not a Nuvemshop order number (digits only, e.g. 1042).`,
@@ -86,8 +91,8 @@ async function resolveOrder({ order_id: orderId, order_number: orderNumber }) {
     if (match) return match;
     if (items.length < perPage || (total !== null && page * perPage >= total)) break;
   }
-  throw toolError(
-    "NOT_FOUND",
+  throw orderNotFoundError(
+    wanted,
     `No order with number #${wanted}. Ask the customer to check the number on their ` +
       "confirmation email, or look them up by email with nuvemshop_find_customer.",
   );

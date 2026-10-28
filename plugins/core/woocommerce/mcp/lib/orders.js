@@ -14,6 +14,7 @@ const { num, round2, toolError } = require("./format");
 const { parsePix } = require("./pix");
 const { staleTracking, stalestShipment } = require("@hay/plugin-sdk/stale-tracking");
 const { readReturnInstructions } = require("@hay/plugin-sdk/return-instructions");
+const { orderNotFoundError } = require("@hay/plugin-sdk/marketplace-orders");
 
 /** Statuses under which nothing has left the warehouse yet. */
 const PRE_DISPATCH_STATUSES = new Set(["pending", "on-hold", "processing"]);
@@ -38,8 +39,8 @@ async function getOrderById(orderId) {
     return await wcApi("GET", `/orders/${encodeURIComponent(orderId)}`);
   } catch (err) {
     if (err instanceof WooApiError && err.status === 404) {
-      throw toolError(
-        "NOT_FOUND",
+      throw orderNotFoundError(
+        orderId,
         `Order ${orderId} not found. Find the order via woocommerce_find_customer (email) and use ` +
           "the id from recentOrders, or pass the number the customer sees as order_number.",
       );
@@ -72,8 +73,8 @@ async function resolveOrder({ order_id: orderId, order_number: orderNumber }) {
   const { items } = await wcList("/orders", { search: wanted, per_page: 10 });
   const match = items.find((o) => String(o.number) === wanted);
   if (!match) {
-    throw toolError(
-      "NOT_FOUND",
+    throw orderNotFoundError(
+      wanted,
       `No order with number ${wanted}. Ask the customer to check the number on their confirmation ` +
         "email, or look them up by email with woocommerce_find_customer.",
     );
