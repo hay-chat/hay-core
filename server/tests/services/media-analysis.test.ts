@@ -248,6 +248,22 @@ describe("processMessageMedia", () => {
     expect(JSON.stringify(body.messages[1].content)).toContain("Pedido 4471");
   });
 
+  it("removes card numbers from PDF text before the model sees it", async () => {
+    mockFindMessage.mockResolvedValue(message(markAnalysisPending([pdf()])!));
+    mockPdfParse.mockResolvedValue({
+      text: "Comprovante\nCartão 4111 1111 1111 1111\nPedido 4471",
+    } as never);
+    mockChatCreate.mockResolvedValue(visionReply({ ...DAMAGE, class: "receipt" }) as never);
+
+    await processMessageMedia("msg-1", ORG);
+
+    const [body] = mockChatCreate.mock.calls[0] as [{ messages: Array<{ content: unknown }> }];
+    const sent = JSON.stringify(body.messages);
+    expect(sent).not.toContain("4111 1111 1111 1111");
+    expect(sent).toContain("[card number removed]");
+    expect(sent).toContain("Pedido 4471");
+  });
+
   it("skips scanned PDFs without calling the model", async () => {
     mockFindMessage.mockResolvedValue(message(markAnalysisPending([pdf()])!));
     mockPdfParse.mockResolvedValue({ text: "  " } as never);

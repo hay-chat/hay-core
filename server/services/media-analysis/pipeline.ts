@@ -31,6 +31,7 @@ import { isUuid } from "@server/services/media-url.service";
 import { isScanCleared, pendingScans, waitForScans } from "@server/services/media-scan.service";
 import { isAnalyzable, PDF_TYPE, READABLE_IMAGE_TYPES as IMAGE_TYPES } from "./readable";
 import { toStoredAnalysis, type PrivacySettings } from "./privacy";
+import { redactCardNumbers } from "./redact";
 import { VisionUnavailableError, visionService, type VisionInput } from "./vision.service";
 
 const logger = createLogger("media-analysis");
@@ -119,7 +120,8 @@ export async function loadFileForVision(
 
   if (upload.mimeType === PDF_TYPE) {
     const parsed = await pdfParse(buffer);
-    const text = (parsed.text ?? "").replace(/\s+\n/g, "\n").trim();
+    // Card numbers are removed before the text reaches the vision model (D8-12).
+    const text = redactCardNumbers((parsed.text ?? "").replace(/\s+\n/g, "\n").trim());
     if (text.length < MIN_PDF_TEXT) {
       // TODO: scanned PDFs (no text layer) need page rendering before vision.
       return { skipped: { status: "skipped", reason: "no_text" } };
