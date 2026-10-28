@@ -1,5 +1,5 @@
 <template>
-  <div class="hay-message-list" ref="messageListRef">
+  <div class="hay-message-list" ref="messageListRef" @scroll="onScroll" @load.capture="onMediaLoad">
     <!-- Greeting Message -->
     <div v-if="greetingMessage && messages.length === 0" class="hay-message hay-message--agent">
       <div class="hay-message__content hay-message__content--rich">{{ greetingMessage }}</div>
@@ -239,6 +239,18 @@ const formatPrice = (amount?: string | number, currency?: string): string => {
   } catch {
     return `${value.toFixed(2)} ${currency ?? ""}`.trim();
   }
+};
+
+// Images load after the list first scrolls, which would push the newest message out of view.
+// Stay pinned to the bottom while they load, unless the shopper has scrolled up to read.
+const pinnedToBottom = ref(true);
+const onScroll = () => {
+  const el = messageListRef.value;
+  if (!el) return;
+  pinnedToBottom.value = el.scrollHeight - el.scrollTop - el.clientHeight < 40;
+};
+const onMediaLoad = () => {
+  if (pinnedToBottom.value) scrollToBottom();
 };
 
 const scrollToBottom = () => {
