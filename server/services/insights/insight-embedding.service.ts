@@ -14,6 +14,7 @@ import { config } from "@server/config/env";
 import { createLogger } from "@server/lib/logger";
 import { llmProviderFactory } from "@server/services/llm/llm-provider.factory";
 import { emitUsage } from "@server/services/llm/usage-sink";
+import { insightRunsService } from "./insight-runs.service";
 
 const logger = createLogger("insight-embeddings");
 
@@ -145,6 +146,15 @@ export class InsightEmbeddingService {
         values,
       );
       this.backoffUntil.delete(organizationId);
+      await insightRunsService.record({
+        organizationId,
+        kind: "embedding",
+        model: result.model,
+        usage: result.usage,
+        durationMs: Date.now() - startedAt,
+        succeeded: true,
+        items: issues.length,
+      });
       return {
         organizationId,
         embedded: issues.length,
@@ -160,6 +170,15 @@ export class InsightEmbeddingService {
         { err: error, organizationId, count: issues.length },
         "Insight embedding failed; pausing this organization",
       );
+      await insightRunsService.record({
+        organizationId,
+        kind: "embedding",
+        model: this.model,
+        usage: null,
+        durationMs: Date.now() - startedAt,
+        succeeded: false,
+        items: issues.length,
+      });
       return {
         organizationId,
         embedded: 0,
