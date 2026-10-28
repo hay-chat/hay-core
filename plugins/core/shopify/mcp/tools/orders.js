@@ -701,6 +701,13 @@ function registerOrderTools(server) {
         )
         .optional()
         .describe("Transactions to process for the refund (from shopify_calculate_refund)."),
+      currency: z
+        .string()
+        .regex(/^[A-Za-z]{3}$/)
+        .describe(
+          'The order\'s currency code (ISO 4217, e.g. "USD"), as shopify_calculate_refund shows it. The person ' +
+            "approving the refund sees the amount in it; a different currency is refused.",
+        ),
       idempotency_key: z
         .string()
         .describe("UUID idempotency key; required by Shopify 2026-04 for refund mutations."),
@@ -729,6 +736,15 @@ function registerOrderTools(server) {
             `Order ${check.order.name} is not refundable (already fully refunded or no ` +
               "eligible payment transactions).",
             { details: { reason: "NOT_REFUNDABLE" } },
+          );
+        }
+        const orderCurrency = check.order.netPaymentSet.shopMoney.currencyCode;
+        if (args.currency.toUpperCase() !== orderCurrency) {
+          throw toolError(
+            "BAD_INPUT",
+            `Order ${check.order.name} is in ${orderCurrency}, not ${args.currency}. ` +
+              `Pass currency "${orderCurrency}".`,
+            { details: { reason: "CURRENCY_MISMATCH", currency: orderCurrency } },
           );
         }
         if (args.transactions && args.transactions.length > 0) {

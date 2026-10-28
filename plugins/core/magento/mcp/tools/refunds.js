@@ -61,6 +61,13 @@ function registerRefundTools(server) {
         .describe(
           'Partial amount as a decimal string (e.g. "10.50"); booked as a positive adjustment.',
         ),
+      currency: z
+        .string()
+        .regex(/^[A-Za-z]{3}$/)
+        .describe(
+          'The order\'s currency code (ISO 4217, e.g. "USD"), as magento_get_order shows it. The person ' +
+            "approving the refund sees the amount in it; a different currency is refused.",
+        ),
       items: z
         .array(
           z.object({
@@ -97,6 +104,12 @@ function registerRefundTools(server) {
       try {
         const order = await resolveOrder(args);
         const ref = `#${order.increment_id}`;
+        const orderCurrency = String(order.order_currency_code || "").toUpperCase();
+        if (orderCurrency && args.currency.toUpperCase() !== orderCurrency) {
+          throw new Error(
+            `Order ${ref} is in ${orderCurrency}, not ${args.currency}. Pass currency "${orderCurrency}".`,
+          );
+        }
         const paid = num(order.total_paid);
         const refunded = num(order.total_refunded);
         const remaining = round2(Math.max(0, paid - refunded));

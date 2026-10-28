@@ -94,6 +94,13 @@ function registerRefundTools(server) {
         .describe(
           'Partial amount in major units as a decimal string (e.g. "10.50"). Omit for full.',
         ),
+      currency: z
+        .string()
+        .regex(/^[A-Za-z]{3}$/)
+        .describe(
+          'The order\'s currency code (ISO 4217, e.g. "USD"), as wix_get_order shows it. The person ' +
+            "approving the refund sees the amount in it; a different currency is refused.",
+        ),
       reason: z
         .string()
         .optional()
@@ -118,6 +125,12 @@ function registerRefundTools(server) {
       try {
         const order = await resolveOrder(args);
         const ref = order.number ? `#${order.number}` : order.id;
+        const orderCurrency = String(order.currency || "").toUpperCase();
+        if (orderCurrency && args.currency.toUpperCase() !== orderCurrency) {
+          throw new Error(
+            `Order ${ref} is in ${orderCurrency}, not ${args.currency}. Pass currency "${orderCurrency}".`,
+          );
+        }
         const transactions = await getTransactions(order.id);
         const payments = paymentBalances(transactions);
         const remaining = round2(payments.reduce((s, p) => s + p.remaining, 0));

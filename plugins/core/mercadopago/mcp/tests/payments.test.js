@@ -224,6 +224,19 @@ describe("mercadopago_resend_payment (identity-gated)", () => {
 });
 
 describe("mercadopago_refund (bounded, idempotent)", () => {
+  it("refuses a currency that is not the payment's, before refunding", async () => {
+    const { calls } = mockFetch([{ path: "/v1/payments/2222222222", reply: () => cardApproved() }]);
+    const res = await server.call("mercadopago_refund", {
+      currency: "USD",
+      payment_id: "2222222222",
+    });
+    expect(res.error).toMatchObject({
+      code: "BAD_INPUT",
+      details: { reason: "CURRENCY_MISMATCH" },
+    });
+    expect(calls.some((c) => c.method === "POST")).toBe(false);
+  });
+
   it("refunds in full with an empty body, an idempotency key and in-process rendering", async () => {
     const { calls } = mockFetch([
       { path: "/v1/payments/2222222222", reply: () => cardApproved() },
@@ -241,7 +254,10 @@ describe("mercadopago_refund (bounded, idempotent)", () => {
         }),
       },
     ]);
-    const res = await server.call("mercadopago_refund", { payment_id: "2222222222" });
+    const res = await server.call("mercadopago_refund", {
+      currency: "BRL",
+      payment_id: "2222222222",
+    });
     expect(res.isError).toBe(false);
     expect(res.data.refund).toMatchObject({ refundId: "9001", status: "succeeded", amount: 100 });
     expect(res.data.note).toMatch(/card issuer/);
@@ -271,7 +287,11 @@ describe("mercadopago_refund (bounded, idempotent)", () => {
         }),
       },
     ]);
-    const res = await server.call("mercadopago_refund", { payment_id: "1111111111", amount: 50 });
+    const res = await server.call("mercadopago_refund", {
+      currency: "BRL",
+      payment_id: "1111111111",
+      amount: 50,
+    });
     expect(res.data.refund.status).toBe("pending");
     expect(res.data.note).toMatch(/do not say the money has arrived/);
     expect(res.data.refundableAfter).toBe(149.9);
@@ -295,7 +315,11 @@ describe("mercadopago_refund (bounded, idempotent)", () => {
           }),
       },
     ]);
-    const res = await server.call("mercadopago_refund", { payment_id: "2222222222", amount: 50 });
+    const res = await server.call("mercadopago_refund", {
+      currency: "BRL",
+      payment_id: "2222222222",
+      amount: 50,
+    });
     expect(res.error.code).toBe("PRECONDITION");
     expect(res.error.details).toMatchObject({ reason: "EXCEEDS_REFUNDABLE", refundable: 40 });
     expect(calls.some((c) => c.method === "POST")).toBe(false);
@@ -318,7 +342,10 @@ describe("mercadopago_refund (bounded, idempotent)", () => {
           }),
       },
     ]);
-    const res = await server.call("mercadopago_refund", { payment_id: "2222222222" });
+    const res = await server.call("mercadopago_refund", {
+      currency: "BRL",
+      payment_id: "2222222222",
+    });
     expect(res.error.details.reason).toBe("ALREADY_REFUNDED");
   });
 
@@ -335,7 +362,11 @@ describe("mercadopago_refund (bounded, idempotent)", () => {
           }),
       },
     ]);
-    const res = await server.call("mercadopago_refund", { payment_id: "2222222222", amount: 30 });
+    const res = await server.call("mercadopago_refund", {
+      currency: "BRL",
+      payment_id: "2222222222",
+      amount: 30,
+    });
     expect(res.data.alreadyRequested).toBe(true);
     expect(res.data.refund.refundId).toBe("7");
     expect(calls.some((c) => c.method === "POST")).toBe(false);
@@ -347,10 +378,12 @@ describe("mercadopago_refund (bounded, idempotent)", () => {
       { path: "/v1/payments/2", reply: () => cardApproved({ id: 2, status: "charged_back" }) },
     ]);
     expect(
-      (await server.call("mercadopago_refund", { payment_id: "1" })).error.details.reason,
+      (await server.call("mercadopago_refund", { currency: "BRL", payment_id: "1" })).error.details
+        .reason,
     ).toBe("NOT_PAID");
     expect(
-      (await server.call("mercadopago_refund", { payment_id: "2" })).error.details.reason,
+      (await server.call("mercadopago_refund", { currency: "BRL", payment_id: "2" })).error.details
+        .reason,
     ).toBe("DISPUTE_OPEN");
   });
 
@@ -363,7 +396,10 @@ describe("mercadopago_refund (bounded, idempotent)", () => {
         reply: () => ({ status: 502, body: {} }),
       },
     ]);
-    const res = await server.call("mercadopago_refund", { payment_id: "2222222222" });
+    const res = await server.call("mercadopago_refund", {
+      currency: "BRL",
+      payment_id: "2222222222",
+    });
     expect(res.error.code).toBe("OUTCOME_UNKNOWN");
   });
 });
