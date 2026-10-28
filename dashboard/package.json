@@ -6,6 +6,7 @@
     "dev": "fuser -k 3000/tcp 2>/dev/null || true && nuxt dev",
     "dev:clean": "fuser -k 3000/tcp 2>/dev/null || true && rm -rf .nuxt && nuxt dev",
     "build": "nuxt build",
+    "test": "vitest run",
     "build:prod": "NODE_ENV=production nuxt build",
     "preview": "nuxt preview",
     "generate": "nuxt generate",
