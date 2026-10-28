@@ -364,6 +364,75 @@ export const publicConversationsRouter = t.router({
     }
   }),
 
+  // D5-8: the shopper leaves an email at hand-off so the team's reply can reach
+  // them after they leave (requires DPoP proof). Email only, with consent.
+  setContactEmail: publicProcedure
+    .input(
+      z.object({
+        conversationId: z.string().uuid(),
+        email: z.string().trim().toLowerCase().email().max(255),
+        proof: z.string(),
+        method: z.string(),
+        url: z.string(),
+      }),
+    )
+    .mutation(async ({ input, ctx }) => {
+      if (
+        await isPublicWidgetRateLimited([{ rule: "messagePerIp", id: clientIp(ctx.ipAddress) }])
+      ) {
+        throw tooManyRequests();
+      }
+
+      const verified = await verifyDPoPForRequest(
+        input.conversationId,
+        input.proof,
+        input.method,
+        input.url,
+      );
+      if (!verified.success) {
+        if (verified.newNonce && verified.error === "Invalid or expired nonce") {
+          return { saved: false, nonce: verified.newNonce, error: "NONCE_EXPIRED" };
+        }
+        throw new TRPCError({
+          code: "UNAUTHORIZED",
+          message: verified.error || "Invalid DPoP proof",
+        });
+      }
+
+      const conversation = await conversationRepository.findById(input.conversationId);
+      if (!conversation) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Conversation not found" });
+      }
+
+      const organizationId = conversation.organization_id;
+      const consent = { emailConsentAt: new Date().toISOString(), emailConsentSource: "handoff" };
+      const customer = conversation.customer_id
+        ? await customerRepository.findByIdAndOrganization(conversation.customer_id, organizationId)
+        : null;
+
+      if (customer) {
+        await customerRepository.update(customer.id, organizationId, {
+          email: input.email,
+          external_metadata: {
+            ...(customer.external_metadata ?? {}),
+            web: {
+              ...((customer.external_metadata?.web as Record<string, unknown>) ?? {}),
+              ...consent,
+            },
+          },
+        });
+      } else {
+        const created = await customerRepository.create({
+          organization_id: organizationId,
+          email: input.email,
+          external_metadata: { web: consent },
+        });
+        await conversationRepository.updateById(conversation.id, { customer_id: created.id });
+      }
+
+      return { saved: true, nonce: verified.newNonce, error: null };
+    }),
+
   // Rotate the keypair for a conversation (requires valid DPoP with old key)
   rotateKeys: publicProcedure
     .input(
