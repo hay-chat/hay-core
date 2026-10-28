@@ -98,7 +98,13 @@ export function handoffTranscriptLine(
   const files = (message.attachments ?? [])
     .map((attachment) => {
       // What the vision pass read (D8-11), so the summary can say what the photo shows.
-      const read = attachment.analysis?.status === "done" ? attachment.analysis.description : "";
+      // Withheld ID/card images (D8-12) carry no description at all.
+      const analysis = attachment.analysis;
+      const read = analysis?.withheld
+        ? "withheld for privacy"
+        : analysis?.status === "done"
+          ? analysis.description
+          : "";
       return `${attachment.name || "file"} (${attachmentKind(attachment.type ?? "")}${read ? `: ${read}` : ""})`;
     })
     .join(", ");

@@ -257,6 +257,22 @@ describe("processMessageMedia", () => {
     expect(mockChatCreate).not.toHaveBeenCalled();
   });
 
+  it("withholds an ID document unless the owner allowed it", async () => {
+    mockFindMessage.mockResolvedValue(message(markAnalysisPending([photo()])!));
+    mockChatCreate.mockResolvedValue(
+      visionReply({ ...DAMAGE, class: "id_document", description: "A passport." }) as never,
+    );
+
+    await processMessageMedia("msg-1", ORG);
+
+    expect(storedAttachments()[0].analysis).toEqual({
+      status: "done",
+      class: "id_document",
+      withheld: true,
+      analyzedAt: expect.any(String),
+    });
+  });
+
   it("records a failure instead of throwing when the model errors", async () => {
     mockFindMessage.mockResolvedValue(message(markAnalysisPending([photo()])!));
     mockChatCreate.mockRejectedValue(new Error("timeout") as never);

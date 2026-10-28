@@ -247,12 +247,26 @@
             <AlertCircle class="chat-message__attachment-icon" />
             {{ t("conversations.attachment.loadFailed") }}
           </span>
-          <img
+          <div
             v-else-if="attachment.type.startsWith('image/')"
-            :src="attachmentUrls[attachment.id]"
-            :alt="attachment.name"
-            class="chat-message__attachment-media"
-          />
+            class="chat-message__attachment-image"
+          >
+            <img
+              :src="attachmentUrls[attachment.id]"
+              :alt="attachment.name"
+              class="chat-message__attachment-media"
+              :class="{ 'chat-message__attachment-media--blurred': isBlurred(attachment) }"
+            />
+            <button
+              v-if="isBlurred(attachment)"
+              type="button"
+              class="chat-message__attachment-reveal"
+              @click="revealAttachment(attachment)"
+            >
+              <EyeOff class="chat-message__attachment-icon" />
+              {{ t("conversations.attachment.reveal") }}
+            </button>
+          </div>
           <audio
             v-else-if="attachment.type.startsWith('audio/')"
             :src="attachmentUrls[attachment.id]"
@@ -580,6 +594,7 @@ import {
   AlertCircle,
   RotateCcw,
   Sparkles,
+  EyeOff,
 } from "lucide-vue-next";
 import {
   TooltipProvider,
@@ -753,11 +768,36 @@ const openAttachment = async (attachment: MessageAttachment): Promise<void> => {
   }
 };
 
+// ID documents and payment cards (D8-12) stay blurred until a staff member
+// clicks reveal. Photos not read yet are blurred too, so a card photo is never
+// shown in the clear while the vision pass is still running.
+const revealedAttachments = ref<Record<string, boolean>>({});
+
+const isBlurred = (attachment: MessageAttachment): boolean => {
+  if (revealedAttachments.value[attachment.id]) return false;
+  const analysis = attachment.analysis;
+  return (
+    analysis?.status === "pending" ||
+    analysis?.withheld === true ||
+    analysis?.class === "id_document" ||
+    analysis?.class === "card"
+  );
+};
+
+const revealAttachment = (attachment: MessageAttachment): void => {
+  revealedAttachments.value[attachment.id] = true;
+};
+
 // What the AI read from a customer's photo or PDF (D8-11), shown under the file.
 const analysisCaption = (attachment: MessageAttachment): string => {
   const analysis = attachment.analysis;
   if (!analysis) return "";
   if (analysis.status === "pending") return t("conversations.attachment.analysisPending");
+  if (analysis.withheld) {
+    return analysis.class === "card"
+      ? t("conversations.attachment.withheldCard")
+      : t("conversations.attachment.withheldId");
+  }
   if (analysis.status === "done" && analysis.description) {
     return t("conversations.attachment.analysisRead", { description: analysis.description });
   }
@@ -1127,6 +1167,34 @@ const getConfidenceIcon = (tier: string | undefined) => {
   gap: 0.375rem;
   font-size: 0.75rem;
   color: var(--color-red-600);
+}
+
+.chat-message__attachment-image {
+  position: relative;
+  overflow: hidden;
+  border-radius: inherit;
+}
+
+.chat-message__attachment-media--blurred {
+  filter: blur(24px);
+}
+
+.chat-message__attachment-reveal {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.375rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: #fff;
+  background: rgb(0 0 0 / 0.35);
+}
+
+.chat-message__attachment-reveal:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: -4px;
 }
 
 .chat-message__attachment-analysis {

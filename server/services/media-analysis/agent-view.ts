@@ -40,6 +40,11 @@ export function describeAttachmentForAgent(attachment: MessageAttachment): strin
     return `[${head}): scanned PDF, its text could not be read]`;
   }
   if (analysis.status !== "done") return `[${head}): could not be read]`;
+  if (analysis.withheld) {
+    return analysis.class === "card"
+      ? `[${head}): payment card image withheld for privacy. Never ask the customer for card details]`
+      : `[${head}): ID document withheld for privacy]`;
+  }
 
   const description = analysis.description ? ` ${analysis.description}` : "";
   const text = analysis.text
