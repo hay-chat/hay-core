@@ -7,7 +7,44 @@
  * Supports API Key authentication.
  */
 
-import { defineHayPlugin } from "@hay/plugin-sdk";
+import { defineHayPlugin, type ToolRiskSpec } from "@hay/plugin-sdk";
+
+/**
+ * Risk class of the hosted Stripe MCP tools we know of (see README "Available
+ * Tools"). Overrides Stripe's own annotations for these names; any other tool
+ * keeps Stripe's readOnlyHint, and an unknown write is held for approval.
+ *
+ * Deliberately left undeclared, so they stay held: update_subscription,
+ * create_invoice, create_invoice_item and finalize_invoice change what a
+ * customer is billed and fit no money category.
+ */
+export const STRIPE_TOOL_RISK: ToolRiskSpec = {
+  read: [
+    "get_stripe_account_info",
+    "retrieve_balance",
+    "list_customers",
+    "list_products",
+    "list_prices",
+    "list_payment_intents",
+    "list_invoices",
+    "list_subscriptions",
+    "list_coupons",
+    "list_disputes",
+    "search_stripe_resources",
+    "fetch_stripe_resources",
+    "search_stripe_documentation",
+  ],
+  write: {
+    create_refund: "refund",
+    cancel_subscription: "cancel",
+    create_coupon: "discount",
+    create_customer: "customer_update",
+    create_product: "other_write",
+    create_price: "other_write",
+    create_payment_link: "other_write",
+    update_dispute: "other_write",
+  },
+};
 
 export default defineHayPlugin((globalCtx) => ({
   name: "Stripe",
@@ -136,6 +173,7 @@ export default defineHayPlugin((globalCtx) => ({
         id: "stripe-mcp",
         url: "https://mcp.stripe.com",
         authHeaders,
+        toolRisk: STRIPE_TOOL_RISK,
       });
 
       ctx.logger.info("Stripe MCP server connected successfully");
