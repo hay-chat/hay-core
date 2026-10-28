@@ -16,6 +16,8 @@ const { staleTracking, stalestShipment } = require("@hay/plugin-sdk/stale-tracki
 
 /** Statuses under which nothing has left the warehouse yet. */
 const PRE_DISPATCH_STATUSES = new Set(["pending", "on-hold", "processing"]);
+/** Core offline payment methods: WooCommerce cannot send money back through them. */
+const OFFLINE_PAYMENT_METHODS = new Set(["bacs", "cod", "cheque"]);
 
 function summarizeOrder(order) {
   return {
@@ -270,7 +272,11 @@ function enrichOrder(
     customerNote: order.customer_note || null,
     paymentMethod: order.payment_method_title ?? order.payment_method ?? null,
     ...paymentFields(order),
+    // Every amount on this order is in `totals.currency` (ISO 4217); state it with
+    // the amount, never assume a currency symbol.
     totals: {
+      currency: order.currency,
+      currencySymbol: order.currency_symbol || null,
       total: order.total,
       tax: order.total_tax,
       shipping: order.shipping_total,
@@ -307,6 +313,8 @@ function enrichOrder(
       // cancelled still owes the customer a refund.
       isRefundable: paid && remaining > 0,
       remainingRefundable: { amount: remaining.toFixed(2), currency: order.currency },
+      // false: a refund must be paid back by hand (create_refund with refund_payment=false).
+      gatewayCanRefund: !OFFLINE_PAYMENT_METHODS.has(order.payment_method),
       addressChangeable: preDispatch,
       shippedAt: rows.find((r) => r.shippedAt)?.shippedAt ?? order.date_completed ?? null,
       deliveredAt: null, // WooCommerce has no delivery confirmation.

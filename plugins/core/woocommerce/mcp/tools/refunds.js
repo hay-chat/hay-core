@@ -166,8 +166,12 @@ function registerRefundTools(server) {
     "Refund an order (WRITE). Omit amount and line_items for a full refund of whatever is left; " +
       "pass line_items to refund specific items (amount computed from the order) or amount for an " +
       "arbitrary partial refund. Refuses unpaid orders and amounts above the remaining refundable " +
-      "balance. By default the payment gateway is asked to return the money; if it cannot, the " +
-      "error says so — refund in the gateway and re-run with refund_payment=false to record it.",
+      "balance. By default the payment gateway is asked to return the money. Offline methods " +
+      "(bank transfer/bacs, cash on delivery/cod, cheque — supportSummary.gatewayCanRefund=false " +
+      "in woocommerce_get_order) cannot return money: for those, tell the customer the store " +
+      "will pay the refund back by hand and pass refund_payment=false, which only records it. " +
+      "If a card/online gateway refuses, the error says so — refund in the gateway and re-run " +
+      "with refund_payment=false.",
     {
       ...REFUND_INPUT,
       reason: z.string().optional().describe("Why the refund is issued (stored on the refund)."),
@@ -176,7 +180,8 @@ function registerRefundTools(server) {
         .boolean()
         .optional()
         .describe(
-          "Ask the payment gateway to return the money (default true). false only records a refund made elsewhere.",
+          "Ask the payment gateway to return the money (default true). Use false for offline " +
+            "methods (bacs, cod, cheque) or a refund made elsewhere: it only records the refund.",
         ),
     },
     async (args) => {
