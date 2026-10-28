@@ -95,4 +95,12 @@ export interface HayProductSourceRuntimeAPI {
   upsert(products: CanonicalProduct[]): Promise<{ upserted: number; errors: number }>;
   /** Delete a single product by its external id (scoped to this plugin's source). */
   delete(externalId: string): Promise<{ removed: boolean }>;
+  /**
+   * Catalogue reconciliation: after a COMPLETE full sync, pass every externalId
+   * the store returned (including ones whose upsert failed); core deletes this
+   * plugin's products that are not in the list (deleted in the store). Call it
+   * only when every page was read. An empty list is a no-op, so a failed or
+   * empty listing never wipes the catalogue.
+   */
+  prune(keepExternalIds: string[]): Promise<{ removed: number }>;
 }

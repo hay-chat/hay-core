@@ -1295,6 +1295,25 @@ export const pluginApiTrpcRouter = router({
     }),
 
   /**
+   * Products Capability - Remove products deleted upstream
+   *
+   * Called after a complete full sync with every externalId the store
+   * returned; this plugin's products not in the list are deleted (variants
+   * and embeddings go with them).
+   */
+  "products.prune": pluginProcedure
+    .input(
+      z.object({
+        keepExternalIds: z.array(z.string().min(1)).min(1).max(200_000),
+      }),
+    )
+    .mutation(async ({ input, ctx }) => {
+      requireCapability(ctx, "products");
+      const { organizationId, pluginId } = ctx.pluginAuth;
+      return productSyncService.pruneProducts(organizationId, pluginId, input.keepExternalIds);
+    }),
+
+  /**
    * Disputes Capability - Report a payment dispute (chargeback), D2-7/D2-8
    *
    * Called by payment-platform plugins from their webhook / onStart via

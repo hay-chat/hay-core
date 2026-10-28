@@ -5,7 +5,8 @@
  * variable products, and pushes each page to core via productSource.upsert so
  * `recommend_products` can search the store's real catalog. Only published,
  * visible products are "active"; drafts, private, pending and catalogue-hidden
- * products are synced as "draft" so recommendations skip them.
+ * products are synced as "draft" so recommendations skip them. After the last
+ * page, products the store no longer returns (deleted or trashed) are pruned.
  */
 import type {
   CanonicalProduct,
@@ -214,9 +215,12 @@ export async function bulkSync(
   wooGet: WooGet,
   productSource: HayProductSourceRuntimeAPI,
   logger: { info: (msg: string, ctx?: Record<string, unknown>) => void },
-): Promise<{ total: number }> {
+): Promise<{ total: number; removed: number }> {
   const currency = await storeCurrency(wooGet);
   let total = 0;
+  // Every product id the store returned; a page that throws aborts the sync
+  // before the prune, so a partial listing never deletes anything.
+  const seen: string[] = [];
   for (let page = 1; ; page++) {
     const { data: products, totalPages } = await wooGet<WooProduct[]>(
       `/products?per_page=${PER_PAGE}&page=${page}&status=any&orderby=id&order=asc`,
@@ -231,6 +235,7 @@ export async function bulkSync(
           : [];
       batch.push(mapProduct(product, variations, currency));
     }
+    seen.push(...batch.map((p) => p.externalId));
     const result = await productSource.upsert(batch);
     total += result.upserted;
     if (result.errors > 0) {
@@ -238,8 +243,9 @@ export async function bulkSync(
     }
     if (page >= totalPages) break;
   }
-  logger.info("WooCommerce catalog sync complete", { total });
-  return { total };
+  const { removed } = await productSource.prune(seen);
+  logger.info("WooCommerce catalog sync complete", { total, removed });
+  return { total, removed };
 }
 
 /** A retrying GET against wc/v3 for the catalog sync (429/5xx/network are replayed). */

@@ -76,5 +76,12 @@ export function createProductSourceRuntime(
       };
       return { removed: Boolean(data?.removed) };
     },
+
+    async prune(keepExternalIds: string[]): Promise<{ removed: number }> {
+      // Empty = the sync saw nothing; never ask core to wipe the catalogue.
+      if (!keepExternalIds.length) return { removed: 0 };
+      const data = (await call("products.prune", { keepExternalIds })) as { removed: number };
+      return { removed: data?.removed ?? 0 };
+    },
   };
 }
