@@ -38,6 +38,13 @@ jest.mock("../../services/websocket.service", () => ({
 // DataSource at import time; no database is needed for these tests.
 jest.mock("../../database/data-source", () => ({ AppDataSource: {} }));
 
+// Waiting for a person: the AI stays quiet within business hours and keeps
+// answering outside them (D5-7).
+const mockWithinHours = jest.fn(async () => true);
+jest.mock("../../services/business-hours.service", () => ({
+  isWithinBusinessHours: () => mockWithinHours(),
+}));
+
 const mockLogger = {
   debug: jest.fn(),
   info: jest.fn(),
@@ -89,6 +96,20 @@ describe("Conversation.addMessage status for a shopper message", () => {
     expect(mockEnqueue).not.toHaveBeenCalled();
     expect(conversation.status).toBe("pending-human");
     expect(conversation.needs_processing).toBe(false);
+  });
+
+  it("lets the AI answer a waiting conversation outside business hours, without leaving the queue", async () => {
+    mockWithinHours.mockResolvedValueOnce(false);
+    const conversation = makeConversation("pending-human");
+
+    await conversation.addMessage(shopperMessage);
+
+    expect(mockUpdate).toHaveBeenCalledWith(
+      CONVERSATION_ID,
+      ORG_ID,
+      expect.objectContaining({ status: "pending-human", needs_processing: true }),
+    );
+    expect(conversation.status).toBe("pending-human");
   });
 
   it("reopens an open conversation for the AI", async () => {
