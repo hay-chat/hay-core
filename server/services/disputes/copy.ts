@@ -82,7 +82,7 @@ export const ALERT_COPY: Record<NotificationLocale, AlertCopy> = {
     reminderSubject: (f) => `Vence pronto la evidencia${orderPart(f.order, "del pedido")}`,
     reminderTitle: "La evidencia del contracargo vence pronto",
     message: (f) =>
-      `${f.platform} informó un contracargo${orderPart(f.order, "en el pedido")}. Hay.chat puede adjuntarle las conversaciones con el cliente como borrador; tú lo revisas y lo envías en ${f.platform}.`,
+      `${f.platform} informó un contracargo${orderPart(f.order, "en el pedido")}. Hay.chat puede adjuntarle las conversaciones con el cliente como borrador; revisa la respuesta en ${f.platform} antes de la fecha límite, porque algunas plataformas envían la evidencia guardada automáticamente ese día.`,
     reminderMessage: (f) =>
       `La evidencia del contracargo${orderPart(f.order, "del pedido")} vence${f.dueBy ? ` el ${f.dueBy}` : " pronto"} y todavía no se adjuntó nada.`,
     labels: {
