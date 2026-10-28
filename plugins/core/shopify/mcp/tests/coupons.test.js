@@ -218,6 +218,44 @@ describe("shopify_create_coupon", () => {
     expect(created(calls)).toHaveLength(1);
   });
 
+  it("searches for this customer's exact title and pages through every hit", async () => {
+    const other = discount({ title: goodwillTitle("gid://shopify/Customer/70") });
+    const { calls } = mockShopify({
+      ...handlers(),
+      FindGoodwillDiscounts: (vars) =>
+        vars.after
+          ? { codeDiscountNodes: { nodes: [discount()], pageInfo: { hasNextPage: false } } }
+          : {
+              codeDiscountNodes: {
+                nodes: Array.from({ length: 50 }, () => other),
+                pageInfo: { hasNextPage: true, endCursor: "c1" },
+              },
+            },
+    });
+    const res = await server.call("shopify_create_coupon", BASE_ARGS);
+    expect(errorOf(res)).toMatchObject({ details: { reason: "ALREADY_HAS_COUPON" } });
+    const searches = calls.filter((c) => c.op === "FindGoodwillDiscounts");
+    expect(searches).toHaveLength(2);
+    expect(searches[0].variables.query).toBe('title:"Hay.chat goodwill coupon · customer 7"');
+    expect(searches[1].variables.after).toBe("c1");
+    expect(created(calls)).toHaveLength(0);
+  });
+
+  it("fails closed when the goodwill search never ends", async () => {
+    const { calls } = mockShopify({
+      ...handlers(),
+      FindGoodwillDiscounts: () => ({
+        codeDiscountNodes: { nodes: [], pageInfo: { hasNextPage: true, endCursor: "c" } },
+      }),
+    });
+    const res = await server.call("shopify_create_coupon", BASE_ARGS);
+    expect(errorOf(res)).toMatchObject({
+      code: "PRECONDITION",
+      details: { reason: "GOODWILL_CHECK_INCOMPLETE" },
+    });
+    expect(created(calls)).toHaveLength(0);
+  });
+
   it("ties the code to the customer's order and appends it to the order note", async () => {
     const { calls } = mockShopify(handlers());
     const res = await server.call("shopify_create_coupon", { ...BASE_ARGS, order_id: "12" });
