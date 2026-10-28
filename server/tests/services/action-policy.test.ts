@@ -2,6 +2,8 @@ import {
   decideGate,
   extractAmount,
   loosensActionApproval,
+  lowerAmount,
+  amountEditable,
 } from "../../services/core/action-policy";
 import { DEFAULT_ACTION_APPROVAL_CONFIG } from "../../types/organization-settings.types";
 import { classifyTool, type ToolRisk } from "../../services/core/tool-risk";
@@ -139,5 +141,28 @@ describe("extractAmount", () => {
     expect(extractAmount({ transactions: [{ amount: "1" }, { amount: "x" }] })).toBeNull();
     expect(extractAmount({ amount: -3 })).toBeNull();
     expect(extractAmount({})).toBeNull();
+  });
+});
+
+describe("lowerAmount (D4-6)", () => {
+  it("lowers a top-level amount and keeps its type", () => {
+    expect(lowerAmount({ amount: "25.00" }, 10)).toEqual({ amount: "10.00" });
+    expect(lowerAmount({ amount: 25 }, 9.999)).toEqual({ amount: 10 });
+  });
+
+  it("lowers a single transaction", () => {
+    expect(lowerAmount({ transactions: [{ parentId: "t", amount: "30.00" }] }, 12.5)).toEqual({
+      transactions: [{ parentId: "t", amount: "12.50" }],
+    });
+  });
+
+  it("refuses up, zero, split refunds and calls without an amount", () => {
+    expect(lowerAmount({ amount: "25.00" }, 25.01)).toBeNull();
+    expect(lowerAmount({ amount: "25.00" }, 0)).toBeNull();
+    expect(
+      lowerAmount({ transactions: [{ amount: "10" }, { amount: "5" }] }, 4),
+    ).toBeNull();
+    expect(lowerAmount({ order_id: "1" }, 4)).toBeNull();
+    expect(amountEditable({ order_id: "1" })).toBe(false);
   });
 });

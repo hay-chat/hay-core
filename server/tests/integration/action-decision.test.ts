@@ -294,6 +294,75 @@ describe("action decisions (D4-5)", () => {
   });
 });
 
+describe("approve with a lowered amount, bulk approve and the Approvals list (D4-6)", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockEnqueue.mockResolvedValue(true);
+    mockExecuteApproved.mockResolvedValue({ success: true, errorCode: null });
+  });
+
+  afterAll(async () => {
+    await AppDataSource.getRepository(PendingAction).delete({ organization_id: orgId });
+    await AppDataSource.getRepository(Conversation).delete({ organization_id: orgId });
+  });
+
+  it("runs the lowered amount and tells the AI about it", async () => {
+    const conversation = await newConversation();
+    const action = await hold(conversation.id);
+
+    const result = await actionDecisionService.approve(action.id, orgId, decider, 10);
+
+    expect(result.transitioned).toBe(true);
+    const [, executed] = mockExecuteApproved.mock.calls[0] as [unknown, PendingAction];
+    expect(executed.args).toEqual({ order_id: "1001", amount: "10.00" });
+    const stored = await pendingActionService.findById(action.id, orgId);
+    expect(stored).toMatchObject({ amount: 10, args: { order_id: "1001", amount: "10.00" } });
+    const notes = await systemNotes(conversation.id);
+    expect(notes[0].content).toContain("lowered the amount from 25 to 10");
+  });
+
+  it("never raises the amount: the request stays pending and nothing runs", async () => {
+    const conversation = await newConversation();
+    const action = await hold(conversation.id);
+
+    const result = await actionDecisionService.approve(action.id, orgId, decider, 30);
+
+    expect(result).toMatchObject({ transitioned: false, blocked: "invalid_amount" });
+    expect(mockExecuteApproved).not.toHaveBeenCalled();
+    expect((await pendingActionService.findById(action.id, orgId))?.status).toBe("pending");
+  });
+
+  it("bulk-approves each request once and reports a late one", async () => {
+    const first = await hold((await newConversation()).id);
+    const second = await hold((await newConversation()).id);
+    await actionDecisionService.approve(second.id, orgId, decider);
+    mockExecuteApproved.mockClear();
+
+    const results = await actionDecisionService.approveMany([first.id, second.id], orgId, decider);
+
+    expect(results).toEqual([
+      { id: first.id, status: "executed" },
+      { id: second.id, status: "already_decided" },
+    ]);
+    expect(mockExecuteApproved).toHaveBeenCalledTimes(1);
+  });
+
+  it("lists pending actions with the conversation title and whether the amount can change", async () => {
+    const conversation = await newConversation();
+    const action = await hold(conversation.id);
+
+    const items = await pendingActionService.listApprovals(orgId);
+    const item = items.find((i) => i.id === action.id);
+
+    expect(item).toMatchObject({
+      conversationTitle: "decision",
+      customerName: null,
+      amountEditable: true,
+      currency: null,
+    });
+  });
+});
+
 describe("action expiry (D4-8)", () => {
   beforeAll(async () => {
     if (!AppDataSource.isInitialized) await AppDataSource.initialize();

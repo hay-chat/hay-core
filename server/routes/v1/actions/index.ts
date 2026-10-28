@@ -40,6 +40,13 @@ async function assertApprover(
 
 function toResponse({ action, transitioned, blocked }: DecisionResult) {
   if (!action) throw new TRPCError({ code: "NOT_FOUND", message: "Action not found" });
+  if (blocked === "invalid_amount") {
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message:
+        "The amount can only be lowered, must be above zero, and only on a request with a single amount.",
+    });
+  }
   if (blocked === "conversation_closed") {
     throw new TRPCError({
       code: "PRECONDITION_FAILED",
@@ -75,12 +82,46 @@ export const actionsRouter = t.router({
     }
   }),
 
-  approve: authenticatedProcedure.input(idInput).mutation(async ({ ctx, input }) => {
-    const organizationId = await assertApprover(ctx.user, ctx.organizationId);
-    return toResponse(
-      await actionDecisionService.approve(input.id, organizationId, deciderOf(ctx.user!)),
-    );
-  }),
+  /** Pending actions across all conversations, for the Approvals list (D4-6). */
+  listApprovals: scopedProcedure(RESOURCES.CONVERSATIONS, ACTIONS.READ).query(({ ctx }) =>
+    pendingActionService.listApprovals(ctx.organizationId!),
+  ),
+
+  /** `amount` lowers the amount before it runs: never up (checked in the service). */
+  approve: authenticatedProcedure
+    .input(idInput.extend({ amount: z.number().positive().finite().optional() }))
+    .mutation(async ({ ctx, input }) => {
+      const organizationId = await assertApprover(ctx.user, ctx.organizationId);
+      return toResponse(
+        await actionDecisionService.approve(
+          input.id,
+          organizationId,
+          deciderOf(ctx.user!),
+          input.amount,
+        ),
+      );
+    }),
+
+  /** Approve several pending actions of the same kind (D4-6). */
+  approveMany: authenticatedProcedure
+    .input(z.object({ ids: z.array(z.string().uuid()).min(1).max(50) }))
+    .mutation(async ({ ctx, input }) => {
+      const organizationId = await assertApprover(ctx.user, ctx.organizationId);
+      const ids = [...new Set(input.ids)];
+      const actions = await Promise.all(
+        ids.map((id) => pendingActionService.findById(id, organizationId)),
+      );
+      const categories = new Set(actions.map((action) => action?.category));
+      if (actions.some((action) => !action) || categories.size !== 1) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Bulk approval needs existing requests of the same kind.",
+        });
+      }
+      return {
+        results: await actionDecisionService.approveMany(ids, organizationId, deciderOf(ctx.user!)),
+      };
+    }),
 
   reject: authenticatedProcedure
     .input(idInput.extend({ reason: z.string().trim().max(1000).nullable().optional() }))

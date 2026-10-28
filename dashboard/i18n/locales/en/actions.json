@@ -60,6 +60,36 @@
       "orgRequired": "Already needs approval in Settings > Actions",
       "saved": "Approval settings saved",
       "saveFailed": "Could not save approval settings"
+    },
+    "approvals": {
+      "title": "Waiting for your approval",
+      "description": "Actions the AI asked to run. Nothing happens until someone decides.",
+      "select": "Select {name}",
+      "selectHint": "Select requests of one kind to approve them together.",
+      "selected": "{count} selected",
+      "total": "Total {amount}",
+      "noAmountCount": "{count} without an amount",
+      "approveSelected": "Approve {count}",
+      "approve": "Approve",
+      "approveAmount": "Approve {amount}",
+      "editAmount": "Lower amount",
+      "amountLabel": "Amount (at most {max})",
+      "amountHelp": "You can only lower it, never raise it.",
+      "reject": "Decline",
+      "rejectReason": "Reason (the AI uses it to explain to the customer)",
+      "confirmReject": "Decline request",
+      "open": "Open conversation",
+      "noAmount": "No amount stated",
+      "untitled": "Conversation",
+      "approvedDone": "Approved and done.",
+      "approvedFailed": "Approved, but it failed when it ran. The AI will tell the customer it was not done.",
+      "rejected": "Declined. The AI will let the customer know.",
+      "failed": "Could not save the decision",
+      "conversationClosed": "This conversation is closed, so nothing ran. Reopen it to approve, or decline.",
+      "invalidAmount": "The amount can only be lowered and must be above zero.",
+      "bulkDone": "{count} approved",
+      "bulkPartial": "{done} approved, {notDone} not done. Check them in their conversations.",
+      "loadFailed": "Could not load approvals"
     }
   }
 }

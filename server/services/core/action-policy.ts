@@ -123,3 +123,40 @@ export function loosensActionApproval(
   }
   return false;
 }
+
+/**
+ * Where an approver may lower the amount (D4-6): a top-level `amount`, or a
+ * single `transactions[0].amount`. Split refunds (several transactions) and
+ * calls without an amount are approved as they are.
+ */
+export function amountEditable(args: Record<string, unknown>): boolean {
+  if (Array.isArray(args.transactions)) {
+    return (
+      args.transactions.length === 1 &&
+      toAmount((args.transactions[0] as { amount?: unknown } | null)?.amount) !== null
+    );
+  }
+  return toAmount(args.amount) !== null;
+}
+
+/**
+ * The args with the amount lowered to `next`, or null when that is not
+ * allowed: only down (never up), above zero, and only where
+ * `amountEditable`. Keeps the value's type (string decimals stay strings).
+ */
+export function lowerAmount(
+  args: Record<string, unknown>,
+  next: number,
+): Record<string, unknown> | null {
+  if (!amountEditable(args) || !Number.isFinite(next)) return null;
+  const current = extractAmount(args);
+  const rounded = Math.round(next * 100) / 100;
+  if (current === null || rounded <= 0 || rounded > current) return null;
+  const write = (previous: unknown) =>
+    typeof previous === "string" ? rounded.toFixed(2) : rounded;
+  if (Array.isArray(args.transactions)) {
+    const [transaction] = args.transactions as Array<Record<string, unknown>>;
+    return { ...args, transactions: [{ ...transaction, amount: write(transaction.amount) }] };
+  }
+  return { ...args, amount: write(args.amount) };
+}
