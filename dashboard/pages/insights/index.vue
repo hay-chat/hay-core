@@ -1,11 +1,25 @@
 <template>
   <Page :title="$t('insights.page.title')" :description="$t('insights.page.description')">
     <template #header>
-      <Button variant="outline" :disabled="loading" @click="load">
-        <RefreshCw class="h-4 w-4 mr-2" :class="{ 'animate-spin': loading }" />
-        {{ $t("insights.page.refresh") }}
-      </Button>
+      <div class="flex items-center gap-2">
+        <Button variant="outline" :disabled="loading" @click="load">
+          <RefreshCw class="h-4 w-4 mr-2" :class="{ 'animate-spin': loading }" />
+          {{ $t("insights.page.refresh") }}
+        </Button>
+        <Button v-if="userStore.isAdmin" variant="outline" @click="settingsOpen = true">
+          <Settings class="h-4 w-4 mr-2" />
+          {{ $t("insights.page.settings") }}
+        </Button>
+      </div>
     </template>
+
+    <div
+      v-if="backfillRunning"
+      class="mb-6 rounded-md border p-4 text-sm text-neutral-muted flex items-center gap-2"
+    >
+      <RefreshCw class="h-4 w-4 animate-spin shrink-0" />
+      {{ $t("insights.page.list.backfilling") }}
+    </div>
 
     <div class="grid gap-4 grid-cols-2 md:grid-cols-5 mb-6">
       <Card v-for="stat in statCards" :key="stat.key">
@@ -122,12 +136,14 @@
         </CardContent>
       </Card>
     </div>
+    <InsightsSettingsDialog v-model:open="settingsOpen" @saved="load" />
   </Page>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from "vue";
-import { RefreshCw } from "lucide-vue-next";
+import { RefreshCw, Settings } from "lucide-vue-next";
+import { useUserStore } from "@/stores/user";
 import { HayApi } from "@/utils/api";
 import type { RouterInputs, RouterOutputs } from "@/types/trpc";
 
@@ -154,6 +170,9 @@ const router = useRouter();
 const toast = useToast();
 const { formatDate } = useOrgDateTime();
 
+const userStore = useUserStore();
+const settingsOpen = ref(false);
+const backfillRunning = ref(false);
 const loading = ref(false);
 const items = ref<ListOutput["items"]>([]);
 const counts = ref<ListOutput["counts"]>({
@@ -228,6 +247,8 @@ const load = async () => {
     });
     items.value = result.items;
     counts.value = result.counts;
+    minClusterSize.value = result.minClusterSize;
+    backfillRunning.value = result.backfill.running;
   } catch (error) {
     console.error("Failed to load insights:", error);
     toast.error(t("insights.page.list.loadError"));

@@ -96,3 +96,45 @@ export async function getOrganizationThresholds(
   });
   return resolveThresholds(org?.settings?.insights);
 }
+
+/** Merge an owner's override into organizations.settings.insights; returns the resolved values. */
+export async function updateOrganizationThresholds(
+  organizationId: string,
+  override: InsightSettingsOverride,
+): Promise<InsightThresholds> {
+  const current = await getOrganizationOverride(organizationId);
+  const next: InsightSettingsOverride = { ...current };
+  for (const key of [
+    "minClusterSize",
+    "joinThreshold",
+    "mergeThreshold",
+    "digestEnabled",
+  ] as const) {
+    if (override[key] !== undefined) (next as Record<string, unknown>)[key] = override[key];
+  }
+  // Store the clamped values so what the owner sees is what runs.
+  const resolved = resolveThresholds(next);
+  const stored: InsightSettingsOverride = {};
+  if (next.minClusterSize !== undefined) stored.minClusterSize = resolved.minClusterSize;
+  if (next.joinThreshold !== undefined) stored.joinThreshold = resolved.joinThreshold;
+  if (next.mergeThreshold !== undefined) stored.mergeThreshold = resolved.mergeThreshold;
+  if (next.digestEnabled !== undefined) stored.digestEnabled = resolved.digestEnabled;
+  await AppDataSource.query(
+    `UPDATE organizations
+        SET settings = jsonb_set(coalesce(settings, '{}'::jsonb), '{insights}', $2::jsonb)
+      WHERE id = $1`,
+    [organizationId, JSON.stringify(stored)],
+  );
+  return resolved;
+}
+
+export async function getOrganizationOverride(
+  organizationId: string,
+): Promise<InsightSettingsOverride> {
+  const org = await AppDataSource.getRepository(Organization).findOne({
+    where: { id: organizationId },
+    select: ["id", "settings"],
+  });
+  const value = org?.settings?.insights;
+  return value && typeof value === "object" ? (value as InsightSettingsOverride) : {};
+}

@@ -473,6 +473,29 @@ export class InsightsService {
     return approval;
   }
 
+  /** Tuning numbers for the settings dialog (D3-18): how the thresholds behave on real data. */
+  async tuning(organizationId: string, windowDays: number) {
+    const [row] = await AppDataSource.query(
+      `SELECT
+         (SELECT count(*)::int FROM insight_issues i
+           WHERE i.organization_id = $1 AND i.source <> 'docs_audit'
+             AND i.created_at >= now() - ($2 || ' days')::interval) AS issues,
+         count(*)::int AS clusters,
+         count(*) FILTER (WHERE promoted_at IS NOT NULL)::int AS promoted,
+         count(*) FILTER (WHERE size = 1)::int AS singletons
+       FROM insight_clusters
+      WHERE organization_id = $1 AND origin = 'clustering' AND merged_into_id IS NULL
+        AND last_seen_at >= now() - ($2 || ' days')::interval`,
+      [organizationId, String(windowDays)],
+    );
+    return {
+      issues: Number(row.issues),
+      clusters: Number(row.clusters),
+      promoted: Number(row.promoted),
+      singletons: Number(row.singletons),
+    };
+  }
+
   /** The playbook most members ran under, if it still exists in the org. */
   private async mainPlaybook(organizationId: string, clusterId: string): Promise<string | null> {
     const [row]: Array<{ id: string }> = await AppDataSource.query(
