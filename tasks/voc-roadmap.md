@@ -4,6 +4,7 @@ Started 2026-10-27. Research: `/Users/rogerjunior/Documents/code/hay/seo/Enginee
 "Roger's answers" block overrides its recommendations). Research baseline: origin/master 3e6ede1.
 
 ## Resume here (orchestrator checkpoint — keep current; safe to /compact after reading this)
+- 2026-10-28 02:40: full suites green on 1f6b394 (server 1204, dash 43 + typecheck, webchat 114, SDK 195, 13 plugins). Tagged `wave-1-done` at e5cfef2 (so Wave 2 review = `git diff wave-1-done..staging`, covering L11+L5). PR #104 body + title updated; GIFs sent. Running: W2 L4 (claude/w2-approvals-ui: D4-6/9/10/11, D6-6/7) + W2 L3 (claude/w2-business-hours: D5-6..11). Prompts in scratchpad lane-w2-l4.md / lane-w2-l3.md.
 - 2026-10-28 02:15: Wave 2 L11 (D14-5..8) + L5 (D6-10..13, D10-3, D10-6, D16-2, D16-8) merged + hand-tested. My fixes: 4cd82e9 drafts approve buttons always + i18n; 992bcb5 plugin settings save no longer wipes secrets; 18c4a4a marketplace copy; aefb1c0 Woo resend reports mail failure (EMAIL_FAILED). GIFs W2-D14-*, W2-L5-*. NEXT: full suites alone → tag wave-1-done → PR #104 body → GIFs to Roger → next W2 lanes.
 - Last update: 2026-10-27 ~19:45. Staging HEAD d64da73 (+ roadmap commits).
 - Wave 0 merged into staging: L2, L1, L8, L3 + D5-2 fix (a0b0220), L9, L5 (24818be), L10 (824abf1), L6 (d64da73). Migrations ran on hay_staging + hay_test.
