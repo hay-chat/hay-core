@@ -10,6 +10,12 @@
 - G5 a45d5057 evidence PDF: Noto Emoji font, SSRF-safe remote attachment fetch (10 MB/20 files), 50-page cap, policy text as used.
 - G2 lives in hay-backoffice-w4-g (claude/w4-g-plan-email, 5aadb2d); template is backoffice-only.
 - Next: review + PR both branches; Roger: confirm 50-page cap, sendPausedNotice same bypass?
+## 2026-10-28 — claude/w4-a-billing (Lane A) + hay-backoffice claude/w4-a-billing
+- core: A1 dd18e569 billing period on orgs (usage page + exclusion cap; calendar month fallback), A3 2c172522 internal review API (approve/deny pending_review, audit-logged), A4 b5d7b647 internal.organizations.setLimits.
+- backoffice (../hay-backoffice-w4-a): A1 0b69caf period sync, A2 f939948 bill billableResolutions only + Stripe credit (negative invoice item) for post-report exclusions/reversals, A3 0389e5d admin Exclusions page, A4 00a3620 SIMULATION_ALLOWANCE (20 %, max 500).
+- Migrations: core 1785880000000 + 1785881000000 run on hay_staging + hay_test. Backoffice 1785700000000-AddCreditedOverage NOT run (no local backoffice DB).
+- Not pushed. Decisions for Roger: credit mechanism/tax, 29-31 anchor clamping, staff approvals outside credit window.
+- Next: review both branches, run backoffice migration on its DB, merge core into staging before backoffice deploys (backoffice calls new internal procedures).
 
 ## 2026-10-28 — staging — Lanes B, C, D merged
 - Merged claude/w4-b-approvals (4544ef9d), claude/w4-c-disputes (0232fb97), claude/w4-d-abuse (a0b1a115).

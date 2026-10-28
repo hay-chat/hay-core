@@ -3,10 +3,10 @@
  * billed, but capped per plan (Roger's answer 3, D7 research §9).
  *
  * Core knows no plans. The operator sets an organization's monthly allowance
- * in `organization.limits.maxSimulationsPerMonth` (from the backoffice, per
- * plan); organizations without one get the default below.
- *
- * TODO: real per-plan numbers. 200 is the example given for Solo.
+ * through `internal.organizations.setLimits` into
+ * `organization.limits.maxSimulationsPerMonth` (the Hay.chat backoffice derives
+ * it from the plan's included resolutions); organizations without one
+ * (self-hosted, or before the first sync) get the default below.
  */
 export const SIMULATION_CAPS = {
   /** Simulated conversations per organization per calendar month (UTC). */

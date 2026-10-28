@@ -63,6 +63,8 @@ export type AuditAction =
   | "retention.cleanup"
   | "billing.resolution.exclude"
   | "billing.resolution.exclusion_review_requested"
+  | "billing.resolution.exclusion_approved"
+  | "billing.resolution.exclusion_denied"
   | "conversation.spam.marked"
   | "conversation.spam.cleared"
   | "dispute_evidence.export"
