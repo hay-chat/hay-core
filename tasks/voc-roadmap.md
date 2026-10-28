@@ -282,6 +282,8 @@ Roger said "Do it now" for every gap. Not started; lanes below.
   - Release runbook `tasks/release-waves-0-3.md`.
   - Maskable icon (designer asset).
 
+- **Lane R: release document** (Roger, 2026-10-28). Marketing-first release notes for Waves 0–3: themed sections, merchant problem → what's new, best recordings from seo `_test-gifs` as small MP4s, "coming soon" for anything unverified. Draft in the scratchpad, then published as an artifact for Roger's review.
+
 ## Still on Roger
 - Run: `ssh homeserver 'grep -n -i -E "build|plugin|sdk" /srv/hay-core/deploy.sh'`. Does deploy rebuild packages/plugin-sdk + stripe/shopify/mercadopago/woocommerce plugins?
 - Resend: Roger thinks it's done. Check Infisical prod has `RESEND_API_KEY` + `RESEND_EVENTS_WEBHOOK_SECRET` (`~/bin/infisical-env.py check`).
