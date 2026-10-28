@@ -655,8 +655,11 @@ const contentSegments = computed(() => splitMarkdownImages(props.message.content
 const isImageSegment = (segment: string): boolean =>
   /^!\[[^\]]*\]\([^)]*\)\s*$/.test(segment.trim());
 // "[Customer sent a photo]" is the line the AI reads; staff see the files themselves.
+// A file-only message (staff composer, AI send_attachment) has no text bubble either.
 const hidesMediaPlaceholder = computed(
-  () => props.message.metadata?.mediaPlaceholder === true && !!props.message.attachments?.length,
+  () =>
+    (props.message.metadata?.mediaPlaceholder === true || !props.message.content?.trim()) &&
+    !!props.message.attachments?.length,
 );
 
 const isSegmented = computed(
