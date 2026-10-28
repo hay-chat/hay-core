@@ -1,3 +1,11 @@
+## 2026-10-28 — claude/w2-business-hours (L3 Wave 2) — D5-6..11 done, committed, not pushed
+- D5-6 schedules (per channel + org default, tz/DST, closures) + Settings page; migration AddBusinessHoursSchedules1785740000000 (run on hay_test).
+- D5-7 availability-aware hand-off copy; pending-human: AI quiet in hours, answers outside; widget header "Open now / Back Mon 09:00".
+- D5-8 widget email capture (consent) -> publicConversations.setContactEmail. D5-9 human reply emailed to absent web shopper w/ resume link (?hay_conversation=).
+- D5-10 waiting banner + median first reply (hidden <5 samples). D5-11 already covered by D11 ladder (no repush/email outside hours).
+- Gaps: email replies do NOT thread back (no core inbound); teams not modelled; presence = local websocket count (single instance).
+- Next: merge into staging, manual staging checks per final report.
+
 ## 2026-10-28 02:15 — staging — W2 L11 + L5 merged, hand-tested, fixes in
 - Merged L11 (D14-5..8) and L5 (commerce, 10 tickets). No migrations.
 - Fixes: 4cd82e9 drafts-only Approve/Block always shown + i18n; 992bcb5 saving plugin settings kept secrets; 18c4a4a marketplace copy; aefb1c0 Woo resend detects mailer failure note → EMAIL_FAILED (6 tests).
