@@ -42,6 +42,8 @@ const WRITE_TOOLS = new Set([
   "nuvemshop_update_order_shipping_address",
 ]);
 
+const toolRisk = require("../tool-risk");
+
 describe("nuvemshop MCP server (stdio)", () => {
   it("serves exactly the semantic tool set with read/write annotations", async () => {
     const transport = new StdioClientTransport({
@@ -59,7 +61,8 @@ describe("nuvemshop MCP server (stdio)", () => {
         expect(tool.description.length).toBeGreaterThan(20);
         expect(tool.inputSchema.type).toBe("object");
         expect(tool.annotations.readOnlyHint).toBe(!WRITE_TOOLS.has(tool.name));
-        expect(tool.annotations.destructiveHint).toBe(tool.name === "nuvemshop_cancel_order");
+        // Risk class from tool-risk.js reaches tools/list (core gates on it).
+        expect(tool._meta?.["chat.hay/category"]).toBe(toolRisk.write[tool.name]);
       }
     } finally {
       await client.close();

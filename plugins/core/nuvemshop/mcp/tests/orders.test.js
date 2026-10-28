@@ -28,6 +28,7 @@ describe("nuvemshop_get_order", () => {
     const res = await server.call("nuvemshop_get_order", { order_number: "10" });
     expect(res.isError).toBe(true);
     expect(res.text).toMatch(/No order with number #10/);
+    expect(res.error.code).toBe("NOT_FOUND");
   });
 
   it("returns a projection with payment, Pix status, tracking and supportSummary", async () => {
@@ -168,6 +169,7 @@ describe("nuvemshop_cancel_order", () => {
     });
     expect(res.isError).toBe(true);
     expect(res.text).toMatch(/tracking QB1/);
+    expect(res.error.code).toBe("PRECONDITION");
     expect(calls.some((c) => c.method === "POST")).toBe(false);
   });
 

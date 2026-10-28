@@ -17,7 +17,7 @@
  */
 
 const { z } = require("zod");
-const { ok, fail, sameEmail, samePhone, phoneKey, READ } = require("../lib/format");
+const { ok, fail, toolError, sameEmail, samePhone, phoneKey, READ } = require("../lib/format");
 const { resolveOrder, getTransactions, paymentInfo } = require("../lib/orders");
 const { ORDER_REF } = require("./orders");
 
@@ -76,7 +76,8 @@ function registerPaymentTools(server) {
     async (args) => {
       try {
         if (!args.email && !phoneKey(args.phone)) {
-          throw new Error(
+          throw toolError(
+            "BAD_INPUT",
             "Ask the customer for the email or phone used on the order first; the payment " +
               "link is only shared after it matches.",
           );
@@ -85,7 +86,8 @@ function registerPaymentTools(server) {
         const matchedBy = identityMatches(order, args);
         if (!matchedBy) {
           return fail(
-            new Error(
+            toolError(
+              "PRECONDITION",
               `The email/phone given does not match order #${order.number}. Do not share ` +
                 "payment details; ask the customer to confirm the email used at checkout.",
             ),
@@ -93,7 +95,10 @@ function registerPaymentTools(server) {
         }
         const payment = paymentInfo(order);
         if (order.status === "cancelled") {
-          throw new Error(`Order #${order.number} is cancelled; it can no longer be paid.`);
+          throw toolError(
+            "PRECONDITION",
+            `Order #${order.number} is cancelled; it can no longer be paid.`,
+          );
         }
         if (!payment.awaitingPayment) {
           return ok({

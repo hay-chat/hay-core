@@ -14,7 +14,7 @@
 
 const { z } = require("zod");
 const { nsApi, nsList, NuvemshopApiError } = require("../lib/client");
-const { ok, fail, pickLang, READ } = require("../lib/format");
+const { ok, fail, toolError, pickLang, READ } = require("../lib/format");
 
 const languageParam = z
   .string()
@@ -131,7 +131,8 @@ function registerProductTools(server) {
           product = await nsApi("GET", `/products/${encodeURIComponent(productId)}`);
         } catch (err) {
           if (err instanceof NuvemshopApiError && err.status === 404) {
-            throw new Error(
+            throw toolError(
+              "NOT_FOUND",
               `Product ${productId} not found. Find the id with nuvemshop_search_products.`,
             );
           }

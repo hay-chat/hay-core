@@ -18,10 +18,20 @@
  *  - List endpoints 404 ("Last page is N") past the last page instead of
  *    returning [] — `nsList` turns that into an empty page.
  *
+ * Every failure is a ToolError from @hay/plugin-sdk/tool-errors (shared `code`
+ * vocabulary); NuvemshopApiError additionally keeps the HTTP `status`.
+ *
  * Replay policy: 429 was never processed, so any method may retry. A transport
  * error, timeout or 5xx may have been applied server-side (a re-POSTed cancel
  * or coupon would run twice), so only idempotent GETs are replayed.
  */
+
+const {
+  ToolError,
+  toolError,
+  codeForHttpStatus,
+  codeForNetworkFailure,
+} = require("@hay/plugin-sdk/tool-errors");
 
 // api.nuvemshop.com.br and api.tiendanube.com are interchangeable twins; either
 // host serves any store regardless of country.
@@ -37,7 +47,10 @@ function credentials() {
   const storeId = (process.env.NUVEMSHOP_STORE_ID || "").trim();
   const token = (process.env.NUVEMSHOP_ACCESS_TOKEN || "").trim();
   if (!storeId || !token) {
-    throw new Error("Nuvemshop MCP server is missing NUVEMSHOP_STORE_ID or NUVEMSHOP_ACCESS_TOKEN");
+    throw toolError(
+      "INTERNAL",
+      "The Nuvemshop connection is not configured (missing store ID or access token).",
+    );
   }
   return {
     storeId,
@@ -50,9 +63,22 @@ function mainLanguage() {
   return process.env.NUVEMSHOP_MAIN_LANGUAGE || "pt";
 }
 
-class NuvemshopApiError extends Error {
+/**
+ * Shared-vocabulary code for a Nuvemshop error response. 402 (subscription
+ * unpaid, API suspended) is the store's own state, not bad credentials.
+ */
+function nuvemshopErrorCode(method, status) {
+  if (status === 402) return "PROVIDER_REFUSED";
+  return codeForHttpStatus(status, { idempotent: method === "GET" });
+}
+
+class NuvemshopApiError extends ToolError {
   constructor(method, path, status, rawBody) {
-    super(`Nuvemshop API ${method} ${path} failed: HTTP ${status}: ${describe(status, rawBody)}`);
+    super(
+      nuvemshopErrorCode(method, status),
+      `Nuvemshop API ${method} ${path} failed: HTTP ${status}: ${describe(status, rawBody)}`,
+      { details: { method, path, status } },
+    );
     this.name = "NuvemshopApiError";
     this.status = status;
   }
@@ -123,7 +149,14 @@ async function nsRequest(method, path, { query, body } = {}) {
         await sleep(Math.pow(2, attempt) * 250);
         continue;
       }
-      throw new Error(`Nuvemshop API ${method} ${path} failed: ${err.message || String(err)}`);
+      const idempotent = method === "GET";
+      throw toolError(
+        codeForNetworkFailure({ idempotent }),
+        idempotent
+          ? "The Nuvemshop store did not respond. Try again in a moment."
+          : "Nuvemshop did not confirm whether this change went through. Check the order before trying again.",
+        { details: { method, path, cause: err?.message || String(err) } },
+      );
     }
 
     const retryable = response.status === 429 || (response.status >= 500 && method === "GET");
@@ -171,4 +204,12 @@ async function nsList(path, query) {
   }
 }
 
-module.exports = { nsRequest, nsApi, nsList, NuvemshopApiError, mainLanguage, API_HOST };
+module.exports = {
+  nsRequest,
+  nsApi,
+  nsList,
+  NuvemshopApiError,
+  nuvemshopErrorCode,
+  mainLanguage,
+  API_HOST,
+};

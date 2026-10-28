@@ -13,7 +13,7 @@
 
 const { z } = require("zod");
 const { nsApi, nsList, NuvemshopApiError } = require("../lib/client");
-const { ok, fail, sameEmail, digits, READ } = require("../lib/format");
+const { ok, fail, toolError, sameEmail, digits, READ } = require("../lib/format");
 const { summarizeOrder } = require("../lib/orders");
 
 function summarizeCustomer(c) {
@@ -57,7 +57,7 @@ async function findByEmail(email) {
 
 async function findByDocument(doc) {
   const wanted = digits(doc);
-  if (wanted.length < 6) throw new Error(`"${doc}" is not a CPF/CNPJ/DNI.`);
+  if (wanted.length < 6) throw toolError("BAD_INPUT", `"${doc}" is not a CPF/CNPJ/DNI.`);
   const { items } = await nsList("/customers", { q: wanted, per_page: 10 });
   return items.find((c) => digits(c.identification) === wanted) || null;
 }
@@ -101,7 +101,8 @@ function registerCustomerTools(server) {
         const e = email?.trim() || undefined;
         const d = identification?.trim() || undefined;
         if (!e && !d) {
-          throw new Error(
+          throw toolError(
+            "BAD_INPUT",
             "Provide an email or a document number. Nuvemshop cannot search customers by phone.",
           );
         }
@@ -152,7 +153,8 @@ function registerCustomerTools(server) {
           c = await nsApi("GET", `/customers/${encodeURIComponent(customerId)}`);
         } catch (err) {
           if (err instanceof NuvemshopApiError && err.status === 404) {
-            throw new Error(
+            throw toolError(
+              "NOT_FOUND",
               `Customer ${customerId} not found. Search by email with nuvemshop_find_customer.`,
             );
           }
