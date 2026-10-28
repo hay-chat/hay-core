@@ -199,6 +199,7 @@ Staging seed: org/user created via `auth.register` (credentials in `../hay-core-
 
 ## Follow-ups logged (not in Wave 0 scope)
 
+- (W1 review) External/hosted MCP tools that annotate `readOnlyHint` skip the approval gate and dry-run on that word alone. Consider trusting the hint only from first-party plugins (HubSpot relies on remote annotations today).
 - (W1) Conversations snapshot the playbook text at the first turn, and `playbooks.update` changes the playbook row but not its active version; an edited playbook only reaches new conversations after a publish. Expected, but worth a hint in the editor.
 - (W1) Channel delivery retries live in memory; a restart during backoff drops them. Delivery-failed alert is push + toast only (no email).
 - (W1) WhatsApp templates with media headers / header variables / URL-button variables are listed but can't be sent.
