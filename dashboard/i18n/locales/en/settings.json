@@ -375,7 +375,17 @@
     "requestHistory": "Request History",
     "requestHistoryDescription": "View and track all customer privacy requests initiated by your organization",
     "retentionSaveSuccess": "Retention policy saved successfully",
-    "retentionSaveFailed": "Failed to save retention policy"
+    "retentionSaveFailed": "Failed to save retention policy",
+    "aiProcessing": {
+      "title": "AI processing",
+      "description": "Where Hay.chat processes your customers' messages with AI.",
+      "regionLabel": "Region",
+      "regionEu": "EU only (EU data centres)",
+      "regionDefault": "Any region",
+      "providerLabel": "Provider",
+      "change": "Change in AI Models",
+      "loadFailed": "Failed to load AI processing details"
+    }
   },
   "security": {
     "title": "Security Settings",

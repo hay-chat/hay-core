@@ -498,7 +498,21 @@
             </div>
           </div>
 
-          <!-- Section 5: Performance Metadata -->
+          <!-- Section 5: Where AI processed this reply (D14-5) -->
+          <div v-if="message.metadata?.aiRegion" class="debug-section">
+            <h3 class="debug-section__title">{{ t("conversations.debug.aiProcessing") }}</h3>
+            <div class="debug-section__content">
+              <p class="text-sm">
+                {{
+                  message.metadata.aiRegion === "eu"
+                    ? t("conversations.debug.aiRegionEu")
+                    : t("conversations.debug.aiRegionDefault")
+                }}
+              </p>
+            </div>
+          </div>
+
+          <!-- Section 6: Performance Metadata -->
           <div
             v-if="message.metadata?.latency_ms || message.metadata?.total_tokens"
             class="debug-section"
@@ -657,7 +671,8 @@ const hasDebugData = computed(() => {
     props.message.metadata?.executionRationale ||
     props.message.metadata?.confidence ||
     props.message.metadata?.documentsUsed?.length ||
-    props.message.metadata?.companyInterest
+    props.message.metadata?.companyInterest ||
+    props.message.metadata?.aiRegion
   );
 });
 

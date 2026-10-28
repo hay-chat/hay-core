@@ -37,6 +37,8 @@
       </Button>
     </Alert>
 
+    <AiProcessingCard />
+
     <!-- Data Retention Policy -->
     <Card>
       <CardHeader>
@@ -226,6 +228,7 @@ import { useToast } from "@/composables/useToast";
 const { t } = useI18n();
 const toast = useToast();
 import CustomerPrivacyRequestsTable from "@/components/CustomerPrivacyRequestsTable.vue";
+import AiProcessingCard from "@/components/settings/AiProcessingCard.vue";
 
 // Retention policy state
 const retentionDays = ref<number | null>(null);

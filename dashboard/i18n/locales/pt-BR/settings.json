@@ -375,7 +375,17 @@
     "requestHistory": "Histórico de Solicitações",
     "requestHistoryDescription": "Visualize e acompanhe todas as solicitações de privacidade de clientes iniciadas pela sua organização",
     "retentionSaveSuccess": "Política de retenção salva com sucesso",
-    "retentionSaveFailed": "Falha ao salvar política de retenção"
+    "retentionSaveFailed": "Falha ao salvar política de retenção",
+    "aiProcessing": {
+      "title": "Processamento de IA",
+      "description": "Onde o Hay.chat processa com IA as mensagens dos seus clientes.",
+      "regionLabel": "Região",
+      "regionEu": "Somente UE (data centers na UE)",
+      "regionDefault": "Qualquer região",
+      "providerLabel": "Provedor",
+      "change": "Alterar em Modelos de IA",
+      "loadFailed": "Falha ao carregar os detalhes do processamento de IA"
+    }
   },
   "security": {
     "title": "Configurações de Segurança",
