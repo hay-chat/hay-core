@@ -128,7 +128,8 @@ export class AnalyticsService {
 
     // What the backoffice meters: billable close outcomes (D1-3: confirmed or
     // assumed AI resolutions, hand-offs included when the AI resolved them),
-    // minus those reversed by the shopper returning within 72 h, by close time.
+    // minus those reversed by the shopper returning within 72 h and those the
+    // merchant excluded on the resolution ledger (D1-6), by close time.
     const billableResolutions = await this.conversationRepository.countBillableResolutions({
       organizationId,
       startDate,

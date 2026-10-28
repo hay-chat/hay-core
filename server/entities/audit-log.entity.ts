@@ -56,7 +56,9 @@ export type AuditAction =
   | "product.delete"
   | "product.sync"
   | "permission.denied"
-  | "retention.cleanup";
+  | "retention.cleanup"
+  | "billing.resolution.exclude"
+  | "billing.resolution.exclusion_review_requested";
 
 @Entity("audit_logs")
 @Index("idx_audit_logs_user", ["userId"])
