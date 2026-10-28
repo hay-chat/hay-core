@@ -36,9 +36,14 @@ describe("suggestGraduation (D4-11)", () => {
     expect(suggestGraduation(base, 30)).toBeNull();
   });
 
-  it("says nothing when requests lack a currency or mix currencies", () => {
-    expect(suggestGraduation(refunds([10, 20, 15, 30, 25], "executed", null), 0)).toBeNull();
+  it("compares calls without a currency together, but never mixes currencies", () => {
+    expect(suggestGraduation(refunds([10, 20, 15, 30, 25], "executed", null), 0)).toMatchObject({
+      amount: 30,
+      currency: null,
+    });
     const mixed = [...refunds([10, 20, 15, 30]), ...refunds([2500], "executed", "USD")];
     expect(suggestGraduation(mixed, 0)).toBeNull();
+    const partly = [...refunds([10, 20, 15, 30]), ...refunds([25], "executed", null)];
+    expect(suggestGraduation(partly, 0)).toBeNull();
   });
 });

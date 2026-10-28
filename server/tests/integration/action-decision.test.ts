@@ -362,9 +362,9 @@ describe("approve with a lowered amount, bulk approve and the Approvals list (D4
       amountEditable: true,
       currency: "BRL",
     });
-    // Without a currency the amount's unit is unknown: approve as it is.
+    // Without a currency the amount is still lowered in the call's own unit.
     expect(items.find((i) => i.id === noCurrency.id)).toMatchObject({
-      amountEditable: false,
+      amountEditable: true,
       currency: null,
     });
   });
