@@ -1,3 +1,10 @@
+## 2026-10-28 — staging — everything PR'd for Roger to merge
+- hay-core PR #104 (staging→master) retitled "VOC roadmap Waves 0–4", Wave 4 section + merge order added. MERGEABLE.
+- New PRs: hay-backoffice #8 (Lane A) #9 (plan email), hay-website #48 (→ #46 branch) #49 (homepage perf), hay-docs #23, hay-shopify-app #2.
+- Backoffice #7 still targets merged claude/w1-billing-notices: retargeting was blocked for me → Roger retargets to main and merges first.
+- Release notes draft approved by Roger (https://claude.ai/artifact/Ugfwub6xvdyzrZZMixWqCT).
+- Next: Roger merges + deploys (runbook tasks/release-waves-0-3.md, deploy.sh steps to confirm), then prod testing.
+
 ## 2026-10-28 — staging — all Wave 4 lanes (A–I) merged
 - Lane I merged (179a31b1) + dashboard `test` script (ffa89285). Every lane A–I is on staging and pushed.
 - Satellite branches (backoffice ×2, website ×2, docs, shopify-app) committed locally only; list + defaults in tasks/voc-roadmap.md "Still on Roger".
