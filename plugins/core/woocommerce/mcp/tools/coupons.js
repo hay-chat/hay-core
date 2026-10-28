@@ -171,8 +171,10 @@ function registerCouponTools(server) {
             usage_limit_per_user: 1,
             email_restrictions: [email],
             free_shipping: false,
-            // Store-local time; WooCommerce ignores date_expires_gmt on write.
-            date_expires: expires.toISOString().slice(0, 19),
+            // WooCommerce ignores date_expires_gmt on write and reads a bare
+            // date_expires as store-local time, but WC_Data::set_date_prop honours
+            // an explicit "Z" offset, so this expires at the exact UTC instant.
+            date_expires: `${expires.toISOString().slice(0, 19)}Z`,
             description: `Hay.chat goodwill coupon. Reason: ${args.reason}`,
             meta_data: [{ key: GOODWILL_META_KEY, value: args.reason }],
           },
