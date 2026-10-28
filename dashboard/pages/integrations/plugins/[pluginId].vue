@@ -408,6 +408,18 @@
         </CardContent>
       </Card>
 
+      <!-- OAuth plugin whose client ID/secret are not set: Connect cannot work, say why -->
+      <Alert
+        v-if="enabled && oauthAvailable && !oauthConfigured"
+        :icon="Info"
+        data-testid="oauth-unavailable-alert"
+      >
+        <AlertTitle>{{ $t("pluginSettings.connection.oauthUnavailableTitle") }}</AlertTitle>
+        <AlertDescription>
+          {{ $t("pluginSettings.connection.oauthUnavailable", { name: plugin.name }) }}
+        </AlertDescription>
+      </Alert>
+
       <!-- Plugin Settings Extensions - Before Settings Slot (only when enabled) -->
       <template v-if="enabled">
         <Card v-for="ext in beforeSettingsExtensions" :key="ext.id">

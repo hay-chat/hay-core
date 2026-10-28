@@ -1,0 +1,36 @@
+{
+  "name": "Mercado Pago",
+  "description": "Connect Mercado Pago so the agent can find the payment behind an order, resend an unpaid Pix code to a verified customer, refund within what was paid and report refund status honestly.",
+  "tools": {
+    "mercadopago_get_payment": {
+      "label": "Get Payment",
+      "description": "Get a Mercado Pago payment: status, method, amount, refunds and dates. Never includes the Pix code."
+    },
+    "mercadopago_find_payments": {
+      "label": "Find Payments for an Order",
+      "description": "Find the Mercado Pago payments behind a WooCommerce or Shopify order."
+    },
+    "mercadopago_resend_payment": {
+      "label": "Resend Pix Code",
+      "description": "Get the Pix code or payment link of an unpaid payment, only after the customer's email or phone matches the payer."
+    },
+    "mercadopago_refund": {
+      "label": "Refund Payment",
+      "description": "Refund all or part of a paid payment, never more than what is still refundable. Moves money."
+    },
+    "mercadopago_refund_status": {
+      "label": "Check Refund Status",
+      "description": "Check each refund of a payment: pending, completed or failed, with amount and date."
+    }
+  },
+  "config": {
+    "clientId": {
+      "label": "OAuth client ID",
+      "description": "Set by the Hay.chat server. Leave empty unless you run your own Hay.chat server with your own Mercado Pago application."
+    },
+    "clientSecret": {
+      "label": "OAuth client secret",
+      "description": "Set by the Hay.chat server. Leave empty unless you run your own Hay.chat server."
+    }
+  }
+}

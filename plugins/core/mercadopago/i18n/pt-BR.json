@@ -1,0 +1,36 @@
+{
+  "name": "Mercado Pago",
+  "description": "Conecte o Mercado Pago para que o agente encontre o pagamento de um pedido, reenvie o código Pix de um pedido não pago a um cliente verificado, faça reembolsos dentro do valor pago e informe o status do reembolso com honestidade.",
+  "tools": {
+    "mercadopago_get_payment": {
+      "label": "Consultar pagamento",
+      "description": "Consulta um pagamento do Mercado Pago: status, meio de pagamento, valor, reembolsos e datas. Nunca inclui o código Pix."
+    },
+    "mercadopago_find_payments": {
+      "label": "Encontrar pagamentos de um pedido",
+      "description": "Encontra os pagamentos do Mercado Pago de um pedido da WooCommerce ou da Shopify."
+    },
+    "mercadopago_resend_payment": {
+      "label": "Reenviar código Pix",
+      "description": "Obtém o código Pix ou o link de pagamento de um pagamento pendente, somente depois que o e-mail ou telefone do cliente confere com o do pagador."
+    },
+    "mercadopago_refund": {
+      "label": "Reembolsar pagamento",
+      "description": "Reembolsa todo ou parte de um pagamento aprovado, nunca mais do que ainda pode ser reembolsado. Movimenta dinheiro."
+    },
+    "mercadopago_refund_status": {
+      "label": "Consultar status do reembolso",
+      "description": "Consulta cada reembolso de um pagamento: em processamento, concluído ou recusado, com valor e data."
+    }
+  },
+  "config": {
+    "clientId": {
+      "label": "Client ID do OAuth",
+      "description": "Definido pelo servidor do Hay.chat. Deixe em branco, a menos que você rode seu próprio servidor do Hay.chat com sua própria aplicação do Mercado Pago."
+    },
+    "clientSecret": {
+      "label": "Client secret do OAuth",
+      "description": "Definido pelo servidor do Hay.chat. Deixe em branco, a menos que você rode seu próprio servidor do Hay.chat."
+    }
+  }
+}

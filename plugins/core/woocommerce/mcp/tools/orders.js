@@ -72,6 +72,7 @@ function registerOrderTools(server) {
     "Get an order by id or number with line items, totals, addresses, payment method and " +
       "transaction id, refunds with dates, shipment tracking, and for an unpaid order its " +
       "payment link and Pix copy-paste code (pix) when the store's gateway saved one, " +
+      "paymentReferences (payment-provider ids, e.g. Mercado Pago, for that plugin's payment tools), " +
       "and a supportSummary (isCancellable, isRefundable, remainingRefundable, addressChangeable, " +
       "tracking: isStale/daysSinceLastUpdate/staleReason). " +
       "One call answers status, refund and cancellation questions.",
