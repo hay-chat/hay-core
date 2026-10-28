@@ -8,6 +8,30 @@ import {
 } from "typeorm";
 import type { SimulationUsage } from "./simulation-run.entity";
 
+/**
+ * What a case is checked against (D7-9/D7-10/D7-12). Set for replays and test
+ * cases; null for plain simulation runs, which are not judged.
+ */
+export interface SimulationExpectations {
+  /** What was actually sent at this point (a person's reply, or the AI's then). */
+  referenceReply?: string | null;
+  /** Free text: what a good answer does ("asks for the order number"). */
+  expectedOutcome?: string | null;
+  /** A reply the AI should not repeat (an edited or thumbed-down answer). */
+  avoidReply?: string | null;
+  /** Tools the AI must call / must not call (tool names). */
+  mustCallTools?: string[];
+  mustNotCallTools?: string[];
+  /** true: must hand off; false: must not; missing/null: either. */
+  expectHandoff?: boolean | null;
+  /** A replay of a past turn: live store reads may differ from what was true then. */
+  replay?: boolean;
+  /** When the replayed turn happened (ISO), when the source says. */
+  originalAt?: string | null;
+  /** The source conversation's title, for the report. */
+  title?: string | null;
+}
+
 export type SimulationItemStatus = "pending" | "running" | "completed" | "failed" | "skipped";
 
 /** A turn written into the simulated conversation before the AI answers. */
@@ -49,6 +73,10 @@ export class SimulationRunItem {
   /** Where the case came from, for the caller (e.g. a transcript id and turn). */
   @Column({ type: "varchar", length: 255, nullable: true })
   source_ref!: string | null;
+
+  /** What the run is checked against; null = not judged (plain simulation). */
+  @Column({ type: "jsonb", nullable: true })
+  expectations!: SimulationExpectations | null;
 
   /** Set when the item is dispatched. */
   @Column({ type: "uuid", nullable: true })

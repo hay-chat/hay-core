@@ -26,6 +26,7 @@ import {
 } from "@server/database/entities/simulation-run.entity";
 import {
   SimulationRunItem,
+  type SimulationExpectations,
   type SimulationSeedTurn,
 } from "@server/database/entities/simulation-run-item.entity";
 import { Organization } from "@server/entities/organization.entity";
@@ -45,6 +46,8 @@ export interface SimulationCase {
   seed: SimulationSeedTurn[];
   /** Opaque to the harness: lets the caller map items back to its cases. */
   sourceRef?: string | null;
+  /** What the AI's turn is checked against; cases without are not judged. */
+  expectations?: SimulationExpectations | null;
 }
 
 export interface StartSimulationRunInput {
@@ -221,6 +224,7 @@ export class SimulationHarnessService {
           status: "pending" as const,
           seed: c.seed.map((turn) => ({ role: turn.role, text: turn.text })),
           source_ref: c.sourceRef ?? null,
+          expectations: c.expectations ?? null,
         })),
       );
       return created;
