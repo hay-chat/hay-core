@@ -731,7 +731,7 @@
       "statusDefault": "AI processing: Hay.chat's default AI provider, which may run outside the EU.",
       "unavailable": "EU-only processing is not available yet. It will appear here once it is ready.",
       "misconfiguredTitle": "EU-only is on, but the EU endpoint is not available",
-      "misconfiguredDescription": "AI replies, searches and transcripts are paused for this organization rather than processed outside the EU. Contact Hay.chat support, or turn EU-only off to resume on the default provider.",
+      "misconfiguredDescription": "AI replies, searches and transcripts are paused for this organization rather than processed outside the EU. Photos and PDFs shoppers send are still read, on the default provider. Contact Hay.chat support, or turn EU-only off to resume on the default provider.",
       "customProviderPaused": "EU-only is on, so the provider and models below are not used. They are kept and apply again if you turn EU-only off.",
       "saveSuccessEu": "AI now runs in the EU only",
       "saveSuccessDefault": "AI now runs on the default provider",
