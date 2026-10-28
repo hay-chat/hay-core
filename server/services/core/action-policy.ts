@@ -135,12 +135,11 @@ export function extractCurrency(args: Record<string, unknown>): string | null {
 
 /**
  * Where an approver may lower the amount (D4-6): a top-level `amount`, or a
- * single `transactions[0].amount`, and only when the call states its currency
- * (without one the amount's unit is unknown, e.g. cents). Split refunds
- * (several transactions) and calls without an amount are approved as they are.
+ * single `transactions[0].amount`. The lowered amount keeps the call's own
+ * unit, so no currency is needed. Split refunds (several transactions) and
+ * calls without an amount are approved as they are.
  */
 export function amountEditable(args: Record<string, unknown>): boolean {
-  if (!extractCurrency(args)) return false;
   if (Array.isArray(args.transactions)) {
     return (
       args.transactions.length === 1 &&

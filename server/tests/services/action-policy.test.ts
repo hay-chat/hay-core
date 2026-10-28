@@ -174,8 +174,8 @@ describe("lowerAmount (D4-6)", () => {
     expect(amountEditable({ order_id: "1" })).toBe(false);
   });
 
-  it("refuses a call that does not state its currency (unknown unit, e.g. cents)", () => {
-    expect(amountEditable({ amount: 2500 })).toBe(false);
-    expect(lowerAmount({ amount: 2500 }, 1000)).toBeNull();
+  it("lowers a call that states no currency in its own unit", () => {
+    expect(amountEditable({ amount: "25.00" })).toBe(true);
+    expect(lowerAmount({ amount: "25.00" }, 10)).toEqual({ amount: "10.00" });
   });
 });

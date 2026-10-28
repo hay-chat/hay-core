@@ -261,7 +261,7 @@ interface GraduationSuggestion {
   approved: number;
   total: number;
   amount: number;
-  currency: string;
+  currency: string | null;
 }
 const DISMISS_KEY = "hay-approvals-graduation-dismissed";
 const userStore = useUserStore();
