@@ -1,3 +1,6 @@
+## 2026-10-28 07:30 — staging — W3 L12a insights foundations merged, hand-tested
+- Merged claude/w3-insights-a (dcb08c8); 2 migrations on hay_staging; feedback backfill run. Fix d5594f6 bracket placeholders.
+- Running: L7a. Next: L12b (clustering, Insights page, digest).
 ## 2026-10-28 — claude/w3-insights-a (L12a)
 - Done: D3-6 Knowledge Improve, D3-7 insight schema+embeddings, D3-9 feedback→issues+enrichment+backfill, D3-11 insight_runs ledger + insights.metrics.
 - Migrations 1785810000000, 1785811000000 run on hay_test only. Not pushed.
