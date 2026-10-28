@@ -17,6 +17,7 @@
  * the replay runner and judge (lane L7b) build on that.
  */
 
+import type { EntityManager } from "typeorm";
 import { AppDataSource } from "@server/database/data-source";
 import { Conversation } from "@server/database/entities/conversation.entity";
 import { Message, MessageDirection, MessageType } from "@server/database/entities/message.entity";
@@ -162,12 +163,16 @@ export class SimulationHarnessService {
   }
 
   /** This month's simulated conversations against the organization's cap. */
-  async getAllowance(organizationId: string): Promise<SimulationAllowance> {
-    const organization = await AppDataSource.getRepository(Organization).findOne({
+  async getAllowance(
+    organizationId: string,
+    manager: EntityManager = AppDataSource.manager,
+  ): Promise<SimulationAllowance> {
+    const organization = await manager.getRepository(Organization).findOne({
       where: { id: organizationId },
     });
     const limit = organization?.limits?.maxSimulationsPerMonth ?? SIMULATION_CAPS.defaultPerMonth;
-    const used = await this.items
+    const used = await manager
+      .getRepository(SimulationRunItem)
       .createQueryBuilder("item")
       .where("item.organization_id = :organizationId", { organizationId })
       .andWhere("item.created_at >= :since", { since: startOfMonthUtc() })
@@ -195,15 +200,20 @@ export class SimulationHarnessService {
       if (!version) throw new SimulationError("NOT_FOUND", "Playbook version not found");
     }
 
-    const allowance = await this.getAllowance(input.organizationId);
-    if (input.cases.length > allowance.remaining) {
-      throw new SimulationError(
-        "LIMIT_REACHED",
-        `This run needs ${input.cases.length} simulated conversations; ${allowance.remaining} of ${allowance.limit} are left this month`,
-      );
-    }
-
     const run = await AppDataSource.transaction(async (manager) => {
+      // One start per organization at a time, so two concurrent starts can't
+      // both pass the allowance check and together exceed the monthly cap.
+      await manager.query(`SELECT pg_advisory_xact_lock(hashtext($1))`, [
+        `simulation-allowance:${input.organizationId}`,
+      ]);
+      const allowance = await this.getAllowance(input.organizationId, manager);
+      if (input.cases.length > allowance.remaining) {
+        throw new SimulationError(
+          "LIMIT_REACHED",
+          `This run needs ${input.cases.length} simulated conversations; ${allowance.remaining} of ${allowance.limit} are left this month`,
+        );
+      }
+
       const created = await manager.getRepository(SimulationRun).save(
         manager.getRepository(SimulationRun).create({
           organization_id: input.organizationId,
