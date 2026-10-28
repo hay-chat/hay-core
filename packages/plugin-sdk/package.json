@@ -43,6 +43,9 @@
     },
     "./marketplace-orders": {
       "default": "./marketplace-orders/index.cjs"
+    },
+    "./payment-provider": {
+      "default": "./payment-provider/index.cjs"
     }
   },
   "bin": {
