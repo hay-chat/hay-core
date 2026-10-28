@@ -1,3 +1,7 @@
+## 2026-10-28 — Meta App Review drafts
+- tasks/meta-app-review-messenger.md (1da6b710+): permission texts, reviewer notes, screencast script. Roger: reviewer login, screencast, submit.
+- Gap found: Meta deauthorize/data-deletion only reach the WhatsApp plugin, so Messenger connections are not cleared when a user removes the app.
+
 ## 2026-10-28 — master 66bf78ec deployed
 - Channel messages that arrive when the org has no agent are now kept: stored and parked pending-human, instead of a 500 that Meta eventually drops. Messenger tested end to end on Magenta Terrários once Roger created an agent.
 - Next: App Review drafts (pages_messaging, pages_manage_metadata, pages_show_list, Human Agent), then WABA checks.

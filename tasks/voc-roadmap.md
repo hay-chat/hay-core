@@ -289,6 +289,10 @@ Roger said "Do it now" for every gap. Not started; lanes below.
 - [x] Prod keys (2026-10-28): Turnstile, Resend webhook secret, OPERATOR_EVENTS_URL, SMTP_FROM_NAME=Hay.chat set; JWT_REFRESH_EXPIRES_IN removed. Optional Meta / Mercado Pago / OpenAI EU still unset.
 - [x] Backoffice (2026-10-28): #7 merged + migrations on boot (a5015d6), deployed on the homeserver (/srv/hay, not DO); secrets match.
 - [x] Stripe live test (2026-10-28): checkout, upgrade, booked downgrade, overage credit all OK; double plan-change email fixed (backoffice d0bae68). Portal can't change plans in live → copy OK.
+- [x] Meta Messenger (2026-10-28): webhook fields messages+message_echoes subscribed, OAuth redirect URI added, Magenta Terrários connected to the demo org, inbound + AI reply tested end to end. No-agent orgs now keep inbound messages (66bf78ec).
+- [ ] **Tomorrow — Messenger App Review** (`tasks/meta-app-review-messenger.md`): Roger creates a reviewer login, records the screencast, checks the usage counters are green, submits.
+- [ ] **Tomorrow — Claude:** shared Meta deauthorize/data-deletion callback (today only the WhatsApp plugin gets it, so a Messenger connection survives "remove app"). Also: Messenger setup-guide panel ("AfterSettings") spins forever.
+- [ ] Cleanup of the Stripe live test: cancel sub_1UVbfHL8O3lIr2V8pSy7KSoQ now without proration, delete pending invoice items on cus_VWee4tKoh7CoM2, refund the €50.
 - [ ] VAT: skipped for now (Hay registered in Brazil; B2B reverse charge). Lawyer: confirm no EU/UK consumer sales → no OSS needed; Brazil ISS/nota fiscal. Fix Stripe head office (says PT).
 - [ ] Billing UX: redesign + country picker (USD fallback) + cancel page with 50% once retention offer — agents running; retest live after.
 - Confirm the simulation-cap reading (20 % of plan resolutions, max 500).
