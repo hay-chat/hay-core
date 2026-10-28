@@ -65,7 +65,7 @@
               v-if="dispute.status === 'needs_response' && dispute.orderKey"
               size="sm"
               data-testid="dispute-attach"
-              @click="confirming = dispute"
+              @click="openConfirm(dispute)"
             >
               <Paperclip class="mr-2 h-4 w-4" />
               {{
@@ -95,7 +95,7 @@
       :open="confirming !== null"
       :title="$t('evidence.disputes.confirmTitle')"
       :description="
-        $t('evidence.disputes.confirmDescription', { platform: confirming?.platform ?? '' })
+        $t('evidence.disputes.confirmDescription', { platform: confirmPlatform })
       "
       :confirm-text="$t('evidence.disputes.confirm')"
       :loading="attaching"
@@ -128,6 +128,12 @@ const { formatDateTime } = useOrgDateTime();
 
 const disputes = ref<Dispute[]>([]);
 const confirming = ref<Dispute | null>(null);
+// Kept after closing so the description does not go blank while the dialog fades out.
+const confirmPlatform = ref("");
+const openConfirm = (dispute: Dispute) => {
+  confirmPlatform.value = dispute.platform ?? "";
+  confirming.value = dispute;
+};
 const attaching = ref(false);
 const highlightId = props.highlightId;
 
