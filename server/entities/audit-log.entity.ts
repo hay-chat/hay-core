@@ -41,6 +41,8 @@ export type AuditAction =
   | "organization.member.role_change"
   | "organization.member.remove"
   | "organization.access_state_changed"
+  | "organization.ai_paused"
+  | "organization.ai_resumed"
   | "agent.create"
   | "agent.update"
   | "agent.delete"

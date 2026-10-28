@@ -20,6 +20,8 @@ import { closureCopy } from "./closure-copy";
 import { availabilityContext, availabilityHandoffLine } from "./handoff-copy";
 import { getAvailability, typicalFirstReplyMinutes } from "@server/services/business-hours.service";
 import { AiReplySuppressedError, isPauseBlocker, recheckAiReply } from "./reply-guard";
+import { isOrganizationAiPaused } from "@server/types/organization-access.types";
+import { sendPausedNotice } from "./paused-notice";
 import type { ExecutionResult } from "./execution.layer";
 import type { ToolLedgerEntry } from "@server/services/core/action-claim-guardrail.service";
 import { decidedActionsLedger } from "./decided-actions";
@@ -324,7 +326,8 @@ async function saveConfidenceLog(
  * A paused agent never replies, whether the owner switched the agent off or the
  * operator paused the whole organization (e.g. included resolutions used up).
  * A conversation that already holds a shopper message goes to "pending-human"
- * (Needs Attention) so a human picks it up; a conversation with no shopper
+ * (Needs Attention) so a human picks it up, and the shopper is told once that
+ * the team will reply there; a conversation with no shopper
  * message yet (widget just opened) only has its needs_processing flag cleared,
  * so no greeting is sent and the sweep stops.
  */
@@ -363,6 +366,8 @@ async function parkForPausedAgent(
       "pending-human",
       conversation.title,
     );
+    // One fixed line so the shopper knows a person will answer (D11-9).
+    await sendPausedNotice(conversation);
   }
 }
 
@@ -436,7 +441,7 @@ export const runConversation = async (conversationId: string) => {
   // off (agents.enabled = false). Shopper messages are still stored; the
   // conversation is parked in the queue as pending-human so the team sees it,
   // and needs_processing is cleared so the sweep stops re-enqueuing it.
-  if (conversation.organization?.agentPausedAt) {
+  if (isOrganizationAiPaused(conversation.organization)) {
     await parkForPausedAgent(conversation, log, "organization_paused");
     return;
   }
@@ -1311,10 +1316,7 @@ async function handleExecutionLoop(
             : null,
       };
       const handoffType = availability.state === "open" ? "available" : "unavailable";
-      log.debug(
-        { hasAgent: !!agent, availability: availability.state },
-        "Handing off to the team",
-      );
+      log.debug({ hasAgent: !!agent, availability: availability.state }, "Handing off to the team");
 
       // The merchant's own hand-off instructions for this situation, if any,
       // are run through the planner on the next iteration, with the facts.

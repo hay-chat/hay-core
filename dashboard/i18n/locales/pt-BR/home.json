@@ -50,6 +50,21 @@
       "denied": "As notificações estão bloqueadas para este site nas configurações do navegador. Permita e recarregue a página.",
       "failed": "Não foi possível ativar os alertas",
       "blocked": "Alertas desativados"
+    },
+    "aiPause": {
+      "title": "Pausar a IA em tudo",
+      "description": "Para na hora todas as respostas da IA em todos os canais, incluindo lembretes e encerramentos por inatividade. Clientes que escreverem recebem uma mensagem curta dizendo que sua equipe vai responder, e as conversas ficam esperando aqui por você.",
+      "statusOn": "IA pausada",
+      "statusOff": "IA respondendo",
+      "pausedBy": "Pausada por {name} em {when}.",
+      "pausedAt": "Pausada em {when}.",
+      "perChannel": "Desligar a IA em um canal só (apenas rascunhos)",
+      "perAgent": "Desligar um agente",
+      "banner": "A IA está pausada em tudo. Sua equipe responde todas as conversas.",
+      "resume": "Retomar a IA",
+      "paused": "IA pausada em tudo",
+      "resumed": "IA retomada",
+      "failed": "Não foi possível alterar a pausa da IA. Tente de novo."
     }
   }
 }

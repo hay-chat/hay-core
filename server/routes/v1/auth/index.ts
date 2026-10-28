@@ -632,6 +632,8 @@ export const authRouter = t.router({
             agentPausedAt: z.union([z.date(), z.string()]).nullable(),
             agentPauseReason: z.enum(AGENT_PAUSE_REASONS).nullable(),
             accessNotice: accessNoticeSchema.nullable(),
+            aiPausedAt: z.union([z.date(), z.string()]).nullable(),
+            aiPausedByUserId: z.string().nullable(),
           }),
         ),
         activeOrganizationId: z.string().optional(),
