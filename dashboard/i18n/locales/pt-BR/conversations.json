@@ -280,6 +280,19 @@
       "aiProcessing": "Processamento de IA",
       "aiRegionEu": "Data centers na UE",
       "aiRegionDefault": "Qualquer região (provedor de IA padrão)"
+    },
+    "draftApproval": {
+      "queued": "Aguardando aprovação",
+      "approve": "Aprovar e enviar",
+      "block": "Bloquear",
+      "dialogTitle": "Revisar resposta da IA",
+      "dialogDescription": "Revise a resposta e edite se precisar antes de enviá-la ao cliente.",
+      "original": "Resposta original da IA:",
+      "content": "Resposta",
+      "placeholder": "Edite a resposta...",
+      "characters": "{count} caracteres",
+      "blockMessage": "Bloquear resposta",
+      "approveEdited": "Aprovar e enviar editada"
     }
   }
 }

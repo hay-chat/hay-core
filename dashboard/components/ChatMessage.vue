@@ -36,7 +36,7 @@
         <div v-if="isQueued && showApproval" class="mb-2 flex-1">
           <Badge variant="outline" class="text-xs">
             <Clock class="h-3 w-3 mr-1" />
-            Queued for Approval
+            {{ t("conversations.draftApproval.queued") }}
           </Badge>
         </div>
 
@@ -280,11 +280,11 @@
         <div class="flex gap-2 mt-2 mb-4">
           <Button size="sm" variant="success" @click="handleApproveClick">
             <Check class="h-3 w-3 mr-1" />
-            Approve & Send
+            {{ t("conversations.draftApproval.approve") }}
           </Button>
           <Button size="sm" variant="destructive" @click="handleBlockClick">
             <Ban class="h-3 w-3 mr-1" />
-            Block
+            {{ t("conversations.draftApproval.block") }}
           </Button>
         </div>
       </div>
