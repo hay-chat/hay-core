@@ -5,7 +5,7 @@
  * Policy (Roger's answers, D9 research): never lock shoppers out because the
  * provider is down. Provider or widget failures flag the conversation; only a
  * token Cloudflare positively rejects, or a missing token while everyone must
- * be challenged, is a deny.
+ * be challenged (whatever error the client reports), is a deny.
  */
 
 export const SITEVERIFY_URL = "https://challenges.cloudflare.com/turnstile/v0/siteverify";
@@ -61,14 +61,15 @@ export async function decide(
   const mustChallenge = settings.mode === "challenge_all" || request.underAttack;
 
   if (!request.token) {
+    // When everyone must be challenged, a client-reported error is not proof of
+    // anything (any client can send one), so no token is always a deny.
+    if (mustChallenge) return { decision: "deny", reason: "token_missing" };
     // The widget tried and the provider failed (script blocked, timeout…).
     if (request.contributionError) {
       return { decision: "flag", reason: `challenge_error:${request.contributionError}`.slice(0, 100) };
     }
     // No token and no explanation: an old widget or a client skipping the challenge.
-    return mustChallenge
-      ? { decision: "deny", reason: "token_missing" }
-      : { decision: "flag", reason: "token_missing" };
+    return { decision: "flag", reason: "token_missing" };
   }
 
   let body: SiteverifyResponse;
