@@ -9,6 +9,8 @@ import {
 } from "typeorm";
 import type { ConversationOutcomeKind } from "../../services/close-classification/outcome-rules";
 
+export type ResolutionExclusionStatus = "excluded" | "pending_review";
+
 /**
  * One row per close of a conversation (D1-3): the billing outcome, written at
  * close by a rule and refined by the close classifier. The billable count
@@ -84,6 +86,27 @@ export class ConversationOutcome {
 
   @Column({ type: "varchar", length: 64, nullable: true })
   reversal_reason!: string | null;
+
+  /**
+   * Merchant exclusion (D1-6). `excluded` drops the row from the billable
+   * count (`excluded_at` set); `pending_review` was over the self-serve
+   * allowance and waits for Hay.chat, still billed.
+   */
+  @Column({ type: "varchar", length: 16, nullable: true })
+  exclusion_status!: ResolutionExclusionStatus | null;
+
+  @Column({ type: "text", nullable: true })
+  exclusion_reason!: string | null;
+
+  @Column({ type: "uuid", nullable: true })
+  exclusion_requested_by!: string | null;
+
+  @Column({ type: "timestamptz", nullable: true })
+  exclusion_requested_at!: Date | null;
+
+  /** When the exclusion took effect; null while pending review. */
+  @Column({ type: "timestamptz", nullable: true })
+  excluded_at!: Date | null;
 
   @Column({ type: "varchar", length: 128, nullable: true })
   llm_model!: string | null;

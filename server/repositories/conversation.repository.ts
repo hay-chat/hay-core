@@ -805,8 +805,8 @@ export class ConversationRepository extends BaseRepository<Conversation> {
 
   /**
    * Resolutions the merchant is billed for: billable close outcomes (D1-3)
-   * that were not reversed by the shopper coming back, counted by close time.
-   * Reads conversation_outcomes, not the live conversation, so reopening or
+   * that were not reversed by the shopper coming back nor excluded by the
+   * merchant (D1-6), counted by close time. Reads conversation_outcomes, not the live conversation, so reopening or
    * deleting a conversation does not rewrite a bill.
    */
   async countBillableResolutions(filters: {
@@ -820,7 +820,8 @@ export class ConversationRepository extends BaseRepository<Conversation> {
         organizationId: filters.organizationId,
       })
       .andWhere("outcome.billable = true")
-      .andWhere("outcome.reversed_at IS NULL");
+      .andWhere("outcome.reversed_at IS NULL")
+      .andWhere("outcome.excluded_at IS NULL");
     if (filters.startDate) {
       queryBuilder.andWhere("outcome.closed_at >= :startDate", { startDate: filters.startDate });
     }
