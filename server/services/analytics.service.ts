@@ -207,6 +207,7 @@ export class AnalyticsService {
         JOIN conversations conv ON conv.id = c.conversation_id
         WHERE conv.organization_id = $1
           AND conv.deleted_at IS NULL
+          AND ${notSimulationSql("conv")}
           AND c.type = 'Customer'${range}
       ),
       turns AS (

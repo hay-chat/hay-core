@@ -3,6 +3,7 @@ import type { QueryDeepPartialEntity } from "typeorm";
 import { Message, MessageType, MessageSentiment } from "../database/entities/message.entity";
 import { AppDataSource } from "../database/data-source";
 import type { DeliveryState } from "../types/message-feedback.types";
+import { notSimulationSql } from "../services/simulation/simulation-kind";
 
 export class MessageRepository {
   private repository!: Repository<Message>;
@@ -166,6 +167,7 @@ export class MessageRepository {
       .select("message.sentiment", "sentiment")
       .addSelect("COUNT(*)", "count")
       .where("conversation.organization_id = :organizationId", { organizationId })
+      .andWhere(notSimulationSql("conversation"))
       .andWhere("message.type = :type", { type: MessageType.CUSTOMER })
       .andWhere("message.sentiment IS NOT NULL");
 
@@ -199,6 +201,7 @@ export class MessageRepository {
         FROM conversations c
         LEFT JOIN messages m ON m.conversation_id = c.id
         WHERE c.organization_id = $1
+          AND ${notSimulationSql("c")}
     `;
 
     const params: (string | Date)[] = [organizationId];
