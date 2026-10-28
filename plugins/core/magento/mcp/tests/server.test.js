@@ -23,6 +23,7 @@ const EXPECTED_TOOLS = [
   "magento_get_product",
   "magento_get_store",
   "magento_list_customer_orders",
+  "magento_resend_order_confirmation",
   "magento_search_products",
   "magento_update_order_shipping_address",
 ];

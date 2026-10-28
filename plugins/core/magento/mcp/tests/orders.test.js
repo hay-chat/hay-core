@@ -370,6 +370,18 @@ describe("order tools", () => {
       status: "processing",
     });
   });
+
+  it("magento_resend_order_confirmation posts to the order's emails endpoint", async () => {
+    const { calls } = mockFetch([
+      { method: "GET", path: `${V1}/orders/12`, reply: () => ORDER },
+      { method: "POST", path: `${V1}/orders/12/emails`, reply: () => true },
+    ]);
+    const res = await server.call("magento_resend_order_confirmation", { order_id: "12" });
+    expect(res.data).toMatchObject({ sent: true, sentTo: "ana@example.com" });
+    expect(calls.some((c) => c.method === "POST" && c.path === `${V1}/orders/12/emails`)).toBe(
+      true,
+    );
+  });
 });
 
 describe("customer tools", () => {

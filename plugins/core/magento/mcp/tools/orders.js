@@ -6,6 +6,7 @@
  *   magento_cancel_order                   POST /orders/{id}/cancel      (not invoiced/shipped)
  *   magento_update_order_shipping_address  PUT /orders/{id} (address)    (not shipped)
  *   magento_add_order_note                 POST /orders/{id}/comments
+ *   magento_resend_order_confirmation      POST /orders/{id}/emails       (to the order's email)
  */
 
 const { z } = require("zod");
@@ -249,6 +250,27 @@ function registerOrderTools(server) {
           number: order.increment_id,
           added: result === true,
           note: args.note,
+        });
+      } catch (err) {
+        return fail(err);
+      }
+    },
+  );
+  server.tool(
+    "magento_resend_order_confirmation",
+    "Resend the order confirmation email to the email already on the order (WRITE). Use when " +
+      "the customer says they never got it. It cannot send to a different address. Only say it " +
+      "was sent if this tool returns sent: true.",
+    ORDER_REF,
+    async (args) => {
+      try {
+        const order = await resolveOrder(args);
+        const result = await magentoApi("POST", `/orders/${order.entity_id}/emails`);
+        return ok({
+          sent: result === true,
+          id: order.entity_id,
+          number: order.increment_id,
+          sentTo: order.customer_email ?? null,
         });
       } catch (err) {
         return fail(err);
