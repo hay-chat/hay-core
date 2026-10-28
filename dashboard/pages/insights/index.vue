@@ -7,7 +7,7 @@
       </Button>
     </template>
 
-    <div class="grid gap-4 grid-cols-2 md:grid-cols-4 mb-6">
+    <div class="grid gap-4 grid-cols-2 md:grid-cols-5 mb-6">
       <Card v-for="stat in statCards" :key="stat.key">
         <CardContent class="p-6">
           <p class="text-sm text-neutral-muted">{{ stat.label }}</p>
@@ -98,6 +98,12 @@
                 <Badge v-if="item.recurredAt" variant="warning">
                   {{ $t("insights.page.list.recurring") }}
                 </Badge>
+                <Badge v-if="item.fixed && item.fixed.status !== 'watching'" variant="outline">
+                  {{ $t(`insights.page.fixedBadge.${item.fixed.status}`) }}
+                </Badge>
+                <Badge v-if="item.archiveSuggested" variant="outline">
+                  {{ $t("insights.page.list.archiveSuggested") }}
+                </Badge>
               </div>
               <p class="font-medium">{{ item.title || $t("insights.page.list.untitled") }}</p>
               <p v-if="item.summary" class="text-sm text-neutral-muted line-clamp-2 mt-1">
@@ -150,7 +156,14 @@ const { formatDate } = useOrgDateTime();
 
 const loading = ref(false);
 const items = ref<ListOutput["items"]>([]);
-const counts = ref<ListOutput["counts"]>({ open: 0, new: 0, positive: 0, addressed: 0 });
+const counts = ref<ListOutput["counts"]>({
+  open: 0,
+  new: 0,
+  positive: 0,
+  addressed: 0,
+  fixed: 0,
+  measured: 0,
+});
 // Owner-tunable minimum; the server default is 5 (INSIGHTS_MIN_CLUSTER_SIZE).
 const minClusterSize = ref(5);
 
@@ -161,6 +174,16 @@ const statCards = computed(() => [
   { key: "new", label: t("insights.page.counts.new"), value: counts.value.new },
   { key: "positive", label: t("insights.page.counts.positive"), value: counts.value.positive },
   { key: "addressed", label: t("insights.page.counts.addressed"), value: counts.value.addressed },
+  {
+    key: "fixed",
+    label: t("insights.page.counts.fixedRate"),
+    value: counts.value.measured
+      ? t("insights.page.counts.fixedRateValue", {
+          fixed: counts.value.fixed,
+          measured: counts.value.measured,
+        })
+      : t("insights.page.counts.fixedRateNone"),
+  },
 ]);
 
 const polarityOptions = computed(() => [

@@ -193,6 +193,11 @@
         "save": "Salvar",
         "saved": "Configurações do Insights salvas",
         "error": "Não foi possível salvar as configurações"
+      },
+      "fixedBadge": {
+        "fixed": "Corrigido",
+        "improved": "Melhorou",
+        "not_fixed": "Não corrigido"
       }
     }
   }

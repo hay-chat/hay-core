@@ -8,6 +8,7 @@
  */
 import { AppDataSource } from "@server/database/data-source";
 import { INSIGHT_ACTION_TYPES, INSIGHT_POLARITIES } from "../close-classification/outcome-rules";
+import { ARCHIVE_SUGGESTION_DAYS, FIXED_OBSERVATION_DAYS } from "./insight-settings";
 
 export const INSIGHT_STATES = [
   "new",
@@ -61,12 +62,55 @@ export interface InsightSnippet {
   text: string;
 }
 
+/** "Fixed" compares the weekly rate after addressed with the 30 days before. */
+const BEFORE_DAYS = 30;
+
+export type FixedStatus = "watching" | "fixed" | "improved" | "not_fixed";
+
+/**
+ * D3-16: did addressing it work? Watching for the first two weeks; then fixed
+ * when the weekly rate fell to a quarter or less of the rate before.
+ */
+export function fixedStatus(
+  addressedAt: Date | null,
+  before: number,
+  after: number,
+  now = new Date(),
+): { status: FixedStatus; beforePerWeek: number; afterPerWeek: number } | null {
+  if (!addressedAt) return null;
+  const days = (now.getTime() - new Date(addressedAt).getTime()) / 86400000;
+  const beforePerWeek = Math.round((before / (BEFORE_DAYS / 7)) * 10) / 10;
+  const afterPerWeek = Math.round((after / Math.max(days / 7, 1 / 7)) * 10) / 10;
+  if (days < FIXED_OBSERVATION_DAYS) return { status: "watching", beforePerWeek, afterPerWeek };
+  let status: FixedStatus;
+  if (after === 0 || afterPerWeek <= beforePerWeek * 0.25) status = "fixed";
+  else if (afterPerWeek < beforePerWeek) status = "improved";
+  else status = "not_fixed";
+  return { status, beforePerWeek, afterPerWeek };
+}
+
+export function archiveSuggested(state: string, lastSeenAt: Date, now = new Date()): boolean {
+  return (
+    ["new", "acknowledged", "addressed"].includes(state) &&
+    now.getTime() - new Date(lastSeenAt).getTime() > ARCHIVE_SUGGESTION_DAYS * 86400000
+  );
+}
+
 const LIST_COLUMNS = `
   c.id, c.origin, c.title, c.summary, c.hypothesis, c.polarity, c.action_type, c.area,
   c.state, c.size, c.window_size, c.conversation_count, c.handed_off_count,
   c.negative_count, c.high_severity_count, c.feedback_negative_count, c.avg_relevance,
   c.impact_score, c.first_seen_at, c.last_seen_at, c.promoted_at, c.state_changed_at,
-  c.addressed_at, c.recurred_at, c.recurrence_count, c.approved_action`;
+  c.addressed_at, c.recurred_at, c.recurrence_count, c.approved_action,
+  (SELECT count(*)::int FROM insight_cluster_members bm
+     JOIN insight_issues bi ON bi.id = bm.insight_issue_id
+    WHERE bm.cluster_id = c.id AND c.addressed_at IS NOT NULL
+      AND bi.created_at >= c.addressed_at - interval '${BEFORE_DAYS} days'
+      AND bi.created_at < c.addressed_at) AS before_count,
+  (SELECT count(*)::int FROM insight_cluster_members am
+     JOIN insight_issues ai ON ai.id = am.insight_issue_id
+    WHERE am.cluster_id = c.id AND c.addressed_at IS NOT NULL
+      AND ai.created_at >= c.addressed_at) AS after_count`;
 
 type ClusterRow = Record<string, unknown> & { id: string; state: InsightState };
 
@@ -97,6 +141,12 @@ function toItem(row: ClusterRow) {
     recurredAt: (row.recurred_at as Date | null) ?? null,
     recurrenceCount: Number(row.recurrence_count),
     approvedAction: (row.approved_action as Record<string, unknown> | null) ?? null,
+    fixed: fixedStatus(
+      (row.addressed_at as Date | null) ?? null,
+      Number(row.before_count ?? 0),
+      Number(row.after_count ?? 0),
+    ),
+    archiveSuggested: archiveSuggested(row.state, row.last_seen_at as Date),
   };
 }
 
@@ -186,6 +236,19 @@ export class InsightsService {
         WHERE organization_id = $1 AND merged_into_id IS NULL AND promoted_at IS NOT NULL`,
       [organizationId, OPEN_STATES],
     );
+    // Fixed rate: of the addressed insights past the watching period, how many stayed fixed.
+    const addressedRows: ClusterRow[] = await AppDataSource.query(
+      `SELECT ${LIST_COLUMNS} FROM insight_clusters c
+        WHERE c.organization_id = $1 AND c.merged_into_id IS NULL AND c.addressed_at IS NOT NULL
+          AND c.state <> 'rejected'
+        ORDER BY c.addressed_at DESC LIMIT 500`,
+      [organizationId],
+    );
+    const measured = addressedRows
+      .map((r) => toItem(r).fixed)
+      .filter((f) => f && f.status !== "watching");
+    const fixed = measured.filter((f) => f?.status === "fixed").length;
+
     return {
       items,
       counts: {
@@ -193,6 +256,8 @@ export class InsightsService {
         new: Number(counts.new),
         positive: Number(counts.positive),
         addressed: Number(counts.addressed),
+        fixed,
+        measured: measured.length,
       },
     };
   }
