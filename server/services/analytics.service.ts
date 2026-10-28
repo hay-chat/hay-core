@@ -4,6 +4,7 @@ import { MessageRepository } from "../repositories/message.repository";
 import { DocumentRepository } from "../repositories/document.repository";
 import { MessageSentiment } from "../database/entities/message.entity";
 import { DocumentationStatus } from "../entities/document.entity";
+import { notSimulationSql } from "./simulation/simulation-kind";
 
 export interface AnalyticsFilters {
   startDate?: Date;
@@ -249,6 +250,7 @@ export class AnalyticsService {
         FROM conversations
         WHERE organization_id = $1
           AND deleted_at IS NULL
+          AND ${notSimulationSql("conversations")}
           AND agent_id IS NOT NULL${range}
         GROUP BY agent_id
         ORDER BY total DESC

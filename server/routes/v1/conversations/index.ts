@@ -31,6 +31,7 @@ import {
 import { isPlaygroundConversation } from "../../../services/core/dry-run";
 import { isTestConversation } from "../../../services/close-classification/outcome-rules";
 import { PlaybookService } from "../../../services/playbook.service";
+import { notSimulationSql } from "../../../services/simulation/simulation-kind";
 import { PLAYBOOK_VERSION_OVERRIDE_KEY } from "../../../services/playbook-version-override";
 
 const logger = createLogger("conversations");
@@ -181,6 +182,7 @@ export const conversationsRouter = t.router({
           AND c.deleted_at IS NULL
           AND c.status IN ('pending-human', 'human-took-over')
           AND c.spam_flagged_at IS NULL
+          AND ${notSimulationSql("c")}
         ORDER BY COALESCE(c.last_message_at, c.updated_at) ASC
         LIMIT 200
       `,
@@ -273,6 +275,7 @@ export const conversationsRouter = t.router({
         WHERE c.organization_id = $1
           AND c.deleted_at IS NULL
           AND c.status = ANY($2)
+          AND ${notSimulationSql("c")}
         ORDER BY last_message_at DESC NULLS LAST, c.updated_at DESC
         LIMIT 5
       `,
@@ -402,6 +405,7 @@ export const conversationsRouter = t.router({
             AND c.deleted_at IS NULL
             AND c.created_at >= $2
             AND c.created_at <= $3
+            AND ${notSimulationSql("c")}
         `,
         [organizationId, start.toISOString(), now.toISOString()],
       );

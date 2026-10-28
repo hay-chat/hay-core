@@ -997,8 +997,16 @@ The following tools are available for you to use. You MUST return only valid JSO
       const { resolveChannelAiMode } = await import("../../types/organization-settings.types");
       const draftsOnly = resolveChannelAiMode(organization?.settings, this.channel) === "drafts";
 
-      // Only apply test mode if this is a response to a customer (not the initial greeting)
-      if ((testModeEnabled || draftsOnly) && hasCustomerMessages) {
+      // Only apply test mode if this is a response to a customer (not the initial greeting).
+      // Test conversations (playground, simulation runs) reach no shopper, so
+      // their replies are never held for approval.
+      const { isTestConversation } =
+        await import("../../services/close-classification/outcome-rules");
+      if (
+        (testModeEnabled || draftsOnly) &&
+        hasCustomerMessages &&
+        !isTestConversation(this.metadata)
+      ) {
         messageStatus = MessageStatus.PENDING;
         reviewRequired = true;
         deliveryState = DeliveryState.QUEUED;
