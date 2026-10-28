@@ -90,6 +90,20 @@
       "bulkDone": "{count} approved",
       "bulkPartial": "{done} approved, {notDone} not done. Check them in their conversations.",
       "loadFailed": "Could not load approvals"
+    },
+    "graduation": {
+      "message": "You approved {approved} of {total} {category} requests in the last 30 days, the largest {amount}. Auto-approve refunds and discounts up to {amount}?",
+      "apply": "Auto-approve up to {amount}",
+      "dismiss": "Not now",
+      "confirmTitle": "Auto-approve up to {amount}?",
+      "confirmDescription": "Refunds and discounts at or below {amount} will run without asking a person. Larger ones still wait for approval. You can change this in Settings > Actions.",
+      "confirm": "Turn on auto-approve",
+      "applied": "Refunds and discounts up to {amount} now run without approval.",
+      "applyFailed": "Could not change the auto-approve amount",
+      "noun": {
+        "refund": "refund",
+        "discount": "discount"
+      }
     }
   }
 }

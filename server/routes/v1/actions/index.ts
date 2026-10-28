@@ -5,6 +5,7 @@ import { RESOURCES, ACTIONS } from "@server/types/scopes";
 import type { AuthUser } from "@server/lib/auth/AuthUser";
 import { organizationRepository } from "@server/repositories/organization.repository";
 import { resolveActionApprovalConfig } from "@server/types/organization-settings.types";
+import { categoryNeedsApproval } from "@server/services/core/action-policy";
 import {
   canApproveActions,
   deciderOf,
@@ -86,6 +87,25 @@ export const actionsRouter = t.router({
   listApprovals: scopedProcedure(RESOURCES.CONVERSATIONS, ACTIONS.READ).query(({ ctx }) =>
     pendingActionService.listApprovals(ctx.organizationId!),
   ),
+
+  /**
+   * The graduation nudge (D4-11): "you approved N of N refunds up to X; auto-
+   * approve below that?". Null unless approval is on for that category and
+   * every recent decision was an approval. Applying it is a settings change,
+   * which only the owner may make (it loosens approval).
+   */
+  graduationSuggestion: authenticatedProcedure.query(async ({ ctx }) => {
+    const organizationId = await assertApprover(ctx.user, ctx.organizationId);
+    const organization = await organizationRepository.findById(organizationId);
+    const config = resolveActionApprovalConfig(organization?.settings);
+    if (!config.moneyMovesNeedApproval) return null;
+    const suggestion = await pendingActionService.graduationSuggestion(
+      organizationId,
+      config.thresholdAmount,
+    );
+    if (!suggestion || !categoryNeedsApproval(config, suggestion.category)) return null;
+    return suggestion;
+  }),
 
   /** `amount` lowers the amount before it runs: never up (checked in the service). */
   approve: authenticatedProcedure
