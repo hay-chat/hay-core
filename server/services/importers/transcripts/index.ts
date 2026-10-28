@@ -3,6 +3,7 @@
 import { parseGenericCsv } from "./csv";
 import { parsePastedTranscripts } from "./paste";
 import { parseWhatsAppExport } from "./whatsapp";
+import { parseTidioCsv } from "./tidio";
 import type { TestTranscript } from "./test-transcript";
 
 /** Per-format hints from the person importing. */
@@ -15,6 +16,7 @@ export const TRANSCRIPT_FILE_FORMATS = {
   csv: parseGenericCsv,
   paste: parsePastedTranscripts,
   whatsapp: parseWhatsAppExport,
+  tidio: parseTidioCsv,
 } satisfies Record<string, (content: string, options: TranscriptFormatOptions) => TestTranscript[]>;
 
 export type TranscriptFileFormat = keyof typeof TRANSCRIPT_FILE_FORMATS;

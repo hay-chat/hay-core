@@ -79,17 +79,31 @@ export function findColumns<K extends string>(
   return columns;
 }
 
+export type MessageCsvColumn = "conversationId" | "role" | "text" | "timestamp" | "orderRef";
+
+export const GENERIC_CSV_COLUMNS: Record<MessageCsvColumn, string[]> = {
+  conversationId: ["conversation_id", "conversation", "thread_id", "ticket_id", "chat_id"],
+  role: ["role", "author_type", "sender_type", "from"],
+  text: ["text", "message", "content", "body"],
+  timestamp: ["timestamp", "date", "time", "created_at", "sent_at"],
+  orderRef: ["order_ref", "order", "order_id", "order_number"],
+};
+
 export function parseGenericCsv(content: string): TestTranscript[] {
+  return parseMessageCsv(content, GENERIC_CSV_COLUMNS);
+}
+
+/** One-row-per-message CSV, with the column names a given tool uses. */
+export function parseMessageCsv(
+  content: string,
+  aliases: Record<MessageCsvColumn, string[]>,
+  /** Sender types to drop (system notes, events) instead of refusing the file. */
+  ignoredRoles: string[] = [],
+): TestTranscript[] {
   const [header, ...rows] = parseCsv(content);
   if (!header) throw new TranscriptImportError("The file is empty");
 
-  const columns = findColumns(header, {
-    conversationId: ["conversation_id", "conversation", "thread_id", "ticket_id", "chat_id"],
-    role: ["role", "author_type", "sender_type", "from"],
-    text: ["text", "message", "content", "body"],
-    timestamp: ["timestamp", "date", "time", "created_at", "sent_at"],
-    orderRef: ["order_ref", "order", "order_id", "order_number"],
-  });
+  const columns = findColumns(header, aliases);
   if (columns.conversationId < 0 || columns.role < 0 || columns.text < 0) {
     throw new TranscriptImportError(
       "The CSV needs conversation_id, role and text columns (timestamp and order_ref are optional)",
@@ -101,6 +115,7 @@ export function parseGenericCsv(content: string): TestTranscript[] {
     const id = (row[columns.conversationId] ?? "").trim();
     const roleLabel = row[columns.role] ?? "";
     const role = roleFromLabel(roleLabel);
+    if (ignoredRoles.includes(roleLabel.trim().toLowerCase())) return;
     if (!id) throw new TranscriptImportError(`Row ${index + 2} has no conversation_id`);
     if (!role) {
       throw new TranscriptImportError(
