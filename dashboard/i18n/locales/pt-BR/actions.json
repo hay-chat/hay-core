@@ -90,6 +90,20 @@
       "bulkDone": "{count} aprovados",
       "bulkPartial": "{done} aprovados, {notDone} não executados. Confira nas conversas.",
       "loadFailed": "Não foi possível carregar as aprovações"
+    },
+    "graduation": {
+      "message": "Você aprovou {approved} de {total} pedidos de {category} nos últimos 30 dias, o maior de {amount}. Aprovar automaticamente reembolsos e descontos até {amount}?",
+      "apply": "Aprovar automaticamente até {amount}",
+      "dismiss": "Agora não",
+      "confirmTitle": "Aprovar automaticamente até {amount}?",
+      "confirmDescription": "Reembolsos e descontos até {amount} serão executados sem consultar uma pessoa. Os maiores continuam aguardando aprovação. Você pode mudar isso em Configurações > Ações.",
+      "confirm": "Ligar aprovação automática",
+      "applied": "Reembolsos e descontos até {amount} agora são executados sem aprovação.",
+      "applyFailed": "Não foi possível mudar o valor de aprovação automática",
+      "noun": {
+        "refund": "reembolso",
+        "discount": "desconto"
+      }
     }
   }
 }

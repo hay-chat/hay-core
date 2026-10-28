@@ -1,6 +1,6 @@
 <template>
   <section
-    v-if="canApprove && items.length > 0"
+    v-if="canApprove && (items.length > 0 || showNudge)"
     aria-labelledby="home-approvals-heading"
     data-testid="home-approvals"
   >
@@ -9,6 +9,44 @@
       <span class="tabular-nums text-neutral-muted">{{ items.length }}</span>
     </h2>
     <p class="mb-2 text-sm text-neutral-muted">{{ $t("aiActions.approvals.description") }}</p>
+
+    <!-- Graduation nudge (D4-11): owner only, applied after a confirmation -->
+    <div
+      v-if="showNudge && suggestion"
+      class="mb-2 flex flex-col gap-3 rounded-xl border border-primary/30 bg-primary/5 p-4"
+      data-testid="approvals-graduation"
+    >
+      <p class="text-sm">{{ nudgeMessage }}</p>
+      <div class="flex flex-col gap-2 sm:flex-row">
+        <Button class="min-h-11 sm:min-h-0" @click="graduationOpen = true">
+          {{ $t("aiActions.graduation.apply", { amount: suggestedAmount }) }}
+        </Button>
+        <Button variant="ghost" class="min-h-11 sm:min-h-0" @click="dismissNudge">
+          {{ $t("aiActions.graduation.dismiss") }}
+        </Button>
+      </div>
+    </div>
+
+    <Dialog v-model:open="graduationOpen">
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>
+            {{ $t("aiActions.graduation.confirmTitle", { amount: suggestedAmount }) }}
+          </DialogTitle>
+          <DialogDescription>
+            {{ $t("aiActions.graduation.confirmDescription", { amount: suggestedAmount }) }}
+          </DialogDescription>
+        </DialogHeader>
+        <DialogFooter>
+          <Button variant="outline" :disabled="applying" @click="graduationOpen = false">
+            {{ $t("common.cancel") }}
+          </Button>
+          <Button :loading="applying" data-testid="approvals-graduation-confirm" @click="applyNudge">
+            {{ $t("aiActions.graduation.confirm") }}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
 
     <!-- Bulk bar: one kind at a time, with the total -->
     <div
@@ -40,7 +78,10 @@
       {{ $t("aiActions.approvals.selectHint") }}
     </p>
 
-    <ul class="divide-y divide-border rounded-xl border border-border bg-background shadow-sm">
+    <ul
+      v-if="items.length > 0"
+      class="divide-y divide-border rounded-xl border border-border bg-background shadow-sm"
+    >
       <li
         v-for="item in items"
         :key="item.id"
@@ -179,6 +220,7 @@ import { ref, computed, onMounted, onUnmounted } from "vue";
 import { Hay } from "@/utils/api";
 import { useToast } from "@/composables/useToast";
 import { useWebSocket } from "@/composables/useWebSocket";
+import { useUserStore } from "@/stores/user";
 
 /**
  * The owner's Approvals list (D4-6): every AI action waiting for a person,
@@ -212,6 +254,76 @@ const editingId = ref<string | null>(null);
 const editAmount = ref<number | undefined>(undefined);
 const rejectingId = ref<string | null>(null);
 const rejectReason = ref("");
+
+// Graduation nudge (D4-11). Dismissal is a per-browser convenience only.
+interface GraduationSuggestion {
+  category: "refund" | "discount";
+  approved: number;
+  total: number;
+  amount: number;
+}
+const DISMISS_KEY = "hay-approvals-graduation-dismissed";
+const userStore = useUserStore();
+const suggestion = ref<GraduationSuggestion | null>(null);
+const dismissed = ref<string | null>(null);
+const graduationOpen = ref(false);
+const applying = ref(false);
+const suggestionKey = computed(() =>
+  suggestion.value ? `${suggestion.value.category}:${suggestion.value.amount}` : null,
+);
+const showNudge = computed(
+  () => userStore.isOwner && !!suggestion.value && dismissed.value !== suggestionKey.value,
+);
+const suggestedAmount = computed(() =>
+  suggestion.value ? formatAmount(suggestion.value.amount, null) : "",
+);
+const nudgeMessage = computed(() => {
+  if (!suggestion.value) return "";
+  const { approved, total, category } = suggestion.value;
+  return t("aiActions.graduation.message", {
+    approved,
+    total,
+    category: t(`aiActions.graduation.noun.${category}`),
+    amount: suggestedAmount.value,
+  });
+});
+
+async function loadSuggestion() {
+  if (!userStore.isOwner) return;
+  try {
+    suggestion.value = await Hay.actions.graduationSuggestion.query();
+  } catch {
+    suggestion.value = null;
+  }
+}
+
+function dismissNudge() {
+  dismissed.value = suggestionKey.value;
+  try {
+    if (dismissed.value) localStorage.setItem(DISMISS_KEY, dismissed.value);
+  } catch {
+    // Storage blocked: the nudge stays hidden until the page reloads.
+  }
+}
+
+async function applyNudge() {
+  if (!suggestion.value) return;
+  applying.value = true;
+  try {
+    const amount = suggestion.value.amount;
+    await Hay.organizations.updateSettings.mutate({ actionApproval: { thresholdAmount: amount } });
+    toast.success(t("aiActions.graduation.applied", { amount: suggestedAmount.value }));
+    graduationOpen.value = false;
+    suggestion.value = null;
+  } catch (error) {
+    toast.error(
+      t("aiActions.graduation.applyFailed"),
+      error instanceof Error ? error.message : undefined,
+    );
+  } finally {
+    applying.value = false;
+  }
+}
 
 defineExpose({ items, canApprove, reload: () => load() });
 
@@ -317,7 +429,7 @@ async function decide(item: ApprovalItem, run: () => Promise<string>) {
     toast.success(await run());
     editingId.value = null;
     rejectingId.value = null;
-    await load();
+    await Promise.all([load(), loadSuggestion()]);
     emit("changed");
   } catch (error) {
     toast.error(t("aiActions.approvals.failed"), failureDetail(error));
@@ -356,7 +468,7 @@ async function approveSelected() {
     if (notDone === 0) toast.success(t("aiActions.approvals.bulkDone", { count: done }));
     else toast.warning(t("aiActions.approvals.bulkPartial", { done, notDone }));
     selected.value = new Set();
-    await load();
+    await Promise.all([load(), loadSuggestion()]);
     emit("changed");
   } catch (error) {
     toast.error(t("aiActions.approvals.failed"), failureDetail(error));
@@ -374,7 +486,12 @@ const scheduleRefresh = () => {
 const unsubscribers: Array<() => void> = [];
 
 onMounted(async () => {
-  await load();
+  try {
+    dismissed.value = localStorage.getItem(DISMISS_KEY);
+  } catch {
+    dismissed.value = null;
+  }
+  await Promise.all([load(), loadSuggestion()]);
   for (const event of [
     "action_requested",
     "action_approved",

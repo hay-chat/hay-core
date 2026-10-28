@@ -10,7 +10,13 @@ import type { AuthUser } from "@server/lib/auth/AuthUser";
 import { RESOURCES, ACTIONS } from "@server/types/scopes";
 import type { ActionApprovalConfig } from "@server/types/organization-settings.types";
 import { createLogger } from "@server/lib/logger";
-import { In, type QueryDeepPartialEntity } from "typeorm";
+import { In, MoreThan, type QueryDeepPartialEntity } from "typeorm";
+import {
+  GRADUATION_CATEGORIES,
+  GRADUATION_WINDOW_DAYS,
+  suggestGraduation,
+  type GraduationSuggestion,
+} from "@server/services/core/approval-graduation";
 import { Conversation } from "@server/database/entities/conversation.entity";
 import { amountEditable } from "@server/services/core/action-policy";
 
@@ -181,6 +187,23 @@ export class PendingActionService {
         currency: currencyOf(action.args),
       });
     });
+  }
+
+  /** The graduation nudge for this org, if its recent decisions earn one (D4-11). */
+  async graduationSuggestion(
+    organizationId: string,
+    currentThreshold: number,
+  ): Promise<GraduationSuggestion | null> {
+    const rows = await this.repo.find({
+      where: {
+        organization_id: organizationId,
+        category: In([...GRADUATION_CATEGORIES]),
+        hold_reason: "money_move",
+        created_at: MoreThan(new Date(Date.now() - GRADUATION_WINDOW_DAYS * 86_400_000)),
+      },
+      select: { category: true, status: true, amount: true },
+    });
+    return suggestGraduation(rows, currentThreshold);
   }
 
   async listForConversation(organizationId: string, conversationId: string) {
