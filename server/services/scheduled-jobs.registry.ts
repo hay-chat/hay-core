@@ -424,6 +424,9 @@ const jobRegistry: CronJobConfig[] = [
       // So do saved test cases (D7-12).
       const { testCaseService } = await import("./simulation/test-case.service");
       await testCaseService.deleteExpired();
+      // And simulation run items (seed turns, judge verdicts).
+      const { simulationHarnessService } = await import("./simulation/simulation-harness.service");
+      await simulationHarnessService.scrubExpired();
     },
     // NOTE: Respects organization.settings.retentionDays (null = disabled)
     // Preserves conversation metadata for analytics while removing PII

@@ -330,6 +330,42 @@ export class SimulationHarnessService {
   }
 
   /**
+   * Simulation items follow the organization's retention (F2). Their seed turns,
+   * expectations (reference replies, titles), verdicts and errors can quote
+   * shoppers, so past the cutoff they are emptied. The rows stay, with status
+   * and usage, so the monthly allowance still counts them; the simulated
+   * conversations themselves are anonymized by the conversation retention job.
+   */
+  async scrubExpired(now: Date = new Date()): Promise<number> {
+    const organizations = await AppDataSource.getRepository(Organization)
+      .createQueryBuilder("org")
+      .where("(org.settings->>'retentionDays')::int > 0")
+      .getMany();
+    let scrubbed = 0;
+    for (const org of organizations) {
+      const retentionDays = org.settings?.retentionDays;
+      if (!retentionDays || retentionDays <= 0) continue;
+      const cutoff = new Date(now.getTime() - retentionDays * 24 * 60 * 60 * 1000);
+      try {
+        const [, affected] = (await AppDataSource.query(
+          `UPDATE simulation_run_items
+              SET seed = '[]'::jsonb, expectations = NULL, verdict = NULL,
+                  source_ref = NULL, error = NULL, updated_at = now()
+            WHERE organization_id = $1 AND created_at < $2
+              AND status NOT IN ('pending', 'running')
+              AND (seed <> '[]'::jsonb OR expectations IS NOT NULL OR verdict IS NOT NULL
+                   OR source_ref IS NOT NULL OR error IS NOT NULL)`,
+          [org.id, cutoff],
+        )) as [unknown, number];
+        scrubbed += affected ?? 0;
+      } catch (error) {
+        logger.error({ error, organizationId: org.id }, "Failed to scrub expired simulation items");
+      }
+    }
+    return scrubbed;
+  }
+
+  /**
    * Claim the run's next cases up to its concurrency and queue them. The run
    * row lock keeps two finishing items from both claiming the same slot.
    */
