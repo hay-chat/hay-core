@@ -564,6 +564,14 @@ export default defineHayPlugin((globalCtx) => ({
         // Goodwill coupon (mcp/tools/coupons.js, D16-4). Stores connected before this
         // change must reconnect to grant it; until then the tool fails with PERMISSION.
         "write_discounts",
+        // Re-consent bundle (Wave 2): every scope below ships in ONE manifest change so
+        // merchants re-approve Hay.chat once. Until a store re-approves, the tools that
+        // need them fail with SCOPE_MISSING ("the store needs to re-approve Hay.chat").
+        // Size swap before dispatch (shopify_swap_order_item, D6-10).
+        "write_order_edits",
+        // Chargeback evidence (D2 disputes). Shopify Payments stores only.
+        "read_shopify_payments_disputes",
+        "write_shopify_payments_dispute_evidences",
       ],
       clientId: ctx.config.field("clientId"),
       clientSecret: ctx.config.field("clientSecret"),

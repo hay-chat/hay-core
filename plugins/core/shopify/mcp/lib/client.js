@@ -70,11 +70,14 @@ function graphqlFailure(errors, idempotent) {
   const details = { errors: errors.slice(0, 5) };
   if (codes.includes("ACCESS_DENIED")) {
     // Shopify's message names the missing scope (e.g. "Required access: `read_returns`").
+    const missingScopes = [
+      ...new Set(messages.flatMap((m) => m.match(/\b(?:read|write)_[a-z_]+\b/g) || [])),
+    ];
     return toolError(
       "SCOPE_MISSING",
-      "Hay.chat doesn't have permission for this in Shopify. The store needs to reconnect " +
-        `Shopify in Hay.chat to grant it. (${messages.join("; ")})`,
-      { details },
+      "The store needs to re-approve Hay.chat in Shopify before Hay.chat can do this. Ask " +
+        `the store owner to reconnect Shopify in Hay.chat. (${messages.join("; ")})`,
+      { details: { ...details, missingScopes, reconnectRequired: true } },
     );
   }
   if (codes.includes("INTERNAL_SERVER_ERROR")) {
