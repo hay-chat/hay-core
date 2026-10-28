@@ -30,6 +30,7 @@ const { registerRefundTools } = require("./tools/refunds");
 const { registerPaymentTools } = require("./tools/payments");
 const { registerCouponTools } = require("./tools/coupons");
 const { registerProductTools } = require("./tools/products");
+const { registerReturnTools } = require("./tools/returns");
 
 function createServer() {
   const server = applyToolRisk(new McpServer({ name: "nuvemshop", version: "2.0.0" }), toolRisk);
@@ -40,6 +41,7 @@ function createServer() {
   registerPaymentTools(server);
   registerCouponTools(server);
   registerProductTools(server);
+  registerReturnTools(server);
   return server;
 }
 

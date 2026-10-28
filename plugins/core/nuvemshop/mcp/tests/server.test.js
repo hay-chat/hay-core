@@ -26,6 +26,7 @@ const EXPECTED_TOOLS = [
   "nuvemshop_get_order_tracking",
   "nuvemshop_get_payment_link",
   "nuvemshop_get_product",
+  "nuvemshop_get_return_instructions",
   "nuvemshop_get_store",
   "nuvemshop_list_categories",
   "nuvemshop_list_customer_orders",

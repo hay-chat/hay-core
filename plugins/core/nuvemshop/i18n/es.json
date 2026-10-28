@@ -69,6 +69,10 @@
     "nuvemshop_list_categories": {
       "label": "Listar Categorías",
       "description": "Lista las categorías de productos de la tienda."
+    },
+    "nuvemshop_get_return_instructions": {
+      "label": "Ver Instrucciones de Devolución",
+      "description": "Obtiene las instrucciones de la tienda para devolver un artículo, para transmitirlas tal cual."
     }
   },
   "config": {
@@ -107,6 +111,10 @@
     "staleTrackingInternationalDays": {
       "label": "Seguimiento detenido: internacional (días)",
       "description": "Considera un envío internacional detenido cuando su seguimiento no se mueve hace más de esta cantidad de días."
+    },
+    "returnInstructions": {
+      "label": "Cómo devolver",
+      "description": "Tu proceso de devolución, con tus palabras: a dónde enviar, enlace o formulario y plazos. Hay.chat lo transmite tal cual cuando un cliente pregunta cómo devolver. Si queda vacío, Hay.chat deriva esas preguntas a tu equipo."
     }
   }
 }

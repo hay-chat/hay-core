@@ -13,6 +13,7 @@ const { wcApi, wcList, WooApiError } = require("./client");
 const { num, round2, toolError } = require("./format");
 const { parsePix } = require("./pix");
 const { staleTracking, stalestShipment } = require("@hay/plugin-sdk/stale-tracking");
+const { readReturnInstructions } = require("@hay/plugin-sdk/return-instructions");
 
 /** Statuses under which nothing has left the warehouse yet. */
 const PRE_DISPATCH_STATUSES = new Set(["pending", "on-hold", "processing"]);
@@ -319,6 +320,8 @@ function enrichOrder(
       shippedAt: rows.find((r) => r.shippedAt)?.shippedAt ?? order.date_completed ?? null,
       deliveredAt: null, // WooCommerce has no delivery confirmation.
       tracking: trackingStaleness(order, rows, originCountry, now),
+      // D6-13: the merchant's "How to return" text (null = hand return questions off).
+      returnInstructions: readReturnInstructions(),
     },
   };
 }

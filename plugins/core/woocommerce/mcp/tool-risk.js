@@ -15,6 +15,7 @@ module.exports = {
     "woocommerce_check_inventory",
     "woocommerce_find_customer",
     "woocommerce_list_customer_orders",
+    "woocommerce_get_return_instructions",
   ],
   write: {
     woocommerce_cancel_order: "cancel",

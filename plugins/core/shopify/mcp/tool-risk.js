@@ -12,6 +12,7 @@ module.exports = {
     "shopify_list_customer_orders",
     "shopify_calculate_refund",
     "shopify_get_returnable_items",
+    "shopify_get_return_instructions",
     "shopify_get_product",
     "shopify_get_product_by_handle",
     "shopify_search_products",
