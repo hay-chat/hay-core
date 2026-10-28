@@ -450,6 +450,10 @@ export const runConversation = async (conversationId: string) => {
     return;
   }
 
+  // Spam is held from the AI (D9-6): no reply, no billing.
+  const { holdIfSpam } = await import("@server/services/spam/spam-hold.service");
+  if (await holdIfSpam(conversation, log)) return;
+
   const processingStartedAt = Date.now();
 
   // 00. Acquire processing lock before doing any work or incrementing attempt

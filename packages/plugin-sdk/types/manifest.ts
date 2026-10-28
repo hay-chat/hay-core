@@ -33,7 +33,8 @@ export type PluginCapability =
   | "sources"
   | "products"
   | "cron"
-  | "email";
+  | "email"
+  | "webchat";
 
 /**
  * Hay plugin manifest structure.

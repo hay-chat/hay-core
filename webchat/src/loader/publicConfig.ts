@@ -1,4 +1,5 @@
 import type { HayChatConfig, PublicConfig } from "@/types";
+import { SUPPORTED_CONTRIBUTIONS } from "@/utils/contributions";
 
 /**
  * `webchat.getPublicConfig`: whether the widget may show (disabled or
@@ -8,7 +9,10 @@ import type { HayChatConfig, PublicConfig } from "@/types";
  */
 export async function fetchPublicConfig(config: HayChatConfig): Promise<PublicConfig | null> {
   try {
-    const input = JSON.stringify({ organizationId: config.organizationId });
+    const input = JSON.stringify({
+      organizationId: config.organizationId,
+      supports: SUPPORTED_CONTRIBUTIONS,
+    });
     const response = await fetch(
       `${config.baseUrl}/v1/webchat.getPublicConfig?input=${encodeURIComponent(input)}`,
     );

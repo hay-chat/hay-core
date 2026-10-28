@@ -619,4 +619,70 @@ describe("Register API", () => {
       );
     });
   });
+
+  describe("Webchat Registration", () => {
+    beforeEach(() => {
+      registerAPI.config({
+        siteKey: { type: "string", label: "Site key" },
+        secretKey: { type: "string", label: "Secret", encrypted: true },
+      });
+    });
+
+    it("splits config references from literal props in the metadata descriptor", () => {
+      registerAPI.webchat.contribution({
+        id: "challenge",
+        type: "challenge@1",
+        props: { provider: "turnstile", siteKey: { name: "siteKey" } },
+      });
+
+      expect(registry.getWebchatMetadata().contributions).toEqual([
+        {
+          id: "challenge",
+          type: "challenge@1",
+          props: { provider: "turnstile" },
+          configProps: { siteKey: "siteKey" },
+        },
+      ]);
+    });
+
+    it("rejects unknown contribution types", () => {
+      expect(() =>
+        registerAPI.webchat.contribution({
+          id: "x",
+          type: "script@1" as never,
+          props: {},
+        }),
+      ).toThrow(/not supported/);
+    });
+
+    it("refuses to expose an encrypted config field as a public prop", () => {
+      expect(() =>
+        registerAPI.webchat.contribution({
+          id: "x",
+          type: "challenge@1",
+          props: { secret: { name: "secretKey" } },
+        }),
+      ).toThrow(/encrypted/);
+    });
+
+    it("registers a gate with defaults and exposes it without the handler", () => {
+      const handler = () => ({ decision: "allow" as const });
+      registerAPI.webchat.gate("conversation.create", handler);
+
+      expect(registry.getWebchatGate("conversation.create")?.handler).toBe(handler);
+      expect(registry.getWebchatMetadata().gates).toEqual([
+        { event: "conversation.create", timeoutMs: 3000, failurePolicy: "open" },
+      ]);
+    });
+
+    it("rejects gate timeouts above the maximum and unknown events", () => {
+      const handler = () => ({ decision: "allow" as const });
+      expect(() =>
+        registerAPI.webchat.gate("message.send", handler, { timeoutMs: 10_000 }),
+      ).toThrow(/timeoutMs/);
+      expect(() => registerAPI.webchat.gate("page.view" as never, handler)).toThrow(
+        /not supported/,
+      );
+    });
+  });
 });

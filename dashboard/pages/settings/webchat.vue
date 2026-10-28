@@ -103,6 +103,69 @@
       </CardContent>
     </Card>
 
+    <!-- Spam protection (D9-6 / D9-7) -->
+    <Card>
+      <CardHeader>
+        <CardTitle>{{ $t("webchat.spamProtection") }}</CardTitle>
+        <CardDescription>{{ $t("webchat.spamProtectionDescription") }}</CardDescription>
+      </CardHeader>
+      <CardContent class="space-y-4">
+        <div class="flex items-start space-x-2">
+          <Switch id="spamClassifierEnabled" v-model="settingsForm.spamClassifierEnabled" />
+          <div class="space-y-1">
+            <Label for="spamClassifierEnabled">{{ $t("webchat.spamClassifier") }}</Label>
+            <p class="text-sm text-neutral-muted">{{ $t("webchat.spamClassifierDescription") }}</p>
+          </div>
+        </div>
+
+        <div class="space-y-2">
+          <Label for="spamGuidance">{{ $t("webchat.spamGuidance") }}</Label>
+          <Textarea
+            id="spamGuidance"
+            v-model="settingsForm.spamGuidance"
+            :placeholder="$t('webchat.spamGuidancePlaceholder')"
+            :rows="3"
+            :maxlength="2000"
+          />
+          <p class="text-sm text-neutral-muted">{{ $t("webchat.spamGuidanceDescription") }}</p>
+        </div>
+      </CardContent>
+    </Card>
+
+    <!-- Under-attack mode (D9-10): acts immediately, not through Save -->
+    <Card>
+      <CardHeader>
+        <CardTitle>{{ $t("webchat.underAttack") }}</CardTitle>
+        <CardDescription>
+          {{ $t("webchat.underAttackDescription", { hours: underAttackHours }) }}
+        </CardDescription>
+      </CardHeader>
+      <CardContent class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <p class="text-sm" :class="underAttack.active ? 'font-medium' : 'text-neutral-muted'">
+          <template v-if="underAttack.active && underAttack.until">
+            {{
+              $t(
+                underAttack.source === "auto"
+                  ? "webchat.underAttackActiveAuto"
+                  : "webchat.underAttackActiveOwner",
+                { until: formatDateTime(underAttack.until) },
+              )
+            }}
+          </template>
+          <template v-else>{{ $t("webchat.underAttackInactive") }}</template>
+        </p>
+        <Button
+          :variant="underAttack.active ? 'outline' : 'destructive'"
+          :loading="isTogglingUnderAttack"
+          @click="toggleUnderAttack"
+        >
+          {{
+            underAttack.active ? $t("webchat.underAttackTurnOff") : $t("webchat.underAttackTurnOn")
+          }}
+        </Button>
+      </CardContent>
+    </Card>
+
     <!-- Save Button -->
     <div class="flex justify-end gap-2">
       <Button variant="outline" :disabled="!hasChanges || isSaving" @click="resetForm">
@@ -147,7 +210,7 @@ import { useDomain } from "@/composables/useDomain";
 
 type UpdateSettingsInput = RouterInputs["webchat"]["updateSettings"];
 
-const { t } = useI18n();
+const { t, locale } = useI18n();
 const toast = useToast();
 const userStore = useUserStore();
 const { getApiUrl } = useDomain();
@@ -162,6 +225,8 @@ const settingsForm = ref({
   showGreeting: true,
   greetingMessage: "Hello! How can we help you today?",
   isEnabled: true,
+  spamClassifierEnabled: false,
+  spamGuidance: "",
 });
 
 const allowedDomainsText = ref("*");
@@ -171,6 +236,13 @@ const originalSettings = ref<WebchatSettingsSnapshot>({
   allowedDomains: ["*"],
 });
 const isSaving = ref(false);
+
+// Under-attack mode (D9-10). The period length is a server setting (UNDER_ATTACK_HOURS).
+const underAttackHours = ref(4);
+const underAttack = ref<{ active: boolean; until: string | null; source: "owner" | "auto" | null }>(
+  { active: false, until: null, source: null },
+);
+const isTogglingUnderAttack = ref(false);
 const copied = ref(false);
 
 // Computed
@@ -219,8 +291,12 @@ async function loadSettings() {
       showGreeting: settings.showGreeting,
       greetingMessage: settings.greetingMessage || "",
       isEnabled: settings.isEnabled,
+      spamClassifierEnabled: settings.spamClassifierEnabled,
+      spamGuidance: settings.spamGuidance || "",
     };
 
+    underAttack.value = settings.underAttack;
+    underAttackHours.value = settings.underAttackHours;
     allowedDomainsText.value = settings.allowedDomains.join("\n");
     originalSettings.value = { ...settingsForm.value, allowedDomains: settings.allowedDomains };
   } catch (error) {
@@ -242,6 +318,8 @@ async function saveSettings() {
       greetingMessage: settingsForm.value.greetingMessage || null,
       allowedDomains: allowedDomainsArray.value,
       isEnabled: settingsForm.value.isEnabled,
+      spamClassifierEnabled: settingsForm.value.spamClassifierEnabled,
+      spamGuidance: settingsForm.value.spamGuidance.trim() || null,
     });
 
     originalSettings.value = { ...settingsForm.value, allowedDomains: allowedDomainsArray.value };
@@ -252,6 +330,29 @@ async function saveSettings() {
     toast.error(t("webchat.saveFailed"));
   } finally {
     isSaving.value = false;
+  }
+}
+
+function formatDateTime(value: string) {
+  return new Date(value).toLocaleString(locale.value, { dateStyle: "medium", timeStyle: "short" });
+}
+
+async function toggleUnderAttack() {
+  isTogglingUnderAttack.value = true;
+  try {
+    underAttack.value = await Hay.webchat.setUnderAttack.mutate({
+      enabled: !underAttack.value.active,
+    });
+    toast.success(
+      t(
+        underAttack.value.active ? "webchat.underAttackOnSuccess" : "webchat.underAttackOffSuccess",
+      ),
+    );
+  } catch (error) {
+    console.error("Failed to change under-attack mode:", error);
+    toast.error(t("webchat.saveFailed"));
+  } finally {
+    isTogglingUnderAttack.value = false;
   }
 }
 

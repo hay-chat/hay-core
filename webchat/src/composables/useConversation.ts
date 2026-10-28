@@ -58,13 +58,32 @@ interface SendMessageResponse {
  * same request automatically will not help.
  */
 export class WidgetRequestError extends Error {
-  constructor(public readonly status: number) {
+  constructor(
+    public readonly status: number,
+    /** Machine-readable refusal code from the server, when it sent one. */
+    public readonly code: string | null = null,
+  ) {
     super(`Request refused with HTTP ${status}`);
     this.name = "WidgetRequestError";
   }
 
+  /** A bot check (challenge) refused the request. */
+  get isVerificationFailure(): boolean {
+    return this.status === 403 && this.code === "VERIFICATION_FAILED";
+  }
+
   get isRefusal(): boolean {
     return this.status >= 400 && this.status < 500;
+  }
+}
+
+/** The tRPC error message of a refused request, used as a machine-readable code. */
+async function refusalCode(response: Response): Promise<string | null> {
+  try {
+    const body = (await response.json()) as { error?: { message?: unknown } };
+    return typeof body?.error?.message === "string" ? body.error.message : null;
+  } catch {
+    return null;
   }
 }
 
@@ -81,6 +100,7 @@ export function useConversation(config: HayChatConfig) {
     publicJwk: JsonWebKey,
     context?: Record<string, unknown>,
     customerExternalId?: string,
+    challenge?: { token?: string; error?: string },
   ): Promise<CreateConversationResponse> => {
     const metadata: ConversationMetadata = {
       source: "web-embed",
@@ -103,11 +123,13 @@ export function useConversation(config: HayChatConfig) {
         language: resolveLocale(config.locale),
         ...(context && Object.keys(context).length > 0 ? { context } : {}),
         ...(customerExternalId ? { customerExternalId } : {}),
+        ...(challenge?.token ? { challengeToken: challenge.token } : {}),
+        ...(challenge?.error ? { challengeError: challenge.error } : {}),
       }),
     });
 
     if (!response.ok) {
-      throw new WidgetRequestError(response.status);
+      throw new WidgetRequestError(response.status, await refusalCode(response));
     }
 
     const data = await response.json();
@@ -188,7 +210,7 @@ export function useConversation(config: HayChatConfig) {
     });
 
     if (!response.ok) {
-      throw new WidgetRequestError(response.status);
+      throw new WidgetRequestError(response.status, await refusalCode(response));
     }
 
     const data = await response.json();

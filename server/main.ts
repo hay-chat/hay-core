@@ -208,6 +208,10 @@ async function startServer() {
       })
       .send("/* Widget styles are bundled into widget.js */\n");
   });
+  // Hay.chat-hosted challenge frame for webchat bot checks (D9-8). Mounted before
+  // the static files so it is never shadowed by a file of the same name.
+  const { webchatChallengeHandler } = await import("@server/routes/webchat-challenge");
+  server.get("/v1/webchat/challenge", (req, res) => void webchatChallengeHandler(req, res));
   // widget.js (the loader) gets a short cache; the hashed chunks under assets/
   // are immutable. See lib/webchat-static.ts.
   server.use("/v1/webchat", webchatStatic(webchatDir));

@@ -18,6 +18,8 @@ export interface WebchatSettingsUpdateDTO {
   allowedDomains?: string[];
   isEnabled?: boolean;
   customCss?: string | null;
+  spamClassifierEnabled?: boolean;
+  spamGuidance?: string | null;
 }
 
 export class WebchatSettingsService {

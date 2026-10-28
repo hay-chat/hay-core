@@ -101,6 +101,15 @@ export const config = {
     max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS || "100", 10),
   },
 
+  // Webchat under-attack mode (D9-10): more than `createThreshold` new
+  // conversations for one org within `windowSeconds` challenges every visitor
+  // for `hours`.
+  underAttack: {
+    createThreshold: parseInt(process.env.UNDER_ATTACK_CREATE_THRESHOLD || "30", 10),
+    windowSeconds: 5 * 60,
+    hours: parseInt(process.env.UNDER_ATTACK_HOURS || "4", 10),
+  },
+
   logging: {
     level: process.env.LOG_LEVEL || "debug",
     debug: process.env.DEBUG === "true",

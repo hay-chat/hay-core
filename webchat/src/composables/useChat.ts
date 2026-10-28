@@ -13,7 +13,8 @@ import {
 import { safeStorage, useConsent } from "./useConsent";
 import { debugLog } from "@/utils/debug";
 import { resumeConversationId } from "@/utils/resume";
-import type { HayChatConfig, Message, SendFailure } from "@/types";
+import type { HayChatConfig, Message, SendFailure, WidgetContribution } from "@/types";
+import { useChallenge } from "./useChallenge";
 import { insertMessage, parseServerTime } from "@/utils/messageOrder";
 import {
   WIDGET_ATTACHMENT_MAX_BYTES,
@@ -21,14 +22,22 @@ import {
   readFileAsBase64,
 } from "@/utils/attachments";
 
+export interface UseChatOptions {
+  /** The org's challenge@1 contribution, when a bot check is on. */
+  challenge?: WidgetContribution | null;
+}
+
 interface Keypair {
   privateKey: CryptoKey;
   publicKey: CryptoKey;
   publicJwk: JsonWebKey;
 }
 
-export function useChat(config: HayChatConfig) {
+export function useChat(config: HayChatConfig, options: UseChatOptions = {}) {
   const { canUseSession, canUseLocal, markInteraction } = useConsent();
+  // Bot check (challenge@1 contribution), run right before the conversation is
+  // created, i.e. after the shopper sends their first message.
+  const challenge = useChallenge(config);
 
   const isOpen = ref(false);
   const isInitialized = ref(false);
@@ -168,11 +177,16 @@ export function useChat(config: HayChatConfig) {
         throw new Error("Failed to generate keypair");
       }
 
+      const challengeResult = options.challenge
+        ? await challenge.run(options.challenge)
+        : undefined;
+
       // Create conversation via HTTP, passing current context and customerExternalId
       const conversationData = await conversation.createConversation(
         newKeypair.publicJwk,
         getContext(),
         config.customerExternalId,
+        challengeResult,
       );
       if (!conversationData) {
         throw new Error("Failed to create conversation");
@@ -905,7 +919,14 @@ export function useChat(config: HayChatConfig) {
         }
 
         const tooLong = stage === "send" && (error.status === 400 || error.status === 413);
-        sendFailure.value = { reason: tooLong ? "messageTooLong" : "sendFailed", text };
+        sendFailure.value = {
+          reason: error.isVerificationFailure
+            ? "verificationFailed"
+            : tooLong
+              ? "messageTooLong"
+              : "sendFailed",
+          text,
+        };
         return;
       }
 
@@ -1040,7 +1061,11 @@ export function useChat(config: HayChatConfig) {
       if (previewUrl) URL.revokeObjectURL(previewUrl);
       const refusedFile =
         error instanceof WidgetRequestError && (error.status === 400 || error.status === 413);
-      sendFailure.value = { reason: refusedFile ? "fileFailed" : "sendFailed", text: caption };
+      const verification = error instanceof WidgetRequestError && error.isVerificationFailure;
+      sendFailure.value = {
+        reason: verification ? "verificationFailed" : refusedFile ? "fileFailed" : "sendFailed",
+        text: caption,
+      };
     } finally {
       isSending.value = false;
     }
@@ -1147,6 +1172,8 @@ export function useChat(config: HayChatConfig) {
     unreadCount,
     isSending,
     sendFailure,
+    challengeHost: challenge.host,
+    isChallengeInteractive: challenge.isInteractive,
     isConversationClosed,
     currentAgentType,
     currentAgentName,

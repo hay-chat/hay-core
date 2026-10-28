@@ -36,6 +36,7 @@ import {
   accessNoticeSchema,
 } from "@server/types/organization-access.types";
 import { createLogger } from "@server/lib/logger";
+import { enableDefaultPlugins } from "@server/services/default-plugins.service";
 
 const logger = createLogger("auth");
 
@@ -198,8 +199,11 @@ export const authRouter = t.router({
   register: publicProcedure.input(registerSchema).mutation(async ({ input, ctx }) => {
     const { email, password, firstName, lastName, organizationName, organizationSlug } = input;
 
+    // Set inside the transaction when a new organization is created.
+    let createdOrganizationId: string | null = null;
+
     // Use a transaction for atomicity
-    return await AppDataSource.transaction(async (manager) => {
+    const result = await AppDataSource.transaction(async (manager) => {
       const userRepository = manager.getRepository(User);
       const organizationRepository = manager.getRepository(Organization);
 
@@ -243,6 +247,7 @@ export const authRouter = t.router({
         });
 
         await organizationRepository.save(org);
+        createdOrganizationId = org.id;
         return org;
       };
 
@@ -338,6 +343,11 @@ export const authRouter = t.router({
         ...tokens,
       };
     });
+
+    // After commit: give the new organization its default plugins (fire-and-forget).
+    if (createdOrganizationId) void enableDefaultPlugins(createdOrganizationId);
+
+    return result;
   }),
 
   /**

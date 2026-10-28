@@ -5,7 +5,10 @@ import { describe, it, expect, jest, beforeEach } from "@jest/globals";
  */
 
 jest.mock("@server/config/env", () => ({
-  config: { domain: { dashboard: "app.hay.chat" }, jwt: { secret: "test" } },
+  config: {
+    domain: { dashboard: "app.hay.chat", api: "api.hay.chat:443" },
+    jwt: { secret: "test" },
+  },
 }));
 const mockLogger = { debug: jest.fn(), info: jest.fn(), warn: jest.fn(), error: jest.fn() };
 jest.mock("@server/lib/logger", () => ({ createLogger: () => mockLogger }));
@@ -62,6 +65,24 @@ const mockRateLimited =
 jest.mock("@server/services/public-widget-limits", () => ({
   PUBLIC_WIDGET_LIMITS: { maxMessageLength: 4000 },
   isPublicWidgetRateLimited: mockRateLimited,
+}));
+
+type GateOutcomeMock = {
+  decision: "allow" | "deny" | "flag";
+  results: Array<{ pluginId: string; decision: string; reason?: string }>;
+};
+const mockRunGates = jest.fn<(...args: unknown[]) => Promise<GateOutcomeMock>>(async () => ({
+  decision: "allow",
+  results: [],
+}));
+jest.mock("@server/services/webchat/webchat-extensions.service", () => ({
+  webchatExtensionsService: { runGates: mockRunGates },
+}));
+
+const mockRecordCreateAttempt = jest.fn<(orgId: string) => Promise<boolean>>(async () => false);
+jest.mock("@server/services/webchat/under-attack.service", () => ({
+  recordCreateAttempt: mockRecordCreateAttempt,
+  isUnderAttack: async () => false,
 }));
 
 import { publicConversationsRouter } from "@server/routes/v1/public-conversations";
@@ -310,5 +331,62 @@ describe("publicConversations.sendAttachment guards (D8-9)", () => {
       callerFor().sendAttachment({ ...attachmentInput, mimeType: "video/mp4" as never }),
     ).rejects.toMatchObject({ code: "BAD_REQUEST" });
     expect(mockRateLimited).not.toHaveBeenCalled();
+  });
+});
+
+describe("publicConversations.create plugin gates", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockFindOrganization.mockResolvedValue({ id: ORG_ID, suspendedAt: null, settings: {} });
+    mockIsEnabled.mockResolvedValue(true);
+    mockGetSettings.mockResolvedValue({ allowedDomains: ["*"] });
+    mockRateLimited.mockResolvedValue(false);
+  });
+
+  it("passes the challenge token and page host to the gates", async () => {
+    await callerFor({ origin: "https://shop.example.com" }).create({
+      ...createInput,
+      challengeToken: "tok",
+    });
+    expect(mockRunGates).toHaveBeenCalledWith(
+      ORG_ID,
+      "conversation.create",
+      expect.objectContaining({
+        token: "tok",
+        pageHostname: "shop.example.com",
+        frameHostname: "api.hay.chat",
+      }),
+    );
+  });
+
+  it("counts the attempt and tells the gates when the org is under attack", async () => {
+    mockRecordCreateAttempt.mockResolvedValueOnce(true);
+    await callerFor().create(createInput);
+    expect(mockRecordCreateAttempt).toHaveBeenCalledWith(ORG_ID);
+    expect(mockRunGates).toHaveBeenCalledWith(
+      ORG_ID,
+      "conversation.create",
+      expect.objectContaining({ underAttack: true }),
+    );
+  });
+
+  it("refuses with VERIFICATION_FAILED and creates nothing when a gate denies", async () => {
+    mockRunGates.mockResolvedValueOnce({
+      decision: "deny",
+      results: [{ pluginId: "p", decision: "deny", reason: "invalid_token" }],
+    });
+    await expect(callerFor().create(createInput)).rejects.toMatchObject({
+      code: "FORBIDDEN",
+      message: "VERIFICATION_FAILED",
+    });
+    expect(mockCreateConversation).not.toHaveBeenCalled();
+  });
+
+  it("creates a flagged conversation and records the bot check", async () => {
+    const results = [{ pluginId: "p", decision: "flag", reason: "provider_unavailable" }];
+    mockRunGates.mockResolvedValueOnce({ decision: "flag", results });
+    await callerFor().create(createInput);
+    const data = mockCreateConversation.mock.calls[0][1] as { metadata: Record<string, unknown> };
+    expect(data.metadata.botCheck).toMatchObject({ decision: "flag", results });
   });
 });
