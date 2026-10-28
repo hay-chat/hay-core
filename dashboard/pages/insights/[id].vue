@@ -123,6 +123,24 @@
       </div>
 
       <div class="space-y-6">
+        <Card v-if="canApprove">
+          <CardHeader>
+            <CardTitle class="text-base">{{
+              $t("insights.page.detail.suggestedAction")
+            }}</CardTitle>
+            <CardDescription>{{ approveHint }}</CardDescription>
+          </CardHeader>
+          <CardContent class="flex flex-col gap-2">
+            <Button :loading="approving" @click="approve">
+              <Sparkles class="h-4 w-4 mr-2" />
+              {{ approveLabel }}
+            </Button>
+            <Button v-if="approvedPlaybookId" variant="outline" @click="openPlaybook">
+              {{ $t("insights.page.detail.approve.openPlaybook") }}
+            </Button>
+          </CardContent>
+        </Card>
+
         <Card>
           <CardHeader>
             <CardTitle class="text-base">{{ $t("insights.page.detail.lifecycle") }}</CardTitle>
@@ -216,17 +234,63 @@
         </DialogFooter>
       </DialogContent>
     </Dialog>
+
+    <SuggestEditsDialog
+      v-if="approval?.kind === 'playbook_edit' && approval.playbookId"
+      v-model:open="playbookDialogOpen"
+      :playbook-id="approval.playbookId"
+      :initial-feedback="approval.feedback"
+      @applied="onPlaybookDraftSaved"
+    />
+
+    <SuggestKnowledgeDialog
+      v-model:open="knowledgeDialogOpen"
+      :initial-feedback="approval?.kind === 'knowledge' ? approval.feedback : undefined"
+      @applied="onKnowledgeSaved"
+    />
+
+    <Dialog v-model:open="taskDialogOpen">
+      <DialogContent class="max-w-2xl">
+        <DialogHeader>
+          <DialogTitle>{{ $t("insights.page.detail.approve.taskTitle") }}</DialogTitle>
+          <DialogDescription>
+            {{ $t("insights.page.detail.approve.taskDescription") }}
+          </DialogDescription>
+        </DialogHeader>
+        <pre class="whitespace-pre-wrap text-sm border rounded-md p-3 max-h-96 overflow-auto">{{
+          taskText
+        }}</pre>
+        <DialogFooter>
+          <Button
+            v-if="insight?.actionType === 'new_playbook'"
+            variant="outline"
+            @click="router.push('/playbooks/new')"
+          >
+            {{ $t("insights.page.detail.approve.newPlaybook") }}
+          </Button>
+          <Button @click="copyTask">
+            <Copy class="h-4 w-4 mr-2" />
+            {{
+              copied
+                ? $t("insights.page.detail.approve.copied")
+                : $t("insights.page.detail.approve.copy")
+            }}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   </Page>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from "vue";
-import { ArrowLeft, ExternalLink } from "lucide-vue-next";
+import { ArrowLeft, Copy, ExternalLink, Sparkles } from "lucide-vue-next";
 import { HayApi } from "@/utils/api";
 import type { RouterInputs, RouterOutputs } from "@/types/trpc";
 
 type Insight = RouterOutputs["insights"]["get"];
 type InsightState = RouterInputs["insights"]["setState"]["state"];
+type Approval = RouterOutputs["insights"]["approve"];
 
 const { t, te } = useI18n();
 const route = useRoute();
@@ -293,6 +357,7 @@ const auditReason = (reason: string | null) => {
   if (!reason) return "";
   if (reason === "recurred") return t("insights.page.detail.auditRecurred");
   if (reason.startsWith("merged:")) return t("insights.page.detail.auditMerged");
+  if (reason.startsWith("approved:")) return t("insights.page.detail.auditApproved");
   return reason;
 };
 
@@ -329,6 +394,103 @@ const changeState = async (state: InsightState, reason?: string) => {
     toast.error(t("insights.page.detail.stateError"));
   } finally {
     changing.value = null;
+  }
+};
+
+// D3-14: approve opens a reviewer; nothing is applied without the owner saving it.
+const OPEN_STATES = ["new", "acknowledged", "in_progress"];
+const approving = ref(false);
+const approval = ref<Approval | null>(null);
+const playbookDialogOpen = ref(false);
+const knowledgeDialogOpen = ref(false);
+const taskDialogOpen = ref(false);
+const copied = ref(false);
+
+const approveKind = computed(() => {
+  const type = insight.value?.actionType;
+  if (type === "playbook_edit") return "playbook_edit";
+  if (type === "knowledge_edit" || type === "knowledge_add") return "knowledge";
+  return "task";
+});
+const canApprove = computed(
+  () =>
+    !!insight.value &&
+    insight.value.actionType !== "none" &&
+    OPEN_STATES.includes(insight.value.state),
+);
+const approveLabel = computed(() => t(`insights.page.detail.approve.${approveKind.value}`));
+const approveHint = computed(() => {
+  if (approveKind.value === "playbook_edit") return t("insights.page.detail.approve.hintPlaybook");
+  if (approveKind.value === "knowledge") return t("insights.page.detail.approve.hintKnowledge");
+  return t("insights.page.detail.approve.hintTask");
+});
+const approvedPlaybookId = computed(() => {
+  const action = insight.value?.approvedAction;
+  return action?.kind === "playbook_edit" && typeof action.playbookId === "string"
+    ? action.playbookId
+    : null;
+});
+
+const taskText = computed(() => {
+  const i = insight.value;
+  if (!i) return "";
+  const lines = [
+    i.title || t("insights.page.list.untitled"),
+    "",
+    `${t("insights.page.detail.suggestedAction")}: ${t(`insights.page.actionTypes.${i.actionType}`)}`,
+  ];
+  if (i.summary) lines.push("", i.summary);
+  if (i.hypothesis) lines.push("", `${t("insights.page.detail.hypothesis")}: ${i.hypothesis}`);
+  if (i.snippets.length) {
+    lines.push(
+      "",
+      `${t("insights.page.detail.evidence")}:`,
+      ...i.snippets.map((s) => `- ${s.text}`),
+    );
+  }
+  lines.push("", `${window.location.origin}/insights/${i.id}`);
+  return lines.join("\n");
+});
+
+const approve = async () => {
+  approving.value = true;
+  try {
+    approval.value = await HayApi.insights.approve.mutate({ id: id.value });
+    if (approval.value.kind === "playbook_edit") playbookDialogOpen.value = true;
+    else if (approval.value.kind === "knowledge") knowledgeDialogOpen.value = true;
+    else {
+      copied.value = false;
+      taskDialogOpen.value = true;
+    }
+    await load();
+  } catch (error) {
+    console.error("Failed to approve insight:", error);
+    toast.error(t("insights.page.detail.approve.error"));
+  } finally {
+    approving.value = false;
+  }
+};
+
+const openPlaybook = () => {
+  if (approvedPlaybookId.value) router.push(`/playbooks/${approvedPlaybookId.value}`);
+};
+
+// A saved draft is not live yet: the insight stays in progress until the owner publishes.
+const onPlaybookDraftSaved = () => {
+  toast.success(t("insights.page.detail.approve.draftSaved"));
+};
+
+const onKnowledgeSaved = async () => {
+  await changeState("addressed");
+  toast.success(t("insights.page.detail.approve.knowledgeSaved"));
+};
+
+const copyTask = async () => {
+  try {
+    await navigator.clipboard.writeText(taskText.value);
+    copied.value = true;
+  } catch (error) {
+    console.error("Failed to copy task:", error);
   }
 };
 

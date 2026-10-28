@@ -178,7 +178,8 @@
           "copy": "Copy",
           "copied": "Copied",
           "newPlaybook": "Create a playbook"
-        }
+        },
+        "auditApproved": "Approved; a suggestion was opened for review"
       },
       "settingsDialog": {
         "title": "Insights settings",

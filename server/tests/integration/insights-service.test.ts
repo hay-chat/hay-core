@@ -183,6 +183,63 @@ describe("insights service (D3-13)", () => {
     ).rejects.toMatchObject({ code: "NOT_FOUND" });
   });
 
+  it("approve opens the right reviewer and moves the insight to in progress (D3-14)", async () => {
+    const [playbook] = await AppDataSource.query(
+      `INSERT INTO playbooks (title, trigger, organization_id) VALUES ('Returns', 'returns', $1) RETURNING id`,
+      [orgId],
+    );
+    const editId = await cluster({ action_type: "playbook_edit", signature: "negative:playbook" });
+    await member(editId, { signals: { playbookId: playbook.id } });
+    await member(editId, { signals: { playbookId: "00000000-0000-4000-8000-00000000dead" } });
+
+    const edit = await insightsService.approve({
+      organizationId: orgId,
+      clusterId: editId,
+      userId: null,
+    });
+    expect(edit).toMatchObject({ kind: "playbook_edit", playbookId: playbook.id });
+    expect(edit.feedback).toContain("Shipping to Portugal is not documented");
+    expect(edit.feedback).toContain("Do you ship to Portugal?");
+    expect(edit.feedback.length).toBeLessThanOrEqual(4000);
+    const detail = await insightsService.get(orgId, editId);
+    expect(detail.state).toBe("in_progress");
+    expect(detail.approvedAction).toMatchObject({ kind: "playbook_edit", playbookId: playbook.id });
+
+    // No playbook to edit any more: falls back to a task, never a silent edit.
+    const orphanId = await cluster({
+      action_type: "playbook_edit",
+      signature: "negative:playbook",
+    });
+    await member(orphanId, { signals: { playbookId: "00000000-0000-4000-8000-00000000dead" } });
+    expect(
+      (await insightsService.approve({ organizationId: orgId, clusterId: orphanId, userId: null }))
+        .kind,
+    ).toBe("task");
+
+    const knowledgeId = await cluster();
+    expect(
+      (
+        await insightsService.approve({
+          organizationId: orgId,
+          clusterId: knowledgeId,
+          userId: null,
+        })
+      ).kind,
+    ).toBe("knowledge");
+
+    const bugId = await cluster({ action_type: "product_bug", signature: "negative:product" });
+    expect(
+      (await insightsService.approve({ organizationId: orgId, clusterId: bugId, userId: null }))
+        .kind,
+    ).toBe("task");
+
+    const closedId = await cluster({ state: "addressed" });
+    await expect(
+      insightsService.approve({ organizationId: orgId, clusterId: closedId, userId: null }),
+    ).rejects.toMatchObject({ code: "BAD_REQUEST" });
+    await AppDataSource.query(`DELETE FROM playbooks WHERE id = $1`, [playbook.id]);
+  });
+
   it("encodes the transition table", () => {
     expect(canTransition("new", "addressed")).toBe(true);
     expect(canTransition("archived", "new")).toBe(true);

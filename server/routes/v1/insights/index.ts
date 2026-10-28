@@ -62,4 +62,17 @@ export const insightsRouter = t.router({
         })
         .catch(rethrow),
     ),
+
+  /** Approve: suggestions only. Returns which reviewer the dashboard opens (D3-14). */
+  approve: scopedProcedure(RESOURCES.PLAYBOOKS, ACTIONS.UPDATE)
+    .input(z.object({ id: z.string().uuid() }))
+    .mutation(({ ctx, input }) =>
+      insightsService
+        .approve({
+          organizationId: ctx.organizationId!,
+          clusterId: input.id,
+          userId: ctx.user?.id ?? null,
+        })
+        .catch(rethrow),
+    ),
 });
