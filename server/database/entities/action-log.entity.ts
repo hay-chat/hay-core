@@ -5,8 +5,9 @@ import { Entity, Column, PrimaryGeneratedColumn, CreateDateColumn, Index } from 
  * - error: the tool ran (or tried to) and failed; see error_code
  * - simulated: dry-run; the write was not sent, a mock came back
  * - held: a write was stopped and is waiting for a person's approval
+ * - confirming: the AI was told to ask the shopper first; nothing ran (D4-10)
  */
-export type ActionOutcome = "success" | "error" | "simulated" | "held";
+export type ActionOutcome = "success" | "error" | "simulated" | "held" | "confirming";
 
 /**
  * One row per tool call the AI (or an approved pending action) makes (D6-5).

@@ -1,4 +1,11 @@
-import { decideGate, extractAmount } from "../../services/core/action-policy";
+import {
+  decideGate,
+  extractAmount,
+  loosensActionApproval,
+  lowerAmount,
+  amountEditable,
+} from "../../services/core/action-policy";
+import { DEFAULT_ACTION_APPROVAL_CONFIG } from "../../types/organization-settings.types";
 import { classifyTool, type ToolRisk } from "../../services/core/tool-risk";
 
 const ON = { moneyMovesNeedApproval: true, thresholdAmount: 0 };
@@ -73,10 +80,89 @@ describe("decideGate", () => {
   });
 });
 
+describe("decideGate per-category and playbook policy (D4-9)", () => {
+  it("applies the threshold only to refunds and discounts", () => {
+    const config = { moneyMovesNeedApproval: true, thresholdAmount: 100 };
+    expect(decideGate(risk("refund"), { amount: 10 }, config)).toEqual({ kind: "allow" });
+    expect(decideGate(risk("exchange"), { amount: 10 }, config)).toMatchObject({
+      kind: "hold",
+      reason: "money_move",
+    });
+  });
+
+  it("holds a non-money category the org switched on, and runs a money one it switched off", () => {
+    const config = { ...ON, categories: { address_change: true, refund: false } };
+    expect(decideGate(risk("address_change"), {}, config)).toEqual({
+      kind: "hold",
+      reason: "category_policy",
+      amount: null,
+    });
+    expect(decideGate(risk("refund"), { amount: 999 }, config)).toEqual({ kind: "allow" });
+    expect(decideGate(risk("cancel"), {}, config).kind).toBe("hold");
+  });
+
+  it("a playbook can only tighten: it holds even under the threshold, a cap, or approval off", () => {
+    const loose = { moneyMovesNeedApproval: false, thresholdAmount: 1000 };
+    expect(decideGate(risk("refund"), { amount: 5 }, loose, ["refund"])).toEqual({
+      kind: "hold",
+      reason: "playbook_policy",
+      amount: 5,
+    });
+    const capped = classifyTool({
+      annotations: { readOnlyHint: false },
+      _meta: { "chat.hay/category": "discount", "chat.hay/capEnforced": true },
+    });
+    expect(decideGate(capped, {}, ON, ["discount"]).kind).toBe("hold");
+    // Listing a category the org already holds changes nothing for others.
+    expect(decideGate(risk("note"), {}, ON, ["refund"])).toEqual({ kind: "allow" });
+  });
+});
+
+describe("loosensActionApproval", () => {
+  const current = DEFAULT_ACTION_APPROVAL_CONFIG;
+  it("flags switching approval off, raising the amount and changing approvers", () => {
+    expect(loosensActionApproval(current, { moneyMovesNeedApproval: false })).toBe(true);
+    expect(loosensActionApproval(current, { customerConfirmation: false })).toBe(true);
+    expect(loosensActionApproval(current, { thresholdAmount: 10 })).toBe(true);
+    expect(loosensActionApproval(current, { approverRoles: ["admin"] })).toBe(true);
+    expect(loosensActionApproval(current, { categories: { cancel: false } })).toBe(true);
+  });
+
+  it("does not flag tightening or no-op changes", () => {
+    expect(loosensActionApproval(current, { categories: { note: true } })).toBe(false);
+    expect(loosensActionApproval(current, { categories: { note: false } })).toBe(false);
+    expect(loosensActionApproval(current, { thresholdAmount: 0 })).toBe(false);
+    expect(loosensActionApproval(current, { moneyMovesNeedApproval: true })).toBe(false);
+  });
+});
+
 describe("extractAmount", () => {
   it("returns null when any transaction amount is unreadable", () => {
     expect(extractAmount({ transactions: [{ amount: "1" }, { amount: "x" }] })).toBeNull();
     expect(extractAmount({ amount: -3 })).toBeNull();
     expect(extractAmount({})).toBeNull();
+  });
+});
+
+describe("lowerAmount (D4-6)", () => {
+  it("lowers a top-level amount and keeps its type", () => {
+    expect(lowerAmount({ amount: "25.00" }, 10)).toEqual({ amount: "10.00" });
+    expect(lowerAmount({ amount: 25 }, 9.999)).toEqual({ amount: 10 });
+  });
+
+  it("lowers a single transaction", () => {
+    expect(lowerAmount({ transactions: [{ parentId: "t", amount: "30.00" }] }, 12.5)).toEqual({
+      transactions: [{ parentId: "t", amount: "12.50" }],
+    });
+  });
+
+  it("refuses up, zero, split refunds and calls without an amount", () => {
+    expect(lowerAmount({ amount: "25.00" }, 25.01)).toBeNull();
+    expect(lowerAmount({ amount: "25.00" }, 0)).toBeNull();
+    expect(
+      lowerAmount({ transactions: [{ amount: "10" }, { amount: "5" }] }, 4),
+    ).toBeNull();
+    expect(lowerAmount({ order_id: "1" }, 4)).toBeNull();
+    expect(amountEditable({ order_id: "1" })).toBe(false);
   });
 });

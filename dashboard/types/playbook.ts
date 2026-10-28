@@ -36,6 +36,8 @@ export interface Playbook {
   organization_id?: string | null;
   active_version_id?: string | null;
   draft_version_id?: string | null;
+  /** Write categories that always need approval while this playbook runs (D4-9). */
+  approval_categories?: string[] | null;
   agents?: Agent[];
   created_at?: string;
   updated_at?: string;

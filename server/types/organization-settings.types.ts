@@ -1,5 +1,6 @@
 import type { OrgLlmConfig } from "@server/services/llm/provider.types";
 import type { AiRegion } from "@server/services/llm/ai-region";
+import type { WriteCategory } from "@server/services/core/tool-risk";
 
 export type { OrgLlmConfig };
 
@@ -325,19 +326,49 @@ export const DEFAULT_ACTION_CLAIM_GUARDRAIL_CONFIG: ActionClaimGuardrailConfig =
  * Action approval (D4-3 / D4-4): which AI write actions wait for a person.
  */
 export interface ActionApprovalConfig {
-  /** Hold refunds, cancels and discounts for approval. Only the owner can turn this off. */
+  /**
+   * Master switch: approval for AI write actions is on. Off = every call runs
+   * (a playbook's own approval list still applies). Only the owner can turn it off.
+   */
   moneyMovesNeedApproval: boolean;
-  /** Money moves at or below this amount run without approval. 0 holds every one. */
+  /** Refunds and discounts at or below this amount run without approval. 0 holds every one. */
   thresholdAmount: number;
+  /**
+   * Per write category: true = needs approval (D4-9). A missing category uses
+   * the default: money moves (refund, cancel, discount, exchange) need approval,
+   * the rest do not. Tools that do not declare a category are always held.
+   */
+  categories: Partial<Record<ApprovalCategory, boolean>>;
+  /**
+   * The AI asks the shopper "shall I do it?" before a write action and only
+   * proceeds after they answer (D4-10). Always on for cancels.
+   */
+  customerConfirmation: boolean;
   /** Roles that may approve or reject. The owner always can. */
   approverRoles: Array<"owner" | "admin" | "member" | "viewer" | "contributor" | "agent">;
   /** Hours a held action waits before the conversation is escalated to a person. */
   expiryHours: number;
 }
 
+/** Write categories the owner can switch approval on or off for (not "other_write"). */
+export const APPROVAL_CATEGORIES = [
+  "refund",
+  "cancel",
+  "discount",
+  "exchange",
+  "return",
+  "address_change",
+  "customer_update",
+  "note",
+] as const satisfies readonly WriteCategory[];
+
+export type ApprovalCategory = (typeof APPROVAL_CATEGORIES)[number];
+
 export const DEFAULT_ACTION_APPROVAL_CONFIG: ActionApprovalConfig = {
   moneyMovesNeedApproval: true,
   thresholdAmount: 0,
+  categories: {},
+  customerConfirmation: true,
   approverRoles: ["owner", "admin"],
   expiryHours: 48,
 };

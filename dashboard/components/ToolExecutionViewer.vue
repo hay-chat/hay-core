@@ -19,6 +19,16 @@
       </div>
     </div>
 
+    <!-- Plain-language failure reason (D6-6), from the structured error code -->
+    <p
+      v-if="failureReason"
+      class="flex items-start gap-1.5 text-sm text-destructive"
+      data-testid="tool-failure-reason"
+    >
+      <AlertCircle class="mt-0.5 h-3.5 w-3.5 shrink-0" />
+      <span>{{ failureReason }}</span>
+    </p>
+
     <!-- Collapsible Details -->
     <div v-show="isExpanded" class="tool-details">
       <!-- Inputs Section -->
@@ -68,6 +78,7 @@ import { ref, computed, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import VueJsonPretty from "vue-json-pretty";
 import "vue-json-pretty/lib/styles.css";
+import { parseToolError } from "@/utils/tool-error";
 import {
   Zap,
   ChevronDown,
@@ -81,9 +92,10 @@ import {
   AlertCircle,
   FlaskConical,
   Hourglass,
+  HelpCircle,
 } from "lucide-vue-next";
 
-const { t } = useI18n();
+const { t, te } = useI18n();
 
 interface Props {
   toolName?: string;
@@ -92,6 +104,8 @@ interface Props {
   toolStatus?: string;
   latency?: number;
   executedAt?: string;
+  /** tool-errors code saved with a failed call (metadata.toolErrorCode). */
+  toolErrorCode?: string;
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -192,6 +206,7 @@ const statusVariant = computed(() => {
       return "tool";
     case "SIMULATED":
     case "PENDING_APPROVAL":
+    case "NEEDS_CONFIRMATION":
       return "secondary";
     case "REJECTED":
     case "EXPIRED":
@@ -213,6 +228,8 @@ const statusIcon = computed(() => {
       return FlaskConical;
     case "PENDING_APPROVAL":
       return Hourglass;
+    case "NEEDS_CONFIRMATION":
+      return HelpCircle;
     case "REJECTED":
       return XCircle;
     case "EXPIRED":
@@ -234,6 +251,8 @@ const statusText = computed(() => {
       return t("conversations.toolStatus.simulated");
     case "PENDING_APPROVAL":
       return t("conversations.toolStatus.pendingApproval");
+    case "NEEDS_CONFIRMATION":
+      return t("conversations.toolStatus.needsConfirmation");
     case "REJECTED":
       return t("conversations.toolStatus.rejected");
     case "EXPIRED":
@@ -241,6 +260,19 @@ const statusText = computed(() => {
     default:
       return t("conversations.toolStatus.unknown");
   }
+});
+
+/** Why it failed, in the merchant's language: the reason if known, else the code. */
+const failureReason = computed(() => {
+  if (props.toolStatus !== "ERROR") return null;
+  const { code, reason } = parseToolError(props.toolOutput, props.toolErrorCode);
+  if (reason && te(`aiActions.toolErrors.reasons.${reason}`)) {
+    return t(`aiActions.toolErrors.reasons.${reason}`);
+  }
+  if (code && te(`aiActions.toolErrors.codes.${code}`)) {
+    return t(`aiActions.toolErrors.codes.${code}`);
+  }
+  return t("aiActions.toolErrors.generic");
 });
 
 const { formatTime } = useOrgDateTime();

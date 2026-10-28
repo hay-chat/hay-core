@@ -10,6 +10,15 @@ import type { AuthUser } from "@server/lib/auth/AuthUser";
 import { RESOURCES, ACTIONS } from "@server/types/scopes";
 import type { ActionApprovalConfig } from "@server/types/organization-settings.types";
 import { createLogger } from "@server/lib/logger";
+import { In, MoreThan, type QueryDeepPartialEntity } from "typeorm";
+import {
+  GRADUATION_CATEGORIES,
+  GRADUATION_WINDOW_DAYS,
+  suggestGraduation,
+  type GraduationSuggestion,
+} from "@server/services/core/approval-graduation";
+import { Conversation } from "@server/database/entities/conversation.entity";
+import { amountEditable } from "@server/services/core/action-policy";
 
 const logger = createLogger("pending-action");
 
@@ -83,8 +92,34 @@ export function deciderOf(user: AuthUser): Decider {
 
 /** The columns a status transition may set alongside the status. */
 type DecisionFields = Partial<
-  Pick<PendingAction, "decided_by" | "decided_at" | "decision_note" | "error_code" | "executed_at">
+  Pick<
+    PendingAction,
+    "decided_by" | "decided_at" | "decision_note" | "error_code" | "executed_at" | "args" | "amount"
+  >
 >;
+
+/** An approver lowered the amount: the args to run and the new amount (D4-6). */
+export interface AmountEdit {
+  args: Record<string, unknown>;
+  amount: number;
+}
+
+/** A pending action as the Approvals list shows it (D4-6). */
+export interface ApprovalItem extends PendingAction {
+  conversationTitle: string | null;
+  customerName: string | null;
+  amountEditable: boolean;
+  currency: string | null;
+}
+
+/** A currency code the call states, if any (`currency` or `transactions[0].currency`). */
+function currencyOf(args: Record<string, unknown>): string | null {
+  const first = Array.isArray(args.transactions)
+    ? (args.transactions[0] as Record<string, unknown> | undefined)
+    : undefined;
+  const value = args.currency ?? first?.currency;
+  return typeof value === "string" && /^[A-Za-z]{3}$/.test(value) ? value.toUpperCase() : null;
+}
 
 export class PendingActionService {
   private get repo() {
@@ -125,6 +160,50 @@ export class PendingActionService {
       },
       order: { created_at: "ASC" },
     });
+  }
+
+  /** Every pending action in the org, with what the Approvals list needs to show it. */
+  async listApprovals(organizationId: string): Promise<ApprovalItem[]> {
+    const actions = await this.listPending(organizationId);
+    if (actions.length === 0) return [];
+    const conversations = await AppDataSource.getRepository(Conversation).find({
+      where: {
+        id: In([...new Set(actions.map((a) => a.conversation_id))]),
+        organization_id: organizationId,
+      },
+      relations: { customer: true },
+    });
+    const byId = new Map(conversations.map((c) => [c.id, c]));
+    return actions.map((action) => {
+      const conversation = byId.get(action.conversation_id);
+      return Object.assign(action, {
+        conversationTitle: conversation?.title ?? null,
+        customerName:
+          conversation?.customer?.name ??
+          conversation?.customer?.email ??
+          conversation?.customer?.phone ??
+          null,
+        amountEditable: amountEditable(action.args),
+        currency: currencyOf(action.args),
+      });
+    });
+  }
+
+  /** The graduation nudge for this org, if its recent decisions earn one (D4-11). */
+  async graduationSuggestion(
+    organizationId: string,
+    currentThreshold: number,
+  ): Promise<GraduationSuggestion | null> {
+    const rows = await this.repo.find({
+      where: {
+        organization_id: organizationId,
+        category: In([...GRADUATION_CATEGORIES]),
+        hold_reason: "money_move",
+        created_at: MoreThan(new Date(Date.now() - GRADUATION_WINDOW_DAYS * 86_400_000)),
+      },
+      select: { category: true, status: true, amount: true },
+    });
+    return suggestGraduation(rows, currentThreshold);
   }
 
   async listForConversation(organizationId: string, conversationId: string) {
@@ -169,7 +248,12 @@ export class PendingActionService {
    * pending -> approved, once. Expired-but-unswept rows cannot be approved.
    * A second approve (double click, two people) gets `transitioned: false`.
    */
-  async approve(id: string, organizationId: string, decider: Decider): Promise<Transition> {
+  async approve(
+    id: string,
+    organizationId: string,
+    decider: Decider,
+    edit?: AmountEdit,
+  ): Promise<Transition> {
     const moved = await this.transition(
       id,
       organizationId,
@@ -178,6 +262,7 @@ export class PendingActionService {
       {
         decided_by: decider.userId,
         decided_at: new Date(),
+        ...(edit && { args: edit.args, amount: edit.amount }),
       },
       true,
     );
@@ -258,7 +343,7 @@ export class PendingActionService {
     const qb = this.repo
       .createQueryBuilder()
       .update(PendingAction)
-      .set({ ...fields, status: to })
+      .set({ ...fields, status: to } as QueryDeepPartialEntity<PendingAction>)
       .where("id = :id", { id })
       .andWhere("organization_id = :organizationId", { organizationId })
       .andWhere("status IN (:...from)", { from });

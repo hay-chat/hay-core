@@ -47,6 +47,7 @@ import {
   ExternalLink,
   Package,
   ThumbsUp,
+  History,
 } from "lucide-vue-next";
 import type { Component } from "vue";
 
@@ -178,6 +179,12 @@ const navMain = computed(() => {
       icon: BookOpen,
       isActive: isPathActive("/playbooks"),
     },
+    {
+      title: t("nav.actionLog"),
+      url: "/actions",
+      icon: History,
+      isActive: isPathActive("/actions"),
+    },
   );
 
   // Feedback on AI replies; the agent role cannot open /insights.
@@ -256,6 +263,11 @@ const navMain = computed(() => {
         title: t("nav.channels"),
         url: "/channels",
         isActive: isPathActive("/channels"),
+      },
+      {
+        title: t("nav.actionsSettings"),
+        url: "/settings/actions",
+        isActive: route.path === "/settings/actions",
       },
       {
         title: t("nav.users"),

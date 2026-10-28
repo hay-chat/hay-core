@@ -242,6 +242,14 @@
               </CardContent>
             </Card>
 
+            <!-- Approval override, tighten-only (D4-9) -->
+            <PlaybookApprovalCard
+              v-if="isEditMode && playbook"
+              :playbook-id="playbook.id"
+              :categories="playbook.approval_categories ?? []"
+              @saved="(categories) => playbook && (playbook.approval_categories = categories)"
+            />
+
             <!-- About + danger zone (edit mode only) -->
             <Card v-if="isEditMode && playbook">
               <CardHeader>
