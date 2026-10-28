@@ -17,6 +17,7 @@ import type {
 } from "@server/database/entities/pending-action.entity";
 import { decideGate, extractAmount, NEEDS_APPROVAL_CODE } from "./action-policy";
 import { pendingActionService } from "../pending-action.service";
+import { orderLinkService } from "../order-links/order-link.service";
 import { organizationRepository } from "@server/repositories/organization.repository";
 import {
   resolveActionApprovalConfig,
@@ -240,6 +241,18 @@ export class ToolExecutionService {
       durationMs: latencyMs,
       idempotencyKey: call.idempotencyKey,
     });
+    // D2-4: index the orders this call named (dry-run playground calls excepted).
+    if (step.logOutcome !== "simulated") {
+      await orderLinkService.recordFromToolCall({
+        organizationId: call.conversation.organization_id,
+        conversationId: call.conversation.id,
+        messageId: call.messageId ?? null,
+        pluginId: call.target.pluginId,
+        toolName: call.target.toolName,
+        input: call.toolCall.args,
+        output: step.logOutcome === "success" ? step.result.result : undefined,
+      });
+    }
     return latencyMs;
   }
 
