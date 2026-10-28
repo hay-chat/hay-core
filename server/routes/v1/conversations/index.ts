@@ -22,6 +22,7 @@ import {
 } from "../../../services/staff-attachments";
 import { config } from "@server/config/env";
 import { ConversationExportService } from "../../../services/conversation-export.service";
+import { organizationRepository } from "@server/repositories/organization.repository";
 import { AppDataSource } from "../../../database/data-source";
 import {
   listChannelTemplates,
@@ -1290,7 +1291,11 @@ export const conversationsRouter = t.router({
       const timestamp = new Date().toISOString().slice(0, 10);
 
       if (input.format === "pdf") {
-        const pdfBuffer = await conversationExportService.generatePdf(conversation);
+        const organization = await organizationRepository.findById(organizationId);
+        const pdfBuffer = await conversationExportService.generatePdf(conversation, {
+          storeName: organization?.name ?? "",
+          timeZone: organization?.timezone ?? "UTC",
+        });
         return {
           base64Data: pdfBuffer.toString("base64"),
           fileName: `${titleSlug}-${timestamp}.pdf`,

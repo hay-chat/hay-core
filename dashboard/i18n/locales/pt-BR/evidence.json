@@ -1,0 +1,57 @@
+{
+  "evidence": {
+    "headTitle": "Pacotes de evidências - Hay.chat",
+    "title": "Pacotes de evidências",
+    "description": "Reúna todas as conversas sobre um pedido em um único documento para anexar quando um cliente contestar um pagamento.",
+    "search": {
+      "label": "Número do pedido",
+      "placeholder": "ex.: #1001",
+      "submit": "Buscar pedido",
+      "forConversation": "Pedidos mencionados nesta conversa",
+      "forCustomer": "Pedidos sobre os quais este cliente falou",
+      "clear": "Buscar pelo número do pedido",
+      "empty": "Nenhuma conversa menciona este pedido. Os pedidos aparecem quando o Hay.chat os consultou na sua loja ou quando uma mensagem citou o número (por exemplo \"#1001\").",
+      "emptyConversation": "Esta conversa não menciona nenhum pedido.",
+      "emptyCustomer": "As conversas deste cliente não mencionam nenhum pedido."
+    },
+    "order": {
+      "label": "Pedido #{number}",
+      "conversations": "{count} conversa | {count} conversas",
+      "lastSeen": "Última menção em {at}",
+      "fromMessages": "Das mensagens",
+      "select": "Selecionar",
+      "selected": "Selecionado"
+    },
+    "conversationOnly": {
+      "title": "Usar só esta conversa",
+      "description": "Montar o pacote com esta conversa, sem um pedido."
+    },
+    "options": {
+      "title": "Montar o pacote",
+      "forOrder": "Pedido #{number}, {count} conversa | Pedido #{number}, {count} conversas",
+      "forConversation": "Esta conversa",
+      "template": "Motivo da disputa",
+      "templates": {
+        "generic": "Geral",
+        "item_not_received": "Produto não recebido",
+        "not_as_described": "Produto diferente do anunciado ou com defeito",
+        "cancelled_credit": "Pedido cancelado ou reembolso não processado"
+      },
+      "templateHelp": "Define quais ações da loja e quais políticas aparecem primeiro no resumo. A conversa completa sempre é incluída.",
+      "pdf": "Baixar PDF",
+      "zip": "Baixar ZIP",
+      "zipHelp": "O ZIP inclui também os anexos, um README e um manifesto SHA-256 para que qualquer pessoa possa conferir que nenhum arquivo foi alterado.",
+      "downloaded": "Pacote de evidências baixado",
+      "imagesOmitted": "Algumas imagens eram grandes demais para o limite de 4 MB do PDF e ficaram fora dele. Elas estão no ZIP.",
+      "overCap": "Este PDF tem mais de 4 MB. Alguns provedores de pagamento não aceitam arquivos desse tamanho; escolha menos conversas ou reduza o arquivo antes de enviar.",
+      "failed": "Não foi possível montar o pacote de evidências. Tente novamente."
+    },
+    "notes": {
+      "title": "Antes de enviar",
+      "honest": "O pacote é um registro do que o Hay.chat armazenou sobre estas conversas. Ele não garante nenhum resultado na disputa, e cada provedor de pagamento decide quais evidências aceita.",
+      "retention": "Sua retenção de dados está configurada para {days} dias. Conversas mais antigas são apagadas e não podem entrar em um pacote. Disputas podem ser abertas meses depois do pedido, então uma retenção curta deixa você com menos evidências.",
+      "retentionOff": "As conversas ficam guardadas até você apagá-las, então pedidos mais antigos ainda podem entrar em um pacote.",
+      "retentionLink": "Configurações de retenção de dados"
+    }
+  }
+}

@@ -58,7 +58,8 @@ export type AuditAction =
   | "permission.denied"
   | "retention.cleanup"
   | "billing.resolution.exclude"
-  | "billing.resolution.exclusion_review_requested";
+  | "billing.resolution.exclusion_review_requested"
+  | "dispute_evidence.export";
 
 @Entity("audit_logs")
 @Index("idx_audit_logs_user", ["userId"])

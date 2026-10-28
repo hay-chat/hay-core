@@ -31,6 +31,7 @@
     "profile": {
       "description": "Customer profile and conversation history",
       "back": "Back to customers",
+      "evidencePack": "Evidence pack",
       "notFound": "Customer not found"
     },
     "conversations": {

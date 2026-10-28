@@ -218,6 +218,10 @@
                     <FileSpreadsheet class="mr-2 h-4 w-4" />
                     {{ $t("conversations.detail.exportCsv") }}
                   </DropdownMenuItem>
+                  <DropdownMenuItem data-testid="open-evidence-pack" @click="openEvidencePack">
+                    <FileCheck class="mr-2 h-4 w-4" />
+                    {{ $t("conversations.detail.evidencePack") }}
+                  </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
               <Button
@@ -275,6 +279,10 @@
                 <DropdownMenuItem @click="exportConversation('csv')">
                   <FileSpreadsheet class="mr-2 h-4 w-4" />
                   {{ $t("conversations.detail.exportCsv") }}
+                </DropdownMenuItem>
+                <DropdownMenuItem data-testid="open-evidence-pack" @click="openEvidencePack">
+                  <FileCheck class="mr-2 h-4 w-4" />
+                  {{ $t("conversations.detail.evidencePack") }}
                 </DropdownMenuItem>
                 <DropdownMenuItem
                   v-if="conversation?.status === 'open'"
@@ -1050,6 +1058,7 @@ import {
   Lock,
   FileText,
   FileSpreadsheet,
+  FileCheck,
   Braces,
   Sparkles,
   MoreHorizontal,
@@ -1850,6 +1859,12 @@ const exportConversation = async (format: "pdf" | "csv") => {
   } finally {
     isExporting.value = false;
   }
+};
+
+/** D2-5: the order-centric evidence pack, starting from this conversation. */
+const openEvidencePack = () => {
+  if (!conversation.value?.id) return;
+  useRouter().push({ path: "/evidence", query: { conversation: conversation.value.id } });
 };
 
 const viewConversation = (id: string) => {

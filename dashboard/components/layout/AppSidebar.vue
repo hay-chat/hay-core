@@ -48,6 +48,7 @@ import {
   Package,
   ThumbsUp,
   History,
+  FileCheck,
 } from "lucide-vue-next";
 import type { Component } from "vue";
 
@@ -184,6 +185,12 @@ const navMain = computed(() => {
       url: "/actions",
       icon: History,
       isActive: isPathActive("/actions"),
+    },
+    {
+      title: t("nav.evidencePacks"),
+      url: "/evidence",
+      icon: FileCheck,
+      isActive: isPathActive("/evidence"),
     },
   );
 

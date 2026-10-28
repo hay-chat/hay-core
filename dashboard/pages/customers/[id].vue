@@ -5,6 +5,16 @@
         <ArrowLeft class="h-4 w-4 mr-2" />
         {{ $t("customers.profile.back") }}
       </Button>
+      <Button
+        v-if="customer"
+        variant="outline"
+        size="sm"
+        data-testid="customer-evidence-pack"
+        @click="openEvidencePack"
+      >
+        <FileCheck class="h-4 w-4 mr-2" />
+        {{ $t("customers.profile.evidencePack") }}
+      </Button>
     </template>
 
     <div v-if="loading" class="py-12 text-center">
@@ -118,7 +128,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from "vue";
-import { ArrowLeft, RefreshCcw } from "lucide-vue-next";
+import { ArrowLeft, FileCheck, RefreshCcw } from "lucide-vue-next";
 import { Hay } from "@/utils/api";
 import type { RouterOutputs } from "@/types/trpc";
 import {
@@ -165,6 +175,8 @@ const avatarUrl = computed(() => {
 
 const goBack = () => router.push("/customers");
 const viewConversation = (id: string) => router.push(`/conversations/${id}`);
+/** D2-5: evidence packs for this customer's orders. */
+const openEvidencePack = () => router.push({ path: "/evidence", query: { customer: customerId } });
 
 onMounted(async () => {
   loading.value = true;
