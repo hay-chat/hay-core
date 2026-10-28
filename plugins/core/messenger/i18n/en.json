@@ -1,0 +1,29 @@
+{
+  "name": "Messenger",
+  "description": "Connect your Facebook Pages and answer Messenger conversations through Hay.chat's AI",
+  "tools": {},
+  "config": {},
+  "setup": {
+    "title": "Messenger Setup Guide",
+    "intro": "Connect your Facebook Pages to Hay.chat. Once connected, Messenger conversations with your Pages are answered by Hay.chat's AI, and replies go straight back to the Messenger thread.",
+    "step1": {
+      "title": "Connect your Pages",
+      "body": "Click the <strong>Connect</strong> button above and sign in with Facebook. Choose the Pages you want Hay.chat to answer for and approve the requested permissions. Hay.chat stores the connection securely, with no tokens to copy or paste.",
+      "hint": "You need to manage the Facebook Pages you connect. To add a Page later, connect again and select it."
+    },
+    "step2": {
+      "title": "Photos, videos and voice messages",
+      "body": "Hay.chat keeps the photos, videos, voice messages and files customers send, and transcribes voice messages so the AI can answer them. Stickers, locations and shared links show as a short note. Your team and the AI can send photos, videos, audio and PDFs back."
+    },
+    "step3": {
+      "title": "Replies after 24 hours",
+      "body": "Messenger allows a free-form reply within <strong>24 hours</strong> of the customer's last message. After that, a reply written by a person on your team is still sent for up to <strong>7 days</strong>. The AI only replies within the 24 hours."
+    },
+    "step4": {
+      "title": "Where messages appear",
+      "body": "New Messenger conversations show up in your Hay.chat inbox. Replies you send from your Page inbox or Meta Business Suite also appear there, and the AI stops answering that conversation.",
+      "hint": "To assign an agent, go to <strong>Settings &rarr; Channels</strong> and select an agent for the Messenger channel."
+    },
+    "windowNote": "<strong>Messaging window:</strong> the AI can reply within 24 hours of the customer's last message. A person on your team can reply for up to 7 days. After that, wait for the customer to write again."
+  }
+}
