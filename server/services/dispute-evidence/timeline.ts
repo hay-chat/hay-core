@@ -55,6 +55,9 @@ export interface SourceActionLog {
   read_only: boolean;
   outcome: ActionOutcome;
   error_code: string | null;
+  /** What actually ran; an approver may have edited it after the tool message was written. */
+  args: Record<string, unknown> | null;
+  created_at: Date;
 }
 
 export interface SourceTakeover {
@@ -83,6 +86,8 @@ export type TimelineEntry =
       conversationId: string;
       /** Write category, or "tracking" for a tracking read. */
       fact: string;
+      /** False for a request sent for approval or an error: shown in the timeline, never a key fact. */
+      succeeded: boolean;
       text: string;
     }
   | { kind: "takeover"; at: Date; conversationId: string; text: string };
@@ -169,9 +174,15 @@ export function buildTimeline(input: {
   timeZone: string;
 }): EvidenceTimeline {
   const copy = evidenceCopy(input.locale);
-  const logByMessage = new Map(
-    input.actionLogs.filter((log) => log.message_id).map((log) => [log.message_id!, log]),
-  );
+  // One tool message can carry several log rows: an approved action logs "held" and then
+  // the run itself, with the approver's edits. Each row is its own event.
+  const logsByMessage = new Map<string, SourceActionLog[]>();
+  for (const log of input.actionLogs) {
+    if (!log.message_id) continue;
+    const list = logsByMessage.get(log.message_id) ?? [];
+    list.push(log);
+    logsByMessage.set(log.message_id, list);
+  }
   const entries: TimelineEntry[] = [];
   const policies = new Map<string, PolicyUse>();
   const counts = { customerMessages: 0, replies: 0, actions: 0 };
@@ -213,39 +224,44 @@ export function buildTimeline(input: {
       }
       if (message.type !== MessageType.TOOL || !message.metadata?.toolName) continue;
 
-      const log = logByMessage.get(message.id);
       const split = splitToolName(message.metadata.toolName);
-      const outcome = log?.outcome ?? TOOL_STATUS_OUTCOME[message.metadata.toolStatus ?? ""];
-      if (!outcome) continue;
-      const sentences = describeAction(
-        {
-          pluginId: log?.plugin_id ?? split.pluginId,
-          toolName: log?.tool_name ?? split.toolName,
-          category: log?.category ?? null,
-          readOnly: log ? log.read_only : null,
-          outcome,
-          errorCode: log?.error_code ?? message.metadata.toolErrorCode ?? null,
-          toolInput: message.metadata.toolInput ?? null,
-          toolOutput: message.metadata.toolOutput,
-        },
-        input.locale,
-        input.timeZone,
-      );
-      const isTracking =
-        (log?.read_only ?? !log?.category) &&
-        findTracking(parseToolOutput(message.metadata.toolOutput)).length > 0;
-      for (const text of sentences) {
-        // The same tracking read again and again adds nothing.
-        if (isTracking && seenTracking.has(text)) continue;
-        if (isTracking) seenTracking.add(text);
-        entries.push({
-          kind: "action",
-          at: new Date(message.created_at),
-          conversationId: conversation.id,
-          fact: isTracking ? "tracking" : (log?.category ?? "other_write"),
-          text: maskCardNumbers(text, copy.cardRemoved),
-        });
-        counts.actions++;
+      const logs: (SourceActionLog | null)[] = logsByMessage.get(message.id) ?? [null];
+      for (const log of logs) {
+        const outcome = log?.outcome ?? TOOL_STATUS_OUTCOME[message.metadata.toolStatus ?? ""];
+        if (!outcome) continue;
+        // The message keeps the final output, so only the successful run may read it.
+        const toolOutput = !log || outcome === "success" ? message.metadata.toolOutput : undefined;
+        const sentences = describeAction(
+          {
+            pluginId: log?.plugin_id ?? split.pluginId,
+            toolName: log?.tool_name ?? split.toolName,
+            category: log?.category ?? null,
+            readOnly: log ? log.read_only : null,
+            outcome,
+            errorCode: log?.error_code ?? message.metadata.toolErrorCode ?? null,
+            toolInput: log?.args ?? message.metadata.toolInput ?? null,
+            toolOutput,
+          },
+          input.locale,
+          input.timeZone,
+        );
+        const isTracking =
+          (log?.read_only ?? !log?.category) &&
+          findTracking(parseToolOutput(toolOutput)).length > 0;
+        for (const text of sentences) {
+          // The same tracking read again and again adds nothing.
+          if (isTracking && seenTracking.has(text)) continue;
+          if (isTracking) seenTracking.add(text);
+          entries.push({
+            kind: "action",
+            at: new Date(log?.created_at ?? message.created_at),
+            conversationId: conversation.id,
+            fact: isTracking ? "tracking" : (log?.category ?? "other_write"),
+            succeeded: outcome === "success",
+            text: maskCardNumbers(text, copy.cardRemoved),
+          });
+          counts.actions++;
+        }
       }
     }
   }
@@ -279,7 +295,7 @@ export function buildTimeline(input: {
   const facts = TEMPLATE_FACTS[input.template];
   const keyFacts = sorted.filter(
     (entry): entry is Extract<TimelineEntry, { kind: "action" }> =>
-      entry.kind === "action" && (facts === null || facts.includes(entry.fact)),
+      entry.kind === "action" && entry.succeeded && (facts === null || facts.includes(entry.fact)),
   );
   const policyFilter = TEMPLATE_POLICIES[input.template];
   const keptPolicies = [...policies.values()]

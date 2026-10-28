@@ -186,6 +186,8 @@ function conversationFixture(): {
       read_only: false,
       outcome: "success",
       error_code: null,
+      args: { amount: 10, currency: "USD" },
+      created_at: at("2026-10-01T10:01:00Z"),
     },
   ];
   return { conversation, actionLogs };
@@ -229,6 +231,37 @@ describe("buildTimeline", () => {
     ]);
     // Not-as-described keeps the returns policy, not the shipping FAQ.
     expect(timeline.policies.map((p) => p.title)).toEqual(["Returns policy"]);
+  });
+
+  it("shows an approved action at the amount that ran, and the approval request only in the timeline", () => {
+    const { conversation, actionLogs } = conversationFixture();
+    // The tool message still carries the AI's 12.00; the approver lowered it to 10.00.
+    const toolMessage = conversation.messages.find((m) => m.id === "m4")!;
+    toolMessage.metadata = { ...toolMessage.metadata!, toolInput: { amount: 12, currency: "USD" } };
+    const timeline = buildTimeline({
+      conversations: [conversation],
+      actionLogs: [
+        {
+          ...actionLogs[0],
+          outcome: "held",
+          args: { amount: 12, currency: "USD" },
+          created_at: at("2026-10-01T10:01:00Z"),
+        },
+        { ...actionLogs[0], created_at: at("2026-10-01T10:03:00Z") },
+      ],
+      takeovers: [],
+      template: "generic",
+      locale: "en",
+      timeZone: "UTC",
+    });
+    const actions = timeline.entries.filter((e) => e.kind === "action");
+    expect(actions).toHaveLength(2);
+    expect(actions[0].text).not.toContain("issued");
+    expect(actions[1].text).toBe("Refund issued: 10.00 USD. Reference: 77.");
+    expect(actions[1].at).toEqual(at("2026-10-01T10:03:00Z"));
+    expect(timeline.keyFacts.map((f) => f.text)).toEqual([
+      "Refund issued: 10.00 USD. Reference: 77.",
+    ]);
   });
 
   it("lists no refund facts for an item-not-received pack", () => {
