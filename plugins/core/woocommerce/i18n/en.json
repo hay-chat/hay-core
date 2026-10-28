@@ -49,6 +49,22 @@
     "woocommerce_check_inventory": {
       "label": "Check Inventory",
       "description": "Check stock status and quantity for a product or variation SKU."
+    },
+    "woocommerce_get_product_by_slug": {
+      "label": "Get Product by Link",
+      "description": "Get a product from its storefront link or slug, with price, stock and variations."
+    },
+    "woocommerce_calculate_refund": {
+      "label": "Preview Refund",
+      "description": "Work out what a refund would return (per item, incl. tax) without refunding anything."
+    },
+    "woocommerce_update_customer": {
+      "label": "Update Customer",
+      "description": "Update a registered customer's name or phone on their saved profile."
+    },
+    "woocommerce_update_customer_address": {
+      "label": "Update Customer Address",
+      "description": "Change the billing or shipping address saved on a customer's account."
     }
   },
   "config": {
