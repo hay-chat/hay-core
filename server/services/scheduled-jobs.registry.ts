@@ -152,6 +152,19 @@ const jobRegistry: CronJobConfig[] = [
   },
 
   {
+    name: "insight-docs-audit",
+    description: "Weekly docs audit and broken playbook action check as an Insights input (D3-15)",
+    schedule: "0 5 * * 1", // Mondays at 5:00 AM
+    handler: async () => {
+      const { docsAuditInsightService } = await import("./insights/docs-audit-insight.service");
+      await docsAuditInsightService.runAll();
+    },
+    singleton: true,
+    enabled: true,
+    timeout: 3600000, // 1 hour max
+  },
+
+  {
     name: "pending-action-expiry",
     description:
       "Expire AI actions that got no approval in time and hand the conversation to the team",
