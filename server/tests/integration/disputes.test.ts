@@ -75,6 +75,16 @@ describe("disputes (D2-7, D2-8)", () => {
       order_label: "1001",
       source: "tool_output",
     });
+    // Only named in message text: no plugin knows this order.
+    await AppDataSource.getRepository(OrderConversationLink).save({
+      organization_id: orgId,
+      conversation_id: conversationId,
+      message_id: null,
+      plugin_id: null,
+      order_key: "2002",
+      order_label: "2002",
+      source: "message_text",
+    });
     global.fetch = fetchMock as unknown as typeof fetch;
   });
 
@@ -119,6 +129,9 @@ describe("disputes (D2-7, D2-8)", () => {
     expect(first.dispute.orderPluginId).toBe("shopify");
     expect(first.dispute.orderLabel).toBe("#1001");
     expect(first.dispute.currency).toBe("USD");
+    const stored = await disputes().findOneByOrFail({ id: first.dispute.id });
+    expect(stored.alertedAt).not.toBeNull();
+    expect(first.dispute.alertedAt).toEqual(stored.alertedAt);
     expect(onDisputeOpened).toHaveBeenCalledTimes(1);
     expect(onDisputeOpened.mock.calls[0][0]).toMatchObject({
       organizationId: orgId,
@@ -133,6 +146,17 @@ describe("disputes (D2-7, D2-8)", () => {
     const closed = await report({ status: "won", orderRefs: undefined });
     expect(closed.dispute.status).toBe("won");
     expect(closed.dispute.orderRefs).toEqual(["#1001"]);
+  });
+
+  it("never matches an order that only message text mentions", async () => {
+    const textOnly = await report({ externalId: "dp_text", orderRefs: ["#2002"] });
+    expect(textOnly.dispute.orderKey).toBeNull();
+    expect(textOnly.dispute.orderPluginId).toBeNull();
+
+    // A later ref a plugin knows still matches.
+    const mixed = await report({ externalId: "dp_mixed", orderRefs: ["#2002", "#1001"] });
+    expect(mixed.dispute.orderKey).toBe("5550001");
+    expect(mixed.dispute.orderPluginId).toBe("shopify");
   });
 
   it("does not alert for a dispute that arrives already decided", async () => {

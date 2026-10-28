@@ -200,11 +200,17 @@ export class DisputesService {
 
     if (dispute.status === "needs_response" && !dispute.alertedAt) {
       await this.alert(dispute, "opened");
+      // The alert stamps alerted_at in the database (here or in a racing report).
+      dispute = await repo.findOneByOrFail({ id: dispute.id });
     }
     return { created, dispute };
   }
 
-  /** First order ref the order index knows; the reporting plugin's own orders win ties. */
+  /**
+   * First order ref a plugin knows; the reporting plugin's own orders win ties.
+   * Groups found only by a text mention never match: the same order number can
+   * belong to another store, and the evidence pack would go to the wrong order.
+   */
   async matchOrder(
     organizationId: string,
     pluginId: string,
@@ -212,10 +218,8 @@ export class DisputesService {
   ): Promise<OrderGroup | null> {
     for (const ref of refs) {
       const groups = await orderLinkService.findOrders(organizationId, { query: ref });
-      if (groups.length === 0) continue;
-      return (
-        groups.find((g) => g.pluginId === pluginId) ?? groups.find((g) => g.pluginId) ?? groups[0]
-      );
+      const match = groups.find((g) => g.pluginId === pluginId) ?? groups.find((g) => g.pluginId);
+      if (match) return match;
     }
     return null;
   }

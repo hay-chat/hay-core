@@ -4,6 +4,11 @@
 - Turnstile copy already says "on for every workspace" (assumes D2 lands before release).
 - Lanes B/C/D agents still running in claude/w4-{b-approvals,c-disputes,d-abuse}; next: review + merge into staging, then Lane A.
 
+## 2026-10-28 — claude/w4-c-disputes (Lane C)
+- C1 9c43852a: `matchOrder` only matches orders a plugin knows (text-only mentions never; later refs still tried). C2 6c58f6af: `report` reloads the row after alerting, so `alertedAt` is fresh. C3 47bd40b9: rationale at `tasks/disputes-rationale.md` (docs/ is the public hay-docs submodule).
+- Verified: server tsc clean; new DB-free `tests/services/disputes.test.ts` 4/4 + dispute-evidence 11/11. NOT run: `tests/integration/disputes.test.ts` (C1/C2 cases added) — Docker hay-staging Postgres (:5433, hay_test) was down.
+- Open for Roger: Stripe MCP `update_dispute` is `other_write` → runs without approval (roadmap says "held"); Spanish alert email lacks the auto-submit warning.
+- Next: start the hay-staging Docker env, run the integration suite, then merge claude/w4-c-disputes into staging.
 ## 2026-10-28 — staging — Needs Roger list fully answered
 - All 86 items answered (questionnaire artifact); recorded in tasks/voc-roadmap.md: "Roger's answers", "Tickets from Roger's answers" (lanes A–I, all "do it now"), "Still on Roger".
 - Nothing built yet. Prod reads (deploy.sh) blocked by classifier → on Roger.
