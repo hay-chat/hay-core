@@ -1,6 +1,7 @@
 import PDFDocument from "pdfkit";
 import { Conversation } from "@server/database/entities/conversation.entity";
 import { Message, MessageType } from "@server/database/entities/message.entity";
+import { formatZonedDateTime, safeTimeZone } from "@server/utils/zoned-datetime";
 
 const MESSAGE_TYPE_LABELS: Record<MessageType, string> = {
   [MessageType.CUSTOMER]: "Customer",
@@ -13,8 +14,17 @@ const MESSAGE_TYPE_LABELS: Record<MessageType, string> = {
   [MessageType.PRODUCT_RECOMMENDATION]: "Product Recommendation",
 };
 
+export interface PdfExportOptions {
+  /** The organization's name, shown as the store in the header. */
+  storeName: string;
+  /** IANA zone every timestamp is shown in (the organization's time zone). */
+  timeZone: string;
+}
+
 export class ConversationExportService {
-  async generatePdf(conversation: Conversation): Promise<Buffer> {
+  async generatePdf(conversation: Conversation, options: PdfExportOptions): Promise<Buffer> {
+    const timeZone = safeTimeZone(options.timeZone);
+    const at = (date: Date | string | null | undefined) => formatZonedDateTime(date, timeZone);
     return new Promise((resolve, reject) => {
       const doc = new PDFDocument({ margin: 50, size: "A4" });
       const chunks: Buffer[] = [];
@@ -31,18 +41,19 @@ export class ConversationExportService {
       doc.moveDown(0.5);
 
       doc.fontSize(10).font("Helvetica");
+      if (options.storeName) doc.text(`Store: ${options.storeName}`);
       doc.text(`ID: ${conversation.id}`);
       doc.text(`Channel: ${conversation.channel}`);
       doc.text(`Status: ${conversation.status}`);
       if (conversation.language) {
         doc.text(`Language: ${conversation.language}`);
       }
-      doc.text(`Created: ${this.formatDate(conversation.created_at)}`);
+      doc.text(`Created: ${at(conversation.created_at)}`);
       if (conversation.ended_at) {
-        doc.text(`Ended: ${this.formatDate(conversation.ended_at)}`);
+        doc.text(`Ended: ${at(conversation.ended_at)}`);
       }
       if (conversation.closed_at) {
-        doc.text(`Closed: ${this.formatDate(conversation.closed_at)}`);
+        doc.text(`Closed: ${at(conversation.closed_at)}`);
       }
 
       if (conversation.agent?.name) {
@@ -59,6 +70,8 @@ export class ConversationExportService {
         }
       }
 
+      doc.text(`Times shown in: ${timeZone}`);
+
       doc.moveDown(0.5);
       doc.moveTo(50, doc.y).lineTo(545, doc.y).stroke();
       doc.moveDown(0.5);
@@ -70,7 +83,7 @@ export class ConversationExportService {
       }
 
       for (const message of messages) {
-        const timestamp = this.formatTime(message.created_at);
+        const timestamp = at(message.created_at);
         const label = this.getMessageLabel(message);
 
         doc
@@ -184,18 +197,6 @@ export class ConversationExportService {
       return `"${value.replace(/"/g, '""')}"`;
     }
     return value;
-  }
-
-  private formatDate(date: Date | string | null | undefined): string {
-    if (!date) return "";
-    const d = date instanceof Date ? date : new Date(date);
-    return d.toISOString().replace("T", " ").slice(0, 19) + " UTC";
-  }
-
-  private formatTime(date: Date | string | null | undefined): string {
-    if (!date) return "";
-    const d = date instanceof Date ? date : new Date(date);
-    return d.toISOString().slice(11, 19);
   }
 
   private getMessageLabel(message: Message): string {
