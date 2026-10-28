@@ -18,7 +18,7 @@ import {
   splitAddress,
   threadRootId,
 } from "./thread.js";
-import type { ReceivedEmail } from "./resend.js";
+import type { ReceivedAttachmentMeta, ReceivedEmail } from "./resend.js";
 
 /**
  * Turn a Resend `email.received` event into a Hay message.
@@ -37,8 +37,14 @@ export interface InboundSummary {
 }
 
 const MAX_ATTACHMENTS = 10;
-const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024;
+/** Matches core's conversation-media cap (CONVERSATION_MEDIA_MAX_SIZE_MB default). */
+const MAX_ATTACHMENT_BYTES = 25 * 1024 * 1024;
 const MAX_CONTENT_CHARS = 20_000;
+/**
+ * Inline parts below this size are signatures, logos and tracking pixels, not
+ * screenshots or photos pasted into the body (D8-7).
+ */
+export const MIN_INLINE_IMAGE_BYTES = 20 * 1024;
 
 interface UploadedAttachment {
   id?: string;
@@ -89,13 +95,37 @@ async function resolveHeaders(email: ReceivedEmail, ctx: ChannelContext): Promis
   return headers;
 }
 
-async function uploadAttachments(
-  email: ReceivedEmail,
-  ctx: ChannelContext,
-): Promise<UploadedAttachment[]> {
+/** An attachment the shopper sent that Hay.chat did not keep, reported in message metadata. */
+export interface RejectedAttachment {
+  filename: string;
+  type: string;
+  reason: "too_large" | "not_accepted" | "not_loaded";
+}
+
+interface AttachmentResult {
+  uploaded: UploadedAttachment[];
+  rejected: RejectedAttachment[];
+}
+
+/**
+ * Regular attachments, plus inline images big enough to be content (a pasted
+ * screenshot or photo) rather than a logo or tracking pixel.
+ */
+function isWanted(meta: ReceivedAttachmentMeta): boolean {
+  if ((meta.content_disposition ?? "attachment") !== "inline") {
+    return true;
+  }
+  if (!(meta.content_type ?? "").toLowerCase().startsWith("image/")) {
+    return false;
+  }
+  return meta.size === undefined || meta.size >= MIN_INLINE_IMAGE_BYTES;
+}
+
+async function uploadAttachments(email: ReceivedEmail, ctx: ChannelContext): Promise<AttachmentResult> {
+  const result: AttachmentResult = { uploaded: [], rejected: [] };
   const resend = ctx.getResend();
   if (!resend || !email.attachments?.length) {
-    return [];
+    return result;
   }
   let metas = email.attachments;
   if (!metas.some((meta) => meta.download_url)) {
@@ -106,48 +136,89 @@ async function uploadAttachments(
         emailId: email.id,
         error: error instanceof Error ? error.message : String(error),
       });
-      return [];
+      return result;
     }
   }
 
-  const uploaded: UploadedAttachment[] = [];
+  const { uploaded, rejected } = result;
   for (const meta of metas) {
     if (uploaded.length >= MAX_ATTACHMENTS) {
       break;
     }
-    if (!meta.download_url || (meta.content_disposition ?? "attachment") === "inline") {
+    if (!meta.download_url || !isWanted(meta)) {
       continue;
     }
+    const inline = meta.content_disposition === "inline";
+    const filename = meta.filename || (inline ? "inline-image" : "attachment");
+    const type = meta.content_type || "application/octet-stream";
     if (meta.size !== undefined && meta.size > MAX_ATTACHMENT_BYTES) {
-      ctx.logger.warn("Skipping oversized attachment", {
-        filename: meta.filename,
-        size: meta.size,
+      ctx.logger.warn("Skipping oversized attachment", { filename, size: meta.size });
+      rejected.push({ filename, type, reason: "too_large" });
+      continue;
+    }
+    let buffer: Buffer;
+    try {
+      ({ buffer } = await resend.download(meta.download_url));
+    } catch (error: unknown) {
+      ctx.logger.warn("Attachment download failed", {
+        filename,
+        error: error instanceof Error ? error.message : String(error),
       });
+      rejected.push({ filename, type, reason: "not_loaded" });
       continue;
     }
     try {
-      const { buffer } = await resend.download(meta.download_url);
+      if (inline && buffer.length < MIN_INLINE_IMAGE_BYTES) {
+        continue;
+      }
       if (buffer.length > MAX_ATTACHMENT_BYTES) {
-        ctx.logger.warn("Skipping oversized attachment", {
-          filename: meta.filename,
-          size: buffer.length,
-        });
+        ctx.logger.warn("Skipping oversized attachment", { filename, size: buffer.length });
+        rejected.push({ filename, type, reason: "too_large" });
         continue;
       }
       const stored = await ctx.api.mutation<UploadedAttachment>("media.upload", {
         data: buffer.toString("base64"),
-        mimeType: meta.content_type || "application/octet-stream",
-        filename: meta.filename || "attachment",
+        mimeType: type,
+        filename,
       });
       uploaded.push(stored);
     } catch (error: unknown) {
+      // Core refuses types outside its conversation-media allow-list (HEIC,
+      // archives, Office files) and content that doesn't match its type.
       ctx.logger.warn("Attachment upload failed", {
-        filename: meta.filename,
+        filename,
         error: error instanceof Error ? error.message : String(error),
       });
+      rejected.push({ filename, type, reason: "not_accepted" });
     }
   }
-  return uploaded;
+  return result;
+}
+
+/**
+ * Text the agent sees when the email has no body of its own: what was kept
+ * and what was not, so an attachment-only email is never an empty turn.
+ */
+export function describeAttachments(
+  uploaded: UploadedAttachment[],
+  rejected: RejectedAttachment[],
+): string {
+  const lines: string[] = [];
+  if (uploaded.length) {
+    const images = uploaded.filter((attachment) => attachment.type.startsWith("image/")).length;
+    const files = uploaded.length - images;
+    const parts = [
+      images ? (images === 1 ? "a photo" : `${images} photos`) : "",
+      files ? (files === 1 ? "a file" : `${files} files`) : "",
+    ].filter(Boolean);
+    lines.push(`[Customer sent ${parts.join(" and ")}]`);
+  }
+  if (rejected.length) {
+    lines.push(
+      `[Customer sent attachments Hay.chat could not accept: ${rejected.map((item) => item.filename).join(", ")}]`,
+    );
+  }
+  return lines.join("\n");
 }
 
 /**
@@ -279,11 +350,14 @@ export async function handleInbound(event: unknown, ctx: ChannelContext): Promis
     }
   }
 
-  const attachments = await uploadAttachments(email, ctx);
-  const content = extractReply(text).slice(0, MAX_CONTENT_CHARS);
-  if (!content && attachments.length === 0) {
+  const { uploaded: attachments, rejected } = await uploadAttachments(email, ctx);
+  const body = extractReply(text).slice(0, MAX_CONTENT_CHARS);
+  if (!body && attachments.length === 0 && rejected.length === 0) {
     return { outcome: "ignored", reason: "empty_body" };
   }
+  const content = body || describeAttachments(attachments, rejected);
+  // Only the "[Customer sent …]" line for kept files: the Inbox shows the files instead.
+  const mediaPlaceholder = !body && rejected.length === 0;
 
   const result = await ctx.api.mutation<{
     messageId: string | null;
@@ -308,6 +382,8 @@ export async function handleInbound(event: unknown, ctx: ChannelContext): Promis
       references,
       authentication: email.authentication ?? undefined,
       holdReason: hold ? holdReason : undefined,
+      mediaPlaceholder: mediaPlaceholder || undefined,
+      rejectedAttachments: rejected.length ? rejected : undefined,
     },
     attachments: attachments.length ? attachments : undefined,
   });
