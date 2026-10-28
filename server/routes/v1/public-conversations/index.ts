@@ -1,5 +1,6 @@
 import { t, publicProcedure } from "@server/trpc";
 import { requestHostname, isDashboardHost, challengeFrameHostname } from "@server/lib/webchat-origin";
+import { isUnderAttack, recordCreateAttempt } from "@server/services/webchat/under-attack.service";
 import {
   webchatExtensionsService,
   type GateOutcome,
@@ -178,6 +179,10 @@ export const publicConversationsRouter = t.router({
         }
       }
 
+      // Every create attempt counts towards the under-attack trigger (D9-10),
+      // including the ones the gates then refuse.
+      const underAttack = await recordCreateAttempt(organizationId);
+
       // Plugin gates (e.g. a bot challenge) run before the conversation exists.
       const gate = await webchatExtensionsService.runGates(organizationId, "conversation.create", {
         token: input.challengeToken,
@@ -185,7 +190,7 @@ export const publicConversationsRouter = t.router({
         pageHostname: hostname,
         frameHostname: challengeFrameHostname(),
         ip: clientIp(ctx.ipAddress),
-        underAttack: false,
+        underAttack,
       });
       if (gate.decision === "deny") throw verificationFailed();
 
@@ -385,7 +390,7 @@ export const publicConversationsRouter = t.router({
           pageHostname: requestHostname(ctx.req.headers),
           frameHostname: challengeFrameHostname(),
           ip: clientIp(ctx.ipAddress),
-          underAttack: false,
+          underAttack: await isUnderAttack(conversation.organization_id),
         },
       );
       if (gate.decision === "deny") throw verificationFailed();

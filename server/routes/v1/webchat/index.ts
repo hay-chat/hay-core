@@ -1,5 +1,7 @@
 import { router, scopedProcedure, publicProcedure } from "@server/trpc";
 import { webchatExtensionsService } from "@server/services/webchat/webchat-extensions.service";
+import { isUnderAttack, setUnderAttack, stateOf } from "@server/services/webchat/under-attack.service";
+import { config } from "@server/config/env";
 import { z } from "zod";
 import { webchatSettingsService } from "@server/services/webchat/webchat-settings.service";
 import { organizationRepository } from "@server/repositories/organization.repository";
@@ -46,8 +48,23 @@ export const webchatRouter = router({
    * Get webchat settings for the current organization
    */
   getSettings: scopedProcedure("webchat", "read").query(async ({ ctx }) => {
-    return await webchatSettingsService.getSettings(ctx.organizationId!);
+    const settings = await webchatSettingsService.getSettings(ctx.organizationId!);
+    return {
+      ...settings,
+      underAttack: stateOf(settings),
+      underAttackHours: config.underAttack.hours,
+    };
   }),
+
+  /**
+   * Under-attack mode (D9-10): challenge every visitor for the next
+   * UNDER_ATTACK_HOURS, or switch it off early.
+   */
+  setUnderAttack: scopedProcedure("webchat", "write")
+    .input(z.object({ enabled: z.boolean() }))
+    .mutation(async ({ ctx, input }) => {
+      return await setUnderAttack(ctx.organizationId!, input.enabled);
+    }),
 
   /**
    * Update webchat settings
@@ -96,10 +113,11 @@ export const webchatRouter = router({
         return { enabled: false as const };
       }
 
+      const underAttack = await isUnderAttack(input.organizationId);
       const [config, contributions] = await Promise.all([
         webchatSettingsService.getPublicConfig(input.organizationId),
         webchatExtensionsService.getPublicContributions(input.organizationId, input.supports ?? [], {
-          underAttack: false,
+          underAttack,
         }),
       ]);
       return {
