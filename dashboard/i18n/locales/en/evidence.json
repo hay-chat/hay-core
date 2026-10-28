@@ -52,6 +52,57 @@
       "retention": "Your data retention is set to {days} days. Conversations older than that are deleted and cannot be part of a pack. Disputes can be opened months after an order, so a short retention leaves you less evidence.",
       "retentionOff": "Conversations are kept until you delete them, so older orders can still be packed.",
       "retentionLink": "Data retention settings"
+    },
+    "disputes": {
+      "title": "Payment disputes",
+      "description": "Chargebacks your connected payment platforms reported. Attach the evidence pack as a draft, then review and submit it on the platform.",
+      "order": "Order {order}",
+      "noOrderLabel": "Order unknown",
+      "status": {
+        "needs_response": "Needs a response",
+        "under_review": "Under review",
+        "won": "Won",
+        "lost": "Lost",
+        "closed": "Closed"
+      },
+      "drafted": "Evidence attached as draft",
+      "dueBy": "Evidence due {at}",
+      "noOrder": "No conversation mentions this order yet, so there is nothing to attach.",
+      "download": "Download pack",
+      "attach": "Attach as draft",
+      "attachAgain": "Attach again",
+      "open": "Open in {platform}",
+      "confirmTitle": "Attach the evidence pack as a draft?",
+      "confirmDescription": "Hay.chat uploads the evidence PDF to this dispute on {platform} and adds a short note. Nothing is submitted: you review the response and submit it on {platform} yourself. Files you added there are kept.",
+      "confirm": "Attach as draft",
+      "attached": "Evidence attached to the dispute on {platform}",
+      "attachedHelp": "It is a draft. Review it and submit the response on {platform} before the deadline.",
+      "reasons": {
+        "product_not_received": "Item not received",
+        "product_unacceptable": "Not as described",
+        "credit_not_processed": "Credit not processed",
+        "subscription_canceled": "Subscription cancelled",
+        "duplicate": "Duplicate charge",
+        "fraudulent": "Fraudulent",
+        "unrecognized": "Unrecognised charge",
+        "general": "General",
+        "customer_initiated": "Customer initiated",
+        "incorrect_account_details": "Incorrect account details",
+        "insufficient_funds": "Insufficient funds",
+        "bank_cannot_process": "Bank cannot process",
+        "debit_not_authorized": "Debit not authorised"
+      },
+      "errors": {
+        "NOT_EDITABLE": "This dispute no longer takes evidence. It may already have been submitted or closed.",
+        "SLOT_TAKEN": "The dispute already holds files you added on the platform, so Hay.chat did not replace them. Download the pack and add it there.",
+        "SCOPE_MISSING": "The connection lacks permission to edit dispute evidence. Reconnect the integration and approve the new permissions.",
+        "NOT_FOUND": "The platform could not find this dispute.",
+        "NOT_CONNECTED": "The integration that reported this dispute is not connected or cannot attach evidence.",
+        "PROVIDER_ERROR": "The platform did not accept the evidence. Try again, or download the pack and add it there.",
+        "NO_ORDER": "No conversation mentions this order, so there is nothing to attach.",
+        "NO_CONVERSATIONS": "The conversations about this order are no longer stored.",
+        "TOO_LARGE": "The evidence file is too large to attach. Download it from this page and trim it before uploading."
+      }
     }
   }
 }

@@ -34,6 +34,7 @@ import type {
 import { createLogger } from "@server/lib/logger";
 import { emailDomainService } from "@server/services/email-domains.service";
 import { channelHealthService } from "@server/services/channel-health.service";
+import { disputesService } from "@server/services/disputes/disputes.service";
 import type { Conversation } from "@server/database/entities/conversation.entity";
 
 const logger = createLogger("plugin-api-trpc");
@@ -1284,6 +1285,37 @@ export const pluginApiTrpcRouter = router({
         input.externalId,
       );
       return { removed };
+    }),
+
+  /**
+   * Disputes Capability - Report a payment dispute (chargeback), D2-7/D2-8
+   *
+   * Called by payment-platform plugins from their webhook / onStart via
+   * `ctx.disputes.report(...)`. Idempotent on (plugin, externalId). Core stamps
+   * the source from the authenticated plugin id, matches the order and alerts
+   * owners and admins once.
+   */
+  "disputes.report": pluginProcedure
+    .input(
+      z.object({
+        externalId: z.string().trim().min(1).max(255),
+        status: z.enum(["needs_response", "under_review", "won", "lost", "closed"]),
+        amount: z.string().max(32).optional(),
+        currency: z.string().length(3).optional(),
+        reason: z.string().max(64).optional(),
+        evidenceDueBy: z.string().datetime({ offset: true }).optional(),
+        initiatedAt: z.string().datetime({ offset: true }).optional(),
+        orderRefs: z.array(z.string().max(255)).max(10).optional(),
+        orderLabel: z.string().max(64).optional(),
+        // Rendered as a link on the dashboard: https only.
+        providerUrl: z.string().url().max(2048).startsWith("https://").optional(),
+      }),
+    )
+    .mutation(async ({ input, ctx }) => {
+      requireCapability(ctx, "disputes");
+      const { organizationId, pluginId } = ctx.pluginAuth;
+      const { created } = await disputesService.report(organizationId, pluginId, input);
+      return { created };
     }),
 });
 

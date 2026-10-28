@@ -13,6 +13,7 @@ import type { HayMcpRuntimeAPI } from "./mcp";
 import type { HayLogger } from "./logger";
 import type { HayOrg } from "./org";
 import type { HayProductSourceRuntimeAPI } from "./products";
+import type { HayDisputeSourceRuntimeAPI } from "./disputes";
 
 /**
  * Global context provided to onInitialize hook.
@@ -176,6 +177,15 @@ export interface HayStartContext {
    * `onStart` (initial bulk sync) or webhook handlers (real-time updates).
    */
   productSource?: HayProductSourceRuntimeAPI;
+
+  /**
+   * Dispute source runtime API.
+   *
+   * Only populated when the plugin declares the `disputes` capability. Used to
+   * report payment disputes (chargebacks) to Hay so the owner is alerted and
+   * can attach the evidence pack as a draft.
+   */
+  disputes?: HayDisputeSourceRuntimeAPI;
 
   /**
    * Logger for plugin messages.
