@@ -3,7 +3,12 @@ import { describe, it, expect, beforeAll, afterAll, beforeEach } from "@jest/glo
 import { AppDataSource } from "../../database/data-source";
 import { Organization } from "../../entities/organization.entity";
 import { InsightIssue } from "../../database/entities/insight-issue.entity";
-import { insightsService, canTransition } from "../../services/insights/insights.service";
+import {
+  insightsService,
+  canTransition,
+  fixedStatus,
+  archiveSuggested,
+} from "../../services/insights/insights.service";
 
 describe("insights service (D3-13)", () => {
   const orgId = "d3130000-0000-4000-8000-000000000001";
@@ -238,6 +243,44 @@ describe("insights service (D3-13)", () => {
       insightsService.approve({ organizationId: orgId, clusterId: closedId, userId: null }),
     ).rejects.toMatchObject({ code: "BAD_REQUEST" });
     await AppDataSource.query(`DELETE FROM playbooks WHERE id = $1`, [playbook.id]);
+  });
+
+  it("measures whether addressed insights stayed fixed and suggests archiving stale ones (D3-16)", async () => {
+    const day = 86400000;
+    const now = new Date();
+    const ago = (days: number) => new Date(now.getTime() - days * day);
+
+    expect(fixedStatus(null, 3, 0)).toBeNull();
+    expect(fixedStatus(ago(5), 8, 0, now)?.status).toBe("watching");
+    expect(fixedStatus(ago(28), 8, 0, now)?.status).toBe("fixed");
+    expect(fixedStatus(ago(28), 8, 3, now)?.status).toBe("improved"); // 0.75/wk vs 1.9/wk
+    expect(fixedStatus(ago(28), 4, 8, now)?.status).toBe("not_fixed");
+    expect(archiveSuggested("new", ago(50), now)).toBe(true);
+    expect(archiveSuggested("new", ago(10), now)).toBe(false);
+    expect(archiveSuggested("rejected", ago(50), now)).toBe(false);
+
+    const fixedId = await cluster({ state: "addressed", addressed_at: ago(20) });
+    for (let i = 0; i < 4; i++) {
+      const m = await member(fixedId);
+      await AppDataSource.query(`UPDATE insight_issues SET created_at = $2 WHERE id = $1`, [
+        m.id,
+        ago(25 + i),
+      ]);
+    }
+    const brokenId = await cluster({ state: "new", addressed_at: ago(20) });
+    for (const daysAgo of [25, 10, 5, 3, 1]) {
+      const m = await member(brokenId);
+      await AppDataSource.query(`UPDATE insight_issues SET created_at = $2 WHERE id = $1`, [
+        m.id,
+        ago(daysAgo),
+      ]);
+    }
+    await cluster({ state: "addressed", addressed_at: ago(3) }); // still watching
+
+    const { counts } = await insightsService.list(orgId, { days: 30, state: "all" });
+    expect(counts).toMatchObject({ fixed: 1, measured: 2 });
+    expect((await insightsService.get(orgId, fixedId)).fixed?.status).toBe("fixed");
+    expect((await insightsService.get(orgId, brokenId)).fixed?.status).toBe("not_fixed");
   });
 
   it("encodes the transition table", () => {

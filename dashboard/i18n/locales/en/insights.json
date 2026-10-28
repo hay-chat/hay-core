@@ -193,6 +193,11 @@
         "save": "Save",
         "saved": "Insights settings saved",
         "error": "Could not save the settings"
+      },
+      "fixedBadge": {
+        "fixed": "Fixed",
+        "improved": "Improved",
+        "not_fixed": "Not fixed"
       }
     }
   }

@@ -40,6 +40,19 @@
           </Badge>
         </div>
 
+        <Card v-if="insight.fixed">
+          <CardHeader>
+            <CardTitle class="text-base">{{ $t("insights.page.detail.fixed.title") }}</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p class="text-sm">{{ fixedText }}</p>
+          </CardContent>
+        </Card>
+
+        <p v-if="insight.archiveSuggested" class="text-sm text-neutral-muted">
+          {{ $t("insights.page.detail.archiveSuggestion") }}
+        </p>
+
         <Card v-if="insight.hypothesis">
           <CardHeader>
             <CardTitle class="text-base">{{ $t("insights.page.detail.hypothesis") }}</CardTitle>
@@ -322,6 +335,14 @@ const statRows = computed(() => {
     { label: t("insights.page.detail.stats.firstSeen"), value: formatDate(i.firstSeenAt) },
     { label: t("insights.page.detail.stats.lastSeen"), value: formatDate(i.lastSeenAt) },
   ];
+});
+
+const fixedText = computed(() => {
+  const fixed = insight.value?.fixed;
+  if (!fixed) return "";
+  const params = { before: fixed.beforePerWeek, after: fixed.afterPerWeek, days: 14 };
+  const key = fixed.status === "not_fixed" ? "notFixed" : fixed.status;
+  return t(`insights.page.detail.fixed.${key}`, params);
 });
 
 const labelFor = (prefix: string, key: string) =>
