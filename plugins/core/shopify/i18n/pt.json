@@ -82,5 +82,15 @@
       "label": "Consultar Estoque",
       "description": "Consulta o estoque de uma variante por id ou SKU em todos os locais."
     }
+  },
+  "config": {
+    "staleTrackingDomesticDays": {
+      "label": "Rastreio parado: nacional (dias)",
+      "description": "Considera uma entrega nacional parada quando o rastreio não se move há mais do que este número de dias."
+    },
+    "staleTrackingInternationalDays": {
+      "label": "Rastreio parado: internacional (dias)",
+      "description": "Considera uma entrega internacional parada quando o rastreio não se move há mais do que este número de dias."
+    }
   }
 }

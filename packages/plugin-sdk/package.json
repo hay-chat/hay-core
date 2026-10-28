@@ -28,6 +28,9 @@
     },
     "./tool-risk": {
       "default": "./tool-risk/index.cjs"
+    },
+    "./stale-tracking": {
+      "default": "./stale-tracking/index.cjs"
     }
   },
   "bin": {

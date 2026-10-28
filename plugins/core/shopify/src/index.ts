@@ -406,6 +406,22 @@ async function writeAppMetafields(
   }
 }
 
+/** D6-9 per-store stale-tracking thresholds → MCP env (the MCP falls back to 5/10). */
+function staleTrackingEnv(config: {
+  getOptional: <T = unknown>(key: string) => T | undefined;
+}): Record<string, string> {
+  const env: Record<string, string> = {};
+  const domestic = config.getOptional<number | string>("staleTrackingDomesticDays");
+  const international = config.getOptional<number | string>("staleTrackingInternationalDays");
+  if (domestic !== undefined && domestic !== null && domestic !== "") {
+    env.STALE_TRACKING_DOMESTIC_DAYS = String(domestic);
+  }
+  if (international !== undefined && international !== null && international !== "") {
+    env.STALE_TRACKING_INTERNATIONAL_DAYS = String(international);
+  }
+  return env;
+}
+
 export default defineHayPlugin((globalCtx) => ({
   name: "Shopify",
 
@@ -457,6 +473,22 @@ export default defineHayPlugin((globalCtx) => ({
         label: "Admin API version",
         description: "Shopify Admin API version to use.",
         default: "2026-04",
+      },
+      staleTrackingDomesticDays: {
+        type: "number",
+        label: "Stale tracking: domestic (days)",
+        description:
+          "Treat a domestic shipment as stuck when its tracking has not moved for more than " +
+          "this many days.",
+        default: 5,
+      },
+      staleTrackingInternationalDays: {
+        type: "number",
+        label: "Stale tracking: international (days)",
+        description:
+          "Treat an international shipment as stuck when its tracking has not moved for more " +
+          "than this many days.",
+        default: 10,
       },
     });
 
@@ -612,6 +644,7 @@ export default defineHayPlugin((globalCtx) => ({
           SHOPIFY_SHOP: shop,
           SHOPIFY_ACCESS_TOKEN: accessToken,
           SHOPIFY_API_VERSION: apiVersion,
+          ...staleTrackingEnv(ctx.config),
         },
       });
       ctx.logger.info("Shopify MCP server started successfully");

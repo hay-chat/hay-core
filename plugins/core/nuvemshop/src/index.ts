@@ -398,6 +398,22 @@ async function bulkSync(
   logger.info("Nuvemshop bulk sync complete", { total });
 }
 
+/** D6-9 per-store stale-tracking thresholds → MCP env (the MCP falls back to 5/10). */
+function staleTrackingEnv(config: {
+  getOptional: <T = unknown>(key: string) => T | undefined;
+}): Record<string, string> {
+  const env: Record<string, string> = {};
+  const domestic = config.getOptional<number | string>("staleTrackingDomesticDays");
+  const international = config.getOptional<number | string>("staleTrackingInternationalDays");
+  if (domestic !== undefined && domestic !== null && domestic !== "") {
+    env.STALE_TRACKING_DOMESTIC_DAYS = String(domestic);
+  }
+  if (international !== undefined && international !== null && international !== "") {
+    env.STALE_TRACKING_INTERNATIONAL_DAYS = String(international);
+  }
+  return env;
+}
+
 export default defineHayPlugin((globalCtx) => ({
   name: "Nuvemshop",
 
@@ -457,6 +473,22 @@ export default defineHayPlugin((globalCtx) => ({
         label: "Coupon validity (days)",
         description: "Coupons the agent creates expire after at most this many days.",
         default: DEFAULT_COUPON_MAX_DAYS,
+      },
+      staleTrackingDomesticDays: {
+        type: "number",
+        label: "Stale tracking: domestic (days)",
+        description:
+          "Treat a domestic shipment as stuck when its tracking has not moved for more than " +
+          "this many days.",
+        default: 5,
+      },
+      staleTrackingInternationalDays: {
+        type: "number",
+        label: "Stale tracking: international (days)",
+        description:
+          "Treat an international shipment as stuck when its tracking has not moved for more " +
+          "than this many days.",
+        default: 10,
       },
     });
 
@@ -538,6 +570,7 @@ export default defineHayPlugin((globalCtx) => ({
           NUVEMSHOP_API_VERSION: apiVersion,
           NUVEMSHOP_MAIN_LANGUAGE: mainLanguage,
           ...couponEnv(ctx.config),
+          ...staleTrackingEnv(ctx.config),
         },
       });
       ctx.logger.info("Nuvemshop MCP server started successfully");

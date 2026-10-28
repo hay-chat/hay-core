@@ -79,6 +79,14 @@
     "consumerSecret": {
       "label": "Consumer Secret",
       "description": "WooCommerce REST API Consumer Secret"
+    },
+    "staleTrackingDomesticDays": {
+      "label": "Stale tracking: domestic (days)",
+      "description": "Treat a domestic shipment as stuck when its tracking has not moved for more than this many days."
+    },
+    "staleTrackingInternationalDays": {
+      "label": "Stale tracking: international (days)",
+      "description": "Treat an international shipment as stuck when its tracking has not moved for more than this many days."
     }
   }
 }

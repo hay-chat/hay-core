@@ -99,6 +99,14 @@
     "couponMaxDays": {
       "label": "Validade do cupom (dias)",
       "description": "Os cupons criados pelo agente expiram em no máximo este número de dias."
+    },
+    "staleTrackingDomesticDays": {
+      "label": "Rastreio parado: nacional (dias)",
+      "description": "Considera uma entrega nacional parada quando o rastreio não se move há mais do que este número de dias."
+    },
+    "staleTrackingInternationalDays": {
+      "label": "Rastreio parado: internacional (dias)",
+      "description": "Considera uma entrega internacional parada quando o rastreio não se move há mais do que este número de dias."
     }
   }
 }

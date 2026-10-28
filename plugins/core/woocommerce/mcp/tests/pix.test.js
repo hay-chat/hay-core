@@ -95,7 +95,7 @@ describe("enrichOrder payment fields (D10-2)", () => {
         refunds: [{ id: 30, reason: "", total: "-10.00" }],
       },
       [],
-      [{ id: 30, date_created: "2026-10-04T09:00:00" }],
+      { refundDetails: [{ id: 30, date_created: "2026-10-04T09:00:00" }] },
     );
     expect(e.refunds).toEqual([
       { id: 30, reason: "", total: "-10.00", dateCreated: "2026-10-04T09:00:00" },

@@ -295,7 +295,9 @@ describe("nuvemshop_add_order_note", () => {
       note: "Customer asked for an update",
     });
     const put = calls.find((c) => c.method === "PUT");
-    expect(put.body.owner_note).toMatch(/^Gift wrap\n\[Hay .* UTC\] Customer asked for an update$/);
+    expect(put.body.owner_note).toMatch(
+      /^Gift wrap\n\[Hay\.chat .* UTC\] Customer asked for an update$/,
+    );
     expect(res.data.ownerNote).toBe(put.body.owner_note);
   });
 });

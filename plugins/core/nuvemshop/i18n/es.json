@@ -99,6 +99,14 @@
     "couponMaxDays": {
       "label": "Validez del cupón (días)",
       "description": "Los cupones que crea el agente vencen como máximo en esta cantidad de días."
+    },
+    "staleTrackingDomesticDays": {
+      "label": "Seguimiento detenido: nacional (días)",
+      "description": "Considera un envío nacional detenido cuando su seguimiento no se mueve hace más de esta cantidad de días."
+    },
+    "staleTrackingInternationalDays": {
+      "label": "Seguimiento detenido: internacional (días)",
+      "description": "Considera un envío internacional detenido cuando su seguimiento no se mueve hace más de esta cantidad de días."
     }
   }
 }
