@@ -90,3 +90,30 @@ jobs:
         run: cd server && npm run migration:run
       - name: Run server tests
         run: cd server && npm test
+
+  # Webchat widget: unit tests, then the performance budget on a fresh build
+  # (D12-9). The budget fails the job when widget.js grows past 10 KB brotli or
+  # the "interaction" loading mode requests anything before the visitor reaches
+  # for the button. No Chrome needed; see webchat/scripts/check-perf.mjs.
+  webchat:
+    name: Webchat Tests & Perf Budget
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: webchat
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: webchat/package-lock.json
+      - name: Install dependencies
+        run: npm ci
+      - name: Run webchat tests
+        run: npm test
+      - name: Build widget
+        run: npm run build
+      - name: Check performance budget
+        run: npm run check:perf
