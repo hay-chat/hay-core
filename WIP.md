@@ -1,3 +1,10 @@
+## 2026-10-28 — staging — Lanes B, C, D merged
+- Merged claude/w4-b-approvals (4544ef9d), claude/w4-c-disputes (0232fb97), claude/w4-d-abuse (a0b1a115).
+- Migration AddWebchatIdentitySecret run on local hay_staging + hay_test (Docker hay-staging-postgres-1 :5433 started).
+- Verified: server tsc clean; full server jest 1678 pass / 1 fail (resolution-ledger exclusions test fails only in the full parallel run, passes alone and in tests/integration 245/245 — flaky shared-DB state).
+- Not run: `plugins:enable-defaults` on staging (Turnstile for all orgs); hand-tests in the dashboard.
+- Open questions for Roger in tasks/voc-roadmap.md "Still on Roger". Next: Lane A (billing).
+
 ## 2026-10-28 — staging — Lane C merged
 - claude/w4-c-disputes merged (0232fb97) + Spanish alert auto-submit warning (5683ba48). Unit 15/15, server tsc clean.
 - NOT run: tests/integration/disputes.test.ts (Docker hay-staging Postgres down; Docker Desktop not running).

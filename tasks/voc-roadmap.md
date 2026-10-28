@@ -292,6 +292,11 @@ Roger said "Do it now" for every gap. Not started; lanes below.
 - (Lane B) Destructive writes run when the approval master switch is off. Hold them anyway? Default: hold (one line in `decideGate`).
 - (Lane B) Typed confirm: server checks a fixed English token, dashboard checks the localized word. OK? Default: keep.
 - (Lane C) Disputes rationale ready to read: `tasks/disputes-rationale.md`.
+- (Lane D) Bot check: browser-reported "could not load" errors (timeout etc.) count as unavailable, so vision still reads files; a bot could claim `timeout`. Under-attack/challenge-all still refuse. Accept? Default: accept.
+- (Lane D) A validly signed `customerExternalId` with no matching customer stays anonymous. Create the customer instead? Default: create it.
+- (Lane D) Shopify theme block can't sign ids. Build signing in apps.hay.chat, or leave Shopify customer linking off for now? Default: leave off.
+- (Lane D) After each deploy run `npm run plugins:enable-defaults` once (enables Turnstile for existing orgs); deploy must include the built turnstile plugin.
+- (Lane D, other repos, not done) WooCommerce plugin must sign ids (`hash_hmac` + secret option); hay-website `context-api.md` must document the signature.
 - Deferred to a Claude-in-Chrome session: prod env keys (Turnstile, VAPID, OPERATOR_EVENTS_URL/INTERNAL_API_SECRET, SMTP_FROM_NAME, JWT_REFRESH_EXPIRES_IN check, Meta, MP, OpenAI EU), Meta Messenger setup + App Review, Mercado Pago app, OpenAI EU application, Stripe test-mode plan changes, WABA checks, real-store checks, connecting test stores to staging.
 - Deferred: disputes real tests (after the C3 rationale doc), iPhone push test (can run before deploy: staging over an https tunnel + VAPID keys), WP 1.0.1/1.1.0 svn release, lawyer questions, read-only prod checks (D1-0, D14-1, D3), merchant comms, Spanish alert + widget locale native checks, legal copy in website #46.
 - After deploy: Claude does the D8 media-private switch (needs Roger's go-ahead then).
