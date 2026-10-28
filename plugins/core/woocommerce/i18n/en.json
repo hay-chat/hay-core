@@ -77,6 +77,10 @@
     "woocommerce_get_return_instructions": {
       "label": "Get Return Instructions",
       "description": "Get the store's own instructions for returning an item, to relay as written."
+    },
+    "woocommerce_resend_pix": {
+      "label": "Resend Pix or Payment Link",
+      "description": "Send the Pix code or payment link of an unpaid order, once the customer's email or phone matches the order."
     }
   },
   "config": {

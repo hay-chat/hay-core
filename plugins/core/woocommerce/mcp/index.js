@@ -28,6 +28,7 @@ const { registerProductTools } = require("./tools/products");
 const { registerCouponTools } = require("./tools/coupons");
 const { registerOrderEmailTools } = require("./tools/order-emails");
 const { registerReturnTools } = require("./tools/returns");
+const { registerPaymentTools } = require("./tools/payments");
 
 function createServer() {
   const server = applyToolRisk(new McpServer({ name: "woocommerce", version: "2.0.0" }), toolRisk);
@@ -39,6 +40,7 @@ function createServer() {
   registerCouponTools(server);
   registerOrderEmailTools(server);
   registerReturnTools(server);
+  registerPaymentTools(server);
   return server;
 }
 

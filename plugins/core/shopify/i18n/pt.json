@@ -97,6 +97,10 @@
     "shopify_get_return_instructions": {
       "label": "Ver Instruções de Devolução",
       "description": "Obtém as instruções da loja para devolver um item, para repassar como estão."
+    },
+    "shopify_send_payment_link": {
+      "label": "Enviar Link de Pagamento",
+      "description": "Envia por e-mail o link de pagamento de um pedido não pago, depois que o e-mail ou telefone do cliente confere com o pedido."
     }
   },
   "config": {
