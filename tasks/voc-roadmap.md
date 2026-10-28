@@ -297,6 +297,11 @@ Roger said "Do it now" for every gap. Not started; lanes below.
 - (Lane D) Shopify theme block can't sign ids. Build signing in apps.hay.chat, or leave Shopify customer linking off for now? Default: leave off.
 - (Lane D) After each deploy run `npm run plugins:enable-defaults` once (enables Turnstile for existing orgs); deploy must include the built turnstile plugin.
 - (Lane D, other repos, not done) WooCommerce plugin must sign ids (`hash_hmac` + secret option); hay-website `context-api.md` must document the signature.
+- (Lane G) Evidence PDF policy text = the excerpt the AI saw when it first used the policy in the chat (not dispute date). Default: keep.
+- (Lane G) Evidence PDF capped at 50 pages (believed Stripe's limit, unchecked); export attachments budget 1.5 GB. Default: keep both.
+- (Lane G) Plan-change email says "applies now"; wrong if the portal schedules downgrades at period end. Default: keep unless portal schedules.
+- (Lane G) Follow-up: `sendPausedNotice` (D11-9) likely also held under drafts-only/test mode → same bypass as the holding reply.
+- (Lane G) Backoffice G2 commit is local only: hay-backoffice-w4-g, branch claude/w4-g-plan-email → needs a PR.
 - Deferred to a Claude-in-Chrome session: prod env keys (Turnstile, VAPID, OPERATOR_EVENTS_URL/INTERNAL_API_SECRET, SMTP_FROM_NAME, JWT_REFRESH_EXPIRES_IN check, Meta, MP, OpenAI EU), Meta Messenger setup + App Review, Mercado Pago app, OpenAI EU application, Stripe test-mode plan changes, WABA checks, real-store checks, connecting test stores to staging.
 - Deferred: disputes real tests (after the C3 rationale doc), iPhone push test (can run before deploy: staging over an https tunnel + VAPID keys), WP 1.0.1/1.1.0 svn release, lawyer questions, read-only prod checks (D1-0, D14-1, D3), merchant comms, Spanish alert + widget locale native checks, legal copy in website #46.
 - After deploy: Claude does the D8 media-private switch (needs Roger's go-ahead then).

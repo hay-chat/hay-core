@@ -1,3 +1,8 @@
+## 2026-10-28 — staging — Lane G merged
+- claude/w4-g-exports merged (6d798bc9); migration AddOperatorEvents ran on hay_test + hay_staging (by the agent).
+- Integration 38/41 suites pass in the full run while other agents share hay_test; the 3 failing ones (organization-export, insight-backfill, conversation-media) pass when re-run alone → contention flakes.
+- Backoffice G2 (plan-change email) local only in hay-backoffice-w4-g. Lane A and E+F agents still running.
+
 ## 2026-10-28 — claude/w4-g-exports (worktree hay-core-w4-g-exports) — Lane G committed, NOT pushed
 - G1 3a71e7d8 export ZIP includes conversation-media attachments (1.5 GB budget, attachments.jsonl index).
 - G3 48af7bf8 operator_events outbox + operator-event-retry cron (1m..24h, 7 attempts) — migration 1785895000000 (run on hay_test + hay_staging).
