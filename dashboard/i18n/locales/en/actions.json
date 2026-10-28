@@ -9,7 +9,7 @@
       "address_change": "Address changes",
       "customer_update": "Customer detail changes",
       "note": "Order notes and resent emails",
-      "destructive": "Deletions and setup changes",
+      "destructive": "Deletions, setup changes and dispute replies",
       "other_write": "Other actions"
     },
     "settings": {
