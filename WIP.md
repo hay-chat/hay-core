@@ -1,3 +1,9 @@
+## 2026-10-28 02:15 — staging — W2 L11 + L5 merged, hand-tested, fixes in
+- Merged L11 (D14-5..8) and L5 (commerce, 10 tickets). No migrations.
+- Fixes: 4cd82e9 drafts-only Approve/Block always shown + i18n; 992bcb5 saving plugin settings kept secrets; 18c4a4a marketplace copy; aefb1c0 Woo resend detects mailer failure note → EMAIL_FAILED (6 tests).
+- Manual ✓ on Woo demo: return instructions, marketplace routing, tracking from note, resend honest on mail failure. GIF W2-L5-*.
+- Next: full suites alone → tag wave-1-done → PR #104 body → GIFs to Roger → next W2 lanes (L9+L4 D4/D6, L3 D5).
+
 ## 2026-10-28 — claude/w2-commerce (L5 Wave 2) — all 10 tickets done, committed, not pushed
 - SDK: exchange write category (core MONEY_CATEGORIES, tiny core change), return-instructions, identity, marketplace-orders modules.
 - Shopify: re-consent scopes + runtime SCOPE_MISSING ("re-approve Hay.chat"); D6-10 swap_order_item; D6-11 create_exchange; D10-3 send_payment_link.

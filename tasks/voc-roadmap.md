@@ -4,6 +4,7 @@ Started 2026-10-27. Research: `/Users/rogerjunior/Documents/code/hay/seo/Enginee
 "Roger's answers" block overrides its recommendations). Research baseline: origin/master 3e6ede1.
 
 ## Resume here (orchestrator checkpoint — keep current; safe to /compact after reading this)
+- 2026-10-28 02:15: Wave 2 L11 (D14-5..8) + L5 (D6-10..13, D10-3, D10-6, D16-2, D16-8) merged + hand-tested. My fixes: 4cd82e9 drafts approve buttons always + i18n; 992bcb5 plugin settings save no longer wipes secrets; 18c4a4a marketplace copy; aefb1c0 Woo resend reports mail failure (EMAIL_FAILED). GIFs W2-D14-*, W2-L5-*. NEXT: full suites alone → tag wave-1-done → PR #104 body → GIFs to Roger → next W2 lanes.
 - Last update: 2026-10-27 ~19:45. Staging HEAD d64da73 (+ roadmap commits).
 - Wave 0 merged into staging: L2, L1, L8, L3 + D5-2 fix (a0b0220), L9, L5 (24818be), L10 (824abf1), L6 (d64da73). Migrations ran on hay_staging + hay_test.
 - Wave 0 DONE: review fixes (b8f3bb5) + test fixes (e4d48c2) merged and retested ✓ (single greeting, KPI cards include today, feedback filter/export). Full suites green (server 963, dashboard 38, webchat 71, sdk 143). Tagged `wave-0-done`; PR staging→master opened. NEXT SESSION: Wave 1 per table below (fresh orchestrator session; start with widget restore-on-reload bug in L6 with D9-4).
@@ -174,6 +175,11 @@ Parked: D13-15, D16-10/11, D6-14, D2-10, D7-15, D8-18, D10-9, D11-13, D14-10, fr
 Staging seed: org/user created via `auth.register` (credentials in `../hay-core-staging/.staging-login`, untracked).
 
 ## Needs Roger
+- [W2 L11] Confirm: EU heuristic = aiRegion eu OR Europe/* timezone; `[label]` first-line format on non-web channels; disclosure controls live on Customer Privacy; drafts-only allowed on Web Chat too; existing orgs keep their retention (suggest opt-in prompt to 365 d). D14-1, D14-3 still pending your answers.
+- [W2 L5] Shopify re-consent: add write_order_edits, write_discounts + dispute scopes to hay-shopify-app `shopify.app.toml`, run `shopify app deploy`. Then real-store checks (Shopify swap/exchange/payment link, Nuvemshop marketplace/returns).
+- [W2 L5] D16-2 one-click Woo connect needs an HTTPS HAY_API_URL to test (tunnel or staging host); keys travel through the admin's browser redirect — confirm acceptable. Pending connects are lost on worker restart.
+- [W2 L5] Product: swaps/exchanges don't refund a price difference to the shopper (only BALANCE_DUE). Shopify has no "resend confirmation" API. VillaTheme/YITH meta keys and marketplace order-id patterns are from docs, unverified on real stores.
+- [W2 L5] Root package-lock.json was hand-edited by the builder; run `npm install` once on a clean checkout before merging to master.
 
 - **Alert copy (Wave 1 review):** push/email alerts now have Spanish copy (`services/notification-locale.ts`) — needs a native-speaker check. Browsers holding the old service worker can't rotate push until the device re-registers (one-off, after deploy).
 - **L5 (on staging):** Shopify merchants must re-consent for the new `write_discounts` scope before Shopify coupons work. Real-store checks I could not do locally: Shopify discount title search, `context.customers`, Fulfillment events, paymentId; Pix meta keys for Pagar.me/Asaas; Nuvemshop coupons. Known gaps: catalogue deletions not synced; Wix/Magento have no stale flag; Woo stale flag needs a tracking plugin; the one-coupon-per-customer check scans the latest 100 coupons.
@@ -207,6 +213,10 @@ Staging seed: org/user created via `auth.register` (credentials in `../hay-core-
 - Confirm it's OK that staging uses the `OPENAI_API_KEY` from the main checkout's `.env` (nothing else copied).
 
 ## Follow-ups logged (not in Wave 0 scope)
+- Perception misdetects language when an English message names a Brazilian brand ("Mercado Livre") → reply in pt. Language should follow the conversation/widget locale.
+- Widget footer shows "Powered by Hay" — check whether it's the logo wordmark or text; text should read "Hay.chat".
+- Woo resend handoff reply is generic ("passed this to the team"); could say the email couldn't be sent first.
+- Woo AfterSettings.vue (plugin UI bundle) is not covered by dashboard typecheck.
 
 - (W1 review) External/hosted MCP tools that annotate `readOnlyHint` skip the approval gate and dry-run on that word alone. Consider trusting the hint only from first-party plugins (HubSpot relies on remote annotations today).
 - (W1) Conversations snapshot the playbook text at the first turn, and `playbooks.update` changes the playbook row but not its active version; an edited playbook only reaches new conversations after a publish. Expected, but worth a hint in the editor.
