@@ -22,6 +22,11 @@ jest.mock("../../services/core/tool-execution.service", () => ({
 jest.mock("../../services/orchestrator-queue.service", () => ({
   orchestratorQueueService: { enqueue: mockEnqueue },
 }));
+const mockRunFollowUp = jest.fn<(conversationId: string) => Promise<void>>();
+jest.mock("../../orchestrator/run", () => {
+  class ConversationLockedError extends Error {}
+  return { runApprovalFollowUp: mockRunFollowUp, ConversationLockedError };
+});
 
 import { AppDataSource } from "../../database/data-source";
 import { Organization } from "../../entities/organization.entity";
@@ -257,6 +262,25 @@ describe("action decisions (D4-5)", () => {
       expect((await pendingActionService.findById(action.id, orgId))?.status).toBe("pending");
     },
   );
+
+  it("without a queue, retries the follow-up while another run holds the lock", async () => {
+    const { ConversationLockedError } = jest.requireMock<{
+      ConversationLockedError: new () => Error;
+    }>("../../orchestrator/run");
+    mockEnqueue.mockResolvedValue(false);
+    mockRunFollowUp
+      .mockRejectedValueOnce(new ConversationLockedError())
+      .mockResolvedValueOnce(undefined);
+    actionDecisionService.followUpRetryMs = 5;
+    const conversation = await newConversation();
+    const action = await hold(conversation.id);
+
+    await actionDecisionService.reject(action.id, orgId, decider, null);
+    await new Promise((resolve) => setTimeout(resolve, 200));
+
+    expect(mockRunFollowUp).toHaveBeenCalledTimes(2);
+    expect(mockRunFollowUp).toHaveBeenCalledWith(conversation.id);
+  });
 
   it("does not resume the AI when a human took over meanwhile", async () => {
     const conversation = await newConversation("human-took-over");

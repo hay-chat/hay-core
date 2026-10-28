@@ -858,6 +858,14 @@ export const runConversation = async (conversationId: string) => {
  *
  * Throws when another run holds the lock, so the queue retries.
  */
+/** Another run holds the conversation lock; the approval follow-up must be retried. */
+export class ConversationLockedError extends Error {
+  constructor() {
+    super("Conversation is locked; approval follow-up will retry");
+    this.name = "ConversationLockedError";
+  }
+}
+
 export const runApprovalFollowUp = async (conversationId: string): Promise<void> => {
   const conversation = await conversationRepository.findById(conversationId);
   if (!conversation?.organization_id) return;
@@ -873,7 +881,7 @@ export const runApprovalFollowUp = async (conversationId: string): Promise<void>
 
   const lockerId = await conversation.lock();
   if (!lockerId) {
-    throw new Error("Conversation is locked; approval follow-up will retry");
+    throw new ConversationLockedError();
   }
   const heartbeat = setInterval(() => {
     conversation.refreshLock(lockerId).catch((err) => log.warn({ err }, "Lock heartbeat error"));

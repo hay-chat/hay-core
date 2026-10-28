@@ -27,6 +27,9 @@ import { getAiReplyBlocker } from "@server/orchestrator/reply-guard";
 
 const logger = createLogger("action-decision");
 
+/** Same bound as the queue worker's retries (MAX_RETRY_ATTEMPTS). */
+const FOLLOW_UP_ATTEMPTS = 3;
+
 const CLOSED_STATUSES: ReadonlyArray<Conversation["status"]> = ["resolved", "unresolved", "closed"];
 
 /** The channel's reply window (if it has one) has already closed. */
@@ -48,6 +51,8 @@ export interface DecisionResult {
 
 export class ActionDecisionService {
   private toolExecution = new ToolExecutionService();
+  /** Delay between in-process follow-up attempts while the conversation is locked. */
+  followUpRetryMs = 10_000;
   private messages = new MessageService();
 
   async approve(id: string, organizationId: string, decider: Decider): Promise<DecisionResult> {
@@ -207,12 +212,31 @@ export class ActionDecisionService {
     if (!queued) {
       // No queue (RabbitMQ down or not configured): run the turn here, after
       // the response, so the approver is not kept waiting on the LLM.
-      const { runApprovalFollowUp } = await import("@server/orchestrator/run");
-      setImmediate(() => {
-        runApprovalFollowUp(conversation.id).catch((err) =>
-          logger.error({ err, conversationId: conversation.id }, "Approval follow-up failed"),
+      setImmediate(() => void this.runFollowUpInProcess(conversation.id, 1));
+    }
+  }
+
+  /**
+   * The in-process follow-up. If another run holds the conversation lock (a
+   * shopper message being answered), retry like the queue worker does
+   * (MAX_RETRY_ATTEMPTS, 10 s apart). needs_processing is not an option here:
+   * the sweep that picks it up only runs with RabbitMQ, and a normal turn
+   * would answer the shopper's last message, not the decision.
+   */
+  private async runFollowUpInProcess(conversationId: string, attempt: number): Promise<void> {
+    const { runApprovalFollowUp, ConversationLockedError } =
+      await import("@server/orchestrator/run");
+    try {
+      await runApprovalFollowUp(conversationId);
+    } catch (err) {
+      if (err instanceof ConversationLockedError && attempt < FOLLOW_UP_ATTEMPTS) {
+        setTimeout(
+          () => void this.runFollowUpInProcess(conversationId, attempt + 1),
+          this.followUpRetryMs,
         );
-      });
+        return;
+      }
+      logger.error({ err, conversationId, attempt }, "Approval follow-up failed");
     }
   }
 
