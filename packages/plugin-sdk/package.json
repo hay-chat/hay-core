@@ -40,6 +40,9 @@
     },
     "./identity": {
       "default": "./identity/index.cjs"
+    },
+    "./marketplace-orders": {
+      "default": "./marketplace-orders/index.cjs"
     }
   },
   "bin": {

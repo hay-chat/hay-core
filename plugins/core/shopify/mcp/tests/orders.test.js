@@ -510,3 +510,15 @@ describe("supportSummary.tracking (D6-9)", () => {
     expect(calls[0].query).toContain("countryCodeV2");
   });
 });
+
+describe("marketplace orders in not-found (D10-6)", () => {
+  it("routes a Shopee order name to the marketplace", async () => {
+    mockShopify({ GetOrderByName: () => ({ orders: { nodes: [], edges: [] }, shop: null }) });
+    const server = createFakeServer();
+    registerOrderTools(server);
+    const res = await server.call("shopify_get_order_by_name", { name: "240512AB12CD34" });
+    expect(res.isError).toBe(true);
+    expect(res.data.code).toBe("NOT_FOUND");
+    expect(res.data.details).toMatchObject({ marketplace: "shopee" });
+  });
+});
