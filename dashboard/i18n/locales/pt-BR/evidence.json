@@ -52,6 +52,57 @@
       "retention": "Sua retenção de dados está configurada para {days} dias. Conversas mais antigas são apagadas e não podem entrar em um pacote. Disputas podem ser abertas meses depois do pedido, então uma retenção curta deixa você com menos evidências.",
       "retentionOff": "As conversas ficam guardadas até você apagá-las, então pedidos mais antigos ainda podem entrar em um pacote.",
       "retentionLink": "Configurações de retenção de dados"
+    },
+    "disputes": {
+      "title": "Contestações de pagamento",
+      "description": "Contestações (chargebacks) informadas pelas suas plataformas de pagamento conectadas. Anexe o pacote de evidências como rascunho e depois revise e envie na plataforma.",
+      "order": "Pedido {order}",
+      "noOrderLabel": "Pedido desconhecido",
+      "status": {
+        "needs_response": "Aguardando resposta",
+        "under_review": "Em análise",
+        "won": "Ganha",
+        "lost": "Perdida",
+        "closed": "Encerrada"
+      },
+      "drafted": "Evidências anexadas como rascunho",
+      "dueBy": "Prazo das evidências: {at}",
+      "noOrder": "Nenhuma conversa menciona este pedido ainda, então não há o que anexar.",
+      "download": "Baixar pacote",
+      "attach": "Anexar como rascunho",
+      "attachAgain": "Anexar de novo",
+      "open": "Abrir em {platform}",
+      "confirmTitle": "Anexar o pacote de evidências como rascunho?",
+      "confirmDescription": "O Hay.chat envia o PDF de evidências para esta contestação em {platform} e adiciona uma nota curta. Nada é enviado ao banco: você revisa a resposta e a envia em {platform}. Arquivos que você adicionou lá são mantidos.",
+      "confirm": "Anexar como rascunho",
+      "attached": "Evidências anexadas à contestação em {platform}",
+      "attachedHelp": "É um rascunho. Revise e envie a resposta em {platform} antes do prazo.",
+      "reasons": {
+        "product_not_received": "Produto não recebido",
+        "product_unacceptable": "Diferente do anunciado",
+        "credit_not_processed": "Reembolso não processado",
+        "subscription_canceled": "Assinatura cancelada",
+        "duplicate": "Cobrança duplicada",
+        "fraudulent": "Fraude",
+        "unrecognized": "Cobrança não reconhecida",
+        "general": "Geral",
+        "customer_initiated": "Iniciada pelo cliente",
+        "incorrect_account_details": "Dados da conta incorretos",
+        "insufficient_funds": "Saldo insuficiente",
+        "bank_cannot_process": "O banco não pode processar",
+        "debit_not_authorized": "Débito não autorizado"
+      },
+      "errors": {
+        "NOT_EDITABLE": "Esta contestação não aceita mais evidências. Talvez já tenha sido enviada ou encerrada.",
+        "SLOT_TAKEN": "A contestação já tem arquivos que você adicionou na plataforma, então o Hay.chat não os substituiu. Baixe o pacote e adicione lá.",
+        "SCOPE_MISSING": "A conexão não tem permissão para editar evidências de contestação. Reconecte a integração e aprove as novas permissões.",
+        "NOT_FOUND": "A plataforma não encontrou esta contestação.",
+        "NOT_CONNECTED": "A integração que informou esta contestação não está conectada ou não consegue anexar evidências.",
+        "PROVIDER_ERROR": "A plataforma não aceitou as evidências. Tente de novo, ou baixe o pacote e adicione lá.",
+        "NO_ORDER": "Nenhuma conversa menciona este pedido, então não há o que anexar.",
+        "NO_CONVERSATIONS": "As conversas sobre este pedido não estão mais armazenadas.",
+        "TOO_LARGE": "O arquivo de evidências é grande demais para anexar. Baixe nesta página e reduza antes de enviar."
+      }
     }
   }
 }

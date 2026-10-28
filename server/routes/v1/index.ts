@@ -32,6 +32,7 @@ import { businessHoursRouter } from "./business-hours";
 import { usageRouter } from "./usage";
 import { organizationExportRouter } from "./organization-export";
 import { evidencePacksRouter } from "./evidence-packs";
+import { disputesRouter } from "./disputes";
 import { emailDomainsRouter } from "./email-domains";
 import { insightsRouter } from "./insights";
 import { simulationsRouter } from "./simulations";
@@ -71,6 +72,7 @@ const coreRouters = {
   usage: usageRouter,
   organizationExport: organizationExportRouter,
   evidencePacks: evidencePacksRouter,
+  disputes: disputesRouter,
   emailDomains: emailDomainsRouter,
   insights: insightsRouter,
   simulations: simulationsRouter,

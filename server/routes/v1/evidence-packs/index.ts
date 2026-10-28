@@ -1,17 +1,14 @@
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
-import { In } from "typeorm";
 import { t, scopedProcedure } from "@server/trpc";
 import { RESOURCES, ACTIONS } from "@server/types/scopes";
-import { AppDataSource } from "@server/database/data-source";
-import { Message, MessageType } from "@server/database/entities/message.entity";
 import { organizationRepository } from "@server/repositories/organization.repository";
 import { pluginManagerService } from "@server/services/plugin-manager.service";
 import { auditLogService } from "@server/services/audit-log.service";
 import { orderLinkService, type OrderGroup } from "@server/services/order-links/order-link.service";
 import { disputeEvidenceService } from "@server/services/dispute-evidence/dispute-evidence.service";
 import { buildEvidenceZip } from "@server/services/dispute-evidence/evidence-zip";
-import { orderSummaryFrom } from "@server/services/dispute-evidence/order-summary";
+import { orderSummaryForGroup } from "@server/services/dispute-evidence/order-summary";
 import { EVIDENCE_TEMPLATES } from "@server/services/dispute-evidence/copy";
 import { safeTimeZone } from "@server/utils/zoned-datetime";
 
@@ -36,22 +33,6 @@ function toOrderResponse(group: OrderGroup) {
     conversationCount: group.conversationIds.length,
     lastSeenAt: group.lastSeenAt,
   };
-}
-
-/** Total and date from the latest tool answer in these conversations that described the order. */
-async function orderSummary(conversationIds: string[], group: OrderGroup) {
-  const tokens = new Set([group.orderKey, ...(group.orderLabel ? [group.orderLabel] : [])]);
-  const toolMessages = await AppDataSource.getRepository(Message).find({
-    where: { conversation_id: In(conversationIds), type: MessageType.TOOL },
-    order: { created_at: "DESC" },
-    take: 200,
-  });
-  for (const message of toolMessages) {
-    if (message.metadata?.toolStatus !== "SUCCESS") continue;
-    const summary = orderSummaryFrom(message.metadata?.toolOutput, tokens);
-    if (summary) return summary;
-  }
-  return { total: null, placedAt: null };
 }
 
 const fileSlug = (value: string) =>
@@ -116,7 +97,7 @@ export const evidencePacksRouter = t.router({
         );
         if (!group) throw new TRPCError({ code: "NOT_FOUND", message: "Order not found" });
         conversationIds = group.conversationIds;
-        const summary = await orderSummary(conversationIds, group);
+        const summary = await orderSummaryForGroup(conversationIds, group);
         order = {
           label: `#${group.orderLabel ?? group.orderKey}`,
           platform: platformName(group.pluginId),

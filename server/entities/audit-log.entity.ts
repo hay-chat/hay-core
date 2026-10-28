@@ -65,7 +65,8 @@ export type AuditAction =
   | "billing.resolution.exclusion_review_requested"
   | "conversation.spam.marked"
   | "conversation.spam.cleared"
-  | "dispute_evidence.export";
+  | "dispute_evidence.export"
+  | "dispute_evidence.push";
 
 @Entity("audit_logs")
 @Index("idx_audit_logs_user", ["userId"])

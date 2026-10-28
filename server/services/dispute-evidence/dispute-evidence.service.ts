@@ -59,6 +59,8 @@ export interface EvidenceRequest {
   conversationIds: string[];
   template: EvidenceTemplate;
   order?: EvidenceOrder | null;
+  /** Size cap for the image passes; defaults to EVIDENCE_PDF_MAX_BYTES. */
+  maxBytes?: number;
 }
 
 export interface StoredAttachment {
@@ -164,6 +166,7 @@ export class DisputeEvidenceService {
       policyExcerpts,
     };
 
+    const maxBytes = request.maxBytes ?? EVIDENCE_PDF_MAX_BYTES;
     const images = attachments.filter((a) => isImageAttachment(a.attachment));
     let pdf: Buffer | null = null;
     let imagesOmitted = false;
@@ -171,7 +174,7 @@ export class DisputeEvidenceService {
       const prepared = await this.prepareImages(images, pass);
       pdf = await renderEvidencePdf({ ...base, images: prepared });
       imagesOmitted = pass === null && images.length > 0;
-      if (pdf.length <= EVIDENCE_PDF_MAX_BYTES) break;
+      if (pdf.length <= maxBytes) break;
       // No images to shrink: further passes cannot help.
       if (images.length === 0) break;
     }
@@ -179,7 +182,7 @@ export class DisputeEvidenceService {
     return {
       pdf: pdf!,
       locale,
-      overCap: pdf!.length > EVIDENCE_PDF_MAX_BYTES,
+      overCap: pdf!.length > maxBytes,
       imagesOmitted,
       attachments,
       conversationIds: ids,

@@ -13,6 +13,13 @@ import type { CanonicalDispute, HayDisputeSourceRuntimeAPI, HayLogger } from "..
 /** Worker route core POSTs the evidence pack to ("Attach as draft"). Core-only. */
 export const DISPUTE_EVIDENCE_ROUTE = "/disputes/evidence";
 
+/**
+ * Every evidence file core pushes is named `hay-chat-evidence-...`. A plugin
+ * may replace a file whose name starts with this; any other file in a slot is
+ * the merchant's and must be kept. (Core: server/services/disputes/copy.ts.)
+ */
+export const DISPUTE_EVIDENCE_FILE_PREFIX = "hay-chat-evidence";
+
 export interface DisputeSourceRuntimeOptions {
   apiUrl: string;
   apiToken: string;
