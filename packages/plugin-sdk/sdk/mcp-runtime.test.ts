@@ -173,6 +173,39 @@ describe('MCP Runtime API', () => {
     });
   });
 
+  describe('Tool risk declarations', () => {
+    const toolRisk = { read: ['list_things'], write: { create_thing: 'note' as const } };
+
+    it('carries toolRisk from startLocal and startExternal registrations', async () => {
+      const api = createMcpRuntimeAPI({ config, auth, logger, pluginDir: '/tmp', onMcpServerStarted });
+      const instance: McpServerInstance = { listTools: async () => [] };
+
+      await api.startLocal('local-risk', () => instance, { toolRisk });
+      await api.startExternal({ id: 'remote-risk', url: 'https://mcp.example.com', toolRisk });
+
+      expect(onMcpServerStarted).toHaveBeenCalledWith({ id: 'local-risk', type: 'local', instance, toolRisk });
+      expect(onMcpServerStarted).toHaveBeenCalledWith(
+        expect.objectContaining({ id: 'remote-risk', type: 'external', toolRisk }),
+      );
+    });
+
+    it('rejects an unknown category at registration', async () => {
+      const api = createMcpRuntimeAPI({ config, auth, logger, pluginDir: '/tmp', onMcpServerStarted });
+      const bad = { write: { pay: 'payment' } } as any;
+
+      await expect(api.startLocal('bad-local', () => ({}), { toolRisk: bad })).rejects.toThrow(
+        /Unknown tool category/,
+      );
+      await expect(
+        api.startExternal({ id: 'bad-remote', url: 'https://mcp.example.com', toolRisk: bad }),
+      ).rejects.toThrow(/Unknown tool category/);
+      await expect(
+        api.startLocalStdio({ id: 'bad-stdio', command: 'node', args: [], cwd: '.', toolRisk: bad }),
+      ).rejects.toThrow(/Unknown tool category/);
+      expect(onMcpServerStarted).not.toHaveBeenCalled();
+    });
+  });
+
   describe('External MCP Server', () => {
     it('should start an external MCP server', async () => {
       const api = createMcpRuntimeAPI({ config, auth, logger, onMcpServerStarted });
