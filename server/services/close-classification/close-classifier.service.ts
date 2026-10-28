@@ -396,6 +396,107 @@ export class CloseClassifierService {
     }
   }
 
+  /**
+   * Insights-only review of an older closed conversation (D3-18 backfill).
+   * Same prompt and model as the close classifier, but it writes only an
+   * insight issue: no outcome row, no billing, no status change.
+   * Returns false when the conversation is skipped (test, spam, no real request,
+   * already reviewed).
+   */
+  async reviewForInsights(conversationId: string): Promise<boolean> {
+    const conversation = await AppDataSource.getRepository(Conversation).findOneBy({
+      id: conversationId,
+    });
+    if (!conversation || !conversation.closed_at) return false;
+    const messages = await AppDataSource.getRepository(Message).find({
+      where: { conversation_id: conversation.id },
+      order: { created_at: "ASC" },
+    });
+    const facts = collectCloseFacts(conversation, messages);
+    if (!needsClassifier(facts)) return false;
+
+    const organizationId = conversation.organization_id;
+    const handedOff = !!conversation.handed_off_at;
+    const startedAt = Date.now();
+    try {
+      const prompt = await this.promptService.getPrompt(
+        "conversation/close-classification",
+        {
+          transcript: buildTranscript(messages),
+          closeReason: facts.closeReason ?? `closed (${conversation.status})`,
+          handedOff: handedOff ? "yes" : "no",
+          channel: conversation.channel,
+        },
+        { organizationId },
+      );
+      const result = await this.llmService.invokeWithMeta<string>({
+        prompt,
+        jsonSchema: CLASSIFIER_JSON_SCHEMA,
+        tier: "medium",
+        temperature: 0,
+        max_tokens: 1200,
+        organizationId,
+      });
+      const response = parseClassifierResponse(result.content);
+      await insightRunsService.record({
+        organizationId,
+        kind: "backfill_review",
+        model: result.model,
+        usage: result.usage,
+        durationMs: Date.now() - startedAt,
+        succeeded: true,
+      });
+      if (response.is_spam || !response.had_real_request) return false;
+
+      const inserted = await AppDataSource.getRepository(InsightIssue)
+        .createQueryBuilder()
+        .insert()
+        .values({
+          organization_id: organizationId,
+          source: "ai_review",
+          conversation_id: conversation.id,
+          conversation_outcome_id: null,
+          polarity: response.polarity,
+          action_type: response.action_type,
+          severity: response.severity,
+          confidence: response.confidence,
+          relevance: computeRelevance(response.relevance, {
+            handedOff,
+            actionType: response.action_type,
+          }),
+          summary: redactInsightText(response.summary, 1000) ?? "",
+          root_cause: redactInsightText(response.root_cause, 500),
+          area: redactInsightText(response.area, 64),
+          snippet: redactInsightText(response.snippet, 300),
+          paraphrase: redactInsightText(response.paraphrase, 500),
+          enriched_at: new Date(),
+          signals: {
+            backfill: true,
+            aiResolved: response.ai_resolved,
+            handedOff,
+            closeReason: facts.closeReason,
+            channel: conversation.channel,
+            playbookId: conversation.playbook_id,
+            playbookVersionId: conversation.playbook_version_id,
+            agentId: conversation.agent_id,
+          },
+        })
+        .orIgnore()
+        .execute();
+      return (inserted.identifiers?.length ?? 0) > 0;
+    } catch (error) {
+      await insightRunsService.record({
+        organizationId,
+        kind: "backfill_review",
+        model: null,
+        usage: null,
+        durationMs: Date.now() - startedAt,
+        succeeded: false,
+      });
+      throw error;
+    }
+  }
+
   /** Keep (or set) the rule outcome and stop retrying. */
   private async finalizeWithRule(
     row: ConversationOutcome,

@@ -27,7 +27,8 @@
     "actionsSettings": "Actions",
     "actionLog": "Action log",
     "evidencePacks": "Evidence packs",
-    "usage": "Usage"
+    "usage": "Usage",
+    "insights": "Insights"
   },
   "user": {
     "status": "Status",

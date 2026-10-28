@@ -47,6 +47,7 @@ import {
   ExternalLink,
   Package,
   ThumbsUp,
+  Lightbulb,
   History,
   FileCheck,
 } from "lucide-vue-next";
@@ -194,8 +195,14 @@ const navMain = computed(() => {
     },
   );
 
-  // Feedback on AI replies; the agent role cannot open /insights.
+  // Insights and feedback on AI replies; the agent role cannot open /insights.
   if (!userStore.isAgent) {
+    items.push({
+      title: t("nav.insights"),
+      url: "/insights",
+      icon: Lightbulb,
+      isActive: isPathActive("/insights") && !isPathActive("/insights/feedback"),
+    });
     items.push({
       title: t("nav.feedback"),
       url: "/insights/feedback",
