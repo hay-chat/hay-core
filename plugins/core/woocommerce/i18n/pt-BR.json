@@ -90,7 +90,7 @@
     },
     "consumerKey": {
       "label": "Consumer Key",
-      "description": "Consumer Key da API REST do WooCommerce (WooCommerce → Configurações → Avançado → API REST, leitura/escrita)"
+      "description": "Consumer Key da API REST do WooCommerce (WooCommerce → Configurações → Avançado → API REST, leitura/escrita). Preenchida automaticamente quando você usa Conectar com o WooCommerce."
     },
     "consumerSecret": {
       "label": "Consumer Secret",
@@ -123,6 +123,36 @@
     "returnInstructions": {
       "label": "Como devolver",
       "description": "Seu processo de devolução, com suas palavras: para onde enviar, link ou formulário e prazos. O Hay.chat repassa o texto como está quando um cliente pergunta como devolver. Se ficar vazio, o Hay.chat encaminha essas perguntas para sua equipe."
+    }
+  },
+  "ui": {
+    "connect": {
+      "title": "Conectar com o WooCommerce",
+      "intro": "Aprove o Hay.chat no painel do WordPress e as chaves de API são criadas e salvas para você. Sem copiar chaves.",
+      "button": "Conectar com o WooCommerce",
+      "reconnect": "Reconectar o WooCommerce",
+      "cancel": "Cancelar",
+      "needSiteUrl": "Informe e salve a URL do seu site WordPress acima primeiro.",
+      "waiting": "Aguardando você aprovar o Hay.chat na janela do WooCommerce...",
+      "saving": "Chaves recebidas e verificadas. Salvando...",
+      "connectedTitle": "WooCommerce conectado",
+      "connectedBody": "O Hay.chat verificou as novas chaves com a sua loja e as salvou. O agente já pode usar a sua loja.",
+      "alreadyConnected": "As chaves de API estão salvas. Reconecte se você as trocou ou revogou.",
+      "manualHint": "Prefere colar as chaves? Crie chaves de Leitura/Escrita em WooCommerce → Configurações → Avançado → API REST e preencha os campos acima.",
+      "errorTitle": "Não foi possível conectar o WooCommerce",
+      "errors": {
+        "SITE_URL_MISSING": "Salve a URL do seu site WordPress primeiro e tente novamente.",
+        "SITE_URL_INVALID": "A URL do site WordPress salva não é válida. Corrija, salve e tente novamente.",
+        "HTTPS_REQUIRED": "A conexão com um clique exige que o Hay.chat esteja acessível por HTTPS. Cole as chaves manualmente.",
+        "WRONG_PERMISSIONS": "As chaves foram criadas sem acesso de Leitura/Escrita. Tente novamente e aprove Leitura/Escrita.",
+        "KEYS_REJECTED": "A sua loja recusou as novas chaves. Verifique se a API REST do WooCommerce está ativa e tente novamente.",
+        "STORE_UNREACHABLE": "O Hay.chat não conseguiu acessar a sua loja para verificar as chaves. Confira a URL do site e tente novamente.",
+        "BAD_KEYS": "O WooCommerce enviou chaves em um formato inesperado. Tente novamente ou cole as chaves manualmente.",
+        "EXPIRED": "A solicitação de conexão expirou ou não foi aprovada. Comece de novo.",
+        "POPUP_BLOCKED": "O navegador bloqueou a janela do WooCommerce. Permita pop-ups nesta página e tente novamente.",
+        "SAVE_FAILED": "As chaves foram verificadas, mas não puderam ser salvas. Tente novamente.",
+        "UNKNOWN": "Algo deu errado ({detail}). Tente novamente."
+      }
     }
   }
 }
