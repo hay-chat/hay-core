@@ -168,7 +168,8 @@ describe("POST /v1/webhooks/email-events", () => {
     expect(res.statusCode).toBe(200);
     expect(res.body).toEqual({ ok: true, handled: true });
     expect(update).toHaveBeenCalled();
-    expect(recordDeliveryFailure).toHaveBeenCalledWith("org-1", "email");
+    // One recipient's bounce says nothing about the channel.
+    expect(recordDeliveryFailure).not.toHaveBeenCalled();
   });
 
   it("answers 503 when the secret is not configured", async () => {
