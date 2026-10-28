@@ -54,3 +54,15 @@ Admin GraphQL (version `apiVersion`, default `2026-04`), mode-agnostic:
 
 > Several Admin API specifics for `2026-04` are marked `// TODO(HAY-219 §8)` in the
 > tool files and must be confirmed against a real dev store (see `tasks/HAY-219-plan.md` §8).
+
+## Chargeback disputes (`disputes` capability)
+
+Shopify Payments stores only. On start the plugin subscribes `DISPUTES_CREATE` /
+`DISPUTES_UPDATE` webhooks (only when `HAY_API_URL` is public https) and syncs the
+last 120 days of disputes; a cron re-syncs every 6h. Webhook bodies are hints: each
+dispute is re-read with the shop's token. "Attach as draft" on the Evidence page
+uploads the pack into `customerCommunicationFile` (or `uncategorizedFile` when the
+merchant already used it) and adds a note to `uncategorizedText`. Hay.chat never
+submits; the merchant reviews and submits in the Shopify admin. Needs the
+`read_shopify_payments_disputes`, `read_shopify_payments_dispute_evidences` and
+`write_shopify_payments_dispute_evidences` scopes (re-consent). See `DISPUTES.md`.
