@@ -32,6 +32,7 @@ jest.mock("@server/services/plugin-manager.service", () => ({
 const mockMessageRepo = {
   updateProviderMessageId: jest.fn<(id: string, providerMessageId: string) => Promise<void>>(),
   update: jest.fn<(id: string, data: Record<string, unknown>) => Promise<unknown>>(),
+  findById: jest.fn<(id: string) => Promise<unknown>>(),
 };
 jest.mock("@server/repositories/message.repository", () => ({
   MessageRepository: jest.fn(() => mockMessageRepo),
@@ -75,6 +76,12 @@ const conversation = {
   channel: "whatsapp",
   metadata: { whatsapp: { phoneNumberId: "123" } },
   customer: { external_id: "5511999999999" },
+  // The AI label is hidden on this channel here; the AI disclosure tests below turn it on.
+  organization: {
+    timezone: "America/Sao_Paulo",
+    settings: { aiDisclosure: { hiddenChannels: ["whatsapp"] } },
+  },
+  messages: [],
 };
 
 const attachment = {
@@ -347,5 +354,80 @@ describe("channelDeliveryService retry (D13-7)", () => {
       providerStatus: "failed",
       providerError: { code: "worker_unreachable" },
     });
+  });
+});
+
+describe("channelDeliveryService AI disclosure (D14-7)", () => {
+  const shown = {
+    ...conversation,
+    language: "pt",
+    organization: { timezone: "America/Sao_Paulo", defaultLanguage: "en", settings: {} },
+  };
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockFindPluginIdByChannel.mockResolvedValue("hay-channel-whatsapp");
+    mockGetOrStartWorker.mockResolvedValue({ port: 4567 });
+    mockFetch.mockResolvedValue({ json: async () => ({ success: true }) });
+    mockMessageRepo.findById.mockResolvedValue({ id: "msg-1", metadata: { model: "m" } });
+  });
+
+  it("opens the first AI reply with the label in the shopper's language and records it", async () => {
+    mockConversationRepo.findById.mockResolvedValue(shown);
+    await dispatch(outboundEvent({}));
+
+    expect(deliverBody()).toMatchObject({ content: "[Assistente de IA]\n\nhello" });
+    expect(mockMessageRepo.update).toHaveBeenCalledWith("msg-1", {
+      metadata: { model: "m", aiDisclosureSent: true },
+    });
+  });
+
+  it("uses the org's own label", async () => {
+    mockConversationRepo.findById.mockResolvedValue({
+      ...shown,
+      organization: { ...shown.organization, settings: { aiDisclosure: { label: "Aurora bot" } } },
+    });
+    await dispatch(outboundEvent({}));
+    expect(deliverBody()).toMatchObject({ content: "[Aurora bot]\n\nhello" });
+  });
+
+  it("does not repeat it once an earlier AI reply carried it", async () => {
+    mockConversationRepo.findById.mockResolvedValue({
+      ...shown,
+      messages: [{ id: "msg-0", metadata: { aiDisclosureSent: true } }],
+    });
+    await dispatch(outboundEvent({}));
+    expect(deliverBody()).toMatchObject({ content: "hello" });
+    expect(mockMessageRepo.update).not.toHaveBeenCalled();
+  });
+
+  it("never adds it to a person's reply", async () => {
+    mockConversationRepo.findById.mockResolvedValue(shown);
+    await dispatch(outboundEvent({ type: "HumanAgent" }));
+    expect(deliverBody()).toMatchObject({ content: "hello" });
+  });
+
+  it("keeps it for an EU org even when the label was hidden on the channel", async () => {
+    mockConversationRepo.findById.mockResolvedValue({
+      ...shown,
+      language: null,
+      organization: {
+        timezone: "Europe/Berlin",
+        defaultLanguage: "en",
+        settings: { aiDisclosure: { hiddenChannels: ["whatsapp"] } },
+      },
+    });
+    await dispatch(outboundEvent({}));
+    expect(deliverBody()).toMatchObject({ content: "[AI assistant]\n\nhello" });
+  });
+
+  it("does not record it when the reply was not delivered", async () => {
+    mockConversationRepo.findById.mockResolvedValue(shown);
+    mockFetch.mockResolvedValue({ status: 200, json: async () => ({ success: false }) });
+    await dispatch(outboundEvent({}));
+    expect(mockMessageRepo.update).not.toHaveBeenCalledWith(
+      "msg-1",
+      expect.objectContaining({ metadata: expect.anything() }),
+    );
   });
 });

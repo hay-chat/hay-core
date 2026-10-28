@@ -387,20 +387,24 @@
       "loadFailed": "Falha ao carregar os detalhes do processamento de IA"
     },
     "aiLabel": {
-      "title": "Etiqueta de IA",
-      "description": "Avise os clientes quando uma resposta vem da IA. No Web Chat a etiqueta aparece em cada resposta da IA; nos outros canais ela abre a primeira resposta da IA.",
+      "title": "IA nos seus canais",
+      "description": "Avise os clientes quando uma resposta vem da IA e escolha onde as respostas da IA saem sozinhas. No Web Chat a etiqueta aparece em cada resposta da IA; nos outros canais ela abre a primeira resposta da IA.",
       "labelText": "Texto da etiqueta",
       "labelPlaceholder": "Assistente de IA",
       "labelHint": "Deixe vazio para usar \"Assistente de IA\" no idioma do cliente. Deixe claro que as respostas vêm da IA.",
       "lockedTitle": "Sempre visível para clientes da UE",
       "lockedDescription": "Sua organização atende a UE (processamento de IA somente na UE ou fuso horário europeu), então o AI Act da UE exige avisar os clientes que estão falando com uma IA. Você pode renomear a etiqueta, mas não ocultá-la.",
-      "channelsTitle": "Onde a etiqueta aparece",
+      "channelsTitle": "Por canal",
       "showLabel": "Mostrar etiqueta",
       "webChat": "Web Chat",
-      "save": "Salvar etiqueta de IA",
-      "saveSuccess": "Etiqueta de IA salva",
-      "saveFailed": "Falha ao salvar a etiqueta de IA",
-      "loadFailed": "Falha ao carregar as configurações da etiqueta de IA"
+      "save": "Salvar",
+      "saveSuccess": "Configurações de IA dos canais salvas",
+      "saveFailed": "Falha ao salvar as configurações de IA dos canais",
+      "loadFailed": "Falha ao carregar as configurações de IA dos canais",
+      "aiReplies": "Respostas da IA",
+      "modeOn": "Enviar automaticamente",
+      "modeDrafts": "Somente rascunhos (uma pessoa aprova)",
+      "draftsHint": "Somente rascunhos: as respostas da IA ficam aguardando na conversa até alguém da sua equipe aprovar ou bloquear."
     }
   },
   "security": {

@@ -313,7 +313,8 @@ describe("messageApprovalService", () => {
       expect(url).toBe("http://localhost:4567/deliver");
       expect(JSON.parse(init.body)).toMatchObject({
         to: "5511999999999",
-        content: "Your order ships on Tuesday.",
+        // First AI reply on the channel, so it opens with the AI label (D14-7).
+        content: "[AI assistant]\n\nYour order ships on Tuesday.",
         messageId: MESSAGE_ID,
         conversationId: CONVERSATION_ID,
       });

@@ -75,6 +75,7 @@ describe("AI disclosure label", () => {
       label: null,
       hiddenChannels: [],
       locked: false,
+      draftsChannels: [],
     });
     expect(isAiLabelShown(US_ORG as never, "web")).toBe(true);
   });
@@ -82,7 +83,10 @@ describe("AI disclosure label", () => {
   it("lets a non-EU org rename it and hide it per channel, keeping other settings", async () => {
     await caller().updateAiDisclosure({ label: "  Aurora bot  ", hiddenChannels: ["web", "web"] });
     expect(mockUpdate).toHaveBeenCalledWith(ORG_ID, {
-      settings: { retentionDays: 30, aiDisclosure: { label: "Aurora bot", hiddenChannels: ["web"] } },
+      settings: {
+        retentionDays: 30,
+        aiDisclosure: { label: "Aurora bot", hiddenChannels: ["web"] },
+      },
     });
   });
 
@@ -111,6 +115,35 @@ describe("AI disclosure label", () => {
   it("rejects a label longer than 40 characters and channel ids that are not ids", async () => {
     await expect(caller().updateAiDisclosure({ label: "x".repeat(41) })).rejects.toThrow();
     await expect(caller().updateAiDisclosure({ hiddenChannels: ["../web"] })).rejects.toThrow();
+  });
+
+  it("switches channels to drafts only and back (D14-7)", async () => {
+    await caller().updateAiDisclosure({ draftsChannels: ["whatsapp", "email"] });
+    expect(mockUpdate).toHaveBeenLastCalledWith(ORG_ID, {
+      settings: expect.objectContaining({
+        retentionDays: 30,
+        channelAiModes: { whatsapp: "drafts", email: "drafts" },
+      }),
+    });
+
+    mockFindOne.mockResolvedValue({
+      ...US_ORG,
+      settings: { channelAiModes: { whatsapp: "drafts", web: "on" } },
+    });
+    await expect(caller().getAiDisclosure()).resolves.toMatchObject({
+      draftsChannels: ["whatsapp"],
+    });
+
+    // Saving only the label leaves the channel modes alone.
+    await caller().updateAiDisclosure({ label: "Aurora bot" });
+    expect(mockUpdate).toHaveBeenLastCalledWith(ORG_ID, {
+      settings: expect.objectContaining({ channelAiModes: { whatsapp: "drafts", web: "on" } }),
+    });
+
+    await caller().updateAiDisclosure({ draftsChannels: [] });
+    expect(mockUpdate).toHaveBeenLastCalledWith(ORG_ID, {
+      settings: expect.objectContaining({ channelAiModes: {} }),
+    });
   });
 
   it("sends the label to the widget", async () => {

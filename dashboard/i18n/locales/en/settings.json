@@ -387,20 +387,24 @@
       "loadFailed": "Failed to load AI processing details"
     },
     "aiLabel": {
-      "title": "AI label",
-      "description": "Tell shoppers when a reply comes from AI. In Web Chat the label sits on every AI reply; on other channels it opens the first AI reply.",
+      "title": "AI on your channels",
+      "description": "Tell shoppers when a reply comes from AI, and choose where AI replies go out on their own. In Web Chat the label sits on every AI reply; on other channels it opens the first AI reply.",
       "labelText": "Label text",
       "labelPlaceholder": "AI assistant",
       "labelHint": "Leave empty to use \"AI assistant\" in the shopper's language. Keep it clear that replies come from AI.",
       "lockedTitle": "Always shown for EU shoppers",
       "lockedDescription": "Your organization serves the EU (EU-only AI processing or a European time zone), so the EU AI Act requires telling shoppers they are talking to AI. You can rename the label but not hide it.",
-      "channelsTitle": "Where the label is shown",
+      "channelsTitle": "Per channel",
       "showLabel": "Show label",
       "webChat": "Web Chat",
-      "save": "Save AI label",
-      "saveSuccess": "AI label saved",
-      "saveFailed": "Failed to save the AI label",
-      "loadFailed": "Failed to load the AI label settings"
+      "save": "Save",
+      "saveSuccess": "AI channel settings saved",
+      "saveFailed": "Failed to save the AI channel settings",
+      "loadFailed": "Failed to load the AI channel settings",
+      "aiReplies": "AI replies",
+      "modeOn": "Send automatically",
+      "modeDrafts": "Drafts only (a person approves)",
+      "draftsHint": "Drafts only: AI replies wait in the conversation until someone on your team approves or blocks them."
     }
   },
   "security": {
