@@ -27,6 +27,7 @@
  */
 
 import { defineHayPlugin } from "@hay/plugin-sdk";
+import { variantPricing } from "./pricing.js";
 import type {
   CanonicalProduct,
   CanonicalVariant,
@@ -256,11 +257,7 @@ function mapVariant(
     .filter((value): value is string => Boolean(value));
   const title = values.length ? values.join(" / ") : "Default";
 
-  // Nuvemshop semantics: `price` is the regular price, `promotional_price` the
-  // active sale price. Canonically the selling price goes in `price` and the
-  // regular price becomes `compareAtPrice` (Shopify-style).
-  const regular = variant.price ? parseFloat(variant.price) : undefined;
-  const promotional = variant.promotional_price ? parseFloat(variant.promotional_price) : undefined;
+  const pricing = variantPricing(variant.price, variant.promotional_price);
 
   const stock = variantStock(variant);
   const tracked = variant.stock_management === true;
@@ -278,8 +275,8 @@ function mapVariant(
       ? values.map((value, i) => ({ name: optionNames[i] ?? `Option ${i + 1}`, value }))
       : undefined,
     position: variant.position ?? index + 1,
-    price: promotional ?? regular,
-    compareAtPrice: promotional !== undefined ? regular : undefined,
+    price: pricing.price,
+    compareAtPrice: pricing.compareAtPrice,
     currency,
     inventoryQuantity: stock,
     inventoryTracked: tracked,
