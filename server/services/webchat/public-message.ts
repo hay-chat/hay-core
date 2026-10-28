@@ -194,6 +194,7 @@ export interface PublicAttachment {
 export async function toPublicAttachments(
   attachments: unknown,
   organizationId: string,
+  ttlSeconds = WIDGET_MEDIA_URL_TTL_SECONDS,
 ): Promise<PublicAttachment[]> {
   if (!Array.isArray(attachments) || attachments.length === 0) return [];
   const valid = attachments
@@ -212,7 +213,7 @@ export async function toPublicAttachments(
       size: typeof attachment.size === "number" ? attachment.size : 0,
     }));
 
-  const signed = await signAttachmentUrls(valid, organizationId, WIDGET_MEDIA_URL_TTL_SECONDS);
+  const signed = await signAttachmentUrls(valid, organizationId, ttlSeconds);
   return signed.filter(
     (attachment) =>
       /^https?:\/\//i.test(attachment.url) &&

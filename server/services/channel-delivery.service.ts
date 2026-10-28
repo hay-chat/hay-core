@@ -18,15 +18,25 @@ import { createLogger } from "@server/lib/logger";
 import { pluginManagerService } from "./plugin-manager.service";
 import { MessageRepository } from "@server/repositories/message.repository";
 import { ConversationRepository } from "@server/repositories/conversation.repository";
-import { DELIVERY_SIGNED_URL_TTL_SECONDS, signAttachmentUrls } from "./media-url.service";
+import {
+  DELIVERY_SIGNED_URL_TTL_SECONDS,
+  HANDOFF_SIGNED_URL_TTL_SECONDS,
+  signAttachmentUrls,
+} from "./media-url.service";
 import { aiDisclosureLine } from "./ai-disclosure";
 import type { Conversation } from "@server/database/entities/conversation.entity";
-import type {
-  MessageAttachment,
-  MessageProviderError,
+import {
+  MessageType,
+  type Message,
+  type MessageAttachment,
+  type MessageProviderError,
 } from "@server/database/entities/message.entity";
+import { toPublicAttachments, type PublicAttachment } from "./webchat/public-message";
 
 const logger = createLogger("channel-delivery");
+
+/** Most files listed in a handoff (the latest ones the customer sent). */
+const HANDOFF_MAX_ATTACHMENTS = 20;
 const messageRepository = new MessageRepository();
 const conversationRepository = new ConversationRepository();
 
@@ -249,6 +259,28 @@ export class ChannelDeliveryService {
   }
 
   /**
+   * Files the customer sent (D8-10), newest last, as signed links the human
+   * agent can open from the provider's tool. Private uploads that can't be
+   * signed are left out rather than sent as dead links.
+   */
+  private async handoffAttachments(
+    messages: Array<Pick<Message, "type" | "attachments">>,
+    organizationId: string,
+  ): Promise<PublicAttachment[]> {
+    const sent = messages
+      .filter((message) => message.type === MessageType.CUSTOMER)
+      .flatMap((message) => message.attachments ?? [])
+      .slice(-HANDOFF_MAX_ATTACHMENTS);
+    if (!sent.length) return [];
+    try {
+      return await toPublicAttachments(sent, organizationId, HANDOFF_SIGNED_URL_TTL_SECONDS);
+    } catch (error) {
+      logger.warn({ err: error, organizationId }, "Failed to sign handoff attachments");
+      return [];
+    }
+  }
+
+  /**
    * Escalation path — when the orchestrator flips a conversation to pending-human
    * on a non-web channel, notify the owning plugin so it can perform provider-side
    * handoff (Chatwoot: toggle_status=open + optional assign + private note).
@@ -298,6 +330,10 @@ export class ChannelDeliveryService {
             conversationId,
             conversationMetadata: conversation.metadata ?? null,
             reason: "orchestrator_handoff",
+            attachments: await this.handoffAttachments(
+              conversation.messages ?? [],
+              conversation.organization_id,
+            ),
           }),
         });
 

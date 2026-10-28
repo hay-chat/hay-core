@@ -431,3 +431,66 @@ describe("channelDeliveryService AI disclosure (D14-7)", () => {
     );
   });
 });
+
+describe("channelDeliveryService /escalate attachments (D8-10)", () => {
+  beforeAll(async () => {
+    global.fetch = mockFetch as unknown as typeof fetch;
+    await channelDeliveryService.initialize();
+  });
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockFindPluginIdByChannel.mockResolvedValue("hay-channel-chatwoot");
+    mockGetOrStartWorker.mockResolvedValue({ port: 4567 });
+    mockFetch.mockResolvedValue({ status: 200, json: async () => ({ success: true }) });
+  });
+
+  const statusEvent = {
+    type: "conversation_status_changed",
+    organizationId: ORG_ID,
+    conversationId: CONVERSATION_ID,
+    payload: { status: "pending-human" },
+  };
+
+  it("lists the customer's files as signed links valid for days, never unsigned private links", async () => {
+    const own = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+    const foreign = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
+    mockUploadFind.mockResolvedValue([{ id: own, folder: "conversation-media" }]);
+    const file = (id: string, name: string) => ({
+      id,
+      name,
+      url: `https://api.example/v1/media/${id}`,
+      type: "image/jpeg",
+      size: 10,
+    });
+    mockConversationRepo.findById.mockResolvedValue({
+      ...conversation,
+      channel: "chatwoot",
+      messages: [
+        { type: "Customer", attachments: [file(own, "box.jpg"), file(foreign, "x.jpg")] },
+        { type: "BotAgent", attachments: [attachment] },
+      ],
+    });
+
+    await dispatch(statusEvent);
+
+    expect(mockFetch).toHaveBeenCalledWith(
+      "http://localhost:4567/escalate",
+      expect.objectContaining({ method: "POST" }),
+    );
+    const body = deliverBody() as { attachments: Array<Record<string, unknown>> };
+    expect(body.attachments).toHaveLength(1);
+    const [listed] = body.attachments;
+    expect(listed).toMatchObject({ name: "box.jpg", type: "image/jpeg", size: 10 });
+    const url = new URL(listed.url as string);
+    expect(Number(url.searchParams.get("expires")) - Date.now() / 1000).toBeGreaterThan(
+      6 * 24 * 60 * 60,
+    );
+  });
+
+  it("sends an empty list when the customer sent no files", async () => {
+    mockConversationRepo.findById.mockResolvedValue({ ...conversation, channel: "chatwoot" });
+    await dispatch(statusEvent);
+    expect(deliverBody().attachments).toEqual([]);
+  });
+});
