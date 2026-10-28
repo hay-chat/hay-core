@@ -6,7 +6,8 @@ import { createLogger } from "@server/lib/logger";
 const logger = createLogger("action-log");
 
 /** Arg keys whose values never reach the log. */
-const SENSITIVE_KEY = /token|secret|password|passwd|api[_-]?key|authorization|cookie|cvv|cvc|card[_-]?number|iban/i;
+const SENSITIVE_KEY =
+  /token|secret|password|passwd|api[_-]?key|authorization|cookie|cvv|cvc|card[_-]?number|iban/i;
 const REDACTED = "[redacted]";
 
 /**
@@ -58,7 +59,57 @@ export interface ActionLogEntry {
   idempotencyKey?: string | null;
 }
 
+export interface ActionLogQuery {
+  toolName?: string;
+  /** A plugin id, or "core" for built-in tools (plugin_id IS NULL). */
+  pluginId?: string;
+  outcome?: ActionOutcome;
+  page: number;
+  pageSize: number;
+}
+
+/** Sentinel for built-in tools in the platform filter. */
+export const CORE_PLUGIN_FILTER = "core";
+
 export class ActionLogService {
+  /** The Actions page (D6-7): newest first, filtered, one page at a time. */
+  async list(
+    organizationId: string,
+    query: ActionLogQuery,
+  ): Promise<{ items: ActionLog[]; total: number }> {
+    const qb = AppDataSource.getRepository(ActionLog)
+      .createQueryBuilder("log")
+      .where("log.organization_id = :organizationId", { organizationId });
+    if (query.toolName) qb.andWhere("log.tool_name = :toolName", { toolName: query.toolName });
+    if (query.pluginId === CORE_PLUGIN_FILTER) qb.andWhere("log.plugin_id IS NULL");
+    else if (query.pluginId) qb.andWhere("log.plugin_id = :pluginId", { pluginId: query.pluginId });
+    if (query.outcome) qb.andWhere("log.outcome = :outcome", { outcome: query.outcome });
+    const [items, total] = await qb
+      .orderBy("log.created_at", "DESC")
+      .skip((query.page - 1) * query.pageSize)
+      .take(query.pageSize)
+      .getManyAndCount();
+    return { items, total };
+  }
+
+  /** The tools and platforms this org has a log for, to fill the filters. */
+  async filterOptions(
+    organizationId: string,
+  ): Promise<{ tools: string[]; plugins: Array<string | null> }> {
+    const rows: Array<{ tool_name: string; plugin_id: string | null }> =
+      await AppDataSource.getRepository(ActionLog)
+        .createQueryBuilder("log")
+        .select(["log.tool_name AS tool_name", "log.plugin_id AS plugin_id"])
+        .where("log.organization_id = :organizationId", { organizationId })
+        .groupBy("log.tool_name")
+        .addGroupBy("log.plugin_id")
+        .getRawMany();
+    return {
+      tools: [...new Set(rows.map((row) => row.tool_name))].sort(),
+      plugins: [...new Set(rows.map((row) => row.plugin_id))],
+    };
+  }
+
   /** Write one row. Never throws: losing an audit row must not fail the turn. */
   async record(entry: ActionLogEntry): Promise<void> {
     try {

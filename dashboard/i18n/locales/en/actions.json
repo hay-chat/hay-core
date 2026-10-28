@@ -1,0 +1,187 @@
+{
+  "aiActions": {
+    "categories": {
+      "refund": "Refunds",
+      "cancel": "Cancellations",
+      "discount": "Discounts and coupons",
+      "exchange": "Exchanges and item swaps",
+      "return": "Returns",
+      "address_change": "Address changes",
+      "customer_update": "Customer detail changes",
+      "note": "Order notes and resent emails",
+      "other_write": "Other actions"
+    },
+    "settings": {
+      "title": "Actions",
+      "headTitle": "Actions settings - Hay.chat",
+      "description": "Choose which actions Hay.chat must ask a person about before it runs them in your store.",
+      "approval": {
+        "title": "Approval before actions run",
+        "description": "When an action needs approval, Hay.chat tells the customer it has requested it and waits. A person approves or declines it from the conversation or the Inbox.",
+        "master": "Ask a person before these actions run",
+        "masterOffHint": "Approval is off. Hay.chat runs every action straight away, except those a playbook asks approval for.",
+        "categoriesLabel": "Needs approval",
+        "moneyBadge": "Money",
+        "unclassifiedNote": "Actions from integrations that do not say what they do always need approval while approval is on."
+      },
+      "threshold": {
+        "label": "Auto-approve refunds and discounts up to",
+        "help": "In the order's currency. Refunds and discounts at or below this amount run without approval. 0 means every one needs approval. Cancellations always need approval while they are switched on."
+      },
+      "confirmation": {
+        "title": "Customer confirmation",
+        "description": "Before an action, Hay.chat tells the customer exactly what it will do and asks \"Shall I go ahead?\". It only continues after the customer replies.",
+        "label": "Ask the customer to confirm first",
+        "cancelNote": "Always on for cancellations, even when this is switched off."
+      },
+      "approvers": {
+        "title": "Who can approve",
+        "description": "The owner can always approve. Choose which other roles can approve or decline actions.",
+        "admin": "Admins",
+        "member": "Members",
+        "contributor": "Contributors"
+      },
+      "ownerOnly": "Only the organization owner can switch approval off, raise the auto-approve amount or change who approves. You can still switch approval on.",
+      "save": "Save changes",
+      "saved": "Actions settings saved",
+      "saveFailed": "Could not save actions settings",
+      "loadFailed": "Could not load actions settings",
+      "typedConfirm": {
+        "title": "Switch approval off?",
+        "description": "These actions will run without anyone seeing them first: {list}.",
+        "instruction": "Type {word} to confirm.",
+        "word": "TURN OFF",
+        "confirm": "Switch off approval"
+      }
+    },
+    "playbook": {
+      "title": "Approval in this playbook",
+      "description": "While this playbook is active, these actions always wait for a person, even under the auto-approve amount or when approval is off in Settings > Actions. A playbook can only add approval, never remove it.",
+      "orgRequired": "Already needs approval in Settings > Actions",
+      "saved": "Approval settings saved",
+      "saveFailed": "Could not save approval settings"
+    },
+    "approvals": {
+      "title": "Waiting for your approval",
+      "description": "Actions the AI asked to run. Nothing happens until someone decides.",
+      "select": "Select {name}",
+      "selectHint": "Select requests of one kind to approve them together.",
+      "selected": "{count} selected",
+      "total": "Total {amount}",
+      "noAmountCount": "{count} without an amount",
+      "approveSelected": "Approve {count}",
+      "approve": "Approve",
+      "approveAmount": "Approve {amount}",
+      "editAmount": "Lower amount",
+      "amountLabel": "Amount (at most {max})",
+      "amountHelp": "You can only lower it, never raise it.",
+      "reject": "Decline",
+      "rejectReason": "Reason (the AI uses it to explain to the customer)",
+      "confirmReject": "Decline request",
+      "open": "Open conversation",
+      "noAmount": "No amount stated",
+      "untitled": "Conversation",
+      "approvedDone": "Approved and done.",
+      "approvedFailed": "Approved, but it failed when it ran. The AI will tell the customer it was not done.",
+      "rejected": "Declined. The AI will let the customer know.",
+      "failed": "Could not save the decision",
+      "conversationClosed": "This conversation is closed, so nothing ran. Reopen it to approve, or decline.",
+      "invalidAmount": "The amount can only be lowered and must be above zero.",
+      "bulkDone": "{count} approved",
+      "bulkPartial": "{done} approved, {notDone} not done. Check them in their conversations.",
+      "loadFailed": "Could not load approvals"
+    },
+    "graduation": {
+      "message": "You approved {approved} of {total} {category} requests in the last 30 days, the largest {amount}. Auto-approve refunds and discounts up to {amount}?",
+      "apply": "Auto-approve up to {amount}",
+      "dismiss": "Not now",
+      "confirmTitle": "Auto-approve up to {amount}?",
+      "confirmDescription": "Refunds and discounts at or below {amount} will run without asking a person. Larger ones still wait for approval. You can change this in Settings > Actions.",
+      "confirm": "Turn on auto-approve",
+      "applied": "Refunds and discounts up to {amount} now run without approval.",
+      "applyFailed": "Could not change the auto-approve amount",
+      "noun": {
+        "refund": "refund",
+        "discount": "discount"
+      }
+    },
+    "toolErrors": {
+      "generic": "This action failed.",
+      "codes": {
+        "BAD_INPUT": "The AI sent details the store could not accept, such as a wrong order number or format.",
+        "NOT_FOUND": "The store could not find the order, customer or item the AI asked for.",
+        "PRECONDITION": "The order's current state does not allow this action.",
+        "PROVIDER_REFUSED": "The store refused the request.",
+        "AUTH_FAILED": "The connection to this integration expired or was revoked. Reconnect it in Integrations.",
+        "SCOPE_MISSING": "The integration is missing a permission this action needs. Reconnect it in Integrations and allow the access it asks for.",
+        "RATE_LIMITED": "The store is getting too many requests right now. It should work again in a few minutes.",
+        "PROVIDER_DOWN": "The store's service did not respond. Try again later.",
+        "OUTCOME_UNKNOWN": "The store did not confirm whether this went through. Check the order in your store before trying again.",
+        "NEEDS_APPROVAL": "This is above the limit set for the integration, so it needs a person's approval.",
+        "INTERNAL": "Something unexpected went wrong while running this action.",
+        "APPROVAL_REJECTED": "A team member declined this request."
+      },
+      "reasons": {
+        "ALREADY_HAS_COUPON": "This customer already has an unused coupon.",
+        "GOODWILL_CHECK_INCOMPLETE": "It could not be confirmed that this customer has no unused goodwill coupon, so none was created.",
+        "EXCEEDS_REFUNDABLE": "The amount is more than what can still be refunded on this order.",
+        "CUSTOMER_MISMATCH": "The order does not belong to this customer.",
+        "ALREADY_CANCELLED": "The order was already cancelled.",
+        "ALREADY_SHIPPED": "The order has already shipped.",
+        "NOT_SUPPORTED": "The store does not support this action.",
+        "RECORD_ONLY_NOT_ALLOWED": "This order was paid through a payment gateway, so a refund cannot just be recorded without paying the money back.",
+        "OUT_OF_STOCK": "The item is out of stock.",
+        "NO_EMAIL": "There is no email address to send to.",
+        "NO_CUSTOMER": "No customer is linked to this order.",
+        "NO_ACCOUNT": "This customer has no account in the store.",
+        "NOT_PAID": "The order has not been paid.",
+        "IDENTITY_MISMATCH": "The customer's details do not match the order.",
+        "FULFILLMENT_IN_PROGRESS": "The order is already being prepared for shipping.",
+        "EMAIL_MISMATCH": "The email given does not match the order.",
+        "COUPON_CREATE_FAILED": "The store could not create the coupon.",
+        "COUPONS_DISABLED": "Coupons are turned off in the store.",
+        "BALANCE_DUE": "The change would leave the customer with an amount to pay, so nothing was changed.",
+        "ALREADY_REFUNDED": "This was already refunded.",
+        "UNSUPPORTED_WC_VERSION": "The store's software version does not support this action.",
+        "PRICE_HIGHER": "The new item costs more than what the customer paid.",
+        "PENDING_REFUND": "A refund is already in progress for this order.",
+        "NOT_RETURNABLE": "This item cannot be returned.",
+        "NOT_REFUNDABLE": "This order cannot be refunded.",
+        "NOT_PRE_DISPATCH": "The order has moved past the stage where it can still be changed.",
+        "NOT_PENDING": "The order is not awaiting payment, so there is no payment link to send.",
+        "FULLY_REFUNDED": "The order has already been fully refunded.",
+        "EMAIL_FAILED": "The email could not be sent.",
+        "DIFFERENT_PRODUCT": "A swap can only change the size or colour of the same product.",
+        "ALREADY_DISPATCHED": "The order has already been dispatched."
+      }
+    },
+    "log": {
+      "title": "Action log",
+      "headTitle": "Action log - Hay.chat",
+      "description": "Every tool call the AI made in conversations, newest first.",
+      "refresh": "Refresh",
+      "filters": {
+        "tool": "Tool",
+        "platform": "Platform",
+        "outcome": "Outcome",
+        "all": "All"
+      },
+      "outcomes": {
+        "success": "Done",
+        "error": "Failed",
+        "simulated": "Dry run",
+        "held": "Waiting for approval",
+        "confirming": "Asking the customer"
+      },
+      "builtIn": "Built-in",
+      "readOnly": "Read only",
+      "openConversation": "Open conversation",
+      "empty": "No actions yet. Tool calls the AI makes will show up here.",
+      "emptyFiltered": "No actions match these filters.",
+      "previous": "Previous",
+      "next": "Next",
+      "pageOf": "Page {page} of {pages}",
+      "loadFailed": "Could not load the action log"
+    }
+  }
+}

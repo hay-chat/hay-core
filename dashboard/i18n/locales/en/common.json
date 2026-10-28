@@ -23,7 +23,9 @@
     "customerPrivacy": "Customer Privacy",
     "myProfile": "My Profile",
     "openMenu": "Open menu",
-    "businessHours": "Business Hours"
+    "businessHours": "Business Hours",
+    "actionsSettings": "Actions",
+    "actionLog": "Action log"
   },
   "user": {
     "status": "Status",

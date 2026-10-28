@@ -24,6 +24,7 @@ import { MessageService } from "./core/message.service";
 import { createLogger } from "@server/lib/logger";
 import { handoffCopy } from "@server/orchestrator/handoff-copy";
 import { getAiReplyBlocker } from "@server/orchestrator/reply-guard";
+import { extractAmount, lowerAmount } from "./core/action-policy";
 
 const logger = createLogger("action-decision");
 
@@ -46,7 +47,13 @@ export interface DecisionResult {
    * Set when the action was not run on purpose: the conversation is closed,
    * so the shopper could not be told the result. It stays pending.
    */
-  blocked?: "conversation_closed";
+  blocked?: "conversation_closed" | "invalid_amount";
+}
+
+/** Bulk approve (D4-6): how each request went. */
+export interface BulkApproveResult {
+  id: string;
+  status: "executed" | "failed" | "already_decided" | "conversation_closed" | "not_found";
 }
 
 export class ActionDecisionService {
@@ -55,15 +62,33 @@ export class ActionDecisionService {
   followUpRetryMs = 10_000;
   private messages = new MessageService();
 
-  async approve(id: string, organizationId: string, decider: Decider): Promise<DecisionResult> {
+  /**
+   * `editedAmount` lowers the amount before it runs (D4-6): re-checked here,
+   * only down, never up, and only where the args carry a single amount.
+   */
+  async approve(
+    id: string,
+    organizationId: string,
+    decider: Decider,
+    editedAmount?: number,
+  ): Promise<DecisionResult> {
     // Never move money on a closed conversation: the shopper may not be
     // reachable to hear the result. The request stays pending (it can still be
     // declined, or approved once the conversation is reopened).
     const pending = await pendingActionService.findById(id, organizationId);
+    let edit: { args: Record<string, unknown>; amount: number; from: number } | undefined;
     if (pending?.status === "pending") {
       const current = await conversationRepository.findById(pending.conversation_id);
       if (current && CLOSED_STATUSES.includes(current.status)) {
         return { action: pending, transitioned: false, blocked: "conversation_closed" };
+      }
+      const from = extractAmount(pending.args);
+      if (editedAmount !== undefined && from !== null && editedAmount !== from) {
+        const args = lowerAmount(pending.args, editedAmount);
+        if (!args) return { action: pending, transitioned: false, blocked: "invalid_amount" };
+        edit = { args, amount: extractAmount(args) ?? editedAmount, from };
+      } else if (editedAmount !== undefined && from === null) {
+        return { action: pending, transitioned: false, blocked: "invalid_amount" };
       }
     }
 
@@ -71,6 +96,7 @@ export class ActionDecisionService {
       id,
       organizationId,
       decider,
+      edit && { args: edit.args, amount: edit.amount },
     );
     if (!action || !transitioned) return { action, transitioned };
 
@@ -93,15 +119,39 @@ export class ActionDecisionService {
           result.errorCode,
         );
 
+    const lowered = edit
+      ? ` The team member lowered the amount from ${edit.from} to ${edit.amount}; tell the ` +
+        `customer the amount that was actually done.`
+      : "";
     const note = result.success
       ? `A team member APPROVED the action ${action.tool_name} and it has now run successfully ` +
-        `(result above). Tell the customer it is done. Do not call this tool again for it.`
+        `(result above).${lowered} Tell the customer it is done. Do not call this tool again for it.`
       : `A team member approved the action ${action.tool_name}, but it FAILED when it ran: ` +
         `${result.error ?? "unknown error"}. It was NOT done. Tell the customer it did not go ` +
         `through and offer to hand them to the team. Do not retry it.`;
     const outcome = result.success ? "approved and done" : "approved, but it failed";
     await this.resume(conversation, action, note, outcome);
     return { action: final ?? action, transitioned };
+  }
+
+  /**
+   * Approve several requests of the same kind in one go (D4-6). The caller
+   * checks they share a category; each one runs as its own approval.
+   */
+  async approveMany(
+    ids: string[],
+    organizationId: string,
+    decider: Decider,
+  ): Promise<BulkApproveResult[]> {
+    const results: BulkApproveResult[] = [];
+    for (const id of ids) {
+      const { action, transitioned, blocked } = await this.approve(id, organizationId, decider);
+      if (!action) results.push({ id, status: "not_found" });
+      else if (blocked === "conversation_closed") results.push({ id, status: "conversation_closed" });
+      else if (!transitioned) results.push({ id, status: "already_decided" });
+      else results.push({ id, status: action.status === "executed" ? "executed" : "failed" });
+    }
+    return results;
   }
 
   async reject(

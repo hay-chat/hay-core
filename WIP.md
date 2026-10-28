@@ -5,6 +5,13 @@
 - D5-10 waiting banner + median first reply (hidden <5 samples). D5-11 already covered by D11 ladder (no repush/email outside hours).
 - Gaps: email replies do NOT thread back (no core inbound); teams not modelled; presence = local websocket count (single instance).
 - Next: merge into staging, manual staging checks per final report.
+## 2026-10-28 — claude/w2-approvals-ui (L4 Wave 2) — 6 tickets done, committed, not pushed
+- 5bf7fbc D4-9 Settings > Actions (per-category approval, typed confirm, playbook tighten-only override; migration AddPlaybookApprovalCategories1785744000000).
+- e104071 D4-10 customer-confirmation gate before writes (cancels always; planner prompt rewritten so the gate drives the ask).
+- dac49b4 D4-6 Approvals list atop /inbox (lower amount, decline reason, same-category bulk approve); 70d33a8 D4-11 owner graduation nudge.
+- 5dc9f3e D6-6 plain-language tool failure reasons; 35a9220 D6-7 /actions page over action_log (tool/platform/outcome filters, conversation link).
+- D4-1 intentionally not built. run.ts untouched.
+- Next: merge into staging, run migration on staging, hand-test per lane report.
 
 ## 2026-10-28 02:15 — staging — W2 L11 + L5 merged, hand-tested, fixes in
 - Merged L11 (D14-5..8) and L5 (commerce, 10 tickets). No migrations.
