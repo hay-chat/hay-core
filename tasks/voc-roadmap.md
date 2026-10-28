@@ -288,6 +288,10 @@ Roger said "Do it now" for every gap. Not started; lanes below.
 - Run: `ssh homeserver 'grep -n -i -E "build|plugin|sdk" /srv/hay-core/deploy.sh'`. Does deploy rebuild packages/plugin-sdk + stripe/shopify/mercadopago/woocommerce plugins?
 - Resend: Roger thinks it's done. Check Infisical prod has `RESEND_API_KEY` + `RESEND_EVENTS_WEBHOOK_SECRET` (`~/bin/infisical-env.py check`).
 - Confirm the simulation-cap reading (20 % of plan resolutions, max 500).
+- (Lane B) Stripe `create_refund` is hosted MCP, amount in cents → approvals likely show 1000 for $10. Fix via wrapper tool or plugin-declared amount unit? Default: plugin-declared unit.
+- (Lane B) Destructive writes run when the approval master switch is off. Hold them anyway? Default: hold (one line in `decideGate`).
+- (Lane B) Typed confirm: server checks a fixed English token, dashboard checks the localized word. OK? Default: keep.
+- (Lane C) Disputes rationale ready to read: `tasks/disputes-rationale.md`.
 - Deferred to a Claude-in-Chrome session: prod env keys (Turnstile, VAPID, OPERATOR_EVENTS_URL/INTERNAL_API_SECRET, SMTP_FROM_NAME, JWT_REFRESH_EXPIRES_IN check, Meta, MP, OpenAI EU), Meta Messenger setup + App Review, Mercado Pago app, OpenAI EU application, Stripe test-mode plan changes, WABA checks, real-store checks, connecting test stores to staging.
 - Deferred: disputes real tests (after the C3 rationale doc), iPhone push test (can run before deploy: staging over an https tunnel + VAPID keys), WP 1.0.1/1.1.0 svn release, lawyer questions, read-only prod checks (D1-0, D14-1, D3), merchant comms, Spanish alert + widget locale native checks, legal copy in website #46.
 - After deploy: Claude does the D8 media-private switch (needs Roger's go-ahead then).
