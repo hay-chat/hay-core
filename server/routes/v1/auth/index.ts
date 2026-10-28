@@ -28,6 +28,7 @@ import { getDashboardUrl } from "@server/config/env";
 import { StorageService } from "@server/services/storage.service";
 import { handleUpload } from "@server/lib/upload-helper";
 import { rateLimitService } from "@server/services/rate-limit.service";
+import { DEFAULT_NEW_ORG_RETENTION_DAYS } from "@server/types/organization-settings.types";
 import { toAccessState } from "@server/services/organization-access.service";
 import {
   AGENT_PAUSE_REASONS,
@@ -238,6 +239,7 @@ export const authRouter = t.router({
             maxJobs: 50,
             maxStorageGb: 1,
           },
+          settings: { retentionDays: DEFAULT_NEW_ORG_RETENTION_DAYS },
         });
 
         await organizationRepository.save(org);

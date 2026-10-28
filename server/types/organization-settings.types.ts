@@ -387,7 +387,7 @@ export interface OrganizationSettings {
   companyInterestGuardrail?: CompanyInterestGuardrailConfig; // Stage 1: Company interest protection
   confidenceGuardrail?: ConfidenceGuardrailConfig; // Stage 2: Fact grounding
   actionClaimGuardrail?: ActionClaimGuardrailConfig; // Stage 0: Action-claim vs tool-call consistency
-  retentionDays?: number | null; // Data retention period in days (null = disabled/forever)
+  retentionDays?: number | null; // Data retention period in days (null = disabled/forever; new orgs start at DEFAULT_NEW_ORG_RETENTION_DAYS)
   isPlayground?: boolean; // Enables playground mode for public conversations (demo orgs only)
   llm?: OrgLlmConfig; // Per-org LLM chat provider + tier→model map (embeddings stay managed)
   aiRegion?: AiRegion; // Where AI calls are processed; "eu" routes everything to the EU endpoint
@@ -396,3 +396,9 @@ export interface OrganizationSettings {
   channelAiModes?: Record<string, ChannelAiMode>; // Per-channel AI mode; missing = "on"
   [key: string]: unknown;
 }
+
+/**
+ * Retention for organizations created from now on (D14-8, Roger's D14 answer 7).
+ * Existing organizations keep what they had (usually null = keep forever).
+ */
+export const DEFAULT_NEW_ORG_RETENTION_DAYS = 365;

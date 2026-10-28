@@ -875,7 +875,7 @@ const resetToDefaults = () => {
         secret: "",
         events: [],
       },
-      retentionDays: null, // Default: disabled
+      retentionDays: 365, // Default for new orgs (D14-8)
       dataRetention: {
         conversations: "365",
         analytics: "730",

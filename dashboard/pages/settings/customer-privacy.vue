@@ -76,6 +76,9 @@
           <p class="text-sm text-muted-foreground">
             {{ $t("customerPrivacy.retentionHelp") }}
           </p>
+          <p class="text-sm text-muted-foreground">
+            {{ $t("customerPrivacy.retentionDefaultNote") }}
+          </p>
         </div>
 
         <div
