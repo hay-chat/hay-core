@@ -269,6 +269,7 @@
       "replyMyself": "I'll reply myself",
       "failed": "Could not save your decision",
       "takeoverFailed": "Your decision was saved, but taking over the conversation failed. Use Take Over to handle it yourself.",
+      "conversationClosed": "This conversation is closed, so the action was not run. Reopen the conversation to approve it, or decline it.",
       "done": {
         "approve": "Approved",
         "reject": "Declined",

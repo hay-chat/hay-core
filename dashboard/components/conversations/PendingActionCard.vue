@@ -61,6 +61,13 @@ const busy = ref<"approve" | "reject" | "reply" | null>(null);
 /** Thrown after the decision was saved but the takeover failed (already reported). */
 const TAKEOVER_FAILED = Symbol("takeoverFailed");
 
+/** The server refuses to approve on a closed conversation; say so in the merchant's language. */
+function failureDetail(error: unknown): string | undefined {
+  const code = (error as { data?: { code?: string } } | null)?.data?.code;
+  if (code === "PRECONDITION_FAILED") return t("conversations.pendingAction.conversationClosed");
+  return error instanceof Error ? error.message : undefined;
+}
+
 async function decide(kind: "approve" | "reject" | "reply", run: () => Promise<unknown>) {
   busy.value = kind;
   try {
@@ -69,10 +76,7 @@ async function decide(kind: "approve" | "reject" | "reply", run: () => Promise<u
     toast.success(t(`conversations.pendingAction.done.${kind}`));
   } catch (error) {
     if (error === TAKEOVER_FAILED) return;
-    toast.error(
-      t("conversations.pendingAction.failed"),
-      error instanceof Error ? error.message : undefined,
-    );
+    toast.error(t("conversations.pendingAction.failed"), failureDetail(error));
   } finally {
     busy.value = null;
   }

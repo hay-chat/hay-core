@@ -269,6 +269,7 @@
       "replyMyself": "Vou responder eu mesmo",
       "failed": "Não foi possível salvar sua decisão",
       "takeoverFailed": "Sua decisão foi salva, mas não foi possível assumir a conversa. Use Assumir para atender você mesmo.",
+      "conversationClosed": "Esta conversa está encerrada, então a ação não foi executada. Reabra a conversa para aprová-la ou recuse.",
       "done": {
         "approve": "Aprovada",
         "reject": "Recusada",
