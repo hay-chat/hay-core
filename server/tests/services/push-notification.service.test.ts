@@ -192,9 +192,9 @@ describe("subscribe / unsubscribe / rotate", () => {
     expect(removed).toBe(false);
   });
 
-  it("re-points a rotated subscription found by its old endpoint", async () => {
+  it("re-points a rotated subscription found by its old endpoint and auth secret", async () => {
     mockRepo.findOne.mockResolvedValue(subscription("old"));
-    const rotated = await pushNotificationService.rotate("https://push.example.com/old", {
+    const rotated = await pushNotificationService.rotate("https://push.example.com/old", "auth", {
       endpoint: "https://push.example.com/new",
       keys: { p256dh: "p2", auth: "a2" },
     });
@@ -208,11 +208,31 @@ describe("subscribe / unsubscribe / rotate", () => {
 
   it("ignores a rotation for an unknown endpoint", async () => {
     mockRepo.findOne.mockResolvedValue(null);
-    const rotated = await pushNotificationService.rotate("https://push.example.com/unknown", {
-      endpoint: "https://push.example.com/new",
-      keys: { p256dh: "p2", auth: "a2" },
-    });
+    const rotated = await pushNotificationService.rotate(
+      "https://push.example.com/unknown",
+      "auth",
+      {
+        endpoint: "https://push.example.com/new",
+        keys: { p256dh: "p2", auth: "a2" },
+      },
+    );
     expect(rotated).toBe(false);
     expect(mockRepo.update).not.toHaveBeenCalled();
+  });
+  it("refuses a rotation whose old auth secret does not match (endpoint alone is not proof)", async () => {
+    mockRepo.findOne.mockResolvedValue(subscription("old"));
+    for (const oldAuth of ["wrong", "", "auth-longer"]) {
+      const rotated = await pushNotificationService.rotate(
+        "https://push.example.com/old",
+        oldAuth,
+        {
+          endpoint: "https://attacker.example.com/new",
+          keys: { p256dh: "p2", auth: "a2" },
+        },
+      );
+      expect(rotated).toBe(false);
+    }
+    expect(mockRepo.update).not.toHaveBeenCalled();
+    expect(mockRepo.delete).not.toHaveBeenCalled();
   });
 });
