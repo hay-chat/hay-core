@@ -36,7 +36,10 @@
         </div>
         <div class="hay-chat-header__info">
           <span class="hay-chat-header__name">{{ displayName }}</span>
-          <span v-if="isShowingTitle && widgetSubtitle" class="hay-chat-header__subtitle">
+          <span v-if="availabilityStatus" class="hay-chat-header__subtitle">
+            {{ availabilityStatus }}
+          </span>
+          <span v-else-if="isShowingTitle && widgetSubtitle" class="hay-chat-header__subtitle">
             {{ widgetSubtitle }}
           </span>
         </div>
@@ -131,6 +134,13 @@
       :ai-label="aiLabel"
     />
 
+    <WaitingBanner
+      v-if="isWaitingForHuman && !isConversationClosed && saveContactEmail"
+      :detail="waitingDetail ?? null"
+      :contact-saved="contactSaved ?? false"
+      :save-email="saveContactEmail"
+    />
+
     <!-- Closed Conversation Footer (replaces input when closed) -->
     <div v-if="isConversationClosed" class="hay-chat-closed-footer">
       <div class="hay-chat-closed-footer__content">
@@ -188,6 +198,7 @@
 import { computed } from "vue";
 import MessageList from "./MessageList.vue";
 import MessageInput from "./MessageInput.vue";
+import WaitingBanner from "./WaitingBanner.vue";
 import { useI18n } from "@/i18n";
 import type { Message, SendFailure } from "@/types";
 
@@ -211,6 +222,13 @@ const props = defineProps<{
   currentAgentName?: string;
   sendFailure?: SendFailure | null;
   aiLabel?: string | null;
+  /** "Open now" / "Back Mon 09:00" when the org set business hours (D5-7). */
+  availabilityStatus?: string | null;
+  /** The conversation waits for a person (D5-10). */
+  isWaitingForHuman?: boolean;
+  waitingDetail?: string | null;
+  contactSaved?: boolean;
+  saveContactEmail?: (email: string) => Promise<boolean>;
 }>();
 
 defineEmits<{

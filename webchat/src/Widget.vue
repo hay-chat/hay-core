@@ -20,6 +20,11 @@
         :current-agent-name="currentAgentName || undefined"
         :send-failure="sendFailure"
         :ai-label="aiLabel"
+        :availability-status="availabilityStatus"
+        :is-waiting-for-human="isWaitingForHuman"
+        :waiting-detail="waitingLine"
+        :contact-saved="contactEmailSaved"
+        :save-contact-email="saveContactEmail"
         @close="closeChat"
         @send="sendMessage"
         @start-typing="startTyping"
@@ -37,6 +42,14 @@ import ChatWindow from "./components/ChatWindow.vue";
 import { useChat } from "./composables/useChat";
 import { provideI18n, type Translations } from "./i18n";
 import { resolveWidgetSubtitle } from "./utils/subtitle";
+import { resolveLocale } from "./i18n/resolve";
+import { resumeConversationId } from "./utils/resume";
+import {
+  fetchAvailability,
+  headerStatus,
+  waitingDetail,
+  type WidgetAvailability,
+} from "./utils/availability";
 import type { HayChatConfig, LauncherBridge, PublicConfig } from "./types";
 
 // The chat window. The button lives in the loader (src/loader), which mounts
@@ -99,6 +112,8 @@ const {
   isConversationClosed,
   currentAgentType,
   currentAgentName,
+  conversationStatus,
+  contactEmailSaved,
   sendFailure,
   toggleChat,
   openChat,
@@ -108,6 +123,7 @@ const {
   stopTyping,
   startNewConversation,
   resumeActiveConversation,
+  saveContactEmail,
 } = useChat({
   ...props.config,
   // The greeting is pinned as the first message, so give the chat the same
@@ -116,12 +132,31 @@ const {
   greetingMessage: props.config.greetingMessage || t("widget.defaultGreeting"),
 });
 
+// Business hours (D5-7) and the waiting state (D5-10).
+const locale = resolveLocale(props.config.locale);
+const availability = ref<WidgetAvailability | null>(null);
+const refreshAvailability = async () => {
+  availability.value = await fetchAvailability(props.config);
+};
+const availabilityStatus = computed(() => headerStatus(availability.value, t, locale));
+const isWaitingForHuman = computed(
+  () => conversationStatus.value === "pending-human" && currentAgentType.value !== "HumanAgent",
+);
+const waitingLine = computed(() => waitingDetail(availability.value, t, locale));
+watch(isOpen, (open) => {
+  if (open) void refreshAvailability();
+});
+watch(isWaitingForHuman, (waiting) => {
+  if (waiting) void refreshAvailability();
+});
+
 // Keep the loader's button in step with the chat.
 watch(isOpen, (open) => props.launcher.setOpen(open));
 watch(unreadCount, (count) => props.launcher.setUnread(count), { immediate: true });
 
 onMounted(() => {
-  if (props.openOnMount) openChat();
+  // A follow-up email link (D5-9) reopens its conversation.
+  if (props.openOnMount || resumeConversationId()) openChat();
   else resumeActiveConversation();
 });
 

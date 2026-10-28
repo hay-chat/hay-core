@@ -198,9 +198,33 @@ export function useConversation(config: HayChatConfig) {
     return data.result.data;
   };
 
+  /**
+   * Leave an email for the team's reply (D5-8). Resolves to the server answer,
+   * which may carry NONCE_EXPIRED with a fresh nonce.
+   */
+  const setContactEmail = async (
+    conversationId: string,
+    email: string,
+    proof: string,
+    method: string,
+    url: string,
+  ): Promise<{ saved: boolean; nonce?: string; error: string | null }> => {
+    const response = await fetch(`${baseUrl}/v1/publicConversations.setContactEmail`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ conversationId, email, proof, method, url }),
+    });
+    if (!response.ok) {
+      throw new WidgetRequestError(response.status);
+    }
+    const data = await response.json();
+    return data.result.data;
+  };
+
   return {
     createConversation,
     getMessages,
     sendMessage,
+    setContactEmail,
   };
 }
