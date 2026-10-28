@@ -1,6 +1,6 @@
 import type { Request, Response } from "express";
 import type { HayLogger } from "@hay/plugin-sdk/types";
-import type { GraphClient } from "./graph-client.js";
+import type { GraphClient, InstagramAttachmentType } from "./graph-client.js";
 import { GraphApiError } from "./graph-client.js";
 
 export interface DeliverContext {
@@ -18,6 +18,17 @@ interface DeliverPayload {
   conversationId: string;
   conversationMetadata?: Record<string, any> | null;
   messageMetadata?: Record<string, any> | null;
+  /** Files on the message; Hay.chat sends private ones as short-lived signed links. */
+  attachments?: Array<{ name?: string; url?: string; type?: string }> | null;
+}
+
+/** Instagram's DM attachment type for a MIME type, or null when Instagram can't send it. */
+export function instagramAttachmentType(mimeType: string): InstagramAttachmentType | null {
+  if (mimeType.startsWith("image/")) return "image";
+  if (mimeType.startsWith("video/")) return "video";
+  if (mimeType.startsWith("audio/")) return "audio";
+  if (mimeType === "application/pdf") return "file";
+  return null;
 }
 
 /**
@@ -43,13 +54,16 @@ function is24hWindowError(error: GraphApiError): boolean {
  * orchestrator produces a bot response on an instagram-channel conversation.
  *
  * Flow:
- *   1. Send the text via POST /me/messages using the org's access token.
- *   2. Return { success:true, providerMessageId } so Hay stores the Meta mid.
+ *   1. Send each attachment as its own DM (Instagram has no captions), D8-17.
+ *   2. Send the text via POST /me/messages using the org's access token.
+ *   3. Return { success:true, providerMessageId } so Hay stores the Meta mid.
  *
  * Error semantics (chatwoot pattern — never retry permanent provider errors):
  *   - 24h window expired           → 200 { success:false, error:"24h_window_expired" }
  *   - other non-retryable Graph 4xx → 200 { success:false, error:"graph_<status>" }
  *   - unknown / network errors      → 500 (Hay may retry)
+ *   - a failure after part of the message went out → 200 { success:false,
+ *     error:"partial_delivery" }, never a retry that would send it twice
  */
 export async function deliverHandler(
   req: Request,
@@ -68,9 +82,20 @@ export async function deliverHandler(
       return;
     }
 
-    const { to, content, messageId, conversationId } = req.body as DeliverPayload;
+    const { to, content, messageId, conversationId, attachments } = req.body as DeliverPayload;
 
-    if (!to || !content) {
+    const files = (Array.isArray(attachments) ? attachments : []).flatMap((file) => {
+      const type = instagramAttachmentType(file?.type ?? "");
+      const url = file?.url;
+      return type && typeof url === "string" && url.startsWith("https://") ? [{ type, url }] : [];
+    });
+    const unsendable = (Array.isArray(attachments) ? attachments.length : 0) - files.length;
+
+    if (!to || (!content && !files.length)) {
+      if (to && unsendable > 0) {
+        res.status(200).json({ success: false, error: "attachment_type_not_supported" });
+        return;
+      }
       res.status(400).json({ success: false, error: "Missing 'to' or 'content'" });
       return;
     }
@@ -82,10 +107,37 @@ export async function deliverHandler(
     logger.info("Delivering Instagram message", {
       conversationId,
       messageId,
-      contentLength: content.length,
+      contentLength: content?.length ?? 0,
+      attachmentCount: files.length,
+      unsendableAttachments: unsendable,
     });
 
-    const providerMessageId = await graphClient.sendText(recipientPsid, content, accessToken);
+    // Instagram has no captions: each file is its own DM, then the text.
+    const sentIds: string[] = [];
+    try {
+      for (const file of files) {
+        sentIds.push(await graphClient.sendAttachment(recipientPsid, file, accessToken));
+      }
+      if (content) {
+        sentIds.push(await graphClient.sendText(recipientPsid, content, accessToken));
+      }
+    } catch (error) {
+      // Part of the message already reached the shopper: report, don't retry.
+      if (sentIds.length) {
+        logger.error("Instagram message only partly delivered", {
+          messageId,
+          error: error instanceof Error ? error.message : String(error),
+        });
+        res.status(200).json({
+          success: false,
+          error: "partial_delivery",
+          providerMessageId: sentIds[sentIds.length - 1],
+        });
+        return;
+      }
+      throw error;
+    }
+    const providerMessageId = sentIds[sentIds.length - 1];
 
     logger.info("Instagram message delivered", {
       providerMessageId,
