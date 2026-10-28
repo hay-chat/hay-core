@@ -1,5 +1,5 @@
 <template>
-  <!-- Customer photos and PDFs: whether the AI reads them (D8-11). -->
+  <!-- Customer photos and PDFs: whether the AI reads them (D8-11) and ID documents (D8-12). -->
   <Card>
     <CardHeader>
       <CardTitle>{{ $t("customerPrivacy.media.title") }}</CardTitle>
@@ -10,6 +10,21 @@
         <Input v-model="readImages" type="switch" :label="$t('customerPrivacy.media.readImages')" />
         <p class="text-sm text-muted-foreground">
           {{ $t("customerPrivacy.media.readImagesHint") }}
+        </p>
+      </div>
+
+      <div class="space-y-1">
+        <Input
+          v-model="allowIdDocuments"
+          type="switch"
+          :label="$t('customerPrivacy.media.allowIdDocuments')"
+          :disabled="!userStore.isOwner"
+        />
+        <p class="text-sm text-muted-foreground">
+          {{ $t("customerPrivacy.media.allowIdDocumentsHint") }}
+        </p>
+        <p v-if="!userStore.isOwner" class="text-sm text-muted-foreground">
+          {{ $t("customerPrivacy.media.ownerOnly") }}
         </p>
       </div>
 
@@ -24,18 +39,22 @@
 import { ref, onMounted } from "vue";
 import { Hay } from "@/utils/api";
 import { useToast } from "@/composables/useToast";
+import { useUserStore } from "@/stores/user";
 
 const { t } = useI18n();
 const toast = useToast();
+const userStore = useUserStore();
 
 const loaded = ref(false);
 const isSaving = ref(false);
 const readImages = ref(true);
+const allowIdDocuments = ref(false);
 
 async function load() {
   try {
     const result = await Hay.organizations.getMediaSettings.query();
     readImages.value = result.readImages;
+    allowIdDocuments.value = result.allowIdDocuments;
     loaded.value = true;
   } catch (error) {
     console.error("Failed to load media settings:", error);
@@ -46,7 +65,11 @@ async function load() {
 async function save() {
   isSaving.value = true;
   try {
-    await Hay.organizations.updateMediaSettings.mutate({ readImages: readImages.value });
+    await Hay.organizations.updateMediaSettings.mutate({
+      readImages: readImages.value,
+      // Only the owner may change it; others leave it as it is.
+      ...(userStore.isOwner ? { allowIdDocuments: allowIdDocuments.value } : {}),
+    });
     toast.success(t("customerPrivacy.media.saveSuccess"));
   } catch (error) {
     console.error("Failed to save media settings:", error);

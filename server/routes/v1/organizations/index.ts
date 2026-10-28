@@ -465,7 +465,12 @@ export const organizationsRouter = t.router({
   ),
 
   updateMediaSettings: scopedProcedure(RESOURCES.ORGANIZATION_SETTINGS, ACTIONS.UPDATE)
-    .input(z.object({ readImages: z.boolean().optional() }))
+    .input(
+      z.object({
+        readImages: z.boolean().optional(),
+        allowIdDocuments: z.boolean().optional(),
+      }),
+    )
     .mutation(async ({ ctx, input }) => {
       const organization = await organizationService.findOne(ctx.organizationId!);
       if (!organization) {
@@ -473,6 +478,16 @@ export const organizationsRouter = t.router({
       }
       const media = { ...(organization.settings?.media ?? {}) };
       if (input.readImages !== undefined) media.readImages = input.readImages;
+      // Letting the AI read ID documents is the owner's call (D8-12). Cards are never readable.
+      if (input.allowIdDocuments !== undefined && input.allowIdDocuments !== media.allowIdDocuments) {
+        if (input.allowIdDocuments && ctx.user?.getRole() !== "owner") {
+          throw new TRPCError({
+            code: "FORBIDDEN",
+            message: "Only the organization owner can let the AI read ID documents",
+          });
+        }
+        media.allowIdDocuments = input.allowIdDocuments;
+      }
       await organizationService.update(ctx.organizationId!, {
         settings: { ...(organization.settings || {}), media },
       });

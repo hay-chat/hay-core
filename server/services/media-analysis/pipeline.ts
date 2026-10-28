@@ -26,7 +26,8 @@ import { organizationRepository } from "@server/repositories/organization.reposi
 import { resolveMediaSettings } from "@server/types/organization-settings.types";
 import { CONVERSATION_MEDIA_FOLDER, storageService } from "@server/services/storage.service";
 import { isAnalyzable, PDF_TYPE, READABLE_IMAGE_TYPES as IMAGE_TYPES } from "./readable";
-import { VisionUnavailableError, visionService, type VisionResult } from "./vision.service";
+import { toStoredAnalysis, type PrivacySettings } from "./privacy";
+import { VisionUnavailableError, visionService } from "./vision.service";
 
 const logger = createLogger("media-analysis");
 
@@ -54,21 +55,11 @@ export function markAnalysisPending(
   );
 }
 
-function toAnalysis(result: VisionResult, text?: string): AttachmentAnalysis {
-  return {
-    status: "done",
-    class: result.class,
-    description: result.description,
-    fields: result.fields,
-    ...(text ? { text } : {}),
-    analyzedAt: new Date().toISOString(),
-  };
-}
-
 /** Read one file: download it (this org's conversation media only), then run the pass. */
 async function analyzeAttachment(
   organizationId: string,
   attachment: MessageAttachment,
+  privacy: PrivacySettings,
 ): Promise<AttachmentAnalysis> {
   const { buffer, upload } = await storageService.download(attachment.id);
   if (upload.organizationId !== organizationId || upload.folder !== CONVERSATION_MEDIA_FOLDER) {
@@ -87,7 +78,7 @@ async function analyzeAttachment(
       text,
       filename: upload.originalName,
     });
-    return toAnalysis(result, text.slice(0, MAX_STORED_PDF_TEXT));
+    return toStoredAnalysis(result, privacy, text.slice(0, MAX_STORED_PDF_TEXT));
   }
 
   if (!IMAGE_TYPES.has(upload.mimeType)) return { status: "skipped", reason: "unsupported" };
@@ -96,7 +87,7 @@ async function analyzeAttachment(
     buffer,
     mimeType: upload.mimeType,
   });
-  return toAnalysis(result);
+  return toStoredAnalysis(result, privacy);
 }
 
 /** Tell dashboard clients a message's files changed (analysis or scan). Org-only event. */
@@ -150,7 +141,7 @@ export async function processMessageMedia(
           return;
         }
         try {
-          results.set(attachment.id, await analyzeAttachment(organizationId, attachment));
+          results.set(attachment.id, await analyzeAttachment(organizationId, attachment, settings));
         } catch (error) {
           const unavailable = error instanceof VisionUnavailableError;
           logger.warn(

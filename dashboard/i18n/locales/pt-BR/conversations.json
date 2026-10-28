@@ -23,7 +23,10 @@
       "tooMany": "Você pode enviar até {count} arquivos por vez.",
       "analysisPending": "A IA está lendo este arquivo…",
       "analysisRead": "A IA leu: {description}",
-      "analysisFailed": "A IA não conseguiu ler este arquivo"
+      "analysisFailed": "A IA não conseguiu ler este arquivo",
+      "reveal": "Clique para revelar",
+      "withheldId": "Documento de identidade: oculto para a IA",
+      "withheldCard": "Cartão de pagamento: oculto para a IA"
     },
     "page": {
       "title": "Conversas",

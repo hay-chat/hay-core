@@ -23,7 +23,10 @@
       "tooMany": "You can send up to {count} files at once.",
       "analysisPending": "AI is reading this file…",
       "analysisRead": "AI read: {description}",
-      "analysisFailed": "The AI couldn't read this file"
+      "analysisFailed": "The AI couldn't read this file",
+      "reveal": "Click to reveal",
+      "withheldId": "ID document: hidden from the AI",
+      "withheldCard": "Payment card: hidden from the AI"
     },
     "page": {
       "title": "Conversations",
