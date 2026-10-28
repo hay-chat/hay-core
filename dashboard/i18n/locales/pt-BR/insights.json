@@ -38,6 +38,161 @@
         "previous": "Anterior",
         "next": "Próxima"
       }
+    },
+    "page": {
+      "title": "Insights",
+      "description": "Padrões nas suas conversas e nas avaliações da sua equipe: o que a IA erra, o que funciona e o que mudar. Atualizado toda noite.",
+      "seoTitle": "Insights - Hay.chat",
+      "refresh": "Atualizar",
+      "settings": "Configurações",
+      "counts": {
+        "open": "Abertos",
+        "new": "Novos",
+        "positive": "Positivos",
+        "addressed": "Resolvidos",
+        "fixedRate": "Corrigidos depois de resolvidos",
+        "fixedRateValue": "{fixed} de {measured}",
+        "fixedRateNone": "Ainda não medido"
+      },
+      "filters": {
+        "polarity": "Polaridade",
+        "state": "Status",
+        "actionType": "Ação sugerida",
+        "window": "Período",
+        "minSize": "Mínimo de conversas",
+        "all": "Todos",
+        "open": "Abertos (novos, reconhecidos, em andamento)",
+        "allStates": "Todos os status",
+        "days": "Últimos {days} dias"
+      },
+      "polarity": {
+        "negative": "Problema",
+        "positive": "Funcionando bem",
+        "neutral": "Neutro"
+      },
+      "states": {
+        "new": "Novo",
+        "acknowledged": "Reconhecido",
+        "in_progress": "Em andamento",
+        "addressed": "Resolvido",
+        "rejected": "Rejeitado",
+        "archived": "Arquivado"
+      },
+      "actionTypes": {
+        "playbook_edit": "Editar um playbook",
+        "new_playbook": "Novo playbook",
+        "knowledge_edit": "Corrigir conhecimento",
+        "knowledge_add": "Adicionar conhecimento",
+        "setup": "Configuração",
+        "policy_ambiguity": "Política pouco clara",
+        "product_bug": "Erro no produto",
+        "ux_confusion": "Confusão no site",
+        "support_training": "Treinamento da equipe",
+        "none": "Nenhuma ação"
+      },
+      "sources": {
+        "ai_review": "Revisão da conversa",
+        "user_feedback": "Avaliação da equipe",
+        "docs_audit": "Auditoria da documentação"
+      },
+      "list": {
+        "count": "{count} insights",
+        "empty": "Nenhum insight com esses filtros",
+        "emptyDescription": "Os insights aparecem depois da análise noturna, quando um padrão surge em pelo menos {min} conversas. Padrões positivos também aparecem aqui.",
+        "periodSize": "{count} neste período",
+        "conversations": "{count} conversas",
+        "lastSeen": "Visto por último em {date}",
+        "untitled": "Padrão sem título",
+        "recurring": "Voltou a acontecer",
+        "archiveSuggested": "Sem conversas novas há 45 dias",
+        "docsAudit": "Auditoria da documentação",
+        "backfilling": "Revisando suas conversas dos últimos 30 dias. Os novos insights aparecem aqui depois da análise.",
+        "loadError": "Não foi possível carregar os insights"
+      },
+      "detail": {
+        "back": "Todos os insights",
+        "loadError": "Não foi possível carregar este insight",
+        "hypothesis": "Causa provável",
+        "stats": {
+          "periodSize": "Nos últimos 30 dias",
+          "total": "Desde o início",
+          "conversations": "Conversas",
+          "takeovers": "Passadas para a equipe",
+          "firstSeen": "Visto pela primeira vez",
+          "lastSeen": "Visto por último"
+        },
+        "breakdown": {
+          "channels": "Canais",
+          "sources": "Origens",
+          "polarity": "Sentimento"
+        },
+        "evidence": "Evidências",
+        "evidenceHint": "Trechos curtos sem dados pessoais. Os links abrem a conversa enquanto ela ainda estiver guardada.",
+        "paraphrases": "O que os clientes perguntaram, em outras palavras",
+        "openConversation": "Abrir conversa",
+        "conversationGone": "Conversa não está mais guardada",
+        "recent": "Conversas recentes",
+        "untitledConversation": "Conversa",
+        "audit": "Histórico",
+        "auditEmpty": "Nenhuma alteração ainda",
+        "auditSystem": "Hay.chat",
+        "auditRecurred": "O padrão voltou depois de ser resolvido",
+        "auditMerged": "Unido a um insight parecido",
+        "lifecycle": "Status",
+        "suggestedAction": "Ação sugerida",
+        "actions": {
+          "acknowledged": "Reconhecer",
+          "in_progress": "Começar",
+          "addressed": "Marcar como resolvido",
+          "rejected": "Rejeitar",
+          "archived": "Arquivar",
+          "new": "Reabrir"
+        },
+        "stateChanged": "Insight atualizado",
+        "stateError": "Não foi possível atualizar este insight",
+        "rejectTitle": "Rejeitar este insight?",
+        "rejectDescription": "Conte o motivo, para ele ficar no histórico. Nada muda na sua IA.",
+        "rejectReason": "Motivo (opcional)",
+        "rejectConfirm": "Rejeitar",
+        "fixed": {
+          "title": "Depois de resolvido",
+          "watching": "Observando: comparamos os próximos {days} dias com os 30 dias anteriores.",
+          "fixed": "Corrigido: {after} por semana agora, antes {before}.",
+          "improved": "Melhorou: {after} por semana agora, antes {before}.",
+          "notFixed": "Ainda não corrigido: {after} por semana agora, {before} antes."
+        },
+        "archiveSuggestion": "Sem conversas novas há 45 dias. Você pode arquivar este insight.",
+        "approve": {
+          "playbook_edit": "Sugerir uma edição no playbook",
+          "knowledge": "Sugerir uma correção no conhecimento",
+          "task": "Criar uma tarefa",
+          "hintPlaybook": "Abre uma edição sugerida do playbook para você revisar. Salvar cria um rascunho; ele só chega às conversas novas depois que você publicar.",
+          "hintKnowledge": "Abre uma mudança sugerida no seu conhecimento para você revisar antes de salvar qualquer coisa.",
+          "hintTask": "Isto precisa de uma mudança fora da IA. Guardamos como tarefa aqui para você acompanhar.",
+          "error": "Não foi possível preparar a sugestão",
+          "draftSaved": "Rascunho salvo. Publique o playbook para usá-lo nas conversas novas.",
+          "openPlaybook": "Abrir playbook",
+          "knowledgeSaved": "Conhecimento salvo e insight marcado como resolvido",
+          "taskTitle": "Tarefa",
+          "taskDescription": "Copie para o seu gerenciador de tarefas, ou mantenha aqui. Marque o insight como resolvido quando terminar.",
+          "copy": "Copiar",
+          "copied": "Copiado",
+          "newPlaybook": "Criar um playbook"
+        }
+      },
+      "settingsDialog": {
+        "title": "Configurações do Insights",
+        "description": "Os valores iniciais funcionam para a maioria das lojas. As mudanças valem a partir da próxima análise noturna.",
+        "minClusterSize": "Mínimo de conversas para um insight aparecer",
+        "digestEnabled": "E-mail semanal de resumo para donos e administradores",
+        "advanced": "Avançado: similaridade",
+        "joinThreshold": "Similaridade para juntar (0,70 a 0,98)",
+        "mergeThreshold": "Similaridade para unir grupos (0,75 a 0,99)",
+        "tuning": "Nos últimos 30 dias: {issues} conversas revisadas e avaliações, {clusters} padrões, {promoted} exibidos, {singletons} vistos só uma vez.",
+        "save": "Salvar",
+        "saved": "Configurações do Insights salvas",
+        "error": "Não foi possível salvar as configurações"
+      }
     }
   }
 }
