@@ -12,6 +12,7 @@
 
 import type { Conversation } from "@server/database/entities/conversation.entity";
 import { createLogger } from "@server/lib/logger";
+import { inspectAttachmentTool } from "./inspect-attachment";
 import { recommendProductsTool } from "./recommend-products";
 import { sendAttachmentTool } from "./send-attachment";
 
@@ -66,3 +67,4 @@ export const coreToolRegistry = new CoreToolRegistry();
 // Built-in registrations
 coreToolRegistry.register(recommendProductsTool);
 coreToolRegistry.register(sendAttachmentTool);
+coreToolRegistry.register(inspectAttachmentTool);

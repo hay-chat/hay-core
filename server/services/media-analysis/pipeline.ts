@@ -27,7 +27,7 @@ import { resolveMediaSettings } from "@server/types/organization-settings.types"
 import { CONVERSATION_MEDIA_FOLDER, storageService } from "@server/services/storage.service";
 import { isAnalyzable, PDF_TYPE, READABLE_IMAGE_TYPES as IMAGE_TYPES } from "./readable";
 import { toStoredAnalysis, type PrivacySettings } from "./privacy";
-import { VisionUnavailableError, visionService } from "./vision.service";
+import { VisionUnavailableError, visionService, type VisionInput } from "./vision.service";
 
 const logger = createLogger("media-analysis");
 
@@ -55,15 +55,25 @@ export function markAnalysisPending(
   );
 }
 
-/** Read one file: download it (this org's conversation media only), then run the pass. */
-async function analyzeAttachment(
+/** Either `input` (ready for the vision pass) or `skipped` (why not). */
+export interface LoadedFile {
+  input?: VisionInput;
+  /** PDF text kept for the AI's view. */
+  text?: string;
+  skipped?: AttachmentAnalysis;
+}
+
+/**
+ * Load a file for the vision pass: this org's conversation media only. PDFs
+ * become their text (a scanned PDF without text is skipped).
+ */
+export async function loadFileForVision(
   organizationId: string,
-  attachment: MessageAttachment,
-  privacy: PrivacySettings,
-): Promise<AttachmentAnalysis> {
-  const { buffer, upload } = await storageService.download(attachment.id);
+  attachmentId: string,
+): Promise<LoadedFile> {
+  const { buffer, upload } = await storageService.download(attachmentId);
   if (upload.organizationId !== organizationId || upload.folder !== CONVERSATION_MEDIA_FOLDER) {
-    return { status: "skipped", reason: "not_conversation_media" };
+    return { skipped: { status: "skipped", reason: "not_conversation_media" } };
   }
 
   if (upload.mimeType === PDF_TYPE) {
@@ -71,23 +81,30 @@ async function analyzeAttachment(
     const text = (parsed.text ?? "").replace(/\s+\n/g, "\n").trim();
     if (text.length < MIN_PDF_TEXT) {
       // TODO: scanned PDFs (no text layer) need page rendering before vision.
-      return { status: "skipped", reason: "no_text" };
+      return { skipped: { status: "skipped", reason: "no_text" } };
     }
-    const result = await visionService.analyze(organizationId, {
-      kind: "text",
-      text,
-      filename: upload.originalName,
-    });
-    return toStoredAnalysis(result, privacy, text.slice(0, MAX_STORED_PDF_TEXT));
+    return {
+      input: { kind: "text", text, filename: upload.originalName },
+      text: text.slice(0, MAX_STORED_PDF_TEXT),
+    };
   }
 
-  if (!IMAGE_TYPES.has(upload.mimeType)) return { status: "skipped", reason: "unsupported" };
-  const result = await visionService.analyze(organizationId, {
-    kind: "image",
-    buffer,
-    mimeType: upload.mimeType,
-  });
-  return toStoredAnalysis(result, privacy);
+  if (!IMAGE_TYPES.has(upload.mimeType)) {
+    return { skipped: { status: "skipped", reason: "unsupported" } };
+  }
+  return { input: { kind: "image", buffer, mimeType: upload.mimeType } };
+}
+
+/** Read one file and store only what the privacy rules allow. */
+async function analyzeAttachment(
+  organizationId: string,
+  attachment: MessageAttachment,
+  privacy: PrivacySettings,
+): Promise<AttachmentAnalysis> {
+  const file = await loadFileForVision(organizationId, attachment.id);
+  if (!file.input) return file.skipped ?? { status: "skipped", reason: "unsupported" };
+  const result = await visionService.analyze(organizationId, file.input);
+  return toStoredAnalysis(result, privacy, file.text);
 }
 
 /** Tell dashboard clients a message's files changed (analysis or scan). Org-only event. */
