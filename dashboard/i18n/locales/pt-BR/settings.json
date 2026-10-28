@@ -330,7 +330,14 @@
     "installationCodeDescription": "Adicione este código ao seu site antes da tag de fechamento body",
     "loadFailed": "Falha ao carregar configurações do webchat",
     "saveSuccess": "Configurações do webchat salvas com sucesso",
-    "saveFailed": "Falha ao salvar configurações do webchat"
+    "saveFailed": "Falha ao salvar configurações do webchat",
+    "spamProtection": "Proteção contra spam",
+    "spamProtectionDescription": "O Hay.chat analisa as primeiras mensagens de cada conversa no webchat e retém o spam antes da IA. Spam nunca entra na sua cobrança.",
+    "spamClassifier": "Conferir conversas suspeitas com IA",
+    "spamClassifierDescription": "Quando uma conversa parece suspeita, mas não é claramente spam, um modelo de IA pequeno a lê antes de a IA do Hay.chat responder.",
+    "spamGuidance": "Orientações para a verificação de spam",
+    "spamGuidancePlaceholder": "Por exemplo: não vendemos serviços de SEO, então ofertas assim são spam. Pedidos de atacado são bem-vindos.",
+    "spamGuidanceDescription": "Diga à verificação por IA o que conta como spam na sua loja e o que não conta."
   },
   "customerPrivacy": {
     "title": "Privacidade do Cliente",

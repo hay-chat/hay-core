@@ -225,6 +225,17 @@
                 </DropdownMenuContent>
               </DropdownMenu>
               <Button
+                v-if="conversation && !conversation.spam_flagged_at"
+                variant="outline"
+                size="sm"
+                data-testid="mark-spam-button"
+                :loading="isMarkingSpam"
+                @click="markSpam"
+              >
+                <ShieldAlert class="h-4 w-4 mr-2" />
+                {{ $t("home.spam.markSpam") }}
+              </Button>
+              <Button
                 v-if="conversation?.status === 'open'"
                 variant="outline"
                 size="sm"
@@ -285,6 +296,14 @@
                   {{ $t("conversations.detail.evidencePack") }}
                 </DropdownMenuItem>
                 <DropdownMenuItem
+                  v-if="conversation && !conversation.spam_flagged_at"
+                  :disabled="isMarkingSpam"
+                  @click="markSpam"
+                >
+                  <ShieldAlert class="mr-2 h-4 w-4" />
+                  {{ $t("home.spam.markSpam") }}
+                </DropdownMenuItem>
+                <DropdownMenuItem
                   v-if="conversation?.status === 'open'"
                   @click="toggleSupervisionMode"
                 >
@@ -321,6 +340,13 @@
           :conversation-id="conversation.id"
           :product-case="productCase"
           @forwarded="onProductCaseForwarded"
+        />
+        <SpamBanner
+          v-if="conversation?.spam_flagged_at && !isPlaygroundMode"
+          :conversation-id="conversation.id"
+          :spam-reason="conversation.spam_reason"
+          :metadata="conversation.metadata as Record<string, unknown> | null"
+          @cleared="fetchConversation"
         />
         <!-- Messages Container -->
         <div ref="messagesContainer" class="flex-1 overflow-y-auto p-3 md:p-6 space-y-4 bg-white">
@@ -1076,6 +1102,7 @@ import {
 import { createReusableTemplate, useMediaQuery } from "@vueuse/core";
 import { TRPCClientError } from "@trpc/client";
 import { HayApi } from "@/utils/api";
+import SpamBanner from "@/components/conversations/SpamBanner.vue";
 import ProductCaseBanner, {
   type ProductCase,
   type ProductCaseForward,
@@ -1519,6 +1546,23 @@ const productCase = computed<ProductCase | null>(() => {
     ?.productCase;
   return value && typeof value === "object" ? (value as ProductCase) : null;
 });
+
+// Spam (D9-7): staff can flag a conversation the detector missed.
+const isMarkingSpam = ref(false);
+const markSpam = async () => {
+  if (!conversation.value) return;
+  const toast = useToast();
+  isMarkingSpam.value = true;
+  try {
+    await HayApi.conversations.markSpam.mutate({ conversationId: conversation.value.id });
+    toast.success(t("home.spam.markSpamDone"));
+    await fetchConversation();
+  } catch {
+    toast.error(t("home.spam.actionFailed"));
+  } finally {
+    isMarkingSpam.value = false;
+  }
+};
 
 const onProductCaseForwarded = (forward: ProductCaseForward) => {
   if (!conversation.value || !productCase.value) return;

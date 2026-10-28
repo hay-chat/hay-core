@@ -103,6 +103,35 @@
       </CardContent>
     </Card>
 
+    <!-- Spam protection (D9-6 / D9-7) -->
+    <Card>
+      <CardHeader>
+        <CardTitle>{{ $t("webchat.spamProtection") }}</CardTitle>
+        <CardDescription>{{ $t("webchat.spamProtectionDescription") }}</CardDescription>
+      </CardHeader>
+      <CardContent class="space-y-4">
+        <div class="flex items-start space-x-2">
+          <Switch id="spamClassifierEnabled" v-model="settingsForm.spamClassifierEnabled" />
+          <div class="space-y-1">
+            <Label for="spamClassifierEnabled">{{ $t("webchat.spamClassifier") }}</Label>
+            <p class="text-sm text-neutral-muted">{{ $t("webchat.spamClassifierDescription") }}</p>
+          </div>
+        </div>
+
+        <div class="space-y-2">
+          <Label for="spamGuidance">{{ $t("webchat.spamGuidance") }}</Label>
+          <Textarea
+            id="spamGuidance"
+            v-model="settingsForm.spamGuidance"
+            :placeholder="$t('webchat.spamGuidancePlaceholder')"
+            :rows="3"
+            :maxlength="2000"
+          />
+          <p class="text-sm text-neutral-muted">{{ $t("webchat.spamGuidanceDescription") }}</p>
+        </div>
+      </CardContent>
+    </Card>
+
     <!-- Save Button -->
     <div class="flex justify-end gap-2">
       <Button variant="outline" :disabled="!hasChanges || isSaving" @click="resetForm">
@@ -162,6 +191,8 @@ const settingsForm = ref({
   showGreeting: true,
   greetingMessage: "Hello! How can we help you today?",
   isEnabled: true,
+  spamClassifierEnabled: false,
+  spamGuidance: "",
 });
 
 const allowedDomainsText = ref("*");
@@ -219,6 +250,8 @@ async function loadSettings() {
       showGreeting: settings.showGreeting,
       greetingMessage: settings.greetingMessage || "",
       isEnabled: settings.isEnabled,
+      spamClassifierEnabled: settings.spamClassifierEnabled,
+      spamGuidance: settings.spamGuidance || "",
     };
 
     allowedDomainsText.value = settings.allowedDomains.join("\n");
@@ -242,6 +275,8 @@ async function saveSettings() {
       greetingMessage: settingsForm.value.greetingMessage || null,
       allowedDomains: allowedDomainsArray.value,
       isEnabled: settingsForm.value.isEnabled,
+      spamClassifierEnabled: settingsForm.value.spamClassifierEnabled,
+      spamGuidance: settingsForm.value.spamGuidance.trim() || null,
     });
 
     originalSettings.value = { ...settingsForm.value, allowedDomains: allowedDomainsArray.value };
