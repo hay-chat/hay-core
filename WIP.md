@@ -1,3 +1,6 @@
+## 2026-10-28 06:20 — staging — W2 L9+L10 owner loop hand-tested
+- Manual ✓: Pause AI everywhere (banner, audit row, one "team will reply" line), Resume, lock-screen privacy toggle. Push untested (no VAPID; real iPhone on Needs Roger).
+- Next: guides for L1+L6 and L9+L10, X lane merge when it reports, Wave 2 review.
 ## 2026-10-28 06:10 — staging — W2 L1+L6 bot protection + spam merged, hand-tested
 - Merged claude/w2-turnstile (099db7e); 2 migrations on hay_staging; plugin SDK rebuilt; Turnstile TEST keys in staging .env.
 - Manual ✓: bot check allow, link spam held + /spam + Not spam re-engages AI, under-attack on/off. Fix bb305a2 spam preview.
