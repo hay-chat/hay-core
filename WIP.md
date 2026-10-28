@@ -1,3 +1,10 @@
+## 2026-10-28 — master — fix: atlassian/notion routers load in prod
+- Root cause: plugin router.cjs bundles keep `@server/*` external (must share the server's tRPC `t`/singletons); tsc-alias only rewrites server/dist, so `node dist/main.js` couldn't resolve `require('@server/trpc')`. tsx/ts-node resolved it, hence CLI worked.
+- Fix: server/lib/plugin-router-alias.ts registers `@server/*` → server root via tsconfig-paths (runtime dep) before plugin-manager loads a router. Test: server/tests/lib/plugin-router-alias.test.ts (plain node child process, prod-like layout).
+- Verified in hay-core:fix-test image: both routers load (listRoots/discover/fetchPage/listChanges), @server/trpc resolves to /app/server/dist/trpc/index.js.
+- Only atlassian + notion declare trpcRouter. Needs full image rebuild: `cd /srv/hay-core && ./deploy.sh`.
+- Next: after deploy, `docker compose logs server | grep "Registered router"` should list Atlassian + Notion.
+
 ## 2026-10-28 — master (homeserver /srv/hay-core) — prod keys live, backoffice #7 merged
 - hay-core prod env from Infisical (`ALLOW_REMOVED=1 ./deploy.sh --env-only`): TURNSTILE_*, OPERATOR_EVENTS_URL, RESEND_EVENTS_WEBHOOK_SECRET set; SMTP_FROM_NAME=Hay.chat; JWT_REFRESH_EXPIRES_IN removed. Health ok.
 - Turnstile: plugin already on for all 101 orgs (enable-defaults ran 16:20); challenge frame now 200 with the Cloudflare script.
