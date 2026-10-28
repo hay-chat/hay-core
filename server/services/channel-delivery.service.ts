@@ -246,6 +246,7 @@ export class ChannelDeliveryService {
         content: disclosure ? (content ? `${disclosure}\n\n${content}` : disclosure) : content,
         aiDisclosed: !!disclosure,
         messageId,
+        messageType: payload.type,
         conversationId,
         conversationMetadata: (conversation.metadata ?? null) as Record<string, unknown> | null,
         language: conversation.language ?? null,
@@ -436,6 +437,8 @@ export class ChannelDeliveryService {
     /** The content opens with the AI disclosure line; recorded once delivered. */
     aiDisclosed?: boolean;
     messageId: string;
+    /** Who wrote it (e.g. "HumanAgent"): Meta lets a person reply after 24 h with the Human Agent tag. */
+    messageType: string;
     conversationId: string;
     conversationMetadata: Record<string, unknown> | null;
     /** Conversation language (e.g. "pt"), so a plugin can pick a template language. */
@@ -476,6 +479,7 @@ export class ChannelDeliveryService {
       to: args.to,
       content,
       messageId,
+      messageType: args.messageType,
       conversationId,
       conversationMetadata: args.conversationMetadata,
       language: args.language,
