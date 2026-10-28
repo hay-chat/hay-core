@@ -1,0 +1,57 @@
+{
+  "evidence": {
+    "headTitle": "Evidence packs - Hay.chat",
+    "title": "Evidence packs",
+    "description": "Put every conversation about an order into one document you can attach when a customer disputes a payment.",
+    "search": {
+      "label": "Order number",
+      "placeholder": "e.g. #1001",
+      "submit": "Find order",
+      "forConversation": "Orders mentioned in this conversation",
+      "forCustomer": "Orders this customer talked about",
+      "clear": "Search by order number instead",
+      "empty": "No conversation mentions this order. Orders are found when Hay.chat looked them up in your store or a message named them (for example \"#1001\").",
+      "emptyConversation": "This conversation does not mention an order.",
+      "emptyCustomer": "This customer's conversations do not mention an order."
+    },
+    "order": {
+      "label": "Order #{number}",
+      "conversations": "{count} conversation | {count} conversations",
+      "lastSeen": "Last mentioned {at}",
+      "fromMessages": "From messages",
+      "select": "Select",
+      "selected": "Selected"
+    },
+    "conversationOnly": {
+      "title": "Use this conversation only",
+      "description": "Build the pack from this conversation without an order."
+    },
+    "options": {
+      "title": "Build the pack",
+      "forOrder": "Order #{number}, {count} conversation | Order #{number}, {count} conversations",
+      "forConversation": "This conversation",
+      "template": "Dispute reason",
+      "templates": {
+        "generic": "General",
+        "item_not_received": "Item not received",
+        "not_as_described": "Item not as described or defective",
+        "cancelled_credit": "Cancelled order or credit not processed"
+      },
+      "templateHelp": "Chooses which store actions and policies the summary puts first. The full conversation is always included.",
+      "pdf": "Download PDF",
+      "zip": "Download ZIP",
+      "zipHelp": "The ZIP adds the attachments, a README and a SHA-256 manifest so anyone can check that no file was changed.",
+      "downloaded": "Evidence pack downloaded",
+      "imagesOmitted": "Some images were too large for the 4 MB PDF limit and were left out of the PDF. They are in the ZIP.",
+      "overCap": "This PDF is larger than 4 MB. Some payment providers do not accept files that large; choose fewer conversations or trim it before uploading.",
+      "failed": "Could not build the evidence pack. Try again."
+    },
+    "notes": {
+      "title": "Before you submit",
+      "honest": "The pack is a record of what Hay.chat stored about these conversations. It does not guarantee any dispute outcome, and each payment provider decides what evidence it accepts.",
+      "retention": "Your data retention is set to {days} days. Conversations older than that are deleted and cannot be part of a pack. Disputes can be opened months after an order, so a short retention leaves you less evidence.",
+      "retentionOff": "Conversations are kept until you delete them, so older orders can still be packed.",
+      "retentionLink": "Data retention settings"
+    }
+  }
+}
