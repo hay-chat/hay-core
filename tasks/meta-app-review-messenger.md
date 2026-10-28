@@ -13,9 +13,11 @@ Drafted 2026-10-28. Roger submits; nothing here has been sent to Meta.
 - [ ] **Screencast** (script below), English UI, ~2–3 min, 1080p. One video can cover all three permissions.
 - [ ] Check the API-call counter for each permission turns green in App Review → Permissions and features (can take up to 24 h).
 
-Note: the app's user data deletion URL and deauthorize callback point at the WhatsApp plugin
-(`/v1/plugins/hay-channel-whatsapp-meta/...`), because the app is shared. Meta only checks that the URL
-answers; confirm it also deletes Messenger data before the reviewer asks.
+**Known gap (not a review blocker):** the app has ONE deauthorize URL and ONE data-deletion URL, and both
+point at the WhatsApp plugin (`/v1/plugins/hay-channel-whatsapp-meta/...`). Core resolves the org by
+looking the user id up in *that plugin's* routing keys only, so when someone removes Hay.chat from Facebook
+the Messenger connection is not cleared (it logs "unknown routing key; nothing to remove"). Fix: one
+shared Meta callback in core that clears every plugin instance whose routing keys contain that user id.
 
 ## Permission texts (paste into each "How will this app use…" field)
 

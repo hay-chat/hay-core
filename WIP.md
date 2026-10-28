@@ -1,3 +1,7 @@
+## 2026-10-28 — master 66bf78ec deployed
+- Channel messages that arrive when the org has no agent are now kept: stored and parked pending-human, instead of a 500 that Meta eventually drops. Messenger tested end to end on Magenta Terrários once Roger created an agent.
+- Next: App Review drafts (pages_messaging, pages_manage_metadata, pages_show_list, Human Agent), then WABA checks.
+
 ## 2026-10-28 — master (homeserver) — Stripe live test done, billing fixes shipped
 - Live test on "My Store" (roger+demo@hay.chat), sub_1UVbfHL8O3lIr2V8pSy7KSoQ: checkout Solo EUR ✅, upgrade → Starter ✅ (2 emails → fixed backoffice d0bae68), downgrade booked for 28 Nov via schedule ✅ (1 email), overage credit −€2 on next invoice ✅.
 - Live portal has plan changes disabled → "applies now" copy is fine. Live billing page was broken since 10-26 (website ecdbb32 fixed). Plugin routers fixed (3ce94dd2, deployed).
