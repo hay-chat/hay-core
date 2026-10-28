@@ -61,7 +61,8 @@ export const STRIPE_TOOL_RISK: ToolRiskSpec = {
     create_product: "other_write",
     create_price: "other_write",
     create_payment_link: "other_write",
-    update_dispute: "other_write",
+    // Submitting dispute evidence cannot be taken back: always held for approval.
+    update_dispute: "destructive",
   },
 };
 

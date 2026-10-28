@@ -47,6 +47,12 @@ describe("tool risk classification", () => {
     expect(unclassified).toEqual(toolRisk.unclassified ?? []);
   });
 
+  it("registers no tool that reads a file path on the host (B5)", () => {
+    expect(tools.map((t) => t.name)).not.toContain("upload_image_from_file");
+    const pathArgs = tools.filter((t) => t.inputSchema?.properties?.filePath);
+    expect(pathArgs.map((t) => t.name)).toEqual([]);
+  });
+
   it("lists no tool that is not registered", () => {
     const names = tools.map((t) => t.name);
     const listed = [...toolRisk.read, ...Object.keys(toolRisk.write)];

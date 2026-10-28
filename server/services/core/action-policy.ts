@@ -10,6 +10,7 @@
  *  - with the org's approval off (`moneyMovesNeedApproval` false), every other
  *    call runs;
  *  - tools that do not declare a risk class are held (they may move money);
+ *  - destructive writes (deletes, account configuration) are always held;
  *  - a category the org does not require approval for runs (by default only
  *    money moves - refund, cancel, discount, exchange - require it);
  *  - a tool that enforces its own cap (capEnforced) runs: within the cap it
@@ -22,13 +23,23 @@ import type {
   ActionApprovalConfig,
   ApprovalCategory,
 } from "@server/types/organization-settings.types";
-import { MONEY_CATEGORIES, type ToolRisk, type WriteCategory } from "./tool-risk";
+import {
+  DESTRUCTIVE_CATEGORY,
+  MONEY_CATEGORIES,
+  type ToolRisk,
+  type WriteCategory,
+} from "./tool-risk";
 
 export type GateDecision =
   | { kind: "allow" }
   | {
       kind: "hold";
-      reason: "money_move" | "category_policy" | "playbook_policy" | "unclassified_write";
+      reason:
+        | "money_move"
+        | "category_policy"
+        | "playbook_policy"
+        | "unclassified_write"
+        | "destructive_write";
       amount: number | null;
     };
 
@@ -89,6 +100,10 @@ export function decideGate(
     return { kind: "hold", reason: "unclassified_write", amount: extractAmount(args) };
   }
 
+  if (risk.category === DESTRUCTIVE_CATEGORY) {
+    return { kind: "hold", reason: "destructive_write", amount: extractAmount(args) };
+  }
+
   if (!categoryNeedsApproval(config, risk.category) || risk.capEnforced) {
     return { kind: "allow" };
   }
@@ -122,6 +137,33 @@ export function loosensActionApproval(
     }
   }
   return false;
+}
+
+/**
+ * The literal an API caller must send as `actionApproval.confirmSwitchOff` when
+ * the change switches approval off for a money move (D4-9 typed confirm). The
+ * dashboard sends it only after the person typed the confirm word in their
+ * language, so a plain API call cannot switch money approval off by accident.
+ */
+export const SWITCH_OFF_CONFIRMATION = "SWITCH OFF APPROVAL";
+
+/**
+ * Money categories that need approval now and would not after `change`, either
+ * because the master switch goes off or the category does. Matches the list
+ * the Settings > Actions typed confirm shows.
+ */
+export function moneyApprovalSwitchedOff(
+  current: ActionApprovalConfig,
+  change: Partial<ActionApprovalConfig>,
+): WriteCategory[] {
+  const after: ActionApprovalConfig = {
+    ...current,
+    ...change,
+    categories: { ...current.categories, ...(change.categories ?? {}) },
+  };
+  const held = (config: ActionApprovalConfig, category: WriteCategory) =>
+    config.moneyMovesNeedApproval && categoryNeedsApproval(config, category);
+  return [...MONEY_CATEGORIES].filter((c) => held(current, c) && !held(after, c));
 }
 
 /** A currency code the call states, if any (`currency` or `transactions[0].currency`). */

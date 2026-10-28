@@ -33,6 +33,6 @@ module.exports = {
     // Generic records can be any object (custom ones included).
     create_record: "other_write",
     update_record: "other_write",
-    delete_record: "other_write",
+    delete_record: "destructive",
   },
 };

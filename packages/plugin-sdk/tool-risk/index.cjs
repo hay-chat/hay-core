@@ -44,6 +44,10 @@ const WRITE_CATEGORIES = Object.freeze({
   address_change: { destructive: true },
   customer_update: { destructive: true },
   note: { destructive: false },
+  // Deletes data, changes how the account is set up (helpdesk triggers), or
+  // cannot be taken back (a cancelled booking, submitted dispute evidence).
+  // Core always holds it for approval while approval is on.
+  destructive: { destructive: true },
   other_write: { destructive: true },
 });
 

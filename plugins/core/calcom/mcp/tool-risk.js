@@ -9,7 +9,8 @@ module.exports = {
   // not a sale cancel.
   write: {
     create_booking: "other_write",
-    cancel_booking: "other_write",
+    // Cancelling frees the shopper's slot for good: always held for approval.
+    cancel_booking: "destructive",
     reschedule_booking: "other_write",
   },
 };

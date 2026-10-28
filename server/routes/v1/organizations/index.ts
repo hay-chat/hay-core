@@ -46,7 +46,11 @@ import {
 import { UserOrganization } from "@server/entities/user-organization.entity";
 import { User } from "@server/entities/user.entity";
 import { RESOURCES, ACTIONS } from "@server/types/scopes";
-import { loosensActionApproval } from "@server/services/core/action-policy";
+import {
+  loosensActionApproval,
+  moneyApprovalSwitchedOff,
+  SWITCH_OFF_CONFIRMATION,
+} from "@server/services/core/action-policy";
 import { auditLogService } from "@server/services/audit-log.service";
 import { handleUpload } from "@server/lib/upload-helper";
 import { StorageService } from "@server/services/storage.service";
@@ -111,6 +115,8 @@ const actionApprovalSchema = z
     approverRoles: z.array(z.enum(["admin", "contributor", "member"])).max(3),
     categories: z.record(z.enum(APPROVAL_CATEGORIES), z.boolean()),
     customerConfirmation: z.boolean(),
+    /** Required when the change switches approval off for a money move (typed confirm). */
+    confirmSwitchOff: z.literal(SWITCH_OFF_CONFIRMATION),
   })
   .partial();
 
@@ -576,9 +582,11 @@ export const organizationsRouter = t.router({
         testModeDefault,
         confidenceGuardrail,
         retentionDays,
-        actionApproval,
+        actionApproval: approvalInput,
         ...topLevelFields
       } = input;
+      const { confirmSwitchOff, ...actionApproval } = approvalInput ?? {};
+      const approvalChanged = approvalInput !== undefined;
 
       // Only the owner may loosen approval: turn it off (master switch, a
       // category, or the shopper confirmation), raise the amount that needs
@@ -586,13 +594,27 @@ export const organizationsRouter = t.router({
       // approves. Tightening (turning approval on, lowering the amount) is fine
       // for admins.
       if (
-        actionApproval &&
+        approvalChanged &&
         loosensActionApproval(resolveActionApprovalConfig(organization.settings), actionApproval) &&
         ctx.user?.getRole() !== "owner"
       ) {
         throw new TRPCError({
           code: "FORBIDDEN",
           message: "Only the organization owner can loosen action approval or change who approves",
+        });
+      }
+
+      // Switching approval off for a money move needs the typed confirm, in
+      // the API as well as the dashboard dialog.
+      if (
+        approvalChanged &&
+        !confirmSwitchOff &&
+        moneyApprovalSwitchedOff(resolveActionApprovalConfig(organization.settings), actionApproval)
+          .length > 0
+      ) {
+        throw new TRPCError({
+          code: "PRECONDITION_FAILED",
+          message: "Switching approval off for money moves needs the typed confirmation",
         });
       }
 
@@ -606,7 +628,7 @@ export const organizationsRouter = t.router({
         testModeDefault !== undefined ||
         confidenceGuardrail !== undefined ||
         retentionDays !== undefined ||
-        actionApproval !== undefined
+        approvalChanged
       ) {
         updatePayload.settings = {
           ...(organization.settings || {}),
@@ -627,7 +649,7 @@ export const organizationsRouter = t.router({
           updatePayload.settings.retentionDays = retentionDays;
         }
 
-        if (actionApproval !== undefined) {
+        if (approvalChanged) {
           const currentApproval = organization.settings?.actionApproval || {};
           updatePayload.settings.actionApproval = {
             ...currentApproval,

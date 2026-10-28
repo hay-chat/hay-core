@@ -4,6 +4,7 @@ import {
   loosensActionApproval,
   lowerAmount,
   amountEditable,
+  moneyApprovalSwitchedOff,
 } from "../../services/core/action-policy";
 import { DEFAULT_ACTION_APPROVAL_CONFIG } from "../../types/organization-settings.types";
 import { classifyTool, type ToolRisk } from "../../services/core/tool-risk";
@@ -54,6 +55,26 @@ describe("decideGate", () => {
     expect(decideGate(UNKNOWN, { anything: 1 }, ON)).toMatchObject({
       kind: "hold",
       reason: "unclassified_write",
+    });
+  });
+
+  it("always holds destructive writes, whatever the category settings say", () => {
+    expect(decideGate(risk("destructive"), { id: "1" }, ON)).toEqual({
+      kind: "hold",
+      reason: "destructive_write",
+      amount: null,
+    });
+    const allOff = { ...ON, categories: { refund: false, note: false } };
+    expect(decideGate(risk("destructive"), {}, allOff).kind).toBe("hold");
+    const off = { moneyMovesNeedApproval: false, thresholdAmount: 0 };
+    expect(decideGate(risk("destructive"), {}, off)).toEqual({ kind: "allow" });
+  });
+
+  it("holds a dispute update declared destructive, though other_write would run (B6)", () => {
+    expect(decideGate(risk("other_write"), { dispute: "dp_1" }, ON)).toEqual({ kind: "allow" });
+    expect(decideGate(risk("destructive"), { dispute: "dp_1", submit: true }, ON)).toMatchObject({
+      kind: "hold",
+      reason: "destructive_write",
     });
   });
 
@@ -167,9 +188,7 @@ describe("lowerAmount (D4-6)", () => {
   it("refuses up, zero, split refunds and calls without an amount", () => {
     expect(lowerAmount({ amount: "25.00", currency: "BRL" }, 25.01)).toBeNull();
     expect(lowerAmount({ amount: "25.00", currency: "BRL" }, 0)).toBeNull();
-    expect(
-      lowerAmount({ transactions: [{ amount: "10" }, { amount: "5" }] }, 4),
-    ).toBeNull();
+    expect(lowerAmount({ transactions: [{ amount: "10" }, { amount: "5" }] }, 4)).toBeNull();
     expect(lowerAmount({ order_id: "1" }, 4)).toBeNull();
     expect(amountEditable({ order_id: "1" })).toBe(false);
   });
@@ -177,5 +196,27 @@ describe("lowerAmount (D4-6)", () => {
   it("lowers a call that states no currency in its own unit", () => {
     expect(amountEditable({ amount: "25.00" })).toBe(true);
     expect(lowerAmount({ amount: "25.00" }, 10)).toEqual({ amount: "10.00" });
+  });
+});
+
+describe("moneyApprovalSwitchedOff", () => {
+  const current = DEFAULT_ACTION_APPROVAL_CONFIG;
+
+  it("lists every money category when the master switch goes off", () => {
+    expect(moneyApprovalSwitchedOff(current, { moneyMovesNeedApproval: false }).sort()).toEqual([
+      "cancel",
+      "discount",
+      "exchange",
+      "refund",
+    ]);
+  });
+
+  it("lists a money category switched off, ignores non-money ones and no-ops", () => {
+    expect(
+      moneyApprovalSwitchedOff(current, { categories: { refund: false, note: false } }),
+    ).toEqual(["refund"]);
+    expect(moneyApprovalSwitchedOff(current, { thresholdAmount: 5 })).toEqual([]);
+    const off = { ...current, moneyMovesNeedApproval: false };
+    expect(moneyApprovalSwitchedOff(off, { categories: { refund: false } })).toEqual([]);
   });
 });
