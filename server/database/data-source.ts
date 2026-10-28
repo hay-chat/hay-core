@@ -41,6 +41,7 @@ import { PendingAction } from "./entities/pending-action.entity";
 import { BusinessHoursSchedule } from "./entities/business-hours-schedule.entity";
 import { OrderConversationLink } from "./entities/order-conversation-link.entity";
 import { EmailSendingDomain } from "./entities/email-sending-domain.entity";
+import { CustomerMergeDismissal } from "./entities/customer-merge-dismissal.entity";
 import { OrderLinkMessageSubscriber } from "./subscribers/order-link-message.subscriber";
 import { SnakeNamingStrategy } from "./naming-strategy";
 import { config } from "../config/env";
@@ -108,6 +109,7 @@ export const AppDataSource = new DataSource({
     BusinessHoursSchedule,
     OrderConversationLink,
     EmailSendingDomain,
+    CustomerMergeDismissal,
   ],
   migrations: __filename.includes("dist")
     ? [__dirname + "/migrations/*.js"] // Production: compiled JS files in same relative location

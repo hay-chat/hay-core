@@ -38,6 +38,19 @@
       "title": "Conversations",
       "none": "No conversations yet",
       "messageCount": "{count} messages"
+    },
+    "merge": {
+      "title": "Possibly the same person",
+      "description": "These customers share an email or a phone number, often the same shopper on two channels. Merging moves every conversation to one customer, and replies keep going to the channel each conversation started on.",
+      "sameEmail": "Same email: {value}",
+      "samePhone": "Same phone: {value}",
+      "merge": "Merge",
+      "dismiss": "Not the same person",
+      "confirmTitle": "Merge these customers?",
+      "confirmDescription": "{source} will be merged into {target}. Its conversations move to {target} and {source} is removed. This can't be undone.",
+      "confirm": "Merge customers",
+      "merged": "Customers merged",
+      "failed": "Something went wrong. Please try again."
     }
   }
 }
