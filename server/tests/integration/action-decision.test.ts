@@ -242,6 +242,20 @@ describe("action decisions (D4-5)", () => {
     expect(mockEnqueue).toHaveBeenCalledWith(conversation.id, orgId, "approval_decided");
   });
 
+  it.each(["resolved", "unresolved", "closed"] as const)(
+    "approve on a %s conversation does not run the action",
+    async (status) => {
+      const conversation = await newConversation(status);
+      const action = await hold(conversation.id);
+
+      const result = await actionDecisionService.approve(action.id, orgId, decider);
+
+      expect(result).toMatchObject({ transitioned: false, blocked: "conversation_closed" });
+      expect(mockExecuteApproved).not.toHaveBeenCalled();
+      expect((await pendingActionService.findById(action.id, orgId))?.status).toBe("pending");
+    },
+  );
+
   it("does not resume the AI when a human took over meanwhile", async () => {
     const conversation = await newConversation("human-took-over");
     const action = await hold(conversation.id);
