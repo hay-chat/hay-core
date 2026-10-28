@@ -23,6 +23,7 @@ import {
   type SimulationSeedTurn,
 } from "@server/database/entities/simulation-run-item.entity";
 import { TestCase, type TestCaseSource } from "@server/database/entities/test-case.entity";
+import { InsightIssue } from "@server/database/entities/insight-issue.entity";
 import { Organization } from "@server/entities/organization.entity";
 import { SIMULATION_CAPS } from "@server/config/simulation-caps";
 import { FeedbackRating } from "@server/types/message-feedback.types";
@@ -227,6 +228,67 @@ export class TestCaseService {
       sourceRef: `message:${message.id}`,
       playbookId: conversation.playbook_id,
       overrides,
+    });
+  }
+
+  /**
+   * Save the conversation behind an Insight issue as a case (D3-17): the
+   * history up to the flagged AI reply (or the whole conversation), with the
+   * issue's summary as what the reply must avoid (negative) or keep doing.
+   */
+  async createFromInsightIssue(
+    organizationId: string,
+    issueId: string,
+    overrides: TestCaseOverrides = {},
+    createdById: string | null = null,
+  ): Promise<TestCase> {
+    const issue = await AppDataSource.getRepository(InsightIssue).findOne({
+      where: { id: issueId, organization_id: organizationId },
+    });
+    const conversation = issue?.conversation_id
+      ? await AppDataSource.getRepository(Conversation).findOne({
+          where: { id: issue.conversation_id, organization_id: organizationId },
+        })
+      : null;
+    if (!issue || !conversation) {
+      throw new SimulationError("NOT_FOUND", "This insight has no conversation to test");
+    }
+
+    const messages = AppDataSource.getRepository(Message);
+    const flagged = issue.message_id
+      ? await messages.findOne({
+          where: { id: issue.message_id, conversation_id: conversation.id },
+        })
+      : null;
+    const history = await messages.find({
+      where: {
+        conversation_id: conversation.id,
+        ...(flagged ? { created_at: LessThan(flagged.created_at) } : {}),
+      },
+      order: { created_at: "ASC" },
+    });
+    const seed = conversationTurns(history).map((t) => ({ role: t.role, text: t.text }));
+
+    const expectations: SimulationExpectations = {
+      expectedOutcome:
+        issue.polarity === "positive"
+          ? `Keep doing this: ${issue.summary}`
+          : `The reply must not repeat this problem: ${issue.summary}`,
+    };
+    if (flagged?.type === MessageType.BOT_AGENT) {
+      if (issue.polarity === "positive") expectations.referenceReply = flagged.content;
+      else expectations.avoidReply = flagged.content;
+    }
+
+    return this.create({
+      organizationId,
+      createdById,
+      seed,
+      expectations,
+      source: "insight",
+      sourceRef: `insight_issue:${issue.id}`,
+      playbookId: conversation.playbook_id,
+      overrides: { title: clip(issue.summary, 255), ...overrides },
     });
   }
 

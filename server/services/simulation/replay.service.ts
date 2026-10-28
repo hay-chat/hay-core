@@ -213,6 +213,36 @@ export class ReplayService {
       .map((c) => c.id);
   }
 
+  /**
+   * The conversations behind an Insight (D3-17), newest first, so a fix can
+   * be replayed against them before it is published. Only the cluster's own
+   * members in this organization, not merged or deleted conversations.
+   */
+  async insightConversationIds(
+    organizationId: string,
+    clusterId: string,
+    limit: number,
+  ): Promise<string[]> {
+    const rows: Array<{ id: string; metadata: Record<string, unknown> | null }> =
+      await AppDataSource.query(
+        `SELECT conv.id, conv.metadata
+           FROM insight_clusters cl
+           JOIN insight_cluster_members m ON m.cluster_id = cl.id
+           JOIN insight_issues i ON i.id = m.insight_issue_id
+           JOIN conversations conv ON conv.id = i.conversation_id
+          WHERE cl.id = $1 AND cl.organization_id = $2
+            AND conv.organization_id = $2 AND conv.deleted_at IS NULL
+          GROUP BY conv.id, conv.metadata
+          ORDER BY max(i.created_at) DESC
+          LIMIT $3`,
+        [clusterId, organizationId, limit * 2],
+      );
+    return rows
+      .filter((c) => !isTestConversation(c.metadata))
+      .slice(0, limit)
+      .map((c) => c.id);
+  }
+
   /** Turn the sources into one case per customer turn and start the run. */
   async start(input: StartReplayInput): Promise<SimulationRun> {
     const recent = input.recentConversations

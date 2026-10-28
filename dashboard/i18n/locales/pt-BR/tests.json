@@ -165,6 +165,11 @@
         "too_many_changes": "Sua equipe ainda altera mais de 1 em cada 20 respostas. Melhore os playbooks ou o conhecimento a partir das respostas editadas primeiro.",
         "ready": "Sua equipe alterou menos de 1 em cada 20 respostas nos últimos {days} dias. Pode ser seguro mudar este agente para Envio automático. As ações continuam seguindo as aprovações de ações."
       }
+    },
+    "insight": {
+      "replayDraft": "Reproduzir estas conversas com o rascunho",
+      "replayDraftHint": "Antes de publicar a correção, veja como o rascunho responde às conversas por trás deste insight. As reproduções são gratuitas e nada é enviado aos clientes.",
+      "noDraft": "Salve primeiro as mudanças sugeridas no playbook como rascunho."
     }
   }
 }

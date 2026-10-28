@@ -57,6 +57,23 @@ export const testCasesRouter = t.router({
       }
     }),
 
+  /** Save the conversation behind an Insight issue as a case (D3-17). */
+  createFromInsightIssue: scopedProcedure(RESOURCES.PLAYBOOKS, ACTIONS.UPDATE)
+    .input(overridesSchema.extend({ issueId: z.string().uuid() }))
+    .mutation(async ({ ctx, input }) => {
+      const { issueId, ...overrides } = input;
+      try {
+        return await testCaseService.createFromInsightIssue(
+          ctx.organizationId!,
+          issueId,
+          overrides,
+          ctx.user?.id ?? null,
+        );
+      } catch (error) {
+        toTrpcError(error);
+      }
+    }),
+
   delete: scopedProcedure(RESOURCES.PLAYBOOKS, ACTIONS.UPDATE)
     .input(z.object({ ids: z.array(z.string().uuid()).min(1).max(200) }))
     .mutation(async ({ ctx, input }) => ({

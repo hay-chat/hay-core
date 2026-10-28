@@ -77,15 +77,19 @@
                 <Badge variant="outline">
                   {{ $t(`insights.page.sources.${snippet.source}`) }}
                 </Badge>
-                <Button
-                  v-if="snippet.conversationId"
-                  variant="ghost"
-                  size="sm"
-                  @click="openConversation(snippet.conversationId)"
-                >
-                  {{ $t("insights.page.detail.openConversation") }}
-                  <ExternalLink class="h-4 w-4 ml-2" />
-                </Button>
+                <div v-if="snippet.conversationId" class="flex items-center gap-1">
+                  <Button variant="ghost" size="sm" @click="openSaveAsTest(snippet.issueId)">
+                    {{ $t("tests.save.button") }}
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    @click="openConversation(snippet.conversationId)"
+                  >
+                    {{ $t("insights.page.detail.openConversation") }}
+                    <ExternalLink class="h-4 w-4 ml-2" />
+                  </Button>
+                </div>
                 <span v-else class="text-xs text-neutral-muted">
                   {{ $t("insights.page.detail.conversationGone") }}
                 </span>
@@ -151,6 +155,18 @@
             <Button v-if="approvedPlaybookId" variant="outline" @click="openPlaybook">
               {{ $t("insights.page.detail.approve.openPlaybook") }}
             </Button>
+            <Button
+              v-if="approvedPlaybookId"
+              variant="outline"
+              :loading="replaying"
+              data-testid="insight-replay-draft"
+              @click="replayDraft"
+            >
+              {{ $t("tests.insight.replayDraft") }}
+            </Button>
+            <p v-if="approvedPlaybookId" class="text-xs text-neutral-muted">
+              {{ $t("tests.insight.replayDraftHint") }}
+            </p>
           </CardContent>
         </Card>
 
@@ -255,6 +271,8 @@
       :initial-feedback="approval.feedback"
       @applied="onPlaybookDraftSaved"
     />
+
+    <SaveTestCaseDialog v-model:open="saveAsTestOpen" :target="saveAsTestTarget" />
 
     <SuggestKnowledgeDialog
       v-model:open="knowledgeDialogOpen"
@@ -504,6 +522,40 @@ const onPlaybookDraftSaved = () => {
 const onKnowledgeSaved = async () => {
   await changeState("addressed");
   toast.success(t("insights.page.detail.approve.knowledgeSaved"));
+};
+
+// D3-17: save an issue's conversation as a test case, and replay the
+// insight's conversations against the playbook draft before publishing it.
+const saveAsTestOpen = ref(false);
+const saveAsTestTarget = ref<{ kind: "insightIssue"; id: string } | null>(null);
+const replaying = ref(false);
+
+const openSaveAsTest = (issueId: string) => {
+  saveAsTestTarget.value = { kind: "insightIssue", id: issueId };
+  saveAsTestOpen.value = true;
+};
+
+const replayDraft = async () => {
+  const playbookId = approvedPlaybookId.value;
+  if (!playbookId) return;
+  replaying.value = true;
+  try {
+    const draft = await HayApi.playbooks.versions.getDraft.query({ playbookId });
+    if (!draft) {
+      toast.error(t("tests.insight.noDraft"));
+      return;
+    }
+    const run = await HayApi.replays.startForInsight.mutate({
+      insightId: id.value,
+      playbookVersionOverride: { playbookId, versionId: draft.id },
+      label: insight.value?.title ?? undefined,
+    });
+    if (run) router.push(`/tests/${run.id}`);
+  } catch (error) {
+    toast.error(error instanceof Error ? error.message : String(error));
+  } finally {
+    replaying.value = false;
+  }
 };
 
 const copyTask = async () => {

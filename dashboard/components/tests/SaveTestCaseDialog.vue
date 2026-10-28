@@ -39,9 +39,9 @@ import { useToast } from "@/composables/useToast";
 /**
  * "Save as test case" (D7-12): from a test result, an AI reply in a
  * conversation (approval edits/blocks and feedback decide what a good answer
- * is).
+ * is), or an Insight issue (D3-17: the problem it found is what to avoid).
  */
-type TestCaseTarget = { kind: "runItem"; id: string } | { kind: "message"; id: string };
+type TestCaseTarget = { kind: "runItem" | "message" | "insightIssue"; id: string };
 
 const props = defineProps<{ open: boolean; target: TestCaseTarget | null }>();
 const emit = defineEmits<{ "update:open": [value: boolean]; saved: [] }>();
@@ -81,6 +81,8 @@ async function save() {
   try {
     if (props.target.kind === "runItem") {
       await Hay.testCases.createFromRunItem.mutate({ itemId: props.target.id, ...overrides });
+    } else if (props.target.kind === "insightIssue") {
+      await Hay.testCases.createFromInsightIssue.mutate({ issueId: props.target.id, ...overrides });
     } else {
       await Hay.testCases.createFromMessage.mutate({ messageId: props.target.id, ...overrides });
     }
