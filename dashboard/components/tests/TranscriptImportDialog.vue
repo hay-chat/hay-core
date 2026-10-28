@@ -58,7 +58,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed } from "vue";
+import { ref, reactive, computed, onBeforeUnmount } from "vue";
 import { Hay } from "@/utils/api";
 import { useToast } from "@/composables/useToast";
 
@@ -93,21 +93,53 @@ async function readFile(event: Event) {
   if (file) content.value = await file.text();
 }
 
+/** Gorgias imports run in the background on the server; poll until the job ends. */
+const POLL_MS = 3000;
+let pollTimer: ReturnType<typeof setTimeout> | null = null;
+onBeforeUnmount(() => {
+  if (pollTimer) clearTimeout(pollTimer);
+});
+
+function pollImport(jobId: string) {
+  pollTimer = setTimeout(async () => {
+    try {
+      const status = await Hay.testTranscripts.importStatus.query({ jobId });
+      if (status.status === "processing") return pollImport(jobId);
+      if (status.status === "completed") {
+        toast.success(t("tests.import.done", { count: status.imported }, status.imported));
+      } else {
+        toast.error(
+          t("tests.import.backgroundFailed", {
+            error: status.error ?? "",
+            count: status.imported,
+          }),
+        );
+      }
+      emit("imported");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : String(error));
+    }
+  }, POLL_MS);
+}
+
 async function submit() {
   importing.value = true;
   try {
-    const result =
-      format.value === "gorgias"
-        ? await Hay.testTranscripts.importGorgias.mutate({ ...gorgias })
-        : await Hay.testTranscripts.importText.mutate({
-            format: format.value,
-            content: content.value,
-            businessName: businessName.value.trim() || undefined,
-          });
-    toast.success(t("tests.import.done", { count: result.imported }, result.imported));
+    if (format.value === "gorgias") {
+      const { jobId } = await Hay.testTranscripts.importGorgias.mutate({ ...gorgias });
+      toast.success(t("tests.import.backgroundStarted"));
+      pollImport(jobId);
+    } else {
+      const result = await Hay.testTranscripts.importText.mutate({
+        format: format.value,
+        content: content.value,
+        businessName: businessName.value.trim() || undefined,
+      });
+      toast.success(t("tests.import.done", { count: result.imported }, result.imported));
+      emit("imported");
+    }
     content.value = "";
     gorgias.apiKey = "";
-    emit("imported");
     emit("update:open", false);
   } catch (error) {
     toast.error(error instanceof Error ? error.message : String(error));
