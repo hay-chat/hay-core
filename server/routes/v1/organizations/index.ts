@@ -10,6 +10,7 @@ import {
   Timezone,
   DEFAULT_CONFIDENCE_GUARDRAIL_CONFIG,
   resolveActionApprovalConfig,
+  DEFAULT_NEW_ORG_RETENTION_DAYS,
 } from "@server/types/organization-settings.types";
 import type { DeepPartial } from "typeorm";
 import { AppDataSource } from "@server/database/data-source";
@@ -184,6 +185,7 @@ export const organizationsRouter = t.router({
             maxJobs: 50,
             maxStorageGb: 1,
           },
+          settings: { retentionDays: DEFAULT_NEW_ORG_RETENTION_DAYS },
         });
 
         await organizationRepository.save(organization);
