@@ -11,6 +11,7 @@ import {
   deciderOf,
   pendingActionService,
 } from "@server/services/pending-action.service";
+import { actionLogService, CORE_PLUGIN_FILTER } from "@server/services/action-log.service";
 import {
   actionDecisionService,
   type DecisionResult,
@@ -81,6 +82,25 @@ export const actionsRouter = t.router({
     } catch {
       return { canApprove: false };
     }
+  }),
+
+  /** The action log (D6-7): every tool call the AI made, newest first. */
+  log: scopedProcedure(RESOURCES.CONVERSATIONS, ACTIONS.READ)
+    .input(
+      z.object({
+        toolName: z.string().max(255).optional(),
+        pluginId: z.string().max(255).optional(),
+        outcome: z.enum(["success", "error", "simulated", "held", "confirming"]).optional(),
+        page: z.number().int().min(1).default(1),
+        pageSize: z.number().int().min(1).max(100).default(25),
+      }),
+    )
+    .query(({ ctx, input }) => actionLogService.list(ctx.organizationId!, input)),
+
+  /** Tool and platform values for the action log filters. */
+  logFilters: scopedProcedure(RESOURCES.CONVERSATIONS, ACTIONS.READ).query(async ({ ctx }) => {
+    const { tools, plugins } = await actionLogService.filterOptions(ctx.organizationId!);
+    return { tools, plugins: plugins.map((id) => id ?? CORE_PLUGIN_FILTER) };
   }),
 
   /** Pending actions across all conversations, for the Approvals list (D4-6). */
