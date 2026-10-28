@@ -54,7 +54,8 @@
         "billed": "Cobrada",
         "reversed": "Estornada",
         "excluded": "Excluída",
-        "pending_review": "Enviada ao Hay.chat para análise"
+        "pending_review": "Enviada ao Hay.chat para análise",
+        "denied": "Cobrada: o Hay.chat recusou a exclusão"
       }
     },
     "excludeDialog": {

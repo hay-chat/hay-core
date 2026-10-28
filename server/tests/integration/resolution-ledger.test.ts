@@ -281,6 +281,77 @@ describe("resolution ledger and exclusions (D1-5, D1-6)", () => {
     expect(line).toContain('"assumed","billed"');
   });
 
+  it("staff approve or deny exclusions waiting for review, once, with an audit row", async () => {
+    const rows = await seed(20);
+    const exclude = (outcomeId: string) =>
+      service.exclude({ organizationId: orgId, outcomeId, userId, reason: "came back by email" });
+    expect((await exclude(rows[0].id)).status).toBe("excluded");
+    expect((await exclude(rows[1].id)).status).toBe("pending_review");
+    expect((await exclude(rows[2].id)).status).toBe("pending_review");
+
+    const pending = await service.listPendingExclusions({ organizationId: orgId, limit: 10 });
+    expect(pending.map((p) => p.id)).toEqual([rows[1].id, rows[2].id]);
+    expect(pending[0]).toMatchObject({
+      organizationName: "Ledger Org",
+      exclusionReason: "came back by email",
+      exclusionRequestedBy: "ledger-test@example.com",
+    });
+
+    const review = (outcomeId: string, decision: "approve" | "deny") =>
+      service.reviewExclusion({
+        organizationId: orgId,
+        outcomeId,
+        decision,
+        reviewer: "staff@hay.chat",
+        note: " checked the transcript ",
+      });
+    expect(await review(rows[1].id, "approve")).toEqual({ status: "excluded" });
+    expect(await review(rows[2].id, "deny")).toEqual({ status: "denied" });
+    await expect(review(rows[2].id, "approve")).rejects.toMatchObject({ code: "CONFLICT" });
+    await expect(review(rows[3].id, "approve")).rejects.toMatchObject({ code: "CONFLICT" });
+    await expect(
+      service.reviewExclusion({
+        organizationId: "1ed6e700-0000-4000-8000-000000000999",
+        outcomeId: rows[1].id,
+        decision: "deny",
+        reviewer: "staff@hay.chat",
+      }),
+    ).rejects.toMatchObject({ code: "NOT_FOUND" });
+
+    // Approved leaves the count; denied stays billed and cannot be asked again.
+    expect(await billableCount()).toBe(18);
+    await expect(exclude(rows[2].id)).rejects.toMatchObject({ code: "CONFLICT" });
+    const stored = await AppDataSource.getRepository(ConversationOutcome).findOneByOrFail({
+      id: rows[1].id,
+    });
+    expect(stored).toMatchObject({
+      exclusion_reviewed_by: "staff@hay.chat",
+      exclusion_review_note: "checked the transcript",
+    });
+    expect(stored.excluded_at).not.toBeNull();
+
+    // A reviewed approval does not use the self-serve allowance.
+    const usage = await service.getUsage(orgId);
+    expect(usage.exclusions).toEqual({ used: 1, allowance: 1, open: true });
+    expect(usage.breakdown).toMatchObject({ billed: 18, excluded: 2, pendingReview: 0 });
+    const ledger = await service.listLedger(orgId, { page: 1, pageSize: 25 });
+    expect(ledger.items.find((i) => i.id === rows[2].id)?.status).toBe("denied");
+
+    const audits = await AppDataSource.getRepository(AuditLog).find({
+      where: { organizationId: orgId },
+    });
+    const decisions = audits.filter((a) => a.action.startsWith("billing.resolution.exclusion_"));
+    expect(decisions.map((a) => a.action).sort()).toEqual([
+      "billing.resolution.exclusion_approved",
+      "billing.resolution.exclusion_denied",
+      "billing.resolution.exclusion_review_requested",
+      "billing.resolution.exclusion_review_requested",
+    ]);
+    expect(
+      decisions.find((a) => a.action === "billing.resolution.exclusion_denied")?.metadata,
+    ).toMatchObject({ source: "operator", reviewer: "staff@hay.chat", outcomeId: rows[2].id });
+  });
+
   describe("with the operator's billing period", () => {
     const now = new Date();
     // A period that started 10 days ago and ends in 20: rows from 15 days ago
