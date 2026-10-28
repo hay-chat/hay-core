@@ -406,6 +406,23 @@
       "modeOn": "Send automatically",
       "modeDrafts": "Drafts only (a person approves)",
       "draftsHint": "Drafts only: AI replies wait in the conversation until someone on your team approves or blocks them."
+    },
+    "media": {
+      "title": "Customer photos and files",
+      "description": "Photos and PDFs shoppers send in conversations.",
+      "readImages": "Read images",
+      "readImagesHint": "The AI looks at photos and PDFs shoppers send (for example a damaged product, a lot number or an invoice) and uses what it sees in its reply. Files are read by OpenAI, through the EU endpoint when this deployment has one.",
+      "allowIdDocuments": "Let the AI read ID documents",
+      "allowIdDocumentsHint": "Off by default: photos of ID cards, passports and driving licences are hidden from the AI and blurred in the Inbox. Only the organization owner can turn this on. Payment card photos are always hidden from the AI, and card numbers are removed from anything it reads.",
+      "ownerOnly": "Only the organization owner can change this.",
+      "caseEmail": "Product case email",
+      "caseEmailPlaceholder": "quality@yourstore.com",
+      "caseEmailHint": "When the AI completes a product-problem case, Hay.chat emails the summary and links to the photos and invoice to this address. Leave it empty to only see cases in the Inbox.",
+      "caseEmailInvalid": "Enter a valid email address for product cases",
+      "save": "Save",
+      "saveSuccess": "File settings saved",
+      "saveFailed": "Failed to save the file settings",
+      "loadFailed": "Failed to load the file settings"
     }
   },
   "security": {

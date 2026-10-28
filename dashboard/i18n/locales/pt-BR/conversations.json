@@ -20,7 +20,15 @@
       "uploading": "Enviando {name}…",
       "uploadFailed": "Não foi possível enviar {name}. Tente de novo ou escolha outro arquivo.",
       "tooLarge": "{name} tem mais de {size} MB.",
-      "tooMany": "Você pode enviar até {count} arquivos por vez."
+      "tooMany": "Você pode enviar até {count} arquivos por vez.",
+      "analysisPending": "A IA está lendo este arquivo…",
+      "analysisRead": "A IA leu: {description}",
+      "analysisFailed": "A IA não conseguiu ler este arquivo",
+      "reveal": "Clique para revelar",
+      "withheldId": "Documento de identidade: oculto para a IA",
+      "withheldCard": "Cartão de pagamento: oculto para a IA",
+      "scanning": "Verificando vírus…",
+      "scanBlocked": "Bloqueado pela verificação de vírus"
     },
     "page": {
       "title": "Conversas",
@@ -301,6 +309,17 @@
       "characters": "{count} caracteres",
       "blockMessage": "Bloquear resposta",
       "approveEdited": "Aprovar e enviar editada"
+    },
+    "productCase": {
+      "title": "Caso de problema com produto completo",
+      "lot": "Lote {lot}",
+      "invoice": "Nota {invoice}",
+      "forwardPending": "Enviando para o e-mail de casos da loja…",
+      "forwardSent": "Enviado por e-mail para {to}",
+      "forwardSentToast": "Caso enviado por e-mail",
+      "forwardFailed": "Não foi possível enviar o e-mail do caso",
+      "forwardNotConfigured": "Nenhum e-mail de casos definido (Configurações > Privacidade do Cliente)",
+      "forwardAgain": "Enviar de novo"
     }
   }
 }

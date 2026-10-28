@@ -316,6 +316,12 @@
     <div class="flex flex-1 overflow-hidden">
       <!-- Left Side: Conversation Thread -->
       <div class="flex-1 flex flex-col">
+        <ProductCaseBanner
+          v-if="productCase && conversation"
+          :conversation-id="conversation.id"
+          :product-case="productCase"
+          @forwarded="onProductCaseForwarded"
+        />
         <!-- Messages Container -->
         <div ref="messagesContainer" class="flex-1 overflow-y-auto p-3 md:p-6 space-y-4 bg-white">
           <!-- Playground Loading State -->
@@ -1070,6 +1076,10 @@ import {
 import { createReusableTemplate, useMediaQuery } from "@vueuse/core";
 import { TRPCClientError } from "@trpc/client";
 import { HayApi } from "@/utils/api";
+import ProductCaseBanner, {
+  type ProductCase,
+  type ProductCaseForward,
+} from "@/components/conversations/ProductCaseBanner.vue";
 import {
   getCustomerChannelInfo,
   getCustomerDisplayName,
@@ -1158,6 +1168,7 @@ const isMessageEventPayload = (value: unknown): value is MessageEventPayload =>
 interface ReplyWindowPayload {
   id?: string;
   reply_window_expires_at?: ConversationDetail["reply_window_expires_at"];
+  metadata?: Record<string, unknown> | null;
 }
 
 const isReplyWindowPayload = (value: unknown): value is ReplyWindowPayload =>
@@ -1167,6 +1178,16 @@ const isConversationEventPayload = (value: unknown): value is ConversationEventP
   typeof value === "object" && value !== null;
 
 const isMessageStatusEventPayload = (value: unknown): value is MessageStatusEventPayload =>
+  typeof value === "object" && value !== null;
+
+/** `message_media_updated`: the vision pass or scan changed a message's files (D8-11). */
+interface MessageMediaEventPayload {
+  conversationId?: string;
+  messageId?: string;
+  attachments?: Message["attachments"];
+}
+
+const isMessageMediaEventPayload = (value: unknown): value is MessageMediaEventPayload =>
   typeof value === "object" && value !== null;
 
 /** Extract a human-readable error message from an unknown thrown value. */
@@ -1491,6 +1512,21 @@ const handleSuggestionApplied = () => {
 
 // Playground action mode: writes are simulated (dry-run) unless switched to live.
 const isLiveStore = computed(() => conversation.value?.metadata?.dryRun === false);
+
+// A complete product-problem case (D8-14/15) lives on the conversation's metadata.
+const productCase = computed<ProductCase | null>(() => {
+  const value = (conversation.value?.metadata as Record<string, unknown> | null | undefined)
+    ?.productCase;
+  return value && typeof value === "object" ? (value as ProductCase) : null;
+});
+
+const onProductCaseForwarded = (forward: ProductCaseForward) => {
+  if (!conversation.value || !productCase.value) return;
+  conversation.value.metadata = {
+    ...(conversation.value.metadata ?? {}),
+    productCase: { ...productCase.value, forward },
+  };
+};
 const showLiveStoreConfirm = ref(false);
 const isSwitchingActionMode = ref(false);
 
@@ -2027,6 +2063,7 @@ let unsubscribeConversationUpdated: (() => void) | null = null;
 let unsubscribeMessageApproved: (() => void) | null = null;
 let unsubscribeMessageBlocked: (() => void) | null = null;
 let unsubscribeMessageStatus: (() => void) | null = null;
+let unsubscribeMessageMedia: (() => void) | null = null;
 
 // Lifecycle
 onMounted(async () => {
@@ -2239,6 +2276,13 @@ onMounted(async () => {
     if (conversation.value && payload.reply_window_expires_at !== undefined) {
       conversation.value.reply_window_expires_at = payload.reply_window_expires_at;
     }
+    // A product case completed or was emailed (D8-14/15).
+    if (conversation.value && payload.metadata && "productCase" in payload.metadata) {
+      conversation.value.metadata = {
+        ...(conversation.value.metadata ?? {}),
+        productCase: payload.metadata.productCase,
+      };
+    }
   });
 
   // Listen for status changes
@@ -2294,6 +2338,15 @@ onMounted(async () => {
     target.providerStatus = payload.providerStatus ?? null;
     target.providerError = payload.providerError ?? null;
   });
+
+  // The AI read a file (or a scan finished): patch the message's files in place.
+  unsubscribeMessageMedia = websocket.on("message_media_updated", (payload: unknown) => {
+    if (!isMessageMediaEventPayload(payload)) return;
+    if (payload.conversationId !== conversationId.value || !payload.messageId) return;
+    const target = conversation.value?.messages?.find((m) => m.id === payload.messageId);
+    if (!target || !Array.isArray(payload.attachments)) return;
+    target.attachments = payload.attachments;
+  });
 });
 
 // eslint-disable-next-line no-undef
@@ -2305,6 +2358,7 @@ onUnmounted(() => {
   if (unsubscribeMessageApproved) unsubscribeMessageApproved();
   if (unsubscribeMessageBlocked) unsubscribeMessageBlocked();
   if (unsubscribeMessageStatus) unsubscribeMessageStatus();
+  if (unsubscribeMessageMedia) unsubscribeMessageMedia();
 
   // Close test conversation in playground mode
   if (isPlaygroundMode.value && conversation.value) {

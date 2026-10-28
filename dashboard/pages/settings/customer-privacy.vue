@@ -41,6 +41,8 @@
 
     <AiDisclosureCard />
 
+    <MediaSettingsCard />
+
     <!-- Data Retention Policy -->
     <Card>
       <CardHeader>
@@ -235,6 +237,7 @@ const toast = useToast();
 import CustomerPrivacyRequestsTable from "@/components/CustomerPrivacyRequestsTable.vue";
 import AiProcessingCard from "@/components/settings/AiProcessingCard.vue";
 import AiDisclosureCard from "@/components/settings/AiDisclosureCard.vue";
+import MediaSettingsCard from "@/components/settings/MediaSettingsCard.vue";
 
 // Retention policy state
 const retentionDays = ref<number | null>(null);

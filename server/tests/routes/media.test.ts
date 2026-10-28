@@ -24,6 +24,13 @@ jest.mock("@server/services/storage.service", () => ({
   storageService: { download: mockDownload },
 }));
 
+const mockWaitForScans = jest.fn<(ids: string[], ms: number) => Promise<Map<string, string | null>>>();
+jest.mock("@server/services/media-scan.service", () => ({
+  isScanCleared: (status: string | null | undefined) =>
+    status === null || status === undefined || status === "skipped" || status === "clean",
+  waitForScans: (ids: string[], ms: number) => mockWaitForScans(ids, ms),
+}));
+
 const mockRequireAuth = jest.fn<(req: unknown) => Promise<unknown>>();
 jest.mock("@server/lib/auth/middleware", () => ({ requireAuth: mockRequireAuth }));
 
@@ -80,6 +87,33 @@ const staffHeaders = (organizationId = ORG_ID) => ({
 });
 
 describe("GET /v1/media/:id", () => {
+  describe("virus scan (D8-4)", () => {
+    it("serves a document once its pending scan comes back clean", async () => {
+      mockFindOne.mockResolvedValue(upload({ mimeType: "application/pdf", scanStatus: "pending" }));
+      mockWaitForScans.mockResolvedValue(new Map([[UPLOAD_ID, "clean"]]));
+      expect((await fetch(`${baseUrl}${signedPath()}`)).status).toBe(200);
+    });
+
+    it("answers 423 while the scan is still pending", async () => {
+      mockFindOne.mockResolvedValue(upload({ mimeType: "application/pdf", scanStatus: "pending" }));
+      mockWaitForScans.mockResolvedValue(new Map([[UPLOAD_ID, "pending"]]));
+      const response = await fetch(`${baseUrl}${signedPath()}`);
+      expect(response.status).toBe(423);
+      expect(mockDownload).not.toHaveBeenCalled();
+    });
+
+    it.each(["infected", "error"])("blocks a %s file", async (scanStatus) => {
+      mockFindOne.mockResolvedValue(upload({ mimeType: "application/pdf", scanStatus }));
+      expect((await fetch(`${baseUrl}${signedPath()}`)).status).toBe(403);
+      expect(mockDownload).not.toHaveBeenCalled();
+    });
+
+    it("never reveals scan state without access", async () => {
+      mockFindOne.mockResolvedValue(upload({ mimeType: "application/pdf", scanStatus: "infected" }));
+      expect((await fetch(`${baseUrl}/v1/media/${UPLOAD_ID}`)).status).toBe(401);
+    });
+  });
+
   it("serves a signed URL with safe headers", async () => {
     const response = await fetch(`${baseUrl}${signedPath()}`);
 

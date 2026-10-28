@@ -295,5 +295,11 @@
     "diff": {
       "showHidden": "Show {count} hidden lines"
     }
+  },
+  "templates": {
+    "button": "From template",
+    "loadFailed": "Failed to load templates",
+    "created": "Draft playbook created from the template. Review it, then activate it.",
+    "createFailed": "Failed to create the playbook from the template"
   }
 }

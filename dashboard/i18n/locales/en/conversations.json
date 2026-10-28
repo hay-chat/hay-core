@@ -20,7 +20,15 @@
       "uploading": "Uploading {name}…",
       "uploadFailed": "Couldn't upload {name}. Try again or pick another file.",
       "tooLarge": "{name} is larger than {size} MB.",
-      "tooMany": "You can send up to {count} files at once."
+      "tooMany": "You can send up to {count} files at once.",
+      "analysisPending": "AI is reading this file…",
+      "analysisRead": "AI read: {description}",
+      "analysisFailed": "The AI couldn't read this file",
+      "reveal": "Click to reveal",
+      "withheldId": "ID document: hidden from the AI",
+      "withheldCard": "Payment card: hidden from the AI",
+      "scanning": "Scanning for viruses…",
+      "scanBlocked": "Blocked by the virus scan"
     },
     "page": {
       "title": "Conversations",
@@ -301,6 +309,17 @@
       "characters": "{count} characters",
       "blockMessage": "Block reply",
       "approveEdited": "Approve & Send edited"
+    },
+    "productCase": {
+      "title": "Product problem case complete",
+      "lot": "Lot {lot}",
+      "invoice": "Invoice {invoice}",
+      "forwardPending": "Sending to the store's case email…",
+      "forwardSent": "Emailed to {to}",
+      "forwardSentToast": "Case emailed",
+      "forwardFailed": "The case email could not be sent",
+      "forwardNotConfigured": "No case email set (Settings > Customer Privacy)",
+      "forwardAgain": "Email again"
     }
   }
 }

@@ -196,6 +196,11 @@ export const config = {
       transcription: {
         model: process.env.OPENAI_TRANSCRIPTION_MODEL || "gpt-4o-mini-transcribe",
       },
+      // Vision pass on customer photos and PDFs (D8-11). Served by the EU endpoint
+      // when configured, else the org's managed OpenAI endpoint.
+      vision: {
+        model: process.env.OPENAI_VISION_MODEL || "gpt-4.1-mini",
+      },
     },
   },
 
@@ -279,6 +284,11 @@ export const config = {
       // body limited to 50 MB, so keep this at or below 35.
       conversationMediaMaxFileSize:
         parseInt(process.env.CONVERSATION_MEDIA_MAX_SIZE_MB || "25", 10) * 1024 * 1024,
+    },
+    // D8-4: clamd for conversation documents; unset host = no scan.
+    clamav: {
+      host: process.env.CLAMAV_HOST || null,
+      port: parseInt(process.env.CLAMAV_PORT || "3310", 10),
     },
   },
 

@@ -17,7 +17,8 @@ import type { AiRegion } from "./ai-region";
 const logger = createLogger("llm-usage");
 
 export interface UsageEvent {
-  kind: "chat" | "embedding";
+  /** "vision" = customer photo/PDF pass (D8-11); "transcription" = voice notes (D8-5). */
+  kind: "chat" | "embedding" | "vision" | "transcription";
   usage: UsageRecord;
   model: string;
   provider: string;

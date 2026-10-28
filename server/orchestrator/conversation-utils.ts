@@ -89,14 +89,24 @@ function attachmentKind(type: string): string {
 /**
  * One transcript line for the hand-off summary (D8-10). Files are listed so
  * the summary can tell the agent what the customer sent:
- * `Customer: It arrived broken [Attachments: box.jpg (photo), invoice.pdf (PDF)]`.
+ * `Customer: It arrived broken [Attachments: box.jpg (photo: Crushed box.), invoice.pdf (PDF)]`.
  */
 export function handoffTranscriptLine(
   message: Pick<Message, "type" | "content" | "attachments">,
 ): string {
   const speaker = message.type === MessageType.CUSTOMER ? "Customer" : "Assistant";
   const files = (message.attachments ?? [])
-    .map((attachment) => `${attachment.name || "file"} (${attachmentKind(attachment.type ?? "")})`)
+    .map((attachment) => {
+      // What the vision pass read (D8-11), so the summary can say what the photo shows.
+      // Withheld ID/card images (D8-12) carry no description at all.
+      const analysis = attachment.analysis;
+      const read = analysis?.withheld
+        ? "withheld for privacy"
+        : analysis?.status === "done"
+          ? analysis.description
+          : "";
+      return `${attachment.name || "file"} (${attachmentKind(attachment.type ?? "")}${read ? `: ${read}` : ""})`;
+    })
     .join(", ");
   return `${speaker}: ${message.content}${files ? ` [Attachments: ${files}]` : ""}`;
 }

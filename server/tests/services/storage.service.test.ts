@@ -20,6 +20,7 @@ jest.mock("@server/config/env", () => ({
         maxFileSize: 10 * 1024 * 1024,
         conversationMediaMaxFileSize: 25 * 1024 * 1024,
       },
+      clamav: { host: null, port: 3310 },
     },
     plugins: { maxUploadSizeMB: 50 },
   },
@@ -27,6 +28,9 @@ jest.mock("@server/config/env", () => ({
 }));
 
 const mockS3Params: Array<Record<string, unknown>> = [];
+jest.mock("@server/lib/logger", () => ({
+  createLogger: () => ({ debug: jest.fn(), info: jest.fn(), warn: jest.fn(), error: jest.fn() }),
+}));
 jest.mock("@aws-sdk/lib-storage", () => ({
   Upload: jest.fn((options: { params: Record<string, unknown> }) => {
     mockS3Params.push(options.params);
