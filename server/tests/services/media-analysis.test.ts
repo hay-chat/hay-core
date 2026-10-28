@@ -52,6 +52,15 @@ jest.mock("@server/services/websocket.service", () => ({
   websocketService: { sendToOrganization: (...args: unknown[]) => mockSendToOrganization(...args) },
 }));
 
+const mockWaitForScans = jest.fn<(ids: string[], timeout: number) => Promise<Map<string, string | null>>>();
+const mockPendingScans = jest.fn<(orgId: string, ids: string[]) => Promise<string[]>>(async () => []);
+jest.mock("@server/services/media-scan.service", () => ({
+  isScanCleared: (status: string | null | undefined) =>
+    status === null || status === undefined || status === "skipped" || status === "clean",
+  pendingScans: (orgId: string, ids: string[]) => mockPendingScans(orgId, ids),
+  waitForScans: (ids: string[], timeout: number) => mockWaitForScans(ids, timeout),
+}));
+
 jest.mock("@server/services/llm/llm-provider.factory", () => ({
   llmProviderFactory: {
     managedOpenAIEndpoint: jest.fn(async () => ({ apiKey: "sk-test", region: "default" })),
@@ -59,7 +68,11 @@ jest.mock("@server/services/llm/llm-provider.factory", () => ({
 }));
 
 import sharp from "sharp";
-import { markAnalysisPending, processMessageMedia } from "../../services/media-analysis/pipeline";
+import {
+  markAnalysisPending,
+  markMediaPending,
+  processMessageMedia,
+} from "../../services/media-analysis/pipeline";
 import {
   describeAttachmentForAgent,
   describeAttachmentsForAgent,
@@ -279,6 +292,58 @@ describe("processMessageMedia", () => {
 
     await expect(processMessageMedia("msg-1", ORG)).resolves.toBeUndefined();
     expect(storedAttachments()[0].analysis).toEqual({ status: "failed", reason: "error" });
+  });
+});
+
+describe("virus scan (D8-4)", () => {
+  const message = (attachments: MessageAttachment[]) => ({
+    id: "msg-1",
+    conversation_id: "conv-1",
+    attachments,
+  });
+
+  it("marks documents still being scanned, on any message", async () => {
+    mockPendingScans.mockResolvedValueOnce([PDF_ID]);
+    const result = await markMediaPending(ORG, [photo(), pdf()], false);
+    expect(result?.[0].scan).toBeUndefined();
+    expect(result?.[1].scan).toBe("pending");
+    expect(result?.[1].analysis).toBeUndefined();
+  });
+
+  it("waits for the scan, then reads a clean PDF", async () => {
+    const pending = markAnalysisPending([pdf({ scan: "pending" })])!;
+    mockFindMessage.mockResolvedValue(message(pending));
+    mockWaitForScans.mockResolvedValue(new Map([[PDF_ID, "clean"]]));
+    mockDownload.mockResolvedValueOnce({
+      buffer: Buffer.from("%PDF"),
+      upload: { organizationId: ORG, folder: "conversation-media", mimeType: "application/pdf", originalName: "nota.pdf", scanStatus: "clean" },
+    } as never);
+    mockPdfParse.mockResolvedValue({ text: "NOTA FISCAL 123 Total R$ 59,90" } as never);
+    mockChatCreate.mockResolvedValue(visionReply({ ...DAMAGE, class: "receipt" }) as never);
+
+    await processMessageMedia("msg-1", ORG);
+
+    const [stored] = storedAttachments();
+    expect(stored.scan).toBe("clean");
+    expect(stored.analysis?.status).toBe("done");
+  });
+
+  it("never reads an infected PDF and shows it as blocked", async () => {
+    const pending = markAnalysisPending([pdf({ scan: "pending" })])!;
+    mockFindMessage.mockResolvedValue(message(pending));
+    mockWaitForScans.mockResolvedValue(new Map([[PDF_ID, "infected"]]));
+    mockDownload.mockResolvedValueOnce({
+      buffer: Buffer.from("%PDF"),
+      upload: { organizationId: ORG, folder: "conversation-media", mimeType: "application/pdf", scanStatus: "infected" },
+    } as never);
+
+    await processMessageMedia("msg-1", ORG);
+
+    const [stored] = storedAttachments();
+    expect(stored.scan).toBe("infected");
+    expect(stored.analysis).toEqual({ status: "skipped", reason: "not_scanned" });
+    expect(mockPdfParse).not.toHaveBeenCalled();
+    expect(mockChatCreate).not.toHaveBeenCalled();
   });
 });
 

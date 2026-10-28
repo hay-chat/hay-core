@@ -5,7 +5,8 @@
  * Without a configured address nothing is sent; the case still shows in the
  * Inbox. The outcome is stored on the case (`productCase.forward`).
  *
- * Withheld ID/card images (D8-12) are never linked.
+ * Withheld ID/card images (D8-12) and documents the virus scan has not
+ * cleared (D8-4) are never linked.
  *
  * @module services/product-case/forward
  */
@@ -91,8 +92,10 @@ export function validCaseEmail(value: string | null | undefined): string | null 
   return parsed.success ? parsed.data : null;
 }
 
+/** Never link withheld ID/card images (D8-12) or documents the virus scan holds (D8-4). */
 function linkable(attachment: MessageAttachment | undefined): attachment is MessageAttachment {
-  return !!attachment && !attachment.analysis?.withheld;
+  if (!attachment || attachment.analysis?.withheld) return false;
+  return attachment.scan === undefined || attachment.scan === "clean";
 }
 
 /**

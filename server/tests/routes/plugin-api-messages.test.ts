@@ -9,6 +9,7 @@ const JWT_SECRET = "plugin-api-test-secret";
 const mockConfig = {
   jwt: { secret: JWT_SECRET },
   conversation: { cooldownInterval: 1000 },
+  storage: { clamav: { host: null, port: 3310 } },
 };
 jest.mock("@server/config/env", () => ({ config: mockConfig }));
 

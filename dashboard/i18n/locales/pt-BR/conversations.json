@@ -26,7 +26,9 @@
       "analysisFailed": "A IA não conseguiu ler este arquivo",
       "reveal": "Clique para revelar",
       "withheldId": "Documento de identidade: oculto para a IA",
-      "withheldCard": "Cartão de pagamento: oculto para a IA"
+      "withheldCard": "Cartão de pagamento: oculto para a IA",
+      "scanning": "Verificando vírus…",
+      "scanBlocked": "Bloqueado pela verificação de vírus"
     },
     "page": {
       "title": "Conversas",

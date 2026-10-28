@@ -102,6 +102,8 @@ export interface MessageAttachment {
   type: string;
   size: number;
   analysis?: AttachmentAnalysis;
+  /** Virus scan of a document (D8-4); absent when the file was not scanned. */
+  scan?: "pending" | "clean" | "infected" | "error";
 }
 
 @Entity("messages")
