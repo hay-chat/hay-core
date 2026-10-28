@@ -4,6 +4,41 @@ import { webchatSettingsService } from "@server/services/webchat/webchat-setting
 import { organizationRepository } from "@server/repositories/organization.repository";
 import { customAiLabel, isAiLabelShown } from "@server/services/ai-disclosure";
 import { WebchatPosition, WebchatTheme } from "@server/database/entities/webchat-settings.entity";
+import { getAvailability, typicalFirstReplyMinutes } from "@server/services/business-hours.service";
+
+// Every widget load asks for availability; a short cache keeps that off the database.
+const AVAILABILITY_TTL_MS = 60_000;
+const availabilityCache = new Map<string, { at: number; value: WidgetAvailability | null }>();
+
+interface WidgetAvailability {
+  state: "open" | "open_nobody_online" | "closed";
+  nextOpening: string | null;
+  timezone: string;
+  hasSchedule: boolean;
+  typicalReplyMinutes: number | null;
+}
+
+async function widgetAvailability(organizationId: string): Promise<WidgetAvailability | null> {
+  const [isEnabled, organization] = await Promise.all([
+    webchatSettingsService.isEnabled(organizationId),
+    organizationRepository.findById(organizationId),
+  ]);
+  if (!isEnabled || !organization || organization.suspendedAt) return null;
+
+  const scope = { organizationId, channel: "web" };
+  const now = new Date();
+  const [availability, typicalReplyMinutes] = await Promise.all([
+    getAvailability(scope, now),
+    typicalFirstReplyMinutes(scope, now),
+  ]);
+  return {
+    state: availability.state,
+    nextOpening: availability.nextOpening?.toISOString() ?? null,
+    timezone: availability.timezone,
+    hasSchedule: availability.hasSchedule,
+    typicalReplyMinutes,
+  };
+}
 
 export const webchatRouter = router({
   /**
@@ -64,5 +99,21 @@ export const webchatRouter = router({
         aiLabelShown: isAiLabelShown(organization, "web"),
         aiLabelText: customAiLabel(organization.settings),
       };
+    }),
+
+  /**
+   * Team availability for the widget header and waiting state (D5-7, D5-10).
+   * Public like getPublicConfig; answers nothing beyond open/closed, the next
+   * opening and the typical first human reply.
+   */
+  getAvailability: publicProcedure
+    .input(z.object({ organizationId: z.string().uuid() }))
+    .query(async ({ input }) => {
+      const cached = availabilityCache.get(input.organizationId);
+      if (cached && Date.now() - cached.at < AVAILABILITY_TTL_MS) return cached.value;
+      const value = await widgetAvailability(input.organizationId);
+      if (availabilityCache.size > 5000) availabilityCache.clear();
+      availabilityCache.set(input.organizationId, { at: Date.now(), value });
+      return value;
     }),
 });

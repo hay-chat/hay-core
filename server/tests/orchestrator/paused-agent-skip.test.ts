@@ -30,6 +30,10 @@ jest.mock("@server/services/prompt.service", () => ({
 jest.mock("../../orchestrator/perception.layer", () => ({ PerceptionLayer: class {} }));
 jest.mock("../../orchestrator/retrieval.layer", () => ({ RetrievalLayer: class {} }));
 jest.mock("../../orchestrator/execution.layer", () => ({ ExecutionLayer: class {} }));
+// A parked conversation within business hours waits for the team (D5-7).
+jest.mock("@server/services/business-hours.service", () => ({
+  isWithinBusinessHours: async () => true,
+}));
 
 const mockPublish = jest.fn();
 jest.mock("@server/services/redis.service", () => ({
