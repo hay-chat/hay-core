@@ -2,6 +2,7 @@ import type { Request, Response } from "express";
 import type { HayLogger } from "@hay/plugin-sdk/types";
 import type { GraphClient } from "./graph-client.js";
 import { PluginApiClient } from "./plugin-api.js";
+import { ingestMessage, type InstagramAttachment } from "./media.js";
 
 export interface WebhookContext {
   /** Resolves the Graph client (built in onStart once credentials exist). */
@@ -31,7 +32,7 @@ interface MetaMessagingEvent {
     mid?: string;
     text?: string;
     is_echo?: boolean;
-    attachments?: unknown[];
+    attachments?: InstagramAttachment[];
   };
   postback?: unknown;
   reaction?: unknown;
@@ -82,10 +83,12 @@ function collectMessagingEvents(entry: MetaEntry): MetaMessagingEvent[] {
  * `x-hay-webhook-verified: true`. We reject anything missing that header (it
  * would mean a direct, unverified hit) and otherwise process the body.
  *
- * MVP scope — TEXT messages only. We explicitly log-and-ignore:
+ * Text and attachments (D8-6): images, videos, voice notes and files are
+ * stored in Hay at once (voice notes transcribed); story mentions, reels and
+ * shared posts become a text line. An attachment-only message always reaches
+ * the agent. We explicitly log-and-ignore:
  *   - echoes (`message.is_echo`)       → our own outbound, would loop the AI
- *   - empty / whitespace-only text     → nothing to act on
- *   - attachment-only messages         → rich content is a follow-up ticket
+ *   - no text and no attachments       → nothing to act on
  *   - postbacks / reactions            → not modeled yet
  *
  * Inbound dedupe is handled core-side via `metadata.mid`, so we always return
@@ -143,7 +146,7 @@ export async function webhookHandler(
           continue;
         }
 
-        // Postbacks / reactions are out of scope for the text-only MVP.
+        // Postbacks / reactions are not modeled yet.
         if (!message) {
           logger.info("Instagram event ignored — non-message (postback/reaction)", {
             igAccountId,
@@ -154,13 +157,10 @@ export async function webhookHandler(
           continue;
         }
 
-        // Attachment-only or empty text — nothing actionable in MVP.
         const text = typeof message.text === "string" ? message.text : "";
-        if (!text || text.trim().length === 0) {
-          logger.info("Instagram message ignored — no text content", {
-            igAccountId,
-            hasAttachments: Array.isArray(message.attachments) && message.attachments.length > 0,
-          });
+        const attachments = Array.isArray(message.attachments) ? message.attachments : [];
+        if (text.trim().length === 0 && attachments.length === 0) {
+          logger.info("Instagram message ignored — no text or attachments", { igAccountId });
           ignored++;
           continue;
         }
@@ -187,21 +187,30 @@ export async function webhookHandler(
           });
         }
 
+        const ingested =
+          attachments.length > 0
+            ? await ingestMessage({ text, attachments, mid: message.mid, api: apiClient, logger })
+            : null;
+
         const result = await apiClient.mutation<{
           messageId: string;
           conversationId: string;
           processed: boolean;
         }>("messages.receive", {
           from: `instagram:${senderPsid}`,
-          content: text,
+          content: ingested ? ingested.content : text,
           channel: "instagram",
           senderType: "customer",
+          ...(ingested?.attachments.length ? { attachments: ingested.attachments } : {}),
           metadata: {
             username,
             profileName,
             mid: message.mid,
             igAccountId,
             timestamp: event.timestamp,
+            ...(ingested?.voiceNote ? { voiceNote: true } : {}),
+            ...(ingested?.mediaPlaceholder ? { mediaPlaceholder: true } : {}),
+            ...(ingested?.failures.length ? { mediaFailures: ingested.failures } : {}),
           },
         });
 
