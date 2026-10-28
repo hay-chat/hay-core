@@ -22,7 +22,9 @@
     "llmProviders": "AI Models",
     "customerPrivacy": "Customer Privacy",
     "myProfile": "My Profile",
-    "openMenu": "Open menu"
+    "openMenu": "Open menu",
+    "actionsSettings": "Actions",
+    "actionLog": "Action log"
   },
   "user": {
     "status": "Status",

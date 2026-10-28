@@ -10,6 +10,7 @@ import {
   Timezone,
   DEFAULT_CONFIDENCE_GUARDRAIL_CONFIG,
   resolveActionApprovalConfig,
+  APPROVAL_CATEGORIES,
   DEFAULT_NEW_ORG_RETENTION_DAYS,
 } from "@server/types/organization-settings.types";
 import type { DeepPartial } from "typeorm";
@@ -36,6 +37,7 @@ import {
 } from "@server/services/llm/model-catalog";
 import { UserOrganization } from "@server/entities/user-organization.entity";
 import { RESOURCES, ACTIONS } from "@server/types/scopes";
+import { loosensActionApproval } from "@server/services/core/action-policy";
 import { auditLogService } from "@server/services/audit-log.service";
 import { handleUpload } from "@server/lib/upload-helper";
 import { StorageService } from "@server/services/storage.service";
@@ -91,12 +93,14 @@ const updateLlmConfigSchema = z.object({
   embedding: z.object({ model: z.string().min(1) }),
 });
 
-/** D4-4: who must approve AI write actions. Expiry stays at the 48 h default. */
+/** D4-4 / D4-9: which AI write actions wait and who approves. Expiry stays at 48 h. */
 const actionApprovalSchema = z
   .object({
     moneyMovesNeedApproval: z.boolean(),
     thresholdAmount: z.number().min(0).max(1_000_000),
     approverRoles: z.array(z.enum(["admin", "contributor", "member"])).max(3),
+    categories: z.record(z.enum(APPROVAL_CATEGORIES), z.boolean()),
+    customerConfirmation: z.boolean(),
   })
   .partial();
 
@@ -469,21 +473,19 @@ export const organizationsRouter = t.router({
         ...topLevelFields
       } = input;
 
-      // Only the owner may let money move without approval, raise the amount
-      // that needs approval (a huge threshold is approval switched off), or
-      // change who approves. Lowering the threshold is fine for admins.
-      const currentThreshold = resolveActionApprovalConfig(organization.settings).thresholdAmount;
+      // Only the owner may loosen approval: turn it off (master switch, a
+      // category, or the shopper confirmation), raise the amount that needs
+      // approval (a huge threshold is approval switched off), or change who
+      // approves. Tightening (turning approval on, lowering the amount) is fine
+      // for admins.
       if (
         actionApproval &&
-        (actionApproval.moneyMovesNeedApproval === false ||
-          (actionApproval.thresholdAmount !== undefined &&
-            actionApproval.thresholdAmount > currentThreshold) ||
-          actionApproval.approverRoles !== undefined) &&
+        loosensActionApproval(resolveActionApprovalConfig(organization.settings), actionApproval) &&
         ctx.user?.getRole() !== "owner"
       ) {
         throw new TRPCError({
           code: "FORBIDDEN",
-          message: "Only the organization owner can change who approves actions",
+          message: "Only the organization owner can loosen action approval or change who approves",
         });
       }
 
@@ -519,9 +521,13 @@ export const organizationsRouter = t.router({
         }
 
         if (actionApproval !== undefined) {
+          const currentApproval = organization.settings?.actionApproval || {};
           updatePayload.settings.actionApproval = {
-            ...(organization.settings?.actionApproval || {}),
+            ...currentApproval,
             ...actionApproval,
+            ...(actionApproval.categories && {
+              categories: { ...(currentApproval.categories || {}), ...actionApproval.categories },
+            }),
           };
         }
       }

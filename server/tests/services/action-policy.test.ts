@@ -1,4 +1,9 @@
-import { decideGate, extractAmount } from "../../services/core/action-policy";
+import {
+  decideGate,
+  extractAmount,
+  loosensActionApproval,
+} from "../../services/core/action-policy";
+import { DEFAULT_ACTION_APPROVAL_CONFIG } from "../../types/organization-settings.types";
 import { classifyTool, type ToolRisk } from "../../services/core/tool-risk";
 
 const ON = { moneyMovesNeedApproval: true, thresholdAmount: 0 };
@@ -70,6 +75,62 @@ describe("decideGate", () => {
     expect(decideGate(risk("refund"), { amount: 999 }, off)).toEqual({ kind: "allow" });
     expect(decideGate(risk("cancel"), {}, off)).toEqual({ kind: "allow" });
     expect(decideGate(UNKNOWN, {}, off)).toEqual({ kind: "allow" });
+  });
+});
+
+describe("decideGate per-category and playbook policy (D4-9)", () => {
+  it("applies the threshold only to refunds and discounts", () => {
+    const config = { moneyMovesNeedApproval: true, thresholdAmount: 100 };
+    expect(decideGate(risk("refund"), { amount: 10 }, config)).toEqual({ kind: "allow" });
+    expect(decideGate(risk("exchange"), { amount: 10 }, config)).toMatchObject({
+      kind: "hold",
+      reason: "money_move",
+    });
+  });
+
+  it("holds a non-money category the org switched on, and runs a money one it switched off", () => {
+    const config = { ...ON, categories: { address_change: true, refund: false } };
+    expect(decideGate(risk("address_change"), {}, config)).toEqual({
+      kind: "hold",
+      reason: "category_policy",
+      amount: null,
+    });
+    expect(decideGate(risk("refund"), { amount: 999 }, config)).toEqual({ kind: "allow" });
+    expect(decideGate(risk("cancel"), {}, config).kind).toBe("hold");
+  });
+
+  it("a playbook can only tighten: it holds even under the threshold, a cap, or approval off", () => {
+    const loose = { moneyMovesNeedApproval: false, thresholdAmount: 1000 };
+    expect(decideGate(risk("refund"), { amount: 5 }, loose, ["refund"])).toEqual({
+      kind: "hold",
+      reason: "playbook_policy",
+      amount: 5,
+    });
+    const capped = classifyTool({
+      annotations: { readOnlyHint: false },
+      _meta: { "chat.hay/category": "discount", "chat.hay/capEnforced": true },
+    });
+    expect(decideGate(capped, {}, ON, ["discount"]).kind).toBe("hold");
+    // Listing a category the org already holds changes nothing for others.
+    expect(decideGate(risk("note"), {}, ON, ["refund"])).toEqual({ kind: "allow" });
+  });
+});
+
+describe("loosensActionApproval", () => {
+  const current = DEFAULT_ACTION_APPROVAL_CONFIG;
+  it("flags switching approval off, raising the amount and changing approvers", () => {
+    expect(loosensActionApproval(current, { moneyMovesNeedApproval: false })).toBe(true);
+    expect(loosensActionApproval(current, { customerConfirmation: false })).toBe(true);
+    expect(loosensActionApproval(current, { thresholdAmount: 10 })).toBe(true);
+    expect(loosensActionApproval(current, { approverRoles: ["admin"] })).toBe(true);
+    expect(loosensActionApproval(current, { categories: { cancel: false } })).toBe(true);
+  });
+
+  it("does not flag tightening or no-op changes", () => {
+    expect(loosensActionApproval(current, { categories: { note: true } })).toBe(false);
+    expect(loosensActionApproval(current, { categories: { note: false } })).toBe(false);
+    expect(loosensActionApproval(current, { thresholdAmount: 0 })).toBe(false);
+    expect(loosensActionApproval(current, { moneyMovesNeedApproval: true })).toBe(false);
   });
 });
 

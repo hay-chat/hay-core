@@ -104,6 +104,7 @@ export default defineNuxtConfig({
           "en/access.json",
           "en/home.json",
           "en/insights.json",
+          "en/actions.json",
         ],
       },
       {
@@ -127,6 +128,7 @@ export default defineNuxtConfig({
           "pt-BR/access.json",
           "pt-BR/home.json",
           "pt-BR/insights.json",
+          "pt-BR/actions.json",
         ],
       },
     ],
