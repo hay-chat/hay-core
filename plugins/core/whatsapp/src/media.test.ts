@@ -63,7 +63,7 @@ describe("bareMimeType", () => {
 });
 
 describe("ingestMedia", () => {
-  it("downloads with the business token, capped at Hay's 10 MB upload limit, and uploads base64", async () => {
+  it("downloads with the business token, capped at Meta's limit for the type, and uploads base64", async () => {
     const { ctx, getMedia, download, mutation } = setup("image/jpeg");
 
     const result = await ingestMedia({ type: "image", media: { id: "m1" }, connection, ctx });
@@ -73,9 +73,8 @@ describe("ingestMedia", () => {
     expect(download).toHaveBeenCalledWith(
       "https://lookaside.test/m1",
       "biz-token",
-      MAX_MEDIA_BYTES,
+      5 * 1024 * 1024,
     );
-    expect(MAX_MEDIA_BYTES).toBe(10 * 1024 * 1024);
     expect(mutation).toHaveBeenCalledWith("media.upload", {
       data: Buffer.from("abc").toString("base64"),
       mimeType: "image/jpeg",
@@ -140,5 +139,24 @@ describe("ingestMedia", () => {
     });
 
     expect(result).toEqual({ failure: "Plugin API call failed: 400 File type not allowed" });
+  });
+});
+
+describe("MAX_MEDIA_BYTES (D8-8)", () => {
+  it("follows Meta's per-type limits, documents capped at Hay's 25 MB", () => {
+    const MB = 1024 * 1024;
+    expect(MAX_MEDIA_BYTES).toEqual({
+      image: 5 * MB,
+      sticker: MB,
+      audio: 16 * MB,
+      video: 16 * MB,
+      document: 25 * MB,
+    });
+  });
+
+  it("passes the video cap to the download", async () => {
+    const { ctx, download } = setup("video/mp4");
+    await ingestMedia({ type: "video", media: { id: "v1" }, connection, ctx });
+    expect(download).toHaveBeenCalledWith("https://lookaside.test/m1", "biz-token", 16 * 1024 * 1024);
   });
 });

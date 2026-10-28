@@ -274,6 +274,11 @@ export const config = {
     },
     limits: {
       maxFileSize: parseInt(process.env.UPLOAD_MAX_SIZE_MB || "10", 10) * 1024 * 1024,
+      // Files sent in conversations (folder conversation-media): Meta allows
+      // 16 MB video/audio and 100 MB documents. Plugins send base64 in a JSON
+      // body limited to 50 MB, so keep this at or below 35.
+      conversationMediaMaxFileSize:
+        parseInt(process.env.CONVERSATION_MEDIA_MAX_SIZE_MB || "25", 10) * 1024 * 1024,
     },
   },
 
