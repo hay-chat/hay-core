@@ -69,6 +69,10 @@
     "woocommerce_create_coupon": {
       "label": "Create Goodwill Coupon",
       "description": "Create a single-use apology coupon for one customer's email, within the merchant's percentage or amount cap."
+    },
+    "woocommerce_resend_order_confirmation": {
+      "label": "Resend Order Confirmation",
+      "description": "Resend the order details email to the billing email on the order (WooCommerce 9.5+)."
     }
   },
   "config": {

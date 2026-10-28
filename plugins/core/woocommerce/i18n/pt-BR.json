@@ -69,6 +69,10 @@
     "woocommerce_create_coupon": {
       "label": "Criar cupom de cortesia",
       "description": "Cria um cupom de uso único para o e-mail de um cliente, dentro do limite de porcentagem ou valor definido pelo lojista."
+    },
+    "woocommerce_resend_order_confirmation": {
+      "label": "Reenviar Confirmação do Pedido",
+      "description": "Reenvia o e-mail com os detalhes do pedido para o e-mail de cobrança do pedido (WooCommerce 9.5+)."
     }
   },
   "config": {
