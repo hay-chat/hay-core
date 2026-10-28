@@ -107,6 +107,7 @@ export class DisputeEvidenceService {
           }),
           AppDataSource.getRepository(ActionLog).find({
             where: { conversation_id: In(ids), organization_id: organizationId },
+            order: { created_at: "ASC" },
           }),
           this.loadTakeovers(organizationId, ids),
         ])

@@ -259,7 +259,8 @@ export function renderEvidencePdf(model: EvidenceDocument): Promise<Buffer> {
       // Start the image on a new page when it would not fit on this one.
       if (doc.y + IMAGE_MAX.height > doc.page.height - doc.page.margins.bottom) doc.addPage();
       try {
-        doc.image(image.buffer, MARGIN, doc.y, { fit: [IMAGE_MAX.width, IMAGE_MAX.height] });
+        // No y: pdfkit only moves doc.y below the image when it places it in the text flow.
+        doc.image(image.buffer, MARGIN, undefined, { fit: [IMAGE_MAX.width, IMAGE_MAX.height] });
         doc.moveDown(0.3);
         text(attachment.name);
       } catch {
