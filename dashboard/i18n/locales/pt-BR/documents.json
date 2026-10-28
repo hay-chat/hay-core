@@ -353,6 +353,6 @@
     "textLabel": "Texto a salvar",
     "editText": "Editar texto",
     "showChanges": "Ver mudanças",
-    "placeholderWarning": "Preencha cada \"[a confirmar: …]\" com a informação certa (Editar texto) antes de salvar."
+    "placeholderWarning": "Preencha cada campo entre colchetes, como \"[a confirmar: …]\", com a informação certa (Editar texto) antes de salvar."
   }
 }

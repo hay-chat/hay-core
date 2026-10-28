@@ -60,7 +60,7 @@ Return a JSON object with:
 5. **revisedContent**: markdown.
    - For `edit`: the COMPLETE revised document. Reproduce every unchanged line character-for-character, do not include the `<<<BEGIN_DOCUMENT>>>`/`<<<END_DOCUMENT>>>` markers or any heading of this prompt. Keep links exactly as they are.
    - For `add`: the answer only (the title is the question). Short, factual, in the store's voice.
-   - Never invent facts: prices, dates, policies, links or contact details that are not in the conversation, the documents or the feedback. When the answer is not known, write `[to confirm: …]` where the store must fill it in.
+   - Never invent facts: prices, dates, policies, links or contact details that are not in the conversation, the documents or the feedback. When the answer is not known, write `[to confirm: …]` where the store must fill it in. Never use other bracketed fill-ins such as `[open/closed]`: the AI reads this text as it is, so explain how to work out the answer instead.
    - Use only headings, bullet lists, links and paragraphs. Return raw markdown, not wrapped in a code fence.
    - Write in the same language as the documents (or, for a new Q&A, the language of the conversation).
 6. **changes**: one entry per distinct change: `section`, `changeType` (`added` | `modified` | `removed`), `rationale` (one sentence).
