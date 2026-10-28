@@ -22,6 +22,7 @@ import { handoffCopy, type HandoffCopyKey } from "./handoff-copy";
 import { AiReplySuppressedError, isPauseBlocker, recheckAiReply } from "./reply-guard";
 import type { ExecutionResult } from "./execution.layer";
 import type { ToolLedgerEntry } from "@server/services/core/action-claim-guardrail.service";
+import { decidedActionsLedger } from "./decided-actions";
 import type { Message } from "@server/database/entities/message.entity";
 import type pino from "pino";
 
@@ -879,7 +880,12 @@ export const runApprovalFollowUp = async (conversationId: string): Promise<void>
   }, LOCK_HEARTBEAT_INTERVAL_MS);
 
   try {
-    await handleExecutionLoop(conversation, Date.now(), conversation.language ?? undefined);
+    await handleExecutionLoop(
+      conversation,
+      Date.now(),
+      conversation.language ?? undefined,
+      await decidedActionsLedger(conversation),
+    );
   } catch (error) {
     if (!(error instanceof AiReplySuppressedError)) throw error;
     log.info({ blocker: error.blocker }, "Dropped approval follow-up reply");
@@ -983,6 +989,7 @@ async function handleExecutionLoop(
   conversation: Conversation,
   processingStartedAt: number,
   customerLanguage?: string,
+  decidedActions: ToolLedgerEntry[] = [],
 ) {
   const log = logger.child({
     organizationId: conversation.organization_id,
@@ -998,7 +1005,7 @@ async function handleExecutionLoop(
   let hasToolCallBeenMade = false; // Track if we've sent the initial processing message
   // Ledger of tool calls made during THIS turn (conversation history is not
   // turn-scoped). The action-claim guardrail compares RESPOND claims against it.
-  const toolsCalledThisTurn: ToolLedgerEntry[] = [];
+  const toolsCalledThisTurn: ToolLedgerEntry[] = [...decidedActions];
   // Shared (by reference) with the execution layer so corrective re-plans are
   // budgeted per turn, not per execute() call.
   const turnGuardrailState = { actionClaimRetries: 0, companyInterestRetries: 0 };

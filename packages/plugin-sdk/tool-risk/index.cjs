@@ -45,20 +45,28 @@ const WRITE_CATEGORIES = Object.freeze({
   other_write: { destructive: true },
 });
 
+/** @param {unknown} category */
+function isWriteCategory(category) {
+  return (
+    typeof category === "string" && Object.prototype.hasOwnProperty.call(WRITE_CATEGORIES, category)
+  );
+}
+
 /**
  * The MCP annotations + _meta for one tool, or null when the spec does not
  * mention it.
  *
  * @param {string} name
- * @param {{ read: string[], write: Record<string, string>, capped?: string[] }} spec
+ * @param {{ read?: string[], write?: Record<string, string>, capped?: string[] }} spec
  */
 function riskFor(name, spec) {
-  if (spec.read.includes(name)) {
+  if ((spec.read || []).includes(name)) {
     return { annotations: { readOnlyHint: true, destructiveHint: false } };
   }
-  const category = spec.write[name];
+  const write = spec.write || {};
+  const category = Object.prototype.hasOwnProperty.call(write, name) ? write[name] : undefined;
   if (!category) return null;
-  if (!WRITE_CATEGORIES[category]) {
+  if (!isWriteCategory(category)) {
     throw new Error(`Unknown tool category "${category}" for ${name}`);
   }
   const _meta = { [CATEGORY_META_KEY]: category };
@@ -70,6 +78,70 @@ function riskFor(name, spec) {
 }
 
 /**
+ * Check a risk spec once, where the plugin declares it, so a typo fails loudly
+ * at startup instead of leaving a tool unclassified. `read`, `write` and
+ * `capped` are all optional. Returns the spec with all three present.
+ *
+ * @param {{ read?: string[], write?: Record<string, string>, capped?: string[] } | undefined} spec
+ * @returns {{ read: string[], write: Record<string, string>, capped: string[] }}
+ */
+function normalizeToolRiskSpec(spec) {
+  if (spec === undefined || spec === null) return { read: [], write: {}, capped: [] };
+  if (typeof spec !== "object") throw new Error("toolRisk must be an object");
+  const read = spec.read ?? [];
+  const write = spec.write ?? {};
+  const capped = spec.capped ?? [];
+  if (!Array.isArray(read) || read.some((name) => typeof name !== "string")) {
+    throw new Error("toolRisk.read must be an array of tool names");
+  }
+  if (typeof write !== "object" || Array.isArray(write)) {
+    throw new Error("toolRisk.write must map tool names to a category");
+  }
+  for (const [name, category] of Object.entries(write)) {
+    if (!isWriteCategory(category)) {
+      throw new Error(`Unknown tool category "${category}" for ${name}`);
+    }
+    if (read.includes(name)) {
+      throw new Error(`Tool ${name} is declared both read and write`);
+    }
+  }
+  if (!Array.isArray(capped) || capped.some((name) => typeof name !== "string")) {
+    throw new Error("toolRisk.capped must be an array of tool names");
+  }
+  for (const name of capped) {
+    // Only a write can enforce its own cap; a capped read or unknown tool is a typo.
+    if (!Object.prototype.hasOwnProperty.call(write, name)) {
+      throw new Error(`Capped tool ${name} must also be declared in toolRisk.write`);
+    }
+  }
+  return { read, write, capped };
+}
+
+/**
+ * Merge a plugin's declared risk into tool descriptors from tools/list. Used
+ * for servers whose tools/list the plugin cannot edit (a hosted MCP server,
+ * an in-process server). A declared tool takes the declaration, which wins
+ * over whatever the server says. Any other tool is left as the server sent it,
+ * so a hosted server's own `readOnlyHint` still counts and an unknown write
+ * stays unclassified (held).
+ *
+ * @template {{ name: string, annotations?: object, _meta?: object }} T
+ * @param {T[]} tools
+ * @param {{ read?: string[], write?: Record<string, string>, capped?: string[] } | undefined} spec
+ * @returns {T[]}
+ */
+function withToolRisk(tools, spec) {
+  const normalized = normalizeToolRiskSpec(spec);
+  return tools.map((tool) => {
+    const risk = tool && typeof tool.name === "string" ? riskFor(tool.name, normalized) : null;
+    if (!risk) return tool;
+    const merged = { ...tool, annotations: { ...(tool.annotations || {}), ...risk.annotations } };
+    if (risk._meta) merged._meta = { ...(tool._meta || {}), ...risk._meta };
+    return merged;
+  });
+}
+
+/**
  * Make every later `server.tool(...)` or `server.registerTool(...)` registration
  * carry its risk class. Mutates and returns the server. For `tool()`, fakes that
  * return nothing (test harnesses) are left alone; for `registerTool()` the risk
@@ -77,7 +149,7 @@ function riskFor(name, spec) {
  *
  * @template T
  * @param {T} server an McpServer
- * @param {{ read: string[], write: Record<string, string>, capped?: string[] }} spec
+ * @param {{ read?: string[], write?: Record<string, string>, capped?: string[] }} spec
  * @returns {T}
  */
 function applyToolRisk(server, spec) {
@@ -118,4 +190,6 @@ module.exports = {
   WRITE_CATEGORIES,
   riskFor,
   applyToolRisk,
+  normalizeToolRiskSpec,
+  withToolRisk,
 };

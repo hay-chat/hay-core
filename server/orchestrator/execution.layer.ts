@@ -22,6 +22,7 @@ import {
 import { MessageIntent, Message } from "@server/database/entities/message.entity";
 import { Document } from "@server/entities/document.entity";
 import { describeLocalTime } from "./local-time";
+import { handoffCopy } from "./handoff-copy";
 
 /**
  * Minimal shape of a retrieved document needed for confidence assessment.
@@ -783,6 +784,24 @@ export class ExecutionLayer {
       }
       // Retry produced nothing usable — fall through to escalation rather than
       // propagating null (which would trigger a blind re-plan without feedback).
+    }
+
+    // An action was held for approval this turn: the honest answer is that it
+    // was requested. Say exactly that instead of handing off, which would also
+    // pull the conversation out of awaiting-approval.
+    if ((options.toolsCalledThisTurn ?? []).some((call) => call.pending)) {
+      log.warn(
+        { claimedActions: assessment.claimedActions },
+        "Stage 0: Retries exhausted after an approval request, sending the fixed requested line",
+      );
+      result.originalMessage = result.userMessage || undefined;
+      result.userMessage = handoffCopy(
+        "approvalRequested",
+        customerLanguage,
+        conversation.language,
+      );
+      result.actionClaimRetryAttempted = true;
+      return result;
     }
 
     const confidenceConfig = await this.getConfidenceConfig(conversation);

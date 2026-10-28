@@ -77,6 +77,9 @@ export type {
   McpInitializerContext,
   StdioMcpOptions,
   ExternalMcpOptions,
+  LocalMcpOptions,
+  ToolRiskSpec,
+  ToolWriteCategory,
   HayMcpRuntimeAPI,
 } from "./mcp";
 

@@ -112,6 +112,60 @@ export interface McpInitializerContext {
 }
 
 /**
+ * Write categories Hay.chat core understands (mirrors `@hay/plugin-sdk/tool-risk`).
+ * Refunds, cancels and discounts move money and are held for approval.
+ */
+export type ToolWriteCategory =
+  | "refund"
+  | "cancel"
+  | "discount"
+  | "return"
+  | "address_change"
+  | "customer_update"
+  | "note"
+  | "other_write";
+
+/**
+ * A plugin's declaration of its tools' risk, for servers whose `tools/list`
+ * the plugin cannot edit (hosted MCP servers, in-process servers).
+ *
+ * The worker merges it into each listed tool's `annotations` / `_meta`, where
+ * core reads it. A declared tool takes the declaration (it overrides what the
+ * server says). Any other tool keeps the server's own annotations, so a hosted
+ * server's `readOnlyHint` still counts and an unknown write stays unclassified,
+ * which core holds for approval.
+ *
+ * @example
+ * ```typescript
+ * toolRisk: {
+ *   read: ["list_customers"],
+ *   write: { create_refund: "refund", create_customer: "customer_update" },
+ * }
+ * ```
+ */
+export interface ToolRiskSpec {
+  /** Tools that only read. */
+  read?: string[];
+  /** Tools that write, mapped to their category. */
+  write?: Record<string, ToolWriteCategory>;
+  /**
+   * Write tools that enforce a merchant-set cap themselves (e.g. a goodwill
+   * coupon). Calls within the cap skip the money approval hold; above it the
+   * tool refuses with NEEDS_APPROVAL, core holds the call for a person and an
+   * approved retry carries `hay_approval_id`. Each must also be in `write`.
+   */
+  capped?: string[];
+}
+
+/**
+ * Options for `mcp.startLocal()`.
+ */
+export interface LocalMcpOptions {
+  /** Risk class of the server's tools (see {@link ToolRiskSpec}). */
+  toolRisk?: ToolRiskSpec;
+}
+
+/**
  * Stdio MCP server options.
  *
  * Configuration for spawning a local MCP server as a stdio-based child process.
@@ -195,6 +249,13 @@ export interface StdioMcpOptions {
    * @default 30000
    */
   timeout?: number;
+
+  /**
+   * Risk class of the server's tools, when the server does not set it itself
+   * (see {@link ToolRiskSpec}). A server can also set annotations directly
+   * with `applyToolRisk` from `@hay/plugin-sdk/tool-risk`.
+   */
+  toolRisk?: ToolRiskSpec;
 }
 
 /**
@@ -243,6 +304,12 @@ export interface ExternalMcpOptions {
    * @example { Authorization: "Bearer token123" }
    */
   authHeaders?: Record<string, string>;
+
+  /**
+   * Risk class of the hosted server's tools (see {@link ToolRiskSpec}).
+   * Overrides the server's own annotations for the tools it names.
+   */
+  toolRisk?: ToolRiskSpec;
 }
 
 /**
@@ -272,6 +339,7 @@ export interface HayMcpRuntimeAPI {
    *
    * @param id - Unique identifier for this MCP server instance
    * @param initializer - Function that creates and returns the MCP server instance
+   * @param options - Optional; `toolRisk` declares the risk class of its tools
    * @returns Promise that resolves when server is started
    *
    * @throws If initializer fails or MCP server fails to start
@@ -290,6 +358,7 @@ export interface HayMcpRuntimeAPI {
   startLocal(
     id: string,
     initializer: (ctx: McpInitializerContext) => Promise<McpServerInstance> | McpServerInstance,
+    options?: LocalMcpOptions,
   ): Promise<void>;
 
   /**
