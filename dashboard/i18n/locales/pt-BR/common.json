@@ -22,7 +22,8 @@
     "myProfile": "Meu Perfil",
     "gitConnections": "Conexões Git",
     "llmProviders": "Modelos de IA",
-    "openMenu": "Abrir menu"
+    "openMenu": "Abrir menu",
+    "businessHours": "Horário de atendimento"
   },
   "user": {
     "status": "Status",

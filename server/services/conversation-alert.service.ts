@@ -386,7 +386,10 @@ class ConversationAlertService {
       assignedUserId: conversation.assigned_user_id,
       cycleStartedAt,
       humanReplied: humanReplies > 0,
-      withinBusinessHours: await isWithinBusinessHours(conversation.organization_id, now),
+      withinBusinessHours: await isWithinBusinessHours(
+        { organizationId: conversation.organization_id, channel: conversation.channel },
+        now,
+      ),
       repushAt: repushRows.length
         ? new Date(Math.min(...repushRows.map((row) => row.created_at.getTime())))
         : null,

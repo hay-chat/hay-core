@@ -278,6 +278,11 @@ const navMain = computed(() => {
         isActive: route.path === "/settings/webchat",
       },
       {
+        title: t("nav.businessHours"),
+        url: "/settings/business-hours",
+        isActive: route.path === "/settings/business-hours",
+      },
+      {
         title: t("nav.gitConnections"),
         url: "/settings/git-connections",
         isActive: route.path === "/settings/git-connections",

@@ -133,6 +133,7 @@ export interface InputProps {
     | "number"
     | "search"
     | "date"
+    | "time"
     | "url"
     | "file";
   label?: string;
