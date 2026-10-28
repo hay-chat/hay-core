@@ -361,3 +361,78 @@ describe("shopify_get_order supportSummary", () => {
     });
   });
 });
+
+describe("shopify_get_order payment and source fields (D10-1)", () => {
+  it("requests and flattens transactions, refunds, sourceName, tags and custom attributes", async () => {
+    const { calls } = mockShopify({
+      GetOrder: () => ({
+        order: unfulfilledOrder({
+          refundable: true,
+          lineItems: { edges: [] },
+          sourceName: "bling",
+          tags: ["mercadolivre"],
+          customAttributes: [{ key: "cpf", value: "000" }],
+          paymentGatewayNames: ["Mercado Pago"],
+          transactions: [
+            {
+              id: "gid://shopify/OrderTransaction/1",
+              kind: "SALE",
+              status: "SUCCESS",
+              gateway: "mercado_pago",
+              formattedGateway: "Mercado Pago",
+              paymentId: "123456789",
+              processedAt: "2026-10-01T10:00:00Z",
+              amountSet: { shopMoney: { amount: "99.90", currencyCode: "BRL" } },
+            },
+          ],
+          refunds: [
+            {
+              id: "gid://shopify/Refund/9",
+              createdAt: "2026-10-03T12:00:00Z",
+              note: null,
+              totalRefundedSet: { shopMoney: { amount: "10.00", currencyCode: "BRL" } },
+            },
+          ],
+        }),
+      }),
+    });
+    const res = await server.call("shopify_get_order", { order_id: "1001" });
+    for (const field of [
+      "sourceName",
+      "paymentGatewayNames",
+      "paymentId",
+      "createdAt",
+      "customAttributes",
+    ]) {
+      expect(calls[0].query).toContain(field);
+    }
+    expect(res.data).toMatchObject({
+      sourceName: "bling",
+      tags: ["mercadolivre"],
+      customAttributes: [{ key: "cpf", value: "000" }],
+      paymentGatewayNames: ["Mercado Pago"],
+      transactions: [
+        {
+          formattedGateway: "Mercado Pago",
+          paymentId: "123456789",
+          amount: { amount: "99.90", currencyCode: "BRL" },
+        },
+      ],
+      refunds: [{ createdAt: "2026-10-03T12:00:00Z", totalRefunded: { amount: "10.00" } }],
+    });
+    expect(res.data.transactions[0].amountSet).toBeUndefined();
+  });
+
+  it("defaults missing payment fields to empty values", async () => {
+    mockShopify({ GetOrder: () => ({ order: unfulfilledOrder({ lineItems: { edges: [] } }) }) });
+    const res = await server.call("shopify_get_order", { order_id: "1001" });
+    expect(res.data).toMatchObject({
+      sourceName: null,
+      tags: [],
+      customAttributes: [],
+      paymentGatewayNames: [],
+      transactions: [],
+      refunds: [],
+    });
+  });
+});
