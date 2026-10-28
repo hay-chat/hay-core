@@ -346,7 +346,16 @@
     "underAttackTurnOn": "Turn on",
     "underAttackTurnOff": "Turn off",
     "underAttackOnSuccess": "Under-attack mode is on",
-    "underAttackOffSuccess": "Under-attack mode is off"
+    "underAttackOffSuccess": "Under-attack mode is off",
+    "customerIdentity": "Signed-in customers",
+    "customerIdentityDescription": "To link a chat to a signed-in customer, your website's server signs their customer ID with this secret and passes customerExternalId and customerExternalIdSignature to the widget. The signature is the hex HMAC-SHA256 of the customer ID. Without a valid signature, the visitor is treated as a new anonymous customer.",
+    "customerIdentityHidden": "The secret is hidden. Only admins can see it.",
+    "customerIdentityReveal": "Show secret",
+    "customerIdentityRotate": "Replace secret",
+    "customerIdentityRotateTitle": "Replace the secret?",
+    "customerIdentityRotateDescription": "Signatures made with the current secret stop working at once. Signed-in customers show up as anonymous until your website signs with the new secret.",
+    "customerIdentityRotated": "Secret replaced",
+    "customerIdentityFailed": "Couldn't load the secret"
   },
   "customerPrivacy": {
     "title": "Customer Privacy",

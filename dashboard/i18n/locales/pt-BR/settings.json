@@ -346,7 +346,16 @@
     "underAttackTurnOn": "Ligar",
     "underAttackTurnOff": "Desligar",
     "underAttackOnSuccess": "Modo sob ataque ligado",
-    "underAttackOffSuccess": "Modo sob ataque desligado"
+    "underAttackOffSuccess": "Modo sob ataque desligado",
+    "customerIdentity": "Clientes conectados",
+    "customerIdentityDescription": "Para vincular um chat a um cliente conectado, o servidor do seu site assina o ID do cliente com este segredo e passa customerExternalId e customerExternalIdSignature para o widget. A assinatura é o HMAC-SHA256 em hexadecimal do ID do cliente. Sem uma assinatura válida, o visitante é tratado como um novo cliente anônimo.",
+    "customerIdentityHidden": "O segredo está oculto. Só administradores podem vê-lo.",
+    "customerIdentityReveal": "Mostrar segredo",
+    "customerIdentityRotate": "Trocar segredo",
+    "customerIdentityRotateTitle": "Trocar o segredo?",
+    "customerIdentityRotateDescription": "As assinaturas feitas com o segredo atual param de funcionar na hora. Os clientes conectados aparecem como anônimos até o seu site assinar com o novo segredo.",
+    "customerIdentityRotated": "Segredo trocado",
+    "customerIdentityFailed": "Não foi possível carregar o segredo"
   },
   "customerPrivacy": {
     "title": "Privacidade do Cliente",

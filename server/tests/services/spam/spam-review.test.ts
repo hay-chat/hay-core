@@ -26,7 +26,15 @@ jest.mock("@server/services/resolution-ledger.service", () => ({
   },
 }));
 
+const mockReanalyze = jest.fn<(...args: unknown[]) => Promise<number>>(async () => 0);
+jest.mock("@server/services/media-analysis/pipeline", () => ({
+  reanalyzeHeldMedia: mockReanalyze,
+}));
+
 import { listSpam, markNotSpam, markSpam } from "@server/services/spam/spam-review.service";
+
+/** Not spam re-reads files and re-engages the AI after it returns. */
+const settle = () => new Promise((resolve) => setImmediate(resolve));
 
 const conversation = (overrides: Record<string, unknown> = {}) => ({
   id: "c1",
@@ -75,6 +83,7 @@ describe("spam review", () => {
   it("Not spam clears the flag, stops screening and re-engages the AI for a waiting shopper", async () => {
     mockFindById.mockResolvedValueOnce(conversation());
     await expect(markNotSpam("o1", "c1", "u1")).resolves.toEqual({ reengaged: true });
+    await settle();
     const update = mockUpdate.mock.calls[0][2] as Record<string, any>;
     expect(update).toMatchObject({ spam_flagged_at: null, spam_reason: null, needs_processing: true });
     expect(update.metadata.spamCheck).toMatchObject({ clearedBy: "u1", signals: ["links"] });
@@ -87,8 +96,33 @@ describe("spam review", () => {
     await expect(markNotSpam("o1", "c1", "u1")).resolves.toEqual({ reengaged: false });
     mockFindById.mockResolvedValueOnce(conversation({ assigned_user_id: "u2", status: "human-took-over" }));
     await expect(markNotSpam("o1", "c1", "u1")).resolves.toEqual({ reengaged: false });
+    await settle();
     expect(mockEnqueue).not.toHaveBeenCalled();
     expect(mockUpdate.mock.calls[0][2]).not.toHaveProperty("needs_processing");
+  });
+
+  it("Not spam reads the files skipped while held before the AI answers", async () => {
+    let finishReading: (count: number) => void = () => undefined;
+    mockReanalyze.mockImplementationOnce(
+      () => new Promise<number>((resolve) => (finishReading = resolve)),
+    );
+    mockFindById.mockResolvedValueOnce(conversation());
+    await markNotSpam("o1", "c1", "u1");
+    await settle();
+    expect(mockReanalyze).toHaveBeenCalledWith("c1", "o1");
+    expect(mockEnqueue).not.toHaveBeenCalled();
+    finishReading(1);
+    await settle();
+    expect(mockEnqueue).toHaveBeenCalledWith("c1", "o1", "ai_return");
+  });
+
+  it("Not spam still hands back to the AI when re-reading files fails", async () => {
+    mockReanalyze.mockRejectedValueOnce(new Error("db down"));
+    mockFindById.mockResolvedValueOnce(conversation());
+    await markNotSpam("o1", "c1", "u1");
+    await settle();
+    await settle();
+    expect(mockEnqueue).toHaveBeenCalledWith("c1", "o1", "ai_return");
   });
 
   it("Mark as spam flags and holds it, and re-arms screening", async () => {

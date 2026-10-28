@@ -83,10 +83,10 @@ export function resumeUrl(
 
 /**
  * D5-8: the shopper left an email at hand-off. It belongs to this conversation
- * and is what the follow-up uses. The call is not authenticated as the
- * customer (a widget can link any customerExternalId), so it only fills the
+ * and is what the follow-up uses. The typed email is the shopper's claim, not
+ * a verified address (a store customer is linked only by a signed
+ * customerExternalId, see webchat-identity.service), so it only fills the
  * customer's email when the customer has none, never overwrites it.
- * TODO: sign customerExternalId so the widget can prove the customer link.
  */
 export async function saveHandoffEmail(conversation: Conversation, email: string): Promise<void> {
   const { conversationRepository } = await import("@server/repositories/conversation.repository");

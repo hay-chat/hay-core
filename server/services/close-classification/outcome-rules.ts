@@ -91,6 +91,8 @@ export interface CloseFacts {
   closeReason: string | null;
   isTest: boolean;
   spamFlagged: boolean;
+  /** Staff marked it "Not spam": a model's spam verdict no longer counts. */
+  spamCleared: boolean;
   handedOff: boolean;
   /** At least one customer message that asks for something (not just "hi"/"thanks"). */
   hadRealRequest: boolean;
@@ -164,6 +166,8 @@ export function collectCloseFacts(
     isTest: isTestConversation(conversation.metadata),
     spamFlagged:
       conversation.spam_flagged_at !== null && conversation.spam_flagged_at !== undefined,
+    spamCleared: !!(conversation.metadata?.spamCheck as { clearedAt?: unknown } | undefined)
+      ?.clearedAt,
     handedOff: conversation.handed_off_at !== null && conversation.handed_off_at !== undefined,
     hadRealRequest: firstRequestIndex !== -1,
     aiReplied: aiReplies.length > 0,
@@ -205,7 +209,8 @@ export function decideOutcome(facts: CloseFacts, verdict: ClassifierVerdict): Ou
   });
 
   if (facts.isTest) return decide("test");
-  if (facts.spamFlagged || verdict.isSpam) return decide("spam");
+  // Staff's "Not spam" beats the model; a flag (set again after it) still wins.
+  if (facts.spamFlagged || (verdict.isSpam && !facts.spamCleared)) return decide("spam");
   // The shopper's own "this didn't help" beats any model opinion.
   if (facts.closeReason === USER_UNHAPPY_REASON) return decide("unhappy");
   if (facts.approvalRequested)

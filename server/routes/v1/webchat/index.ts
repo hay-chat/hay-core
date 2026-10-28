@@ -8,6 +8,15 @@ import { organizationRepository } from "@server/repositories/organization.reposi
 import { customAiLabel, isAiLabelShown } from "@server/services/ai-disclosure";
 import { WebchatPosition, WebchatTheme } from "@server/database/entities/webchat-settings.entity";
 import { getAvailability, typicalFirstReplyMinutes } from "@server/services/business-hours.service";
+import {
+  revealIdentitySecret,
+  rotateIdentitySecret,
+} from "@server/services/webchat/webchat-identity.service";
+import { auditLogService } from "@server/services/audit-log.service";
+import { RESOURCES, ACTIONS } from "@server/types/scopes";
+import { createLogger } from "@server/lib/logger";
+
+const logger = createLogger("webchat-router");
 
 // Every widget load asks for availability; a short cache keeps that off the database.
 const AVAILABILITY_TTL_MS = 60_000;
@@ -90,6 +99,28 @@ export const webchatRouter = router({
     }),
 
   /**
+   * Customer identity secret (D1): the key the store's server signs
+   * `customerExternalId` with. A credential, so it sits with API keys, which
+   * only org admins and owners hold. Created on first reveal.
+   */
+  revealIdentitySecret: scopedProcedure(RESOURCES.API_KEYS, ACTIONS.READ).mutation(
+    async ({ ctx }) => {
+      const secret = await revealIdentitySecret(ctx.organizationId!);
+      auditIdentitySecret(ctx, "revealed");
+      return { secret };
+    },
+  ),
+
+  /** Replace the identity secret; ids signed with the old one stop linking. */
+  rotateIdentitySecret: scopedProcedure(RESOURCES.API_KEYS, ACTIONS.UPDATE).mutation(
+    async ({ ctx }) => {
+      const secret = await rotateIdentitySecret(ctx.organizationId!);
+      auditIdentitySecret(ctx, "rotated");
+      return { secret };
+    },
+  ),
+
+  /**
    * Get public configuration for the widget (no auth required)
    * Used by the widget to fetch configuration on load
    */
@@ -147,3 +178,19 @@ export const webchatRouter = router({
       return value;
     }),
 });
+
+function auditIdentitySecret(
+  ctx: { user?: { id: string } | null; organizationId?: string | null; ipAddress?: string },
+  change: "revealed" | "rotated",
+): void {
+  auditLogService
+    .log({
+      userId: ctx.user?.id,
+      organizationId: ctx.organizationId ?? undefined,
+      action: "security.setting.change",
+      resource: "webchat_identity_secret",
+      changes: { identitySecret: change },
+      ipAddress: ctx.ipAddress,
+    })
+    .catch((error) => logger.warn({ err: error }, "Could not audit the identity secret"));
+}

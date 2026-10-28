@@ -18,6 +18,7 @@ import {
   webchatSettingsService,
   matchesAllowedDomains,
 } from "../../../services/webchat/webchat-settings.service";
+import { verifiedCustomerExternalId } from "../../../services/webchat/webchat-identity.service";
 import { toPublicAttachments, toPublicMessage } from "../../../services/webchat/public-message";
 import {
   PUBLIC_WIDGET_LIMITS,
@@ -61,7 +62,10 @@ const createPublicConversationSchema = z.object({
     .regex(/^[A-Za-z]{2,3}(-[A-Za-z0-9]{1,8})*$/)
     .optional(),
   context: z.record(z.any()).optional(),
-  customerExternalId: z.string().optional(),
+  // The store's customer id, linked only when signed by the store's server
+  // with the organization's identity secret (D1, webchat-identity.service).
+  customerExternalId: z.string().max(255).optional(),
+  customerExternalIdSignature: z.string().max(128).optional(),
   isPlayground: z.boolean().optional().default(false),
   // Token from a rendered challenge@1 contribution, or the error code when the
   // challenge could not run. Checked by plugin gates before the conversation exists.
@@ -194,9 +198,24 @@ export const publicConversationsRouter = t.router({
       });
       if (gate.decision === "deny") throw verificationFailed();
 
+      // A signed customerExternalId links the store's customer. Unsigned or
+      // wrongly signed, the visitor is anonymous (a fresh customer).
+      const customerExternalId = await verifiedCustomerExternalId(
+        organizationId,
+        input.customerExternalId,
+        input.customerExternalIdSignature,
+      );
+      if (input.customerExternalId && !customerExternalId) {
+        logger.info({ organizationId }, "Ignored an unsigned or invalid customerExternalId");
+      }
+      const customer = customerExternalId
+        ? await customerRepository.findByExternalId(customerExternalId, organizationId)
+        : null;
+
       // Create the conversation with the public JWK
       const conversation = await conversationService.createConversation(organizationId, {
         status: "open",
+        customer_id: customer?.id ?? null,
         language: input.language || null,
         metadata: {
           ...publicMetadata(input.metadata),
@@ -216,19 +235,6 @@ export const publicConversationsRouter = t.router({
           ? { context: input.context }
           : {}),
       });
-
-      // Link customer if customerExternalId is provided
-      if (input.customerExternalId) {
-        const customer = await customerRepository.findByExternalId(
-          input.customerExternalId,
-          organizationId,
-        );
-        if (customer) {
-          await conversationRepository.updateById(conversation.id, {
-            customer_id: customer.id,
-          });
-        }
-      }
 
       // Generate initial nonce for this conversation
       const nonce = await dpopCacheService.generateNonce(conversation.id);

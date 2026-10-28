@@ -10,7 +10,11 @@ jest.mock("@server/services/plugin-manager.service", () => ({
   pluginManagerService: {
     getAllPlugins: () => [
       { pluginId: "core-default", sourceType: "core", manifest: { defaultEnabled: true } },
-      { pluginId: "core-disabled-by-owner", sourceType: "core", manifest: { defaultEnabled: true } },
+      {
+        pluginId: "core-disabled-by-owner",
+        sourceType: "core",
+        manifest: { defaultEnabled: true },
+      },
       { pluginId: "core-optional", sourceType: "core", manifest: {} },
       { pluginId: "custom-default", sourceType: "custom", manifest: { defaultEnabled: true } },
     ],
@@ -22,6 +26,7 @@ jest.mock("@server/services/plugin-manager.service", () => ({
 import {
   defaultEnabledPluginIds,
   enableDefaultPlugins,
+  enableDefaultPluginsForOrganizations,
 } from "@server/services/default-plugins.service";
 
 describe("default-enabled plugins", () => {
@@ -39,5 +44,41 @@ describe("default-enabled plugins", () => {
 
     expect(enablePlugin).toHaveBeenCalledTimes(1);
     expect(enablePlugin).toHaveBeenCalledWith("org-1", "core-default", {});
+  });
+
+  it("backfills existing organizations, keeping each owner's choice", async () => {
+    enablePlugin.mockClear();
+    // org-a already has both instances; org-b has neither; org-c disabled one.
+    findByOrgAndPlugin.mockImplementation(async (orgId, pluginId) => {
+      if (orgId === "org-a") return { enabled: true };
+      if (orgId === "org-c" && pluginId === "core-default") return { enabled: false };
+      return null;
+    });
+    enablePlugin.mockResolvedValue({});
+
+    const result = await enableDefaultPluginsForOrganizations(["org-a", "org-b", "org-c"]);
+
+    expect(result).toEqual({
+      organizations: 3,
+      enabled: { "core-default": 1, "core-disabled-by-owner": 2 },
+    });
+    expect(enablePlugin.mock.calls).toEqual([
+      ["org-b", "core-default", {}],
+      ["org-b", "core-disabled-by-owner", {}],
+      ["org-c", "core-disabled-by-owner", {}],
+    ]);
+  });
+
+  it("one org failing does not stop the backfill", async () => {
+    enablePlugin.mockClear();
+    findByOrgAndPlugin.mockResolvedValue(null);
+    enablePlugin.mockImplementation(async (orgId) => {
+      if (orgId === "org-broken") throw new Error("db");
+      return {};
+    });
+
+    const result = await enableDefaultPluginsForOrganizations(["org-broken", "org-ok"]);
+
+    expect(result.enabled).toEqual({ "core-default": 1, "core-disabled-by-owner": 1 });
   });
 });
