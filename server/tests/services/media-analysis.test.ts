@@ -67,6 +67,18 @@ jest.mock("@server/services/llm/llm-provider.factory", () => ({
   },
 }));
 
+const mockFindConversation = jest.fn<(...args: unknown[]) => Promise<unknown>>(async () => ({
+  id: "conv-1",
+  spam_flagged_at: null,
+  metadata: {},
+}));
+jest.mock("@server/database/data-source", () => ({
+  AppDataSource: {
+    getRepository: () => ({ findOne: (...args: unknown[]) => mockFindConversation(...args) }),
+    query: jest.fn(async () => []),
+  },
+}));
+
 import sharp from "sharp";
 import {
   markAnalysisPending,
@@ -253,6 +265,24 @@ describe("processMessageMedia", () => {
     await processMessageMedia("msg-1", ORG);
 
     expect(storedAttachments()[0].analysis).toEqual({ status: "skipped", reason: "disabled" });
+    expect(mockDownload).not.toHaveBeenCalled();
+    expect(mockChatCreate).not.toHaveBeenCalled();
+  });
+
+  it("does not spend a vision call on a spam-held or unverified conversation", async () => {
+    mockFindMessage.mockResolvedValue(message(markAnalysisPending([photo()])!));
+    mockFindConversation.mockResolvedValueOnce({ id: "conv-1", spam_flagged_at: new Date(), metadata: {} });
+    await processMessageMedia("msg-1", ORG);
+    expect(storedAttachments()[0].analysis).toEqual({ status: "skipped", reason: "spam" });
+
+    mockUpdateMessage.mockClear();
+    mockFindConversation.mockResolvedValueOnce({
+      id: "conv-1",
+      spam_flagged_at: null,
+      metadata: { botCheck: { decision: "flag" } },
+    });
+    await processMessageMedia("msg-1", ORG);
+    expect(storedAttachments()[0].analysis).toEqual({ status: "skipped", reason: "unverified" });
     expect(mockDownload).not.toHaveBeenCalled();
     expect(mockChatCreate).not.toHaveBeenCalled();
   });

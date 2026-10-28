@@ -26,6 +26,8 @@ export const PUBLIC_WIDGET_LIMITS = {
   challengePerIp: { max: 60, windowSeconds: 10 * 60 },
   /** Files per IP, across conversations. */
   attachmentPerIp: { max: 30, windowSeconds: 10 * 60 },
+  /** Files per organization, as a burst cap on storage and vision cost across all visitors. */
+  attachmentPerOrg: { max: 300, windowSeconds: 10 * 60 },
 } as const;
 
 type LimitRule = Exclude<keyof typeof PUBLIC_WIDGET_LIMITS, "maxMessageLength">;

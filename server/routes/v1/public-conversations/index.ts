@@ -478,6 +478,10 @@ export const publicConversationsRouter = t.router({
       throw new TRPCError({ code: "NOT_FOUND", message: "Conversation not found" });
     }
     const organizationId = conversation.organization_id;
+    // Broadest last, so one conversation's flood only spends its own budget first.
+    if (await isPublicWidgetRateLimited([{ rule: "attachmentPerOrg", id: organizationId }])) {
+      throw tooManyRequests();
+    }
 
     // Same gate as starting a chat: the organization must still offer webchat.
     const organization = await organizationRepository.findById(organizationId);
