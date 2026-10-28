@@ -137,11 +137,16 @@ describe("bulkSync", () => {
         return { upserted: products.length, errors: 0 };
       },
       delete: async () => ({ removed: false }),
+      prune: async (keep: string[]) => (pruned.push(keep), { removed: 1 }),
     };
+    const pruned: string[][] = [];
 
-    const { total } = await bulkSync(wooGet, productSource, { info: () => {} });
+    const { total, removed } = await bulkSync(wooGet, productSource, { info: () => {} });
 
     expect(total).toBe(3);
+    // Deleted/trashed products are pruned: core keeps exactly what the store returned.
+    expect(pruned).toEqual([["10", "20", "11"]]);
+    expect(removed).toBe(1);
     expect(batches.map((b) => b.map((p) => p.externalId))).toEqual([["10", "20"], ["11"]]);
     expect(batches[0][1].variants).toHaveLength(2);
     expect(batches[0][0].currency).toBe("USD");
@@ -162,10 +167,32 @@ describe("bulkSync", () => {
       {
         upsert: async (p) => (seen.push(...p), { upserted: p.length, errors: 0 }),
         delete: async () => ({ removed: false }),
+        prune: async () => ({ removed: 0 }),
       },
       { info: () => {} },
     );
     expect(seen).toHaveLength(1);
     expect(seen[0].currency).toBeUndefined();
+  });
+
+  it("does not prune when a page fails mid-sync", async () => {
+    const wooGet: WooGet = async <T>(path: string) => {
+      if (path === "/data/currencies/current") return { data: { code: "USD" } as T, totalPages: 1 };
+      if (path.includes("page=1&")) return { data: [SIMPLE] as T, totalPages: 2 };
+      throw new Error("WooCommerce GET failed (HTTP 500)");
+    };
+    let pruneCalls = 0;
+    await expect(
+      bulkSync(
+        wooGet,
+        {
+          upsert: async (p) => ({ upserted: p.length, errors: 0 }),
+          delete: async () => ({ removed: false }),
+          prune: async () => (pruneCalls++, { removed: 0 }),
+        },
+        { info: () => {} },
+      ),
+    ).rejects.toThrow("HTTP 500");
+    expect(pruneCalls).toBe(0);
   });
 });

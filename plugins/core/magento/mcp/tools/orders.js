@@ -38,7 +38,8 @@ function registerOrderTools(server) {
     "magento_get_order",
     "Get an order by id or number with line items, totals, shipping address, invoices, shipment " +
       "tracking and a supportSummary (isCancellable, isRefundable, remainingRefundable, " +
-      "addressChangeable, needsCreditMemo). One call answers status, refund and cancellation questions.",
+      "addressChangeable, needsCreditMemo, tracking: isStale/daysSinceLastUpdate/staleReason). One " +
+      "call answers status, refund, cancellation and stuck-parcel questions.",
     ORDER_REF,
     async (args) => {
       try {
