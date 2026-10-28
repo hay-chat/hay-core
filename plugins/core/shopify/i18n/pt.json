@@ -85,6 +85,10 @@
     "shopify_create_coupon": {
       "label": "Criar cupom de cortesia",
       "description": "Cria um código de desconto de uso único para um cliente, dentro do limite de porcentagem ou valor definido pelo lojista."
+    },
+    "shopify_swap_order_item": {
+      "label": "Trocar Item do Pedido",
+      "description": "Antes do envio, troca um item por outro tamanho ou cor do mesmo produto. Só com preço igual ou menor e em estoque."
     }
   },
   "config": {
