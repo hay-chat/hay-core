@@ -104,6 +104,56 @@
         "refund": "reembolso",
         "discount": "desconto"
       }
+    },
+    "toolErrors": {
+      "generic": "Esta ação falhou.",
+      "codes": {
+        "BAD_INPUT": "A IA enviou dados que a loja não aceitou, como um número de pedido ou formato errado.",
+        "NOT_FOUND": "A loja não encontrou o pedido, cliente ou item que a IA pediu.",
+        "PRECONDITION": "A situação atual do pedido não permite esta ação.",
+        "PROVIDER_REFUSED": "A loja recusou o pedido.",
+        "AUTH_FAILED": "A conexão com esta integração expirou ou foi revogada. Reconecte em Integrações.",
+        "SCOPE_MISSING": "Falta à integração uma permissão de que esta ação precisa. Reconecte em Integrações e permita o acesso solicitado.",
+        "RATE_LIMITED": "A loja está recebendo pedidos demais agora. Deve voltar a funcionar em alguns minutos.",
+        "PROVIDER_DOWN": "O serviço da loja não respondeu. Tente de novo mais tarde.",
+        "OUTCOME_UNKNOWN": "A loja não confirmou se isso foi feito. Confira o pedido na sua loja antes de tentar de novo.",
+        "NEEDS_APPROVAL": "Está acima do limite definido para a integração, então precisa da aprovação de uma pessoa.",
+        "INTERNAL": "Algo inesperado deu errado ao executar esta ação.",
+        "APPROVAL_REJECTED": "Alguém da equipe recusou este pedido."
+      },
+      "reasons": {
+        "ALREADY_HAS_COUPON": "Este cliente já tem um cupom não usado.",
+        "GOODWILL_CHECK_INCOMPLETE": "Não foi possível confirmar que este cliente não tem um cupom de cortesia não usado, então nenhum foi criado.",
+        "EXCEEDS_REFUNDABLE": "O valor é maior do que ainda pode ser reembolsado neste pedido.",
+        "CUSTOMER_MISMATCH": "O pedido não pertence a este cliente.",
+        "ALREADY_CANCELLED": "O pedido já foi cancelado.",
+        "ALREADY_SHIPPED": "O pedido já foi enviado.",
+        "NOT_SUPPORTED": "A loja não oferece esta ação.",
+        "RECORD_ONLY_NOT_ALLOWED": "Este pedido foi pago por um gateway de pagamento, então o reembolso não pode ser só registrado sem devolver o dinheiro.",
+        "OUT_OF_STOCK": "O item está sem estoque.",
+        "NO_EMAIL": "Não há um e-mail para onde enviar.",
+        "NO_CUSTOMER": "Nenhum cliente está vinculado a este pedido.",
+        "NO_ACCOUNT": "Este cliente não tem conta na loja.",
+        "NOT_PAID": "O pedido não foi pago.",
+        "IDENTITY_MISMATCH": "Os dados do cliente não correspondem ao pedido.",
+        "FULFILLMENT_IN_PROGRESS": "O pedido já está sendo preparado para envio.",
+        "EMAIL_MISMATCH": "O e-mail informado não corresponde ao pedido.",
+        "COUPON_CREATE_FAILED": "A loja não conseguiu criar o cupom.",
+        "COUPONS_DISABLED": "Os cupons estão desligados na loja.",
+        "BALANCE_DUE": "A mudança deixaria um valor para o cliente pagar, então nada foi alterado.",
+        "ALREADY_REFUNDED": "Isso já foi reembolsado.",
+        "UNSUPPORTED_WC_VERSION": "A versão do software da loja não oferece esta ação.",
+        "PRICE_HIGHER": "O novo item custa mais do que o cliente pagou.",
+        "PENDING_REFUND": "Já existe um reembolso em andamento para este pedido.",
+        "NOT_RETURNABLE": "Este item não pode ser devolvido.",
+        "NOT_REFUNDABLE": "Este pedido não pode ser reembolsado.",
+        "NOT_PRE_DISPATCH": "O pedido já passou da etapa em que ainda podia ser alterado.",
+        "NOT_PENDING": "O pedido não está aguardando pagamento, então não há link de pagamento para enviar.",
+        "FULLY_REFUNDED": "O pedido já foi totalmente reembolsado.",
+        "EMAIL_FAILED": "Não foi possível enviar o e-mail.",
+        "DIFFERENT_PRODUCT": "Uma troca só pode mudar o tamanho ou a cor do mesmo produto.",
+        "ALREADY_DISPATCHED": "O pedido já foi despachado."
+      }
     }
   }
 }
