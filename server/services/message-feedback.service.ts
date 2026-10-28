@@ -1,6 +1,16 @@
 import { MessageFeedbackRepository } from "../repositories/message-feedback.repository";
 import { MessageFeedback } from "../database/entities/message-feedback.entity";
+import { InsightIssue } from "../database/entities/insight-issue.entity";
+import { AppDataSource } from "../database/data-source";
 import type { CreateFeedbackInput, FeedbackFilter } from "../types/message-feedback.types";
+import { feedbackInsightService, findRatedMessage } from "./insights/feedback-insight.service";
+
+/** The rated message does not exist in the caller's organization. */
+export class FeedbackMessageNotFoundError extends Error {
+  constructor() {
+    super("Message not found");
+  }
+}
 
 export class MessageFeedbackService {
   private feedbackRepository: MessageFeedbackRepository;
@@ -14,7 +24,23 @@ export class MessageFeedbackService {
     reviewerId: string,
     data: CreateFeedbackInput,
   ): Promise<MessageFeedback> {
-    return this.feedbackRepository.create(organizationId, reviewerId, data);
+    // The rating and its insight issue (D3-9) are written together.
+    return AppDataSource.transaction(async (manager) => {
+      const rated = await findRatedMessage(organizationId, data.messageId, manager);
+      if (!rated) throw new FeedbackMessageNotFoundError();
+      const repository = manager.getRepository(MessageFeedback);
+      const feedback = await repository.save(
+        repository.create({
+          messageId: data.messageId,
+          organizationId,
+          reviewerId,
+          rating: data.rating,
+          comment: data.comment || null,
+        }),
+      );
+      await feedbackInsightService.createPendingIssue(feedback, rated, manager);
+      return feedback;
+    });
   }
 
   async getFeedbackById(id: string): Promise<MessageFeedback | null> {
@@ -54,7 +80,12 @@ export class MessageFeedbackService {
     };
   }
 
+  /**
+   * Withdraw a rating: its insight issue goes too. (Retention deleting the
+   * message cascades to the feedback but keeps the issue, via SET NULL.)
+   */
   async deleteFeedback(id: string): Promise<boolean> {
+    await AppDataSource.getRepository(InsightIssue).delete({ message_feedback_id: id });
     return this.feedbackRepository.delete(id);
   }
 
