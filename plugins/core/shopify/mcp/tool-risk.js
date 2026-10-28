@@ -27,5 +27,8 @@ module.exports = {
     shopify_update_customer: "customer_update",
     shopify_update_customer_address: "customer_update",
     shopify_add_order_note: "note",
+    shopify_create_coupon: "discount",
   },
+  // Enforces the merchant's coupon cap itself; above it, core holds the call.
+  capped: ["shopify_create_coupon"],
 };

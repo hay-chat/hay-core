@@ -89,12 +89,24 @@ describe("enrichOrder", () => {
       isCancellable: true,
       isRefundable: true,
       remainingRefundable: { amount: "60.00", currency: "EUR" },
+      gatewayCanRefund: true,
       addressChangeable: true,
       shippedAt: null,
       deliveredAt: null,
+      tracking: expect.objectContaining({ isStale: false, shippedAt: null }),
     });
+    // Amounts carry their currency so the AI never assumes "$".
+    expect(e.totals).toMatchObject({ currency: "EUR", total: "60.00" });
     expect(e.lineItems[0]).toMatchObject({ id: 101, sku: "HAT-1", quantity: 2 });
     expect(e.shippingMethod).toBe("Flat rate");
+  });
+
+  it("flags offline payment methods whose refunds must be paid back by hand", () => {
+    for (const method of ["bacs", "cod", "cheque"]) {
+      expect(
+        enrichOrder({ ...ORDER, payment_method: method }, []).supportSummary.gatewayCanRefund,
+      ).toBe(false);
+    }
   });
 
   it("subtracts refunds, blocks cancel/address after completion, and refuses refunds on unpaid orders", () => {
@@ -197,7 +209,8 @@ describe("order tools", () => {
     expect(res.data.tracking).toEqual([
       expect.objectContaining({ trackingNumber: "JD1", carrier: "DHL", source: "wc/v3" }),
     ]);
-    expect(calls.map((c) => c.path)).toEqual([
+    // The store-country lookup (stale-tracking threshold) is a cached side read.
+    expect(calls.map((c) => c.path).filter((p) => !p.includes("/settings/"))).toEqual([
       `${WC}/orders/12`,
       `${WC}/orders/12/shipment-trackings`,
     ]);
@@ -238,7 +251,7 @@ describe("order tools", () => {
     expect(res.data.tracking).toEqual([
       expect.objectContaining({ trackingNumber: "1Z", carrier: "ups", source: "meta" }),
     ]);
-    expect(calls.map((c) => c.path)).toEqual([
+    expect(calls.map((c) => c.path).filter((p) => !p.includes("/settings/"))).toEqual([
       `${WC}/orders/12`,
       `${WC}/orders`,
       `${WC}/orders/5000/shipment-trackings`,

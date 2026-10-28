@@ -9,6 +9,9 @@
  *  - refunds, cancels and discounts are held unless their amount is known and
  *    at or below `thresholdAmount` (a cancel's amount is usually unknown, so
  *    cancels are held);
+ *  - a money tool that enforces its own cap (capEnforced) runs: within the cap
+ *    it needs no approval, and above it the plugin refuses with NEEDS_APPROVAL,
+ *    which core turns into a hold (see ToolExecutionService.runLive);
  *  - tools that do not declare a risk class are held (they may move money);
  *  - other classified writes (address change, note, return, ...) run.
  * With it off, every call runs.
@@ -19,6 +22,9 @@ import { MONEY_CATEGORIES, type ToolRisk } from "./tool-risk";
 export type GateDecision =
   | { kind: "allow" }
   | { kind: "hold"; reason: "money_move" | "unclassified_write"; amount: number | null };
+
+/** Tool-error code a cap-enforcing plugin returns for a call above its cap. */
+export const NEEDS_APPROVAL_CODE = "NEEDS_APPROVAL";
 
 function toAmount(value: unknown): number | null {
   const n = typeof value === "string" ? Number(value) : value;
@@ -54,7 +60,7 @@ export function decideGate(
     return { kind: "hold", reason: "unclassified_write", amount: extractAmount(args) };
   }
 
-  if (MONEY_CATEGORIES.has(risk.category)) {
+  if (MONEY_CATEGORIES.has(risk.category) && !risk.capEnforced) {
     const amount = extractAmount(args);
     if (amount === null || amount > config.thresholdAmount) {
       return { kind: "hold", reason: "money_move", amount };

@@ -23,8 +23,11 @@ export type PendingActionStatus =
   | "rejected"
   | "expired";
 
-/** Why the policy gate held the call. */
-export type PendingActionHoldReason = "money_move" | "unclassified_write";
+/**
+ * Why the call was held: by the policy gate (money_move, unclassified_write), or
+ * because a cap-enforcing plugin refused it as above the merchant's cap (over_cap).
+ */
+export type PendingActionHoldReason = "money_move" | "unclassified_write" | "over_cap";
 
 /**
  * A write tool call held for human approval (D4-3). Status moves only forward,

@@ -148,6 +148,13 @@ export interface ToolRiskSpec {
   read?: string[];
   /** Tools that write, mapped to their category. */
   write?: Record<string, ToolWriteCategory>;
+  /**
+   * Write tools that enforce a merchant-set cap themselves (e.g. a goodwill
+   * coupon). Calls within the cap skip the money approval hold; above it the
+   * tool refuses with NEEDS_APPROVAL, core holds the call for a person and an
+   * approved retry carries `hay_approval_id`. Each must also be in `write`.
+   */
+  capped?: string[];
 }
 
 /**

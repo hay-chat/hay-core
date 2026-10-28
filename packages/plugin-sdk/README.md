@@ -547,6 +547,7 @@ text becomes JSON `{ code, retryable, message, details? }`.
 | `RATE_LIMITED`     | yes       | Throttled; retry later                                                       |
 | `PROVIDER_DOWN`    | yes       | The platform failed on a read; retry later                                   |
 | `OUTCOME_UNKNOWN`  | no        | A write failed in a way that may still have applied: check before retrying   |
+| `NEEDS_APPROVAL`   | no        | Above the merchant's cap: core holds it for a person (capped tools only)     |
 | `INTERNAL`         | no        | The plugin failed or is misconfigured (also the fallback for uncoded errors) |
 
 The module is dependency-free CommonJS so local MCP servers (CommonJS scripts) can

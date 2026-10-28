@@ -49,6 +49,26 @@
     "woocommerce_check_inventory": {
       "label": "Check Inventory",
       "description": "Check stock status and quantity for a product or variation SKU."
+    },
+    "woocommerce_get_product_by_slug": {
+      "label": "Get Product by Link",
+      "description": "Get a product from its storefront link or slug, with price, stock and variations."
+    },
+    "woocommerce_calculate_refund": {
+      "label": "Preview Refund",
+      "description": "Work out what a refund would return (per item, incl. tax) without refunding anything."
+    },
+    "woocommerce_update_customer": {
+      "label": "Update Customer",
+      "description": "Update a registered customer's name or phone on their saved profile."
+    },
+    "woocommerce_update_customer_address": {
+      "label": "Update Customer Address",
+      "description": "Change the billing or shipping address saved on a customer's account."
+    },
+    "woocommerce_create_coupon": {
+      "label": "Create Goodwill Coupon",
+      "description": "Create a single-use apology coupon for one customer's email, within the merchant's percentage or amount cap."
     }
   },
   "config": {
@@ -63,6 +83,30 @@
     "consumerSecret": {
       "label": "Consumer Secret",
       "description": "WooCommerce REST API Consumer Secret"
+    },
+    "couponsEnabled": {
+      "label": "Allow goodwill coupons",
+      "description": "Let the agent create single-use apology coupons, restricted to the customer's email, within the caps below. A coupon above the cap waits for a team member to approve it."
+    },
+    "couponMaxPercent": {
+      "label": "Coupon cap: maximum percentage",
+      "description": "Largest percentage discount the agent may give (0 turns percentage coupons off)."
+    },
+    "couponMaxAmount": {
+      "label": "Coupon cap: maximum fixed amount",
+      "description": "Largest fixed discount in your store currency (0 or empty turns fixed-amount coupons off)."
+    },
+    "couponMaxDays": {
+      "label": "Coupon validity (days)",
+      "description": "Coupons the agent creates expire after at most this many days."
+    },
+    "staleTrackingDomesticDays": {
+      "label": "Stale tracking: domestic (days)",
+      "description": "Treat a domestic shipment as stuck when its tracking has not moved for more than this many days."
+    },
+    "staleTrackingInternationalDays": {
+      "label": "Stale tracking: international (days)",
+      "description": "Treat an international shipment as stuck when its tracking has not moved for more than this many days."
     }
   }
 }
