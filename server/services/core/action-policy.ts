@@ -124,6 +124,33 @@ export function loosensActionApproval(
   return false;
 }
 
+/**
+ * The literal an API caller must send as `actionApproval.confirmSwitchOff` when
+ * the change switches approval off for a money move (D4-9 typed confirm). The
+ * dashboard sends it only after the person typed the confirm word in their
+ * language, so a plain API call cannot switch money approval off by accident.
+ */
+export const SWITCH_OFF_CONFIRMATION = "SWITCH OFF APPROVAL";
+
+/**
+ * Money categories that need approval now and would not after `change`, either
+ * because the master switch goes off or the category does. Matches the list
+ * the Settings > Actions typed confirm shows.
+ */
+export function moneyApprovalSwitchedOff(
+  current: ActionApprovalConfig,
+  change: Partial<ActionApprovalConfig>,
+): WriteCategory[] {
+  const after: ActionApprovalConfig = {
+    ...current,
+    ...change,
+    categories: { ...current.categories, ...(change.categories ?? {}) },
+  };
+  const held = (config: ActionApprovalConfig, category: WriteCategory) =>
+    config.moneyMovesNeedApproval && categoryNeedsApproval(config, category);
+  return [...MONEY_CATEGORIES].filter((c) => held(current, c) && !held(after, c));
+}
+
 /** A currency code the call states, if any (`currency` or `transactions[0].currency`). */
 export function extractCurrency(args: Record<string, unknown>): string | null {
   const first = Array.isArray(args.transactions)
