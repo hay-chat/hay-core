@@ -522,6 +522,77 @@ describe("pluginApi.messages.receive replyWindowExpiresAt (D13-2)", () => {
   });
 });
 
+describe("pluginApi.messages.receive human echoes (D13-8, D11-11)", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockCustomerRepo.findByExternalId.mockResolvedValue({
+      id: "cust-1",
+      name: "Ana",
+      phone: null,
+      external_metadata: {},
+    });
+    mockAgentRepo.findByOrganization.mockResolvedValue([{ id: "agent-1", channels: ["whatsapp"] }]);
+    mockConversationRepo.findByIdAndOrganization.mockResolvedValue(null);
+    mockConversationRepo.findByExternalConversationId.mockResolvedValue(null);
+    mockConversationRepo.findActiveByCustomerAndChannel.mockResolvedValue(makeConversation());
+    mockConversationRepo.getMessages.mockResolvedValue([]);
+    mockMessageRepo.findByProviderMessageIdAndOrganization.mockResolvedValue(null);
+    mockMessageRepo.create.mockImplementation(async (data) => ({ id: "msg-new", ...data }));
+  });
+
+  it("stores the owner's app reply as a human message and takes the conversation over", async () => {
+    const result = await caller()["messages.receive"]({
+      from: "+5511999999999",
+      content: "Sent it this morning!",
+      channel: "whatsapp",
+      senderType: "human_agent",
+      metadata: { mid: "wamid.ECHO.1", echo: true },
+    });
+
+    expect(result.processed).toBe(true);
+    expect(mockMessageRepo.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: "HumanAgent",
+        providerMessageId: "wamid.ECHO.1",
+        metadata: expect.objectContaining({ externalOrigin: true }),
+      }),
+    );
+    expect(mockConversationRepo.update).toHaveBeenLastCalledWith(
+      CONVERSATION_ID,
+      ORG_ID,
+      expect.objectContaining({ status: "human-took-over", needs_processing: false }),
+    );
+  });
+
+  it("skips an echo of a message Hay.chat sent itself", async () => {
+    mockMessageRepo.findByProviderMessageIdAndOrganization.mockResolvedValue({
+      id: "bot-msg",
+      conversation_id: CONVERSATION_ID,
+    });
+
+    const result = await caller()["messages.receive"]({
+      from: "instagram:123",
+      content: "AI reply",
+      channel: "instagram",
+      senderType: "human_agent",
+      metadata: { mid: "mid.OWN" },
+    });
+
+    expect(result).toEqual({
+      messageId: null,
+      conversationId: CONVERSATION_ID,
+      processed: false,
+      deduped: true,
+    });
+    expect(mockMessageRepo.findByProviderMessageIdAndOrganization).toHaveBeenCalledWith(
+      "mid.OWN",
+      ORG_ID,
+    );
+    expect(mockMessageRepo.create).not.toHaveBeenCalled();
+    expect(mockConversationRepo.update).not.toHaveBeenCalled();
+  });
+});
+
 describe("pluginApi.messages.updateStatus", () => {
   const storedMessage = (providerStatus: string | null = null) => ({
     id: "msg-1",

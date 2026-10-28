@@ -158,6 +158,24 @@ export const pluginApiTrpcRouter = router({
       const organizationId = ctx.pluginAuth.organizationId;
 
       try {
+        // An echo of a message Hay.chat itself sent (the provider id was stored
+        // at delivery) is not a human reply: never store it twice and never let
+        // it take the conversation away from the AI (D13-8, D11-11).
+        if (senderType === "human_agent" && typeof metadata?.mid === "string" && metadata.mid) {
+          const ownSend = await messageRepository.findByProviderMessageIdAndOrganization(
+            metadata.mid,
+            organizationId,
+          );
+          if (ownSend) {
+            return {
+              messageId: null,
+              conversationId: ownSend.conversation_id,
+              processed: false,
+              deduped: true,
+            };
+          }
+        }
+
         // Find or create customer
         let customer = await customerRepository.findByExternalId(from, organizationId);
 
