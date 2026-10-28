@@ -1,7 +1,7 @@
 import type { ChannelContext } from "./context.js";
 import type { WhatsAppConnection } from "./connection.js";
 import { customerExternalId } from "./identity.js";
-import { ingestMedia, type Attachment, type InboundMedia, type InboundMediaType } from "./media.js";
+import { describeMedia, ingestMedia, type Attachment, type InboundMedia, type InboundMediaType } from "./media.js";
 
 /**
  * Inbound WhatsApp webhook normaliser.
@@ -472,6 +472,11 @@ async function receiveMessage(
       if (type === "audio" && result.transcript) {
         content = result.transcript;
         extra.voiceNote = true;
+      } else if (!content.trim()) {
+        // Never an empty turn: the agent learns what arrived; the Inbox shows
+        // the media itself instead of this line.
+        content = describeMedia(type, media);
+        extra.mediaPlaceholder = true;
       }
     } else if (!content) {
       // Let the agent still acknowledge something arrived.

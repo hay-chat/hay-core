@@ -38,11 +38,41 @@ export interface MediaResult {
   failure?: string;
 }
 
+const MB = 1024 * 1024;
+
 /**
- * Hay storage rejects files above UPLOAD_MAX_SIZE_MB (default 10), so there is
- * no point downloading more than that — Meta allows documents up to 100 MB.
+ * Download cap per type: Meta's own limit (images 5 MB, audio and video
+ * 16 MB, stickers 500 KB), and for documents (Meta: 100 MB) Hay's
+ * conversation-media cap (CONVERSATION_MEDIA_MAX_SIZE_MB, default 25).
  */
-export const MAX_MEDIA_BYTES = 10 * 1024 * 1024;
+export const MAX_MEDIA_BYTES: Record<InboundMediaType, number> = {
+  image: 5 * MB,
+  sticker: MB,
+  audio: 16 * MB,
+  video: 16 * MB,
+  document: 25 * MB,
+};
+
+/**
+ * What the agent sees for media that arrived without a caption, e.g.
+ * `[Customer sent a photo]` or `[Customer sent a document: invoice.pdf]`.
+ */
+export function describeMedia(type: InboundMediaType, media: InboundMedia): string {
+  switch (type) {
+    case "image":
+      return "[Customer sent a photo]";
+    case "sticker":
+      return "[Customer sent a sticker]";
+    case "video":
+      return "[Customer sent a video]";
+    case "audio":
+      return media.voice ? "[Customer sent a voice message]" : "[Customer sent an audio file]";
+    case "document": {
+      const name = media.filename?.trim();
+      return name ? `[Customer sent a document: ${name.slice(0, 120)}]` : "[Customer sent a document]";
+    }
+  }
+}
 
 const EXTENSIONS: Record<string, string> = {
   "image/jpeg": "jpg",
@@ -92,7 +122,7 @@ export async function ingestMedia(input: {
 
   try {
     const info = await ctx.graph.getMedia(media.id, token);
-    const bytes = await ctx.graph.downloadMedia(info.url, token, MAX_MEDIA_BYTES);
+    const bytes = await ctx.graph.downloadMedia(info.url, token, MAX_MEDIA_BYTES[type]);
     const mimeType = bareMimeType(info.mime_type || media.mime_type || "application/octet-stream");
 
     const uploaded = await ctx.api.mutation<UploadResult>("media.upload", {
