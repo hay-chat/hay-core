@@ -2,7 +2,7 @@
   "name": "hay-plugin-shopify",
   "version": "1.0.0",
   "type": "module",
-  "description": "Connect your Shopify store — Hay.chat handles auth (managed OAuth or self-hosted), exposes Admin API tools via MCP, and syncs your catalog so the agent can recommend real products.",
+  "description": "Connect your Shopify store \u2014 Hay.chat handles auth (managed OAuth or self-hosted), exposes Admin API tools via MCP, and syncs your catalog so the agent can recommend real products.",
   "author": "Hay",
   "main": "dist/index.js",
   "hay-plugin": {
@@ -13,7 +13,8 @@
       "mcp",
       "auth",
       "cron",
-      "products"
+      "products",
+      "disputes"
     ],
     "env": [
       "SHOPIFY_OAUTH_CLIENT_ID",

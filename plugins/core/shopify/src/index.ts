@@ -27,7 +27,25 @@
  * @see https://shopify.dev/docs/apps/build/authentication-authorization
  */
 
-import { defineHayPlugin, type HayCronContext } from "@hay/plugin-sdk";
+import {
+  defineHayPlugin,
+  DISPUTE_EVIDENCE_FILE_PREFIX,
+  DISPUTE_EVIDENCE_ROUTE,
+  type CanonicalDispute,
+  type DisputeEvidenceRequest,
+  type HayCronContext,
+} from "@hay/plugin-sdk";
+import {
+  attachEvidence,
+  createShopifyClient,
+  disputeIdFromWebhook,
+  ensureWebhooks,
+  fetchDispute,
+  syncRecentDisputes,
+  toCanonical,
+  webhookUrl,
+  type ShopifyClient,
+} from "./disputes.js";
 import type {
   CanonicalProduct,
   CanonicalVariant,
@@ -452,317 +470,414 @@ function couponEnv(config: {
   return env;
 }
 
-export default defineHayPlugin((globalCtx) => ({
-  name: "Shopify",
+export default defineHayPlugin((globalCtx) => {
+  /** Set by onStart for this org's worker: the shop client and the dispute reporter. */
+  let disputes: {
+    client: ShopifyClient;
+    report: (dispute: CanonicalDispute) => Promise<{ created: boolean }>;
+  } | null = null;
 
-  onInitialize(ctx) {
-    globalCtx.logger.info("Initializing Shopify plugin");
+  return {
+    name: "Shopify",
 
-    ctx.register.config({
-      authMode: {
-        type: "string",
-        label: "Connection mode",
-        description:
-          "Managed: connect in one click via hay.chat's Shopify app. " +
-          "Self-hosted: use your own Shopify app's Client ID and secret.",
-        options: [
-          { label: "Managed (recommended)", value: "oauth" },
-          { label: "Self-hosted (own app)", value: "self_hosted" },
+    onInitialize(ctx) {
+      globalCtx.logger.info("Initializing Shopify plugin");
+
+      ctx.register.config({
+        authMode: {
+          type: "string",
+          label: "Connection mode",
+          description:
+            "Managed: connect in one click via hay.chat's Shopify app. " +
+            "Self-hosted: use your own Shopify app's Client ID and secret.",
+          options: [
+            { label: "Managed (recommended)", value: "oauth" },
+            { label: "Self-hosted (own app)", value: "self_hosted" },
+          ],
+          default: "oauth",
+          required: true,
+        },
+        shopDomain: {
+          type: "string",
+          label: "Store domain",
+          description: "Your myshopify.com domain, e.g. mystore.myshopify.com (without https://).",
+          placeholder: "mystore.myshopify.com",
+          required: true,
+        },
+        clientId: {
+          type: "string",
+          label: "Client ID",
+          description:
+            "Self-hosted mode only. Your Shopify app's Client ID. " +
+            "Managed mode resolves this from server configuration.",
+          required: false,
+          env: "SHOPIFY_OAUTH_CLIENT_ID",
+          showWhen: { field: "authMode", equals: "self_hosted" },
+        },
+        clientSecret: {
+          type: "string",
+          label: "Client secret",
+          description: "Self-hosted mode only. Your Shopify app's Client secret.",
+          required: false,
+          encrypted: true,
+          env: "SHOPIFY_OAUTH_CLIENT_SECRET",
+          showWhen: { field: "authMode", equals: "self_hosted" },
+        },
+        apiVersion: {
+          type: "string",
+          label: "Admin API version",
+          description: "Shopify Admin API version to use.",
+          default: "2026-04",
+        },
+        couponsEnabled: {
+          type: "boolean",
+          label: "Allow goodwill coupons",
+          description:
+            "Let the agent create single-use apology discount codes, only usable by that customer, " +
+            "within the caps below. A coupon above the cap waits for a team member to approve it.",
+          default: true,
+        },
+        couponMaxPercent: {
+          type: "number",
+          label: "Coupon cap: maximum percentage",
+          description:
+            "Largest percentage discount the agent may give (0 turns percentage coupons off).",
+          default: 10,
+        },
+        couponMaxAmount: {
+          type: "number",
+          label: "Coupon cap: maximum fixed amount",
+          description:
+            "Largest fixed discount in your shop currency (0 or empty turns fixed-amount coupons off).",
+          default: 0,
+        },
+        couponMaxDays: {
+          type: "number",
+          label: "Coupon validity (days)",
+          description: "Codes the agent creates expire after at most this many days.",
+          default: 30,
+        },
+        staleTrackingDomesticDays: {
+          type: "number",
+          label: "Stale tracking: domestic (days)",
+          description:
+            "Treat a domestic shipment as stuck when its tracking has not moved for more than " +
+            "this many days.",
+          default: 5,
+        },
+        staleTrackingInternationalDays: {
+          type: "number",
+          label: "Stale tracking: international (days)",
+          description:
+            "Treat an international shipment as stuck when its tracking has not moved for more " +
+            "than this many days.",
+          default: 10,
+        },
+        returnInstructions: {
+          type: "string",
+          label: "How to return",
+          description:
+            "Your return process, in your words: where to send items, any link or form, and " +
+            "deadlines. Hay.chat relays it as written when a customer asks how to return " +
+            "something. Leave empty and Hay.chat hands those questions to your team.",
+        },
+      });
+
+      // Managed: one-click OAuth. Hay Core substitutes {shop} from shopDomain and
+      // resolves client id/secret from the SHOPIFY_OAUTH_CLIENT_* server env vars.
+      ctx.register.auth.oauth2({
+        id: "shopify-oauth",
+        label: "Connect with Shopify",
+        authorizationUrl: "https://{shop}/admin/oauth/authorize",
+        tokenUrl: "https://{shop}/admin/oauth/access_token",
+        scopes: [
+          "read_orders",
+          "write_orders",
+          "read_customers",
+          "write_customers",
+          "read_products",
+          "read_inventory",
+          "read_fulfillments",
+          // Returns tools (mcp/tools/returns.js). Added after initial release: stores
+          // connected before this change must reconnect to grant the new scopes.
+          "read_returns",
+          "write_returns",
+          // Goodwill coupon (mcp/tools/coupons.js, D16-4). Stores connected before this
+          // change must reconnect to grant it; until then the tool fails with PERMISSION.
+          "write_discounts",
+          // Re-consent bundle (Wave 2): every scope below ships in ONE manifest change so
+          // merchants re-approve Hay.chat once. Until a store re-approves, the tools that
+          // need them fail with SCOPE_MISSING ("the store needs to re-approve Hay.chat").
+          // Size swap before dispatch (shopify_swap_order_item, D6-10).
+          "write_order_edits",
+          // Chargeback intake + evidence draft (D2-8, src/disputes.ts). Shopify Payments
+          // stores only. Protected scopes: the hay-shopify-app toml must request the same
+          // three and Shopify must approve them; ship with the D6 re-consent above.
+          "read_shopify_payments_disputes",
+          "read_shopify_payments_dispute_evidences",
+          "write_shopify_payments_dispute_evidences",
         ],
-        default: "oauth",
-        required: true,
-      },
-      shopDomain: {
-        type: "string",
-        label: "Store domain",
-        description: "Your myshopify.com domain, e.g. mystore.myshopify.com (without https://).",
-        placeholder: "mystore.myshopify.com",
-        required: true,
-      },
-      clientId: {
-        type: "string",
-        label: "Client ID",
-        description:
-          "Self-hosted mode only. Your Shopify app's Client ID. " +
-          "Managed mode resolves this from server configuration.",
-        required: false,
-        env: "SHOPIFY_OAUTH_CLIENT_ID",
-        showWhen: { field: "authMode", equals: "self_hosted" },
-      },
-      clientSecret: {
-        type: "string",
-        label: "Client secret",
-        description: "Self-hosted mode only. Your Shopify app's Client secret.",
-        required: false,
-        encrypted: true,
-        env: "SHOPIFY_OAUTH_CLIENT_SECRET",
-        showWhen: { field: "authMode", equals: "self_hosted" },
-      },
-      apiVersion: {
-        type: "string",
-        label: "Admin API version",
-        description: "Shopify Admin API version to use.",
-        default: "2026-04",
-      },
-      couponsEnabled: {
-        type: "boolean",
-        label: "Allow goodwill coupons",
-        description:
-          "Let the agent create single-use apology discount codes, only usable by that customer, " +
-          "within the caps below. A coupon above the cap waits for a team member to approve it.",
-        default: true,
-      },
-      couponMaxPercent: {
-        type: "number",
-        label: "Coupon cap: maximum percentage",
-        description:
-          "Largest percentage discount the agent may give (0 turns percentage coupons off).",
-        default: 10,
-      },
-      couponMaxAmount: {
-        type: "number",
-        label: "Coupon cap: maximum fixed amount",
-        description:
-          "Largest fixed discount in your shop currency (0 or empty turns fixed-amount coupons off).",
-        default: 0,
-      },
-      couponMaxDays: {
-        type: "number",
-        label: "Coupon validity (days)",
-        description: "Codes the agent creates expire after at most this many days.",
-        default: 30,
-      },
-      staleTrackingDomesticDays: {
-        type: "number",
-        label: "Stale tracking: domestic (days)",
-        description:
-          "Treat a domestic shipment as stuck when its tracking has not moved for more than " +
-          "this many days.",
-        default: 5,
-      },
-      staleTrackingInternationalDays: {
-        type: "number",
-        label: "Stale tracking: international (days)",
-        description:
-          "Treat an international shipment as stuck when its tracking has not moved for more " +
-          "than this many days.",
-        default: 10,
-      },
-      returnInstructions: {
-        type: "string",
-        label: "How to return",
-        description:
-          "Your return process, in your words: where to send items, any link or form, and " +
-          "deadlines. Hay.chat relays it as written when a customer asks how to return " +
-          "something. Leave empty and Hay.chat hands those questions to your team.",
-      },
-    });
+        clientId: ctx.config.field("clientId"),
+        clientSecret: ctx.config.field("clientSecret"),
+      });
 
-    // Managed: one-click OAuth. Hay Core substitutes {shop} from shopDomain and
-    // resolves client id/secret from the SHOPIFY_OAUTH_CLIENT_* server env vars.
-    ctx.register.auth.oauth2({
-      id: "shopify-oauth",
-      label: "Connect with Shopify",
-      authorizationUrl: "https://{shop}/admin/oauth/authorize",
-      tokenUrl: "https://{shop}/admin/oauth/access_token",
-      scopes: [
-        "read_orders",
-        "write_orders",
-        "read_customers",
-        "write_customers",
-        "read_products",
-        "read_inventory",
-        "read_fulfillments",
-        // Returns tools (mcp/tools/returns.js). Added after initial release: stores
-        // connected before this change must reconnect to grant the new scopes.
-        "read_returns",
-        "write_returns",
-        // Goodwill coupon (mcp/tools/coupons.js, D16-4). Stores connected before this
-        // change must reconnect to grant it; until then the tool fails with PERMISSION.
-        "write_discounts",
-        // Re-consent bundle (Wave 2): every scope below ships in ONE manifest change so
-        // merchants re-approve Hay.chat once. Until a store re-approves, the tools that
-        // need them fail with SCOPE_MISSING ("the store needs to re-approve Hay.chat").
-        // Size swap before dispatch (shopify_swap_order_item, D6-10).
-        "write_order_edits",
-        // Chargeback evidence (D2 disputes). Shopify Payments stores only.
-        "read_shopify_payments_disputes",
-        "write_shopify_payments_dispute_evidences",
-      ],
-      clientId: ctx.config.field("clientId"),
-      clientSecret: ctx.config.field("clientSecret"),
-    });
+      // Self-hosted: client-credentials path. Validating the secret runs the grant.
+      ctx.register.auth.apiKey({
+        id: "shopify-credentials",
+        label: "Self-hosted app credentials",
+        configField: "clientSecret",
+      });
 
-    // Self-hosted: client-credentials path. Validating the secret runs the grant.
-    ctx.register.auth.apiKey({
-      id: "shopify-credentials",
-      label: "Self-hosted app credentials",
-      configField: "clientSecret",
-    });
+      // HAY-221: refresh the 24h self-hosted token every 20h (no-op in managed mode).
+      ctx.register.cron({
+        name: "refresh_shopify_token",
+        schedule: "0 */20 * * *",
+        handler: refreshTokenHandler,
+        retryPolicy: { maxRetries: 3, backoff: "exponential" },
+      });
 
-    // HAY-221: refresh the 24h self-hosted token every 20h (no-op in managed mode).
-    ctx.register.cron({
-      name: "refresh_shopify_token",
-      schedule: "0 */20 * * *",
-      handler: refreshTokenHandler,
-      retryPolicy: { maxRetries: 3, backoff: "exponential" },
-    });
-
-    globalCtx.logger.info("Shopify plugin config, auth and cron registered");
-  },
-
-  async onValidateAuth(ctx) {
-    const mode = getAuthMode(ctx);
-    ctx.logger.info("Validating Shopify credentials", { authMode: mode });
-
-    const shopDomain = ctx.config.getOptional<string>("shopDomain");
-    if (!shopDomain) {
-      throw new Error("Store domain is required");
-    }
-
-    if (mode === "oauth") {
-      // Managed: the OAuth flow proves credentials. Here we only require the
-      // store domain so Hay can build the per-shop authorize URL.
-      return true;
-    }
-
-    // Self-hosted: actually run the grant to prove the Client ID/secret work.
-    const creds = readSelfHostedCredentials(ctx);
-    if (!creds) {
-      throw new Error("Self-hosted mode requires Store domain, Client ID and Client secret");
-    }
-    try {
-      await clientCredentialsGrant(creds.shopDomain, creds.clientId, creds.clientSecret);
-      ctx.logger.info("Shopify self-hosted credentials validated");
-      return true;
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      ctx.logger.error("Failed to validate Shopify credentials", { error: message });
-      throw new Error(`Could not authenticate with Shopify: ${message}`);
-    }
-  },
-
-  async onStart(ctx) {
-    const mode = getAuthMode(ctx);
-    ctx.logger.info("Starting Shopify plugin for org", { orgId: ctx.org.id, authMode: mode });
-
-    const shopRaw = ctx.config.getOptional<string>("shopDomain");
-    if (!shopRaw) {
-      ctx.logger.info("Shopify: no store domain configured yet — MCP not started.");
-      return;
-    }
-    const shop = normalizeShopDomain(shopRaw);
-    const apiVersion = ctx.config.getOptional<string>("apiVersion") || "2026-04";
-
-    let accessToken: string | undefined;
-
-    if (mode === "oauth") {
-      // Managed: the offline access token was minted by Core's OAuth exchange and
-      // stored in authState. Core merges the DECRYPTED credentials into config, so
-      // read the token via config — `ctx.auth.get()` returns the still-encrypted
-      // credentials in the worker, and its methodId is Core's "${pluginId}-oauth"
-      // convention rather than this plugin's registered method id.
-      accessToken = ctx.config.getOptional<string>("accessToken");
-      if (!accessToken) {
-        ctx.logger.info(
-          "Shopify managed mode: not connected yet (no access token). " +
-            "Click Connect in the plugin settings. MCP not started.",
-        );
-        return;
-      }
-    } else {
-      // Self-hosted: an OAuth connect stores a non-expiring offline token in
-      // authState (which Core merges into config) — and that connect clobbers
-      // the stored clientSecret, so prefer the token when it exists. Fall back
-      // to the client-credentials grant for secret-only setups.
-      accessToken = ctx.config.getOptional<string>("accessToken");
-      if (!accessToken) {
-        const creds = readSelfHostedCredentials(ctx);
-        if (!creds) {
-          ctx.logger.info(
-            "Shopify self-hosted: no access token and credentials missing — MCP not started.",
-          );
+      // Disputes (D2-8). A webhook body is a hint only: the dispute is re-read with
+      // the shop's own token before anything is reported.
+      ctx.register.route("POST", "/webhook", async (req, res) => {
+        const id = disputeIdFromWebhook(req.body);
+        if (!id || !disputes) {
+          res.status(200).json({ received: true, handled: false });
           return;
         }
         try {
-          const token = await clientCredentialsGrant(
-            creds.shopDomain,
-            creds.clientId,
-            creds.clientSecret,
-          );
-          accessToken = token.accessToken;
+          const dispute = await fetchDispute(disputes.client, id);
+          if (dispute) await disputes.report(toCanonical(disputes.client.shop, dispute));
+          res.status(200).json({ received: true, handled: Boolean(dispute) });
         } catch (error) {
-          ctx.logger.error("Failed to obtain Shopify access token on start", error);
-          return; // Stay installed but degraded; the cron will retry.
+          globalCtx.logger.error("Shopify dispute webhook failed", { error: String(error) });
+          // 5xx makes Shopify retry; reporting is idempotent.
+          res.status(500).json({ error: "dispute intake failed" });
         }
-      }
-    }
+      });
 
-    if (mode === "oauth") {
-      // Tell the App Store app + theme embed which Hay org this store belongs to.
-      // Idempotent and non-blocking: the MCP server must start even if this fails.
-      const serverUrl = process.env.HAY_API_URL || "";
-      void writeAppMetafields(shop, accessToken, apiVersion, {
-        mode: "managed",
-        organization_id: ctx.org.id,
-        server_url: serverUrl,
-      })
-        .then(() => ctx.logger.info("Shopify app metafields written", { serverUrl }))
-        .catch((err) => ctx.logger.error("Failed to write Shopify app metafields", err));
-    }
+      // Core-only (the public proxy blocks /disputes/*): attach the pack, never submit.
+      ctx.register.route("POST", DISPUTE_EVIDENCE_ROUTE, async (req, res) => {
+        if (!disputes) {
+          res
+            .status(200)
+            .json({ ok: false, code: "NOT_CONNECTED", message: "Shopify is not connected" });
+          return;
+        }
+        const result = await attachEvidence(
+          disputes.client,
+          req.body as DisputeEvidenceRequest,
+          DISPUTE_EVIDENCE_FILE_PREFIX,
+        );
+        res.status(200).json(result);
+      });
 
-    try {
-      await ctx.mcp.startLocalStdio({
-        id: "shopify-mcp",
-        command: "node",
-        args: ["index.js"],
-        cwd: "./mcp",
-        env: {
-          SHOPIFY_SHOP: shop,
-          SHOPIFY_ACCESS_TOKEN: accessToken,
-          SHOPIFY_API_VERSION: apiVersion,
-          ...staleTrackingEnv(ctx.config),
-          ...returnInstructionsEnv(ctx.config),
-          ...couponEnv(ctx.config),
+      // Catch disputes a missed or unregistered webhook did not deliver.
+      ctx.register.cron({
+        name: "sync_disputes",
+        schedule: "30 */6 * * *",
+        handler: async (cronCtx) => {
+          if (!disputes) return;
+          const count = await syncRecentDisputes(disputes.client, disputes.report);
+          cronCtx.logger.info("Shopify disputes synced", { count });
         },
       });
-      ctx.logger.info("Shopify MCP server started successfully");
+
+      globalCtx.logger.info("Shopify plugin config, auth, dispute routes and cron registered");
+    },
+
+    async onValidateAuth(ctx) {
+      const mode = getAuthMode(ctx);
+      ctx.logger.info("Validating Shopify credentials", { authMode: mode });
+
+      const shopDomain = ctx.config.getOptional<string>("shopDomain");
+      if (!shopDomain) {
+        throw new Error("Store domain is required");
+      }
+
+      if (mode === "oauth") {
+        // Managed: the OAuth flow proves credentials. Here we only require the
+        // store domain so Hay can build the per-shop authorize URL.
+        return true;
+      }
+
+      // Self-hosted: actually run the grant to prove the Client ID/secret work.
+      const creds = readSelfHostedCredentials(ctx);
+      if (!creds) {
+        throw new Error("Self-hosted mode requires Store domain, Client ID and Client secret");
+      }
+      try {
+        await clientCredentialsGrant(creds.shopDomain, creds.clientId, creds.clientSecret);
+        ctx.logger.info("Shopify self-hosted credentials validated");
+        return true;
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        ctx.logger.error("Failed to validate Shopify credentials", { error: message });
+        throw new Error(`Could not authenticate with Shopify: ${message}`);
+      }
+    },
+
+    async onStart(ctx) {
+      const mode = getAuthMode(ctx);
+      ctx.logger.info("Starting Shopify plugin for org", { orgId: ctx.org.id, authMode: mode });
+
+      const shopRaw = ctx.config.getOptional<string>("shopDomain");
+      if (!shopRaw) {
+        ctx.logger.info("Shopify: no store domain configured yet — MCP not started.");
+        return;
+      }
+      const shop = normalizeShopDomain(shopRaw);
+      const apiVersion = ctx.config.getOptional<string>("apiVersion") || "2026-04";
+
+      let accessToken: string | undefined;
+
+      if (mode === "oauth") {
+        // Managed: the offline access token was minted by Core's OAuth exchange and
+        // stored in authState. Core merges the DECRYPTED credentials into config, so
+        // read the token via config — `ctx.auth.get()` returns the still-encrypted
+        // credentials in the worker, and its methodId is Core's "${pluginId}-oauth"
+        // convention rather than this plugin's registered method id.
+        accessToken = ctx.config.getOptional<string>("accessToken");
+        if (!accessToken) {
+          ctx.logger.info(
+            "Shopify managed mode: not connected yet (no access token). " +
+              "Click Connect in the plugin settings. MCP not started.",
+          );
+          return;
+        }
+      } else {
+        // Self-hosted: an OAuth connect stores a non-expiring offline token in
+        // authState (which Core merges into config) — and that connect clobbers
+        // the stored clientSecret, so prefer the token when it exists. Fall back
+        // to the client-credentials grant for secret-only setups.
+        accessToken = ctx.config.getOptional<string>("accessToken");
+        if (!accessToken) {
+          const creds = readSelfHostedCredentials(ctx);
+          if (!creds) {
+            ctx.logger.info(
+              "Shopify self-hosted: no access token and credentials missing — MCP not started.",
+            );
+            return;
+          }
+          try {
+            const token = await clientCredentialsGrant(
+              creds.shopDomain,
+              creds.clientId,
+              creds.clientSecret,
+            );
+            accessToken = token.accessToken;
+          } catch (error) {
+            ctx.logger.error("Failed to obtain Shopify access token on start", error);
+            return; // Stay installed but degraded; the cron will retry.
+          }
+        }
+      }
+
+      if (mode === "oauth") {
+        // Tell the App Store app + theme embed which Hay org this store belongs to.
+        // Idempotent and non-blocking: the MCP server must start even if this fails.
+        const serverUrl = process.env.HAY_API_URL || "";
+        void writeAppMetafields(shop, accessToken, apiVersion, {
+          mode: "managed",
+          organization_id: ctx.org.id,
+          server_url: serverUrl,
+        })
+          .then(() => ctx.logger.info("Shopify app metafields written", { serverUrl }))
+          .catch((err) => ctx.logger.error("Failed to write Shopify app metafields", err));
+      }
+
+      try {
+        await ctx.mcp.startLocalStdio({
+          id: "shopify-mcp",
+          command: "node",
+          args: ["index.js"],
+          cwd: "./mcp",
+          env: {
+            SHOPIFY_SHOP: shop,
+            SHOPIFY_ACCESS_TOKEN: accessToken,
+            SHOPIFY_API_VERSION: apiVersion,
+            ...staleTrackingEnv(ctx.config),
+            ...returnInstructionsEnv(ctx.config),
+            ...couponEnv(ctx.config),
+          },
+        });
+        ctx.logger.info("Shopify MCP server started successfully");
+      } catch (error) {
+        ctx.logger.error("Failed to start Shopify MCP server", error);
+        throw error;
+      }
+
+      // Disputes capability (D2-8): webhook subscriptions + a sync of recent disputes.
+      if (ctx.disputes) {
+        const client = createShopifyClient(shop, accessToken, apiVersion);
+        const reporter = ctx.disputes;
+        disputes = { client, report: (dispute) => reporter.report(dispute) };
+        void startDisputeIntake(client, disputes.report, ctx.org.id, ctx.logger);
+      }
+
+      // Products capability: mirror the catalog into core for `recommend_products`.
+      // Injected only when the manifest declares `products` and core supplied the
+      // plugin-api credentials. Runs in the background so it never blocks startup;
+      // core's product-source coordinator re-invokes onStart on its schedule.
+      if (ctx.productSource) {
+        const productSource = ctx.productSource;
+        void bulkSync(shop, accessToken, apiVersion, productSource, {
+          info: (msg, c) => ctx.logger.info(msg, c),
+          error: (msg, c) => ctx.logger.error(msg, c as Record<string, unknown> | undefined),
+        }).catch((err) => ctx.logger.error("Shopify catalog sync failed", err));
+      } else {
+        ctx.logger.info(
+          "Shopify: productSource runtime not available — skipping catalog sync " +
+            "(capability not negotiated or plugin-api credentials missing).",
+        );
+      }
+    },
+
+    async onConfigUpdate(ctx) {
+      // The platform restarts the stdio MCP server with fresh env after this hook.
+      ctx.logger.info("Shopify plugin config updated");
+    },
+
+    async onDisable(ctx) {
+      // NB: the runner also invokes this on every worker shutdown/restart (e.g.
+      // right after an OAuth callback), so it must NOT clear the app metafields —
+      // the storefront widget stays valid regardless of the tools connection, and
+      // the merchant detaches it from the Shopify app's Disconnect button.
+      ctx.logger.info("Shopify plugin disabled for org", { orgId: ctx.org.id });
+    },
+  };
+});
+
+/**
+ * Subscribe the dispute topics (when the API is public) and sync recent disputes.
+ * Best effort: a store without Shopify Payments or without the dispute scopes just
+ * logs and moves on.
+ */
+async function startDisputeIntake(
+  client: ShopifyClient,
+  report: (dispute: CanonicalDispute) => Promise<unknown>,
+  orgId: string,
+  logger: { info: (m: string, c?: any) => void; warn: (m: string, c?: any) => void },
+): Promise<void> {
+  const url = webhookUrl(process.env.HAY_API_URL, process.env.HAY_PLUGIN_ID ?? "", orgId);
+  if (url) {
+    try {
+      const created = await ensureWebhooks(client, url);
+      logger.info("Shopify dispute webhooks ready", { created });
     } catch (error) {
-      ctx.logger.error("Failed to start Shopify MCP server", error);
-      throw error;
+      logger.warn("Could not subscribe Shopify dispute webhooks; relying on sync", {
+        error: String(error),
+      });
     }
-
-    // Products capability: mirror the catalog into core for `recommend_products`.
-    // Injected only when the manifest declares `products` and core supplied the
-    // plugin-api credentials. Runs in the background so it never blocks startup;
-    // core's product-source coordinator re-invokes onStart on its schedule.
-    if (ctx.productSource) {
-      const productSource = ctx.productSource;
-      void bulkSync(shop, accessToken, apiVersion, productSource, {
-        info: (msg, c) => ctx.logger.info(msg, c),
-        error: (msg, c) => ctx.logger.error(msg, c as Record<string, unknown> | undefined),
-      }).catch((err) => ctx.logger.error("Shopify catalog sync failed", err));
-    } else {
-      ctx.logger.info(
-        "Shopify: productSource runtime not available — skipping catalog sync " +
-          "(capability not negotiated or plugin-api credentials missing).",
-      );
-    }
-  },
-
-  async onConfigUpdate(ctx) {
-    // The platform restarts the stdio MCP server with fresh env after this hook.
-    ctx.logger.info("Shopify plugin config updated");
-  },
-
-  async onDisable(ctx) {
-    // NB: the runner also invokes this on every worker shutdown/restart (e.g.
-    // right after an OAuth callback), so it must NOT clear the app metafields —
-    // the storefront widget stays valid regardless of the tools connection, and
-    // the merchant detaches it from the Shopify app's Disconnect button.
-    ctx.logger.info("Shopify plugin disabled for org", { orgId: ctx.org.id });
-  },
-}));
+  } else {
+    logger.info("Shopify dispute webhooks skipped: the API URL is not public https");
+  }
+  try {
+    const count = await syncRecentDisputes(client, report);
+    logger.info("Shopify disputes synced", { count });
+  } catch (error) {
+    logger.warn("Shopify dispute sync failed", { error: String(error) });
+  }
+}
 
 /**
  * Cron handler (self-hosted only): mint a fresh 24h access token via the client
