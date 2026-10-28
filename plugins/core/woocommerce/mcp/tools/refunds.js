@@ -177,6 +177,13 @@ function registerRefundTools(server) {
       "person, who refunds in the gateway.",
     {
       ...REFUND_INPUT,
+      currency: z
+        .string()
+        .regex(/^[A-Za-z]{3}$/)
+        .describe(
+          'The order\'s currency code (ISO 4217, e.g. "USD"), as woocommerce_get_order shows it. The person ' +
+            "approving the refund sees the amount in it; a different currency is refused.",
+        ),
       reason: z.string().optional().describe("Why the refund is issued (stored on the refund)."),
       restock: z.boolean().optional().describe("Restock refunded items (default false)."),
       refund_payment: z
@@ -190,6 +197,14 @@ function registerRefundTools(server) {
     async (args) => {
       try {
         const order = await resolveOrder(args);
+        if (args.currency.toUpperCase() !== String(order.currency).toUpperCase()) {
+          throw toolError(
+            "BAD_INPUT",
+            `Order #${order.number} is in ${order.currency}, not ${args.currency}. ` +
+              `Pass currency "${order.currency}".`,
+            { details: { reason: "CURRENCY_MISMATCH", currency: order.currency } },
+          );
+        }
         const { amount, lines, remaining } = planRefund(order, args);
 
         const refundPayment = args.refund_payment ?? true;

@@ -120,9 +120,18 @@ describe("wix_create_refund", () => {
     registerRefundTools(server);
   });
 
+  it("refuses a currency that is not the order's, before refunding", async () => {
+    const { calls } = mockFetch(routes({ payments: [CARD] }));
+    const res = await server.call("wix_create_refund", { currency: "USD", order_id: "ord-1" });
+    expect(res.isError).toBe(true);
+    expect(res.text).toMatch(/is in EUR, not USD/);
+    expect(calls.some((c) => c.method === "POST")).toBe(false);
+  });
+
   it("issues a full refund against the right payment with the documented side effects", async () => {
     const { calls } = mockFetch(routes({ payments: [CARD] }));
     const res = await server.call("wix_create_refund", {
+      currency: "EUR",
       order_id: "ord-1",
       restock: true,
       notify_customer: true,
@@ -169,12 +178,17 @@ describe("wix_create_refund", () => {
         ],
       }),
     );
-    const tooMuch = await server.call("wix_create_refund", { order_id: "ord-1", amount: "25.00" });
+    const tooMuch = await server.call("wix_create_refund", {
+      currency: "EUR",
+      order_id: "ord-1",
+      amount: "25.00",
+    });
     expect(tooMuch.isError).toBe(true);
     expect(tooMuch.text).toMatch(/exceeds the remaining refundable balance of 20.00/);
     expect(calls.some((c) => c.path.endsWith("/refund-payments"))).toBe(false);
 
     const okRes = await server.call("wix_create_refund", {
+      currency: "EUR",
       order_id: "ord-1",
       amount: "20.00",
       restock: true,
@@ -199,12 +213,13 @@ describe("wix_create_refund", () => {
         ],
       }),
     );
-    expect((await server.call("wix_create_refund", { order_id: "ord-1" })).text).toMatch(
-      /nothing left to refund/,
-    );
+    expect(
+      (await server.call("wix_create_refund", { currency: "EUR", order_id: "ord-1" })).text,
+    ).toMatch(/nothing left to refund/);
     mockFetch(routes({ payments: [CARD] }));
     expect(
-      (await server.call("wix_create_refund", { order_id: "ord-1", amount: "-1" })).text,
+      (await server.call("wix_create_refund", { currency: "EUR", order_id: "ord-1", amount: "-1" }))
+        .text,
     ).toMatch(/Invalid refund amount/);
   });
 
@@ -223,7 +238,7 @@ describe("wix_create_refund", () => {
         },
       }),
     );
-    const res = await server.call("wix_create_refund", { order_id: "ord-1" });
+    const res = await server.call("wix_create_refund", { currency: "EUR", order_id: "ord-1" });
     expect(res.isError).toBe(false);
     expect(res.data.refunded).toBe(false);
     expect(res.data.reason).toBe("provider_not_api_refundable");
@@ -236,7 +251,11 @@ describe("wix_create_refund", () => {
   it("spans two payments and refuses when one of them is non-refundable", async () => {
     const second = { ...CARD, id: "pay-2", amount: { amount: "20.00" } };
     const { calls } = mockFetch(routes({ payments: [CARD, second] }));
-    const res = await server.call("wix_create_refund", { order_id: "ord-1", amount: "60.00" });
+    const res = await server.call("wix_create_refund", {
+      currency: "EUR",
+      order_id: "ord-1",
+      amount: "60.00",
+    });
     expect(res.data.payments).toEqual([
       { paymentId: "pay-1", amount: 50 },
       { paymentId: "pay-2", amount: 10 },
@@ -257,7 +276,11 @@ describe("wix_create_refund", () => {
         },
       }),
     );
-    const blocked = await server.call("wix_create_refund", { order_id: "ord-1", amount: "60.00" });
+    const blocked = await server.call("wix_create_refund", {
+      currency: "EUR",
+      order_id: "ord-1",
+      amount: "60.00",
+    });
     expect(blocked.data.refunded).toBe(false);
     expect(blocked.data.message).toMatch(/pay-2 \(PENDING_REFUND\) cannot be refunded/);
     expect(calls2.some((c) => c.path.endsWith("/refund-payments"))).toBe(false);
@@ -266,6 +289,7 @@ describe("wix_create_refund", () => {
   it("records an external refund without the refundability check", async () => {
     const { calls } = mockFetch(routes({ payments: [CARD] }));
     const res = await server.call("wix_create_refund", {
+      currency: "EUR",
       order_id: "ord-1",
       amount: "10.00",
       external_refund: true,
@@ -293,7 +317,7 @@ describe("wix_create_refund", () => {
         }),
       }),
     );
-    const res = await server.call("wix_create_refund", { order_id: "ord-1" });
+    const res = await server.call("wix_create_refund", { currency: "EUR", order_id: "ord-1" });
     expect(res.isError).toBe(true);
     expect(res.text).toMatch(/Provider declined \(DECLINED\)/);
   });

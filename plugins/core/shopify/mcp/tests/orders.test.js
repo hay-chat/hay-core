@@ -235,6 +235,32 @@ describe("shopify_cancel_order", () => {
   });
 });
 
+describe("shopify_create_refund currency (B4)", () => {
+  const refundable = {
+    order: {
+      id: ORDER_GID,
+      name: "#1001",
+      refundable: true,
+      netPaymentSet: { shopMoney: { amount: "50.00", currencyCode: "BRL" } },
+    },
+  };
+
+  it("refuses a currency that is not the order's, before refunding", async () => {
+    const { calls } = mockShopify({ CheckRefundable: () => refundable });
+    const res = await server.call("shopify_create_refund", {
+      order_id: "1001",
+      currency: "USD",
+      idempotency_key: "11111111-1111-4111-8111-111111111111",
+    });
+    expect(res.isError).toBe(true);
+    expect(res.data).toMatchObject({
+      code: "BAD_INPUT",
+      details: { reason: "CURRENCY_MISMATCH", currency: "BRL" },
+    });
+    expect(calls.map((c) => c.op)).toEqual(["CheckRefundable"]);
+  });
+});
+
 describe("shopify_add_order_note", () => {
   it("appends to the existing note instead of replacing it", async () => {
     const { calls } = mockShopify({

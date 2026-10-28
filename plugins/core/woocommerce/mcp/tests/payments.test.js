@@ -10,7 +10,8 @@ process.env.WOOCOMMERCE_CONSUMER_KEY = "ck";
 process.env.WOOCOMMERCE_CONSUMER_SECRET = "cs";
 
 const WC = "/wp-json/wc/v3";
-const PIX = "00020126580014br.gov.bcb.pix0136123e4567-e89b-12d3-a456-4266141740005204000053039865802BR";
+const PIX =
+  "00020126580014br.gov.bcb.pix0136123e4567-e89b-12d3-a456-4266141740005204000053039865802BR";
 
 function order(overrides = {}) {
   return {
