@@ -28,6 +28,9 @@ export interface OrganizationAccessState {
   agentPausedAt?: Date | string | null;
   agentPauseReason?: AgentPauseReason | null;
   accessNotice?: AccessNotice | null;
+  /** The team's "Pause AI everywhere" (D11-9), separate from the operator's pause. */
+  aiPausedAt?: Date | string | null;
+  aiPausedByUserId?: string | null;
 }
 
 export interface Organization extends OrganizationAccessState {
@@ -92,6 +95,12 @@ export const useUserStore = defineStore("user", {
     isSuspended: (state) => {
       const activeOrg = state.organizations.find((org) => org.id === state.activeOrganizationId);
       return !!activeOrg?.suspendedAt;
+    },
+
+    /** The team paused the AI everywhere in the active organization (D11-9). */
+    isAiPausedByTeam: (state): boolean => {
+      const activeOrg = state.organizations.find((org) => org.id === state.activeOrganizationId);
+      return !!activeOrg?.aiPausedAt;
     },
 
     /** The active organization's notice, or null once it has expired. */
@@ -338,6 +347,8 @@ export const useUserStore = defineStore("user", {
       organization.agentPausedAt = state.agentPausedAt ?? null;
       organization.agentPauseReason = state.agentPauseReason ?? null;
       organization.accessNotice = state.accessNotice ?? null;
+      organization.aiPausedAt = state.aiPausedAt ?? null;
+      organization.aiPausedByUserId = state.aiPausedByUserId ?? null;
     },
 
     /** Mark the active organization suspended after the API refused a call. */

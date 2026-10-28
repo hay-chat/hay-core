@@ -1,7 +1,10 @@
 import { t, authenticatedProcedure, scopedProcedure } from "@server/trpc";
 import { z } from "zod";
 import { organizationService } from "@server/services/organization.service";
-import { toAccessState } from "@server/services/organization-access.service";
+import {
+  organizationAccessService,
+  toAccessState,
+} from "@server/services/organization-access.service";
 import { TRPCError } from "@trpc/server";
 import { SupportedLanguage } from "@server/types/language.types";
 import {
@@ -37,6 +40,7 @@ import {
   DEFAULT_TIER_MAP,
 } from "@server/services/llm/model-catalog";
 import { UserOrganization } from "@server/entities/user-organization.entity";
+import { User } from "@server/entities/user.entity";
 import { RESOURCES, ACTIONS } from "@server/types/scopes";
 import { loosensActionApproval } from "@server/services/core/action-policy";
 import { auditLogService } from "@server/services/audit-log.service";
@@ -388,6 +392,47 @@ export const organizationsRouter = t.router({
       );
 
       return { success: true, region: input.region };
+    }),
+
+  // The owner's "Pause AI everywhere" (D11-9), plus whether the operator paused
+  // the AI too (usage_limit), so Home can say why the AI is quiet.
+  getAiPause: scopedProcedure(RESOURCES.ORGANIZATION_SETTINGS, ACTIONS.READ).query(
+    async ({ ctx }) => {
+      const organization = await organizationService.findOne(ctx.organizationId!);
+      if (!organization) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Organization not found" });
+      }
+      let pausedBy: { id: string; name: string } | null = null;
+      if (organization.aiPausedByUserId) {
+        const user = await AppDataSource.getRepository(User).findOne({
+          where: { id: organization.aiPausedByUserId },
+          select: { id: true, firstName: true, lastName: true, email: true },
+        });
+        if (user) {
+          const name = [user.firstName, user.lastName].filter(Boolean).join(" ");
+          pausedBy = { id: user.id, name: name || user.email };
+        }
+      }
+      return {
+        pausedAt: organization.aiPausedAt ?? null,
+        pausedBy,
+        operatorPaused: !!organization.agentPausedAt,
+      };
+    },
+  ),
+
+  setAiPause: scopedProcedure(RESOURCES.ORGANIZATION_SETTINGS, ACTIONS.UPDATE)
+    .input(z.object({ paused: z.boolean() }))
+    .mutation(async ({ ctx, input }) => {
+      const state = await organizationAccessService.setOwnerAiPause({
+        organizationId: ctx.organizationId!,
+        userId: ctx.user!.id,
+        paused: input.paused,
+      });
+      if (!state) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Organization not found" });
+      }
+      return { pausedAt: state.aiPausedAt };
     }),
 
   // AI label on AI replies (D14-6): widget badge + first-reply line on other channels.

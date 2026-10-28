@@ -50,6 +50,21 @@
       "denied": "Notifications are blocked for this site in your browser settings. Allow them, then reload the page.",
       "failed": "Couldn't turn on alerts",
       "blocked": "Alerts off"
+    },
+    "aiPause": {
+      "title": "Pause AI everywhere",
+      "description": "Stops every AI reply on every channel right away, including follow-ups and inactivity closes. Customers who write get one short message saying your team will reply, and their conversations wait here for you.",
+      "statusOn": "AI paused",
+      "statusOff": "AI is replying",
+      "pausedBy": "Paused by {name} on {when}.",
+      "pausedAt": "Paused on {when}.",
+      "perChannel": "Turn the AI off on one channel only (drafts only)",
+      "perAgent": "Switch off one agent",
+      "banner": "The AI is paused everywhere. Your team answers every conversation.",
+      "resume": "Resume AI",
+      "paused": "AI paused everywhere",
+      "resumed": "AI resumed",
+      "failed": "Couldn't change the AI pause. Try again."
     }
   }
 }

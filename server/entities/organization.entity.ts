@@ -65,6 +65,14 @@ export class Organization extends BaseEntity {
   @Column({ type: "jsonb", nullable: true })
   accessNotice?: AccessNotice | null;
 
+  // AI paused by the owner ("Pause AI everywhere", D11-9). Same effect as
+  // agentPausedAt, but owned by the team: the operator's sync never clears it.
+  @Column({ type: "timestamptz", nullable: true })
+  aiPausedAt?: Date | null;
+
+  @Column({ type: "uuid", nullable: true })
+  aiPausedByUserId?: string | null;
+
   @Column({ type: "varchar", length: 255, nullable: true })
   website?: string;
 
