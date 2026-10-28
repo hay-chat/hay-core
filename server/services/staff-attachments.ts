@@ -42,7 +42,7 @@ export async function storeStaffAttachment(params: {
       name,
       url: stored.url,
       type: stored.upload.mimeType,
-      size: stored.upload.size,
+      size: Number(stored.upload.size),
     };
   } catch (error) {
     throw new StaffAttachmentRejectedError(
@@ -84,7 +84,8 @@ export async function staffAttachmentsFromUploads(params: {
       name: upload.originalName,
       url: storageService.getUrl(upload),
       type: upload.mimeType,
-      size: upload.size,
+      // bigint column: the driver returns it as a string.
+      size: Number(upload.size),
     };
   });
 }

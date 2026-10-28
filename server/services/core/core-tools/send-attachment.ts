@@ -153,7 +153,7 @@ export const sendAttachmentTool: CoreToolDefinition = {
       name: stored.upload.originalName,
       url: stored.url,
       type: stored.upload.mimeType,
-      size: stored.upload.size,
+      size: Number(stored.upload.size),
     };
     await conversation.addMessage({
       content: caption,
