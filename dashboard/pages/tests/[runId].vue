@@ -134,6 +134,9 @@
               >
                 {{ $t("tests.report.improveKnowledge") }}
               </Button>
+              <Button variant="outline" size="sm" @click="openSaveAsTest(example.itemId)">
+                {{ $t("tests.save.button") }}
+              </Button>
               <Button
                 v-if="example.sourceConversationId"
                 variant="link"
@@ -155,6 +158,7 @@
       :conversation-id="suggestTarget.conversationId"
       @applied="handlePlaybookApplied"
     />
+    <SaveTestCaseDialog v-model:open="showSaveAsTest" :target="saveAsTestTarget" />
     <SuggestKnowledgeDialog
       v-if="suggestTarget"
       v-model:open="showKnowledgeSuggest"
@@ -193,7 +197,14 @@ const cancelling = ref(false);
 const suggestTarget = ref<{ playbookId: string | null; conversationId: string } | null>(null);
 const showPlaybookSuggest = ref(false);
 const showKnowledgeSuggest = ref(false);
+const showSaveAsTest = ref(false);
+const saveAsTestTarget = ref<{ kind: "runItem"; id: string } | null>(null);
 let timer: ReturnType<typeof setTimeout> | null = null;
+
+function openSaveAsTest(itemId: string) {
+  saveAsTestTarget.value = { kind: "runItem", id: itemId };
+  showSaveAsTest.value = true;
+}
 
 const agreementTotal = computed(() => {
   const value = report.value?.agreement;

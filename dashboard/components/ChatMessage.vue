@@ -352,6 +352,16 @@
               :message-id="message.id"
               @feedback-submitted="handleFeedbackSubmitted"
             />
+            <Button
+              v-if="showSaveAsTest"
+              variant="ghost"
+              size="sm"
+              class="text-xs"
+              data-testid="save-as-test"
+              @click="emit('saveAsTest', message.id)"
+            >
+              {{ $t("tests.save.button") }}
+            </Button>
           </div>
 
           <!-- Right side: timestamp + debug button -->
@@ -651,6 +661,8 @@ interface Props {
   inverted?: boolean;
   showFeedback?: boolean;
   showApproval?: boolean;
+  /** Offer "Save as test case" on sent AI replies (D7-12). */
+  showSaveAsTest?: boolean;
   /**
    * Whether to render this message's timestamp. The parent hides it for all but
    * the last of a run of consecutive same-author messages within the same minute.
@@ -665,6 +677,7 @@ interface Props {
 const props = withDefaults(defineProps<Props>(), {
   showFeedback: false,
   showApproval: false,
+  showSaveAsTest: false,
   showTimestamp: true,
   botAvatarUrl: null,
   humanAvatarUrl: null,
@@ -686,6 +699,7 @@ const emit = defineEmits<{
   messageApproved: [messageId: string];
   messageBlocked: [messageId: string];
   retry: [messageId: string];
+  saveAsTest: [messageId: string];
 }>();
 
 // Split plain agent/customer text into one bubble per image. Only regular text

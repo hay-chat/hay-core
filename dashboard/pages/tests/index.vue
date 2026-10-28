@@ -145,6 +145,45 @@
       </CardContent>
     </Card>
 
+    <Card>
+      <CardHeader>
+        <div class="flex flex-wrap items-start justify-between gap-2">
+          <div>
+            <CardTitle class="text-base">{{ $t("tests.cases.title") }}</CardTitle>
+            <CardDescription>{{ $t("tests.cases.description") }}</CardDescription>
+          </div>
+          <Button
+            v-if="testCases.length > 0"
+            variant="outline"
+            size="sm"
+            :loading="runningCases"
+            @click="runAllCases"
+          >
+            {{ $t("tests.cases.runAll") }}
+          </Button>
+        </div>
+      </CardHeader>
+      <CardContent>
+        <p v-if="testCases.length === 0" class="text-sm text-muted-foreground">
+          {{ $t("tests.cases.empty") }}
+        </p>
+        <ul v-else class="divide-y divide-border">
+          <li v-for="testCase in testCases" :key="testCase.id" class="flex items-center gap-4 py-3">
+            <div class="min-w-0 flex-1">
+              <p class="truncate font-medium">{{ testCase.title }}</p>
+              <p class="text-xs text-muted-foreground">
+                {{ $t(`tests.cases.sources.${testCase.source}`) }} ·
+                {{ formatDateTime(testCase.created_at) }}
+              </p>
+            </div>
+            <Button variant="ghost" size="sm" @click="deleteCase(testCase.id)">
+              {{ $t("tests.cases.delete") }}
+            </Button>
+          </li>
+        </ul>
+      </CardContent>
+    </Card>
+
     <TranscriptImportDialog v-model:open="showImport" @imported="loadTranscripts" />
   </Page>
 </template>
@@ -163,6 +202,7 @@ import type { RouterOutputs } from "@/types/trpc";
  */
 type Run = RouterOutputs["simulations"]["list"][number];
 type Transcript = RouterOutputs["testTranscripts"]["list"]["items"][number];
+type TestCase = RouterOutputs["testCases"]["list"][number];
 
 /** Run kinds this page lists: replays and test-case regressions. */
 const LISTED_KINDS = ["replay", "test_cases"];
@@ -186,6 +226,8 @@ const selectedTranscripts = ref<string[]>([]);
 const starting = ref(false);
 const showImport = ref(false);
 const draftName = ref("");
+const testCases = ref<TestCase[]>([]);
+const runningCases = ref(false);
 
 const draft = computed(() => {
   const { playbookId, versionId } = route.query;
@@ -226,6 +268,31 @@ async function startReplay() {
   }
 }
 
+async function runAllCases() {
+  runningCases.value = true;
+  try {
+    const run = await Hay.testCases.startRegression.mutate({
+      playbookVersionOverride: draft.value ?? undefined,
+      playbookId: draft.value?.playbookId,
+    });
+    if (run) router.push(`/tests/${run.id}`);
+  } catch (error) {
+    toast.error(error instanceof Error ? error.message : String(error));
+  } finally {
+    runningCases.value = false;
+  }
+}
+
+async function deleteCase(id: string) {
+  try {
+    await Hay.testCases.delete.mutate({ ids: [id] });
+    testCases.value = testCases.value.filter((c) => c.id !== id);
+    toast.success(t("tests.cases.deleted"));
+  } catch (error) {
+    toast.error(error instanceof Error ? error.message : String(error));
+  }
+}
+
 async function loadTranscripts() {
   const result = await Hay.testTranscripts.list.query({ limit: 100 });
   transcripts.value = result.items;
@@ -233,11 +300,13 @@ async function loadTranscripts() {
 
 async function load() {
   try {
-    const [allowanceResult, runList] = await Promise.all([
+    const [allowanceResult, runList, caseList] = await Promise.all([
       Hay.simulations.allowance.query(),
       Hay.simulations.list.query({ limit: 50 }),
+      Hay.testCases.list.query(),
       loadTranscripts(),
     ]);
+    testCases.value = caseList;
     allowance.value = allowanceResult;
     runs.value = runList.filter((run) => LISTED_KINDS.includes(run.kind));
     if (draft.value) {

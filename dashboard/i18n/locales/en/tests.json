@@ -105,6 +105,48 @@
         "wrong_or_risky": "Fix these first: wrong facts, risky promises, or a claim no action backs.",
         "knowledge_missing": "The AI lacked store information. Add it to your knowledge or playbook."
       }
+    },
+    "save": {
+      "button": "Save as test case",
+      "title": "Save as test case",
+      "description": "The conversation up to this shopper message is saved. Before you publish a playbook draft, its test cases run against it and you are warned about any that fail.",
+      "name": "Name (optional)",
+      "expectedOutcome": "What a good answer does (optional)",
+      "expectedOutcomePlaceholder": "Asks for the order number before promising anything",
+      "handoff": "Hand-off to your team",
+      "handoffEither": "Either is fine",
+      "handoffMust": "Must hand off",
+      "handoffMustNot": "Must not hand off",
+      "submit": "Save test case",
+      "saved": "Test case saved"
+    },
+    "cases": {
+      "title": "Test cases",
+      "description": "Saved from replays, edited or blocked replies and feedback. A playbook's test cases run before its draft is published.",
+      "empty": "No test cases yet. Save one from a test report or from an AI reply in a conversation.",
+      "runAll": "Run all test cases",
+      "delete": "Delete",
+      "deleted": "Test case deleted",
+      "sources": {
+        "replay": "From a replay",
+        "approval_edit": "Edited reply",
+        "approval_block": "Blocked reply",
+        "feedback": "Feedback",
+        "conversation": "Conversation",
+        "insight": "Insight"
+      }
+    },
+    "regression": {
+      "title": "Test cases",
+      "checking": "Checking for test cases…",
+      "none": "This playbook has no test cases yet. Save some from a test report or a conversation to check drafts before publishing.",
+      "running": "Running test cases against this draft: {done} of {total} done…",
+      "allPassed": "All {count} test cases passed with this draft.",
+      "failing": "{failing} of {total} test cases fail with this draft.",
+      "newFailures": "{count} passed before.",
+      "passedBefore": "passed before",
+      "warnOnly": "You can still publish. Check the report to see what changed.",
+      "openReport": "Open the test report"
     }
   }
 }

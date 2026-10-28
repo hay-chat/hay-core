@@ -344,6 +344,13 @@
         :playbook-id="playbookId"
         :version-id="draftVersion.id"
       />
+      <!-- D7-12: run the playbook's test cases against the draft; warns, never blocks -->
+      <PrePublishTests
+        v-if="showPublishDialog && playbookId && draftVersion"
+        class="mt-4"
+        :playbook-id="playbookId"
+        :version-id="draftVersion.id"
+      />
       <div class="mt-4">
         <Input
           v-model="publishNote"
