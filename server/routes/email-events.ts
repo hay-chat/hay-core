@@ -45,11 +45,9 @@ router.post("/v1/webhooks/email-events", async (req, res) => {
   }
 
   try {
+    // A bounce or complaint is about one recipient, not the email channel, so
+    // it never counts toward the channel-failing alert.
     const outcome = await applyEmailEvent(req.body as ResendEmailEvent);
-    if (outcome.handled && outcome.providerStatus === "failed") {
-      const { channelHealthService } = await import("@server/services/channel-health.service");
-      void channelHealthService.recordDeliveryFailure(outcome.organizationId, outcome.channel);
-    }
     res.json({ ok: true, handled: outcome.handled });
   } catch (error) {
     logger.error({ err: error }, "Email event handling failed");

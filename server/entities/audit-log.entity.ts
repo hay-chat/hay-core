@@ -63,6 +63,8 @@ export type AuditAction =
   | "retention.cleanup"
   | "billing.resolution.exclude"
   | "billing.resolution.exclusion_review_requested"
+  | "conversation.spam.marked"
+  | "conversation.spam.cleared"
   | "dispute_evidence.export";
 
 @Entity("audit_logs")

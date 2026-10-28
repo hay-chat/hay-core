@@ -67,6 +67,13 @@ describe("channelHealthService", () => {
     expect(sendTemplateEmail).not.toHaveBeenCalled();
   });
 
+  it("never counts recipient bounces or complaints as channel failures", async () => {
+    mockQueries(2);
+    await channelHealthService.recordDeliveryFailure("org-1", "email");
+    const [, params] = query.mock.calls.find(([sql]) => sql.includes("COUNT(*)"))!;
+    expect(params?.[3]).toEqual(expect.arrayContaining(["bounced", "complained"]));
+  });
+
   it("marks the channel failing and alerts every owner and admin by email and push", async () => {
     mockQueries(3);
     await channelHealthService.recordDeliveryFailure("org-1", "whatsapp");

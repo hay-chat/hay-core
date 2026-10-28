@@ -4,6 +4,8 @@
  * of those amounts. Only money-move holds count (not playbook or over-cap
  * holds, which the threshold does not affect), and only once there are
  * enough decisions to mean something. Never applied without the owner.
+ * Amounts are only compared within one currency: a category whose requests
+ * mix currencies (or mix stated and unstated ones) gets no nudge.
  */
 import type { PendingActionStatus } from "@server/database/entities/pending-action.entity";
 
@@ -18,6 +20,7 @@ export interface GraduationRow {
   category: string;
   status: PendingActionStatus;
   amount: number | null;
+  currency: string | null;
 }
 
 export interface GraduationSuggestion {
@@ -26,12 +29,14 @@ export interface GraduationSuggestion {
   total: number;
   /** The largest approved amount: the auto-approve amount to suggest. */
   amount: number;
+  /** Null when the calls state none (the store's own currency). */
+  currency: string | null;
 }
 
 /**
  * The suggestion to show, or null. Per category: every decided request was
  * approved (none declined, handed to the team or left to expire), each one
- * stated an amount, and the largest is above today's auto-approve amount.
+ * stated an amount in one currency, and the largest is above today's auto-approve amount.
  * When both categories qualify, the one with more approvals wins.
  */
 export function suggestGraduation(
@@ -43,10 +48,13 @@ export function suggestGraduation(
     const decided = rows.filter((row) => row.category === category && row.status !== "pending");
     if (decided.length < GRADUATION_MIN_DECISIONS) continue;
     if (decided.some((row) => !APPROVED.has(row.status) || row.amount === null)) continue;
+    const currencies = new Set(decided.map((row) => row.currency));
+    if (currencies.size !== 1) continue;
+    const [currency] = currencies;
     const amount = Math.max(...decided.map((row) => Number(row.amount)));
     if (!(amount > currentThreshold)) continue;
     if (!best || decided.length > best.approved) {
-      best = { category, approved: decided.length, total: decided.length, amount };
+      best = { category, approved: decided.length, total: decided.length, amount, currency };
     }
   }
   return best;

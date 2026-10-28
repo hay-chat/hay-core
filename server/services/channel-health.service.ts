@@ -29,8 +29,11 @@ export const FAILURE_THRESHOLD = 3;
 const FAILURE_WINDOW_MS = 60 * 60 * 1000;
 const ALERT_COOLDOWN_MS = 24 * 60 * 60 * 1000;
 
-/** Failures that say nothing about the channel itself. */
-const IGNORED_FAILURE_CODES = ["24h_window_expired", "empty_message"];
+/**
+ * Failures that say nothing about the channel itself: a closed reply window,
+ * an empty message, or one recipient's mailbox bouncing or reporting spam.
+ */
+const IGNORED_FAILURE_CODES = ["24h_window_expired", "empty_message", "bounced", "complained"];
 
 /** Reasons a successful delivery proves resolved. */
 const CLEARED_BY_DELIVERY: ChannelHealthReason[] = ["delivery_failures", "token_revoked"];

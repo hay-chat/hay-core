@@ -58,8 +58,19 @@ describe("turnstile gate", () => {
   it("flags a widget-side challenge failure instead of blocking the shopper", async () => {
     const fetchMock = siteverify({});
     await expect(
-      decide({ ...settings, mode: "challenge_all" }, { ...request, contributionError: "timeout" }, fetchMock),
+      decide(settings, { ...request, contributionError: "timeout" }, fetchMock),
     ).resolves.toEqual({ decision: "flag", reason: "challenge_error:timeout" });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("denies a missing token with a client-reported error when everyone must be challenged", async () => {
+    const fetchMock = siteverify({});
+    await expect(
+      decide({ ...settings, mode: "challenge_all" }, { ...request, contributionError: "timeout" }, fetchMock),
+    ).resolves.toEqual({ decision: "deny", reason: "token_missing" });
+    await expect(
+      decide(settings, { ...request, underAttack: true, contributionError: "timeout" }, fetchMock),
+    ).resolves.toEqual({ decision: "deny", reason: "token_missing" });
     expect(fetchMock).not.toHaveBeenCalled();
   });
 

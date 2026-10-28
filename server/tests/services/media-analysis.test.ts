@@ -67,6 +67,18 @@ jest.mock("@server/services/llm/llm-provider.factory", () => ({
   },
 }));
 
+const mockFindConversation = jest.fn<(...args: unknown[]) => Promise<unknown>>(async () => ({
+  id: "conv-1",
+  spam_flagged_at: null,
+  metadata: {},
+}));
+jest.mock("@server/database/data-source", () => ({
+  AppDataSource: {
+    getRepository: () => ({ findOne: (...args: unknown[]) => mockFindConversation(...args) }),
+    query: jest.fn(async () => []),
+  },
+}));
+
 import sharp from "sharp";
 import {
   markAnalysisPending,
@@ -236,6 +248,22 @@ describe("processMessageMedia", () => {
     expect(JSON.stringify(body.messages[1].content)).toContain("Pedido 4471");
   });
 
+  it("removes card numbers from PDF text before the model sees it", async () => {
+    mockFindMessage.mockResolvedValue(message(markAnalysisPending([pdf()])!));
+    mockPdfParse.mockResolvedValue({
+      text: "Comprovante\nCartão 4111 1111 1111 1111\nPedido 4471",
+    } as never);
+    mockChatCreate.mockResolvedValue(visionReply({ ...DAMAGE, class: "receipt" }) as never);
+
+    await processMessageMedia("msg-1", ORG);
+
+    const [body] = mockChatCreate.mock.calls[0] as [{ messages: Array<{ content: unknown }> }];
+    const sent = JSON.stringify(body.messages);
+    expect(sent).not.toContain("4111 1111 1111 1111");
+    expect(sent).toContain("[card number removed]");
+    expect(sent).toContain("Pedido 4471");
+  });
+
   it("skips scanned PDFs without calling the model", async () => {
     mockFindMessage.mockResolvedValue(message(markAnalysisPending([pdf()])!));
     mockPdfParse.mockResolvedValue({ text: "  " } as never);
@@ -253,6 +281,24 @@ describe("processMessageMedia", () => {
     await processMessageMedia("msg-1", ORG);
 
     expect(storedAttachments()[0].analysis).toEqual({ status: "skipped", reason: "disabled" });
+    expect(mockDownload).not.toHaveBeenCalled();
+    expect(mockChatCreate).not.toHaveBeenCalled();
+  });
+
+  it("does not spend a vision call on a spam-held or unverified conversation", async () => {
+    mockFindMessage.mockResolvedValue(message(markAnalysisPending([photo()])!));
+    mockFindConversation.mockResolvedValueOnce({ id: "conv-1", spam_flagged_at: new Date(), metadata: {} });
+    await processMessageMedia("msg-1", ORG);
+    expect(storedAttachments()[0].analysis).toEqual({ status: "skipped", reason: "spam" });
+
+    mockUpdateMessage.mockClear();
+    mockFindConversation.mockResolvedValueOnce({
+      id: "conv-1",
+      spam_flagged_at: null,
+      metadata: { botCheck: { decision: "flag" } },
+    });
+    await processMessageMedia("msg-1", ORG);
+    expect(storedAttachments()[0].analysis).toEqual({ status: "skipped", reason: "unverified" });
     expect(mockDownload).not.toHaveBeenCalled();
     expect(mockChatCreate).not.toHaveBeenCalled();
   });

@@ -18,7 +18,7 @@ import {
   type GraduationSuggestion,
 } from "@server/services/core/approval-graduation";
 import { Conversation } from "@server/database/entities/conversation.entity";
-import { amountEditable } from "@server/services/core/action-policy";
+import { amountEditable, extractCurrency } from "@server/services/core/action-policy";
 
 const logger = createLogger("pending-action");
 
@@ -112,15 +112,6 @@ export interface ApprovalItem extends PendingAction {
   currency: string | null;
 }
 
-/** A currency code the call states, if any (`currency` or `transactions[0].currency`). */
-function currencyOf(args: Record<string, unknown>): string | null {
-  const first = Array.isArray(args.transactions)
-    ? (args.transactions[0] as Record<string, unknown> | undefined)
-    : undefined;
-  const value = args.currency ?? first?.currency;
-  return typeof value === "string" && /^[A-Za-z]{3}$/.test(value) ? value.toUpperCase() : null;
-}
-
 export class PendingActionService {
   private get repo() {
     return AppDataSource.getRepository(PendingAction);
@@ -184,7 +175,7 @@ export class PendingActionService {
           conversation?.customer?.phone ??
           null,
         amountEditable: amountEditable(action.args),
-        currency: currencyOf(action.args),
+        currency: extractCurrency(action.args),
       });
     });
   }
@@ -201,9 +192,12 @@ export class PendingActionService {
         hold_reason: "money_move",
         created_at: MoreThan(new Date(Date.now() - GRADUATION_WINDOW_DAYS * 86_400_000)),
       },
-      select: { category: true, status: true, amount: true },
+      select: { category: true, status: true, amount: true, args: true },
     });
-    return suggestGraduation(rows, currentThreshold);
+    return suggestGraduation(
+      rows.map((row) => ({ ...row, currency: extractCurrency(row.args) })),
+      currentThreshold,
+    );
   }
 
   async listForConversation(organizationId: string, conversationId: string) {

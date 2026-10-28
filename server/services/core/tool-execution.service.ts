@@ -318,6 +318,12 @@ export class ToolExecutionService {
    * (or was already turned down), without touching the provider.
    */
   private async gate(call: PreparedCall, config: ActionApprovalConfig): Promise<CallStep | null> {
+    // The same request is already with the team: answer from it, even if the
+    // policy would now let it run (e.g. the threshold was raised), or the
+    // pending one could still be approved and run a second time.
+    const earlier = await this.answerFromEarlierRequest(call);
+    if (earlier) return earlier;
+
     const { conversation, toolCall, target } = call;
     const playbookCategories = await this.playbookApprovalCategories(conversation);
     const decision = decideGate(target.risk, toolCall.args, config, playbookCategories);
@@ -348,13 +354,8 @@ export class ToolExecutionService {
     expiryHours: number,
   ): Promise<CallStep> {
     const { conversation, toolCall, target } = call;
-    const earlier = await pendingActionService.findEarlierRequest(
-      conversation.id,
-      toolCall.name,
-      toolCall.args,
-    );
-    if (earlier?.status === "rejected") return this.declined(call, earlier);
-    if (earlier?.status === "pending") return this.held(call, earlier);
+    const earlier = await this.answerFromEarlierRequest(call);
+    if (earlier) return earlier;
 
     const action = await pendingActionService.hold({
       organizationId: conversation.organization_id,
@@ -375,6 +376,18 @@ export class ToolExecutionService {
     });
     conversation.status = "awaiting-approval";
     return this.held(call, action);
+  }
+
+  /** Held or declined when this exact call is already pending or was turned down; else null. */
+  private async answerFromEarlierRequest(call: PreparedCall): Promise<CallStep | null> {
+    const earlier = await pendingActionService.findEarlierRequest(
+      call.conversation.id,
+      call.toolCall.name,
+      call.toolCall.args,
+    );
+    if (earlier?.status === "rejected") return this.declined(call, earlier);
+    if (earlier?.status === "pending") return this.held(call, earlier);
+    return null;
   }
 
   /**

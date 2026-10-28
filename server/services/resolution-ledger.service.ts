@@ -103,6 +103,14 @@ function monthsBetween(a: UsagePeriod, b: UsagePeriod): number {
   );
 }
 
+/** Start of the oldest period whose closes may still be corrected (excluded, marked spam). */
+function correctableSince(now: Date): Date {
+  const current = periodFor(undefined, now).start;
+  return new Date(
+    Date.UTC(current.getUTCFullYear(), current.getUTCMonth() - EXCLUDABLE_PAST_PERIODS, 1),
+  );
+}
+
 /** Instant exclusions allowed: 5 % of the period, at least one once something bills. */
 export function exclusionAllowance(billableInPeriod: number): number {
   if (billableInPeriod <= 0) return 0;
@@ -385,6 +393,105 @@ export class ResolutionLedgerService {
       );
 
       return { status, used: counts.excluded + (instant ? 1 : 0), allowance };
+    });
+  }
+
+  /**
+   * Staff marked a conversation as spam: its closes stop billing. Only closes
+   * from periods that can still be excluded are rewritten; older periods have
+   * been billed. A pending close is settled here too, so the classifier never
+   * bills it afterwards. Audited in the same transaction.
+   */
+  async markConversationSpam(input: {
+    organizationId: string;
+    conversationId: string;
+    userId: string;
+    now?: Date;
+  }): Promise<number> {
+    const now = input.now ?? new Date();
+    return AppDataSource.transaction(async (manager) => {
+      const [rows]: [Array<{ id: string; outcome: string; billable: boolean }>, number] =
+        await manager.query(
+          `UPDATE conversation_outcomes o
+           SET outcome = 'spam',
+               billable = false,
+               ai_resolved = false,
+               classified_by = 'staff',
+               classified_at = COALESCE(o.classified_at, $4),
+               claimed_until = NULL,
+               updated_at = now()
+           FROM conversation_outcomes before
+           WHERE before.id = o.id
+             AND o.organization_id = $1
+             AND o.conversation_id = $2
+             AND o.outcome NOT IN ('spam', 'test')
+             AND o.closed_at >= $3
+           RETURNING o.id, before.outcome, before.billable`,
+          [input.organizationId, input.conversationId, correctableSince(now), now],
+        );
+      await manager.getRepository(AuditLog).save(
+        AuditLog.createLog({
+          userId: input.userId,
+          organizationId: input.organizationId,
+          action: "conversation.spam.marked",
+          resource: "conversation",
+          changes: {
+            outcomes: rows.map((row) => ({
+              outcomeId: row.id,
+              outcome: { from: row.outcome, to: "spam" },
+              billable: { from: row.billable, to: false },
+            })),
+          },
+          metadata: { conversationId: input.conversationId },
+          status: "success",
+        }),
+      );
+      return rows.length;
+    });
+  }
+
+  /**
+   * Staff said "Not spam": closes that were spam only because of the flag
+   * (the rule, or a staff mark) go back to the close classifier, which
+   * decides their outcome afresh. Spam the LLM itself found stays. Same
+   * period limit as marking. Audited in the same transaction.
+   */
+  async clearConversationSpam(input: {
+    organizationId: string;
+    conversationId: string;
+    userId: string;
+    now?: Date;
+  }): Promise<number> {
+    const now = input.now ?? new Date();
+    return AppDataSource.transaction(async (manager) => {
+      const [rows]: [Array<{ id: string }>, number] = await manager.query(
+        `UPDATE conversation_outcomes
+         SET classified_at = NULL,
+             classified_by = 'rule',
+             attempts = 0,
+             claimed_until = NULL,
+             last_error = NULL,
+             updated_at = now()
+         WHERE organization_id = $1
+           AND conversation_id = $2
+           AND outcome = 'spam'
+           AND classified_by IN ('rule', 'staff')
+           AND closed_at >= $3
+         RETURNING id`,
+        [input.organizationId, input.conversationId, correctableSince(now)],
+      );
+      await manager.getRepository(AuditLog).save(
+        AuditLog.createLog({
+          userId: input.userId,
+          organizationId: input.organizationId,
+          action: "conversation.spam.cleared",
+          resource: "conversation",
+          changes: { reclassifyOutcomes: rows.map((row) => row.id) },
+          metadata: { conversationId: input.conversationId },
+          status: "success",
+        }),
+      );
+      return rows.length;
     });
   }
 

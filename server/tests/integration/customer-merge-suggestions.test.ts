@@ -5,6 +5,7 @@ import { Organization } from "../../entities/organization.entity";
 import { Customer } from "../../database/entities/customer.entity";
 import { Conversation } from "../../database/entities/conversation.entity";
 import { CustomerRepository } from "../../repositories/customer.repository";
+import { ConversationRepository } from "../../repositories/conversation.repository";
 
 /**
  * D13-13 against the real database: suggested merges (shared email or phone,
@@ -96,6 +97,56 @@ describe("customer merge suggestions", () => {
     expect((await repository.findByExternalId("+5511999990000", orgId))?.id).toBe(target.id);
     expect((await repository.findByExternalId("instagram:1", orgId))?.id).toBe(target.id);
     expect(await repository.findByExternalId("+5500000000000", orgId)).toBeNull();
+  });
+
+  it("after a merge, each identity on a channel keeps its own active conversation", async () => {
+    const target = await customer({ external_id: "+5511111111111" });
+    const source = await customer({ external_id: "+5522222222222" });
+    const open = (customerId: string) =>
+      AppDataSource.getRepository(Conversation).save(
+        AppDataSource.getRepository(Conversation).create({
+          organization_id: orgId,
+          customer_id: customerId,
+          channel: "whatsapp",
+          status: "open",
+          title: "",
+          metadata: {},
+        }),
+      );
+    const targetConversation = await open(target.id);
+    await repository.mergeCustomers(source.id, target.id, orgId);
+    const merged = await customers().findOneByOrFail({ id: target.id });
+    const conversations = new ConversationRepository();
+
+    // The alias's inbound must not land in (and reply to) the target's thread.
+    expect(
+      await conversations.findActiveByCustomerAndChannel(merged, "+5522222222222", "whatsapp", orgId),
+    ).toBeNull();
+    expect(
+      (
+        await conversations.findActiveByCustomerAndChannel(
+          merged,
+          "+5511111111111",
+          "whatsapp",
+          orgId,
+        )
+      )?.id,
+    ).toBe(targetConversation.id);
+
+    const aliasConversation = await open(target.id);
+    await AppDataSource.getRepository(Conversation).update(aliasConversation.id, {
+      metadata: { customerExternalId: "+5522222222222" },
+    });
+    expect(
+      (
+        await conversations.findActiveByCustomerAndChannel(
+          merged,
+          "+5522222222222",
+          "whatsapp",
+          orgId,
+        )
+      )?.id,
+    ).toBe(aliasConversation.id);
   });
 
   it("refuses to merge a customer into itself or across organizations", async () => {

@@ -95,6 +95,26 @@ describe("Conversation.addMessage for an AI reply", () => {
     });
   });
 
+  it("holds product cards with the reply on a drafts-only web channel and in test mode", async () => {
+    const cards = {
+      content: "Recommending 2 products",
+      type: MessageType.PRODUCT_RECOMMENDATION,
+      metadata: { productRecommendation: { products: [{ id: "p1" }, { id: "p2" }] } },
+    };
+    mockFindOrg.mockResolvedValue({ id: ORG_ID, settings: { channelAiModes: { web: "drafts" } } });
+    await makeConversation("web").addMessage(cards);
+    expect(created()).toMatchObject({
+      status: "pending",
+      reviewRequired: true,
+      deliveryState: "queued",
+    });
+
+    mockCreateMessage.mockClear();
+    mockFindOrg.mockResolvedValue({ id: ORG_ID, settings: { testModeDefault: true } });
+    await makeConversation("web").addMessage(cards);
+    expect(created()).toMatchObject({ reviewRequired: true, deliveryState: "queued" });
+  });
+
   it("sends straight away on other channels", async () => {
     mockFindOrg.mockResolvedValue({
       id: ORG_ID,

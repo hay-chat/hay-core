@@ -15,6 +15,7 @@
 
 import pdfParse from "pdf-parse";
 import { AppDataSource } from "@server/database/data-source";
+import { Conversation } from "@server/database/entities/conversation.entity";
 import type { ScanStatus } from "@server/entities/upload.entity";
 import type {
   AttachmentAnalysis,
@@ -30,6 +31,7 @@ import { isUuid } from "@server/services/media-url.service";
 import { isScanCleared, pendingScans, waitForScans } from "@server/services/media-scan.service";
 import { isAnalyzable, PDF_TYPE, READABLE_IMAGE_TYPES as IMAGE_TYPES } from "./readable";
 import { toStoredAnalysis, type PrivacySettings } from "./privacy";
+import { redactCardNumbers } from "./redact";
 import { VisionUnavailableError, visionService, type VisionInput } from "./vision.service";
 
 const logger = createLogger("media-analysis");
@@ -118,7 +120,8 @@ export async function loadFileForVision(
 
   if (upload.mimeType === PDF_TYPE) {
     const parsed = await pdfParse(buffer);
-    const text = (parsed.text ?? "").replace(/\s+\n/g, "\n").trim();
+    // Card numbers are removed before the text reaches the vision model (D8-12).
+    const text = redactCardNumbers((parsed.text ?? "").replace(/\s+\n/g, "\n").trim());
     if (text.length < MIN_PDF_TEXT) {
       // TODO: scanned PDFs (no text layer) need page rendering before vision.
       return { skipped: { status: "skipped", reason: "no_text" } };
@@ -199,10 +202,17 @@ export async function processMessageMedia(
   if (pendingAnalysis.length) {
     const organization = await organizationRepository.findById(organizationId);
     const settings = resolveMediaSettings(organization?.settings);
+    const notWorthReading = settings.readImages
+      ? await visionSkipReason(message!.conversation_id)
+      : null;
     await Promise.all(
       pendingAnalysis.map(async (attachment) => {
         if (!settings.readImages) {
           results.set(attachment.id, { status: "skipped", reason: "disabled" });
+          return;
+        }
+        if (notWorthReading) {
+          results.set(attachment.id, { status: "skipped", reason: notWorthReading });
           return;
         }
         try {
@@ -227,6 +237,21 @@ export async function processMessageMedia(
   }
 
   await saveMediaResults(message!, organizationId, results, scans);
+}
+
+/**
+ * Files in a conversation held as spam, or whose bot check did not verify the
+ * visitor, are not worth a vision call: the AI does not answer spam, and a
+ * bot flooding photos would otherwise run up the org's vision cost.
+ */
+async function visionSkipReason(conversationId: string): Promise<"spam" | "unverified" | null> {
+  const conversation = await AppDataSource.getRepository(Conversation).findOne({
+    where: { id: conversationId },
+    select: { id: true, spam_flagged_at: true, metadata: true },
+  });
+  if (conversation?.spam_flagged_at) return "spam";
+  const botCheck = conversation?.metadata?.botCheck as { decision?: unknown } | undefined;
+  return botCheck?.decision === "flag" ? "unverified" : null;
 }
 
 /** Merge the results into the message's current attachments (re-read) and store them. */
