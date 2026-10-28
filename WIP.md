@@ -1,3 +1,10 @@
+## 2026-10-28 — claude/w3-golive-b (L7b)
+- Done: D7-9 replay runner, D7-10 judge + buckets, D7-11 /tests report (no %), D7-12 test cases + pre-publish warn, D7-13 agent readiness card, D7-14 channel AI "Off" + "Start on Web Chat only" + shared-channel responder rule, D3-17 Insight save-as-test + replay draft (staging merged in, e9e17c8).
+- Migrations (hay_test only): AddSimulationItemExpectations1785850000000, AddSimulationItemVerdicts1785851000000, AddTestCases1785852000000. Not pushed.
+- API change: organizations.get/updateAiDisclosure use channelAiModes map (draftsChannels removed).
+- Gaps: simulation run items not covered by retention; webchat greeting still shows on an "Off" web channel.
+- Next: orchestrator review/merge to staging, run the 3 migrations on hay_staging, hand-test.
+
 ## 2026-10-28 08:20 — staging — W3 L12b insights merged, hand-tested
 - Merged claude/w3-insights-b (8e1e14a); migration AddInsightClusters1785840000000 on hay_staging. Fix c3472cb: EmptyState no longer renders an empty button.
 - Hand test: backfill (0 new, correct), min size 5→2 saved, clustering promoted+named 3 positive patterns, detail/evidence/filters, reject+reason in History, reopen; docs audit ran (0 findings); digest once per week. Staging min cluster size left at 2.
