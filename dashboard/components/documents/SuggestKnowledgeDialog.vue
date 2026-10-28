@@ -208,9 +208,10 @@ const applying = ref(false);
 const staleWarning = ref(false);
 const editingText = ref(false);
 
-// The AI marks facts it does not know as "[to confirm: …]" ("[a confirmar: …]");
-// they must be filled in before anything reaches the knowledge base.
-const PLACEHOLDER_REGEX = /\[(to confirm|a confirmar)\b/i;
+// The AI marks facts it does not know as "[to confirm: …]" ("[a confirmar: …]"),
+// and sometimes writes other fill-ins like "[open/closed]". Any bracketed text
+// that is not a markdown link must be filled in before it reaches the knowledge base.
+const PLACEHOLDER_REGEX = /\[[^\]\n]{1,80}\](?!\()/;
 const hasPlaceholder = computed(() => PLACEHOLDER_REGEX.test(result.value?.revisedMarkdown ?? ""));
 
 watch(

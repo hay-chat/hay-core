@@ -371,6 +371,6 @@
     "textLabel": "Text to save",
     "editText": "Edit text",
     "showChanges": "Show changes",
-    "placeholderWarning": "Fill in every \"[to confirm: …]\" with the right information (Edit text) before saving."
+    "placeholderWarning": "Fill in every bracketed placeholder, such as \"[to confirm: …]\", with the right information (Edit text) before saving."
   }
 }

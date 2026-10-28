@@ -60,7 +60,7 @@ Retorne um objeto JSON com:
 5. **revisedContent**: markdown.
    - Para `edit`: o documento revisado COMPLETO. Reproduza cada linha inalterada caractere por caractere, não inclua os marcadores `<<<BEGIN_DOCUMENT>>>`/`<<<END_DOCUMENT>>>` nem nenhum título deste prompt. Mantenha os links exatamente como estão.
    - Para `add`: apenas a resposta (o título é a pergunta). Curta, objetiva, no tom da loja.
-   - Nunca invente fatos: preços, prazos, políticas, links ou contatos que não estejam na conversa, nos documentos ou no feedback. Quando a resposta não for conhecida, escreva `[a confirmar: …]` onde a loja deve completar.
+   - Nunca invente fatos: preços, prazos, políticas, links ou contatos que não estejam na conversa, nos documentos ou no feedback. Quando a resposta não for conhecida, escreva `[a confirmar: …]` onde a loja deve completar. Nunca use outros campos entre colchetes, como `[aberta/fechada]`: a IA lê este texto como está, então explique como chegar à resposta.
    - Use apenas títulos, listas com marcadores, links e parágrafos. Retorne markdown puro, sem bloco de código.
    - Escreva no mesmo idioma dos documentos (ou, para uma nova pergunta e resposta, no idioma da conversa).
 6. **changes**: uma entrada por mudança distinta: `section`, `changeType` (`added` | `modified` | `removed`), `rationale` (uma frase).
