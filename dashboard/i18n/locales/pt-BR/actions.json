@@ -60,6 +60,36 @@
       "orgRequired": "Já precisa de aprovação em Configurações > Ações",
       "saved": "Configurações de aprovação salvas",
       "saveFailed": "Não foi possível salvar as configurações de aprovação"
+    },
+    "approvals": {
+      "title": "Aguardando sua aprovação",
+      "description": "Ações que a IA pediu para executar. Nada acontece até alguém decidir.",
+      "select": "Selecionar {name}",
+      "selectHint": "Selecione pedidos do mesmo tipo para aprovar juntos.",
+      "selected": "{count} selecionados",
+      "total": "Total {amount}",
+      "noAmountCount": "{count} sem valor",
+      "approveSelected": "Aprovar {count}",
+      "approve": "Aprovar",
+      "approveAmount": "Aprovar {amount}",
+      "editAmount": "Diminuir valor",
+      "amountLabel": "Valor (no máximo {max})",
+      "amountHelp": "Você só pode diminuir, nunca aumentar.",
+      "reject": "Recusar",
+      "rejectReason": "Motivo (a IA usa para explicar ao cliente)",
+      "confirmReject": "Recusar pedido",
+      "open": "Abrir conversa",
+      "noAmount": "Sem valor informado",
+      "untitled": "Conversa",
+      "approvedDone": "Aprovado e executado.",
+      "approvedFailed": "Aprovado, mas falhou ao executar. A IA vai avisar o cliente que não foi feito.",
+      "rejected": "Recusado. A IA vai avisar o cliente.",
+      "failed": "Não foi possível salvar a decisão",
+      "conversationClosed": "Esta conversa está encerrada, então nada foi executado. Reabra para aprovar, ou recuse.",
+      "invalidAmount": "O valor só pode ser diminuído e precisa ser maior que zero.",
+      "bulkDone": "{count} aprovados",
+      "bulkPartial": "{done} aprovados, {notDone} não executados. Confira nas conversas.",
+      "loadFailed": "Não foi possível carregar as aprovações"
     }
   }
 }
