@@ -95,8 +95,10 @@ const COPY: Record<
 
 /**
  * Weekly Insights digest to owners and admins (Roger: weekly digest only, no
- * real-time alerts). One email per org per week, claimed in insight_org_state
- * before sending so a restart never sends it twice.
+ * real-time alerts). One email per org per week. The org's insight_org_state
+ * row is locked while sending, so two runners never both send, and the week
+ * is marked sent only once at least one email went out (F7): when every send
+ * fails, the next run tries again.
  */
 export class InsightDigestService {
   /** Orgs with a promoted insight seen in the last 7 days. */
@@ -167,19 +169,41 @@ export class InsightDigestService {
       return false;
     }
 
-    // Claim the week first: at most one digest per org per ~week, even across restarts.
-    const claimed = await AppDataSource.query(
-      `INSERT INTO insight_org_state (organization_id, digest_last_sent_at)
-       VALUES ($1, now())
-       ON CONFLICT (organization_id) DO UPDATE SET digest_last_sent_at = now(), updated_at = now()
-         WHERE insight_org_state.digest_last_sent_at IS NULL
-            OR insight_org_state.digest_last_sent_at < now() - interval '6 days'
-       RETURNING organization_id`,
-      [organizationId],
-    );
-    if (claimed.length === 0) return false;
-
     const locale = await organizationNotificationLocale(organizationId);
+    return AppDataSource.transaction(async (manager) => {
+      await manager.query(
+        `INSERT INTO insight_org_state (organization_id) VALUES ($1)
+         ON CONFLICT (organization_id) DO NOTHING`,
+        [organizationId],
+      );
+      // Held until commit: a second runner waits here, then sees this week's send.
+      const [state] = await manager.query(
+        `SELECT (digest_last_sent_at IS NULL
+                 OR digest_last_sent_at < now() - interval '6 days') AS due
+           FROM insight_org_state WHERE organization_id = $1 FOR UPDATE`,
+        [organizationId],
+      );
+      if (!state?.due) return false;
+
+      const delivered = await this.deliver(organizationId, recipients, content, locale);
+      if (delivered > 0) {
+        await manager.query(
+          `UPDATE insight_org_state SET digest_last_sent_at = now(), updated_at = now()
+            WHERE organization_id = $1`,
+          [organizationId],
+        );
+      }
+      return delivered > 0;
+    });
+  }
+
+  /** Send to each recipient; returns how many sends succeeded. */
+  private async deliver(
+    organizationId: string,
+    recipients: Array<{ email: string; first_name: string | null }>,
+    content: DigestContent,
+    locale: NotificationLocale,
+  ): Promise<number> {
     const copy = COPY[locale];
     const base = getDashboardUrl();
     const { emailService } = await import("@server/services/email.service");
@@ -222,7 +246,7 @@ export class InsightDigestService {
         logger.warn({ err: error, organizationId }, "Digest email failed for one recipient");
       }
     }
-    return delivered > 0;
+    return delivered;
   }
 }
 
