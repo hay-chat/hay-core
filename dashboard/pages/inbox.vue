@@ -19,6 +19,9 @@
       </Button>
     </div>
 
+    <!-- iPhone in a browser tab: how to get alerts (D11-12) -->
+    <InstallAppGuide dismissible />
+
     <!-- AI actions waiting for an approver (D4-6); hidden when none or not an approver -->
     <ApprovalsSection @changed="load()" />
 

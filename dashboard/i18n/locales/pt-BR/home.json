@@ -49,7 +49,12 @@
       "unavailable": "Os alertas push ainda não foram configurados neste servidor do Hay.chat. Peça ao administrador para adicionar as chaves VAPID.",
       "denied": "As notificações estão bloqueadas para este site nas configurações do navegador. Permita e recarregue a página.",
       "failed": "Não foi possível ativar os alertas",
-      "blocked": "Alertas desativados"
+      "blocked": "Alertas desativados",
+      "privacyLabel": "Ocultar dados do cliente na tela bloqueada",
+      "privacyHelp": "Os alertas dizem apenas \"Um cliente precisa de um humano\". Abra o Hay.chat para ver quem é. Vale para todos os seus dispositivos.",
+      "privacyOn": "Dados do cliente ocultos nos alertas",
+      "privacyOff": "Os alertas mostram o cliente e o resumo",
+      "privacyFailed": "Não foi possível alterar esta configuração"
     },
     "aiPause": {
       "title": "Pausar a IA em tudo",
@@ -65,6 +70,14 @@
       "paused": "IA pausada em tudo",
       "resumed": "IA retomada",
       "failed": "Não foi possível alterar a pausa da IA. Tente de novo."
+    },
+    "install": {
+      "title": "Receba alertas no iPhone",
+      "description": "O iPhone só mostra alertas do Hay.chat quando ele está na Tela de Início. São três toques.",
+      "stepShare": "No Safari, toque no botão Compartilhar",
+      "stepAdd": "Role para baixo e toque em \"Adicionar à Tela de Início\" e depois em \"Adicionar\"",
+      "stepOpen": "Abra o Hay.chat pelo novo ícone na Tela de Início e ative os alertas",
+      "dismiss": "Ocultar estes passos"
     }
   }
 }

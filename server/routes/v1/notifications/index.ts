@@ -2,6 +2,8 @@ import { t, authenticatedProcedure, publicProcedure } from "@server/trpc";
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { pushNotificationService } from "@server/services/push-notification.service";
+import { AppDataSource } from "@server/database/data-source";
+import { User } from "@server/entities/user.entity";
 
 /**
  * Notifications router: Web Push opt-in per device.
@@ -71,4 +73,23 @@ export const notificationsRouter = t.router({
     assertConfigured();
     return pushNotificationService.sendTest(ctx.user!.id, ctx.organizationId!);
   }),
+
+  /** Lock-screen privacy: alerts say only "A customer needs a human" (per person, all devices). */
+  alertPrivacy: authenticatedProcedure.query(async ({ ctx }) => {
+    const user = await AppDataSource.getRepository(User).findOne({
+      where: { id: ctx.user!.id },
+      select: { id: true, hideAlertPreview: true },
+    });
+    return { hidePreview: user?.hideAlertPreview ?? false };
+  }),
+
+  setAlertPrivacy: authenticatedProcedure
+    .input(z.object({ hidePreview: z.boolean() }))
+    .mutation(async ({ ctx, input }) => {
+      await AppDataSource.getRepository(User).update(
+        { id: ctx.user!.id },
+        { hideAlertPreview: input.hidePreview },
+      );
+      return { hidePreview: input.hidePreview };
+    }),
 });
