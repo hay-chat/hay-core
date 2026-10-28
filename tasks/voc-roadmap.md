@@ -83,6 +83,13 @@ Started 2026-10-27. Research: `/Users/rogerjunior/Documents/code/hay/seo/Enginee
 | L10 | `AddRefreshTokenRotationToSessions1784700000000` (drops refresh_token_hash/is_active; adds generation, token_version, rotated_at, revoked_at, revoked_reason) | sessions | ✓ |
 | reply-defaults | `DropWebchatSubtitleDefault1784800000000` | webchat_settings | ✓ |
 | review-fixes | `AddLegacyRefreshTokenHashToSessions1784900000000` | sessions | ✓ |
+| W1 L2 | `AddConversationOutcomes1785100000000` | conversations | ✓ |
+| W1 email merge | `MergeEmailPluginIntoEmailInbox1785300000000` (irreversible; run after new code is live) | plugin_instances, plugin_registry | ✓ |
+| W1 L7 | `AddConversationReplyWindow1785470000000` | conversations | ✓ |
+| W1 L10 | `PushPerUserAndNotificationDeliveries1785600000000` | push_subscriptions, notification_deliveries | ✓ |
+| W1 L4 | `AddActionLog1785710000000` | action_log | ✓ |
+| W1 L4 | `AddPendingActions1785720000000` | pending_actions | ✓ |
+| W1 L4 | `AddAwaitingApprovalStatus1785730000000` | conversations (enum) | ✓ |
 
 ## Wave 0 — security, honesty, quick fixes (tag `wave-0-done`)
 
