@@ -11,6 +11,7 @@
 
 const { wcApi, wcList, WooApiError } = require("./client");
 const { num, round2, toolError } = require("./format");
+const { parsePix } = require("./pix");
 
 /** Statuses under which nothing has left the warehouse yet. */
 const PRE_DISPATCH_STATUSES = new Set(["pending", "on-hold", "processing"]);
@@ -164,6 +165,20 @@ async function getTracking(order) {
   return trackingFromGenericMeta(meta);
 }
 
+/** Refund records with dates; best-effort (an empty list on failure). */
+async function getRefundDetails(order) {
+  if (!(order.refunds || []).length) return [];
+  try {
+    const rows = await wcApi("GET", `/orders/${order.id}/refunds`, {
+      query: { per_page: 100 },
+    });
+    return Array.isArray(rows) ? rows : [];
+  } catch (err) {
+    console.error(`[woocommerce] refund list for order ${order.id} failed: ${err.message}`);
+    return [];
+  }
+}
+
 /** Total already refunded (WooCommerce stores refund totals as negative strings). */
 function refundedTotal(order) {
   return round2((order.refunds || []).reduce((s, r) => s + Math.abs(num(r.total)), 0));
@@ -178,7 +193,24 @@ function isPreDispatch(order, tracking) {
   return PRE_DISPATCH_STATUSES.has(order.status) && !(tracking || []).length;
 }
 
-function enrichOrder(order, tracking) {
+/**
+ * Payment fields (D10-2). `refundDetails` is the /orders/{id}/refunds list (the
+ * order body's refund stubs carry no date). The Pix block is only returned while
+ * the order is unpaid: a paid order's code is spent and would mislead.
+ */
+function paymentFields(order) {
+  const unpaid = order.needs_payment === true || (!order.date_paid && order.status === "pending");
+  return {
+    paymentMethodId: order.payment_method || null,
+    transactionId: order.transaction_id || null,
+    needsPayment: order.needs_payment ?? null,
+    paymentUrl: unpaid ? order.payment_url || null : null,
+    createdVia: order.created_via || null,
+    pix: unpaid ? parsePix(order.meta_data) : null,
+  };
+}
+
+function enrichOrder(order, tracking, refundDetails = []) {
   const total = num(order.total);
   const refunded = refundedTotal(order);
   const remaining = round2(Math.max(0, total - refunded));
@@ -197,6 +229,7 @@ function enrichOrder(order, tracking) {
     customerId: order.customer_id || null,
     customerNote: order.customer_note || null,
     paymentMethod: order.payment_method_title ?? order.payment_method ?? null,
+    ...paymentFields(order),
     totals: {
       total: order.total,
       tax: order.total_tax,
@@ -221,7 +254,12 @@ function enrichOrder(order, tracking) {
       total: li.total,
       totalTax: li.total_tax,
     })),
-    refunds: (order.refunds || []).map((r) => ({ id: r.id, reason: r.reason, total: r.total })),
+    refunds: (order.refunds || []).map((r) => ({
+      id: r.id,
+      reason: r.reason,
+      total: r.total,
+      dateCreated: refundDetails.find((d) => d.id === r.id)?.date_created ?? null,
+    })),
     tracking: rows,
     supportSummary: {
       isCancellable: preDispatch,
@@ -247,4 +285,5 @@ module.exports = {
   trackingFromGenericMeta,
   refundedTotal,
   enrichOrder,
+  getRefundDetails,
 };
