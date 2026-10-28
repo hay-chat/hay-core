@@ -12,10 +12,12 @@ jest.mock("@server/lib/logger", () => ({ createLogger: () => mockLogger }));
 
 const mockSetAccessState = jest.fn();
 const mockGetAccessState = jest.fn();
+const mockSetBillingPeriod = jest.fn();
 jest.mock("@server/services/organization-access.service", () => ({
   organizationAccessService: {
     setAccessState: mockSetAccessState,
     getAccessState: mockGetAccessState,
+    setBillingPeriod: mockSetBillingPeriod,
   },
 }));
 
@@ -155,6 +157,35 @@ describe("internal.organizations", () => {
     mockGetAccessState.mockResolvedValueOnce(null);
     await expect(
       internalRouter.createCaller(ctx()).organizations.getAccessState({ organizationId: ORG_ID }),
+    ).rejects.toMatchObject({ code: "NOT_FOUND" });
+  });
+
+  it("passes the billing period through as dates and refuses an empty one", async () => {
+    mockSetBillingPeriod.mockResolvedValueOnce(state);
+    await internalRouter.createCaller(ctx()).organizations.setBillingPeriod({
+      organizationId: ORG_ID,
+      period: { start: "2026-10-14T09:30:00.000Z", end: "2026-11-14T09:30:00.000Z" } as never,
+    });
+    expect(mockSetBillingPeriod).toHaveBeenCalledWith({
+      organizationId: ORG_ID,
+      period: {
+        start: new Date("2026-10-14T09:30:00.000Z"),
+        end: new Date("2026-11-14T09:30:00.000Z"),
+      },
+    });
+
+    await expect(
+      internalRouter.createCaller(ctx()).organizations.setBillingPeriod({
+        organizationId: ORG_ID,
+        period: { start: new Date("2026-10-14"), end: new Date("2026-10-14") },
+      }),
+    ).rejects.toMatchObject({ code: "BAD_REQUEST" });
+
+    mockSetBillingPeriod.mockResolvedValueOnce(null);
+    await expect(
+      internalRouter
+        .createCaller(ctx())
+        .organizations.setBillingPeriod({ organizationId: ORG_ID, period: null }),
     ).rejects.toMatchObject({ code: "NOT_FOUND" });
   });
 

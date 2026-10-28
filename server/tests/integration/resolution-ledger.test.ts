@@ -10,8 +10,8 @@ import type { ConversationOutcomeKind } from "../../services/close-classificatio
 import { AnalyticsService } from "../../services/analytics.service";
 import {
   ResolutionLedgerService,
+  billingPeriodFor,
   exclusionAllowance,
-  periodFor,
 } from "../../services/resolution-ledger.service";
 
 /**
@@ -23,7 +23,7 @@ describe("resolution ledger and exclusions (D1-5, D1-6)", () => {
   const userId = "1ed6e700-0000-4000-8000-0000000000aa";
   const service = new ResolutionLedgerService();
   const analytics = new AnalyticsService();
-  const period = periodFor();
+  const period = billingPeriodFor(null);
   // A minute into the current UTC month: always in the period, always excludable.
   const inPeriod = new Date(period.start.getTime() + 60_000);
 
@@ -105,7 +105,9 @@ describe("resolution ledger and exclusions (D1-5, D1-6)", () => {
     );
     const [billed] = await seed(1, { conversation_id: conversation.id });
     // A close from two periods back has been billed and is left alone.
-    const old = new Date(Date.UTC(period.start.getUTCFullYear(), period.start.getUTCMonth() - 2, 5));
+    const old = new Date(
+      Date.UTC(period.start.getUTCFullYear(), period.start.getUTCMonth() - 2, 5),
+    );
     const [closedPeriod] = await seed(1, { conversation_id: conversation.id, closed_at: old });
     expect(await billableCount()).toBe(1);
 
@@ -277,5 +279,72 @@ describe("resolution ledger and exclusions (D1-5, D1-6)", () => {
     );
     expect(line).toContain(`"'=HYPERLINK(""x"")"`);
     expect(line).toContain('"assumed","billed"');
+  });
+
+  describe("with the operator's billing period", () => {
+    const now = new Date();
+    // A period that started 10 days ago and ends in 20: rows from 15 days ago
+    // are in the previous period, though usually the same calendar month.
+    const billing = {
+      start: new Date(now.getTime() - 10 * 86_400_000),
+      end: new Date(now.getTime() + 20 * 86_400_000),
+    };
+    const setPeriod = (value: { start: Date; end: Date } | null) =>
+      AppDataSource.getRepository(Organization).update(
+        { id: orgId },
+        { billingPeriodStart: value?.start ?? null, billingPeriodEnd: value?.end ?? null },
+      );
+
+    beforeEach(() => setPeriod(billing));
+    afterAll(() => setPeriod(null));
+
+    it("counts the usage page and the allowance over the billing period", async () => {
+      const current = await seed(20, { closed_at: new Date(billing.start.getTime() + 60_000) });
+      await seed(5, { closed_at: new Date(billing.start.getTime() - 5 * 86_400_000) });
+
+      const usage = await service.getUsage(orgId);
+      expect(usage.period).toMatchObject({ index: 0, source: "billing" });
+      expect(usage.period.start.getTime()).toBe(billing.start.getTime());
+      expect(usage.billable).toBe(20);
+      expect(usage.exclusions.allowance).toBe(1);
+
+      expect(
+        (
+          await service.exclude({
+            organizationId: orgId,
+            outcomeId: current[0].id,
+            userId,
+            reason: "test",
+          })
+        ).status,
+      ).toBe("excluded");
+      expect(
+        (
+          await service.exclude({
+            organizationId: orgId,
+            outcomeId: current[1].id,
+            userId,
+            reason: "test",
+          })
+        ).status,
+      ).toBe("pending_review");
+
+      const previous = await service.getUsage(orgId, 1);
+      expect(previous.period.end.getTime()).toBe(billing.start.getTime());
+      expect(previous.billable).toBe(5);
+      expect(previous.exclusions).toMatchObject({ used: 0, allowance: 1, open: true });
+
+      const periods = await service.listPeriods(orgId);
+      expect(periods).toHaveLength(12);
+      expect(periods[1].end.getTime()).toBe(periods[0].start.getTime());
+    });
+
+    it("refuses exclusions from before the previous billing period", async () => {
+      const twoBack = billingPeriodFor(billing, 2, now);
+      const [row] = await seed(1, { closed_at: new Date(twoBack.start.getTime() + 60_000) });
+      await expect(
+        service.exclude({ organizationId: orgId, outcomeId: row.id, userId, reason: "late" }),
+      ).rejects.toMatchObject({ code: "BAD_REQUEST" });
+    });
   });
 });

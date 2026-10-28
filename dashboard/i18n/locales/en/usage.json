@@ -4,14 +4,15 @@
     "title": "Usage",
     "description": "Resolutions Hay.chat counts for billing, and the ledger behind the number.",
     "refresh": "Refresh",
-    "month": "Month",
+    "period": "Billing period",
     "loadFailed": "Could not load usage",
     "meter": {
       "title": "Billable resolutions",
       "period": "{start} to {end}",
-      "periodNote": "Counted per calendar month (UTC). Your invoice may use different period dates.",
+      "periodNote": "Counted over your billing period, the same dates as your invoice.",
       "planNote": "Your plan's allowance and any extra-resolution charges are on your billing page.",
-      "paused": "The AI agent is paused because the plan's resolutions are used up. Conversations wait for your team."
+      "paused": "The AI agent is paused because the plan's resolutions are used up. Conversations wait for your team.",
+      "calendarNote": "Counted per calendar month (UTC). Your invoice may use different period dates."
     },
     "breakdown": {
       "title": "Breakdown",
@@ -30,12 +31,12 @@
     },
     "ledger": {
       "title": "Resolution ledger",
-      "description": "Every resolution counted this month, with the reason it counted.",
+      "description": "Every resolution counted in this period, with the reason it counted.",
       "export": "Export CSV",
       "exportFailed": "Could not export the ledger",
-      "exclusionsUsed": "Self-serve exclusions this month: {used} of {allowance}",
-      "exclusionsClosed": "Resolutions from this month can no longer be excluded here.",
-      "empty": "No billable resolutions this month.",
+      "exclusionsUsed": "Self-serve exclusions this period: {used} of {allowance}",
+      "exclusionsClosed": "Resolutions from this period can no longer be excluded here.",
+      "empty": "No billable resolutions in this period.",
       "openConversation": "Open conversation",
       "conversationDeleted": "Conversation deleted",
       "exclude": "Exclude",
@@ -58,8 +59,8 @@
     },
     "excludeDialog": {
       "title": "Exclude this resolution",
-      "instant": "It leaves this month's count right away. After this one, {left} self-serve exclusions are left this month.",
-      "review": "You have used this month's self-serve exclusions (5 % of resolutions). This request goes to Hay.chat for review, and the resolution stays counted until then.",
+      "instant": "It leaves this period's count right away. After this one, {left} self-serve exclusions are left this period.",
+      "review": "You have used this period's self-serve exclusions (5 % of resolutions). This request goes to Hay.chat for review, and the resolution stays counted until then.",
       "reason": "Reason (required)",
       "reasonPlaceholder": "For example: this was our own test, or the shopper needed a person",
       "confirm": "Exclude",
