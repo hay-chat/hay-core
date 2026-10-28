@@ -944,7 +944,12 @@ The following tools are available for you to use. You MUST return only valid JSO
     let deliveryState = DeliveryState.SENT;
     let metadata = messageData.metadata;
 
-    if (messageData.type === MessageType.BOT_AGENT) {
+    // Product cards are AI output the shopper sees, so test mode and "drafts
+    // only" hold them with the text reply they belong to.
+    if (
+      messageData.type === MessageType.BOT_AGENT ||
+      messageData.type === MessageType.PRODUCT_RECOMMENDATION
+    ) {
       // Get agent and organization to check test mode
       const { agentRepository } = await import("../../repositories/agent.repository");
       const { organizationRepository } = await import("../../repositories/organization.repository");
