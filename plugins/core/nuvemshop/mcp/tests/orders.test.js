@@ -31,6 +31,13 @@ describe("nuvemshop_get_order", () => {
     expect(res.error.code).toBe("NOT_FOUND");
   });
 
+  it("routes an Amazon order number to the marketplace (D10-6)", async () => {
+    mockFetch(orderRoutes(makeOrder()));
+    const res = await server.call("nuvemshop_get_order", { order_number: "701-1234567-1234567" });
+    expect(res.error.code).toBe("NOT_FOUND");
+    expect(res.error.details).toMatchObject({ marketplace: "amazon" });
+  });
+
   it("returns a projection with payment, Pix status, tracking and supportSummary", async () => {
     const order = makeOrder({ payment_status: "pending", paid_at: null });
     mockFetch(orderRoutes(order));

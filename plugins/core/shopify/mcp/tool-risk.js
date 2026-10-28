@@ -12,6 +12,7 @@ module.exports = {
     "shopify_list_customer_orders",
     "shopify_calculate_refund",
     "shopify_get_returnable_items",
+    "shopify_get_return_instructions",
     "shopify_get_product",
     "shopify_get_product_by_handle",
     "shopify_search_products",
@@ -28,6 +29,10 @@ module.exports = {
     shopify_update_customer_address: "customer_update",
     shopify_add_order_note: "note",
     shopify_create_coupon: "discount",
+    shopify_swap_order_item: "exchange",
+    shopify_create_exchange: "exchange",
+    // Emails the invoice to the address on the order; moves no money.
+    shopify_send_payment_link: "note",
   },
   // Enforces the merchant's coupon cap itself; above it, core holds the call.
   capped: ["shopify_create_coupon"],

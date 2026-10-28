@@ -108,6 +108,8 @@ describe("shopifyGql retry and error codes", () => {
     const payload = await codeOf(shopifyGql(QUERY, { id: "1" }));
     expect(payload.code).toBe("SCOPE_MISSING");
     expect(payload.message).toMatch(/read_returns/);
+    expect(payload.message).toMatch(/re-approve Hay\.chat/);
+    expect(payload.details.missingScopes).toEqual(["read_returns"]);
   });
 
   it("maps an invalid id to BAD_INPUT", async () => {

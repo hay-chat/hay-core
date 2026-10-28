@@ -2,7 +2,7 @@
  * Order tools — rich reads, narrow bounded writes.
  *
  *   woocommerce_get_order                      GET /orders/{id} + tracking lookup
- *   woocommerce_get_order_tracking             tracking lookup (3 sources)
+ *   woocommerce_get_order_tracking             tracking lookup (plugins, meta, order notes)
  *   woocommerce_cancel_order                   PUT /orders/{id} {status: cancelled}   pre-dispatch only
  *   woocommerce_update_order_shipping_address  PUT /orders/{id} {shipping}            pre-dispatch only
  *   woocommerce_add_order_note                 POST /orders/{id}/notes
@@ -94,8 +94,9 @@ function registerOrderTools(server) {
   server.tool(
     "woocommerce_get_order_tracking",
     "Get an order's shipment tracking (where-is-my-order). Reads the store's shipment-tracking " +
-      "plugin (official Shipment Tracking or Advanced Shipment Tracking) or the order's tracking " +
-      "meta. An empty list means nothing has been recorded yet.",
+      "plugin (official Shipment Tracking, Advanced Shipment Tracking, VillaTheme Orders " +
+      "Tracking, YITH Order Tracking), the order's tracking meta, or a tracking number written " +
+      "in the order notes. An empty list means nothing has been recorded yet.",
     ORDER_REF,
     async (args) => {
       try {
@@ -220,4 +221,4 @@ function registerOrderTools(server) {
   );
 }
 
-module.exports = { registerOrderTools, assertPreDispatch };
+module.exports = { registerOrderTools, assertPreDispatch, ORDER_REF };

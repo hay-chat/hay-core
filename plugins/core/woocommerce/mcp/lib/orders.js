@@ -13,6 +13,8 @@ const { wcApi, wcList, WooApiError } = require("./client");
 const { num, round2, toolError } = require("./format");
 const { parsePix } = require("./pix");
 const { staleTracking, stalestShipment } = require("@hay/plugin-sdk/stale-tracking");
+const { readReturnInstructions } = require("@hay/plugin-sdk/return-instructions");
+const { orderNotFoundError } = require("@hay/plugin-sdk/marketplace-orders");
 
 /** Statuses under which nothing has left the warehouse yet. */
 const PRE_DISPATCH_STATUSES = new Set(["pending", "on-hold", "processing"]);
@@ -37,8 +39,8 @@ async function getOrderById(orderId) {
     return await wcApi("GET", `/orders/${encodeURIComponent(orderId)}`);
   } catch (err) {
     if (err instanceof WooApiError && err.status === 404) {
-      throw toolError(
-        "NOT_FOUND",
+      throw orderNotFoundError(
+        orderId,
         `Order ${orderId} not found. Find the order via woocommerce_find_customer (email) and use ` +
           "the id from recentOrders, or pass the number the customer sees as order_number.",
       );
@@ -71,8 +73,8 @@ async function resolveOrder({ order_id: orderId, order_number: orderNumber }) {
   const { items } = await wcList("/orders", { search: wanted, per_page: 10 });
   const match = items.find((o) => String(o.number) === wanted);
   if (!match) {
-    throw toolError(
-      "NOT_FOUND",
+    throw orderNotFoundError(
+      wanted,
       `No order with number ${wanted}. Ask the customer to check the number on their confirmation ` +
         "email, or look them up by email with woocommerce_find_customer.",
     );
@@ -134,11 +136,117 @@ function trackingFromGenericMeta(metaData) {
   ];
 }
 
+/** Parse a meta value that may be a JSON string. */
+function jsonValue(value) {
+  if (typeof value !== "string") return value;
+  try {
+    return JSON.parse(value);
+  } catch {
+    return null;
+  }
+}
+
 /**
- * Tracking lookup, multi-endpoint: official Shipment Tracking endpoint →
+ * D16-8: Orders Tracking for WooCommerce (VillaTheme) keeps tracking per line item in
+ * `_vi_wot_order_item_tracking_data`: a JSON list of { tracking_number, carrier_name,
+ * carrier_url, time }, newest last. UNVERIFIED against a live install, and the REST
+ * API may hide underscore line-item meta on some WooCommerce versions.
+ */
+function trackingFromVillaTheme(order) {
+  const rows = [];
+  const seen = new Set();
+  for (const li of order.line_items || []) {
+    const raw = (li.meta_data || []).find((m) => m.key === "_vi_wot_order_item_tracking_data");
+    const list = raw ? jsonValue(raw.value) : null;
+    if (!Array.isArray(list) || !list.length) continue;
+    const latest = list[list.length - 1];
+    if (!latest || !latest.tracking_number || seen.has(String(latest.tracking_number))) continue;
+    seen.add(String(latest.tracking_number));
+    rows.push({
+      trackingNumber: String(latest.tracking_number),
+      carrier: latest.carrier_name || latest.carrier_slug || null,
+      trackingUrl: latest.carrier_url
+        ? String(latest.carrier_url).replace("{tracking_number}", latest.tracking_number)
+        : null,
+      shippedAt: latest.time ? new Date(Number(latest.time) * 1000).toISOString() : null,
+      source: "villatheme",
+      lineItemId: li.id ?? null,
+    });
+  }
+  return rows;
+}
+
+/**
+ * D16-8: YITH WooCommerce Order & Shipment Tracking stores order meta `ywot_tracking_code`,
+ * `ywot_carrier_name` / `ywot_carrier_id` and `ywot_pick_up_date`. The carrier keys don't
+ * contain "track", so the generic fallback would miss them. UNVERIFIED on a live install.
+ */
+function trackingFromYith(metaData) {
+  const get = (key) => (metaData || []).find((m) => m.key === key)?.value || null;
+  const number = get("ywot_tracking_code") || get("_ywot_tracking_code");
+  if (!number) return [];
+  return [
+    {
+      trackingNumber: String(number),
+      carrier:
+        get("ywot_carrier_name") || get("_ywot_carrier_name") || get("ywot_carrier_id") || null,
+      trackingUrl: null,
+      shippedAt: get("ywot_pick_up_date") || get("_ywot_pick_up_date") || null,
+      source: "yith",
+    },
+  ];
+}
+
+// Tracking numbers written into order notes (ShipStation and many Brazilian
+// integrations): a "tracking number / rastreio" label followed by a code, or a
+// Universal Postal Union S10 code (Correios: AA123456789BR).
+const NOTE_LABELLED =
+  /(?:tracking(?:\s*(?:number|no\.?|code|#))?|c[oó]digo\s+de\s+rastreio|rastreio|rastreamento)\s*(?:is|é|:|#|-)?\s*:?\s*([A-Z0-9][A-Z0-9-]{7,33})/i;
+const NOTE_S10 = /\b([A-Z]{2}\d{9}[A-Z]{2})\b/;
+
+function trackingNumberInNote(text) {
+  const plain = String(text || "").replace(/<[^>]*>/g, " ");
+  const labelled = NOTE_LABELLED.exec(plain);
+  if (labelled && /\d/.test(labelled[1])) return labelled[1];
+  const s10 = NOTE_S10.exec(plain);
+  return s10 ? s10[1] : null;
+}
+
+/** D16-8 last resort: the newest order note that carries a tracking number. */
+async function trackingFromNotes(order) {
+  try {
+    const notes = await wcApi("GET", `/orders/${order.id}/notes`, { query: { type: "any" } });
+    for (const note of Array.isArray(notes) ? notes : []) {
+      const number = trackingNumberInNote(note.note);
+      if (number) {
+        const link = /https?:\/\/[^\s"'<>]+/.exec(String(note.note || ""));
+        return [
+          {
+            trackingNumber: number,
+            carrier: null,
+            trackingUrl: link ? link[0] : null,
+            shippedAt: note.date_created_gmt
+              ? `${note.date_created_gmt}Z`
+              : note.date_created || null,
+            source: "order_note",
+          },
+        ];
+      }
+    }
+  } catch (err) {
+    if (!(err instanceof WooApiError && (err.status === 404 || err.status === 401))) {
+      console.error(`[woocommerce] order notes for ${order.id} failed: ${err.message}`);
+    }
+  }
+  return [];
+}
+
+/**
+ * Tracking lookup, multi-source: official Shipment Tracking endpoint →
  * Advanced Shipment Tracking endpoint → `_wc_shipment_tracking_items` meta
- * (both plugins write it) → any `*tracking*` meta key. Never throws; an empty
- * list means "no tracking recorded yet".
+ * (both plugins write it) → VillaTheme line-item meta → YITH meta → any
+ * `*tracking*` meta key → a tracking number in the order notes. Never throws;
+ * an empty list means "no tracking recorded yet".
  */
 async function getTracking(order) {
   const endpoints = [
@@ -165,7 +273,14 @@ async function getTracking(order) {
   if (Array.isArray(stItems) && stItems.length) {
     return stItems.map((i) => normalizeTrackingItem({ ...i, __source: "meta" })).filter(Boolean);
   }
-  return trackingFromGenericMeta(meta);
+  for (const rows of [
+    trackingFromVillaTheme(order),
+    trackingFromYith(meta),
+    trackingFromGenericMeta(meta),
+  ]) {
+    if (rows.length) return rows;
+  }
+  return trackingFromNotes(order);
 }
 
 /** Refund records with dates; best-effort (an empty list on failure). */
@@ -319,6 +434,8 @@ function enrichOrder(
       shippedAt: rows.find((r) => r.shippedAt)?.shippedAt ?? order.date_completed ?? null,
       deliveredAt: null, // WooCommerce has no delivery confirmation.
       tracking: trackingStaleness(order, rows, originCountry, now),
+      // D6-13: the merchant's "How to return" text (null = hand return questions off).
+      returnInstructions: readReturnInstructions(),
     },
   };
 }
@@ -333,6 +450,7 @@ module.exports = {
   getTracking,
   normalizeTrackingItem,
   trackingFromGenericMeta,
+  trackingNumberInNote,
   refundedTotal,
   enrichOrder,
   getRefundDetails,

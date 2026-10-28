@@ -1,3 +1,9 @@
+## 2026-10-28 — claude/w2-commerce (L5 Wave 2) — all 10 tickets done, committed, not pushed
+- SDK: exchange write category (core MONEY_CATEGORIES, tiny core change), return-instructions, identity, marketplace-orders modules.
+- Shopify: re-consent scopes + runtime SCOPE_MISSING ("re-approve Hay.chat"); D6-10 swap_order_item; D6-11 create_exchange; D10-3 send_payment_link.
+- Woo: D6-12 resend confirmation (+Magento), D10-3 resend_pix, D16-8 tracking (VillaTheme/YITH/notes). D6-13 return instructions + D10-6 marketplace routing on Woo/Shopify/Nuvemshop.
+- D16-2 f7ac632: Woo wc-auth one-click connect (worker routes + AfterSettings UI bundle; keys now optional in schema). Needs HTTPS HAY_API_URL.
+- Next: merge into staging, real-store checks (see final report Needs Roger), tunnel test of D16-2.
 ## 2026-10-28 — claude/w2-eu-disclosure — Wave 2 L11 (D14-5..8) built, not pushed
 - 0e46e8e D14-5 AI region+provider card (Customer Privacy) + debug note; 4a71322 D14-6 widget AI label (EU: rename, not hide).
 - 6837a58 D14-7 first-reply [label] line on non-web channels + per-channel drafts-only (reuses approval queue).

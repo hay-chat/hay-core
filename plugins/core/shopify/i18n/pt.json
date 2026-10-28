@@ -85,6 +85,22 @@
     "shopify_create_coupon": {
       "label": "Criar cupom de cortesia",
       "description": "Cria um código de desconto de uso único para um cliente, dentro do limite de porcentagem ou valor definido pelo lojista."
+    },
+    "shopify_swap_order_item": {
+      "label": "Trocar Item do Pedido",
+      "description": "Antes do envio, troca um item por outro tamanho ou cor do mesmo produto. Só com preço igual ou menor e em estoque."
+    },
+    "shopify_create_exchange": {
+      "label": "Criar Troca",
+      "description": "Após a entrega, troca itens por outras variações. Recusa quando o cliente teria que pagar a diferença ou a reposição está sem estoque."
+    },
+    "shopify_get_return_instructions": {
+      "label": "Ver Instruções de Devolução",
+      "description": "Obtém as instruções da loja para devolver um item, para repassar como estão."
+    },
+    "shopify_send_payment_link": {
+      "label": "Enviar Link de Pagamento",
+      "description": "Envia por e-mail o link de pagamento de um pedido não pago, depois que o e-mail ou telefone do cliente confere com o pedido."
     }
   },
   "config": {
@@ -111,6 +127,10 @@
     "staleTrackingInternationalDays": {
       "label": "Rastreio parado: internacional (dias)",
       "description": "Considera uma entrega internacional parada quando o rastreio não se move há mais do que este número de dias."
+    },
+    "returnInstructions": {
+      "label": "Como devolver",
+      "description": "Seu processo de devolução, com suas palavras: para onde enviar, link ou formulário e prazos. O Hay.chat repassa o texto como está quando um cliente pergunta como devolver. Se ficar vazio, o Hay.chat encaminha essas perguntas para sua equipe."
     }
   }
 }

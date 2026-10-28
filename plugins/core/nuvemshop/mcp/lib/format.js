@@ -42,15 +42,8 @@ function pickLang(field, lang) {
   return null;
 }
 
-const sameEmail = (a, b) =>
-  Boolean(a) && Boolean(b) && String(a).trim().toLowerCase() === String(b).trim().toLowerCase();
-const digits = (s) => String(s || "").replace(/\D/g, "");
-/** The part of a phone number that survives formatting differences (+55, spaces, DDD). */
-const phoneKey = (phone) => digits(phone).slice(-8);
-const samePhone = (a, b) => {
-  const ka = phoneKey(a);
-  return ka.length === 8 && ka === phoneKey(b);
-};
+// Shopper identity matching is shared with the other commerce plugins.
+const { sameEmail, samePhone, phoneKey, digits } = require("@hay/plugin-sdk/identity");
 
 /**
  * MCP tool annotations. Core caches them from tools/list

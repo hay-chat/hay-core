@@ -395,6 +395,14 @@ async function bulkSync(
   logger.info("Nuvemshop bulk sync complete", { total });
 }
 
+/** D6-13 "How to return" owner text → MCP env (unset = the agent hands off). */
+function returnInstructionsEnv(config: {
+  getOptional: <T = unknown>(key: string) => T | undefined;
+}): Record<string, string> {
+  const text = config.getOptional<string>("returnInstructions");
+  return typeof text === "string" && text.trim() ? { RETURN_INSTRUCTIONS: text.trim() } : {};
+}
+
 /** D6-9 per-store stale-tracking thresholds → MCP env (the MCP falls back to 5/10). */
 function staleTrackingEnv(config: {
   getOptional: <T = unknown>(key: string) => T | undefined;
@@ -487,6 +495,14 @@ export default defineHayPlugin((globalCtx) => ({
           "than this many days.",
         default: 10,
       },
+      returnInstructions: {
+        type: "string",
+        label: "How to return",
+        description:
+          "Your return process, in your words: where to send items, any link or form, and " +
+          "deadlines. Hay.chat relays it as written when a customer asks how to return " +
+          "something. Leave empty and Hay.chat hands those questions to your team.",
+      },
     });
 
     ctx.register.auth.apiKey({
@@ -568,6 +584,7 @@ export default defineHayPlugin((globalCtx) => ({
           NUVEMSHOP_MAIN_LANGUAGE: mainLanguage,
           ...couponEnv(ctx.config),
           ...staleTrackingEnv(ctx.config),
+          ...returnInstructionsEnv(ctx.config),
         },
       });
       ctx.logger.info("Nuvemshop MCP server started successfully");

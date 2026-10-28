@@ -61,6 +61,7 @@ describe("tool-risk declarations", () => {
       refund: true,
       cancel: true,
       discount: true,
+      exchange: true,
       return: true,
       address_change: true,
       customer_update: true,

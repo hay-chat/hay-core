@@ -69,6 +69,18 @@
     "woocommerce_create_coupon": {
       "label": "Create Goodwill Coupon",
       "description": "Create a single-use apology coupon for one customer's email, within the merchant's percentage or amount cap."
+    },
+    "woocommerce_resend_order_confirmation": {
+      "label": "Resend Order Confirmation",
+      "description": "Resend the order details email to the billing email on the order (WooCommerce 9.5+)."
+    },
+    "woocommerce_get_return_instructions": {
+      "label": "Get Return Instructions",
+      "description": "Get the store's own instructions for returning an item, to relay as written."
+    },
+    "woocommerce_resend_pix": {
+      "label": "Resend Pix or Payment Link",
+      "description": "Send the Pix code or payment link of an unpaid order, once the customer's email or phone matches the order."
     }
   },
   "config": {
@@ -78,7 +90,7 @@
     },
     "consumerKey": {
       "label": "Consumer Key",
-      "description": "WooCommerce REST API Consumer Key (WooCommerce → Settings → Advanced → REST API, Read/Write)"
+      "description": "WooCommerce REST API Consumer Key (WooCommerce → Settings → Advanced → REST API, Read/Write). Filled in for you when you use Connect with WooCommerce."
     },
     "consumerSecret": {
       "label": "Consumer Secret",
@@ -107,6 +119,40 @@
     "staleTrackingInternationalDays": {
       "label": "Stale tracking: international (days)",
       "description": "Treat an international shipment as stuck when its tracking has not moved for more than this many days."
+    },
+    "returnInstructions": {
+      "label": "How to return",
+      "description": "Your return process, in your words: where to send items, any link or form, and deadlines. Hay.chat relays it as written when a customer asks how to return something. Leave empty and Hay.chat hands those questions to your team."
+    }
+  },
+  "ui": {
+    "connect": {
+      "title": "Connect with WooCommerce",
+      "intro": "Approve Hay.chat in your WordPress admin and the API keys are created and saved for you. No copying keys.",
+      "button": "Connect with WooCommerce",
+      "reconnect": "Reconnect WooCommerce",
+      "cancel": "Cancel",
+      "needSiteUrl": "Enter and save your WordPress site URL above first.",
+      "waiting": "Waiting for you to approve Hay.chat in the WooCommerce window...",
+      "saving": "Keys received and checked. Saving...",
+      "connectedTitle": "WooCommerce connected",
+      "connectedBody": "Hay.chat checked the new keys with your store and saved them. The agent can now use your store.",
+      "alreadyConnected": "API keys are saved. Reconnect if you rotated or revoked them.",
+      "manualHint": "Prefer to paste keys? Create Read/Write keys in WooCommerce → Settings → Advanced → REST API and fill in the fields above.",
+      "errorTitle": "Could not connect WooCommerce",
+      "errors": {
+        "SITE_URL_MISSING": "Save your WordPress site URL first, then try again.",
+        "SITE_URL_INVALID": "The saved WordPress site URL is not valid. Fix it, save, and try again.",
+        "HTTPS_REQUIRED": "One-click connect needs Hay.chat to be reachable over HTTPS. Paste the keys manually instead.",
+        "WRONG_PERMISSIONS": "The keys were created without Read/Write access. Try again and approve Read/Write.",
+        "KEYS_REJECTED": "Your store rejected the new keys. Check that the WooCommerce REST API is enabled and try again.",
+        "STORE_UNREACHABLE": "Hay.chat could not reach your store to check the keys. Check the site URL and try again.",
+        "BAD_KEYS": "WooCommerce sent keys in an unexpected format. Try again or paste the keys manually.",
+        "EXPIRED": "The connect request expired or was not approved. Start again.",
+        "POPUP_BLOCKED": "Your browser blocked the WooCommerce window. Allow pop-ups for this page and try again.",
+        "SAVE_FAILED": "The keys were checked but could not be saved. Try again.",
+        "UNKNOWN": "Something went wrong ({detail}). Try again."
+      }
     }
   }
 }

@@ -19,5 +19,6 @@ module.exports = {
     magento_create_refund: "refund",
     magento_update_order_shipping_address: "address_change",
     magento_add_order_note: "note",
+    magento_resend_order_confirmation: "note",
   },
 };

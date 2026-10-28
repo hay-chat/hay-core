@@ -406,6 +406,14 @@ async function writeAppMetafields(
   }
 }
 
+/** D6-13 "How to return" owner text → MCP env (unset = the agent hands off). */
+function returnInstructionsEnv(config: {
+  getOptional: <T = unknown>(key: string) => T | undefined;
+}): Record<string, string> {
+  const text = config.getOptional<string>("returnInstructions");
+  return typeof text === "string" && text.trim() ? { RETURN_INSTRUCTIONS: text.trim() } : {};
+}
+
 /** D6-9 per-store stale-tracking thresholds → MCP env (the MCP falls back to 5/10). */
 function staleTrackingEnv(config: {
   getOptional: <T = unknown>(key: string) => T | undefined;
@@ -540,6 +548,14 @@ export default defineHayPlugin((globalCtx) => ({
           "than this many days.",
         default: 10,
       },
+      returnInstructions: {
+        type: "string",
+        label: "How to return",
+        description:
+          "Your return process, in your words: where to send items, any link or form, and " +
+          "deadlines. Hay.chat relays it as written when a customer asks how to return " +
+          "something. Leave empty and Hay.chat hands those questions to your team.",
+      },
     });
 
     // Managed: one-click OAuth. Hay Core substitutes {shop} from shopDomain and
@@ -564,6 +580,14 @@ export default defineHayPlugin((globalCtx) => ({
         // Goodwill coupon (mcp/tools/coupons.js, D16-4). Stores connected before this
         // change must reconnect to grant it; until then the tool fails with PERMISSION.
         "write_discounts",
+        // Re-consent bundle (Wave 2): every scope below ships in ONE manifest change so
+        // merchants re-approve Hay.chat once. Until a store re-approves, the tools that
+        // need them fail with SCOPE_MISSING ("the store needs to re-approve Hay.chat").
+        // Size swap before dispatch (shopify_swap_order_item, D6-10).
+        "write_order_edits",
+        // Chargeback evidence (D2 disputes). Shopify Payments stores only.
+        "read_shopify_payments_disputes",
+        "write_shopify_payments_dispute_evidences",
       ],
       clientId: ctx.config.field("clientId"),
       clientSecret: ctx.config.field("clientSecret"),
@@ -698,6 +722,7 @@ export default defineHayPlugin((globalCtx) => ({
           SHOPIFY_ACCESS_TOKEN: accessToken,
           SHOPIFY_API_VERSION: apiVersion,
           ...staleTrackingEnv(ctx.config),
+          ...returnInstructionsEnv(ctx.config),
           ...couponEnv(ctx.config),
         },
       });
