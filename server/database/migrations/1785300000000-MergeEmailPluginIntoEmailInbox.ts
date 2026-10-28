@@ -16,8 +16,9 @@ import { MigrationInterface, QueryRunner } from "typeorm";
  *    the org's send-email action keeps working with the same recipients and
  *    nothing needs to be noted for the merchant. The channel part stays
  *    inactive until they save a support address and set up forwarding.
- *  - Email inbox not in the registry (never discovered on this host): the old
- *    instances cannot be moved and are deleted.
+ *  - Email inbox not in the registry (never discovered on this host): nothing
+ *    is changed (no instance is moved or deleted, references are kept) and a
+ *    warning is logged, so no data is destroyed.
  *
  * Action references `hay-plugin-email:send-email` in playbooks, playbook
  * versions, agent instructions and conversations' enabled_tools are rewritten
@@ -48,76 +49,79 @@ export class MergeEmailPluginIntoEmailInbox1785300000000 implements MigrationInt
   name = "MergeEmailPluginIntoEmailInbox1785300000000";
 
   public async up(queryRunner: QueryRunner): Promise<void> {
-    await this.rewriteActionReferences(queryRunner);
-
     const oldRows: Array<{ id: string }> = await queryRunner.query(
       `SELECT id FROM plugin_registry WHERE plugin_id = $1`,
       [OLD_PLUGIN],
     );
-    if (oldRows.length === 0) {
-      return;
-    }
-    const oldId = oldRows[0].id;
     const newRows: Array<{ id: string }> = await queryRunner.query(
       `SELECT id FROM plugin_registry WHERE plugin_id = $1`,
       [NEW_PLUGIN],
     );
+    const oldId = oldRows[0]?.id ?? null;
     const newId = newRows[0]?.id ?? null;
 
-    if (newId) {
-      // Orgs with both: carry the recipients over, then drop the old instance.
-      await queryRunner.query(
-        `
-        UPDATE plugin_instances inbox
-        SET config = COALESCE(inbox.config, '{}'::jsonb)
-              || jsonb_build_object('notificationRecipients', TRIM(old.config->>'recipients')),
-            updated_at = now()
-        FROM plugin_instances old
-        WHERE old.plugin_id = $1
-          AND inbox.plugin_id = $2
-          AND inbox.organization_id = old.organization_id
-          AND NULLIF(TRIM(old.config->>'recipients'), '') IS NOT NULL
-          AND NULLIF(TRIM(inbox.config->>'notificationRecipients'), '') IS NULL
-        `,
-        [oldId, newId],
+    if (oldId && !newId) {
+      console.warn(
+        `Warning: MergeEmailPluginIntoEmailInbox skipped: ${OLD_PLUGIN} is installed but ${NEW_PLUGIN} is not in plugin_registry, so its instances were left as they are.`,
       );
-      await queryRunner.query(
-        `
-        DELETE FROM plugin_instances old
-        USING plugin_instances inbox
-        WHERE old.plugin_id = $1
-          AND inbox.plugin_id = $2
-          AND inbox.organization_id = old.organization_id
-        `,
-        [oldId, newId],
-      );
-
-      // Orgs with only the old plugin: move the instance to Email inbox.
-      await queryRunner.query(
-        `
-        UPDATE plugin_instances
-        SET plugin_id = $2,
-            config = (COALESCE(config, '{}'::jsonb) - 'recipients')
-              || CASE
-                   WHEN NULLIF(TRIM(config->>'recipients'), '') IS NOT NULL
-                   THEN jsonb_build_object('notificationRecipients', TRIM(config->>'recipients'))
-                   ELSE '{}'::jsonb
-                 END,
-            running = false,
-            process_id = NULL,
-            status = 'stopped',
-            runtime_state = 'stopped',
-            last_error = NULL,
-            restart_count = 0,
-            health_status = NULL,
-            updated_at = now()
-        WHERE plugin_id = $1
-        `,
-        [oldId, newId],
-      );
-    } else {
-      await queryRunner.query(`DELETE FROM plugin_instances WHERE plugin_id = $1`, [oldId]);
+      return;
     }
+
+    await this.rewriteActionReferences(queryRunner);
+    if (!oldId) {
+      return;
+    }
+
+    // Orgs with both: carry the recipients over, then drop the old instance.
+    await queryRunner.query(
+      `
+      UPDATE plugin_instances inbox
+      SET config = COALESCE(inbox.config, '{}'::jsonb)
+            || jsonb_build_object('notificationRecipients', TRIM(old.config->>'recipients')),
+          updated_at = now()
+      FROM plugin_instances old
+      WHERE old.plugin_id = $1
+        AND inbox.plugin_id = $2
+        AND inbox.organization_id = old.organization_id
+        AND NULLIF(TRIM(old.config->>'recipients'), '') IS NOT NULL
+        AND NULLIF(TRIM(inbox.config->>'notificationRecipients'), '') IS NULL
+      `,
+      [oldId, newId],
+    );
+    await queryRunner.query(
+      `
+      DELETE FROM plugin_instances old
+      USING plugin_instances inbox
+      WHERE old.plugin_id = $1
+        AND inbox.plugin_id = $2
+        AND inbox.organization_id = old.organization_id
+      `,
+      [oldId, newId],
+    );
+
+    // Orgs with only the old plugin: move the instance to Email inbox.
+    await queryRunner.query(
+      `
+      UPDATE plugin_instances
+      SET plugin_id = $2,
+          config = (COALESCE(config, '{}'::jsonb) - 'recipients')
+            || CASE
+                 WHEN NULLIF(TRIM(config->>'recipients'), '') IS NOT NULL
+                 THEN jsonb_build_object('notificationRecipients', TRIM(config->>'recipients'))
+                 ELSE '{}'::jsonb
+               END,
+          running = false,
+          process_id = NULL,
+          status = 'stopped',
+          runtime_state = 'stopped',
+          last_error = NULL,
+          restart_count = 0,
+          health_status = NULL,
+          updated_at = now()
+      WHERE plugin_id = $1
+      `,
+      [oldId, newId],
+    );
 
     await queryRunner.query(`DELETE FROM plugin_registry WHERE id = $1`, [oldId]);
   }
