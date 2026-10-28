@@ -1,4 +1,4 @@
-import type { HayLogger } from "@hay/plugin-sdk/types";
+import type { HayLogger, ToolRiskSpec } from "@hay/plugin-sdk/types";
 import type { ChannelSettings } from "./context.js";
 import { parseAddressList } from "./mime.js";
 import type { PluginApi } from "./plugin-api.js";
@@ -61,6 +61,14 @@ export interface ToolDescriptor {
     required: string[];
   };
 }
+
+/**
+ * Risk class of the tools this server lists. Mailing the team is a side
+ * effect, not a money move, so Hay.chat core runs it without approval.
+ */
+export const NOTIFY_TOOL_RISK: ToolRiskSpec = {
+  write: { "send-email": "other_write" },
+};
 
 export const SEND_EMAIL_TOOL: ToolDescriptor = {
   name: "send-email",

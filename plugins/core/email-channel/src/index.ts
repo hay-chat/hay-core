@@ -8,7 +8,12 @@ import { deliver } from "./deliver.js";
 import { getChannelStatus } from "./status.js";
 import { ingestAlias, splitAddress } from "./thread.js";
 import { parseAddress } from "./mime.js";
-import { NOTIFY_SERVER_ID, createNotifyServer, resolveNotificationRecipients } from "./notify.js";
+import {
+  NOTIFY_SERVER_ID,
+  NOTIFY_TOOL_RISK,
+  createNotifyServer,
+  resolveNotificationRecipients,
+} from "./notify.js";
 
 /**
  * Email Channel Plugin
@@ -231,13 +236,16 @@ export default defineHayPlugin((globalCtx) => {
     async onStart(ctx) {
       await apply(ctx);
       try {
-        await ctx.mcp.startLocal(NOTIFY_SERVER_ID, () =>
-          createNotifyServer({
-            getSettings: () => settings,
-            getRecipients: () => notificationRecipients,
-            api: new PluginApiClient(ctx.logger),
-            logger: ctx.logger,
-          }),
+        await ctx.mcp.startLocal(
+          NOTIFY_SERVER_ID,
+          () =>
+            createNotifyServer({
+              getSettings: () => settings,
+              getRecipients: () => notificationRecipients,
+              api: new PluginApiClient(ctx.logger),
+              logger: ctx.logger,
+            }),
+          { toolRisk: NOTIFY_TOOL_RISK },
         );
       } catch (error: unknown) {
         ctx.logger.error("Could not start the send-email action", { error: errorMessage(error) });
