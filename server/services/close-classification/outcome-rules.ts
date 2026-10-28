@@ -82,7 +82,7 @@ export function isTestConversation(metadata: Record<string, unknown> | null | un
     metadata.sourceId === "playground" ||
     metadata.isPlayground === true ||
     metadata.isPlayground === "true" ||
-    (metadata.runKind !== undefined && metadata.runKind !== null)
+    typeof metadata.runKind === "string"
   );
 }
 
