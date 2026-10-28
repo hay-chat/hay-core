@@ -1,9 +1,31 @@
 import { defineHayPlugin } from "@hay/plugin-sdk";
 import { bulkSync, createWooGet } from "./catalog.js";
+import {
+  WcAuthError,
+  WcAuthSessions,
+  buildAuthorizeUrl,
+  buildCallbackUrl,
+  normalizeSiteUrl,
+  safeReturnUrl,
+} from "./wc-auth.js";
 
 /** Re-sync the catalog this often while the worker runs (core keeps it alive). */
 const CATALOG_RESYNC_MS = 6 * 60 * 60 * 1000;
 let resyncTimer: ReturnType<typeof setInterval> | undefined;
+
+/** D16-2 one-click connect: pending wc-auth sessions and the saved site URL (one org per worker). */
+const wcAuthSessions = new WcAuthSessions();
+let connectSiteUrl: string | undefined;
+
+function sendWcAuthError(res: any, error: unknown): void {
+  if (error instanceof WcAuthError) {
+    res.status(400).json({ error: { code: error.code, message: error.message } });
+    return;
+  }
+  res.status(500).json({
+    error: { code: "INTERNAL", message: error instanceof Error ? error.message : String(error) },
+  });
+}
 
 /**
  * WooCommerce Plugin
@@ -84,15 +106,16 @@ export default defineHayPlugin((globalCtx) => ({
         type: "string",
         label: "Consumer Key",
         description:
-          "WooCommerce REST API Consumer Key (WooCommerce → Settings → Advanced → REST API, Read/Write)",
-        required: true,
+          "WooCommerce REST API Consumer Key (WooCommerce → Settings → Advanced → REST API, " +
+          "Read/Write). Filled in for you when you use Connect with WooCommerce.",
+        required: false,
         encrypted: true,
       },
       consumerSecret: {
         type: "string",
         label: "Consumer Secret",
         description: "WooCommerce REST API Consumer Secret",
-        required: true,
+        required: false,
         encrypted: true,
       },
       couponsEnabled: {
@@ -153,6 +176,49 @@ export default defineHayPlugin((globalCtx) => ({
       id: "woocommerce-apikey",
       label: "WooCommerce API Key",
       configField: "consumerKey",
+    });
+
+    // D16-2 one-click connect (see ./wc-auth.ts).
+    ctx.register.ui.page({
+      id: "woocommerce-connect",
+      title: "Connect with WooCommerce",
+      component: "./components/settings/AfterSettings.vue",
+      slot: "after-settings",
+      icon: "plug",
+    });
+
+    // Settings UI (authenticated, org-scoped via plugins.callUiRoute).
+    ctx.register.route("POST", "/ui/wc-auth/start", async (req, res) => {
+      try {
+        const siteUrl = normalizeSiteUrl(connectSiteUrl);
+        const callbackUrl = buildCallbackUrl(
+          process.env.HAY_API_URL,
+          process.env.HAY_PLUGIN_ID || "hay-plugin-woocommerce",
+          process.env.HAY_ORG_ID || "",
+        );
+        const nonce = wcAuthSessions.start(siteUrl);
+        const returnUrl = safeReturnUrl(req.body?.returnUrl, siteUrl);
+        res.json({ nonce, authorizeUrl: buildAuthorizeUrl({ siteUrl, nonce, callbackUrl, returnUrl }) });
+      } catch (error) {
+        sendWcAuthError(res, error);
+      }
+    });
+
+    ctx.register.route("POST", "/ui/wc-auth/status", async (req, res) => {
+      res.json(wcAuthSessions.status(req.body?.nonce));
+    });
+
+    // Public: WooCommerce posts the generated keys here through the core proxy.
+    ctx.register.route("POST", "/wc-auth/callback", async (req, res) => {
+      try {
+        await wcAuthSessions.receive(req.body);
+        res.status(200).json({ ok: true });
+      } catch (error) {
+        globalCtx.logger.warn("WooCommerce one-click connect callback rejected", {
+          code: error instanceof WcAuthError ? error.code : "INTERNAL",
+        });
+        sendWcAuthError(res, error);
+      }
     });
 
     globalCtx.logger.info("WooCommerce plugin config and auth methods registered");
@@ -226,6 +292,7 @@ export default defineHayPlugin((globalCtx) => ({
     const siteUrl = ctx.config.getOptional<string>("siteUrl");
     const consumerKey = ctx.config.getOptional<string>("consumerKey");
     const consumerSecret = ctx.config.getOptional<string>("consumerSecret");
+    connectSiteUrl = siteUrl;
 
     if (!siteUrl || !consumerKey || !consumerSecret) {
       ctx.logger.info(
