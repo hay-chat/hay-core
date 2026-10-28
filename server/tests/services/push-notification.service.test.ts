@@ -37,6 +37,7 @@ jest.mock("@server/services/email.service", () => ({
 }));
 
 import { pushNotificationService } from "@server/services/push-notification.service";
+import { notificationLocale } from "@server/services/notification-locale";
 
 const ORG_ID = "11111111-1111-4111-8111-111111111111";
 const USER_ID = "22222222-2222-4222-8222-222222222222";
@@ -142,7 +143,7 @@ describe("sendToUser", () => {
 describe("sendTest", () => {
   it("only targets the caller's own devices, in the organization's language", async () => {
     configure();
-    mockGetOrganizationLocale.mockResolvedValue("pt-BR");
+    mockGetOrganizationLocale.mockResolvedValue("pt"); // org languages are short codes
     mockRepo.find.mockResolvedValue([subscription("mine")]);
     mockSendNotification.mockResolvedValue({ statusCode: 201 });
 
@@ -154,6 +155,32 @@ describe("sendTest", () => {
       kind: "test",
       title: "Alertas do Hay.chat ativados",
       url: "/",
+    });
+  });
+});
+
+describe("notification locale", () => {
+  it.each([
+    ["pt", "pt-BR"],
+    ["pt-BR", "pt-BR"],
+    ["es", "es"],
+    ["en", "en"],
+    ["fr", "en"],
+    [null, "en"],
+  ])("maps the organization language %p to %p copy", (language, locale) => {
+    expect(notificationLocale(language)).toBe(locale);
+  });
+
+  it("sends Spanish copy to a Spanish organization", async () => {
+    configure();
+    mockGetOrganizationLocale.mockResolvedValue("es");
+    mockRepo.find.mockResolvedValue([subscription("mine")]);
+    mockSendNotification.mockResolvedValue({ statusCode: 201 });
+
+    await pushNotificationService.sendTest(USER_ID, ORG_ID);
+
+    expect(JSON.parse(mockSendNotification.mock.calls[0][1])).toMatchObject({
+      title: "Las alertas de Hay.chat están activadas",
     });
   });
 });
