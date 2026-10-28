@@ -40,6 +40,14 @@
                       : $t("conversations.detail.simulatedBadge")
                   }}
                 </Badge>
+                <Badge
+                  v-if="testedDraft"
+                  variant="warning"
+                  class="text-xs shrink-0"
+                  data-testid="playground-draft"
+                >
+                  {{ $t("conversations.detail.testingDraft") }}
+                </Badge>
               </div>
               <p class="text-sm text-neutral-muted hidden sm:block">
                 {{ $t("conversations.detail.playgroundDescription") }}
@@ -1513,7 +1521,9 @@ const goBack = () => {
 
 // Playground-specific functions
 const exitPlayground = () => {
-  navigateTo("/conversations");
+  const router = useRouter();
+  // Testing a playbook draft (D7-5): go back to that playbook's editor.
+  router.push(testedDraft.value ? `/playbooks/${testedDraft.value.playbookId}` : "/conversations");
 };
 
 const navigateToPlaybook = () => {
@@ -1603,6 +1613,14 @@ const setActionMode = async (dryRun: boolean) => {
   }
 };
 
+// D7-5: "Test this draft" opens the playground with ?playbookId=&versionId=.
+const testedDraft = computed(() => {
+  const { playbookId, versionId } = route.query;
+  return isPlaygroundMode.value && typeof playbookId === "string" && typeof versionId === "string"
+    ? { playbookId, versionId }
+    : null;
+});
+
 const createTestConversation = async () => {
   try {
     messagesLoading.value = true;
@@ -1614,6 +1632,7 @@ const createTestConversation = async () => {
         dryRun: true,
       },
       status: "open",
+      ...(testedDraft.value ? { playbookVersionOverride: testedDraft.value } : {}),
     });
 
     conversation.value = response;
@@ -1621,6 +1640,9 @@ const createTestConversation = async () => {
     messages.value = [];
   } catch (error) {
     console.error("Failed to create test conversation:", error);
+    if (testedDraft.value) {
+      useToast().error(t("common.error"), t("conversations.detail.testDraftFailed"));
+    }
   } finally {
     messagesLoading.value = false;
   }

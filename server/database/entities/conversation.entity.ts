@@ -317,15 +317,29 @@ export class Conversation {
       return;
     }
 
-    // Resolve versioned fields: prefer active version, fall back to playbook row
+    // Resolve versioned fields: a test conversation's version override (D7-5),
+    // else the active version, else the playbook row.
     let instructions = playbook.instructions;
     let requiredFields = playbook.required_fields;
     let activeVersionId: string | null = null;
+    let testedDraftVersionId: string | null = null;
 
-    if (playbook.active_version_id) {
+    const { getPlaybookVersionOverride } = await import("../../services/playbook-version-override");
+    const override = getPlaybookVersionOverride(this.metadata);
+    const overrideVersionId = override?.playbookId === playbookId ? override.versionId : null;
+    const versionId = overrideVersionId ?? playbook.active_version_id;
+
+    if (versionId) {
       const { playbookVersionRepository } =
         await import("../../repositories/playbook-version.repository");
-      const activeVersion = await playbookVersionRepository.findById(playbook.active_version_id);
+      let activeVersion = await playbookVersionRepository.findById(versionId);
+      if (activeVersion?.playbook_id !== playbookId) activeVersion = null;
+      if (activeVersion && overrideVersionId) {
+        testedDraftVersionId = activeVersion.id;
+      } else if (!activeVersion && overrideVersionId && playbook.active_version_id) {
+        // The tested draft is gone (published or discarded): run the live version.
+        activeVersion = await playbookVersionRepository.findById(playbook.active_version_id);
+      }
       if (activeVersion) {
         instructions = activeVersion.instructions;
         requiredFields = activeVersion.required_fields;
@@ -575,6 +589,9 @@ The following tools are available for you to use. You MUST return only valid JSO
         metadata: {
           playbookId: playbookId,
           playbookTitle: playbook.title,
+          ...(testedDraftVersionId
+            ? { playbookVersionId: testedDraftVersionId, isDraft: true }
+            : {}),
         },
       });
     } else {

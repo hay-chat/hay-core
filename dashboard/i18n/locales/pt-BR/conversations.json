@@ -139,7 +139,9 @@
       "liveStoreConfirmTitle": "Usar sua loja real?",
       "liveStoreConfirmDescription": "Reembolsos, cancelamentos, mudanças de endereço e outras ações nesta conversa de teste serão enviados para sua loja real. Você pode voltar a qualquer momento.",
       "liveStoreConfirm": "Usar loja real",
-      "actionModeFailed": "Não foi possível trocar o modo de ações. Tente novamente."
+      "actionModeFailed": "Não foi possível trocar o modo de ações. Tente novamente.",
+      "testingDraft": "Testando rascunho do playbook",
+      "testDraftFailed": "Não foi possível testar este rascunho. Ele pode ter sido publicado ou descartado."
     },
     "pendingHuman": {
       "needsHuman": "Esta conversa foi encaminhada para um agente humano",

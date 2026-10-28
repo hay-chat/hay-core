@@ -73,6 +73,18 @@
             {{ t("versioning.history.button") }}
           </Button>
 
+          <Button
+            v-if="isEditMode && draftVersion"
+            variant="outline"
+            size="sm"
+            data-testid="test-draft"
+            :loading="isOpeningTest"
+            @click="testDraft"
+          >
+            <FlaskConical class="h-4 w-4 mr-2" />
+            {{ t("versioning.testDraft") }}
+          </Button>
+
           <!-- Edit mode: Save (identity) + Publish -->
           <template v-if="isEditMode">
             <Button
@@ -360,6 +372,7 @@ import {
   Circle,
   History,
   Sparkles,
+  FlaskConical,
 } from "lucide-vue-next";
 import type { JSONContent } from "@tiptap/vue-3";
 import type { MCPTool } from "@/components/tiptap/MentionExtension";
@@ -445,6 +458,22 @@ const draftVersion = ref<PlaybookVersion | null>(null);
 const showPublishDialog = ref(false);
 const publishNote = ref("");
 const showVersionHistory = ref(false);
+
+// D7-5: open the playground against the draft (writes simulated there by default).
+const isOpeningTest = ref(false);
+const testDraft = async () => {
+  if (!playbookId.value || !draftVersion.value) return;
+  isOpeningTest.value = true;
+  try {
+    await flushAutoSave();
+    router.push({
+      path: "/conversations/playground",
+      query: { playbookId: playbookId.value, versionId: draftVersion.value.id },
+    });
+  } finally {
+    isOpeningTest.value = false;
+  }
+};
 
 // AI suggest-edits state
 const showSuggestDialog = ref(false);

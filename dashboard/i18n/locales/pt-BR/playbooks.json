@@ -149,7 +149,8 @@
       "discardConfirm": "Descartar rascunho",
       "discardSuccess": "Rascunho descartado",
       "discardFailed": "Falha ao descartar o rascunho"
-    }
+    },
+    "testDraft": "Testar este rascunho"
   },
   "loading": {
     "loadingPlaybook": "Carregando playbook...",
