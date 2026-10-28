@@ -32,6 +32,7 @@ const baseFacts: CloseFacts = {
   closeReason: "inactivity_timeout",
   isTest: false,
   spamFlagged: false,
+  spamCleared: false,
   handedOff: false,
   hadRealRequest: true,
   aiReplied: true,
@@ -120,6 +121,17 @@ describe("close outcome rules", () => {
       });
     });
 
+    it("staff's Not spam beats the model's spam verdict, but not a later flag", () => {
+      const cleared = { ...baseFacts, spamCleared: true };
+      expect(decideOutcome(cleared, verdict(true, { isSpam: true }))).toMatchObject({
+        outcome: "assumed",
+        billable: true,
+      });
+      expect(
+        decideOutcome({ ...cleared, spamFlagged: true }, verdict(true, { isSpam: true })).outcome,
+      ).toBe("spam");
+    });
+
     it("test traffic is never billed and wins over everything", () => {
       const facts = { ...baseFacts, isTest: true, spamFlagged: true };
       expect(decideOutcome(facts, verdict(true))).toMatchObject({
@@ -172,6 +184,12 @@ describe("close outcome rules", () => {
       handed_off_at: null,
       spam_flagged_at: null,
     };
+
+    it("notes a staff Not spam from the spam check record", () => {
+      const cleared = { ...conversation, metadata: { spamCheck: { clearedAt: "2026-10-28" } } };
+      expect(collectCloseFacts(cleared, []).spamCleared).toBe(true);
+      expect(collectCloseFacts(conversation, []).spamCleared).toBe(false);
+    });
 
     it("notes a requested approval from the TOOL message", () => {
       const facts = collectCloseFacts(conversation, [

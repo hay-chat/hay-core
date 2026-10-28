@@ -99,7 +99,7 @@ export function useConversation(config: HayChatConfig) {
   const createConversation = async (
     publicJwk: JsonWebKey,
     context?: Record<string, unknown>,
-    customerExternalId?: string,
+    customer?: { externalId?: string; signature?: string },
     challenge?: { token?: string; error?: string },
   ): Promise<CreateConversationResponse> => {
     const metadata: ConversationMetadata = {
@@ -122,7 +122,10 @@ export function useConversation(config: HayChatConfig) {
         // Same locale the widget UI uses, so the server greeting matches it.
         language: resolveLocale(config.locale),
         ...(context && Object.keys(context).length > 0 ? { context } : {}),
-        ...(customerExternalId ? { customerExternalId } : {}),
+        ...(customer?.externalId ? { customerExternalId: customer.externalId } : {}),
+        ...(customer?.externalId && customer.signature
+          ? { customerExternalIdSignature: customer.signature }
+          : {}),
         ...(challenge?.token ? { challengeToken: challenge.token } : {}),
         ...(challenge?.error ? { challengeError: challenge.error } : {}),
       }),

@@ -33,6 +33,7 @@ import { isAnalyzable, PDF_TYPE, READABLE_IMAGE_TYPES as IMAGE_TYPES } from "./r
 import { toStoredAnalysis, type PrivacySettings } from "./privacy";
 import { redactCardNumbers } from "./redact";
 import { VisionUnavailableError, visionService, type VisionInput } from "./vision.service";
+import { isBotFlagged } from "@server/services/webchat/bot-check";
 
 const logger = createLogger("media-analysis");
 
@@ -240,9 +241,11 @@ export async function processMessageMedia(
 }
 
 /**
- * Files in a conversation held as spam, or whose bot check did not verify the
- * visitor, are not worth a vision call: the AI does not answer spam, and a
- * bot flooding photos would otherwise run up the org's vision cost.
+ * Files in a conversation held as spam, or whose visitor failed the bot check,
+ * are not worth a vision call: the AI does not answer spam, and a bot flooding
+ * photos would otherwise run up the org's vision cost. A check that could not
+ * run (Cloudflare unreachable) says nothing about the shopper and is no reason
+ * to skip.
  */
 async function visionSkipReason(conversationId: string): Promise<"spam" | "unverified" | null> {
   const conversation = await AppDataSource.getRepository(Conversation).findOne({
@@ -250,8 +253,65 @@ async function visionSkipReason(conversationId: string): Promise<"spam" | "unver
     select: { id: true, spam_flagged_at: true, metadata: true },
   });
   if (conversation?.spam_flagged_at) return "spam";
-  const botCheck = conversation?.metadata?.botCheck as { decision?: unknown } | undefined;
-  return botCheck?.decision === "flag" ? "unverified" : null;
+  // Staff marked it "Not spam": a person vouched for the shopper.
+  const spamCheck = conversation?.metadata?.spamCheck as { clearedAt?: unknown } | undefined;
+  if (spamCheck?.clearedAt) return null;
+  return isBotFlagged(conversation?.metadata?.botCheck) ? "unverified" : null;
+}
+
+/** Skip reasons that a "Not spam" from staff takes back. */
+const HELD_SKIP_REASONS: ReadonlyArray<string> = ["spam", "unverified"];
+
+function isHeldSkip(attachment: MessageAttachment): boolean {
+  return (
+    attachment.analysis?.status === "skipped" &&
+    HELD_SKIP_REASONS.includes(attachment.analysis.reason ?? "")
+  );
+}
+
+/**
+ * Staff marked the conversation "Not spam" (D3): the customer files the pass
+ * skipped because it was held as spam or unverified are marked pending again
+ * (the Inbox shows them as being read) and analysed. Resolves once every file
+ * is settled; never throws. Returns how many messages were re-read.
+ */
+export async function reanalyzeHeldMedia(
+  conversationId: string,
+  organizationId: string,
+): Promise<number> {
+  const rows: Array<{ id: string }> = await AppDataSource.query(
+    `SELECT id FROM messages
+     WHERE conversation_id = $1
+       AND type = 'Customer'
+       AND (attachments @> '[{"analysis":{"status":"skipped","reason":"spam"}}]'::jsonb
+         OR attachments @> '[{"analysis":{"status":"skipped","reason":"unverified"}}]'::jsonb)
+     ORDER BY created_at ASC`,
+    [conversationId],
+  );
+
+  const now = new Date().toISOString();
+  const marked: string[] = [];
+  for (const { id } of rows) {
+    const message = await messageRepository.findByIdAndOrganization(id, organizationId);
+    if (!message?.attachments?.some(isHeldSkip)) continue;
+    const attachments = message.attachments.map((attachment) =>
+      isHeldSkip(attachment)
+        ? { ...attachment, analysis: { status: "pending" as const, startedAt: now } }
+        : attachment,
+    );
+    await messageRepository.update(message.id, { attachments });
+    await publishMediaUpdate(organizationId, conversationId, message.id, attachments);
+    marked.push(message.id);
+  }
+
+  await Promise.all(
+    marked.map((messageId) =>
+      processMessageMedia(messageId, organizationId).catch((error) => {
+        logger.error({ err: error, messageId }, "Media analysis crashed");
+      }),
+    ),
+  );
+  return marked.length;
 }
 
 /** Merge the results into the message's current attachments (re-read) and store them. */

@@ -7,6 +7,7 @@ import { Message, MessageType } from "../../database/entities/message.entity";
 import { ConversationOutcome } from "../../database/entities/conversation-outcome.entity";
 import { InsightIssue } from "../../database/entities/insight-issue.entity";
 import { Customer } from "../../database/entities/customer.entity";
+import { User } from "../../entities/user.entity";
 import { AnalyticsService } from "../../services/analytics.service";
 import { ConversationRepository } from "../../repositories/conversation.repository";
 import {
@@ -14,6 +15,7 @@ import {
   MAX_ATTEMPTS,
 } from "../../services/close-classification/close-classifier.service";
 import { REVERSAL_WINDOW_MS } from "../../services/close-classification/outcome-rules";
+import { markNotSpam } from "../../services/spam/spam-review.service";
 import { AddConversationOutcomes1785100000000 } from "../../database/migrations/1785100000000-AddConversationOutcomes";
 
 const mockInvokeWithMeta = jest.fn<(options: Record<string, unknown>) => Promise<unknown>>();
@@ -68,6 +70,7 @@ function llmReturns(overrides: Partial<typeof VALID_RESPONSE> = {}) {
 
 describe("close classifier (D1-3 + D3-8)", () => {
   const orgId = "c105edc1-0000-4000-8000-000000000001";
+  const staffUserId = "c105edc1-0000-4000-8000-0000000000aa";
   const analytics = new AnalyticsService();
   const repository = new ConversationRepository();
   const outcomes = () => AppDataSource.getRepository(ConversationOutcome);
@@ -138,6 +141,12 @@ describe("close classifier (D1-3 + D3-8)", () => {
         orgRepo.create({ id: orgId, name: "Close Classifier Org", slug: "close-classifier-org" }),
       );
     }
+    const userRepo = AppDataSource.getRepository(User);
+    if (!(await userRepo.findOne({ where: { id: staffUserId } }))) {
+      await userRepo.save(
+        userRepo.create({ id: staffUserId, email: "close-classifier@example.com", password: "x" }),
+      );
+    }
   });
 
   beforeEach(async () => {
@@ -155,6 +164,7 @@ describe("close classifier (D1-3 + D3-8)", () => {
     await AppDataSource.getRepository(Conversation).delete({ organization_id: orgId });
     await AppDataSource.getRepository(Customer).delete({ organization_id: orgId });
     await AppDataSource.getRepository(Organization).delete({ id: orgId });
+    await AppDataSource.getRepository(User).delete({ id: staffUserId });
     if (AppDataSource.isInitialized) {
       await AppDataSource.destroy();
     }
@@ -432,6 +442,32 @@ describe("close classifier (D1-3 + D3-8)", () => {
     // No QA event for spam.
     expect(await issues().countBy({ organization_id: orgId })).toBe(0);
     expect(await billable()).toBe(0);
+  });
+
+  it("Not spam undoes spam the classifier found: reclassified, and the model's spam no longer counts", async () => {
+    const found = await conversationWithAnswer();
+    await inactivityClose(found);
+    llmReturns({ is_spam: true });
+    await closeClassifierService.processPending(10);
+    expect(await outcomeFor(found.id)).toMatchObject({ outcome: "spam", classified_by: "llm" });
+
+    await markNotSpam(orgId, found.id, staffUserId);
+    const cleared = await AppDataSource.getRepository(Conversation).findOneByOrFail({
+      id: found.id,
+    });
+    expect(cleared.spam_flagged_at).toBeNull();
+    expect(await outcomeFor(found.id)).toMatchObject({ classified_at: null });
+
+    // The model says spam again; staff's verdict wins.
+    await closeClassifierService.processPending(10);
+    expect(await outcomeFor(found.id)).toMatchObject({
+      outcome: "assumed",
+      billable: true,
+      classified_by: "llm",
+    });
+    const after = await AppDataSource.getRepository(Conversation).findOneByOrFail({ id: found.id });
+    expect(after.spam_flagged_at).toBeNull();
+    expect(await billable()).toBe(1);
   });
 
   it("test traffic and greeting-only chats skip the LLM and never bill", async () => {

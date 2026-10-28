@@ -1,8 +1,9 @@
 /**
  * D9-7: the Inbox Spam view. Lists spam-flagged conversations with the reasons
  * the detector recorded, and lets staff correct it either way:
- *  - "Not spam" clears the flag, stops future screening and gives the
- *    conversation back to the AI when the shopper is still waiting.
+ *  - "Not spam" clears the flag, stops future screening, reads the files
+ *    skipped while it was held and gives the conversation back to the AI
+ *    when the shopper is still waiting.
  *  - "Mark as spam" flags it (never billed, D9-5) and holds it from the AI.
  *    Closes it already had stop billing (within the correctable periods);
  *    "Not spam" sends them back to the close classifier.
@@ -13,6 +14,9 @@ import { AppDataSource } from "@server/database/data-source";
 import { conversationRepository } from "@server/repositories/conversation.repository";
 import { resolutionLedgerService } from "@server/services/resolution-ledger.service";
 import type { SpamCheckRecord } from "@server/services/spam/spam-hold.service";
+import { createLogger } from "@server/lib/logger";
+
+const logger = createLogger("spam-review");
 
 /** Reasons the Spam view can explain. Anything else shows as "other". */
 export type SpamSource = "detector" | "staff" | "close_classifier" | "other";
@@ -156,9 +160,28 @@ export async function markNotSpam(
   // Closes that were spam only because of the flag get classified again.
   await resolutionLedgerService.clearConversationSpam({ organizationId, conversationId, userId });
 
-  if (reengage) {
-    const { orchestratorQueueService } = await import("@server/services/orchestrator-queue.service");
-    await orchestratorQueueService.enqueue(conversation.id, organizationId, "ai_return");
-  }
+  // Files skipped while it was held are read now; the AI answers once they
+  // are, so it sees the photo the shopper sent. Runs after the response.
+  void answerAfterHeldMedia(conversation.id, organizationId, reengage);
   return { reengaged: reengage };
+}
+
+async function answerAfterHeldMedia(
+  conversationId: string,
+  organizationId: string,
+  reengage: boolean,
+): Promise<void> {
+  try {
+    const { reanalyzeHeldMedia } = await import("@server/services/media-analysis/pipeline");
+    await reanalyzeHeldMedia(conversationId, organizationId);
+  } catch (error) {
+    logger.warn({ err: error, conversationId }, "Could not re-read files after Not spam");
+  }
+  if (!reengage) return;
+  try {
+    const { orchestratorQueueService } = await import("@server/services/orchestrator-queue.service");
+    await orchestratorQueueService.enqueue(conversationId, organizationId, "ai_return");
+  } catch (error) {
+    logger.error({ err: error, conversationId }, "Could not hand the conversation back to the AI");
+  }
 }
