@@ -16,6 +16,7 @@ export const roleProtectedRoutes: Record<string, string[]> = {
   "/settings/privacy": ["owner", "admin"],
   "/settings/webchat": ["owner", "admin"],
   "/settings/business-hours": ["owner", "admin"],
+  "/settings/usage": ["owner", "admin"],
   "/agents": ["owner", "admin"],
 
   // Insights - all except agent

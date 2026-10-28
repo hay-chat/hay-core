@@ -29,6 +29,7 @@ import { internalRouter } from "./internal";
 import { notificationsRouter } from "./notifications";
 import { actionsRouter } from "./actions";
 import { businessHoursRouter } from "./business-hours";
+import { usageRouter } from "./usage";
 
 // Core routers - always available
 const coreRouters = {
@@ -61,6 +62,7 @@ const coreRouters = {
   notifications: notificationsRouter,
   actions: actionsRouter,
   businessHours: businessHoursRouter,
+  usage: usageRouter,
 };
 
 // Create v1Router with core + plugin routers
