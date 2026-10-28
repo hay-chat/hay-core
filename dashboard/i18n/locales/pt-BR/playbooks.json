@@ -295,5 +295,11 @@
     "diff": {
       "showHidden": "Mostrar {count} linhas ocultas"
     }
+  },
+  "templates": {
+    "button": "A partir de modelo",
+    "loadFailed": "Falha ao carregar os modelos",
+    "created": "Playbook em rascunho criado a partir do modelo. Revise e depois ative.",
+    "createFailed": "Falha ao criar o playbook a partir do modelo"
   }
 }
