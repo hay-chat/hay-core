@@ -322,6 +322,9 @@ const jobRegistry: CronJobConfig[] = [
     handler: async () => {
       const { dataRetentionService } = await import("./data-retention.service");
       await dataRetentionService.anonymizeExpiredConversations();
+      // Imported test transcripts (D7-8) follow the same retention setting.
+      const { testTranscriptService } = await import("./test-transcript.service");
+      await testTranscriptService.deleteExpired();
     },
     // NOTE: Respects organization.settings.retentionDays (null = disabled)
     // Preserves conversation metadata for analytics while removing PII
