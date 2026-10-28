@@ -46,7 +46,8 @@ function registerOrderTools(server) {
     "wix_get_order",
     "Get an order by id or order number, with line items, totals, shipping address, payments, " +
       "tracking and a supportSummary (isCancellable, isRefundable, remainingRefundable, " +
-      "addressChangeable). One call answers status, refund and cancellation questions.",
+      "addressChangeable, tracking: isStale/daysSinceLastUpdate/staleReason). One call answers " +
+      "status, refund, cancellation and stuck-parcel questions.",
     ORDER_REF,
     async (args) => {
       try {

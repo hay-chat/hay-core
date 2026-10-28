@@ -9,6 +9,7 @@
  *   GET /invoices?searchCriteria…(order_id)    → needed for online refunds
  */
 
+const { staleTracking, stalestShipment } = require("@hay/plugin-sdk/stale-tracking");
 const { magentoApi, searchCriteria, MagentoApiError } = require("./client");
 const { num, round2 } = require("./format");
 
@@ -123,7 +124,34 @@ function shippingAddressOf(order) {
   return order?.extension_attributes?.shipping_assignments?.[0]?.shipping?.address ?? null;
 }
 
-function enrichOrder(order, shipments, invoices) {
+/** Magento REST dates are UTC without a zone ("2026-10-20 10:00:00"). */
+function utcIso(value) {
+  if (!value) return null;
+  const text = String(value).trim().replace(" ", "T");
+  return /Z|[+-]\d\d:?\d\d$/.test(text) ? text : `${text}Z`;
+}
+
+/**
+ * D6-9 stale flag: days since each shipment was created. Magento has no
+ * carrier events or delivery confirmation, so a shipment that left more than
+ * the threshold ago is flagged until the order is closed or cancelled. The
+ * store country is not readable over REST, so the origin is unknown and the
+ * shorter domestic threshold applies unless the store sets its own.
+ */
+function trackingStaleness(order, shipments, now) {
+  const destinationCountry = shippingAddressOf(order)?.country_id ?? null;
+  const open = order.state !== "canceled" && order.state !== "closed";
+  const results = open
+    ? (shipments || [])
+        .filter((s) => s.created_at)
+        .map((s) =>
+          staleTracking({ shippedAt: utcIso(s.created_at), destinationCountry, now }),
+        )
+    : [];
+  return stalestShipment(results) || staleTracking({ shippedAt: null, destinationCountry, now });
+}
+
+function enrichOrder(order, shipments, invoices, { now = Date.now() } = {}) {
   const paid = num(order.total_paid);
   const refunded = num(order.total_refunded);
   const remaining = round2(Math.max(0, paid - refunded));
@@ -186,6 +214,7 @@ function enrichOrder(order, shipments, invoices) {
       addressChangeable: !closed && !shipped,
       shippedAt: tracking[0]?.shippedAt ?? null,
       deliveredAt: null, // Magento has no delivery confirmation.
+      tracking: trackingStaleness(order, shipments, now),
       needsCreditMemo: paid > 0, // paid orders cannot be cancelled; refund instead
     },
   };

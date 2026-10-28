@@ -10,6 +10,7 @@
  * Env (injected by the plugin worker):
  *   WIX_API_KEY   site-scoped Wix API key (sent raw in the Authorization header)
  *   WIX_SITE_ID   the Wix site ID the key is scoped to (wix-site-id header)
+ *   STALE_TRACKING_DOMESTIC_DAYS, STALE_TRACKING_INTERNATIONAL_DAYS (optional, D6-9)
  */
 
 const { McpServer } = require("@modelcontextprotocol/sdk/server/mcp.js");

@@ -63,6 +63,14 @@
     "apiToken": {
       "label": "API Token",
       "description": "Magento integration access token (System → Integrations) with access to Sales, Catalog and Customers"
+    },
+    "staleTrackingDomesticDays": {
+      "label": "Stale tracking: domestic (days)",
+      "description": "Treat a domestic shipment as stuck when its tracking has not moved for more than this many days."
+    },
+    "staleTrackingInternationalDays": {
+      "label": "Stale tracking: international (days)",
+      "description": "Treat an international shipment as stuck when its tracking has not moved for more than this many days."
     }
   }
 }

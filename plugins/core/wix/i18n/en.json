@@ -47,6 +47,14 @@
     "siteId": {
       "label": "Site ID",
       "description": "The Wix site ID this key is scoped to (from your dashboard URL or the Query Sites API)."
+    },
+    "staleTrackingDomesticDays": {
+      "label": "Stale tracking: domestic (days)",
+      "description": "Treat a domestic shipment as stuck when its tracking has not moved for more than this many days."
+    },
+    "staleTrackingInternationalDays": {
+      "label": "Stale tracking: international (days)",
+      "description": "Treat an international shipment as stuck when its tracking has not moved for more than this many days."
     }
   }
 }

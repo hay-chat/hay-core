@@ -152,6 +152,7 @@ describe("enrichOrder", () => {
       addressChangeable: true,
       shippedAt: null,
       deliveredAt: null,
+      tracking: expect.objectContaining({ isStale: false, shippedAt: null }),
       needsCreditMemo: true,
     });
     expect(e.lineItems).toHaveLength(1); // child row collapsed
