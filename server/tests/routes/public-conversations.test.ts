@@ -28,8 +28,18 @@ jest.mock("@server/services/dpop-cache.service", () => ({
 jest.mock("@server/repositories/conversation.repository", () => ({
   conversationRepository: { updateById: jest.fn(async () => undefined) },
 }));
+const mockFindByExternalId = jest.fn<(id: string, orgId: string) => Promise<unknown>>(
+  async () => null,
+);
 jest.mock("@server/repositories/customer.repository", () => ({
-  CustomerRepository: jest.fn(() => ({ findByExternalId: jest.fn(async () => null) })),
+  CustomerRepository: jest.fn(() => ({ findByExternalId: mockFindByExternalId })),
+}));
+
+const mockVerifiedCustomerExternalId = jest.fn<
+  (orgId: string, id?: string, signature?: string) => Promise<string | null>
+>(async () => null);
+jest.mock("@server/services/webchat/webchat-identity.service", () => ({
+  verifiedCustomerExternalId: mockVerifiedCustomerExternalId,
 }));
 
 const mockFindOrganization = jest.fn<(id: string) => Promise<unknown>>();
@@ -388,5 +398,72 @@ describe("publicConversations.create plugin gates", () => {
     await callerFor().create(createInput);
     const data = mockCreateConversation.mock.calls[0][1] as { metadata: Record<string, unknown> };
     expect(data.metadata.botCheck).toMatchObject({ decision: "flag", results });
+  });
+});
+
+describe("publicConversations.create customer link (D1)", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockFindOrganization.mockResolvedValue({ id: ORG_ID, suspendedAt: null, settings: {} });
+    mockIsEnabled.mockResolvedValue(true);
+    mockGetSettings.mockResolvedValue({ allowedDomains: ["*"] });
+    mockRateLimited.mockResolvedValue(false);
+    mockFindByExternalId.mockResolvedValue({ id: "customer-ana" });
+  });
+
+  it("links the store's customer when the id is signed", async () => {
+    mockVerifiedCustomerExternalId.mockResolvedValue("ana@shop.com");
+
+    await callerFor().create({
+      ...createInput,
+      customerExternalId: "ana@shop.com",
+      customerExternalIdSignature: "a".repeat(64),
+    });
+
+    expect(mockVerifiedCustomerExternalId).toHaveBeenCalledWith(
+      ORG_ID,
+      "ana@shop.com",
+      "a".repeat(64),
+    );
+    expect(mockFindByExternalId).toHaveBeenCalledWith("ana@shop.com", ORG_ID);
+    expect(mockCreateConversation).toHaveBeenCalledWith(
+      ORG_ID,
+      expect.objectContaining({ customer_id: "customer-ana" }),
+    );
+  });
+
+  it.each([
+    ["unsigned", undefined],
+    ["wrongly signed", "b".repeat(64)],
+  ])("never links an %s id: the visitor gets a fresh customer", async (_label, signature) => {
+    mockVerifiedCustomerExternalId.mockResolvedValue(null);
+
+    await callerFor().create({
+      ...createInput,
+      customerExternalId: "ana@shop.com",
+      ...(signature ? { customerExternalIdSignature: signature } : {}),
+    });
+
+    expect(mockFindByExternalId).not.toHaveBeenCalled();
+    expect(mockCreateConversation).toHaveBeenCalledWith(
+      ORG_ID,
+      expect.objectContaining({ customer_id: null }),
+    );
+  });
+
+  it("a signed id with no matching customer stays anonymous", async () => {
+    mockVerifiedCustomerExternalId.mockResolvedValue("new@shop.com");
+    mockFindByExternalId.mockResolvedValue(null);
+
+    await callerFor().create({
+      ...createInput,
+      customerExternalId: "new@shop.com",
+      customerExternalIdSignature: "c".repeat(64),
+    });
+
+    expect(mockCreateConversation).toHaveBeenCalledWith(
+      ORG_ID,
+      expect.objectContaining({ customer_id: null }),
+    );
   });
 });

@@ -88,6 +88,12 @@ export class WebchatSettings {
   @Column({ type: "varchar", length: 20, name: "under_attack_source", nullable: true })
   underAttackSource!: "owner" | "auto" | null;
 
+  // Customer identity (D1): HMAC key for signing `customerExternalId`, encrypted
+  // with encryptValue. Never loaded by default; read through
+  // webchat-identity.service only, and shown to org admins only.
+  @Column({ type: "text", name: "identity_secret", nullable: true, select: false })
+  identitySecret!: string | null;
+
   // Advanced
   @Column({ type: "text", name: "custom_css", nullable: true })
   customCss!: string | null;

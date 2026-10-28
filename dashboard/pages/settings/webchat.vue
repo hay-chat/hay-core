@@ -196,6 +196,51 @@
         </div>
       </CardContent>
     </Card>
+
+    <!-- Customer identity secret (D1): admins only, acts immediately -->
+    <Card>
+      <CardHeader>
+        <CardTitle>{{ $t("webchat.customerIdentity") }}</CardTitle>
+        <CardDescription>{{ $t("webchat.customerIdentityDescription") }}</CardDescription>
+      </CardHeader>
+      <CardContent class="space-y-3">
+        <pre
+          v-if="identitySecret"
+          class="bg-muted p-4 rounded-lg text-sm overflow-x-auto break-all whitespace-pre-wrap"
+          >{{ identitySecret }}</pre
+        >
+        <p v-else class="text-sm text-neutral-muted">{{ $t("webchat.customerIdentityHidden") }}</p>
+        <div class="flex flex-wrap gap-2">
+          <Button
+            v-if="!identitySecret"
+            variant="outline"
+            size="sm"
+            :loading="isRevealingSecret"
+            @click="revealIdentitySecret"
+          >
+            {{ $t("webchat.customerIdentityReveal") }}
+          </Button>
+          <Button v-else variant="outline" size="sm" @click="copyIdentitySecret">
+            <Copy v-if="!secretCopied" class="h-3 w-3 mr-1" />
+            <Check v-else class="h-3 w-3 mr-1" />
+            {{ secretCopied ? $t("apiTokens.copied") : $t("apiTokens.copy") }}
+          </Button>
+          <Button variant="outline" size="sm" @click="showRotateDialog = true">
+            {{ $t("webchat.customerIdentityRotate") }}
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+
+    <ConfirmDialog
+      v-model:open="showRotateDialog"
+      :title="$t('webchat.customerIdentityRotateTitle')"
+      :description="$t('webchat.customerIdentityRotateDescription')"
+      :confirm-text="$t('webchat.customerIdentityRotate')"
+      :destructive="true"
+      :loading="isRotatingSecret"
+      @confirm="rotateIdentitySecret"
+    />
   </Page>
 </template>
 
@@ -369,6 +414,52 @@ async function copyInstallationCode() {
     copied.value = true;
     setTimeout(() => {
       copied.value = false;
+    }, 2000);
+  } catch (error) {
+    console.error("Failed to copy:", error);
+  }
+}
+
+// Customer identity secret (D1)
+const identitySecret = ref<string | null>(null);
+const isRevealingSecret = ref(false);
+const isRotatingSecret = ref(false);
+const showRotateDialog = ref(false);
+const secretCopied = ref(false);
+
+async function revealIdentitySecret() {
+  isRevealingSecret.value = true;
+  try {
+    identitySecret.value = (await Hay.webchat.revealIdentitySecret.mutate()).secret;
+  } catch (error) {
+    console.error("Failed to reveal the identity secret:", error);
+    toast.error(t("webchat.customerIdentityFailed"));
+  } finally {
+    isRevealingSecret.value = false;
+  }
+}
+
+async function rotateIdentitySecret() {
+  isRotatingSecret.value = true;
+  try {
+    identitySecret.value = (await Hay.webchat.rotateIdentitySecret.mutate()).secret;
+    showRotateDialog.value = false;
+    toast.success(t("webchat.customerIdentityRotated"));
+  } catch (error) {
+    console.error("Failed to replace the identity secret:", error);
+    toast.error(t("webchat.customerIdentityFailed"));
+  } finally {
+    isRotatingSecret.value = false;
+  }
+}
+
+async function copyIdentitySecret() {
+  if (!identitySecret.value) return;
+  try {
+    await navigator.clipboard.writeText(identitySecret.value);
+    secretCopied.value = true;
+    setTimeout(() => {
+      secretCopied.value = false;
     }, 2000);
   } catch (error) {
     console.error("Failed to copy:", error);
