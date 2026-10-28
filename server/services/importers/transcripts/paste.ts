@@ -16,9 +16,7 @@ import { roleFromLabel, TranscriptImportError, type TestTranscript } from "./tes
 const PREFIX = /^\s*([\p{L}\- ]{2,20})\s*:\s?(.*)$/u;
 
 export function parsePastedTranscripts(content: string): TestTranscript[] {
-  const blocks = content
-    .replace(/\r\n/g, "\n")
-    .split(/\n\s*-{3,}\s*\n|\n\s*\n\s*\n/);
+  const blocks = content.replace(/\r\n/g, "\n").split(/\n\s*-{3,}\s*\n|\n\s*\n\s*\n/);
 
   const transcripts: TestTranscript[] = [];
   blocks.forEach((block, blockIndex) => {

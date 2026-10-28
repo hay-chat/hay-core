@@ -2,12 +2,20 @@
 
 import { parseGenericCsv } from "./csv";
 import { parsePastedTranscripts } from "./paste";
+import { parseWhatsAppExport } from "./whatsapp";
 import type { TestTranscript } from "./test-transcript";
+
+/** Per-format hints from the person importing. */
+export interface TranscriptFormatOptions {
+  /** WhatsApp: the business's name as it appears in the chat. */
+  businessName?: string | null;
+}
 
 export const TRANSCRIPT_FILE_FORMATS = {
   csv: parseGenericCsv,
   paste: parsePastedTranscripts,
-} satisfies Record<string, (content: string) => TestTranscript[]>;
+  whatsapp: parseWhatsAppExport,
+} satisfies Record<string, (content: string, options: TranscriptFormatOptions) => TestTranscript[]>;
 
 export type TranscriptFileFormat = keyof typeof TRANSCRIPT_FILE_FORMATS;
 
