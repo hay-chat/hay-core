@@ -303,6 +303,24 @@ describe("processMessageMedia", () => {
     expect(mockChatCreate).not.toHaveBeenCalled();
   });
 
+  it("reads files when the bot check could not run (Cloudflare unreachable)", async () => {
+    mockFindMessage.mockResolvedValue(message(markAnalysisPending([photo()])!));
+    mockFindConversation.mockResolvedValueOnce({
+      id: "conv-1",
+      spam_flagged_at: null,
+      metadata: {
+        botCheck: {
+          decision: "flag",
+          results: [{ pluginId: "p", decision: "flag", reason: "challenge_error:timeout" }],
+        },
+      },
+    });
+    mockChatCreate.mockResolvedValueOnce(visionReply(DAMAGE) as never);
+    await processMessageMedia("msg-1", ORG);
+    expect(mockChatCreate).toHaveBeenCalledTimes(1);
+    expect(storedAttachments()[0].analysis).toMatchObject({ status: "done" });
+  });
+
   it("never reads a file from another organization", async () => {
     mockFindMessage.mockResolvedValue(message(markAnalysisPending([photo()])!));
     mockDownload.mockResolvedValue({
