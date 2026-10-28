@@ -1,3 +1,7 @@
+## 2026-10-28 06:45 — staging — W2 X lane merged, export hand-tested
+- Merged claude/w2-x (610299e): D15-4 locked holding reply, D15-6 export ZIP, D15-7 export while locked, D15-11 deletion event, D16-3. No migrations.
+- Manual ✓: Settings → Privacy export → ZIP checked on disk. Other repos: backoffice#7, website#46 drafts, WP patch 1.1.0.
+- Running: W2 review-fix agent. Next: merge fixes, Wave 2 close, Wave 3.
 ## 2026-10-28 06:20 — staging — W2 L9+L10 owner loop hand-tested
 - Manual ✓: Pause AI everywhere (banner, audit row, one "team will reply" line), Resume, lock-screen privacy toggle. Push untested (no VAPID; real iPhone on Needs Roger).
 - Next: guides for L1+L6 and L9+L10, X lane merge when it reports, Wave 2 review.
