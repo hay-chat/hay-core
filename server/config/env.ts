@@ -317,6 +317,10 @@ export const config = {
   // Empty disables those procedures entirely — the default for self-hosting.
   internal: {
     apiSecret: process.env.INTERNAL_API_SECRET || "",
+    // Where core POSTs signed events the operator may need to act on (for
+    // example organization.deleted, so the operator can stop billing).
+    // Empty disables them.
+    operatorEventsUrl: process.env.OPERATOR_EVENTS_URL || "",
   },
 
   github: {
