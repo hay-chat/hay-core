@@ -10,10 +10,13 @@ import { Job, JobStatus } from "../../entities/job.entity";
 import { Conversation } from "../../database/entities/conversation.entity";
 import { Message, MessageType } from "../../database/entities/message.entity";
 import { Customer } from "../../database/entities/customer.entity";
+import { Upload } from "../../entities/upload.entity";
 
 const uploads: Array<{ buffer: Buffer; folder: string; organizationId: string }> = [];
 const deleted: string[] = [];
 const audits: Array<{ action: string; organizationId: string }> = [];
+/** Files the mocked storage holds, by upload id; any other id is "not found". */
+const stored = new Map<string, Buffer>();
 
 jest.mock("../../services/storage.service", () => ({
   storageService: {
@@ -24,7 +27,13 @@ jest.mock("../../services/storage.service", () => ({
     delete: jest.fn(async (id: string) => {
       deleted.push(id);
     }),
+    download: jest.fn(async (id: string) => {
+      const buffer = stored.get(id);
+      if (!buffer) throw new Error(`Upload not found: ${id}`);
+      return { buffer, upload: { id } };
+    }),
   },
+  CONVERSATION_MEDIA_FOLDER: "conversation-media",
 }));
 jest.mock("../../services/audit-log.service", () => ({
   auditLogService: {
@@ -67,6 +76,27 @@ describe("organization export", () => {
   const otherOrgId = "e0e0e0e0-0000-4000-8000-000000000002";
   const userId = "e0e0e0e0-0000-4000-8000-0000000000aa";
   const now = new Date("2026-10-20T12:00:00Z");
+  const linkedUpload = "e0e0e0e0-0000-4000-8000-0000000000b1";
+  const referencedUpload = "e0e0e0e0-0000-4000-8000-0000000000b2";
+  const missingUpload = "e0e0e0e0-0000-4000-8000-0000000000b3";
+  const otherOrgUpload = "e0e0e0e0-0000-4000-8000-0000000000b4";
+
+  async function saveUpload(id: string, organizationId: string, name: string, extra = {}) {
+    await AppDataSource.getRepository(Upload).save(
+      AppDataSource.getRepository(Upload).create({
+        id,
+        organizationId,
+        filename: `${id}.bin`,
+        originalName: name,
+        path: `/tmp/${id}`,
+        mimeType: "image/png",
+        size: 5,
+        storageType: "local",
+        folder: "conversation-media",
+        ...extra,
+      }),
+    );
+  }
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "org-export-test-"));
 
   async function cleanup() {
@@ -77,6 +107,7 @@ describe("organization export", () => {
       );
       await AppDataSource.getRepository(Conversation).delete({ organization_id: id });
       await AppDataSource.getRepository(Customer).delete({ organization_id: id });
+      await AppDataSource.getRepository(Upload).delete({ organizationId: id });
       await AppDataSource.getRepository(Job).delete({ organizationId: id });
       await AppDataSource.getRepository(Organization).delete({ id });
     }
@@ -111,14 +142,34 @@ describe("organization export", () => {
           metadata: {},
         }),
       );
-      await AppDataSource.getRepository(Message).save(
+      const mine = org === orgId;
+      const message = await AppDataSource.getRepository(Message).save(
         AppDataSource.getRepository(Message).create({
           conversation_id: conversation.id,
           content: `Where is my order, says ${name}, "quoted"`,
           type: MessageType.CUSTOMER,
+          // Referenced only from the message (stored before upload linking existed).
+          attachments: mine
+            ? [{ id: referencedUpload, name: "receipt.pdf", url: "", type: "file", size: 5 }]
+            : [],
         }),
       );
+      if (mine) {
+        await saveUpload(linkedUpload, orgId, "damaged box.png", {
+          conversationId: conversation.id,
+          messageId: message.id,
+        });
+        await saveUpload(referencedUpload, orgId, "receipt.pdf");
+        await saveUpload(missingUpload, orgId, "gone.png", { conversationId: conversation.id });
+      } else {
+        await saveUpload(otherOrgUpload, otherOrgId, "secret.png", {
+          conversationId: conversation.id,
+        });
+      }
     }
+    stored.set(linkedUpload, Buffer.from("PHOTO"));
+    stored.set(referencedUpload, Buffer.from("PDF!!"));
+    stored.set(otherOrgUpload, Buffer.from("NOPE!"));
   });
 
   afterAll(async () => {
@@ -138,7 +189,12 @@ describe("organization export", () => {
 
     const job = await AppDataSource.getRepository(Job).findOneByOrFail({ id: first.jobId });
     const result = await organizationExportService.processJob(job, now);
-    expect(result.counts).toMatchObject({ conversations: 1, messages: 1, customers: 1 });
+    expect(result.counts).toMatchObject({
+      conversations: 1,
+      messages: 1,
+      customers: 1,
+      attachments: 2,
+    });
     expect(result.fileName).toBe("hay-chat-export-2026-10-20.zip");
 
     const zip = path.join(tmp, "export.zip");
@@ -161,8 +217,25 @@ describe("organization export", () => {
         "agents.jsonl",
         "webchat_settings.jsonl",
         "business_hours.jsonl",
+        "attachments.jsonl",
+        `attachments/${linkedUpload}-damaged_box.png`,
+        `attachments/${referencedUpload}-receipt.pdf`,
       ]),
     );
+    expect(listing.some((file) => file.includes(otherOrgUpload))).toBe(false);
+    expect(
+      execFileSync("unzip", ["-p", zip, `attachments/${linkedUpload}-damaged_box.png`]).toString(),
+    ).toBe("PHOTO");
+    const index = execFileSync("unzip", ["-p", zip, "attachments.jsonl"])
+      .toString()
+      .trim()
+      .split("\n")
+      .map((line) => JSON.parse(line));
+    expect(index.map((row) => [row.id, row.included, row.reason])).toEqual([
+      [linkedUpload, true, null],
+      [referencedUpload, true, null],
+      [missingUpload, false, "file_not_found"],
+    ]);
     const messages = execFileSync("unzip", ["-p", zip, "messages.jsonl"]).toString();
     expect(messages).toContain("says Ana");
     expect(messages).not.toContain("Not mine");

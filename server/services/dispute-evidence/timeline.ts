@@ -36,7 +36,7 @@ export interface SourceMessage {
     toolOutput?: unknown;
     toolStatus?: string;
     toolErrorCode?: string;
-    documentsUsed?: Array<{ id: string; title: string }>;
+    documentsUsed?: Array<{ id: string; title: string; excerpt?: string }>;
   } | null;
 }
 
@@ -96,6 +96,16 @@ export interface PolicyUse {
   documentId: string;
   title: string;
   firstUsedAt: Date;
+  /** The text the AI used at first use, recorded with the reply; null for older replies. */
+  excerpt: string | null;
+}
+
+/** Characters of a policy document kept as evidence. */
+export const POLICY_EXCERPT_CHARS = 1500;
+
+/** A policy document's text as kept in evidence: whitespace collapsed, capped. */
+export function policyExcerpt(text: string | null | undefined): string {
+  return (text ?? "").replace(/\s+/g, " ").trim().slice(0, POLICY_EXCERPT_CHARS);
 }
 
 export interface EvidenceTimeline {
@@ -217,6 +227,7 @@ export function buildTimeline(input: {
               documentId: doc.id,
               title: doc.title,
               firstUsedAt: new Date(message.created_at),
+              excerpt: typeof doc.excerpt === "string" && doc.excerpt ? doc.excerpt : null,
             });
           }
         }
