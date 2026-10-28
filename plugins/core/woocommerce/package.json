@@ -10,7 +10,8 @@
     "displayName": "WooCommerce",
     "category": "integration",
     "capabilities": [
-      "mcp"
+      "mcp",
+      "products"
     ],
     "env": []
   },
