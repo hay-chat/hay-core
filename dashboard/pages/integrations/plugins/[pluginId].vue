@@ -174,6 +174,34 @@
         </Card>
       </template>
 
+      <!-- Channel health (D13-11): generic "channel failing" signal -->
+      <Alert
+        v-if="plugin.channelHealth?.status === 'failing'"
+        variant="danger"
+        :icon="AlertTriangle"
+        data-testid="channel-health-alert"
+      >
+        <AlertTitle>{{ $t("pluginSettings.channelHealth.failingTitle") }}</AlertTitle>
+        <AlertDescription>
+          <p>
+            {{
+              $t(
+                `pluginSettings.channelHealth.reasons.${plugin.channelHealth.reason ?? "delivery_failures"}`,
+                { detail: plugin.channelHealth.detail ?? "" },
+              )
+            }}
+          </p>
+          <p class="text-xs mt-1">
+            {{
+              $t("pluginSettings.channelHealth.since", {
+                time: new Date(plugin.channelHealth.since).toLocaleString(locale),
+              })
+            }}
+            · {{ $t("pluginSettings.channelHealth.alerted") }}
+          </p>
+        </AlertDescription>
+      </Alert>
+
       <!-- Connection Status Alert (only for MCP plugins when enabled) -->
       <Alert
         v-if="isMcpPlugin && enabled && testResult && !testResult.success"

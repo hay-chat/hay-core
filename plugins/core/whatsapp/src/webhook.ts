@@ -1,7 +1,13 @@
 import type { ChannelContext } from "./context.js";
 import type { WhatsAppConnection } from "./connection.js";
 import { customerExternalId } from "./identity.js";
-import { describeMedia, ingestMedia, type Attachment, type InboundMedia, type InboundMediaType } from "./media.js";
+import {
+  describeMedia,
+  ingestMedia,
+  type Attachment,
+  type InboundMedia,
+  type InboundMediaType,
+} from "./media.js";
 
 /**
  * Inbound WhatsApp webhook normaliser.
@@ -112,8 +118,11 @@ interface WaValue {
   message_echoes?: WaEcho[];
   statuses?: WaStatus[];
   errors?: WaError[];
-  /** account_update */
+  /** account_update, phone_number_quality_update */
   event?: string;
+  /** phone_number_quality_update: the messaging limit tier after the event. */
+  current_limit?: string;
+  display_phone_number?: string;
 }
 
 interface WaChange {
@@ -204,8 +213,9 @@ export async function handleWebhook(body: unknown, ctx: ChannelContext): Promise
             summary.ignored++;
           }
         }
+      } else if (change.field === "phone_number_quality_update") {
+        await handleQualityUpdate(value, ctx);
       } else {
-        // TODO: Phase 3 — phone_number_quality_update for the health card.
         // TODO: Phase 4 — coexistence `history` import.
         ctx.logger.info("WhatsApp webhook field ignored", {
           field: change.field,
@@ -663,6 +673,32 @@ async function updateStatus(status: WaStatus, ctx: ChannelContext): Promise<bool
     });
   }
   return true;
+}
+
+/** Quality events that mean the number is at risk / back to normal (D13-11). */
+const QUALITY_FAILING_EVENTS = new Set(["FLAGGED", "DOWNGRADE"]);
+const QUALITY_OK_EVENTS = new Set(["UNFLAGGED", "UPGRADE"]);
+
+/**
+ * `phone_number_quality_update`: Meta flagged the number (quality dropped) or
+ * lowered its messaging limit → core's generic channel health signal, which
+ * alerts the org's admins. UNFLAGGED / UPGRADE clear it.
+ */
+async function handleQualityUpdate(value: WaValue, ctx: ChannelContext): Promise<void> {
+  const event = (value.event ?? "").toUpperCase();
+  const status = QUALITY_FAILING_EVENTS.has(event)
+    ? "failing"
+    : QUALITY_OK_EVENTS.has(event)
+      ? "ok"
+      : null;
+  ctx.logger.info("WhatsApp quality update", { event, currentLimit: value.current_limit });
+  if (!status) return;
+  const detail = [event, value.current_limit].filter(Boolean).join(" · ");
+  try {
+    await ctx.api.mutation("channel.reportHealth", { status, detail });
+  } catch (error: unknown) {
+    ctx.logger.error("WhatsApp quality report failed", { event, error: errorMessage(error) });
+  }
 }
 
 /** Returns true when it reported the connection revoked. */

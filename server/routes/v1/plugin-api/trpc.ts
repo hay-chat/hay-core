@@ -32,6 +32,7 @@ import type {
 } from "@server/types/plugin.types";
 import { createLogger } from "@server/lib/logger";
 import { emailDomainService } from "@server/services/email-domains.service";
+import { channelHealthService } from "@server/services/channel-health.service";
 import type { Conversation } from "@server/database/entities/conversation.entity";
 
 const logger = createLogger("plugin-api-trpc");
@@ -569,6 +570,18 @@ export const pluginApiTrpcRouter = router({
         providerError,
       });
 
+      if (isFailure) {
+        // Best effort: a health check problem never fails the status update.
+        void (async () => {
+          const conversation = await conversationRepository.findById(message.conversation_id);
+          if (conversation) {
+            await channelHealthService.recordDeliveryFailure(organizationId, conversation.channel);
+          }
+        })().catch((error: unknown) => {
+          logger.warn({ err: error, messageId: message.id }, "Channel health check failed");
+        });
+      }
+
       // Status-only event: never `message_received`, which channel-delivery
       // would treat as a new outbound message and re-deliver.
       try {
@@ -676,8 +689,42 @@ export const pluginApiTrpcRouter = router({
         "Plugin reported revoked connection",
       );
       scheduleConnectionRevoke(organizationId, pluginId);
+      void channelHealthService
+        .markFailing(organizationId, pluginId, "token_revoked", input.reason)
+        .catch((error: unknown) => {
+          logger.error({ err: error, organizationId, pluginId }, "Channel health update failed");
+        });
 
       return { revoked: true as const };
+    }),
+
+  /**
+   * Report the channel's own health (D13-11), e.g. the provider lowered the
+   * account's quality rating. "failing" alerts the org's owners and admins
+   * (throttled); "ok" clears a failure the plugin reported. Core-detected
+   * failures (failed deliveries, revoked connection) are cleared by core.
+   */
+  "channel.reportHealth": pluginProcedure
+    .input(
+      z.object({
+        status: z.enum(["ok", "failing"]),
+        detail: z.string().max(200).optional(),
+      }),
+    )
+    .mutation(async ({ input, ctx }) => {
+      requireCapability(ctx, "messages");
+      const { organizationId, pluginId } = ctx.pluginAuth;
+      if (input.status === "failing") {
+        await channelHealthService.markFailing(
+          organizationId,
+          pluginId,
+          "quality_drop",
+          input.detail,
+        );
+      } else {
+        await channelHealthService.markOk(organizationId, pluginId, ["quality_drop"]);
+      }
+      return { ok: true as const };
     }),
 
   /**
