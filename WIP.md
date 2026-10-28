@@ -1,3 +1,9 @@
+## 2026-10-28 — staging — Lane C merged
+- claude/w4-c-disputes merged (0232fb97) + Spanish alert auto-submit warning (5683ba48). Unit 15/15, server tsc clean.
+- NOT run: tests/integration/disputes.test.ts (Docker hay-staging Postgres down; Docker Desktop not running).
+- Rationale doc for Roger: tasks/disputes-rationale.md. Stripe update_dispute ungated → sent to Lane B as B6.
+- Next: Lane B and D reports → review, merge; then Lane A.
+
 ## 2026-10-28 — staging — Lane R release doc drafted
 - Draft release notes (Waves 0–3) published privately: https://claude.ai/artifact/Ugfwub6xvdyzrZZMixWqCT (16 staging clips inline).
 - Source: session scratchpad release/release.md + tools/build_release.py (not in repo).
