@@ -80,6 +80,24 @@ const internalOrganizationsRouter = router({
       return state;
     }),
 
+  /**
+   * Plan limits from the operator (Lane A4). `maxSimulationsPerMonth` null
+   * falls back to the core default (config/simulation-caps.ts).
+   */
+  setLimits: internalProcedure
+    .input(
+      organizationIdInput.extend({
+        maxSimulationsPerMonth: z.number().int().min(0).max(100_000).nullable(),
+      }),
+    )
+    .mutation(async ({ input }) => {
+      const limits = await organizationAccessService.setLimits(input);
+      if (!limits) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Organization not found" });
+      }
+      return limits;
+    }),
+
   delete: internalProcedure.input(organizationIdInput).mutation(async ({ input }) => {
     const organization = await organizationService.findOne(input.organizationId);
     if (!organization) {

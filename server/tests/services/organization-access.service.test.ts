@@ -17,6 +17,7 @@ type OrgRow = {
   aiPausedByUserId?: string | null;
   billingPeriodStart?: Date | null;
   billingPeriodEnd?: Date | null;
+  limits?: Record<string, number> | null;
 };
 
 const rows = new Map<string, OrgRow>();
@@ -343,5 +344,44 @@ describe("organizationAccessService.setBillingPeriod", () => {
     expect(
       await organizationAccessService.setBillingPeriod({ organizationId: "nope", period }),
     ).toBeNull();
+  });
+});
+
+describe("organizationAccessService.setLimits", () => {
+  beforeEach(() => {
+    rows.clear();
+    rows.set(ORG_ID, {
+      id: ORG_ID,
+      suspendedAt: null,
+      suspensionReason: null,
+      suspensionRedirectUrl: null,
+      agentPausedAt: null,
+      agentPauseReason: null,
+      accessNotice: null,
+      limits: { maxUsers: 5 },
+    });
+    jest.clearAllMocks();
+  });
+
+  it("merges the simulation allowance into limits, writes only on a change, null removes it", async () => {
+    expect(
+      await organizationAccessService.setLimits({
+        organizationId: ORG_ID,
+        maxSimulationsPerMonth: 100,
+      }),
+    ).toEqual({ maxUsers: 5, maxSimulationsPerMonth: 100 });
+    expect(rows.get(ORG_ID)?.limits).toEqual({ maxUsers: 5, maxSimulationsPerMonth: 100 });
+
+    await organizationAccessService.setLimits({
+      organizationId: ORG_ID,
+      maxSimulationsPerMonth: 100,
+    });
+    expect(mockRepository.update).toHaveBeenCalledTimes(1);
+
+    await organizationAccessService.setLimits({
+      organizationId: ORG_ID,
+      maxSimulationsPerMonth: null,
+    });
+    expect(rows.get(ORG_ID)?.limits).toEqual({ maxUsers: 5 });
   });
 });
