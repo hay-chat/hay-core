@@ -1,8 +1,8 @@
 import { MigrationInterface, QueryRunner } from "typeorm";
 
 /** D7-8: imported past conversations, in the neutral TestTranscript shape. */
-export class AddTestTranscripts1785811000000 implements MigrationInterface {
-  name = "AddTestTranscripts1785811000000";
+export class AddTestTranscripts1785831000000 implements MigrationInterface {
+  name = "AddTestTranscripts1785831000000";
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(`

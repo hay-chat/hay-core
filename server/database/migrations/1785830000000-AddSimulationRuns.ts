@@ -4,8 +4,8 @@ import { MigrationInterface, QueryRunner } from "typeorm";
  * D7-7: offline run harness. `simulation_runs` (one batch) and
  * `simulation_run_items` (one simulated conversation each).
  */
-export class AddSimulationRuns1785810000000 implements MigrationInterface {
-  name = "AddSimulationRuns1785810000000";
+export class AddSimulationRuns1785830000000 implements MigrationInterface {
+  name = "AddSimulationRuns1785830000000";
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(`
