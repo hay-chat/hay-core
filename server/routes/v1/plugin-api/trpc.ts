@@ -23,6 +23,7 @@ import { transcriptionService } from "@server/services/transcription.service";
 import { oauthService } from "@server/services/oauth.service";
 import { randomUUID } from "crypto";
 import { productSyncService } from "@server/services/product-sync.service";
+import { PluginStateLimitError, pluginStateService } from "@server/services/plugin-state.service";
 import { ProductStatus } from "@server/entities/product.entity";
 import { VariantAvailability } from "@server/entities/product-variant.entity";
 import type { CanonicalProduct } from "@server/types/canonical-product";
@@ -1198,6 +1199,51 @@ export const pluginApiTrpcRouter = router({
         serverId,
         toolsRegistered: input.tools.length,
       };
+    }),
+
+  /**
+   * Plugin state (H4) - a worker's own key/value store that survives restarts.
+   * Scoped to the token's organization and plugin id; no capability needed.
+   */
+  "state.get": pluginProcedure
+    .input(z.object({ key: z.string().min(1).max(255) }))
+    .mutation(async ({ input, ctx }) => {
+      const { organizationId, pluginId } = ctx.pluginAuth;
+      return { value: await pluginStateService.get(organizationId, pluginId, input.key) };
+    }),
+
+  "state.set": pluginProcedure
+    .input(
+      z.object({
+        key: z.string().min(1).max(255),
+        value: z.unknown(),
+        ttlMs: z
+          .number()
+          .int()
+          .positive()
+          .max(90 * 24 * 60 * 60 * 1000)
+          .optional(),
+      }),
+    )
+    .mutation(async ({ input, ctx }) => {
+      const { organizationId, pluginId } = ctx.pluginAuth;
+      try {
+        await pluginStateService.set(organizationId, pluginId, input.key, input.value, input.ttlMs);
+      } catch (error) {
+        if (error instanceof PluginStateLimitError) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: error.message });
+        }
+        throw error;
+      }
+      return { ok: true };
+    }),
+
+  "state.delete": pluginProcedure
+    .input(z.object({ key: z.string().min(1).max(255) }))
+    .mutation(async ({ input, ctx }) => {
+      const { organizationId, pluginId } = ctx.pluginAuth;
+      await pluginStateService.delete(organizationId, pluginId, input.key);
+      return { ok: true };
     }),
 
   /**

@@ -13,8 +13,7 @@ import {
 const CATALOG_RESYNC_MS = 6 * 60 * 60 * 1000;
 let resyncTimer: ReturnType<typeof setInterval> | undefined;
 
-/** D16-2 one-click connect: pending wc-auth sessions and the saved site URL (one org per worker). */
-const wcAuthSessions = new WcAuthSessions();
+/** D16-2 one-click connect: the saved site URL (one org per worker); sessions persist in core. */
 let connectSiteUrl: string | undefined;
 
 function sendWcAuthError(res: any, error: unknown): void {
@@ -93,6 +92,16 @@ export default defineHayPlugin((globalCtx) => ({
 
   onInitialize(ctx) {
     globalCtx.logger.info("Initializing WooCommerce plugin");
+    const wcAuthSessions = globalCtx.state ? new WcAuthSessions(globalCtx.state) : null;
+    const requireSessions = (): WcAuthSessions => {
+      if (!wcAuthSessions) {
+        throw new WcAuthError(
+          "UNAVAILABLE",
+          "One-click connect is unavailable right now. Enter the keys manually instead.",
+        );
+      }
+      return wcAuthSessions;
+    };
 
     ctx.register.config({
       siteUrl: {
@@ -196,7 +205,7 @@ export default defineHayPlugin((globalCtx) => ({
           process.env.HAY_PLUGIN_ID || "hay-plugin-woocommerce",
           process.env.HAY_ORG_ID || "",
         );
-        const nonce = wcAuthSessions.start(siteUrl);
+        const nonce = await requireSessions().start(siteUrl);
         const returnUrl = safeReturnUrl(req.body?.returnUrl, siteUrl);
         res.json({ nonce, authorizeUrl: buildAuthorizeUrl({ siteUrl, nonce, callbackUrl, returnUrl }) });
       } catch (error) {
@@ -205,13 +214,17 @@ export default defineHayPlugin((globalCtx) => ({
     });
 
     ctx.register.route("POST", "/ui/wc-auth/status", async (req, res) => {
-      res.json(wcAuthSessions.status(req.body?.nonce));
+      try {
+        res.json(await requireSessions().status(req.body?.nonce));
+      } catch (error) {
+        sendWcAuthError(res, error);
+      }
     });
 
     // Public: WooCommerce posts the generated keys here through the core proxy.
     ctx.register.route("POST", "/wc-auth/callback", async (req, res) => {
       try {
-        await wcAuthSessions.receive(req.body);
+        await requireSessions().receive(req.body);
         res.status(200).json({ ok: true });
       } catch (error) {
         globalCtx.logger.warn("WooCommerce one-click connect callback rejected", {

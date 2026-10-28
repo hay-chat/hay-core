@@ -10,6 +10,7 @@ import type { HayGlobalContext, HayPluginManifest } from '../types/index.js';
 import { PluginRegistry } from '../sdk/registry.js';
 import { createRegisterAPI } from '../sdk/register.js';
 import { createConfigDescriptorAPI } from '../sdk/config-descriptor.js';
+import { createPluginStateRuntime } from '../sdk/plugin-state-runtime.js';
 import type { HayLogger } from '../types/index.js';
 
 /**
@@ -25,6 +26,8 @@ import type { HayLogger } from '../types/index.js';
  * - `register`: API for registering config, auth, routes, UI
  * - `config`: API for creating config field references (descriptor API only)
  * - `logger`: Logger instance
+ * - `state`: persisted key/value store in core (when HAY_API_URL/TOKEN are set;
+ *   a worker serves one organization, so it is that org's state)
  *
  * This context is passed to the plugin factory and used in `onInitialize`.
  *
@@ -45,5 +48,12 @@ export function createGlobalContext(
     }),
     config: createConfigDescriptorAPI(),
     logger,
+    state:
+      process.env.HAY_API_URL && process.env.HAY_API_TOKEN
+        ? createPluginStateRuntime({
+            apiUrl: process.env.HAY_API_URL,
+            apiToken: process.env.HAY_API_TOKEN,
+          })
+        : undefined,
   };
 }
