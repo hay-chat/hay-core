@@ -49,6 +49,7 @@ import {
   ThumbsUp,
   History,
   FileCheck,
+  FlaskConical,
 } from "lucide-vue-next";
 import type { Component } from "vue";
 
@@ -179,6 +180,12 @@ const navMain = computed(() => {
       url: "/playbooks",
       icon: BookOpen,
       isActive: isPathActive("/playbooks"),
+    },
+    {
+      title: t("nav.tests"),
+      url: "/tests",
+      icon: FlaskConical,
+      isActive: isPathActive("/tests"),
     },
     {
       title: t("nav.actionLog"),

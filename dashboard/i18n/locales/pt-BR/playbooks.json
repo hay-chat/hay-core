@@ -151,6 +151,7 @@
       "discardFailed": "Falha ao descartar o rascunho"
     },
     "testDraft": "Testar este rascunho",
+    "replayDraft": "Reproduzir conversas antigas",
     "diff": {
       "compareWithActive": "Comparar com a ativa",
       "hide": "Ocultar alterações",

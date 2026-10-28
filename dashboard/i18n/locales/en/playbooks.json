@@ -151,6 +151,7 @@
       "discardFailed": "Failed to discard draft"
     },
     "testDraft": "Test this draft",
+    "replayDraft": "Replay past conversations",
     "diff": {
       "compareWithActive": "Compare with active",
       "hide": "Hide changes",
