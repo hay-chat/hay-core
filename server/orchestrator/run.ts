@@ -22,6 +22,7 @@ import { getAvailability, typicalFirstReplyMinutes } from "@server/services/busi
 import { AiReplySuppressedError, isPauseBlocker, recheckAiReply } from "./reply-guard";
 import { isOrganizationAiPaused } from "@server/types/organization-access.types";
 import { sendPausedNotice } from "./paused-notice";
+import { sendSuspendedHoldingReply } from "./suspended-holding-reply";
 import type { ExecutionResult } from "./execution.layer";
 import type { ToolLedgerEntry } from "@server/services/core/action-claim-guardrail.service";
 import { decidedActionsLedger } from "./decided-actions";
@@ -389,16 +390,24 @@ export const runConversation = async (conversationId: string) => {
 
   // Suspended organizations keep receiving (and storing) messages but get no
   // AI reply. Clear the flag so the sweep stops re-enqueuing this conversation
-  // and the stale-message recovery never escalates it to a human.
+  // and the stale-message recovery never escalates it to a human. An open
+  // conversation is queued for the team (pending-human) so it is waiting in
+  // Needs Attention when the account is reactivated, and on external channels
+  // the shopper is told once that the message arrived (D15-4).
   if (conversation.organization?.suspendedAt) {
     log.info(
       { reason: conversation.organization.suspensionReason },
       "Skipping - organization suspended",
     );
     if (conversation.needs_processing) {
-      await conversationRepository.update(conversation.id, conversation.organization_id, {
-        needs_processing: false,
-      });
+      const updates: Partial<Conversation> = { needs_processing: false };
+      if (conversation.status === "open") updates.status = "pending-human";
+      await conversationRepository.update(conversation.id, conversation.organization_id, updates);
+      try {
+        await sendSuspendedHoldingReply(conversation);
+      } catch (err) {
+        log.warn({ err }, "Could not send the holding reply for a suspended organization");
+      }
     }
     return;
   }

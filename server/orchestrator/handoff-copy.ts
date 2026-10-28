@@ -20,7 +20,9 @@ export type HandoffCopyKey =
   /** A change was sent to a team member for approval this turn (D4-4). */
   | "approvalRequested"
   /** The AI is paused (owner, operator or agent off): sent once per conversation (D11-9). */
-  | "pausedTeamWillReply";
+  | "pausedTeamWillReply"
+  /** The organization is locked (billing or admin): sent once per conversation on non-web channels (D15-4). */
+  | "suspendedHoldingReply";
 
 type CopyLanguage = "en" | "pt" | "es";
 
@@ -44,6 +46,7 @@ const HANDOFF_COPY: Record<CopyLanguage, Record<HandoffCopyKey, string>> = {
     approvalRequested:
       "I've asked the team to approve this. It hasn't been done yet, and you'll get their answer here in this chat.",
     pausedTeamWillReply: "Thanks for your message. Our team will reply to you here in this chat.",
+    suspendedHoldingReply: "Thanks for your message. We've received it.",
   },
   pt: {
     handoffQueued: "Encaminhei sua mensagem para a equipe. Eles vão te responder aqui neste chat.",
@@ -57,6 +60,7 @@ const HANDOFF_COPY: Record<CopyLanguage, Record<HandoffCopyKey, string>> = {
       "Pedi a aprovação da equipe. Isso ainda não foi feito, e você vai receber a resposta deles aqui neste chat.",
     pausedTeamWillReply:
       "Obrigado pela sua mensagem. Nossa equipe vai te responder aqui neste chat.",
+    suspendedHoldingReply: "Obrigado pela sua mensagem. Nós a recebemos.",
   },
   es: {
     handoffQueued: "Le pasé tu mensaje al equipo. Te responderán aquí, en este chat.",
@@ -69,6 +73,7 @@ const HANDOFF_COPY: Record<CopyLanguage, Record<HandoffCopyKey, string>> = {
     approvalRequested:
       "Le pedí al equipo que lo apruebe. Todavía no está hecho y recibirás su respuesta aquí, en este chat.",
     pausedTeamWillReply: "Gracias por tu mensaje. Nuestro equipo te responderá aquí, en este chat.",
+    suspendedHoldingReply: "Gracias por tu mensaje. Lo hemos recibido.",
   },
 };
 
@@ -138,7 +143,8 @@ const AVAILABILITY_COPY: Record<
     hours: (n) => (n === 1 ? "cerca de uma hora" : `cerca de ${n} horas`),
     today: (time) => `hoje às ${time}`,
     tomorrow: (time) => `amanhã às ${time}`,
-    weekday: (day, weekday, time) => `${weekday === 0 || weekday === 6 ? "no" : "na"} ${day} às ${time}`,
+    weekday: (day, weekday, time) =>
+      `${weekday === 0 || weekday === 6 ? "no" : "na"} ${day} às ${time}`,
     date: (date, time) => `em ${date} às ${time}`,
     zone: (city) => `(horário de ${city})`,
   },
@@ -231,7 +237,9 @@ export function availabilityHandoffLine(
       : HANDOFF_COPY[language].handoffNobodyOnline;
   }
   return availability.nextOpening
-    ? copy.closedUntil(formatNextOpening(availability.nextOpening, availability.timezone, now, language))
+    ? copy.closedUntil(
+        formatNextOpening(availability.nextOpening, availability.timezone, now, language),
+      )
     : copy.closed;
 }
 
