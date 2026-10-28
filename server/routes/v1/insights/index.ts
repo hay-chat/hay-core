@@ -3,6 +3,13 @@ import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { RESOURCES, ACTIONS } from "@server/types/scopes";
 import { insightRunsService } from "@server/services/insights/insight-runs.service";
+import { insightBackfillService } from "@server/services/insights/insight-backfill.service";
+import {
+  THRESHOLD_LIMITS,
+  defaultThresholds,
+  getOrganizationThresholds,
+  updateOrganizationThresholds,
+} from "@server/services/insights/insight-settings";
 import {
   insightsService,
   InsightError,
@@ -36,7 +43,17 @@ export const insightsRouter = t.router({
         minSize: z.number().int().min(1).max(1000).optional(),
       }),
     )
-    .query(({ ctx, input }) => insightsService.list(ctx.organizationId!, input)),
+    .query(async ({ ctx, input }) => {
+      const organizationId = ctx.organizationId!;
+      // The first visit to the page enables Insights: backfill the last 30 days (D3-18).
+      await insightBackfillService.request(organizationId);
+      const [result, backfill, thresholds] = await Promise.all([
+        insightsService.list(organizationId, input),
+        insightBackfillService.status(organizationId),
+        getOrganizationThresholds(organizationId),
+      ]);
+      return { ...result, backfill, minClusterSize: thresholds.minClusterSize };
+    }),
 
   get: scopedProcedure(RESOURCES.ANALYTICS, ACTIONS.READ)
     .input(z.object({ id: z.string().uuid() }))
@@ -75,4 +92,27 @@ export const insightsRouter = t.router({
         })
         .catch(rethrow),
     ),
+
+  /** Threshold tuning hooks (D3-18): current values, defaults, limits and how they behave. */
+  getSettings: scopedProcedure(RESOURCES.ANALYTICS, ACTIONS.READ).query(async ({ ctx }) => {
+    const organizationId = ctx.organizationId!;
+    const thresholds = await getOrganizationThresholds(organizationId);
+    return {
+      thresholds,
+      defaults: defaultThresholds(),
+      limits: THRESHOLD_LIMITS,
+      tuning: await insightsService.tuning(organizationId, thresholds.windowDays),
+    };
+  }),
+
+  updateSettings: scopedProcedure(RESOURCES.ORGANIZATION_SETTINGS, ACTIONS.UPDATE)
+    .input(
+      z.object({
+        minClusterSize: z.number().int().min(1).max(100).optional(),
+        joinThreshold: z.number().min(0).max(1).optional(),
+        mergeThreshold: z.number().min(0).max(1).optional(),
+        digestEnabled: z.boolean().optional(),
+      }),
+    )
+    .mutation(({ ctx, input }) => updateOrganizationThresholds(ctx.organizationId!, input)),
 });

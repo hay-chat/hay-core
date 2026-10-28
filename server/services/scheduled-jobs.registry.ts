@@ -152,6 +152,21 @@ const jobRegistry: CronJobConfig[] = [
   },
 
   {
+    name: "insight-backfill",
+    description:
+      "Insights-only review of the last 30 days of closed conversations when Insights is enabled (D3-18)",
+    schedule: 120000, // Every 2 minutes, 10 conversations per org per run
+    handler: async () => {
+      const { insightBackfillService } = await import("./insights/insight-backfill.service");
+      await insightBackfillService.processPending(10);
+    },
+    singleton: true,
+    enabled: true,
+    skipDatabaseLogging: true,
+    timeout: 600000, // 10 minutes max
+  },
+
+  {
     name: "insight-docs-audit",
     description: "Weekly docs audit and broken playbook action check as an Insights input (D3-15)",
     schedule: "0 5 * * 1", // Mondays at 5:00 AM
