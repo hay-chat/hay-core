@@ -85,6 +85,16 @@
             {{ t("versioning.testDraft") }}
           </Button>
 
+          <Button
+            v-if="isEditMode && draftVersion"
+            variant="outline"
+            size="sm"
+            data-testid="replay-draft"
+            @click="replayDraft"
+          >
+            {{ t("versioning.replayDraft") }}
+          </Button>
+
           <!-- Edit mode: Save (identity) + Publish -->
           <template v-if="isEditMode">
             <Button
@@ -334,6 +344,13 @@
         :playbook-id="playbookId"
         :version-id="draftVersion.id"
       />
+      <!-- D7-12: run the playbook's test cases against the draft; warns, never blocks -->
+      <PrePublishTests
+        v-if="showPublishDialog && playbookId && draftVersion"
+        class="mt-4"
+        :playbook-id="playbookId"
+        :version-id="draftVersion.id"
+      />
       <div class="mt-4">
         <Input
           v-model="publishNote"
@@ -485,6 +502,16 @@ const testDraft = async () => {
   } finally {
     isOpeningTest.value = false;
   }
+};
+
+// D7-11: replay past conversations against the draft.
+const replayDraft = async () => {
+  if (!playbookId.value || !draftVersion.value) return;
+  await flushAutoSave();
+  router.push({
+    path: "/tests",
+    query: { playbookId: playbookId.value, versionId: draftVersion.value.id },
+  });
 };
 
 // AI suggest-edits state

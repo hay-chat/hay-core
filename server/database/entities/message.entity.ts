@@ -212,6 +212,9 @@ export class Message {
     isClosureMessage?: boolean;
     closureReason?: string;
     blockReason?: string;
+    /** Action-claim guardrail on this reply; passed=false survived the retries (D7-10). */
+    actionClaim?: { passed: boolean; claimedActions: string[] };
+    actionClaimRetryAttempted?: boolean;
     // Handoff metadata
     isHandoffMessage?: boolean;
     handoffType?: string;

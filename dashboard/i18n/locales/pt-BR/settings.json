@@ -421,7 +421,11 @@
       "aiReplies": "Respostas da IA",
       "modeOn": "Enviar automaticamente",
       "modeDrafts": "Somente rascunhos (uma pessoa aprova)",
-      "draftsHint": "Somente rascunhos: as respostas da IA ficam aguardando na conversa até alguém da sua equipe aprovar ou bloquear."
+      "draftsHint": "Somente rascunhos: as respostas da IA ficam aguardando na conversa até alguém da sua equipe aprovar ou bloquear.",
+      "modeOff": "Desligada (sua equipe responde)",
+      "offHint": "Desligada: a IA não responde neste canal. As mensagens aguardam sua equipe em Precisa de Atenção, sem resposta automática.",
+      "webChatOnly": "Começar só pelo Web Chat",
+      "webChatOnlyDone": "Todos os canais, exceto o Web Chat, ficaram como Desligada. Salve para aplicar."
     },
     "media": {
       "title": "Fotos e arquivos dos clientes",

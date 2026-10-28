@@ -26,12 +26,14 @@ import {
 } from "@server/database/entities/simulation-run.entity";
 import {
   SimulationRunItem,
+  type SimulationExpectations,
   type SimulationSeedTurn,
 } from "@server/database/entities/simulation-run-item.entity";
 import { Organization } from "@server/entities/organization.entity";
 import { Agent } from "@server/database/entities/agent.entity";
 import { SIMULATION_CAPS } from "@server/config/simulation-caps";
 import { withUsageCollector, type UsageEvent } from "@server/services/llm/usage-sink";
+import type { SimulationVerdict } from "./turn-judge.service";
 import {
   PLAYBOOK_VERSION_OVERRIDE_KEY,
   type PlaybookVersionOverride,
@@ -45,6 +47,8 @@ export interface SimulationCase {
   seed: SimulationSeedTurn[];
   /** Opaque to the harness: lets the caller map items back to its cases. */
   sourceRef?: string | null;
+  /** What the AI's turn is checked against; cases without are not judged. */
+  expectations?: SimulationExpectations | null;
 }
 
 export interface StartSimulationRunInput {
@@ -221,6 +225,7 @@ export class SimulationHarnessService {
           status: "pending" as const,
           seed: c.seed.map((turn) => ({ role: turn.role, text: turn.text })),
           source_ref: c.sourceRef ?? null,
+          expectations: c.expectations ?? null,
         })),
       );
       return created;
@@ -278,19 +283,24 @@ export class SimulationHarnessService {
 
     let usage: SimulationUsage = {};
     let error: string | null = null;
+    let verdict: SimulationVerdict | null = null;
     try {
       await withUsageCollector(
         (event) => {
           usage = addUsage(usage, event);
         },
-        () => process(conversationId),
+        async () => {
+          await process(conversationId);
+          // Replays and test cases are judged; the judge's tokens are run usage.
+          if (item.expectations) verdict = await this.judgeItem(item, conversationId);
+        },
       );
     } catch (err) {
       error = err instanceof Error ? err.message : String(err);
       logger.warn({ err, runId: item.run_id, itemId: item.id }, "Simulated conversation failed");
     }
 
-    await this.finishItem(item, error ? "failed" : "completed", { usage, error });
+    await this.finishItem(item, error ? "failed" : "completed", { usage, error, verdict });
     await this.dispatchNext(item.run_id);
   }
 
@@ -437,10 +447,30 @@ export class SimulationHarnessService {
     return agent?.id ?? null;
   }
 
+  /** Never throws: a judge failure leaves the item unjudged, not failed. */
+  private async judgeItem(
+    item: SimulationRunItem,
+    conversationId: string,
+  ): Promise<SimulationVerdict | null> {
+    try {
+      // Lazy: the judge imports the replay runner, which imports this file.
+      const { turnJudgeService } = await import("./turn-judge.service");
+      return await turnJudgeService.judge({
+        organizationId: item.organization_id,
+        conversationId,
+        seed: item.seed,
+        expectations: item.expectations ?? {},
+      });
+    } catch (err) {
+      logger.warn({ err, runId: item.run_id, itemId: item.id }, "Judging a simulated turn failed");
+      return null;
+    }
+  }
+
   private async finishItem(
     item: SimulationRunItem,
     status: "completed" | "failed",
-    result: { usage: SimulationUsage; error: string | null },
+    result: { usage: SimulationUsage; error: string | null; verdict?: SimulationVerdict | null },
   ): Promise<void> {
     if (item.conversation_id) await this.closeConversation(item.conversation_id);
 
@@ -450,8 +480,17 @@ export class SimulationHarnessService {
         .getRepository(SimulationRunItem)
         .createQueryBuilder()
         .update()
-        .set({ status, error: result.error, usage: result.usage, completed_at: new Date() })
+        .set({
+          status,
+          error: result.error,
+          usage: result.usage,
+          // Raw jsonb: TypeORM's deep-partial type rejects free-form tool args.
+          verdict: () => ":verdict",
+          bucket: result.verdict?.bucket ?? null,
+          completed_at: new Date(),
+        })
         .where("id = :id AND status = 'running'", { id: item.id })
+        .setParameter("verdict", result.verdict ? JSON.stringify(result.verdict) : null)
         .execute();
       if (!updated.affected) return; // already finished (sweep vs worker)
 

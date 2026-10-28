@@ -113,6 +113,11 @@
       "startChat": "Iniciar Chat Playground",
       "viewConversations": "Ver Conversas",
       "locked": "Termine as etapas anteriores antes de fazer isso. O Hay.chat vai funcionar melhor assim."
+    },
+    "goLive": {
+      "title": "Entre no ar por um canal primeiro",
+      "description": "Muitas lojas começam com a IA só no Web Chat e deixam WhatsApp, Instagram e e-mail com a equipe. Quando estiver satisfeito com as respostas, ligue os outros canais um de cada vez.",
+      "button": "Escolher os canais da IA"
     }
   }
   }

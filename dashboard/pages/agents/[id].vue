@@ -139,10 +139,7 @@
         <Card v-if="availableChannels.length > 0">
           <CardHeader>
             <CardTitle>Channels</CardTitle>
-            <CardDescription>
-              Choose which channels this agent handles. A channel can be assigned to more than one
-              agent; if it is, the default agent responds.
-            </CardDescription>
+            <CardDescription>{{ $t("agents.sharedChannel.description") }}</CardDescription>
           </CardHeader>
           <CardContent class="space-y-4">
             <div
@@ -170,6 +167,14 @@
                 @update:model-value="toggleChannel(ch.channel, $event)"
               />
             </div>
+            <p
+              v-for="note in sharedChannelNotes"
+              :key="note.channel"
+              class="text-sm text-neutral-muted"
+              data-testid="shared-channel-note"
+            >
+              {{ note.text }}
+            </p>
           </CardContent>
         </Card>
 
@@ -211,6 +216,8 @@
             </div>
           </CardContent>
         </Card>
+
+        <ReadinessCard v-if="isEditMode && agentId" :agent-id="agentId" />
 
         <Card>
           <CardHeader>
@@ -475,6 +482,26 @@ const availableChannels = computed(() => {
   return [{ channel: "web", name: "Web Chat", thumbnail: "" }, ...pluginChannels];
 });
 
+// Channels this agent shares with other agents, and who answers there (D7-14).
+const sharedChannelList = ref<RouterOutputs["agents"]["sharedChannels"]>([]);
+const sharedChannelNotes = computed(() =>
+  sharedChannelList.value
+    .filter((shared) => agentId.value && shared.agentIds.includes(agentId.value))
+    .map((shared) => ({
+      channel: shared.channel,
+      text: t("agents.sharedChannel.note", {
+        channel:
+          availableChannels.value.find((ch) => ch.channel === shared.channel)?.name ??
+          shared.channel,
+        agents: shared.agents
+          .filter((a) => a.id !== agentId.value)
+          .map((a) => a.name)
+          .join(", "),
+        responder: shared.responderName ?? t("agents.sharedChannel.noResponder"),
+      }),
+    })),
+);
+
 const toggleChannel = (channel: string, enabled: string | number | boolean) => {
   const set = new Set(form.value.channels);
   if (enabled) {
@@ -534,6 +561,10 @@ onMounted(async () => {
       }
 
       agent.value = agentResponse;
+      Hay.agents.sharedChannels
+        .query()
+        .then((list) => (sharedChannelList.value = list))
+        .catch(() => (sharedChannelList.value = []));
 
       // Populate form. testMode is boolean | null; null/undefined means "inherit".
       const formData = {

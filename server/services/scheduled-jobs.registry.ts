@@ -407,6 +407,9 @@ const jobRegistry: CronJobConfig[] = [
       // Imported test transcripts (D7-8) follow the same retention setting.
       const { testTranscriptService } = await import("./test-transcript.service");
       await testTranscriptService.deleteExpired();
+      // So do saved test cases (D7-12).
+      const { testCaseService } = await import("./simulation/test-case.service");
+      await testCaseService.deleteExpired();
     },
     // NOTE: Respects organization.settings.retentionDays (null = disabled)
     // Preserves conversation metadata for analytics while removing PII
