@@ -7,6 +7,7 @@ import { ExecutionLayer } from "./execution.layer";
 import { PlaybookStatus } from "@server/database/entities/playbook.entity";
 import type { Playbook } from "@server/database/entities/playbook.entity";
 import { shouldReselectPlaybook } from "./playbook-gate";
+import { withOverridePlaybook } from "@server/services/playbook-version-override";
 import { agentRepository } from "@server/repositories/agent.repository";
 import { MessageType } from "@server/database/entities/message.entity";
 import { ToolExecutionService } from "@server/services/core/tool-execution.service";
@@ -708,10 +709,11 @@ export const runConversation = async (conversationId: string) => {
     // Run playbook lookup and document retrieval in parallel — they share no
     // data dependency. Document retrieval (vector search) overlaps with the
     // playbook DB fetch.
-    const [activePlaybooks, retrievedDocuments] = await Promise.all([
+    const [livePlaybooks, retrievedDocuments] = await Promise.all([
       playbookRepository.findByStatus(conversation.organization_id, PlaybookStatus.ACTIVE),
       retrievalLayer.getRelevantDocuments(publicMessages, conversation.organization_id),
     ]);
+    const activePlaybooks = await selectablePlaybooks(conversation, livePlaybooks);
 
     log.debug(
       {
@@ -979,6 +981,17 @@ async function requeueIfStillPending(conversation: Conversation, log: pino.Logge
  * This allows the LLM to call tools, analyze results, and continue the conversation
  */
 
+/** Live playbooks, plus the one a test conversation runs a draft of (D7-5). */
+function selectablePlaybooks(conversation: Conversation, livePlaybooks: Playbook[]) {
+  return withOverridePlaybook(
+    conversation.metadata,
+    conversation.organization_id,
+    livePlaybooks,
+    (playbookId, organizationId) =>
+      playbookRepository.findByIdAndOrganization(playbookId, organizationId),
+  );
+}
+
 /** Run the selector and apply its result to the conversation. */
 async function selectPlaybook(
   conversation: Conversation,
@@ -1139,9 +1152,9 @@ async function handleExecutionLoop(
       await recordPlaybookFit(conversation, false);
 
       const retrievalLayer = new RetrievalLayer();
-      const activePlaybooks = await playbookRepository.findByStatus(
-        conversation.organization_id,
-        PlaybookStatus.ACTIVE,
+      const activePlaybooks = await selectablePlaybooks(
+        conversation,
+        await playbookRepository.findByStatus(conversation.organization_id, PlaybookStatus.ACTIVE),
       );
       if (activePlaybooks.length > 0) {
         const publicMessages = await conversation.getPublicMessages();

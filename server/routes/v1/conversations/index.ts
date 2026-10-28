@@ -29,6 +29,10 @@ import {
   prepareChannelTemplate,
 } from "../../../services/channel-templates.service";
 import { isPlaygroundConversation } from "../../../services/core/dry-run";
+import { isTestConversation } from "../../../services/close-classification/outcome-rules";
+import { PlaybookService } from "../../../services/playbook.service";
+import { notSimulationSql } from "../../../services/simulation/simulation-kind";
+import { PLAYBOOK_VERSION_OVERRIDE_KEY } from "../../../services/playbook-version-override";
 
 const logger = createLogger("conversations");
 const conversationExportService = new ConversationExportService();
@@ -104,6 +108,10 @@ const createConversationSchema = z.object({
   status: settableStatusSchema.optional(),
   customerId: z.string().uuid().optional(),
   organizationId: z.string().uuid().optional(),
+  /** D7-5: a test conversation that runs this playbook version (usually the draft). */
+  playbookVersionOverride: z
+    .object({ playbookId: z.string().uuid(), versionId: z.string().uuid() })
+    .optional(),
 });
 
 const updateConversationSchema = z.object({
@@ -136,6 +144,8 @@ const sendMessageSchema = z
     message: "A message needs text or a file",
     path: ["content"],
   });
+
+const playbookService = new PlaybookService();
 
 /** Base64 length of the largest conversation-media file, so zod refuses bigger bodies first. */
 const STAFF_ATTACHMENT_MAX_BASE64_LENGTH =
@@ -172,6 +182,7 @@ export const conversationsRouter = t.router({
           AND c.deleted_at IS NULL
           AND c.status IN ('pending-human', 'human-took-over')
           AND c.spam_flagged_at IS NULL
+          AND ${notSimulationSql("c")}
         ORDER BY COALESCE(c.last_message_at, c.updated_at) ASC
         LIMIT 200
       `,
@@ -264,6 +275,7 @@ export const conversationsRouter = t.router({
         WHERE c.organization_id = $1
           AND c.deleted_at IS NULL
           AND c.status = ANY($2)
+          AND ${notSimulationSql("c")}
         ORDER BY last_message_at DESC NULLS LAST, c.updated_at DESC
         LIMIT 5
       `,
@@ -393,6 +405,7 @@ export const conversationsRouter = t.router({
             AND c.deleted_at IS NULL
             AND c.created_at >= $2
             AND c.created_at <= $3
+            AND ${notSimulationSql("c")}
         `,
         [organizationId, start.toISOString(), now.toISOString()],
       );
@@ -542,7 +555,30 @@ export const conversationsRouter = t.router({
           message: "Organization ID is required",
         });
       }
-      const conversation = await conversationService.createConversation(organizationId, input);
+      const { playbookVersionOverride, ...data } = input;
+      if (playbookVersionOverride) {
+        if (!isTestConversation(data.metadata)) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "Only test conversations can run a playbook draft",
+          });
+        }
+        const version = await playbookService
+          .getVersion(
+            organizationId,
+            playbookVersionOverride.playbookId,
+            playbookVersionOverride.versionId,
+          )
+          .catch(() => null);
+        if (!version) {
+          throw new TRPCError({ code: "NOT_FOUND", message: "Playbook version not found" });
+        }
+        data.metadata = {
+          ...data.metadata,
+          [PLAYBOOK_VERSION_OVERRIDE_KEY]: playbookVersionOverride,
+        };
+      }
+      const conversation = await conversationService.createConversation(organizationId, data);
 
       return conversation;
     }),

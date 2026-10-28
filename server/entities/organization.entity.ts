@@ -94,6 +94,8 @@ export class Organization extends BaseEntity {
     maxApiKeys?: number;
     maxJobs?: number;
     maxStorageGb?: number;
+    /** Simulated conversations per month (D7-7); see config/simulation-caps.ts. */
+    maxSimulationsPerMonth?: number;
   };
 
   @Column({ type: "varchar", length: 255, nullable: true })

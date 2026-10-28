@@ -286,6 +286,30 @@ export const playbooksRouter = t.router({
         }
       }),
 
+    /** A version (default: the draft) as a diff against the active version. */
+    compare: scopedProcedure(RESOURCES.PLAYBOOKS, ACTIONS.READ)
+      .input(
+        z.object({
+          playbookId: z.string().uuid(),
+          versionId: z.string().uuid().optional(),
+        }),
+      )
+      .query(async ({ ctx, input }) => {
+        try {
+          return await playbookService.compareWithActive(
+            ctx.organizationId!,
+            input.playbookId,
+            input.versionId,
+          );
+        } catch (error) {
+          const message = error instanceof Error ? error.message : "Playbook not found";
+          throw new TRPCError({
+            code: "NOT_FOUND",
+            message: message === "Version not found" ? message : "Playbook not found",
+          });
+        }
+      }),
+
     getDraft: scopedProcedure(RESOURCES.PLAYBOOKS, ACTIONS.READ)
       .input(
         z.object({

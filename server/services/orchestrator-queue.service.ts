@@ -23,7 +23,9 @@ export type OrchestratorTrigger =
   | "creation"
   | "sweep"
   // A person approved or rejected a held action (D4-5): one follow-up AI turn.
-  | "approval_decided";
+  | "approval_decided"
+  // One simulated conversation of an offline run (D7-7), answered once.
+  | "simulation";
 
 export interface OrchestratorMessage {
   messageId: string;

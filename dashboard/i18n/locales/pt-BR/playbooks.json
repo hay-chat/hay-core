@@ -149,6 +149,15 @@
       "discardConfirm": "Descartar rascunho",
       "discardSuccess": "Rascunho descartado",
       "discardFailed": "Falha ao descartar o rascunho"
+    },
+    "testDraft": "Testar este rascunho",
+    "diff": {
+      "compareWithActive": "Comparar com a ativa",
+      "hide": "Ocultar alterações",
+      "against": "Alterações em relação à versão ativa (v{version})",
+      "neverPublished": "Nunca publicado: tudo abaixo é novo",
+      "noChanges": "Mesmas instruções da versão ativa",
+      "loadFailed": "Não foi possível carregar as alterações"
     }
   },
   "loading": {

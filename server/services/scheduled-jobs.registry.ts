@@ -194,6 +194,20 @@ const jobRegistry: CronJobConfig[] = [
   },
 
   {
+    name: "simulation-sweep",
+    description: "Fail simulated conversations stuck past their timeout and move their runs on",
+    schedule: 60000, // Every 60 seconds
+    handler: async () => {
+      const { simulationHarnessService } =
+        await import("./simulation/simulation-harness.service");
+      await simulationHarnessService.sweepStaleItems();
+    },
+    singleton: true,
+    enabled: true,
+    skipDatabaseLogging: true,
+  },
+
+  {
     name: "orchestrator-inactivity-check",
     description: "Check for inactive conversations",
     schedule: 300000, // Every 5 minutes
@@ -335,6 +349,9 @@ const jobRegistry: CronJobConfig[] = [
     handler: async () => {
       const { dataRetentionService } = await import("./data-retention.service");
       await dataRetentionService.anonymizeExpiredConversations();
+      // Imported test transcripts (D7-8) follow the same retention setting.
+      const { testTranscriptService } = await import("./test-transcript.service");
+      await testTranscriptService.deleteExpired();
     },
     // NOTE: Respects organization.settings.retentionDays (null = disabled)
     // Preserves conversation metadata for analytics while removing PII
