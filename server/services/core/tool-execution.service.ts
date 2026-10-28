@@ -18,9 +18,21 @@ import type {
 import { decideGate, extractAmount, NEEDS_APPROVAL_CODE } from "./action-policy";
 import { pendingActionService } from "../pending-action.service";
 import { organizationRepository } from "@server/repositories/organization.repository";
-import { resolveActionApprovalConfig } from "@server/types/organization-settings.types";
+import {
+  resolveActionApprovalConfig,
+  type ActionApprovalConfig,
+} from "@server/types/organization-settings.types";
 import { AppDataSource } from "@server/database/data-source";
 import { Playbook } from "@server/database/entities/playbook.entity";
+import {
+  confirmationRequest,
+  findConfirmation,
+  needsCustomerConfirmation,
+  NEEDS_CONFIRMATION_STATUS,
+} from "./customer-confirmation";
+
+/** How far back the confirmation check looks for the AI's question (D4-10). */
+const CONFIRMATION_LOOKBACK_MESSAGES = 50;
 
 const logger = createLogger("tool-execution");
 
@@ -232,13 +244,59 @@ export class ToolExecutionService {
   }
 
   /**
-   * Reads run. A write is simulated in a dry-run conversation, held when the
-   * org's approval policy says so, and run otherwise.
+   * Reads run. A write first needs the shopper's go-ahead (D4-10); then it is
+   * simulated in a dry-run conversation, held when the org's approval policy
+   * says so, and run otherwise.
    */
   private async runStep(call: PreparedCall): Promise<CallStep> {
     if (call.target.risk.readOnly) return this.runLive(call);
+    const organization = await organizationRepository.findById(call.conversation.organization_id);
+    const config = resolveActionApprovalConfig(organization?.settings);
+    if (needsCustomerConfirmation(call.target.risk, config)) {
+      const ask = await this.confirmWithCustomer(call);
+      if (ask) return ask;
+    }
     if (isDryRun(call.conversation.metadata)) return this.simulate(call);
-    return (await this.gate(call)) ?? this.runLive(call);
+    return (await this.gate(call, config)) ?? this.runLive(call);
+  }
+
+  /**
+   * Returns null when the shopper already answered the AI's question about
+   * this exact call (and uses that answer up); otherwise marks this call as
+   * waiting for the shopper and tells the AI to ask. A call already waiting
+   * for (or turned down by) the team is not asked about again.
+   */
+  private async confirmWithCustomer(call: PreparedCall): Promise<CallStep | null> {
+    const { conversation, toolCall } = call;
+    const earlier = await pendingActionService.findEarlierRequest(
+      conversation.id,
+      toolCall.name,
+      toolCall.args,
+    );
+    if (earlier) return null;
+
+    const messages = await this.messageService.messageRepository.getLastMessages(
+      conversation.id,
+      CONFIRMATION_LOOKBACK_MESSAGES,
+    );
+    const confirmation = findConfirmation(messages, toolCall.name, toolCall.args, call.messageId);
+    if (confirmation) {
+      await this.messageService.messageRepository.update(confirmation.id, {
+        metadata: { ...confirmation.metadata, confirmationUsed: true },
+      });
+      return null;
+    }
+
+    const result = confirmationRequest(toolCall.name);
+    await this.finishToolMessage(call, `Confirmation needed: ${toolCall.name}`, {
+      toolOutput: result,
+      toolStatus: NEEDS_CONFIRMATION_STATUS,
+    });
+    return {
+      result: { success: false, result },
+      logOutcome: "confirming",
+      errorCode: null,
+    };
   }
 
   /**
@@ -246,10 +304,8 @@ export class ToolExecutionService {
    * otherwise a step that tells the AI the action is waiting for a person
    * (or was already turned down), without touching the provider.
    */
-  private async gate(call: PreparedCall): Promise<CallStep | null> {
+  private async gate(call: PreparedCall, config: ActionApprovalConfig): Promise<CallStep | null> {
     const { conversation, toolCall, target } = call;
-    const organization = await organizationRepository.findById(conversation.organization_id);
-    const config = resolveActionApprovalConfig(organization?.settings);
     const playbookCategories = await this.playbookApprovalCategories(conversation);
     const decision = decideGate(target.risk, toolCall.args, config, playbookCategories);
     if (decision.kind === "allow") return null;

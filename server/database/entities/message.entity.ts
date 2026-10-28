@@ -153,6 +153,8 @@ export class Message {
     toolExecutedAt?: string;
     /** The pending action this call opened or answered from (D4-4). */
     pendingActionId?: string;
+    /** A NEEDS_CONFIRMATION ask the shopper answered and a later call used (D4-10). */
+    confirmationUsed?: boolean;
     /** System note telling the AI how a team member decided that action. */
     isApprovalDecision?: boolean;
     // Playbook & Document metadata

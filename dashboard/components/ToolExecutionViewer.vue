@@ -81,6 +81,7 @@ import {
   AlertCircle,
   FlaskConical,
   Hourglass,
+  HelpCircle,
 } from "lucide-vue-next";
 
 const { t } = useI18n();
@@ -192,6 +193,7 @@ const statusVariant = computed(() => {
       return "tool";
     case "SIMULATED":
     case "PENDING_APPROVAL":
+    case "NEEDS_CONFIRMATION":
       return "secondary";
     case "REJECTED":
     case "EXPIRED":
@@ -213,6 +215,8 @@ const statusIcon = computed(() => {
       return FlaskConical;
     case "PENDING_APPROVAL":
       return Hourglass;
+    case "NEEDS_CONFIRMATION":
+      return HelpCircle;
     case "REJECTED":
       return XCircle;
     case "EXPIRED":
@@ -234,6 +238,8 @@ const statusText = computed(() => {
       return t("conversations.toolStatus.simulated");
     case "PENDING_APPROVAL":
       return t("conversations.toolStatus.pendingApproval");
+    case "NEEDS_CONFIRMATION":
+      return t("conversations.toolStatus.needsConfirmation");
     case "REJECTED":
       return t("conversations.toolStatus.rejected");
     case "EXPIRED":

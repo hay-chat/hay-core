@@ -256,6 +256,7 @@
       "pendingApproval": "Awaiting approval",
       "rejected": "Declined",
       "expired": "Expired, not done",
+      "needsConfirmation": "Asking the customer",
       "unknown": "Unknown"
     },
     "pendingAction": {

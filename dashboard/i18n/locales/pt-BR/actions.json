@@ -32,7 +32,7 @@
         "title": "Confirmação do cliente",
         "description": "Antes de uma ação, o Hay.chat diz ao cliente exatamente o que vai fazer e pergunta \"Posso seguir?\". Só continua depois que o cliente responde.",
         "label": "Pedir a confirmação do cliente antes",
-        "cancelNote": "Sempre ligado para cancelamentos. Notas no pedido e reenvio de e-mails não são perguntados."
+        "cancelNote": "Sempre ligado para cancelamentos, mesmo com esta opção desligada."
       },
       "approvers": {
         "title": "Quem pode aprovar",

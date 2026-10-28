@@ -14,6 +14,7 @@ const mockFindOrg = jest.fn();
 const mockHold = jest.fn();
 const mockFindEarlierRequest = jest.fn();
 const mockGetToolsForOrg = jest.fn();
+const mockGetLastMessages = jest.fn();
 
 jest.mock("@server/lib/logger", () => ({
   createLogger: () => ({ info: jest.fn(), debug: jest.fn(), warn: jest.fn(), error: jest.fn() }),
@@ -35,6 +36,7 @@ jest.mock("@server/services/core/message.service", () => ({
         created_at: new Date(),
       })),
       update: mockMessageUpdate,
+      getLastMessages: mockGetLastMessages,
     };
   },
 }));
@@ -93,7 +95,12 @@ function makeConversation(metadata: Record<string, unknown> = {}): Conversation 
   } as unknown as Conversation;
 }
 
-const APPROVAL_OFF = { settings: { actionApproval: { moneyMovesNeedApproval: false } } };
+// Customer confirmation (D4-10) has its own suite; the others skip it.
+const NO_CONFIRM = { customerConfirmation: false };
+const APPROVAL_OFF = {
+  settings: { actionApproval: { moneyMovesNeedApproval: false, ...NO_CONFIRM } },
+};
+const APPROVAL_DEFAULTS = { settings: { actionApproval: NO_CONFIRM } };
 
 beforeEach(() => {
   jest.clearAllMocks();
@@ -102,6 +109,7 @@ beforeEach(() => {
   mockFindOrg.mockResolvedValue(APPROVAL_OFF);
   mockFindEarlierRequest.mockResolvedValue(null);
   mockGetToolsForOrg.mockResolvedValue([]);
+  mockGetLastMessages.mockResolvedValue([]);
   mockHold.mockImplementation(async (input: Record<string, unknown>) => ({
     id: "pa-1",
     idempotency_key: "key-from-pending-action",
@@ -251,7 +259,7 @@ describe("ToolExecutionService dry-run", () => {
 });
 
 describe("ToolExecutionService approval gate", () => {
-  beforeEach(() => mockFindOrg.mockResolvedValue({ settings: {} })); // defaults: ON, threshold 0
+  beforeEach(() => mockFindOrg.mockResolvedValue(APPROVAL_DEFAULTS)); // defaults: ON, threshold 0
 
   it("holds a refund, tells the AI it is pending and moves the conversation", async () => {
     const service = new ToolExecutionService();
@@ -306,7 +314,7 @@ describe("ToolExecutionService approval gate", () => {
   });
 
   it("runs a refund under the threshold", async () => {
-    mockFindOrg.mockResolvedValue({ settings: { actionApproval: { thresholdAmount: 50 } } });
+    mockFindOrg.mockResolvedValue({ settings: { actionApproval: { thresholdAmount: 50, ...NO_CONFIRM } } });
     mockCallTool.mockResolvedValue({ content: [{ type: "text", text: "refunded" }] });
     const res = await new ToolExecutionService().handleToolExecution(makeConversation(), {
       name: "shop:create_refund",
@@ -388,7 +396,7 @@ describe("ToolExecutionService over-cap approval (capEnforced tools)", () => {
   });
 
   it("runs a capped tool within its cap with approvals on, without holding", async () => {
-    mockFindOrg.mockResolvedValue({ settings: {} });
+    mockFindOrg.mockResolvedValue(APPROVAL_DEFAULTS);
     mockCallTool.mockResolvedValue({ content: [{ type: "text", text: '{"created":true}' }] });
     const res = await new ToolExecutionService().handleToolExecution(
       makeConversation(),
@@ -479,6 +487,106 @@ describe("ToolExecutionService over-cap approval (capEnforced tools)", () => {
       idempotency_key: "key-1",
     } as never);
     expect(mockCallTool.mock.calls[0][1]).not.toHaveProperty("hay_approval_id");
+  });
+});
+
+describe("ToolExecutionService customer confirmation (D4-10)", () => {
+  const refund = { name: "shop:create_refund", args: { order_id: "1", amount: "25.00" } };
+  const ask = (overrides: Record<string, unknown> = {}) => ({
+    id: "ask-1",
+    type: "Tool",
+    metadata: {
+      toolName: "shop:create_refund",
+      toolInput: { order_id: "1", amount: "25.00" },
+      toolStatus: "NEEDS_CONFIRMATION",
+      ...overrides,
+    },
+  });
+  const customerReply = { id: "c-1", type: "Customer", metadata: {} };
+
+  beforeEach(() => {
+    mockFindOrg.mockResolvedValue({ settings: { actionApproval: { moneyMovesNeedApproval: false } } });
+    mockCallTool.mockResolvedValue({ content: [{ type: "text", text: '{"ok":true}' }] });
+  });
+
+  it("asks the shopper first: nothing runs, the AI is told to confirm", async () => {
+    const res = await new ToolExecutionService().handleToolExecution(
+      makeConversation(),
+      refund,
+      "msg-1",
+    );
+
+    expect(mockCallTool).not.toHaveBeenCalled();
+    expect(res).toMatchObject({
+      success: false,
+      result: { status: "needs_customer_confirmation" },
+    });
+    expect(mockMessageUpdate.mock.calls[0][1].metadata.toolStatus).toBe("NEEDS_CONFIRMATION");
+    expect(mockRecord.mock.calls[0][0].outcome).toBe("confirming");
+  });
+
+  it("runs once the shopper replied after the ask, and uses the ask up", async () => {
+    mockGetLastMessages.mockResolvedValue([customerReply, ask()]);
+    const res = await new ToolExecutionService().handleToolExecution(
+      makeConversation(),
+      refund,
+      "msg-2",
+    );
+
+    expect(res.success).toBe(true);
+    expect(mockCallTool).toHaveBeenCalled();
+    expect(mockMessageUpdate).toHaveBeenCalledWith("ask-1", {
+      metadata: expect.objectContaining({ confirmationUsed: true }),
+    });
+  });
+
+  it("asks again when the shopper has not replied yet", async () => {
+    mockGetLastMessages.mockResolvedValue([ask()]);
+    await new ToolExecutionService().handleToolExecution(makeConversation(), refund, "msg-2");
+    expect(mockCallTool).not.toHaveBeenCalled();
+  });
+
+  it("asks again when the amount went up since the ask", async () => {
+    mockGetLastMessages.mockResolvedValue([customerReply, ask()]);
+    await new ToolExecutionService().handleToolExecution(
+      makeConversation(),
+      { name: refund.name, args: { order_id: "1", amount: "40.00" } },
+      "msg-2",
+    );
+    expect(mockCallTool).not.toHaveBeenCalled();
+  });
+
+  it("always asks before a cancel, even with confirmation switched off", async () => {
+    mockGetToolRisk.mockResolvedValue({ readOnly: false, category: "cancel", classified: true });
+    mockFindOrg.mockResolvedValue(APPROVAL_OFF);
+    const res = await new ToolExecutionService().handleToolExecution(
+      makeConversation(),
+      { name: "shop:cancel_order", args: { order_id: "1" } },
+      "msg-1",
+    );
+    expect(mockCallTool).not.toHaveBeenCalled();
+    expect(res.result).toMatchObject({ status: "needs_customer_confirmation" });
+  });
+
+  it("asks in a dry-run conversation too, before simulating", async () => {
+    const res = await new ToolExecutionService().handleToolExecution(
+      makeConversation({ sourceId: "playground", dryRun: true }),
+      refund,
+      "msg-1",
+    );
+    expect(res.simulated).toBeUndefined();
+    expect(res.result).toMatchObject({ status: "needs_customer_confirmation" });
+  });
+
+  it("does not ask about a call already waiting for the team", async () => {
+    mockFindOrg.mockResolvedValue({ settings: {} });
+    mockFindEarlierRequest.mockResolvedValue({ id: "pa-9", status: "pending" });
+    const res = await new ToolExecutionService().handleToolExecution(
+      makeConversation(),
+      refund,
+      "msg-1",
+    );
+    expect(res).toMatchObject({ pending: true, result: { status: "pending_approval" } });
   });
 });
 
