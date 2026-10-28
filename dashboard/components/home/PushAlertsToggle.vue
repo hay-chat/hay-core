@@ -40,8 +40,10 @@
   <div v-else class="space-y-4">
     <p class="text-sm text-neutral-muted">{{ $t("home.push.description") }}</p>
 
+    <!-- iPhone in a browser tab: alerts need the Home Screen app first -->
+    <InstallAppGuide v-if="push.status.value === 'unsupported' && iosInstall" />
     <p
-      v-if="push.status.value === 'unsupported'"
+      v-else-if="push.status.value === 'unsupported'"
       class="rounded-lg bg-background-tertiary p-3 text-sm text-neutral-700"
     >
       {{ $t("home.push.unsupported") }}
@@ -82,25 +84,70 @@
     </div>
 
     <p v-if="push.error.value" class="text-sm text-destructive">{{ push.error.value }}</p>
+
+    <!-- Lock-screen privacy (D11-12): per person, applies to every device -->
+    <div class="space-y-1 border-t border-border pt-4">
+      <Input
+        type="switch"
+        :label="$t('home.push.privacyLabel')"
+        :model-value="hidePreview === true"
+        :disabled="privacyBusy || hidePreview === null"
+        data-testid="push-privacy-switch"
+        @update:model-value="setPrivacy($event === true)"
+      />
+      <p class="text-sm text-neutral-muted">{{ $t("home.push.privacyHelp") }}</p>
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { onMounted } from "vue";
+import { onMounted, ref } from "vue";
 import { Bell, BellRing, BellOff, Send } from "lucide-vue-next";
 import { usePushNotifications } from "@/composables/usePushNotifications";
 import { useToast } from "@/composables/useToast";
+import { browserNeedsIosInstall } from "@/utils/install-app";
+import { Hay } from "@/utils/api";
 
-withDefaults(defineProps<{ variant?: "compact" | "full" }>(), { variant: "compact" });
+const props = withDefaults(defineProps<{ variant?: "compact" | "full" }>(), {
+  variant: "compact",
+});
 
 const push = usePushNotifications();
 const toast = useToast();
 const router = useRouter();
 const { t } = useI18n();
 
+const iosInstall = ref(false);
+const hidePreview = ref<boolean | null>(null);
+const privacyBusy = ref(false);
+
 onMounted(() => {
   void push.init();
+  iosInstall.value = browserNeedsIosInstall();
+  if (props.variant === "full") void loadPrivacy();
 });
+
+const loadPrivacy = async () => {
+  try {
+    hidePreview.value = (await Hay.notifications.alertPrivacy.query()).hidePreview;
+  } catch (error) {
+    console.error("[PushAlerts] privacy setting failed to load:", error);
+  }
+};
+
+const setPrivacy = async (value: boolean) => {
+  privacyBusy.value = true;
+  try {
+    hidePreview.value = (
+      await Hay.notifications.setAlertPrivacy.mutate({ hidePreview: value })
+    ).hidePreview;
+    toast.success(value ? t("home.push.privacyOn") : t("home.push.privacyOff"));
+  } catch {
+    toast.error(t("home.push.privacyFailed"));
+  } finally {
+    privacyBusy.value = false;
+  }
+};
 
 const enable = async () => {
   const ok = await push.enable();

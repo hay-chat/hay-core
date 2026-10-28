@@ -15,6 +15,8 @@
 
         <!-- Operator notice (e.g. trial ending, payment failed) -->
         <AccessNoticeBanner />
+        <!-- The team paused the AI everywhere (D11-9) -->
+        <AiPauseBanner />
         <main class="min-h-0 flex-1 overflow-y-auto bg-neutral-50">
           <slot />
         </main>

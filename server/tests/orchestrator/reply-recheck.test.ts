@@ -119,6 +119,7 @@ function makeConversation() {
       savePerception: jest.fn(),
     })),
     getPublicMessages: jest.fn(async () => []),
+    getMessages: jest.fn(async () => []),
     addMessage: jest.fn(async (payload: { content: string }) => ({ id: "new", ...payload })),
     markProcessed: jest.fn(async () => true),
   };
@@ -181,7 +182,10 @@ describe("runConversation re-checks before sending", () => {
 
     await runConversation(CONVERSATION_ID);
 
-    expect(botMessages()).toEqual([]);
+    // The in-flight reply is dropped; only the fixed "team will reply" line goes out (D11-9).
+    expect(botMessages()).toEqual([
+      expect.objectContaining({ metadata: { isPausedNotice: true } }),
+    ]);
     expect(mockUpdate).toHaveBeenCalledWith(CONVERSATION_ID, ORG_ID, {
       needs_processing: false,
       status: "pending-human",
@@ -196,7 +200,9 @@ describe("runConversation re-checks before sending", () => {
 
     await runConversation(CONVERSATION_ID);
 
-    expect(botMessages()).toEqual([]);
+    expect(botMessages()).toEqual([
+      expect.objectContaining({ metadata: { isPausedNotice: true } }),
+    ]);
     expect(mockLogger.info).toHaveBeenCalledWith(
       { blocker: "organization_paused" },
       "Dropped in-flight AI reply",

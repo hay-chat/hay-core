@@ -49,7 +49,35 @@
       "unavailable": "Push alerts are not set up on this Hay.chat server yet. Ask your administrator to add VAPID keys.",
       "denied": "Notifications are blocked for this site in your browser settings. Allow them, then reload the page.",
       "failed": "Couldn't turn on alerts",
-      "blocked": "Alerts off"
+      "blocked": "Alerts off",
+      "privacyLabel": "Hide customer details on the lock screen",
+      "privacyHelp": "Alerts only say \"A customer needs a human\". Open Hay.chat to see who it is. Applies to all your devices.",
+      "privacyOn": "Customer details hidden from alerts",
+      "privacyOff": "Alerts show the customer and summary",
+      "privacyFailed": "Couldn't change this setting"
+    },
+    "aiPause": {
+      "title": "Pause AI everywhere",
+      "description": "Stops every AI reply on every channel right away, including follow-ups and inactivity closes. Customers who write get one short message saying your team will reply, and their conversations wait here for you.",
+      "statusOn": "AI paused",
+      "statusOff": "AI is replying",
+      "pausedBy": "Paused by {name} on {when}.",
+      "pausedAt": "Paused on {when}.",
+      "perChannel": "Turn the AI off on one channel only (drafts only)",
+      "perAgent": "Switch off one agent",
+      "banner": "The AI is paused everywhere. Your team answers every conversation.",
+      "resume": "Resume AI",
+      "paused": "AI paused everywhere",
+      "resumed": "AI resumed",
+      "failed": "Couldn't change the AI pause. Try again."
+    },
+    "install": {
+      "title": "Get alerts on your iPhone",
+      "description": "iPhone only shows Hay.chat alerts when Hay.chat is on your Home Screen. It takes three taps.",
+      "stepShare": "In Safari, tap the Share button",
+      "stepAdd": "Scroll down and tap \"Add to Home Screen\", then \"Add\"",
+      "stepOpen": "Open Hay.chat from the new icon on your Home Screen and turn on alerts",
+      "dismiss": "Hide these steps"
     }
   }
 }

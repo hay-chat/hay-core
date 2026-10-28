@@ -157,6 +157,25 @@ describe("conversation alert ladder", () => {
     expect(await steps(conversation.id)).toEqual(["initial:push:sent"]);
   });
 
+  it("sends the generic alert to a member with lock-screen privacy on (D11-12)", async () => {
+    await AppDataSource.getRepository(User).update({ id: availableId }, { hideAlertPreview: true });
+    try {
+      const conversation = await waitingConversation();
+      const [, payload] = mockSendToUser.mock.calls[0];
+      expect(payload).toMatchObject({
+        title: "Hay.chat",
+        body: "Um cliente precisa de um humano",
+        url: `/conversations/${conversation.id}?org=${orgId}`,
+      });
+      expect(JSON.stringify(payload)).not.toContain("refund");
+    } finally {
+      await AppDataSource.getRepository(User).update(
+        { id: availableId },
+        { hideAlertPreview: false },
+      );
+    }
+  });
+
   it("records no_device for a member without devices", async () => {
     mockSendToUser.mockResolvedValue({ devices: 0, sent: 0, removed: 0 });
     const conversation = await waitingConversation();
@@ -267,5 +286,121 @@ describe("conversation alert ladder", () => {
     await conversationAlertService.runEscalationSweep();
     expect(await steps(takenOver.id)).toEqual(["initial:push:sent"]);
     expect(await steps(closed.id)).toEqual(["initial:push:sent"]);
+  });
+
+  describe("shopper-message alerts (D11-7)", () => {
+    async function conversationWith(
+      status: Conversation["status"],
+      assignedUserId: string | null = null,
+    ): Promise<Conversation> {
+      return repository.create({
+        title: "Refund",
+        summary: "Wants a refund for a damaged item.",
+        organization_id: orgId,
+        status,
+        assigned_user_id: assignedUserId,
+      } as Partial<Conversation>);
+    }
+
+    async function customerMessage(conversationId: string, minutesAgo: number): Promise<void> {
+      const messages = AppDataSource.getRepository(Message);
+      const saved = await messages.save(
+        messages.create({
+          conversation_id: conversationId,
+          type: MessageType.CUSTOMER,
+          content: "Any news?",
+        }),
+      );
+      await AppDataSource.query(
+        `UPDATE messages SET created_at = now() - ($2 || ' minutes')::interval WHERE id = $1`,
+        [saved.id, String(minutesAgo)],
+      );
+    }
+
+    const message = { content: "Is   anyone\nthere?", created_at: new Date() };
+
+    it("tells the assignee when the shopper writes in a taken-over conversation, once per window", async () => {
+      const conversation = await conversationWith("human-took-over", availableId);
+
+      await conversationAlertService.onCustomerMessage(conversation, "human-took-over", message);
+      await conversationAlertService.onCustomerMessage(conversation, "human-took-over", message);
+
+      expect(mockSendToUser).toHaveBeenCalledTimes(1);
+      expect(mockSendToUser.mock.calls[0][0]).toBe(availableId);
+      expect(mockSendToUser.mock.calls[0][1]).toMatchObject({
+        title: "Um cliente respondeu",
+        body: "Refund: Is anyone there?",
+        tag: `conversation:${conversation.id}`,
+      });
+      expect(await steps(conversation.id)).toEqual(["customer_reply:push:sent"]);
+    });
+
+    it("tells every Available member when the assignee is away", async () => {
+      const conversation = await conversationWith("human-took-over", awayId);
+      await conversationAlertService.onCustomerMessage(conversation, "human-took-over", message);
+      expect(mockSendToUser.mock.calls.map(([userId]) => userId)).toEqual([availableId]);
+    });
+
+    it("re-alerts on a waiting conversation within business hours only", async () => {
+      const waiting = await conversationWith("pending-human");
+      await conversationAlertService.onCustomerMessage(waiting, "pending-human", message);
+      expect(mockSendToUser.mock.calls[0][1]).toMatchObject({
+        title: "Nova mensagem de um cliente que está esperando",
+      });
+
+      mockWithinHours.mockResolvedValue(false);
+      const afterHours = await conversationWith("pending-human");
+      await conversationAlertService.onCustomerMessage(afterHours, "pending-human", message);
+      expect(mockSendToUser).toHaveBeenCalledTimes(1);
+    });
+
+    it("stays quiet while the AI handles the conversation", async () => {
+      const open = await conversationWith("open");
+      await conversationAlertService.onCustomerMessage(open, "open", message);
+      expect(mockSendToUser).not.toHaveBeenCalled();
+    });
+
+    it("alerts once when a held conversation goes 10 minutes unanswered, emailing whoever push missed", async () => {
+      mockSendToUser.mockResolvedValue({ devices: 0, sent: 0, removed: 0 });
+      const conversation = await conversationWith("human-took-over", availableId);
+      const fresh = await conversationWith("human-took-over", availableId);
+      await customerMessage(conversation.id, 11);
+      await customerMessage(fresh.id, 3);
+
+      await conversationAlertService.runUnansweredSweep();
+      await conversationAlertService.runUnansweredSweep();
+
+      expect(await steps(conversation.id)).toEqual([
+        "unanswered:push:no_device",
+        "unanswered_email:email:sent",
+      ]);
+      expect(await steps(fresh.id)).toEqual([]);
+      expect(mockSendToUser.mock.calls[0][1]).toMatchObject({
+        title: "Um cliente está esperando sua resposta",
+      });
+    });
+
+    it("does not alert once a person replied, or outside business hours", async () => {
+      const replied = await conversationWith("human-took-over", availableId);
+      await customerMessage(replied.id, 20);
+      await AppDataSource.getRepository(Message).save(
+        AppDataSource.getRepository(Message).create({
+          conversation_id: replied.id,
+          type: MessageType.HUMAN_AGENT,
+          content: "On it",
+        }),
+      );
+      const afterHours = await conversationWith("human-took-over", availableId);
+      await customerMessage(afterHours.id, 20);
+      mockWithinHours.mockResolvedValue(false);
+
+      await conversationAlertService.runUnansweredSweep();
+      expect(mockSendToUser).not.toHaveBeenCalled();
+
+      mockWithinHours.mockResolvedValue(true);
+      await conversationAlertService.runUnansweredSweep();
+      expect(await steps(replied.id)).toEqual([]);
+      expect(await steps(afterHours.id)).toEqual(["unanswered:push:sent"]);
+    });
   });
 });

@@ -33,6 +33,8 @@ export function toAccessState(organization: Organization): OrganizationAccessSta
     agentPausedAt: organization.agentPausedAt ?? null,
     agentPauseReason: organization.agentPauseReason ?? null,
     accessNotice: organization.accessNotice ?? null,
+    aiPausedAt: organization.aiPausedAt ?? null,
+    aiPausedByUserId: organization.aiPausedByUserId ?? null,
   };
 }
 
@@ -117,6 +119,61 @@ class OrganizationAccessService {
       },
       "Organization access state updated",
     );
+
+    return state;
+  }
+
+  /**
+   * The owner's "Pause AI everywhere" (D11-9). Pausing keeps the original
+   * timestamp and author when already paused. Audited with who did it, and
+   * pushed to every open dashboard so the banner appears everywhere at once.
+   */
+  async setOwnerAiPause(input: {
+    organizationId: string;
+    userId: string;
+    paused: boolean;
+  }): Promise<OrganizationAccessState | null> {
+    const organization = await this.repository.findOneBy({ id: input.organizationId });
+    if (!organization) return null;
+
+    const wasPaused = !!organization.aiPausedAt;
+    if (input.paused && !wasPaused) {
+      organization.aiPausedAt = new Date();
+      organization.aiPausedByUserId = input.userId;
+    } else if (!input.paused) {
+      organization.aiPausedAt = null;
+      organization.aiPausedByUserId = null;
+    }
+    await this.repository.update(
+      { id: organization.id },
+      { aiPausedAt: organization.aiPausedAt, aiPausedByUserId: organization.aiPausedByUserId },
+    );
+    const state = toAccessState(organization);
+
+    if (wasPaused !== input.paused) {
+      try {
+        await auditLogService.log({
+          organizationId: organization.id,
+          userId: input.userId,
+          action: input.paused ? "organization.ai_paused" : "organization.ai_resumed",
+          resource: "organization",
+          metadata: { source: "dashboard" },
+        });
+      } catch (error) {
+        logger.error(
+          { err: error, organizationId: organization.id },
+          "Failed to audit AI pause change",
+        );
+      }
+      websocketService.sendToOrganization(organization.id, {
+        type: ORGANIZATION_ACCESS_CHANGED_EVENT,
+        payload: state,
+      });
+      logger.info(
+        { organizationId: organization.id, userId: input.userId, paused: input.paused },
+        "Owner AI pause changed",
+      );
+    }
 
     return state;
   }

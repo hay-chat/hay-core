@@ -202,6 +202,8 @@ export class Message {
     documentTitle?: string;
     // Conversation management metadata
     isInactivityWarning?: boolean;
+    /** "Our team will reply here", sent once while the AI is paused (D11-9). */
+    isPausedNotice?: boolean;
     warningTimestamp?: string;
     reason?: string;
     inactivity_duration_ms?: number;

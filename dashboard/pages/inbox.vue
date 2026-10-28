@@ -19,6 +19,9 @@
       </Button>
     </div>
 
+    <!-- iPhone in a browser tab: how to get alerts (D11-12) -->
+    <InstallAppGuide dismissible />
+
     <!-- AI actions waiting for an approver (D4-6); hidden when none or not an approver -->
     <ApprovalsSection @changed="load()" />
 
@@ -106,6 +109,9 @@
         />
       </ul>
     </section>
+
+    <!-- The off switch, one tap from the phone (D11-9) -->
+    <AiPauseCard />
 
     <!-- Everything else is one tap away, not on this screen -->
     <nav class="flex flex-wrap gap-x-6 gap-y-2 pt-2 text-sm">
