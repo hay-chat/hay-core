@@ -42,6 +42,11 @@ export interface DecisionResult {
   action: PendingAction | null;
   /** False when someone else already decided (double click, two approvers). */
   transitioned: boolean;
+  /**
+   * Set when the action was not run on purpose: the conversation is closed,
+   * so the shopper could not be told the result. It stays pending.
+   */
+  blocked?: "conversation_closed";
 }
 
 export class ActionDecisionService {
@@ -49,6 +54,17 @@ export class ActionDecisionService {
   private messages = new MessageService();
 
   async approve(id: string, organizationId: string, decider: Decider): Promise<DecisionResult> {
+    // Never move money on a closed conversation: the shopper may not be
+    // reachable to hear the result. The request stays pending (it can still be
+    // declined, or approved once the conversation is reopened).
+    const pending = await pendingActionService.findById(id, organizationId);
+    if (pending?.status === "pending") {
+      const current = await conversationRepository.findById(pending.conversation_id);
+      if (current && CLOSED_STATUSES.includes(current.status)) {
+        return { action: pending, transitioned: false, blocked: "conversation_closed" };
+      }
+    }
+
     const { action, transitioned } = await pendingActionService.approve(
       id,
       organizationId,

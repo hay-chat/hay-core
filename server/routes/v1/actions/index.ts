@@ -38,8 +38,15 @@ async function assertApprover(
   return organizationId;
 }
 
-function toResponse({ action, transitioned }: DecisionResult) {
+function toResponse({ action, transitioned, blocked }: DecisionResult) {
   if (!action) throw new TRPCError({ code: "NOT_FOUND", message: "Action not found" });
+  if (blocked === "conversation_closed") {
+    throw new TRPCError({
+      code: "PRECONDITION_FAILED",
+      message:
+        "This conversation is closed, so the action was not run. Reopen the conversation to approve it, or decline it.",
+    });
+  }
   return { action, transitioned };
 }
 
