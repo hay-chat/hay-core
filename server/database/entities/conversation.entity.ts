@@ -17,6 +17,8 @@ import { MessageType, MessageStatus, type MessageAttachment } from "./message.en
 import { DeliveryState } from "../../types/message-feedback.types";
 import type { TiptapDoc } from "../../types/tiptap.types";
 import { analyzeTiptapInstructions } from "../../utils/tiptap-formatter";
+import { asTiptapDocument } from "../../services/playbook-instructions-text";
+import type { PlaybookInstructions } from "./playbook.entity";
 import { documentRepository } from "../../repositories/document.repository";
 import { createLogger } from "@server/lib/logger";
 import { SupportedLanguage } from "../../types/language.types";
@@ -55,12 +57,9 @@ function toResolvedInputSchema(toolSchema: ToolSchemaEntry): Record<string, unkn
 type TiptapInstructionInput = Parameters<typeof analyzeTiptapInstructions>[0];
 
 function toTiptapInstructions(value: unknown): TiptapInstructionInput {
-  if (value && typeof value === "object" && (value as { type?: unknown }).type === "doc") {
-    // The runtime jsonb is a Tiptap document; the column types are too loose to
-    // express that, so we narrow via `unknown` after confirming the doc marker.
-    return value as unknown as TiptapInstructionInput;
-  }
-  return undefined;
+  // Plain-text and legacy instructions become paragraphs (asTiptapDocument);
+  // the column types are too loose to express the doc, hence the `unknown` hop.
+  return asTiptapDocument(value as PlaybookInstructions) as unknown as TiptapInstructionInput;
 }
 
 @Entity("conversations")

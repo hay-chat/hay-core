@@ -405,8 +405,25 @@ import type { PlaybookStatus, Agent, Playbook, PlaybookVersion } from "~/types/p
 const EMPTY_INSTRUCTIONS: JSONContent = { type: "doc", content: [] };
 
 // Server-sourced instructions are opaque (jsonb); narrow to a Tiptap document for the editor.
-const toInstructionContent = (value: unknown): JSONContent =>
-  value && typeof value === "object" ? (value as JSONContent) : EMPTY_INSTRUCTIONS;
+// Plain-text instructions (the onboarding examples) become one paragraph per line;
+// showing them as empty let the next auto-save wipe them.
+const toInstructionContent = (value: unknown): JSONContent => {
+  if (value && typeof value === "object" && !Array.isArray(value)) return value as JSONContent;
+  const text = Array.isArray(value)
+    ? value.map((item) => (item as { instructions?: string })?.instructions ?? "").join("\n")
+    : typeof value === "string"
+      ? value
+      : "";
+  const lines = text
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+  if (!lines.length) return EMPTY_INSTRUCTIONS;
+  return {
+    type: "doc",
+    content: lines.map((line) => ({ type: "paragraph", content: [{ type: "text", text: line }] })),
+  };
+};
 import { useToast } from "~/composables/useToast";
 import { useUnsavedChanges } from "~/composables/useUnsavedChanges";
 import { useAutoSave } from "~/composables/useAutoSave";

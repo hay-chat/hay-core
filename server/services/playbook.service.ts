@@ -13,6 +13,7 @@ import { AppDataSource } from "../database/data-source";
 import { analyzeTiptapInstructions } from "../utils/tiptap-formatter";
 import { createLogger } from "@server/lib/logger";
 import {
+  asTiptapDocument,
   instructionsToMarkdown,
   collectMentionReferences,
   type MentionReferences,
@@ -32,10 +33,7 @@ type TiptapInstructionInput = Parameters<typeof analyzeTiptapInstructions>[0];
 
 /** Narrow dynamic jsonb instructions to the Tiptap doc shape the analyzer consumes. */
 function toTiptapInstructions(value: unknown): TiptapInstructionInput {
-  if (value && typeof value === "object" && (value as { type?: unknown }).type === "doc") {
-    return value as unknown as TiptapInstructionInput;
-  }
-  return undefined;
+  return asTiptapDocument(value as PlaybookInstructions) as unknown as TiptapInstructionInput;
 }
 
 export class PlaybookService {
@@ -62,7 +60,12 @@ export class PlaybookService {
       agentIds?: string[];
     },
   ): Promise<Playbook> {
-    const { agentIds, ...playbookData } = data;
+    const { agentIds, ...rest } = data;
+    // Store plain-text instructions as a Tiptap document so the editor can show them.
+    const playbookData =
+      typeof rest.instructions === "string"
+        ? { ...rest, instructions: asTiptapDocument(rest.instructions) ?? null }
+        : rest;
 
     const agents: Agent[] = [];
     if (agentIds && agentIds.length > 0) {
@@ -405,7 +408,12 @@ export class PlaybookService {
 
     // Update draft with new data
     const updateData: Partial<PlaybookVersion> = {};
-    if (data.instructions !== undefined) updateData.instructions = data.instructions;
+    if (data.instructions !== undefined) {
+      updateData.instructions =
+        typeof data.instructions === "string"
+          ? (asTiptapDocument(data.instructions) ?? null)
+          : data.instructions;
+    }
     if (data.promptTemplate !== undefined) updateData.prompt_template = data.promptTemplate;
     if (data.requiredFields !== undefined) updateData.required_fields = data.requiredFields;
 

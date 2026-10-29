@@ -28,6 +28,33 @@ function isTiptapDocument(instructions: PlaybookInstructions): instructions is T
   );
 }
 
+/**
+ * Instructions as a Tiptap document. Plain-text instructions (the onboarding
+ * example playbooks are created as strings) and legacy item lists become one
+ * paragraph per line; without this every reader treated them as empty, so the
+ * AI got no instructions and the editor showed a blank body.
+ */
+export function asTiptapDocument(
+  instructions: PlaybookInstructions | undefined,
+): TiptapDocument | undefined {
+  if (!instructions) return undefined;
+  if (isTiptapDocument(instructions)) return instructions;
+  const text = Array.isArray(instructions)
+    ? (instructions as InstructionItem[]).map((item) => item.instructions).join("\n")
+    : typeof instructions === "string"
+      ? instructions
+      : "";
+  const lines = text
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+  if (!lines.length) return undefined;
+  return {
+    type: "doc",
+    content: lines.map((line) => ({ type: "paragraph", content: [{ type: "text", text: line }] })),
+  };
+}
+
 export function instructionsToMarkdown(instructions: PlaybookInstructions | null): string {
   if (!instructions) return "";
   if (typeof instructions === "string") return normalizeMentionTokens(instructions);
