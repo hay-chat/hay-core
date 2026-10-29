@@ -37,7 +37,14 @@ const DISPUTE_FIELDS = `
   order { id name legacyResourceId }
 `;
 
+// Intake reads only the dispute: `disputeEvidence` needs the protected evidence scopes,
+// which Shopify only grants to dispute-management apps, and asking for it would fail
+// the whole query.
 export const DISPUTE_SHOW = `query DisputeShow($id: ID!) {
+  dispute(id: $id) { ${DISPUTE_FIELDS} }
+}`;
+
+export const DISPUTE_EVIDENCE_SHOW = `query DisputeEvidenceShow($id: ID!) {
   dispute(id: $id) {
     ${DISPUTE_FIELDS}
     disputeEvidence {
@@ -224,6 +231,13 @@ export async function fetchDispute(client: ShopifyClient, id: string): Promise<J
   return data.dispute;
 }
 
+async function fetchDisputeWithEvidence(client: ShopifyClient, id: string): Promise<Json | null> {
+  const data = await client.graphql<{ dispute: Json | null }>(DISPUTE_EVIDENCE_SHOW, {
+    id: disputeGid(id),
+  });
+  return data.dispute;
+}
+
 export async function syncRecentDisputes(
   client: ShopifyClient,
   report: (d: CanonicalDispute) => Promise<unknown>,
@@ -322,7 +336,7 @@ export async function attachEvidence(
   filePrefix: string,
 ): Promise<DisputeEvidenceResponse> {
   try {
-    const dispute = await fetchDispute(client, request.disputeId);
+    const dispute = await fetchDisputeWithEvidence(client, request.disputeId);
     if (!dispute) return { ok: false, code: "NOT_FOUND", message: "Dispute not found" };
     const pastDue = dispute.evidenceDueBy && new Date(dispute.evidenceDueBy).getTime() < Date.now();
     if (dispute.status !== "NEEDS_RESPONSE" || dispute.evidenceSentOn || pastDue) {
