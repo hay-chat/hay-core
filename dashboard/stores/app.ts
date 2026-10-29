@@ -17,6 +17,8 @@ interface AppState {
   pluginsLoading: boolean;
   rowsPerPage: number;
   onboardingCompleted: boolean;
+  /** Plugin settings Advanced mode, remembered per user id (D20). */
+  pluginAdvancedMode: Record<string, boolean>;
 }
 
 export const useAppStore = defineStore("app", {
@@ -30,6 +32,7 @@ export const useAppStore = defineStore("app", {
     pluginsLoading: false,
     rowsPerPage: 10,
     onboardingCompleted: false,
+    pluginAdvancedMode: {},
   }),
 
   getters: {
@@ -197,6 +200,10 @@ export const useAppStore = defineStore("app", {
     // Onboarding management
     setOnboardingCompleted(completed: boolean) {
       this.onboardingCompleted = completed;
+    },
+
+    setPluginAdvancedMode(userId: string, on: boolean) {
+      this.pluginAdvancedMode = { ...this.pluginAdvancedMode, [userId]: on };
     },
   },
   persist: true,

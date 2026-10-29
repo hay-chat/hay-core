@@ -140,14 +140,14 @@
               <Button
                 v-if="!plugin.enabled"
                 size="sm"
-                :disabled="enablingPlugin === plugin.id"
-                @click="enablePlugin(plugin.id)"
+                :loading="enablingPlugin === plugin.id"
+                @click="connectPlugin(plugin.id)"
               >
-                <Plug class="h-3 w-3 mr-1" />
+                <Plug v-if="enablingPlugin !== plugin.id" class="h-3 w-3 mr-1" />
                 {{
                   enablingPlugin === plugin.id
-                    ? $t("marketplace.actions.installing")
-                    : $t("marketplace.actions.install")
+                    ? $t("marketplace.actions.connecting")
+                    : $t("marketplace.actions.connect")
                 }}
               </Button>
 
@@ -328,31 +328,18 @@ const refreshPlugins = () => {
   fetchPlugins();
 };
 
-const enablePlugin = async (pluginId: string) => {
-  console.log("🔍 [DEBUG] Enabling plugin with ID:", pluginId);
+// One verb everywhere (D20): Connect adds the plugin and opens its Setup.
+const connectPlugin = async (pluginId: string) => {
   enablingPlugin.value = pluginId;
   const { toast } = useToast();
 
   try {
     await appStore.enablePlugin(pluginId);
-
-    // Show success toast
-    const pluginName = pluginId.replace("hay-plugin-", "");
-    toast.success(t("marketplace.toast.enabledSuccess", { name: pluginName }));
-
-    // Navigate to settings if plugin has configuration
-    const plugin = appStore.getPluginById(pluginId);
-    if (plugin?.hasConfiguration) {
-      navigateToSettings(pluginId);
-    }
+    navigateToSettings(pluginId);
   } catch (error: unknown) {
-    console.error("Failed to enable plugin:", error);
-
-    // Show error toast with details
+    console.error("Failed to connect plugin:", error);
     // TRPCError messages are in error.message for client errors
     const errorMessage = extractErrorMessage(error) || t("marketplace.toast.enableFailed");
-
-    // Clean up the plugin name in the error message for better readability
     const cleanMessage = errorMessage.replace(/hay-plugin-/g, "");
     toast.error(cleanMessage, undefined, 10000); // Show error for 10 seconds
   } finally {

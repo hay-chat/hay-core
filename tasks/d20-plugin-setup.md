@@ -8,7 +8,7 @@ Research: `Engineering/02 Research/D20 Plugin setup UX.md` (Roger accepted every
 - [x] D20-1 quick fixes on the current plugin page
 - [x] D20-2 i18n of the generic form + OAuth card, plugin field labels, locale renames, en/pt-BR hard check
 - [x] D20-3 SDK + server: `advanced` fields, `managed` resolver metadata, override policy (env flag)
-- [ ] D20-4 standard page: status header, tabs, Advanced mode, badges, ⋯ menu, Enable → Connect
+- [x] D20-4 standard page: status header, tabs, Advanced mode, badges, ⋯ menu, Enable → Connect (vitest 82/82, nuxt dev vue-tsc 0 errors, Playwright 390px + 1440px)
 - [ ] D20-5 `register.setup({steps})`, `GET /setup/status`, core checklist + fallback steps, build-plugin skill
 - Verify each slice: plugin-sdk vitest, dashboard vitest, server jest (config resolver / handler), Playwright 390 px + desktop.
 

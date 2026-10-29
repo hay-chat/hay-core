@@ -54,18 +54,17 @@
       "playbook": "Playbook"
     },
     "actions": {
-      "install": "Install",
-      "installing": "Installing...",
       "configure": "Configure",
       "remove": "Remove",
       "removing": "Removing...",
       "delete": "Delete",
-      "deleting": "Deleting..."
+      "deleting": "Deleting...",
+      "connect": "Connect",
+      "connecting": "Connecting…"
     },
     "custom": "Custom",
     "confirmDelete": "Are you sure you want to delete this integration? This action cannot be undone.",
     "toast": {
-      "enabledSuccess": "Integration {name} enabled successfully",
       "disabledSuccess": "Integration {name} disabled successfully",
       "deletedSuccess": "Integration deleted successfully",
       "enableFailed": "Failed to enable integration",
@@ -177,32 +176,23 @@
     "backToMarketplace": "Back to Marketplace",
     "headTitle": "Integration Settings - Hay.chat",
     "headTitleWithName": "{name} Settings - Hay.chat",
-    "restartWorker": "Restart Worker",
+    "restartWorker": "Restart",
     "restarting": "Restarting...",
-    "disablePlugin": "Disable Integration",
-    "disabling": "Disabling...",
-    "enablePlugin": "Enable Integration",
+    "disablePlugin": "Disconnect and remove",
     "disableConfirm": {
-      "title": "Disable Integration?",
-      "description": "Are you sure you want to disable {name}? This will stop the integration from being used in your organization.",
-      "confirm": "Disable"
+      "title": "Disconnect and remove?",
+      "description": "{name} stops working for your workspace and its settings are kept in case you connect it again.",
+      "confirm": "Disconnect"
     },
     "error": {
       "loadFailed": "Failed to load integration",
       "returnToMarketplace": "Return to Marketplace"
     },
     "connection": {
-      "testing": "Testing Connection",
-      "connected": "Connected",
-      "failed": "Connection Failed",
-      "needsAuth": "Needs Authentication",
-      "configureCredentials": "Please configure your credentials",
       "connectionFailed": "Connection failed",
-      "tryAgain": "Try Again",
       "oauthUnavailableTitle": "Connecting is not available yet",
       "oauthUnavailable": "{name} can't be connected until its OAuth app is set up on this Hay.chat server. An administrator needs to add the client ID and secret for this integration."
     },
-    "about": "About",
     "capabilities": {
       "title": "Capabilities",
       "description": "What this integration can do",
@@ -235,7 +225,8 @@
           "title": "Web chat",
           "description": "Adds to the chat widget on your website."
         }
-      }
+      },
+      "empty": "This integration works in the background and adds no actions of its own."
     },
     "availableActions": {
       "title": "Available Actions",
@@ -246,36 +237,33 @@
         "read": "Read",
         "write": "Write",
         "destructive": "Destructive"
-      }
-    },
-    "configuration": {
-      "title": "Configuration",
-      "description": "Configure your {name} settings"
+      },
+      "parameters": "Parameters"
     },
     "connectionTest": {
-      "title": "Connection Test",
-      "description": "Test your {name} connection",
-      "testConnection": "Test Connection",
-      "testing": "Testing...",
+      "title": "Check the connection",
+      "description": "Make sure Hay.chat can reach {name} with these details.",
+      "testConnection": "Test connection",
       "success": "Connection successful!",
       "configRequired": "Configuration required",
-      "failed": "Connection failed",
-      "checkConfig": "Please check your configuration and try again."
+      "failed": "Connection failed"
     },
     "tabs": {
-      "settings": "Settings"
+      "label": "Integration sections",
+      "setup": "Setup",
+      "capabilities": "What it can do",
+      "advanced": "Advanced"
     },
     "toast": {
       "configSaved": "Configuration saved successfully",
       "configSaveFailed": "Failed to save configuration",
-      "enabledSuccess": "Integration enabled successfully",
       "enableFailed": "Failed to enable integration",
       "disabledSuccess": "Integration disabled successfully",
       "disableFailed": "Failed to disable integration",
       "restartedSuccess": "Integration worker restarted successfully",
       "restartFailed": "Failed to restart integration",
-      "resetToEnv": "Reset to environment variable",
-      "resetToEnvFailed": "Failed to reset to environment variable",
+      "resetToEnv": "Back to the managed value",
+      "resetToEnvFailed": "Couldn't go back to the managed value",
       "oauthSuccess": "OAuth connection established successfully",
       "oauthFailed": "OAuth connection failed. Please try again.",
       "connectionEstablished": "Connection established successfully",
@@ -296,8 +284,9 @@
       "alerted": "Owners and admins were notified by email and push."
     },
     "advanced": {
-      "show": "Show advanced settings",
-      "managedHidden": "{count} value is set up for you by Hay.chat. | {count} values are set up for you by Hay.chat."
+      "title": "Advanced settings",
+      "description": "Technical values most workspaces never change. Values marked Managed by Hay.chat are set up for you.",
+      "readOnlyDescription": "Hay.chat sets these values for you. They are shown here for reference."
     },
     "form": {
       "managedValue": "Set by Hay.chat",
@@ -315,7 +304,10 @@
       "willEncrypt": "Stored encrypted.",
       "selectPlaceholder": "Choose an option",
       "discard": "Discard changes",
-      "save": "Save"
+      "save": "Save",
+      "managedReadOnlyHint": "Hay.chat sets this value for you.",
+      "badgeManaged": "Managed by Hay.chat",
+      "badgeSetByYou": "Set by you"
     },
     "oauth": {
       "title": "Connect your {name} account",
@@ -332,6 +324,24 @@
       "reconnect": "Reconnect",
       "disconnect": "Disconnect",
       "statusFailed": "Couldn't check the connection. Refresh the page to try again."
+    },
+    "status": {
+      "not_set_up": "Not set up",
+      "needs_action": "Needs action",
+      "connected": "Connected",
+      "error": "Not working"
+    },
+    "actions": {
+      "connect": "Connect",
+      "finishSetup": "Finish setup",
+      "reviewSetup": "Review setup",
+      "more": "More options",
+      "advancedMode": "Advanced mode",
+      "version": "Version {version}"
+    },
+    "setup": {
+      "fieldsTitle": "Your details",
+      "fieldsDescription": "What {name} needs from you to connect."
     }
   }
 }

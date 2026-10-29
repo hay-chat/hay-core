@@ -23,7 +23,7 @@
             : 'bg-green-50 border-green-200 dark:bg-green-950/20 dark:border-green-800'
       "
     >
-      <div class="flex items-start justify-between">
+      <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div class="flex items-center space-x-3">
           <div
             v-if="oauthStatus.connected && oauthStatus.expired"
@@ -92,7 +92,7 @@
         </div>
 
         <!-- Action Buttons -->
-        <div class="flex items-center space-x-2">
+        <div class="flex flex-wrap items-center gap-2">
           <Button
             v-if="!oauthStatus.connected && !isClientFlow"
             @click="handleConnect"
