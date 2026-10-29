@@ -229,10 +229,13 @@
               :hint="$t('agents.escalation.availableHint')"
             />
 
+            <HandoffTicketSettings v-model="form.humanHandoffUnavailableTicket" />
+
+            <!-- v-show, not v-if: the editor must stay mounted so save() keeps the text when a ticket is chosen. -->
             <InstructionsTiptap
+              v-show="!form.humanHandoffUnavailableTicket"
               ref="handoffUnavailableEditorRef"
               :initial-data="form.humanHandoffUnavailableInstructions"
-              :label="$t('agents.escalation.unavailableLabel')"
               :hint="$t('agents.escalation.unavailableHint')"
             />
           </CardContent>
@@ -345,6 +348,8 @@ type OrganizationSettings = RouterOutputs["organizations"]["getSettings"];
 type InstructionsInput = NonNullable<
   RouterInputs["agents"]["create"]["humanHandoffAvailableInstructions"]
 >;
+// "If all human agents are unavailable → create a ticket"; null = follow the instructions.
+type HandoffTicket = RouterOutputs["agents"]["get"]["human_handoff_unavailable_ticket"];
 
 const EMPTY_INSTRUCTIONS: JSONContent = { type: "doc", content: [] };
 
@@ -385,6 +390,7 @@ const initialForm = ref({
   channels: [] as string[],
   humanHandoffAvailableInstructions: null as InstructionContent,
   humanHandoffUnavailableInstructions: null as InstructionContent,
+  humanHandoffUnavailableTicket: null as HandoffTicket,
 });
 
 // Determine if we're in edit mode based on route
@@ -442,6 +448,7 @@ const form = ref({
   channels: [] as string[],
   humanHandoffAvailableInstructions: { blocks: [] } as JSONContent,
   humanHandoffUnavailableInstructions: { blocks: [] } as JSONContent,
+  humanHandoffUnavailableTicket: null as HandoffTicket,
 });
 
 // UI state
@@ -573,6 +580,7 @@ onMounted(async () => {
         humanHandoffUnavailableInstructions: toInstructionContent(
           agentResponse.human_handoff_unavailable_instructions,
         ),
+        humanHandoffUnavailableTicket: agentResponse.human_handoff_unavailable_ticket ?? null,
       };
 
       form.value = { ...formData };
@@ -648,6 +656,7 @@ const handleSubmit = async () => {
       channels: form.value.channels,
       humanHandoffAvailableInstructions: toInstructionsInput(savedHandoffAvailable),
       humanHandoffUnavailableInstructions: toInstructionsInput(savedHandoffUnavailable),
+      humanHandoffUnavailableTicket: form.value.humanHandoffUnavailableTicket ?? null,
     };
 
     if (isEditMode.value && agentId.value) {

@@ -1,5 +1,6 @@
 import { AgentRepository } from "../repositories/agent.repository";
 import type { TiptapDoc } from "@server/types/tiptap.types";
+import type { HandoffTicketConfig } from "@server/types/handoff-ticket.types";
 import { Agent } from "../database/entities/agent.entity";
 
 export class AgentService {
@@ -22,6 +23,7 @@ export class AgentService {
       testMode?: boolean | null;
       humanHandoffAvailableInstructions?: TiptapDoc;
       humanHandoffUnavailableInstructions?: TiptapDoc;
+      humanHandoffUnavailableTicket?: HandoffTicketConfig | null;
       initialGreeting?: string;
       language?: string | null;
       channels?: string[];
@@ -38,6 +40,7 @@ export class AgentService {
       testMode: data.testMode,
       human_handoff_available_instructions: data.humanHandoffAvailableInstructions,
       human_handoff_unavailable_instructions: data.humanHandoffUnavailableInstructions,
+      human_handoff_unavailable_ticket: data.humanHandoffUnavailableTicket,
       initialGreeting: data.initialGreeting,
       language: data.language,
       channels: data.channels,
@@ -71,6 +74,7 @@ export class AgentService {
       testMode?: boolean | null;
       humanHandoffAvailableInstructions?: TiptapDoc;
       humanHandoffUnavailableInstructions?: TiptapDoc;
+      humanHandoffUnavailableTicket?: HandoffTicketConfig | null;
       initialGreeting?: string;
       language?: string | null;
       channels?: string[];
@@ -87,6 +91,7 @@ export class AgentService {
       testMode: data.testMode,
       human_handoff_available_instructions: data.humanHandoffAvailableInstructions,
       human_handoff_unavailable_instructions: data.humanHandoffUnavailableInstructions,
+      human_handoff_unavailable_ticket: data.humanHandoffUnavailableTicket,
       initialGreeting: data.initialGreeting,
       language: data.language,
       channels: data.channels,

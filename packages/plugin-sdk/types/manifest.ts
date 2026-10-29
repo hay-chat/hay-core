@@ -24,6 +24,8 @@ export type PluginCategory = "integration" | "channel" | "tool" | "analytics" | 
  * - `disputes`: plugin reads payment disputes (chargebacks). It receives a
  *   `HayDisputeSourceRuntimeAPI` on `HayStartContext` and answers core's
  *   `POST /disputes/evidence` (attach as a draft, never submit).
+ * - `tickets`: plugin raises helpdesk tickets when a hand-off finds nobody
+ *   available. It answers core's `POST /tickets/form` and `POST /tickets/create`.
  */
 export type PluginCapability =
   | "routes"
@@ -36,6 +38,7 @@ export type PluginCapability =
   | "sources"
   | "products"
   | "disputes"
+  | "tickets"
   | "cron"
   | "email"
   | "webchat";
