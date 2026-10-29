@@ -7,6 +7,9 @@ import { MigrationInterface, QueryRunner } from "typeorm";
  *
  * Backfill from the traces that existed before this column: a takeover event,
  * a human-agent message, a handoff summary, or a current handoff status.
+ * The status is compared as text: on a fresh database "human-took-over" is
+ * added to the enum earlier in the same migration transaction, and Postgres
+ * rejects an uncommitted enum value as a literal.
  */
 export class AddConversationHandedOffAt1784600000000 implements MigrationInterface {
   name = "AddConversationHandedOffAt1784600000000";
@@ -29,7 +32,7 @@ export class AddConversationHandedOffAt1784600000000 implements MigrationInterfa
       WHERE c."handed_off_at" IS NULL
         AND (
           c."summary" IS NOT NULL
-          OR c."status" IN ('pending-human', 'human-took-over')
+          OR c."status"::text IN ('pending-human', 'human-took-over')
           OR EXISTS (SELECT 1 FROM "conversation_takeover_events" e
             WHERE e."conversation_id" = c."id")
           OR EXISTS (SELECT 1 FROM "messages" m
