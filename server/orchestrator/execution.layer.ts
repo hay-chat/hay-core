@@ -63,6 +63,11 @@ export interface ExecutionResult {
   toolArgs?: string | null; // JSON string of tool arguments
   handoffReason?: string | null;
   closeReason?: string | null;
+  /**
+   * Set when planning itself failed (provider down, overloaded or hung after the
+   * retry). The turn becomes a hand-off that must not need the LLM again.
+   */
+  aiUnavailable?: boolean;
   rationale?: string;
   /**
    * Planner's verdict on whether the conversation's current playbook still fits
@@ -444,10 +449,14 @@ export class ExecutionLayer {
       return result;
     } catch (error) {
       log.error({ err: error }, "Error in execution layer");
+      // "Please try again" leaves the shopper stuck while the provider is down.
+      // Hand the conversation to the team instead; the hand-off line is fixed
+      // copy, so it still goes out without the LLM.
       return {
-        step: "RESPOND",
-        userMessage:
-          "I apologize, but I encountered an error while processing your request. Please try again.",
+        step: "HANDOFF",
+        handoffReason: "The AI could not answer (provider unavailable)",
+        handoff: { reason: "The AI could not answer (provider unavailable)" },
+        aiUnavailable: true,
       };
     }
   }

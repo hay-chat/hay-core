@@ -1403,7 +1403,9 @@ async function handleExecutionLoop(
         handoffType === "available"
           ? agent?.human_handoff_available_instructions
           : agent?.human_handoff_unavailable_instructions;
-      if (hasTiptapContent(customInstructions)) {
+      // Custom instructions run through the planner again, which is exactly what
+      // just failed when the AI is unavailable; use the fixed line instead.
+      if (hasTiptapContent(customInstructions) && !executionResult.aiUnavailable) {
         log.debug({ handoffType }, "Executing custom handoff instructions");
         await conversation.addHandoffInstructions(
           customInstructions,
@@ -1431,6 +1433,7 @@ async function handleExecutionLoop(
           metadata: buildMessageMetadata(executionResult, {
             isHandoffMessage: true,
             handoffType,
+            ...(executionResult.aiUnavailable ? { aiUnavailable: true } : {}),
             availability: {
               state: availability.state,
               nextOpening: availability.nextOpening?.toISOString() ?? null,

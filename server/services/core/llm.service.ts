@@ -41,6 +41,27 @@ export interface ChatMeta<T> {
 
 const logger = createLogger("llm");
 
+/** One extra attempt for a non-streaming chat call that hung or hit an overloaded vendor. */
+const CHAT_ATTEMPTS = 2;
+const CHAT_RETRY_DELAY_MS = 1000;
+
+/**
+ * Provider failures worth another attempt: a call that hung past our timeout, or
+ * a vendor answering 408/409/429/5xx (DigitalOcean's "529 Platform overloaded").
+ * The SDK's own retries all run inside one timeout window, so they cannot help a
+ * call that hangs. Bad requests, auth errors and schema failures are not retried.
+ */
+export function isTransientLlmError(error: unknown): boolean {
+  if (!(error instanceof Error)) return false;
+  const status = (error as { status?: unknown }).status;
+  if (typeof status === "number") {
+    return status === 408 || status === 409 || status === 429 || status >= 500;
+  }
+  return /timeout|overloaded|ECONNRESET|ETIMEDOUT|ECONNREFUSED|fetch failed|socket hang up/i.test(
+    error.message,
+  );
+}
+
 export interface ChatOptions {
   history?: string | Message[];
   prompt?: string;
@@ -166,7 +187,7 @@ export class LLMService {
 
     let result: ChatResult;
     try {
-      result = await this.runWithTimeout(30000, request, (req) => bundle.chat.chat(req));
+      result = await this.chatWithRetry(bundle.chat, request);
       result = await this.coerceStructured(bundle.chat, request, result);
     } catch (error) {
       if (error instanceof StructuredOutputError) throw error;
@@ -272,6 +293,23 @@ export class LLMService {
       return result.embeddings[0] ?? [];
     } catch (error) {
       throw this.wrapError(error, "embedding", "LLM embedding timeout");
+    }
+  }
+
+  private async chatWithRetry(provider: ChatProvider, request: ChatRequest): Promise<ChatResult> {
+    for (let attempt = 1; ; attempt++) {
+      try {
+        return await this.runWithTimeout(30000, request, (req) => provider.chat(req));
+      } catch (error) {
+        const retry =
+          attempt < CHAT_ATTEMPTS && !request.signal?.aborted && isTransientLlmError(error);
+        if (!retry) throw error;
+        logger.warn(
+          { err: error, attempt, model: request.model },
+          "LLM call failed transiently, retrying once",
+        );
+        await new Promise((resolve) => setTimeout(resolve, CHAT_RETRY_DELAY_MS));
+      }
     }
   }
 

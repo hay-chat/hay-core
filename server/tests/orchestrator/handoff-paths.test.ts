@@ -250,6 +250,26 @@ describe("hand-off line", () => {
     },
   );
 
+  it("hands off with the fixed line, skipping the merchant's instructions, when the AI is down", async () => {
+    mockExecute.mockResolvedValue({
+      step: "HANDOFF",
+      handoff: { reason: "The AI could not answer (provider unavailable)" },
+      aiUnavailable: true,
+    });
+    given({ id: AGENT_ID, human_handoff_available_instructions: INSTRUCTIONS }, 1);
+
+    await runConversation(CONVERSATION_ID);
+
+    expect(conversation.addHandoffInstructions).not.toHaveBeenCalled();
+    expect(mockUpdate).toHaveBeenCalledWith(CONVERSATION_ID, ORG_ID, { status: "pending-human" });
+    expect(botMessages()).toEqual([
+      expect.objectContaining({
+        content: handoffCopy("handoffQueued", "en"),
+        metadata: expect.objectContaining({ isHandoffMessage: true, aiUnavailable: true }),
+      }),
+    ]);
+  });
+
   it("tells the shopper the team usually replies within the median time when known (D5-7)", async () => {
     given({ id: AGENT_ID }, 0);
     mockTypicalReply.mockResolvedValue(12);
