@@ -350,12 +350,17 @@ export class Conversation {
     let instructionText = "";
     let referencedActions: string[] = [];
     let referencedDocuments: string[] = [];
+    // Whether this playbook prescribes a "Handoff to human" step, so a hand-off
+    // taken while following it can be classified as a planned (billable)
+    // escalation at close rather than a fallback.
+    let playbookPrescribesHandoff = false;
 
     if (instructions) {
       const analysis = analyzeTiptapInstructions(toTiptapInstructions(instructions));
       instructionText = analysis.formattedText;
       referencedActions = analysis.actions;
       referencedDocuments = analysis.documents;
+      playbookPrescribesHandoff = analysis.hasHandoff;
     }
 
     // Log playbook addition with embedded references (only logs once per conversation per playbook)
@@ -616,15 +621,19 @@ The following tools are available for you to use. You MUST return only valid JSO
       "Updating conversation with playbook and tools",
     );
 
+    const updatedMetadata = { ...(this.metadata ?? {}), playbookPrescribesHandoff };
+
     await conversationRepository.update(this.id, this.organization_id, {
       playbook_id: playbookId,
       playbook_version_id: activeVersionId,
       enabled_tools: enabledToolIds.length > 0 ? enabledToolIds : null,
+      metadata: updatedMetadata,
     });
 
     this.playbook_id = playbookId;
     this.playbook_version_id = activeVersionId;
     this.enabled_tools = enabledToolIds.length > 0 ? enabledToolIds : null;
+    this.metadata = updatedMetadata;
 
     logger.debug(
       {
