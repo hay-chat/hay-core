@@ -1,6 +1,6 @@
 <template>
   <div class="space-y-4">
-    <div class="flex items-center justify-between">
+    <div v-if="!hideHeader" class="flex items-center justify-between">
       <div class="space-y-1">
         <h3 class="text-lg font-medium">
           {{ t("pluginSettings.oauth.title", { name: pluginName }) }}
@@ -166,6 +166,8 @@ interface Props {
   infoText?: string;
   oauthAvailable?: boolean; // Passed from parent
   oauthConfigured?: boolean; // Passed from parent
+  /** The setup checklist shows the title itself. */
+  hideHeader?: boolean;
 }
 
 const props = defineProps<Props>();

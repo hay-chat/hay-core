@@ -114,6 +114,48 @@ Runtime: `ctx.config.get<T>("key")` / `ctx.config.getOptional<T>("key")`,
 `ctx.auth.get(): { methodId, credentials } | null` (apiKey → `{ apiKey }`,
 oauth → `{ accessToken, refreshToken?, expiresAt? }`; tokens auto-refreshed by core).
 
+### Advanced and managed fields
+
+Mark technical fields the merchant should not need (API version, auth mode, base URL) with
+`advanced: true`: the plugin page moves them to the Advanced tab, which only shows in Advanced
+mode. A field whose `env` var is set on the host is **managed by Hay.chat**: read-only and shown
+on the Advanced tab (overridable only when the host sets `PLUGIN_ALLOW_MANAGED_OVERRIDE=true`).
+A required field that is still empty always stays on the Setup tab.
+
+## Setup checklist (`register.setup`) and status
+
+The Setup tab is a numbered checklist. Declare it in `onInitialize`; without a declaration core
+builds one: before-settings components, the Setup fields, Connect (if OAuth), after-settings
+components, Verify (if MCP).
+
+```ts
+ctx.register.setup({
+  steps: [
+    { id: "store", kind: "fields", fields: ["shopDomain"] },        // config fields
+    { id: "connect", kind: "connect" },                              // the OAuth method
+    { id: "webhooks", kind: "component", component: "AfterSettings" }, // a ui.page component
+    { id: "app", kind: "external", url: "https://partners.example.com" },
+    { id: "notify", kind: "fields", fields: ["recipients"], optional: true },
+    { id: "verify", kind: "verify" },                                // connection test (MCP)
+  ],
+  // Optional: report your own status (core calls POST /setup/status with config + auth, 5 s timeout)
+  async status({ auth, config }) {
+    const connected = !!auth.get();
+    return {
+      state: connected ? "connected" : "needs_action", // not_set_up | needs_action | connected | error
+      account: config.getOptional<string>("shopDomain"), // shown as "Connected as …"
+      steps: { connect: { done: connected } },          // steps you leave out are judged by core
+    };
+  },
+});
+```
+
+Step titles live in i18n, not code: `setupSteps.<id>.title` (required) and `.description` in
+`i18n/en.json` **and** `i18n/pt-BR.json`. The SDK test `core-plugin-labels.test.ts` fails without
+them. Setup fields no `fields` step claims get a leading "Your details" step (or go to a step
+declared with `kind: "fields"` and no `fields`). Steps that cannot apply are skipped (no OAuth
+method, unknown component, no fields left).
+
 ## MCP wiring (in `onStart`) — three modes
 
 ```ts

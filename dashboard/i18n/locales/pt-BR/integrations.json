@@ -341,7 +341,11 @@
     },
     "setup": {
       "fieldsTitle": "Seus dados",
-      "fieldsDescription": "O que o {name} precisa de você para conectar."
+      "fieldsDescription": "O que o {name} precisa de você para conectar.",
+      "optional": "Opcional",
+      "stepDone": "Concluído",
+      "stepsLabel": "Etapas de configuração",
+      "openExternal": "Abrir em uma nova aba"
     }
   }
 }

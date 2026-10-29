@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
+  buildSetupChecklist,
+  isStepDone,
+  type DeclaredSetupStep,
   deriveSetupState,
   describedCapabilities,
   missingRequiredFields,
@@ -98,6 +101,102 @@ describe("deriveSetupState", () => {
   it("is connected otherwise", () => {
     expect(deriveSetupState({ ...base, oauth: { available: true, connected: true } })).toBe(
       "connected",
+    );
+  });
+});
+
+describe("buildSetupChecklist", () => {
+  const base = {
+    setupFields: ["shopDomain", "recipients"],
+    before: ["Guide"],
+    after: ["Webhooks"],
+    hasConnect: true,
+    hasVerify: true,
+  };
+
+  it("builds the standard order when the plugin declares nothing", () => {
+    const { steps, extraBefore, extraAfter } = buildSetupChecklist(base);
+    expect(steps.map((s) => `${s.kind}:${s.id}`)).toEqual([
+      "component:Guide",
+      "fields:details",
+      "connect:connect",
+      "component:Webhooks",
+      "verify:verify",
+    ]);
+    expect(steps[1].fields).toEqual(["shopDomain", "recipients"]);
+    expect([extraBefore, extraAfter]).toEqual([[], []]);
+  });
+
+  it("skips steps that cannot apply in the fallback", () => {
+    const { steps } = buildSetupChecklist({
+      ...base,
+      setupFields: [],
+      before: [],
+      after: [],
+      hasConnect: false,
+      hasVerify: false,
+    });
+    expect(steps).toEqual([]);
+  });
+
+  it("follows the declared steps and keeps unclaimed fields and components", () => {
+    const { steps, extraBefore, extraAfter } = buildSetupChecklist({
+      ...base,
+      setupFields: ["shopDomain", "recipients", "token"],
+      declared: [
+        { id: "store", kind: "fields", fields: ["shopDomain", "managedId"] },
+        { id: "connect", kind: "connect" },
+        { id: "webhooks", kind: "component", component: "Webhooks" },
+        { id: "missing", kind: "component", component: "Nope" },
+        { id: "notify", kind: "fields", fields: ["recipients"], optional: true },
+        { id: "app", kind: "external", url: "https://example.com" },
+      ],
+    });
+    expect(steps.map((s) => s.id)).toEqual(["details", "store", "connect", "webhooks", "notify", "app"]);
+    expect(steps[0].fields).toEqual(["token"]);
+    expect(steps[1].fields).toEqual(["shopDomain"]);
+    expect(steps[4].optional).toBe(true);
+    expect([extraBefore, extraAfter]).toEqual([["Guide"], []]);
+  });
+
+  it("puts unclaimed fields in a declared catch-all fields step", () => {
+    const { steps } = buildSetupChecklist({
+      ...base,
+      declared: [
+        { id: "notify", kind: "fields", fields: ["recipients"] },
+        { id: "rest", kind: "fields" },
+      ],
+    });
+    expect(steps.map((s) => [s.id, s.fields])).toEqual([
+      ["notify", ["recipients"]],
+      ["rest", ["shopDomain"]],
+    ]);
+  });
+});
+
+describe("isStepDone", () => {
+  const signals = { missingRequired: ["shopDomain"], oauthConnected: true, testSuccess: null };
+  const s = (kind: DeclaredSetupStep["kind"], fields: string[] = []) => ({
+    id: kind,
+    kind,
+    optional: false,
+    fields,
+  });
+
+  it("judges fields, connect and verify from what core knows", () => {
+    expect(isStepDone(s("fields", ["shopDomain"]), signals)).toBe(false);
+    expect(isStepDone(s("fields", ["recipients"]), signals)).toBe(true);
+    expect(isStepDone(s("connect"), signals)).toBe(true);
+    expect(isStepDone(s("verify"), signals)).toBe(false);
+    expect(isStepDone(s("external"), signals)).toBeNull();
+  });
+
+  it("prefers what the plugin reported", () => {
+    expect(
+      isStepDone(s("external"), { ...signals, reported: { external: { done: true } } }),
+    ).toBe(true);
+    expect(isStepDone(s("connect"), { ...signals, reported: { connect: { done: false } } })).toBe(
+      false,
     );
   });
 });

@@ -341,7 +341,11 @@
     },
     "setup": {
       "fieldsTitle": "Your details",
-      "fieldsDescription": "What {name} needs from you to connect."
+      "fieldsDescription": "What {name} needs from you to connect.",
+      "optional": "Optional",
+      "stepDone": "Done",
+      "stepsLabel": "Setup steps",
+      "openExternal": "Open in a new tab"
     }
   }
 }
