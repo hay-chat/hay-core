@@ -1,15 +1,15 @@
 # Context
 
-**Current Task**: Merge-gate session: everything merged and deployed; the Email inbox channel is verified end to end in prod (inbound via Resend webhook, agent reply delivered by email after the worker-token fix).
+**Current Task**: VOC roadmap, bottom-up lane: Wave 4 phase 1 (D18 Nuvemshop OAuth, D19 quick check, D20 plugin setup) is live on prod and the Nuvemshop partner OAuth connect is verified on a demo store. Source of truth: `tasks/voc-roadmap.md` ("Resume here" top entry).
 
 **Key Decisions**:
 
-- Merge straight to master (no PRs), deploy with `/srv/hay-core/deploy.sh`, verify live in Chrome; migrations run manually with `cd server && npm run migration:run`.
-- `/` redirects by viewport: phones → `/inbox` (attention list), desktops → `/dashboard`; the sidebar entry is "Inbox".
-- The agent-pause migration keeps class/name/DB row at 1784500000000 (same timestamp as push_subscriptions; both applied).
+- Merge straight to master, deploy with `/srv/hay-core/deploy.sh` (`--env-only` for env), run migrations from the host (`cd server && npm run migration:run`), verify live in Chrome.
+- Secrets live in Infisical prod; report keys only as set/missing. Never wait on `pgrep -f deploy.sh` (it matches its own wait loop).
+- D19 quick check is off for every org (`quickCheck.enabled`); D20 managed overrides off (`PLUGIN_ALLOW_MANAGED_OVERRIDE`).
 
 **Next Steps**:
 
-- Done 2026-10-26: VAPID_*/RESEND_*/EMAIL_INBOUND_DOMAIN live in prod (deploy.sh --env-only); backoffice billing branches merged, migrated, Stripe live catalog synced, deployed (see /srv/hay/WIP.md).
-- Dashboard still has no `test` script/vitest config (run `npx vitest run` from `dashboard/`); server `PluginMetadata` lacks the `pages` field the SDK emits.
-- Email inbox: Roger confirms the reply arrived in his mailbox; then set up real Gmail forwarding. Observed: empty-body mail passes the signature to the agent; legacy "Failed to decrypt credential" warnings on delivery; atlassian/notion router.cjs fail to load in the image. Website copy fixes still in each branch's `tasks/todo.md`.
+- iPhone push test (step 9): Roger re-adds the PWA, allows notifications, sends a test alert.
+- Nuvemshop: seed the demo store (product + test order) and test tool reads; LGPD HMAC check; post-connect redirect fix; then Dados de publicação (ask Roger first).
+- D19/D20 phase 2 (see the Wave 4 section of the roadmap).
