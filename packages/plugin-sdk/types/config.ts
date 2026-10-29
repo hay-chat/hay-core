@@ -134,6 +134,21 @@ export interface ConfigFieldDescriptor<T = any> {
   serverOnly?: boolean;
 
   /**
+   * Technical setting most merchants never touch (API version, auth mode,
+   * escalation ids…). The dashboard keeps it out of Setup and shows it on the
+   * Advanced tab, which only appears in Advanced mode.
+   *
+   * @remarks
+   * Fields with `env` need no flag: when the env var is set on the Hay server
+   * the value is managed for the merchant and the field moves to Advanced
+   * automatically; when it is not set (self-hosting) the field stays in Setup.
+   * A required advanced field with no value still shows in Setup.
+   *
+   * @defaultValue false
+   */
+  advanced?: boolean;
+
+  /**
    * Default value if not configured.
    */
   default?: T;

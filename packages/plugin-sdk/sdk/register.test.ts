@@ -24,6 +24,22 @@ describe("Register API", () => {
   });
 
   describe("Config Registration", () => {
+    it("keeps the advanced flag in /metadata's config schema", () => {
+      registerAPI.config({
+        apiVersion: { type: "string", label: "API version", advanced: true, default: "2026-04" },
+      });
+
+      expect(registry.getConfigSchema().apiVersion.advanced).toBe(true);
+    });
+
+    it("rejects a non-boolean advanced flag", () => {
+      expect(() =>
+        registerAPI.config({
+          apiVersion: { type: "string", advanced: "yes" as unknown as boolean },
+        }),
+      ).toThrow('Config field "apiVersion" advanced must be a boolean');
+    });
+
     it("should register valid config schema", () => {
       registerAPI.config({
         apiKey: {

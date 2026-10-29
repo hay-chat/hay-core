@@ -5,13 +5,57 @@ export interface ResolvedConfigField {
   value: unknown;
   source: "env" | "database" | "default";
   isEncrypted: boolean;
+  /** The merchant may set their own value (false for a managed value when the policy forbids it). */
   canOverride: boolean;
   hasEnvFallback?: boolean; // Whether field has env variable fallback available
+  /** The Hay server sets this value (its env var is set): "Managed by Hay.chat". */
+  managed: boolean;
+  /** Belongs on the Advanced tab: declared `advanced`, or managed. */
+  advanced: boolean;
+  /** Env var behind a managed-capable field; the dashboard shows it in Advanced mode only. */
+  envName?: string;
+}
+
+/**
+ * Whether a merchant may replace a value the server manages (D20, Roger's
+ * answer 1). Off by default (Hay.chat cloud: managed values are read-only even
+ * in Advanced mode); self-hosters turn it on with PLUGIN_ALLOW_MANAGED_OVERRIDE=true.
+ */
+export function isManagedOverrideAllowed(): boolean {
+  return process.env.PLUGIN_ALLOW_MANAGED_OVERRIDE === "true";
+}
+
+function envValueOf(fieldDef: ConfigFieldDescriptor): string | undefined {
+  const envVarName = fieldDef.env;
+  return envVarName && process.env[envVarName] && process.env[envVarName] !== ""
+    ? process.env[envVarName]
+    : undefined;
+}
+
+/** Fields whose value the server manages right now (their env var is set). */
+export function managedFieldKeys(configSchema: Record<string, ConfigFieldDescriptor>): string[] {
+  return Object.entries(configSchema)
+    .filter(([, fieldDef]) => envValueOf(fieldDef) !== undefined)
+    .map(([key]) => key);
 }
 
 export interface ResolvedConfig {
   values: Record<string, unknown>;
   metadata: Record<string, ResolvedConfigField>;
+}
+
+/**
+ * Enforce the managed-value policy on a configuration a merchant submits: when
+ * overriding is not allowed, values for managed fields are dropped so the
+ * server's value keeps applying (and a stored override is cleared on save).
+ */
+export function dropManagedOverrides(
+  input: Record<string, unknown>,
+  configSchema: Record<string, ConfigFieldDescriptor> | undefined,
+): Record<string, unknown> {
+  if (!configSchema || isManagedOverrideAllowed()) return input;
+  const managed = new Set(managedFieldKeys(configSchema));
+  return Object.fromEntries(Object.entries(input).filter(([key]) => !managed.has(key)));
 }
 
 /**
@@ -26,9 +70,14 @@ export function resolveConfigWithEnv(
   options: {
     decrypt?: boolean; // Whether to decrypt values
     maskSecrets?: boolean; // Whether to mask encrypted/env values for display
+    allowManagedOverride?: boolean; // Defaults to the PLUGIN_ALLOW_MANAGED_OVERRIDE policy
   } = {},
 ): ResolvedConfig {
-  const { decrypt = false, maskSecrets = false } = options;
+  const {
+    decrypt = false,
+    maskSecrets = false,
+    allowManagedOverride = isManagedOverrideAllowed(),
+  } = options;
 
   const decryptedConfig = decrypt && dbConfig ? decryptConfig(dbConfig) : dbConfig || {};
   const resolved: ResolvedConfig = {
@@ -41,10 +90,13 @@ export function resolveConfigWithEnv(
     const dbValue = decryptedConfig[key];
     const envVarName = fieldDef.env;
     const hasEnvFallback = !!envVarName;
-    const envValue =
-      hasEnvFallback && process.env[envVarName] && process.env[envVarName] !== ""
-        ? process.env[envVarName]
-        : undefined;
+    const envValue = envValueOf(fieldDef);
+    const managed = envValue !== undefined;
+    const presentation = {
+      managed,
+      advanced: !!fieldDef.advanced || managed,
+      ...(envVarName ? { envName: envVarName } : {}),
+    };
 
     // Resolution priority:
     // 1. Database value (if key exists in config)
@@ -61,6 +113,7 @@ export function resolveConfigWithEnv(
         isEncrypted: !!fieldDef.encrypted,
         canOverride: false, // Already overridden
         hasEnvFallback: hasEnvFallback && envValue !== undefined, // Can reset to env if available
+        ...presentation,
       };
     } else if (hasEnvFallback && envValue !== undefined) {
       // Fallback to environment variable
@@ -70,8 +123,9 @@ export function resolveConfigWithEnv(
         value: envValue,
         source: "env",
         isEncrypted: !!fieldDef.encrypted,
-        canOverride: true, // Can override with org-specific value
+        canOverride: allowManagedOverride, // Org-specific value only when the policy allows it
         hasEnvFallback: true,
+        ...presentation,
       };
     } else if (fieldDef.default !== undefined) {
       // Use default from schema
@@ -81,6 +135,7 @@ export function resolveConfigWithEnv(
         source: "default",
         isEncrypted: false,
         canOverride: true,
+        ...presentation,
       };
     } else {
       // No value available
@@ -90,6 +145,7 @@ export function resolveConfigWithEnv(
         source: "database",
         isEncrypted: false,
         canOverride: true,
+        ...presentation,
       };
     }
   }

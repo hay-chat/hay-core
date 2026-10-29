@@ -9,7 +9,7 @@ import { pluginUIService } from "@server/services/plugin-ui.service";
 import { getPluginRunnerService } from "@server/services/plugin-runner.service";
 import { pluginCronService } from "@server/services/plugin-cron.service";
 import { decryptConfig, isEncrypted } from "@server/lib/auth/utils/encryption";
-import { resolveConfigWithEnv } from "@server/lib/config-resolver";
+import { dropManagedOverrides, resolveConfigWithEnv } from "@server/lib/config-resolver";
 import { oauthService } from "@server/services/oauth.service";
 import { v4 as uuidv4 } from "uuid";
 import type { HayPluginManifest } from "@server/types/plugin.types";
@@ -375,7 +375,13 @@ export const enablePlugin = authenticatedProcedure
       const instance = await pluginInstanceRepository.enablePlugin(
         ctx.organizationId!,
         input.pluginId,
-        input.configuration || {},
+        dropManagedOverrides(
+          input.configuration || {},
+          (plugin.metadata?.configSchema ??
+            (plugin.manifest as HayPluginManifest).configSchema) as
+            | Record<string, ConfigFieldDescriptor>
+            | undefined,
+        ),
       );
 
       logger.info({ pluginName: plugin.name }, "Plugin successfully enabled");
@@ -612,17 +618,22 @@ export const configurePlugin = authenticatedProcedure
     const metadata = pluginRegistry?.metadata; // Metadata from /metadata endpoint
 
     const configSchema = metadata?.configSchema || manifest.configSchema;
+    // Managed values are read-only unless the instance allows overriding them.
+    const submitted = dropManagedOverrides(
+      input.configuration,
+      configSchema as Record<string, ConfigFieldDescriptor> | undefined,
+    );
     // Masked or omitted fields keep their stored value (config or auth credentials).
     const finalConfig = instance
       ? mergeWithStoredConfig(
-          input.configuration,
+          submitted,
           {
             ...(instance.config ? decryptConfig(instance.config) : {}),
             ...(instance.authState?.credentials ?? {}),
           },
           configSchema as Record<string, ConfigFieldDescriptor> | undefined,
         )
-      : input.configuration;
+      : submitted;
 
     // Separate config and auth
     const { config, authState } = separateConfigAndAuth(finalConfig, metadata);
@@ -647,10 +658,9 @@ export const configurePlugin = authenticatedProcedure
       // Check for missing required fields
       for (const [key, field] of Object.entries(configSchema)) {
         if (field.required && !resolved.values[key]) {
-          const envHint = field.env ? ` or set ${field.env} in your environment` : "";
           throw new TRPCError({
             code: "BAD_REQUEST",
-            message: `Required field "${field.label || key}" is not configured. Please provide a value${envHint}.`,
+            message: `Required field "${field.label || key}" is not configured. Please provide a value.`,
           });
         }
       }
