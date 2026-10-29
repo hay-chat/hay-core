@@ -276,6 +276,27 @@ describe("Register API", () => {
       });
     });
 
+    it("accepts tokenRequestFormat json and rejects unknown formats", () => {
+      const base = {
+        type: "oauth2" as const,
+        label: "OAuth",
+        authorizationUrl: "https://example.com/apps/{client_id}/authorize",
+        tokenUrl: "https://example.com/oauth/token",
+        clientId: { name: "clientId" },
+        clientSecret: { name: "clientSecret" },
+      };
+      registerAPI.auth.oauth2({ ...base, id: "json", tokenRequestFormat: "json" });
+      expect(registry.getAuthMethods()[0]).toMatchObject({ tokenRequestFormat: "json" });
+
+      expect(() =>
+        registerAPI.auth.oauth2({
+          ...base,
+          id: "xml",
+          tokenRequestFormat: "xml" as unknown as "json",
+        }),
+      ).toThrow('OAuth2 auth tokenRequestFormat must be "form" or "json"');
+    });
+
     it("should validate id is present", () => {
       expect(() => {
         registerAPI.auth.oauth2({

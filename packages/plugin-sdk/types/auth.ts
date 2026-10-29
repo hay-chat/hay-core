@@ -124,7 +124,14 @@ export interface OAuth2AuthOptions {
   /**
    * OAuth authorization URL.
    *
+   * @remarks
+   * The platform fills two placeholders at flow time: `{shop}` (from the
+   * instance's `shopDomain` config, for per-merchant hosts) and `{client_id}`
+   * (the resolved OAuth client id, for providers that put the app id in the
+   * path).
+   *
    * @example "https://accounts.shopify.com/oauth/authorize"
+   * @example "https://www.example.com/apps/{client_id}/authorize"
    */
   authorizationUrl: string;
 
@@ -209,6 +216,19 @@ export interface OAuth2AuthOptions {
    *   disabled and the OAuth card hides its Connect/Reconnect buttons.
    */
   connectFlow?: "redirect" | "client";
+
+  /**
+   * Body encoding of the authorization-code exchange POST (optional, defaults
+   * to `"form"`, i.e. `application/x-www-form-urlencoded` per OAuth 2.0).
+   * `"json"` sends the same fields as `application/json`, for providers that
+   * document a JSON exchange.
+   *
+   * @remarks
+   * Non-standard scalar fields of the token response (e.g. a provider account
+   * or store id) are kept in the stored credentials under their provider name,
+   * so `onConnected` and `ctx.config` can read them.
+   */
+  tokenRequestFormat?: "form" | "json";
 
   // Future: PKCE, redirect paths, etc.
 }

@@ -29,16 +29,29 @@ function asCredentialString(value: unknown): string | null {
 }
 
 /**
- * Substitute a per-tenant `{shop}` placeholder in an OAuth URL.
+ * Substitute the per-flow placeholders in an OAuth URL.
  *
- * Some providers (notably Shopify) host the authorize/token endpoints on a
- * per-merchant domain — `https://{shop}/admin/oauth/...`. SDK oauth2 methods
- * declare these URLs as static strings, so we resolve `{shop}` from the
- * instance's `shopDomain` config at flow time. Generic + safe: URLs without
- * `{shop}` are returned untouched.
+ * SDK oauth2 methods declare their URLs as static strings, so two values are
+ * resolved at flow time:
+ * - `{shop}`: some providers (e.g. Shopify) host the endpoints on a
+ *   per-merchant domain (`https://{shop}/admin/oauth/...`); filled from the
+ *   instance's `shopDomain` config.
+ * - `{client_id}`: some providers put the app id in the authorize path
+ *   (`https://…/apps/{client_id}/authorize`); filled from the resolved client id.
+ *
+ * Generic + safe: URLs without placeholders are returned untouched.
  */
+export function substituteUrlPlaceholders(
+  url: string,
+  values: { shopDomain: unknown; clientId: string },
+): string {
+  if (!url) return url;
+  const withClientId = url.replace(/\{client_id\}/g, encodeURIComponent(values.clientId));
+  return substituteShopPlaceholder(withClientId, values.shopDomain);
+}
+
 function substituteShopPlaceholder(url: string, shopDomain: unknown): string {
-  if (!url || !url.includes("{shop}")) return url;
+  if (!url.includes("{shop}")) return url;
   const shop = String(shopDomain ?? "")
     .trim()
     .replace(/^https?:\/\//i, "")
@@ -51,6 +64,44 @@ function substituteShopPlaceholder(url: string, shopDomain: unknown): string {
     });
   }
   return url.replace(/\{shop\}/g, shop);
+}
+
+/** Token-response fields core already maps onto its own credential keys. */
+const STANDARD_TOKEN_FIELDS = new Set([
+  "access_token",
+  "refresh_token",
+  "expires_in",
+  "expires_at",
+  "token_type",
+  "scope",
+]);
+const TOKEN_EXTRA_KEY_PATTERN = /^[a-zA-Z][a-zA-Z0-9_]{0,63}$/;
+const MAX_TOKEN_EXTRA_KEYS = 20;
+const MAX_TOKEN_EXTRA_LENGTH = 4096;
+
+/**
+ * Keep the non-standard scalar fields of a token response (e.g. a provider's
+ * store or account id) so the plugin can read them from its credentials.
+ * Strings, finite numbers and booleans are stringified; objects, arrays,
+ * malformed keys and oversized values are dropped; at most 20 keys are kept.
+ */
+export function tokenResponseExtras(data: unknown): Record<string, string> | undefined {
+  if (!data || typeof data !== "object" || Array.isArray(data)) return undefined;
+  const extras: Record<string, string> = {};
+  let count = 0;
+  for (const [key, value] of Object.entries(data as Record<string, unknown>)) {
+    if (count >= MAX_TOKEN_EXTRA_KEYS) break;
+    if (STANDARD_TOKEN_FIELDS.has(key) || !TOKEN_EXTRA_KEY_PATTERN.test(key)) continue;
+    let text: string;
+    if (typeof value === "string") text = value;
+    else if (typeof value === "number" && Number.isFinite(value)) text = String(value);
+    else if (typeof value === "boolean") text = String(value);
+    else continue;
+    if (text.length === 0 || text.length > MAX_TOKEN_EXTRA_LENGTH) continue;
+    extras[key] = text;
+    count++;
+  }
+  return count > 0 ? extras : undefined;
 }
 
 export class OAuthService {
@@ -302,6 +353,7 @@ export class OAuthService {
       expires_in: expiresIn,
       expires_at: expiresIn ? Math.floor(Date.now() / 1000) + expiresIn : undefined,
       scope: asCredentialString(data.scope) ?? undefined,
+      extra: tokenResponseExtras(data),
     };
 
     await this.storeTokens(organizationId, pluginId, tokens, oauth2Method.scopes);
@@ -385,11 +437,11 @@ export class OAuthService {
     });
     logger.debug("OAuth state stored in Redis");
 
-    // Resolve per-tenant {shop} placeholder (e.g. Shopify) in the authorize URL.
-    oauthConfig.authorizationUrl = substituteShopPlaceholder(
-      oauthConfig.authorizationUrl,
-      resolved.values.shopDomain,
-    );
+    // Resolve the {shop} / {client_id} placeholders in the authorize URL.
+    oauthConfig.authorizationUrl = substituteUrlPlaceholders(oauthConfig.authorizationUrl, {
+      shopDomain: resolved.values.shopDomain,
+      clientId,
+    });
 
     // Build authorization URL
     const redirectUri = this.getRedirectUri();
@@ -527,17 +579,18 @@ export class OAuthService {
         optionalScopes: oauth2Method.optionalScopes,
         pkce: true,
         tokenExchange: oauth2Method.tokenExchange,
+        tokenRequestFormat: oauth2Method.tokenRequestFormat,
       };
 
       logger.debug({ tokenUrl: oauthConfig.tokenUrl }, "OAuth token URL resolved");
 
       const validCredentials = { clientId, clientSecret };
 
-      // Resolve per-tenant {shop} placeholder (e.g. Shopify) in the token URL.
-      oauthConfig.tokenUrl = substituteShopPlaceholder(
-        oauthConfig.tokenUrl,
-        resolved.values.shopDomain,
-      );
+      // Resolve the {shop} / {client_id} placeholders in the token URL.
+      oauthConfig.tokenUrl = substituteUrlPlaceholders(oauthConfig.tokenUrl, {
+        shopDomain: resolved.values.shopDomain,
+        clientId,
+      });
 
       logger.info("Exchanging authorization code for tokens");
       // Exchange code for tokens
@@ -681,26 +734,30 @@ export class OAuthService {
   ): Promise<OAuthTokenData> {
     const redirectUri = this.getRedirectUri();
 
-    const body = new URLSearchParams({
+    const fields: Record<string, string> = {
       grant_type: "authorization_code",
       code,
       redirect_uri: redirectUri,
       client_id: credentials.clientId,
-    });
+    };
 
     // Only add client_secret for traditional OAuth (not CIMD)
     if (credentials.clientSecret) {
-      body.append("client_secret", credentials.clientSecret);
+      fields.client_secret = credentials.clientSecret;
     }
 
     if (codeVerifier) {
-      body.append("code_verifier", codeVerifier);
+      fields.code_verifier = codeVerifier;
     }
+
+    // Form-encoded per OAuth 2.0 unless the plugin declares a JSON exchange.
+    const json = oauthConfig.tokenRequestFormat === "json";
 
     logger.debug(
       {
         tokenUrl: oauthConfig.tokenUrl,
         grantType: "authorization_code",
+        format: json ? "json" : "form",
         redirectUri,
         hasClientSecret: !!credentials.clientSecret,
         hasCodeVerifier: !!codeVerifier,
@@ -711,9 +768,10 @@ export class OAuthService {
     const response = await fetch(oauthConfig.tokenUrl, {
       method: "POST",
       headers: {
-        "Content-Type": "application/x-www-form-urlencoded",
+        "Content-Type": json ? "application/json" : "application/x-www-form-urlencoded",
+        Accept: "application/json",
       },
-      body: body.toString(),
+      body: json ? JSON.stringify(fields) : new URLSearchParams(fields).toString(),
     });
 
     logger.debug(
@@ -751,6 +809,7 @@ export class OAuthService {
       expires_at: expiresAt,
       token_type: data.token_type || "Bearer",
       scope: data.scope,
+      extra: tokenResponseExtras(data),
     };
   }
 
@@ -789,9 +848,12 @@ export class OAuthService {
     // The authState format is what the plugin SDK expects via ctx.auth.get()
     // NOTE: Do NOT manually encrypt here - use updateAuthState() which uses .save()
     // and triggers the TypeORM AuthStateEncryptedTransformer automatically.
+    // Provider extras (e.g. a store id the plugin needs for every API path) go
+    // first so core's own keys always win.
     const authState = {
       methodId: `${pluginId}-oauth`, // Convention: {pluginId}-oauth
       credentials: {
+        ...tokens.extra,
         accessToken: tokens.access_token, // Plain text - transformer will encrypt
         refreshToken: tokens.refresh_token || undefined, // Plain text - transformer will encrypt
         expiresAt: tokens.expires_at,
@@ -1074,6 +1136,8 @@ export class OAuthService {
       await pluginInstanceRepository.updateAuthState(instance.id, instance.organizationId, {
         methodId: `${pluginId}-oauth`,
         credentials: {
+          // Keep connection data (token extras, onConnected credentials).
+          ...instance.authState?.credentials,
           accessToken: newTokens.access_token,
           expiresAt: newTokens.expires_at,
           connectedAt: instance.authState?.credentials?.connectedAt,
@@ -1141,6 +1205,8 @@ export class OAuthService {
     const authState = {
       methodId: `${pluginId}-oauth`,
       credentials: {
+        // Keep connection data (token extras, onConnected credentials).
+        ...instance.authState?.credentials,
         accessToken: newTokens.access_token, // Plain text - transformer will encrypt
         refreshToken: newTokens.refresh_token || undefined, // Plain text - transformer will encrypt
         expiresAt: newTokens.expires_at,

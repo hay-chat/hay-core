@@ -14,6 +14,8 @@ export interface OAuthTokenData {
   expires_at?: number; // Unix timestamp
   token_type?: string;
   scope?: string;
+  /** Non-standard scalar token-response fields (e.g. a provider store id), stringified. */
+  extra?: Record<string, string>;
 }
 
 export interface OAuthState {
@@ -39,6 +41,7 @@ export interface OAuthManifestConfig {
   scopeSeparator?: string; // Delimiter used to join scopes in the authorize URL (defaults to a space)
   tokenExchange?: OAuthTokenOpConfig; // One-time post-callback token transform (e.g. short→long)
   tokenRefresh?: OAuthTokenOpConfig; // Custom refresh strategy (non-standard, e.g. Instagram)
+  tokenRequestFormat?: "form" | "json"; // Code-exchange body encoding (defaults to form)
 }
 
 /** Declarative token op executed as a GET request; see OAuthTokenOpDescriptor. */
