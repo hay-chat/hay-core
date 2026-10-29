@@ -150,7 +150,9 @@ export async function seedWooCommerce(options: SeedOptions): Promise<SeedResult>
       ["woocommerce_currency", CURRENCY],
       ["woocommerce_default_country", "PT"],
     ]) {
-      await woo.write("PUT", `/settings/general/${id}`, { value }, {}).catch((e) => log(`  ! ${id}: ${e.message}`));
+      await woo
+        .write("PUT", `/settings/general/${id}`, { value }, {})
+        .catch((e) => log(`  ! ${id}: ${e.message}`));
     }
     if (!options.keepEmails) {
       for (const group of EMAIL_SETTINGS) {
@@ -166,14 +168,20 @@ export async function seedWooCommerce(options: SeedOptions): Promise<SeedResult>
   const tagIds = new Map<string, number>();
   const productRefs = new Map<string, ProductRef>();
 
-  async function termId(kind: "categories" | "tags", slug: string, cache: Map<string, number>): Promise<number> {
+  async function termId(
+    kind: "categories" | "tags",
+    slug: string,
+    cache: Map<string, number>,
+  ): Promise<number> {
     const cached = cache.get(slug);
     if (cached) return cached;
     let id: number | undefined;
     if (!woo.dryRun) id = (await woo.get<WooProduct[]>(`/products/${kind}`, { slug }))[0]?.id;
     if (!id) {
       const name = kind === "categories" ? categoryName(slug) : slug;
-      id = (await woo.write<WooProduct>("POST", `/products/${kind}`, { name, slug }, { id: fake() })).id;
+      id = (
+        await woo.write<WooProduct>("POST", `/products/${kind}`, { name, slug }, { id: fake() })
+      ).id;
     }
     cache.set(slug, id);
     return id;
@@ -183,7 +191,8 @@ export async function seedWooCommerce(options: SeedOptions): Promise<SeedResult>
     const out = [];
     for (const [i, path] of product.images.entries()) {
       const local = join(IMAGES_DIR, path);
-      if (woo.canUploadMedia && existsSync(local)) out.push({ id: await woo.uploadMedia(local, fake()), position: i });
+      if (woo.canUploadMedia && existsSync(local))
+        out.push({ id: await woo.uploadMedia(local, fake()), position: i });
       else out.push({ src: `${imageBaseUrl}/${path}`, name: path, alt: product.title.en });
     }
     return out;
@@ -191,7 +200,9 @@ export async function seedWooCommerce(options: SeedOptions): Promise<SeedResult>
 
   async function findProduct(product: Product): Promise<WooProduct | undefined> {
     if (woo.dryRun) return undefined;
-    const query: Record<string, string> = isSimple(product) ? { sku: product.variants[0].sku } : { slug: product.handle };
+    const query: Record<string, string> = isSimple(product)
+      ? { sku: product.variants[0].sku }
+      : { slug: product.handle };
     return (await woo.get<WooProduct[]>("/products", { ...query, status: "any" }))[0];
   }
 
@@ -208,14 +219,23 @@ export async function seedWooCommerce(options: SeedOptions): Promise<SeedResult>
         images: await images(product),
       };
       try {
-        found = await woo.write<WooProduct>("POST", "/products", productPayload(product, refs), { id: fake() });
+        found = await woo.write<WooProduct>("POST", "/products", productPayload(product, refs), {
+          id: fake(),
+        });
       } catch (err) {
         // Woo sideloads image URLs; if they 404 (not pushed yet), create the product without them.
         if (!/image/i.test(String(err))) throw err;
-        log(`  ! ${product.handle}: images rejected, creating without them (${String(err).slice(0, 120)})`);
-        found = await woo.write<WooProduct>("POST", "/products", productPayload(product, { ...refs, images: [] }), {
-          id: fake(),
-        });
+        log(
+          `  ! ${product.handle}: images rejected, creating without them (${String(err).slice(0, 120)})`,
+        );
+        found = await woo.write<WooProduct>(
+          "POST",
+          "/products",
+          productPayload(product, { ...refs, images: [] }),
+          {
+            id: fake(),
+          },
+        );
       }
       log(`  + ${product.handle} (#${found.id})`);
     }
@@ -225,7 +245,8 @@ export async function seedWooCommerce(options: SeedOptions): Promise<SeedResult>
       return ref;
     }
     if (!woo.dryRun) {
-      for (const v of await woo.list<WooProduct>(`/products/${found.id}/variations`)) if (v.sku) ref.variations.set(v.sku, v.id);
+      for (const v of await woo.list<WooProduct>(`/products/${found.id}/variations`))
+        if (v.sku) ref.variations.set(v.sku, v.id);
     }
     const missing = product.variants.filter((v) => !ref.variations.has(v.sku));
     if (missing.length) {
@@ -253,11 +274,14 @@ export async function seedWooCommerce(options: SeedOptions): Promise<SeedResult>
     if (cached) return cached;
     let id: number | undefined;
     if (!woo.dryRun) {
-      id = (await woo.get<WooProduct[]>("/customers", { email: customer.email, role: "all" }))[0]?.id;
+      id = (await woo.get<WooProduct[]>("/customers", { email: customer.email, role: "all" }))[0]
+        ?.id;
       if (id) log(`  = ${customer.email} (#${id})`);
     }
     if (!id) {
-      id = (await woo.write<WooProduct>("POST", "/customers", customerPayload(customer), { id: fake() })).id;
+      id = (
+        await woo.write<WooProduct>("POST", "/customers", customerPayload(customer), { id: fake() })
+      ).id;
       log(`  + ${customer.email} (#${id})`);
     }
     customerIds.set(customer.key, id);
@@ -300,19 +324,31 @@ export async function seedWooCommerce(options: SeedOptions): Promise<SeedResult>
       if (lineRefs.has(line.sku)) continue;
       const { product } = productBySku(products, line.sku);
       if (skipRefs) {
-        lineRefs.set(line.sku, isSimple(product) ? { product_id: fake() } : { product_id: fake(), variation_id: fake() });
+        lineRefs.set(
+          line.sku,
+          isSimple(product) ? { product_id: fake() } : { product_id: fake(), variation_id: fake() },
+        );
         continue;
       }
       const ref = await ensureProduct(product);
       const variationId = ref.variations.get(line.sku);
-      if (!isSimple(product) && !variationId) throw new Error(`Variation ${line.sku} not found in the store`);
-      lineRefs.set(line.sku, isSimple(product) ? { product_id: ref.productId } : { product_id: ref.productId, variation_id: variationId });
+      if (!isSimple(product) && !variationId)
+        throw new Error(`Variation ${line.sku} not found in the store`);
+      lineRefs.set(
+        line.sku,
+        isSimple(product)
+          ? { product_id: ref.productId }
+          : { product_id: ref.productId, variation_id: variationId },
+      );
     }
   }
 
   for (const fixture of fixtures) {
     const customer = customers.find((c) => c.key === fixture.customer.woocommerce);
-    if (!customer) throw new Error(`${fixture.key}: customer ${fixture.customer.woocommerce} is not in customers.json`);
+    if (!customer)
+      throw new Error(
+        `${fixture.key}: customer ${fixture.customer.woocommerce} is not in customers.json`,
+      );
     const shipped = isShipped(fixture);
     const carrier = carrierFor(fixture, customer);
     const tracking = shipped ? trackingNumber(fixture, "woocommerce") : null;
@@ -328,13 +364,25 @@ export async function seedWooCommerce(options: SeedOptions): Promise<SeedResult>
     };
     const found = existing.get(fixture.key);
     if (found) {
-      rows.push({ ...row, orderId: String(found.id), orderNumber: String(found.number), status: found.status, result: "existing" });
+      rows.push({
+        ...row,
+        orderId: String(found.id),
+        orderNumber: String(found.number),
+        status: found.status,
+        result: "existing",
+      });
       log(`  = ${fixture.key} (#${found.number}, ${found.status})`);
       continue;
     }
 
     const customerId = woo.dryRun && !step("customers") ? fake() : await ensureCustomer(customer);
-    const payload = orderPayload(fixture, { customer, customerId, products, lineRef: (sku) => lineRefs.get(sku)!, now });
+    const payload = orderPayload(fixture, {
+      customer,
+      customerId,
+      products,
+      lineRef: (sku) => lineRefs.get(sku)!,
+      now,
+    });
     const dryOrder: WooOrder = {
       id: fake(),
       number: "",
@@ -342,7 +390,12 @@ export async function seedWooCommerce(options: SeedOptions): Promise<SeedResult>
       total: "0",
       line_items: fixture.lines.map((line) => {
         const { product, variant } = productBySku(products, line.sku);
-        return { id: fake(), sku: line.sku, quantity: line.quantity, total: (variantPrice(product, variant) * line.quantity).toFixed(2) };
+        return {
+          id: fake(),
+          sku: line.sku,
+          quantity: line.quantity,
+          total: (variantPrice(product, variant) * line.quantity).toFixed(2),
+        };
       }),
     };
     dryOrder.number = String(dryOrder.id);
@@ -351,7 +404,10 @@ export async function seedWooCommerce(options: SeedOptions): Promise<SeedResult>
     const bd: BackdateRow = {
       id: order.id,
       created: unix(daysAgo(fixture.placedDaysAgo, now)),
-      completed: fixture.deliveredDaysAgo !== undefined ? unix(daysAgo(fixture.deliveredDaysAgo, now)) : null,
+      completed:
+        fixture.deliveredDaysAgo !== undefined
+          ? unix(daysAgo(fixture.deliveredDaysAgo, now))
+          : null,
       notes: [],
       refunds: [],
     };
@@ -369,17 +425,27 @@ export async function seedWooCommerce(options: SeedOptions): Promise<SeedResult>
     let status = order.status;
     const refund = refundPayload(fixture, order);
     if (refund) {
-      const created = await woo.write<{ id: number }>("POST", `/orders/${order.id}/refunds`, refund, { id: fake() });
+      const created = await woo.write<{ id: number }>(
+        "POST",
+        `/orders/${order.id}/refunds`,
+        refund,
+        { id: fake() },
+      );
       bd.refunds.push([created.id, unix(daysAgo(refundDaysAgo(fixture), now))]);
       status = woo.dryRun
-        ? fixture.financialStatus === "refunded" ? "refunded" : status
+        ? fixture.financialStatus === "refunded"
+          ? "refunded"
+          : status
         : (await woo.get<WooOrder>(`/orders/${order.id}`)).status;
     }
 
     if (fixture.cancelled && fixture.financialStatus === "refunded") {
-      row.notes.push('Woo has no "cancelled + refunded": a full refund leaves the order "refunded".');
+      row.notes.push(
+        'Woo has no "cancelled + refunded": a full refund leaves the order "refunded".',
+      );
     }
-    if (fixture.fulfillmentStatus === "delivered") row.notes.push("Woo has no delivered state: completed + \"Delivered on\" note.");
+    if (fixture.fulfillmentStatus === "delivered")
+      row.notes.push('Woo has no delivered state: completed + "Delivered on" note.');
     backdate.push(bd);
     rows.push({ ...row, orderId: String(order.id), orderNumber: String(order.number), status });
     log(`  + ${fixture.key} (#${order.number}, ${status})`);
@@ -405,7 +471,11 @@ export async function run(argv: string[]): Promise<number> {
         }
       : (() => {
           const env = requireEnv("WOO_URL", "WOO_CONSUMER_KEY", "WOO_CONSUMER_SECRET");
-          return { url: env.WOO_URL, consumerKey: env.WOO_CONSUMER_KEY, consumerSecret: env.WOO_CONSUMER_SECRET };
+          return {
+            url: env.WOO_URL,
+            consumerKey: env.WOO_CONSUMER_KEY,
+            consumerSecret: env.WOO_CONSUMER_SECRET,
+          };
         })();
     config.wpUser = process.env.WP_USER || undefined;
     config.wpAppPassword = process.env.WP_APP_PASSWORD || undefined;
@@ -420,7 +490,9 @@ export async function run(argv: string[]): Promise<number> {
     });
     if (rows.length) printSeededTable(rows);
     if (!flags.dryRun && rows.length) {
-      log(`\nWrote ${writeSeededOrders("woocommerce", rows, { store: config.url, backdateCommand })}`);
+      log(
+        `\nWrote ${writeSeededOrders("woocommerce", rows, { store: config.url, backdateCommand })}`,
+      );
     }
     if (backdateCommand && !flags.dryRun) {
       log("\nREST cannot set order/refund/note dates. To backdate them, run on the WordPress host");

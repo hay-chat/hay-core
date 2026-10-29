@@ -1,7 +1,7 @@
 ---
 title: Return an item
 trigger: The shopper wants to return an item or asks how returns work
-description: Checks the item is inside the 30-day window and eligible (unused, original packaging, no burned candles), gives the store's return steps and opens the return; outside the window, says so and hands off exceptions.
+description: Checks the item is inside the 30-day window and eligible (unused, original packaging, no burned candles), gives the store's return steps and opens the return; outside the window, says so and hands off exceptions. Scenarios RET-01, RET-02, RET-03.
 approvalCategories: [return]
 ---
 
@@ -12,7 +12,7 @@ approvalCategories: [return]
 4. Broken or wrong items are not returns: use "Damaged or broken item".
 
 ## Inside the window
-1. Give the store's return steps from {{action:shopify_get_return_instructions}}, exactly as written. Don't invent labels or addresses.
+1. Give the store's return steps from {{action:shopify_get_return_instructions}}, exactly as written, with any link unchanged. Don't invent labels, addresses or free return shipping: if the steps don't say who pays return shipping, say you don't know and offer the team.
 2. If the shopper wants to go ahead, list what can come back with {{action:shopify_get_returnable_items}}, confirm the items and quantities, then call {{action:shopify_create_return}}.
 3. Say the return is open (only if the result confirms it). The refund goes to the original payment method once the item arrives and is checked.
 4. Exchanges for another scent, colour or size: open the return and suggest a new order, or hand off to the team for an exchange.

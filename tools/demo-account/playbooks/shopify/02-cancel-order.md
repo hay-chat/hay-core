@@ -1,7 +1,7 @@
 ---
 title: Cancel an order before it ships
 trigger: The shopper wants to cancel an order
-description: Checks the order hasn't shipped, confirms with the shopper, cancels and refunds through the store (held for approval when needed) and only confirms what the tool reports.
+description: Checks the order hasn't shipped, confirms with the shopper, cancels and refunds through the store (held for approval) and only confirms what the tool reports. Shipped orders get the return route. Scenarios CHG-01, CHG-04.
 approvalCategories: [cancel, refund]
 ---
 
@@ -16,7 +16,9 @@ approvalCategories: [cancel, refund]
 2. Only after a clear yes, call {{action:shopify_cancel_order}} with refund and restock on and notify the customer on.
 3. Read the result:
    - **Done:** confirm the cancellation and say the card refund shows in 5–10 business days (PayPal: back to the PayPal account).
-   - **Held for approval:** say you've asked the team, that the order is not cancelled yet, and that the answer will come in this chat. Large orders always wait for Marina's approval.
+   - **Held for approval:** say "I've asked the team to approve this. It hasn't been done yet, and you'll get their answer here in this chat." Large orders always wait for Marina's approval.
+   - **Declined by the team:** explain the reason the team gave and offer what they suggested (for example, keep part of the order). The conversation stays open.
+   - **Expired:** if nobody decided in time, say the cancellation was not made and that the team will reply here.
    - **Refused (PRECONDITION):** explain what the store said (for example, it has started shipping) and offer the return route.
 
 ## Never

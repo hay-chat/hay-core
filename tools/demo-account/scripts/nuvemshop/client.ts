@@ -17,7 +17,12 @@ export interface Nuvemshop {
   get<T>(path: string, query?: Record<string, string | number>): Promise<T>;
   /** Every page of a list endpoint; a 404 past the last page ends the list. */
   list<T>(path: string, query?: Record<string, string | number>): Promise<T[]>;
-  write<T>(method: "POST" | "PUT" | "PATCH" | "DELETE", path: string, body: unknown, dryRunResult: T): Promise<T>;
+  write<T>(
+    method: "POST" | "PUT" | "PATCH" | "DELETE",
+    path: string,
+    body: unknown,
+    dryRunResult: T,
+  ): Promise<T>;
 }
 
 export interface NuvemshopConfig {
@@ -49,7 +54,12 @@ export function createNuvemshop(
     return u.toString();
   }
 
-  async function call<T>(method: string, target: string, body?: unknown, dryRunResult?: T): Promise<T> {
+  async function call<T>(
+    method: string,
+    target: string,
+    body?: unknown,
+    dryRunResult?: T,
+  ): Promise<T> {
     for (let attempt = 1; ; attempt++) {
       try {
         return await http<T>(flags, method, target, { headers, body, dryRunResult });

@@ -6,7 +6,14 @@
  */
 import { createHash } from "node:crypto";
 import { daysAgo, DEMO_TAG, productBySku, trackingNumber } from "../lib/data";
-import type { Address, Customer, OrderFixture, OrderLine, Product, ProductVariant } from "../lib/types";
+import type {
+  Address,
+  Customer,
+  OrderFixture,
+  OrderLine,
+  Product,
+  ProductVariant,
+} from "../lib/types";
 
 export const CURRENCY = "EUR";
 /** Order meta that marks a seeded order (idempotency + --reset-orders). */
@@ -17,7 +24,8 @@ export const TRACKING_META = "_wc_shipment_tracking_items";
 const money = (n: number) => n.toFixed(2);
 const kg = (grams: number) => (grams / 1000).toFixed(3);
 const isoDay = (d: Date) => d.toISOString().slice(0, 10);
-const escapeHtml = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+const escapeHtml = (s: string) =>
+  s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
 // ---------- products ----------
 
@@ -81,18 +89,27 @@ export function productPayload(product: Product, refs: ProductRefs): Record<stri
       variation: true,
       options: [...new Set(product.variants.map((v) => v.options[i]))],
     })),
-    default_attributes: product.options.map((option, i) => ({ name: option.en, option: product.variants[0].options[i] })),
+    default_attributes: product.options.map((option, i) => ({
+      name: option.en,
+      option: product.variants[0].options[i],
+    })),
   };
 }
 
-export function variationPayload(product: Product, variant: ProductVariant): Record<string, unknown> {
+export function variationPayload(
+  product: Product,
+  variant: ProductVariant,
+): Record<string, unknown> {
   return {
     sku: variant.sku,
     ...priceFields(product, variant),
     manage_stock: true,
     stock_quantity: variant.stock,
     weight: kg(product.weightGrams),
-    attributes: product.options.map((option, i) => ({ name: option.en, option: variant.options[i] })),
+    attributes: product.options.map((option, i) => ({
+      name: option.en,
+      option: variant.options[i],
+    })),
   };
 }
 
@@ -100,7 +117,10 @@ export function variationPayload(product: Product, variant: ProductVariant): Rec
 export const productTags = (product: Product) => [...new Set([DEMO_TAG, ...product.tags])];
 
 export const categoryName = (slug: string) =>
-  slug.split("-").map((w, i) => (i === 0 || w !== "and" ? w[0].toUpperCase() + w.slice(1) : w)).join(" ");
+  slug
+    .split("-")
+    .map((w, i) => (i === 0 || w !== "and" ? w[0].toUpperCase() + w.slice(1) : w))
+    .join(" ");
 
 // ---------- customers ----------
 
@@ -125,7 +145,10 @@ export function customerPayload(customer: Customer): Record<string, unknown> {
     first_name: customer.firstName,
     last_name: customer.lastName,
     // Random: nobody logs in as a demo shopper; set so stores without auto-generated passwords accept it.
-    password: createHash("sha256").update(`${customer.key}:${Math.random()}`).digest("hex").slice(0, 24),
+    password: createHash("sha256")
+      .update(`${customer.key}:${Math.random()}`)
+      .digest("hex")
+      .slice(0, 24),
     billing: wooAddress(customer.address, customer.email),
     shipping: wooAddress(customer.address),
   };
@@ -171,7 +194,8 @@ export const isPaid = (f: OrderFixture) => !["pending", "voided"].includes(f.fin
  * (a full refund flips the order to "refunded" by itself), so they start as a paid order.
  */
 export function initialStatus(fixture: OrderFixture): string {
-  if (fixture.financialStatus === "voided" || (fixture.cancelled && !isPaid(fixture))) return "cancelled";
+  if (fixture.financialStatus === "voided" || (fixture.cancelled && !isPaid(fixture)))
+    return "cancelled";
   if (fixture.financialStatus === "pending") {
     // Bank transfer waits on-hold for the money; other unpaid methods stay pending.
     return fixture.paymentMethod?.woocommerce === "bacs" ? "on-hold" : "pending";
@@ -183,7 +207,8 @@ export function initialStatus(fixture: OrderFixture): string {
 
 export function paymentFields(fixture: OrderFixture) {
   const method = fixture.paymentMethod?.woocommerce ?? "card";
-  if (method === "bacs") return { payment_method: "bacs", payment_method_title: "Direct bank transfer" };
+  if (method === "bacs")
+    return { payment_method: "bacs", payment_method_title: "Direct bank transfer" };
   return { payment_method: "stripe", payment_method_title: "Credit Card (Stripe)" };
 }
 
@@ -194,8 +219,10 @@ export interface ShipmentDates {
 
 export function shipmentDates(fixture: OrderFixture, now: Date): ShipmentDates {
   return {
-    shippedAt: fixture.shippedDaysAgo !== undefined ? daysAgo(fixture.shippedDaysAgo, now) : undefined,
-    deliveredAt: fixture.deliveredDaysAgo !== undefined ? daysAgo(fixture.deliveredDaysAgo, now) : undefined,
+    shippedAt:
+      fixture.shippedDaysAgo !== undefined ? daysAgo(fixture.shippedDaysAgo, now) : undefined,
+    deliveredAt:
+      fixture.deliveredDaysAgo !== undefined ? daysAgo(fixture.deliveredDaysAgo, now) : undefined,
   };
 }
 
@@ -231,7 +258,9 @@ export interface OrderContext {
 export function splitNote(note?: string): { customerNote: string; staffNote: string | null } {
   if (!note) return { customerNote: "", staffNote: null };
   const match = /^customer note:\s*(.*)$/i.exec(note);
-  return match ? { customerNote: match[1], staffNote: null } : { customerNote: "", staffNote: note };
+  return match
+    ? { customerNote: match[1], staffNote: null }
+    : { customerNote: "", staffNote: note };
 }
 
 export function orderPayload(fixture: OrderFixture, ctx: OrderContext): Record<string, unknown> {
@@ -239,7 +268,8 @@ export function orderPayload(fixture: OrderFixture, ctx: OrderContext): Record<s
   const carrier = carrierFor(fixture, customer);
   const { shippedAt } = shipmentDates(fixture, ctx.now);
   const meta: Array<{ key: string; value: unknown }> = [{ key: KEY_META, value: fixture.key }];
-  if (isShipped(fixture) && shippedAt) meta.push({ key: TRACKING_META, value: trackingItems(fixture, carrier, shippedAt) });
+  if (isShipped(fixture) && shippedAt)
+    meta.push({ key: TRACKING_META, value: trackingItems(fixture, carrier, shippedAt) });
   const paid = isPaid(fixture);
   const payment = paymentFields(fixture);
   return {
@@ -249,12 +279,17 @@ export function orderPayload(fixture: OrderFixture, ctx: OrderContext): Record<s
     ...payment,
     set_paid: paid,
     ...(paid && payment.payment_method === "stripe"
-      ? { transaction_id: `pi_demo_${createHash("sha256").update(fixture.key).digest("hex").slice(0, 16)}` }
+      ? {
+          transaction_id: `pi_demo_${createHash("sha256").update(fixture.key).digest("hex").slice(0, 16)}`,
+        }
       : {}),
     billing: wooAddress(customer.address, customer.email),
     shipping: wooAddress(customer.address),
     customer_note: splitNote(fixture.note).customerNote,
-    line_items: fixture.lines.map((line) => ({ ...ctx.lineRef(line.sku), quantity: line.quantity })),
+    line_items: fixture.lines.map((line) => ({
+      ...ctx.lineRef(line.sku),
+      quantity: line.quantity,
+    })),
     shipping_lines: [shippingLine(fixture, customer, ctx.products)],
     meta_data: meta,
   };
@@ -271,7 +306,10 @@ export interface NotePlan {
  * Order notes per state. The shipped note is phrased so the plugin's note parser
  * (trackingNumberInNote) finds the number, in case the store has no tracking plugin.
  */
-export function orderNotes(fixture: OrderFixture, ctx: Pick<OrderContext, "customer" | "now">): NotePlan[] {
+export function orderNotes(
+  fixture: OrderFixture,
+  ctx: Pick<OrderContext, "customer" | "now">,
+): NotePlan[] {
   const notes: NotePlan[] = [];
   const { shippedAt, deliveredAt } = shipmentDates(fixture, ctx.now);
   const placedAt = daysAgo(fixture.placedDaysAgo, ctx.now);
@@ -287,7 +325,11 @@ export function orderNotes(fixture: OrderFixture, ctx: Pick<OrderContext, "custo
     });
   }
   if (fixture.fulfillmentStatus === "delivered" && deliveredAt) {
-    notes.push({ note: `Delivered on ${isoDay(deliveredAt)} (carrier confirmation).`, customer_note: false, date: deliveredAt });
+    notes.push({
+      note: `Delivered on ${isoDay(deliveredAt)} (carrier confirmation).`,
+      customer_note: false,
+      date: deliveredAt,
+    });
   }
   return notes;
 }
@@ -328,7 +370,8 @@ export function refundPayload(
   if (fixture.financialStatus !== "partially_refunded") return null;
   const lines = (fixture.refundLines ?? []).map((refund) => {
     const line = (order.line_items ?? []).find((l) => l.sku === refund.sku);
-    if (!line) throw new Error(`${fixture.key}: refund SKU ${refund.sku} is not on the created order`);
+    if (!line)
+      throw new Error(`${fixture.key}: refund SKU ${refund.sku} is not on the created order`);
     const total = (Number(line.total) / line.quantity) * refund.quantity;
     return { id: line.id, quantity: refund.quantity, refund_total: Number(money(total)) };
   });

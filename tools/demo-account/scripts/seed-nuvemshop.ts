@@ -33,7 +33,12 @@ import {
   type SeededOrder,
 } from "./lib/data";
 import type { Customer, OrderFixture, Product } from "./lib/types";
-import { createNuvemshop, statusOf, type Nuvemshop, type NuvemshopConfig } from "./nuvemshop/client";
+import {
+  createNuvemshop,
+  statusOf,
+  type Nuvemshop,
+  type NuvemshopConfig,
+} from "./nuvemshop/client";
 import {
   cancelPayload,
   carrierFor,
@@ -91,7 +96,9 @@ export async function seedNuvemshop(options: SeedOptions): Promise<SeededOrder[]
   const fixtures = (options.orders ?? loadOrders("nuvemshop")).filter(
     (o) => flags.orderKeys.size === 0 || flags.orderKeys.has(o.key),
   );
-  const ns: Nuvemshop = createNuvemshop(flags, options.config, { retryDelayMs: options.retryDelayMs });
+  const ns: Nuvemshop = createNuvemshop(flags, options.config, {
+    retryDelayMs: options.retryDelayMs,
+  });
   const step = (name: string) => flags.only.size === 0 || flags.only.has(name);
   let fakeId = 70000;
   const fake = () => ++fakeId;
@@ -99,7 +106,9 @@ export async function seedNuvemshop(options: SeedOptions): Promise<SeededOrder[]
   // Fill "en" too when the store has it; dry-run assumes a pt-only store (the BR default).
   let languages: StoreLanguage[] = ["pt"];
   if (!ns.dryRun && step("products")) {
-    const store = await ns.get<{ languages?: Record<string, unknown>; main_language?: string }>("/store");
+    const store = await ns.get<{ languages?: Record<string, unknown>; main_language?: string }>(
+      "/store",
+    );
     const codes = Object.keys(store.languages ?? {});
     languages = (["pt", "en"] as StoreLanguage[]).filter((l) => codes.includes(l) || l === "pt");
   }
@@ -139,7 +148,9 @@ export async function seedNuvemshop(options: SeedOptions): Promise<SeededOrder[]
         ? { attachment: readFileSync(local).toString("base64"), filename: path, position: i + 1 }
         : { src: `${imageBaseUrl}/${path}`, position: i + 1 };
       if (!("attachment" in body)) log(`  ! ${path} not in catalog/images; using ${body.src}`);
-      await ns.write("POST", `/products/${productId}/images`, body, {}).catch((e) => log(`  ! image ${path}: ${e.message}`));
+      await ns
+        .write("POST", `/products/${productId}/images`, body, {})
+        .catch((e) => log(`  ! image ${path}: ${e.message}`));
     }
   }
 
@@ -183,14 +194,21 @@ export async function seedNuvemshop(options: SeedOptions): Promise<SeededOrder[]
   // ---------- customers ----------
   async function ensureCustomer(customer: Customer): Promise<void> {
     if (!ns.dryRun) {
-      const hits = await ns.get<Array<{ id: number; email?: string }>>("/customers", { q: customer.email });
+      const hits = await ns.get<Array<{ id: number; email?: string }>>("/customers", {
+        q: customer.email,
+      });
       const hit = hits.find((c) => c.email?.toLowerCase() === customer.email.toLowerCase());
       if (hit) {
         log(`  = ${customer.email} (#${hit.id})`);
         return;
       }
     }
-    const created = await ns.write<{ id: number }>("POST", "/customers", customerPayload(customer), { id: fake() });
+    const created = await ns.write<{ id: number }>(
+      "POST",
+      "/customers",
+      customerPayload(customer),
+      { id: fake() },
+    );
     log(`  + ${customer.email} (#${created.id})`);
   }
 
@@ -219,10 +237,18 @@ export async function seedNuvemshop(options: SeedOptions): Promise<SeededOrder[]
         log(`  - deleted ${key} (#${order.number})`);
       } catch (err) {
         // No order delete for this token/API: cancel it and retire the marker so it is not matched again.
-        if (order.status !== "cancelled") await ns.write("POST", `/orders/${order.id}/cancel`, { reason: "other", email: false, restock: true }, {});
+        if (order.status !== "cancelled")
+          await ns.write(
+            "POST",
+            `/orders/${order.id}/cancel`,
+            { reason: "other", email: false, restock: true },
+            {},
+          );
         const note = (order.owner_note ?? "").replace(MARKER_RE, `[hay-demo-reset:${key}]`);
         await ns.write("PUT", `/orders/${order.id}`, { owner_note: note }, {});
-        log(`  - retired ${key} (#${order.number}): delete refused (${statusOf(err) ?? "error"}), cancelled + marker removed`);
+        log(
+          `  - retired ${key} (#${order.number}): delete refused (${statusOf(err) ?? "error"}), cancelled + marker removed`,
+        );
       }
       existing.delete(key);
     }
@@ -242,14 +268,25 @@ export async function seedNuvemshop(options: SeedOptions): Promise<SeededOrder[]
     };
     const found = existing.get(fixture.key);
     if (found) {
-      const status = [found.status, found.payment_status, found.shipping_status].filter(Boolean).join("/");
-      rows.push({ ...row, orderId: String(found.id), orderNumber: String(found.number), status, result: "existing" });
+      const status = [found.status, found.payment_status, found.shipping_status]
+        .filter(Boolean)
+        .join("/");
+      rows.push({
+        ...row,
+        orderId: String(found.id),
+        orderNumber: String(found.number),
+        status,
+        result: "existing",
+      });
       log(`  = ${fixture.key} (#${found.number}, ${status})`);
       continue;
     }
 
     const customer = customers.find((c) => c.key === fixture.customer.nuvemshop);
-    if (!customer) throw new Error(`${fixture.key}: customer ${fixture.customer.nuvemshop} is not in customers.json`);
+    if (!customer)
+      throw new Error(
+        `${fixture.key}: customer ${fixture.customer.nuvemshop} is not in customers.json`,
+      );
     for (const line of fixture.lines) {
       if (variantIds.has(line.sku)) continue;
       if (ns.dryRun && !step("products")) variantIds.set(line.sku, fake());
@@ -281,8 +318,11 @@ export async function seedNuvemshop(options: SeedOptions): Promise<SeededOrder[]
         break;
       } catch (err) {
         const status = statusOf(err);
-        if (i === candidates.length - 1 || status === null || status >= 500 || status === 401) throw err;
-        row.notes.push(`payment_status "${candidate}" refused on create (${status}); created as "${candidates[i + 1]}", refund noted in owner_note.`);
+        if (i === candidates.length - 1 || status === null || status >= 500 || status === 401)
+          throw err;
+        row.notes.push(
+          `payment_status "${candidate}" refused on create (${status}); created as "${candidates[i + 1]}", refund noted in owner_note.`,
+        );
       }
     }
     if (!order) throw new Error(`${fixture.key}: order was not created`);
@@ -293,31 +333,45 @@ export async function seedNuvemshop(options: SeedOptions): Promise<SeededOrder[]
     if (steps.length) {
       let fos: Array<{ id: string }> | null = ns.dryRun ? [{ id: "<fulfillment-order-id>" }] : null;
       if (!ns.dryRun) {
-        fos = await ns.get<Array<{ id: string }>>(`/orders/${order.id}/fulfillment-orders`).catch(() => null);
+        fos = await ns
+          .get<Array<{ id: string }>>(`/orders/${order.id}/fulfillment-orders`)
+          .catch(() => null);
       }
       let legacy = !fos || fos.length === 0;
       if (!legacy) {
         try {
           for (const fo of fos!) {
             for (const s of steps) {
-              await ns.write(s.method, `/orders/${order.id}/fulfillment-orders/${encodeURIComponent(fo.id)}${s.path}`, s.body, {});
+              await ns.write(
+                s.method,
+                `/orders/${order.id}/fulfillment-orders/${encodeURIComponent(fo.id)}${s.path}`,
+                s.body,
+                {},
+              );
             }
           }
         } catch (err) {
-          row.notes.push(`fulfillment-order update failed (${statusOf(err) ?? "error"}); used legacy /fulfill, no carrier events or delivery date.`);
+          row.notes.push(
+            `fulfillment-order update failed (${statusOf(err) ?? "error"}); used legacy /fulfill, no carrier events or delivery date.`,
+          );
           legacy = true;
         }
       }
-      if (legacy) await ns.write("POST", `/orders/${order.id}/fulfill`, legacyFulfilPayload(fixture), {});
+      if (legacy)
+        await ns.write("POST", `/orders/${order.id}/fulfill`, legacyFulfilPayload(fixture), {});
     }
 
     const finalStatus = finalOrderStatus(fixture);
     if (finalStatus === "closed") await ns.write("POST", `/orders/${order.id}/close`, {}, {});
-    if (finalStatus === "cancelled") await ns.write("POST", `/orders/${order.id}/cancel`, cancelPayload(fixture), {});
+    if (finalStatus === "cancelled")
+      await ns.write("POST", `/orders/${order.id}/cancel`, cancelPayload(fixture), {});
 
-    const shipping = { unfulfilled: "unpacked", in_transit: "dispatched", stale: "dispatched", delivered: "delivered" }[
-      fixture.fulfillmentStatus
-    ];
+    const shipping = {
+      unfulfilled: "unpacked",
+      in_transit: "dispatched",
+      stale: "dispatched",
+      delivered: "delivered",
+    }[fixture.fulfillmentStatus];
     const status = `${finalStatus}/${paymentStatus}/${shipping}`;
     rows.push({ ...row, orderId: String(order.id), orderNumber: String(order.number), status });
     log(`  + ${fixture.key} (#${order.number}, ${status})`);
@@ -335,13 +389,18 @@ export async function run(argv: string[]): Promise<number> {
     loadEnv();
     const flags = parseFlags(argv);
     const config: NuvemshopConfig = flags.dryRun
-      ? { storeId: process.env.NUVEMSHOP_STORE_ID || "", accessToken: process.env.NUVEMSHOP_ACCESS_TOKEN || "" }
+      ? {
+          storeId: process.env.NUVEMSHOP_STORE_ID || "",
+          accessToken: process.env.NUVEMSHOP_ACCESS_TOKEN || "",
+        }
       : (() => {
           const env = requireEnv("NUVEMSHOP_STORE_ID", "NUVEMSHOP_ACCESS_TOKEN");
           return { storeId: env.NUVEMSHOP_STORE_ID, accessToken: env.NUVEMSHOP_ACCESS_TOKEN };
         })();
     config.apiVersion = process.env.NUVEMSHOP_API_VERSION || undefined;
-    log(`Nuvemshop store ${config.storeId || "<store_id>"}${flags.dryRun ? " (dry-run: nothing is sent)" : ""}`);
+    log(
+      `Nuvemshop store ${config.storeId || "<store_id>"}${flags.dryRun ? " (dry-run: nothing is sent)" : ""}`,
+    );
 
     const rows = await seedNuvemshop({
       flags,
