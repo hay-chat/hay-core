@@ -13,6 +13,16 @@ const retrieveState = jest.fn();
 const storeState = jest.fn();
 const resolveConfigWithEnv = jest.fn();
 
+// Provider token endpoints are reached through the SSRF-safe fetch; here it
+// forwards to the faked global fetch, recording the options it was given.
+const mockSafeFetchInits: Array<RequestInit & { timeoutMs: number }> = [];
+jest.mock("@server/utils/ssrf", () => ({
+  safeFetch: (url: string, init: RequestInit & { timeoutMs: number }) => {
+    mockSafeFetchInits.push(init);
+    const { timeoutMs: _timeoutMs, ...rest } = init;
+    return global.fetch(url, rest);
+  },
+}));
 jest.mock("@server/repositories/plugin-registry.repository", () => ({
   pluginRegistryRepository: { findByPluginId },
 }));
@@ -121,6 +131,9 @@ describe("oauthService.completeWithCode", () => {
     const [exchangeUrl, exchangeInit] = fetchMock.mock.calls[0];
     const url = new URL(exchangeUrl as string);
     expect(exchangeInit).toEqual({ method: "GET" });
+    expect(mockSafeFetchInits[mockSafeFetchInits.length - 1]).toMatchObject({
+      timeoutMs: expect.any(Number),
+    });
     expect(url.origin + url.pathname).toBe(TOKEN_URL);
     expect(url.searchParams.get("client_id")).toBe("app-id");
     expect(url.searchParams.get("client_secret")).toBe("app-secret");
