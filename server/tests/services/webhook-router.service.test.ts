@@ -23,6 +23,8 @@ jest.mock("@server/services/plugin-instance-manager.service", () => ({
 jest.mock("@server/services/plugin-route.service", () => ({
   verifyHmacSha256: jest.fn(),
 }));
+const claimWebhookDelivery = jest.fn();
+jest.mock("@server/lib/webhook-replay", () => ({ claimWebhookDelivery }));
 
 import {
   webhookRouterService,
@@ -357,6 +359,7 @@ describe("webhookRouterService.handle signature formats", () => {
     jest.resetAllMocks();
     process.env.TEST_SVIX_SECRET = svixSecret;
     findByKey.mockResolvedValue(null);
+    claimWebhookDelivery.mockResolvedValue(true);
   });
 
   afterEach(() => {
@@ -384,6 +387,20 @@ describe("webhookRouterService.handle signature formats", () => {
     await webhookRouterService.handle(req, res as never, "p", svixRouting as never);
 
     expect(res.statusCode).toBe(200);
+    expect(claimWebhookDelivery).toHaveBeenCalledWith("webhook-router:p", "msg_1");
+  });
+
+  it("acknowledges a repeated svix-id without dispatching it again", async () => {
+    claimWebhookDelivery.mockResolvedValue(false);
+    const ts = Math.floor(Date.now() / 1000);
+    const req = { method: "POST", headers: svixHeaders(ts, rawBody), rawBody } as never;
+    const res = makeRes();
+
+    await webhookRouterService.handle(req, res as never, "p", svixRouting as never);
+
+    expect(res.statusCode).toBe(200);
+    expect(res.body).toEqual({ received: true, duplicate: true });
+    expect(findByKey).not.toHaveBeenCalled();
   });
 
   it("rejects a svix request signed with another secret", async () => {
