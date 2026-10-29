@@ -358,6 +358,7 @@
                 v-model:formData="formData"
                 v-model:editingEncryptedFields="editingEncryptedFields"
                 v-model:editingEnvFields="editingEnvFields"
+                :plugin-id="plugin.id"
                 :configSchema="configSchema"
                 :originalFormData="originalFormData"
                 :configMetadata="configMetadata"
@@ -426,6 +427,7 @@
             v-model:formData="formData"
             v-model:editingEncryptedFields="editingEncryptedFields"
             v-model:editingEnvFields="editingEnvFields"
+            :plugin-id="plugin.id"
             :configSchema="visibleConfigSchema"
             :originalFormData="originalFormData"
             :configMetadata="configMetadata"
@@ -661,11 +663,13 @@ import PluginOAuthConnection from "@/components/plugins/PluginOAuthConnection.vu
 import PluginPageSlot from "@/components/plugins/PluginPageSlot.vue";
 import McpToolInputSchema from "@/components/plugins/McpToolInputSchema.vue";
 import { useToolLabel } from "@/composables/useToolLabel";
+import { usePluginTranslations } from "@/composables/usePluginTranslations";
 import { describedCapabilities, type DescribedCapability } from "@/utils/pluginSetup";
 
 const { t } = useI18n();
 const { locale } = useI18n({ useScope: "global" });
 const { getToolLabel, getToolDescription, getPluginDescription } = useToolLabel();
+const { loadTranslations: loadPluginTranslations } = usePluginTranslations();
 
 // Constants
 const AUTO_TEST_DELAY_MS = 0; // No delay needed - test connection immediately
@@ -1325,6 +1329,8 @@ const handleEnablePlugin = async () => {
 
     toast.success(t("pluginSettings.toast.enabledSuccess"));
 
+    // Plugin translations are served for enabled plugins only: load this one's now.
+    void loadPluginTranslations();
     // Reload plugin data to show settings
     await fetchPlugin();
   } catch (err: any) {

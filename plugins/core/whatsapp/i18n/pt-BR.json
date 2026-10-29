@@ -5,7 +5,45 @@
   "config": {
     "handoffTemplateName": {
       "label": "Modelo de transferência",
-      "description": "Modelo aprovado enviado quando a IA passa a conversa para a sua equipe depois que a janela de 24 horas fechou"
+      "description": "Modelo aprovado enviado quando a IA passa a conversa para sua equipe depois que a janela de 24 horas fechou."
+    },
+    "connectionMode": {
+      "label": "Método de conexão",
+      "description": "O Embedded Signup conecta seu número em uma janela da Meta. O manual usa um token permanente do seu próprio app da Meta.",
+      "options": {
+        "embedded-signup": "Embedded Signup (recomendado)",
+        "manual": "Token manual (app próprio da Meta)"
+      }
+    },
+    "clientId": {
+      "label": "ID do app da Meta",
+      "description": "Configurado para você pelo Hay.chat. Altere apenas se você roda seu próprio servidor do Hay.chat com seu próprio app."
+    },
+    "clientSecret": {
+      "label": "Segredo do app da Meta",
+      "description": "Configurado para você pelo Hay.chat. Altere apenas se você roda seu próprio servidor do Hay.chat com seu próprio app."
+    },
+    "esConfigId": {
+      "label": "ID de configuração do Embedded Signup",
+      "description": "Configurado para você pelo Hay.chat. Altere apenas se você roda seu próprio servidor do Hay.chat com seu próprio app."
+    },
+    "manualAccessToken": {
+      "label": "Token de acesso permanente",
+      "description": "Token de usuário do sistema com whatsapp_business_messaging e whatsapp_business_management."
+    },
+    "manualPhoneNumberId": {
+      "label": "ID do número de telefone"
+    },
+    "manualWabaId": {
+      "label": "ID da conta do WhatsApp Business"
+    },
+    "manualAppSecret": {
+      "label": "Segredo do app",
+      "description": "O segredo do seu app da Meta, usado para verificar a assinatura dos webhooks."
+    },
+    "manualVerifyToken": {
+      "label": "Token de verificação do webhook",
+      "description": "Qualquer texto; digite o mesmo valor nas configurações de webhook do seu app da Meta."
     }
   },
   "ui": {

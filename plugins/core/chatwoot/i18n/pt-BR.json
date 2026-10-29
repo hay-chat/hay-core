@@ -1,0 +1,27 @@
+{
+  "name": "Chatwoot",
+  "description": "Conecte o Chatwoot como canal de atendimento: as conversas passam pela IA do Hay.chat e voltam para os agentes humanos do Chatwoot quando preciso.",
+  "tools": {},
+  "config": {
+    "baseUrl": {
+      "label": "URL do Chatwoot",
+      "description": "O endereço da sua instância do Chatwoot, por exemplo https://app.chatwoot.com na nuvem, ou a URL do seu servidor."
+    },
+    "accountId": {
+      "label": "ID da conta",
+      "description": "O ID da sua conta no Chatwoot (o número na URL do painel do Chatwoot)."
+    },
+    "botAccessToken": {
+      "label": "Token de acesso do Agent Bot",
+      "description": "O access_token gerado quando você criou o Agent Bot no Chatwoot."
+    },
+    "webhookSecret": {
+      "label": "Segredo do webhook",
+      "description": "O Webhook Secret exibido na página de edição do Agent Bot no Chatwoot. O Hay.chat o usa para verificar a assinatura de cada webhook recebido."
+    },
+    "defaultEscalationTeamId": {
+      "label": "ID do time de escalonamento (opcional)",
+      "description": "Quando a IA passa a conversa para uma pessoa, atribui a conversa do Chatwoot a este time."
+    }
+  }
+}

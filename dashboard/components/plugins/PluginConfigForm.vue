@@ -10,11 +10,11 @@
       <!-- Text Input -->
       <template v-if="field.type === 'string' && !field.options">
         <Label :for="key" :required="field.required">
-          {{ field.label || key }}
+          {{ fieldLabel(key, field) }}
           <Lock v-if="field.encrypted" class="inline-block h-3 w-3 ml-1 text-neutral-muted" />
         </Label>
-        <p v-if="field.description" class="text-xs text-neutral-muted !mt-0">
-          {{ field.description }}
+        <p v-if="fieldDescription(key, field)" class="text-xs text-neutral-muted !mt-0">
+          {{ fieldDescription(key, field) }}
         </p>
 
         <!-- Environment variable field (not yet overridden) -->
@@ -29,19 +29,18 @@
           <div class="flex items-center space-x-2">
             <Input
               :id="key"
-              value="Environment variable"
+              :value="t('pluginSettings.form.managedValue')"
               type="text"
               disabled
               class="flex-1 bg-muted"
             />
             <Button type="button" variant="outline" @click="handleEditEnvField(key)">
               <Edit3 class="h-4 w-4 mr-1" />
-              Override
+              {{ t("pluginSettings.form.override") }}
             </Button>
           </div>
           <p class="text-xs text-neutral-muted">
-            This setting is configured locally. Click override to set an organization-specific
-            value.
+            {{ t("pluginSettings.form.managedHint") }}
           </p>
         </div>
 
@@ -60,17 +59,23 @@
               :model-value="formData[key]"
               @update:model-value="updateFormData(key, $event)"
               :type="field.encrypted ? 'password' : 'text'"
-              :placeholder="field.placeholder || undefined"
+              :placeholder="fieldPlaceholder(key, field)"
               :required="field.required"
               class="flex-1"
               autofocus
             />
-            <Button type="button" size="sm" variant="ghost" @click="handleCancelEditEnvField(key)">
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              :aria-label="t('pluginSettings.form.cancelOverride')"
+              @click="handleCancelEditEnvField(key)"
+            >
               <X class="h-4 w-4" />
             </Button>
           </div>
           <p class="text-xs text-neutral-muted">
-            Overriding environment variable. Click X to revert to local configuration.
+            {{ t("pluginSettings.form.overridingHint") }}
           </p>
         </div>
 
@@ -87,10 +92,16 @@
           class="space-y-2"
         >
           <div v-if="!editingEncryptedFields.has(key)" class="flex items-center space-x-2">
-            <Input :id="key" value="Encrypted value" type="text" disabled class="flex-1 bg-muted" />
+            <Input
+              :id="key"
+              :value="t('pluginSettings.form.encryptedValue')"
+              type="text"
+              disabled
+              class="flex-1 bg-muted"
+            />
             <Button type="button" variant="outline" @click="handleEditEncryptedField(key)">
               <Edit3 class="h-4 w-4 mr-1" />
-              Edit
+              {{ t("pluginSettings.form.edit") }}
             </Button>
             <!-- Show Reset button if field has env fallback -->
             <Button
@@ -100,7 +111,7 @@
               @click="handleResetToEnv(key)"
             >
               <RotateCcw class="h-4 w-4 mr-1" />
-              Reset
+              {{ t("pluginSettings.form.resetToManaged") }}
             </Button>
           </div>
 
@@ -110,7 +121,7 @@
               :model-value="formData[key]"
               @update:model-value="updateFormData(key, $event)"
               type="password"
-              :placeholder="field.placeholder || undefined"
+              :placeholder="fieldPlaceholder(key, field)"
               :required="field.required"
               class="flex-1"
               autofocus
@@ -119,17 +130,17 @@
               type="button"
               size="sm"
               variant="ghost"
+              :aria-label="t('pluginSettings.form.cancelEdit')"
               @click="handleCancelEditEncryptedField(key)"
             >
               <X class="h-4 w-4" />
             </Button>
           </div>
           <p class="text-xs text-neutral-muted">
-            This value is encrypted and stored securely.
             {{
               configMetadata?.[key]?.hasEnvFallback
-                ? " Click Reset to revert to environment variable."
-                : " Click edit to update it."
+                ? t("pluginSettings.form.encryptedResetHint")
+                : t("pluginSettings.form.encryptedHint")
             }}
           </p>
         </div>
@@ -149,17 +160,17 @@
               :model-value="formData[key]"
               @update:model-value="updateFormData(key, $event)"
               type="text"
-              :placeholder="field.placeholder || undefined"
+              :placeholder="fieldPlaceholder(key, field)"
               :required="field.required"
               class="flex-1"
             />
             <Button type="button" variant="ghost" @click="handleResetToEnv(key)">
               <RotateCcw class="h-4 w-4 mr-1" />
-              Reset
+              {{ t("pluginSettings.form.resetToManaged") }}
             </Button>
           </div>
           <p class="text-xs text-neutral-muted">
-            Overriding environment variable. Click Reset to revert to local configuration.
+            {{ t("pluginSettings.form.overrideResetHint") }}
           </p>
         </div>
 
@@ -175,11 +186,11 @@
             :model-value="formData[key]"
             @update:model-value="updateFormData(key, $event)"
             :type="field.encrypted ? 'password' : 'text'"
-            :placeholder="field.placeholder || undefined"
+            :placeholder="fieldPlaceholder(key, field)"
             :required="field.required"
           />
           <p v-if="field.encrypted" class="text-xs text-neutral-muted mt-1">
-            This value will be encrypted and stored securely.
+            {{ t("pluginSettings.form.willEncrypt") }}
           </p>
         </div>
       </template>
@@ -187,18 +198,18 @@
       <!-- Select -->
       <template v-else-if="field.type === 'select' || field.options">
         <Label :for="key" :required="field.required">
-          {{ field.label || key }}
+          {{ fieldLabel(key, field) }}
         </Label>
-        <p v-if="field.description" class="text-sm mt-0 text-neutral-muted">
-          {{ field.description }}
+        <p v-if="fieldDescription(key, field)" class="text-xs mt-0 text-neutral-muted">
+          {{ fieldDescription(key, field) }}
         </p>
         <Select :model-value="formData[key]" @update:model-value="updateFormData(key, $event)">
           <SelectTrigger :id="key" class="w-full">
-            <SelectValue :placeholder="`Select ${(field.label || key).toLowerCase()}`" />
+            <SelectValue :placeholder="t('pluginSettings.form.selectPlaceholder')" />
           </SelectTrigger>
           <SelectContent>
             <SelectItem v-for="option in field.options" :key="option.value" :value="option.value">
-              {{ option.label }}
+              {{ optionLabel(key, option) }}
             </SelectItem>
           </SelectContent>
         </Select>
@@ -208,9 +219,9 @@
       <template v-else-if="field.type === 'boolean'">
         <div class="flex items-center justify-between space-x-2">
           <div class="space-y-0.5">
-            <Label :for="key">{{ field.label || key }}</Label>
-            <p v-if="field.description" class="text-sm text-neutral-muted">
-              {{ field.description }}
+            <Label :for="key">{{ fieldLabel(key, field) }}</Label>
+            <p v-if="fieldDescription(key, field)" class="text-xs text-neutral-muted">
+              {{ fieldDescription(key, field) }}
             </p>
           </div>
           <Switch
@@ -224,16 +235,16 @@
       <!-- Textarea -->
       <template v-else-if="field.type === 'textarea'">
         <Label :for="key" :required="field.required">
-          {{ field.label || key }}
+          {{ fieldLabel(key, field) }}
         </Label>
-        <p v-if="field.description" class="text-sm text-neutral-muted">
-          {{ field.description }}
+        <p v-if="fieldDescription(key, field)" class="text-xs text-neutral-muted">
+          {{ fieldDescription(key, field) }}
         </p>
         <Textarea
           :id="key"
           :model-value="formData[key]"
           @update:model-value="updateFormData(key, $event)"
-          :placeholder="field.placeholder || undefined"
+          :placeholder="fieldPlaceholder(key, field)"
           :rows="4"
           :required="field.required"
         />
@@ -242,31 +253,34 @@
       <!-- Number -->
       <template v-else-if="field.type === 'number'">
         <Label :for="key" :required="field.required">
-          {{ field.label || key }}
+          {{ fieldLabel(key, field) }}
         </Label>
-        <p v-if="field.description" class="text-sm text-neutral-muted">
-          {{ field.description }}
+        <p v-if="fieldDescription(key, field)" class="text-xs text-neutral-muted">
+          {{ fieldDescription(key, field) }}
         </p>
         <Input
           :id="key"
           :model-value="formData[key]"
           @update:model-value="updateFormData(key, $event === '' ? undefined : Number($event))"
           type="number"
-          :placeholder="field.placeholder || undefined"
+          :placeholder="fieldPlaceholder(key, field)"
           :required="field.required"
         />
       </template>
     </div>
 
     <div class="flex justify-end space-x-2 pt-4">
-      <Button type="button" variant="outline" @click="$emit('reset')"> Reset </Button>
-      <Button type="submit" :disabled="saving" :loading="saving"> Save Configuration </Button>
+      <Button type="button" variant="outline" @click="$emit('reset')">
+        {{ t("pluginSettings.form.discard") }}
+      </Button>
+      <Button type="submit" :loading="saving">{{ t("pluginSettings.form.save") }}</Button>
     </div>
   </form>
 </template>
 
 <script setup lang="ts">
 import { Lock, Edit3, X, RotateCcw } from "lucide-vue-next";
+import { useToolLabel } from "@/composables/useToolLabel";
 
 interface ShowWhen {
   field: string;
@@ -304,6 +318,8 @@ interface ConfigFieldMetadata {
 }
 
 interface Props {
+  /** Plugin id, for its translated field labels (`plugins.<id>.config.<field>.*`). */
+  pluginId: string;
   configSchema: Record<string, FieldSchema>;
   formData: Record<string, any>;
   originalFormData: Record<string, any>;
@@ -313,6 +329,19 @@ interface Props {
 }
 
 const props = defineProps<Props>();
+
+const { t } = useI18n();
+const { getConfigLabel, getConfigDescription, getConfigOptionLabel, getConfigPlaceholder } =
+  useToolLabel();
+
+const fieldLabel = (key: string, field: FieldSchema) =>
+  getConfigLabel(props.pluginId, key, field.label);
+const fieldDescription = (key: string, field: FieldSchema) =>
+  getConfigDescription(props.pluginId, key, field.description);
+const fieldPlaceholder = (key: string, field: FieldSchema) =>
+  getConfigPlaceholder(props.pluginId, key, field.placeholder) || undefined;
+const optionLabel = (key: string, option: { value: string; label: string }) =>
+  getConfigOptionLabel(props.pluginId, key, option.value, option.label);
 
 const editingEnvFields = ref<Set<string>>(new Set());
 

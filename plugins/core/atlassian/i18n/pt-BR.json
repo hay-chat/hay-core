@@ -1,0 +1,34 @@
+{
+  "name": "Atlassian",
+  "description": "Importe páginas do Confluence como documentos e deixe o agente trabalhar com tickets do Jira.",
+  "tools": {},
+  "config": {
+    "authMode": {
+      "label": "Método de autenticação",
+      "description": "Como o Hay.chat entra na Atlassian.",
+      "options": {
+        "basic": "Token de API (recomendado)",
+        "oauth": "OAuth"
+      }
+    },
+    "siteUrl": {
+      "label": "URL do site Atlassian",
+      "description": "Usada tanto para o Confluence quanto para o Jira."
+    },
+    "email": {
+      "label": "E-mail da Atlassian"
+    },
+    "apiToken": {
+      "label": "Token de API",
+      "description": "Funciona para o Confluence e para o Jira. Crie um em id.atlassian.com/manage-profile/security/api-tokens"
+    },
+    "clientId": {
+      "label": "Client ID do OAuth",
+      "description": "Configurado para você pelo Hay.chat. Altere apenas se você roda seu próprio servidor do Hay.chat com seu próprio app."
+    },
+    "clientSecret": {
+      "label": "Client secret do OAuth",
+      "description": "Configurado para você pelo Hay.chat. Altere apenas se você roda seu próprio servidor do Hay.chat com seu próprio app."
+    }
+  }
+}

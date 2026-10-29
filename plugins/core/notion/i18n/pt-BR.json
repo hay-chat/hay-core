@@ -1,0 +1,15 @@
+{
+  "name": "Notion",
+  "description": "Importe páginas e itens de bancos de dados do Notion para a sua base de conhecimento.",
+  "tools": {},
+  "config": {
+    "apiToken": {
+      "label": "Token da integração interna",
+      "description": "Crie uma integração interna em notion.so/my-integrations e compartilhe com ela as páginas e bancos de dados que você quer importar. O token começa com 'ntn_' ou 'secret_'."
+    },
+    "notionVersion": {
+      "label": "Versão da API do Notion",
+      "description": "O cabeçalho Notion-Version enviado em cada requisição."
+    }
+  }
+}
