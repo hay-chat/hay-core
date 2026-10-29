@@ -2,13 +2,12 @@
  * Loads the Casa Aurora demo data and the small helpers every seed script shares:
  * flags, env, dates relative to "now", tracking numbers and an HTTP helper with dry-run.
  */
-import { readFileSync, existsSync } from "node:fs";
+import { readFileSync, existsSync, writeFileSync } from "node:fs";
 import { createHash } from "node:crypto";
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { join } from "node:path";
 import type { Customer, OrderFixture, Platform, Product } from "./types";
 
-export const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
+export const ROOT = join(__dirname, "..", "..");
 export const IMAGES_DIR = join(ROOT, "catalog", "images");
 /** Tag/marker stored on everything the seed scripts create, so re-runs find it. */
 export const DEMO_TAG = "hay-demo";
@@ -123,4 +122,43 @@ export async function http<T = unknown>(
     throw new Error(`${method} ${url} → ${response.status}: ${text.slice(0, 500)}`);
   }
   return (text ? JSON.parse(text) : {}) as T;
+}
+
+/** One line of a seed run's summary: fixture key → order on the platform. */
+export interface SeededOrder {
+  key: string;
+  orderId: string;
+  orderNumber: string;
+  /** Platform status as seeded, e.g. "completed" or "open/paid/delivered". */
+  status: string;
+  tracking: string | null;
+  trackingUrl: string | null;
+  /** "created", "existing" (left alone) or "dry-run". */
+  result: string;
+  /** States the platform could not take as-is and what was done instead. */
+  notes: string[];
+}
+
+/** Prints the summary table every seed script ends with. */
+export function printSeededTable(rows: SeededOrder[]): void {
+  const cols: Array<[string, (r: SeededOrder) => string]> = [
+    ["fixture", (r) => r.key],
+    ["order", (r) => r.orderNumber],
+    ["status", (r) => r.status],
+    ["tracking", (r) => r.tracking ?? "-"],
+    ["result", (r) => r.result],
+  ];
+  const widths = cols.map(([title, get]) => Math.max(title.length, ...rows.map((r) => get(r).length)));
+  const line = (cells: string[]) => cells.map((c, i) => c.padEnd(widths[i])).join("  ");
+  log("");
+  log(line(cols.map(([title]) => title)));
+  log(line(widths.map((w) => "-".repeat(w))));
+  for (const row of rows) log(line(cols.map(([, get]) => get(row))));
+}
+
+/** Writes orders/seeded-<platform>.json (gitignored) so scenarios can look orders up by key. */
+export function writeSeededOrders(platform: Platform, rows: SeededOrder[], extra: Record<string, unknown> = {}): string {
+  const file = join(ROOT, "orders", `seeded-${platform}.json`);
+  writeFileSync(file, `${JSON.stringify({ platform, seededAt: new Date().toISOString(), ...extra, orders: rows }, null, 2)}\n`);
+  return file;
 }

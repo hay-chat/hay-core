@@ -8,7 +8,17 @@ export interface ParsedArgs {
 }
 
 /** Flags that never take a value. Everything else consumes the next token. */
-export const BOOLEAN_FLAGS = new Set(["json", "wait", "no-wait", "logs", "help", "all", "verbose"]);
+export const BOOLEAN_FLAGS = new Set([
+  "json",
+  "wait",
+  "no-wait",
+  "logs",
+  "help",
+  "all",
+  "verbose",
+  "dry-run",
+  "reset-orders",
+]);
 
 export class UsageError extends Error {}
 
