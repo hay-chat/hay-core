@@ -28,7 +28,6 @@ const SYSTEM_CHROME_PATHS = [
   "C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe",
 ];
 
-// TODO: drop --no-sandbox once the server process runs as a non-root user.
 const BROWSER_LAUNCH_ARGS = [
   "--no-sandbox",
   "--disable-dev-shm-usage",
