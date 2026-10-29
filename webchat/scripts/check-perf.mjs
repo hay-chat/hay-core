@@ -24,7 +24,11 @@ const KB = 1024;
 // Raise one only on purpose, in the same commit as the change that needs it.
 const BUDGETS = {
   loader: 10 * KB, // widget.js, on every page view
-  chat: 48 * KB, // Vue + chat window, loaded when idle or on intent
+  // Vue + chat window, loaded when idle or on intent. 48 → 52 KB with the
+  // form feature (hay-chat/hay-core#115): master sat at 48.0 KB after CSAT and
+  // page tools, and the pre-chat gating + form message plumbing add 2.6 KB
+  // (the form components themselves load on demand).
+  chat: 52 * KB,
   locale: 2 * KB, // one locale chunk, loaded with the chat
 };
 

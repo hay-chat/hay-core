@@ -189,6 +189,8 @@
         </Button>
       </CardContent>
     </Card>
+    <!-- Pre-chat form -->
+    <PreChatFormBuilder v-model="settingsForm.preChatForm" />
 
     <!-- Save Button -->
     <div class="flex justify-end gap-2">
@@ -273,6 +275,8 @@ import { ref, computed, onMounted } from "vue";
 import { Save, Copy, Check } from "lucide-vue-next";
 import { Hay } from "@/utils/api";
 import type { RouterInputs } from "@/types/trpc";
+import type { FormSchema } from "@hay/form-schema";
+import PreChatFormBuilder from "@/components/settings/PreChatFormBuilder.vue";
 import { useToast } from "@/composables/useToast";
 import { useUserStore } from "@/stores/user";
 import { useDomain } from "@/composables/useDomain";
@@ -298,6 +302,7 @@ const settingsForm = ref({
   isEnabled: true,
   spamClassifierEnabled: false,
   spamGuidance: "",
+  preChatForm: null as FormSchema | null,
 });
 
 const allowedDomainsText = ref("*");
@@ -370,6 +375,7 @@ async function loadSettings() {
       isEnabled: settings.isEnabled,
       spamClassifierEnabled: settings.spamClassifierEnabled,
       spamGuidance: settings.spamGuidance || "",
+      preChatForm: (settings.preChatForm as FormSchema | null) ?? null,
     };
 
     underAttack.value = settings.underAttack;
@@ -399,6 +405,7 @@ async function saveSettings() {
       isEnabled: settingsForm.value.isEnabled,
       spamClassifierEnabled: settingsForm.value.spamClassifierEnabled,
       spamGuidance: settingsForm.value.spamGuidance.trim() || null,
+      preChatForm: settingsForm.value.preChatForm,
     });
 
     originalSettings.value = { ...settingsForm.value, allowedDomains: allowedDomainsArray.value };
