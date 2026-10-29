@@ -1,7 +1,7 @@
 import { t, scopedProcedure } from "@server/trpc";
 import { z } from "zod";
 import { RESOURCES, ACTIONS } from "@server/types/scopes";
-import { DocumentProcessorFactory } from "@server/processors";
+import { DocumentProcessorFactory, DocumentRejectedError } from "@server/processors";
 import { vectorStoreService } from "@server/services/vector-store.service";
 import { documentRepository } from "@server/repositories/document.repository";
 import { splitTextIntoChunks, createChunkMetadata } from "@server/utils/text-chunking";
@@ -17,6 +17,8 @@ import { documentListInputSchema } from "@server/types/entity-list-inputs";
 import { createListProcedure } from "@server/trpc/procedures/list";
 import { documentRetryService } from "@server/services/document-retry.service";
 import { storageService } from "@server/services/storage.service";
+import { MediaRejectedError } from "@server/services/media-sanitizer.service";
+import { config } from "@server/config/env";
 import { AppDataSource } from "@server/database/data-source";
 import { createLogger } from "@server/lib/logger";
 import { pluginManagerService } from "@server/services/plugin-manager.service";
@@ -203,16 +205,28 @@ export const documentsRouter = t.router({
         | Array<{ type: string; url: string; name: string; size?: number }>
         | undefined;
 
+      // Editor documents are rendered as HTML, so their content is always sanitized
       const isEditorAuthored = !!input.contentJson;
-      if (isEditorAuthored && input.contentHtml) {
-        processedContent = sanitizeEditorHtml(input.contentHtml);
+      if (isEditorAuthored) {
+        processedContent = sanitizeEditorHtml(input.contentHtml ?? input.content);
       }
 
       // Process file if provided
       if (input.fileBuffer && input.mimeType) {
         const buffer = Buffer.from(input.fileBuffer, "base64");
+        if (buffer.length > config.storage.limits.maxFileSize) {
+          throw new TRPCError({ code: "PAYLOAD_TOO_LARGE", message: "File too large" });
+        }
         const processor = new DocumentProcessorFactory();
-        const processed = await processor.processDocument(buffer, input.mimeType, input.fileName);
+        let processed: Awaited<ReturnType<DocumentProcessorFactory["processDocument"]>>;
+        try {
+          processed = await processor.processDocument(buffer, input.mimeType, input.fileName);
+        } catch (error) {
+          if (error instanceof DocumentRejectedError) {
+            throw new TRPCError({ code: "BAD_REQUEST", message: error.message });
+          }
+          throw error;
+        }
         processedContent = processed.content;
         metadata = processed.metadata;
 
@@ -221,7 +235,7 @@ export const documentsRouter = t.router({
           const uploadResult = await storageService.upload({
             buffer,
             originalName: input.fileName || "document",
-            mimeType: input.mimeType,
+            mimeType: processed.mimeType,
             folder: `documents/${ctx.organizationId}`,
             organizationId: ctx.organizationId,
             uploadedById: ctx.user.id,
@@ -229,7 +243,7 @@ export const documentsRouter = t.router({
 
           attachments = [
             {
-              type: input.mimeType,
+              type: uploadResult.upload.mimeType,
               url: uploadResult.url,
               name: input.fileName || "document",
               size: buffer.length,
@@ -315,8 +329,11 @@ export const documentsRouter = t.router({
         throw new Error("Document not found");
       }
 
-      const sanitizedHtml = input.contentHtml ? sanitizeEditorHtml(input.contentHtml) : undefined;
-      const nextContent = sanitizedHtml ?? input.content;
+      // Editor documents are rendered as HTML, so their content is always sanitized
+      const html =
+        input.contentHtml ??
+        (document.importMethod === ImportMethod.EDITOR ? input.content : undefined);
+      const nextContent = html !== undefined ? sanitizeEditorHtml(html) : input.content;
 
       // Update document
       const updatedDocument = await documentRepository.update(document.id, ctx.organizationId!, {
@@ -466,27 +483,29 @@ export const documentsRouter = t.router({
       if (!ctx.organizationId) {
         throw new Error("Organization ID is required");
       }
-      if (!input.mimeType.startsWith("image/")) {
-        throw new Error("Only image uploads are allowed");
-      }
-
       const buffer = Buffer.from(input.fileBuffer, "base64");
       const maxSize = 10 * 1024 * 1024;
       if (buffer.length > maxSize) {
         throw new Error("Image too large (max 10MB)");
       }
 
-      const result = await storageService.upload({
-        buffer,
-        originalName: input.fileName,
-        mimeType: input.mimeType,
-        folder: "document-images",
-        organizationId: ctx.organizationId,
-        uploadedById: ctx.user.id,
-        maxSize,
-      });
-
-      return { url: result.url };
+      try {
+        const result = await storageService.upload({
+          buffer,
+          originalName: input.fileName,
+          mimeType: input.mimeType,
+          folder: "document-images",
+          organizationId: ctx.organizationId,
+          uploadedById: ctx.user.id,
+          maxSize,
+        });
+        return { url: result.url };
+      } catch (error) {
+        if (error instanceof MediaRejectedError) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: error.message });
+        }
+        throw error;
+      }
     }),
 
   regenerateEmbeddings: scopedProcedure(RESOURCES.DOCUMENTS, ACTIONS.UPDATE)

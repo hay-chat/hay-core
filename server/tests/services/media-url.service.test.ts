@@ -21,6 +21,7 @@ jest.mock("@server/entities/upload.entity", () => ({ Upload: { find: mockFind } 
 import {
   isPublicUploadPath,
   mediaUrl,
+  setPublicUploadHeaders,
   signAttachmentUrls,
   signMediaUrl,
   verifyMediaSignature,
@@ -113,6 +114,7 @@ describe("/uploads gate in front of express.static", () => {
     fs.mkdirSync(path.join(root, ORG_ID, "organizations"), { recursive: true });
     fs.mkdirSync(path.join(root, ORG_ID, "conversation-media"), { recursive: true });
     fs.writeFileSync(path.join(root, ORG_ID, "organizations", "logo.png"), "public");
+    fs.writeFileSync(path.join(root, ORG_ID, "organizations", "logo.svg"), "<svg/>");
     fs.writeFileSync(path.join(root, ORG_ID, "conversation-media", "a.txt"), "private");
 
     // Same wiring as server/main.ts.
@@ -120,7 +122,7 @@ describe("/uploads gate in front of express.static", () => {
     app.use(
       "/uploads",
       (req, res, next) => (isPublicUploadPath(req.path) ? next() : res.status(404).end()),
-      express.static(root),
+      express.static(root, { setHeaders: setPublicUploadHeaders }),
     );
     server = app.listen(0);
     await new Promise<void>((resolve) => server.once("listening", () => resolve()));
@@ -133,16 +135,39 @@ describe("/uploads gate in front of express.static", () => {
   });
 
   // Raw request so the client does not normalise `..` before sending.
-  const get = (rawPath: string) =>
-    new Promise<{ status: number; body: string }>((resolve, reject) => {
-      const req = http.request({ host: "127.0.0.1", port, path: rawPath, method: "GET" }, (res) => {
-        let body = "";
-        res.on("data", (chunk) => (body += chunk));
-        res.on("end", () => resolve({ status: res.statusCode ?? 0, body }));
-      });
-      req.on("error", reject);
-      req.end();
-    });
+  const request = (rawPath: string) =>
+    new Promise<{ status: number; body: string; headers: http.IncomingHttpHeaders }>(
+      (resolve, reject) => {
+        const req = http.request(
+          { host: "127.0.0.1", port, path: rawPath, method: "GET" },
+          (res) => {
+            let body = "";
+            res.on("data", (chunk) => (body += chunk));
+            res.on("end", () =>
+              resolve({ status: res.statusCode ?? 0, body, headers: res.headers }),
+            );
+          },
+        );
+        req.on("error", reject);
+        req.end();
+      },
+    );
+  const get = async (rawPath: string) => {
+    const { status, body } = await request(rawPath);
+    return { status, body };
+  };
+
+  it("serves raster images inline and anything else as a sandboxed download", async () => {
+    const png = await request(`/uploads/${ORG_ID}/organizations/logo.png`);
+    expect(png.headers["content-security-policy"]).toBe("default-src 'none'; sandbox");
+    expect(png.headers["content-disposition"]).toBeUndefined();
+
+    const svg = await request(`/uploads/${ORG_ID}/organizations/logo.svg`);
+    expect(svg.status).toBe(200);
+    expect(svg.headers["content-security-policy"]).toBe("default-src 'none'; sandbox");
+    expect(svg.headers["content-disposition"]).toBe("attachment");
+    expect(svg.headers["x-content-type-options"]).toBe("nosniff");
+  });
 
   it("serves a public file", async () => {
     await expect(get(`/uploads/${ORG_ID}/organizations/logo.png`)).resolves.toEqual({
