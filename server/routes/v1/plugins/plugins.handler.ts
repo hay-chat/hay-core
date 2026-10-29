@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { authenticatedProcedure } from "@server/trpc";
-import { pickHealthCheckTool } from "@server/lib/plugin-health-tool";
+import { hasPluginCredentials, pickHealthCheckTool } from "@server/lib/plugin-health-tool";
 import { pluginManagerService } from "@server/services/plugin-manager.service";
 import { pluginRegistryRepository } from "@server/repositories/plugin-registry.repository";
 import { pluginInstanceRepository } from "@server/repositories/plugin-instance.repository";
@@ -1159,16 +1159,7 @@ export const testConnection = authenticatedProcedure
 
     // Check if plugin requires authentication
     if (authMethods && authMethods.length > 0) {
-      // Plugin requires authentication - check if credentials are provided
-      const configKeys = Object.keys(instance.config || {});
-      const hasCredentials =
-        configKeys.length > 0 &&
-        configKeys.some((key) => {
-          const value = instance.config![key];
-          return value !== null && value !== undefined && value !== "";
-        });
-
-      if (!hasCredentials) {
+      if (!hasPluginCredentials(instance)) {
         logger.debug("Plugin requires authentication but no credentials configured");
         return {
           success: false,

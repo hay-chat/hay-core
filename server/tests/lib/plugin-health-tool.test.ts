@@ -1,4 +1,4 @@
-import { pickHealthCheckTool } from "@server/lib/plugin-health-tool";
+import { hasPluginCredentials, pickHealthCheckTool } from "@server/lib/plugin-health-tool";
 
 describe("pickHealthCheckTool", () => {
   it("prefers a dedicated health tool", () => {
@@ -22,5 +22,24 @@ describe("pickHealthCheckTool", () => {
   it("reads snake_case input_schema when deciding required parameters", () => {
     const tools = [{ name: "list_inboxes", input_schema: { required: ["account"] } }];
     expect(pickHealthCheckTool(tools)).toBeUndefined();
+  });
+});
+
+describe("hasPluginCredentials", () => {
+  it("accepts OAuth tokens in authState when config is empty", () => {
+    expect(
+      hasPluginCredentials({ config: {}, authState: { credentials: { accessToken: "tok" } } }),
+    ).toBe(true);
+  });
+
+  it("accepts credentials in config", () => {
+    expect(hasPluginCredentials({ config: { apiKey: "k" } })).toBe(true);
+  });
+
+  it("rejects empty config and empty authState", () => {
+    expect(hasPluginCredentials({ config: { apiKey: "" }, authState: { credentials: {} } })).toBe(
+      false,
+    );
+    expect(hasPluginCredentials({})).toBe(false);
   });
 });
