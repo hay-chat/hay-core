@@ -89,7 +89,9 @@ export class PluginCronService {
           handler: () => this.runCron(orgId, pluginId, cron.name),
           singleton: true,
           retryOnFailure: maxRetries > 0,
-          maxRetries,
+          // The scheduler rejects maxRetries < 1, so a cron without a retryPolicy
+          // must leave it out rather than send 0.
+          ...(maxRetries > 0 ? { maxRetries } : {}),
           enabled: true,
         });
         names.push(name);
