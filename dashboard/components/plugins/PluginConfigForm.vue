@@ -17,13 +17,9 @@
           {{ fieldDescription(key, field) }}
         </p>
 
-        <!-- Environment variable field (not yet overridden) -->
+        <!-- Managed value (the server sets it). Override only when the instance allows it. -->
         <div
-          v-if="
-            configMetadata?.[key]?.source === 'env' &&
-            configMetadata[key]?.canOverride &&
-            !editingEnvFields.has(key)
-          "
+          v-if="configMetadata?.[key]?.source === 'env' && !editingEnvFields.has(key)"
           class="space-y-2"
         >
           <div class="flex items-center space-x-2">
@@ -34,13 +30,22 @@
               disabled
               class="flex-1 bg-muted"
             />
-            <Button type="button" variant="outline" @click="handleEditEnvField(key)">
+            <Button
+              v-if="configMetadata[key]?.canOverride"
+              type="button"
+              variant="outline"
+              @click="handleEditEnvField(key)"
+            >
               <Edit3 class="h-4 w-4 mr-1" />
               {{ t("pluginSettings.form.override") }}
             </Button>
           </div>
           <p class="text-xs text-neutral-muted">
-            {{ t("pluginSettings.form.managedHint") }}
+            {{
+              configMetadata[key]?.canOverride
+                ? t("pluginSettings.form.managedHint")
+                : t("pluginSettings.form.managedReadOnlyHint")
+            }}
           </p>
         </div>
 
@@ -267,9 +272,25 @@
           :required="field.required"
         />
       </template>
+      <!-- Advanced mode: who set this value, and the server variable behind it -->
+      <div
+        v-if="advancedView && (configMetadata?.[key]?.managed || configMetadata?.[key]?.envName)"
+        class="flex flex-wrap items-center gap-2 text-xs text-neutral-muted"
+        :data-testid="`field-source-${key}`"
+      >
+        <Badge v-if="configMetadata?.[key]?.source === 'env'" variant="secondary">
+          {{ t("pluginSettings.form.badgeManaged") }}
+        </Badge>
+        <Badge v-else-if="configMetadata?.[key]?.managed" variant="outline">
+          {{ t("pluginSettings.form.badgeSetByYou") }}
+        </Badge>
+        <code v-if="configMetadata?.[key]?.envName" class="font-mono">{{
+          configMetadata[key]?.envName
+        }}</code>
+      </div>
     </div>
 
-    <div class="flex justify-end space-x-2 pt-4">
+    <div v-if="!hideActions" class="flex flex-wrap justify-end gap-2 pt-4">
       <Button type="button" variant="outline" @click="$emit('reset')">
         {{ t("pluginSettings.form.discard") }}
       </Button>
@@ -281,6 +302,7 @@
 <script setup lang="ts">
 import { Lock, Edit3, X, RotateCcw } from "lucide-vue-next";
 import { useToolLabel } from "@/composables/useToolLabel";
+import { isShown, type ConfigFieldMeta } from "@/utils/pluginSetup";
 
 interface ShowWhen {
   field: string;
@@ -302,20 +324,9 @@ interface FieldSchema {
 }
 
 function evaluateShowWhen(rule: ShowWhen | undefined, values: Record<string, unknown>): boolean {
-  if (!rule) return true;
-  const current = values[rule.field];
-  if (rule.equals !== undefined && current !== rule.equals) return false;
-  if (rule.notEquals !== undefined && current === rule.notEquals) return false;
-  if (rule.in !== undefined && !rule.in.includes(current as never)) return false;
-  return true;
+  return isShown({ showWhen: rule }, values);
 }
 
-interface ConfigFieldMetadata {
-  source: "env" | "database" | "default";
-  canOverride: boolean;
-  isEncrypted: boolean;
-  hasEnvFallback?: boolean;
-}
 
 interface Props {
   /** Plugin id, for its translated field labels (`plugins.<id>.config.<field>.*`). */
@@ -324,8 +335,12 @@ interface Props {
   formData: Record<string, any>;
   originalFormData: Record<string, any>;
   editingEncryptedFields: Set<string>;
-  configMetadata?: Record<string, ConfigFieldMetadata>;
+  configMetadata?: Record<string, ConfigFieldMeta>;
   saving?: boolean;
+  /** Advanced tab: show "Managed by Hay.chat" / "Set by you" badges and env names. */
+  advancedView?: boolean;
+  /** Hide Save / Discard (nothing on the form can be edited). */
+  hideActions?: boolean;
 }
 
 const props = defineProps<Props>();

@@ -54,18 +54,17 @@
       "playbook": "Playbook"
     },
     "actions": {
-      "install": "Instalar",
-      "installing": "Instalando...",
       "configure": "Configurar",
       "remove": "Remover",
       "removing": "Removendo...",
       "delete": "Excluir",
-      "deleting": "Excluindo..."
+      "deleting": "Excluindo...",
+      "connect": "Conectar",
+      "connecting": "Conectando…"
     },
     "custom": "Personalizado",
     "confirmDelete": "Tem certeza de que deseja excluir esta integração? Esta ação não pode ser desfeita.",
     "toast": {
-      "enabledSuccess": "Integração {name} ativada com sucesso",
       "disabledSuccess": "Integração {name} desativada com sucesso",
       "deletedSuccess": "Integração excluída com sucesso",
       "enableFailed": "Falha ao ativar integração",
@@ -177,32 +176,23 @@
     "backToMarketplace": "Voltar ao Marketplace",
     "headTitle": "Configurações da Integração - Hay.chat",
     "headTitleWithName": "Configurações de {name} - Hay.chat",
-    "restartWorker": "Reiniciar Worker",
+    "restartWorker": "Reiniciar",
     "restarting": "Reiniciando...",
-    "disablePlugin": "Desativar Integração",
-    "disabling": "Desativando...",
-    "enablePlugin": "Ativar Integração",
+    "disablePlugin": "Desconectar e remover",
     "disableConfirm": {
-      "title": "Desativar Integração?",
-      "description": "Tem certeza de que deseja desativar {name}? Isso impedirá o uso da integração na sua organização.",
-      "confirm": "Desativar"
+      "title": "Desconectar e remover?",
+      "description": "{name} deixa de funcionar no seu workspace. As configurações ficam guardadas caso você conecte de novo.",
+      "confirm": "Desconectar"
     },
     "error": {
       "loadFailed": "Falha ao carregar integração",
       "returnToMarketplace": "Voltar ao Marketplace"
     },
     "connection": {
-      "testing": "Testando Conexão",
-      "connected": "Conectado",
-      "failed": "Conexão Falhou",
-      "needsAuth": "Necessita Autenticação",
-      "configureCredentials": "Por favor, configure suas credenciais",
       "connectionFailed": "Conexão falhou",
-      "tryAgain": "Tentar Novamente",
       "oauthUnavailableTitle": "A conexão ainda não está disponível",
       "oauthUnavailable": "Não é possível conectar {name} até que o app OAuth esteja configurado neste servidor do Hay.chat. Um administrador precisa adicionar o client ID e o secret desta integração."
     },
-    "about": "Sobre",
     "capabilities": {
       "title": "Capacidades",
       "description": "O que esta integração pode fazer",
@@ -235,7 +225,8 @@
           "title": "Chat do site",
           "description": "Funciona no widget de chat do seu site."
         }
-      }
+      },
+      "empty": "Esta integração funciona em segundo plano e não adiciona ações próprias."
     },
     "availableActions": {
       "title": "Ações Disponíveis",
@@ -246,36 +237,33 @@
         "read": "Leitura",
         "write": "Escrita",
         "destructive": "Destrutiva"
-      }
-    },
-    "configuration": {
-      "title": "Configuração",
-      "description": "Configure as definições de {name}"
+      },
+      "parameters": "Parâmetros"
     },
     "connectionTest": {
-      "title": "Teste de Conexão",
-      "description": "Teste a conexão de {name}",
-      "testConnection": "Testar Conexão",
-      "testing": "Testando...",
+      "title": "Verifique a conexão",
+      "description": "Confirme que o Hay.chat consegue acessar {name} com esses dados.",
+      "testConnection": "Testar conexão",
       "success": "Conexão bem-sucedida!",
       "configRequired": "Configuração necessária",
-      "failed": "Conexão falhou",
-      "checkConfig": "Por favor, verifique sua configuração e tente novamente."
+      "failed": "Conexão falhou"
     },
     "tabs": {
-      "settings": "Configurações"
+      "label": "Seções da integração",
+      "setup": "Configuração",
+      "capabilities": "O que ela faz",
+      "advanced": "Avançado"
     },
     "toast": {
       "configSaved": "Configuração salva com sucesso",
       "configSaveFailed": "Falha ao salvar configuração",
-      "enabledSuccess": "Integração ativada com sucesso",
       "enableFailed": "Falha ao ativar integração",
       "disabledSuccess": "Integração desativada com sucesso",
       "disableFailed": "Falha ao desativar integração",
       "restartedSuccess": "Worker da integração reiniciado com sucesso",
       "restartFailed": "Falha ao reiniciar integração",
-      "resetToEnv": "Redefinido para variável de ambiente",
-      "resetToEnvFailed": "Falha ao redefinir para variável de ambiente",
+      "resetToEnv": "De volta ao valor gerenciado",
+      "resetToEnvFailed": "Não foi possível voltar ao valor gerenciado",
       "oauthSuccess": "Conexão OAuth estabelecida com sucesso",
       "oauthFailed": "Conexão OAuth falhou. Por favor, tente novamente.",
       "connectionEstablished": "Conexão estabelecida com sucesso",
@@ -296,8 +284,9 @@
       "alerted": "Proprietários e administradores foram avisados por e-mail e push."
     },
     "advanced": {
-      "show": "Mostrar configurações avançadas",
-      "managedHidden": "{count} valor é configurado para você pelo Hay.chat. | {count} valores são configurados para você pelo Hay.chat."
+      "title": "Configurações avançadas",
+      "description": "Valores técnicos que a maioria dos workspaces nunca altera. Os marcados como Gerenciado pelo Hay.chat já vêm configurados.",
+      "readOnlyDescription": "O Hay.chat define estes valores para você. Eles aparecem aqui só para consulta."
     },
     "form": {
       "managedValue": "Definido pelo Hay.chat",
@@ -315,7 +304,10 @@
       "willEncrypt": "Armazenado com criptografia.",
       "selectPlaceholder": "Escolha uma opção",
       "discard": "Descartar alterações",
-      "save": "Salvar"
+      "save": "Salvar",
+      "managedReadOnlyHint": "O Hay.chat define este valor para você.",
+      "badgeManaged": "Gerenciado pelo Hay.chat",
+      "badgeSetByYou": "Definido por você"
     },
     "oauth": {
       "title": "Conecte sua conta {name}",
@@ -332,6 +324,24 @@
       "reconnect": "Reconectar",
       "disconnect": "Desconectar",
       "statusFailed": "Não foi possível verificar a conexão. Atualize a página para tentar de novo."
+    },
+    "status": {
+      "not_set_up": "Não configurado",
+      "needs_action": "Requer ação",
+      "connected": "Conectado",
+      "error": "Com problema"
+    },
+    "actions": {
+      "connect": "Conectar",
+      "finishSetup": "Concluir configuração",
+      "reviewSetup": "Revisar configuração",
+      "more": "Mais opções",
+      "advancedMode": "Modo avançado",
+      "version": "Versão {version}"
+    },
+    "setup": {
+      "fieldsTitle": "Seus dados",
+      "fieldsDescription": "O que o {name} precisa de você para conectar."
     }
   }
 }
