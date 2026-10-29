@@ -1,5 +1,5 @@
 {
-  "_comment": "Plugin translations. One file per locale at plugins/.../<name>/i18n/<locale>.json (e.g. en.json, pt.json). The plugin manager loads every *.json here onto manifest.i18n; getPluginTranslations serves the org's locale (falling back to en). The dashboard resolves chips/labels via plugins.<pluginId>.tools.<toolName>.label. Keys under `tools` MUST be the exact MCP tool names; without a label the UI falls back to humanizeToolName (list_event_types -> 'List Event Types'). Ship en.json at minimum.",
+  "_comment": "Plugin translations. One file per locale at plugins/.../<name>/i18n/<locale>.json (en.json and pt-BR.json, both required). The plugin manager loads every *.json here onto manifest.i18n; getPluginTranslations serves the org's locale (falling back to en). The dashboard resolves chips/labels via plugins.<pluginId>.tools.<toolName>.label. Keys under `tools` MUST be the exact MCP tool names; without a label the UI falls back to humanizeToolName (list_event_types -> 'List Event Types'). Ship en.json at minimum.",
   "name": "<Human Name>",
   "description": "<One-sentence description shown in the integrations list.>",
   "tools": {
@@ -12,6 +12,12 @@
     "<configField>": {
       "label": "<Field Label>",
       "description": "<Help text for this config field.>"
+    }
+  },
+  "setupSteps": {
+    "<stepId>": {
+      "title": "<Setup step title, only for steps declared with register.setup>",
+      "description": "<Optional one-line help under the step title.>"
     }
   }
 }

@@ -234,3 +234,73 @@ describe("PluginHttpServer webchat gate endpoint", () => {
     expect(response.status).toBe(404);
   });
 });
+
+describe("PluginHttpServer setup status endpoint", () => {
+  const start = async (registry: PluginRegistry) => {
+    const server = new PluginHttpServer(0, registry, silentLogger);
+    server.setRuntimeData({
+      orgId: "org-1",
+      manifest: { env: [] },
+      mcpRuntime: {} as never,
+      orgConfig: { shopDomain: "stored.example" },
+      orgAuth: null,
+    });
+    await server.start();
+    const address = (server as unknown as { server: { address(): AddressInfo } }).server.address();
+    return { server, baseUrl: `http://127.0.0.1:${address.port}` };
+  };
+  const post = (baseUrl: string, body: unknown) =>
+    fetch(`${baseUrl}/setup/status`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(body),
+    });
+
+  it("runs the status handler with the config and auth Core sent", async () => {
+    const registry = new PluginRegistry();
+    registry.registerConfig({ shopDomain: { type: "string" } });
+    registry.registerSetup({
+      steps: [{ id: "connect", kind: "connect" }],
+      status: ({ auth, config, org }) => ({
+        state: auth.get() ? "connected" : "needs_action",
+        account: `${org.id}:${String(config.get("shopDomain"))}`,
+        steps: { connect: { done: !!auth.get(), message: "x".repeat(300) }, bad: {} as never },
+      }),
+    });
+    const { server, baseUrl } = await start(registry);
+    try {
+      const response = await post(baseUrl, {
+        config: { shopDomain: "sent.example" },
+        authState: { methodId: "oauth", credentials: { accessToken: "t" } },
+      });
+      expect(response.status).toBe(200);
+      const body = await response.json();
+      expect(body.state).toBe("connected");
+      expect(body.account).toBe("org-1:sent.example");
+      expect(body.steps.connect.done).toBe(true);
+      expect(body.steps.connect.message).toHaveLength(200);
+      expect(body.steps.bad).toBeUndefined();
+    } finally {
+      await server.stop();
+    }
+  });
+
+  it("returns 500 for an invalid state and 404 without a handler", async () => {
+    const invalid = new PluginRegistry();
+    invalid.registerSetup({
+      steps: [{ id: "connect", kind: "connect" }],
+      status: () => ({ state: "great" }) as never,
+    });
+    const a = await start(invalid);
+    const none = new PluginRegistry();
+    none.registerSetup({ steps: [{ id: "connect", kind: "connect" }] });
+    const b = await start(none);
+    try {
+      expect((await post(a.baseUrl, {})).status).toBe(500);
+      expect((await post(b.baseUrl, {})).status).toBe(404);
+    } finally {
+      await a.server.stop();
+      await b.server.stop();
+    }
+  });
+});

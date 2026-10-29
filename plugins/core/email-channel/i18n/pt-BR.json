@@ -1,6 +1,6 @@
 {
   "name": "Caixa de e-mail",
-  "description": "Conecte sua caixa de suporte: encaminhe os e-mails de support@ para o Hay.chat e deixe a IA responder por e-mail, na mesma conversa. A IA também pode enviar e-mails para a sua equipe.",
+  "description": "Conecte sua caixa de suporte: encaminhe os e-mails de support{'@'} para o Hay.chat e deixe a IA responder por e-mail, na mesma conversa. A IA também pode enviar e-mails para a sua equipe.",
   "tools": {
     "send-email": {
       "label": "Enviar e-mail para a equipe",
@@ -10,7 +10,7 @@
   "config": {
     "supportAddress": {
       "label": "Seu endereço de suporte",
-      "description": "O endereço para onde seus clientes já escrevem, por exemplo suporte@sualoja.com. Você vai encaminhar essa caixa para o endereço do Hay.chat mostrado abaixo."
+      "description": "O endereço para onde seus clientes já escrevem, por exemplo suporte{'@'}sualoja.com. Você vai encaminhar essa caixa para o endereço do Hay.chat mostrado abaixo."
     },
     "storeName": {
       "label": "Nome do remetente",

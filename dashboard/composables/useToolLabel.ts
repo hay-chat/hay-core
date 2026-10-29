@@ -48,6 +48,35 @@ export function useToolLabel() {
     return fallback || "";
   }
 
+  function getConfigPlaceholder(pluginId: string, fieldKey: string, fallback?: string): string {
+    const key = `plugins.${pluginId}.config.${fieldKey}.placeholder`;
+    if (te(key)) return t(key);
+    return fallback || "";
+  }
+
+  function getConfigOptionLabel(
+    pluginId: string,
+    fieldKey: string,
+    value: string | number,
+    fallback?: string,
+  ): string {
+    const key = `plugins.${pluginId}.config.${fieldKey}.options.${value}`;
+    if (te(key)) return t(key);
+    return fallback || String(value);
+  }
+
+  /** Setup step copy: `plugins.<id>.setupSteps.<stepId>.title|description`. */
+  function getSetupStepText(
+    pluginId: string,
+    stepId: string,
+    part: "title" | "description",
+    fallback?: string,
+  ): string {
+    const key = `plugins.${pluginId}.setupSteps.${stepId}.${part}`;
+    if (te(key)) return t(key);
+    return fallback || "";
+  }
+
   return {
     getToolLabel,
     getToolDescription,
@@ -55,5 +84,8 @@ export function useToolLabel() {
     getPluginDescription,
     getConfigLabel,
     getConfigDescription,
+    getConfigPlaceholder,
+    getConfigOptionLabel,
+    getSetupStepText,
   };
 }

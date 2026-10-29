@@ -1,10 +1,12 @@
 <template>
   <div class="space-y-4">
-    <div class="flex items-center justify-between">
+    <div v-if="!hideHeader" class="flex items-center justify-between">
       <div class="space-y-1">
-        <h3 class="text-lg font-medium">Connect with OAuth</h3>
+        <h3 class="text-lg font-medium">
+          {{ t("pluginSettings.oauth.title", { name: pluginName }) }}
+        </h3>
         <p class="text-sm text-muted-foreground">
-          {{ description || `Securely connect your ${pluginName} account using OAuth` }}
+          {{ description || t("pluginSettings.oauth.description", { name: pluginName }) }}
         </p>
       </div>
     </div>
@@ -21,7 +23,7 @@
             : 'bg-green-50 border-green-200 dark:bg-green-950/20 dark:border-green-800'
       "
     >
-      <div class="flex items-start justify-between">
+      <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div class="flex items-center space-x-3">
           <div
             v-if="oauthStatus.connected && oauthStatus.expired"
@@ -54,40 +56,43 @@
             <p class="font-medium">
               {{
                 !oauthStatus.connected
-                  ? "Not connected"
+                  ? t("pluginSettings.oauth.notConnected")
                   : oauthStatus.expired
-                    ? "Connection expired"
+                    ? t("pluginSettings.oauth.expired")
                     : oauthStatus.account
-                      ? `Connected as ${oauthStatus.account.label}`
-                      : "Connected via OAuth"
+                      ? t("pluginSettings.oauth.connectedAs", {
+                          account: oauthStatus.account.label,
+                        })
+                      : t("pluginSettings.oauth.connected")
               }}
             </p>
             <p
               v-if="oauthStatus.connected && oauthStatus.connectedAt"
               class="text-xs text-muted-foreground"
             >
-              Connected {{ formatDate(oauthStatus.connectedAt) }}
+              {{ t("pluginSettings.oauth.connectedAt", { date: formatDate(oauthStatus.connectedAt) }) }}
             </p>
             <p
               v-if="oauthStatus.connected && oauthStatus.expired"
               class="text-xs text-amber-700 dark:text-amber-400"
             >
-              Token expired{{
-                oauthStatus.expiresAt ? ` ${formatDate(oauthStatus.expiresAt)}` : ""
+              {{
+                oauthStatus.expiresAt
+                  ? t("pluginSettings.oauth.expiredAt", { date: formatDate(oauthStatus.expiresAt) })
+                  : t("pluginSettings.oauth.expiredHint")
               }}
-              — reconnect to keep this channel active
             </p>
             <p
               v-else-if="oauthStatus.connected && oauthStatus.expiresAt"
               class="text-xs text-muted-foreground"
             >
-              Token expires {{ formatDate(oauthStatus.expiresAt) }}
+              {{ t("pluginSettings.oauth.expiresAt", { date: formatDate(oauthStatus.expiresAt) }) }}
             </p>
           </div>
         </div>
 
         <!-- Action Buttons -->
-        <div class="flex items-center space-x-2">
+        <div class="flex flex-wrap items-center gap-2">
           <Button
             v-if="!oauthStatus.connected && !isClientFlow"
             @click="handleConnect"
@@ -95,7 +100,7 @@
             :loading="connecting"
             size="sm"
           >
-            Connect to {{ pluginName }}
+            {{ t("pluginSettings.oauth.connect", { name: pluginName }) }}
           </Button>
           <Button
             v-if="oauthStatus.connected && oauthStatus.expired && !isClientFlow"
@@ -104,7 +109,7 @@
             :loading="connecting"
             size="sm"
           >
-            Reconnect
+            {{ t("pluginSettings.oauth.reconnect") }}
           </Button>
           <Button
             v-if="oauthStatus.connected"
@@ -114,7 +119,7 @@
             :disabled="disconnecting"
             :loading="disconnecting"
           >
-            Disconnect
+            {{ t("pluginSettings.oauth.disconnect") }}
           </Button>
         </div>
       </div>
@@ -161,6 +166,8 @@ interface Props {
   infoText?: string;
   oauthAvailable?: boolean; // Passed from parent
   oauthConfigured?: boolean; // Passed from parent
+  /** The setup checklist shows the title itself. */
+  hideHeader?: boolean;
 }
 
 const props = defineProps<Props>();
@@ -195,7 +202,7 @@ const fetchOAuthStatus = async () => {
     oauthStatus.value = status;
   } catch (error) {
     console.error("Failed to fetch OAuth status:", error);
-    oauthStatus.value = { connected: false, error: "Failed to check connection status" };
+    oauthStatus.value = { connected: false, error: t("pluginSettings.oauth.statusFailed") };
   }
 };
 

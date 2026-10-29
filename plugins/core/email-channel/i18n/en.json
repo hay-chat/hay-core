@@ -1,6 +1,6 @@
 {
   "name": "Email inbox",
-  "description": "Connect your support inbox: forward support@ emails to Hay.chat and let the AI reply by email, threaded like a normal conversation. The AI can also email your team.",
+  "description": "Connect your support inbox: forward support{'@'} emails to Hay.chat and let the AI reply by email, threaded like a normal conversation. The AI can also email your team.",
   "tools": {
     "send-email": {
       "label": "Send email to your team",
@@ -10,7 +10,7 @@
   "config": {
     "supportAddress": {
       "label": "Your support address",
-      "description": "The address your customers already write to, e.g. support@yourstore.com. You will forward this mailbox to the Hay.chat address shown below."
+      "description": "The address your customers already write to, e.g. support{'@'}yourstore.com. You will forward this mailbox to the Hay.chat address shown below."
     },
     "storeName": {
       "label": "Sender name",

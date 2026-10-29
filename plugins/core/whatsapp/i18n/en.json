@@ -6,6 +6,44 @@
     "handoffTemplateName": {
       "label": "Hand-off template",
       "description": "Approved template sent when the AI hands a conversation to your team after the 24-hour window has closed"
+    },
+    "connectionMode": {
+      "label": "Connection method",
+      "description": "Embedded Signup connects your number in a Meta popup. Manual uses a permanent token from your own Meta app.",
+      "options": {
+        "embedded-signup": "Embedded Signup (recommended)",
+        "manual": "Manual token (own Meta app)"
+      }
+    },
+    "clientId": {
+      "label": "Meta app ID",
+      "description": "Set up for you by Hay.chat. Change it only if you run your own Hay.chat server with your own app."
+    },
+    "clientSecret": {
+      "label": "Meta app secret",
+      "description": "Set up for you by Hay.chat. Change it only if you run your own Hay.chat server with your own app."
+    },
+    "esConfigId": {
+      "label": "Embedded Signup configuration ID",
+      "description": "Set up for you by Hay.chat. Change it only if you run your own Hay.chat server with your own app."
+    },
+    "manualAccessToken": {
+      "label": "Permanent access token",
+      "description": "System-user token with whatsapp_business_messaging and whatsapp_business_management."
+    },
+    "manualPhoneNumberId": {
+      "label": "Phone number ID"
+    },
+    "manualWabaId": {
+      "label": "WhatsApp Business Account ID"
+    },
+    "manualAppSecret": {
+      "label": "App secret",
+      "description": "Your Meta app's secret, used to verify webhook signatures."
+    },
+    "manualVerifyToken": {
+      "label": "Webhook verify token",
+      "description": "Any text; enter the same value in your Meta app's webhook settings."
     }
   },
   "ui": {

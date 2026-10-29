@@ -72,6 +72,8 @@ export interface PluginMetadata {
   webhookRouting?: WebhookRoutingDescriptor;
   /** Plugin-declared webchat contributions and gates (from register.webchat). */
   webchat?: WebchatMetadata;
+  /** Plugin-declared setup checklist (from register.setup). */
+  setup?: SetupMetadata;
 }
 
 // ============================================================================
@@ -99,6 +101,26 @@ export interface WebchatGateDescriptor {
 export interface WebchatMetadata {
   contributions: WebchatContributionDescriptor[];
   gates: WebchatGateDescriptor[];
+}
+
+// ============================================================================
+// Setup checklist + status contract (register.setup, POST /setup/status)
+// ============================================================================
+
+export type SetupStepKind = "fields" | "connect" | "component" | "external" | "verify";
+
+export interface SetupStepDescriptor {
+  id: string;
+  kind: SetupStepKind;
+  optional?: boolean;
+  fields?: string[];
+  component?: string;
+  url?: string;
+}
+
+export interface SetupMetadata {
+  steps: SetupStepDescriptor[];
+  hasStatus: boolean;
 }
 
 // ============================================================================
@@ -246,6 +268,17 @@ export interface ConfigFieldDescriptor {
   serverOnly?: boolean;
   default?: unknown;
   env?: string; // Environment variable fallback
+  /** Technical field: shown on the Advanced tab instead of Setup (D20). */
+  advanced?: boolean;
+  /** Select choices (the UI renders a dropdown). */
+  options?: Array<{ label: string; value: string | number }>;
+  /** Show the field only when another field matches. */
+  showWhen?: {
+    field: string;
+    equals?: string | number | boolean;
+    in?: Array<string | number | boolean>;
+    notEquals?: string | number | boolean;
+  };
   validation?: {
     min?: number;
     max?: number;

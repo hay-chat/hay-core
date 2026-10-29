@@ -131,6 +131,30 @@
     "returnInstructions": {
       "label": "How to return",
       "description": "Your return process, in your words: where to send items, any link or form, and deadlines. Hay.chat relays it as written when a customer asks how to return something. Leave empty and Hay.chat hands those questions to your team."
+    },
+    "authMode": {
+      "label": "Connection mode",
+      "description": "Managed: connect in one click through Hay.chat's Shopify app. Self-hosted: use your own Shopify app's client ID and secret.",
+      "options": {
+        "oauth": "Managed (recommended)",
+        "self_hosted": "Self-hosted (own app)"
+      }
+    },
+    "shopDomain": {
+      "label": "Store domain",
+      "description": "Your myshopify.com domain, e.g. mystore.myshopify.com (without https://)."
+    },
+    "clientId": {
+      "label": "Client ID",
+      "description": "Self-hosted mode only: your Shopify app's client ID."
+    },
+    "clientSecret": {
+      "label": "Client secret",
+      "description": "Self-hosted mode only: your Shopify app's client secret."
+    },
+    "apiVersion": {
+      "label": "Admin API version",
+      "description": "Shopify Admin API version Hay.chat uses."
     }
   }
 }

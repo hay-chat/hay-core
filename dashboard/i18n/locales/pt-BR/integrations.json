@@ -54,18 +54,17 @@
       "playbook": "Playbook"
     },
     "actions": {
-      "install": "Instalar",
-      "installing": "Instalando...",
       "configure": "Configurar",
       "remove": "Remover",
       "removing": "Removendo...",
       "delete": "Excluir",
-      "deleting": "Excluindo..."
+      "deleting": "Excluindo...",
+      "connect": "Conectar",
+      "connecting": "Conectando…"
     },
     "custom": "Personalizado",
     "confirmDelete": "Tem certeza de que deseja excluir esta integração? Esta ação não pode ser desfeita.",
     "toast": {
-      "enabledSuccess": "Integração {name} ativada com sucesso",
       "disabledSuccess": "Integração {name} desativada com sucesso",
       "deletedSuccess": "Integração excluída com sucesso",
       "enableFailed": "Falha ao ativar integração",
@@ -177,43 +176,57 @@
     "backToMarketplace": "Voltar ao Marketplace",
     "headTitle": "Configurações da Integração - Hay.chat",
     "headTitleWithName": "Configurações de {name} - Hay.chat",
-    "restartWorker": "Reiniciar Worker",
+    "restartWorker": "Reiniciar",
     "restarting": "Reiniciando...",
-    "disablePlugin": "Desativar Integração",
-    "disabling": "Desativando...",
-    "enablePlugin": "Ativar Integração",
+    "disablePlugin": "Desconectar e remover",
     "disableConfirm": {
-      "title": "Desativar Integração?",
-      "description": "Tem certeza de que deseja desativar {name}? Isso impedirá o uso da integração na sua organização.",
-      "confirm": "Desativar"
+      "title": "Desconectar e remover?",
+      "description": "{name} deixa de funcionar no seu workspace. As configurações ficam guardadas caso você conecte de novo.",
+      "confirm": "Desconectar"
     },
     "error": {
       "loadFailed": "Falha ao carregar integração",
       "returnToMarketplace": "Voltar ao Marketplace"
     },
     "connection": {
-      "testing": "Testando Conexão",
-      "connected": "Conectado",
-      "failed": "Conexão Falhou",
-      "needsAuth": "Necessita Autenticação",
-      "configureCredentials": "Por favor, configure suas credenciais",
       "connectionFailed": "Conexão falhou",
-      "tryAgain": "Tentar Novamente",
       "oauthUnavailableTitle": "A conexão ainda não está disponível",
       "oauthUnavailable": "Não é possível conectar {name} até que o app OAuth esteja configurado neste servidor do Hay.chat. Um administrador precisa adicionar o client ID e o secret desta integração."
     },
-    "about": "Sobre",
     "capabilities": {
       "title": "Capacidades",
       "description": "O que esta integração pode fazer",
-      "chatConnector": "Conector de Chat",
-      "sendMessages": "Enviar mensagens",
-      "receiveMessages": "Receber mensagens",
-      "listConversations": "Listar conversas",
-      "mcpConnector": "Conector MCP",
-      "mcpDescription": "Fornece ferramentas e recursos de IA através do Model Context Protocol",
-      "documentImporter": "Importador de Documentos",
-      "documentImporterDescription": "Importar e processar documentos de fontes externas"
+      "items": {
+        "messages": {
+          "title": "Conversas com clientes",
+          "description": "Recebe as mensagens dos seus clientes e envia as respostas do Hay.chat."
+        },
+        "customers": {
+          "title": "Perfis de clientes",
+          "description": "Vincula cada conversa ao cliente que a iniciou."
+        },
+        "mcp": {
+          "title": "Ações para o seu agente de IA",
+          "description": "Permite que o agente consulte informações e aja pelos seus clientes, como verificar um pedido."
+        },
+        "products": {
+          "title": "Catálogo de produtos",
+          "description": "Mantém seus produtos sincronizados para que o agente responda perguntas sobre eles."
+        },
+        "disputes": {
+          "title": "Provas para chargeback",
+          "description": "Reúne o histórico do pedido e da conversa de que você precisa para responder a um chargeback."
+        },
+        "documents": {
+          "title": "Importação de conhecimento",
+          "description": "Importa páginas e documentos para a sua base de conhecimento."
+        },
+        "webchat": {
+          "title": "Chat do site",
+          "description": "Funciona no widget de chat do seu site."
+        }
+      },
+      "empty": "Esta integração funciona em segundo plano e não adiciona ações próprias."
     },
     "availableActions": {
       "title": "Ações Disponíveis",
@@ -224,36 +237,33 @@
         "read": "Leitura",
         "write": "Escrita",
         "destructive": "Destrutiva"
-      }
-    },
-    "configuration": {
-      "title": "Configuração",
-      "description": "Configure as definições de {name}"
+      },
+      "parameters": "Parâmetros"
     },
     "connectionTest": {
-      "title": "Teste de Conexão",
-      "description": "Teste a conexão de {name}",
-      "testConnection": "Testar Conexão",
-      "testing": "Testando...",
+      "title": "Verifique a conexão",
+      "description": "Confirme que o Hay.chat consegue acessar {name} com esses dados.",
+      "testConnection": "Testar conexão",
       "success": "Conexão bem-sucedida!",
       "configRequired": "Configuração necessária",
-      "failed": "Conexão falhou",
-      "checkConfig": "Por favor, verifique sua configuração e tente novamente."
+      "failed": "Conexão falhou"
     },
     "tabs": {
-      "settings": "Configurações"
+      "label": "Seções da integração",
+      "setup": "Configuração",
+      "capabilities": "O que ela faz",
+      "advanced": "Avançado"
     },
     "toast": {
       "configSaved": "Configuração salva com sucesso",
       "configSaveFailed": "Falha ao salvar configuração",
-      "enabledSuccess": "Integração ativada com sucesso",
       "enableFailed": "Falha ao ativar integração",
       "disabledSuccess": "Integração desativada com sucesso",
       "disableFailed": "Falha ao desativar integração",
       "restartedSuccess": "Worker da integração reiniciado com sucesso",
       "restartFailed": "Falha ao reiniciar integração",
-      "resetToEnv": "Redefinido para variável de ambiente",
-      "resetToEnvFailed": "Falha ao redefinir para variável de ambiente",
+      "resetToEnv": "De volta ao valor gerenciado",
+      "resetToEnvFailed": "Não foi possível voltar ao valor gerenciado",
       "oauthSuccess": "Conexão OAuth estabelecida com sucesso",
       "oauthFailed": "Conexão OAuth falhou. Por favor, tente novamente.",
       "connectionEstablished": "Conexão estabelecida com sucesso",
@@ -272,6 +282,70 @@
         "quality_drop": "O provedor reduziu a classificação de qualidade deste canal ({detail}). Os limites de mensagens podem cair se ela continuar baixando."
       },
       "alerted": "Proprietários e administradores foram avisados por e-mail e push."
+    },
+    "advanced": {
+      "title": "Configurações avançadas",
+      "description": "Valores técnicos que a maioria dos workspaces nunca altera. Os marcados como Gerenciado pelo Hay.chat já vêm configurados.",
+      "readOnlyDescription": "O Hay.chat define estes valores para você. Eles aparecem aqui só para consulta."
+    },
+    "form": {
+      "managedValue": "Definido pelo Hay.chat",
+      "override": "Substituir",
+      "managedHint": "O Hay.chat define este valor para você. Substitua apenas se quiser usar um valor próprio neste workspace.",
+      "overridingHint": "Você está substituindo o valor definido pelo Hay.chat. Cancele para voltar a ele.",
+      "cancelOverride": "Cancelar substituição",
+      "encryptedValue": "Salvo e oculto",
+      "edit": "Editar",
+      "cancelEdit": "Cancelar edição",
+      "resetToManaged": "Voltar ao valor gerenciado",
+      "encryptedHint": "Armazenado com criptografia. Edite para trocar.",
+      "encryptedResetHint": "Armazenado com criptografia. Voltar retorna ao valor definido pelo Hay.chat.",
+      "overrideResetHint": "Você substituiu o valor definido pelo Hay.chat. Voltar retorna a ele.",
+      "willEncrypt": "Armazenado com criptografia.",
+      "selectPlaceholder": "Escolha uma opção",
+      "discard": "Descartar alterações",
+      "save": "Salvar",
+      "managedReadOnlyHint": "O Hay.chat define este valor para você.",
+      "badgeManaged": "Gerenciado pelo Hay.chat",
+      "badgeSetByYou": "Definido por você"
+    },
+    "oauth": {
+      "title": "Conecte sua conta {name}",
+      "description": "Entre no {name} para dar acesso ao Hay.chat. Você pode desconectar quando quiser.",
+      "notConnected": "Não conectado",
+      "expired": "Conexão expirada",
+      "connectedAs": "Conectado como {account}",
+      "connected": "Conectado",
+      "connectedAt": "Conectado {date}",
+      "expiredAt": "Expirou {date}. Reconecte para continuar funcionando.",
+      "expiredHint": "Reconecte para continuar funcionando.",
+      "expiresAt": "O acesso expira {date}",
+      "connect": "Conectar {name}",
+      "reconnect": "Reconectar",
+      "disconnect": "Desconectar",
+      "statusFailed": "Não foi possível verificar a conexão. Atualize a página para tentar de novo."
+    },
+    "status": {
+      "not_set_up": "Não configurado",
+      "needs_action": "Requer ação",
+      "connected": "Conectado",
+      "error": "Com problema"
+    },
+    "actions": {
+      "connect": "Conectar",
+      "finishSetup": "Concluir configuração",
+      "reviewSetup": "Revisar configuração",
+      "more": "Mais opções",
+      "advancedMode": "Modo avançado",
+      "version": "Versão {version}"
+    },
+    "setup": {
+      "fieldsTitle": "Seus dados",
+      "fieldsDescription": "O que o {name} precisa de você para conectar.",
+      "optional": "Opcional",
+      "stepDone": "Concluído",
+      "stepsLabel": "Etapas de configuração",
+      "openExternal": "Abrir em uma nova aba"
     }
   }
 }

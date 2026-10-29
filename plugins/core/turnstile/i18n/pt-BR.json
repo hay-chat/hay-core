@@ -4,7 +4,12 @@
   "config": {
     "mode": {
       "label": "Proteção",
-      "description": "Invisível verifica os visitantes em segundo plano e só pede um clique quando o Cloudflare não tem certeza. Desafiar todos mostra a verificação a todo visitante antes da primeira mensagem."
+      "description": "Invisível verifica os visitantes em segundo plano e só pede um clique quando o Cloudflare não tem certeza. Desafiar todos mostra a verificação a todo visitante antes da primeira mensagem.",
+      "options": {
+        "off": "Desligado",
+        "invisible": "Invisível (recomendado)",
+        "challenge_all": "Desafiar todos"
+      }
     },
     "siteKey": {
       "label": "Chave do site",

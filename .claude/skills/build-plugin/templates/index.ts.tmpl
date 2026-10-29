@@ -34,6 +34,15 @@ export default defineHayPlugin((globalCtx) => ({
       configField: "apiKey",
     });
 
+    // Optional: a custom Setup checklist. Without it core shows the fields, then Connect/Verify.
+    // Each step id needs setupSteps.<id>.title in i18n/en.json and i18n/pt-BR.json.
+    // ctx.register.setup({
+    //   steps: [
+    //     { id: "credentials", kind: "fields", fields: ["apiKey"] },
+    //     { id: "verify", kind: "verify" },
+    //   ],
+    // });
+
     globalCtx.logger.info("<Name> plugin: config + auth registered");
   },
 

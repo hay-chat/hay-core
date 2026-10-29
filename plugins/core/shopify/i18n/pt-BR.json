@@ -131,6 +131,30 @@
     "returnInstructions": {
       "label": "Como devolver",
       "description": "Seu processo de devolução, com suas palavras: para onde enviar, link ou formulário e prazos. O Hay.chat repassa o texto como está quando um cliente pergunta como devolver. Se ficar vazio, o Hay.chat encaminha essas perguntas para sua equipe."
+    },
+    "authMode": {
+      "label": "Modo de conexão",
+      "description": "Gerenciado: conecte com um clique pelo app do Hay.chat na Shopify. Auto-hospedado: use o client ID e o secret do seu próprio app da Shopify.",
+      "options": {
+        "oauth": "Gerenciado (recomendado)",
+        "self_hosted": "Auto-hospedado (app próprio)"
+      }
+    },
+    "shopDomain": {
+      "label": "Domínio da loja",
+      "description": "Seu domínio myshopify.com, por exemplo minhaloja.myshopify.com (sem https://)."
+    },
+    "clientId": {
+      "label": "Client ID",
+      "description": "Só no modo auto-hospedado: o client ID do seu app da Shopify."
+    },
+    "clientSecret": {
+      "label": "Client secret",
+      "description": "Só no modo auto-hospedado: o client secret do seu app da Shopify."
+    },
+    "apiVersion": {
+      "label": "Versão da Admin API",
+      "description": "Versão da Admin API da Shopify que o Hay.chat usa."
     }
   }
 }
