@@ -1,5 +1,6 @@
 <template>
   <Page :title="$t('general.title')" :description="$t('general.description')">
+    <SettingsTabs />
     <!-- Header -->
     <template #header>
       <div class="flex items-center space-x-2">
