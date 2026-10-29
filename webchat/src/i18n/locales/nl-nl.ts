@@ -47,4 +47,6 @@ export default {
   "error.verificationFailed": "We konden uw bericht niet verifiëren. Vernieuw de pagina en probeer het opnieuw.",
   "challenge.label": "Beveiligingscontrole",
   "challenge.prompt": "Een korte beveiligingscontrole voordat we uw bericht versturen.",
+  "csat.defaultQuestion": "Hoe zou je de ondersteuning van vandaag beoordelen?",
+  "csat.thankYou": "Bedankt voor je feedback!",
 } as const;

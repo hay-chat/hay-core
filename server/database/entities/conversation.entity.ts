@@ -123,6 +123,13 @@ export class Conversation {
   @Column({ type: "varchar", length: 255, nullable: true })
   spam_reason!: string | null;
 
+  // CSAT rating (1-5) submitted by the customer when the conversation ends.
+  @Column({ type: "smallint", nullable: true })
+  csat_rating!: number | null;
+
+  @Column({ type: "timestamptz", nullable: true })
+  csat_rated_at!: Date | null;
+
   @Column({ type: "timestamptz", nullable: true })
   lastMessageAt!: Date | null;
 

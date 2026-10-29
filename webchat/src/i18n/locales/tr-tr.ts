@@ -48,4 +48,6 @@ export default {
   "error.verificationFailed": "Mesajınızı doğrulayamadık. Lütfen sayfayı yenileyip tekrar deneyin.",
   "challenge.label": "Güvenlik kontrolü",
   "challenge.prompt": "Mesajınızı göndermeden önce kısa bir güvenlik kontrolü.",
+  "csat.defaultQuestion": "Bugün aldığınız desteği nasıl değerlendirirsiniz?",
+  "csat.thankYou": "Geri bildiriminiz için teşekkürler!",
 } as const;

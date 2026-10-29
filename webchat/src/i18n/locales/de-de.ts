@@ -51,4 +51,6 @@ export default {
   "error.verificationFailed": "Wir konnten Ihre Nachricht nicht verifizieren. Bitte laden Sie die Seite neu und versuchen Sie es erneut.",
   "challenge.label": "Sicherheitsprüfung",
   "challenge.prompt": "Eine kurze Sicherheitsprüfung, bevor wir Ihre Nachricht senden.",
+  "csat.defaultQuestion": "Wie würden Sie den heute erhaltenen Support bewerten?",
+  "csat.thankYou": "Vielen Dank für Ihr Feedback!",
 } as const;
