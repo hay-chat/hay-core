@@ -199,13 +199,13 @@ const COPY: Record<
     summaryLabel: "Resumen",
     emailButton: "Abrir la conversación",
     emailFooter:
-      "Recibes este correo porque estás como Disponible en Hay.chat. Cambia a Ausente para dejar de recibir estas alertas.",
+      "Recibes este correo porque tu estado en Hay.chat es Disponible. Cambia a Ausente para dejar de recibir estas alertas.",
     replyTitle: "Un cliente respondió",
     followupTitle: "Nuevo mensaje de un cliente que está esperando",
     unansweredTitle: "Un cliente está esperando tu respuesta",
     unansweredBody: (who, minutes) => `${who} lleva ${minutes} minutos esperando una respuesta.`,
     unansweredEmailMessage: (who, minutes) =>
-      `${who} escribió hace ${minutes} minutos en una conversación que tu equipo atendió, y nadie ha respondido todavía.`,
+      `${who} escribió hace ${minutes} minutos en una conversación que tu equipo tomó, y nadie ha respondido todavía.`,
   },
 };
 

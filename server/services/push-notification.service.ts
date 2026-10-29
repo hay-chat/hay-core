@@ -58,7 +58,7 @@ const DELIVERY_FAILED_COPY = {
   },
   es: {
     title: "No se pudo entregar una respuesta",
-    body: "Hay.chat lo intentó 3 veces y se rindió. Abre la conversación para dar seguimiento.",
+    body: "Hay.chat lo intentó 3 veces sin éxito. Abre la conversación para darle seguimiento.",
   },
 } as const;
 
