@@ -78,9 +78,7 @@ export default defineNuxtRouteMiddleware(
     }
 
     // Skip auth check if staying on the same page (e.g., opening modals)
-    // UNLESS we have URL tokens (for E2E testing)
-    const hasUrlTokens = to.query.accessToken && to.query.refreshToken && to.query.expiresIn;
-    if (to.path === from.path && !hasUrlTokens) {
+    if (to.path === from.path) {
       console.log("[Auth Middleware] Same page, skipping");
       return;
     }
@@ -88,12 +86,6 @@ export default defineNuxtRouteMiddleware(
     // Check if the page is marked as public via page metadata
     if (to.meta.public === true) {
       console.log("[Auth Middleware] Public page detected:", to.path);
-      return;
-    }
-
-    // Allow test pages without auth
-    if (to.path.startsWith("/test/")) {
-      console.log("[Auth Middleware] Test page detected:", to.path);
       return;
     }
 
@@ -105,70 +97,6 @@ export default defineNuxtRouteMiddleware(
 
     const authStore = useAuthStore();
     const userStore = useUserStore();
-
-    // URL Token Auth for E2E Testing (Development Only)
-    if (
-      process.client &&
-      process.env.NODE_ENV !== "production" &&
-      to.query.accessToken &&
-      to.query.refreshToken &&
-      to.query.expiresIn
-    ) {
-      console.log("[Auth Middleware] 🔐 URL token authentication detected (E2E testing mode)");
-
-      const accessToken = to.query.accessToken as string;
-      const refreshToken = to.query.refreshToken as string;
-      const expiresIn = parseInt(to.query.expiresIn as string, 10);
-
-      try {
-        await authStore.loginWithTokens({
-          accessToken,
-          refreshToken,
-          expiresIn,
-        });
-
-        console.log("[Auth Middleware] ✅ URL token validated successfully");
-        console.log(
-          "[Auth Middleware] ⚠️  Warning: URL token auth is for development/testing only!",
-        );
-
-        // Mark that we just did URL token auth to prevent AuthProvider from redirecting
-        if (process.client) {
-          sessionStorage.setItem("urlTokenAuthCompleted", "true");
-        }
-
-        // Clean URL by removing tokens and navigating with replace
-        const cleanQuery = { ...to.query };
-        delete cleanQuery.accessToken;
-        delete cleanQuery.refreshToken;
-        delete cleanQuery.expiresIn;
-
-        // Navigate to the same path with clean query params
-        return navigateTo({ path: to.path, query: cleanQuery }, { replace: true });
-      } catch (error) {
-        console.error("[Auth Middleware] ❌ URL token validation failed:", error);
-
-        // Clear invalid auth state
-        authStore.tokens = null;
-        authStore.isAuthenticated = false;
-
-        // Show error to user
-        if (process.client) {
-          const nuxtApp = useNuxtApp() as {
-            $toast?: { error: (msg: string) => void };
-            $i18n?: { t: (key: string) => string };
-          };
-          const message =
-            nuxtApp.$i18n?.t("auth.session.invalidToken") ??
-            "Invalid authentication token. Please login.";
-          if (nuxtApp.$toast) {
-            nuxtApp.$toast.error(message);
-          }
-        }
-
-        // Continue to normal login flow (don't return, let code below handle it)
-      }
-    }
 
     console.log("[Auth Middleware] Auth initialized:", authStore.isInitialized);
     console.log("[Auth Middleware] Authenticated:", authStore.isAuthenticated);

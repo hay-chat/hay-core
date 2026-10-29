@@ -54,16 +54,6 @@ const initializeAuth = async () => {
   }
 
   if (!authStore.isInitialized) {
-    // Check if URL token auth just completed - give it time to persist
-    const urlTokenAuthCompleted =
-      process.client && sessionStorage.getItem("urlTokenAuthCompleted") === "true";
-
-    if (urlTokenAuthCompleted) {
-      console.log("[AuthProvider] URL token auth completed, waiting for store to persist");
-      // Wait a bit longer for the store to persist after URL token auth
-      await new Promise((resolve) => setTimeout(resolve, 200));
-    }
-
     // Check if we have tokens before trying to initialize
     if (!authStore.tokens?.accessToken) {
       // No tokens, mark as initialized but not authenticated
@@ -71,8 +61,7 @@ const initializeAuth = async () => {
       authStore.isAuthenticated = false;
 
       // Only redirect to login if we're not already on a public page
-      // AND we didn't just complete URL token auth (race condition protection)
-      if (!isPublicPath.value && !urlTokenAuthCompleted) {
+      if (!isPublicPath.value) {
         await navigateTo("/login");
       }
       return;
