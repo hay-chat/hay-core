@@ -81,7 +81,7 @@ export default defineConfig({
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "src"),
-      "@hay/form-schema": path.resolve(__dirname, "../packages/form-schema/src/index.ts"),
+      "@hay/form-schema": path.resolve(__dirname, "../packages/form-schema/src/runtime.ts"),
     },
   },
   server: {
