@@ -10,6 +10,7 @@ produtos são feitos e os tamanhos. Se a resposta não estiver aqui nem no catá
 sabe e oferece passar para a equipe.
 
 ## Velas
+
 - **Cera:** 100 % cera de soja, sem parafina, feita à mão em pequenos lotes em São Paulo.
 - **Pavios:** de algodão, sem chumbo e sem zinco.
 - **Alergênicos:** a cera e os pavios da vela Aurora e do kit trio são livres de alergênicos. A
@@ -28,6 +29,7 @@ sabe e oferece passar para a equipe.
 - Cuidados: veja "Cuidados e segurança com velas".
 
 ## Cerâmica e vidro
+
 - **Esmalte:** todos os esmaltes são sem chumbo.
 - **Caneca de Grês:** 350 ml, 9 cm de altura × 8,5 cm (12 cm com a alça), nas cores Areia, Ardósia ou
   Sálvia. Também vendida em jogo de 4 (Areia, Ardósia, Sálvia e Argila).
@@ -47,6 +49,7 @@ sabe e oferece passar para a equipe.
 - Cuidados: veja "Cuidados com cerâmica, vasos e canecas".
 
 ## Linho, algodão e madeira
+
 - **Jogo de 4 Guardanapos de Linho:** linho europeu lavado, 45 × 45 cm. Natural, Terracota, Sálvia ou
   Grafite. Lavar a 40 °C, secadora em temperatura baixa, sem alvejante. Pode encolher até 3 % na
   primeira lavagem.
@@ -61,5 +64,6 @@ sabe e oferece passar para a equipe.
   óleo de vez em quando.
 
 ## Variação do feito à mão
+
 Cor, esmalte, veios da madeira e bolhas do vidro variam de peça para peça. As fotos mostram uma peça
 típica.

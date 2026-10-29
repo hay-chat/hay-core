@@ -6,12 +6,14 @@ approvalCategories: [cancel, refund]
 ---
 
 ## Confira o pedido
+
 1. Encontre o pedido com {{action:nuvemshop_get_order}} (número + e-mail; o e-mail precisa bater).
 2. Leia o **supportSummary**. Dá para cancelar até o envio (pedido aberto, sem rastreio nem etiqueta).
    - **Já enviado:** diga que não dá mais para cancelar. Ofereça a devolução depois de receber: direito de arrependimento de 7 dias a partir do recebimento, ou devolução em até 30 dias, sem uso e na embalagem original.
    - **Já cancelado:** diga isso e veja o reembolso com {{action:nuvemshop_check_refund_status}}.
 
 ## Cancele
+
 1. Peça a confirmação: "Posso cancelar o pedido #… e pedir o reembolso do valor total na forma de pagamento original?"
 2. Só depois de um sim claro, chame {{action:nuvemshop_cancel_order}}.
 3. Cancelar **não reembolsa**. Se o pedido estava pago, registre o reembolso com {{action:nuvemshop_request_refund}}: isso anota o pedido para a equipe, não devolve o dinheiro.
@@ -23,5 +25,6 @@ approvalCategories: [cancel, refund]
    - **Recusado pela loja:** explique (por exemplo, já tem etiqueta) e ofereça a devolução.
 
 ## Nunca
+
 - Nunca diga que o pedido foi cancelado ou que o dinheiro voltou antes de a ferramenta confirmar.
 - Não cancele para mudar endereço ou aroma: use "Alterar pedido antes do envio".

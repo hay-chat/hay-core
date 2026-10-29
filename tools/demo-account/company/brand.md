@@ -12,22 +12,22 @@ customer, address, phone number or card appears anywhere in this folder. Shopper
   than other goods.
 - **Founded:** 2021 in São Paulo by Marina Duarte. Sells in three markets, each on a different platform:
 
-| Store                   | Platform    | Market            | Currency | Languages      | Payments                          | Carriers            |
-| ----------------------- | ----------- | ----------------- | -------- | -------------- | --------------------------------- | ------------------- |
-| Casa Aurora (US)        | Shopify     | United States     | USD      | en             | card (Shopify Payments), PayPal   | USPS, UPS           |
-| Casa Aurora Europe      | WooCommerce | Portugal + EU     | EUR      | en, pt-PT      | card, bank transfer (BACS), MB WAY | CTT, DPD           |
-| Casa Aurora Brasil      | Nuvemshop   | Brazil            | BRL      | pt-BR          | Pix, boleto, card (Mercado Pago)  | Correios (PAC, SEDEX), Jadlog |
+| Store              | Platform    | Market        | Currency | Languages | Payments                           | Carriers                      |
+| ------------------ | ----------- | ------------- | -------- | --------- | ---------------------------------- | ----------------------------- |
+| Casa Aurora (US)   | Shopify     | United States | USD      | en        | card (Shopify Payments), PayPal    | USPS, UPS                     |
+| Casa Aurora Europe | WooCommerce | Portugal + EU | EUR      | en, pt-PT | card, bank transfer (BACS), MB WAY | CTT, DPD                      |
+| Casa Aurora Brasil | Nuvemshop   | Brazil        | BRL      | pt-BR     | Pix, boleto, card (Mercado Pago)   | Correios (PAC, SEDEX), Jadlog |
 
 The Brazilian store also sells on Mercado Livre and Shopee. Those orders are handled in the
 marketplace apps, not in Nuvemshop.
 
 ## Team
 
-| Name           | Role                    | Hay.chat role |
-| -------------- | ----------------------- | ------------- |
-| Marina Duarte  | Founder, approves money | Owner         |
-| Lucas Pereira  | Customer support        | Agent         |
-| Sofia Almeida  | Operations and shipping | Admin         |
+| Name          | Role                    | Hay.chat role |
+| ------------- | ----------------------- | ------------- |
+| Marina Duarte | Founder, approves money | Owner         |
+| Lucas Pereira | Customer support        | Agent         |
+| Sofia Almeida | Operations and shipping | Admin         |
 
 Business hours: Monday to Friday, 09:00–18:00 store local time (America/New_York for the US store,
 Europe/Lisbon for Europe, America/Sao_Paulo for Brasil). The AI answers 24/7. People answer in hours.

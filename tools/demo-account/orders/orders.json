@@ -6,7 +6,10 @@
       "platforms": ["shopify", "woocommerce", "nuvemshop"],
       "purpose": "Just placed and paid, not shipped: 'where is my order', cancel before shipping, add a note.",
       "customer": { "shopify": "us-emily", "woocommerce": "eu-joao", "nuvemshop": "br-camila" },
-      "lines": [{ "sku": "CA-CND-001-SAN", "quantity": 2 }, { "sku": "CA-NAP-001-NAT", "quantity": 1 }],
+      "lines": [
+        { "sku": "CA-CND-001-SAN", "quantity": 2 },
+        { "sku": "CA-NAP-001-NAT", "quantity": 1 }
+      ],
       "financialStatus": "paid",
       "fulfillmentStatus": "unfulfilled",
       "paymentMethod": { "shopify": "card", "woocommerce": "card", "nuvemshop": "card" },
@@ -29,7 +32,10 @@
       "platforms": ["shopify", "woocommerce", "nuvemshop"],
       "purpose": "Paid, not shipped: shopper wants a different candle scent (same price). Variant swap / order edit.",
       "customer": { "shopify": "us-priya", "woocommerce": "eu-lena", "nuvemshop": "br-juliana" },
-      "lines": [{ "sku": "CA-CND-001-FIG", "quantity": 1 }, { "sku": "CA-MUG-001-SND", "quantity": 2 }],
+      "lines": [
+        { "sku": "CA-CND-001-FIG", "quantity": 1 },
+        { "sku": "CA-MUG-001-SND", "quantity": 2 }
+      ],
       "financialStatus": "paid",
       "fulfillmentStatus": "unfulfilled",
       "paymentMethod": { "shopify": "card", "woocommerce": "card", "nuvemshop": "card" },
@@ -40,7 +46,10 @@
       "platforms": ["shopify", "woocommerce", "nuvemshop"],
       "purpose": "Shipped 2 days ago with tracking: WISMO, tracking link, expected delivery date.",
       "customer": { "shopify": "us-emily", "woocommerce": "eu-joao", "nuvemshop": "br-camila" },
-      "lines": [{ "sku": "CA-VAS-001-WHT", "quantity": 1 }, { "sku": "CA-CND-002-LAV", "quantity": 1 }],
+      "lines": [
+        { "sku": "CA-VAS-001-WHT", "quantity": 1 },
+        { "sku": "CA-CND-002-LAV", "quantity": 1 }
+      ],
       "financialStatus": "paid",
       "fulfillmentStatus": "in_transit",
       "paymentMethod": { "shopify": "card", "woocommerce": "card", "nuvemshop": "pix" },
@@ -66,7 +75,10 @@
       "platforms": ["shopify", "woocommerce", "nuvemshop"],
       "purpose": "Delivered 5 days ago, all fine: care questions, return inside the window, resend order email, review request.",
       "customer": { "shopify": "us-priya", "woocommerce": "eu-ines", "nuvemshop": "br-juliana" },
-      "lines": [{ "sku": "CA-MUG-002-SET", "quantity": 1 }, { "sku": "CA-NAP-002-SET", "quantity": 1 }],
+      "lines": [
+        { "sku": "CA-MUG-002-SET", "quantity": 1 },
+        { "sku": "CA-NAP-002-SET", "quantity": 1 }
+      ],
       "financialStatus": "paid",
       "fulfillmentStatus": "delivered",
       "paymentMethod": { "shopify": "card", "woocommerce": "card", "nuvemshop": "pix" },
@@ -132,7 +144,10 @@
       "platforms": ["shopify", "woocommerce", "nuvemshop"],
       "purpose": "Delivered; one item was refunded after a damage report: shopper asks why the refund is smaller than the order.",
       "customer": { "shopify": "us-daniel", "woocommerce": "eu-lena", "nuvemshop": "br-rafael" },
-      "lines": [{ "sku": "CA-CND-001-SAN", "quantity": 1 }, { "sku": "CA-POT-001-TER", "quantity": 1 }],
+      "lines": [
+        { "sku": "CA-CND-001-SAN", "quantity": 1 },
+        { "sku": "CA-POT-001-TER", "quantity": 1 }
+      ],
       "refundLines": [{ "sku": "CA-POT-001-TER", "quantity": 1 }],
       "financialStatus": "partially_refunded",
       "fulfillmentStatus": "delivered",
@@ -158,8 +173,16 @@
       "key": "high-value",
       "platforms": ["shopify", "woocommerce", "nuvemshop"],
       "purpose": "Large paid order above the approval threshold: refund or cancel must wait for Marina's approval.",
-      "customer": { "shopify": "us-olivia", "woocommerce": "eu-sophie", "nuvemshop": "br-fernanda" },
-      "lines": [{ "sku": "CA-POT-002-L", "quantity": 3 }, { "sku": "CA-VAS-001-WHT", "quantity": 2 }, { "sku": "CA-SRV-001-OAK", "quantity": 2 }],
+      "customer": {
+        "shopify": "us-olivia",
+        "woocommerce": "eu-sophie",
+        "nuvemshop": "br-fernanda"
+      },
+      "lines": [
+        { "sku": "CA-POT-002-L", "quantity": 3 },
+        { "sku": "CA-VAS-001-WHT", "quantity": 2 },
+        { "sku": "CA-SRV-001-OAK", "quantity": 2 }
+      ],
       "financialStatus": "paid",
       "fulfillmentStatus": "unfulfilled",
       "paymentMethod": { "shopify": "card", "woocommerce": "card", "nuvemshop": "card" },
@@ -169,7 +192,11 @@
       "key": "disputed-not-received",
       "platforms": ["shopify", "woocommerce", "nuvemshop"],
       "purpose": "Delivered per tracking 9 days ago, shopper claims it never arrived: honest answer, evidence pack, dispute prep.",
-      "customer": { "shopify": "us-olivia", "woocommerce": "eu-sophie", "nuvemshop": "br-fernanda" },
+      "customer": {
+        "shopify": "us-olivia",
+        "woocommerce": "eu-sophie",
+        "nuvemshop": "br-fernanda"
+      },
       "lines": [{ "sku": "CA-CND-003-SET", "quantity": 2 }],
       "financialStatus": "paid",
       "fulfillmentStatus": "delivered",

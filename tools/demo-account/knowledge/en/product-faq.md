@@ -10,6 +10,7 @@ made of and how big they are. If a question isn't answered here or in the catalo
 doesn't know and offers to pass it to the team.
 
 ## Candles
+
 - **Wax:** 100 % soy wax, paraffin-free, hand-poured in small batches in São Paulo, Brazil.
 - **Wicks:** cotton, free of lead and zinc.
 - **Allergens:** the wax and wicks of the Aurora candle and the gift set are allergen-free. The
@@ -26,6 +27,7 @@ doesn't know and offers to pass it to the team.
 - Care and safety: see "Candle care and safety".
 
 ## Ceramics and glass
+
 - **Glaze:** every glaze is lead-free.
 - **Stoneware Mug:** 350 ml, 9 cm tall × 8.5 cm wide (12 cm with the handle), in Sand, Slate or Sage.
   Also sold as a set of 4 (Sand, Slate, Sage and Clay).
@@ -43,6 +45,7 @@ doesn't know and offers to pass it to the team.
 - Care: see "Ceramic, pot and mug care".
 
 ## Linen, cotton and wood
+
 - **Linen Napkins (set of 4):** stonewashed European flax linen, 45 × 45 cm. Natural, Terracotta, Sage
   or Charcoal. Machine wash at 40 °C, tumble dry low, no bleach. May shrink up to 3 % on the first wash.
 - **Gingham Cotton Napkins (set of 6):** organic cotton, 40 × 40 cm, 3 terracotta and 3 sage. Machine
@@ -55,4 +58,5 @@ doesn't know and offers to pass it to the team.
 - **Olive Wood Salad Servers:** 30 cm, from pruning offcuts. Hand wash; oil occasionally.
 
 ## Handmade variation
+
 Colour, glaze, grain and glass bubbles vary from piece to piece. Photos show a typical piece.

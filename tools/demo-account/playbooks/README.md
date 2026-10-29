@@ -4,32 +4,33 @@ Step-by-step instructions the Casa Aurora AI agent follows in a given situation,
 store: `shopify/` (US, en), `woocommerce/` (Europe, en) and `nuvemshop/` (Brasil, pt-BR). Each
 playbook names the scenario IDs from `SCENARIOS.md` it covers in its description.
 
-| Situation | Shopify | WooCommerce | Nuvemshop |
-| --- | --- | --- | --- |
-| Where is my order, stale tracking, refund demand, confirmation email | 01 | 01 | 01 |
-| Cancel before shipping | 02 | 02 | 02 |
-| Address change / scent swap before shipping | 03 | 03 (swap → team) | 03 (swap → team) |
-| Damaged item, photos, refund or replacement | 04 | 04 | 04 (refund request only) |
-| Return / 7-day withdrawal (BR) | 05 | 05 | 05 |
-| Refund status | 06 | 06 | 06 |
-| Payment pending (link / bank transfer / Pix and boleto) | 07 | 07 | 07 |
-| Goodwill coupon within the 10 % cap | 08 | 08 | 08 |
-| Delivered but not received, missing item | 09 | 09 | 09 |
-| Product and care questions | 10 | 10 | 10 |
-| Wholesale (30+ units) | 11 | 11 | 11 |
-| Mercado Livre / Shopee orders | | | 12 |
+| Situation                                                            | Shopify | WooCommerce      | Nuvemshop                |
+| -------------------------------------------------------------------- | ------- | ---------------- | ------------------------ |
+| Where is my order, stale tracking, refund demand, confirmation email | 01      | 01               | 01                       |
+| Cancel before shipping                                               | 02      | 02               | 02                       |
+| Address change / scent swap before shipping                          | 03      | 03 (swap → team) | 03 (swap → team)         |
+| Damaged item, photos, refund or replacement                          | 04      | 04               | 04 (refund request only) |
+| Return / 7-day withdrawal (BR)                                       | 05      | 05               | 05                       |
+| Refund status                                                        | 06      | 06               | 06                       |
+| Payment pending (link / bank transfer / Pix and boleto)              | 07      | 07               | 07                       |
+| Goodwill coupon within the 10 % cap                                  | 08      | 08               | 08                       |
+| Delivered but not received, missing item                             | 09      | 09               | 09                       |
+| Product and care questions                                           | 10      | 10               | 10                       |
+| Wholesale (30+ units)                                                | 11      | 11               | 11                       |
+| Mercado Livre / Shopee orders                                        |         |                  | 12                       |
 
 ## File format
 
 ```markdown
 ---
-title: Cancel an order before it ships        # idempotency key in Hay.chat
+title: Cancel an order before it ships # idempotency key in Hay.chat
 trigger: The shopper wants to cancel an order # one line, max 255 characters
 description: What it does. Scenarios CHG-01, CHG-04.
-approvalCategories: [cancel, refund]          # optional, tighten-only (server APPROVAL_CATEGORIES)
+approvalCategories: [cancel, refund] # optional, tighten-only (server APPROVAL_CATEGORIES)
 ---
 
 ## Check the order
+
 1. Find the order with {{action:shopify_get_order_by_name}} ...
 ```
 
