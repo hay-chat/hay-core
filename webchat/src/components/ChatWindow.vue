@@ -126,12 +126,23 @@
       </div>
     </div>
 
+    <!-- Pre-chat form: shown before the conversation is created when configured -->
+    <div v-if="pendingPreChatForm && preChatFormSchema" class="hay-chat-pre-chat">
+      <PreChatForm
+        :schema="preChatFormSchema"
+        :context="context"
+        @submit="$emit('submitPreChatForm', $event)"
+      />
+    </div>
+
     <!-- Messages -->
     <MessageList
+      v-else
       :messages="messages"
       :is-typing="isTyping"
       :greeting-message="showGreeting && messages.length === 0 ? greetingMessage : undefined"
       :ai-label="aiLabel"
+      @submit-form="(messageId, response) => $emit('submitInConversationForm', messageId, response)"
     />
 
     <WaitingBanner
@@ -148,7 +159,7 @@
     />
 
     <!-- Closed Conversation Footer (replaces input when closed) -->
-    <div v-if="isConversationClosed" class="hay-chat-closed-footer">
+    <div v-if="isConversationClosed && !pendingPreChatForm" class="hay-chat-closed-footer">
       <CsatRating
         v-if="csatEnabled"
         :question="csatQuestion"
@@ -163,9 +174,9 @@
       </button>
     </div>
 
-    <!-- Input (hidden when conversation is closed) -->
+    <!-- Input (hidden when conversation is closed or while pre-chat form is pending) -->
     <MessageInput
-      v-else
+      v-else-if="!pendingPreChatForm"
       :is-ready="isReady"
       :failure="sendFailure"
       @send="$emit('send', $event)"
@@ -208,7 +219,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, defineAsyncComponent } from "vue";
 import MessageList from "./MessageList.vue";
 import MessageInput from "./MessageInput.vue";
 import WaitingBanner from "./WaitingBanner.vue";
@@ -216,6 +227,10 @@ import ChallengeFrame from "./ChallengeFrame.vue";
 import CsatRating from "./CsatRating.vue";
 import { useI18n } from "@/i18n";
 import type { Message, SendFailure } from "@/types";
+import type { FormResponse, FormSchema } from "@hay/form-schema";
+
+// Loaded on demand: most organizations never ask for a pre-chat form.
+const PreChatForm = defineAsyncComponent(() => import("./PreChatForm.vue"));
 
 const t = useI18n();
 
@@ -252,6 +267,9 @@ const props = defineProps<{
   setChallengeHost?: (el: HTMLElement | null) => void;
   /** The security check needs the shopper to interact. */
   challengeInteractive?: boolean;
+  pendingPreChatForm?: boolean;
+  preChatFormSchema?: FormSchema | null;
+  context?: Record<string, unknown>;
 }>();
 
 defineEmits<{
@@ -262,6 +280,8 @@ defineEmits<{
   stopTyping: [];
   startNewConversation: [];
   toggleExpand: [];
+  submitPreChatForm: [response: FormResponse];
+  submitInConversationForm: [messageId: string, response: FormResponse];
 }>();
 
 const isShowingTitle = computed(() => {

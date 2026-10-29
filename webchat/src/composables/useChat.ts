@@ -24,9 +24,14 @@ import {
   readFileAsBase64,
 } from "@/utils/attachments";
 
+import type { FormResponse, FormSchema } from "@hay/form-schema";
+import { findMissingRequiredFields } from "@hay/form-schema";
+
 export interface UseChatOptions {
   /** The org's challenge@1 contribution, when a bot check is on. */
   challenge?: WidgetContribution | null;
+  /** The org's pre-chat form, asked before the first message when set. */
+  preChatForm?: FormSchema | null;
 }
 
 interface Keypair {
@@ -67,6 +72,18 @@ export function useChat(config: HayChatConfig, options: UseChatOptions = {}) {
   // Server status of the conversation ("pending-human" while it waits for a person).
   const conversationStatus = ref<string | null>(null);
   const contactEmailSaved = ref(false);
+
+  // Pre-chat form (from the public config): shown instead of the input until
+  // the shopper fills it, unless the host context already carries every
+  // required field. The response rides along with conversation creation.
+  const preChatFormSchema = ref<FormSchema | null>(options.preChatForm ?? null);
+  const preChatFormResponse = ref<FormResponse | null>(null);
+  const pendingPreChatForm = computed(() => {
+    if (!preChatFormSchema.value) return false;
+    if (preChatFormResponse.value) return false;
+    if (conversationId.value) return false;
+    return findMissingRequiredFields(preChatFormSchema.value, getContext()).length > 0;
+  });
 
   // Populated inside initialize() via safeStorage — see comment above.
   const existingConversationId = ref<string | null>(null);
@@ -208,12 +225,19 @@ export function useChat(config: HayChatConfig, options: UseChatOptions = {}) {
         ? await challenge.run(options.challenge)
         : undefined;
 
+      // The pre-chat form answers, when the shopper filled one.
+      const preChatPayload =
+        preChatFormSchema.value && preChatFormResponse.value
+          ? { schema: preChatFormSchema.value, response: preChatFormResponse.value }
+          : undefined;
+
       // Create conversation via HTTP, passing current context and the signed customer id
       const conversationData = await conversation.createConversation(
         newKeypair.publicJwk,
         getContext(),
         { externalId: config.customerExternalId, signature: config.customerExternalIdSignature },
         challengeResult,
+        preChatPayload,
       );
       if (!conversationData) {
         throw new Error("Failed to create conversation");
@@ -1197,6 +1221,39 @@ export function useChat(config: HayChatConfig, options: UseChatOptions = {}) {
     }
   };
 
+  // The shopper filled the pre-chat form: keep the answers and open the
+  // conversation now, so the answers reach the team before the first message.
+  const submitPreChatForm = async (response: FormResponse): Promise<boolean> => {
+    preChatFormResponse.value = response;
+    if (!(await ensureConversation())) {
+      preChatFormResponse.value = null;
+      return false;
+    }
+    return true;
+  };
+
+  // Submit a response to an in-conversation FORM message (ASK_FORM step).
+  // The request code loads on demand: few conversations carry a form.
+  const submitInConversationForm = async (
+    messageId: string,
+    response: FormResponse,
+  ): Promise<boolean> => {
+    if (!keypair.value || !conversationId.value) {
+      console.error("[Webchat] Cannot submit form: missing keypair or conversation");
+      return false;
+    }
+    const { submitFormMessage } = await import("./formSubmit");
+    return submitFormMessage({
+      config,
+      conversationId: conversationId.value,
+      keypair: keypair.value,
+      nonce,
+      messages: messages.value,
+      messageId,
+      response,
+    });
+  };
+
   // Rate the support once the conversation has ended (CSAT).
   const submitCsat = async (rating: number, retried = false): Promise<boolean> => {
     if (!conversationId.value || !keypair.value) return false;
@@ -1254,6 +1311,8 @@ export function useChat(config: HayChatConfig, options: UseChatOptions = {}) {
     currentAgentName,
     conversationStatus,
     contactEmailSaved,
+    pendingPreChatForm,
+    preChatFormSchema,
 
     // Actions
     initialize,
@@ -1270,6 +1329,8 @@ export function useChat(config: HayChatConfig, options: UseChatOptions = {}) {
     checkMessageForClosure,
     startNewConversation,
     saveContactEmail,
+    submitPreChatForm,
+    submitInConversationForm,
   };
 }
 

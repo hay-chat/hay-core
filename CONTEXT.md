@@ -1,15 +1,15 @@
 # Context
 
-**Current Task**: WebMCP page tools (Lane B of PR #72) on branch `claude/modest-cray-0i6zh0`: host pages register tools the AI runs in the visitor's browser; Hay's dashboard registers its own tools as the demo. Plan + results: `tasks/webmcp-page-tools.md`; integrator guide: `webchat/PAGE_TOOLS.md`.
+**Current Task**: Pre-chat forms / form messages (hay-chat/hay-core#61) rebased onto master on `claude/happy-gates-f9a54x`; CI green on hay-chat/hay-core#115 (draft); waiting on review.
 
 **Key Decisions**:
 
-- Tools are namespaced `page:<name>`, exempt from `enabled_tools`, no merchant approval gate (visitor's own browser, no provider, no secrets); every call still logged.
-- WebMCP-shaped API (`navigator.modelContext` shim/tee + `window.HayChat.registerTool`), MCP-shaped results.
-- Kill switch `WEBCHAT_PAGE_TOOLS=false`; the chat chunk sits at 47.2 KB of its 48 KB brotli budget.
+- `@hay/form-schema` is a root workspace package: the server uses its CommonJS build (built on install via `prepare`), dashboard and webchat alias straight to `packages/form-schema/src`.
+- `validateResponse` is plain TypeScript (no zod) so the widget stays inside its 48 KB brotli budget; the form components and the submit request load lazily; chat budget raised 48 → 52 KB (master was at 48.0).
+- Migrations renumbered to 1785960000000/1785960000001 (after the latest on master).
 
 **Next Steps**:
 
-- Live end-to-end check on `/demo/web-embed` ("take me to the playbooks page") with a running server.
-- Plugin capability `pageTools` (storefront scripts shipping `add_to_cart` etc. for Shopify/Nuvemshop).
-- Per-org switch in Settings > Webchat and a page-tools listing in the conversation view.
+- Run `cd server && npm run migration:run` where the PR deploys.
+- Verify end to end with `hay chat send` on an org with a pre-chat form, and an `ASK_FORM` playbook turn.
+- Decide whether pre-chat forms stay on the roadmap (the original PR left that open).

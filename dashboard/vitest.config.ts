@@ -8,7 +8,15 @@ const root = fileURLToPath(new URL("./", import.meta.url));
 
 export default defineConfig({
   plugins: [vue()],
-  resolve: { alias: { "@": root, "~": root } },
+  resolve: {
+    alias: {
+      "@": root,
+      "~": root,
+      "@hay/form-schema": fileURLToPath(
+        new URL("../packages/form-schema/src/index.ts", import.meta.url),
+      ),
+    },
+  },
   test: {
     // tests/*.spec.ts are Playwright specs (tasks/lessons.md).
     exclude: ["node_modules/**", ".nuxt/**", ".output/**", "tests/**/*.spec.ts"],

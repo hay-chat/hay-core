@@ -15,12 +15,21 @@
         'hay-message--agent': message.sender === 'agent',
         'hay-message--closure': message.metadata?.isClosureMessage,
         'hay-message--system': agentNoticeText(message, t) !== null,
+        'hay-message--form': formUi(message) !== null,
       }"
     >
       <!-- A team member joined or left: a centred line, no bubble or time -->
       <div v-if="agentNoticeText(message, t) !== null" class="hay-message__system">
         {{ agentNoticeText(message, t) }}
       </div>
+      <!-- FORM messages: the form itself, or the answers once submitted -->
+      <FormMessage
+        v-else-if="formUi(message)"
+        :schema="formUi(message)!.schema!"
+        :submitted="formUi(message)!.status === 'SUBMITTED'"
+        :submitted-response="formUi(message)!.response"
+        @submit="(response) => $emit('submitForm', message.id, response)"
+      />
       <template v-else>
         <!-- AI disclosure (EU AI Act art. 50): label on every AI reply unless the org hid it -->
         <div v-if="aiLabel && message.agentType === 'BotAgent'" class="hay-message__ai-badge">
@@ -137,12 +146,16 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch, nextTick, type Directive } from "vue";
+import { defineAsyncComponent, ref, watch, nextTick, type Directive } from "vue";
 import type { Message } from "@/types";
 import { parseMarkdown, wrapWordsForAnimation, splitMarkdownImages } from "@/utils/markdown";
 import { useI18n } from "@/i18n";
 import { agentFirstName, agentNoticeText } from "@/utils/agentNotice";
 import { formatFileSize, isImageAttachment } from "@/utils/attachments";
+import type { FormResponse, FormSchema } from "@hay/form-schema";
+
+// Forms are rare on a first open, so their code loads only when one shows.
+const FormMessage = defineAsyncComponent(() => import("./FormMessage.vue"));
 
 const t = useI18n();
 
@@ -153,6 +166,23 @@ const props = defineProps<{
   /** Label on AI replies; null or empty hides it. */
   aiLabel?: string | null;
 }>();
+
+defineEmits<{
+  submitForm: [messageId: string, response: FormResponse];
+}>();
+
+interface FormUi {
+  kind?: string;
+  schema?: FormSchema;
+  status?: string;
+  response?: FormResponse;
+}
+
+/** The form carried by a FORM message (server `metadata.ui`), or null. */
+function formUi(message: Message): FormUi | null {
+  const ui = message.metadata?.ui as FormUi | undefined;
+  return ui?.kind === "form" && ui.schema ? ui : null;
+}
 
 const messageListRef = ref<HTMLElement | null>(null);
 const seenIds = new Set<string>(props.messages.map((m) => m.id));

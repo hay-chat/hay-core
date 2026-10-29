@@ -107,6 +107,7 @@
 - **Failure mode**: `dashboard/tests/*.spec.ts` are Playwright specs but match Vitest's default include, so `npx vitest run` reports 3 failed files / 0 tests ("Playwright Test did not expect test.describe()") even on a clean tree.
 - **Detection signal**: every failing file is under `dashboard/tests/` and the error names Playwright, not an assertion.
 - **Prevention**: treat that output as pre-existing noise, not a regression; the real fix is excluding `tests/**` in the dashboard Vitest config (TODO, out of scope for the pause-switch PR).
+
 ### Playwright specs cannot import TypeORM entities directly
 
 - **Failure mode**: A spec that imported `server/entities/*` through a helper died in `PrimaryGeneratedColumn` with `Cannot read properties of undefined (reading 'constructor')`. Playwright 1.57's own TypeScript transform does not run legacy decorators, so entity metadata never registers.
@@ -130,65 +131,79 @@
 - **Failure mode**: An override file meant to move the e2e Postgres/Redis/RabbitMQ to free ports merged with the base `ports:` list, so the stack still tried to bind the production ports (and the LAN-bound 5672) and failed to start.
 - **Detection signal**: "address already in use" for a port the override never mentions.
 - **Prevention**: Use `ports: !override` in the override file and run with a distinct `-p <project>` so container names, networks and volumes cannot collide with another session's stack. Tear down with `docker compose -p <project> down -v`.
+
 ## 2026-10-26: Mobile Home + Web Push (claude/mobile-attention)
 
 ### Playwright specs cannot import TypeORM entities
+
 - **Failure mode**: A spec that imported `server/entities/*` to seed data crashed in `PrimaryGeneratedColumn` ("Cannot read properties of undefined (reading 'constructor')"): Playwright's transpiler emits no decorator metadata.
 - **Detection signal**: The error is in the entity module, not the test body, and only appears under `npx playwright test` (global-setup runs through `tsx`, so it works there).
 - **Prevention**: Seed and assert from specs with raw SQL via `pg` (dotenv from `../.env`); keep TypeORM in `tests/global-setup.ts` only.
 
 ### Side effects in the repository, not the event broadcaster
+
 - **Failure mode**: The first push hook sat in `conversationEventsService.broadcastConversationUpdated` and fired whenever `changedFields` contained "status", including re-saves of the same status, and awaited remote HTTPS calls inside the orchestrator's save path.
 - **Detection signal**: A hook keyed on "field was in the update payload" instead of "value actually changed"; an `await` on a network fan-out inside a DB write path.
 - **Prevention**: Put transition hooks where the previous value is known (`conversationRepository.update/updateById`), compare previous vs new, and fire-and-forget with a caught promise.
 
 ### Python edit scripts: assert before writing, and no `"\\n"` in quoted heredocs
+
 - **Failure mode**: One multi-file edit script aborted mid-way on a later assertion, leaving the earlier files written and a later rewrite silently missing; another wrote a literal backslash-n to a JSON file, which 500'd the Nuxt dev server ("Could not parse JSON file").
 - **Detection signal**: `git status` disagreeing with what you believe you changed; a dev server 500 right after an i18n edit.
 - **Prevention**: One file per script, or compute every replacement before the first `write`; re-validate JSON with `json.loads` after editing it.
 
 ### `npm run lint` from a workspace directory runs the workspace's (missing) script
+
 - **Failure mode**: Running `npm run lint` with cwd inside `dashboard/` fails with "Missing script: lint" because the dashboard package has none; the root script is the one that lints everything.
 - **Prevention**: Run root scripts from the repo root, or call `npx eslint "server/**/*.{js,ts}" "dashboard/**/*.{js,ts,vue}" --cache --max-warnings 0` directly.
+
 ### Retry loops that only looked at HTTP status retried timed-out writes
+
 - **Failure mode**: The commerce MCP clients skipped 5xx retries for non-GET requests but the `catch` around `fetch()` retried every method, so a refund POST that hit the 30s `AbortSignal.timeout` was sent again after the store had already processed it (double refund). Spotted by the independent reviewer, not by the tests.
 - **Detection signal**: Two retry decisions in one loop (status branch and exception branch) with different method rules; a timeout test for POST was missing while the 5xx-POST test passed.
 - **Prevention**: Decide idempotency once per request and apply it to both branches. Every client ships a "POST that throws TimeoutError is called exactly once" test.
 
 ### Trusting a search API's first hit without verifying the filter was honoured
+
 - **Failure mode**: Wix ignores unknown top-level keys, so a bare `{ filter }` body (instead of `{ search: { filter } }`) silently returned the store's newest orders for any order number or email. The code returned `orders[0]`, which would have read, cancelled or refunded someone else's order. Masked in tests by a mock that honoured the bare key.
 - **Detection signal**: A search whose request shape was never checked against the vendor's reference, plus a mock that mirrors the code's own assumption rather than the documented payload.
 - **Prevention**: Fetch the vendor reference (`dev.wix.com/docs/...md` serves markdown) before writing a request body, assert the exact body in tests, and post-verify every hit (number must match, email filtered case-insensitively) so a wrong envelope fails loudly instead of returning the wrong record.
 
 ### Worktree guard refuses shell variables in commands
+
 - **Failure mode**: The worktree-isolation hook rejects any Bash command where a path or value comes from a shell variable or a `for` loop, so heredoc chains and loops over plugin dirs were silently dropped and early file rewrites never landed.
 - **Detection signal**: "Refusing to run it … cannot be shown not to be git" errors; a file you believed rewritten still has the old content.
 - **Prevention**: Use the Write/Edit tools for file content and spell out absolute paths literally, one plain command per plugin; always pass `--root <abs plugin dir>` to vitest because the shell cwd drifts between calls.
+
 ### Free-text config used as a shared-webhook routing key
+
 - **Failure mode**: The email channel registered the merchant's typed support address as a routing key. Routing keys are "last connect wins" per plugin, so any org could type a competitor's address and receive their customers' mail through the shared webhook.
 - **Detection signal**: a `setRoutingKeys` call whose key comes from `register.config` rather than from something the provider issued or we verified (OAuth asset id, our own derived alias).
 - **Prevention**: Route only on keys the provider or Hay controls (the alias derived from the org id, a phone_number_id from OAuth). Anything a user types needs proof of control before it may route, or must not route at all.
 
 ### Ids we hand to customers are not authentication
+
 - **Failure mode**: `messages.receive` trusted the Hay conversation id recovered from the Reply-To token and appended the message to that conversation without checking the sender was its customer. The token is in every outbound email, so a forwarded reply let a third party inject into the shopper's thread (and drive the AI's tools).
 - **Detection signal**: a lookup by an id that leaves the system (URL, email header, QR, webhook echo) followed directly by a write, with no ownership check against the authenticated/derived actor.
 - **Prevention**: Every "hint" id must be bound to the actor that is allowed to use it (`customer_id === customer.id`) and silently ignored otherwise; write the mismatch test alongside the happy path.
 
 ### Worktree tests silently lose the project .env
+
 - **Failure mode**: `server/config/env.ts` searches up to 4 directories above `server/config` for `.env`. From the main checkout that reaches `/srv/hay-core/.env`; from `.claude/worktrees/<name>/` it stops one level short, so every DB-backed Jest suite fails with an empty `AggregateError` that looks like a regression.
 - **Detection signal**: suites failing only in the worktree with `AggregateError:` and no message; the same suite green from `/srv/hay-core/repo`.
 - **Prevention**: Compare against the main checkout before debugging; run DB-backed suites from the main checkout (or export the DB vars) and say so in the verification story.
 
 ### Stacked a branch on a base that had already merged
+
 - **Failure mode**: `claude/billing-usage-limits` was created off the local `claude/agent-pause` branch while a parallel session merged agent-pause into master with different SHAs. `git rebase origin/master` then tried to replay the base's commits and conflicted on code this branch never touched.
 - **Detection signal**: `git merge-base --is-ancestor <base> origin/master` is false although the base's work is in master; `git log origin/master` shows a "Merge branch '<base>'" commit.
 - **Prevention**: Before stacking, `git fetch` and check whether the base already landed; if the base merges mid-task, rebase with `git rebase --onto origin/master <old-base-sha>` so only this branch's own commits replay.
 
 ### Stripe fixes a customer's currency with the first subscription
-- **Failure mode**: the plans page offered the currency selector whenever no *live* subscription existed, so a cancelled EUR customer could pick USD and Checkout failed with a Stripe error on every retry.
+
+- **Failure mode**: the plans page offered the currency selector whenever no _live_ subscription existed, so a cancelled EUR customer could pick USD and Checkout failed with a Stripe error on every retry.
 - **Detection signal**: any flow that reuses `stripeCustomerId` and lets the user choose a currency.
 - **Prevention**: lock the currency as soon as the account has ever had a subscription (or read `customer.currency`); changing currency needs a new Stripe customer.
-
 
 ### Logout decided by string heuristics in five places
 
@@ -219,6 +234,18 @@
 - **Failure mode**: PluginPageSlot passes `:api="Hay"` to every plugin component. Components that didn't declare `api` (Messenger, Instagram, Chatwoot, Zendesk) got it as a root-element attribute; `setAttribute` stringified the tRPC proxy, which called a `toString` procedure and threw mid-mount, so the Suspense stayed on "Loading plugin component" forever with no error card.
 - **Detection signal**: A plugin slot spinning forever while the console shows `[PluginRegistry] Successfully loaded ...` followed by `client[procedureType] is not a function`.
 - **Prevention**: The registry returns plugin components with `inheritAttrs: false`. Never let a proxy object (tRPC client, reactive store) reach a DOM attribute; `dashboard/tests/plugin-page-slot.test.ts` mounts a component without the `api` prop.
+
+### "Keep both sides" conflict resolution silently breaks code that both sides extended
+
+- **Failure mode**: Rebasing the parked form branch (hay-chat/hay-core#61) onto master, both sides had added a branch to the same `if/else if` chain, union type or array. Keeping both hunks produced duplicate `type?:` lines, an `else if` nested inside another branch's object literal and a `| "simulation"; | "form_submission";` union: all syntax errors that lint and tsc caught, but only after the fact.
+- **Detection signal**: A conflict hunk that ends mid-expression (no closing `},` or `;` on the HEAD side) or where both sides edit the same union/enum/array literal.
+- **Prevention**: Keep-both only for hunks that are whole statements on both sides. For unions, enums, arrays and `else if` chains, merge by hand and run the typecheck for every package the file belongs to before moving on.
+
+### A webchat dependency on a shared package needs its own budget and lockfile check
+
+- **Failure mode**: The parked branch added `@hay/form-schema` (zod inside) to the widget. The widget has its own `package-lock.json` and CI `npm ci`, so a workspace dependency can't resolve there, and zod alone pushed the chat chunk 12 KB over its brotli budget.
+- **Detection signal**: A new `"@hay/..."` entry in `webchat/package.json`, or `import { z } from "zod"` reachable from `webchat/src`.
+- **Prevention**: The widget reads shared code through a Vite/tsconfig alias to the source, never as a package dependency, and shared code it imports stays plain TypeScript (`sideEffects: false` so unused zod schemas tree-shake). Run `npm run build && npm run check:perf` in `webchat/` before pushing.
 
 ## 2026-10-29: MCP tools mirrored the provider API 1:1
 

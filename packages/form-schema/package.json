@@ -1,0 +1,29 @@
+{
+  "name": "@hay/form-schema",
+  "version": "1.0.0",
+  "description": "Shared form schema, validators, and helpers for Hay chat-widget forms",
+  "sideEffects": false,
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "prepare": "tsc",
+    "build": "tsc",
+    "watch": "tsc --watch",
+    "clean": "rm -rf dist",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "author": "Hay",
+  "license": "MIT",
+  "devDependencies": {
+    "typescript": "^5.3.0",
+    "vitest": "^1.6.0"
+  },
+  "dependencies": {
+    "zod": "^3.25.76"
+  }
+}

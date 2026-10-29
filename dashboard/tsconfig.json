@@ -11,7 +11,8 @@
       "@/*": ["./*"],
       "~/*": ["./*"],
       "@server/*": ["../server/*"],
-      "@plugins/*": ["../plugins/*"]
+      "@plugins/*": ["../plugins/*"],
+      "@hay/form-schema": ["../packages/form-schema/src/index.ts"]
     }
   },
   "include": [
