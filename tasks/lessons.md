@@ -219,3 +219,11 @@
 - **Failure mode**: PluginPageSlot passes `:api="Hay"` to every plugin component. Components that didn't declare `api` (Messenger, Instagram, Chatwoot, Zendesk) got it as a root-element attribute; `setAttribute` stringified the tRPC proxy, which called a `toString` procedure and threw mid-mount, so the Suspense stayed on "Loading plugin component" forever with no error card.
 - **Detection signal**: A plugin slot spinning forever while the console shows `[PluginRegistry] Successfully loaded ...` followed by `client[procedureType] is not a function`.
 - **Prevention**: The registry returns plugin components with `inheritAttrs: false`. Never let a proxy object (tRPC client, reactive store) reach a DOM attribute; `dashboard/tests/plugin-page-slot.test.ts` mounts a component without the `api` prop.
+
+## 2026-10-29: MCP tools mirrored the provider API 1:1
+
+### One tool per endpoint instead of one tool per playbook step
+
+- **Failure mode**: The first Spacebring plugin (PR hay-chat/hay-core#58) exposed 25 tools, one per kept endpoint. Booking a room meant the agent chaining `find_membership` → `list_resources` → `list_bookings` → `create_booking`, passing UUIDs, guessing `startDate[gte]` syntax and computing overlaps itself, with no ownership check on cancel. Roger: tools should be the actions a playbook takes; serialise requests and fix input inside the tool, and give the LLM text feedback.
+- **Detection signal**: Tool names that read like HTTP routes (`list_x`/`get_x`/`create_x` per resource), tools that need an id the customer cannot give, a plugin with 20+ tools, or tool descriptions that tell the agent to "call X first, then Y".
+- **Prevention**: Write the playbooks before opening the API spec; follow `.claude/skills/build-plugin/reference/tool-design.md` (playbook-step tools, lenient input, rules enforced in code, `ToolError` messages that say what to do next) and its checklist.
