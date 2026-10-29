@@ -1109,7 +1109,10 @@ export const organizationsRouter = t.router({
       });
     }
 
-    await organizationService.deleteWithData(organization);
+    await organizationService.deleteWithData(organization, {
+      userId: ctx.user!.id,
+      source: "owner",
+    });
     logger.info({ orgId: organization.id, userId: ctx.user!.id }, "Organization deleted by owner");
     // A hosted operator stops billing for the deleted workspace (D15-11).
     await notifyOperator({

@@ -6,6 +6,7 @@ import { ApiKey } from "@server/entities/apikey.entity";
 import { generateApiKey, hashApiKey } from "@server/lib/auth/utils/hashing";
 import { ApiTokenScope } from "@server/types/api-token-scopes";
 import { RESOURCES, ACTIONS } from "@server/types/scopes";
+import { auditLogService } from "@server/services/audit-log.service";
 
 // Schema for creating an API token
 const createApiTokenSchema = z.object({
@@ -66,6 +67,15 @@ export const apiTokensRouter = t.router({
       });
 
       await apiKeyRepository.save(apiKeyEntity);
+      await auditLogService.record({
+        userId: ctx.user?.id,
+        organizationId: ctx.organizationId,
+        action: "apikey.create",
+        resource: "api_key",
+        changes: { apiKeyId: apiKeyEntity.id, name: input.name, scopes: input.scopes },
+        ipAddress: ctx.ipAddress,
+        userAgent: ctx.userAgent,
+      });
 
       return {
         id: apiKeyEntity.id,
@@ -207,6 +217,15 @@ export const apiTokensRouter = t.router({
 
       apiKey.isActive = false;
       await apiKeyRepository.save(apiKey);
+      await auditLogService.record({
+        userId: ctx.user?.id,
+        organizationId: ctx.organizationId,
+        action: "apikey.revoke",
+        resource: "api_key",
+        changes: { apiKeyId: apiKey.id },
+        ipAddress: ctx.ipAddress,
+        userAgent: ctx.userAgent,
+      });
 
       return {
         success: true,
@@ -243,6 +262,15 @@ export const apiTokensRouter = t.router({
       }
 
       await apiKeyRepository.remove(apiKey);
+      await auditLogService.record({
+        userId: ctx.user?.id,
+        organizationId: ctx.organizationId,
+        action: "apikey.revoke",
+        resource: "api_key",
+        changes: { apiKeyId: input.id, deleted: true },
+        ipAddress: ctx.ipAddress,
+        userAgent: ctx.userAgent,
+      });
 
       return {
         success: true,

@@ -2,6 +2,8 @@ import { AppDataSource } from "../database/data-source";
 import { AuditLog, type AuditAction } from "../entities/audit-log.entity";
 import { User } from "../entities/user.entity";
 import { createLogger } from "@server/lib/logger";
+import { config } from "@server/config/env";
+import { createHmac } from "crypto";
 
 const logger = createLogger("audit-log");
 
@@ -12,7 +14,7 @@ export interface AuditLogOptions {
    * a nullable user reference.
    */
   userId?: string;
-  organizationId?: string;
+  organizationId?: string | null;
   action: AuditAction;
   resource?: string;
   changes?: Record<string, unknown>;
@@ -33,6 +35,16 @@ export interface GetAuditLogsOptions {
   offset?: number;
 }
 
+/** Audit log retention promised in PRIVACY.md. */
+export const AUDIT_LOG_RETENTION_DAYS = 90;
+
+/** Keyed hash so failed logins for the same unknown email can be correlated without storing it. */
+export function hashEmailForAudit(email: string): string {
+  return createHmac("sha256", config.jwt.secret || "")
+    .update(`hay:audit-email:v1:${email.trim().toLowerCase()}`)
+    .digest("hex");
+}
+
 export class AuditLogService {
   private auditLogRepository = AppDataSource.getRepository(AuditLog);
 
@@ -43,6 +55,7 @@ export class AuditLogService {
     try {
       const auditLog = AuditLog.createLog({
         ...options,
+        organizationId: options.organizationId ?? undefined,
         status: options.status || "success",
       });
 
@@ -50,6 +63,18 @@ export class AuditLogService {
     } catch (error) {
       logger.error({ err: error }, "Failed to create audit log");
       throw error;
+    }
+  }
+
+  /**
+   * Best-effort audit write for events recorded after the action already
+   * happened: a failed audit insert is logged, never surfaced to the caller.
+   */
+  async record(options: AuditLogOptions): Promise<void> {
+    try {
+      await this.log(options);
+    } catch {
+      // already logged by log()
     }
   }
 
@@ -167,7 +192,8 @@ export class AuditLogService {
   }
 
   /**
-   * Log failed login attempt
+   * Log failed login attempt. Attempts for unknown emails are recorded
+   * without a user, with a keyed hash of the email instead of the address.
    */
   async logFailedLogin(
     email: string,
@@ -176,22 +202,16 @@ export class AuditLogService {
     errorMessage?: string,
   ): Promise<AuditLog | null> {
     try {
-      // Try to find user by email
-      const userRepository = AppDataSource.getRepository(User);
-      const user = await userRepository.findOne({
+      const user = await AppDataSource.getRepository(User).findOne({
         where: { email: email.toLowerCase() },
+        select: ["id"],
       });
 
-      if (!user) {
-        // Can't log without a user ID - could create a separate failed_login_attempts table
-        logger.warn({ email }, "Cannot log failed login for non-existent user");
-        return null;
-      }
-
-      return this.log({
-        userId: user.id,
+      return await this.log({
+        userId: user?.id,
         action: "user.login",
         resource: "auth",
+        metadata: user ? undefined : { emailHash: hashEmailForAudit(email) },
         ipAddress,
         userAgent,
         status: "failure",
@@ -277,19 +297,24 @@ export class AuditLogService {
   }
 
   /**
-   * Clean up old audit logs (retention policy)
+   * Delete audit logs older than the retention period. Rows are append-only
+   * at the database level; the purge flag set here (transaction-scoped) is
+   * the only way the guard trigger allows a DELETE.
    */
-  async cleanup(retentionDays: number = 90): Promise<number> {
+  async cleanup(retentionDays: number = AUDIT_LOG_RETENTION_DAYS): Promise<number> {
     const cutoffDate = new Date();
     cutoffDate.setDate(cutoffDate.getDate() - retentionDays);
 
-    const result = await this.auditLogRepository
-      .createQueryBuilder()
-      .delete()
-      .where("created_at < :cutoffDate", { cutoffDate })
-      .execute();
-
-    return result.affected || 0;
+    return AppDataSource.transaction(async (manager) => {
+      await manager.query(`SELECT set_config('hay.audit_logs_purge', 'on', true)`);
+      const result = await manager
+        .createQueryBuilder()
+        .delete()
+        .from(AuditLog)
+        .where("created_at < :cutoffDate", { cutoffDate })
+        .execute();
+      return result.affected || 0;
+    });
   }
 
   /**

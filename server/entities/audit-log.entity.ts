@@ -21,6 +21,7 @@ export type AuditAction =
   | "user.login"
   | "user.logout"
   | "user.register"
+  | "user.deactivate"
   | "apikey.create"
   | "apikey.revoke"
   | "security.setting.change"
@@ -30,8 +31,8 @@ export type AuditAction =
   | "privacy.deletion.request"
   | "privacy.deletion.confirm"
   | "privacy.deletion.complete"
-  | "privacy.rectification.request"
   | "organization.create"
+  | "organization.delete"
   | "organization.switch"
   | "organization.invitation.send"
   | "organization.invitation.accept"
@@ -66,6 +67,14 @@ export type AuditAction =
   | "billing.resolution.exclusion_review_requested"
   | "billing.resolution.exclusion_approved"
   | "billing.resolution.exclusion_denied"
+  | "plugin.enable"
+  | "plugin.disable"
+  | "plugin.configure"
+  | "plugin.credentials.update"
+  | "customer.delete"
+  | "customer.merge"
+  | "conversation.delete"
+  | "conversation.export"
   | "conversation.spam.marked"
   | "conversation.spam.cleared"
   | "dispute_evidence.export"
@@ -74,6 +83,7 @@ export type AuditAction =
 @Entity("audit_logs")
 @Index("idx_audit_logs_user", ["userId"])
 @Index("idx_audit_logs_organization", ["organizationId"])
+@Index("idx_audit_logs_original_organization", ["originalOrganizationId"])
 @Index("idx_audit_logs_action", ["action"])
 @Index("idx_audit_logs_created_at", ["createdAt"])
 export class AuditLog extends TypeOrmBaseEntity {
@@ -91,6 +101,14 @@ export class AuditLog extends TypeOrmBaseEntity {
 
   @Column({ type: "uuid", nullable: true })
   organizationId?: string;
+
+  /**
+   * Organization the row was written for. Plain column (no FK) filled by a DB
+   * trigger on insert, so the row stays attributable after the organization
+   * is deleted and `organizationId` is set to NULL.
+   */
+  @Column({ type: "uuid", nullable: true, insert: false, update: false })
+  originalOrganizationId?: string;
 
   @Column({ type: "varchar", length: 100 })
   action!: AuditAction;
@@ -121,7 +139,7 @@ export class AuditLog extends TypeOrmBaseEntity {
   @JoinColumn()
   user?: User;
 
-  @ManyToOne(() => Organization, { nullable: true, onDelete: "CASCADE" })
+  @ManyToOne(() => Organization, { nullable: true, onDelete: "SET NULL" })
   @JoinColumn()
   organization?: Organization;
 

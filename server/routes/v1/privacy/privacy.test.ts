@@ -3,6 +3,7 @@ import { AppDataSource } from "@server/database/data-source";
 import { User } from "@server/entities/user.entity";
 import { PrivacyRequest } from "@server/entities/privacy-request.entity";
 import { AuditLog } from "@server/entities/audit-log.entity";
+import { purgeAuditLogs } from "@server/tests/helpers/audit-logs";
 import { Organization } from "@server/entities/organization.entity";
 import { privacyService } from "@server/services/privacy.service";
 import { rateLimitService } from "@server/services/rate-limit.service";
@@ -42,7 +43,6 @@ describe("Privacy DSAR Integration Tests", () => {
   beforeEach(async () => {
     // Clean up test data - order matters due to foreign key constraints
     const privacyRequestRepo = AppDataSource.getRepository(PrivacyRequest);
-    const auditLogRepo = AppDataSource.getRepository(AuditLog);
     const userRepo = AppDataSource.getRepository(User);
     const orgRepo = AppDataSource.getRepository(Organization);
 
@@ -65,18 +65,14 @@ describe("Privacy DSAR Integration Tests", () => {
       // 3. Audit logs (references both users and organization)
       // Delete all audit logs for users in this organization
       if (userIds.length > 0) {
-        await auditLogRepo
-          .createQueryBuilder()
-          .delete()
-          .where("user_id IN (:...userIds)", { userIds })
-          .execute();
+        await purgeAuditLogs("user_id = ANY($1)", [userIds]);
       }
       // Delete audit logs by organization ID
       if (existingOrg.id) {
-        await auditLogRepo.delete({ organizationId: existingOrg.id });
+        await purgeAuditLogs("organization_id = $1", [existingOrg.id]);
       }
       // Clean up any audit logs with null user IDs (created during deletion tests)
-      await auditLogRepo.delete({ userId: null as any });
+      await purgeAuditLogs("user_id IS NULL");
 
       // 4. Users (now safe to delete as no audit logs reference them)
       await userRepo.delete({ organizationId: existingOrg.id });
@@ -545,7 +541,7 @@ describe("Privacy DSAR Integration Tests", () => {
         expect(anonymizedLog?.ipAddress).toBe(expected);
 
         // Cleanup for next iteration
-        await auditLogRepo.delete({ id: log.id });
+        await purgeAuditLogs("id = $1", [log.id]);
 
         // Recreate user for next test
         const userRepo = AppDataSource.getRepository(User);

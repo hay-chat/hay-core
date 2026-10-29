@@ -1,5 +1,6 @@
 import { t, authenticatedProcedure, scopedProcedure } from "@server/trpc";
 import { RESOURCES, ACTIONS } from "@server/types/scopes";
+import { auditLogService } from "@server/services/audit-log.service";
 import { conversationSecretService } from "../../../services/conversation-secret.service";
 import { z } from "zod";
 import { ConversationService } from "../../../services/conversation.service";
@@ -631,6 +632,15 @@ export const conversationsRouter = t.router({
           message: "Conversation not found",
         });
       }
+      await auditLogService.record({
+        userId: ctx.user?.id,
+        organizationId: ctx.organizationId,
+        action: "conversation.delete",
+        resource: "conversation",
+        changes: { conversationId: input.id },
+        ipAddress: ctx.ipAddress,
+        userAgent: ctx.userAgent,
+      });
 
       return { success: true };
     }),
@@ -1378,6 +1388,15 @@ export const conversationsRouter = t.router({
         .replace(/^-|-$/g, "")
         .slice(0, 50);
       const timestamp = new Date().toISOString().slice(0, 10);
+      await auditLogService.record({
+        userId: ctx.user?.id,
+        organizationId,
+        action: "conversation.export",
+        resource: "conversation",
+        changes: { conversationId: conversation.id, format: input.format },
+        ipAddress: ctx.ipAddress,
+        userAgent: ctx.userAgent,
+      });
 
       if (input.format === "pdf") {
         const organization = await organizationRepository.findById(organizationId);
