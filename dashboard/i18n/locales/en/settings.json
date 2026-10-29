@@ -743,6 +743,16 @@
     "title": "Business hours",
     "description": "When your team answers each channel. Outside these hours the AI keeps answering, and conversations that need a person wait in the queue until you open.",
     "addSchedule": "Add schedule",
+    "quickCheck": {
+      "title": "Quick check with the team",
+      "description": "When the AI doesn't know a fact (\"does this vase come gift-boxed?\"), it asks your team instead of handing the whole chat over, and keeps answering the customer's other questions. Everyone on the team gets a notification and an email with a one-tap answer link. Outside business hours, or when nobody is reachable, the question goes straight to your queue.",
+      "enabled": "Ask the team before handing off",
+      "updateAfter": "\"Still checking\" update after (minutes)",
+      "giveUpAfter": "Pass it to the team queue after (minutes)",
+      "preview": "The customer is told they'll hear back within {giveUp} minutes, gets an update at {update} minutes, and if nobody has answered by then the chat joins your queue. A late answer still reaches them.",
+      "invalid": "Use whole minutes from 1 to 60, with the update before the hand-off.",
+      "saved": "Quick check settings saved"
+    },
     "empty": "No schedule yet, so every channel counts as open. Add one to tell shoppers when your team is back.",
     "untitled": "Untitled schedule",
     "defaultName": "Default hours",

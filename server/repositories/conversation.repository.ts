@@ -158,6 +158,7 @@ export class ConversationRepository extends BaseRepository<Conversation> {
         changedFields,
       );
       this.notifyDevicesOnTransition(conversation.status, updatedConversation);
+      await this.syncTeamQuestionsOnTransition(conversation.status, updatedConversation);
       await this.recordCloseOnTransition(conversation.status, updatedConversation);
     }
 
@@ -178,6 +179,26 @@ export class ConversationRepository extends BaseRepository<Conversation> {
       .catch((error) => {
         logger.warn({ err: error, conversationId: updated.id }, "Push alert failed");
       });
+  }
+
+  /**
+   * Quick checks with the team (D19) follow the conversation: a take-over
+   * cancels them, any other move to the team queue stops their timers.
+   * Never fails the status write.
+   */
+  private async syncTeamQuestionsOnTransition(
+    previousStatus: string,
+    updated: Conversation,
+  ): Promise<void> {
+    if (updated.status === previousStatus) return;
+    if (updated.status !== "human-took-over" && updated.status !== "pending-human") return;
+    try {
+      const { teamQuestionService } =
+        await import("../services/team-questions/team-question.service");
+      await teamQuestionService.onConversationStatusChanged(updated);
+    } catch (error) {
+      logger.warn({ err: error, conversationId: updated.id }, "Team question sync failed");
+    }
   }
 
   /**
@@ -219,6 +240,7 @@ export class ConversationRepository extends BaseRepository<Conversation> {
         changedFields,
       );
       this.notifyDevicesOnTransition(conversation.status, updatedConversation);
+      await this.syncTeamQuestionsOnTransition(conversation.status, updatedConversation);
       await this.recordCloseOnTransition(conversation.status, updatedConversation);
     }
 

@@ -1135,7 +1135,7 @@ async function handleExecutionLoop(
     log.debug(`Execution iteration ${iterations}`);
 
     // Get current messages and execute (with confidence guardrails integrated)
-    const executionResult: ExecutionResult | null = await executionLayer.execute(
+    let executionResult: ExecutionResult | null = await executionLayer.execute(
       conversation,
       customerLanguage,
       { toolsCalledThisTurn, turnGuardrailState },
@@ -1256,6 +1256,23 @@ async function handleExecutionLoop(
           continue;
         }
       }
+    }
+
+    // Quick check with the team (D19): one fact goes to the team and the
+    // conversation stays with the AI. When the rules don't allow it (setting
+    // off, approval mode, limits), it is an ordinary hand-off.
+    if (executionResult.step === "ASK_TEAM") {
+      const handled = await askTeam(conversation, executionResult, customerLanguage, log, {
+        processingStartedAt,
+      });
+      if (handled) break;
+      executionResult = {
+        ...executionResult,
+        step: "HANDOFF",
+        handoff: executionResult.handoff ?? {
+          reason: executionResult.handoffReason ?? "The AI could not answer a fact",
+        },
+      };
     }
 
     // Handle case where LLM returns both a userMessage and a tool call
@@ -1557,6 +1574,62 @@ async function handleExecutionLoop(
   if (iterations >= MAX_ITERATIONS) {
     log.warn("Reached maximum execution iterations, ending loop");
   }
+}
+
+/**
+ * ASK_TEAM (D19): ask the team, send the fixed line, alert the team. Returns
+ * false when the quick check is not allowed, so the caller hands off instead.
+ * Nobody reachable (or outside business hours) still stores the question for
+ * the team, and the chat joins the team queue at once with an honest line.
+ */
+async function askTeam(
+  conversation: Conversation,
+  executionResult: ExecutionResult,
+  customerLanguage: string | undefined,
+  log: pino.Logger,
+  timing: { processingStartedAt: number },
+): Promise<boolean> {
+  const { teamQuestionService } =
+    await import("@server/services/team-questions/team-question.service");
+  const lastCustomerMessage = await conversation.getLastCustomerMessage();
+  const asked = await teamQuestionService.ask(conversation, {
+    question: executionResult.teamQuestion ?? "",
+    customerMessage: lastCustomerMessage?.content ?? null,
+    language: customerLanguage ?? null,
+  });
+  if (asked.kind === "refused") return false;
+
+  log.info({ questionId: asked.question.id, outcome: asked.kind }, "Quick check with the team");
+  await saveConfidenceLog(conversation, executionResult);
+  if (asked.kind === "offline") {
+    await teamQuestionService.moveToTeamQueue(conversation.id, asked.question.id);
+  }
+  await sendBotMessage(
+    conversation,
+    {
+      content: asked.line,
+      type: MessageType.BOT_AGENT,
+      metadata: buildMessageMetadata(executionResult, {
+        isTeamQuestionMessage: true,
+        teamQuestionId: asked.question.id,
+        quickCheckStep: asked.kind,
+        ...(asked.kind === "offline" ? { isHandoffMessage: true } : {}),
+        ...(executionResult.userMessage
+          ? { discardedHandoffMessage: executionResult.userMessage }
+          : {}),
+      }),
+    },
+    log,
+    timing.processingStartedAt,
+  );
+  // Ask the people: push + email with the answer link. A question that went
+  // straight to the queue already raised the hand-off push.
+  if (asked.kind !== "appended") {
+    void teamQuestionService.notifyTeam(conversation, asked.question, {
+      push: asked.kind === "asked",
+    });
+  }
+  return true;
 }
 
 /**
