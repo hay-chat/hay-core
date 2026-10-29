@@ -2,7 +2,7 @@
  * Command implementations. Each returns `{ data, text }`: `data` is printed for
  * --json, `text` (lines) otherwise.
  */
-import { HayApi, HayApiError } from "./api";
+import { HayApi, HayApiError, type Credentials } from "./api";
 import {
   boolFlag,
   intFlag,
@@ -39,14 +39,42 @@ export interface Ctx {
 }
 
 export function buildCtx(args: ParsedArgs, target: string): Ctx {
-  const profile = resolveProfile(target, loadConfig());
+  let profile = resolveProfile(target, loadConfig());
+  const credentials = envCredentials();
+  // A saved session of another user is dropped so the .env account takes over.
+  if (credentials && profile.email && profile.email !== credentials.email) {
+    profile = {
+      ...profile,
+      email: undefined,
+      accessToken: undefined,
+      refreshToken: undefined,
+      organizationId: undefined,
+      organizationName: undefined,
+    };
+  }
   const orgOverride = stringFlag(args, "org");
   const api = new HayApi({
     profile,
     organizationId: orgOverride ?? profile.organizationId,
+    credentials,
     onTokens: (tokens) => updateProfile(target, tokens),
+    onLogin: (email, response, organizationId) =>
+      updateProfile(target, {
+        email,
+        accessToken: response.accessToken,
+        refreshToken: response.refreshToken,
+        organizationId,
+        organizationName: response.user.organizations.find((o) => o.id === organizationId)?.name,
+      }),
   });
   return { args, target, profile, api, verbose: boolFlag(args, "verbose") };
+}
+
+/** HAY_EMAIL + HAY_PASSWORD (tools/hay-cli/.env or the environment) enable automatic login. */
+function envCredentials(): Credentials | undefined {
+  const email = process.env.HAY_EMAIL;
+  const password = process.env.HAY_PASSWORD;
+  return email && password ? { email, password } : undefined;
 }
 
 // ---------------------------------------------------------------- auth / orgs
@@ -75,27 +103,16 @@ async function readStdin(): Promise<string> {
 }
 
 export async function login(ctx: Ctx): Promise<CommandResult> {
-  const email = stringFlag(ctx.args, "email") ?? ctx.profile.email;
+  const email = stringFlag(ctx.args, "email") ?? process.env.HAY_EMAIL ?? ctx.profile.email;
   if (!email)
     throw new UsageError("hay login --email <email> (password from HAY_PASSWORD or stdin)");
   const password = process.env.HAY_PASSWORD || (await readStdin());
   if (!password) throw new UsageError("No password: set HAY_PASSWORD or pipe it on stdin");
 
-  const result = await ctx.api.mutation<{
-    accessToken: string;
-    refreshToken: string;
-    user: { activeOrganizationId?: string; organizations: MeOrganization[] };
-  }>("auth.login", { email, password }, { auth: false });
-
-  const organizationId = ctx.profile.organizationId ?? result.user.activeOrganizationId;
+  const result = await ctx.api.login(email, password);
+  const organizationId =
+    stringFlag(ctx.args, "org") ?? ctx.profile.organizationId ?? result.user.activeOrganizationId;
   const org = result.user.organizations.find((o) => o.id === organizationId);
-  updateProfile(ctx.target, {
-    email,
-    accessToken: result.accessToken,
-    refreshToken: result.refreshToken,
-    organizationId,
-    organizationName: org?.name,
-  });
   return {
     data: { target: ctx.target, email, organizationId },
     text: [

@@ -26,12 +26,28 @@ interface AuthTokens {
   refreshToken: string;
 }
 
+export interface Credentials {
+  email: string;
+  password: string;
+}
+
+export interface LoginResponse extends AuthTokens {
+  user: {
+    activeOrganizationId?: string;
+    organizations: { id: string; name: string }[];
+  };
+}
+
 export interface ApiOptions {
   profile: TargetProfile;
   /** Organization for `x-organization-id`; defaults to the profile's. */
   organizationId?: string;
   /** Called after a token refresh so the new pair is persisted. */
   onTokens?: (tokens: AuthTokens) => void;
+  /** Used to log in when there is no session or the refresh token is rejected. */
+  credentials?: Credentials;
+  /** Called after a login so the session and its organization are persisted. */
+  onLogin?: (email: string, response: LoginResponse, organizationId?: string) => void;
 }
 
 const USER_AGENT = "hay-cli/0.1";
@@ -55,11 +71,15 @@ export class HayApi {
   private profile: TargetProfile;
   private organizationId?: string;
   private onTokens?: (tokens: AuthTokens) => void;
+  private credentials?: Credentials;
+  private onLogin?: ApiOptions["onLogin"];
 
   constructor(options: ApiOptions) {
     this.profile = { ...options.profile };
     this.organizationId = options.organizationId ?? options.profile.organizationId;
     this.onTokens = options.onTokens;
+    this.credentials = options.credentials;
+    this.onLogin = options.onLogin;
   }
 
   get baseUrl(): string {
@@ -67,7 +87,28 @@ export class HayApi {
   }
 
   get hasAuth(): boolean {
-    return !!(this.profile.apiKey || this.profile.refreshToken || this.profile.accessToken);
+    return !!(
+      this.profile.apiKey ||
+      this.profile.refreshToken ||
+      this.profile.accessToken ||
+      this.credentials
+    );
+  }
+
+  /** `auth.login`; keeps the new tokens and, without an explicit org, adopts the user's active one. */
+  async login(email: string, password: string): Promise<LoginResponse> {
+    const response = await this.call<LoginResponse>(
+      "POST",
+      "auth.login",
+      { email, password },
+      false,
+      true,
+    );
+    this.profile.accessToken = response.accessToken;
+    this.profile.refreshToken = response.refreshToken;
+    this.organizationId ??= response.user.activeOrganizationId;
+    this.onLogin?.(email, response, this.organizationId);
+    return response;
   }
 
   query<T>(path: string, input?: unknown, opts: { auth?: boolean } = {}): Promise<T> {
@@ -144,10 +185,25 @@ export class HayApi {
       await this.refresh();
       return this.profile.accessToken!;
     }
+    if (this.credentials) {
+      await this.login(this.credentials.email, this.credentials.password);
+      return this.profile.accessToken!;
+    }
     throw new HayApiError("auth", "NOT_LOGGED_IN", "run `hay login` first", 401);
   }
 
   private async refresh(): Promise<void> {
+    try {
+      await this.refreshTokens();
+    } catch (error) {
+      if (!(error instanceof HayApiError && error.code === "SESSION_ENDED" && this.credentials)) {
+        throw error;
+      }
+      await this.login(this.credentials.email, this.credentials.password);
+    }
+  }
+
+  private async refreshTokens(): Promise<void> {
     const tokens = await this.call<AuthTokens>(
       "POST",
       "auth.refreshToken",

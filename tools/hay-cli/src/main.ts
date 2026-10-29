@@ -22,13 +22,19 @@ import {
   type CommandResult,
   type Ctx,
 } from "./commands";
+import { existsSync } from "node:fs";
+import { join } from "node:path";
 import { configDir, loadConfig, resolveTargetName } from "./config";
+
+/** Gitignored test-account credentials (HAY_EMAIL, HAY_PASSWORD, HAY_TARGET); see .env.example. */
+const ENV_FILE = join(__dirname, "..", ".env");
 
 const HELP = `hay - Hay backend test CLI
 
 Usage: hay <command> [options]   (global: --target prod|local, --org <id>, --json, --verbose)
 
-  login --email <e>               password from HAY_PASSWORD or stdin
+  login [--email <e>]             password from HAY_PASSWORD or stdin
+                                  (HAY_EMAIL + HAY_PASSWORD in tools/hay-cli/.env log in automatically)
   logout | whoami
   orgs                            organizations of the logged-in user (* = current)
   use <org id|slug|name>          set the current organization for the target
@@ -65,6 +71,7 @@ export function resolveHandler(positionals: string[]): Handler | undefined {
 }
 
 async function main(argv: string[]): Promise<number> {
+  if (existsSync(ENV_FILE)) process.loadEnvFile(ENV_FILE);
   let json = argv.includes("--json");
   try {
     const args = parseArgs(argv);

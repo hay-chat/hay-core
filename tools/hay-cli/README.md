@@ -37,7 +37,11 @@ conversation. Drive the tool through `chat send` and read it back with `conv sho
   - `conversations.json`: the webchat key pair and DPoP nonce of each conversation the CLI started,
     so `--conversation <id>` can continue it (last 200 kept).
 - Auth is the dashboard's: `auth.login` → JWT (15 min) + rotating refresh token (90-day idle),
-  refreshed automatically. The password is never stored.
+  refreshed automatically. The password is never stored in the config.
+- Default account: copy `.env.example` to `tools/hay-cli/.env` (gitignored) and fill `HAY_EMAIL` /
+  `HAY_PASSWORD` (the shared test account is `roger+demo@hay.chat`). With both set, the CLI logs in
+  by itself when there is no session, the refresh token is rejected, or the saved session belongs to
+  another user. Real environment variables win over the file.
 - Sending a chat message needs no login (public widget path), only an org id (`hay use` or `--org`).
 
 ## Logs
