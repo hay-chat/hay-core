@@ -209,6 +209,58 @@ const COPY: Record<
   },
 };
 
+/** Quick check with the team (D19): push and email copy. */
+const QUESTION_COPY: Record<
+  NotificationLocale,
+  {
+    pushTitle: string;
+    emailSubject: (who: string) => string;
+    emailTitle: string;
+    emailMessage: (who: string) => string;
+    questionLabel: string;
+    customerMessageLabel: string;
+    emailButton: string;
+    emailFooter: string;
+  }
+> = {
+  en: {
+    pushTitle: "A customer is waiting on a question",
+    emailSubject: (who) => `${who} asked something the AI couldn't answer`,
+    emailTitle: "A customer is waiting on a question",
+    emailMessage: (who) =>
+      `${who} asked something the AI couldn't answer, so it is checking with your team. Answer it and the AI passes it on to the customer in their language.`,
+    questionLabel: "Question",
+    customerMessageLabel: "Customer's message",
+    emailButton: "Answer the question",
+    emailFooter:
+      "The link needs no login, works once and expires in 24 hours. You can also answer from the Inbox in Hay.chat.",
+  },
+  "pt-BR": {
+    pushTitle: "Um cliente está esperando uma resposta",
+    emailSubject: (who) => `${who} perguntou algo que a IA não soube responder`,
+    emailTitle: "Um cliente está esperando uma resposta",
+    emailMessage: (who) =>
+      `${who} perguntou algo que a IA não soube responder, então ela está verificando com a sua equipe. Responda e a IA repassa a resposta ao cliente no idioma dele.`,
+    questionLabel: "Pergunta",
+    customerMessageLabel: "Mensagem do cliente",
+    emailButton: "Responder a pergunta",
+    emailFooter:
+      "O link não precisa de login, funciona uma vez e expira em 24 horas. Você também pode responder pela Caixa de entrada do Hay.chat.",
+  },
+  es: {
+    pushTitle: "Un cliente espera una respuesta",
+    emailSubject: (who) => `${who} preguntó algo que la IA no supo responder`,
+    emailTitle: "Un cliente espera una respuesta",
+    emailMessage: (who) =>
+      `${who} preguntó algo que la IA no supo responder, así que lo está consultando con tu equipo. Respóndelo y la IA se lo pasa al cliente en su idioma.`,
+    questionLabel: "Pregunta",
+    customerMessageLabel: "Mensaje del cliente",
+    emailButton: "Responder la pregunta",
+    emailFooter:
+      "El enlace no necesita inicio de sesión, funciona una vez y caduca en 24 horas. También puedes responder desde la Bandeja de entrada de Hay.chat.",
+  },
+};
+
 function conversationPath(conversation: Pick<Conversation, "id" | "organization_id">): string {
   // `org` lets the dashboard switch to the right organization for multi-org users
   return `/conversations/${conversation.id}?org=${conversation.organization_id}`;
@@ -287,6 +339,116 @@ class ConversationAlertService {
       .filter(isAlertRecipient);
   }
 
+  /** Every active member of the organization, whatever their status (quick checks ask everyone). */
+  async findActiveMembers(organizationId: string): Promise<MemberCandidate[]> {
+    const rows: Array<{
+      id: string;
+      email: string;
+      first_name: string | null;
+      status: string;
+      hide_alert_preview: boolean;
+    }> = await AppDataSource.query(
+      `SELECT u.id, u.email, u.first_name, u.status, u.hide_alert_preview
+         FROM user_organizations uo
+         JOIN users u ON u.id = uo.user_id
+        WHERE uo.organization_id = $1
+          AND uo.is_active = true
+          AND u.is_active = true`,
+      [organizationId],
+    );
+    return rows.map((row) => ({
+      id: row.id,
+      email: row.email,
+      firstName: row.first_name,
+      membershipActive: true,
+      userActive: true,
+      status: row.status,
+      hideAlertPreview: row.hide_alert_preview === true,
+    }));
+  }
+
+  /**
+   * A quick check with the team (D19-3, D19-5): every active member (Roger,
+   * D19 answer 5) gets a push (unless the hand-off alert already covers the
+   * conversation) and an email with a one-field answer link (no login, single
+   * use, 24 h). Recorded and claim-first per recipient like the other steps.
+   * The question is the shopper's (or the AI's) text: plain text only.
+   */
+  async onTeamQuestion(
+    conversation: Conversation,
+    question: { id: string; askedAt: Date; question: string; customerMessage: string | null },
+    options: { push: boolean; answerLink: (userId: string) => string },
+  ): Promise<{ pushed: number; emailed: number }> {
+    if (isSimulationConversation(conversation.metadata)) return { pushed: 0, emailed: 0 };
+    const recipients = await this.findActiveMembers(conversation.organization_id);
+    if (recipients.length === 0) return { pushed: 0, emailed: 0 };
+
+    const locale = await organizationNotificationLocale(conversation.organization_id);
+    const copy = QUESTION_COPY[locale];
+    const who = customerLabel(conversation, locale);
+    let pushed = 0;
+    if (options.push) {
+      const results = await this.pushTo(
+        conversation,
+        question.askedAt,
+        "question",
+        recipients,
+        locale,
+        {
+          kind: "team_question",
+          title: copy.pushTitle,
+          body: `${who}: ${excerpt(question.question)}`,
+          url: `/inbox?question=${question.id}&org=${conversation.organization_id}`,
+          tag: `team_question:${question.id}`,
+        },
+        { title: "Hay.chat", body: copy.pushTitle },
+      );
+      pushed = [...results.values()].filter((status) => status === "sent").length;
+    }
+
+    const { emailService } = await import("./email.service");
+    let emailed = 0;
+    await Promise.all(
+      recipients.map(async (recipient) => {
+        const row = await this.claim(
+          conversation,
+          question.askedAt,
+          "question_email",
+          "email",
+          recipient.id,
+        );
+        if (!row) return;
+        try {
+          const result = await emailService.sendTemplateEmail({
+            to: recipient.email,
+            subject: copy.emailSubject(who),
+            template: "notification",
+            locale,
+            variables: {
+              companyName: "Hay.chat",
+              userName: recipient.firstName || undefined,
+              notificationTitle: copy.emailTitle,
+              notificationMessage: copy.emailMessage(who),
+              details: [
+                { label: copy.questionLabel, value: question.question },
+                ...(question.customerMessage && question.customerMessage !== question.question
+                  ? [{ label: copy.customerMessageLabel, value: question.customerMessage }]
+                  : []),
+              ],
+              actionButton: { url: options.answerLink(recipient.id), text: copy.emailButton },
+              additionalInfo: copy.emailFooter,
+            },
+          });
+          await this.finish(row, result.success ? "sent" : "failed", result.error ?? null);
+          if (result.success) emailed++;
+        } catch (error) {
+          await this.finish(row, "failed", error instanceof Error ? error.message : String(error));
+        }
+      }),
+    );
+    return { pushed, emailed };
+  }
+
   /** Called by the conversation repository on every status transition. */
   async onConversationStatusChanged(conversation: Conversation): Promise<void> {
     if (conversation.status !== "pending-human") return;
@@ -347,9 +509,12 @@ class ConversationAlertService {
     recipients: MemberCandidate[],
     locale: NotificationLocale,
     payload: PushPayload,
+    privateCopy?: { title: string; body: string },
   ): Promise<Map<string, NotificationStatus>> {
     const results = new Map<string, NotificationStatus>();
-    const privatePayload = privateAlertPayload(payload, locale);
+    const privatePayload = privateCopy
+      ? { ...payload, ...privateCopy }
+      : privateAlertPayload(payload, locale);
     await Promise.all(
       recipients.map(async (recipient) => {
         const row = await this.claim(conversation, cycleStartedAt, step, "push", recipient.id);

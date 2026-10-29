@@ -73,6 +73,12 @@ export class Orchestrator {
 
       logger.debug(`Found ${openConversations.length} open conversations to check`);
 
+      // A shopper waiting on a quick check with the team (D19) gets the
+      // check's own updates, not inactivity nudges or a close.
+      const { teamQuestionService } =
+        await import("@server/services/team-questions/team-question.service");
+      const waitingOnTeam = await teamQuestionService.conversationIdsWithOpenQuestion();
+
       const now = new Date();
       const inactivityThreshold = config.conversation.inactivityInterval;
       const warningThreshold = inactivityThreshold / 2; // Send warning at half the timeout
@@ -84,6 +90,11 @@ export class Orchestrator {
           conversationId: conversation.id,
         });
         try {
+          if (waitingOnTeam.has(conversation.id)) {
+            log.debug("Skipping inactivity check - quick check with the team open");
+            continue;
+          }
+
           // Get the last message in the conversation
           const messages = await conversation.getMessages();
 

@@ -49,6 +49,7 @@ import { Dispute } from "./entities/dispute.entity";
 import { PluginState } from "./entities/plugin-state.entity";
 import { EmailSendingDomain } from "./entities/email-sending-domain.entity";
 import { CustomerMergeDismissal } from "./entities/customer-merge-dismissal.entity";
+import { TeamQuestion } from "./entities/team-question.entity";
 import { OrderLinkMessageSubscriber } from "./subscribers/order-link-message.subscriber";
 import { SnakeNamingStrategy } from "./naming-strategy";
 import { config } from "../config/env";
@@ -119,6 +120,7 @@ export const AppDataSource = new DataSource({
     PluginState,
     EmailSendingDomain,
     CustomerMergeDismissal,
+    TeamQuestion,
     SimulationRun,
     SimulationRunItem,
     TestTranscript,
