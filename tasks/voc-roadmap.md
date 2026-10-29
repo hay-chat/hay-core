@@ -199,7 +199,7 @@ D19/D20 recommendation (hay-seo ec61f76). Builders work on master-based branches
 | Lane | Branch                        | Tickets                                                                 | Status                                              |
 | ---- | ----------------------------- | ----------------------------------------------------------------------- | --------------------------------------------------- |
 | D18  | claude/w4-d18-nuvemshop-oauth | partner OAuth ({client_id}, JSON exchange, token extras), LGPD webhooks | merged d856431f; partner app registered (id 49319), keys in Infisical |
-| D20  | claude/w4-d20-plugin-setup    | phase 1: D20-0..D20-5                                                   | building                                            |
+| D20  | claude/w4-d20-plugin-setup    | phase 1: D20-0..D20-5                                                   | merged; no migration; env PLUGIN_ALLOW_MANAGED_OVERRIDE (off) |
 | D19  | claude/w4-d19-quick-check     | phase 1: D19-0..6, 8, 12 (off by default)                               | merged cc472050 + test fix ad6e63ba; migration AddTeamQuestions1785930000000 |
 
 Phase 2 later: D20-6..11 (plugin adoption, marketplace, error copy), D19-7, 9..11, 13 (knowledge loop, offline hand-off
@@ -210,6 +210,7 @@ and logged only (no Nuvemshop customer records in Hay; mapping needs a merchant-
 store/redact disconnects but leaves the synced catalogue. Plugin option/button labels stay English (plugin i18n covers
 fields only).
 D19 notes: per-org setting `quickCheck.enabled`, off for every org (Settings > Business hours card). Hand-tested locally with a mock LLM only (no real-model check of the ASK_TEAM choice or the rephrase yet). Follow-ups: rephrased relay gets no extra guardrail check; a chat classified at close is not reclassified when a late answer arrives; planner prompt en/pt only (es falls back to en); merchant custom hand-off instructions not run on quick-check hand-offs; `saveToKnowledge` stored but unused until D19-7; with SMTP off `question_email` deliveries still record `sent` (check email-service). Orchestrator tests need RabbitMQ (not in the builder brief).
+D20 notes: status contract is `POST /setup/status` (core sends config + authState like cron; dashboard reads tRPC `plugins.setupStatus`, zod-validated, 5 s timeout, null on failure). Advanced mode remembered per browser (localStorage; no server-side user prefs). Env var names shown as code only in Advanced mode. Follow-ups: remove the unused `plugins.getUITemplate` route; docs/PLUGIN_API.md (submodule) not updated; no server unit test for setupStatus. Phase 2 needs plugins to adopt `register.setup` (+ `setupSteps.<id>.title` en/pt-BR, enforced by core-plugin-labels.test.ts), `advanced: true` on technical fields, WhatsApp duplicate connectionMode, dead Zendesk env, marketplace cards, error copy. Local-env note: `tests/lib/plugin-api-token.test.ts` (and before ad6e63ba quick-check) fail without JWT_SECRET in the worktree .env.
 
 ## Test stores and fixtures
 
