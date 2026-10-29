@@ -17,6 +17,38 @@
       "mine": "Você está atendendo",
       "team": "Colegas estão atendendo"
     },
+    "questions": {
+      "title": "Perguntas para a equipe",
+      "description": "A IA não sabia estas respostas e está verificando com vocês. Enquanto isso, ela continua respondendo às outras perguntas do cliente.",
+      "untitled": "Conversa",
+      "asked": "Perguntado há {time}",
+      "statusOpen": "O cliente foi avisado de que terá um retorno aqui em poucos minutos.",
+      "statusTimedOut": "Na sua fila. O cliente foi avisado de que a equipe vai responder.",
+      "customerSaid": "O cliente escreveu: {message}",
+      "answerLabel": "Sua resposta",
+      "answerPlaceholder": "Ex.: Sim, o vaso de 40 cm vai em caixa de presente.",
+      "sendAsWritten": "Enviar como está escrito",
+      "saveToKnowledge": "Salvar no conhecimento",
+      "rephraseHelp": "A IA repassa sua resposta no idioma do cliente, usando só o que você escreveu.",
+      "asWrittenHelp": "Sua resposta vai para o cliente exatamente como você escreveu.",
+      "send": "Enviar resposta",
+      "dismiss": "Dispensar",
+      "sent": "Resposta enviada ao cliente",
+      "dismissed": "Pergunta dispensada",
+      "dismissedOpen": "Pergunta dispensada. O cliente foi avisado de que a equipe vai responder, e a conversa está na sua fila.",
+      "failed": "Algo deu errado. Tente de novo."
+    },
+    "answerPage": {
+      "headTitle": "Responder a pergunta de um cliente - Hay.chat",
+      "title": "Um cliente está esperando por esta resposta",
+      "description": "A IA de {organization} não soube responder e está verificando com a equipe. Sua resposta vai para o cliente no chat.",
+      "sentTitle": "Resposta enviada",
+      "sentDescription": "O cliente recebe sua resposta no chat. Você já pode fechar esta página.",
+      "unavailableTitle": "Esta pergunta não pode ser respondida aqui",
+      "alreadyHandled": "Alguém já respondeu ou encerrou a pergunta.",
+      "invalidLink": "Este link é inválido ou expirou.",
+      "openInbox": "Abrir a Caixa de entrada"
+    },
     "row": {
       "noSummary": "Resumo ainda não está pronto. Abra a conversa para ler.",
       "waitingFor": "Esperando há {time}",

@@ -17,6 +17,38 @@
       "mine": "You're handling",
       "team": "Teammates are handling"
     },
+    "questions": {
+      "title": "Questions for the team",
+      "description": "The AI didn't know these and is checking with you. It keeps answering the customer's other questions meanwhile.",
+      "untitled": "Conversation",
+      "asked": "Asked {time} ago",
+      "statusOpen": "The customer was told they'll hear back here in a few minutes.",
+      "statusTimedOut": "Waiting in your queue. The customer was told the team will reply.",
+      "customerSaid": "Customer wrote: {message}",
+      "answerLabel": "Your answer",
+      "answerPlaceholder": "e.g. Yes, the 40 cm vase ships in a gift box.",
+      "sendAsWritten": "Send as written",
+      "saveToKnowledge": "Save to knowledge",
+      "rephraseHelp": "The AI passes your answer on in the customer's language, using only what you wrote.",
+      "asWrittenHelp": "Your answer goes to the customer exactly as you wrote it.",
+      "send": "Send answer",
+      "dismiss": "Dismiss",
+      "sent": "Answer sent to the customer",
+      "dismissed": "Question dismissed",
+      "dismissedOpen": "Question dismissed. The customer was told the team will reply, and the chat is in your queue.",
+      "failed": "Something went wrong. Try again."
+    },
+    "answerPage": {
+      "headTitle": "Answer a customer's question - Hay.chat",
+      "title": "A customer is waiting on this question",
+      "description": "The AI of {organization} couldn't answer it and is checking with the team. Your answer goes to the customer in the chat.",
+      "sentTitle": "Answer sent",
+      "sentDescription": "The customer gets your answer in the chat. You can close this page.",
+      "unavailableTitle": "This question can't be answered here",
+      "alreadyHandled": "Someone already answered or closed it.",
+      "invalidLink": "This link is invalid or expired.",
+      "openInbox": "Open the Inbox"
+    },
     "row": {
       "noSummary": "Summary not ready yet. Open the conversation to read it.",
       "waitingFor": "Waiting {time}",
