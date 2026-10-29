@@ -595,3 +595,66 @@ describe("marketplace orders in not-found (D10-6)", () => {
     expect(res.data.details).toMatchObject({ marketplace: "shopee" });
   });
 });
+
+describe("order lookups as customers phrase them (haychat-2, 2026-10-29)", () => {
+  const found = {
+    orders: { edges: [{ node: { id: "gid://shopify/Order/5", name: "#1005" } }] },
+    shop: null,
+  };
+
+  it('finds "1005" as "#1005"', async () => {
+    const { calls } = mockShopify({
+      GetOrderByName: (vars) =>
+        vars.query === 'name:"#1005"' ? found : { orders: { edges: [] }, shop: null },
+    });
+    const server = createFakeServer();
+    registerOrderTools(server);
+    const res = await server.call("shopify_get_order_by_name", { name: "1005" });
+    expect(res.isError).toBe(false);
+    expect(calls.map((c) => c.variables.query)).toEqual(['name:"#1005"']);
+  });
+
+  it("warns that orders older than 60 days are invisible without read_all_orders", async () => {
+    mockShopify({
+      GetOrderByName: () => ({ orders: { edges: [] }, shop: null }),
+      AppScopes: () => ({
+        currentAppInstallation: { accessScopes: [{ handle: "read_orders" }] },
+      }),
+    });
+    const server = createFakeServer();
+    registerOrderTools(server);
+    const res = await server.call("shopify_get_order_by_name", { name: "#1005" });
+    expect(res.data.code).toBe("NOT_FOUND");
+    expect(res.data.message).toMatch(/last 60 days/);
+  });
+
+  it("does not warn when the app can read all orders", async () => {
+    mockShopify({
+      GetOrderByName: () => ({ orders: { edges: [] }, shop: null }),
+      AppScopes: () => ({
+        currentAppInstallation: { accessScopes: [{ handle: "read_all_orders" }] },
+      }),
+    });
+    const server = createFakeServer();
+    registerOrderTools(server);
+    const res = await server.call("shopify_get_order_by_name", { name: "#1005" });
+    expect(res.data.message).not.toMatch(/60 days/);
+  });
+
+  it("lists a customer's orders from their email", async () => {
+    const { calls } = mockShopify({
+      FindCustomerByEmail: () => ({
+        customers: { edges: [{ node: { id: "gid://shopify/Customer/9" } }] },
+      }),
+      ListCustomerOrders: () => ({ customer: { orders: { edges: [], pageInfo: {} } } }),
+    });
+    const server = createFakeServer();
+    registerOrderTools(server);
+    const res = await server.call("shopify_list_customer_orders", {
+      customer_id: "Russel.winfield@example.com",
+    });
+    expect(res.isError).toBe(false);
+    expect(calls[0].variables.query).toBe('email:"Russel.winfield@example.com"');
+    expect(calls[1].variables.id).toBe("gid://shopify/Customer/9");
+  });
+});

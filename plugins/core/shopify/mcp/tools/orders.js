@@ -260,6 +260,28 @@ async function orderNotFound(rawId) {
   );
 }
 
+/**
+ * True when the app was not granted read_all_orders: Shopify then only returns
+ * orders from the last 60 days, so "not found" may just mean "older". Best-effort.
+ */
+async function lacksAllOrdersAccess() {
+  try {
+    const data = await shopifyGql(
+      "query AppScopes { currentAppInstallation { accessScopes { handle } } }",
+      {},
+    );
+    const scopes = data.currentAppInstallation?.accessScopes ?? [];
+    return !scopes.some((scope) => scope.handle === "read_all_orders");
+  } catch {
+    return false;
+  }
+}
+
+const OLDER_THAN_60_DAYS =
+  " Shopify only lets this app see orders from the last 60 days, so an older order can " +
+  "exist and still not be found: do not tell the customer it does not exist; hand the " +
+  "conversation to the team.";
+
 function registerOrderTools(server) {
   server.tool(
     "shopify_get_order",
@@ -307,13 +329,23 @@ function registerOrderTools(server) {
             ${SHOP_COUNTRY}
           }
         `;
-        const data = await shopifyGql(QUERY, { query: `name:"${args.name}"` });
-        const first = unwrapConnection(data.orders)[0];
+        // Customers often type "1005" for "#1005": try the prefixed name first.
+        const raw = args.name.trim();
+        const candidates = raw.startsWith("#") ? [raw] : [`#${raw}`, raw];
+        let data;
+        let first;
+        for (const name of candidates) {
+          data = await shopifyGql(QUERY, { query: `name:"${name}"` });
+          first = unwrapConnection(data.orders)[0];
+          if (first) break;
+        }
         if (!first) {
+          const older = await lacksAllOrdersAccess();
           throw orderNotFoundError(
             args.name,
             `No order named "${args.name}" found. Order names usually include the "#" prefix ` +
-              '(e.g. "#1001"); or find the order via the customer\'s recentOrders.',
+              '(e.g. "#1001"); or find the order via the customer\'s recentOrders.' +
+              (older ? OLDER_THAN_60_DAYS : ""),
           );
         }
         return ok(enrichOrder(first, shopCountry(data)));
@@ -327,12 +359,29 @@ function registerOrderTools(server) {
     "shopify_list_customer_orders",
     "List a customer's orders, most recent first.",
     {
-      customer_id: z.string().describe("Customer GID or bare numeric id."),
+      customer_id: z
+        .string()
+        .describe("Customer GID, bare numeric id, or the customer's email address."),
       limit: z.number().int().optional().describe("Max orders to return (default 10)."),
     },
     async (args) => {
       try {
-        const id = toGid("Customer", args.customer_id);
+        let id;
+        if (args.customer_id.includes("@")) {
+          const FIND = `
+            query FindCustomerByEmail($query: String!) {
+              customers(first: 1, query: $query) { edges { node { id } } }
+            }
+          `;
+          const found = await shopifyGql(FIND, { query: `email:"${args.customer_id.trim()}"` });
+          const customer = unwrapConnection(found.customers)[0];
+          if (!customer) {
+            throw toolError("NOT_FOUND", `No customer with the email ${args.customer_id}.`);
+          }
+          id = customer.id;
+        } else {
+          id = toGid("Customer", args.customer_id);
+        }
         const first = args.limit ?? 10;
         const QUERY = `
           query ListCustomerOrders($id: ID!, $first: Int!) {
