@@ -149,6 +149,12 @@
 
     <!-- Closed Conversation Footer (replaces input when closed) -->
     <div v-if="isConversationClosed" class="hay-chat-closed-footer">
+      <CsatRating
+        v-if="csatEnabled"
+        :question="csatQuestion"
+        :submitted="csatSubmitted"
+        :submit="submitCsat"
+      />
       <div class="hay-chat-closed-footer__content">
         <span class="hay-chat-closed-footer__text">{{ t("chat.conversationEnded") }}</span>
       </div>
@@ -207,6 +213,7 @@ import MessageList from "./MessageList.vue";
 import MessageInput from "./MessageInput.vue";
 import WaitingBanner from "./WaitingBanner.vue";
 import ChallengeFrame from "./ChallengeFrame.vue";
+import CsatRating from "./CsatRating.vue";
 import { useI18n } from "@/i18n";
 import type { Message, SendFailure } from "@/types";
 
@@ -222,6 +229,10 @@ const props = defineProps<{
   isTyping: boolean;
   isReady: boolean;
   isConversationClosed: boolean;
+  csatEnabled: boolean;
+  csatQuestion: string;
+  csatSubmitted: boolean;
+  submitCsat: (rating: number) => Promise<boolean>;
   isExpanded: boolean;
   agentName?: string;
   agentAvatarUrl?: string;
