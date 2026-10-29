@@ -220,11 +220,6 @@ export const useAuthStore = defineStore("auth", {
           expiresAt: Date.now() + result.expiresIn * 1000, // Convert seconds to milliseconds
         };
 
-        if (process.client) {
-          const token = useCookie("auth-token");
-          token.value = result.accessToken;
-        }
-
         this.updateActivity();
         this.$persist?.(); // Write through now, so other tabs see the new pair.
       });
@@ -274,5 +269,8 @@ export const useAuthStore = defineStore("auth", {
       }
     },
   },
-  persist: true,
+  persist: {
+    // isLoading is per page load and must not come back stuck.
+    pick: ["tokens", "isAuthenticated", "isInitialized", "lastActivity"],
+  },
 });

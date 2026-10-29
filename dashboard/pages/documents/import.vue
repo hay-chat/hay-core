@@ -964,9 +964,6 @@ const startUpload = async () => {
   isProcessing.value = true;
   uploadedCount.value = 0;
 
-  const authToken = useCookie("auth-token");
-  const organizationId = authToken.value ? "org_default" : "default";
-
   try {
     // Upload files sequentially
     for (let i = 0; i < selectedFiles.value.length; i++) {
@@ -984,7 +981,6 @@ const startUpload = async () => {
           fileBuffer: fileBuffer,
           mimeType: file.type,
           fileName: file.name,
-          organizationId: organizationId,
           type: mapCategoryToDocumentType(file.category || ""),
           status: file.isActive ? DocumentationStatus.PUBLISHED : DocumentationStatus.DRAFT,
           visibility: DocumentVisibility.PRIVATE,

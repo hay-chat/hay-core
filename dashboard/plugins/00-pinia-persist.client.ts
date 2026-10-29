@@ -16,8 +16,12 @@ export default defineNuxtPlugin(({ $pinia }: { $pinia: Pinia }) => {
   // Install the persistence plugin
   $pinia.use(createPersistedState({
     storage: window.localStorage,
-    auto: true, // Auto-persist stores with persist: true
+    // Only stores that opt in with `persist: { pick: [...] }` are written to localStorage.
+    auto: false,
   }))
+
+  // The analytics cache is no longer persisted; drop what older builds stored.
+  window.localStorage.removeItem('analytics')
 
   console.log('[Pinia Persistence] Plugin installed successfully')
 })
