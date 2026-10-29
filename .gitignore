@@ -42,9 +42,10 @@ node_modules/
 # OS specific
 .DS_Store
 
-# Task files
-# tasks.json
-# tasks/
+# Working notes (kept local, never published)
+/tasks/
+/WIP.md
+/CONTEXT.md
 
 # Playwright
 /test-results/
