@@ -1,3 +1,9 @@
+## 2026-10-29 — master — committed + Shopify app server redeployed
+- hay-core plans/WIP pushed (9e88f12e); hay-wordpress claude/woo-marketplace pushed to main (a8fc229, no release → no WP.org deploy).
+- apps.hay.chat rebuilt on homeserver at e5992a4, smoke 5/5. `shopify app deploy` NOT done: CLI needs Roger's device login.
+- 2.1.1 fix (62c1c332) is in hay-core master but hay-core prod not redeployed yet (/srv/hay-core/deploy.sh).
+- docs submodule left untouched: local checkout is older than the committed pointer.
+
 ## 2026-10-29 — master @ 62c1c332 — Shopify 2.1.1 fixed (pushed)
 - Reviewer's error = false "Connection Failed: Plugin requires authentication" while "Connected via OAuth": testConnection only read instance.config, ignored authState tokens. Now hasPluginCredentials() checks both (server/lib/plugin-health-tool.ts, tests added).
 - Next: deploy, verify on haychat-2 with a fresh account; then Shopify App Pricing (tasks/shopify-app-pricing.md, Roger: plans + Partner API client).
