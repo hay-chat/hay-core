@@ -442,6 +442,43 @@ export function resolveMediaSettings(
 }
 
 /**
+ * Quick check with the team (D19): instead of handing off, the AI asks the team
+ * one fact and keeps answering. Off unless the organization turns it on.
+ */
+export interface QuickCheckSettings {
+  enabled?: boolean;
+  /** Minutes until the shopper gets "still checking" (default 5). */
+  updateAfterMinutes?: number;
+  /** Minutes until the wait ends and the chat joins the team queue (default 10). */
+  giveUpAfterMinutes?: number;
+}
+
+export const QUICK_CHECK_MINUTES_LIMITS = { min: 1, max: 60 } as const;
+
+export function resolveQuickCheckSettings(
+  settings: OrganizationSettings | null | undefined,
+): Required<QuickCheckSettings> {
+  const quickCheck = settings?.quickCheck;
+  const minutes = (value: unknown, fallback: number) =>
+    typeof value === "number" &&
+    Number.isFinite(value) &&
+    value >= QUICK_CHECK_MINUTES_LIMITS.min &&
+    value <= QUICK_CHECK_MINUTES_LIMITS.max
+      ? Math.round(value)
+      : fallback;
+  const giveUpAfterMinutes = minutes(quickCheck?.giveUpAfterMinutes, 10);
+  return {
+    enabled: quickCheck?.enabled === true,
+    // The update must come before the wait ends, or it would never be sent.
+    updateAfterMinutes: Math.min(
+      minutes(quickCheck?.updateAfterMinutes, 5),
+      Math.max(giveUpAfterMinutes - 1, QUICK_CHECK_MINUTES_LIMITS.min),
+    ),
+    giveUpAfterMinutes,
+  };
+}
+
+/**
  * Organization Settings JSONB structure
  * This type defines the complete structure of the settings field in the Organization entity
  */
@@ -459,6 +496,7 @@ export interface OrganizationSettings {
   aiDisclosure?: AiDisclosureConfig; // AI label on replies, per channel
   channelAiModes?: Record<string, ChannelAiMode>; // Per-channel AI mode; missing = "on"
   media?: MediaSettings; // Customer photos/PDFs: AI reading, ID documents, case email
+  quickCheck?: QuickCheckSettings; // Ask the team one fact instead of handing off (D19)
   [key: string]: unknown;
 }
 

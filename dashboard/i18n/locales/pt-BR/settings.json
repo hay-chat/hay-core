@@ -743,6 +743,16 @@
     "title": "Horário de atendimento",
     "description": "Quando sua equipe atende cada canal. Fora desse horário a IA continua respondendo, e as conversas que precisam de uma pessoa esperam na fila até vocês abrirem.",
     "addSchedule": "Adicionar horário",
+    "quickCheck": {
+      "title": "Verificação rápida com a equipe",
+      "description": "Quando a IA não sabe um fato (\"este vaso vai em caixa de presente?\"), ela pergunta à sua equipe em vez de transferir a conversa inteira, e continua respondendo às outras perguntas do cliente. Todos da equipe recebem uma notificação e um e-mail com um link para responder em um toque. Fora do horário de atendimento, ou quando ninguém está disponível, a pergunta vai direto para a sua fila.",
+      "enabled": "Perguntar à equipe antes de transferir",
+      "updateAfter": "Aviso de \"ainda verificando\" após (minutos)",
+      "giveUpAfter": "Passar para a fila da equipe após (minutos)",
+      "preview": "O cliente é avisado de que terá um retorno em até {giveUp} minutos, recebe um aviso aos {update} minutos e, se ninguém tiver respondido até lá, a conversa entra na sua fila. Uma resposta atrasada ainda chega até ele.",
+      "invalid": "Use minutos inteiros de 1 a 60, com o aviso antes da transferência.",
+      "saved": "Configurações da verificação rápida salvas"
+    },
     "empty": "Ainda não há horário, então todos os canais contam como abertos. Adicione um para dizer aos clientes quando a equipe volta.",
     "untitled": "Horário sem nome",
     "defaultName": "Horário padrão",

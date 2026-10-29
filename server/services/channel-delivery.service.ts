@@ -24,7 +24,7 @@ import {
   signAttachmentUrls,
 } from "./media-url.service";
 import { aiDisclosureLine } from "./ai-disclosure";
-import { resolveChannelAiMode } from "@server/types/organization-settings.types";
+import { aiRepliesHeldForReview } from "./ai-reply-review";
 import {
   renderForChannel,
   renderProductList,
@@ -224,7 +224,7 @@ export class ChannelDeliveryService {
 
       // Product cards are written by the AI outside the reply gate: hold them
       // while the AI's replies on this channel wait for review.
-      if (isProductCards && this.aiRepliesHeldForReview(conversation)) return;
+      if (isProductCards && aiRepliesHeldForReview(conversation)) return;
 
       // AI disclosure (D14-7): the first AI reply on a channel opens with the
       // org's AI label, unless the org hid it there (never for EU orgs).
@@ -270,19 +270,6 @@ export class ChannelDeliveryService {
     return Array.isArray(recommendation?.products)
       ? (recommendation.products as RecommendedProductLike[])
       : [];
-  }
-
-  /**
-   * True when AI replies on this conversation's channel are queued for a person
-   * to approve: test mode (agent, else org default) or a "drafts only" channel.
-   * Mirrors the gate in Conversation.addMessage.
-   */
-  private aiRepliesHeldForReview(conversation: Conversation): boolean {
-    const settings = conversation.organization?.settings;
-    if (resolveChannelAiMode(settings, conversation.channel) === "drafts") return true;
-    const testMode = conversation.agent?.testMode;
-    if (testMode !== null && testMode !== undefined) return testMode;
-    return settings?.testModeDefault === true;
   }
 
   /**

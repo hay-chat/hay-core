@@ -23,6 +23,10 @@ import { MessageIntent, Message } from "@server/database/entities/message.entity
 import { Document } from "@server/entities/document.entity";
 import { describeLocalTime } from "./local-time";
 import { handoffCopy } from "./handoff-copy";
+import {
+  resolveQuickCheckSettings,
+  type OrganizationSettings,
+} from "@server/types/organization-settings.types";
 
 /**
  * Minimal shape of a retrieved document needed for confidence assessment.
@@ -57,8 +61,14 @@ export interface ExecuteOptions {
 }
 
 export interface ExecutionResult {
-  step: "ASK" | "RESPOND" | "CALL_TOOL" | "HANDOFF" | "CLOSE";
+  step: "ASK" | "RESPOND" | "CALL_TOOL" | "HANDOFF" | "CLOSE" | "ASK_TEAM";
   userMessage?: string | null;
+  /**
+   * ASK_TEAM (D19): the fact to check with the team. The shopper gets fixed
+   * copy, not userMessage; when the quick check isn't allowed the step becomes
+   * a HANDOFF with handoffReason and userMessage as usual.
+   */
+  teamQuestion?: string | null;
   toolName?: string | null;
   toolArgs?: string | null; // JSON string of tool arguments
   handoffReason?: string | null;
@@ -101,6 +111,14 @@ export interface ExecutionResult {
   };
 }
 
+/** The shopper's latest message text, for a quick check the planner left blank. */
+function lastCustomerContent(messages: Message[]): string | null {
+  for (let i = messages.length - 1; i >= 0; i--) {
+    if (messages[i].type === "Customer") return messages[i].content;
+  }
+  return null;
+}
+
 export class ExecutionLayer {
   private llmService: LLMService;
   private promptService: PromptService;
@@ -127,7 +145,7 @@ export class ExecutionLayer {
    * cannot emit a malformed name like a bare plugin id — the failure mode that
    * produced `hay-plugin-shopify` instead of `hay-plugin-shopify:shopify_get_product`.
    */
-  private buildPlannerSchema(enabledTools?: string[] | null): object {
+  private buildPlannerSchema(enabledTools?: string[] | null, quickCheck = false): object {
     const hasTools = Array.isArray(enabledTools) && enabledTools.length > 0;
     const toolName = hasTools
       ? {
@@ -149,7 +167,14 @@ export class ExecutionLayer {
       properties: {
         step: {
           type: "string",
-          enum: ["ASK", "RESPOND", "CALL_TOOL", "HANDOFF", "CLOSE"],
+          enum: [
+            "ASK",
+            "RESPOND",
+            "CALL_TOOL",
+            "HANDOFF",
+            "CLOSE",
+            ...(quickCheck ? ["ASK_TEAM"] : []),
+          ],
         },
         userMessage: {
           type: ["string", "null"],
@@ -168,6 +193,15 @@ export class ExecutionLayer {
           type: ["string", "null"],
           description: "Reason for closing (for CLOSE step only)",
         },
+        ...(quickCheck
+          ? {
+              teamQuestion: {
+                type: ["string", "null"],
+                description:
+                  "The short, self-contained question for the team (for ASK_TEAM step only)",
+              },
+            }
+          : {}),
         rationale: {
           type: "string",
           description: "Explanation of why this step was chosen",
@@ -187,6 +221,7 @@ export class ExecutionLayer {
         "handoffReason",
         "closeReason",
         "playbookFits",
+        ...(quickCheck ? ["teamQuestion"] : []),
       ],
       additionalProperties: false,
     };
@@ -238,6 +273,7 @@ export class ExecutionLayer {
       // The business's local date and hour, so "today", "tomorrow" and greetings
       // match where the shop is (organization timezone, UTC by default).
       const { timezone, localTime } = describeLocalTime(conversation.organization?.timezone);
+      const quickCheck = await this.isQuickCheckEnabled(conversation);
 
       // Get the prompt from PromptService
       const responsePrompt = await this.promptService.getPrompt(
@@ -248,6 +284,7 @@ export class ExecutionLayer {
           toolsDetail,
           timezone,
           localTime,
+          quickCheck,
         },
         { conversationId: conversation.id, organizationId: conversation.organization_id },
       );
@@ -319,11 +356,23 @@ export class ExecutionLayer {
       const response = await this.llmService.invoke({
         history: messages, // Pass Message[] directly instead of converting to string
         prompt: finalPrompt,
-        jsonSchema: this.buildPlannerSchema(allToolNames),
+        jsonSchema: this.buildPlannerSchema(allToolNames, quickCheck),
         organizationId: conversation.organization_id,
       });
 
       const result = JSON.parse(response) as ExecutionResult;
+
+      // ASK_TEAM (D19): only offered when the organization turned quick checks
+      // on; the question defaults to the shopper's own words.
+      if (result.step === "ASK_TEAM") {
+        if (!quickCheck) {
+          result.step = "HANDOFF";
+          result.handoffReason ??= "The AI could not answer a fact";
+        } else if (!result.teamQuestion?.trim()) {
+          result.teamQuestion = lastCustomerContent(messages);
+        }
+        result.handoffReason ??= "Checking a fact with the team";
+      }
 
       // Convert new flat structure to legacy nested structure for backward compatibility
       if (result.toolName && result.toolArgs) {
@@ -684,11 +733,18 @@ export class ExecutionLayer {
 
         const originalMessage = result.userMessage;
 
-        // If escalation is enabled, convert to HANDOFF
+        // If escalation is enabled, convert to HANDOFF, or to a quick check
+        // with the team when the organization allows it (D19): a missing fact
+        // is usually one line a teammate knows, and the AI keeps answering.
         if (config.enableEscalation) {
-          log.debug("Escalation enabled, converting to HANDOFF");
+          const quickCheck = await this.isQuickCheckEnabled(conversation);
+          log.debug({ quickCheck }, "Escalation enabled, converting to HANDOFF or ASK_TEAM");
+          const lastCustomerMessage = quickCheck
+            ? await conversation.getLastCustomerMessage()
+            : null;
           return {
-            step: "HANDOFF",
+            step: quickCheck ? "ASK_TEAM" : "HANDOFF",
+            ...(quickCheck ? { teamQuestion: lastCustomerMessage?.content ?? null } : {}),
             userMessage: fallbackMessage,
             handoff: {
               reason: "Low confidence in AI response - unverified company claims",
@@ -1362,6 +1418,17 @@ export class ExecutionLayer {
     } catch (error) {
       this.orgSettingsCache.delete(organizationId);
       throw error;
+    }
+  }
+
+  /** Quick check with the team (D19) is on for this organization. */
+  private async isQuickCheckEnabled(conversation: Conversation): Promise<boolean> {
+    try {
+      const settings = await this.getOrganizationSettings(conversation.organization_id);
+      return resolveQuickCheckSettings(settings as OrganizationSettings | undefined).enabled;
+    } catch (error) {
+      logger.warn({ err: error, conversationId: conversation.id }, "Quick check setting unread");
+      return false;
     }
   }
 

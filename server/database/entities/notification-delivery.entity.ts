@@ -16,6 +16,9 @@ import {
  * - unanswered / unanswered_email: a held conversation's last shopper message
  *   got no reply from a person for 10 minutes (D11-7); email only when the push
  *   reached no device.
+ * - question / question_email: a quick check with the team (D19), pushed to
+ *   and emailed (with a one-field answer link) to every active member. The
+ *   cycle is the question's asked_at.
  */
 export type NotificationStep =
   | "initial"
@@ -24,7 +27,9 @@ export type NotificationStep =
   | "customer_reply"
   | "followup"
   | "unanswered"
-  | "unanswered_email";
+  | "unanswered_email"
+  | "question"
+  | "question_email";
 export type NotificationChannel = "push" | "email";
 /**
  * - pending: claimed, being sent

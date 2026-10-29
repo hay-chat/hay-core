@@ -5,7 +5,8 @@
  * Honesty rules: never promise a response time ("shortly", "soon") and never
  * say someone is available when we don't know that. The only time figures
  * allowed come from data: the next opening of the channel's business hours and
- * the team's own median reply time (D5-7, see availabilityHandoffLine).
+ * the team's own median reply time (D5-7, see availabilityHandoffLine), and the
+ * quick check's update timers, which the system enforces (D19, quickCheckCopy).
  */
 
 export type HandoffCopyKey =
@@ -258,4 +259,125 @@ export function availabilityContext(availability: HandoffAvailability, now: Date
     ? ` The team is back ${formatNextOpening(availability.nextOpening, availability.timezone, now, "en")}.`
     : "";
   return `Outside business hours: no team member will reply until the team is back.${back} The conversation is in the team's queue. Keep helping the customer with anything else in the meantime; never invent another reason or time.`;
+}
+
+// ---------------------------------------------------------------------------
+// Quick check with the team (D19)
+// ---------------------------------------------------------------------------
+//
+// The only time figures here are the quick check's own timers, which the
+// sweep enforces (an update, never an answer, is what is promised).
+
+export interface QuickCheckCopy {
+  /** T0, someone reachable: the AI keeps answering meanwhile. */
+  asked: (minutes: number) => string;
+  /** A second unknown fact while one question is open: added to it. */
+  appended: string;
+  /** T+5: still waiting; `minutes` until the wait ends. */
+  stillChecking: (minutes: number) => string;
+  /** T+10: in-chat channels (and web without a way to reach the shopper by email). */
+  gaveUp: string;
+  /** T+10 on web, the shopper left an email address (masked). */
+  gaveUpEmail: (maskedEmail: string) => string;
+  /** T+10 on web, no email: the widget shows its email form while the chat waits. */
+  gaveUpLeaveEmail: string;
+  /** T0, within hours but nobody reachable: straight to the team queue. */
+  nobodyOnline: string;
+  /** T0 outside business hours, with the next opening. */
+  closedUntil: (when: string) => string;
+  /** T0 outside business hours, next opening unknown. */
+  closed: string;
+}
+
+const QUICK_CHECK_COPY: Record<CopyLanguage, QuickCheckCopy> = {
+  en: {
+    asked: (n) =>
+      `I don't have that information. I'm checking with the team and will update you here within ${n === 1 ? "1 minute" : `${n} minutes`}. You can keep asking me other things meanwhile.`,
+    appended:
+      "I've added that to my question for the team. You can keep asking me other things meanwhile.",
+    stillChecking: (n) =>
+      `Still checking with the team. I'll update you here in about ${n === 1 ? "1 minute" : `${n} minutes`} either way.`,
+    gaveUp:
+      "I couldn't get that answer from the team yet. I've passed your question on, and they'll reply to you here in this chat.",
+    gaveUpEmail: (email) =>
+      `I couldn't get that answer from the team yet. I've passed your question on, and they'll reply to you here in this chat or by email at ${email}.`,
+    gaveUpLeaveEmail:
+      "I couldn't get that answer from the team yet. I've passed your question on. Leave your email below so the team can reply to you there.",
+    nobodyOnline:
+      "I don't have that information, and no one from the team is online right now. I've passed your question on, and they'll reply to you here in this chat.",
+    closedUntil: (when) =>
+      `I don't have that information, and the team is away right now, back ${when}. I've passed your question on, and they'll reply to you here in this chat. Until then, I can keep helping with anything else.`,
+    closed:
+      "I don't have that information, and the team is away right now. I've passed your question on, and they'll reply to you here in this chat. Until then, I can keep helping with anything else.",
+  },
+  pt: {
+    asked: (n) =>
+      `Não tenho essa informação. Estou verificando com a equipe e te dou um retorno aqui em até ${n === 1 ? "1 minuto" : `${n} minutos`}. Enquanto isso, pode me perguntar outras coisas.`,
+    appended:
+      "Incluí isso na minha pergunta para a equipe. Enquanto isso, pode me perguntar outras coisas.",
+    stillChecking: (n) =>
+      `Ainda estou verificando com a equipe. Em ${n === 1 ? "1 minuto" : `uns ${n} minutos`} te dou um retorno aqui, de qualquer forma.`,
+    gaveUp:
+      "Ainda não consegui essa resposta com a equipe. Encaminhei sua pergunta, e eles vão te responder aqui neste chat.",
+    gaveUpEmail: (email) =>
+      `Ainda não consegui essa resposta com a equipe. Encaminhei sua pergunta, e eles vão te responder aqui neste chat ou por e-mail em ${email}.`,
+    gaveUpLeaveEmail:
+      "Ainda não consegui essa resposta com a equipe. Encaminhei sua pergunta. Deixe seu e-mail abaixo para a equipe te responder por lá.",
+    nobodyOnline:
+      "Não tenho essa informação, e ninguém da equipe está online agora. Encaminhei sua pergunta, e eles vão te responder aqui neste chat.",
+    closedUntil: (when) =>
+      `Não tenho essa informação, e a equipe não está atendendo agora; ela volta ${when}. Encaminhei sua pergunta, e eles vão te responder aqui neste chat. Até lá, posso continuar ajudando com qualquer outra coisa.`,
+    closed:
+      "Não tenho essa informação, e a equipe não está atendendo agora. Encaminhei sua pergunta, e eles vão te responder aqui neste chat. Até lá, posso continuar ajudando com qualquer outra coisa.",
+  },
+  es: {
+    asked: (n) =>
+      `No tengo esa información. Lo estoy consultando con el equipo y te daré una respuesta aquí en un máximo de ${n === 1 ? "1 minuto" : `${n} minutos`}. Mientras tanto, puedes preguntarme otras cosas.`,
+    appended:
+      "Agregué eso a mi pregunta para el equipo. Mientras tanto, puedes preguntarme otras cosas.",
+    stillChecking: (n) =>
+      `Sigo consultándolo con el equipo. En ${n === 1 ? "1 minuto" : `unos ${n} minutos`} te daré una respuesta aquí, de todos modos.`,
+    gaveUp:
+      "Todavía no obtuve esa respuesta del equipo. Les pasé tu pregunta y te responderán aquí, en este chat.",
+    gaveUpEmail: (email) =>
+      `Todavía no obtuve esa respuesta del equipo. Les pasé tu pregunta y te responderán aquí, en este chat, o por correo en ${email}.`,
+    gaveUpLeaveEmail:
+      "Todavía no obtuve esa respuesta del equipo. Les pasé tu pregunta. Deja tu correo abajo para que el equipo te responda allí.",
+    nobodyOnline:
+      "No tengo esa información y ahora mismo no hay nadie del equipo conectado. Les pasé tu pregunta y te responderán aquí, en este chat.",
+    closedUntil: (when) =>
+      `No tengo esa información y el equipo no está disponible ahora; vuelve ${when}. Les pasé tu pregunta y te responderán aquí, en este chat. Mientras tanto, puedo seguir ayudándote con cualquier otra cosa.`,
+    closed:
+      "No tengo esa información y el equipo no está disponible ahora. Les pasé tu pregunta y te responderán aquí, en este chat. Mientras tanto, puedo seguir ayudándote con cualquier otra cosa.",
+  },
+};
+
+/** Quick-check lines in the first language we have copy for (see handoffCopy). */
+export function quickCheckCopy(...languages: Array<string | null | undefined>): QuickCheckCopy {
+  return QUICK_CHECK_COPY[pickLanguage(languages)];
+}
+
+/** "r***@gmail.com": enough for the shopper to recognise, not to read off a screen. */
+export function maskEmail(email: string): string {
+  const at = email.lastIndexOf("@");
+  if (at < 1) return "***";
+  return `${email[0]}***${email.slice(at)}`;
+}
+
+/**
+ * The T0 line for a quick check the team cannot take now (D19-12): outside
+ * business hours with the next opening, or within hours with nobody reachable.
+ */
+export function quickCheckOfflineLine(
+  availability: Pick<HandoffAvailability, "state" | "nextOpening" | "timezone">,
+  now: Date,
+  ...languages: Array<string | null | undefined>
+): string {
+  const copy = quickCheckCopy(...languages);
+  if (availability.state !== "closed") return copy.nobodyOnline;
+  return availability.nextOpening
+    ? copy.closedUntil(
+        formatNextOpening(availability.nextOpening, availability.timezone, now, ...languages),
+      )
+    : copy.closed;
 }
