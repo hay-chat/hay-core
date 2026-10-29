@@ -8,9 +8,14 @@ import {
 import { AuditLog } from "@server/entities/audit-log.entity";
 import { Organization } from "@server/entities/organization.entity";
 import {
+  BILLABLE_OUTCOMES,
+  type BillableOutcome,
   CONVERSATION_OUTCOMES,
   type ConversationOutcomeKind,
 } from "@server/services/close-classification/outcome-rules";
+
+/** Outcomes that never bill — everything the breakdown's `notBilled` groups. */
+type NotBilledOutcome = Exclude<ConversationOutcomeKind, BillableOutcome>;
 
 /**
  * Usage page and resolution ledger (D1-5, D1-6).
@@ -61,7 +66,7 @@ export interface UsageSummary {
     pendingReview: number;
     reversed: number;
     excluded: number;
-    notBilled: Record<Exclude<ConversationOutcomeKind, "confirmed" | "assumed">, number>;
+    notBilled: Record<NotBilledOutcome, number>;
   };
   exclusions: { used: number; allowance: number; open: boolean };
   /** Only what core already knows from the operator (access state). */
@@ -281,7 +286,7 @@ export class ResolutionLedgerService {
       }>();
 
     const notBilled = Object.fromEntries(
-      CONVERSATION_OUTCOMES.filter((o) => o !== "confirmed" && o !== "assumed").map((o) => [o, 0]),
+      CONVERSATION_OUTCOMES.filter((o) => !BILLABLE_OUTCOMES.includes(o)).map((o) => [o, 0]),
     ) as UsageSummary["breakdown"]["notBilled"];
     const breakdown: UsageSummary["breakdown"] = {
       billed: 0,

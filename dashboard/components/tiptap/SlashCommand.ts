@@ -14,7 +14,7 @@ export interface CommandItem {
   title: string;
   description: string;
   icon: string;
-  type?: "block" | "action" | "document";
+  type?: "block" | "action" | "document" | "handoff";
   pluginId?: string;
   id?: string;
   command: ({ editor, range }: { editor: Editor; range: Range }) => void;
@@ -102,6 +102,29 @@ export const configureSlashCommand = (config: SlashCommandConfig) => {
                 type: "document",
                 command: () => {
                   // This will be handled by the component to show submenu
+                },
+              },
+              {
+                title: "Handoff to human",
+                description: "Escalate to a teammate — a planned step, counted as a success",
+                icon: "user-round",
+                type: "handoff",
+                command: ({ editor, range }) => {
+                  editor
+                    .chain()
+                    .focus()
+                    .deleteRange(range)
+                    .insertContent({
+                      type: "mention",
+                      attrs: {
+                        id: null,
+                        label: "Handoff to human",
+                        type: "handoff",
+                        pluginId: null,
+                      },
+                    })
+                    .insertContent(" ")
+                    .run();
                 },
               },
             ];

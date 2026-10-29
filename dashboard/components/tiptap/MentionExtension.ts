@@ -139,6 +139,8 @@ export const configureMentionExtension = (config: MentionConfig) => {
         classes.push("mention-action");
       } else if (type === "document") {
         classes.push("mention-document");
+      } else if (type === "handoff") {
+        classes.push("mention-handoff");
       }
 
       // Build the content array
@@ -160,6 +162,14 @@ export const configureMentionExtension = (config: MentionConfig) => {
           "span",
           {
             class: "mention-icon mention-icon-document",
+          },
+        ]);
+      } else if (type === "handoff") {
+        // Add a person icon for the handoff step
+        content.push([
+          "span",
+          {
+            class: "mention-icon mention-icon-handoff",
           },
         ]);
       }

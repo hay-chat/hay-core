@@ -12,6 +12,9 @@
  * - assumed: the AI resolved it and the shopper went quiet. Billable, reversed
  *   if the shopper comes back within REVERSAL_WINDOW_MS.
  * - Hand-offs bill when the AI resolved it, even if a human was involved.
+ * - assisted: a playbook's "Handoff to human" step sent the chat to a person on
+ *   purpose. The AI did its job by following the playbook, so it bills (Roger,
+ *   29 Oct 2026). Distinct from `human` (an unplanned fallback escalation).
  * - An action the AI requested for approval (D4-4) bills: the AI did the work
  *   when it requested it, whatever the team decides later.
  * - Never billable: abandoned (no real request or no real answer), unhappy
@@ -24,6 +27,7 @@ import { MessageIntent, MessageType, type Message } from "@server/database/entit
 export const CONVERSATION_OUTCOMES = [
   "confirmed",
   "assumed",
+  "assisted",
   "abandoned",
   "unhappy",
   "human",
@@ -32,7 +36,10 @@ export const CONVERSATION_OUTCOMES = [
 ] as const;
 export type ConversationOutcomeKind = (typeof CONVERSATION_OUTCOMES)[number];
 
-export const BILLABLE_OUTCOMES: ReadonlyArray<ConversationOutcomeKind> = ["confirmed", "assumed"];
+const BILLABLE_OUTCOME_LIST = ["confirmed", "assumed", "assisted"] as const;
+/** The outcomes that bill, as a literal union (for typing the non-billable rest). */
+export type BillableOutcome = (typeof BILLABLE_OUTCOME_LIST)[number];
+export const BILLABLE_OUTCOMES: ReadonlyArray<ConversationOutcomeKind> = BILLABLE_OUTCOME_LIST;
 
 /** A shopper who comes back within this window reverses the charge. */
 export const REVERSAL_WINDOW_MS = 72 * 60 * 60 * 1000;
@@ -104,6 +111,8 @@ export interface CloseFacts {
   approvalRequested: boolean;
   /** A teammate answered a quick check and the answer was relayed (D19-6). */
   teamAssisted: boolean;
+  /** A playbook's "Handoff to human" step drove this hand-off (a planned escalation). */
+  plannedHandoff: boolean;
 }
 
 /** What the LLM decides. Absent when the rule outcome is final or the LLM failed. */
@@ -179,6 +188,7 @@ export function collectCloseFacts(
       (m) => m.type === MessageType.TOOL && typeof m.metadata?.pendingActionId === "string",
     ),
     teamAssisted: ordered.some((m) => m.metadata?.isTeamAnswer === true),
+    plannedHandoff: conversation.metadata?.plannedHandoff === true,
   };
 }
 
@@ -221,6 +231,11 @@ export function decideOutcome(facts: CloseFacts, verdict: ClassifierVerdict): Ou
   // it, so it is not billed (Roger, D19 answer 3). Once the answer is in the
   // knowledge base, the next shopper's question is AI-resolved.
   if (facts.teamAssisted && facts.hadRealRequest) return decide("human");
+  // A playbook's "Handoff to human" step sent this to a person on purpose: the
+  // AI did its job by following the playbook. Billable, and kept distinct from
+  // the fallback `human` outcome below. (A shopper's "didn't help" and a quick
+  // check still win, since those branches run first.)
+  if (facts.plannedHandoff && facts.hadRealRequest) return decide("assisted", true);
   if (facts.approvalRequested)
     return decide(shopperConfirmed(facts) ? "confirmed" : "assumed", true);
   if (!facts.hadRealRequest || !verdict.hadRealRequest) return decide("abandoned");
