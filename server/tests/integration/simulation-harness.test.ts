@@ -191,7 +191,9 @@ describe("simulation harness", () => {
       limits: { maxSimulationsPerMonth: 3 },
     });
     // Open pooled connections first so the starts really run side by side.
-    await Promise.all(Array.from({ length: 5 }, () => AppDataSource.query("SELECT pg_sleep(0.05)")));
+    await Promise.all(
+      Array.from({ length: 5 }, () => AppDataSource.query("SELECT pg_sleep(0.05)")),
+    );
     const results = await Promise.allSettled(
       Array.from({ length: 5 }, () =>
         simulationHarnessService.startRun({ organizationId: orgId, cases: twoCases }),

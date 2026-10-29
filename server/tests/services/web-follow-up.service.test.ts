@@ -25,7 +25,9 @@ jest.mock("@server/services/webchat/webchat-settings.service", () => {
   };
 });
 
-const mockUpdateConversation = jest.fn<(...args: unknown[]) => Promise<void>>(async () => undefined);
+const mockUpdateConversation = jest.fn<(...args: unknown[]) => Promise<void>>(
+  async () => undefined,
+);
 jest.mock("@server/repositories/conversation.repository", () => ({
   conversationRepository: { updateById: (...args: unknown[]) => mockUpdateConversation(...args) },
 }));

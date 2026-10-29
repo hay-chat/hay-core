@@ -15,7 +15,8 @@ import { ConversationService } from "../../services/conversation.service";
  * translated (with the org's LLM) before create returns.
  */
 
-const mockInvoke = jest.fn<(args: { prompt: string; organizationId?: string }) => Promise<string>>();
+const mockInvoke =
+  jest.fn<(args: { prompt: string; organizationId?: string }) => Promise<string>>();
 jest.mock("../../services/core/llm.service", () => ({
   LLMService: jest.fn().mockImplementation(() => ({ invoke: mockInvoke })),
 }));

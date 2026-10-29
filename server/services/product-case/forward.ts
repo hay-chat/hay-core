@@ -182,7 +182,9 @@ async function sendCaseEmail(
       variables: {
         companyName: "Hay.chat",
         notificationTitle: copy.title,
-        notificationMessage: productCase.summary ? `${copy.message}\n\n${productCase.summary}` : copy.message,
+        notificationMessage: productCase.summary
+          ? `${copy.message}\n\n${productCase.summary}`
+          : copy.message,
         details,
         relatedItems,
         actionButton: {

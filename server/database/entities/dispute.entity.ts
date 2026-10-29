@@ -1,4 +1,11 @@
-import { Entity, Column, PrimaryGeneratedColumn, CreateDateColumn, UpdateDateColumn, Index } from "typeorm";
+import {
+  Entity,
+  Column,
+  PrimaryGeneratedColumn,
+  CreateDateColumn,
+  UpdateDateColumn,
+  Index,
+} from "typeorm";
 
 export type DisputeStatus = "needs_response" | "under_review" | "won" | "lost" | "closed";
 export type DisputeEvidenceStatus = "none" | "drafted" | "failed";

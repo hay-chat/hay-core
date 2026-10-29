@@ -26,7 +26,10 @@ describe("suggestGraduation (D4-11)", () => {
     expect(suggestGraduation([...base, ...refunds([5], "rejected")], 0)).toBeNull();
     expect(suggestGraduation([...base, ...refunds([5], "expired")], 0)).toBeNull();
     expect(
-      suggestGraduation([...base, { category: "refund", status: "approved", amount: null, currency: "BRL" }], 0),
+      suggestGraduation(
+        [...base, { category: "refund", status: "approved", amount: null, currency: "BRL" }],
+        0,
+      ),
     ).toBeNull();
   });
 
