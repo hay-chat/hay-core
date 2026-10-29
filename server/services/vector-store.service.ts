@@ -35,7 +35,7 @@ export interface VectorChunk {
 
 export interface SearchResult {
   id: string;
-  documentId: string;
+  documentId: string | null;
   content: string;
   metadata?: Record<string, unknown>;
   similarity?: number;
@@ -239,6 +239,7 @@ export class VectorStoreService {
     const searchQuery = `
       SELECT
         id,
+        "document_id" as "documentId",
         "page_content" as content,
         metadata,
         1 - (embedding <=> $1::vector) as similarity
@@ -256,14 +257,16 @@ export class VectorStoreService {
 
     interface SearchResultRow {
       id: string;
-      metadata: { documentId: string };
+      documentId: string | null;
+      metadata: Record<string, unknown>;
       content: string;
       similarity: number;
     }
 
+    // The document comes from the row's document_id column, never from chunk metadata.
     return results.map((row: SearchResultRow) => ({
       id: row.id,
-      documentId: row.metadata.documentId,
+      documentId: row.documentId,
       content: row.content,
       metadata: row.metadata,
       similarity: row.similarity,

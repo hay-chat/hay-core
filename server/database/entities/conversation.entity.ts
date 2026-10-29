@@ -7,6 +7,7 @@ import {
   ManyToOne,
   OneToMany,
   JoinColumn,
+  Index,
 } from "typeorm";
 import { Organization } from "../../entities/organization.entity";
 import { User } from "../../entities/user.entity";
@@ -63,6 +64,8 @@ function toTiptapInstructions(value: unknown): TiptapInstructionInput {
 }
 
 @Entity("conversations")
+@Index("idx_conversations_assigned_user_id", ["assigned_user_id"])
+@Index("idx_conversations_status_assigned", ["status", "assigned_user_id"])
 export class Conversation {
   @PrimaryGeneratedColumn("uuid")
   id!: string;
@@ -906,6 +909,15 @@ The following tools are available for you to use. You MUST return only valid JSO
     const { conversationRepository } = await import("../../repositories/conversation.repository");
 
     if (!this.document_ids?.includes(documentId)) {
+      const document = await documentRepository.findByIdAndOrganization(
+        documentId,
+        this.organization_id,
+      );
+      if (!document) {
+        logger.warn({ conversationId: this.id, documentId }, "Document not found, not attaching");
+        return;
+      }
+
       logger.debug({ documentId }, "Adding document to conversation");
       logger.debug({ documentIds: this.document_ids }, "Current document ids");
       const updatedDocIds = [...(this.document_ids || []), documentId];
@@ -915,14 +927,12 @@ The following tools are available for you to use. You MUST return only valid JSO
       });
       this.document_ids = updatedDocIds;
 
-      const document = await documentRepository.findById(documentId);
-
       await this.addMessage({
-        content: `# ${document?.title} added to conversation \n ${document?.content}`,
+        content: `# ${document.title} added to conversation \n ${document.content}`,
         type: "Document",
         metadata: {
-          documentId: document?.id,
-          documentTitle: document?.title,
+          documentId: document.id,
+          documentTitle: document.title,
         },
       });
     }
