@@ -1,5 +1,6 @@
 <template>
   <Page :title="$t('llmSettings.title')" :description="$t('llmSettings.description')">
+    <SettingsTabs />
     <template #header>
       <Button :loading="isSaving" :disabled="!unlocked || !hasChanges || isEu" @click="save">
         <Save class="h-4 w-4 mr-2" />
