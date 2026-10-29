@@ -2,6 +2,7 @@ import { ref, onUnmounted } from "vue";
 import { safeStorage } from "./useConsent";
 import { debugLog } from "@/utils/debug";
 import type { Message } from "@/types";
+import type { PageToolDescriptor } from "./usePageTools";
 import { insertMessage, parseServerTime } from "@/utils/messageOrder";
 
 export function useWebSocket(baseUrl: string, organizationId: string) {
@@ -15,6 +16,7 @@ export function useWebSocket(baseUrl: string, organizationId: string) {
   let reconnectAttempts = 0;
   const maxReconnectAttempts = 5;
   let statusChangeCallback: ((status: string, payload: any) => void) | null = null;
+  let toolCallCallback: ((call: PageToolCall) => void) | null = null;
 
   const connect = (token?: string) => {
     const wsUrl = new URL("/ws", baseUrl.replace("http", "ws"));
@@ -120,6 +122,17 @@ export function useWebSocket(baseUrl: string, organizationId: string) {
         }
         break;
 
+      case "tool_call":
+        // The AI wants a page tool run here; useChat executes it and answers.
+        if (typeof data.callId === "string" && typeof data.name === "string" && toolCallCallback) {
+          toolCallCallback({
+            callId: data.callId,
+            name: data.name,
+            args: data.args && typeof data.args === "object" ? data.args : {},
+          });
+        }
+        break;
+
       case "error":
         console.error("[Webchat] Server error:", data.error);
         break;
@@ -133,7 +146,11 @@ export function useWebSocket(baseUrl: string, organizationId: string) {
     insertMessage(messages.value, message);
   };
 
-  const identify = (customerId: string, existingConversationId?: string) => {
+  const identify = (
+    customerId: string,
+    existingConversationId?: string,
+    tools?: PageToolDescriptor[],
+  ) => {
     if (!ws.value || ws.value.readyState !== WebSocket.OPEN) {
       console.error("[Webchat] WebSocket not connected");
       return;
@@ -148,8 +165,25 @@ export function useWebSocket(baseUrl: string, organizationId: string) {
           userAgent: navigator.userAgent,
           timestamp: Date.now(),
         },
+        // Page tools (WebMCP) the host page registered, if any.
+        ...(tools && tools.length > 0 ? { tools } : {}),
       }),
     );
+  };
+
+  /** The page's tool list changed after identify: send the whole list again. */
+  const sendTools = (tools: PageToolDescriptor[]) => {
+    if (!ws.value || ws.value.readyState !== WebSocket.OPEN) return;
+    ws.value.send(JSON.stringify({ type: "register_tools", tools }));
+  };
+
+  const sendToolResult = (callId: string, outcome: { result?: unknown; error?: string }) => {
+    if (!ws.value || ws.value.readyState !== WebSocket.OPEN) return;
+    ws.value.send(JSON.stringify({ type: "tool_result", callId, ...outcome }));
+  };
+
+  const setToolCallHandler = (callback: (call: PageToolCall) => void) => {
+    toolCallCallback = callback;
   };
 
   const sendTypingIndicator = (isTypingValue: boolean) => {
@@ -196,7 +230,17 @@ export function useWebSocket(baseUrl: string, organizationId: string) {
     connect,
     identify,
     sendTypingIndicator,
+    sendTools,
+    sendToolResult,
     setStatusChangeCallback,
+    setToolCallHandler,
     disconnect,
   };
+}
+
+/** A `tool_call` frame: the AI asked for page tool `name` with `args`. */
+export interface PageToolCall {
+  callId: string;
+  name: string;
+  args: Record<string, unknown>;
 }

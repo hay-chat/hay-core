@@ -1,5 +1,7 @@
 import { ref, shallowRef, computed, watch } from "vue";
-import { useWebSocket } from "./useWebSocket";
+import { useWebSocket, type PageToolCall } from "./useWebSocket";
+import { executePageTool, listPageTools, pageToolsVersion } from "./usePageTools";
+import { startActivity, endActivity } from "@/utils/agentActivity";
 import { useConversation, WidgetRequestError } from "./useConversation";
 import { useMessageQueue } from "./useMessageQueue";
 import { initContext, getContext } from "./useWidgetContext";
@@ -84,9 +86,33 @@ export function useChat(config: HayChatConfig, options: UseChatOptions = {}) {
     connect,
     identify,
     sendTypingIndicator,
+    sendTools,
+    sendToolResult,
     disconnect,
     setStatusChangeCallback,
+    setToolCallHandler,
   } = useWebSocket(config.baseUrl, config.organizationId);
+
+  // Page tools (WebMCP): the host page's tools go up with identify and again
+  // whenever the page changes them; a tool_call runs here, under the orange
+  // "working" overlay, and its answer goes back on the same socket.
+  watch(pageToolsVersion, () => {
+    if (isConnected.value && conversationId.value) sendTools(listPageTools());
+  });
+  const runPageTool = async (call: PageToolCall) => {
+    debugLog("[Webchat] Page tool call", call);
+    startActivity(config.agentName || "Hay", describeToolCall(call.name));
+    try {
+      const result = await executePageTool(call.name, call.args);
+      sendToolResult(call.callId, { result: result === undefined ? null : result });
+    } catch (error) {
+      console.warn(`[Hay Webchat] Page tool "${call.name}" failed:`, error);
+      sendToolResult(call.callId, { error: (error as Error)?.message || String(error) });
+    } finally {
+      endActivity();
+    }
+  };
+  setToolCallHandler((call) => void runPageTool(call));
 
   // Initialize message queue for offline/retry handling
   const messageQueue = useMessageQueue();
@@ -419,7 +445,7 @@ export function useChat(config: HayChatConfig, options: UseChatOptions = {}) {
 
     if (conversationId.value && isConnected.value) {
       debugLog("[Webchat] Identifying with WebSocket after connection...");
-      identify(customerId.value, conversationId.value);
+      identify(customerId.value, conversationId.value, listPageTools());
     }
   };
 
@@ -1245,4 +1271,10 @@ export function useChat(config: HayChatConfig, options: UseChatOptions = {}) {
     startNewConversation,
     saveContactEmail,
   };
+}
+
+/** "open_conversation" → "Open conversation", for the overlay pill. */
+function describeToolCall(name: string): string {
+  const words = name.replace(/[_-]+/g, " ").trim();
+  return words.charAt(0).toUpperCase() + words.slice(1);
 }
