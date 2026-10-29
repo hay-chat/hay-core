@@ -598,6 +598,9 @@ export default defineHayPlugin((globalCtx) => {
         tokenUrl: "https://{shop}/admin/oauth/access_token",
         scopes: [
           "read_orders",
+          // Without it Shopify only returns orders from the last 60 days (approved
+          // for the Hay.chat app; also in the hay-shopify-app toml since 2026-10-29).
+          "read_all_orders",
           "write_orders",
           "read_customers",
           "write_customers",
