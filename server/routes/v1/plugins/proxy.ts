@@ -140,6 +140,7 @@ router.all(/^\/([^/]+)\/(.*)?$/, async (req: Request, res: Response): Promise<vo
         method: req.method,
         headers,
         body,
+        signal: AbortSignal.timeout(WORKER_FORWARD_TIMEOUT_MS),
       });
 
       // Copy status
@@ -205,6 +206,9 @@ function pathSegments(path: string): string[] | null {
   const segments = trimmed.split("/");
   return segments.some((segment) => segment === "") ? null : segments;
 }
+
+// Upper bound for a plugin route to answer a forwarded request.
+const WORKER_FORWARD_TIMEOUT_MS = 30_000;
 
 // Cold starts (waking a worker that isn't running) per plugin, per window. The
 // proxy is unauthenticated, so this bounds how fast it can spin up workers.
