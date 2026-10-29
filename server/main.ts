@@ -201,7 +201,7 @@ async function startServer() {
 
   // Liveness: the process is up and serving HTTP. Registered at both `/health`
   // (internal — used by deploy.sh) and `/v1/health` (externally reachable via
-  // the nginx `/v1` proxy; `/health` is not proxied). Reveals no internals.
+  // the reverse proxy's `/v1` route; `/health` is not proxied). Reveals no internals.
   const healthHandler = (_req: express.Request, res: express.Response): void => {
     res.json({ status: "ok" });
   };

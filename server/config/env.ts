@@ -35,9 +35,9 @@ export const config = {
   server: {
     port: parseInt(process.env.PORT || "3001", 10),
     host: process.env.HOST || "localhost",
-    // Reverse-proxy hops in front of the server (nginx = 1). The client IP is
-    // read from X-Forwarded-For through this many proxies only, so entries a
-    // client adds itself are ignored. 0 = clients connect directly.
+    // Reverse-proxy hops in front of the server (one reverse proxy = 1). The
+    // client IP is read from X-Forwarded-For through this many proxies only,
+    // so entries a client adds itself are ignored. 0 = clients connect directly.
     trustProxy: parseInt(
       process.env.TRUST_PROXY || (process.env.NODE_ENV === "production" ? "1" : "0"),
       10,
