@@ -3,7 +3,7 @@ import { getClientIp } from "@server/lib/client-ip";
 
 describe("getClientIp", () => {
   it("takes the address our proxy appended, not client-supplied entries", () => {
-    // nginx appends the peer it saw to whatever X-Forwarded-For the client sent.
+    // The reverse proxy appends the peer it saw to whatever X-Forwarded-For the client sent.
     expect(getClientIp({ "x-forwarded-for": "198.51.100.1, 203.0.113.7" }, "10.0.0.1", 1)).toBe(
       "203.0.113.7",
     );
