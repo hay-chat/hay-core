@@ -10,6 +10,7 @@ const upsertRoutes = jest.fn();
 const stopPluginWorker = jest.fn();
 const startPluginWorker = jest.fn();
 const retrieveState = jest.fn();
+const storeState = jest.fn();
 const resolveConfigWithEnv = jest.fn();
 
 jest.mock("@server/repositories/plugin-registry.repository", () => ({
@@ -25,14 +26,23 @@ jest.mock("@server/services/plugin-manager.service", () => ({
   pluginManagerService: { stopPluginWorker, startPluginWorker },
 }));
 jest.mock("@server/services/oauth-state.service", () => ({
-  oauthStateService: { retrieveState },
+  oauthStateService: {
+    retrieveState,
+    storeState,
+    generateNonce: () => "nonce-123",
+    generatePKCE: () => ({ codeVerifier: "verifier", codeChallenge: "challenge" }),
+  },
 }));
 jest.mock("@server/lib/config-resolver", () => ({
   resolveConfigWithEnv,
   stripServerOnlyFields: (config: Record<string, unknown>) => config,
 }));
 
-import { oauthService } from "../../services/oauth.service";
+import {
+  oauthService,
+  substituteUrlPlaceholders,
+  tokenResponseExtras,
+} from "../../services/oauth.service";
 
 const TOKEN_URL = "https://graph.facebook.com/v21.0/oauth/access_token";
 
@@ -318,5 +328,160 @@ describe("oauthService.initiateOAuth", () => {
       code: "BAD_REQUEST",
       message: "This plugin connects from its settings page",
     });
+  });
+});
+
+describe("oauthService.initiateOAuth placeholders", () => {
+  it("puts the client id in the authorize path when the URL declares {client_id}", async () => {
+    findByPluginId.mockResolvedValue(
+      registryPlugin({
+        authorizationUrl: "https://www.example.com/apps/{client_id}/authorize",
+        scopes: [],
+      }),
+    );
+    storeState.mockResolvedValue(undefined);
+
+    const { authorizationUrl, state } = await oauthService.initiateOAuth("p", "org-1", "u-1");
+
+    const url = new URL(authorizationUrl);
+    expect(url.origin + url.pathname).toBe("https://www.example.com/apps/app-id/authorize");
+    expect(url.searchParams.get("state")).toBe(state);
+    expect(url.searchParams.has("scope")).toBe(false);
+  });
+});
+
+describe("substituteUrlPlaceholders", () => {
+  it("fills {client_id} (encoded) and {shop}, and leaves plain URLs alone", () => {
+    expect(
+      substituteUrlPlaceholders("https://x.test/apps/{client_id}/authorize", {
+        shopDomain: undefined,
+        clientId: "a b",
+      }),
+    ).toBe("https://x.test/apps/a%20b/authorize");
+    expect(
+      substituteUrlPlaceholders("https://{shop}/admin/oauth/authorize", {
+        shopDomain: "https://store.myshopify.com/",
+        clientId: "id",
+      }),
+    ).toBe("https://store.myshopify.com/admin/oauth/authorize");
+    expect(
+      substituteUrlPlaceholders("https://x.test/token", { shopDomain: undefined, clientId: "id" }),
+    ).toBe("https://x.test/token");
+  });
+
+  it("still requires a store domain for {shop}", () => {
+    expect(() =>
+      substituteUrlPlaceholders("https://{shop}/token", { shopDomain: "", clientId: "id" }),
+    ).toThrow(TRPCError);
+  });
+});
+
+describe("tokenResponseExtras", () => {
+  it("keeps non-standard scalar fields as strings and drops the rest", () => {
+    expect(
+      tokenResponseExtras({
+        access_token: "t",
+        refresh_token: "r",
+        expires_in: 10,
+        token_type: "bearer",
+        scope: "a,b",
+        user_id: 789,
+        store_id: "789",
+        live: false,
+        nested: { a: 1 },
+        list: [1],
+        empty: "",
+        "bad-key": "x",
+        huge: "x".repeat(4097),
+        nan: Number.NaN,
+      }),
+    ).toEqual({ user_id: "789", store_id: "789", live: "false" });
+  });
+
+  it("returns undefined when there is nothing extra", () => {
+    expect(tokenResponseExtras({ access_token: "t" })).toBeUndefined();
+    expect(tokenResponseExtras(null)).toBeUndefined();
+  });
+});
+
+describe("oauthService.handleCallback exchange encoding", () => {
+  beforeEach(() => {
+    retrieveState.mockResolvedValue({
+      pluginId: "p",
+      organizationId: "org-1",
+      userId: "u-1",
+      nonce: "nonce",
+      codeVerifier: "verifier",
+      createdAt: Date.now(),
+    });
+  });
+
+  it("posts JSON when the method declares tokenRequestFormat json and keeps token extras", async () => {
+    findByPluginId.mockResolvedValue(
+      registryPlugin({
+        tokenUrl: "https://x.test/apps/authorize/token",
+        tokenRequestFormat: "json",
+      }),
+    );
+    fetchMock
+      .mockResolvedValueOnce(
+        jsonResponse({
+          access_token: "store-token",
+          token_type: "bearer",
+          scope: "read_products,write_orders",
+          user_id: 789,
+        }),
+      )
+      .mockResolvedValueOnce(jsonResponse({ routingKeys: [] }));
+
+    const result = await oauthService.handleCallback("auth-code", "nonce");
+    expect(result).toMatchObject({ success: true });
+
+    const [tokenUrl, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(tokenUrl).toBe("https://x.test/apps/authorize/token");
+    expect((init.headers as Record<string, string>)["Content-Type"]).toBe("application/json");
+    expect(JSON.parse(init.body as string)).toMatchObject({
+      grant_type: "authorization_code",
+      code: "auth-code",
+      client_id: "app-id",
+      client_secret: "app-secret",
+    });
+
+    expect(updateAuthState).toHaveBeenCalledWith(
+      "inst-1",
+      "org-1",
+      expect.objectContaining({
+        credentials: expect.objectContaining({
+          accessToken: "store-token",
+          scope: "read_products,write_orders",
+          user_id: "789",
+        }),
+      }),
+    );
+  });
+
+  it("stays form-encoded by default", async () => {
+    fetchMock
+      .mockResolvedValueOnce(jsonResponse({ access_token: "t" }))
+      .mockResolvedValueOnce(jsonResponse({ routingKeys: [] }));
+
+    await oauthService.handleCallback("auth-code", "nonce");
+
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect((init.headers as Record<string, string>)["Content-Type"]).toBe(
+      "application/x-www-form-urlencoded",
+    );
+    expect(new URLSearchParams(init.body as string).get("code")).toBe("auth-code");
+  });
+
+  it("never lets a token extra overwrite core's own credential keys", async () => {
+    fetchMock
+      .mockResolvedValueOnce(jsonResponse({ access_token: "real", accessToken: "evil" }))
+      .mockResolvedValueOnce(jsonResponse({ routingKeys: [] }));
+
+    await oauthService.handleCallback("auth-code", "nonce");
+
+    const stored = updateAuthState.mock.calls[0][2].credentials as Record<string, unknown>;
+    expect(stored.accessToken).toBe("real");
   });
 });

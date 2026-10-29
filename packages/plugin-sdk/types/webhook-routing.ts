@@ -88,7 +88,11 @@ export interface WebhookVerificationChallengeDescriptor {
  * on each array item (e.g. "id"). No code execution, no DSL.
  */
 export interface WebhookRouteKeyPathDescriptor {
-  /** Dot-path to the array of events on the parsed body (e.g. "entry"). */
+  /**
+   * Dot-path to the array of events on the parsed body (e.g. "entry"). The
+   * special value `"."` means the body itself is one event (providers that send
+   * a single object per delivery); it is routed by `keyPath` and forwarded whole.
+   */
   itemsPath: string;
 
   /**

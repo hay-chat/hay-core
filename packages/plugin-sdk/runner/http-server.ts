@@ -222,6 +222,7 @@ export class PluginHttpServer {
                 tokenExchange: method.tokenExchange,
                 tokenRefresh: method.tokenRefresh,
                 connectFlow: method.connectFlow,
+                tokenRequestFormat: method.tokenRequestFormat,
               };
             }
           }),

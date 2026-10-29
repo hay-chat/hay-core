@@ -303,6 +303,9 @@ export interface AuthMethodDescriptor {
   /** For OAuth2 auth: delimiter used to join scopes in the authorize URL (defaults to a space) */
   scopeSeparator?: string;
 
+  /** For OAuth2 auth: body encoding of the code exchange POST ("form" default, or "json"). */
+  tokenRequestFormat?: "form" | "json";
+
   /** For OAuth2 auth: one-time token transform run after the code exchange (e.g. short→long). */
   tokenExchange?: OAuthTokenOpDescriptor;
 
