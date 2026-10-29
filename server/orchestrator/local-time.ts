@@ -37,7 +37,8 @@ export function describeLocalTime(
 
   const hour = Number(part("hour"));
   const pad = (h: number) => `${String(h % 24).padStart(2, "0")}:00`;
-  const offset = part("timeZoneName") || "GMT";
+  // ICU versions disagree on a zero offset ("GMT" vs "GMT+0"); keep one form
+  const offset = (part("timeZoneName") || "GMT").replace(/^GMT[+-]0$/, "GMT");
 
   return {
     timezone: zone,
