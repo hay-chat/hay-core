@@ -70,3 +70,6 @@ plugins/custom/
 server/uploads/plugin-zips/
 .dual-graph/
 .impeccable/
+
+# Redis snapshots
+*.rdb
