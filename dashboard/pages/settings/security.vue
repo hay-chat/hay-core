@@ -551,6 +551,7 @@
 </template>
 
 <script setup lang="ts">
+import { logger } from "@/utils/logger";
 import {
   Download,
   Save,
@@ -734,7 +735,7 @@ const removeIPAddress = (index: number) => {
 
 const createAPIKey = () => {
   // TODO: Open API key creation modal
-  console.log("Create new API key");
+  logger.debug("Create new API key");
 };
 
 const toggleAPIKey = (keyId: string) => {
@@ -762,7 +763,7 @@ const confirmDeleteAPIKey = () => {
 
 const implementRecommendation = (recId: string) => {
   // TODO: Implement security recommendation
-  console.log("Implement recommendation:", recId);
+  logger.debug("Implement recommendation:", recId);
 
   // Remove from recommendations
   const index = recommendations.value.findIndex((r) => r.id === recId);
@@ -775,13 +776,13 @@ const saveSettings = async () => {
   try {
     isSaving.value = true;
     // TODO: Save security settings to API
-    console.log("Saving security settings:", settings.value);
+    logger.debug("Saving security settings:", settings.value);
 
     // Update original settings to new saved state
     originalSettings.value = JSON.parse(JSON.stringify(settings.value));
 
     // TODO: Show success toast
-    console.log("Security settings saved successfully");
+    logger.debug("Security settings saved successfully");
   } catch (error) {
     // TODO: Show error toast
     console.error("Failed to save security settings:", error);
@@ -792,7 +793,7 @@ const saveSettings = async () => {
 
 const downloadSecurityReport = () => {
   // TODO: Generate and download security report
-  console.log("Download security report");
+  logger.debug("Download security report");
 };
 
 // Lifecycle

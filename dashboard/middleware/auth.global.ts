@@ -1,3 +1,4 @@
+import { logger } from "@/utils/logger";
 import type { RouteLocationNormalized } from "vue-router";
 import { useAuthStore } from "@/stores/auth";
 import { useUserStore, type User } from "@/stores/user";
@@ -62,7 +63,7 @@ function hasRouteAccess(path: string, userRole: string | undefined): boolean {
 
 export default defineNuxtRouteMiddleware(
   async (to: RouteLocationNormalized, from: RouteLocationNormalized) => {
-    console.log("[Auth Middleware] Checking route:", to.path, "process.client:", process.client);
+    logger.debug("[Auth Middleware] Checking route:", to.path, "process.client:", process.client);
 
     // Alert links (push, email) carry ?org=<id>: open them in that organization
     // for users who belong to several. Before the same-page check, which also
@@ -79,38 +80,34 @@ export default defineNuxtRouteMiddleware(
 
     // Skip auth check if staying on the same page (e.g., opening modals)
     if (to.path === from.path) {
-      console.log("[Auth Middleware] Same page, skipping");
+      logger.debug("[Auth Middleware] Same page, skipping");
       return;
     }
 
     // Check if the page is marked as public via page metadata
     if (to.meta.public === true) {
-      console.log("[Auth Middleware] Public page detected:", to.path);
+      logger.debug("[Auth Middleware] Public page detected:", to.path);
       return;
     }
 
     // Only run on client side - SSR doesn't have access to stores properly
     if (!process.client) {
-      console.log("[Auth Middleware] Running on server side, skipping role check");
+      logger.debug("[Auth Middleware] Running on server side, skipping role check");
       return;
     }
 
     const authStore = useAuthStore();
     const userStore = useUserStore();
 
-    console.log("[Auth Middleware] Auth initialized:", authStore.isInitialized);
-    console.log("[Auth Middleware] Authenticated:", authStore.isAuthenticated);
-    console.log("[Auth Middleware] Has tokens:", !!authStore.tokens?.accessToken);
-
     // Check if auth is still initializing - only on client side
     if (!authStore.isInitialized) {
       // For client-side navigation, wait for auth initialization
       // but immediately redirect if we know there's no token
       if (!authStore.tokens?.accessToken) {
-        console.log("[Auth Middleware] No token and not initialized, redirecting to login");
+        logger.debug("[Auth Middleware] No token and not initialized, redirecting to login");
         return navigateTo({ path: "/login", query: { redirect: to.fullPath } });
       }
-      console.log("[Auth Middleware] Auth not initialized yet but has token, waiting");
+      logger.debug("[Auth Middleware] Auth not initialized yet but has token, waiting");
       return; // Let AuthProvider handle the loading state
     }
 
@@ -120,7 +117,7 @@ export default defineNuxtRouteMiddleware(
     if (!hasValidAuth) {
       // If authenticated but missing user data, clear auth state
       if (authStore.isAuthenticated && !userStore.user?.id) {
-        console.log("[Auth Middleware] Authenticated but missing user data, logging out");
+        logger.debug("[Auth Middleware] Authenticated but missing user data, logging out");
         authStore.logout();
         return;
       }
@@ -158,8 +155,8 @@ export default defineNuxtRouteMiddleware(
     // Role-based route protection
     const userRole = currentOrganization?.role;
 
-    console.log("[Auth Middleware] User role:", userRole);
-    console.log("[Auth Middleware] Has access:", hasRouteAccess(to.path, userRole));
+    logger.debug("[Auth Middleware] User role:", userRole);
+    logger.debug("[Auth Middleware] Has access:", hasRouteAccess(to.path, userRole));
 
     if (!hasRouteAccess(to.path, userRole)) {
       console.warn(`[Auth Middleware] Access denied to ${to.path} for role: ${userRole}`);
@@ -170,10 +167,10 @@ export default defineNuxtRouteMiddleware(
       }
 
       // Redirect to unauthorized page with the attempted path
-      console.log("[Auth Middleware] Redirecting to unauthorized page");
+      logger.debug("[Auth Middleware] Redirecting to unauthorized page");
       return navigateTo("/unauthorized?from=" + encodeURIComponent(to.path));
     }
 
-    console.log("[Auth Middleware] Access granted");
+    logger.debug("[Auth Middleware] Access granted");
   },
 );

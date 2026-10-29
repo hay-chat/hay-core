@@ -152,16 +152,12 @@ export function useWebSocket() {
    * Handle incoming WebSocket message
    */
   const handleMessage = (message: WebSocketMessage) => {
-    console.log("[Dashboard WebSocket] Received message:", message.type, message);
-
     // Emit to registered event handlers
     const handlers = eventHandlers.get(message.type);
-    console.log(`[Dashboard WebSocket] Handlers for ${message.type}:`, handlers?.size || 0);
 
     if (handlers) {
       handlers.forEach((handler) => {
         try {
-          console.log(`[Dashboard WebSocket] Calling handler for ${message.type}`);
           // For 'message' events, the payload is in message.data, for others it's in message.payload
           const payload = message.type === "message" ? message : message.payload;
           handler(payload);
@@ -169,9 +165,6 @@ export function useWebSocket() {
           console.error(`[Dashboard WebSocket] Handler error for ${message.type}:`, error);
         }
       });
-    } else {
-      console.log(`[Dashboard WebSocket] No handlers registered for ${message.type}`);
-      // Use debug level for unknown message types to reduce noise
     }
 
     // Handle built-in events
@@ -313,15 +306,10 @@ export function useWebSocket() {
    * Register event handler
    */
   const on = (eventType: string, handler: WebSocketEventHandler) => {
-    console.log(`[Dashboard WebSocket] Registering handler for event: ${eventType}`);
     if (!eventHandlers.has(eventType)) {
       eventHandlers.set(eventType, new Set());
     }
     eventHandlers.get(eventType)!.add(handler);
-    console.log(
-      `[Dashboard WebSocket] Total handlers for ${eventType}:`,
-      eventHandlers.get(eventType)!.size,
-    );
 
     // Return unsubscribe function
     return () => {

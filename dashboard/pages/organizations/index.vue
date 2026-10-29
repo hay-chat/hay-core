@@ -214,6 +214,7 @@
 </template>
 
 <script setup lang="ts">
+import { logger } from "@/utils/logger";
 import { Building2, Plus, RefreshCw, Search, Settings, MoreVertical } from "lucide-vue-next";
 
 // TODO: Import organization store/composable
@@ -341,7 +342,7 @@ const refreshData = async () => {
   loading.value = true;
   try {
     // TODO: Fetch organizations from API
-    console.log("Refreshing organizations data...");
+    logger.debug("Refreshing organizations data...");
 
     // Simulate API call
     await new Promise((resolve) => setTimeout(resolve, 1000));
@@ -371,13 +372,13 @@ const clearFilters = () => {
 const createOrganization = () => {
   // TODO: Open create organization modal or navigate to form
   // TODO: Implement organization creation workflow
-  console.log("Create organization");
+  logger.debug("Create organization");
 };
 
 const viewOrganization = (id: string) => {
   // TODO: Navigate to organization detail page
   // await navigateTo(`/organizations/${id}`)
-  console.log("View organization:", id);
+  logger.debug("View organization:", id);
 };
 
 const switchToOrganization = async (id: string) => {
@@ -386,7 +387,7 @@ const switchToOrganization = async (id: string) => {
     // TODO: Update current organization in store
     // TODO: Refresh user session with new organization context
     // TODO: Show success notification
-    console.log("Switch to organization:", id);
+    logger.debug("Switch to organization:", id);
 
     // Simulate API call
     await new Promise((resolve) => setTimeout(resolve, 500));
@@ -409,14 +410,14 @@ const showOptionsMenu = (org: Organization) => {
   // - View settings
   // - Deactivate/Activate
   // - Delete (if allowed)
-  console.log("Show options for organization:", org.id);
+  logger.debug("Show options for organization:", org.id);
 };
 
 // Lifecycle
 onMounted(async () => {
   // TODO: Load organizations on mount
   // TODO: Set up real-time updates for organization list
-  console.log("Organizations page mounted");
+  logger.debug("Organizations page mounted");
 
   // Load data
   await refreshData();

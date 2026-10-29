@@ -1,3 +1,4 @@
+import { logger } from "@/utils/logger";
 import { ref, onUnmounted } from "vue";
 
 interface Message {
@@ -40,7 +41,7 @@ export function useMessageSync(options: SyncOptions) {
 
     try {
       isSyncing.value = true;
-      console.log("[Dashboard MessageSync] Starting sync for conversation:", conversationId);
+      logger.debug("[Dashboard MessageSync] Starting sync for conversation:", conversationId);
 
       // Fetch messages from server
       const serverMessages = await fetchMessages();
@@ -56,7 +57,7 @@ export function useMessageSync(options: SyncOptions) {
       const extraMessages = currentMessages.filter((msg) => !serverMessageIds.has(msg.id));
 
       if (missingMessages.length > 0) {
-        console.log(
+        logger.debug(
           `[Dashboard MessageSync] Found ${missingMessages.length} missing messages, syncing...`,
         );
         // Merge missing messages into current messages, maintaining chronological order
@@ -75,7 +76,7 @@ export function useMessageSync(options: SyncOptions) {
       }
 
       lastSyncTime.value = Date.now();
-      console.log("[Dashboard MessageSync] Sync completed successfully");
+      logger.debug("[Dashboard MessageSync] Sync completed successfully");
     } catch (error) {
       console.error("[Dashboard MessageSync] Sync failed:", error);
     } finally {
@@ -87,7 +88,7 @@ export function useMessageSync(options: SyncOptions) {
   const startSync = () => {
     if (!enabled) return;
 
-    console.log(`[Dashboard MessageSync] Starting periodic sync (interval: ${syncInterval}ms)`);
+    logger.debug(`[Dashboard MessageSync] Starting periodic sync (interval: ${syncInterval}ms)`);
     syncTimer = setInterval(sync, syncInterval);
 
     // Do initial sync
@@ -99,7 +100,7 @@ export function useMessageSync(options: SyncOptions) {
     if (syncTimer) {
       clearInterval(syncTimer);
       syncTimer = null;
-      console.log("[Dashboard MessageSync] Periodic sync stopped");
+      logger.debug("[Dashboard MessageSync] Periodic sync stopped");
     }
   };
 

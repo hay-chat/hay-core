@@ -271,6 +271,14 @@ module.exports = {
         "no-console": "off",
       },
     },
+    // Dashboard app code: debug output goes through utils/logger (dev builds only).
+    {
+      files: ["dashboard/**/*.ts", "dashboard/**/*.vue"],
+      excludedFiles: ["dashboard/tests/**", "dashboard/scripts/**", "dashboard/**/*.test.ts"],
+      rules: {
+        "no-console": ["error", { allow: ["warn", "error"] }],
+      },
+    },
   ],
   ignorePatterns: [
     "node_modules",

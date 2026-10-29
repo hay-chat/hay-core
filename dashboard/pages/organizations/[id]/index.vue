@@ -482,6 +482,7 @@
 </template>
 
 <script setup lang="ts">
+import { logger } from "@/utils/logger";
 import { useI18n } from "vue-i18n";
 import {
   Building2,
@@ -648,7 +649,7 @@ const loadOrganization = async () => {
   loading.value = true;
   try {
     // TODO: Fetch organization data from API
-    console.log("Loading organization:", organizationId);
+    logger.debug("Loading organization:", organizationId);
 
     // Simulate API call
     await new Promise((resolve) => setTimeout(resolve, 1000));
@@ -682,24 +683,24 @@ const loadOrganization = async () => {
 };
 
 const editOrganization = () => {
-  console.log("Edit organization");
+  logger.debug("Edit organization");
 };
 
 const switchToOrganization = async () => {
   try {
-    console.log("Switch to organization:", organizationId);
+    logger.debug("Switch to organization:", organizationId);
   } catch (error) {
     console.error("Error switching organization:", error);
   }
 };
 
 const inviteMember = () => {
-  console.log("Invite member");
+  logger.debug("Invite member");
 };
 
 const updateMemberRole = async (member: Member) => {
   try {
-    console.log("Update member role:", member.id, member.role);
+    logger.debug("Update member role:", member.id, member.role);
   } catch (error) {
     console.error("Error updating member role:", error);
   }
@@ -707,7 +708,7 @@ const updateMemberRole = async (member: Member) => {
 
 const removeMember = async (member: Member) => {
   try {
-    console.log("Remove member:", member.id);
+    logger.debug("Remove member:", member.id);
   } catch (error) {
     console.error("Error removing member:", error);
   }
@@ -715,7 +716,7 @@ const removeMember = async (member: Member) => {
 
 const saveSettings = async () => {
   try {
-    console.log("Save settings:", organizationForm);
+    logger.debug("Save settings:", organizationForm);
   } catch (error) {
     console.error("Error saving settings:", error);
   }
@@ -723,7 +724,7 @@ const saveSettings = async () => {
 
 const saveSecuritySettings = async () => {
   try {
-    console.log("Save security settings");
+    logger.debug("Save security settings");
   } catch (error) {
     console.error("Error saving security settings:", error);
   }
@@ -731,7 +732,7 @@ const saveSecuritySettings = async () => {
 
 const regenerateApiKey = async () => {
   try {
-    console.log("Regenerate API key");
+    logger.debug("Regenerate API key");
   } catch (error) {
     console.error("Error regenerating API key:", error);
   }
@@ -740,7 +741,7 @@ const regenerateApiKey = async () => {
 const copyApiKey = async () => {
   try {
     await navigator.clipboard.writeText(organization.value?.apiKey || "");
-    console.log("API key copied to clipboard");
+    logger.debug("API key copied to clipboard");
   } catch (error) {
     console.error("Error copying API key:", error);
   }

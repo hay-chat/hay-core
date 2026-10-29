@@ -1,3 +1,4 @@
+import { logger } from "@/utils/logger";
 import { ref } from "vue";
 
 interface QueuedMessage {
@@ -45,14 +46,14 @@ export function useMessageQueue() {
       retryCount: 0,
     });
     saveQueue();
-    console.log("[Dashboard MessageQueue] Message queued:", message.id);
+    logger.debug("[Dashboard MessageQueue] Message queued:", message.id);
   };
 
   // Remove message from queue
   const dequeue = (messageId: string) => {
     queue.value = queue.value.filter((msg) => msg.id !== messageId);
     saveQueue();
-    console.log("[Dashboard MessageQueue] Message dequeued:", messageId);
+    logger.debug("[Dashboard MessageQueue] Message dequeued:", messageId);
   };
 
   // Get next message to retry with exponential backoff
@@ -62,7 +63,7 @@ export function useMessageQueue() {
     for (const msg of queue.value) {
       // Skip if max retries reached
       if (msg.retryCount >= MAX_RETRIES) {
-        console.log("[Dashboard MessageQueue] Max retries reached for:", msg.id);
+        logger.debug("[Dashboard MessageQueue] Max retries reached for:", msg.id);
         continue;
       }
 
@@ -85,7 +86,7 @@ export function useMessageQueue() {
       msg.retryCount++;
       msg.timestamp = Date.now(); // Update timestamp for next backoff calculation
       saveQueue();
-      console.log(
+      logger.debug(
         `[Dashboard MessageQueue] Retry count incremented for ${messageId}: ${msg.retryCount}`,
       );
     }
@@ -95,7 +96,7 @@ export function useMessageQueue() {
   const clearQueue = () => {
     queue.value = [];
     localStorage.removeItem(STORAGE_KEY);
-    console.log("[Dashboard MessageQueue] Queue cleared");
+    logger.debug("[Dashboard MessageQueue] Queue cleared");
   };
 
   // Get messages for specific conversation
@@ -110,7 +111,7 @@ export function useMessageQueue() {
     const removed = beforeCount - queue.value.length;
     if (removed > 0) {
       saveQueue();
-      console.log(`[Dashboard MessageQueue] Cleared ${removed} failed messages`);
+      logger.debug(`[Dashboard MessageQueue] Cleared ${removed} failed messages`);
     }
   };
 
