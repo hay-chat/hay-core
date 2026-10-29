@@ -25,6 +25,7 @@ import {
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { configDir, loadConfig, resolveTargetName } from "./config";
+import { demoImages, demoSeed } from "./demo";
 
 /** Gitignored test-account credentials (HAY_EMAIL, HAY_PASSWORD, HAY_TARGET); see .env.example. */
 const ENV_FILE = join(__dirname, "..", ".env");
@@ -44,6 +45,11 @@ Usage: hay <command> [options]   (global: --target prod|local, --org <id>, --jso
   conv show <id> [--limit 200] [--logs]
   logs [<conversationId>] [--since 15m] [--log-limit 300]
   plugins list [--all] | tools [<plugin>] | test <plugin> | call (not available)
+  demo seed [all|hay|shopify|woocommerce|nuvemshop]
+                                  load the Casa Aurora demo (tools/demo-account) into the stores
+                                  and Hay.chat; store keys in tools/demo-account/.env
+        [--dry-run] [--reset-orders] [--image-base-url <url>]
+  demo images                     regenerate the demo product images
 
 Target: --target, else HAY_TARGET, else config defaultTarget, else prod.
 Config: ${configDir()}/config.json
@@ -61,6 +67,7 @@ const COMMANDS: Record<string, Handler | Record<string, Handler>> = {
   chat: { send: chatSend },
   conv: { list: convList, show: convShow },
   plugins: { list: pluginsList, tools: pluginsTools, test: pluginsTest, call: pluginsCall },
+  demo: { seed: demoSeed, images: demoImages },
 };
 
 export function resolveHandler(positionals: string[]): Handler | undefined {
