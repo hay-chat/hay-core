@@ -5,7 +5,7 @@ import { pluginInstanceManagerService } from "./plugin-instance-manager.service"
 import { pluginRegistryRepository } from "../repositories/plugin-registry.repository";
 import { pluginInstanceRepository } from "../repositories/plugin-instance.repository";
 import { pluginWebhookRouteRepository } from "../repositories/plugin-webhook-route.repository";
-import { verifyHmacSha256 } from "./plugin-route.service";
+import { verifyHmacSha256 } from "@server/lib/hmac-signature";
 import { normalizeEmailAddressKey, verifySvixSignature } from "@server/lib/svix-signature";
 import type {
   WebhookDeauthorizationDescriptor,

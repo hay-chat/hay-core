@@ -89,12 +89,6 @@ export interface HayPluginManifest {
     };
     chat_connector?: {
       type: "webhook" | "polling" | "websocket";
-      webhooks?: Array<{
-        path: string;
-        method: "GET" | "POST" | "PUT" | "DELETE";
-        verificationToken?: boolean;
-        signatureHeader?: string;
-      }>;
       publicDirectory?: string;
       realtime?: {
         type: "websocket" | "sse";
