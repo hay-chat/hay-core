@@ -147,7 +147,12 @@ export async function holdIfSpam(conversation: Conversation, log: HoldLogger): P
       });
       if (settings?.spamClassifierEnabled) {
         try {
-          record.classifier = await classify(conversation, messages, signals, settings.spamGuidance);
+          record.classifier = await classify(
+            conversation,
+            messages,
+            signals,
+            settings.spamGuidance,
+          );
           isSpam = record.classifier.isSpam;
         } catch (error) {
           log.warn({ err: error }, "Spam classifier failed; letting the AI answer");
@@ -171,7 +176,10 @@ export async function holdIfSpam(conversation: Conversation, log: HoldLogger): P
       spam_reason: `detector:${reason}`.slice(0, 255),
       needs_processing: false,
     });
-    log.info({ score, signals, classifier: !!record.classifier }, "Held webchat conversation as spam");
+    log.info(
+      { score, signals, classifier: !!record.classifier },
+      "Held webchat conversation as spam",
+    );
     return true;
   } catch (error) {
     log.warn({ err: error }, "Spam screening failed; letting the AI answer");

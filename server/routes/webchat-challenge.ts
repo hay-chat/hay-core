@@ -182,15 +182,18 @@ export async function webchatChallengeHandler(req: Request, res: Response): Prom
     }
 
     const hostname = pageOrigin.hostname.toLowerCase();
-    if (!isDashboardHost(hostname) && !(await webchatSettingsService.isDomainAllowed(org, hostname))) {
+    if (
+      !isDashboardHost(hostname) &&
+      !(await webchatSettingsService.isDomainAllowed(org, hostname))
+    ) {
       return refuse(res, 403, "This website is not allowed to use this chat");
     }
 
     const challenge = (
-      await webchatExtensionsService.resolveChallenges(org, { underAttack: await isUnderAttack(org) })
-    ).find(
-      (candidate) => candidate.id === c,
-    );
+      await webchatExtensionsService.resolveChallenges(org, {
+        underAttack: await isUnderAttack(org),
+      })
+    ).find((candidate) => candidate.id === c);
     const providerOrigin = challenge && PROVIDER_ORIGINS[challenge.props.provider];
     if (!challenge || !providerOrigin) return refuse(res, 404, "Not available");
 

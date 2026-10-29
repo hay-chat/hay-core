@@ -82,7 +82,8 @@ export function describeAiProvider(
     if (provider === "anthropic") host = hostOf(baseUrl ?? "", "api.anthropic.com");
     else if (provider === "gemini") host = "generativelanguage.googleapis.com";
     else if (baseUrl) host = hostOf(baseUrl, "api.openai.com");
-    else host = apiKeyEncrypted ? "api.openai.com" : hostOf(config.openai.baseUrl, "api.openai.com");
+    else
+      host = apiKeyEncrypted ? "api.openai.com" : hostOf(config.openai.baseUrl, "api.openai.com");
   } else {
     host = hostOf(config.llm.baseUrl || config.openai.baseUrl, "api.openai.com");
   }

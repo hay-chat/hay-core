@@ -80,7 +80,9 @@ export function scanWithClamd(buffer: Buffer): Promise<ScanStatus> {
       reply += data.toString("utf8");
       if (reply.includes("\0") || reply.includes("\n")) finish(parseClamdReply(reply));
     });
-    socket.on("end", () => finish(reply ? parseClamdReply(reply) : "error", reply ? undefined : "no reply"));
+    socket.on("end", () =>
+      finish(reply ? parseClamdReply(reply) : "error", reply ? undefined : "no reply"),
+    );
     socket.on("error", (error) => finish("error", error.message));
   });
 }
@@ -90,7 +92,8 @@ export function startScan(uploadId: string, buffer: Buffer): void {
   void scanWithClamd(buffer)
     .then(async (status) => {
       await Upload.update({ id: uploadId }, { scanStatus: status });
-      if (status !== "clean") logger.warn({ uploadId, status }, "Conversation file held by virus scan");
+      if (status !== "clean")
+        logger.warn({ uploadId, status }, "Conversation file held by virus scan");
     })
     .catch(async (error) => {
       logger.error({ err: error, uploadId }, "Virus scan crashed");

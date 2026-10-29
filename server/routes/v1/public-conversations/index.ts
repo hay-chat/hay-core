@@ -1,5 +1,9 @@
 import { t, publicProcedure } from "@server/trpc";
-import { requestHostname, isDashboardHost, challengeFrameHostname } from "@server/lib/webchat-origin";
+import {
+  requestHostname,
+  isDashboardHost,
+  challengeFrameHostname,
+} from "@server/lib/webchat-origin";
 import { isUnderAttack, recordCreateAttempt } from "@server/services/webchat/under-attack.service";
 import {
   webchatExtensionsService,
@@ -14,10 +18,7 @@ import { conversationRepository } from "../../../repositories/conversation.repos
 import { CustomerRepository } from "../../../repositories/customer.repository";
 import { OrganizationRepository } from "../../../repositories/organization.repository";
 import { createLogger } from "@server/lib/logger";
-import {
-  webchatSettingsService,
-  matchesAllowedDomains,
-} from "../../../services/webchat/webchat-settings.service";
+import { webchatSettingsService } from "../../../services/webchat/webchat-settings.service";
 import { verifiedCustomerExternalId } from "../../../services/webchat/webchat-identity.service";
 import { toPublicAttachments, toPublicMessage } from "../../../services/webchat/public-message";
 import {

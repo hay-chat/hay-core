@@ -57,8 +57,8 @@
           <Card>
             <CardContent class="pt-6">
               <p class="text-sm text-gray-600 mb-4">
-                The Hay.chat webchat widget will appear in the bottom-right corner of this page. Click on
-                it to start a conversation.
+                The Hay.chat webchat widget will appear in the bottom-right corner of this page.
+                Click on it to start a conversation.
               </p>
               <div class="space-y-2 text-sm">
                 <div class="flex items-center gap-2">

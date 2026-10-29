@@ -335,7 +335,7 @@
           v-if="conversation?.spam_flagged_at && !isPlaygroundMode"
           :conversation-id="conversation.id"
           :spam-reason="conversation.spam_reason"
-          :metadata="conversation.metadata as Record<string, unknown> | null"
+          :metadata="conversationMetadata"
           @cleared="fetchConversation"
         />
         <!-- Messages Container -->
@@ -1289,6 +1289,10 @@ const highlightedMessageId = computed(() =>
 // Context panel: one template, rendered inline on lg+ and inside a Sheet below lg
 const [DefinePanel, ReusePanel] = createReusableTemplate();
 const showDetailsSheet = ref(false);
+// Typed in script: a `|` in a template expression parses as a Vue 2 filter
+const conversationMetadata = computed(
+  () => conversation.value?.metadata as Record<string, unknown> | null | undefined,
+);
 // The inline panel returns at lg; a sheet left open would duplicate it
 const isDesktopPanel = useMediaQuery("(min-width: 1024px)");
 watch(isDesktopPanel, (desktop) => {

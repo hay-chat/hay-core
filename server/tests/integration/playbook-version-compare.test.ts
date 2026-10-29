@@ -112,9 +112,9 @@ describe("PlaybookService.compareWithActive", () => {
   });
 
   it("refuses another playbook's version and another org", async () => {
-    await expect(
-      service.compareWithActive(orgId, neverPublished.id, draft.id),
-    ).rejects.toThrow("Version not found");
+    await expect(service.compareWithActive(orgId, neverPublished.id, draft.id)).rejects.toThrow(
+      "Version not found",
+    );
     await expect(
       service.compareWithActive("d7600000-0000-4000-8000-0000000000ff", playbook.id),
     ).rejects.toThrow("Playbook not found");
