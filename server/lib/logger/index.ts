@@ -17,9 +17,33 @@
  * ```
  */
 
+import { AsyncLocalStorage } from "node:async_hooks";
 import pino from "pino";
 import { config } from "@server/config/env";
 import { REDACT_PATHS, REDACT_CENSOR, redactString } from "./redaction";
+
+interface LogContext {
+  conversationId: string;
+}
+
+const logContext = new AsyncLocalStorage<LogContext>();
+
+/**
+ * Run `fn` with a conversation id that every log line inside it carries (unless
+ * the line or its logger already sets one), so one orchestrator run can be
+ * filtered out of interleaved logs (`hay logs <conversationId>`).
+ */
+export function withLogContext<T>(context: LogContext, fn: () => T): T {
+  return logContext.run(context, fn);
+}
+
+/** pino mixin: adds the context's conversationId. Exported for tests. */
+export function logContextMixin(mergeObject: object, _level: number, log: pino.Logger): object {
+  const context = logContext.getStore();
+  if (!context || "conversationId" in mergeObject) return {};
+  if ("conversationId" in log.bindings()) return {};
+  return { conversationId: context.conversationId };
+}
 
 const level = config.logging.level || (config.isProduction ? "info" : "debug");
 
@@ -91,6 +115,7 @@ const rootLogger = pino({
     censor: REDACT_CENSOR,
   },
   timestamp: pino.stdTimeFunctions.isoTime,
+  mixin: logContextMixin,
   // Redact PII from string messages (including printf-style %s arguments)
   hooks: {
     logMethod(this: pino.Logger, inputArgs, method) {
