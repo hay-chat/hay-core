@@ -4,6 +4,12 @@ import { pluginWebhookRouteRepository } from "../repositories/plugin-webhook-rou
 import { pluginManagerService } from "./plugin-manager.service";
 import { oauthStateService } from "./oauth-state.service";
 import { resolveConfigWithEnv, stripServerOnlyFields } from "../lib/config-resolver";
+import { configEnvAllowList } from "../lib/plugin-env";
+import {
+  assertOAuthEndpoint,
+  oauthEndpointPolicy,
+  type OAuthEndpointPolicy,
+} from "../lib/oauth-endpoint";
 import { getApiUrl } from "../config/env";
 import type {
   OAuthTokenData,
@@ -15,6 +21,7 @@ import type { AuthMethodDescriptor, ConfigFieldDescriptor } from "../types/plugi
 import { parseConnectedAccount, parseConnectedCredentials } from "../lib/connected-account";
 import { createLogger } from "@server/lib/logger";
 import { TRPCError } from "@trpc/server";
+import { workerFetch } from "@server/lib/worker-client";
 
 const logger = createLogger("oauth");
 
@@ -200,6 +207,7 @@ export class OAuthService {
     clientId: string;
     clientSecret: string | null;
     resolved: ReturnType<typeof resolveConfigWithEnv>;
+    endpointPolicy: OAuthEndpointPolicy;
   }> {
     const plugin = await pluginRegistryRepository.findByPluginId(pluginId);
     if (!plugin) {
@@ -251,6 +259,7 @@ export class OAuthService {
       {
         decrypt: true,
         maskSecrets: false, // We need actual values for OAuth flow
+        allowedEnv: configEnvAllowList(plugin),
       },
     );
 
@@ -274,7 +283,12 @@ export class OAuthService {
       });
     }
 
-    return { plugin, instance, oauth2Method, clientId, clientSecret, resolved };
+    const endpointPolicy = oauthEndpointPolicy({
+      managedSecret: resolved.metadata[clientSecretFieldName]?.source === "env",
+      declaredHosts: (plugin.manifest as HayPluginManifest | undefined)?.oauthHosts,
+    });
+
+    return { plugin, instance, oauth2Method, clientId, clientSecret, resolved, endpointPolicy };
   }
 
   /**
@@ -299,10 +313,8 @@ export class OAuthService {
   ): Promise<{ success: true; onConnected: { ok: boolean; routingKeyCount: number } }> {
     logger.info({ pluginId, organizationId }, "OAuth code exchange started");
 
-    const { oauth2Method, clientId, clientSecret } = await this.resolveOAuthContext(
-      organizationId,
-      pluginId,
-    );
+    const { oauth2Method, clientId, clientSecret, endpointPolicy } =
+      await this.resolveOAuthContext(organizationId, pluginId);
 
     if (!oauth2Method.tokenUrl) {
       throw new TRPCError({ code: "BAD_REQUEST", message: `OAuth2 method missing tokenUrl` });
@@ -314,6 +326,7 @@ export class OAuthService {
       });
     }
 
+    assertOAuthEndpoint(oauth2Method.tokenUrl, endpointPolicy);
     const url = new URL(oauth2Method.tokenUrl);
     url.searchParams.set("client_id", clientId);
     url.searchParams.set("client_secret", clientSecret);
@@ -374,10 +387,8 @@ export class OAuthService {
   ): Promise<{ authorizationUrl: string; state: string }> {
     logger.info({ pluginId, organizationId, userId }, "OAuth initiate started");
 
-    const { oauth2Method, clientId, clientSecret, resolved } = await this.resolveOAuthContext(
-      organizationId,
-      pluginId,
-    );
+    const { oauth2Method, clientId, clientSecret, resolved, endpointPolicy } =
+      await this.resolveOAuthContext(organizationId, pluginId);
 
     // Client-flow plugins obtain the code in their own UI (completeWithCode).
     if (oauth2Method.connectFlow === "client") {
@@ -442,6 +453,7 @@ export class OAuthService {
       shopDomain: resolved.values.shopDomain,
       clientId,
     });
+    assertOAuthEndpoint(oauthConfig.authorizationUrl, endpointPolicy);
 
     // Build authorization URL
     const redirectUri = this.getRedirectUri();
@@ -560,10 +572,8 @@ export class OAuthService {
 
     try {
       logger.debug({ pluginId }, "Loading plugin for OAuth callback");
-      const { oauth2Method, clientId, clientSecret, resolved } = await this.resolveOAuthContext(
-        organizationId,
-        pluginId,
-      );
+      const { oauth2Method, clientId, clientSecret, resolved, endpointPolicy } =
+        await this.resolveOAuthContext(organizationId, pluginId);
 
       // Validate required OAuth fields
       if (!oauth2Method.tokenUrl) {
@@ -591,6 +601,7 @@ export class OAuthService {
         shopDomain: resolved.values.shopDomain,
         clientId,
       });
+      assertOAuthEndpoint(oauthConfig.tokenUrl, endpointPolicy);
 
       logger.info("Exchanging authorization code for tokens");
       // Exchange code for tokens
@@ -620,6 +631,7 @@ export class OAuthService {
             oauthConfig.tokenExchange,
             tokens.access_token,
             validCredentials.clientSecret,
+            endpointPolicy,
           );
           tokens.access_token = exchanged.access_token;
           tokens.expires_in = exchanged.expires_in;
@@ -701,7 +713,9 @@ export class OAuthService {
     op: { url: string; grantType: string; tokenParam: string; includeClientSecret?: boolean },
     accessToken: string,
     clientSecret: string | null,
+    endpointPolicy: OAuthEndpointPolicy,
   ): Promise<{ access_token: string; expires_in?: number; token_type?: string }> {
+    assertOAuthEndpoint(op.url, endpointPolicy);
     const url = new URL(op.url);
     url.searchParams.set("grant_type", op.grantType);
     url.searchParams.set(op.tokenParam, accessToken);
@@ -924,7 +938,7 @@ export class OAuthService {
 
       const worker = await pluginManagerService.startPluginWorker(organizationId, pluginId);
 
-      const response = await fetch(`http://localhost:${worker.port}/on-connected`, {
+      const response = await workerFetch(worker.port, "/on-connected", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -1083,10 +1097,8 @@ export class OAuthService {
    * Refresh OAuth access token
    */
   async refreshToken(organizationId: string, pluginId: string): Promise<OAuthTokenData | null> {
-    const { instance, oauth2Method, clientId, clientSecret } = await this.resolveOAuthContext(
-      organizationId,
-      pluginId,
-    );
+    const { instance, oauth2Method, clientId, clientSecret, endpointPolicy } =
+      await this.resolveOAuthContext(organizationId, pluginId);
 
     // A plugin may declare a custom refresh strategy (e.g. Instagram's
     // ig_refresh_token) for providers that don't issue a standard refresh_token.
@@ -1121,6 +1133,7 @@ export class OAuthService {
         customRefresh,
         currentAccessToken,
         validCredentials.clientSecret,
+        endpointPolicy,
       );
       const expiresAt = result.expires_in
         ? Math.floor(Date.now() / 1000) + result.expires_in
@@ -1169,6 +1182,7 @@ export class OAuthService {
       body.append("client_secret", validCredentials.clientSecret);
     }
 
+    assertOAuthEndpoint(oauthConfig.tokenUrl, endpointPolicy);
     const response = await fetch(oauthConfig.tokenUrl, {
       method: "POST",
       headers: {

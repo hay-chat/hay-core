@@ -37,6 +37,8 @@ export interface HayPluginManifest {
     handler: string;
   }>;
   trpcRouter?: string;
+  /** Hosts a server-managed OAuth client secret may be sent to (exact or `*.suffix`). */
+  oauthHosts?: string[];
   services?: Array<{
     name: string;
     path: string;

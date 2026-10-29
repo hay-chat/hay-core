@@ -3,6 +3,10 @@ import { pluginManagerService } from "@server/services/plugin-manager.service";
 import { pluginInstanceManagerService } from "@server/services/plugin-instance-manager.service";
 import { webhookRouterService } from "@server/services/webhook-router.service";
 import { organizationRepository } from "@server/repositories/organization.repository";
+import { pluginInstanceRepository } from "@server/repositories/plugin-instance.repository";
+import { getPluginRunnerService } from "@server/services/plugin-runner.service";
+import { WORKER_HOST, workerFetch } from "@server/lib/worker-client";
+import type { RouteDescriptor } from "@server/types/plugin-sdk.types";
 import { isValidUuid } from "@server/lib/validation/uuid";
 import { createLogger } from "@server/lib/logger";
 
@@ -78,6 +82,29 @@ router.all(/^\/([^/]+)\/(.*)?$/, async (req: Request, res: Response): Promise<vo
       return;
     }
 
+    // Only orgs that enabled this plugin can reach its worker.
+    const instance = await pluginInstanceRepository.findByOrgAndPlugin(organizationId, pluginId);
+    if (!instance?.enabled) {
+      res.status(404).json({ error: "Not found" });
+      return;
+    }
+
+    // Only routes the plugin declared with register.route() are reachable. When
+    // metadata is cached, check before waking a worker; otherwise after start.
+    const cachedRoutes = pluginManagerService.getPlugin(pluginId)?.metadata?.routes;
+    if (cachedRoutes && !isDeclaredRoute(cachedRoutes, req.method, path)) {
+      res.status(404).json({ error: "Not found" });
+      return;
+    }
+
+    if (!getPluginRunnerService().isRunning(organizationId, pluginId)) {
+      if (!takeColdStartSlot(pluginId)) {
+        res.setHeader("Retry-After", String(Math.ceil(COLD_START_WINDOW_MS / 1000)));
+        res.status(429).json({ error: "Too many requests" });
+        return;
+      }
+    }
+
     // Get or start worker for this org+plugin combination
     let worker;
     try {
@@ -95,15 +122,25 @@ router.all(/^\/([^/]+)\/(.*)?$/, async (req: Request, res: Response): Promise<vo
       return;
     }
 
-    // Proxy request to worker
-    const workerUrl = `http://localhost:${worker.port}${path}${req.url.includes("?") ? req.url.substring(req.url.indexOf("?")) : ""}`;
+    const declaredRoutes = pluginManagerService.getPlugin(pluginId)?.metadata?.routes ?? [];
+    if (!isDeclaredRoute(declaredRoutes, req.method, path)) {
+      res.status(404).json({ error: "Not found" });
+      return;
+    }
 
-    logger.debug({ workerUrl }, "Forwarding request to worker");
+    // Proxy request to worker
+    const workerPath = `${path}${req.url.includes("?") ? req.url.substring(req.url.indexOf("?")) : ""}`;
+
+    logger.debug({ port: worker.port, path }, "Forwarding request to worker");
 
     try {
       const { headers, body } = buildWorkerForward(req, worker.port);
 
-      const response = await fetch(workerUrl, { method: req.method, headers, body });
+      const response = await workerFetch(worker.port, workerPath, {
+        method: req.method,
+        headers,
+        body,
+      });
 
       // Copy status
       res.status(response.status);
@@ -133,11 +170,68 @@ router.all(/^\/([^/]+)\/(.*)?$/, async (req: Request, res: Response): Promise<vo
 });
 
 /**
- * First path segments only core may call on a worker (over localhost): the SDK
+ * Whether `method path` matches a route the plugin declared with
+ * register.route(). Matches the way the worker's Express router resolves
+ * paths: case-insensitive, `:param` segments, optional trailing slash, and
+ * HEAD served by GET routes.
+ */
+export function isDeclaredRoute(
+  routes: Pick<RouteDescriptor, "method" | "path">[],
+  method: string,
+  path: string,
+): boolean {
+  const requestMethod = method.toUpperCase();
+  const requestSegments = pathSegments(path);
+  if (requestSegments === null) return false;
+  return routes.some((route) => {
+    const routeMethod = String(route.method).toUpperCase();
+    if (routeMethod !== requestMethod && !(requestMethod === "HEAD" && routeMethod === "GET")) {
+      return false;
+    }
+    const routeSegments = pathSegments(route.path);
+    if (routeSegments === null || routeSegments.length !== requestSegments.length) return false;
+    return routeSegments.every(
+      (segment, i) =>
+        (segment.startsWith(":") && requestSegments[i].length > 0) ||
+        segment.toLowerCase() === requestSegments[i].toLowerCase(),
+    );
+  });
+}
+
+/** Path segments without the leading/trailing slash; null for empty segments. */
+function pathSegments(path: string): string[] | null {
+  const trimmed = path.replace(/^\//, "").replace(/\/$/, "");
+  if (trimmed === "") return [];
+  const segments = trimmed.split("/");
+  return segments.some((segment) => segment === "") ? null : segments;
+}
+
+// Cold starts (waking a worker that isn't running) per plugin, per window. The
+// proxy is unauthenticated, so this bounds how fast it can spin up workers.
+const COLD_START_WINDOW_MS = 60_000;
+const MAX_COLD_STARTS_PER_WINDOW = 30;
+const coldStarts = new Map<string, { windowStart: number; count: number }>();
+
+/** Whether the proxy may cold-start another worker for `pluginId` right now. */
+export function takeColdStartSlot(pluginId: string, now = Date.now()): boolean {
+  const entry = coldStarts.get(pluginId);
+  if (!entry || now - entry.windowStart >= COLD_START_WINDOW_MS) {
+    coldStarts.set(pluginId, { windowStart: now, count: 1 });
+    return true;
+  }
+  if (entry.count >= MAX_COLD_STARTS_PER_WINDOW) return false;
+  entry.count += 1;
+  return true;
+}
+
+/**
+ * First path segments only core may call on a worker (over loopback): the SDK
  * runner's control endpoints, the channel `/deliver` + `/escalate` + `/templates` contract,
  * the `/disputes/*` evidence push (D2-7), the `/tickets/*` hand-off tickets, and
  * `/ui/*` (settings UI routes, reachable only via the authenticated, org-scoped
- * `plugins.callUiRoute`).
+ * `plugins.callUiRoute`), and the `/setup/*` + `/webchat/*` runner endpoints.
+ * Checked in addition to the declared-route allow-list, because plugins
+ * declare some of these core-only routes with register.route() too.
  */
 const WORKER_INTERNAL_SEGMENTS = new Set([
   "health",
@@ -154,6 +248,8 @@ const WORKER_INTERNAL_SEGMENTS = new Set([
   "disputes",
   "tickets",
   "ui",
+  "setup",
+  "webchat",
 ]);
 
 /**
@@ -178,6 +274,7 @@ const STRIPPED_HEADERS = new Set([
   "proxy-authorization",
   "content-length",
   "x-hay-webhook-verified",
+  "x-hay-worker-secret",
 ]);
 
 /**
@@ -204,7 +301,7 @@ export function buildWorkerForward(
       headers[key] = value[0];
     }
   });
-  headers.host = `localhost:${workerPort}`;
+  headers.host = `${WORKER_HOST}:${workerPort}`;
 
   if (req.method === "GET" || req.method === "HEAD") {
     return { headers, body: undefined };

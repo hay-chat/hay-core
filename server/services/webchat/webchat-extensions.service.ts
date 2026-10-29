@@ -17,7 +17,12 @@
 import { z } from "zod";
 import { pluginInstanceRepository } from "@server/repositories/plugin-instance.repository";
 import { pluginManagerService } from "@server/services/plugin-manager.service";
-import { resolveConfigWithEnv, resolveConfigForWorker } from "@server/lib/config-resolver";
+import {
+  resolveConfigWithEnv,
+  resolveConfigForWorker,
+  type ConfigEnvAllowList,
+} from "@server/lib/config-resolver";
+import { configEnvAllowList } from "@server/lib/plugin-env";
 import { createLogger } from "@server/lib/logger";
 import type { PluginInstance } from "@server/entities/plugin-instance.entity";
 import type {
@@ -27,6 +32,7 @@ import type {
   WebchatGateEvent,
   WebchatMetadata,
 } from "@server/types/plugin-sdk.types";
+import { workerFetch } from "@server/lib/worker-client";
 
 const logger = createLogger("webchat-extensions");
 
@@ -123,12 +129,13 @@ export function resolveContributionProps(
   descriptor: WebchatContributionDescriptor,
   dbConfig: Record<string, unknown> | undefined,
   configSchema: Record<string, ConfigFieldDescriptor>,
+  allowedEnv: ConfigEnvAllowList,
 ): Record<string, unknown> {
   const publicSchema: Record<string, ConfigFieldDescriptor> = {};
   for (const [field, def] of Object.entries(configSchema)) {
     if (!def.encrypted && !def.serverOnly) publicSchema[field] = def;
   }
-  const values = resolveConfigWithEnv(dbConfig, publicSchema, { decrypt: false }).values;
+  const values = resolveConfigWithEnv(dbConfig, publicSchema, { decrypt: false, allowedEnv }).values;
 
   const props: Record<string, unknown> = { ...descriptor.props };
   for (const [prop, field] of Object.entries(descriptor.configProps ?? {})) {
@@ -175,7 +182,12 @@ export class WebchatExtensionsService {
         if (descriptor.type !== "challenge@1") continue;
         const id = `${instance.plugin.pluginId}.${descriptor.id}`;
         const parsed = challengeV1Schema.safeParse(
-          resolveContributionProps(descriptor, instance.config, configSchemaOf(instance)),
+          resolveContributionProps(
+            descriptor,
+            instance.config,
+            configSchemaOf(instance),
+            configEnvAllowList(instance.plugin),
+          ),
         );
         if (!parsed.success) {
           // Typically a missing site key (env unset): the feature is unavailable.
@@ -253,9 +265,9 @@ export class WebchatExtensionsService {
         instance.config,
         instance.authState,
         configSchemaOf(instance),
+        configEnvAllowList(instance.plugin),
       );
-      const response = await fetch(
-        `http://localhost:${worker.port}/webchat/gate/${encodeURIComponent(gate.event)}`,
+      const response = await workerFetch(worker.port, `/webchat/gate/${encodeURIComponent(gate.event)}`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },

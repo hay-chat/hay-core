@@ -9,6 +9,7 @@
 import { pluginInstanceRepository } from "@server/repositories/plugin-instance.repository";
 import { createLogger } from "@server/lib/logger";
 import { classifyTool, type ToolRisk } from "@server/services/core/tool-risk";
+import { workerFetch } from "@server/lib/worker-client";
 
 const logger = createLogger("plugin-tools");
 
@@ -88,10 +89,9 @@ export async function fetchToolsFromWorker(port: number, pluginId: string): Prom
     const timeoutId = setTimeout(() => abortController.abort(), timeoutMs);
 
     try {
-      const url = `http://localhost:${port}/mcp/list-tools`;
-      logger.debug({ pluginId, attempt, maxRetries, url }, "Fetching tools endpoint");
+      logger.debug({ pluginId, attempt, maxRetries, port }, "Fetching tools endpoint");
 
-      const response = await fetch(url, {
+      const response = await workerFetch(port, "/mcp/list-tools", {
         signal: abortController.signal,
       });
 

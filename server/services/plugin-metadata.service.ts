@@ -7,6 +7,7 @@
 
 import type { PluginMetadata } from "../types/plugin-sdk.types";
 import { createLogger } from "@server/lib/logger";
+import { workerFetch } from "@server/lib/worker-client";
 
 const logger = createLogger("plugin-metadata");
 
@@ -161,7 +162,7 @@ export async function fetchMetadataFromWorker(
     try {
       logger.debug({ pluginId, attempt, maxRetries, port }, "Fetching metadata");
 
-      const response = await fetch(`http://localhost:${port}/metadata`, {
+      const response = await workerFetch(port, "/metadata", {
         signal: abortController.signal,
       });
 

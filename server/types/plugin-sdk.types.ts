@@ -483,5 +483,7 @@ export interface WorkerInfo {
   organizationId: string;
   pluginId: string;
   instanceId: string;
+  /** Release the worker's port and revoke its secret (idempotent). */
+  releasePort: () => void;
   metadata?: PluginMetadata; // Plugin registry metadata
 }

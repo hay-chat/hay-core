@@ -18,6 +18,7 @@ import {
   templateForReason,
   type AlertFacts,
 } from "./copy";
+import { workerFetch } from "@server/lib/worker-client";
 
 /**
  * Payment disputes (D2-7 / D2-8). Plugins with the `disputes` capability
@@ -502,7 +503,7 @@ export class DisputesService {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), PUSH_TIMEOUT_MS);
     try {
-      const response = await fetch(`http://localhost:${port}/disputes/evidence`, {
+      const response = await workerFetch(port, "/disputes/evidence", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),

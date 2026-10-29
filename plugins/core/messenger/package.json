@@ -22,6 +22,10 @@
       "META_MESSENGER_APP_ID",
       "META_MESSENGER_APP_SECRET",
       "META_VERIFY_TOKEN"
+    ],
+    "oauthHosts": [
+      "www.facebook.com",
+      "graph.facebook.com"
     ]
   },
   "scripts": {

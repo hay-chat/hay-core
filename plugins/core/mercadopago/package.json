@@ -16,6 +16,10 @@
     "env": [
       "MERCADOPAGO_CLIENT_ID",
       "MERCADOPAGO_CLIENT_SECRET"
+    ],
+    "oauthHosts": [
+      "auth.mercadopago.com",
+      "api.mercadopago.com"
     ]
   },
   "scripts": {
