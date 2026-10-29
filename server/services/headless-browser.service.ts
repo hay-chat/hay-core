@@ -7,6 +7,7 @@ import {
 } from "@puppeteer/browsers";
 import { createLogger } from "@server/lib/logger";
 import { validateUrlForSSRF } from "@server/utils/ssrf";
+import { stripHiddenHtml } from "@server/utils/strip-hidden-html";
 import { config } from "@server/config/env";
 import fs from "fs";
 import path from "path";
@@ -27,6 +28,7 @@ const SYSTEM_CHROME_PATHS = [
   "C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe",
 ];
 
+// TODO: drop --no-sandbox once the server process runs as a non-root user.
 const BROWSER_LAUNCH_ARGS = [
   "--no-sandbox",
   "--disable-dev-shm-usage",
@@ -38,7 +40,36 @@ const BROWSER_LAUNCH_ARGS = [
   "--disable-translate",
   "--metrics-recording-only",
   "--no-first-run",
+  // Keep WebRTC from opening UDP sockets outside request interception.
+  "--force-webrtc-ip-handling-policy=disable_non_proxied_udp",
 ];
+
+const SKIPPED_RESOURCE_TYPES = new Set(["image", "font", "media"]);
+
+/**
+ * Decide whether the rendered page may make a request: only http(s) to public
+ * addresses, plus inline `data:` / `blob:` content.
+ */
+export async function allowRequest(url: string, resourceType: string): Promise<boolean> {
+  if (SKIPPED_RESOURCE_TYPES.has(resourceType)) return false;
+  const protocol = url.slice(0, url.indexOf(":") + 1).toLowerCase();
+  if (protocol === "data:" || protocol === "blob:") return true;
+  if (protocol !== "http:" && protocol !== "https:") return false;
+  try {
+    await validateUrlForSSRF(url);
+    return true;
+  } catch {
+    logger.debug({ url }, "Blocked headless browser request");
+    return false;
+  }
+}
+
+/** Runs in every frame before page scripts: removes network APIs interception cannot see. */
+const DISABLE_UNINTERCEPTED_NETWORK_APIS = `(() => {
+  for (const name of ["WebSocket", "WebTransport", "RTCPeerConnection", "webkitRTCPeerConnection"]) {
+    try { Object.defineProperty(globalThis, name, { value: undefined, configurable: false, writable: false }); } catch {}
+  }
+})();`;
 
 export class HeadlessBrowserService {
   private browser: Browser | null = null;
@@ -172,15 +203,17 @@ export class HeadlessBrowserService {
       const browser = await this.getBrowser();
       page = await browser.newPage();
 
-      // Block unnecessary resources to speed up rendering
+      // Service workers would fetch outside request interception.
+      await page.setBypassServiceWorker(true);
+      // WebSockets / WebRTC are not covered by request interception either.
+      await page.evaluateOnNewDocument(DISABLE_UNINTERCEPTED_NETWORK_APIS);
+      // Every request the page makes (subresources, XHR, iframes, redirect hops)
+      // is SSRF-checked; images, fonts and media are skipped to speed up rendering.
       await page.setRequestInterception(true);
       page.on("request", (request) => {
-        const resourceType = request.resourceType();
-        if (["image", "font", "media"].includes(resourceType)) {
-          request.abort();
-        } else {
-          request.continue();
-        }
+        void allowRequest(request.url(), request.resourceType()).then((allowed) =>
+          (allowed ? request.continue() : request.abort("blockedbyclient")).catch(() => undefined),
+        );
       });
 
       await page.goto(url, {
@@ -188,7 +221,7 @@ export class HeadlessBrowserService {
         timeout: this.timeout,
       });
 
-      const html = await page.content();
+      const html = stripHiddenHtml(await page.content());
       logger.debug({ url, htmlLength: html.length }, "Page rendered successfully");
       return html;
     } finally {
