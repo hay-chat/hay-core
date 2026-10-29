@@ -386,13 +386,17 @@ export const conversationsRouter = t.router({
         start.setUTCHours(0, 0, 0, 0);
       }
 
+      // Planned hand-offs (a playbook's "Handoff to human" step) are a designed,
+      // successful outcome, not an escalation, so they are excluded here.
       const [escalationsRow] = await AppDataSource.query(
         `
           SELECT COUNT(*)::int AS count
           FROM conversation_takeover_events e
+          JOIN conversations c ON c.id = e.conversation_id
           WHERE e.organization_id = $1
             AND e.started_at >= $2
             AND e.started_at <= $3
+            AND (c.metadata->>'plannedHandoff') IS DISTINCT FROM 'true'
         `,
         [organizationId, start.toISOString(), now.toISOString()],
       );
@@ -418,9 +422,11 @@ export const conversationsRouter = t.router({
         `
           SELECT COUNT(DISTINCT e.conversation_id)::int AS count
           FROM conversation_takeover_events e
+          JOIN conversations c ON c.id = e.conversation_id
           WHERE e.organization_id = $1
             AND e.started_at >= $2
             AND e.started_at <= $3
+            AND (c.metadata->>'plannedHandoff') IS DISTINCT FROM 'true'
         `,
         [organizationId, start.toISOString(), now.toISOString()],
       );
@@ -466,9 +472,11 @@ export const conversationsRouter = t.router({
         `
           SELECT DISTINCT e.conversation_id AS id
           FROM conversation_takeover_events e
+          JOIN conversations c ON c.id = e.conversation_id
           WHERE e.organization_id = $1
             AND e.started_at >= $2
             AND e.started_at <= $3
+            AND (c.metadata->>'plannedHandoff') IS DISTINCT FROM 'true'
           ORDER BY e.conversation_id
           LIMIT $4
         `,
@@ -1245,7 +1253,10 @@ export const conversationsRouter = t.router({
       const { forwardProductCase } = await import("../../../services/product-case/forward");
       const forward = await forwardProductCase(conversation.id, ctx.organizationId!);
       if (!forward) {
-        throw new TRPCError({ code: "BAD_REQUEST", message: "This conversation has no complete product case" });
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "This conversation has no complete product case",
+        });
       }
       return forward;
     }),

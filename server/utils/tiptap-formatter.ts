@@ -20,6 +20,22 @@ interface InstructionAnalysis {
   formattedText: string;
   actions: string[];
   documents: string[];
+  /** The instructions include a "Handoff to human" step (a planned escalation). */
+  hasHandoff: boolean;
+}
+
+/** Mention `type` for a playbook's "Handoff to human" step. */
+export const HANDOFF_MENTION_TYPE = "handoff";
+
+/** Instruction line the handoff step renders into for the planner. */
+const HANDOFF_INSTRUCTION = "**Hand off to a human teammate at this point in the process.**";
+
+/** True when the document contains a handoff mention node anywhere in its tree. */
+function containsHandoffMention(node: TiptapNode): boolean {
+  if (node.type === "mention" && node.attrs?.type === HANDOFF_MENTION_TYPE) {
+    return true;
+  }
+  return (node.content ?? []).some(containsHandoffMention);
 }
 
 /**
@@ -184,6 +200,12 @@ function convertNodeToMarkdown(
       const id = typeof node.attrs?.id === "string" ? node.attrs.id : undefined;
       const type = typeof node.attrs?.type === "string" ? node.attrs.type : undefined;
 
+      // The handoff step carries no id — it is a terminal instruction, not a
+      // reference to a tool or document.
+      if (type === HANDOFF_MENTION_TYPE) {
+        return { markdown: HANDOFF_INSTRUCTION, actions, documents };
+      }
+
       if (id && type) {
         if (type === "action") {
           actions.add(id);
@@ -253,6 +275,7 @@ export function analyzeTiptapInstructions(
       formattedText: "",
       actions: [],
       documents: [],
+      hasHandoff: false,
     };
   }
 
@@ -262,6 +285,7 @@ export function analyzeTiptapInstructions(
     formattedText: result.markdown,
     actions: Array.from(result.actions),
     documents: Array.from(result.documents),
+    hasHandoff: containsHandoffMention(tiptapData),
   };
 }
 
