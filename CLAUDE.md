@@ -665,7 +665,16 @@ DEBUG_MODULES="perception,retrieval,execution"  # Filter debug modules
 
 Avoid setting `DEBUG=true` as it enables ALL debug logging including OpenAI SDK.
 
+### Backend and chat testing: use the `hay` CLI, not Claude in Chrome
+
+For chat, conversation, plugin and log checks, run `tools/hay-cli/bin/hay` through Bash instead of driving the dashboard or widget in Claude in Chrome (faster, far fewer tokens). Keep the browser for UI work.
+
+- `hay chat send "<msg>" --logs` posts as a webchat customer, waits for the reply, and prints the turn (tools, docs, confidence) with that conversation's server logs. Continue with `--conversation <id>`.
+- `hay conv show <id> --logs`, `hay conv list`, `hay logs <conversationId|--since 5m>`, `hay plugins list|tools|test <plugin>`, `hay orgs` / `hay use <org>`; `--json` on everything, `--target prod|local`.
+- Credentials live in `~/.config/hay-cli/config.json`; prod defaults to the test org "Hay CLI Test". Details: `tools/hay-cli/README.md`.
+
 <!-- dgc-policy-v11 -->
+
 # Dual-Graph Context Policy
 
 This project uses a local dual-graph MCP server for efficient context retrieval.
@@ -726,6 +735,7 @@ Live dashboard URL is printed at startup next to "Token usage".
 Whenever you make a decision, identify a task, note a next step, fact, or blocker during a conversation, call `graph_add_memory`.
 
 **To add an entry:**
+
 ```
 graph_add_memory(type="decision|task|next|fact|blocker", content="one sentence max 15 words", tags=["topic"], files=["relevant/file.ts"])
 ```
@@ -733,6 +743,7 @@ graph_add_memory(type="decision|task|next|fact|blocker", content="one sentence m
 **Do NOT write context-store.json directly** — always use `graph_add_memory`. It applies pruning and keeps the store healthy.
 
 **Rules:**
+
 - Only log things worth remembering across sessions (not every minor detail)
 - `content` must be under 15 words
 - `files` lists the files this decision/task relates to (can be empty)
@@ -743,6 +754,7 @@ graph_add_memory(type="decision|task|next|fact|blocker", content="one sentence m
 Do NOT wait for a "done" signal — sessions here typically end mid-task, so
 checkpoint proactively: after completing any major task chunk, and whenever a
 debugging thread concludes, update `CONTEXT.md` in the project root with:
+
 - **Current Task**: one sentence on what was being worked on
 - **Key Decisions**: bullet list, max 3 items
 - **Next Steps**: bullet list, max 3 items
