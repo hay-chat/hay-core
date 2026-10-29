@@ -14,7 +14,10 @@
       "auth",
       "products"
     ],
-    "env": []
+    "env": [
+      "NUVEMSHOP_OAUTH_CLIENT_ID",
+      "NUVEMSHOP_OAUTH_CLIENT_SECRET"
+    ]
   },
   "scripts": {
     "build": "tsc",

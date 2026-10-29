@@ -2,16 +2,20 @@
  * Nuvemshop / Tiendanube Plugin — LatAm e-commerce integration + catalog sync.
  *
  * Nuvemshop (Brazil) and Tiendanube (Spanish-speaking LatAm) are the same
- * platform and the same API; only the domains differ. Connection uses a
- * store-scoped "custom app" access token (admin → Aplicativos a medida /
- * Aplicaciones a medida): the merchant pastes the token + store ID here.
- * Those tokens never expire (they are invalidated only by re-issuing or
- * uninstalling), so there is no refresh cron.
+ * platform and the same API; only the domains differ. Two connection modes
+ * (`authMode`, see ./connection.ts):
  *
- * A managed OAuth mode (Hay partner app) needs two core changes first — the
- * authorize URL embeds the app id (https://www.tiendanube.com/apps/{app_id}/authorize,
- * no scope param) and the token response's `user_id` (the store id every API
- * path needs) must be persisted. See README.md → "OAuth (partner app)".
+ * - `oauth` (default when the server sets NUVEMSHOP_OAUTH_CLIENT_ID): the
+ *   Hay.chat partner app. The authorize URL embeds the app id
+ *   (`/apps/{client_id}/authorize`, scopes fixed at app registration), the
+ *   code exchange is JSON, and the token response's `user_id` is the store id.
+ *   `onConnected` saves it as `storeId` and returns it as the routing key for
+ *   the LGPD webhooks (./lgpd.ts).
+ * - `token`: a store-scoped "custom app" token (admin → Aplicativos a medida /
+ *   Aplicaciones a medida) pasted with the store ID.
+ *
+ * Neither token expires (they end on uninstall or re-issue), so there is no
+ * refresh cron.
  *
  * The MCP server (./mcp) only ever sees NUVEMSHOP_STORE_ID, NUVEMSHOP_ACCESS_TOKEN,
  * NUVEMSHOP_API_VERSION, NUVEMSHOP_MAIN_LANGUAGE and the coupon cap
@@ -28,6 +32,15 @@
 
 import { defineHayPlugin } from "@hay/plugin-sdk";
 import { variantPricing } from "./pricing.js";
+import {
+  defaultAuthMode,
+  getAuthMode,
+  oauthStoreId,
+  readCredentials,
+  type NuvemshopCredentials,
+} from "./connection.js";
+import { handleLgpdWebhook } from "./lgpd.js";
+import { pluginApiMutation } from "./plugin-api.js";
 import type {
   CanonicalProduct,
   CanonicalVariant,
@@ -60,19 +73,12 @@ function pickLang(field: I18nField, lang: string): string | undefined {
   return undefined;
 }
 
-interface NuvemshopCredentials {
-  storeId: string;
-  accessToken: string;
-}
-
-function readCredentials(ctx: {
-  config: { getOptional: <T = unknown>(key: string) => T | undefined };
-}): NuvemshopCredentials | null {
-  const storeId = ctx.config.getOptional<string>("storeId")?.trim();
-  const accessToken = ctx.config.getOptional<string>("accessToken")?.trim();
-  if (!storeId || !accessToken) return null;
-  return { storeId, accessToken };
-}
+// Partner-app OAuth (Hay.chat app registered in the Nuvemshop partner portal).
+// No scope parameter: scopes are fixed on the app. The Brazilian and
+// Spanish-speaking hosts are interchangeable for authorize; the token endpoint
+// is the documented one.
+const OAUTH_AUTHORIZE_URL = "https://www.nuvemshop.com.br/apps/{client_id}/authorize";
+const OAUTH_TOKEN_URL = "https://www.tiendanube.com/apps/authorize/token";
 
 /**
  * Minimal REST helper for the entry (validation + catalog sync). The MCP server
@@ -425,201 +431,321 @@ function staleTrackingEnv(config: {
   return env;
 }
 
-export default defineHayPlugin((globalCtx) => ({
-  name: "Nuvemshop",
+export default defineHayPlugin((globalCtx) => {
+  /** This org's connected store id, set by onStart (read by the LGPD webhook). */
+  let connectedStoreId: string | undefined;
 
-  onInitialize(ctx) {
-    globalCtx.logger.info("Initializing Nuvemshop plugin");
+  return {
+    name: "Nuvemshop",
 
-    ctx.register.config({
-      storeId: {
-        type: "string",
-        label: "Store ID",
-        description:
-          "Your numeric store ID. Shown when creating the custom app; it is the " +
-          "user_id of your store.",
-        placeholder: "123456",
-        required: true,
-      },
-      accessToken: {
-        type: "string",
-        label: "Access token",
-        description:
-          "Access token from a custom app (admin → Aplicativos a medida / " +
-          "Aplicaciones a medida). Grant it read/write orders, fulfillment orders, " +
-          "customers and coupons, and read products. Shown only once at creation.",
-        required: true,
-        encrypted: true,
-      },
-      apiVersion: {
-        type: "string",
-        label: "API version",
-        description: "Nuvemshop API version to use.",
-        default: DEFAULT_API_VERSION,
-      },
-      couponsEnabled: {
-        type: "boolean",
-        label: "Allow goodwill coupons",
-        description:
-          "Let the agent create single-use apology coupons within the caps below. " +
-          "A coupon above the cap waits for a team member to approve it. Each order gets at most one coupon.",
-        default: true,
-      },
-      couponMaxPercent: {
-        type: "number",
-        label: "Coupon cap: maximum percentage",
-        description:
-          "Largest percentage discount the agent may give (0 turns percentage coupons off).",
-        default: DEFAULT_COUPON_MAX_PERCENT,
-      },
-      couponMaxAmount: {
-        type: "number",
-        label: "Coupon cap: maximum fixed amount",
-        description:
-          "Largest fixed discount in your store currency (0 or empty turns fixed-amount coupons off).",
-        default: 0,
-      },
-      couponMaxDays: {
-        type: "number",
-        label: "Coupon validity (days)",
-        description: "Coupons the agent creates expire after at most this many days.",
-        default: DEFAULT_COUPON_MAX_DAYS,
-      },
-      staleTrackingDomesticDays: {
-        type: "number",
-        label: "Stale tracking: domestic (days)",
-        description:
-          "Treat a domestic shipment as stuck when its tracking has not moved for more than " +
-          "this many days.",
-        default: 5,
-      },
-      staleTrackingInternationalDays: {
-        type: "number",
-        label: "Stale tracking: international (days)",
-        description:
-          "Treat an international shipment as stuck when its tracking has not moved for more " +
-          "than this many days.",
-        default: 10,
-      },
-      returnInstructions: {
-        type: "string",
-        label: "How to return",
-        description:
-          "Your return process, in your words: where to send items, any link or form, and " +
-          "deadlines. Hay.chat relays it as written when a customer asks how to return " +
-          "something. Leave empty and Hay.chat hands those questions to your team.",
-      },
-    });
+    onInitialize(ctx) {
+      globalCtx.logger.info("Initializing Nuvemshop plugin");
 
-    ctx.register.auth.apiKey({
-      id: "nuvemshop-token",
-      label: "Custom app access token",
-      configField: "accessToken",
-    });
-
-    globalCtx.logger.info("Nuvemshop plugin config and auth registered");
-  },
-
-  async onValidateAuth(ctx) {
-    const creds = readCredentials(ctx);
-    if (!creds) {
-      throw new Error("Store ID and Access token are required");
-    }
-    const apiVersion = ctx.config.getOptional<string>("apiVersion") || DEFAULT_API_VERSION;
-
-    try {
-      const store = await nuvemshopFetch<NuvemshopStore>(creds, apiVersion, "/store");
-      ctx.logger.info("Nuvemshop credentials validated", { storeId: store.id });
-      return true;
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      ctx.logger.error("Failed to validate Nuvemshop credentials", { error: message });
-      if (message.includes("HTTP 401")) {
-        throw new Error(
-          "Invalid access token — check the token from your custom app " +
-            "(re-issuing a token invalidates the previous one).",
-        );
-      }
-      if (message.includes("HTTP 402")) {
-        throw new Error(
-          "Nuvemshop returned 402 Payment Required — the store's subscription is unpaid, " +
-            "so its API is suspended.",
-        );
-      }
-      if (message.includes("HTTP 404")) {
-        throw new Error("Store not found — check the Store ID.");
-      }
-      throw new Error(`Could not authenticate with Nuvemshop: ${message}`);
-    }
-  },
-
-  async onStart(ctx) {
-    ctx.logger.info("Starting Nuvemshop plugin for org", { orgId: ctx.org.id });
-
-    const creds = readCredentials(ctx);
-    if (!creds) {
-      ctx.logger.info("Nuvemshop: credentials not configured yet — MCP not started.");
-      return;
-    }
-    const apiVersion = ctx.config.getOptional<string>("apiVersion") || DEFAULT_API_VERSION;
-
-    // Best-effort store lookup: the store's main language localizes i18n fields
-    // ({es, pt, en} objects) for the agent, and main currency stamps the catalog.
-    let mainLanguage = "pt";
-    let currency: string | undefined;
-    try {
-      const store = await nuvemshopFetch<NuvemshopStore>(creds, apiVersion, "/store");
-      if (store.main_language) mainLanguage = store.main_language;
-      currency = store.main_currency;
-    } catch (error) {
-      ctx.logger.warn("Nuvemshop: could not fetch store info — using defaults", {
-        error: error instanceof Error ? error.message : String(error),
-      });
-    }
-
-    try {
-      await ctx.mcp.startLocalStdio({
-        id: "nuvemshop-mcp",
-        command: "node",
-        args: ["index.js"],
-        cwd: "./mcp",
-        env: {
-          NUVEMSHOP_STORE_ID: creds.storeId,
-          NUVEMSHOP_ACCESS_TOKEN: creds.accessToken,
-          NUVEMSHOP_API_VERSION: apiVersion,
-          NUVEMSHOP_MAIN_LANGUAGE: mainLanguage,
-          ...couponEnv(ctx.config),
-          ...staleTrackingEnv(ctx.config),
-          ...returnInstructionsEnv(ctx.config),
+      ctx.register.config({
+        authMode: {
+          type: "string",
+          label: "Connection mode",
+          description:
+            "Connect with Nuvemshop: approve Hay.chat in your store in one click. " +
+            "Custom app token: paste a token from a custom app you created.",
+          options: [
+            { label: "Connect with Nuvemshop (recommended)", value: "oauth" },
+            { label: "Custom app token", value: "token" },
+          ],
+          default: defaultAuthMode(),
+        },
+        clientId: {
+          type: "string",
+          label: "OAuth client ID",
+          description: "Set by the Hay.chat server (NUVEMSHOP_OAUTH_CLIENT_ID). Leave empty.",
+          required: false,
+          serverOnly: true,
+          env: "NUVEMSHOP_OAUTH_CLIENT_ID",
+          showWhen: { field: "authMode", equals: "oauth" },
+        },
+        clientSecret: {
+          type: "string",
+          label: "OAuth client secret",
+          description: "Set by the Hay.chat server (NUVEMSHOP_OAUTH_CLIENT_SECRET). Leave empty.",
+          required: false,
+          encrypted: true,
+          serverOnly: true,
+          env: "NUVEMSHOP_OAUTH_CLIENT_SECRET",
+          showWhen: { field: "authMode", equals: "oauth" },
+        },
+        storeId: {
+          type: "string",
+          label: "Store ID",
+          description:
+            "Your numeric store ID. Shown when creating the custom app; it is the " +
+            "user_id of your store.",
+          placeholder: "123456",
+          // Required in token mode only; onValidateAuth enforces it there.
+          required: false,
+          showWhen: { field: "authMode", equals: "token" },
+        },
+        accessToken: {
+          type: "string",
+          label: "Access token",
+          description:
+            "Access token from a custom app (admin → Aplicativos a medida / " +
+            "Aplicaciones a medida). Grant it read/write orders, fulfillment orders, " +
+            "customers and coupons, and read products. Shown only once at creation.",
+          required: false,
+          encrypted: true,
+          showWhen: { field: "authMode", equals: "token" },
+        },
+        apiVersion: {
+          type: "string",
+          label: "API version",
+          description: "Nuvemshop API version to use.",
+          default: DEFAULT_API_VERSION,
+        },
+        couponsEnabled: {
+          type: "boolean",
+          label: "Allow goodwill coupons",
+          description:
+            "Let the agent create single-use apology coupons within the caps below. " +
+            "A coupon above the cap waits for a team member to approve it. Each order gets at most one coupon.",
+          default: true,
+        },
+        couponMaxPercent: {
+          type: "number",
+          label: "Coupon cap: maximum percentage",
+          description:
+            "Largest percentage discount the agent may give (0 turns percentage coupons off).",
+          default: DEFAULT_COUPON_MAX_PERCENT,
+        },
+        couponMaxAmount: {
+          type: "number",
+          label: "Coupon cap: maximum fixed amount",
+          description:
+            "Largest fixed discount in your store currency (0 or empty turns fixed-amount coupons off).",
+          default: 0,
+        },
+        couponMaxDays: {
+          type: "number",
+          label: "Coupon validity (days)",
+          description: "Coupons the agent creates expire after at most this many days.",
+          default: DEFAULT_COUPON_MAX_DAYS,
+        },
+        staleTrackingDomesticDays: {
+          type: "number",
+          label: "Stale tracking: domestic (days)",
+          description:
+            "Treat a domestic shipment as stuck when its tracking has not moved for more than " +
+            "this many days.",
+          default: 5,
+        },
+        staleTrackingInternationalDays: {
+          type: "number",
+          label: "Stale tracking: international (days)",
+          description:
+            "Treat an international shipment as stuck when its tracking has not moved for more " +
+            "than this many days.",
+          default: 10,
+        },
+        returnInstructions: {
+          type: "string",
+          label: "How to return",
+          description:
+            "Your return process, in your words: where to send items, any link or form, and " +
+            "deadlines. Hay.chat relays it as written when a customer asks how to return " +
+            "something. Leave empty and Hay.chat hands those questions to your team.",
         },
       });
-      ctx.logger.info("Nuvemshop MCP server started successfully");
-    } catch (error) {
-      ctx.logger.error("Failed to start Nuvemshop MCP server", error);
-      throw error;
-    }
 
-    // Products capability: mirror the catalog into core for `recommend_products`.
-    if (ctx.productSource) {
-      const productSource = ctx.productSource;
-      void bulkSync(creds, apiVersion, mainLanguage, currency, productSource, {
-        info: (msg, c) => ctx.logger.info(msg, c),
-        error: (msg, c) => ctx.logger.error(msg, c as Record<string, unknown> | undefined),
-      }).catch((err) => ctx.logger.error("Nuvemshop catalog sync failed", err));
-    } else {
-      ctx.logger.info(
-        "Nuvemshop: productSource runtime not available — skipping catalog sync " +
-          "(capability not negotiated or plugin-api credentials missing).",
+      // Partner app: core fills {client_id} and resolves id/secret from the
+      // NUVEMSHOP_OAUTH_CLIENT_* server env. The token response's user_id (the
+      // store id) is kept in the credentials.
+      ctx.register.auth.oauth2({
+        id: "nuvemshop-oauth",
+        label: "Connect with Nuvemshop",
+        authorizationUrl: OAUTH_AUTHORIZE_URL,
+        tokenUrl: OAUTH_TOKEN_URL,
+        scopes: [],
+        tokenRequestFormat: "json",
+        clientId: ctx.config.field("clientId"),
+        clientSecret: ctx.config.field("clientSecret"),
+      });
+
+      ctx.register.auth.apiKey({
+        id: "nuvemshop-token",
+        label: "Custom app access token",
+        configField: "accessToken",
+      });
+
+      // LGPD webhooks (store/redact, customers/redact, customers/data_request) all
+      // arrive at /v1/plugins/<id>/webhook, signed with the app secret, one JSON
+      // object per delivery. Core verifies them and routes by store_id.
+      ctx.register.webhookRouting({
+        signature: {
+          header: "x-linkedstore-hmac-sha256",
+          format: "sha256-hmac",
+          secretEnv: "NUVEMSHOP_OAUTH_CLIENT_SECRET",
+        },
+        routeKeyPath: { itemsPath: ".", keyPath: "store_id" },
+      });
+
+      ctx.register.route("POST", "/webhook", (req, res) =>
+        handleLgpdWebhook(req, res, {
+          storeId: () => connectedStoreId,
+          revokeConnection: async (reason) => {
+            await pluginApiMutation("connection.revoke", { reason });
+          },
+          logger: globalCtx.logger,
+        }),
       );
-    }
-  },
 
-  async onConfigUpdate(ctx) {
-    // The platform restarts the stdio MCP server with fresh env after this hook.
-    ctx.logger.info("Nuvemshop plugin config updated");
-  },
+      globalCtx.logger.info("Nuvemshop plugin config, auth and LGPD webhook registered");
+    },
 
-  async onDisable(ctx) {
-    ctx.logger.info("Nuvemshop plugin disabled for org", { orgId: ctx.org.id });
-  },
-}));
+    /**
+     * Partner-app connect: save the store id from the token response as
+     * `storeId`, return it as the LGPD webhook routing key, and name the store.
+     */
+    async onConnected(ctx) {
+      const storeId = oauthStoreId(ctx.config);
+      const accessToken = ctx.config.getOptional<string>("accessToken");
+      if (!storeId) {
+        ctx.logger.error("Nuvemshop connect: the token response had no store id (user_id)");
+        return { routingKeys: [] };
+      }
+
+      let label: string | undefined;
+      if (accessToken) {
+        try {
+          const store = await nuvemshopFetch<NuvemshopStore>(
+            { storeId, accessToken },
+            ctx.config.getOptional<string>("apiVersion") || DEFAULT_API_VERSION,
+            "/store",
+          );
+          label = pickLang(store.name, store.main_language ?? "pt");
+        } catch (error) {
+          ctx.logger.warn("Nuvemshop connect: could not read the store name", {
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
+      }
+
+      return {
+        routingKeys: [storeId],
+        credentials: { storeId },
+        account: { label: label ?? `Nuvemshop ${storeId}` },
+      };
+    },
+
+    async onValidateAuth(ctx) {
+      if (getAuthMode(ctx.config) === "oauth") {
+        // The OAuth flow proves the connection; nothing to paste or check here.
+        return true;
+      }
+      const creds = readCredentials(ctx.config);
+      if (!creds) {
+        throw new Error("Store ID and Access token are required");
+      }
+      const apiVersion = ctx.config.getOptional<string>("apiVersion") || DEFAULT_API_VERSION;
+
+      try {
+        const store = await nuvemshopFetch<NuvemshopStore>(creds, apiVersion, "/store");
+        ctx.logger.info("Nuvemshop credentials validated", { storeId: store.id });
+        return true;
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        ctx.logger.error("Failed to validate Nuvemshop credentials", { error: message });
+        if (message.includes("HTTP 401")) {
+          throw new Error(
+            "Invalid access token — check the token from your custom app " +
+              "(re-issuing a token invalidates the previous one).",
+          );
+        }
+        if (message.includes("HTTP 402")) {
+          throw new Error(
+            "Nuvemshop returned 402 Payment Required — the store's subscription is unpaid, " +
+              "so its API is suspended.",
+          );
+        }
+        if (message.includes("HTTP 404")) {
+          throw new Error("Store not found — check the Store ID.");
+        }
+        throw new Error(`Could not authenticate with Nuvemshop: ${message}`);
+      }
+    },
+
+    async onStart(ctx) {
+      const mode = getAuthMode(ctx.config);
+      ctx.logger.info("Starting Nuvemshop plugin for org", { orgId: ctx.org.id, authMode: mode });
+
+      const creds = readCredentials(ctx.config);
+      if (!creds) {
+        ctx.logger.info(
+          mode === "oauth"
+            ? "Nuvemshop: not connected yet. Click Connect in the plugin settings. MCP not started."
+            : "Nuvemshop: credentials not configured yet — MCP not started.",
+        );
+        return;
+      }
+      connectedStoreId = creds.storeId;
+      const apiVersion = ctx.config.getOptional<string>("apiVersion") || DEFAULT_API_VERSION;
+
+      // Best-effort store lookup: the store's main language localizes i18n fields
+      // ({es, pt, en} objects) for the agent, and main currency stamps the catalog.
+      let mainLanguage = "pt";
+      let currency: string | undefined;
+      try {
+        const store = await nuvemshopFetch<NuvemshopStore>(creds, apiVersion, "/store");
+        if (store.main_language) mainLanguage = store.main_language;
+        currency = store.main_currency;
+      } catch (error) {
+        ctx.logger.warn("Nuvemshop: could not fetch store info — using defaults", {
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+
+      try {
+        await ctx.mcp.startLocalStdio({
+          id: "nuvemshop-mcp",
+          command: "node",
+          args: ["index.js"],
+          cwd: "./mcp",
+          env: {
+            NUVEMSHOP_STORE_ID: creds.storeId,
+            NUVEMSHOP_ACCESS_TOKEN: creds.accessToken,
+            NUVEMSHOP_API_VERSION: apiVersion,
+            NUVEMSHOP_MAIN_LANGUAGE: mainLanguage,
+            ...couponEnv(ctx.config),
+            ...staleTrackingEnv(ctx.config),
+            ...returnInstructionsEnv(ctx.config),
+          },
+        });
+        ctx.logger.info("Nuvemshop MCP server started successfully");
+      } catch (error) {
+        ctx.logger.error("Failed to start Nuvemshop MCP server", error);
+        throw error;
+      }
+
+      // Products capability: mirror the catalog into core for `recommend_products`.
+      if (ctx.productSource) {
+        const productSource = ctx.productSource;
+        void bulkSync(creds, apiVersion, mainLanguage, currency, productSource, {
+          info: (msg, c) => ctx.logger.info(msg, c),
+          error: (msg, c) => ctx.logger.error(msg, c as Record<string, unknown> | undefined),
+        }).catch((err) => ctx.logger.error("Nuvemshop catalog sync failed", err));
+      } else {
+        ctx.logger.info(
+          "Nuvemshop: productSource runtime not available — skipping catalog sync " +
+            "(capability not negotiated or plugin-api credentials missing).",
+        );
+      }
+    },
+
+    async onConfigUpdate(ctx) {
+      // The platform restarts the stdio MCP server with fresh env after this hook.
+      ctx.logger.info("Nuvemshop plugin config updated");
+    },
+
+    async onDisable(ctx) {
+      ctx.logger.info("Nuvemshop plugin disabled for org", { orgId: ctx.org.id });
+    },
+  };
+});
