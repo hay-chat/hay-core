@@ -340,6 +340,25 @@ kbd {
   border-color: var(--color-document-400);
 }
 
+/* Handoff step (planned escalation to a human) */
+.mention-icon-handoff {
+  background-image: url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJub25lIiBzdHJva2U9IiNlYTU4MGMiIHN0cm9rZS13aWR0aD0iMiIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIj48Y2lyY2xlIGN4PSIxMiIgY3k9IjgiIHI9IjUiLz48cGF0aCBkPSJNMjAgMjFhOCA4IDAgMCAwLTE2IDAiLz48L3N2Zz4=");
+  background-size: contain;
+  background-repeat: no-repeat;
+  background-position: center;
+}
+
+.mention.mention-handoff {
+  background: var(--color-orange-100);
+  border: 1px solid var(--color-orange-300);
+  color: var(--color-orange-600);
+}
+
+.mention.mention-handoff:hover {
+  background: var(--color-orange-200);
+  border-color: var(--color-orange-400);
+}
+
 /* Mention & Slash Command Menu */
 .mention-menu,
 .slash-command-menu {

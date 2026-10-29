@@ -1399,10 +1399,24 @@ async function handleExecutionLoop(
         );
       });
 
+      // A planned hand-off: the active playbook prescribes a "Handoff to human"
+      // step, and this isn't a guardrail/outage fallback. Recorded so the close
+      // classifier bills it as `assisted` rather than the fallback `human`.
+      const plannedHandoff =
+        conversation.metadata?.playbookPrescribesHandoff === true &&
+        !executionResult.confidence &&
+        !executionResult.aiUnavailable;
+
       // Every hand-off queues the conversation for the team.
       await conversationRepository.update(conversation.id, conversation.organization_id, {
         status: "pending-human",
+        ...(plannedHandoff
+          ? { metadata: { ...(conversation.metadata ?? {}), plannedHandoff: true } }
+          : {}),
       });
+      if (plannedHandoff) {
+        conversation.metadata = { ...(conversation.metadata ?? {}), plannedHandoff: true };
+      }
       await publishStatusChange(
         conversation.organization_id,
         conversation.id,

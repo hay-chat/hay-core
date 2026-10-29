@@ -102,7 +102,7 @@ import { ref, watch, nextTick } from "vue";
 import type { Component, ComponentPublicInstance } from "vue";
 import type { CommandItem } from "./SlashCommand";
 import type { MCPTool, DocumentItem } from "./MentionExtension";
-import { Type, Heading1, Heading2, List, ListOrdered, Zap, Book } from "lucide-vue-next";
+import { Type, Heading1, Heading2, List, ListOrdered, Zap, Book, UserRound } from "lucide-vue-next";
 import { useDomain } from "@/composables/useDomain";
 
 // Map icon names to Lucide components
@@ -114,6 +114,7 @@ const iconMap: Record<string, Component> = {
   "list-ordered": ListOrdered,
   zap: Zap,
   book: Book,
+  "user-round": UserRound,
 };
 
 const getLucideIcon = (iconName: string) => {

@@ -39,6 +39,7 @@ const baseFacts: CloseFacts = {
   aiLastReplyIsAnswer: true,
   approvalRequested: false,
   teamAssisted: false,
+  plannedHandoff: false,
 };
 
 const verdict = (
@@ -121,6 +122,30 @@ describe("close outcome rules", () => {
       const unhappy = { ...facts, closeReason: "user_indicated_close_unsatisfied" };
       expect(decideOutcome(unhappy, verdict(true)).outcome).toBe("unhappy");
       // A greeting-only chat with a stray team answer is still abandoned.
+      expect(decideOutcome({ ...facts, hadRealRequest: false }, verdict(false)).outcome).toBe(
+        "abandoned",
+      );
+    });
+
+    it("bills a playbook-planned hand-off as assisted, even when the AI did not resolve", () => {
+      const facts = { ...baseFacts, plannedHandoff: true, handedOff: true };
+      // A fallback hand-off (no planned step) with the same verdict is `human`.
+      expect(decideOutcome({ ...facts, plannedHandoff: false }, verdict(false)).outcome).toBe(
+        "human",
+      );
+      // The planned step makes it a billable `assisted` success instead.
+      expect(decideOutcome(facts, verdict(false))).toEqual({
+        outcome: "assisted",
+        billable: true,
+        aiResolved: true,
+      });
+      // A shopper's "didn't help", a quick-check answer, spam and test still win.
+      const unhappy = { ...facts, closeReason: "user_indicated_close_unsatisfied" };
+      expect(decideOutcome(unhappy, verdict(false)).outcome).toBe("unhappy");
+      expect(decideOutcome({ ...facts, teamAssisted: true }, verdict(false)).outcome).toBe("human");
+      expect(decideOutcome({ ...facts, spamFlagged: true }, verdict(false)).outcome).toBe("spam");
+      expect(decideOutcome({ ...facts, isTest: true }, verdict(false)).outcome).toBe("test");
+      // A greeting-only chat that reached the step is still abandoned.
       expect(decideOutcome({ ...facts, hadRealRequest: false }, verdict(false)).outcome).toBe(
         "abandoned",
       );
@@ -245,6 +270,12 @@ describe("close outcome rules", () => {
       ]);
       expect(waiting.teamAssisted).toBe(false);
       expect(waiting.aiReplied).toBe(false);
+    });
+
+    it("reads a planned hand-off from conversation metadata", () => {
+      expect(collectCloseFacts(conversation, []).plannedHandoff).toBe(false);
+      const planned = { ...conversation, metadata: { plannedHandoff: true } };
+      expect(collectCloseFacts(planned, []).plannedHandoff).toBe(true);
     });
 
     it("treats a greeting and silence as no real request", () => {
