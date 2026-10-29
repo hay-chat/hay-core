@@ -31,6 +31,12 @@ import {
   needsCustomerConfirmation,
   NEEDS_CONFIRMATION_STATUS,
 } from "./customer-confirmation";
+import {
+  isPageTool,
+  pageToolName,
+  pageToolService,
+  unwrapPageToolResult,
+} from "@server/services/webchat/page-tools.service";
 
 /** How far back the confirmation check looks for the AI's question (D4-10). */
 const CONFIRMATION_LOOKBACK_MESSAGES = 50;
@@ -520,6 +526,11 @@ export class ToolExecutionService {
     if (coreToolRegistry.has(fullToolName)) {
       return { pluginId: null, toolName: fullToolName, risk: CORE_TOOL_RISK };
     }
+    // Page tools run in the visitor's own browser, in front of the visitor,
+    // with no provider and no secret involved: no approval gate, like core tools.
+    if (isPageTool(fullToolName)) {
+      return { pluginId: null, toolName: fullToolName, risk: CORE_TOOL_RISK };
+    }
     const colonIndex = fullToolName.lastIndexOf(":");
     if (colonIndex === -1) {
       return { pluginId: null, toolName: fullToolName, risk: classifyTool(null) };
@@ -571,6 +582,19 @@ export class ToolExecutionService {
     if (coreToolRegistry.has(fullToolName)) {
       logger.debug({ fullToolName }, "Dispatching to core tool");
       return coreToolRegistry.execute(fullToolName, conversation, toolArgs ?? {});
+    }
+
+    // Page tools (`page:name`) — run by the host page over the conversation's
+    // socket. Nothing is injected: the page gets exactly what the model sent.
+    if (isPageTool(fullToolName)) {
+      logger.debug({ fullToolName }, "Dispatching to page tool");
+      const result = await pageToolService.call(
+        conversation.id,
+        conversation.organization_id,
+        pageToolName(fullToolName),
+        toolArgs ?? {},
+      );
+      return unwrapPageToolResult(result);
     }
 
     // Parse the tool name to extract plugin and tool parts

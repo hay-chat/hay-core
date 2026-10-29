@@ -26,6 +26,14 @@ These tools are provided by Hay and may be called regardless of any playbook too
 
 {{toolsDetail}}
 {{/if}}
+{{#if pageToolsDetail}}
+
+### Page tools (this visitor's browser)
+
+The web page the customer is chatting from registered these tools. Calling one runs it in the customer's browser right away, in front of them (for example opening a page or adding to their cart), so call them when the customer asks for that action and tell them what you did in your next message:
+
+{{pageToolsDetail}}
+{{/if}}
 {{/if}}
 
 ## Product recommendations
