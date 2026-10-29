@@ -24,7 +24,7 @@
     "baseUrl": ".",
     "paths": {
       "@/*": ["./src/*"],
-      "@hay/form-schema": ["../packages/form-schema/src/index.ts"]
+      "@hay/form-schema": ["../packages/form-schema/src/runtime.ts"]
     }
   },
   "include": ["src/**/*.ts", "src/**/*.vue"],
