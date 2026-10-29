@@ -4,6 +4,7 @@ import { AppDataSource } from "../../database/data-source";
 import { Organization } from "../../entities/organization.entity";
 import { User } from "../../entities/user.entity";
 import { AuditLog } from "../../entities/audit-log.entity";
+import { purgeAuditLogs } from "../helpers/audit-logs";
 import { ConversationOutcome } from "../../database/entities/conversation-outcome.entity";
 import { Conversation } from "../../database/entities/conversation.entity";
 import type { ConversationOutcomeKind } from "../../services/close-classification/outcome-rules";
@@ -82,13 +83,13 @@ describe("resolution ledger and exclusions (D1-5, D1-6)", () => {
 
   beforeEach(async () => {
     await AppDataSource.getRepository(ConversationOutcome).delete({ organization_id: orgId });
-    await AppDataSource.getRepository(AuditLog).delete({ organizationId: orgId });
+    await purgeAuditLogs("organization_id = $1", [orgId]);
   });
 
   afterAll(async () => {
     await AppDataSource.getRepository(ConversationOutcome).delete({ organization_id: orgId });
     await AppDataSource.getRepository(Conversation).delete({ organization_id: orgId });
-    await AppDataSource.getRepository(AuditLog).delete({ organizationId: orgId });
+    await purgeAuditLogs("organization_id = $1", [orgId]);
     await AppDataSource.getRepository(Organization).delete({ id: orgId });
     await AppDataSource.getRepository(User).delete({ id: userId });
     if (AppDataSource.isInitialized) await AppDataSource.destroy();

@@ -4,6 +4,7 @@ import { auditLogService } from "@server/services/audit-log.service";
 import type { AuditAction, AuditLog } from "@server/entities/audit-log.entity";
 import { TRPCError } from "@trpc/server";
 import { RESOURCES, ACTIONS } from "@server/types/scopes";
+import { csvCell } from "@server/services/organization-export.service";
 
 const exportAuditLogsSchema = z.object({
   format: z.enum(["csv", "json"]).default("csv"),
@@ -37,7 +38,7 @@ const listAuditLogsSchema = z.object({
 /**
  * Convert audit logs to CSV format
  */
-function convertToCSV(logs: AuditLog[]): string {
+export function convertToCSV(logs: AuditLog[]): string {
   if (logs.length === 0) {
     return "No audit logs found";
   }
@@ -64,14 +65,14 @@ function convertToCSV(logs: AuditLog[]): string {
     return [
       log.id,
       log.createdAt,
-      log.userId,
+      log.userId || "",
       log.user?.email || "",
       log.organizationId || "",
       log.action,
       log.resource || "",
       log.status || "",
-      JSON.stringify(log.changes || {}),
-      JSON.stringify(log.metadata || {}),
+      log.changes || {},
+      log.metadata || {},
       log.ipAddress || "",
       log.userAgent || "",
       log.errorMessage || "",
@@ -79,10 +80,9 @@ function convertToCSV(logs: AuditLog[]): string {
   });
 
   // Combine headers and rows
-  const csvContent = [
-    headers.join(","),
-    ...rows.map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(",")),
-  ].join("\n");
+  const csvContent = [headers.join(","), ...rows.map((row) => row.map(csvCell).join(","))].join(
+    "\n",
+  );
 
   return csvContent;
 }
