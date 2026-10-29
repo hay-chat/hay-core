@@ -1,0 +1,72 @@
+{
+  "name": "Spacebring",
+  "description": "Connect your Spacebring co-working space so the assistant can book, move and cancel rooms for members, invite their guests, report issues to the team and answer house questions.",
+  "tools": {
+    "spacebring_get_member": {
+      "label": "Get Member",
+      "description": "Look up a member by email: plan, credits, upcoming bookings, guest visits and open tickets."
+    },
+    "spacebring_find_available_spaces": {
+      "label": "Find Available Spaces",
+      "description": "See which rooms, desks or other spaces are free for a time slot."
+    },
+    "spacebring_book_space": {
+      "label": "Book a Space",
+      "description": "Book a room or desk for a member after checking the slot is free."
+    },
+    "spacebring_move_booking": {
+      "label": "Move Booking",
+      "description": "Move a member's booking to another time or space, booking the new slot before freeing the old one."
+    },
+    "spacebring_cancel_booking": {
+      "label": "Cancel Booking",
+      "description": "Cancel one of the member's own bookings."
+    },
+    "spacebring_invite_guest": {
+      "label": "Invite Guest",
+      "description": "Register a guest visit; Spacebring emails the guest their invite."
+    },
+    "spacebring_cancel_guest_visit": {
+      "label": "Cancel Guest Visit",
+      "description": "Cancel a guest visit the member registered."
+    },
+    "spacebring_report_issue": {
+      "label": "Report Issue",
+      "description": "Report a problem in the space (Wi-Fi, AC, access, cleaning, repairs) to the team."
+    },
+    "spacebring_search_guides": {
+      "label": "Search House Guides",
+      "description": "Answer house questions (Wi-Fi, opening hours, rules) from the space's guides."
+    },
+    "spacebring_whats_on": {
+      "label": "What's On",
+      "description": "Upcoming community events and the latest announcements."
+    },
+    "spacebring_list_perks": {
+      "label": "List Perks",
+      "description": "Member perks and partner discounts, with how to redeem them."
+    },
+    "spacebring_list_plans": {
+      "label": "List Plans",
+      "description": "Membership plans on offer, with prices."
+    }
+  },
+  "config": {
+    "apiKeyId": {
+      "label": "API Key ID",
+      "description": "Spacebring API key ID (the username for Basic auth). Generate API credentials in Spacebring under Settings → Integrations → API."
+    },
+    "apiKeySecret": {
+      "label": "API Key Secret",
+      "description": "Spacebring API key secret (the password for Basic auth). Stored encrypted."
+    },
+    "locationRef": {
+      "label": "Default Location",
+      "description": "Name or ID of the location this assistant serves. Leave empty if your network has a single location; with several, members are asked which one."
+    },
+    "timeZone": {
+      "label": "Time Zone",
+      "description": "IANA time zone (e.g. Europe/Lisbon) used when Spacebring does not report one for the location. Members' times are read and shown in it."
+    }
+  }
+}

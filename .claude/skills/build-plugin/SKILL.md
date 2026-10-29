@@ -29,18 +29,21 @@ Full contract (lifecycle, metadata fields, config/auth/MCP/UI APIs, build): **`r
 Answer these before writing code:
 
 - **What platform**, and how does it expose itself? (REST API? hosted MCP server? messaging webhooks? document source?)
-- **What should the agent be able to do?** List the concrete actions → these become tools or the channel's message flow.
+- **What should the agent be able to do?** Write the support playbooks first ("book a room",
+  "cancel my order", "what's the Wi‑Fi?"); each step that touches the platform becomes **one
+  tool**, however many endpoints it needs. Never mirror the API 1:1. Read
+  **`reference/tool-design.md`** before designing tools.
 - **Auth method?** API key / OAuth2 / basic. What credentials does the user supply?
 - **Plugin name** → npm name `hay-plugin-<name>` (channels: `hay-channel-<name>-<provider>`).
 
 ### 2. Pick the archetype (full detail + reference plugins in `reference/archetypes.md`)
 
-| The platform…                 | Archetype                           | Reference to copy                                                           | Avoid                                            |
-| ----------------------------- | ----------------------------------- | --------------------------------------------------------------------------- | ------------------------------------------------ |
-| has a REST API, no hosted MCP | **A. Local bundled MCP**            | **shopify** / **woocommerce** (semantic tools + tests), **klaviyo** (clean) | one tool per endpoint (see anti-patterns)        |
-| hosts its own MCP server      | **B. Remote connector**             | **hubspot** (OAuth), **stripe** (API key)                                   | stripe's stale `.md` docs                        |
-| is two-way messaging          | **C. Channel**                      | **chatwoot** (verify), **email-imap** (semantics)                           | whatsapp (no idempotency)                        |
-| is a document source          | **D. Document importer** (advanced) | **atlassian** ConfluenceClient + adf-to-markdown                            | atlassian's manifest.json + `@server/*` coupling |
+| The platform…                 | Archetype                           | Reference to copy                                               | Avoid                                            |
+| ----------------------------- | ----------------------------------- | --------------------------------------------------------------- | ------------------------------------------------ |
+| has a REST API, no hosted MCP | **A. Local bundled MCP**            | **spacebring** / **wix** / **shopify** (playbook tools + tests) | one tool per endpoint (see `tool-design.md`)     |
+| hosts its own MCP server      | **B. Remote connector**             | **hubspot** (OAuth), **stripe** (API key)                       | stripe's stale `.md` docs                        |
+| is two-way messaging          | **C. Channel**                      | **chatwoot** (verify), **email-imap** (semantics)               | whatsapp (no idempotency)                        |
+| is a document source          | **D. Document importer** (advanced) | **atlassian** ConfluenceClient + adf-to-markdown                | atlassian's manifest.json + `@server/*` coupling |
 
 **Payment provider** (Pix, card refunds: Mercado Pago, PagBank, Pagar.me…)? Archetype A plus the
 shared five-tool contract in `packages/plugin-sdk/payment-provider/README.md` (`@hay/plugin-sdk/payment-provider`).
@@ -62,8 +65,13 @@ archetypes you're not using.
 
 - `onValidateAuth`: do a **real API round-trip** and throw user-facing messages (klaviyo/zendesk).
 - `onStart`: **gate on credentials** — missing creds → log + return, never crash the worker.
-- MCP server: native `fetch`, one shared `api()` request helper, `ok()`/`fail()` responses, zod
-  schemas with `.describe()`, rich tool descriptions with cross-tool hints (klaviyo).
+- MCP tools follow **`reference/tool-design.md`**: playbook-step tools that serialise the requests
+  they need, accept what customers say (emails, names, "tomorrow 2pm") and normalise it, enforce
+  rules before writing, and answer with a relayable `summary` / a `ToolError` that says what to do
+  next (spacebring, wix, shopify).
+- MCP server: native `fetch`, one shared `api()` request helper, `ok()`/`fail()` responses
+  (`@hay/plugin-sdk/tool-errors`), zod schemas with `.describe()`, split into `mcp/lib` + `mcp/tools`
+  with a `fetch`-stub test harness (wix, spacebring).
 - HTTP client (archetype D or any direct API calls): retry with `Retry-After` on 429 + exponential
   backoff on 5xx (atlassian `ConfluenceClient`).
 - Channel inbound: verify signature over **raw bytes** with replay window + `timingSafeEqual`,
@@ -115,6 +123,7 @@ npm run typecheck:server   # plugin types compile against the SDK
 - [ ] Every secret config field is `encrypted:true`; nothing logs credentials.
 - [ ] `onValidateAuth` does a live round-trip; `onStart` gates on creds; `onDisable` tears down; no `onEnable`.
 - [ ] Every imported dependency is declared in the relevant `package.json`.
+- [ ] Tools pass the `reference/tool-design.md` checklist (playbook steps, lenient input, rules enforced in code, actionable errors).
 - [ ] (Archetype A) `mcp/` uses `@modelcontextprotocol/sdk`, real zod schemas, `console.error` logging, and a documented dependency-install approach.
 - [ ] (Channel) signature verified, inbound deduped, non-retryable errors return `200 {success:false}`.
 - [ ] No committed cruft: no `.git`/vendored repos, `node_modules` bloat, `test-results/`, design `.md` TODOs, or creds in fixtures.
@@ -125,6 +134,7 @@ npm run typecheck:server   # plugin types compile against the SDK
 
 ## Reference map
 
+- `reference/tool-design.md` — how to choose and shape MCP tools (playbook steps, not endpoints).
 - `reference/contract.md` — the enforced SDK contract (lifecycle, metadata, config/auth/MCP/UI, build).
 - `reference/archetypes.md` — the four archetypes, which reference plugin to copy, what to avoid.
 - `reference/anti-patterns.md` — real mistakes in `plugins/core/*`, with file pointers.
