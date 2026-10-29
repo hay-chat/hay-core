@@ -191,6 +191,25 @@ and is not scheduled — ask Roger whether it becomes Wave 4.
 
 Parked: D13-15, D16-10/11, D6-14, D2-10, D7-15, D8-18, D10-9, D11-13, D14-10, fraud flags.
 
+## Wave 4 — D18 OAuth, D19 quick check, D20 plugin setup (started 2026-10-29)
+
+Research now on the homeserver: `git@github.com:hay-chat/hay-seo.git` (`Engineering/02 Research/`). Roger accepted every
+D19/D20 recommendation (hay-seo ec61f76). Builders work on master-based branches; the orchestrator merges, deploys, tests on prod.
+
+| Lane | Branch                        | Tickets                                                                 | Status                                              |
+| ---- | ----------------------------- | ----------------------------------------------------------------------- | --------------------------------------------------- |
+| D18  | claude/w4-d18-nuvemshop-oauth | partner OAuth ({client_id}, JSON exchange, token extras), LGPD webhooks | merged 01c6c6bd; live connect needs the partner app |
+| D20  | claude/w4-d20-plugin-setup    | phase 1: D20-0..D20-5                                                   | building                                            |
+| D19  | claude/w4-d19-quick-check     | phase 1: D19-0..6, 8, 12 (off by default)                               | building                                            |
+
+Phase 2 later: D20-6..11 (plugin adoption, marketplace, error copy), D19-7, 9..11, 13 (knowledge loop, offline hand-off
+settings, SDK `handoff` + Zendesk, channel specifics).
+D18 notes: token-response extras now reach every OAuth plugin's credentials (e.g. Mercado Pago `user_id`); token refresh
+keeps connection credentials (fixes Instagram losing onConnected values). customers/redact + data_request are acknowledged
+and logged only (no Nuvemshop customer records in Hay; mapping needs a merchant-initiated flow, TODO in `lgpd.ts`);
+store/redact disconnects but leaves the synced catalogue. Plugin option/button labels stay English (plugin i18n covers
+fields only).
+
 ## Test stores and fixtures
 
 | Store                          | Test orders                           | Notes                                                              |
@@ -308,6 +327,7 @@ Roger said "Do it now" for every gap. Not started; lanes below.
 - [x] Shopify scopes step 1 (2026-10-29): app version hay-chat-12 released (write_order_edits, write_discounts; hay-shopify-app 4fbb7de). Plugin loads again after the `disputes` capability fix (5a5af975). Merchants re-consent on next open. Deploy needs the CLI logged in as roger@rogerjunior.com (roger@hay.chat is not in the Hay.chat org).
 - [x] Shopify scopes step 2 (2026-10-29): read_shopify_payments_disputes released (hay-chat-13, hay-shopify-app e5992a4), no approval needed. The evidence scopes are NOT requested: Shopify grants them only to dispute-management apps, via Support. So the agent can read disputes but the evidence attach returns SCOPE_MISSING. Dispute intake no longer asks for evidence fields (72e1cd4b); it would have failed every webhook. Also fixed: crons without a retryPolicy were never scheduled (9ac9ee4a), incl. Shopify/Stripe sync_disputes.
 - [ ] Shopify dispute test: needs a Shopify Payments store with a test chargeback (dev stores can't use Shopify Payments live).
+- [ ] **Nuvemshop partner app (W4 D18, code live):** register in the Nuvemshop partner portal. Redirect `https://eu.hay.chat/oauth/callback`; scopes `read_products, write_orders, write_customers, write_coupons, write_fulfillment_orders`; LGPD webhooks store/redact, customers/redact, customers/data_request all → `https://eu.hay.chat/v1/plugins/hay-plugin-nuvemshop/webhook`. App id → `NUVEMSHOP_OAUTH_CLIENT_ID`, secret → `NUVEMSHOP_OAUTH_CLIENT_SECRET` in Infisical prod, then `deploy.sh --env-only`. Then one live connect on a test store (checks: Nuvemshop ignores core's extra authorize/exchange params, HMAC header is hex).
 - [ ] VAT: skipped for now (Hay registered in Brazil; B2B reverse charge). Lawyer: confirm no EU/UK consumer sales → no OSS needed; Brazil ISS/nota fiscal. Fix Stripe head office (says PT).
 - [ ] Billing UX: redesign + country picker (USD fallback) + cancel page with 50% once retention offer — agents running; retest live after.
 - Confirm the simulation-cap reading (20 % of plan resolutions, max 500).
