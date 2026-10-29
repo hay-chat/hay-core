@@ -27,7 +27,8 @@
     "migration:check": "tsx scripts/ensure-migrations.ts",
     "order-links:backfill": "tsx scripts/backfill-order-links.ts",
     "insights:backfill-feedback": "tsx scripts/backfill-feedback-insights.ts",
-    "plugins:enable-defaults": "tsx scripts/enable-default-plugins.ts"
+    "plugins:enable-defaults": "tsx scripts/enable-default-plugins.ts",
+    "secrets:reencrypt": "tsx scripts/reencrypt-secrets.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.100.1",
@@ -91,6 +92,7 @@
     "express": "^5.1.0",
     "fast-uri": "^3.1.0",
     "file-type": "^16.5.4",
+    "helmet": "^8.3.0",
     "ioredis": "^5.8.1",
     "jest": "^30.2.0",
     "jose": "^6.1.0",

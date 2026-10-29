@@ -16,7 +16,15 @@ jest.mock("@server/repositories/message.repository", () => ({
   messageRepository: { findOutboundByProviderMessageIds: findOutbound, update },
 }));
 const publish = jest.fn<(channel: string, event: unknown) => Promise<void>>();
-jest.mock("@server/services/redis.service", () => ({ redisService: { publish } }));
+// In-memory stand-in for the delivery-id store (SET NX / DEL).
+const seenIds = new Set<string>();
+const redisClient = {
+  set: async (key: string) => (seenIds.has(key) ? null : (seenIds.add(key), "OK")),
+  del: async (key: string) => (seenIds.delete(key) ? 1 : 0),
+};
+jest.mock("@server/services/redis.service", () => ({
+  redisService: { publish, getClient: () => redisClient, isConnected: () => true },
+}));
 
 const recordDeliveryFailure = jest.fn<(organizationId: string, channel: string) => Promise<void>>();
 jest.mock("@server/services/channel-health.service", () => ({
@@ -137,19 +145,20 @@ describe("POST /v1/webhooks/email-events", () => {
     return handler({ headers, body, rawBody: raw }, res).then(() => ({ res, raw }));
   }
 
-  function signed(body: unknown) {
+  function signed(body: unknown, id = "msg_1") {
     const raw = JSON.stringify(body);
     const ts = String(Math.floor(Date.now() / 1000));
     const signature = crypto
       .createHmac("sha256", secretBytes)
-      .update(`msg_1.${ts}.`)
+      .update(`${id}.${ts}.`)
       .update(raw)
       .digest("base64");
-    return { "svix-id": "msg_1", "svix-timestamp": ts, "svix-signature": `v1,${signature}` };
+    return { "svix-id": id, "svix-timestamp": ts, "svix-signature": `v1,${signature}` };
   }
 
   beforeEach(() => {
     jest.clearAllMocks();
+    seenIds.clear();
     process.env.RESEND_EVENTS_WEBHOOK_SECRET = secret;
   });
 
@@ -170,6 +179,28 @@ describe("POST /v1/webhooks/email-events", () => {
     expect(update).toHaveBeenCalled();
     // One recipient's bounce says nothing about the channel.
     expect(recordDeliveryFailure).not.toHaveBeenCalled();
+  });
+
+  it("processes each svix-id once and acknowledges a repeat without applying it", async () => {
+    findOutbound.mockResolvedValue(message());
+    const headers = signed(bounce);
+    await call(headers, bounce);
+    const { res } = await call(headers, bounce);
+    expect(res.statusCode).toBe(200);
+    expect(res.body).toEqual({ ok: true, duplicate: true });
+    expect(findOutbound).toHaveBeenCalledTimes(1);
+  });
+
+  it("accepts the provider's retry after a failed attempt", async () => {
+    findOutbound.mockRejectedValueOnce(new Error("db down"));
+    const headers = signed(bounce, "msg_retry");
+    const first = await call(headers, bounce);
+    expect(first.res.statusCode).toBe(500);
+
+    findOutbound.mockResolvedValue(message());
+    const retry = await call(headers, bounce);
+    expect(retry.res.statusCode).toBe(200);
+    expect(retry.res.body).toEqual({ ok: true, handled: true });
   });
 
   it("answers 503 when the secret is not configured", async () => {

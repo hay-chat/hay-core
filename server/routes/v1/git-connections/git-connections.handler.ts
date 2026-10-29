@@ -1,7 +1,7 @@
 import { z } from "zod";
-import { TRPCError } from "@trpc/server";
 import { authenticatedProcedure } from "@server/trpc";
 import { gitConnectionService } from "@server/services/git-connection.service";
+import { toClientError } from "@server/trpc/client-error";
 
 /**
  * Get the GitHub App installation URL (or null if not configured).
@@ -34,8 +34,7 @@ export const completeInstallation = authenticatedProcedure
         accountLogin: connection.accountLogin,
       };
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Installation failed";
-      throw new TRPCError({ code: "BAD_REQUEST", message });
+      throw toClientError(error, "BAD_REQUEST", "Installation failed");
     }
   });
 
@@ -90,8 +89,7 @@ export const listRepos = authenticatedProcedure
       );
       return repos;
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Failed to list repos";
-      throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message });
+      throw toClientError(error, "INTERNAL_SERVER_ERROR", "Failed to list repos");
     }
   });
 
@@ -124,8 +122,7 @@ export const installPlugin = authenticatedProcedure
         commitSha: plugin.gitLastCommitSha,
       };
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Failed to install plugin";
-      throw new TRPCError({ code: "BAD_REQUEST", message });
+      throw toClientError(error, "BAD_REQUEST", "Failed to install plugin");
     }
   });
 
@@ -139,8 +136,7 @@ export const syncPlugin = authenticatedProcedure
       const result = await gitConnectionService.syncPlugin(input.pluginId);
       return result;
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Sync failed";
-      throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message });
+      throw toClientError(error, "INTERNAL_SERVER_ERROR", "Sync failed");
     }
   });
 
@@ -153,7 +149,6 @@ export const checkForUpdates = authenticatedProcedure
     try {
       return await gitConnectionService.checkForUpdates(input.pluginId);
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Check failed";
-      throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message });
+      throw toClientError(error, "INTERNAL_SERVER_ERROR", "Check failed");
     }
   });

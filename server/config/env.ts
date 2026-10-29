@@ -35,7 +35,13 @@ export const config = {
   server: {
     port: parseInt(process.env.PORT || "3001", 10),
     host: process.env.HOST || "localhost",
-    wsPort: parseInt(process.env.WS_PORT || process.env.PORT || "3001", 10), // WebSocket port, defaults to same as server port
+    // Reverse-proxy hops in front of the server (one reverse proxy = 1). The
+    // client IP is read from X-Forwarded-For through this many proxies only,
+    // so entries a client adds itself are ignored. 0 = clients connect directly.
+    trustProxy: parseInt(
+      process.env.TRUST_PROXY || (process.env.NODE_ENV === "production" ? "1" : "0"),
+      10,
+    ),
   },
 
   domain: {
@@ -96,11 +102,6 @@ export const config = {
     credentials: true,
   },
 
-  rateLimit: {
-    windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS || "60000", 10), // 1 minute
-    max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS || "100", 10),
-  },
-
   webchat: {
     // Page tools (WebMCP): tools the host page registers in the browser for the
     // AI to call in the visitor's session. Set WEBCHAT_PAGE_TOOLS=false to turn
@@ -118,7 +119,7 @@ export const config = {
   },
 
   logging: {
-    level: process.env.LOG_LEVEL || "debug",
+    level: process.env.LOG_LEVEL || "info",
     debug: process.env.DEBUG === "true",
   },
 
@@ -137,6 +138,10 @@ export const config = {
     password: process.env.DB_PASSWORD || "hay_password",
     database: process.env.DB_NAME || "hay_db",
     ssl: process.env.DB_SSL === "true",
+    // CA certificate (PEM text or a path to a PEM file) used to verify the
+    // database server when DB_SSL=true. Without it the connection is encrypted
+    // but the server certificate is not verified.
+    sslCa: process.env.DB_SSL_CA || "",
     synchronize: false, // Never use synchronize in production
     logging: process.env.DB_LOGGING === "true",
     maxConnections: parseInt(process.env.DB_MAX_CONNECTIONS || "10", 10),
@@ -487,20 +492,27 @@ export function validateJwtSecrets(): void {
   }
 }
 
+const MIN_SECRET_LENGTH = 32;
+const DEFAULT_DB_PASSWORD = "hay_password";
+const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1", "::1"]);
+
 /**
- * Validates that required environment variables are set in production.
- * Throws an error if any required variables are missing.
+ * Validates the configuration a production server needs. Throws on settings
+ * that would leave the deployment insecure (missing or default secrets) and
+ * returns warnings for weaker settings the operator should review.
  * Should be called at application startup.
  */
-export function validateProductionConfig(): void {
+export function validateProductionConfig(): string[] {
   // JWT secrets are validated in all environments (except test)
   validateJwtSecrets();
 
   if (config.env === "development" || config.env === "test") {
-    return;
+    return [];
   }
 
   const missingVars: string[] = [];
+  const errors: string[] = [];
+  const warnings: string[] = [];
 
   if (!config.domain.api) {
     missingVars.push("API_DOMAIN");
@@ -511,12 +523,50 @@ export function validateProductionConfig(): void {
   if (!config.openai.apiKey) {
     missingVars.push("OPENAI_API_KEY");
   }
+  if (!process.env.RABBITMQ_URL) {
+    missingVars.push("RABBITMQ_URL");
+  }
+
+  const encryptionKey = process.env.PLUGIN_ENCRYPTION_KEY || "";
+  if (!encryptionKey) {
+    missingVars.push("PLUGIN_ENCRYPTION_KEY");
+  } else if (encryptionKey.length < MIN_SECRET_LENGTH) {
+    errors.push(`PLUGIN_ENCRYPTION_KEY must be at least ${MIN_SECRET_LENGTH} characters.`);
+  }
+
+  if (!process.env.DB_PASSWORD || process.env.DB_PASSWORD === DEFAULT_DB_PASSWORD) {
+    errors.push("DB_PASSWORD must be set to a non-default value.");
+  }
+  if (process.env.RABBITMQ_URL?.includes(`:${DEFAULT_DB_PASSWORD}@`)) {
+    errors.push("RABBITMQ_URL must not use the default development credentials.");
+  }
+  if (config.internal.apiSecret && config.internal.apiSecret.length < MIN_SECRET_LENGTH) {
+    errors.push(`INTERNAL_API_SECRET must be at least ${MIN_SECRET_LENGTH} characters when set.`);
+  }
 
   if (missingVars.length > 0) {
+    errors.unshift(`Missing required environment variables: ${missingVars.join(", ")}`);
+  }
+  if (errors.length > 0) {
     throw new Error(
-      `Missing required environment variables for production:\n` +
-        `  ${missingVars.join("\n  ")}\n\n` +
+      `Invalid production configuration:\n` +
+        `  ${errors.join("\n  ")}\n\n` +
         `Please set these variables in your .env file or environment.`,
     );
   }
+
+  if (config.logging.level === "debug" || config.logging.level === "trace") {
+    warnings.push(`LOG_LEVEL=${config.logging.level} is verbose and may log customer data.`);
+  }
+  if (!config.database.ssl && !LOCAL_HOSTS.has(config.database.host)) {
+    warnings.push("DB_SSL is off for a remote database host; database traffic is unencrypted.");
+  }
+  if (config.database.ssl && !config.database.sslCa) {
+    warnings.push("DB_SSL is on without DB_SSL_CA; the database certificate is not verified.");
+  }
+  if (!config.redis.password && !LOCAL_HOSTS.has(config.redis.host)) {
+    warnings.push("REDIS_PASSWORD is not set for a remote Redis host.");
+  }
+
+  return warnings;
 }

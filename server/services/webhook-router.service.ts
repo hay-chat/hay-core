@@ -7,6 +7,7 @@ import { pluginInstanceRepository } from "../repositories/plugin-instance.reposi
 import { pluginWebhookRouteRepository } from "../repositories/plugin-webhook-route.repository";
 import { verifyHmacSha256 } from "./plugin-route.service";
 import { normalizeEmailAddressKey, verifySvixSignature } from "@server/lib/svix-signature";
+import { claimWebhookDelivery } from "@server/lib/webhook-replay";
 import type {
   WebhookDeauthorizationDescriptor,
   WebhookRouteKeyPathDescriptor,
@@ -133,6 +134,18 @@ export class WebhookRouterService {
     } catch {
       logger.warn({ pluginId }, "Shared webhook body is not valid JSON");
       res.status(400).json({ error: "Invalid JSON body" });
+      return;
+    }
+
+    // Svix deliveries carry a unique id: process each one once. (Plain HMAC
+    // formats have no delivery id or timestamp, and two legitimate events can
+    // have identical bodies, so they are not deduplicated here.)
+    const deliveryId = routing.signature.format === "svix" ? req.headers["svix-id"] : undefined;
+    if (
+      typeof deliveryId === "string" &&
+      !(await claimWebhookDelivery(`webhook-router:${pluginId}`, deliveryId))
+    ) {
+      res.status(200).json({ received: true, duplicate: true });
       return;
     }
 

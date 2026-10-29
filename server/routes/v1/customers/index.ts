@@ -5,7 +5,9 @@ import { TRPCError } from "@trpc/server";
 import { createListProcedure } from "@server/trpc/procedures/list";
 import { CustomerRepository } from "@server/repositories/customer.repository";
 import { RESOURCES, ACTIONS } from "@server/types/scopes";
+import { createLogger } from "@server/lib/logger";
 
+const logger = createLogger("customers");
 const customerService = new CustomerService();
 const customerRepository = new CustomerRepository();
 
@@ -133,9 +135,10 @@ export const customersRouter = t.router({
         });
         return customer;
       } catch (error) {
+        logger.warn({ err: error }, "Customer create failed");
         throw new TRPCError({
           code: "BAD_REQUEST",
-          message: error instanceof Error ? error.message : "An error occurred",
+          message: "Failed to create customer. Check that the external ID is not already in use.",
         });
       }
     }),
@@ -191,9 +194,10 @@ export const customersRouter = t.router({
         if (error instanceof TRPCError && error.code === "NOT_FOUND") {
           throw error;
         }
+        logger.warn({ err: error }, "Customer update failed");
         throw new TRPCError({
           code: "BAD_REQUEST",
-          message: error instanceof Error ? error.message : "An error occurred",
+          message: "Failed to update customer. Check that the external ID is not already in use.",
         });
       }
     }),

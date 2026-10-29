@@ -1,5 +1,6 @@
 import { Router, type Request } from "express";
 import { verifySvixSignature } from "@server/lib/svix-signature";
+import { claimWebhookDelivery, releaseWebhookDelivery } from "@server/lib/webhook-replay";
 import { applyEmailEvent, type ResendEmailEvent } from "@server/services/email-events.service";
 import { createLogger } from "@server/lib/logger";
 
@@ -15,6 +16,7 @@ import { createLogger } from "@server/lib/logger";
 
 const logger = createLogger("email-events-webhook");
 const router = Router();
+const REPLAY_NAMESPACE = "email-events";
 
 function header(req: Request, name: string): string | undefined {
   const value = req.headers[name];
@@ -28,12 +30,14 @@ router.post("/v1/webhooks/email-events", async (req, res) => {
     return;
   }
   const rawBody = (req as Request & { rawBody?: string }).rawBody;
+  const deliveryId = header(req, "svix-id");
   if (
     !rawBody ||
+    !deliveryId ||
     !verifySvixSignature(
       Buffer.from(rawBody, "utf8"),
       {
-        id: header(req, "svix-id"),
+        id: deliveryId,
         timestamp: header(req, "svix-timestamp"),
         signature: header(req, "svix-signature"),
       },
@@ -44,6 +48,12 @@ router.post("/v1/webhooks/email-events", async (req, res) => {
     return;
   }
 
+  // Each svix-id is processed once; a repeat is acknowledged without effect.
+  if (!(await claimWebhookDelivery(REPLAY_NAMESPACE, deliveryId))) {
+    res.json({ ok: true, duplicate: true });
+    return;
+  }
+
   try {
     // A bounce or complaint is about one recipient, not the email channel, so
     // it never counts toward the channel-failing alert.
@@ -51,6 +61,7 @@ router.post("/v1/webhooks/email-events", async (req, res) => {
     res.json({ ok: true, handled: outcome.handled });
   } catch (error) {
     logger.error({ err: error }, "Email event handling failed");
+    await releaseWebhookDelivery(REPLAY_NAMESPACE, deliveryId);
     res.status(500).json({ error: "Internal server error" });
   }
 });
