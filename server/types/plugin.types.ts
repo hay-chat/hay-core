@@ -202,11 +202,7 @@ export interface MCPToolDefinition {
 export interface LocalMCPServerConfig {
   serverId: string;
   serverPath: string;
-  startCommand: string;
-  installCommand?: string;
-  buildCommand?: string;
   tools?: MCPToolDefinition[]; // Optional - will be discovered from MCP server via listTools()
-  env?: Record<string, string>;
 }
 
 /**
