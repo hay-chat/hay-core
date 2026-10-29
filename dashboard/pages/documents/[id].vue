@@ -215,6 +215,7 @@ import { ref, computed, onMounted, nextTick } from "vue";
 import { useRouter, useRoute } from "vue-router";
 import { HayApi } from "@/utils/api";
 import { markdownToHtml } from "@/utils/markdownToHtml";
+import { sanitizeHtml } from "@/utils/sanitize";
 import { useToast } from "@/composables/useToast";
 import type { JSONContent } from "@tiptap/vue-3";
 import {
@@ -334,7 +335,7 @@ const editorInitialContent = computed<JSONContent | undefined>(() => {
 const renderedContent = computed(() => {
   if (!document.value?.content) return "";
   if (isEditorAuthored.value) {
-    return document.value.content;
+    return sanitizeHtml(document.value.content);
   }
   return markdownToHtml(document.value.content);
 });

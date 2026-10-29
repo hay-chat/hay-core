@@ -10,7 +10,7 @@ import { createContext } from "@server/trpc/context";
 import { initializeDatabase } from "@server/database/data-source";
 import { createLogger } from "@server/lib/logger";
 import { initTelemetry, captureException, shutdownTelemetry } from "@server/lib/telemetry";
-import { isPublicUploadPath } from "@server/services/media-url.service";
+import { isPublicUploadPath, setPublicUploadHeaders } from "@server/services/media-url.service";
 import "reflect-metadata";
 import "dotenv/config";
 
@@ -185,10 +185,7 @@ async function startServer() {
       maxAge: "7d",
       etag: true,
       lastModified: true,
-      setHeaders: (res, _filePath) => {
-        // Security headers
-        res.setHeader("X-Content-Type-Options", "nosniff");
-      },
+      setHeaders: setPublicUploadHeaders,
     }),
   );
 
