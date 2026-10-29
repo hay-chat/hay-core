@@ -246,6 +246,17 @@ export interface ConfigFieldDescriptor {
   serverOnly?: boolean;
   default?: unknown;
   env?: string; // Environment variable fallback
+  /** Technical field: shown on the Advanced tab instead of Setup (D20). */
+  advanced?: boolean;
+  /** Select choices (the UI renders a dropdown). */
+  options?: Array<{ label: string; value: string | number }>;
+  /** Show the field only when another field matches. */
+  showWhen?: {
+    field: string;
+    equals?: string | number | boolean;
+    in?: Array<string | number | boolean>;
+    notEquals?: string | number | boolean;
+  };
   validation?: {
     min?: number;
     max?: number;

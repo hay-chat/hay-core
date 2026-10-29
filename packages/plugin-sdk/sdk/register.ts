@@ -533,6 +533,10 @@ function validateConfigSchema(
       }
     }
 
+    if (descriptor.advanced !== undefined && typeof descriptor.advanced !== "boolean") {
+      throw new Error(`Config field "${fieldName}" advanced must be a boolean`);
+    }
+
     // Validate default value type (if provided)
     if (descriptor.default !== undefined) {
       validateDefaultValue(fieldName, descriptor);

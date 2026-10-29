@@ -7,7 +7,7 @@ Research: `Engineering/02 Research/D20 Plugin setup UX.md` (Roger accepted every
 - [x] D20-0 re-check the research against master
 - [x] D20-1 quick fixes on the current plugin page
 - [x] D20-2 i18n of the generic form + OAuth card, plugin field labels, locale renames, en/pt-BR hard check
-- [ ] D20-3 SDK + server: `advanced` fields, `managed` resolver metadata, override policy (env flag)
+- [x] D20-3 SDK + server: `advanced` fields, `managed` resolver metadata, override policy (env flag)
 - [ ] D20-4 standard page: status header, tabs, Advanced mode, badges, ⋯ menu, Enable → Connect
 - [ ] D20-5 `register.setup({steps})`, `GET /setup/status`, core checklist + fallback steps, build-plugin skill
 - Verify each slice: plugin-sdk vitest, dashboard vitest, server jest (config resolver / handler), Playwright 390 px + desktop.
