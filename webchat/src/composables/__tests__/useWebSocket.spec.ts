@@ -75,6 +75,30 @@ describe("useWebSocket", () => {
     app.unmount();
   });
 
+  it("sends page tools with identify and answers tool_call with tool_result", () => {
+    const { ws, app } = setup();
+    ws.connect();
+    const socket = FakeWebSocket.instances[0];
+    socket.onopen?.();
+    const tools = [{ name: "navigate", description: "Go", inputSchema: { type: "object" } }];
+    ws.identify("anon_1", "conv-1", tools);
+    expect(JSON.parse(socket.sent[0]).tools).toEqual(tools);
+
+    const calls: unknown[] = [];
+    ws.setToolCallHandler((call) => calls.push(call));
+    socket.receive({ type: "tool_call", callId: "c1", name: "navigate", args: { path: "/x" } });
+    socket.receive({ type: "tool_call", name: "no-call-id" });
+    expect(calls).toEqual([{ callId: "c1", name: "navigate", args: { path: "/x" } }]);
+
+    ws.sendToolResult("c1", { result: "ok" });
+    ws.sendTools([]);
+    expect(socket.sent.slice(1).map((f) => JSON.parse(f))).toEqual([
+      { type: "tool_result", callId: "c1", result: "ok" },
+      { type: "register_tools", tools: [] },
+    ]);
+    app.unmount();
+  });
+
   it("appends agent messages and ignores customer echoes", () => {
     const { ws, app } = setup();
     ws.connect();

@@ -26,6 +26,14 @@ Estas ferramentas são fornecidas pelo Hay e podem ser chamadas independentement
 
 {{toolsDetail}}
 {{/if}}
+{{#if pageToolsDetail}}
+
+### Ferramentas da página (navegador deste cliente)
+
+A página web de onde o cliente está conversando registrou estas ferramentas. Chamar uma delas executa a ação na hora no navegador do cliente, na frente dele (por exemplo abrir uma página ou adicionar ao carrinho), então chame-as quando o cliente pedir essa ação e diga o que você fez na sua próxima mensagem:
+
+{{pageToolsDetail}}
+{{/if}}
 {{/if}}
 
 ## Recomendação de produtos

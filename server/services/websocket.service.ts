@@ -19,6 +19,12 @@ import {
   toPublicMessageEvent,
 } from "./webchat/public-message";
 import { PUBLIC_WIDGET_LIMITS, isPublicWidgetRateLimited } from "./public-widget-limits";
+import {
+  PAGE_TOOL_CALL_EVENT,
+  PageToolValidationError,
+  pageToolService,
+  validatePageTools,
+} from "./webchat/page-tools.service";
 
 // Largest frame a client may send. Clients only send small JSON control frames
 // and chat messages (capped at PUBLIC_WIDGET_LIMITS.maxMessageLength); the ws
@@ -48,6 +54,18 @@ interface IdentifyMessage extends WebSocketMessage {
   customerId: string;
   conversationId?: string;
   metadata?: Record<string, unknown>;
+  /** Page tools (WebMCP) the host page registered; see page-tools.service. */
+  tools?: unknown;
+}
+
+interface RegisterToolsMessage extends WebSocketMessage {
+  tools?: unknown;
+}
+
+interface ToolResultMessage extends WebSocketMessage {
+  callId?: unknown;
+  result?: unknown;
+  error?: unknown;
 }
 
 interface ChatMessage extends WebSocketMessage {
@@ -232,6 +250,10 @@ export class WebSocketService {
           "Broadcasted QUEUED message to org clients only",
         );
       }
+    } else if (type === PAGE_TOOL_CALL_EVENT && conversationId) {
+      // Only the page that registered the tool may run it: never the dashboard.
+      const sent = this.sendToConversation(conversationId, { type: "tool_call", ...payload });
+      logger.debug({ conversationId, sent }, "Forwarded page tool call to the widget");
     } else if (type === "conversation_status_changed" && conversationId) {
       // Broadcast status changes to BOTH conversation clients (webchat) AND organization clients (dashboard)
       const conversationSent = this.sendToConversation(conversationId, { type, payload });
@@ -400,6 +422,14 @@ export class WebSocketService {
           await this.handleSubscribe(clientId, message);
           break;
 
+        case "register_tools":
+          await this.handleRegisterTools(clientId, message);
+          break;
+
+        case "tool_result":
+          await this.handleToolResult(clientId, message);
+          break;
+
         default:
           logger.debug({ messageType: message.type }, "Unknown message type");
       }
@@ -454,6 +484,8 @@ export class WebSocketService {
 
     logger.debug({ conversationId: conversation.id }, "Webchat client connected to conversation");
 
+    if (message.tools !== undefined) await this.registerPageTools(client, message.tools);
+
     client.ws.send(
       JSON.stringify({
         type: "identified",
@@ -461,6 +493,40 @@ export class WebSocketService {
         customerId: client.customerId,
       }),
     );
+  }
+
+  /** The host page registered (or changed) its page tools after identifying. */
+  private async handleRegisterTools(
+    clientId: string,
+    message: RegisterToolsMessage,
+  ): Promise<void> {
+    const client = this.clients.get(clientId);
+    if (!client?.conversationId) return;
+    await this.registerPageTools(client, message.tools);
+  }
+
+  private async registerPageTools(client: WebSocketClient, tools: unknown): Promise<void> {
+    if (!client.conversationId || !pageToolService.isEnabled()) return;
+    try {
+      await pageToolService.register(client.conversationId, validatePageTools(tools));
+    } catch (error) {
+      if (!(error instanceof PageToolValidationError)) throw error;
+      logger.warn(
+        { conversationId: client.conversationId, reason: error.message },
+        "Page tools rejected",
+      );
+      this.sendError(client, `Page tools rejected: ${error.message}`);
+    }
+  }
+
+  /** The page ran a tool the AI asked for; hand the answer to whoever is waiting. */
+  private async handleToolResult(clientId: string, message: ToolResultMessage): Promise<void> {
+    const client = this.clients.get(clientId);
+    if (!client?.conversationId || typeof message.callId !== "string") return;
+    await pageToolService.resolve(message.callId, {
+      result: message.result,
+      ...(message.error !== undefined ? { error: String(message.error) } : {}),
+    });
   }
 
   /**
@@ -632,6 +698,7 @@ export class WebSocketService {
         conversationClients.delete(clientId);
         if (conversationClients.size === 0) {
           this.conversationClients.delete(client.conversationId);
+          void pageToolService.clear(client.conversationId);
         }
       }
 

@@ -134,13 +134,18 @@ const {
   startNewConversation,
   resumeActiveConversation,
   saveContactEmail,
-} = useChat({
-  ...props.config,
-  // The greeting is pinned as the first message, so give the chat the same
-  // localised default the empty state shows.
-  showGreeting: props.config.showGreeting ?? true,
-  greetingMessage: props.config.greetingMessage || t("widget.defaultGreeting"),
-}, { challenge: challengeContribution });
+} = useChat(
+  {
+    ...props.config,
+    // The greeting is pinned as the first message, so give the chat the same
+    // localised default the empty state shows.
+    showGreeting: props.config.showGreeting ?? true,
+    greetingMessage: props.config.greetingMessage || t("widget.defaultGreeting"),
+    // Named on the "working" overlay while a page tool runs.
+    agentName: resolvedAgentName.value,
+  },
+  { challenge: challengeContribution },
+);
 
 function setChallengeHost(el: HTMLElement | null) {
   challengeHost.value = el;

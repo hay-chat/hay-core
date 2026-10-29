@@ -259,15 +259,24 @@ export class ExecutionLayer {
       const { coreToolRegistry } = await import("@server/services/core/core-tools");
       const coreTools = coreToolRegistry.list();
       const enabledTools = conversation.enabled_tools ?? [];
-      const allToolNames = [...enabledTools, ...coreTools.map((t) => t.name)];
+      // Page tools (WebMCP): registered by the page the visitor is chatting
+      // from, present only while its socket is open. Third tool source, exempt
+      // from enabled_tools like core tools.
+      const { pageToolService, PAGE_TOOL_PREFIX } =
+        await import("@server/services/webchat/page-tools.service");
+      const pageTools =
+        conversation.channel === "web" ? await pageToolService.list(conversation.id) : [];
+      const describeTool = (t: { name: string; description: string; inputSchema: unknown }) =>
+        `- ${t.name}: ${t.description}\n  input schema: ${JSON.stringify(t.inputSchema)}`;
+      const allToolNames = [
+        ...enabledTools,
+        ...coreTools.map((t) => t.name),
+        ...pageTools.map((t) => PAGE_TOOL_PREFIX + t.name),
+      ];
       const hasTools = allToolNames.length > 0;
-      const toolsDetail = coreTools.length
-        ? coreTools
-            .map(
-              (t) =>
-                `- ${t.name}: ${t.description}\n  input schema: ${JSON.stringify(t.inputSchema)}`,
-            )
-            .join("\n")
+      const toolsDetail = coreTools.length ? coreTools.map(describeTool).join("\n") : "";
+      const pageToolsDetail = pageTools.length
+        ? pageTools.map((t) => describeTool({ ...t, name: PAGE_TOOL_PREFIX + t.name })).join("\n")
         : "";
 
       // The business's local date and hour, so "today", "tomorrow" and greetings
@@ -282,6 +291,7 @@ export class ExecutionLayer {
           hasTools,
           tools: allToolNames.join(", "),
           toolsDetail,
+          pageToolsDetail,
           timezone,
           localTime,
           quickCheck,
