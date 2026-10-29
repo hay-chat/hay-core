@@ -40,7 +40,10 @@ export function assertOAuthEndpoint(rawUrl: string, policy: OAuthEndpointPolicy)
     throw new TRPCError({ code: "BAD_REQUEST", message: "OAuth endpoint URL is invalid" });
   }
   if (url.protocol !== "https:" || url.port !== "" || url.username || url.password) {
-    throw new TRPCError({ code: "BAD_REQUEST", message: "OAuth endpoint must be a plain https URL" });
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message: "OAuth endpoint must be a plain https URL",
+    });
   }
   const host = url.hostname.toLowerCase();
   if (policy.allowedHosts && !policy.allowedHosts.some((pattern) => hostMatches(host, pattern))) {

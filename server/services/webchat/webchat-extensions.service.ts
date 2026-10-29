@@ -135,7 +135,10 @@ export function resolveContributionProps(
   for (const [field, def] of Object.entries(configSchema)) {
     if (!def.encrypted && !def.serverOnly) publicSchema[field] = def;
   }
-  const values = resolveConfigWithEnv(dbConfig, publicSchema, { decrypt: false, allowedEnv }).values;
+  const values = resolveConfigWithEnv(dbConfig, publicSchema, {
+    decrypt: false,
+    allowedEnv,
+  }).values;
 
   const props: Record<string, unknown> = { ...descriptor.props };
   for (const [prop, field] of Object.entries(descriptor.configProps ?? {})) {
@@ -267,7 +270,9 @@ export class WebchatExtensionsService {
         configSchemaOf(instance),
         configEnvAllowList(instance.plugin),
       );
-      const response = await workerFetch(worker.port, `/webchat/gate/${encodeURIComponent(gate.event)}`,
+      const response = await workerFetch(
+        worker.port,
+        `/webchat/gate/${encodeURIComponent(gate.event)}`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },

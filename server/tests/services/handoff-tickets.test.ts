@@ -122,7 +122,7 @@ describe("HandoffTicketsService", () => {
 
     expect(result).toEqual({ created: true, ticketId: "987" });
     const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
-    expect(url).toBe("http://localhost:5999/tickets/create");
+    expect(url).toBe("http://127.0.0.1:5999/tickets/create");
     const body = JSON.parse(String(init.body));
     expect(body.requester).toEqual({ name: "Ana", email: "ana@example.com" });
     expect(body.fields).toEqual({ priority: "high" });

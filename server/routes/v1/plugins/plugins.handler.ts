@@ -380,8 +380,7 @@ export const enablePlugin = authenticatedProcedure
         input.pluginId,
         dropManagedOverrides(
           input.configuration || {},
-          (plugin.metadata?.configSchema ??
-            (plugin.manifest as HayPluginManifest).configSchema) as
+          (plugin.metadata?.configSchema ?? (plugin.manifest as HayPluginManifest).configSchema) as
             | Record<string, ConfigFieldDescriptor>
             | undefined,
           configEnvAllowList(plugin),

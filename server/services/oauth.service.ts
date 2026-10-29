@@ -313,8 +313,10 @@ export class OAuthService {
   ): Promise<{ success: true; onConnected: { ok: boolean; routingKeyCount: number } }> {
     logger.info({ pluginId, organizationId }, "OAuth code exchange started");
 
-    const { oauth2Method, clientId, clientSecret, endpointPolicy } =
-      await this.resolveOAuthContext(organizationId, pluginId);
+    const { oauth2Method, clientId, clientSecret, endpointPolicy } = await this.resolveOAuthContext(
+      organizationId,
+      pluginId,
+    );
 
     if (!oauth2Method.tokenUrl) {
       throw new TRPCError({ code: "BAD_REQUEST", message: `OAuth2 method missing tokenUrl` });
