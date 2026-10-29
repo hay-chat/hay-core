@@ -1,0 +1,289 @@
+{
+  "$comment": "Fake shoppers, 5 per store. Emails are @example.com. CPFs are valid-format numbers generated for this file, not real people. Shape: scripts/lib/types.ts Customer.",
+  "customers": [
+    {
+      "key": "us-emily",
+      "platform": "shopify",
+      "firstName": "Emily",
+      "lastName": "Carter",
+      "email": "emily.carter@example.com",
+      "locale": "en",
+      "address": {
+        "firstName": "Emily",
+        "lastName": "Carter",
+        "address1": "214 Maple Street",
+        "city": "Brooklyn",
+        "province": "New York",
+        "provinceCode": "NY",
+        "zip": "11215",
+        "country": "US",
+        "phone": "+1 555 010 1201"
+      }
+    },
+    {
+      "key": "us-daniel",
+      "platform": "shopify",
+      "firstName": "Daniel",
+      "lastName": "Brooks",
+      "email": "daniel.brooks@example.com",
+      "locale": "en",
+      "address": {
+        "firstName": "Daniel",
+        "lastName": "Brooks",
+        "address1": "88 Pine Avenue",
+        "address2": "Apt 3B",
+        "city": "Austin",
+        "province": "Texas",
+        "provinceCode": "TX",
+        "zip": "78704",
+        "country": "US",
+        "phone": "+1 555 010 1202"
+      }
+    },
+    {
+      "key": "us-priya",
+      "platform": "shopify",
+      "firstName": "Priya",
+      "lastName": "Nair",
+      "email": "priya.nair@example.com",
+      "locale": "en",
+      "address": {
+        "firstName": "Priya",
+        "lastName": "Nair",
+        "address1": "1520 Lake Shore Drive",
+        "city": "Chicago",
+        "province": "Illinois",
+        "provinceCode": "IL",
+        "zip": "60610",
+        "country": "US",
+        "phone": "+1 555 010 1203"
+      }
+    },
+    {
+      "key": "us-marcus",
+      "platform": "shopify",
+      "firstName": "Marcus",
+      "lastName": "Hill",
+      "email": "marcus.hill@example.com",
+      "locale": "en",
+      "address": {
+        "firstName": "Marcus",
+        "lastName": "Hill",
+        "address1": "9 Harbor Road",
+        "city": "Portland",
+        "province": "Oregon",
+        "provinceCode": "OR",
+        "zip": "97209",
+        "country": "US",
+        "phone": "+1 555 010 1204"
+      }
+    },
+    {
+      "key": "us-olivia",
+      "platform": "shopify",
+      "firstName": "Olivia",
+      "lastName": "Reyes",
+      "email": "olivia.reyes@example.com",
+      "locale": "en",
+      "address": {
+        "firstName": "Olivia",
+        "lastName": "Reyes",
+        "address1": "301 Ocean View Blvd",
+        "city": "San Diego",
+        "province": "California",
+        "provinceCode": "CA",
+        "zip": "92109",
+        "country": "US",
+        "phone": "+1 555 010 1205"
+      }
+    },
+    {
+      "key": "eu-joao",
+      "platform": "woocommerce",
+      "firstName": "João",
+      "lastName": "Ferreira",
+      "email": "joao.ferreira@example.com",
+      "locale": "en",
+      "address": {
+        "firstName": "João",
+        "lastName": "Ferreira",
+        "address1": "Rua das Flores 42",
+        "city": "Lisboa",
+        "zip": "1200-195",
+        "country": "PT",
+        "phone": "+351 910 000 101"
+      }
+    },
+    {
+      "key": "eu-ines",
+      "platform": "woocommerce",
+      "firstName": "Inês",
+      "lastName": "Costa",
+      "email": "ines.costa@example.com",
+      "locale": "en",
+      "address": {
+        "firstName": "Inês",
+        "lastName": "Costa",
+        "address1": "Avenida da Boavista 1200",
+        "address2": "3º Esq",
+        "city": "Porto",
+        "zip": "4100-130",
+        "country": "PT",
+        "phone": "+351 910 000 102"
+      }
+    },
+    {
+      "key": "eu-lena",
+      "platform": "woocommerce",
+      "firstName": "Lena",
+      "lastName": "Schmidt",
+      "email": "lena.schmidt@example.com",
+      "locale": "en",
+      "address": {
+        "firstName": "Lena",
+        "lastName": "Schmidt",
+        "address1": "Bergmannstraße 12",
+        "city": "Berlin",
+        "zip": "10961",
+        "country": "DE",
+        "phone": "+49 1510 000 103"
+      }
+    },
+    {
+      "key": "eu-pierre",
+      "platform": "woocommerce",
+      "firstName": "Pierre",
+      "lastName": "Martin",
+      "email": "pierre.martin@example.com",
+      "locale": "en",
+      "address": {
+        "firstName": "Pierre",
+        "lastName": "Martin",
+        "address1": "15 Rue des Martyrs",
+        "city": "Paris",
+        "zip": "75009",
+        "country": "FR",
+        "phone": "+33 6 00 00 01 04"
+      }
+    },
+    {
+      "key": "eu-sophie",
+      "platform": "woocommerce",
+      "firstName": "Sophie",
+      "lastName": "de Vries",
+      "email": "sophie.devries@example.com",
+      "locale": "en",
+      "address": {
+        "firstName": "Sophie",
+        "lastName": "de Vries",
+        "address1": "Prinsengracht 300",
+        "city": "Amsterdam",
+        "zip": "1016 HW",
+        "country": "NL",
+        "phone": "+31 6 0000 0105"
+      }
+    },
+    {
+      "key": "br-camila",
+      "platform": "nuvemshop",
+      "firstName": "Camila",
+      "lastName": "Souza",
+      "email": "camila.souza@example.com",
+      "locale": "pt-BR",
+      "address": {
+        "firstName": "Camila",
+        "lastName": "Souza",
+        "address1": "Rua Augusta, 1500",
+        "address2": "Apto 52",
+        "city": "São Paulo",
+        "province": "São Paulo",
+        "provinceCode": "SP",
+        "zip": "01304-001",
+        "country": "BR",
+        "phone": "+55 11 90000-0101"
+      },
+      "cpf": "100.007.919-89"
+    },
+    {
+      "key": "br-rafael",
+      "platform": "nuvemshop",
+      "firstName": "Rafael",
+      "lastName": "Oliveira",
+      "email": "rafael.oliveira@example.com",
+      "locale": "pt-BR",
+      "address": {
+        "firstName": "Rafael",
+        "lastName": "Oliveira",
+        "address1": "Rua Voluntários da Pátria, 300",
+        "city": "Rio de Janeiro",
+        "province": "Rio de Janeiro",
+        "provinceCode": "RJ",
+        "zip": "22270-010",
+        "country": "BR",
+        "phone": "+55 21 90000-0102"
+      },
+      "cpf": "100.015.838-16"
+    },
+    {
+      "key": "br-juliana",
+      "platform": "nuvemshop",
+      "firstName": "Juliana",
+      "lastName": "Lima",
+      "email": "juliana.lima@example.com",
+      "locale": "pt-BR",
+      "address": {
+        "firstName": "Juliana",
+        "lastName": "Lima",
+        "address1": "Avenida Afonso Pena, 2000",
+        "city": "Belo Horizonte",
+        "province": "Minas Gerais",
+        "provinceCode": "MG",
+        "zip": "30130-008",
+        "country": "BR",
+        "phone": "+55 31 90000-0103"
+      },
+      "cpf": "100.023.757-53"
+    },
+    {
+      "key": "br-thiago",
+      "platform": "nuvemshop",
+      "firstName": "Thiago",
+      "lastName": "Santos",
+      "email": "thiago.santos@example.com",
+      "locale": "pt-BR",
+      "address": {
+        "firstName": "Thiago",
+        "lastName": "Santos",
+        "address1": "Rua XV de Novembro, 700",
+        "city": "Curitiba",
+        "province": "Paraná",
+        "provinceCode": "PR",
+        "zip": "80020-310",
+        "country": "BR",
+        "phone": "+55 41 90000-0104"
+      },
+      "cpf": "100.031.676-90"
+    },
+    {
+      "key": "br-fernanda",
+      "platform": "nuvemshop",
+      "firstName": "Fernanda",
+      "lastName": "Rocha",
+      "email": "fernanda.rocha@example.com",
+      "locale": "pt-BR",
+      "address": {
+        "firstName": "Fernanda",
+        "lastName": "Rocha",
+        "address1": "Avenida Boa Viagem, 3500",
+        "address2": "Apto 1201",
+        "city": "Recife",
+        "province": "Pernambuco",
+        "provinceCode": "PE",
+        "zip": "51020-000",
+        "country": "BR",
+        "phone": "+55 81 90000-0105"
+      },
+      "cpf": "100.039.595-20"
+    }
+  ]
+}
