@@ -71,44 +71,24 @@ INCLUDE = belongs in a member chat. EXCLUDE = admin/finance/back-office/not chat
 | Subscriptions | all                                            | EXCLUDE                                   | billing/admin                                    |
 | Transactions  | credits/day_passes/money/balances              | EXCLUDE                                   | finance history; credit balance is on membership |
 
-### Curated tool set (25)
+### Tool set — superseded
 
-Identity/location: list_locations, find_membership, get_membership
-Spaces & bookings: list_resources, get_resource, list_bookings, create_booking, get_booking, cancel_booking
-Knowledge: list_guides, get_guide
-Announcements: list_feed_posts, get_feed_post
-Events: list_events, get_event
-Benefits: list_benefits, get_benefit
-Plans: list_plans
-Visitors: list_visits, create_visit, get_visit, cancel_visit
-Support: list_support_tickets, create_support_ticket, get_support_ticket
-
-## Checklist
-
-- [x] Parse spec, group by tag, decide include/exclude
-- [x] Confirm exact SDK API + klaviyo dependency/build approach (background workflow)
-- [x] package.json (hay-plugin block) + tsconfig.json
-- [x] src/index.ts (config: apiKeyId/apiKeySecret/locationRef; Basic auth; onValidateAuth round-trip; onStart → startLocalStdio)
-- [x] mcp/index.js (api() Basic-auth helper, ok/fail, 25 tools with zod schemas + cross-tool hints)
-- [x] mcp/package.json + dependency-gap strategy (match klaviyo: commit package-lock, gitignore node_modules)
-- [x] i18n/en.json + pt-BR.json (label/description per tool + config field)
-- [x] Build (strict tsc) + MCP smoke test (25 tools listed over stdio)
-- [ ] Commit + push to claude/spacebring-mcp-integration-2vsw46 (PR #58, draft)
+The first cut exposed the 25 INCLUDE endpoints above as 25 tools (one per endpoint). That was
+replaced by **12 playbook-step tools** that compose these endpoints inside the server (resolve
+member/space by name, compute availability, check ownership, serialise writes). The mapping is in
+`plugins/core/spacebring/README.md`; the design rules that drove it are in
+`.claude/skills/build-plugin/reference/tool-design.md`. The table above is still the record of
+which endpoints are in scope.
 
 ## Results
 
-- Plugin `plugins/core/spacebring/` (Archetype A): `package.json` (category `integration`,
-  capabilities `["mcp","auth"]`), `tsconfig.json`, `src/index.ts`, `mcp/index.js` (25 tools),
-  `mcp/package.json` + committed `mcp/package-lock.json`, `i18n/en.json` + `i18n/pt-BR.json`, README.
-- Auth: HTTP Basic via two config fields (`apiKeyId` + encrypted `apiKeySecret`) + `register.auth.apiKey`
-  pointing at the secret (SDK has no `basic()` method). `locationRef` config default + per-tool override.
-- Verification: `@hay/plugin-sdk` had no `dist/` in this fresh clone — built it, then the plugin
-  compiled clean under `strict:true` (`tsc` → `dist/index.js`). MCP server boots over stdio and a
-  real MCP client enumerated all **25 tools**. `mcp/` deps install cleanly (93 pkgs).
-- `npm run typecheck:server` is NOT runnable here: `server/node_modules` is absent (fresh clone) and
-  the root `npm install` that would bootstrap it aborts on the dashboard's `nuxt prepare` postinstall
-  (`nuxt: not found`). This is an environment-bootstrap gap, independent of the plugin; the server
-  tsconfig does not include `plugins/`, so the plugin's own strict build is the meaningful type check.
+- v1 (2026-06-25): 25 one-per-endpoint tools; strict `tsc` build; MCP smoke test.
+- v2 (2026-10-29): rewritten as 12 playbook tools in `mcp/{lib,tools}` on the shared
+  `@hay/plugin-sdk` tool-errors/tool-risk/identity helpers; time handling in the location's
+  zone; `timeZone` advanced config; vitest suite (`mcp/tests`, 46 tests) covering request order,
+  refusal paths, "no write when a check fails" and risk classification.
+- Still unverified against a live workspace (docs host blocked by egress): see README
+  "Unverified against a live account".
 
 ## Working notes
 
