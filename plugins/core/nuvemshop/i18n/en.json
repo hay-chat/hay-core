@@ -78,7 +78,11 @@
   "config": {
     "authMode": {
       "label": "Connection mode",
-      "description": "Connect with Nuvemshop: approve Hay.chat in your store in one click. Custom app token: paste a token from a custom app you created."
+      "description": "Connect with Nuvemshop: approve Hay.chat in your store in one click. Custom app token: paste a token from a custom app you created.",
+      "options": {
+        "oauth": "Connect with Nuvemshop (recommended)",
+        "token": "Custom app token"
+      }
     },
     "clientId": {
       "label": "OAuth client ID",
