@@ -32,10 +32,14 @@ const mockLogger = {
 jest.mock("@server/lib/logger", () => ({ createLogger: () => mockLogger }));
 
 // Mock the document repository used via dynamic import inside buildKnowledgePrompt.
-const findById = jest.fn<(id: string) => Promise<unknown>>();
+const findById = jest.fn<(id: string, organizationId?: string) => Promise<unknown>>();
 jest.mock("@server/repositories/document.repository", () => ({
-  documentRepository: { findById: (id: string) => findById(id) },
+  documentRepository: {
+    findByIdAndOrganization: (id: string, organizationId: string) => findById(id, organizationId),
+  },
 }));
+
+const ORG_ID = "org-1";
 
 import { ExecutionLayer } from "../../orchestrator/execution.layer";
 
@@ -49,8 +53,11 @@ describe("ExecutionLayer.buildKnowledgePrompt (document RAG injection)", () => {
     layer = new ExecutionLayer();
   });
 
-  const build = (conversation: unknown) =>
-    (layer as unknown as Buildable).buildKnowledgePrompt(conversation);
+  const build = (conversation: object) =>
+    (layer as unknown as Buildable).buildKnowledgePrompt({
+      organization_id: ORG_ID,
+      ...conversation,
+    });
 
   it("injects attached document content into the prompt", async () => {
     findById.mockImplementation(async (id: string) =>
@@ -64,6 +71,7 @@ describe("ExecutionLayer.buildKnowledgePrompt (document RAG injection)", () => {
     expect(block).toContain("KNOWLEDGE BASE");
     expect(block).toContain("Return Policy");
     expect(block).toContain("Returns accepted within 30 days.");
+    expect(findById).toHaveBeenCalledWith("doc-1", ORG_ID);
   });
 
   it("returns an empty string when no documents are attached", async () => {
