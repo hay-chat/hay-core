@@ -25,3 +25,18 @@ export function pickHealthCheckTool<T extends ToolLike>(tools: T[]): T | undefin
     )
   );
 }
+
+function hasAnyValue(record: Record<string, unknown> | null | undefined): boolean {
+  return Object.values(record ?? {}).some((v) => v !== null && v !== undefined && v !== "");
+}
+
+/**
+ * Whether a plugin instance has credentials for an auth-requiring plugin. OAuth
+ * tokens live in authState, not config, so both are checked.
+ */
+export function hasPluginCredentials(instance: {
+  config?: Record<string, unknown> | null;
+  authState?: { credentials?: Record<string, unknown> } | null;
+}): boolean {
+  return hasAnyValue(instance.config) || hasAnyValue(instance.authState?.credentials);
+}
