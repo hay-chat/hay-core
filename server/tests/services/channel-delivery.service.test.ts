@@ -56,6 +56,9 @@ const mockUploadFind =
   jest.fn<(options: unknown) => Promise<Array<{ id: string; folder: string }>>>();
 jest.mock("@server/entities/upload.entity", () => ({ Upload: { find: mockUploadFind } }));
 jest.mock("@server/config/env", () => {
+  // getApiUrl() reads the real module's config; without an API domain the
+  // media URL comes out as "http:///v1/media/..." and parses "v1" as the host
+  process.env.API_DOMAIN = "api.example";
   const actual = jest.requireActual<typeof import("@server/config/env")>("@server/config/env");
   return {
     ...actual,
