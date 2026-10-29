@@ -6,9 +6,9 @@
  *
  * Endpoint (Roger's D8 answer 2, "OpenAI via the EU endpoint"):
  * - the EU endpoint whenever it is configured, for every organization;
- * - otherwise the default managed OpenAI endpoint, for every organization,
- *   EU-only orgs included. Roger (2026-10-28): don't block vision just because
- *   an org is EU while no EU inference exists; EU inference is decided later.
+ * - otherwise the default managed OpenAI endpoint, except for EU-only orgs:
+ *   they get no vision pass (VisionUnavailableError, callers degrade), the
+ *   same fail-closed rule as every other AI call (see llm/ai-region).
  *
  * Usage is reported through the LLM usage seam (services/llm/usage-sink).
  *
@@ -20,7 +20,12 @@ import sharp from "sharp";
 import { config } from "@server/config/env";
 import { createLogger } from "@server/lib/logger";
 import { MEDIA_CLASSES, type MediaClass } from "@server/database/entities/message.entity";
-import { isEuRegionConfigured, type AiRegion } from "@server/services/llm/ai-region";
+import {
+  isEuRegionConfigured,
+  regionFromSettings,
+  type AiRegion,
+} from "@server/services/llm/ai-region";
+import { organizationRepository } from "@server/repositories/organization.repository";
 import { emitUsage } from "@server/services/llm/usage-sink";
 
 const logger = createLogger("vision");
@@ -108,8 +113,11 @@ interface Endpoint {
 class VisionService {
   private readonly clients = new Map<string, OpenAI>();
 
-  /** The vision endpoint, or null when no OpenAI key is configured. Same for every org. */
-  private endpoint(): Endpoint | null {
+  /**
+   * The vision endpoint for this org, or null when none may be used: no OpenAI
+   * key, or an EU-only org while the EU endpoint is not configured.
+   */
+  private async endpoint(organizationId: string): Promise<Endpoint | null> {
     if (isEuRegionConfigured()) {
       return {
         apiKey: config.aiRegion.eu.apiKey,
@@ -118,6 +126,9 @@ class VisionService {
       };
     }
     if (!config.openai.apiKey) return null;
+    // Unreadable settings throw: the org may be EU-only, so never assume default.
+    const organization = await organizationRepository.findById(organizationId);
+    if (regionFromSettings(organization?.settings) === "eu") return null;
     return {
       apiKey: config.openai.apiKey,
       baseURL: config.openai.baseUrl || undefined,
@@ -155,7 +166,7 @@ class VisionService {
     input: VisionInput,
     question?: string,
   ): Promise<VisionResult> {
-    const endpoint = this.endpoint();
+    const endpoint = await this.endpoint(organizationId);
     if (!endpoint)
       throw new VisionUnavailableError("vision is not available for this organization");
 

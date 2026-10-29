@@ -54,7 +54,10 @@ describe("audit log coverage", () => {
 
   it("records API key creation, revocation and deletion without the secret", async () => {
     const caller = apiTokensRouter.createCaller(ctx);
-    const created = await caller.create({ name: "CI key", scopes: [ApiTokenScope.CONVERSATIONS_READ] });
+    const created = await caller.create({
+      name: "CI key",
+      scopes: [ApiTokenScope.CONVERSATIONS_READ],
+    });
     await caller.revoke({ id: created.id });
     await caller.delete({ id: created.id });
 
