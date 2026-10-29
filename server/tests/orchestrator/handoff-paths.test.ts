@@ -270,6 +270,18 @@ describe("hand-off line", () => {
     ]);
   });
 
+  it("sends the fixed line once when the planner hands off again while following the instructions", async () => {
+    mockExecute.mockResolvedValue({ step: "HANDOFF", userMessage: PLANNER_LINE });
+    given({ id: AGENT_ID, human_handoff_unavailable_instructions: INSTRUCTIONS }, 0);
+
+    await runConversation(CONVERSATION_ID);
+
+    // Once for the hand-off, once after the instructions: no loop to the iteration cap.
+    expect(mockExecute).toHaveBeenCalledTimes(2);
+    expect(conversation.addHandoffInstructions).toHaveBeenCalledTimes(1);
+    expect(botMessages().map((m) => m.content)).toEqual([handoffCopy("handoffNobodyOnline", "en")]);
+  });
+
   it("tells the shopper the team usually replies within the median time when known (D5-7)", async () => {
     given({ id: AGENT_ID }, 0);
     mockTypicalReply.mockResolvedValue(12);

@@ -1117,6 +1117,8 @@ async function handleExecutionLoop(
   let iterations = 0;
   let emptyRetries = 0; // Track consecutive retries without valid response
   let handoffProcessed = false; // Track if handoff has been processed
+  // The fixed hand-off line, held back while the merchant's instructions run.
+  let deferredHandoffLine: Parameters<typeof sendBotMessage>[1] | null = null;
   let hasToolCallBeenMade = false; // Track if we've sent the initial processing message
   // Ledger of tool calls made during THIS turn (conversation history is not
   // turn-scoped). The action-claim guardrail compares RESPOND claims against it.
@@ -1347,10 +1349,15 @@ async function handleExecutionLoop(
         "HANDOFF step detected",
       );
 
-      // Check if we've already processed handoff to avoid duplicates
+      // The planner handed off again while following the merchant's hand-off
+      // instructions. Re-planning only repeats it (it looped to the iteration cap
+      // and the shopper got no reply), so send the fixed line once and stop.
       if (handoffProcessed) {
-        log.debug("Handoff already processed, skipping duplicate");
-        continue;
+        log.debug("Handoff already processed, sending the fixed line and ending");
+        if (deferredHandoffLine) {
+          await sendBotMessage(conversation, deferredHandoffLine, log, processingStartedAt);
+        }
+        break;
       }
 
       handoffProcessed = true; // Mark as processed
@@ -1403,6 +1410,30 @@ async function handleExecutionLoop(
         handoffType === "available"
           ? agent?.human_handoff_available_instructions
           : agent?.human_handoff_unavailable_instructions;
+      const handoffLine: Parameters<typeof sendBotMessage>[1] = {
+        content: availabilityHandoffLine(
+          handoffAvailability,
+          now,
+          customerLanguage,
+          conversation.language,
+          conversation.organization?.defaultLanguage,
+        ),
+        type: MessageType.BOT_AGENT,
+        metadata: buildMessageMetadata(executionResult, {
+          isHandoffMessage: true,
+          handoffType,
+          ...(executionResult.aiUnavailable ? { aiUnavailable: true } : {}),
+          availability: {
+            state: availability.state,
+            nextOpening: availability.nextOpening?.toISOString() ?? null,
+            timezone: availability.timezone,
+          },
+          ...(executionResult.userMessage
+            ? { discardedHandoffMessage: executionResult.userMessage }
+            : {}),
+        }),
+      };
+
       // Custom instructions run through the planner again, which is exactly what
       // just failed when the AI is unavailable; use the fixed line instead.
       if (hasTiptapContent(customInstructions) && !executionResult.aiUnavailable) {
@@ -1412,6 +1443,7 @@ async function handleExecutionLoop(
           handoffType,
           availabilityContext(handoffAvailability, now),
         );
+        deferredHandoffLine = handoffLine;
         continue;
       }
 
@@ -1419,34 +1451,7 @@ async function handleExecutionLoop(
       // guardrail's own hand-off text is not sent: models keep promising speed
       // ("please hold on for a moment", "right away") that nobody can keep.
       // It is kept in metadata for review.
-      await sendBotMessage(
-        conversation,
-        {
-          content: availabilityHandoffLine(
-            handoffAvailability,
-            now,
-            customerLanguage,
-            conversation.language,
-            conversation.organization?.defaultLanguage,
-          ),
-          type: MessageType.BOT_AGENT,
-          metadata: buildMessageMetadata(executionResult, {
-            isHandoffMessage: true,
-            handoffType,
-            ...(executionResult.aiUnavailable ? { aiUnavailable: true } : {}),
-            availability: {
-              state: availability.state,
-              nextOpening: availability.nextOpening?.toISOString() ?? null,
-              timezone: availability.timezone,
-            },
-            ...(executionResult.userMessage
-              ? { discardedHandoffMessage: executionResult.userMessage }
-              : {}),
-          }),
-        },
-        log,
-        processingStartedAt,
-      );
+      await sendBotMessage(conversation, handoffLine, log, processingStartedAt);
       break;
     } else if (executionResult.step === "CLOSE") {
       // Handle conversation closure
