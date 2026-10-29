@@ -217,6 +217,10 @@
           "title": "Provas para chargeback",
           "description": "Reúne o histórico do pedido e da conversa de que você precisa para responder a um chargeback."
         },
+        "tickets": {
+          "title": "Chamados no help desk",
+          "description": "Abre um chamado para a sua equipe quando um cliente precisa de uma pessoa e ninguém está disponível."
+        },
         "documents": {
           "title": "Importação de conhecimento",
           "description": "Importa páginas e documentos para a sua base de conhecimento."

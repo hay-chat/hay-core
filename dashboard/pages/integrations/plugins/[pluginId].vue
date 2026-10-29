@@ -267,7 +267,9 @@
               >
                 <Check v-if="step.done" class="h-4 w-4" aria-hidden="true" />
                 <span v-else aria-hidden="true">{{ index + 1 }}</span>
-                <span v-if="step.done" class="sr-only">{{ $t("pluginSettings.setup.stepDone") }}</span>
+                <span v-if="step.done" class="sr-only">{{
+                  $t("pluginSettings.setup.stepDone")
+                }}</span>
               </span>
               <span
                 v-if="index < checklistSteps.length - 1"
@@ -278,7 +280,10 @@
 
             <div class="min-w-0 flex-1 space-y-3 pb-8">
               <div v-if="step.title || step.description" class="space-y-1 pt-0.5">
-                <h3 v-if="step.title" class="flex flex-wrap items-center gap-2 font-medium leading-6">
+                <h3
+                  v-if="step.title"
+                  class="flex flex-wrap items-center gap-2 font-medium leading-6"
+                >
                   {{ step.title }}
                   <Badge v-if="step.optional" variant="secondary">
                     {{ $t("pluginSettings.setup.optional") }}
@@ -311,7 +316,9 @@
               <template v-else-if="step.kind === 'connect'">
                 <!-- OAuth client ID/secret not set: Connect cannot work, say why -->
                 <Alert v-if="!oauthConfigured" :icon="Info" data-testid="oauth-unavailable-alert">
-                  <AlertTitle>{{ $t("pluginSettings.connection.oauthUnavailableTitle") }}</AlertTitle>
+                  <AlertTitle>{{
+                    $t("pluginSettings.connection.oauthUnavailableTitle")
+                  }}</AlertTitle>
                   <AlertDescription>
                     {{ $t("pluginSettings.connection.oauthUnavailable", { name: displayName }) }}
                   </AlertDescription>
@@ -561,6 +568,7 @@ import {
   Check,
   Power,
   ExternalLink,
+  Ticket,
 } from "lucide-vue-next";
 import { Hay } from "@/utils/api";
 import { useUserStore } from "@/stores/user";
@@ -590,13 +598,8 @@ import {
 
 const { t } = useI18n();
 const { locale } = useI18n({ useScope: "global" });
-const {
-  getToolLabel,
-  getToolDescription,
-  getPluginName,
-  getPluginDescription,
-  getSetupStepText,
-} = useToolLabel();
+const { getToolLabel, getToolDescription, getPluginName, getPluginDescription, getSetupStepText } =
+  useToolLabel();
 const { loadTranslations: loadPluginTranslations } = usePluginTranslations();
 
 const route = useRoute();
@@ -748,7 +751,11 @@ const defaultStepText = (kind: DeclaredSetupStep["kind"], title?: string) => {
 };
 const checklistSteps = computed(() => {
   const signals = {
-    missingRequired: missingRequiredFields(configSchema.value, configMetadata.value, formData.value),
+    missingRequired: missingRequiredFields(
+      configSchema.value,
+      configMetadata.value,
+      formData.value,
+    ),
     oauthConnected: oauthConnected.value,
     testSuccess: testResult.value ? testResult.value.success : null,
     reported: reportedStatus.value?.steps,
@@ -857,6 +864,7 @@ const CAPABILITY_ICONS: Record<DescribedCapability, Component> = {
   mcp: Zap,
   products: ShoppingBag,
   disputes: ShieldCheck,
+  tickets: Ticket,
   documents: FileText,
   webchat: MessageCircle,
 };

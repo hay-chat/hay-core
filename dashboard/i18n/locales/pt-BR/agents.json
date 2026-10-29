@@ -124,7 +124,18 @@
       "availableLabel": "Se algum atendente humano estiver disponível",
       "availableHint": "Defina as instruções que o agente deve seguir quando houver um atendente humano disponível. Deixe vazio para apenas mudar o status para 'pending-human'.",
       "unavailableLabel": "Se nenhum atendente humano estiver disponível",
-      "unavailableHint": "Defina as instruções que o agente deve seguir quando não houver atendentes humanos disponíveis (ex.: abrir um chamado, pedir o e-mail)."
+      "unavailableHint": "Defina as instruções que o agente deve seguir quando não houver atendentes humanos disponíveis (ex.: abrir um chamado, pedir o e-mail).",
+      "unavailableModeHint": "O que o agente faz quando um cliente precisa de uma pessoa e ninguém pode assumir a conversa (fora do horário de atendimento ou sem ninguém online).",
+      "modeInstructions": "Seguir minhas instruções",
+      "modeTicket": "Abrir um chamado",
+      "modeTicketIn": "Abrir um chamado no {name}",
+      "noHelpdesk": "Conecte um help desk como o Zendesk para abrir chamados automaticamente.",
+      "connectHelpdesk": "Ver integrações",
+      "ticketExplainer": "O agente garante que tem o e-mail do cliente, abre um chamado com um resumo e a conversa completa e avisa o cliente que a equipe vai retornar. Depois a conversa é encerrada em vez de ficar esperando na fila.",
+      "helpdesk": "Help desk",
+      "prefillTitle": "Preencher todo chamado com",
+      "notSet": "Não definido",
+      "formError": "Não foi possível carregar os campos de chamado do seu help desk: {message}"
     },
     "deleteDialog": {
       "title": "Excluir agente",

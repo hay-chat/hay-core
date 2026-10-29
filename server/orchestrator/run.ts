@@ -20,6 +20,12 @@ import { hasTiptapContent } from "@server/types/tiptap.types";
 import { closureCopy } from "./closure-copy";
 import { availabilityContext, availabilityHandoffLine } from "./handoff-copy";
 import { getAvailability, typicalFirstReplyMinutes } from "@server/services/business-hours.service";
+import {
+  handoffTicketsService,
+  readHandoffTicket,
+  requestHandoffTicket,
+  ticketHandoffInstructions,
+} from "@server/services/handoff-tickets/handoff-tickets.service";
 import { AiReplySuppressedError, isPauseBlocker, recheckAiReply } from "./reply-guard";
 import { isOrganizationAiPaused } from "@server/types/organization-access.types";
 import { sendPausedNotice } from "./paused-notice";
@@ -481,7 +487,9 @@ export const runConversation = async (conversationId: string) => {
       organizationId: conversation.organization_id,
       channel: conversation.channel,
     });
-    if (withinHours) {
+    // A hand-off raising a ticket keeps the AI talking until it is raised: it
+    // may still need the customer's email.
+    if (withinHours && readHandoffTicket(conversation)?.status !== "requested") {
       log.debug("Skipping - waiting for the team within business hours");
       if (conversation.needs_processing) {
         await conversationRepository.update(conversation.id, conversation.organization_id, {
@@ -1451,6 +1459,34 @@ async function handleExecutionLoop(
         }),
       };
 
+      // "When no one is available → create a ticket": the planner gets a way to
+      // reply from the customer and raises the ticket (create_ticket); the turn
+      // then closes the conversation instead of leaving it in the queue. Like
+      // custom instructions, it needs the AI, so not when it is unavailable.
+      const ticketConfig =
+        handoffType === "unavailable" ? agent?.human_handoff_unavailable_ticket : null;
+      if (
+        ticketConfig &&
+        !executionResult.aiUnavailable &&
+        (await handoffTicketsService.isProvider(
+          conversation.organization_id,
+          ticketConfig.pluginId,
+        ))
+      ) {
+        log.debug({ pluginId: ticketConfig.pluginId }, "Hand-off raises a ticket");
+        const ticketState = await requestHandoffTicket(conversation, ticketConfig.pluginId);
+        await conversation.addMessage({
+          content: ticketHandoffInstructions(
+            availabilityContext(handoffAvailability, now),
+            ticketState,
+          ),
+          type: MessageType.SYSTEM,
+          metadata: { isHandoffInstructions: true, handoffType, handoffTicket: true },
+        });
+        deferredHandoffLine = handoffLine;
+        continue;
+      }
+
       // Custom instructions run through the planner again, which is exactly what
       // just failed when the AI is unavailable; use the fixed line instead.
       if (hasTiptapContent(customInstructions) && !executionResult.aiUnavailable) {
@@ -1574,6 +1610,12 @@ async function handleExecutionLoop(
   if (iterations >= MAX_ITERATIONS) {
     log.warn("Reached maximum execution iterations, ending loop");
   }
+
+  // The hand-off raised its ticket this turn: the team follows up in the
+  // helpdesk, so the conversation leaves the queue.
+  await handoffTicketsService
+    .closeIfRaised(conversation.id, conversation.organization_id)
+    .catch((error) => log.error({ err: error }, "Failed to close after raising a ticket"));
 }
 
 /**
