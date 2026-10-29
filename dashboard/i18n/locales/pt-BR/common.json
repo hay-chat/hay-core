@@ -35,7 +35,10 @@
     "workspaceData": "Dados do espaço de trabalho",
     "privacy": "Privacidade",
     "developers": "Desenvolvedores",
-    "billingUsage": "Cobrança e Uso"
+    "billingUsage": "Cobrança e Uso",
+    "knowledge": "Conhecimento",
+    "quality": "Qualidade",
+    "compliance": "Conformidade"
   },
   "user": {
     "status": "Status",
