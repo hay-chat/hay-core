@@ -15,6 +15,7 @@ export interface PushPayload {
     | "channel_delivery_failed"
     | "channel_failing"
     | "dispute_opened"
+    | "team_question"
     | "test";
   title: string;
   body: string;

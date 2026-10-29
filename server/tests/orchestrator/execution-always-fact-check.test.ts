@@ -106,6 +106,20 @@ describe("ExecutionLayer Stage 2 runs on every reply", () => {
     anyLayer.composeContextualFallbackMessage = jest.fn(
       async (_conv: unknown, message: string) => message,
     );
+    anyLayer.isQuickCheckEnabled = jest.fn(async () => false);
+  });
+
+  it("asks the team instead of handing off when quick checks are on (D19)", async () => {
+    assessGrounding.mockResolvedValue(0.1);
+    anyLayer.isQuickCheckEnabled = jest.fn(async () => true);
+
+    const outcome = await invoke("We absolutely do ship to Portugal!");
+
+    expect(outcome.step).toBe("ASK_TEAM");
+    expect(outcome.teamQuestion).toBe("do you ship to Portugal?");
+    // Kept so run.ts can hand off as before when the check isn't allowed.
+    expect(outcome.userMessage).toBe("Let me connect you with a team member.");
+    expect(outcome.handoff?.reason).toMatch(/Low confidence/);
   });
 
   it("hands off when Stage 1 saw no claims but grounding is low", async () => {

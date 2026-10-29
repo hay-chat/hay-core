@@ -281,8 +281,7 @@ const jobRegistry: CronJobConfig[] = [
     description: "Fail simulated conversations stuck past their timeout and move their runs on",
     schedule: 60000, // Every 60 seconds
     handler: async () => {
-      const { simulationHarnessService } =
-        await import("./simulation/simulation-harness.service");
+      const { simulationHarnessService } = await import("./simulation/simulation-harness.service");
       await simulationHarnessService.sweepStaleItems();
     },
     singleton: true,
@@ -308,6 +307,20 @@ const jobRegistry: CronJobConfig[] = [
     handler: async () => {
       const { conversationAlertService } = await import("./conversation-alert.service");
       await conversationAlertService.runEscalationSweep();
+    },
+    singleton: true,
+    enabled: true,
+    skipDatabaseLogging: true,
+  },
+
+  {
+    name: "team-question-timers",
+    description:
+      "Quick check with the team (D19): send the 'still checking' update and end the wait (team queue) when no teammate answered in time",
+    schedule: 60000, // Every 60 seconds
+    handler: async () => {
+      const { teamQuestionService } = await import("./team-questions/team-question.service");
+      await teamQuestionService.runSweep();
     },
     singleton: true,
     enabled: true,

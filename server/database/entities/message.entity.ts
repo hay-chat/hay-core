@@ -219,6 +219,12 @@ export class Message {
     // Handoff metadata
     isHandoffMessage?: boolean;
     handoffType?: string;
+    // Quick check with the team (D19)
+    /** A fixed quick-check line (checking, still checking, wait ended). Not an AI answer. */
+    isTeamQuestionMessage?: boolean;
+    /** The relayed answer of a teammate (rephrased or as written). */
+    isTeamAnswer?: boolean;
+    teamQuestionId?: string;
   } | null;
 
   @Column({
