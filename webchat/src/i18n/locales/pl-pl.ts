@@ -43,7 +43,7 @@ export default {
   "attachment.photo": "Zdjęcie",
   "attachment.file": "Plik",
   "attachment.sending": "Wysyłanie...",
-  "error.verificationFailed": "We couldn't verify your message. Please refresh the page and try again.",
-  "challenge.label": "Security check",
-  "challenge.prompt": "Quick security check before we send your message.",
+  "error.verificationFailed": "Nie udało się zweryfikować wiadomości. Odśwież stronę i spróbuj ponownie.",
+  "challenge.label": "Kontrola bezpieczeństwa",
+  "challenge.prompt": "Szybka kontrola bezpieczeństwa przed wysłaniem wiadomości.",
 } as const;
