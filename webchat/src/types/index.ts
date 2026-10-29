@@ -7,6 +7,10 @@ export interface HayChatConfig {
   theme?: "blue" | "green" | "purple" | "black";
   showGreeting?: boolean;
   greetingMessage?: string;
+  /** Whether to show a 1–5 satisfaction rating when a conversation ends. Populated from public config. */
+  csatEnabled?: boolean;
+  /** Question shown above the satisfaction rating. Populated from public config. */
+  csatQuestion?: string;
   /** Public context passed to the AI prompt. Safe for non-sensitive data only. */
   context?: Record<string, unknown>;
   /**
@@ -75,6 +79,10 @@ export interface PublicConfig {
   aiLabelShown?: boolean;
   /** The org's label text; null = the localized default. */
   aiLabelText?: string | null;
+  /** Whether to ask for a 1–5 satisfaction rating when a conversation ends. */
+  csatEnabled?: boolean;
+  /** Question shown above the satisfaction rating; null = the localized default. */
+  csatQuestion?: string | null;
   /** Plugin contributions this widget advertised support for (never code). */
   contributions?: WidgetContribution[];
 }

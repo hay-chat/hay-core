@@ -33,6 +33,7 @@ interface GetMessagesResponse {
   typing?: boolean;
   status?: string;
   isClosed?: boolean;
+  csatRating?: number | null;
   error?: string;
 }
 
@@ -287,11 +288,35 @@ export function useConversation(config: HayChatConfig) {
     return data.result.data;
   };
 
+  /**
+   * Rate the support once the conversation has ended (CSAT). Resolves to the
+   * server answer, which may carry NONCE_EXPIRED with a fresh nonce.
+   */
+  const submitCsat = async (
+    conversationId: string,
+    rating: number,
+    proof: string,
+    method: string,
+    url: string,
+  ): Promise<{ saved: boolean; nonce?: string; error: string | null }> => {
+    const response = await fetch(`${baseUrl}/v1/publicConversations.submitCsat`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ conversationId, rating, proof, method, url }),
+    });
+    if (!response.ok) {
+      throw new WidgetRequestError(response.status);
+    }
+    const data = await response.json();
+    return data.result.data;
+  };
+
   return {
     createConversation,
     getMessages,
     sendMessage,
     sendAttachment,
     setContactEmail,
+    submitCsat,
   };
 }

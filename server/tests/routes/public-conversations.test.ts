@@ -344,6 +344,45 @@ describe("publicConversations.sendAttachment guards (D8-9)", () => {
   });
 });
 
+describe("publicConversations.submitCsat guards", () => {
+  beforeEach(() => jest.clearAllMocks());
+
+  const csatInput = {
+    conversationId: "22222222-2222-4222-8222-222222222222",
+    rating: 4,
+    proof: "proof",
+    method: "POST",
+    url: "http://localhost:3001/v1/publicConversations.submitCsat",
+  };
+
+  it("is limited per IP before the proof is checked", async () => {
+    mockRateLimited.mockResolvedValue(true);
+    await expect(callerFor({}, "198.51.100.4").submitCsat(csatInput)).rejects.toMatchObject({
+      code: "TOO_MANY_REQUESTS",
+    });
+    expect(mockRateLimited).toHaveBeenCalledWith([{ rule: "messagePerIp", id: "198.51.100.4" }]);
+  });
+
+  it("requires a valid proof for the conversation before the rating is stored", async () => {
+    mockRateLimited.mockResolvedValue(false);
+    const { conversationRepository } = jest.requireMock<{
+      conversationRepository: { updateById: jest.Mock };
+    }>("@server/repositories/conversation.repository");
+    await expect(callerFor().submitCsat(csatInput)).rejects.toMatchObject({
+      code: "UNAUTHORIZED",
+    });
+    expect(conversationRepository.updateById).not.toHaveBeenCalled();
+  });
+
+  it.each([0, 6, 3.5])("rejects a rating of %p", async (rating) => {
+    mockRateLimited.mockResolvedValue(false);
+    await expect(callerFor().submitCsat({ ...csatInput, rating })).rejects.toMatchObject({
+      code: "BAD_REQUEST",
+    });
+    expect(mockRateLimited).not.toHaveBeenCalled();
+  });
+});
+
 describe("publicConversations.create plugin gates", () => {
   beforeEach(() => {
     jest.clearAllMocks();

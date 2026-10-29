@@ -47,6 +47,7 @@ export function useChat(config: HayChatConfig, options: UseChatOptions = {}) {
   const keypair = shallowRef<Keypair | null>(null);
   const nonce = ref<string>("");
   const isConversationClosed = ref(false);
+  const csatSubmitted = ref(false);
   const isSending = ref(false);
   // Set when the server refuses the shopper's message (rate limited, website
   // not allowed, too long). The UI shows a short notice and restores the text.
@@ -220,6 +221,7 @@ export function useChat(config: HayChatConfig, options: UseChatOptions = {}) {
       existingConversationId.value = conversationData.id;
       conversationId.value = conversationData.id;
       isConversationClosed.value = false;
+      csatSubmitted.value = false;
 
       debugLog("[Webchat] Conversation created:", conversationData.id);
 
@@ -311,6 +313,11 @@ export function useChat(config: HayChatConfig, options: UseChatOptions = {}) {
         if (retryData.isClosed) {
           isConversationClosed.value = true;
         }
+
+        // Reflect a rating that was already submitted
+        if (retryData.csatRating != null) {
+          csatSubmitted.value = true;
+        }
       } else if (messagesData) {
         nonce.value = messagesData.nonce;
 
@@ -324,6 +331,11 @@ export function useChat(config: HayChatConfig, options: UseChatOptions = {}) {
         // Check if conversation is closed
         if (messagesData.isClosed) {
           isConversationClosed.value = true;
+        }
+
+        // Reflect a rating that was already submitted
+        if (messagesData.csatRating != null) {
+          csatSubmitted.value = true;
         }
       }
 
@@ -646,6 +658,7 @@ export function useChat(config: HayChatConfig, options: UseChatOptions = {}) {
     nonce.value = "";
     messages.value = [];
     isConversationClosed.value = false;
+    csatSubmitted.value = false;
     lastReadMessageId.value = null;
     conversationStatus.value = null;
     contactEmailSaved.value = false;
@@ -778,6 +791,11 @@ export function useChat(config: HayChatConfig, options: UseChatOptions = {}) {
       // Update conversation closed state
       if (messagesData?.isClosed) {
         isConversationClosed.value = true;
+      }
+
+      // Reflect a rating that was already submitted
+      if (messagesData?.csatRating != null) {
+        csatSubmitted.value = true;
       }
     } catch (error) {
       console.error("[Webchat] Failed to refresh messages:", error);
@@ -1153,6 +1171,36 @@ export function useChat(config: HayChatConfig, options: UseChatOptions = {}) {
     }
   };
 
+  // Rate the support once the conversation has ended (CSAT).
+  const submitCsat = async (rating: number, retried = false): Promise<boolean> => {
+    if (!conversationId.value || !keypair.value) return false;
+    const url = `${config.baseUrl}/v1/publicConversations.submitCsat`;
+    const proof = await createDPoPProof(
+      "POST",
+      url,
+      keypair.value.privateKey,
+      keypair.value.publicJwk,
+      nonce.value || "initial",
+    );
+    if (!proof) return false;
+    try {
+      const result = await conversation.submitCsat(
+        conversationId.value,
+        rating,
+        proof,
+        "POST",
+        url,
+      );
+      if (result.nonce) nonce.value = result.nonce;
+      if (result.error === "NONCE_EXPIRED" && !retried) return submitCsat(rating, true);
+      csatSubmitted.value = result.saved;
+      return result.saved;
+    } catch (error) {
+      console.error("[Webchat] Failed to submit CSAT rating:", error);
+      return false;
+    }
+  };
+
   // Enhanced disconnect that also stops retry loop and polling
   const disconnectAll = () => {
     disconnect();
@@ -1175,6 +1223,7 @@ export function useChat(config: HayChatConfig, options: UseChatOptions = {}) {
     challengeHost: challenge.host,
     isChallengeInteractive: challenge.isInteractive,
     isConversationClosed,
+    csatSubmitted,
     currentAgentType,
     currentAgentName,
     conversationStatus,
@@ -1188,6 +1237,7 @@ export function useChat(config: HayChatConfig, options: UseChatOptions = {}) {
     closeChat,
     sendMessage,
     sendAttachment,
+    submitCsat,
     startTyping,
     stopTyping,
     disconnect: disconnectAll,

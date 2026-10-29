@@ -45,4 +45,6 @@ export default {
   "error.verificationFailed": "We couldn't verify your message. Please refresh the page and try again.",
   "challenge.label": "Security check",
   "challenge.prompt": "Quick security check before we send your message.",
+  "csat.defaultQuestion": "How would you rate the support you received today?",
+  "csat.thankYou": "Thanks for your feedback!",
 } as const;
