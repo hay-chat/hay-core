@@ -1059,9 +1059,20 @@ const getConfidenceIcon = (tier: string | undefined) => {
   margin-inline: 2.5rem;
 }
 
+/* min-width: 0 lets the flex item shrink below a long URL or id on phones. */
 .chat-message__content {
   position: relative;
-  max-width: 60ch;
+  min-width: 0;
+  max-width: min(60ch, 85%);
+  overflow-wrap: anywhere;
+}
+
+/* Code blocks and tables in a reply scroll inside the bubble instead of widening it. */
+.chat-message__text pre,
+.chat-message__text table {
+  display: block;
+  max-width: 100%;
+  overflow-x: auto;
 }
 
 .chat-message__bubble {
