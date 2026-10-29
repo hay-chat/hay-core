@@ -18,7 +18,14 @@ export const LOCALE_BY_PLATFORM: Record<Platform, Locale> = {
 };
 
 /** server/entities/document.entity.ts DocumentationType values. */
-export const DOCUMENT_TYPES = ["article", "guide", "faq", "tutorial", "reference", "policy"] as const;
+export const DOCUMENT_TYPES = [
+  "article",
+  "guide",
+  "faq",
+  "tutorial",
+  "reference",
+  "policy",
+] as const;
 export type DocumentType = (typeof DOCUMENT_TYPES)[number];
 
 /** server/types/organization-settings.types.ts APPROVAL_CATEGORIES. */
@@ -56,7 +63,8 @@ export interface PlaybookFile {
 }
 
 function asString(value: unknown, field: string, file: string): string {
-  if (typeof value !== "string" || !value.trim()) throw new Error(`${file}: front-matter "${field}" is required`);
+  if (typeof value !== "string" || !value.trim())
+    throw new Error(`${file}: front-matter "${field}" is required`);
   return value.trim();
 }
 
@@ -78,12 +86,14 @@ export function parseKnowledgeDoc(path: string, locale: Locale): KnowledgeDoc {
   const type = (data.type ?? "article") as DocumentType;
   if (!DOCUMENT_TYPES.includes(type)) throw new Error(`${file}: unknown type "${type}"`);
   const platforms = asList(data.platforms) as Platform[];
-  for (const p of platforms) if (!PLATFORMS.includes(p)) throw new Error(`${file}: unknown platform "${p}"`);
+  for (const p of platforms)
+    if (!PLATFORMS.includes(p)) throw new Error(`${file}: unknown platform "${p}"`);
   return {
     file,
     title: asString(data.title, "title", file),
     type,
-    platforms: platforms.length > 0 ? platforms : PLATFORMS.filter((p) => LOCALE_BY_PLATFORM[p] === locale),
+    platforms:
+      platforms.length > 0 ? platforms : PLATFORMS.filter((p) => LOCALE_BY_PLATFORM[p] === locale),
     content: body,
   };
 }
@@ -99,7 +109,8 @@ export function parsePlaybook(source: string, file: string): PlaybookFile {
   const { data, body } = parseFrontMatter(source);
   const approvalCategories = asList(data.approvalCategories) as ApprovalCategory[];
   for (const c of approvalCategories) {
-    if (!APPROVAL_CATEGORIES.includes(c)) throw new Error(`${file}: unknown approval category "${c}"`);
+    if (!APPROVAL_CATEGORIES.includes(c))
+      throw new Error(`${file}: unknown approval category "${c}"`);
   }
   const trigger = asString(data.trigger, "trigger", file);
   if (trigger.length > 255) throw new Error(`${file}: trigger is longer than 255 characters`);

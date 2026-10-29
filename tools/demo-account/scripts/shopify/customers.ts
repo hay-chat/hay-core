@@ -55,7 +55,10 @@ const CUSTOMER_UPDATE = `
 `;
 
 /** Creates or updates every customer. Returns customer key → customer id. */
-export async function seedCustomers(shop: Shopify, customers: Customer[]): Promise<Record<string, string>> {
+export async function seedCustomers(
+  shop: Shopify,
+  customers: Customer[],
+): Promise<Record<string, string>> {
   const ids: Record<string, string> = {};
   for (const customer of customers) {
     const existingId = await findCustomerId(shop, customer.email);
@@ -64,7 +67,12 @@ export async function seedCustomers(shop: Shopify, customers: Customer[]): Promi
     const data = await shop.mutate<Record<string, Payload>>(
       existingId ? CUSTOMER_UPDATE : CUSTOMER_CREATE,
       { input: customerInput(customer, existingId) },
-      { [operation]: { customer: { id: `gid://shopify/Customer/dry-run-${customer.key}` }, userErrors: [] } },
+      {
+        [operation]: {
+          customer: { id: `gid://shopify/Customer/dry-run-${customer.key}` },
+          userErrors: [],
+        },
+      },
     );
     assertNoUserErrors(`${operation} ${customer.email}`, data[operation]);
     ids[customer.key] = data[operation].customer?.id ?? (existingId as string);
@@ -74,11 +82,19 @@ export async function seedCustomers(shop: Shopify, customers: Customer[]): Promi
 }
 
 /** Customer key → id for `--only orders` runs. */
-export async function findCustomerIds(shop: Shopify, customers: Customer[]): Promise<Record<string, string>> {
+export async function findCustomerIds(
+  shop: Shopify,
+  customers: Customer[],
+): Promise<Record<string, string>> {
   const ids: Record<string, string> = {};
   for (const customer of customers) {
-    const id = shop.dryRun ? `gid://shopify/Customer/dry-run-${customer.key}` : await findCustomerId(shop, customer.email);
-    if (!id) throw new Error(`Customer ${customer.email} is not in the store. Run without --only orders first.`);
+    const id = shop.dryRun
+      ? `gid://shopify/Customer/dry-run-${customer.key}`
+      : await findCustomerId(shop, customer.email);
+    if (!id)
+      throw new Error(
+        `Customer ${customer.email} is not in the store. Run without --only orders first.`,
+      );
     ids[customer.key] = id;
   }
   return ids;

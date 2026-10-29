@@ -55,7 +55,9 @@ export interface SeededOrder {
 
 const round = (n: number) => Math.round(n * 100) / 100;
 const iso = (days: number, now: Date) => daysAgo(days, now).toISOString();
-const moneySet = (amount: number) => ({ shopMoney: { amount: money(amount), currencyCode: CURRENCY } });
+const moneySet = (amount: number) => ({
+  shopMoney: { amount: money(amount), currencyCode: CURRENCY },
+});
 const isShipped = (fixture: OrderFixture) => fixture.fulfillmentStatus !== "unfulfilled";
 
 export function linePrice(products: Product[], sku: string): number {
@@ -99,7 +101,10 @@ export function trackingUrl(carrier: string, number: string): string | null {
 const gateway = (fixture: OrderFixture) => fixture.paymentMethod?.shopify ?? "manual";
 
 /** OrderCreateOrderInput for a fixture. */
-export function orderCreateInput(fixture: OrderFixture, ctx: OrderContext): Record<string, unknown> {
+export function orderCreateInput(
+  fixture: OrderFixture,
+  ctx: OrderContext,
+): Record<string, unknown> {
   const customerKey = fixture.customer.shopify;
   const customer = customerKey ? ctx.customers[customerKey] : undefined;
   if (!customerKey || !customer) throw new Error(`Order ${fixture.key} has no Shopify customer`);
@@ -124,13 +129,26 @@ export function orderCreateInput(fixture: OrderFixture, ctx: OrderContext): Reco
     lineItems: fixture.lines.map((line) => {
       const variantId = ctx.variantIds[line.sku];
       if (!variantId) throw new Error(`SKU ${line.sku} has no Shopify variant`);
-      return { variantId, quantity: line.quantity, priceSet: moneySet(linePrice(ctx.products, line.sku)) };
+      return {
+        variantId,
+        quantity: line.quantity,
+        priceSet: moneySet(linePrice(ctx.products, line.sku)),
+      };
     }),
     shippingLines: [{ title: "Standard shipping", code: "standard", priceSet: moneySet(shipping) }],
     // Only a captured payment gets a transaction; it's the parent refunds point at.
     transactions:
       financialStatus === "PAID"
-        ? [{ kind: "SALE", status: "SUCCESS", gateway: gateway(fixture), test: true, processedAt, amountSet: moneySet(total) }]
+        ? [
+            {
+              kind: "SALE",
+              status: "SUCCESS",
+              gateway: gateway(fixture),
+              test: true,
+              processedAt,
+              amountSet: moneySet(total),
+            },
+          ]
         : [],
   };
 }
@@ -154,7 +172,10 @@ interface OrderState {
   cancelledAt: string | null;
   displayFinancialStatus: string | null;
   displayFulfillmentStatus: string;
-  fulfillments: { displayStatus: string | null; trackingInfo: { company: string | null; number: string | null }[] }[];
+  fulfillments: {
+    displayStatus: string | null;
+    trackingInfo: { company: string | null; number: string | null }[];
+  }[];
 }
 
 function toSeeded(key: string, status: SeededOrder["status"], order: OrderState): SeededOrder {
@@ -183,7 +204,11 @@ export function expectedState(fixture: OrderFixture): SeededOrder {
     orderName: null,
     financialStatus: fixture.financialStatus.toUpperCase(),
     fulfillmentStatus: shipped ? "FULFILLED" : "UNFULFILLED",
-    shipmentStatus: shipped ? (fixture.fulfillmentStatus === "delivered" ? "DELIVERED" : "IN_TRANSIT") : null,
+    shipmentStatus: shipped
+      ? fixture.fulfillmentStatus === "delivered"
+        ? "DELIVERED"
+        : "IN_TRANSIT"
+      : null,
     tracking: shipped ? `${carrierOf(fixture)} ${trackingNumber(fixture, "shopify")}` : null,
     cancelled: fixture.cancelled === true,
   };
@@ -195,7 +220,9 @@ export async function findDemoOrders(shop: Shopify, tag = DEMO_TAG): Promise<Ord
   const found: OrderState[] = [];
   let cursor: string | null = null;
   do {
-    type Page = { orders: { nodes: OrderState[]; pageInfo: { hasNextPage: boolean; endCursor: string | null } } };
+    type Page = {
+      orders: { nodes: OrderState[]; pageInfo: { hasNextPage: boolean; endCursor: string | null } };
+    };
     const data: Page = await shop.query<Page>(
       `query FindOrders($query: String!, $cursor: String) {
         orders(first: 50, after: $cursor, query: $query) {
@@ -276,29 +303,45 @@ const ORDER_CANCEL = `
 
 const ORDER_STATE = `query OrderState($id: ID!) { order(id: $id) { ${ORDER_STATE_FIELDS} } }`;
 
-async function fulfil(shop: Shopify, fixture: OrderFixture, orderId: string, now: Date): Promise<void> {
+async function fulfil(
+  shop: Shopify,
+  fixture: OrderFixture,
+  orderId: string,
+  now: Date,
+): Promise<void> {
   let fulfillmentOrderIds = [`gid://shopify/FulfillmentOrder/dry-run-${fixture.key}`];
   if (!shop.dryRun) {
-    const data = await shop.query<{ order: { fulfillmentOrders: { nodes: { id: string; status: string }[] } } }>(
-      FULFILLMENT_ORDERS,
-      { id: orderId },
-    );
-    fulfillmentOrderIds = data.order.fulfillmentOrders.nodes.filter((f) => f.status === "OPEN").map((f) => f.id);
-    if (fulfillmentOrderIds.length === 0) throw new Error(`${fixture.key}: no open fulfillment order to fulfil`);
+    const data = await shop.query<{
+      order: { fulfillmentOrders: { nodes: { id: string; status: string }[] } };
+    }>(FULFILLMENT_ORDERS, { id: orderId });
+    fulfillmentOrderIds = data.order.fulfillmentOrders.nodes
+      .filter((f) => f.status === "OPEN")
+      .map((f) => f.id);
+    if (fulfillmentOrderIds.length === 0)
+      throw new Error(`${fixture.key}: no open fulfillment order to fulfil`);
   }
 
   const carrier = carrierOf(fixture);
   const number = trackingNumber(fixture, "shopify");
-  const created = await shop.mutate<{ fulfillmentCreate: { fulfillment: { id: string }; userErrors: [] } }>(
+  const created = await shop.mutate<{
+    fulfillmentCreate: { fulfillment: { id: string }; userErrors: [] };
+  }>(
     FULFILLMENT_CREATE,
     {
       fulfillment: {
-        lineItemsByFulfillmentOrder: fulfillmentOrderIds.map((fulfillmentOrderId) => ({ fulfillmentOrderId })),
+        lineItemsByFulfillmentOrder: fulfillmentOrderIds.map((fulfillmentOrderId) => ({
+          fulfillmentOrderId,
+        })),
         notifyCustomer: false,
         trackingInfo: { company: carrier, number, url: trackingUrl(carrier, number) },
       },
     },
-    { fulfillmentCreate: { fulfillment: { id: `gid://shopify/Fulfillment/dry-run-${fixture.key}` }, userErrors: [] } },
+    {
+      fulfillmentCreate: {
+        fulfillment: { id: `gid://shopify/Fulfillment/dry-run-${fixture.key}` },
+        userErrors: [],
+      },
+    },
   );
   assertNoUserErrors(`fulfillmentCreate ${fixture.key}`, created.fulfillmentCreate);
   const fulfillmentId = created.fulfillmentCreate.fulfillment.id;
@@ -326,7 +369,10 @@ async function fulfil(shop: Shopify, fixture: OrderFixture, orderId: string, now
       { fulfillmentEvent: { fulfillmentId, ...event } },
       { fulfillmentEventCreate: { userErrors: [] } },
     );
-    assertNoUserErrors(`fulfillmentEventCreate ${fixture.key} ${String(event.status)}`, data.fulfillmentEventCreate);
+    assertNoUserErrors(
+      `fulfillmentEventCreate ${fixture.key} ${String(event.status)}`,
+      data.fulfillmentEventCreate,
+    );
   }
 }
 
@@ -365,18 +411,41 @@ export function refundInput(
       return { lineItemId: item.id, quantity: line.quantity, restockType: "NO_RESTOCK" };
     }),
     ...(full ? { shipping: { fullRefund: true } } : {}),
-    transactions: [{ orderId, parentId: sale.id, amount: money(amount), gateway: sale.gateway, kind: "REFUND" }],
+    transactions: [
+      { orderId, parentId: sale.id, amount: money(amount), gateway: sale.gateway, kind: "REFUND" },
+    ],
   };
 }
 
-async function refund(shop: Shopify, fixture: OrderFixture, orderId: string, ctx: OrderContext): Promise<void> {
+async function refund(
+  shop: Shopify,
+  fixture: OrderFixture,
+  orderId: string,
+  ctx: OrderContext,
+): Promise<void> {
   let details: RefundDetails["order"] = {
-    lineItems: { nodes: fixture.lines.map((l) => ({ id: `gid://shopify/LineItem/dry-run-${l.sku}`, sku: l.sku, quantity: l.quantity })) },
-    transactions: [{ id: "gid://shopify/OrderTransaction/dry-run", kind: "SALE", status: "SUCCESS", gateway: gateway(fixture) }],
+    lineItems: {
+      nodes: fixture.lines.map((l) => ({
+        id: `gid://shopify/LineItem/dry-run-${l.sku}`,
+        sku: l.sku,
+        quantity: l.quantity,
+      })),
+    },
+    transactions: [
+      {
+        id: "gid://shopify/OrderTransaction/dry-run",
+        kind: "SALE",
+        status: "SUCCESS",
+        gateway: gateway(fixture),
+      },
+    ],
   };
-  if (!shop.dryRun) details = (await shop.query<RefundDetails>(REFUND_DETAILS, { id: orderId })).order;
+  if (!shop.dryRun)
+    details = (await shop.query<RefundDetails>(REFUND_DETAILS, { id: orderId })).order;
   const input = refundInput(fixture, orderId, details, ctx.products, ctx.now);
-  const data = await shop.mutate<{ refundCreate: { refund: { id: string } | null; userErrors: [] } }>(
+  const data = await shop.mutate<{
+    refundCreate: { refund: { id: string } | null; userErrors: [] };
+  }>(
     REFUND_CREATE,
     // Stable per order, so a retried run can't refund twice.
     { input, key: `hay-demo-refund-${orderId.split("/").pop()}` },
@@ -398,18 +467,26 @@ async function cancel(shop: Shopify, fixture: OrderFixture, orderId: string): Pr
       // Any refund was already recorded by refundCreate (with its own date).
       refundMethod: { originalPaymentMethodsRefund: false },
       notifyCustomer: false,
-      staffNote: fixture.note ?? (unpaid ? "Cancelled automatically: payment never arrived." : null),
+      staffNote:
+        fixture.note ?? (unpaid ? "Cancelled automatically: payment never arrived." : null),
     },
     { orderCancel: { orderCancelUserErrors: [], userErrors: [] } },
   );
-  assertNoUserErrors(`orderCancel ${fixture.key}`, { userErrors: data.orderCancel.orderCancelUserErrors });
+  assertNoUserErrors(`orderCancel ${fixture.key}`, {
+    userErrors: data.orderCancel.orderCancelUserErrors,
+  });
   assertNoUserErrors(`orderCancel ${fixture.key}`, data.orderCancel);
 }
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 /** Final state as Shopify reports it. orderCancel runs as a job, so wait briefly for it. */
-async function readState(shop: Shopify, fixture: OrderFixture, orderId: string, pollMs: number): Promise<OrderState> {
+async function readState(
+  shop: Shopify,
+  fixture: OrderFixture,
+  orderId: string,
+  pollMs: number,
+): Promise<OrderState> {
   for (let attempt = 0; ; attempt++) {
     const { order } = await shop.query<{ order: OrderState }>(ORDER_STATE, { id: orderId });
     if (!fixture.cancelled || order.cancelledAt || attempt >= 5) return order;
@@ -430,15 +507,24 @@ export async function seedOrder(
     return toSeeded(fixture.key, "existing", existing);
   }
 
-  log(`Order ${fixture.key}: creating (${fixture.financialStatus}, ${fixture.fulfillmentStatus}${fixture.cancelled ? ", cancelled" : ""})`);
-  const created = await shop.mutate<{ orderCreate: { order: { id: string; name: string } | null; userErrors: [] } }>(
+  log(
+    `Order ${fixture.key}: creating (${fixture.financialStatus}, ${fixture.fulfillmentStatus}${fixture.cancelled ? ", cancelled" : ""})`,
+  );
+  const created = await shop.mutate<{
+    orderCreate: { order: { id: string; name: string } | null; userErrors: [] };
+  }>(
     ORDER_CREATE,
     {
       order: orderCreateInput(fixture, ctx),
       // No order confirmation or shipping emails; stock levels stay as the product step set them.
       options: { sendReceipt: false, sendFulfillmentReceipt: false, inventoryBehaviour: "BYPASS" },
     },
-    { orderCreate: { order: { id: `gid://shopify/Order/dry-run-${fixture.key}`, name: "(dry-run)" }, userErrors: [] } },
+    {
+      orderCreate: {
+        order: { id: `gid://shopify/Order/dry-run-${fixture.key}`, name: "(dry-run)" },
+        userErrors: [],
+      },
+    },
   );
   assertNoUserErrors(`orderCreate ${fixture.key}`, created.orderCreate);
   const orderId = created.orderCreate.order?.id;
@@ -451,7 +537,11 @@ export async function seedOrder(
   if (fixture.cancelled) await cancel(shop, fixture, orderId);
 
   if (shop.dryRun) return expectedState(fixture);
-  return toSeeded(fixture.key, "created", await readState(shop, fixture, orderId, options.pollMs ?? 1000));
+  return toSeeded(
+    fixture.key,
+    "created",
+    await readState(shop, fixture, orderId, options.pollMs ?? 1000),
+  );
 }
 
 /** Archives (when needed) and deletes demo-tagged orders, all of them or only `keys`. */
@@ -479,6 +569,8 @@ export async function resetOrders(shop: Shopify, keys: Set<string>): Promise<voi
       { orderDelete: { userErrors: [] } },
     );
     assertNoUserErrors(`orderDelete ${order.name}`, deleted.orderDelete);
-    log(`Deleted order ${order.name} (${order.tags.filter((t) => t.startsWith(`${DEMO_TAG}:`)).join(", ")})`);
+    log(
+      `Deleted order ${order.name} (${order.tags.filter((t) => t.startsWith(`${DEMO_TAG}:`)).join(", ")})`,
+    );
   }
 }

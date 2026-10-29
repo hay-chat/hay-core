@@ -59,7 +59,11 @@ export function createShopify(
   return {
     dryRun: flags.dryRun,
     query: send,
-    async mutate<T>(document: string, variables: Record<string, unknown>, dryRunResult: T): Promise<T> {
+    async mutate<T>(
+      document: string,
+      variables: Record<string, unknown>,
+      dryRunResult: T,
+    ): Promise<T> {
       if (flags.dryRun) {
         log(`  [dry-run] ${operationName(document)} ${JSON.stringify(variables)}`);
         return dryRunResult;
@@ -76,7 +80,9 @@ export function assertNoUserErrors(
 ): void {
   const errors = payload?.userErrors ?? [];
   if (errors.length > 0) {
-    const text = errors.map((e) => (e.field?.length ? `${e.field.join(".")}: ${e.message}` : e.message));
+    const text = errors.map((e) =>
+      e.field?.length ? `${e.field.join(".")}: ${e.message}` : e.message,
+    );
     throw new Error(`${operation}: ${text.join("; ")}`);
   }
 }

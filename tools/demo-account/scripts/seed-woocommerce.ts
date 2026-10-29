@@ -34,7 +34,7 @@ import {
   type SeededOrder,
 } from "./lib/data";
 import type { Customer, OrderFixture, Product } from "./lib/types";
-import { createWoo, type Woo, type WooConfig } from "./woocommerce/client";
+import { createWoo, type WooConfig } from "./woocommerce/client";
 import {
   carrierFor,
   categoryName,

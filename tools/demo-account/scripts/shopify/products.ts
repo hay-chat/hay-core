@@ -42,20 +42,28 @@ export function productSetInput(
   product: Product,
   options: { locationId: string; existing?: ExistingProduct; files?: string[] },
 ): Record<string, unknown> {
-  const optionNames = product.options.length > 0 ? product.options.map((o) => o.en) : [DEFAULT_OPTION.name];
+  const optionNames =
+    product.options.length > 0 ? product.options.map((o) => o.en) : [DEFAULT_OPTION.name];
   const optionValues = (variantOptions: string[]) =>
     product.options.length > 0 ? variantOptions : [DEFAULT_OPTION.value];
 
   const productOptions = optionNames.map((name, i) => ({
     name,
-    values: [...new Set(product.variants.map((v) => optionValues(v.options)[i]))].map((value) => ({ name: value })),
+    values: [...new Set(product.variants.map((v) => optionValues(v.options)[i]))].map((value) => ({
+      name: value,
+    })),
   }));
 
   const compareAt = product.compareAtPrice?.USD;
   const variants = product.variants.map((variant) => ({
-    ...(options.existing?.variantIds[variant.sku] ? { id: options.existing.variantIds[variant.sku] } : {}),
+    ...(options.existing?.variantIds[variant.sku]
+      ? { id: options.existing.variantIds[variant.sku] }
+      : {}),
     sku: variant.sku,
-    optionValues: optionValues(variant.options).map((name, i) => ({ optionName: optionNames[i], name })),
+    optionValues: optionValues(variant.options).map((name, i) => ({
+      optionName: optionNames[i],
+      name,
+    })),
     price: money(variant.price?.USD ?? product.price.USD),
     compareAtPrice: compareAt === undefined ? null : money(compareAt),
     taxable: true,
@@ -65,7 +73,9 @@ export function productSetInput(
       requiresShipping: true,
       measurement: { weight: { unit: "GRAMS", value: product.weightGrams } },
     },
-    inventoryQuantities: [{ locationId: options.locationId, name: "available", quantity: variant.stock }],
+    inventoryQuantities: [
+      { locationId: options.locationId, name: "available", quantity: variant.stock },
+    ],
   }));
 
   return {
@@ -76,11 +86,26 @@ export function productSetInput(
     productType: product.category,
     vendor: VENDOR,
     status: "ACTIVE",
-    tags: [...new Set([...product.tags, product.category, ...(product.fragile ? ["fragile"] : []), DEMO_TAG])],
+    tags: [
+      ...new Set([
+        ...product.tags,
+        product.category,
+        ...(product.fragile ? ["fragile"] : []),
+        DEMO_TAG,
+      ]),
+    ],
     productOptions,
     variants,
     // Omitted on re-runs when the product already has media, so images aren't added twice.
-    ...(options.files ? { files: options.files.map((src) => ({ originalSource: src, alt: product.title.en, contentType: "IMAGE" })) } : {}),
+    ...(options.files
+      ? {
+          files: options.files.map((src) => ({
+            originalSource: src,
+            alt: product.title.en,
+            contentType: "IMAGE",
+          })),
+        }
+      : {}),
   };
 }
 
@@ -102,7 +127,10 @@ interface ProductNode {
   variants: { nodes: { id: string; sku: string | null }[] };
 }
 
-export async function findProduct(shop: Shopify, product: Product): Promise<ExistingProduct | undefined> {
+export async function findProduct(
+  shop: Shopify,
+  product: Product,
+): Promise<ExistingProduct | undefined> {
   if (shop.dryRun) return undefined;
   for (const query of [`handle:"${product.handle}"`, `sku:"${product.variants[0]?.sku}"`]) {
     const data = await shop.query<{ products: { nodes: ProductNode[] } }>(FIND_PRODUCT, { query });
@@ -148,12 +176,26 @@ export async function stageImage(shop: Shopify, file: string): Promise<string> {
   const path = join(IMAGES_DIR, file);
   const mimeType = MIME[extname(file).toLowerCase()] ?? "image/jpeg";
   const fileSize = shop.dryRun && !existsSync(path) ? "0" : String(statSync(path).size);
-  const data = await shop.mutate<{ stagedUploadsCreate: { stagedTargets: StagedTarget[]; userErrors: [] } }>(
+  const data = await shop.mutate<{
+    stagedUploadsCreate: { stagedTargets: StagedTarget[]; userErrors: [] };
+  }>(
     STAGED_UPLOADS,
-    { input: [{ resource: "IMAGE", filename: file.split("/").pop(), mimeType, httpMethod: "POST", fileSize }] },
+    {
+      input: [
+        {
+          resource: "IMAGE",
+          filename: file.split("/").pop(),
+          mimeType,
+          httpMethod: "POST",
+          fileSize,
+        },
+      ],
+    },
     {
       stagedUploadsCreate: {
-        stagedTargets: [{ url: "", resourceUrl: `https://dry-run.invalid/${file}`, parameters: [] }],
+        stagedTargets: [
+          { url: "", resourceUrl: `https://dry-run.invalid/${file}`, parameters: [] },
+        ],
         userErrors: [],
       },
     },
@@ -169,13 +211,19 @@ export async function stageImage(shop: Shopify, file: string): Promise<string> {
   for (const p of target.parameters) form.append(p.name, p.value);
   form.append("file", new Blob([readFileSync(path)], { type: mimeType }), file.split("/").pop());
   const response = await fetch(target.url, { method: "POST", body: form });
-  if (!response.ok) throw new Error(`Upload of ${file} failed: ${response.status} ${await response.text()}`);
+  if (!response.ok)
+    throw new Error(`Upload of ${file} failed: ${response.status} ${await response.text()}`);
   return target.resourceUrl;
 }
 
 /** Image sources for productSet: `<base>/<file>` with --image-base-url, else staged uploads. */
-export async function imageSources(shop: Shopify, product: Product, imageBaseUrl?: string): Promise<string[]> {
-  if (imageBaseUrl) return product.images.map((file) => `${imageBaseUrl.replace(/\/$/, "")}/${file}`);
+export async function imageSources(
+  shop: Shopify,
+  product: Product,
+  imageBaseUrl?: string,
+): Promise<string[]> {
+  if (imageBaseUrl)
+    return product.images.map((file) => `${imageBaseUrl.replace(/\/$/, "")}/${file}`);
   const sources: string[] = [];
   for (const file of product.images) {
     if (!existsSync(join(IMAGES_DIR, file)) && !shop.dryRun) {
@@ -206,16 +254,28 @@ export async function seedProducts(
   const variantIds: Record<string, string> = {};
   for (const product of products) {
     const existing = await findProduct(shop, product);
-    const files = existing?.hasMedia ? undefined : await imageSources(shop, product, options.imageBaseUrl);
+    const files = existing?.hasMedia
+      ? undefined
+      : await imageSources(shop, product, options.imageBaseUrl);
     const input = productSetInput(product, { locationId, existing, files });
-    const data = await shop.mutate<{ productSet: { product: { id: string; variants: { nodes: { id: string; sku: string }[] } }; userErrors: [] } }>(
+    const data = await shop.mutate<{
+      productSet: {
+        product: { id: string; variants: { nodes: { id: string; sku: string }[] } };
+        userErrors: [];
+      };
+    }>(
       PRODUCT_SET,
       { input },
       {
         productSet: {
           product: {
             id: `gid://shopify/Product/dry-run-${product.handle}`,
-            variants: { nodes: product.variants.map((v) => ({ id: `gid://shopify/ProductVariant/dry-run-${v.sku}`, sku: v.sku })) },
+            variants: {
+              nodes: product.variants.map((v) => ({
+                id: `gid://shopify/ProductVariant/dry-run-${v.sku}`,
+                sku: v.sku,
+              })),
+            },
           },
           userErrors: [],
         },
@@ -223,13 +283,18 @@ export async function seedProducts(
     );
     assertNoUserErrors(`productSet ${product.handle}`, data.productSet);
     for (const v of data.productSet.product.variants.nodes) variantIds[v.sku] = v.id;
-    log(`${existing ? "Updated" : "Created"} product ${product.handle} (${product.variants.length} variants)`);
+    log(
+      `${existing ? "Updated" : "Created"} product ${product.handle} (${product.variants.length} variants)`,
+    );
   }
   return variantIds;
 }
 
 /** SKU → variant id lookups for `--only orders` runs, where the product step didn't run. */
-export async function findVariantIds(shop: Shopify, skus: string[]): Promise<Record<string, string>> {
+export async function findVariantIds(
+  shop: Shopify,
+  skus: string[],
+): Promise<Record<string, string>> {
   const ids: Record<string, string> = {};
   for (const sku of new Set(skus)) {
     if (shop.dryRun) {
@@ -241,7 +306,8 @@ export async function findVariantIds(shop: Shopify, skus: string[]): Promise<Rec
       { query: `sku:"${sku}"` },
     );
     const variant = data.productVariants.nodes.find((v) => v.sku === sku);
-    if (!variant) throw new Error(`SKU ${sku} is not in the store. Run without --only orders first.`);
+    if (!variant)
+      throw new Error(`SKU ${sku} is not in the store. Run without --only orders first.`);
     ids[sku] = variant.id;
   }
   return ids;
