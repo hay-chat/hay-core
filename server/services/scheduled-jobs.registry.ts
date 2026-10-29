@@ -17,6 +17,9 @@ const logger = createLogger("scheduled-jobs");
  * All cron jobs and scheduled tasks are registered here.
  * This makes it easy to see all scheduled jobs at a glance.
  *
+ * Jobs run on one server instance at a time (Postgres advisory lock) unless
+ * marked `perInstance`, for work on in-memory state or local plugin workers.
+ *
  * To add a new job:
  * 1. Ensure the service exposes a public async method for the task
  * 2. Add the job configuration to the jobRegistry array below
@@ -33,6 +36,7 @@ const jobRegistry: CronJobConfig[] = [
     schedule: 60000, // Every 60 seconds
     handler: async () => dpopCacheService.cleanupExpired(),
     singleton: true,
+    perInstance: true,
     enabled: true,
     skipDatabaseLogging: true, // Don't log frequent cache cleanups
   },
@@ -43,6 +47,7 @@ const jobRegistry: CronJobConfig[] = [
     schedule: 60000, // Every 60 seconds
     handler: async () => pluginInstanceManagerService.cleanupInactiveInstances(),
     singleton: true,
+    perInstance: true,
     enabled: true,
     skipDatabaseLogging: true, // Don't log frequent cleanups
   },
@@ -53,6 +58,7 @@ const jobRegistry: CronJobConfig[] = [
     schedule: 60000, // Every 60 seconds
     handler: async () => pluginRouteService.clearRateLimits(),
     singleton: true,
+    perInstance: true,
     enabled: true,
     skipDatabaseLogging: true, // Don't log frequent cleanups
   },
@@ -66,6 +72,7 @@ const jobRegistry: CronJobConfig[] = [
       await pluginManagerService.cleanupInactiveWorkers();
     },
     singleton: true,
+    perInstance: true,
     enabled: true,
     skipDatabaseLogging: true, // Don't log frequent cleanups
   },
@@ -91,6 +98,7 @@ const jobRegistry: CronJobConfig[] = [
     schedule: 5000, // Every 5 seconds
     handler: async () => jobQueueService.processNextJob(),
     singleton: true, // Prevent concurrent processing
+    perInstance: true,
     enabled: true,
     skipDatabaseLogging: true, // Don't log frequent checks
   },
@@ -241,6 +249,7 @@ const jobRegistry: CronJobConfig[] = [
     schedule: 1000,
     handler: async () => orchestratorWorker.tick(),
     singleton: true,
+    perInstance: true,
     enabled: false, // Disabled: RabbitMQ consumer handles processing now
     skipDatabaseLogging: true,
   },
@@ -495,6 +504,7 @@ const jobRegistry: CronJobConfig[] = [
       await gitConnectionService.syncAllGitPlugins();
     },
     singleton: true,
+    perInstance: true,
     enabled: true,
     timeout: 600000, // 10 minutes max
     retryOnFailure: true,
@@ -527,6 +537,7 @@ const jobRegistry: CronJobConfig[] = [
       await productSourceCoordinator.syncAllOrgs();
     },
     singleton: true,
+    perInstance: true,
     enabled: true,
     timeout: 600000, // 10 minutes max
     retryOnFailure: true,
