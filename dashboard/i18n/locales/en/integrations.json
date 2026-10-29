@@ -206,14 +206,36 @@
     "capabilities": {
       "title": "Capabilities",
       "description": "What this integration can do",
-      "chatConnector": "Chat Connector",
-      "sendMessages": "Send messages",
-      "receiveMessages": "Receive messages",
-      "listConversations": "List conversations",
-      "mcpConnector": "MCP Connector",
-      "mcpDescription": "Provides AI tools and resources through Model Context Protocol",
-      "documentImporter": "Document Importer",
-      "documentImporterDescription": "Import and process documents from external sources"
+      "items": {
+        "messages": {
+          "title": "Customer conversations",
+          "description": "Receives your customers' messages and sends Hay.chat's replies."
+        },
+        "customers": {
+          "title": "Customer profiles",
+          "description": "Links each conversation to the customer who started it."
+        },
+        "mcp": {
+          "title": "Actions for your AI agent",
+          "description": "Lets the agent look things up and act for your customers, like checking an order."
+        },
+        "products": {
+          "title": "Product catalogue",
+          "description": "Keeps your products in sync so the agent can answer questions about them."
+        },
+        "disputes": {
+          "title": "Chargeback evidence",
+          "description": "Collects the order and conversation history you need to answer a chargeback."
+        },
+        "documents": {
+          "title": "Knowledge import",
+          "description": "Imports pages and documents into your knowledge base."
+        },
+        "webchat": {
+          "title": "Web chat",
+          "description": "Adds to the chat widget on your website."
+        }
+      }
     },
     "availableActions": {
       "title": "Available Actions",
@@ -272,6 +294,10 @@
         "quality_drop": "The provider lowered this channel's quality rating ({detail}). Messaging limits may drop if it keeps falling."
       },
       "alerted": "Owners and admins were notified by email and push."
+    },
+    "advanced": {
+      "show": "Show advanced settings",
+      "managedHidden": "{count} value is set up for you by Hay.chat. | {count} values are set up for you by Hay.chat."
     }
   }
 }

@@ -5,7 +5,7 @@ Research: `Engineering/02 Research/D20 Plugin setup UX.md` (Roger accepted every
 ## Plan
 
 - [x] D20-0 re-check the research against master
-- [ ] D20-1 quick fixes on the current plugin page
+- [x] D20-1 quick fixes on the current plugin page
 - [ ] D20-2 i18n of the generic form + OAuth card, plugin field labels, locale renames, en/pt-BR hard check
 - [ ] D20-3 SDK + server: `advanced` fields, `managed` resolver metadata, override policy (env flag)
 - [ ] D20-4 standard page: status header, tabs, Advanced mode, badges, ⋯ menu, Enable → Connect
@@ -31,7 +31,7 @@ Changed since the research:
 - New channel-health alert (D13-11) on the page.
 - 20 core plugins now: + mercadopago, messenger, nuvemshop, turnstile. The Email tool is merged into
   email-channel (`notificationRecipients`). WooCommerce has its own `after-settings` connect page.
-- 99 config fields in total (inventory dumped by loading each plugin's `onInitialize`).
+- 86 config fields in total (inventory dumped by loading each plugin's `onInitialize`).
 
 Env/tooling notes:
 

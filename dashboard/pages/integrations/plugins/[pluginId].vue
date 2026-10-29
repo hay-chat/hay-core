@@ -1,14 +1,14 @@
 <template>
   <Page width="max">
     <!-- Header -->
-    <div class="flex items-center justify-between">
-      <div class="flex items-center space-x-4">
+    <div class="flex flex-wrap items-center justify-between gap-2">
+      <div class="flex items-center">
         <Button variant="ghost" size="sm" @click="router.push('/integrations/marketplace')">
           <ArrowLeft class="h-4 w-4 mr-2" />
           {{ $t("pluginSettings.backToMarketplace") }}
         </Button>
       </div>
-      <div v-if="!loading && plugin && enabled" class="flex items-center space-x-2">
+      <div v-if="!loading && plugin && enabled" class="flex flex-wrap items-center gap-2">
         <Button variant="outline" size="sm" :disabled="restarting" @click="handleRestartPlugin">
           <Loader2 v-if="restarting" class="h-4 w-4 mr-2 animate-spin" />
           <RotateCw v-else class="h-4 w-4 mr-2" />
@@ -98,9 +98,7 @@
               </div>
               <div>
                 <CardTitle>{{ plugin.name || getPluginDisplayName(plugin.id) }}</CardTitle>
-                <CardDescription>{{
-                  plugin.description || `Version ${plugin.version}`
-                }}</CardDescription>
+                <CardDescription v-if="pluginDescription">{{ pluginDescription }}</CardDescription>
               </div>
             </div>
             <!-- Connection Status Badge (only for MCP plugins when enabled) -->
@@ -247,71 +245,307 @@
         </Card>
 
         <!-- Capabilities Card -->
-        <Card v-if="plugin.manifest?.capabilities">
+        <Card v-if="capabilities.length > 0" data-testid="plugin-capabilities">
           <CardHeader>
             <CardTitle>{{ $t("pluginSettings.capabilities.title") }}</CardTitle>
             <CardDescription>{{ $t("pluginSettings.capabilities.description") }}</CardDescription>
           </CardHeader>
           <CardContent>
-            <div class="space-y-4">
-              <!-- Chat Connector Capabilities -->
-              <div v-if="plugin.manifest.capabilities.chat_connector" class="space-y-3">
-                <div class="flex items-center gap-2">
-                  <MessageSquare class="h-5 w-5 text-primary" />
-                  <h4 class="font-medium">{{ $t("pluginSettings.capabilities.chatConnector") }}</h4>
+            <ul class="space-y-3">
+              <li v-for="capability in capabilities" :key="capability" class="flex gap-3">
+                <component
+                  :is="CAPABILITY_ICONS[capability]"
+                  class="h-5 w-5 text-primary flex-shrink-0 mt-0.5"
+                />
+                <div>
+                  <p class="font-medium text-sm">
+                    {{ $t(`pluginSettings.capabilities.items.${capability}.title`) }}
+                  </p>
+                  <p class="text-sm text-muted-foreground">
+                    {{ $t(`pluginSettings.capabilities.items.${capability}.description`) }}
+                  </p>
                 </div>
-                <div class="pl-7 space-y-2 text-sm text-muted-foreground">
-                  <div v-if="plugin.manifest.capabilities.chat_connector.features?.send_message">
-                    <Check class="inline h-4 w-4 text-green-600 mr-2" />
-                    {{ $t("pluginSettings.capabilities.sendMessages") }}
-                  </div>
-                  <div v-if="plugin.manifest.capabilities.chat_connector.features?.receive_message">
-                    <Check class="inline h-4 w-4 text-green-600 mr-2" />
-                    {{ $t("pluginSettings.capabilities.receiveMessages") }}
-                  </div>
-                  <div
-                    v-if="plugin.manifest.capabilities.chat_connector.features?.list_conversations"
-                  >
-                    <Check class="inline h-4 w-4 text-green-600 mr-2" />
-                    {{ $t("pluginSettings.capabilities.listConversations") }}
-                  </div>
-                </div>
-              </div>
-
-              <!-- MCP Connector Capabilities -->
-              <div
-                v-if="
-                  Array.isArray(plugin.manifest.capabilities)
-                    ? plugin.manifest.capabilities.includes('mcp')
-                    : plugin.manifest.capabilities.mcp
-                "
-                class="space-y-3"
-              >
-                <div class="flex items-center gap-2">
-                  <Cpu class="h-5 w-5 text-primary" />
-                  <h4 class="font-medium">{{ $t("pluginSettings.capabilities.mcpConnector") }}</h4>
-                </div>
-                <p class="pl-7 text-sm text-muted-foreground">
-                  {{ $t("pluginSettings.capabilities.mcpDescription") }}
-                </p>
-              </div>
-
-              <!-- Document Importer Capabilities -->
-              <div v-if="plugin.manifest.capabilities.document_importer" class="space-y-3">
-                <div class="flex items-center gap-2">
-                  <FileText class="h-5 w-5 text-primary" />
-                  <h4 class="font-medium">
-                    {{ $t("pluginSettings.capabilities.documentImporter") }}
-                  </h4>
-                </div>
-                <p class="pl-7 text-sm text-muted-foreground">
-                  {{ $t("pluginSettings.capabilities.documentImporterDescription") }}
-                </p>
-              </div>
-            </div>
+              </li>
+            </ul>
           </CardContent>
         </Card>
       </template>
+
+      <!-- Plugin Settings Extensions - Before Settings Slot (only when enabled) -->
+      <template v-if="enabled">
+        <Card v-for="ext in beforeSettingsExtensions" :key="ext.id">
+          <CardContent>
+            <PluginPageSlot
+              :plugin-id="plugin.id"
+              :plugin-path="plugin.pluginPath"
+              :component-name="ext.componentName"
+              :plugin="plugin"
+              :config="{
+                ...formData,
+                instanceId: instanceId,
+                organizationId: userStore.activeOrganizationId,
+              }"
+              :api-base-url="apiBaseUrl"
+              @update:config="
+                (newConfig: any) => {
+                  formData = { ...formData, ...newConfig };
+                }
+              "
+            />
+          </CardContent>
+        </Card>
+      </template>
+
+      <!-- Plugin Settings Extensions - After Settings Slot (only when enabled) -->
+      <template v-if="enabled">
+        <Card v-for="ext in afterSettingsExtensions" :key="ext.id">
+          <CardContent>
+            <PluginPageSlot
+              :plugin-id="plugin.id"
+              :plugin-path="plugin.pluginPath"
+              :component-name="ext.componentName"
+              :plugin="plugin"
+              :config="{
+                ...formData,
+                instanceId: instanceId,
+                organizationId: userStore.activeOrganizationId,
+              }"
+              :api-base-url="apiBaseUrl"
+              @update:config="
+                (newConfig: any) => {
+                  formData = { ...formData, ...newConfig };
+                }
+              "
+            />
+          </CardContent>
+        </Card>
+      </template>
+
+      <!-- OAuth plugin whose client ID/secret are not set: Connect cannot work, say why -->
+      <Alert
+        v-if="enabled && oauthAvailable && !oauthConfigured"
+        :icon="Info"
+        data-testid="oauth-unavailable-alert"
+      >
+        <AlertTitle>{{ $t("pluginSettings.connection.oauthUnavailableTitle") }}</AlertTitle>
+        <AlertDescription>
+          {{ $t("pluginSettings.connection.oauthUnavailable", { name: plugin.name }) }}
+        </AlertDescription>
+      </Alert>
+
+      <!-- Tabs Section: Show tabs if there are any tab extensions (only when enabled) -->
+      <Card v-if="enabled && tabExtensions.length > 0">
+        <CardContent class="p-0">
+          <Tabs :default-value="hasConfiguration ? 'settings' : tabExtensions[0]?.id">
+            <TabsList class="w-full justify-start rounded-none border-b">
+              <!-- Settings Tab (shown when there's configuration and tabs) -->
+              <TabsTrigger v-if="hasConfiguration" value="settings">{{
+                $t("pluginSettings.tabs.settings")
+              }}</TabsTrigger>
+              <!-- Custom Tab Extensions -->
+              <TabsTrigger v-for="tab in sortedTabExtensions" :key="tab.id" :value="tab.id">
+                {{ tab.name }}
+              </TabsTrigger>
+            </TabsList>
+
+            <!-- Settings Tab Content -->
+            <TabsContent v-if="hasConfiguration" value="settings" class="p-6">
+              <!-- Custom Template (if available) -->
+              <div v-if="hasCustomTemplate && templateHtml" v-html="templateHtml"></div>
+
+              <!-- Auto-generated Form -->
+              <PluginConfigForm
+                v-model:formData="formData"
+                v-model:editingEncryptedFields="editingEncryptedFields"
+                v-model:editingEnvFields="editingEnvFields"
+                :configSchema="configSchema"
+                :originalFormData="originalFormData"
+                :configMetadata="configMetadata"
+                :saving="saving"
+                @submit="saveConfiguration"
+                @reset="resetForm"
+                @reset-to-env="handleResetToEnv"
+              />
+            </TabsContent>
+
+            <!-- Custom Tab Contents -->
+            <TabsContent
+              v-for="tab in sortedTabExtensions"
+              :key="tab.id"
+              :value="tab.id"
+              class="p-6"
+            >
+              <component
+                :is="tab.component"
+                :plugin="plugin"
+                :config="{
+                  ...formData,
+                  instanceId: instanceId,
+                  organizationId: userStore.activeOrganizationId,
+                }"
+                :api-base-url="apiBaseUrl"
+                :api="Hay"
+                :locale="locale"
+                @update:config="
+                  (newConfig: any) => {
+                    formData = { ...formData, ...newConfig };
+                  }
+                "
+              />
+            </TabsContent>
+          </Tabs>
+        </CardContent>
+      </Card>
+
+      <!-- Configuration Form (shown when no tabs are present and enabled) -->
+      <Card
+        v-if="
+          enabled &&
+          hasConfiguration &&
+          tabExtensions.length === 0 &&
+          (Object.keys(visibleConfigSchema).length > 0 || managedFieldCount > 0)
+        "
+      >
+        <CardHeader>
+          <CardTitle>{{ $t("pluginSettings.configuration.title") }}</CardTitle>
+          <CardDescription>
+            {{
+              $t("pluginSettings.configuration.description", {
+                name: plugin.name || getPluginDisplayName(plugin.id),
+              })
+            }}
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <!-- Custom Template (if available) -->
+          <div v-if="hasCustomTemplate && templateHtml" v-html="templateHtml"></div>
+
+          <!-- Auto-generated Form -->
+          <PluginConfigForm
+            v-if="Object.keys(visibleConfigSchema).length > 0"
+            v-model:formData="formData"
+            v-model:editingEncryptedFields="editingEncryptedFields"
+            v-model:editingEnvFields="editingEnvFields"
+            :configSchema="visibleConfigSchema"
+            :originalFormData="originalFormData"
+            :configMetadata="configMetadata"
+            :saving="saving"
+            @submit="saveConfiguration"
+            @reset="resetForm"
+            @reset-to-env="handleResetToEnv"
+          />
+
+          <!-- Values the server manages (env) stay out of the way unless asked for -->
+          <div
+            v-if="managedFieldCount > 0"
+            class="flex items-center justify-between gap-4 border-t pt-4 mt-4"
+            data-testid="advanced-settings-switch"
+          >
+            <div>
+              <Label for="show-advanced">{{ $t("pluginSettings.advanced.show") }}</Label>
+              <p class="text-xs text-neutral-muted">
+                {{ $t("pluginSettings.advanced.managedHidden", { count: managedFieldCount }) }}
+              </p>
+            </div>
+            <Switch id="show-advanced" v-model="showAdvanced" />
+          </div>
+        </CardContent>
+      </Card>
+
+      <!-- OAuth Connection Card (show when OAuth is available and configured) -->
+      <Card v-if="enabled && oauthAvailable && oauthConfigured">
+        <CardContent>
+          <PluginOAuthConnection
+            :plugin="plugin"
+            :config="{
+              ...formData,
+              instanceId: instanceId,
+              organizationId: userStore.activeOrganizationId,
+            }"
+            :api-base-url="apiBaseUrl"
+            :oauth-available="oauthAvailable"
+            :oauth-configured="oauthConfigured"
+          />
+        </CardContent>
+      </Card>
+
+      <!-- Test Connection for Connectors (only when enabled) -->
+      <Card v-if="enabled && plugin.type.includes('connector')">
+        <CardHeader>
+          <CardTitle>{{ $t("pluginSettings.connectionTest.title") }}</CardTitle>
+          <CardDescription>
+            {{
+              $t("pluginSettings.connectionTest.description", {
+                name: plugin.name || getPluginDisplayName(plugin.id),
+              })
+            }}
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div class="space-y-4">
+            <Button :disabled="testing" @click="testConnection">
+              <Zap v-if="!testing" class="h-4 w-4 mr-2" />
+              <Loader2 v-else class="h-4 w-4 mr-2 animate-spin" />
+              {{
+                testing
+                  ? $t("pluginSettings.connectionTest.testing")
+                  : $t("pluginSettings.connectionTest.testConnection")
+              }}
+            </Button>
+
+            <div
+              v-if="testResult"
+              class="p-4 rounded-lg"
+              :class="
+                testResult.success
+                  ? 'bg-green-50 text-green-800 dark:bg-green-950/20 dark:text-green-200'
+                  : testResult.status === 'unconfigured'
+                    ? 'bg-gray-50 text-gray-800 dark:bg-gray-950/20 dark:text-gray-200'
+                    : 'bg-red-50 text-red-800 dark:bg-red-950/20 dark:text-red-200'
+              "
+            >
+              <div class="flex items-center space-x-2">
+                <CheckCircle v-if="testResult.success" class="h-5 w-5" />
+                <Info v-else-if="testResult.status === 'unconfigured'" class="h-5 w-5" />
+                <XCircle v-else class="h-5 w-5" />
+                <span class="font-medium">
+                  <Badge
+                    v-if="testResult.status === 'unconfigured'"
+                    variant="secondary"
+                    class="mr-2"
+                  >
+                    {{ $t("pluginSettings.connection.needsAuth") }}
+                  </Badge>
+                  {{
+                    testResult.success
+                      ? $t("pluginSettings.connectionTest.success")
+                      : testResult.status === "unconfigured"
+                        ? $t("pluginSettings.connectionTest.configRequired")
+                        : $t("pluginSettings.connectionTest.failed")
+                  }}
+                </span>
+              </div>
+              <p v-if="testResult.message" class="mt-2 text-sm">
+                {{ testResult.message }}
+              </p>
+              <p
+                v-if="
+                  !testResult.success && testResult.status !== 'unconfigured' && testResult.error
+                "
+                class="mt-2 text-sm font-mono bg-red-100 dark:bg-red-900/30 p-2 rounded border border-red-200 dark:border-red-800"
+              >
+                {{ testResult.error }}
+              </p>
+              <p
+                v-if="!testResult.success && testResult.status !== 'unconfigured'"
+                class="mt-2 text-xs opacity-75"
+              >
+                {{ $t("pluginSettings.connectionTest.checkConfig") }}
+              </p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       <!-- Available Actions Card (for MCP plugins) -->
       <!-- Renders for both enabled and disabled plugins. Prefers live tools registered
@@ -390,267 +624,12 @@
           </div>
         </CardContent>
       </Card>
-
-      <!-- OAuth Connection Card (show when OAuth is available and configured) -->
-      <Card v-if="enabled && oauthAvailable && oauthConfigured">
-        <CardContent>
-          <PluginOAuthConnection
-            :plugin="plugin"
-            :config="{
-              ...formData,
-              instanceId: instanceId,
-              organizationId: userStore.activeOrganizationId,
-            }"
-            :api-base-url="apiBaseUrl"
-            :oauth-available="oauthAvailable"
-            :oauth-configured="oauthConfigured"
-          />
-        </CardContent>
-      </Card>
-
-      <!-- OAuth plugin whose client ID/secret are not set: Connect cannot work, say why -->
-      <Alert
-        v-if="enabled && oauthAvailable && !oauthConfigured"
-        :icon="Info"
-        data-testid="oauth-unavailable-alert"
-      >
-        <AlertTitle>{{ $t("pluginSettings.connection.oauthUnavailableTitle") }}</AlertTitle>
-        <AlertDescription>
-          {{ $t("pluginSettings.connection.oauthUnavailable", { name: plugin.name }) }}
-        </AlertDescription>
-      </Alert>
-
-      <!-- Plugin Settings Extensions - Before Settings Slot (only when enabled) -->
-      <template v-if="enabled">
-        <Card v-for="ext in beforeSettingsExtensions" :key="ext.id">
-          <CardContent>
-            <PluginPageSlot
-              :plugin-id="plugin.id"
-              :plugin-path="plugin.pluginPath"
-              :component-name="ext.componentName"
-              :plugin="plugin"
-              :config="{
-                ...formData,
-                instanceId: instanceId,
-                organizationId: userStore.activeOrganizationId,
-              }"
-              :api-base-url="apiBaseUrl"
-              @update:config="
-                (newConfig: any) => {
-                  formData = { ...formData, ...newConfig };
-                }
-              "
-            />
-          </CardContent>
-        </Card>
-      </template>
-
-      <!-- Tabs Section: Show tabs if there are any tab extensions (only when enabled) -->
-      <Card v-if="enabled && tabExtensions.length > 0">
-        <CardContent class="p-0">
-          <Tabs :default-value="hasConfiguration ? 'settings' : tabExtensions[0]?.id">
-            <TabsList class="w-full justify-start rounded-none border-b">
-              <!-- Settings Tab (shown when there's configuration and tabs) -->
-              <TabsTrigger v-if="hasConfiguration" value="settings">{{
-                $t("pluginSettings.tabs.settings")
-              }}</TabsTrigger>
-              <!-- Custom Tab Extensions -->
-              <TabsTrigger v-for="tab in sortedTabExtensions" :key="tab.id" :value="tab.id">
-                {{ tab.name }}
-              </TabsTrigger>
-            </TabsList>
-
-            <!-- Settings Tab Content -->
-            <TabsContent v-if="hasConfiguration" value="settings" class="p-6">
-              <!-- Custom Template (if available) -->
-              <div v-if="hasCustomTemplate && templateHtml" v-html="templateHtml"></div>
-
-              <!-- Auto-generated Form -->
-              <PluginConfigForm
-                v-model:formData="formData"
-                v-model:editingEncryptedFields="editingEncryptedFields"
-                v-model:editingEnvFields="editingEnvFields"
-                :configSchema="configSchema"
-                :originalFormData="originalFormData"
-                :configMetadata="configMetadata"
-                :saving="saving"
-                @submit="saveConfiguration"
-                @reset="resetForm"
-                @reset-to-env="handleResetToEnv"
-              />
-            </TabsContent>
-
-            <!-- Custom Tab Contents -->
-            <TabsContent
-              v-for="tab in sortedTabExtensions"
-              :key="tab.id"
-              :value="tab.id"
-              class="p-6"
-            >
-              <component
-                :is="tab.component"
-                :plugin="plugin"
-                :config="{
-                  ...formData,
-                  instanceId: instanceId,
-                  organizationId: userStore.activeOrganizationId,
-                }"
-                :api-base-url="apiBaseUrl"
-                :api="Hay"
-                :locale="locale"
-                @update:config="
-                  (newConfig: any) => {
-                    formData = { ...formData, ...newConfig };
-                  }
-                "
-              />
-            </TabsContent>
-          </Tabs>
-        </CardContent>
-      </Card>
-
-      <!-- Configuration Form (shown when no tabs are present and enabled) -->
-      <Card v-if="enabled && hasConfiguration && tabExtensions.length === 0">
-        <CardHeader>
-          <CardTitle>{{ $t("pluginSettings.configuration.title") }}</CardTitle>
-          <CardDescription>
-            {{
-              $t("pluginSettings.configuration.description", {
-                name: plugin.name || getPluginDisplayName(plugin.id),
-              })
-            }}
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <!-- Custom Template (if available) -->
-          <div v-if="hasCustomTemplate && templateHtml" v-html="templateHtml"></div>
-
-          <!-- Auto-generated Form -->
-          <PluginConfigForm
-            v-model:formData="formData"
-            v-model:editingEncryptedFields="editingEncryptedFields"
-            v-model:editingEnvFields="editingEnvFields"
-            :configSchema="configSchema"
-            :originalFormData="originalFormData"
-            :configMetadata="configMetadata"
-            :saving="saving"
-            @submit="saveConfiguration"
-            @reset="resetForm"
-            @reset-to-env="handleResetToEnv"
-          />
-        </CardContent>
-      </Card>
-
-      <!-- Test Connection for Connectors (only when enabled) -->
-      <Card v-if="enabled && plugin.type.includes('connector')">
-        <CardHeader>
-          <CardTitle>{{ $t("pluginSettings.connectionTest.title") }}</CardTitle>
-          <CardDescription>
-            {{
-              $t("pluginSettings.connectionTest.description", {
-                name: plugin.name || getPluginDisplayName(plugin.id),
-              })
-            }}
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div class="space-y-4">
-            <Button :disabled="testing" @click="testConnection">
-              <Zap v-if="!testing" class="h-4 w-4 mr-2" />
-              <Loader2 v-else class="h-4 w-4 mr-2 animate-spin" />
-              {{
-                testing
-                  ? $t("pluginSettings.connectionTest.testing")
-                  : $t("pluginSettings.connectionTest.testConnection")
-              }}
-            </Button>
-
-            {{ testResult }}
-
-            <div
-              v-if="testResult"
-              class="p-4 rounded-lg"
-              :class="
-                testResult.success
-                  ? 'bg-green-50 text-green-800 dark:bg-green-950/20 dark:text-green-200'
-                  : testResult.status === 'unconfigured'
-                    ? 'bg-gray-50 text-gray-800 dark:bg-gray-950/20 dark:text-gray-200'
-                    : 'bg-red-50 text-red-800 dark:bg-red-950/20 dark:text-red-200'
-              "
-            >
-              <div class="flex items-center space-x-2">
-                <CheckCircle v-if="testResult.success" class="h-5 w-5" />
-                <Info v-else-if="testResult.status === 'unconfigured'" class="h-5 w-5" />
-                <XCircle v-else class="h-5 w-5" />
-                <span class="font-medium">
-                  <Badge
-                    v-if="testResult.status === 'unconfigured'"
-                    variant="secondary"
-                    class="mr-2"
-                  >
-                    {{ $t("pluginSettings.connection.needsAuth") }}
-                  </Badge>
-                  {{
-                    testResult.success
-                      ? $t("pluginSettings.connectionTest.success")
-                      : testResult.status === "unconfigured"
-                        ? $t("pluginSettings.connectionTest.configRequired")
-                        : $t("pluginSettings.connectionTest.failed")
-                  }}
-                </span>
-              </div>
-              <p v-if="testResult.message" class="mt-2 text-sm">
-                {{ testResult.message }}
-              </p>
-              <p
-                v-if="
-                  !testResult.success && testResult.status !== 'unconfigured' && testResult.error
-                "
-                class="mt-2 text-sm font-mono bg-red-100 dark:bg-red-900/30 p-2 rounded border border-red-200 dark:border-red-800"
-              >
-                {{ testResult.error }}
-              </p>
-              <p
-                v-if="!testResult.success && testResult.status !== 'unconfigured'"
-                class="mt-2 text-xs opacity-75"
-              >
-                {{ $t("pluginSettings.connectionTest.checkConfig") }}
-              </p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      <!-- Plugin Settings Extensions - After Settings Slot (only when enabled) -->
-      <template v-if="enabled">
-        <Card v-for="ext in afterSettingsExtensions" :key="ext.id">
-          <CardContent>
-            <PluginPageSlot
-              :plugin-id="plugin.id"
-              :plugin-path="plugin.pluginPath"
-              :component-name="ext.componentName"
-              :plugin="plugin"
-              :config="{
-                ...formData,
-                instanceId: instanceId,
-                organizationId: userStore.activeOrganizationId,
-              }"
-              :api-base-url="apiBaseUrl"
-              @update:config="
-                (newConfig: any) => {
-                  formData = { ...formData, ...newConfig };
-                }
-              "
-            />
-          </CardContent>
-        </Card>
-      </template>
     </div>
   </Page>
 </template>
 
 <script setup lang="ts">
-import { markRaw, defineAsyncComponent, computed, ref, onUnmounted } from "vue";
+import { defineAsyncComponent, computed, ref, onUnmounted, type Component } from "vue";
 import {
   ArrowLeft,
   AlertCircle,
@@ -664,10 +643,13 @@ import {
   FileText,
   Database,
   Package,
-  Check,
   Info,
   RotateCw,
   ChevronDown,
+  Users,
+  ShoppingBag,
+  ShieldCheck,
+  MessageCircle,
 } from "lucide-vue-next";
 import { Hay } from "@/utils/api";
 import { useUserStore } from "@/stores/user";
@@ -679,10 +661,11 @@ import PluginOAuthConnection from "@/components/plugins/PluginOAuthConnection.vu
 import PluginPageSlot from "@/components/plugins/PluginPageSlot.vue";
 import McpToolInputSchema from "@/components/plugins/McpToolInputSchema.vue";
 import { useToolLabel } from "@/composables/useToolLabel";
+import { describedCapabilities, type DescribedCapability } from "@/utils/pluginSetup";
 
 const { t } = useI18n();
 const { locale } = useI18n({ useScope: "global" });
-const { getToolLabel, getToolDescription } = useToolLabel();
+const { getToolLabel, getToolDescription, getPluginDescription } = useToolLabel();
 
 // Constants
 const AUTO_TEST_DELAY_MS = 0; // No delay needed - test connection immediately
@@ -816,6 +799,34 @@ const editingEncryptedFields = ref<Set<string>>(new Set());
 const configMetadata = ref<Record<string, any>>({});
 // Track which env fields are being overridden
 const editingEnvFields = ref<Set<string>>(new Set());
+
+// Fields whose value the server manages (env) are hidden until the merchant asks.
+const showAdvanced = ref(false);
+const isManagedField = (key: string) => configMetadata.value[key]?.source === "env";
+const managedFieldCount = computed(
+  () => Object.keys(configSchema.value).filter(isManagedField).length,
+);
+const visibleConfigSchema = computed(() =>
+  Object.fromEntries(
+    Object.entries(configSchema.value).filter(
+      ([key]) => showAdvanced.value || !isManagedField(key),
+    ),
+  ),
+);
+
+const capabilities = computed(() => describedCapabilities(plugin.value?.manifest?.capabilities));
+const CAPABILITY_ICONS: Record<DescribedCapability, Component> = {
+  messages: MessageSquare,
+  customers: Users,
+  mcp: Zap,
+  products: ShoppingBag,
+  disputes: ShieldCheck,
+  documents: FileText,
+  webchat: MessageCircle,
+};
+const pluginDescription = computed(() =>
+  plugin.value ? getPluginDescription(plugin.value.id, plugin.value.manifest?.description) : "",
+);
 
 // Plugin Extensions for slots
 const beforeSettingsExtensions = ref<

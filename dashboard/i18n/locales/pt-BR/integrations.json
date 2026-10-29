@@ -206,14 +206,36 @@
     "capabilities": {
       "title": "Capacidades",
       "description": "O que esta integração pode fazer",
-      "chatConnector": "Conector de Chat",
-      "sendMessages": "Enviar mensagens",
-      "receiveMessages": "Receber mensagens",
-      "listConversations": "Listar conversas",
-      "mcpConnector": "Conector MCP",
-      "mcpDescription": "Fornece ferramentas e recursos de IA através do Model Context Protocol",
-      "documentImporter": "Importador de Documentos",
-      "documentImporterDescription": "Importar e processar documentos de fontes externas"
+      "items": {
+        "messages": {
+          "title": "Conversas com clientes",
+          "description": "Recebe as mensagens dos seus clientes e envia as respostas do Hay.chat."
+        },
+        "customers": {
+          "title": "Perfis de clientes",
+          "description": "Vincula cada conversa ao cliente que a iniciou."
+        },
+        "mcp": {
+          "title": "Ações para o seu agente de IA",
+          "description": "Permite que o agente consulte informações e aja pelos seus clientes, como verificar um pedido."
+        },
+        "products": {
+          "title": "Catálogo de produtos",
+          "description": "Mantém seus produtos sincronizados para que o agente responda perguntas sobre eles."
+        },
+        "disputes": {
+          "title": "Provas para chargeback",
+          "description": "Reúne o histórico do pedido e da conversa de que você precisa para responder a um chargeback."
+        },
+        "documents": {
+          "title": "Importação de conhecimento",
+          "description": "Importa páginas e documentos para a sua base de conhecimento."
+        },
+        "webchat": {
+          "title": "Chat do site",
+          "description": "Funciona no widget de chat do seu site."
+        }
+      }
     },
     "availableActions": {
       "title": "Ações Disponíveis",
@@ -272,6 +294,10 @@
         "quality_drop": "O provedor reduziu a classificação de qualidade deste canal ({detail}). Os limites de mensagens podem cair se ela continuar baixando."
       },
       "alerted": "Proprietários e administradores foram avisados por e-mail e push."
+    },
+    "advanced": {
+      "show": "Mostrar configurações avançadas",
+      "managedHidden": "{count} valor é configurado para você pelo Hay.chat. | {count} valores são configurados para você pelo Hay.chat."
     }
   }
 }
