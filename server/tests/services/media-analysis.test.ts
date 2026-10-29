@@ -234,18 +234,18 @@ describe("processMessageMedia", () => {
     );
   });
 
-  it("reads files for an EU-only org on the default endpoint when no EU endpoint is configured (E1)", async () => {
+  it("skips the vision pass for an EU-only org when no EU endpoint is configured", async () => {
     mockFindOrganization.mockResolvedValue({ settings: { aiRegion: "eu" } });
     mockFindMessage.mockResolvedValue(message(markAnalysisPending([photo()])!));
     mockChatCreate.mockResolvedValue(visionReply(DAMAGE) as never);
-    const events: UsageEvent[] = [];
-    setUsageSink((event) => events.push(event));
 
     await processMessageMedia("msg-1", ORG);
-    setUsageSink(undefined);
 
-    expect(storedAttachments()[0].analysis).toMatchObject({ status: "done", class: "damage" });
-    expect(events).toEqual([expect.objectContaining({ kind: "vision", region: "default" })]);
+    expect(mockChatCreate).not.toHaveBeenCalled();
+    expect(storedAttachments()[0].analysis).toMatchObject({
+      status: "failed",
+      reason: "unavailable",
+    });
   });
 
   it("reads files on the EU endpoint whenever it is configured", async () => {
