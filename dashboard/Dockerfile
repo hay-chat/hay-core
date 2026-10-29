@@ -1,21 +1,27 @@
-FROM node:20-alpine
+# Production image for the dashboard. The dashboard is an npm workspace, so
+# build from the repository root:
+#   docker build -f dashboard/Dockerfile .
+FROM node:22-alpine AS build
 
 WORKDIR /app
 
-# Copy package files
-COPY package*.json ./
-COPY tsconfig.json ./
-COPY nuxt.config.ts ./
-COPY tailwind.config.ts ./
-
-# Install dependencies
-RUN npm ci
-
-# Copy source code
 COPY . .
 
-# Expose port
+# Install only the dashboard workspace; `nuxt build` runs `nuxt prepare` itself.
+RUN npm ci --workspace dashboard --ignore-scripts --no-audit --no-fund
+RUN npm run build:prod --workspace dashboard
+
+FROM node:22-alpine
+
+WORKDIR /app
+ENV NODE_ENV=production \
+    HOST=0.0.0.0 \
+    PORT=3000
+
+# The Nitro output is self-contained (server + static client bundle).
+COPY --from=build --chown=node:node /app/dashboard/.output ./.output
+
+USER node
 EXPOSE 3000
 
-# Start Nuxt in development mode for hot-reload
-CMD ["npm", "run", "dev"]
+CMD ["node", ".output/server/index.mjs"]

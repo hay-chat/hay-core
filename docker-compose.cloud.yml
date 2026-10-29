@@ -76,15 +76,17 @@ services:
 
   dashboard:
     build:
-      context: ./dashboard
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: dashboard/Dockerfile
     depends_on:
       - hay-core
     ports:
       - "${DASHBOARD_PORT:-3000}:3000"
     environment:
-      NUXT_PUBLIC_API_URL: http://hay-core:3001/v1
-      NUXT_PUBLIC_WS_URL: ws://hay-core:3002/ws
+      # Read by the browser, so these must be the public API host, not the
+      # internal service name. Runtime overrides of runtimeConfig.public.
+      NUXT_PUBLIC_API_DOMAIN: ${API_DOMAIN}
+      NUXT_PUBLIC_API_BASE_URL: ${API_BASE_URL}
     networks:
       - hay-network
 

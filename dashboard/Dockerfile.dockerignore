@@ -1,0 +1,14 @@
+# Used by dashboard/Dockerfile, whose build context is the repository root.
+**/node_modules
+**/.nuxt
+**/.output
+**/dist
+**/coverage
+**/.env
+**/.env.*
+**/*.log
+.git
+.vscode
+.idea
+**/.DS_Store
+uploads
