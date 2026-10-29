@@ -8,6 +8,8 @@ import { TRPCError } from "@trpc/server";
 import { RESOURCES, ACTIONS } from "@server/types/scopes";
 import { SupportedLanguage } from "@server/types/language.types";
 import { tiptapDocSchema } from "@server/types/tiptap.types";
+import { handoffTicketConfigSchema } from "@server/types/handoff-ticket.types";
+import { handoffTicketsService } from "@server/services/handoff-tickets/handoff-tickets.service";
 
 const agentService = new AgentService();
 
@@ -22,6 +24,7 @@ export const createAgentSchema = z.object({
   initialGreeting: z.string().optional(),
   humanHandoffAvailableInstructions: tiptapDocSchema.optional(),
   humanHandoffUnavailableInstructions: tiptapDocSchema.optional(),
+  humanHandoffUnavailableTicket: handoffTicketConfigSchema.nullable().optional(),
   testMode: z.boolean().nullable().optional(),
   language: z.nativeEnum(SupportedLanguage).nullable().optional(),
   channels: z.array(z.string()).optional(),
@@ -38,10 +41,24 @@ export const updateAgentSchema = z.object({
   initialGreeting: z.string().optional(),
   humanHandoffAvailableInstructions: tiptapDocSchema.optional(),
   humanHandoffUnavailableInstructions: tiptapDocSchema.optional(),
+  humanHandoffUnavailableTicket: handoffTicketConfigSchema.nullable().optional(),
   testMode: z.boolean().nullable().optional(),
   language: z.nativeEnum(SupportedLanguage).nullable().optional(),
   channels: z.array(z.string()).optional(),
 });
+
+/** A ticket hand-off must name a helpdesk plugin this organization has enabled. */
+async function assertTicketProvider(
+  organizationId: string,
+  ticket: { pluginId: string } | null | undefined,
+): Promise<void> {
+  if (ticket && !(await handoffTicketsService.isProvider(organizationId, ticket.pluginId))) {
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message: "That helpdesk is not connected, so it cannot create tickets",
+    });
+  }
+}
 
 export const agentsRouter = t.router({
   list: scopedProcedure(RESOURCES.AGENTS, ACTIONS.READ).query(async ({ ctx }) => {
@@ -87,6 +104,18 @@ export const agentsRouter = t.router({
     }));
   }),
 
+  /** Helpdesk plugins that can raise a ticket when nobody can take a hand-off. */
+  ticketProviders: scopedProcedure(RESOURCES.AGENTS, ACTIONS.READ).query(async ({ ctx }) =>
+    handoffTicketsService.listProviders(ctx.organizationId!),
+  ),
+
+  /** The ticket fields a merchant can prefill, read from their connected helpdesk account. */
+  ticketForm: scopedProcedure(RESOURCES.AGENTS, ACTIONS.READ)
+    .input(z.object({ pluginId: z.string().min(1).max(255) }))
+    .query(async ({ ctx, input }) =>
+      handoffTicketsService.readForm(ctx.organizationId!, input.pluginId),
+    ),
+
   get: scopedProcedure(RESOURCES.AGENTS, ACTIONS.READ)
     .input(
       z.object({
@@ -110,6 +139,7 @@ export const agentsRouter = t.router({
   create: scopedProcedure(RESOURCES.AGENTS, ACTIONS.CREATE)
     .input(createAgentSchema)
     .mutation(async ({ ctx, input }) => {
+      await assertTicketProvider(ctx.organizationId!, input.humanHandoffUnavailableTicket);
       const agent = await agentService.createAgent(ctx.organizationId!, input);
 
       // Auto-set as default agent if this is the first agent for the organization
@@ -134,6 +164,7 @@ export const agentsRouter = t.router({
       }),
     )
     .mutation(async ({ ctx, input }) => {
+      await assertTicketProvider(ctx.organizationId!, input.data.humanHandoffUnavailableTicket);
       const agent = await agentService.updateAgent(ctx.organizationId!, input.id, input.data);
 
       if (!agent) {

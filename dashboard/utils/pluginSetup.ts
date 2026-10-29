@@ -11,6 +11,7 @@ export const DESCRIBED_CAPABILITIES = [
   "mcp",
   "products",
   "disputes",
+  "tickets",
   "documents",
   "webchat",
 ] as const;

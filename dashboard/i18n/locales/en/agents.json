@@ -124,7 +124,18 @@
       "availableLabel": "If any human agent is available",
       "availableHint": "Define the instructions for the agent to follow when a human agent is available. Leave empty to simply change status to 'pending-human'.",
       "unavailableLabel": "If all human agents are unavailable",
-      "unavailableHint": "Define the instructions for the agent to follow when no human agents are available (e.g., create a ticket, ask for email)."
+      "unavailableHint": "Define the instructions for the agent to follow when no human agents are available (e.g., create a ticket, ask for email).",
+      "unavailableModeHint": "What the agent does when a customer needs a person and nobody can take the conversation (outside business hours, or nobody online).",
+      "modeInstructions": "Follow my instructions",
+      "modeTicket": "Create a ticket",
+      "modeTicketIn": "Create a ticket in {name}",
+      "noHelpdesk": "Connect a helpdesk such as Zendesk to raise tickets automatically.",
+      "connectHelpdesk": "Browse integrations",
+      "ticketExplainer": "The agent makes sure it has the customer's email, raises a ticket with a summary and the full conversation, and tells the customer the team will get back to them. The conversation is then closed instead of waiting in the queue.",
+      "helpdesk": "Helpdesk",
+      "prefillTitle": "Prefill every ticket with",
+      "notSet": "Not set",
+      "formError": "Could not load the ticket fields from your helpdesk: {message}"
     },
     "deleteDialog": {
       "title": "Delete Agent",

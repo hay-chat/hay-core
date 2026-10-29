@@ -13,6 +13,7 @@ import { Organization } from "../../entities/organization.entity";
 import { Upload } from "../../entities/upload.entity";
 import { Playbook } from "./playbook.entity";
 import type { TiptapDoc } from "../../types/tiptap.types";
+import type { HandoffTicketConfig } from "../../types/handoff-ticket.types";
 
 @Entity("agents")
 export class Agent {
@@ -48,6 +49,10 @@ export class Agent {
 
   @Column({ type: "jsonb", nullable: true })
   human_handoff_unavailable_instructions!: TiptapDoc | null;
+
+  /** When set, a hand-off nobody can take raises a helpdesk ticket instead of following the instructions above. */
+  @Column({ type: "jsonb", nullable: true })
+  human_handoff_unavailable_ticket!: HandoffTicketConfig | null;
 
   @Column({ type: "uuid" })
   organization_id!: string;

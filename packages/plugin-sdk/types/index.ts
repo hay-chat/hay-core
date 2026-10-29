@@ -214,3 +214,17 @@ export type {
   DisputeEvidenceErrorCode,
   DisputeEvidenceResponse,
 } from "./disputes";
+
+// ============================================================================
+// Helpdesk tickets (hand-off when nobody is available)
+// ============================================================================
+
+export type {
+  TicketFieldValue,
+  TicketFormOption,
+  TicketFormField,
+  TicketFormResponse,
+  TicketCreateRequest,
+  TicketErrorCode,
+  TicketCreateResponse,
+} from "./tickets";
