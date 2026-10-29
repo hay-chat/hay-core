@@ -78,7 +78,11 @@
   "config": {
     "authMode": {
       "label": "Forma de conexão",
-      "description": "Conectar com a Nuvemshop: aprove o Hay.chat na sua loja com um clique. Token de aplicativo a medida: cole o token de um aplicativo que você criou."
+      "description": "Conectar com a Nuvemshop: aprove o Hay.chat na sua loja com um clique. Token de aplicativo a medida: cole o token de um aplicativo que você criou.",
+      "options": {
+        "oauth": "Conectar com a Nuvemshop (recomendado)",
+        "token": "Token de aplicativo a medida"
+      }
     },
     "clientId": {
       "label": "ID do cliente OAuth",

@@ -78,7 +78,11 @@
   "config": {
     "authMode": {
       "label": "Forma de conexión",
-      "description": "Conectar con Tiendanube: aprueba Hay.chat en tu tienda con un clic. Token de aplicación a medida: pega el token de una aplicación que creaste."
+      "description": "Conectar con Tiendanube: aprueba Hay.chat en tu tienda con un clic. Token de aplicación a medida: pega el token de una aplicación que creaste.",
+      "options": {
+        "oauth": "Conectar con Tiendanube (recomendado)",
+        "token": "Token de aplicación a medida"
+      }
     },
     "clientId": {
       "label": "ID de cliente OAuth",
