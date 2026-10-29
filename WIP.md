@@ -1,3 +1,10 @@
+## 2026-10-29 — Shopify App Pricing merged to main in all repos
+- hay-shopify-app main 3cf0823 LIVE on homeserver (/srv/hay-shopify rebuilt, smoke OK). `shopify app deploy` NOT done (device login expires; Roger runs it in his own terminal) → scopes read_all_orders + read_shopify_payments_disputes pending.
+- hay-backoffice main b68e4ea pushed, NOT deployed (auto-mode blocked prod deploy): /srv/hay → git -C hay-backoffice pull; docker compose build hay-backoffice; up -d. Migration AddShopifyBillingProvider1785900000000 runs on boot (additive, safe).
+- hay-website main c55d603 pushed; Coolify auto-deploy was building.
+- Env NOT on servers: Shopify keys aren't in hay-core Infisical; /srv/hay/.env.backoffice has no SHOPIFY_* and /srv/hay-shopify/.env has no HAY_BACKOFFICE_*. Until set, gate fails open (safe).
+- Next: Roger: app deploy + backoffice deploy + env vars; test on haychat-2; then Enable App Pricing + resubmit after 10-31.
+
 ## 2026-10-29 — Shopify App Pricing: both branches done, contract checked
 - hay-backoffice claude/shopify-app-pricing (worktree hay-backoffice-shopify-pricing, 5 commits, 380 tests pass): provider column + migration 1785900000000 (runs on boot), Partner API sync, hourly reconcile, usage outbox → app, 409 on Stripe routes for Shopify orgs.
 - hay-shopify-app claude/shopify-app-pricing @ 85a9303 (5 commits): gate, /welcome, Change plan, /internal/app-events (422 = permanent, matches backoffice retry rules).
