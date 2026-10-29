@@ -3,7 +3,6 @@ import { dpopCacheService } from "./dpop-cache.service";
 import { jobQueueService } from "./job-queue.service";
 import { privacyService } from "./privacy.service";
 import { pluginInstanceManagerService } from "./plugin-instance-manager.service";
-import { pluginRouteService } from "./plugin-route.service";
 import { orchestratorWorker } from "@server/workers/orchestrator.worker";
 import { refreshOAuthTokens } from "./oauth-token-refresh.job";
 import { documentRetryService } from "./document-retry.service";
@@ -42,16 +41,6 @@ const jobRegistry: CronJobConfig[] = [
     description: "Clean up stale plugin instances",
     schedule: 60000, // Every 60 seconds
     handler: async () => pluginInstanceManagerService.cleanupInactiveInstances(),
-    singleton: true,
-    enabled: true,
-    skipDatabaseLogging: true, // Don't log frequent cleanups
-  },
-
-  {
-    name: "plugin-rate-limit-cleanup",
-    description: "Clear expired plugin route rate limit entries",
-    schedule: 60000, // Every 60 seconds
-    handler: async () => pluginRouteService.clearRateLimits(),
     singleton: true,
     enabled: true,
     skipDatabaseLogging: true, // Don't log frequent cleanups
@@ -543,15 +532,6 @@ const jobRegistry: CronJobConfig[] = [
   //   schedule: 300000,  // Every 5 minutes
   //   handler: async () => pluginInstanceManager.cleanup(),
   //   singleton: true,
-  //   enabled: false,  // Enable when ready
-  // },
-  //
-  // {
-  //   name: 'plugin-health-check',
-  //   description: 'Check health of plugin routes and instances',
-  //   schedule: 60000,  // Every 60 seconds
-  //   handler: async () => pluginRouteService.healthCheck(),
-  //   timeout: 30000,
   //   enabled: false,  // Enable when ready
   // },
   //

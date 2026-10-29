@@ -1,5 +1,8 @@
 import type { ConfigFieldDescriptor } from "@server/types/plugin-sdk.types";
 import { decryptConfig, decryptValue } from "@server/lib/auth/utils/encryption";
+import { createLogger } from "@server/lib/logger";
+
+const logger = createLogger("config-resolver");
 
 export interface ResolvedConfigField {
   value: unknown;
@@ -25,17 +28,51 @@ export function isManagedOverrideAllowed(): boolean {
   return process.env.PLUGIN_ALLOW_MANAGED_OVERRIDE === "true";
 }
 
-function envValueOf(fieldDef: ConfigFieldDescriptor): string | undefined {
+/**
+ * Host env var names a plugin's config may resolve, from
+ * `configEnvAllowList(plugin)`. The schema's `env` names come from the plugin
+ * worker, so only names in this set are ever read from `process.env`.
+ */
+export type ConfigEnvAllowList = ReadonlySet<string>;
+
+const NO_ENV: ConfigEnvAllowList = new Set();
+const refusedEnvNames = new Set<string>();
+
+/** The field's env var name when the plugin may resolve it, else undefined. */
+function allowedEnvName(
+  fieldDef: ConfigFieldDescriptor,
+  allowedEnv: ConfigEnvAllowList,
+): string | undefined {
   const envVarName = fieldDef.env;
+  if (!envVarName) return undefined;
+  if (allowedEnv.has(envVarName)) return envVarName;
+  if (!refusedEnvNames.has(envVarName)) {
+    refusedEnvNames.add(envVarName);
+    logger.warn(
+      { envVar: envVarName },
+      "Config field env var not allowed for this plugin; ignored",
+    );
+  }
+  return undefined;
+}
+
+function envValueOf(
+  fieldDef: ConfigFieldDescriptor,
+  allowedEnv: ConfigEnvAllowList,
+): string | undefined {
+  const envVarName = allowedEnvName(fieldDef, allowedEnv);
   return envVarName && process.env[envVarName] && process.env[envVarName] !== ""
     ? process.env[envVarName]
     : undefined;
 }
 
 /** Fields whose value the server manages right now (their env var is set). */
-export function managedFieldKeys(configSchema: Record<string, ConfigFieldDescriptor>): string[] {
+export function managedFieldKeys(
+  configSchema: Record<string, ConfigFieldDescriptor>,
+  allowedEnv: ConfigEnvAllowList = NO_ENV,
+): string[] {
   return Object.entries(configSchema)
-    .filter(([, fieldDef]) => envValueOf(fieldDef) !== undefined)
+    .filter(([, fieldDef]) => envValueOf(fieldDef, allowedEnv) !== undefined)
     .map(([key]) => key);
 }
 
@@ -52,9 +89,10 @@ export interface ResolvedConfig {
 export function dropManagedOverrides(
   input: Record<string, unknown>,
   configSchema: Record<string, ConfigFieldDescriptor> | undefined,
+  allowedEnv: ConfigEnvAllowList = NO_ENV,
 ): Record<string, unknown> {
   if (!configSchema || isManagedOverrideAllowed()) return input;
-  const managed = new Set(managedFieldKeys(configSchema));
+  const managed = new Set(managedFieldKeys(configSchema, allowedEnv));
   return Object.fromEntries(Object.entries(input).filter(([key]) => !managed.has(key)));
 }
 
@@ -71,12 +109,14 @@ export function resolveConfigWithEnv(
     decrypt?: boolean; // Whether to decrypt values
     maskSecrets?: boolean; // Whether to mask encrypted/env values for display
     allowManagedOverride?: boolean; // Defaults to the PLUGIN_ALLOW_MANAGED_OVERRIDE policy
+    allowedEnv?: ConfigEnvAllowList; // Env vars this plugin may resolve; none by default
   } = {},
 ): ResolvedConfig {
   const {
     decrypt = false,
     maskSecrets = false,
     allowManagedOverride = isManagedOverrideAllowed(),
+    allowedEnv = NO_ENV,
   } = options;
 
   const decryptedConfig = decrypt && dbConfig ? decryptConfig(dbConfig) : dbConfig || {};
@@ -88,9 +128,9 @@ export function resolveConfigWithEnv(
   for (const [key, fieldDef] of Object.entries(configSchema)) {
     const hasDbValue = key in decryptedConfig;
     const dbValue = decryptedConfig[key];
-    const envVarName = fieldDef.env;
+    const envVarName = allowedEnvName(fieldDef, allowedEnv);
     const hasEnvFallback = !!envVarName;
-    const envValue = envValueOf(fieldDef);
+    const envValue = envValueOf(fieldDef, allowedEnv);
     const managed = envValue !== undefined;
     const presentation = {
       managed,
@@ -161,10 +201,12 @@ export function resolveConfigForWorker(
   dbConfig: Record<string, unknown> | undefined,
   authState: { credentials?: Record<string, unknown> } | null | undefined,
   configSchema: Record<string, ConfigFieldDescriptor>,
+  allowedEnv: ConfigEnvAllowList = NO_ENV,
 ): Record<string, unknown> {
   const resolved = resolveConfigWithEnv(dbConfig, configSchema, {
     decrypt: true,
     maskSecrets: false, // Worker needs real values
+    allowedEnv,
   });
   resolved.values = stripServerOnlyFields(resolved.values, configSchema);
 

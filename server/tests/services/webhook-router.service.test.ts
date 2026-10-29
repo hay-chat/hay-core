@@ -20,7 +20,7 @@ jest.mock("@server/services/plugin-manager.service", () => ({
 jest.mock("@server/services/plugin-instance-manager.service", () => ({
   pluginInstanceManagerService: { updateActivityTimestamp },
 }));
-jest.mock("@server/services/plugin-route.service", () => ({
+jest.mock("@server/lib/hmac-signature", () => ({
   verifyHmacSha256: jest.fn(),
 }));
 
