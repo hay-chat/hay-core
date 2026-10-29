@@ -102,6 +102,8 @@ export interface CloseFacts {
   aiLastReplyIsAnswer: boolean;
   /** The AI requested an action that needed a person's approval (D4-4). */
   approvalRequested: boolean;
+  /** A teammate answered a quick check and the answer was relayed (D19-6). */
+  teamAssisted: boolean;
 }
 
 /** What the LLM decides. Absent when the rule outcome is final or the LLM failed. */
@@ -125,6 +127,7 @@ function isSystemBotMessage(message: Message): boolean {
     metadata.isInactivityWarning === true ||
     metadata.isClosureMessage === true ||
     metadata.isHandoffMessage === true ||
+    metadata.isTeamQuestionMessage === true ||
     metadata.reason === "inactivity_timeout"
   );
 }
@@ -175,6 +178,7 @@ export function collectCloseFacts(
     approvalRequested: ordered.some(
       (m) => m.type === MessageType.TOOL && typeof m.metadata?.pendingActionId === "string",
     ),
+    teamAssisted: ordered.some((m) => m.metadata?.isTeamAnswer === true),
   };
 }
 
@@ -213,6 +217,10 @@ export function decideOutcome(facts: CloseFacts, verdict: ClassifierVerdict): Ou
   if (facts.spamFlagged || (verdict.isSpam && !facts.spamCleared)) return decide("spam");
   // The shopper's own "this didn't help" beats any model opinion.
   if (facts.closeReason === USER_UNHAPPY_REASON) return decide("unhappy");
+  // A teammate supplied the answer through a quick check: a person resolved
+  // it, so it is not billed (Roger, D19 answer 3). Once the answer is in the
+  // knowledge base, the next shopper's question is AI-resolved.
+  if (facts.teamAssisted && facts.hadRealRequest) return decide("human");
   if (facts.approvalRequested)
     return decide(shopperConfirmed(facts) ? "confirmed" : "assumed", true);
   if (!facts.hadRealRequest || !verdict.hadRealRequest) return decide("abandoned");
