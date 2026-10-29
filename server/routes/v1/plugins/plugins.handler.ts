@@ -156,7 +156,9 @@ export const getPlugin = authenticatedProcedure
         const runner = getPluginRunnerService();
         const worker = runner.getWorker(ctx.organizationId!, input.pluginId);
         if (worker && worker.port) {
-          const metadataResponse = await workerFetch(worker.port, "/metadata");
+          const metadataResponse = await workerFetch(worker.port, "/metadata", {
+            signal: AbortSignal.timeout(5000),
+          });
           if (metadataResponse.ok) {
             const metadata = await metadataResponse.json();
             if (metadata.configSchema) {
@@ -179,7 +181,9 @@ export const getPlugin = authenticatedProcedure
           // Worker not running, try to start it
           const newWorker = await runner.startWorker(ctx.organizationId!, input.pluginId);
           if (newWorker && newWorker.port) {
-            const metadataResponse2 = await workerFetch(newWorker.port, "/metadata");
+            const metadataResponse2 = await workerFetch(newWorker.port, "/metadata", {
+              signal: AbortSignal.timeout(5000),
+            });
             if (metadataResponse2.ok) {
               const metadata2 = await metadataResponse2.json();
               if (metadata2.configSchema) {
