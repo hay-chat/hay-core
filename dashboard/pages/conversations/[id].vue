@@ -929,7 +929,7 @@
             </Card>
 
             <!-- Related Documents -->
-            <Card>
+            <Card v-if="relatedDocuments.length > 0">
               <CardHeader>
                 <CardTitle class="text-base">
                   {{ $t("conversations.relatedDocuments.title") }}
