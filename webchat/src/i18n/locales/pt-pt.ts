@@ -47,4 +47,6 @@ export default {
   "error.verificationFailed": "Não foi possível verificar a sua mensagem. Atualize a página e tente novamente.",
   "challenge.label": "Verificação de segurança",
   "challenge.prompt": "Uma verificação rápida de segurança antes de enviarmos a sua mensagem.",
+  "csat.defaultQuestion": "Como avalia o apoio que recebeu hoje?",
+  "csat.thankYou": "Obrigado pelo seu feedback!",
 } as const;
