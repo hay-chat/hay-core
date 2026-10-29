@@ -1,15 +1,15 @@
 # Context
 
-**Current Task**: VOC roadmap, bottom-up lane: Wave 4 phase 1 (D18 Nuvemshop OAuth, D19 quick check, D20 plugin setup) is live on prod and the Nuvemshop partner OAuth connect is verified on a demo store. Source of truth: `tasks/voc-roadmap.md` ("Resume here" top entry).
+**Current Task**: WebMCP page tools (Lane B of PR #72) on branch `claude/modest-cray-0i6zh0`: host pages register tools the AI runs in the visitor's browser; Hay's dashboard registers its own tools as the demo. Plan + results: `tasks/webmcp-page-tools.md`; integrator guide: `webchat/PAGE_TOOLS.md`.
 
 **Key Decisions**:
 
-- Merge straight to master, deploy with `/srv/hay-core/deploy.sh` (`--env-only` for env), run migrations from the host (`cd server && npm run migration:run`), verify live in Chrome.
-- Secrets live in Infisical prod; report keys only as set/missing. Never wait on `pgrep -f deploy.sh` (it matches its own wait loop).
-- D19 quick check is off for every org (`quickCheck.enabled`); D20 managed overrides off (`PLUGIN_ALLOW_MANAGED_OVERRIDE`).
+- Tools are namespaced `page:<name>`, exempt from `enabled_tools`, no merchant approval gate (visitor's own browser, no provider, no secrets); every call still logged.
+- WebMCP-shaped API (`navigator.modelContext` shim/tee + `window.HayChat.registerTool`), MCP-shaped results.
+- Kill switch `WEBCHAT_PAGE_TOOLS=false`; the chat chunk sits at 47.2 KB of its 48 KB brotli budget.
 
 **Next Steps**:
 
-- iPhone push test (step 9): Roger re-adds the PWA, allows notifications, sends a test alert.
-- Nuvemshop: seed the demo store (product + test order) and test tool reads; LGPD HMAC check; post-connect redirect fix; then Dados de publicação (ask Roger first).
-- D19/D20 phase 2 (see the Wave 4 section of the roadmap).
+- Live end-to-end check on `/demo/web-embed` ("take me to the playbooks page") with a running server.
+- Plugin capability `pageTools` (storefront scripts shipping `add_to_cart` etc. for Shopify/Nuvemshop).
+- Per-org switch in Settings > Webchat and a page-tools listing in the conversation view.
