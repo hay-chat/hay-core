@@ -2,7 +2,16 @@
   "name": "Instagram",
   "description": "Conecte uma conta profissional do Instagram e troque mensagens diretas pela IA do Hay.chat",
   "tools": {},
-  "config": {},
+  "config": {
+    "clientId": {
+      "label": "ID do app da Meta",
+      "description": "Configurado para você pelo Hay.chat. Altere apenas se você roda seu próprio servidor do Hay.chat com seu próprio app."
+    },
+    "clientSecret": {
+      "label": "Segredo do app da Meta",
+      "description": "Configurado para você pelo Hay.chat. Altere apenas se você roda seu próprio servidor do Hay.chat com seu próprio app."
+    }
+  },
   "setup": {
     "title": "Guia de Configuração do Instagram",
     "intro": "Conecte sua conta profissional do Instagram ao Hay.chat. Uma vez conectada, as mensagens diretas enviadas para sua conta são processadas pela IA do Hay.chat, e as respostas são entregues diretamente na conversa do Instagram.",

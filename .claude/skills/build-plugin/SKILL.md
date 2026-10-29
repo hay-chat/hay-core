@@ -53,7 +53,7 @@ Copy **mercadopago**.
 - `channel.ts.tmpl` — entry for archetype C.
 - `mcp-server.js.tmpl` — the `mcp/index.js` for archetype A.
 - `vite.config.ui.ts.tmpl` — only if you ship a settings UI (`capability "ui"`).
-- `i18n.en.json.tmpl` — **always.** Copy to `i18n/en.json` (drop the `.tmpl`) and add `i18n/pt.json`.
+- `i18n.en.json.tmpl` — **always.** Copy to `i18n/en.json` (drop the `.tmpl`) and add `i18n/pt-BR.json`.
 
 Replace every `<placeholder>`, strip the trailing NOTES comments, and delete templates for
 archetypes you're not using.
@@ -77,7 +77,7 @@ archetypes you're not using.
   (wix, calcom). Hosted or in-process server: pass `toolRisk: { read, write }` to
   `startExternal`/`startLocalStdio`/`startLocal` (stripe, atlassian); undeclared hosted tools keep
   the server's own `readOnlyHint`. Add a test that every listed tool is classified.
-- **Translations (`i18n/`)**: ship `i18n/en.json` (+ `pt.json`) with a `tools.<toolName>.label`/`description`
+- **Translations (`i18n/`)**: ship `i18n/en.json` (+ `pt-BR.json`) with a `tools.<toolName>.label`/`description`
   for **every** MCP tool and a `config.<field>` for every config field. Keys must be the exact tool
   names. Without them the UI humanizes raw names (`list_event_types` → "List Event Types") and only
   serves English — translated playbook chips, the tool picker, and plugin settings all read from here.
@@ -114,7 +114,7 @@ npm run typecheck:server   # plugin types compile against the SDK
 - [ ] (Channel) signature verified, inbound deduped, non-retryable errors return `200 {success:false}`.
 - [ ] No committed cruft: no `.git`/vendored repos, `node_modules` bloat, `test-results/`, design `.md` TODOs, or creds in fixtures.
 - [ ] Every MCP tool has a risk class (read, or a write category); a test keeps it complete.
-- [ ] `i18n/en.json` (+ `pt.json`) exists with a `label`/`description` for every MCP tool and config field; tool keys match the exact tool names.
+- [ ] `i18n/en.json` (+ `pt-BR.json`) exists with a `label`/`description` for every MCP tool and config field; tool keys match the exact tool names.
 - [ ] `npm run build` + `typecheck` pass; tools appear in `/mcp/list-tools`.
 
 ## Reference map

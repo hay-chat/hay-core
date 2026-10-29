@@ -298,6 +298,40 @@
     "advanced": {
       "show": "Show advanced settings",
       "managedHidden": "{count} value is set up for you by Hay.chat. | {count} values are set up for you by Hay.chat."
+    },
+    "form": {
+      "managedValue": "Set by Hay.chat",
+      "override": "Override",
+      "managedHint": "Hay.chat sets this value for you. Override it only to use your own value for this workspace.",
+      "overridingHint": "You are replacing the value Hay.chat sets. Cancel to go back to it.",
+      "cancelOverride": "Cancel override",
+      "encryptedValue": "Saved and hidden",
+      "edit": "Edit",
+      "cancelEdit": "Cancel edit",
+      "resetToManaged": "Reset to managed value",
+      "encryptedHint": "Stored encrypted. Edit to replace it.",
+      "encryptedResetHint": "Stored encrypted. Reset goes back to the value Hay.chat sets.",
+      "overrideResetHint": "You replaced the value Hay.chat sets. Reset goes back to it.",
+      "willEncrypt": "Stored encrypted.",
+      "selectPlaceholder": "Choose an option",
+      "discard": "Discard changes",
+      "save": "Save"
+    },
+    "oauth": {
+      "title": "Connect your {name} account",
+      "description": "Sign in to {name} to give Hay.chat access. You can disconnect at any time.",
+      "notConnected": "Not connected",
+      "expired": "Connection expired",
+      "connectedAs": "Connected as {account}",
+      "connected": "Connected",
+      "connectedAt": "Connected {date}",
+      "expiredAt": "Expired {date}. Reconnect to keep it working.",
+      "expiredHint": "Reconnect to keep it working.",
+      "expiresAt": "Access expires {date}",
+      "connect": "Connect {name}",
+      "reconnect": "Reconnect",
+      "disconnect": "Disconnect",
+      "statusFailed": "Couldn't check the connection. Refresh the page to try again."
     }
   }
 }

@@ -298,6 +298,40 @@
     "advanced": {
       "show": "Mostrar configurações avançadas",
       "managedHidden": "{count} valor é configurado para você pelo Hay.chat. | {count} valores são configurados para você pelo Hay.chat."
+    },
+    "form": {
+      "managedValue": "Definido pelo Hay.chat",
+      "override": "Substituir",
+      "managedHint": "O Hay.chat define este valor para você. Substitua apenas se quiser usar um valor próprio neste workspace.",
+      "overridingHint": "Você está substituindo o valor definido pelo Hay.chat. Cancele para voltar a ele.",
+      "cancelOverride": "Cancelar substituição",
+      "encryptedValue": "Salvo e oculto",
+      "edit": "Editar",
+      "cancelEdit": "Cancelar edição",
+      "resetToManaged": "Voltar ao valor gerenciado",
+      "encryptedHint": "Armazenado com criptografia. Edite para trocar.",
+      "encryptedResetHint": "Armazenado com criptografia. Voltar retorna ao valor definido pelo Hay.chat.",
+      "overrideResetHint": "Você substituiu o valor definido pelo Hay.chat. Voltar retorna a ele.",
+      "willEncrypt": "Armazenado com criptografia.",
+      "selectPlaceholder": "Escolha uma opção",
+      "discard": "Descartar alterações",
+      "save": "Salvar"
+    },
+    "oauth": {
+      "title": "Conecte sua conta {name}",
+      "description": "Entre no {name} para dar acesso ao Hay.chat. Você pode desconectar quando quiser.",
+      "notConnected": "Não conectado",
+      "expired": "Conexão expirada",
+      "connectedAs": "Conectado como {account}",
+      "connected": "Conectado",
+      "connectedAt": "Conectado {date}",
+      "expiredAt": "Expirou {date}. Reconecte para continuar funcionando.",
+      "expiredHint": "Reconecte para continuar funcionando.",
+      "expiresAt": "O acesso expira {date}",
+      "connect": "Conectar {name}",
+      "reconnect": "Reconectar",
+      "disconnect": "Desconectar",
+      "statusFailed": "Não foi possível verificar a conexão. Atualize a página para tentar de novo."
     }
   }
 }

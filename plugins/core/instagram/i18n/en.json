@@ -2,7 +2,16 @@
   "name": "Instagram",
   "description": "Connect an Instagram Professional account and exchange direct messages through Hay.chat's AI",
   "tools": {},
-  "config": {},
+  "config": {
+    "clientId": {
+      "label": "Meta app ID",
+      "description": "Set up for you by Hay.chat. Change it only if you run your own Hay.chat server with your own app."
+    },
+    "clientSecret": {
+      "label": "Meta app secret",
+      "description": "Set up for you by Hay.chat. Change it only if you run your own Hay.chat server with your own app."
+    }
+  },
   "setup": {
     "title": "Instagram Setup Guide",
     "intro": "Connect your Instagram Professional account to Hay.chat. Once connected, direct messages sent to your account are routed through Hay.chat's AI, and replies are delivered straight back to the Instagram thread.",
