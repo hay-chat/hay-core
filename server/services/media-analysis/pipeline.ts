@@ -14,6 +14,7 @@
  */
 
 import pdfParse from "pdf-parse";
+import { MAX_PDF_PAGES } from "@server/processors/pdf.processor";
 import { AppDataSource } from "@server/database/data-source";
 import { Conversation } from "@server/database/entities/conversation.entity";
 import type { ScanStatus } from "@server/entities/upload.entity";
@@ -117,7 +118,7 @@ export async function loadFileForVision(
   }
 
   if (upload.mimeType === PDF_TYPE) {
-    const parsed = await pdfParse(buffer);
+    const parsed = await pdfParse(buffer, { max: MAX_PDF_PAGES });
     // Card numbers are removed before the text reaches the vision model (D8-12).
     const text = redactCardNumbers((parsed.text ?? "").replace(/\s+\n/g, "\n").trim());
     if (text.length < MIN_PDF_TEXT) {
