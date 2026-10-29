@@ -1,3 +1,9 @@
+## 2026-10-29 — claude/hay-cli (worktree claude+hay-cli, not pushed) — hay CLI
+
+- Works on prod: `tools/hay-cli/bin/hay chat send "<msg>" --logs`, `conv list|show`, `logs <id|--since>`, `orgs`/`use`, `plugins list|tools|test`, `--json` everywhere. Plan/results: tasks/hay-cli.md.
+- Test account roger+cli@hay.chat / org "Hay CLI Test" (6e09a8b0-…); tokens in ~/.config/hay-cli/config.json. Email unverified → `hay login` fails until the link is clicked; refresh token keeps it alive.
+- Server: log context so every orchestrator-run line carries conversationId (lib/logger + worker). Needs deploy for retrieval/tool lines.
+- Missing: `plugins call` (no server endpoint). Next: review + merge, deploy, then `hay logs <id>` shows retrieval lines.
 ## 2026-10-29 — Shopify App Pricing: both branches done, contract checked
 - hay-backoffice claude/shopify-app-pricing (worktree hay-backoffice-shopify-pricing, 5 commits, 380 tests pass): provider column + migration 1785900000000 (runs on boot), Partner API sync, hourly reconcile, usage outbox → app, 409 on Stripe routes for Shopify orgs.
 - hay-shopify-app claude/shopify-app-pricing @ 85a9303 (5 commits): gate, /welcome, Change plan, /internal/app-events (422 = permanent, matches backoffice retry rules).
