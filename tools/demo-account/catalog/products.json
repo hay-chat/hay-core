@@ -251,7 +251,12 @@
       "options": [{ "en": "Size", "pt-BR": "Tamanho" }],
       "variants": [
         { "sku": "CA-POT-002-M", "options": ["Medium"], "stock": 14 },
-        { "sku": "CA-POT-002-L", "options": ["Large"], "price": { "USD": 68, "EUR": 62, "BRL": 249.9 }, "stock": 9 }
+        {
+          "sku": "CA-POT-002-L",
+          "options": ["Large"],
+          "price": { "USD": 68, "EUR": 62, "BRL": 249.9 },
+          "stock": 9
+        }
       ],
       "weightGrams": 3400,
       "images": ["stoneware-planter-1.png", "stoneware-planter-2.png"],
@@ -261,7 +266,10 @@
     {
       "handle": "mini-succulent-pots",
       "category": "pots-and-vases",
-      "title": { "en": "Mini Succulent Pots, Set of 3", "pt-BR": "Trio de Minivasos para Suculentas" },
+      "title": {
+        "en": "Mini Succulent Pots, Set of 3",
+        "pt-BR": "Trio de Minivasos para Suculentas"
+      },
       "description": {
         "en": "Three little glazed pots in sage, sand and clay, sized for succulents, cacti and cuttings on a windowsill. They nest inside each other for storage.",
         "pt-BR": "Três vasinhos esmaltados nas cores sálvia, areia e argila, do tamanho certo para suculentas, cactos e mudas na janela. Eles se encaixam um dentro do outro para guardar."
@@ -439,7 +447,10 @@
     {
       "handle": "gold-rim-espresso-cups",
       "category": "cups-and-mugs",
-      "title": { "en": "Gold-Rim Espresso Cups, Set of 2", "pt-BR": "Par de Xícaras de Café com Borda Dourada" },
+      "title": {
+        "en": "Gold-Rim Espresso Cups, Set of 2",
+        "pt-BR": "Par de Xícaras de Café com Borda Dourada"
+      },
       "description": {
         "en": "Two fine porcelain espresso cups and saucers, finished by hand with a thin rim of real gold lustre. Made for slow afternoon coffee, and the one line in our range that needs washing by hand.",
         "pt-BR": "Duas xícaras de café em porcelana fina com pires, finalizadas à mão com um filete de ouro de verdade na borda. Feitas para o cafezinho da tarde, e a única linha da nossa coleção que precisa ser lavada à mão."
@@ -549,7 +560,10 @@
     {
       "handle": "gingham-cotton-napkins",
       "category": "napkins-and-linen",
-      "title": { "en": "Gingham Cotton Napkins, Set of 6", "pt-BR": "Jogo de 6 Guardanapos Xadrez de Algodão" },
+      "title": {
+        "en": "Gingham Cotton Napkins, Set of 6",
+        "pt-BR": "Jogo de 6 Guardanapos Xadrez de Algodão"
+      },
       "description": {
         "en": "Six organic cotton napkins in a small terracotta and sage gingham, for picnics, Sunday lunches and everyday meals. Cotton handles a hot wash, so stains from tomato sauce come out easily.",
         "pt-BR": "Seis guardanapos de algodão orgânico em xadrez miúdo terracota e sálvia, para piquenique, almoço de domingo e o dia a dia. O algodão aguenta lavagem quente, então manchas de molho de tomate saem fácil."
@@ -608,7 +622,12 @@
       "options": [{ "en": "Size", "pt-BR": "Tamanho" }],
       "variants": [
         { "sku": "CA-LIN-001-150", "options": ["150 × 150 cm"], "stock": 10 },
-        { "sku": "CA-LIN-001-250", "options": ["150 × 250 cm"], "price": { "USD": 119, "EUR": 109, "BRL": 429.9 }, "stock": 8 }
+        {
+          "sku": "CA-LIN-001-250",
+          "options": ["150 × 250 cm"],
+          "price": { "USD": 119, "EUR": 109, "BRL": 429.9 },
+          "stock": 8
+        }
       ],
       "weightGrams": 700,
       "images": ["linen-tablecloth-1.png", "linen-tablecloth-2.png"],
@@ -752,7 +771,10 @@
     {
       "handle": "olive-wood-salad-servers",
       "category": "serving",
-      "title": { "en": "Olive Wood Salad Servers", "pt-BR": "Talheres para Salada em Madeira de Oliveira" },
+      "title": {
+        "en": "Olive Wood Salad Servers",
+        "pt-BR": "Talheres para Salada em Madeira de Oliveira"
+      },
       "description": {
         "en": "A pair of salad servers carved from olive wood offcuts, with the dense, swirling grain the wood is known for. Smooth enough to toss leaves without bruising them.",
         "pt-BR": "Um par de talheres para salada esculpidos em sobras de madeira de oliveira, com os veios densos e ondulados típicos dessa madeira. Lisos o bastante para misturar as folhas sem amassá-las."

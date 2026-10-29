@@ -9,16 +9,16 @@ order with customer emails off. Use **test stores only**, never a real merchant'
 
 ## What's here
 
-| Path                             | What                                                                                   |
-| -------------------------------- | -------------------------------------------------------------------------------------- |
-| `company/brand.md`               | The company: stores, team, hours, policies, voice. Source of truth for policy facts.   |
-| `catalog/`                       | 22 products (en + pt-BR, USD/EUR/BRL), 44 placeholder images. See `catalog/README.md`. |
-| `orders/orders.json`             | 14 order fixtures in fixed states, the same in every store.                            |
-| `orders/customers.json`          | 15 fake shoppers, 5 per store.                                                         |
-| `knowledge/`                     | Knowledge-base documents, en and pt-BR.                                                |
-| `playbooks/<platform>/`          | Playbooks per store, using that store's plugin actions. Nuvemshop in pt-BR.           |
-| `SCENARIOS.md`                   | 57 conversation test scenarios from the VOC research, mapped to the features they test. |
-| `scripts/`                       | Seed scripts (one per store + Hay.chat), image generator, tests.                       |
+| Path                    | What                                                                                    |
+| ----------------------- | --------------------------------------------------------------------------------------- |
+| `company/brand.md`      | The company: stores, team, hours, policies, voice. Source of truth for policy facts.    |
+| `catalog/`              | 22 products (en + pt-BR, USD/EUR/BRL), 44 placeholder images. See `catalog/README.md`.  |
+| `orders/orders.json`    | 14 order fixtures in fixed states, the same in every store.                             |
+| `orders/customers.json` | 15 fake shoppers, 5 per store.                                                          |
+| `knowledge/`            | Knowledge-base documents, en and pt-BR.                                                 |
+| `playbooks/<platform>/` | Playbooks per store, using that store's plugin actions. Nuvemshop in pt-BR.             |
+| `SCENARIOS.md`          | 57 conversation test scenarios from the VOC research, mapped to the features they test. |
+| `scripts/`              | Seed scripts (one per store + Hay.chat), image generator, tests.                        |
 
 The three stores:
 

@@ -12,6 +12,7 @@ type: faq
 - **E-mail:** hello@casaaurora.example.
 
 ## Quem é a equipe
+
 - Lucas Pereira: atendimento.
 - Sofia Almeida: operações e envios (transportadora, reenvios).
 - Marina Duarte: fundadora (aprovações, atacado, exceções).

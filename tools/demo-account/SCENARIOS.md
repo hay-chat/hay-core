@@ -86,18 +86,18 @@ tools/hay-cli/bin/hay conv show <id> --logs --verbose
 
 ## Legend
 
-| Mark | Meaning |
-| --- | --- |
-| `ready` | Shipped, and the feature guide says it was tested by hand on this store type. |
-| `ready*` | Shipped, but only partly proven: the guide says automated tests only, or hand-tested on another platform, or the tool exists with no feature guide yet. A failure here is a finding, not a broken test. |
-| `blocked` | Needs something outside Hay.chat (an account, an approval, a real device). The scenario says what. |
-| `gap` | The behaviour we want isn't built yet. Run it anyway and record what happens: it's a product signal. |
-| **Needs: store** | Needs the store connected and the fixture seeded. |
-| **Needs: kb** | Works on the knowledge base alone (brand policies loaded as documents). No store needed. |
-| **Needs: widget** | Needs the real web chat widget (photos, email form, notices). |
-| **Needs: dashboard** | Needs someone in the dashboard (approve, take over, settings). |
-| **Needs: channel** | Needs a connected channel other than web chat. |
-| US / EU / BR | Shopify (USD, en) / WooCommerce (EUR, en) / Nuvemshop (BRL, pt-BR). |
+| Mark                 | Meaning                                                                                                                                                                                                 |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ready`              | Shipped, and the feature guide says it was tested by hand on this store type.                                                                                                                           |
+| `ready*`             | Shipped, but only partly proven: the guide says automated tests only, or hand-tested on another platform, or the tool exists with no feature guide yet. A failure here is a finding, not a broken test. |
+| `blocked`            | Needs something outside Hay.chat (an account, an approval, a real device). The scenario says what.                                                                                                      |
+| `gap`                | The behaviour we want isn't built yet. Run it anyway and record what happens: it's a product signal.                                                                                                    |
+| **Needs: store**     | Needs the store connected and the fixture seeded.                                                                                                                                                       |
+| **Needs: kb**        | Works on the knowledge base alone (brand policies loaded as documents). No store needed.                                                                                                                |
+| **Needs: widget**    | Needs the real web chat widget (photos, email form, notices).                                                                                                                                           |
+| **Needs: dashboard** | Needs someone in the dashboard (approve, take over, settings).                                                                                                                                          |
+| **Needs: channel**   | Needs a connected channel other than web chat.                                                                                                                                                          |
+| US / EU / BR         | Shopify (USD, en) / WooCommerce (EUR, en) / Nuvemshop (BRL, pt-BR).                                                                                                                                     |
 
 Customer keys (`us-emily`, `eu-joao`, `br-camila`…) are in `orders/customers.json`. Fixture keys
 (`paid-unfulfilled`, `in-transit`…) are in `orders/orders.json`. SKUs are in `catalog/products.json`.
@@ -106,42 +106,42 @@ Customer keys (`us-emily`, `eu-joao`, `br-camila`…) are in `orders/customers.j
 
 Every scenario starts from this state unless its **Setup** says otherwise.
 
-| Setting | Baseline | Where |
-| --- | --- | --- |
-| Store time zone | America/New_York (US), Europe/Lisbon (EU), America/Sao_Paulo (BR) | Settings → General → Timezone |
-| Business hours | Mon–Fri 09:00–18:00 local | Settings > Business Hours |
-| Action approval | On, limit 0: every refund, cancel and discount waits for a person (default) | Settings > Actions |
-| Goodwill coupons | On, max 10 %, fixed amount off, 30 days (default) | store integration page |
-| Return instructions | The brand's return policy, as written in `company/brand.md` | store plugin settings → Return instructions |
-| Stale tracking | 5 days domestic / 10 international (default) | Shopify plugin settings (Woo, Nuvemshop use the same defaults) |
-| Read images | On (default) | Settings → Customer privacy |
-| Bot protection | On, Invisible; under-attack off | Integrations → Bot protection; Settings → Webchat |
-| Quick check (D19) | **Off** (default for every org) | Settings > Business hours card |
-| Pause AI everywhere | Off | Inbox |
-| Channel AI mode | Web Chat: send automatically | Settings → Customer privacy → AI on your channels |
-| Knowledge | Brand policies, shipping, returns, care (`knowledge/`) | Documents |
-| Playbooks | From `playbooks/<platform>/`, published, with the store's actions, and mentioning apology coupons for late or damaged parcels | Playbooks |
-| Team presence | Nobody online, unless a scenario says "keep a dashboard tab open" | — |
+| Setting             | Baseline                                                                                                                      | Where                                                          |
+| ------------------- | ----------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------- |
+| Store time zone     | America/New_York (US), Europe/Lisbon (EU), America/Sao_Paulo (BR)                                                             | Settings → General → Timezone                                  |
+| Business hours      | Mon–Fri 09:00–18:00 local                                                                                                     | Settings > Business Hours                                      |
+| Action approval     | On, limit 0: every refund, cancel and discount waits for a person (default)                                                   | Settings > Actions                                             |
+| Goodwill coupons    | On, max 10 %, fixed amount off, 30 days (default)                                                                             | store integration page                                         |
+| Return instructions | The brand's return policy, as written in `company/brand.md`                                                                   | store plugin settings → Return instructions                    |
+| Stale tracking      | 5 days domestic / 10 international (default)                                                                                  | Shopify plugin settings (Woo, Nuvemshop use the same defaults) |
+| Read images         | On (default)                                                                                                                  | Settings → Customer privacy                                    |
+| Bot protection      | On, Invisible; under-attack off                                                                                               | Integrations → Bot protection; Settings → Webchat              |
+| Quick check (D19)   | **Off** (default for every org)                                                                                               | Settings > Business hours card                                 |
+| Pause AI everywhere | Off                                                                                                                           | Inbox                                                          |
+| Channel AI mode     | Web Chat: send automatically                                                                                                  | Settings → Customer privacy → AI on your channels              |
+| Knowledge           | Brand policies, shipping, returns, care (`knowledge/`)                                                                        | Documents                                                      |
+| Playbooks           | From `playbooks/<platform>/`, published, with the store's actions, and mentioning apology coupons for late or damaged parcels | Playbooks                                                      |
+| Team presence       | Nobody online, unless a scenario says "keep a dashboard tab open"                                                             | —                                                              |
 
 ## Tools to expect, per store
 
 What to look for in `hay conv show` tool calls.
 
-| Job | Shopify (US) | WooCommerce (EU) | Nuvemshop (BR) |
-| --- | --- | --- | --- |
-| Find the order | `shopify_get_order`, `shopify_get_order_by_name`, `shopify_list_customer_orders` | `woocommerce_get_order`, `woocommerce_list_customer_orders` | `nuvemshop_get_order`, `nuvemshop_list_customer_orders` |
-| Tracking | `shopify_get_order_tracking` | `woocommerce_get_order_tracking` | `nuvemshop_get_order_tracking` |
-| Cancel before shipping | `shopify_cancel_order` | `woocommerce_cancel_order` | `nuvemshop_cancel_order` (never refunds) |
-| Address change | `shopify_update_order_shipping_address` | `woocommerce_update_order_shipping_address` | `nuvemshop_update_order_shipping_address` |
-| Swap a line | `shopify_swap_order_item` | none | none |
-| Note on order | `shopify_add_order_note` | `woocommerce_add_order_note` | `nuvemshop_add_order_note` |
-| Refund | `shopify_calculate_refund`, `shopify_create_refund` | `woocommerce_calculate_refund`, `woocommerce_create_refund` | `nuvemshop_request_refund` (records the request only, no money moves) |
-| Refund status | in order data | in order data | `nuvemshop_check_refund_status` |
-| Payment link / Pix | `shopify_send_payment_link` | `woocommerce_resend_pix` (Pix plugins only) | `nuvemshop_get_payment_link` |
-| Return steps | `shopify_get_return_instructions` | `woocommerce_get_return_instructions` | `nuvemshop_get_return_instructions` |
-| Resend confirmation | none (Shopify has no API for it) | `woocommerce_resend_order_confirmation` | none |
-| Coupon | `shopify_create_coupon` | `woocommerce_create_coupon` | `nuvemshop_create_coupon` |
-| Stock | `shopify_check_inventory` | `woocommerce_check_inventory` | `nuvemshop_check_inventory` |
+| Job                    | Shopify (US)                                                                     | WooCommerce (EU)                                            | Nuvemshop (BR)                                                        |
+| ---------------------- | -------------------------------------------------------------------------------- | ----------------------------------------------------------- | --------------------------------------------------------------------- |
+| Find the order         | `shopify_get_order`, `shopify_get_order_by_name`, `shopify_list_customer_orders` | `woocommerce_get_order`, `woocommerce_list_customer_orders` | `nuvemshop_get_order`, `nuvemshop_list_customer_orders`               |
+| Tracking               | `shopify_get_order_tracking`                                                     | `woocommerce_get_order_tracking`                            | `nuvemshop_get_order_tracking`                                        |
+| Cancel before shipping | `shopify_cancel_order`                                                           | `woocommerce_cancel_order`                                  | `nuvemshop_cancel_order` (never refunds)                              |
+| Address change         | `shopify_update_order_shipping_address`                                          | `woocommerce_update_order_shipping_address`                 | `nuvemshop_update_order_shipping_address`                             |
+| Swap a line            | `shopify_swap_order_item`                                                        | none                                                        | none                                                                  |
+| Note on order          | `shopify_add_order_note`                                                         | `woocommerce_add_order_note`                                | `nuvemshop_add_order_note`                                            |
+| Refund                 | `shopify_calculate_refund`, `shopify_create_refund`                              | `woocommerce_calculate_refund`, `woocommerce_create_refund` | `nuvemshop_request_refund` (records the request only, no money moves) |
+| Refund status          | in order data                                                                    | in order data                                               | `nuvemshop_check_refund_status`                                       |
+| Payment link / Pix     | `shopify_send_payment_link`                                                      | `woocommerce_resend_pix` (Pix plugins only)                 | `nuvemshop_get_payment_link`                                          |
+| Return steps           | `shopify_get_return_instructions`                                                | `woocommerce_get_return_instructions`                       | `nuvemshop_get_return_instructions`                                   |
+| Resend confirmation    | none (Shopify has no API for it)                                                 | `woocommerce_resend_order_confirmation`                     | none                                                                  |
+| Coupon                 | `shopify_create_coupon`                                                          | `woocommerce_create_coupon`                                 | `nuvemshop_create_coupon`                                             |
+| Stock                  | `shopify_check_inventory`                                                        | `woocommerce_check_inventory`                               | `nuvemshop_check_inventory`                                           |
 
 ---
 
@@ -150,43 +150,43 @@ What to look for in `hay conv show` tool calls.
 Each shipped feature, where it is described, and the scenarios that exercise it. Status is the
 feature's status as the guide states it.
 
-| # | Feature | Source | Status | Scenarios |
-| --- | --- | --- | --- | --- |
-| F01 | Honest hand-off lines (team online / nobody online), en + pt-BR | guide `honest-handoff` | ready | ORD-03, ORD-05, RET-02, RET-06, RET-08, PAY-04, HND-01, HND-02, HND-03, TRS-06, BIL-04, DSP-01, DSP-02, CHN-01 |
-| F02 | Store local time; business hours, closed line with next opening, waiting state, email follow-up | guides `honest-handoff`, `business-hours` | ready (web chat) | HND-03 |
-| F03 | Take over stops the AI mid-reply; "Marina joined / left the chat" | guides `honest-handoff`, `agent-joined-notice` | ready (web chat only) | HND-04 |
-| F04 | Action approval: hold, approve runs once, decline with reason, 48 h expiry | guide `action-approval` | ready (Woo); 48 h expiry ready* | ORD-04, CHG-01, CHG-03, CHG-04, RET-04, RET-07, TRS-02, OWN-02 |
-| F05 | Shopper confirms first; approvals list; lower amount; Settings > Actions | guide `approvals-and-action-log` | ready (Woo) | ORD-04, CHG-01, CHG-02, CHG-04, RET-04, OWN-02 |
-| F06 | Action log, failures in plain words | guide `approvals-and-action-log` | ready (Woo) | ORD-06, CHG-01, CHG-02, OWN-02 |
-| F07 | Goodwill coupons within the owner's cap, one per shopper, over-cap waits | guide `goodwill-coupons` | ready (Woo); ready* Shopify (re-consent), Nuvemshop | RET-07, TRS-02 |
-| F08 | Stale-tracking flag (D6-9) | roadmap W1 L5; plugin settings; no guide yet | ready* | ORD-03, ORD-04 |
-| F09 | WooCommerce tracking from tracking plugins or an order note | guide `woo-tracking-anywhere` | ready (order-note path) | ORD-02 |
-| F10 | Return instructions in the store's own words | guide `return-help-and-order-emails` | ready (Woo); ready* Shopify, Nuvemshop | RET-01, RET-02 |
-| F11 | Honest order-email resend | guide `return-help-and-order-emails` | ready (Woo only) | ORD-06 |
-| F12 | Marketplace orders routed to the right app | guide `marketplace-orders` | ready (Woo); ready* Shopify, Nuvemshop | ORD-05 |
-| F13 | Refund status with the real date (order data; Nuvemshop refund status) | research D10-1/2; Nuvemshop README; guide `mercado-pago` | ready* | ORD-04, RET-05, RET-06, PAY-03 |
-| F14 | Pix code / payment link resend after an identity match | research D10-3; guide `mercado-pago`; Nuvemshop README | ready* (MP: mocked only) | PAY-01, PAY-02 |
-| F15 | Order changes: cancel before shipping, address change, line swap | plugin tools (D6); approvals guides | ready* | CHG-01, CHG-02, CHG-03, CHG-04 |
-| F16 | Photos and files from shoppers (web chat paperclip) | guide `photos-and-files` | ready (web chat) | RET-04, RET-08, TRS-05 |
-| F17 | AI reads photos and PDFs; card/ID photos withheld and blurred | guide `ai-reads-photos` | ready (web chat) | RET-04, TRS-05 |
-| F18 | Product-problem intake template + case email | guide `ai-reads-photos` | ready* (intake and email by automated tests) | RET-04 |
-| F19 | Chargeback evidence pack (PDF timeline, ZIP + manifest) | guide `chargeback-evidence-pack` | ready (Woo) | DSP-02, DSP-03 |
-| F20 | Payment disputes (Stripe, Shopify Payments intake, alert, attach as draft) | guide `payment-disputes` | blocked (no real dispute run) | DSP-03 |
-| F21 | Spam held before the AI answers, Spam view, Turnstile, under-attack mode | guide `spam-and-bot-protection` | ready (Cloudflare test keys) | TRS-04 |
-| F22 | Pause AI everywhere, one "team will reply" line | guide `pause-ai-everywhere` | ready | OWN-01 |
-| F23 | "Unresolved" status and close review | guide `unresolved-status` | ready | TRS-06, BIL-01, BIL-02, BIL-03 |
-| F24 | Usage page, resolution ledger, billing outcome, exclusions | guide `usage-and-resolution-ledger` | ready | HND-02, HND-05, TRS-04, BIL-01, BIL-02, BIL-03, BIL-04, OWN-03 |
-| F25 | Insights: closed-chat review, nightly patterns, approve opens a draft fix | guide `insights` | ready* (approve flow by automated tests) | OWN-04 |
-| F26 | Test before go-live: draft test, replay, test cases, readiness, channel modes | guide `test-before-go-live` | ready (Off channel delivery: ready*) | OWN-05 |
-| F27 | Quick check with the team (D19), off by default | roadmap Wave 4; research D19 | ready* (live, mock-LLM tested only) | HND-05, TRS-01 |
-| F28 | Fact check on every reply / no invented facts | roadmap "Still on Roger" (ffd1f715, deployed 28 Oct) | ready | ORD-01, ORD-02, RET-01, RET-03, RET-06, PAY-02, PAY-04, PRD-01, PRD-02, PRD-03, PRD-04, TRS-01, TRS-07, DSP-01 |
-| F29 | Replies in the shopper's language, mid-conversation switches | research D17 (built); hand-off copy en/pt | ready (one known bug) | ORD-01, ORD-05, PAY-01, CHN-01 |
-| F30 | EU-only AI processing, fails closed | guide `eu-only-processing` | blocked (OpenAI EU approval) | CHN-06 |
-| F31 | AI label (EU can rename, not hide); drafts-only per channel | guide `ai-label-and-drafts` | ready | CHN-02, CHN-05, OWN-05 |
-| F32 | WhatsApp templates and the 24-hour window | guide `whatsapp-templates` | blocked (WhatsApp Business account) | CHN-03 |
-| F33 | Messenger; owner replies from phone apps count as take-over; channel-safe formatting | guide `channels-that-behave` | ready* | CHN-04 |
-| F34 | Email inbox (AI answers by email, emails the team) | guide `email-inbox` | ready | PRD-04, CHN-02 |
-| F35 | Team alerts (push, re-push at 10 min, email at 20 min) | guide `team-alerts` | blocked for real-phone push | HND-01, OWN-06 |
+| #   | Feature                                                                                         | Source                                                   | Status                                               | Scenarios                                                                                                      |
+| --- | ----------------------------------------------------------------------------------------------- | -------------------------------------------------------- | ---------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| F01 | Honest hand-off lines (team online / nobody online), en + pt-BR                                 | guide `honest-handoff`                                   | ready                                                | ORD-03, ORD-05, RET-02, RET-06, RET-08, PAY-04, HND-01, HND-02, HND-03, TRS-06, BIL-04, DSP-01, DSP-02, CHN-01 |
+| F02 | Store local time; business hours, closed line with next opening, waiting state, email follow-up | guides `honest-handoff`, `business-hours`                | ready (web chat)                                     | HND-03                                                                                                         |
+| F03 | Take over stops the AI mid-reply; "Marina joined / left the chat"                               | guides `honest-handoff`, `agent-joined-notice`           | ready (web chat only)                                | HND-04                                                                                                         |
+| F04 | Action approval: hold, approve runs once, decline with reason, 48 h expiry                      | guide `action-approval`                                  | ready (Woo); 48 h expiry ready\*                     | ORD-04, CHG-01, CHG-03, CHG-04, RET-04, RET-07, TRS-02, OWN-02                                                 |
+| F05 | Shopper confirms first; approvals list; lower amount; Settings > Actions                        | guide `approvals-and-action-log`                         | ready (Woo)                                          | ORD-04, CHG-01, CHG-02, CHG-04, RET-04, OWN-02                                                                 |
+| F06 | Action log, failures in plain words                                                             | guide `approvals-and-action-log`                         | ready (Woo)                                          | ORD-06, CHG-01, CHG-02, OWN-02                                                                                 |
+| F07 | Goodwill coupons within the owner's cap, one per shopper, over-cap waits                        | guide `goodwill-coupons`                                 | ready (Woo); ready\* Shopify (re-consent), Nuvemshop | RET-07, TRS-02                                                                                                 |
+| F08 | Stale-tracking flag (D6-9)                                                                      | roadmap W1 L5; plugin settings; no guide yet             | ready\*                                              | ORD-03, ORD-04                                                                                                 |
+| F09 | WooCommerce tracking from tracking plugins or an order note                                     | guide `woo-tracking-anywhere`                            | ready (order-note path)                              | ORD-02                                                                                                         |
+| F10 | Return instructions in the store's own words                                                    | guide `return-help-and-order-emails`                     | ready (Woo); ready\* Shopify, Nuvemshop              | RET-01, RET-02                                                                                                 |
+| F11 | Honest order-email resend                                                                       | guide `return-help-and-order-emails`                     | ready (Woo only)                                     | ORD-06                                                                                                         |
+| F12 | Marketplace orders routed to the right app                                                      | guide `marketplace-orders`                               | ready (Woo); ready\* Shopify, Nuvemshop              | ORD-05                                                                                                         |
+| F13 | Refund status with the real date (order data; Nuvemshop refund status)                          | research D10-1/2; Nuvemshop README; guide `mercado-pago` | ready\*                                              | ORD-04, RET-05, RET-06, PAY-03                                                                                 |
+| F14 | Pix code / payment link resend after an identity match                                          | research D10-3; guide `mercado-pago`; Nuvemshop README   | ready\* (MP: mocked only)                            | PAY-01, PAY-02                                                                                                 |
+| F15 | Order changes: cancel before shipping, address change, line swap                                | plugin tools (D6); approvals guides                      | ready\*                                              | CHG-01, CHG-02, CHG-03, CHG-04                                                                                 |
+| F16 | Photos and files from shoppers (web chat paperclip)                                             | guide `photos-and-files`                                 | ready (web chat)                                     | RET-04, RET-08, TRS-05                                                                                         |
+| F17 | AI reads photos and PDFs; card/ID photos withheld and blurred                                   | guide `ai-reads-photos`                                  | ready (web chat)                                     | RET-04, TRS-05                                                                                                 |
+| F18 | Product-problem intake template + case email                                                    | guide `ai-reads-photos`                                  | ready\* (intake and email by automated tests)        | RET-04                                                                                                         |
+| F19 | Chargeback evidence pack (PDF timeline, ZIP + manifest)                                         | guide `chargeback-evidence-pack`                         | ready (Woo)                                          | DSP-02, DSP-03                                                                                                 |
+| F20 | Payment disputes (Stripe, Shopify Payments intake, alert, attach as draft)                      | guide `payment-disputes`                                 | blocked (no real dispute run)                        | DSP-03                                                                                                         |
+| F21 | Spam held before the AI answers, Spam view, Turnstile, under-attack mode                        | guide `spam-and-bot-protection`                          | ready (Cloudflare test keys)                         | TRS-04                                                                                                         |
+| F22 | Pause AI everywhere, one "team will reply" line                                                 | guide `pause-ai-everywhere`                              | ready                                                | OWN-01                                                                                                         |
+| F23 | "Unresolved" status and close review                                                            | guide `unresolved-status`                                | ready                                                | TRS-06, BIL-01, BIL-02, BIL-03                                                                                 |
+| F24 | Usage page, resolution ledger, billing outcome, exclusions                                      | guide `usage-and-resolution-ledger`                      | ready                                                | HND-02, HND-05, TRS-04, BIL-01, BIL-02, BIL-03, BIL-04, OWN-03                                                 |
+| F25 | Insights: closed-chat review, nightly patterns, approve opens a draft fix                       | guide `insights`                                         | ready\* (approve flow by automated tests)            | OWN-04                                                                                                         |
+| F26 | Test before go-live: draft test, replay, test cases, readiness, channel modes                   | guide `test-before-go-live`                              | ready (Off channel delivery: ready\*)                | OWN-05                                                                                                         |
+| F27 | Quick check with the team (D19), off by default                                                 | roadmap Wave 4; research D19                             | ready\* (live, mock-LLM tested only)                 | HND-05, TRS-01                                                                                                 |
+| F28 | Fact check on every reply / no invented facts                                                   | roadmap "Still on Roger" (ffd1f715, deployed 28 Oct)     | ready                                                | ORD-01, ORD-02, RET-01, RET-03, RET-06, PAY-02, PAY-04, PRD-01, PRD-02, PRD-03, PRD-04, TRS-01, TRS-07, DSP-01 |
+| F29 | Replies in the shopper's language, mid-conversation switches                                    | research D17 (built); hand-off copy en/pt                | ready (one known bug)                                | ORD-01, ORD-05, PAY-01, CHN-01                                                                                 |
+| F30 | EU-only AI processing, fails closed                                                             | guide `eu-only-processing`                               | blocked (OpenAI EU approval)                         | CHN-06                                                                                                         |
+| F31 | AI label (EU can rename, not hide); drafts-only per channel                                     | guide `ai-label-and-drafts`                              | ready                                                | CHN-02, CHN-05, OWN-05                                                                                         |
+| F32 | WhatsApp templates and the 24-hour window                                                       | guide `whatsapp-templates`                               | blocked (WhatsApp Business account)                  | CHN-03                                                                                                         |
+| F33 | Messenger; owner replies from phone apps count as take-over; channel-safe formatting            | guide `channels-that-behave`                             | ready\*                                              | CHN-04                                                                                                         |
+| F34 | Email inbox (AI answers by email, emails the team)                                              | guide `email-inbox`                                      | ready                                                | PRD-04, CHN-02                                                                                                 |
+| F35 | Team alerts (push, re-push at 10 min, email at 20 min)                                          | guide `team-alerts`                                      | blocked for real-phone push                          | HND-01, OWN-06                                                                                                 |
 
 Not covered here: allowed websites (needs a copied site), widget loading and weight, workspace data
 export, plan control. They have their own guides.
@@ -225,7 +225,7 @@ export, plan control. They have their own guides.
 - **Must not:** promise Friday; invent a delivery date or a code; tell the shopper only to "check the tracking".
 - **Features:** F09 (EU), F28
 - **Verify:** tracking tool call returns the code; the code in the reply matches the tool output character for character.
-- **Status:** ready (EU order-note path) · ready* (US, BR; tracking-plugin fields on Woo)
+- **Status:** ready (EU order-note path) · ready\* (US, BR; tracking-plugin fields on Woo)
 
 ### ORD-03 Tracking stopped moving (stale)
 
@@ -241,7 +241,7 @@ export, plan control. They have their own guides.
 - **Must not:** say "wait 48 hours and try again"; just paste the tracking link; promise a reship or a refund; invent a carrier update.
 - **Features:** F08, F01
 - **Verify:** tracking/order tool output carries the stale flag (`isStale`, `daysSinceLastUpdate`); conversation ends `pending-human`; hand-off summary mentions stale tracking.
-- **Status:** ready* (stale flag shipped in W1 L5; no feature guide yet)
+- **Status:** ready\* (stale flag shipped in W1 L5; no feature guide yet)
 
 ### ORD-04 "Where is my order, I want a refund" (mixed intent)
 
@@ -257,7 +257,7 @@ export, plan control. They have their own guides.
 - **Must not:** answer with tracking only; say the refund is done; give a date for the money before the team approves; ask for full bank details in the chat.
 - **Features:** F08, F04, F05, F13
 - **Verify:** US: status `awaiting-approval`, held `shopify_create_refund` in the tool log, approval card in Inbox. BR: `nuvemshop_request_refund` returns `moneyMoved: false`, then `pending-human`.
-- **Status:** ready* (no dedicated mixed-intent routing, P1-10 parked; a miss is a product signal)
+- **Status:** ready\* (no dedicated mixed-intent routing, P1-10 parked; a miss is a product signal)
 
 ### ORD-05 "I bought it on Mercado Livre"
 
@@ -273,7 +273,7 @@ export, plan control. They have their own guides.
 - **Must not:** loop on "order not found"; ask for the order number again and again; promise a refund for a marketplace order. The English message must get an English reply.
 - **Features:** F12, F29, F01
 - **Verify:** order lookup fails, then the reply names the marketplace path; defect follow-up ends `pending-human`. Known bug (roadmap follow-ups): an English message naming "Mercado Livre" got a Portuguese reply. Record whether it still happens.
-- **Status:** ready* (hand-tested on Woo only; marketplace number patterns not checked against real orders)
+- **Status:** ready\* (hand-tested on Woo only; marketplace number patterns not checked against real orders)
 
 ### ORD-06 "I never got my order confirmation"
 
@@ -310,7 +310,7 @@ export, plan control. They have their own guides.
 - **Must not:** say "cancelled" before approval; refuse a cancel on an unshipped order; cancel a shipped order.
 - **Features:** F15, F04, F05, F06
 - **Verify:** status `awaiting-approval` then back to open; one cancel in the Action log ("Sent for approval", then the run); store order cancelled once. Shopify: per Roger's decision B3, cancel refunds to the original payment by default for an unfulfilled order; check the refund appears. BR: `nuvemshop_cancel_order` then `nuvemshop_request_refund` with `moneyMoved: false`.
-- **Status:** ready (EU) · ready* (US, BR)
+- **Status:** ready (EU) · ready\* (US, BR)
 
 ### CHG-02 Wrong street number (address change before shipping)
 
@@ -327,7 +327,7 @@ export, plan control. They have their own guides.
 - **Must not:** change anything before the shopper confirms; drop the apartment line or the note; claim success if the tool failed.
 - **Features:** F15, F05, F06
 - **Verify:** one `*_update_order_shipping_address` call with the full address; store order shows the new address and the note; Action log entry. If Settings > Actions holds it, approve and check it runs once.
-- **Status:** ready*
+- **Status:** ready\*
 
 ### CHG-03 Swap the candle scent before shipping
 
@@ -343,7 +343,7 @@ export, plan control. They have their own guides.
 - **Must not:** say it's swapped when it only wrote a note; take payment details for a difference.
 - **Features:** F15, F04
 - **Verify:** US: `shopify_swap_order_item` in the tool log, order lines changed. EU/BR: `*_add_order_note` then `pending-human`.
-- **Status:** ready* (US; swap tool exists, no feature guide) · gap (EU, BR: no swap tool)
+- **Status:** ready\* (US; swap tool exists, no feature guide) · gap (EU, BR: no swap tool)
 
 ### CHG-04 Cancel a big order (approval, decline, expiry)
 
@@ -358,7 +358,7 @@ export, plan control. They have their own guides.
 - **Must not:** run the cancel before a person decides; approve itself; run it twice on a double approve.
 - **Features:** F04, F05, F15
 - **Verify:** approval card "Hay.chat wants to take this action" with Approve / Decline / I'll reply myself; card state Approved / Declined / "Expired, not done"; one cancel in the store.
-- **Status:** ready (approve, decline on Woo) · ready* (US, BR; 48 h expiry by automated tests)
+- **Status:** ready (approve, decline on Woo) · ready\* (US, BR; 48 h expiry by automated tests)
 
 ---
 
@@ -378,7 +378,7 @@ export, plan control. They have their own guides.
 - **Must not:** invent a prepaid label, free return shipping or a link; rewrite the store's link.
 - **Features:** F10, F28
 - **Verify:** `*_get_return_instructions` call; reply text matches the setting; no URL that isn't in the setting.
-- **Status:** ready (EU) · ready* (US, BR)
+- **Status:** ready (EU) · ready\* (US, BR)
 
 ### RET-02 Return after 45 days
 
@@ -394,7 +394,7 @@ export, plan control. They have their own guides.
 - **Must not:** grant the exception itself; say "no" to a request still inside the window; invent store credit.
 - **Features:** F10, F01
 - **Verify:** order lookup shows the delivery date; reply uses that date; follow-up ends `pending-human` if the shopper asks for the team.
-- **Status:** ready (EU) · ready* (US, BR)
+- **Status:** ready (EU) · ready\* (US, BR)
 
 ### RET-03 Return a candle that was burned
 
@@ -425,7 +425,7 @@ export, plan control. They have their own guides.
 - **Must not:** refund the whole order for one mug; refund before approval; ask the shopper to return the broken piece; ask for a photo it already has.
 - **Features:** F16, F17, F18, F04, F05
 - **Verify:** Inbox shows the photo with "AI read: …"; status `awaiting-approval`; after approval one refund in the store for one mug's price; evidence pack for the order later shows the photo, the request and the approved amount (see DSP-02). With the intake template: case banner "Emailed to …".
-- **Status:** ready (EU, web chat) · ready* (US, BR; intake email by automated tests)
+- **Status:** ready (EU, web chat) · ready\* (US, BR; intake email by automated tests)
 
 ### RET-05 Where is my refund? (fully refunded)
 
@@ -441,7 +441,7 @@ export, plan control. They have their own guides.
 - **Must not:** say "it's on the way" with no date; invent a date the order doesn't support; say it was never refunded.
 - **Features:** F13
 - **Verify:** order tool output has the refund line with a date; the reply's date and amount match it. BR: `nuvemshop_check_refund_status` call.
-- **Status:** ready*
+- **Status:** ready\*
 
 ### RET-06 Why is my refund smaller than my order?
 
@@ -457,7 +457,7 @@ export, plan control. They have their own guides.
 - **Must not:** invent a fee or a restocking charge; refund the rest on its own.
 - **Features:** F13, F28, F01
 - **Verify:** reply amounts match the refund line in the tool output.
-- **Status:** ready*
+- **Status:** ready\*
 
 ### RET-07 Late parcel: apology coupon, then a second one, then 25 %
 
@@ -473,7 +473,7 @@ export, plan control. They have their own guides.
 - **Must not:** promise a code before the store created it; give a second coupon; give 25 % on its own.
 - **Features:** F07, F04
 - **Verify:** `*_create_coupon` result with a `HAY…` code; coupon in the store's list, limited to the email, one use; second ask returns `ALREADY_HAS_COUPON`; 25 % ask shows an over-cap approval card.
-- **Status:** ready (EU) · ready* (US: needs the re-consent, not tested on a real store; BR: one per order, email must match)
+- **Status:** ready (EU) · ready\* (US: needs the re-consent, not tested on a real store; BR: one per order, email must match)
 
 ### RET-08 "An item was missing from my box"
 
@@ -508,7 +508,7 @@ export, plan control. They have their own guides.
 - **Must not:** send a code before the match; invent a Pix code; say it's paid.
 - **Features:** F14, F29
 - **Verify:** `nuvemshop_get_payment_link` called only after the match; reply code equals the tool output.
-- **Status:** ready* (honest path) · blocked for the "code sent" path: a seeded order usually has no real Pix transaction. Needs an order placed through the storefront with Pix, or the Mercado Pago plugin on a WooCommerce/Shopify store with a real MP account.
+- **Status:** ready\* (honest path) · blocked for the "code sent" path: a seeded order usually has no real Pix transaction. Needs an order placed through the storefront with Pix, or the Mercado Pago plugin on a WooCommerce/Shopify store with a real MP account.
 
 ### PAY-02 Pending payment: bank transfer (EU), payment link (US), cancelled unpaid
 
@@ -524,7 +524,7 @@ export, plan control. They have their own guides.
 - **Must not:** invent an IBAN; send a link for a cancelled order; send a link before the identity match.
 - **Features:** F14, F28
 - **Verify:** US: `shopify_send_payment_link` after the match. EU: no bank details unless a source has them (check the RAG documents in `conv show`).
-- **Status:** ready* (US) · ready (EU honest path) · ready (cancelled unpaid)
+- **Status:** ready\* (US) · ready (EU honest path) · ready (cancelled unpaid)
 
 ### PAY-03 When does my Pix refund land?
 
@@ -539,7 +539,7 @@ export, plan control. They have their own guides.
 - **Must not:** say it's done while it's in progress; offer store credit instead; invent a date.
 - **Features:** F13
 - **Verify:** `nuvemshop_check_refund_status` output; refund events are readable only when the transactions endpoint answers ("best-effort"); if not, the AI should say it can't see the status and hand off.
-- **Status:** ready*
+- **Status:** ready\*
 
 ### PAY-04 "Quero desistir da compra" (7-day right of withdrawal)
 
@@ -703,7 +703,7 @@ export, plan control. They have their own guides.
 - **Must not:** guess the answer; promise a time it can't keep; go silent for the other question.
 - **Features:** F27, F24
 - **Verify:** a team question row; T+5 and T+10 messages in variant B; billing outcome `human` (teammate answered through a quick check, Roger's decision) in Settings > Usage, not counted as an AI resolution.
-- **Status:** ready* (live on prod since 29 Oct, off by default; tested with a mock LLM only, so the real model's choice to ask the team is unproven)
+- **Status:** ready\* (live on prod since 29 Oct, off by default; tested with a mock LLM only, so the real model's choice to ask the team is unproven)
 
 ---
 
@@ -911,7 +911,7 @@ Settings > Usage (ledger row, or the "never counted" breakdown).
 - **Must not:** put drafts or system instructions in the pack; promise any dispute outcome.
 - **Features:** F19, F01
 - **Verify:** pack finds every conversation that mentions the order; manifest hashes match the files; the export is in the audit log.
-- **Status:** ready (Woo) · ready* (US, BR)
+- **Status:** ready (Woo) · ready\* (US, BR)
 
 ### DSP-03 A real dispute arrives (Stripe / Shopify Payments)
 
@@ -980,7 +980,7 @@ Settings > Usage (ledger row, or the "never counted" breakdown).
 - **Expected:** answers with tracking; product suggestions arrive as a short list with links, no `**` marks. A reply Marina types in the Page inbox shows as a human reply and stops the AI in that conversation.
 - **Features:** F33
 - **Verify:** channel messenger in `hay conv list`; formatting in the delivered message.
-- **Status:** ready* (inbound and AI reply tested end to end on another demo org on 28 Oct; Meta App Review still to submit, so only Page admins/testers can use it)
+- **Status:** ready\* (inbound and AI reply tested end to end on another demo org on 28 Oct; Meta App Review still to submit, so only Page admins/testers can use it)
 
 ### CHN-05 EU store: AI label and drafts-only Instagram
 
@@ -1035,7 +1035,7 @@ Settings > Usage (ledger row, or the "never counted" breakdown).
 - **Expected:** amounts can only go down; the store records the lowered amount; the AI tells the shopper the real amount. Auto-approve applies to refunds and discounts only, not cancellations.
 - **Features:** F05, F06, F04
 - **Verify:** store refunds match the approved amounts; Action log shows each action twice (sent for approval, then run).
-- **Status:** ready (Woo) · ready* (Shopify: lowered refunds may not match line items)
+- **Status:** ready (Woo) · ready\* (Shopify: lowered refunds may not match line items)
 
 ### OWN-03 Usage page and excluding a resolution
 
@@ -1058,7 +1058,7 @@ Settings > Usage (ledger row, or the "never counted" breakdown).
 - **Expected:** the thumbs-down becomes an insight issue within seconds. After the nightly run, a "gift wrapping" pattern with cause, excerpts (personal data removed), shoppers' wording and links. Approve opens a knowledge proposal with a bracketed fill-in that must be completed before saving. Nothing changes in the AI until saved.
 - **Features:** F25
 - **Verify:** insight detail; History entries; after "Mark as addressed", the 14-day fixed / not fixed check.
-- **Status:** ready* (page, settings, reject and history hand-tested; approve and fixed-after-addressed by automated tests only)
+- **Status:** ready\* (page, settings, reject and history hand-tested; approve and fixed-after-addressed by automated tests only)
 
 ### OWN-05 Test a playbook change before it goes live
 
@@ -1087,7 +1087,7 @@ Settings > Usage (ledger row, or the "never counted" breakdown).
 - **Expected:** push "A customer needs a human" with the summary; a second push at 10 min; an email at 20 min with "Open the conversation". Taking over stops the rest. With "Hide customer details on the lock screen", the push says only "A customer needs a human".
 - **Features:** F35
 - **Verify:** notification delivery rows; the email.
-- **Status:** blocked for real-phone push (waiting on Roger's iPhone test) · ready* for the re-push and email steps (checked on staging without a device; alerts not tied to business hours yet)
+- **Status:** blocked for real-phone push (waiting on Roger's iPhone test) · ready\* for the re-push and email steps (checked on staging without a device; alerts not tied to business hours yet)
 
 ---
 
@@ -1114,21 +1114,21 @@ that really stops the AI (P3-04).
 
 Scenarios marked `gap` or `blocked`, plus limits of the test setup.
 
-| Gap | Scenario | Note |
-| --- | --- | --- |
-| Computed Art. 49 deadline | PAY-04 | D10-4 waits for a Brazilian lawyer's sign-off; the AI states the policy and hands off. |
-| Identity check before reading an order | TRS-03 | CR-16 parked. Only Pix resend and coupons require an email or phone match. |
-| Fraud tells / repeat missing-item claims | RET-08 | "Fraud flags" parked. Hand-off only. |
-| Scam-store victims | TRS-07 | P2-19 parked. No owner log. |
-| Spike / incident mode | — | P2-07 parked: many near-identical messages after a bad batch. No scenario, nothing to test. |
-| Line swap on WooCommerce and Nuvemshop | CHG-03 | Only Shopify has `shopify_swap_order_item`; others note and hand off. |
-| Order-email resend on Shopify and Nuvemshop | ORD-06 | Shopify has no API; Nuvemshop has no tool. |
-| Real refunds on Nuvemshop | ORD-04, RET-04, CHG-01 | The Nuvemshop API can't move money; refunds are recorded and handed off. The Mercado Pago plugin covers WooCommerce and Shopify orders, not Nuvemshop. |
-| Pix code on a seeded order | PAY-01 | A seeded Nuvemshop order usually has no real Pix transaction to read. |
-| Mixed intent | ORD-04 | P1-10 parked; relies on the planner. |
-| English + "Mercado Livre" → Portuguese reply | ORD-05, CHN-01 | Logged follow-up: language should follow the conversation locale. |
-| Shopper's email reply after hours | HND-03 | Doesn't come back into the conversation; they return through the link (same browser only). |
-| 72 h reversal for anonymous web chats | BIL-01 | Works only for recognised shoppers. |
-| Quick check with a real model | HND-05 | Tested with a mock LLM only. |
-| Payment disputes, WhatsApp, EU-only, real-phone push | DSP-03, CHN-03, CHN-06, OWN-06 | Blocked on Stripe/Shopify test disputes and the Shopify evidence scope, Meta, OpenAI EU, and Roger's phone. |
-| CLI limits | many | `hay chat send` can't attach files, fill the email form, pass a bot challenge or act as the owner; those steps need the widget and the dashboard. No `plugins call`: drive tools through a chat. |
+| Gap                                                  | Scenario                       | Note                                                                                                                                                                                             |
+| ---------------------------------------------------- | ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Computed Art. 49 deadline                            | PAY-04                         | D10-4 waits for a Brazilian lawyer's sign-off; the AI states the policy and hands off.                                                                                                           |
+| Identity check before reading an order               | TRS-03                         | CR-16 parked. Only Pix resend and coupons require an email or phone match.                                                                                                                       |
+| Fraud tells / repeat missing-item claims             | RET-08                         | "Fraud flags" parked. Hand-off only.                                                                                                                                                             |
+| Scam-store victims                                   | TRS-07                         | P2-19 parked. No owner log.                                                                                                                                                                      |
+| Spike / incident mode                                | —                              | P2-07 parked: many near-identical messages after a bad batch. No scenario, nothing to test.                                                                                                      |
+| Line swap on WooCommerce and Nuvemshop               | CHG-03                         | Only Shopify has `shopify_swap_order_item`; others note and hand off.                                                                                                                            |
+| Order-email resend on Shopify and Nuvemshop          | ORD-06                         | Shopify has no API; Nuvemshop has no tool.                                                                                                                                                       |
+| Real refunds on Nuvemshop                            | ORD-04, RET-04, CHG-01         | The Nuvemshop API can't move money; refunds are recorded and handed off. The Mercado Pago plugin covers WooCommerce and Shopify orders, not Nuvemshop.                                           |
+| Pix code on a seeded order                           | PAY-01                         | A seeded Nuvemshop order usually has no real Pix transaction to read.                                                                                                                            |
+| Mixed intent                                         | ORD-04                         | P1-10 parked; relies on the planner.                                                                                                                                                             |
+| English + "Mercado Livre" → Portuguese reply         | ORD-05, CHN-01                 | Logged follow-up: language should follow the conversation locale.                                                                                                                                |
+| Shopper's email reply after hours                    | HND-03                         | Doesn't come back into the conversation; they return through the link (same browser only).                                                                                                       |
+| 72 h reversal for anonymous web chats                | BIL-01                         | Works only for recognised shoppers.                                                                                                                                                              |
+| Quick check with a real model                        | HND-05                         | Tested with a mock LLM only.                                                                                                                                                                     |
+| Payment disputes, WhatsApp, EU-only, real-phone push | DSP-03, CHN-03, CHN-06, OWN-06 | Blocked on Stripe/Shopify test disputes and the Shopify evidence scope, Meta, OpenAI EU, and Roger's phone.                                                                                      |
+| CLI limits                                           | many                           | `hay chat send` can't attach files, fill the email form, pass a bot challenge or act as the owner; those steps need the widget and the dashboard. No `plugins call`: drive tools through a chat. |

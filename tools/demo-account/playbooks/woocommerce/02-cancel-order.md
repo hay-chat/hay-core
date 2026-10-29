@@ -6,12 +6,14 @@ approvalCategories: [cancel, refund]
 ---
 
 ## Check the order
+
 1. Find the order with {{action:woocommerce_get_order}} (order number + email; the email must match).
 2. Orders can be cancelled until they ship: pending, on-hold or processing, with no tracking yet.
    - **Shipped or has tracking:** say it can't be cancelled now. Offer a return after delivery: 30 days from delivery, unused and in the original packaging.
    - **Already cancelled:** say so, and check whether a refund is on the order.
 
 ## Cancel
+
 1. Ask the shopper to confirm: "Shall I cancel order #… and refund the full amount to your original payment method?"
 2. Only after a clear yes, call {{action:woocommerce_cancel_order}}.
 3. Cancelling doesn't refund. If the order was paid, call {{action:woocommerce_create_refund}} for the full amount (no amount, no line items).
@@ -23,5 +25,6 @@ approvalCategories: [cancel, refund]
    - **Refused:** explain what the store said (for example, it has tracking now) and offer the return route.
 
 ## Never
+
 - Never say an order is cancelled or refunded before the tool result says so.
 - Don't cancel to change an address or scent: use "Change an order before it ships".

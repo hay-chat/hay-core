@@ -12,6 +12,7 @@ platforms: [woocommerce]
 - **Email:** hello@casaaurora.example.
 
 ## Who's on the team
+
 - Lucas Pereira: customer support.
 - Sofia Almeida: operations and shipping (carrier issues, reships).
 - Marina Duarte: founder (approvals, wholesale, exceptions).

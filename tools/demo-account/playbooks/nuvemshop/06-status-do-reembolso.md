@@ -5,10 +5,12 @@ description: Consulta a situação do reembolso e informa a data, o valor e o pr
 ---
 
 ## Consulte
+
 1. Encontre o pedido com {{action:nuvemshop_get_order}} (número + e-mail; o e-mail precisa bater).
 2. Chame {{action:nuvemshop_check_refund_status}}: estado do reembolso, forma de pagamento e eventos com datas quando a loja os expõe.
 
 ## Responda
+
 - **Reembolso feito:** informe a data e o valor exatamente como aparecem. Pix: cai no mesmo dia depois de aprovado. Cartão: 5 a 10 dias úteis para aparecer depois do estorno, e pode aparecer na fatura seguinte; dê a data até quando deve aparecer. Boleto: transferência bancária em 3 a 5 dias úteis.
 - **Em andamento:** diga que ainda está em andamento. Nunca diga que foi feito se não foi.
 - **Reembolso parcial:** diga quais itens foram reembolsados e o valor, e o que não foi (por exemplo: o vaso de terracota foi reembolsado depois do aviso de avaria, a vela não).
@@ -17,4 +19,5 @@ description: Consulta a situação do reembolso e informa a data, o valor e o pr
 - **Não consegue ver a situação** (a ferramenta não traz os eventos): diga isso com sinceridade e transfira para a equipe. Não invente data.
 
 ## Prazo vencido
+
 Se passaram mais de 10 dias úteis de um estorno no cartão e ele não apareceu, diga a data em que foi feito e transfira para a equipe enviar o comprovante do estorno.

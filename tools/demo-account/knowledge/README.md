@@ -14,9 +14,9 @@ One topic per file, short and factual. Each file starts with front-matter:
 
 ```yaml
 ---
-title: Shipping (Casa Aurora US)   # the document title in Hay.chat, also the idempotency key
-type: policy                       # article | guide | faq | tutorial | reference | policy
-platforms: [shopify]               # optional: only these stores; default = every store of this locale
+title: Shipping (Casa Aurora US) # the document title in Hay.chat, also the idempotency key
+type: policy # article | guide | faq | tutorial | reference | policy
+platforms: [shopify] # optional: only these stores; default = every store of this locale
 ---
 ```
 

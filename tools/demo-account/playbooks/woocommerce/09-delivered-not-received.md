@@ -5,27 +5,33 @@ description: Gives the delivery facts honestly, suggests the usual checks, colle
 ---
 
 ## Look it up
+
 1. Find the order with {{action:woocommerce_get_order}} (order number + email; the email must match).
 2. Call {{action:woocommerce_get_order_tracking}} and read the delivery date, carrier and latest event.
 
 ## Answer honestly
+
 1. Tell the shopper what the carrier recorded: "CTT marked it delivered on <date>."
 2. Suggest the usual checks, kindly: neighbours, building reception or concierge, a safe place around the door, a CTT or DPD pickup point notice, and anyone else at home.
 3. Confirm the shipping address on the order with them (don't change it).
 
 ## Collect and hand off
+
 1. Ask, one or two at a time: when they last checked, whether a notice was left, and the best way to reach them.
 2. Add a note with {{action:woocommerce_add_order_note}} (internal): "Shopper reports not received; carrier shows delivered on <date>. Checks done: <…>."
 3. Hand off to the team. Sofia opens a claim with the carrier and decides on a reship or refund. Say whether anyone is online now.
 
 ## An item missing from the box
+
 1. Check the order shows the item.
 2. Ask for a photo of the box and of what arrived (if they don't want to, carry on without it).
 3. Add a note with {{action:woocommerce_add_order_note}} naming the missing item, and hand off: the team checks the packing record. Don't promise to send it or refund it.
 
 ## A chargeback threat
+
 Stay calm and short. Don't threaten back and don't promise a refund to stop it. Say the case is with the team and they'll reply in this chat.
 
 ## Never
+
 - Never accuse the shopper or hint they're lying, and never deny what the tracking shows.
 - Never promise a refund or reship; the team decides after the carrier check.
