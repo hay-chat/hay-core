@@ -35,6 +35,8 @@ interface HayPluginBlock {
   defaultEnabled?: boolean;
   trpcRouter?: string;
   documentImporter?: boolean;
+  /** Hosts a server-managed OAuth client secret may be sent to (exact or `*.suffix`). */
+  oauthHosts?: string[];
 }
 
 /**
@@ -251,6 +253,7 @@ export class PluginManagerService {
         autoActivate: hayPlugin.autoActivate === true, // Eagerly load router at boot
         defaultEnabled: hayPlugin.defaultEnabled === true, // Enabled for new orgs
         trpcRouter: hayPlugin.trpcRouter || undefined, // Optional plugin-side tRPC router file
+        oauthHosts: hayPlugin.oauthHosts || undefined, // Hosts a managed OAuth secret may reach
       };
 
       // Load i18n translations from plugin's i18n/ directory

@@ -33,6 +33,7 @@ import type {
   RemoteMCPServerConfig,
 } from "@server/types/plugin.types";
 import { createLogger } from "@server/lib/logger";
+import { validateUrlForSSRF } from "@server/utils/ssrf";
 import { emailDomainService } from "@server/services/email-domains.service";
 import { channelHealthService } from "@server/services/channel-health.service";
 import type { Conversation } from "@server/database/entities/conversation.entity";
@@ -1008,9 +1009,6 @@ export const pluginApiTrpcRouter = router({
       z.object({
         serverId: z.string().optional(), // Auto-generate if not provided
         serverPath: z.string(),
-        startCommand: z.string(),
-        installCommand: z.string().optional(),
-        buildCommand: z.string().optional(),
         tools: z.array(
           z.object({
             name: z.string(),
@@ -1018,7 +1016,6 @@ export const pluginApiTrpcRouter = router({
             input_schema: z.record(z.any()),
           }),
         ),
-        env: z.record(z.string()).optional(),
       }),
     )
     .mutation(async ({ input, ctx }) => {
@@ -1067,11 +1064,7 @@ export const pluginApiTrpcRouter = router({
       mcpServers.local.push({
         serverId,
         serverPath: input.serverPath,
-        startCommand: input.startCommand,
-        installCommand: input.installCommand,
-        buildCommand: input.buildCommand,
         tools: input.tools,
-        env: input.env,
       });
 
       // 3. Save to database
@@ -1139,6 +1132,22 @@ export const pluginApiTrpcRouter = router({
 
       const { organizationId, pluginId } = ctx.pluginAuth;
       const serverId = input.serverId || `mcp-remote-${Date.now()}`;
+
+      // Every URL core may later fetch must point at a public host.
+      const urlsToCheck = [input.url];
+      if (input.auth?.type === "oauth2") {
+        urlsToCheck.push(input.auth.authorizationUrl, input.auth.tokenUrl);
+      }
+      for (const url of urlsToCheck) {
+        try {
+          await validateUrlForSSRF(url);
+        } catch {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: `URL is not allowed: ${url}`,
+          });
+        }
+      }
 
       logger.debug(
         {

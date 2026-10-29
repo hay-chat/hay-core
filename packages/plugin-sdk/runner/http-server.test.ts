@@ -304,3 +304,58 @@ describe("PluginHttpServer setup status endpoint", () => {
     }
   });
 });
+
+describe("PluginHttpServer worker secret", () => {
+  const secret = "s".repeat(64);
+  let server: PluginHttpServer;
+  let baseUrl: string;
+  let seenSecretHeader: unknown = "unset";
+
+  beforeAll(async () => {
+    const registry = new PluginRegistry();
+    registry.registerRoute({
+      method: "POST",
+      path: "/webhook",
+      handler: async (req, res) => {
+        seenSecretHeader = req.headers["x-hay-worker-secret"];
+        res.json({ ok: true });
+      },
+    });
+    server = new PluginHttpServer(0, registry, silentLogger, { secret });
+    await server.start();
+    const address = (server as unknown as { server: { address(): AddressInfo } }).server.address();
+    expect(address.address).toBe("127.0.0.1");
+    baseUrl = `http://127.0.0.1:${address.port}`;
+  });
+
+  afterAll(async () => {
+    await server.stop();
+  });
+
+  it.each(["/metadata", "/health", "/mcp/list-tools", "/webhook"])(
+    "rejects %s without the secret",
+    async (path) => {
+      const response = await fetch(`${baseUrl}${path}`, {
+        method: path === "/webhook" ? "POST" : "GET",
+      });
+      expect(response.status).toBe(401);
+    },
+  );
+
+  it("rejects a wrong secret", async () => {
+    const response = await fetch(`${baseUrl}/metadata`, {
+      headers: { "x-hay-worker-secret": "wrong" },
+    });
+    expect(response.status).toBe(401);
+  });
+
+  it("serves requests with the secret and hides it from plugin handlers", async () => {
+    const response = await fetch(`${baseUrl}/webhook`, {
+      method: "POST",
+      headers: { "x-hay-worker-secret": secret, "content-type": "application/json" },
+      body: "{}",
+    });
+    expect(response.status).toBe(200);
+    expect(seenSecretHeader).toBeUndefined();
+  });
+});

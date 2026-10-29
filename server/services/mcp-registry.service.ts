@@ -4,6 +4,7 @@ import { getPluginRunnerService } from "./plugin-runner.service";
 import { getCachedToolDescriptors } from "./plugin-tools.service";
 import { createLogger } from "@server/lib/logger";
 import { classifyTool, type ToolRisk } from "./core/tool-risk";
+import { workerFetch } from "@server/lib/worker-client";
 
 const logger = createLogger("mcp-registry");
 
@@ -151,7 +152,7 @@ export class MCPRegistryService {
     );
 
     try {
-      const response = await fetch(`http://localhost:${worker.port}/mcp/call-tool`, {
+      const response = await workerFetch(worker.port, "/mcp/call-tool", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

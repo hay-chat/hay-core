@@ -201,7 +201,7 @@ describe("disputes (D2-7, D2-8)", () => {
       }),
     );
     const [url, init] = fetchMock.mock.calls[0];
-    expect(url).toBe("http://localhost:49999/disputes/evidence");
+    expect(url).toBe("http://127.0.0.1:49999/disputes/evidence");
     const body = JSON.parse(String(init?.body));
     expect(body.disputeId).toBe("dp_123");
     expect(body.file.name).toMatch(/^hay-chat-evidence-1001-2026-10-28\.pdf$/);

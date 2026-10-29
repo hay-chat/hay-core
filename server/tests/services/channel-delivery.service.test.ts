@@ -151,7 +151,7 @@ describe("channelDeliveryService /deliver", () => {
 
     expect(mockFindPluginIdByChannel).toHaveBeenCalledWith(ORG_ID, "whatsapp");
     expect(mockFetch).toHaveBeenCalledWith(
-      "http://localhost:4567/deliver",
+      "http://127.0.0.1:4567/deliver",
       expect.objectContaining({ method: "POST" }),
     );
     expect(deliverBody()).toMatchObject({
@@ -500,7 +500,7 @@ describe("channelDeliveryService /escalate attachments (D8-10)", () => {
     await dispatch(statusEvent);
 
     expect(mockFetch).toHaveBeenCalledWith(
-      "http://localhost:4567/escalate",
+      "http://127.0.0.1:4567/escalate",
       expect.objectContaining({ method: "POST" }),
     );
     const body = deliverBody() as { attachments: Array<Record<string, unknown>> };

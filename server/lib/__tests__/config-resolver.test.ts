@@ -5,6 +5,8 @@ import {
 } from "../config-resolver";
 import type { ConfigFieldDescriptor } from "@server/types/plugin-sdk.types";
 
+const allowedEnv = new Set(["TEST_API_KEY", "TEST_CLIENT_ID"]);
+
 describe("config-resolver", () => {
   describe("resolveConfigWithEnv", () => {
     const schema: Record<string, ConfigFieldDescriptor> = {
@@ -53,7 +55,7 @@ describe("config-resolver", () => {
         clientId: "db-client-id-012",
       };
 
-      const result = resolveConfigWithEnv(dbConfig, schema);
+      const result = resolveConfigWithEnv(dbConfig, schema, { allowedEnv });
 
       expect(result.values.apiKey).toBe("db-api-key-789");
       expect(result.values.clientId).toBe("db-client-id-012");
@@ -66,7 +68,7 @@ describe("config-resolver", () => {
     it("should fallback to env when DB value absent", () => {
       const dbConfig = {};
 
-      const result = resolveConfigWithEnv(dbConfig, schema);
+      const result = resolveConfigWithEnv(dbConfig, schema, { allowedEnv });
 
       expect(result.values.apiKey).toBe("env-api-key-123");
       expect(result.values.clientId).toBe("env-client-id-456");
@@ -80,7 +82,7 @@ describe("config-resolver", () => {
     it("lets the merchant override an env value when PLUGIN_ALLOW_MANAGED_OVERRIDE is on", () => {
       process.env.PLUGIN_ALLOW_MANAGED_OVERRIDE = "true";
       try {
-        const result = resolveConfigWithEnv({}, schema);
+        const result = resolveConfigWithEnv({}, schema, { allowedEnv });
 
         expect(result.metadata.apiKey.source).toBe("env");
         expect(result.metadata.apiKey.canOverride).toBe(true);
@@ -94,7 +96,7 @@ describe("config-resolver", () => {
         apiKey: "db-api-key-789",
       };
 
-      const result = resolveConfigWithEnv(dbConfig, schema);
+      const result = resolveConfigWithEnv(dbConfig, schema, { allowedEnv });
 
       expect(result.values.apiKey).toBe("db-api-key-789");
       expect(result.metadata.apiKey.source).toBe("database");
@@ -105,7 +107,7 @@ describe("config-resolver", () => {
     it("should use default value when DB and env absent", () => {
       const dbConfig = {};
 
-      const result = resolveConfigWithEnv(dbConfig, schema);
+      const result = resolveConfigWithEnv(dbConfig, schema, { allowedEnv });
 
       expect(result.values.endpoint).toBe("https://api.example.com");
       expect(result.metadata.endpoint.source).toBe("default");
@@ -117,7 +119,7 @@ describe("config-resolver", () => {
         apiKey: null,
       };
 
-      const result = resolveConfigWithEnv(dbConfig, schema);
+      const result = resolveConfigWithEnv(dbConfig, schema, { allowedEnv });
 
       expect(result.values.apiKey).toBe(null);
       expect(result.metadata.apiKey.source).toBe("database");
@@ -128,7 +130,7 @@ describe("config-resolver", () => {
       process.env.TEST_API_KEY = "";
 
       const dbConfig = {};
-      const result = resolveConfigWithEnv(dbConfig, schema);
+      const result = resolveConfigWithEnv(dbConfig, schema, { allowedEnv });
 
       expect(result.values.apiKey).toBe(undefined);
       expect(result.metadata.apiKey.source).toBe("database");
@@ -140,6 +142,7 @@ describe("config-resolver", () => {
       };
 
       const result = resolveConfigWithEnv(dbConfig, schema, {
+        allowedEnv,
         decrypt: false,
         maskSecrets: true,
       });
@@ -151,6 +154,7 @@ describe("config-resolver", () => {
       const dbConfig = {};
 
       const result = resolveConfigWithEnv(dbConfig, schema, {
+        allowedEnv,
         decrypt: false,
         maskSecrets: true,
       });
@@ -170,6 +174,7 @@ describe("config-resolver", () => {
       };
 
       const result = resolveConfigWithEnv(dbConfig, schema, {
+        allowedEnv,
         decrypt: false,
         maskSecrets: true,
       });
@@ -180,7 +185,7 @@ describe("config-resolver", () => {
     it("should handle field with no value from any source", () => {
       const dbConfig = {};
 
-      const result = resolveConfigWithEnv(dbConfig, schema);
+      const result = resolveConfigWithEnv(dbConfig, schema, { allowedEnv });
 
       expect(result.values.customField).toBe(undefined);
       expect(result.metadata.customField.source).toBe("database");
@@ -190,7 +195,7 @@ describe("config-resolver", () => {
     it("should mark encrypted fields in metadata", () => {
       const dbConfig = {};
 
-      const result = resolveConfigWithEnv(dbConfig, schema);
+      const result = resolveConfigWithEnv(dbConfig, schema, { allowedEnv });
 
       expect(result.metadata.apiKey.isEncrypted).toBe(true);
       expect(result.metadata.clientId.isEncrypted).toBe(false);
@@ -235,7 +240,7 @@ describe("config-resolver", () => {
         },
       };
 
-      const result = resolveConfigForWorker(dbConfig, authState, schema);
+      const result = resolveConfigForWorker(dbConfig, authState, schema, allowedEnv);
 
       expect(result.clientId).toBe("db-client-id");
       expect(result.apiKey).toBe("auth-api-key");
@@ -245,7 +250,7 @@ describe("config-resolver", () => {
       const dbConfig = {};
       const authState = null;
 
-      const result = resolveConfigForWorker(dbConfig, authState, schema);
+      const result = resolveConfigForWorker(dbConfig, authState, schema, allowedEnv);
 
       expect(result.apiKey).toBe("env-api-key-123");
       expect(result.clientId).toBe("env-client-id-456");
@@ -257,7 +262,7 @@ describe("config-resolver", () => {
       };
       const authState = null;
 
-      const result = resolveConfigForWorker(dbConfig, authState, schema);
+      const result = resolveConfigForWorker(dbConfig, authState, schema, allowedEnv);
 
       expect(result.apiKey).toBe("db-api-key");
       // Should return actual value, not "********"
@@ -268,7 +273,7 @@ describe("config-resolver", () => {
         clientId: "db-client-id",
       };
 
-      const result = resolveConfigForWorker(dbConfig, null, schema);
+      const result = resolveConfigForWorker(dbConfig, null, schema, allowedEnv);
 
       expect(result.clientId).toBe("db-client-id");
     });
@@ -278,7 +283,7 @@ describe("config-resolver", () => {
         clientId: "db-client-id",
       };
 
-      const result = resolveConfigForWorker(dbConfig, {}, schema);
+      const result = resolveConfigForWorker(dbConfig, {}, schema, allowedEnv);
 
       expect(result.clientId).toBe("db-client-id");
     });

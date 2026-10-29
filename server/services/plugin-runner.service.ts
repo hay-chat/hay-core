@@ -8,14 +8,26 @@ import { PluginInstance } from "../entities/plugin-instance.entity";
 import { pluginInstanceRepository } from "../repositories/plugin-instance.repository";
 import { fetchAndStoreTools } from "./plugin-tools.service";
 import { resolveConfigForWorker } from "@server/lib/config-resolver";
-import { isDeniedPluginEnv } from "@server/lib/plugin-env";
+import { configEnvAllowList, isDeniedPluginEnv } from "@server/lib/plugin-env";
 import { mintPluginApiToken } from "@server/lib/plugin-api-token";
 import { getApiUrl } from "../config/env";
 import { oauthService } from "./oauth.service";
 import { createLogger } from "@server/lib/logger";
+import { redactEmbeddedJsonFields } from "@server/lib/logger/redaction";
+import { issueWorkerSecret, revokeWorkerSecret, workerFetch } from "@server/lib/worker-client";
 import type { HayPluginManifest } from "../types/plugin.types";
 
 const logger = createLogger("plugin-runner");
+
+/** Default per-plugin worker pool size when the registry entry sets none. */
+const DEFAULT_MAX_WORKERS_PER_PLUGIN = 10;
+
+/**
+ * V8 heap ceiling for a worker (MB). Workers share core's uid, so this is the
+ * main bound on what one plugin can consume.
+ * TODO: run workers under a separate uid / cgroup for OS-level isolation.
+ */
+const WORKER_MAX_OLD_SPACE_MB = 1024;
 
 /**
  * Manifest as persisted in the plugin registry: identical to
@@ -42,6 +54,7 @@ type RegistryManifest = Omit<HayPluginManifest, "capabilities"> & {
  */
 export class PluginRunnerService {
   private workers = new Map<string, WorkerInfo>(); // Key: "orgId:pluginId"
+  private pendingStarts = new Set<string>(); // workerKeys spawned but not yet ready
   private portAllocator = getPortAllocator();
   private pluginsDir: string;
   private runnerPath: string;
@@ -94,12 +107,60 @@ export class PluginRunnerService {
 
     // Get plugin instance
     const instanceRepo = AppDataSource.getRepository(PluginInstance);
-    let instance = await instanceRepo.findOne({
+    const instance = await instanceRepo.findOne({
       where: { organizationId: orgId, pluginId: plugin.id },
     });
     if (!instance || !instance.enabled) {
       throw new Error(`Plugin not enabled for org: ${orgId}`);
     }
+
+    await this.makeRoomInPool(
+      pluginId,
+      plugin.maxConcurrentInstances || DEFAULT_MAX_WORKERS_PER_PLUGIN,
+    );
+    this.pendingStarts.add(workerKey);
+    try {
+      return await this.spawnWorker(orgId, pluginId, plugin, instance);
+    } finally {
+      this.pendingStarts.delete(workerKey);
+    }
+  }
+
+  /**
+   * Keep each plugin's pool within `maxWorkers`: when it is full, stop the
+   * least recently active workers (they restart on demand). Throws when the
+   * pool is full of workers that are still starting.
+   */
+  private async makeRoomInPool(pluginId: string, maxWorkers: number): Promise<void> {
+    const running = this.getAllWorkers().filter((worker) => worker.pluginId === pluginId);
+    const starting = [...this.pendingStarts].filter((key) => key.endsWith(`:${pluginId}`)).length;
+    const excess = running.length + starting - maxWorkers + 1;
+    if (excess <= 0) return;
+    if (excess > running.length) {
+      throw new Error(`Worker pool for ${pluginId} is full`);
+    }
+
+    const leastRecent = [...running]
+      .sort((a, b) => a.lastActivity.getTime() - b.lastActivity.getTime())
+      .slice(0, excess);
+    for (const worker of leastRecent) {
+      logger.info(
+        { pluginId, organizationId: worker.organizationId },
+        "Worker pool full, stopping least recently active worker",
+      );
+      await this.stopWorker(worker.organizationId, pluginId);
+    }
+  }
+
+  private async spawnWorker(
+    orgId: string,
+    pluginId: string,
+    plugin: PluginRegistry,
+    initialInstance: PluginInstance,
+  ): Promise<WorkerInfo> {
+    const workerKey = `${orgId}:${pluginId}`;
+    const instanceRepo = AppDataSource.getRepository(PluginInstance);
+    let instance = initialInstance;
 
     logger.debug(
       {
@@ -167,6 +228,11 @@ export class PluginRunnerService {
     try {
       // Allocate port
       const port = await this.portAllocator.allocate();
+      const workerSecret = issueWorkerSecret(port);
+      const releasePort = () => {
+        revokeWorkerSecret(port, workerSecret);
+        this.portAllocator.release(port);
+      };
 
       // Build environment variables
       // SDK expects org config in this format: { org: { id }, config: {...} }
@@ -179,6 +245,7 @@ export class PluginRunnerService {
         instance.config,
         instance.authState,
         configSchema,
+        configEnvAllowList(plugin),
       );
 
       const orgConfig = {
@@ -193,6 +260,7 @@ export class PluginRunnerService {
         orgId,
         pluginId,
         port,
+        workerSecret,
         orgConfig,
         orgAuth: instance.authState || null,
         capabilities: manifest.capabilities || [],
@@ -238,23 +306,24 @@ export class PluginRunnerService {
       workerProcess.on("error", (error) => {
         logger.error({ err: error, pluginId, orgId }, "Spawn error");
         spawnError = error;
-        this.portAllocator.release(port);
+        releasePort();
         this.workers.delete(workerKey);
       });
 
-      // Log worker output
+      // Log worker output through the redacting logger (string patterns are
+      // redacted by the logger itself; embedded JSON fields here).
       workerProcess.stdout?.on("data", (data) => {
-        logger.info({ pluginId, orgId }, data.toString().trim());
+        logger.info({ pluginId, orgId }, redactEmbeddedJsonFields(data.toString().trim()));
       });
 
       workerProcess.stderr?.on("data", (data) => {
-        logger.error({ pluginId, orgId }, data.toString().trim());
+        logger.error({ pluginId, orgId }, redactEmbeddedJsonFields(data.toString().trim()));
       });
 
       // Handle process exit
       workerProcess.on("exit", async (code, signal) => {
         logger.info({ pluginId, orgId, code, signal }, "Process exited");
-        this.portAllocator.release(port);
+        releasePort();
         this.workers.delete(workerKey);
 
         // Update runtime state
@@ -292,6 +361,7 @@ export class PluginRunnerService {
       const workerInfo: WorkerInfo = {
         process: workerProcess,
         port,
+        releasePort,
         startedAt: new Date(),
         lastActivity: new Date(),
         organizationId: orgId,
@@ -341,7 +411,7 @@ export class PluginRunnerService {
     try {
       // Call /disable endpoint if worker is running
       try {
-        const response = await fetch(`http://localhost:${worker.port}/disable`, {
+        const response = await workerFetch(worker.port, "/disable", {
           method: "POST",
           signal: AbortSignal.timeout(5000),
         });
@@ -368,7 +438,7 @@ export class PluginRunnerService {
       });
 
       // Release port
-      this.portAllocator.release(worker.port);
+      worker.releasePort();
 
       // Remove from workers map
       this.workers.delete(workerKey);
@@ -428,12 +498,22 @@ export class PluginRunnerService {
     orgId: string;
     pluginId: string;
     port: number;
+    workerSecret: string;
     orgConfig: { org: { id: string }; config: Record<string, unknown> };
     orgAuth: AuthState | null;
     capabilities: string[];
     allowedEnvVars: string[];
   }): Record<string, string> {
-    const { orgId, pluginId, port, orgConfig, orgAuth, capabilities, allowedEnvVars } = params;
+    const {
+      orgId,
+      pluginId,
+      port,
+      workerSecret,
+      orgConfig,
+      orgAuth,
+      capabilities,
+      allowedEnvVars,
+    } = params;
 
     // Base environment
     const env: Record<string, string> = {
@@ -444,6 +524,8 @@ export class PluginRunnerService {
       HAY_ORG_ID: orgId,
       HAY_PLUGIN_ID: pluginId,
       HAY_WORKER_PORT: port.toString(),
+      HAY_WORKER_SECRET: workerSecret,
+      NODE_OPTIONS: `--max-old-space-size=${WORKER_MAX_OLD_SPACE_MB}`,
       HAY_ORG_CONFIG: JSON.stringify(orgConfig),
       HAY_ORG_AUTH: JSON.stringify(orgAuth || {}),
     };
@@ -485,7 +567,7 @@ export class PluginRunnerService {
 
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
       try {
-        const response = await fetch(`http://localhost:${port}/metadata`, {
+        const response = await workerFetch(port, "/metadata", {
           signal: AbortSignal.timeout(2000),
         });
 
