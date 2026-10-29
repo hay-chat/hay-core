@@ -65,7 +65,7 @@ describe("channel-templates.service", () => {
       supported: true,
       templates: [ORDER_UPDATE],
     });
-    expect(mockFetch.mock.calls[0][0]).toBe("http://localhost:5123/templates");
+    expect(mockFetch.mock.calls[0][0]).toBe("http://127.0.0.1:5123/templates");
   });
 
   it("treats a worker 404 as a channel without templates", async () => {

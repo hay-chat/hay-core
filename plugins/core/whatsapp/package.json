@@ -23,6 +23,10 @@
       "META_WHATSAPP_APP_SECRET",
       "META_VERIFY_TOKEN",
       "META_WHATSAPP_ES_CONFIG_ID"
+    ],
+    "oauthHosts": [
+      "www.facebook.com",
+      "graph.facebook.com"
     ]
   },
   "scripts": {

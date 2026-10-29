@@ -311,7 +311,7 @@ describe("messageApprovalService", () => {
       expect(mockFindPluginIdByChannel).toHaveBeenCalledWith(ORG_ID, "whatsapp");
       expect(mockFetch).toHaveBeenCalledTimes(1);
       const [url, init] = mockFetch.mock.calls[0] as unknown as [string, { body: string }];
-      expect(url).toBe("http://localhost:4567/deliver");
+      expect(url).toBe("http://127.0.0.1:4567/deliver");
       expect(JSON.parse(init.body)).toMatchObject({
         to: "5511999999999",
         // First AI reply on the channel, so it opens with the AI label (D14-7).

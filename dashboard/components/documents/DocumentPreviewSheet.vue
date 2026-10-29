@@ -85,6 +85,7 @@
 import { ref, computed, watch } from "vue";
 import { HayApi } from "@/utils/api";
 import { markdownToHtml } from "@/utils/markdownToHtml";
+import { sanitizeHtml } from "@/utils/sanitize";
 import { FileText, FileCode, FileJson, File, AlertCircle, Globe } from "lucide-vue-next";
 
 interface DocumentPreview {
@@ -124,7 +125,7 @@ const isOpen = computed({
 const renderedContent = computed(() => {
   if (!document.value?.content) return "";
   if (document.value.importMethod === "editor") {
-    return document.value.content;
+    return sanitizeHtml(document.value.content);
   }
   return markdownToHtml(document.value.content);
 });

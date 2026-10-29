@@ -145,7 +145,7 @@ describe("oauthService.completeWithCode", () => {
 
     // 2nd call: the worker hook with extras
     const [hookUrl, hookInit] = fetchMock.mock.calls[1];
-    expect(hookUrl).toBe("http://localhost:4321/on-connected");
+    expect(hookUrl).toBe("http://127.0.0.1:4321/on-connected");
     const body = JSON.parse((hookInit as { body: string }).body);
     expect(body.extras).toEqual({ waba_id: "WABA1", phone_number_id: "PN1" });
     expect(body.authState).toBeDefined();

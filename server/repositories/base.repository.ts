@@ -13,7 +13,7 @@ const logger = createLogger("base-repo");
  * Prevents SQL injection through dynamic column interpolation.
  */
 const SAFE_IDENTIFIER = /^[a-zA-Z_][a-zA-Z0-9_]*$/;
-function assertSafeIdentifier(name: string, context: string): void {
+export function assertSafeIdentifier(name: string, context: string): void {
   if (!SAFE_IDENTIFIER.test(name)) {
     throw new Error(`Invalid ${context}: ${name}`);
   }

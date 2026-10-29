@@ -62,7 +62,9 @@ jest.mock("@server/repositories/agent.repository", () => ({
 }));
 
 jest.mock("@server/repositories/organization.repository", () => ({
-  organizationRepository: { findById: jest.fn(async () => null) },
+  organizationRepository: {
+    findById: jest.fn(async () => ({ isActive: true, suspendedAt: null })),
+  },
 }));
 jest.mock("@server/repositories/plugin-instance.repository", () => ({
   pluginInstanceRepository: {},
@@ -104,6 +106,7 @@ const ctx = (organizationId = ORG_ID, capabilities = ["messages"]) => {
   const token = jwt.sign(
     { scope: "plugin-api", organizationId, pluginId: "hay-channel-test", capabilities },
     JWT_SECRET,
+    { issuer: "hay-plugin-api", audience: "plugin" },
   );
   return {
     user: null,

@@ -20,12 +20,14 @@ import { schedulerService } from "./scheduler.service";
 import { getPluginRunnerService } from "./plugin-runner.service";
 import { pluginInstanceRepository } from "../repositories/plugin-instance.repository";
 import { resolveConfigForWorker } from "@server/lib/config-resolver";
+import { configEnvAllowList } from "@server/lib/plugin-env";
 import { createLogger } from "@server/lib/logger";
 import type {
   AuthState,
   ConfigFieldDescriptor,
   CronJobDescriptor,
 } from "../types/plugin-sdk.types";
+import { workerFetch } from "@server/lib/worker-client";
 
 const logger = createLogger("plugin-cron");
 
@@ -142,6 +144,7 @@ export class PluginCronService {
       instance.config,
       instance.authState,
       configSchema,
+      configEnvAllowList(instance.plugin),
     );
 
     const runner = getPluginRunnerService();
@@ -150,18 +153,15 @@ export class PluginCronService {
       worker = await runner.startWorker(orgId, pluginId);
     }
 
-    const response = await fetch(
-      `http://localhost:${worker.port}/cron/${encodeURIComponent(cronName)}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          config: resolvedConfig,
-          authState: instance.authState ?? null,
-        }),
-        signal: AbortSignal.timeout(60_000),
-      },
-    );
+    const response = await workerFetch(worker.port, `/cron/${encodeURIComponent(cronName)}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        config: resolvedConfig,
+        authState: instance.authState ?? null,
+      }),
+      signal: AbortSignal.timeout(60_000),
+    });
 
     if (!response.ok) {
       const text = await response.text();

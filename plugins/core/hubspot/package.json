@@ -17,6 +17,9 @@
     "env": [
       "HUBSPOT_CLIENT_ID",
       "HUBSPOT_CLIENT_SECRET"
+    ],
+    "oauthHosts": [
+      "mcp.hubspot.com"
     ]
   },
   "scripts": {

@@ -5,7 +5,7 @@ import { pluginInstanceManagerService } from "./plugin-instance-manager.service"
 import { pluginRegistryRepository } from "../repositories/plugin-registry.repository";
 import { pluginInstanceRepository } from "../repositories/plugin-instance.repository";
 import { pluginWebhookRouteRepository } from "../repositories/plugin-webhook-route.repository";
-import { verifyHmacSha256 } from "./plugin-route.service";
+import { verifyHmacSha256 } from "@server/lib/hmac-signature";
 import { normalizeEmailAddressKey, verifySvixSignature } from "@server/lib/svix-signature";
 import type {
   WebhookDeauthorizationDescriptor,
@@ -16,6 +16,7 @@ import { createLogger } from "@server/lib/logger";
 import { parseSignedRequest } from "@server/lib/signed-request";
 import { isValidUuid } from "@server/lib/validation/uuid";
 import { getApiUrl } from "@server/config/env";
+import { WORKER_HOST, workerFetch } from "@server/lib/worker-client";
 
 const logger = createLogger("webhook-router");
 
@@ -478,7 +479,7 @@ export class WebhookRouterService {
         headers[key] = value[0];
       }
     });
-    headers.host = `localhost:${worker.port}`;
+    headers.host = `${WORKER_HOST}:${worker.port}`;
     headers["content-type"] = "application/json";
 
     const externalProto = req.get("x-forwarded-proto") || req.protocol;
@@ -489,9 +490,7 @@ export class WebhookRouterService {
     // so tell the worker to trust this request.
     headers["x-hay-webhook-verified"] = "true";
 
-    const workerUrl = `http://localhost:${worker.port}/webhook`;
-
-    const response = await fetch(workerUrl, {
+    const response = await workerFetch(worker.port, "/webhook", {
       method: "POST",
       headers,
       body: serialized,

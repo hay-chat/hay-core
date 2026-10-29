@@ -10,7 +10,7 @@ import { createContext } from "@server/trpc/context";
 import { initializeDatabase } from "@server/database/data-source";
 import { createLogger } from "@server/lib/logger";
 import { initTelemetry, captureException, shutdownTelemetry } from "@server/lib/telemetry";
-import { isPublicUploadPath } from "@server/services/media-url.service";
+import { isPublicUploadPath, setPublicUploadHeaders } from "@server/services/media-url.service";
 import "reflect-metadata";
 import "dotenv/config";
 
@@ -103,7 +103,6 @@ async function startServer() {
   const { pluginInstanceRepository: _pluginInstanceRepository } =
     await import("@server/repositories/plugin-instance.repository");
   const { pluginAssetService } = await import("@server/services/plugin-asset.service");
-  const { pluginRouteService } = await import("@server/services/plugin-route.service");
   const { websocketService } = await import("@server/services/websocket.service");
 
   const server = express();
@@ -185,10 +184,7 @@ async function startServer() {
       maxAge: "7d",
       etag: true,
       lastModified: true,
-      setHeaders: (res, _filePath) => {
-        // Security headers
-        res.setHeader("X-Content-Type-Options", "nosniff");
-      },
+      setHeaders: setPublicUploadHeaders,
     }),
   );
 
@@ -242,7 +238,9 @@ async function startServer() {
     });
   });
 
-  // Plugin UI assets route - serve dist/ files (ui.js, etc.)
+  // Plugin UI assets route - serve dist/ files (ui.js, etc.). The dashboard
+  // loads these with <script>/<link> tags, which carry no auth header, so the
+  // route serves static bundles of registered plugins only.
   server.get(/^\/plugins\/ui\/([^/]+)\/(.+)$/, async (req, res) => {
     req.params = { pluginName: req.params[0], assetPath: req.params[1] };
 
@@ -252,24 +250,6 @@ async function startServer() {
       logger.error({ err: error }, "UI asset serving error");
       res.status(500).json({ error: "Failed to load UI asset" });
     }
-  });
-
-  // Plugin webhook routes - handle incoming webhooks from external services
-  server.all(/^\/plugins\/webhooks\/([^/]+)\/(.*)$/, (req, res) => {
-    req.params = { pluginName: req.params[0], webhookPath: req.params[1] };
-    pluginRouteService.handleWebhook(req, res).catch((error) => {
-      logger.error({ err: error }, "Webhook handling error");
-      res.status(500).json({ error: "Internal server error" });
-    });
-  });
-
-  // Plugin webhook verification route - handle webhook verification challenges
-  server.get(/^\/plugins\/webhooks\/([^/]+)$/, (req, res) => {
-    req.params = { pluginName: req.params[0] };
-    pluginRouteService.handleWebhookVerification(req, res).catch((error) => {
-      logger.error({ err: error }, "Webhook verification error");
-      res.status(500).json({ error: "Internal server error" });
-    });
   });
 
   // Plugin worker proxy route - proxy requests to plugin workers
@@ -532,10 +512,6 @@ async function startServer() {
       const { pluginPagesService } = await import("./services/plugin-pages.service");
       await pluginPagesService.initialize();
       logger.info("Plugin pages synced with dashboard");
-
-      // Start plugin route service cleanup
-      pluginRouteService.startCleanup();
-      logger.info("Plugin route service started");
 
       // Start plugin instance lifecycle management
       pluginInstanceManagerService.startCleanup();

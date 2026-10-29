@@ -19,6 +19,14 @@ function toSupportedLanguage(value: string | null | undefined): SupportedLanguag
   return primary && SUPPORTED_LANGUAGE_VALUES.has(primary) ? (primary as SupportedLanguage) : null;
 }
 
+/** A customer or agent id given for a new conversation is not in its organization. */
+export class ConversationReferenceNotFoundError extends Error {
+  constructor(kind: "Customer" | "Agent") {
+    super(`${kind} not found`);
+    this.name = "ConversationReferenceNotFoundError";
+  }
+}
+
 export class ConversationService {
   private conversationRepository: ConversationRepository;
   private messageRepository: MessageRepository;
@@ -44,14 +52,23 @@ export class ConversationService {
   ): Promise<Conversation> {
     // If no customer_id is provided, create an anonymous customer
     let customerId = data.customer_id;
-    if (!customerId) {
+    if (customerId) {
+      if (!(await this.customerService.getCustomer(customerId, organizationId))) {
+        throw new ConversationReferenceNotFoundError("Customer");
+      }
+    } else {
       const anonymousCustomer = await this.customerService.createAnonymousCustomer(organizationId);
       customerId = anonymousCustomer.id;
     }
 
     // Determine agent_id: use provided, or fall back to organization's default agent, or first agent
     let agentId = data.agentId || null;
-    if (!agentId) {
+    if (agentId) {
+      const { agentRepository } = await import("../repositories/agent.repository");
+      if (!(await agentRepository.findByIdAndOrganization(agentId, organizationId))) {
+        throw new ConversationReferenceNotFoundError("Agent");
+      }
+    } else {
       const { organizationRepository } = await import("../repositories/organization.repository");
       const org = await organizationRepository.findById(organizationId);
       if (org?.defaultAgentId) {

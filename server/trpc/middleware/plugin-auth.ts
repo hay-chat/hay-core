@@ -2,19 +2,12 @@ import { TRPCError } from "@trpc/server";
 import { t } from "@server/trpc/init";
 import * as jwt from "jsonwebtoken";
 import type { Context } from "@server/trpc/context";
-import { config } from "@server/config/env";
-
-/**
- * Plugin JWT token payload
- */
-interface PluginTokenPayload {
-  organizationId: string;
-  pluginId: string;
-  scope: string;
-  capabilities: string[];
-  iat: number;
-  exp: number;
-}
+import {
+  isOrganizationOpenToPlugins,
+  PluginApiTokenClaimsError,
+  verifyPluginApiToken,
+} from "@server/lib/plugin-api-token";
+import { organizationRepository } from "@server/repositories/organization.repository";
 
 /**
  * Extended context with plugin authentication
@@ -36,6 +29,9 @@ export interface PluginAuthContext extends Context {
  * - pluginId: Plugin identifier
  * - scope: Must be "plugin-api"
  * - capabilities: Array of capabilities (routes, messages, customers, sources, mcp)
+ *
+ * Issuer, audience and scope are checked by the shared verifier, and the
+ * organization must exist, be active and not be suspended.
  */
 export const verifyPluginAuth = t.middleware(async ({ ctx, next }) => {
   // Extract token from Authorization header
@@ -57,37 +53,9 @@ export const verifyPluginAuth = t.middleware(async ({ ctx, next }) => {
     });
   }
 
+  let decoded;
   try {
-    // Verify JWT token
-    const decoded = jwt.verify(token, config.jwt.secret) as PluginTokenPayload;
-
-    // Verify scope
-    if (decoded.scope !== "plugin-api") {
-      throw new TRPCError({
-        code: "FORBIDDEN",
-        message: "Invalid token scope",
-      });
-    }
-
-    // Verify required fields
-    if (!decoded.organizationId || !decoded.pluginId || !decoded.capabilities) {
-      throw new TRPCError({
-        code: "FORBIDDEN",
-        message: "Invalid token payload",
-      });
-    }
-
-    // Add plugin auth to context
-    return await next({
-      ctx: {
-        ...ctx,
-        pluginAuth: {
-          organizationId: decoded.organizationId,
-          pluginId: decoded.pluginId,
-          capabilities: decoded.capabilities,
-        },
-      } as PluginAuthContext,
-    });
+    decoded = verifyPluginApiToken(token);
   } catch (error) {
     if (error instanceof jwt.TokenExpiredError) {
       throw new TRPCError({
@@ -103,9 +71,11 @@ export const verifyPluginAuth = t.middleware(async ({ ctx, next }) => {
       });
     }
 
-    // Re-throw TRPC errors
-    if (error instanceof TRPCError) {
-      throw error;
+    if (error instanceof PluginApiTokenClaimsError) {
+      throw new TRPCError({
+        code: "FORBIDDEN",
+        message: error.message,
+      });
     }
 
     throw new TRPCError({
@@ -113,6 +83,26 @@ export const verifyPluginAuth = t.middleware(async ({ ctx, next }) => {
       message: "Failed to verify token",
     });
   }
+
+  const organization = await organizationRepository.findById(decoded.organizationId);
+  if (!isOrganizationOpenToPlugins(organization)) {
+    throw new TRPCError({
+      code: "FORBIDDEN",
+      message: "Organization is not available",
+    });
+  }
+
+  // Add plugin auth to context
+  return next({
+    ctx: {
+      ...ctx,
+      pluginAuth: {
+        organizationId: decoded.organizationId,
+        pluginId: decoded.pluginId,
+        capabilities: decoded.capabilities,
+      },
+    } as PluginAuthContext,
+  });
 });
 
 /**

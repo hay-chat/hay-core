@@ -34,7 +34,7 @@ export default defineHayPlugin((globalCtx) => ({ name: "My Plugin" /* hooks */ }
 A plugin is **not** loaded in-process. Per `(orgId, pluginId)` the platform lazily spawns a
 **separate HTTP worker** (the SDK runner: `node packages/plugin-sdk/dist/runner/index.js
 --plugin-path=… --org-id=… --port=… --mode=production`), idle-killed after ~5 min. Core talks
-to it over HTTP: `/health`, `/metadata`, `/validate-auth`, `/config-update`, `/disable`,
+to it over loopback HTTP, authenticated with a per-worker secret: `/health`, `/metadata`, `/validate-auth`, `/config-update`, `/disable`,
 `/mcp/list-tools`, `/mcp/call-tool`, plus any routes you register. Implications:
 
 - Config and auth are injected as env JSON (`HAY_ORG_CONFIG`, `HAY_ORG_AUTH`); you read them

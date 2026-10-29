@@ -1,4 +1,3 @@
-import jwt from "jsonwebtoken";
 import type {
   PluginAPITokenPayload,
   EmailSendOptions,
@@ -8,11 +7,7 @@ import { emailService } from "../email.service";
 import { emailDomainService, addressDomain } from "../email-domains.service";
 import { createLogger } from "../../lib/logger";
 import { config } from "../../config/env";
-import {
-  mintPluginApiToken,
-  PLUGIN_API_TOKEN_AUDIENCE,
-  PLUGIN_API_TOKEN_ISSUER,
-} from "@server/lib/plugin-api-token";
+import { mintPluginApiToken, verifyPluginApiToken } from "@server/lib/plugin-api-token";
 
 const logger = createLogger("plugin-api");
 
@@ -106,12 +101,7 @@ export class PluginAPIService {
    */
   validateToken(token: string): PluginAPITokenPayload | null {
     try {
-      const decoded = jwt.verify(token, config.jwt.secret, {
-        issuer: PLUGIN_API_TOKEN_ISSUER,
-        audience: PLUGIN_API_TOKEN_AUDIENCE,
-      }) as PluginAPITokenPayload;
-
-      return decoded;
+      return verifyPluginApiToken(token);
     } catch (error) {
       logger.warn(
         { error: error instanceof Error ? error.message : "Unknown error" },

@@ -27,6 +27,8 @@ const schema: Record<string, ConfigFieldDescriptor> = {
   },
 };
 
+const allowedEnv = new Set(["TEST_SERVER_ONLY_APP_ID", "TEST_SERVER_ONLY_APP_SECRET"]);
+
 describe("serverOnly config fields never reach the worker", () => {
   beforeEach(() => {
     process.env.TEST_SERVER_ONLY_APP_ID = "env-app-id";
@@ -39,7 +41,7 @@ describe("serverOnly config fields never reach the worker", () => {
   });
 
   it("omits env-backed serverOnly fields from the worker config", () => {
-    const result = resolveConfigForWorker({}, null, schema);
+    const result = resolveConfigForWorker({}, null, schema, allowedEnv);
 
     expect(result.clientId).toBe("env-app-id");
     expect(result).not.toHaveProperty("clientSecret");

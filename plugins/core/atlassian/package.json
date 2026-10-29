@@ -21,6 +21,9 @@
       "ATLASSIAN_CLIENT_ID",
       "ATLASSIAN_CLIENT_SECRET"
     ],
+    "oauthHosts": [
+      "auth.atlassian.com"
+    ],
     "config": {
       "authMode": {
         "type": "string",

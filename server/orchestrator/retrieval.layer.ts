@@ -223,10 +223,9 @@ export class RetrievalLayer {
         "Filtered documents by similarity threshold",
       );
 
-      const documents = filteredResults.map((result) => ({
-        id: result.documentId,
-        similarity: result.similarity || 0,
-      }));
+      const documents = filteredResults.flatMap((result) =>
+        result.documentId ? [{ id: result.documentId, similarity: result.similarity || 0 }] : [],
+      );
 
       log.debug({ documentsCount: documents.length, documents }, "Document retrieval complete");
 

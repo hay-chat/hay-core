@@ -5,7 +5,7 @@ import { Conversation } from "../database/entities/conversation.entity";
 import { ConversationOutcome } from "../database/entities/conversation-outcome.entity";
 import { CLOSED_STATUSES } from "../services/close-classification/outcome-rules";
 import { AppDataSource } from "../database/data-source";
-import { BaseRepository } from "./base.repository";
+import { BaseRepository, assertSafeIdentifier } from "./base.repository";
 import type { ListParams } from "../trpc/middleware/pagination";
 import { Message, MessageType } from "@server/database/entities/message.entity";
 import { createLogger } from "@server/lib/logger";
@@ -358,6 +358,7 @@ export class ConversationRepository extends BaseRepository<Conversation> {
     // Add base where conditions if provided
     if (baseWhere) {
       Object.entries(baseWhere).forEach(([key, value], index) => {
+        assertSafeIdentifier(key, "baseWhere column");
         queryBuilder.andWhere(`entity.${key} = :baseWhere${index}`, {
           [`baseWhere${index}`]: value,
         });
@@ -387,7 +388,10 @@ export class ConversationRepository extends BaseRepository<Conversation> {
 
     // Apply select fields if specified
     if (listParams.select && listParams.select.length > 0) {
-      const selectFields = listParams.select.map((field: string) => `entity.${field}`);
+      const selectFields = listParams.select.map((field: string) => {
+        assertSafeIdentifier(field, "select field");
+        return `entity.${field}`;
+      });
       queryBuilder.select(selectFields);
     }
 
@@ -461,7 +465,10 @@ export class ConversationRepository extends BaseRepository<Conversation> {
     const searchFields = search.searchFields || ["title"];
 
     const searchConditions = searchFields
-      .map((field, index) => `entity.${field} ILIKE :searchQuery${index}`)
+      .map((field, index) => {
+        assertSafeIdentifier(field, "search field");
+        return `entity.${field} ILIKE :searchQuery${index}`;
+      })
       .join(" OR ");
 
     if (searchConditions) {
@@ -503,6 +510,7 @@ export class ConversationRepository extends BaseRepository<Conversation> {
           break;
         default:
           // Try to apply generic relation
+          assertSafeIdentifier(relation, "relation name");
           try {
             queryBuilder.leftJoinAndSelect(`entity.${relation}`, relation);
           } catch (error) {

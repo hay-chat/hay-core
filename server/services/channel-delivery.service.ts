@@ -39,6 +39,7 @@ import {
 } from "@server/database/entities/message.entity";
 import { toPublicAttachments, type PublicAttachment } from "./webchat/public-message";
 import { isSimulationConversation } from "./simulation/simulation-kind";
+import { workerFetch } from "@server/lib/worker-client";
 
 const logger = createLogger("channel-delivery");
 
@@ -360,10 +361,8 @@ export class ChannelDeliveryService {
         return;
       }
 
-      const escalateUrl = `http://localhost:${worker.port}/escalate`;
-
       try {
-        const response = await fetch(escalateUrl, {
+        const response = await workerFetch(worker.port, "/escalate", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -395,7 +394,7 @@ export class ChannelDeliveryService {
         }
       } catch (error) {
         logger.error(
-          { err: error, escalateUrl, conversationId },
+          { err: error, port: worker.port, conversationId },
           "Failed to call plugin /escalate",
         );
       }
@@ -552,10 +551,9 @@ export class ChannelDeliveryService {
       return { kind: "failed", retryable: true, error: "worker_unavailable" };
     }
 
-    const deliverUrl = `http://localhost:${worker.port}/deliver`;
     let response: Response;
     try {
-      response = await fetch(deliverUrl, {
+      response = await workerFetch(worker.port, "/deliver", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body,
@@ -565,7 +563,7 @@ export class ChannelDeliveryService {
       // have happened after the worker sent the message, so it is not retried.
       const refused = errorCode(error) === "ECONNREFUSED";
       logger.error(
-        { err: error, deliverUrl, refused },
+        { err: error, port: worker.port, refused },
         "Failed to deliver message to plugin worker",
       );
       return { kind: "failed", retryable: refused, error: "worker_unreachable" };
