@@ -6,6 +6,7 @@
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "scripts": {
+    "prepare": "tsc",
     "build": "tsc",
     "watch": "tsc --watch",
     "clean": "rm -rf dist",
