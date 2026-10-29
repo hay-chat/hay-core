@@ -213,3 +213,9 @@
 - **Failure mode**: A placeholder `quality@yourstore.com` in `settings.json` is linked-message syntax to vue-i18n; the compile error failed the entire en settings file and every dashboard string rendered as its raw key. Typecheck and unit tests passed.
 - **Detection signal**: Raw keys (`nav.inbox`) across the whole UI after a merge; vite "Invalid linked format" in the console.
 - **Prevention**: Write `{'@'}` (also for `{ } |`) in locale strings. `dashboard/tests/locale-messages.test.ts` compiles every message; keep it in the suite.
+
+### An undeclared prop on a plugin component falls through to the DOM
+
+- **Failure mode**: PluginPageSlot passes `:api="Hay"` to every plugin component. Components that didn't declare `api` (Messenger, Instagram, Chatwoot, Zendesk) got it as a root-element attribute; `setAttribute` stringified the tRPC proxy, which called a `toString` procedure and threw mid-mount, so the Suspense stayed on "Loading plugin component" forever with no error card.
+- **Detection signal**: A plugin slot spinning forever while the console shows `[PluginRegistry] Successfully loaded ...` followed by `client[procedureType] is not a function`.
+- **Prevention**: The registry returns plugin components with `inheritAttrs: false`. Never let a proxy object (tRPC client, reactive store) reach a DOM attribute; `dashboard/tests/plugin-page-slot.test.ts` mounts a component without the `api` prop.

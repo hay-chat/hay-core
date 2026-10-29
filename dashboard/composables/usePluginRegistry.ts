@@ -11,7 +11,7 @@
  * ```
  */
 
-import { defineAsyncComponent, type Component } from "vue";
+import { defineAsyncComponent, type Component, type ComponentOptions } from "vue";
 import { useDomain } from "@/composables/useDomain";
 
 interface PluginComponentCache {
@@ -160,7 +160,11 @@ export const usePluginRegistry = () => {
           }
 
           console.log(`[PluginRegistry] Successfully loaded ${componentName} from ${pluginId}`);
-          return loadedComponent;
+          // PluginPageSlot passes every component the same props (api, locale, ...).
+          // A prop the component doesn't declare would fall through to its root
+          // element as a DOM attribute, and stringifying the tRPC client (`api`)
+          // throws, leaving the slot stuck on its loading state.
+          return { ...(loadedComponent as ComponentOptions), inheritAttrs: false };
         },
         delay: 200,
         timeout: 10000,
