@@ -10,7 +10,16 @@
  */
 import { writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { ROOT, loadCustomers, loadEnv, loadOrders, loadProducts, log, parseFlags, requireEnv } from "./lib/data";
+import {
+  ROOT,
+  loadCustomers,
+  loadEnv,
+  loadOrders,
+  loadProducts,
+  log,
+  parseFlags,
+  requireEnv,
+} from "./lib/data";
 import type { Customer, OrderFixture, Product } from "./lib/types";
 import { API_VERSION, createShopify, type Shopify } from "./shopify/client";
 import { findCustomerIds, seedCustomers } from "./shopify/customers";
@@ -35,23 +44,37 @@ export interface SeedData {
 }
 
 /** Runs the selected steps against `shop`; returns the order rows for the summary. */
-export async function seedShopify(shop: Shopify, data: SeedData, options: SeedOptions): Promise<SeededOrder[]> {
+export async function seedShopify(
+  shop: Shopify,
+  data: SeedData,
+  options: SeedOptions,
+): Promise<SeededOrder[]> {
   const wants = (step: string) => options.only.size === 0 || options.only.has(step);
-  const orders = data.orders.filter((o) => options.orderKeys.size === 0 || options.orderKeys.has(o.key));
+  const orders = data.orders.filter(
+    (o) => options.orderKeys.size === 0 || options.orderKeys.has(o.key),
+  );
   const unknown = [...options.orderKeys].filter((key) => !data.orders.some((o) => o.key === key));
   if (unknown.length > 0) throw new Error(`Unknown order keys: ${unknown.join(", ")}`);
 
   let variantIds: Record<string, string> = {};
   let customerIds: Record<string, string> = {};
-  if (wants("products")) variantIds = await seedProducts(shop, data.products, { imageBaseUrl: options.imageBaseUrl });
+  if (wants("products"))
+    variantIds = await seedProducts(shop, data.products, { imageBaseUrl: options.imageBaseUrl });
   if (wants("customers")) customerIds = await seedCustomers(shop, data.customers);
   if (!wants("orders")) return [];
 
   // --only orders: resolve what the earlier steps would have returned.
-  if (!wants("products")) variantIds = await findVariantIds(shop, orders.flatMap((o) => o.lines.map((l) => l.sku)));
+  if (!wants("products"))
+    variantIds = await findVariantIds(
+      shop,
+      orders.flatMap((o) => o.lines.map((l) => l.sku)),
+    );
   if (!wants("customers")) {
     const used = new Set(orders.map((o) => o.customer.shopify));
-    customerIds = await findCustomerIds(shop, data.customers.filter((c) => used.has(c.key)));
+    customerIds = await findCustomerIds(
+      shop,
+      data.customers.filter((c) => used.has(c.key)),
+    );
   }
   if (options.resetOrders) await resetOrders(shop, options.orderKeys);
 
@@ -63,7 +86,8 @@ export async function seedShopify(shop: Shopify, data: SeedData, options: SeedOp
     now: options.now ?? new Date(),
   };
   const seeded: SeededOrder[] = [];
-  for (const fixture of orders) seeded.push(await seedOrder(shop, fixture, ctx, { pollMs: options.pollMs }));
+  for (const fixture of orders)
+    seeded.push(await seedOrder(shop, fixture, ctx, { pollMs: options.pollMs }));
   return seeded;
 }
 
@@ -79,7 +103,11 @@ export function summaryTable(rows: SeededOrder[]): string {
     r.tracking ?? "-",
   ]);
   const widths = header.map((h, i) => Math.max(h.length, ...body.map((row) => row[i].length)));
-  const line = (cells: string[]) => cells.map((c, i) => c.padEnd(widths[i])).join("  ").trimEnd();
+  const line = (cells: string[]) =>
+    cells
+      .map((c, i) => c.padEnd(widths[i]))
+      .join("  ")
+      .trimEnd();
   return [line(header), line(widths.map((w) => "-".repeat(w))), ...body.map(line)].join("\n");
 }
 
@@ -93,15 +121,24 @@ export async function run(argv: string[]): Promise<number> {
     const flags = parseFlags(argv);
     loadEnv();
     const env = flags.dryRun
-      ? { SHOPIFY_STORE_DOMAIN: process.env.SHOPIFY_STORE_DOMAIN || "dry-run.myshopify.com", SHOPIFY_ADMIN_TOKEN: "" }
+      ? {
+          SHOPIFY_STORE_DOMAIN: process.env.SHOPIFY_STORE_DOMAIN || "dry-run.myshopify.com",
+          SHOPIFY_ADMIN_TOKEN: "",
+        }
       : requireEnv("SHOPIFY_STORE_DOMAIN", "SHOPIFY_ADMIN_TOKEN");
     const domain = env.SHOPIFY_STORE_DOMAIN.replace(/^https?:\/\//, "").replace(/\/$/, "");
-    log(`Shopify ${domain} (Admin API ${API_VERSION})${flags.dryRun ? " — dry run, nothing is sent" : ""}`);
+    log(
+      `Shopify ${domain} (Admin API ${API_VERSION})${flags.dryRun ? " — dry run, nothing is sent" : ""}`,
+    );
 
     const shop = createShopify(flags, domain, env.SHOPIFY_ADMIN_TOKEN);
     const rows = await seedShopify(
       shop,
-      { products: loadProducts(), customers: loadCustomers("shopify"), orders: loadOrders("shopify") },
+      {
+        products: loadProducts(),
+        customers: loadCustomers("shopify"),
+        orders: loadOrders("shopify"),
+      },
       {
         only: flags.only,
         orderKeys: flags.orderKeys,
@@ -112,7 +149,10 @@ export async function run(argv: string[]): Promise<number> {
     if (rows.length > 0) {
       log(`\n${summaryTable(rows)}`);
       if (!flags.dryRun) {
-        writeFileSync(SUMMARY_FILE, `${JSON.stringify({ store: domain, seededAt: new Date().toISOString(), orders: rows }, null, 2)}\n`);
+        writeFileSync(
+          SUMMARY_FILE,
+          `${JSON.stringify({ store: domain, seededAt: new Date().toISOString(), orders: rows }, null, 2)}\n`,
+        );
         log(`\nWrote ${SUMMARY_FILE}`);
       }
     }

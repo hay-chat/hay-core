@@ -33,7 +33,12 @@ export function listPluginTools(platform: Platform): string[] {
 
 /** Plugin id for a tool name, by its `<platform>_` prefix. Throws for a tool of no known plugin. */
 export function pluginIdForTool(toolName: string): string {
-  const platform = (Object.keys(PLUGIN_IDS) as Platform[]).find((p) => toolName.startsWith(`${p}_`));
-  if (!platform) throw new Error(`{{action:${toolName}}} names no known plugin (expected a shopify_, woocommerce_ or nuvemshop_ tool)`);
+  const platform = (Object.keys(PLUGIN_IDS) as Platform[]).find((p) =>
+    toolName.startsWith(`${p}_`),
+  );
+  if (!platform)
+    throw new Error(
+      `{{action:${toolName}}} names no known plugin (expected a shopify_, woocommerce_ or nuvemshop_ tool)`,
+    );
   return PLUGIN_IDS[platform];
 }

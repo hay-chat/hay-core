@@ -75,7 +75,15 @@ const flame = (x: number, y: number) =>
 const leaf = (x: number, y: number, len: number, angle: number, colour = "#6F8F5E") =>
   `<ellipse cx="${x}" cy="${y - len / 2}" rx="${len * 0.22}" ry="${len / 2}" fill="${colour}" transform="rotate(${angle} ${x} ${y})"/>`;
 
-function jar(x: number, base: number, w: number, h: number, glass: string, label: string, lit = true): string {
+function jar(
+  x: number,
+  base: number,
+  w: number,
+  h: number,
+  glass: string,
+  label: string,
+  lit = true,
+): string {
   const top = base - h;
   return (
     `<rect x="${x - w / 2}" y="${top}" width="${w}" height="${h}" rx="${w * 0.14}" fill="${glass}"/>` +
@@ -88,7 +96,14 @@ function jar(x: number, base: number, w: number, h: number, glass: string, label
   );
 }
 
-function potShape(x: number, base: number, wTop: number, wBottom: number, h: number, fill: string): string {
+function potShape(
+  x: number,
+  base: number,
+  wTop: number,
+  wBottom: number,
+  h: number,
+  fill: string,
+): string {
   const top = base - h;
   return (
     `<path d="M${x - wTop / 2} ${top + 30} L ${x + wTop / 2} ${top + 30} L ${x + wBottom / 2} ${base} L ${x - wBottom / 2} ${base} Z" fill="${fill}"/>` +
@@ -114,7 +129,14 @@ function mug(x: number, base: number, w: number, h: number, fill: string, steam 
   );
 }
 
-function foldedCloth(x: number, base: number, w: number, layers: number, fill: string, pattern = ""): string {
+function foldedCloth(
+  x: number,
+  base: number,
+  w: number,
+  layers: number,
+  fill: string,
+  pattern = "",
+): string {
   let out = "";
   for (let i = 0; i < layers; i++) {
     const y = base - (i + 1) * 46;
@@ -254,7 +276,12 @@ const DRAWERS: Record<string, Drawer> = {
     shadow(600, 860, 340) +
     `<path d="M300 460 L 900 460 L 940 860 L 260 860 Z" fill="${c}"/>` +
     `<path d="M300 460 L 900 460 L 880 540 L 320 540 Z" fill="${shade(c, -0.08)}"/>` +
-    [400, 520, 640, 760].map((x) => `<line x1="${x}" y1="560" x2="${x - 20 + (x - 600) * 0.12}" y2="850" stroke="#fff" stroke-width="5" opacity="0.3"/>`).join(""),
+    [400, 520, 640, 760]
+      .map(
+        (x) =>
+          `<line x1="${x}" y1="560" x2="${x - 20 + (x - 600) * 0.12}" y2="850" stroke="#fff" stroke-width="5" opacity="0.3"/>`,
+      )
+      .join(""),
   "linen-table-runner": (c) =>
     shadow(600, 820, 420, 20) +
     `<path d="M240 700 L 900 560 L 960 640 L 300 790 Z" fill="${c}"/>` +
@@ -269,7 +296,12 @@ const DRAWERS: Record<string, Drawer> = {
     `<path d="M220 600 L 980 600 L 940 800 L 260 800 Z" fill="#B88A5A"/>` +
     `<path d="M260 620 L 940 620 L 910 780 L 290 780 Z" fill="#D2A876"/>` +
     `<rect x="300" y="650" width="70" height="20" rx="10" fill="#8F6A42"/><rect x="830" y="650" width="70" height="20" rx="10" fill="#8F6A42"/>` +
-    [660, 700, 740].map((y) => `<path d="M380 ${y} C 500 ${y - 12}, 700 ${y + 12}, 820 ${y}" stroke="#B88A5A" stroke-width="4" fill="none" opacity="0.6"/>`).join(""),
+    [660, 700, 740]
+      .map(
+        (y) =>
+          `<path d="M380 ${y} C 500 ${y - 12}, 700 ${y + 12}, 820 ${y}" stroke="#B88A5A" stroke-width="4" fill="none" opacity="0.6"/>`,
+      )
+      .join(""),
   "stoneware-serving-bowl": () =>
     shadow(600, 830, 340) +
     `<path d="M240 590 L 960 590 C 940 760, 800 830, 600 830 C 400 830, 260 760, 240 590 Z" fill="#F6F3EC"/>` +
@@ -290,7 +322,9 @@ const DRAWERS: Record<string, Drawer> = {
     `<ellipse cx="497" cy="740" rx="70" ry="110" fill="#B8915F"/><ellipse cx="497" cy="740" rx="48" ry="84" fill="#9C7650"/></g>` +
     `<g transform="rotate(12 600 600)"><rect x="686" y="300" width="34" height="380" rx="17" fill="#A88358"/>` +
     `<path d="M633 660 L 773 660 L 763 850 L 643 850 Z" fill="#B8915F"/>` +
-    [665, 703, 741].map((x) => `<rect x="${x}" y="720" width="14" height="140" fill="${CATEGORY_BG.serving}"/>`).join("") +
+    [665, 703, 741]
+      .map((x) => `<rect x="${x}" y="720" width="14" height="140" fill="${CATEGORY_BG.serving}"/>`)
+      .join("") +
     `</g>`,
 };
 
@@ -302,7 +336,10 @@ function escapeXml(text: string): string {
 
 function render(product: Product, index: number): string {
   const drawer = DRAWERS[product.handle];
-  if (!drawer) throw new Error(`No drawing for "${product.handle}". Add one to DRAWERS in generate-images.ts.`);
+  if (!drawer)
+    throw new Error(
+      `No drawing for "${product.handle}". Add one to DRAWERS in generate-images.ts.`,
+    );
   const bg = CATEGORY_BG[product.category];
   const variant = product.variants[index === 0 ? 0 : Math.min(1, product.variants.length - 1)];
   const colour = OPTION_COLOUR[variant.options[0] ?? ""] ?? "#C46A45";
@@ -338,14 +375,20 @@ async function launchChromium(): Promise<Browser> {
     return await chromium.launch();
   } catch (error) {
     if (!String(error).includes("Executable doesn't exist")) throw error;
-    const browsersDir = process.env.PLAYWRIGHT_BROWSERS_PATH || join(homedir(), ".cache", "ms-playwright");
+    const browsersDir =
+      process.env.PLAYWRIGHT_BROWSERS_PATH || join(homedir(), ".cache", "ms-playwright");
     const shells = existsSync(browsersDir)
       ? readdirSync(browsersDir)
           .filter((name) => name.startsWith("chromium_headless_shell-"))
           .sort((a, b) => Number(b.split("-")[1]) - Number(a.split("-")[1]))
       : [];
     for (const dir of shells) {
-      const executablePath = join(browsersDir, dir, "chrome-headless-shell-linux64", "chrome-headless-shell");
+      const executablePath = join(
+        browsersDir,
+        dir,
+        "chrome-headless-shell-linux64",
+        "chrome-headless-shell",
+      );
       if (existsSync(executablePath)) {
         log(`Playwright's bundled Chromium is missing; using ${executablePath}`);
         return chromium.launch({ executablePath });
@@ -365,9 +408,15 @@ async function main(): Promise<void> {
   try {
     for (const product of products) {
       for (const [index, file] of product.images.entries()) {
-        await page.setContent(`<!doctype html><html><body style="margin:0">${render(product, index)}</body></html>`);
+        await page.setContent(
+          `<!doctype html><html><body style="margin:0">${render(product, index)}</body></html>`,
+        );
         const path = join(IMAGES_DIR, file);
-        await page.screenshot({ path, type: "png", clip: { x: 0, y: 0, width: SIZE, height: SIZE } });
+        await page.screenshot({
+          path,
+          type: "png",
+          clip: { x: 0, y: 0, width: SIZE, height: SIZE },
+        });
         const size = statSync(path).size;
         count += 1;
         bytes += size;

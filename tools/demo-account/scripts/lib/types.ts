@@ -8,7 +8,12 @@ export type Localized = Record<Locale, string>;
 export type Currency = "USD" | "EUR" | "BRL";
 export type Platform = "shopify" | "woocommerce" | "nuvemshop";
 
-export type Category = "candles" | "pots-and-vases" | "cups-and-mugs" | "napkins-and-linen" | "serving";
+export type Category =
+  | "candles"
+  | "pots-and-vases"
+  | "cups-and-mugs"
+  | "napkins-and-linen"
+  | "serving";
 
 export interface ProductVariant {
   /** Unique across the catalogue, e.g. "CA-CND-001-SAN". Seed scripts match on it (idempotency). */

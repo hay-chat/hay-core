@@ -45,7 +45,13 @@ export function parseFlags(argv = process.argv.slice(2)): Flags {
     const i = argv.indexOf(name);
     return i >= 0 ? (argv[i + 1] ?? "") : "";
   };
-  const list = (name: string) => new Set(value(name).split(",").map((s) => s.trim()).filter(Boolean));
+  const list = (name: string) =>
+    new Set(
+      value(name)
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean),
+    );
   return { dryRun: argv.includes("--dry-run"), only: list("--only"), orderKeys: list("--orders") };
 }
 
@@ -64,7 +70,9 @@ export function loadEnv(): void {
 export function requireEnv(...names: string[]): Record<string, string> {
   const missing = names.filter((n) => !process.env[n]);
   if (missing.length > 0) {
-    throw new Error(`Missing ${missing.join(", ")}. Set them in tools/demo-account/.env (see .env.example).`);
+    throw new Error(
+      `Missing ${missing.join(", ")}. Set them in tools/demo-account/.env (see .env.example).`,
+    );
   }
   return Object.fromEntries(names.map((n) => [n, process.env[n] as string]));
 }
@@ -75,7 +83,10 @@ export function daysAgo(days: number, now = new Date()): Date {
 
 /** Deterministic per fixture + platform, so re-runs and scenarios see the same number. */
 export function trackingNumber(fixture: OrderFixture, platform: Platform): string {
-  const digits = parseInt(createHash("sha256").update(`${platform}:${fixture.key}`).digest("hex").slice(0, 10), 16)
+  const digits = parseInt(
+    createHash("sha256").update(`${platform}:${fixture.key}`).digest("hex").slice(0, 10),
+    16,
+  )
     .toString()
     .padStart(12, "0")
     .slice(0, 12);
@@ -109,7 +120,9 @@ export async function http<T = unknown>(
   options: { headers?: Record<string, string>; body?: unknown; dryRunResult?: T } = {},
 ): Promise<T> {
   if (flags.dryRun && method !== "GET") {
-    log(`  [dry-run] ${method} ${url}${options.body ? ` ${JSON.stringify(options.body).slice(0, 300)}` : ""}`);
+    log(
+      `  [dry-run] ${method} ${url}${options.body ? ` ${JSON.stringify(options.body).slice(0, 300)}` : ""}`,
+    );
     return (options.dryRunResult ?? ({} as T)) as T;
   }
   const response = await fetch(url, {
@@ -148,7 +161,9 @@ export function printSeededTable(rows: SeededOrder[]): void {
     ["tracking", (r) => r.tracking ?? "-"],
     ["result", (r) => r.result],
   ];
-  const widths = cols.map(([title, get]) => Math.max(title.length, ...rows.map((r) => get(r).length)));
+  const widths = cols.map(([title, get]) =>
+    Math.max(title.length, ...rows.map((r) => get(r).length)),
+  );
   const line = (cells: string[]) => cells.map((c, i) => c.padEnd(widths[i])).join("  ");
   log("");
   log(line(cols.map(([title]) => title)));
@@ -157,8 +172,15 @@ export function printSeededTable(rows: SeededOrder[]): void {
 }
 
 /** Writes orders/seeded-<platform>.json (gitignored) so scenarios can look orders up by key. */
-export function writeSeededOrders(platform: Platform, rows: SeededOrder[], extra: Record<string, unknown> = {}): string {
+export function writeSeededOrders(
+  platform: Platform,
+  rows: SeededOrder[],
+  extra: Record<string, unknown> = {},
+): string {
   const file = join(ROOT, "orders", `seeded-${platform}.json`);
-  writeFileSync(file, `${JSON.stringify({ platform, seededAt: new Date().toISOString(), ...extra, orders: rows }, null, 2)}\n`);
+  writeFileSync(
+    file,
+    `${JSON.stringify({ platform, seededAt: new Date().toISOString(), ...extra, orders: rows }, null, 2)}\n`,
+  );
   return file;
 }

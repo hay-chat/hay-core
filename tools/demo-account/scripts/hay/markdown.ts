@@ -46,7 +46,7 @@ function unquote(value: string): string {
  * `  - item` lines; that's all the content files use.
  */
 export function parseFrontMatter(source: string): ParsedFile {
-  const text = source.replace(/^﻿/, "").replace(/\r\n/g, "\n");
+  const text = source.replace(/^\uFEFF/, "").replace(/\r\n/g, "\n");
   const match = /^---\n([\s\S]*?)\n---\n?/.exec(text);
   if (!match) return { data: {}, body: text.trim() };
 
@@ -100,7 +100,12 @@ export function parseInline(text: string, resolve: ActionResolver): TiptapNode[]
     if (action) {
       nodes.push({
         type: "mention",
-        attrs: { id: `${resolve(action)}:${action}`, label: action, type: "action", pluginId: resolve(action) },
+        attrs: {
+          id: `${resolve(action)}:${action}`,
+          label: action,
+          type: "action",
+          pluginId: resolve(action),
+        },
       });
     } else if (bold) {
       nodes.push(...withMark(parseInline(bold, resolve), "bold"));
@@ -137,7 +142,10 @@ export function markdownToTiptap(markdown: string, resolve: ActionResolver): Tip
       content.push({
         type: list.kind,
         ...(list.kind === "orderedList" && { attrs: { start: 1 } }),
-        content: list.items.map((item) => ({ type: "listItem", content: [paragraph(item, resolve)] })),
+        content: list.items.map((item) => ({
+          type: "listItem",
+          content: [paragraph(item, resolve)],
+        })),
       });
     }
     list = null;

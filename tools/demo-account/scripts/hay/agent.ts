@@ -19,7 +19,8 @@ export interface AgentDefinition {
 
 const EN: AgentDefinition = {
   name: AGENT_NAME,
-  description: "Casa Aurora's Hay.chat AI agent (demo account). Seeded by tools/demo-account/scripts/seed-hay.ts.",
+  description:
+    "Casa Aurora's Hay.chat AI agent (demo account). Seeded by tools/demo-account/scripts/seed-hay.ts.",
   language: "en",
   tone:
     "Warm, short and practical. Use the shopper's first name. Name the next step and the date. " +
@@ -42,7 +43,8 @@ You help shoppers of Casa Aurora, a small home-goods brand from São Paulo: hand
 
 const PT: AgentDefinition = {
   name: AGENT_NAME,
-  description: "Agente de IA da Casa Aurora no Hay.chat (conta de demonstração). Criado por tools/demo-account/scripts/seed-hay.ts.",
+  description:
+    "Agente de IA da Casa Aurora no Hay.chat (conta de demonstração). Criado por tools/demo-account/scripts/seed-hay.ts.",
   language: "pt",
   tone:
     "Acolhedor, curto e prático. Chame o cliente pelo primeiro nome. Diga o próximo passo e a data. " +

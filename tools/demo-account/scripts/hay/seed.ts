@@ -91,7 +91,9 @@ interface SavedPlaybook {
 async function listAllDocuments(api: TrpcClient): Promise<RemoteDocument[]> {
   const all: RemoteDocument[] = [];
   for (let page = 1; ; page++) {
-    const result = await api.query<ListPage<RemoteDocument>>("documents.list", { pagination: { page, limit: 100 } });
+    const result = await api.query<ListPage<RemoteDocument>>("documents.list", {
+      pagination: { page, limit: 100 },
+    });
     all.push(...result.items);
     if (!result.pagination.hasNext) return all;
   }
@@ -103,7 +105,8 @@ export function offlineActionWarnings(platform: Platform, playbooks: PlaybookFil
   const warnings: string[] = [];
   for (const playbook of playbooks) {
     for (const action of playbook.actions) {
-      if (!tools.has(action)) warnings.push(`${playbook.file}: {{action:${action}}} is not a ${platform} tool`);
+      if (!tools.has(action))
+        warnings.push(`${playbook.file}: {{action:${action}}} is not a ${platform} tool`);
     }
   }
   return warnings;
@@ -127,7 +130,10 @@ export async function seedHay(api: TrpcClient | null, options: SeedOptions): Pro
   // ---- settings: time zone, language, business hours, quick check
   if (options.steps.has("settings")) {
     log(`Settings (${TIMEZONES[platform]}, ${locale})`);
-    const settings = { timezone: TIMEZONES[platform], defaultLanguage: locale === "pt-BR" ? "pt" : "en" };
+    const settings = {
+      timezone: TIMEZONES[platform],
+      defaultLanguage: locale === "pt-BR" ? "pt" : "en",
+    };
     if (!dryRun) await client.mutation("organizations.updateSettings", settings);
     write("update", `organization settings ${JSON.stringify(settings)}`);
 
@@ -142,7 +148,11 @@ export async function seedHay(api: TrpcClient | null, options: SeedOptions): Pro
       : (await client.query<Schedule[]>("businessHours.list")).find((s) => s.channels.length === 0);
     if (existing) {
       // Keep closures someone added in the dashboard (holidays).
-      await client.mutation("businessHours.update", { ...schedule, id: existing.id, closures: existing.closures });
+      await client.mutation("businessHours.update", {
+        ...schedule,
+        id: existing.id,
+        closures: existing.closures,
+      });
       write("update", `business hours "${SCHEDULE_NAME}" Mon–Fri 09:00–18:00`);
     } else {
       if (!dryRun) await client.mutation("businessHours.create", { ...schedule, closures: [] });
@@ -152,7 +162,9 @@ export async function seedHay(api: TrpcClient | null, options: SeedOptions): Pro
     if (options.quickCheck !== undefined) {
       const current = dryRun
         ? { updateAfterMinutes: 5, giveUpAfterMinutes: 10 }
-        : await client.query<{ updateAfterMinutes: number; giveUpAfterMinutes: number }>("teamQuestions.getSettings");
+        : await client.query<{ updateAfterMinutes: number; giveUpAfterMinutes: number }>(
+            "teamQuestions.getSettings",
+          );
       const input = {
         enabled: options.quickCheck,
         updateAfterMinutes: current.updateAfterMinutes,
@@ -203,11 +215,21 @@ export async function seedHay(api: TrpcClient | null, options: SeedOptions): Pro
         report.unchanged.push(`document "${doc.title}"`);
         log(`  unchanged document "${doc.title}"`);
       } else if (match) {
-        await client.mutation("documents.update", { id: match.id, title: doc.title, content: doc.content, status: "published" });
+        await client.mutation("documents.update", {
+          id: match.id,
+          title: doc.title,
+          content: doc.content,
+          status: "published",
+        });
         write("update", `document "${doc.title}"`);
       } else {
         if (!dryRun) {
-          await client.mutation("documents.create", { title: doc.title, content: doc.content, type: doc.type, status: "published" });
+          await client.mutation("documents.create", {
+            title: doc.title,
+            content: doc.content,
+            type: doc.type,
+            status: "published",
+          });
         }
         write("create", `document "${doc.title}"`);
       }
@@ -217,7 +239,10 @@ export async function seedHay(api: TrpcClient | null, options: SeedOptions): Pro
   // ---- playbooks
   if (options.steps.has("playbooks")) {
     log(`Playbooks (${playbooks.length}, ${options.playbookStatus})`);
-    if (!dryRun && !agentId) throw new Error(`Agent "${agentDefinition(locale).name}" not found: run with the agent step first`);
+    if (!dryRun && !agentId)
+      throw new Error(
+        `Agent "${agentDefinition(locale).name}" not found: run with the agent step first`,
+      );
     const existing = dryRun ? [] : await client.query<RemotePlaybook[]>("playbooks.list");
     for (const playbook of playbooks) {
       const match = existing.find((p) => p.title === playbook.title);
@@ -230,7 +255,9 @@ export async function seedHay(api: TrpcClient | null, options: SeedOptions): Pro
       };
       let saved: SavedPlaybook | undefined;
       if (match) {
-        const agentIds = [...new Set([...(match.agents ?? []).map((a) => a.id), agentId as string])];
+        const agentIds = [
+          ...new Set([...(match.agents ?? []).map((a) => a.id), agentId as string]),
+        ];
         saved = await client.mutation<SavedPlaybook>("playbooks.update", {
           id: match.id,
           data: { ...fields, agentIds, approvalCategories: playbook.approvalCategories },
@@ -238,7 +265,10 @@ export async function seedHay(api: TrpcClient | null, options: SeedOptions): Pro
         write("update", `playbook "${playbook.title}"`);
       } else {
         if (!dryRun) {
-          saved = await client.mutation<SavedPlaybook>("playbooks.create", { ...fields, agentIds: [agentId] });
+          saved = await client.mutation<SavedPlaybook>("playbooks.create", {
+            ...fields,
+            agentIds: [agentId],
+          });
           // create takes no approvalCategories; update sets them.
           if (playbook.approvalCategories.length > 0) {
             saved = await client.mutation<SavedPlaybook>("playbooks.update", {
@@ -249,7 +279,8 @@ export async function seedHay(api: TrpcClient | null, options: SeedOptions): Pro
         }
         write("create", `playbook "${playbook.title}"`);
       }
-      for (const warning of saved?.actionWarnings ?? []) report.actionWarnings.push(`${playbook.title}: ${warning}`);
+      for (const warning of saved?.actionWarnings ?? [])
+        report.actionWarnings.push(`${playbook.title}: ${warning}`);
     }
     // Checked against the plugin sources too, so a typo shows even when the plugin isn't connected.
     report.actionWarnings.push(...offlineActionWarnings(platform, playbooks));
