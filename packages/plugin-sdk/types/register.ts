@@ -13,6 +13,7 @@ import type { PluginPage } from "./ui";
 import type { CronJobOptions } from "./cron";
 import type { WebhookRoutingDescriptor } from "./webhook-routing";
 import type { RegisterWebchatAPI } from "./webchat";
+import type { SetupOptions } from "./setup";
 
 /**
  * UI registration API.
@@ -286,6 +287,32 @@ export interface HayRegisterAPI {
    * capability in the manifest.
    */
   webchat: RegisterWebchatAPI;
+
+  /**
+   * Declare the setup checklist core shows on the plugin's Setup tab, and
+   * optionally report the plugin's own status (`POST /setup/status`).
+   * Each step needs `setupSteps.<id>.title` in `i18n/en.json` and `i18n/pt-BR.json`.
+   *
+   * @example
+   * ```typescript
+   * register.setup({
+   *   steps: [
+   *     { id: 'store', kind: 'fields', fields: ['shopDomain'] },
+   *     { id: 'connect', kind: 'connect' },
+   *     { id: 'notify', kind: 'fields', fields: ['recipients'], optional: true },
+   *   ],
+   *   async status({ auth, config }) {
+   *     const connected = !!auth.get();
+   *     return {
+   *       state: connected ? 'connected' : 'needs_action',
+   *       account: config.getOptional<string>('shopDomain'),
+   *       steps: { connect: { done: connected } },
+   *     };
+   *   },
+   * });
+   * ```
+   */
+  setup(options: SetupOptions): void;
 
   // Future: mcp descriptor registration (optional)
   // mcp?: RegisterMcpDescriptorAPI;

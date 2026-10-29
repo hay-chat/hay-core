@@ -72,6 +72,8 @@ export interface PluginMetadata {
   webhookRouting?: WebhookRoutingDescriptor;
   /** Plugin-declared webchat contributions and gates (from register.webchat). */
   webchat?: WebchatMetadata;
+  /** Plugin-declared setup checklist (from register.setup). */
+  setup?: SetupMetadata;
 }
 
 // ============================================================================
@@ -99,6 +101,26 @@ export interface WebchatGateDescriptor {
 export interface WebchatMetadata {
   contributions: WebchatContributionDescriptor[];
   gates: WebchatGateDescriptor[];
+}
+
+// ============================================================================
+// Setup checklist + status contract (register.setup, POST /setup/status)
+// ============================================================================
+
+export type SetupStepKind = "fields" | "connect" | "component" | "external" | "verify";
+
+export interface SetupStepDescriptor {
+  id: string;
+  kind: SetupStepKind;
+  optional?: boolean;
+  fields?: string[];
+  component?: string;
+  url?: string;
+}
+
+export interface SetupMetadata {
+  steps: SetupStepDescriptor[];
+  hasStatus: boolean;
 }
 
 // ============================================================================

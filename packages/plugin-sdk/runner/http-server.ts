@@ -14,6 +14,7 @@ import type {
   HayMcpRuntimeAPI,
   ToolRiskSpec,
   WebchatGateEvent,
+  SetupState,
 } from "../types/index.js";
 import { PluginRegistry } from "../sdk/registry.js";
 import type { HayPluginDefinition } from "../types/plugin.js";
@@ -50,6 +51,8 @@ function captureRawBody(req: Request, _res: Response, buf: Buffer): void {
   }
 }
 
+const SETUP_STATES: SetupState[] = ["not_set_up", "needs_action", "connected", "error"];
+
 export class PluginHttpServer {
   private app: Express;
   private server: Server | null = null;
@@ -84,6 +87,7 @@ export class PluginHttpServer {
     this.setupLifecycleEndpoints();
     this.setupCronEndpoint();
     this.setupWebchatGateEndpoint();
+    this.setupStatusEndpoint();
     this.setupMcpEndpoints();
     this.setupPluginRoutes();
     this.setupErrorHandler();
@@ -237,6 +241,7 @@ export class PluginHttpServer {
           crons: this.registry.getCronJobDescriptors(),
           webhookRouting: this.registry.getWebhookRouting(),
           webchat: this.registry.getWebchatMetadata(),
+          setup: this.registry.getSetupMetadata(),
         };
 
         res.json(metadata);
@@ -582,6 +587,68 @@ export class PluginHttpServer {
         const errorMsg = err instanceof Error ? err.message : String(err);
         this.logger.error(`Error in cron job ${jobName}`, { error: errorMsg });
         res.status(500).json({ success: false, error: errorMsg });
+      }
+    });
+  }
+
+  /**
+   * Setup the setup-status endpoint (D20 status contract).
+   *
+   * `POST /setup/status` runs the plugin's `register.setup({ status })` handler
+   * with the resolved org config and auth state Core sends (like a cron run).
+   * 404 when the plugin declares no status handler. A malformed result is a 500,
+   * so Core falls back to judging the status itself.
+   */
+  private setupStatusEndpoint(): void {
+    this.app.post("/setup/status", async (req: Request, res: Response): Promise<void> => {
+      try {
+        const handler = this.registry.getSetup()?.status;
+        if (!handler) {
+          res.status(404).json({ error: "Plugin does not report setup status" });
+          return;
+        }
+        if (!this.orgId || !this.manifest) {
+          res.status(400).json({ error: "Runtime data not set" });
+          return;
+        }
+
+        const { config, authState } = req.body ?? {};
+        const configAPI = createConfigRuntimeAPI({
+          orgConfig: { ...(this.orgConfig ?? {}), ...(config ?? {}) },
+          registry: this.registry,
+          manifest: { env: this.manifest.env },
+          logger: this.logger,
+        });
+        const authAPI = createAuthRuntimeAPI({ authState: authState ?? null, logger: this.logger });
+
+        const result = await handler({
+          org: { id: this.orgId },
+          config: configAPI,
+          auth: authAPI,
+          logger: this.logger,
+        });
+
+        if (!result || !SETUP_STATES.includes(result.state)) {
+          res.status(500).json({ error: "Setup status handler returned an invalid state" });
+          return;
+        }
+        const steps: Record<string, { done: boolean; message?: string }> = {};
+        for (const [id, step] of Object.entries(result.steps ?? {})) {
+          if (!step || typeof step.done !== "boolean") continue;
+          steps[id] = {
+            done: step.done,
+            ...(typeof step.message === "string" ? { message: step.message.slice(0, 200) } : {}),
+          };
+        }
+        res.json({
+          state: result.state,
+          ...(typeof result.account === "string" ? { account: result.account.slice(0, 200) } : {}),
+          steps,
+        });
+      } catch (err) {
+        const errorMsg = err instanceof Error ? err.message : String(err);
+        this.logger.error("Error in setup status handler", { error: errorMsg });
+        res.status(500).json({ error: errorMsg });
       }
     });
   }

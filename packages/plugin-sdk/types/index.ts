@@ -141,6 +141,21 @@ export type {
 } from "./webchat";
 
 // ============================================================================
+// Setup checklist + status contract (D20)
+// ============================================================================
+
+export type {
+  SetupStepKind,
+  SetupStep,
+  SetupState,
+  SetupStatus,
+  HaySetupStatusContext,
+  SetupStatusHandler,
+  SetupOptions,
+  SetupMetadata,
+} from "./setup";
+
+// ============================================================================
 // Cron Jobs (HAY-221)
 // ============================================================================
 
