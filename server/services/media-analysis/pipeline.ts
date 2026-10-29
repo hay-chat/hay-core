@@ -63,10 +63,7 @@ export async function markMediaPending(
   const marked = readFiles ? markAnalysisPending(attachments) : attachments;
   if (!marked?.length) return marked;
   const scanning = new Set(
-    await pendingScans(
-      organizationId,
-      marked.map((attachment) => attachment.id).filter(isUuid),
-    ),
+    await pendingScans(organizationId, marked.map((attachment) => attachment.id).filter(isUuid)),
   );
   if (!scanning.size) return marked;
   return marked.map((attachment) =>

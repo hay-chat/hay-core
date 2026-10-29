@@ -72,10 +72,7 @@ describe("feedback → insight issues (D3-9)", () => {
   const issues = () => AppDataSource.getRepository(InsightIssue);
 
   /** A conversation in `org` with a customer question and an AI reply; returns the reply. */
-  async function ratedReply(
-    org = orgId,
-    metadata: Record<string, unknown> = {},
-  ): Promise<Message> {
+  async function ratedReply(org = orgId, metadata: Record<string, unknown> = {}): Promise<Message> {
     const conversation = await repository.create({
       title: "feedback insights test",
       organization_id: org,

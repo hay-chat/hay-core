@@ -35,6 +35,9 @@ jest.mock("@server/services/orchestrator-queue.service", () => ({
   orchestratorQueueService: { enqueue: mockEnqueue },
 }));
 jest.mock("../../orchestrator/run", () => ({ runConversation: jest.fn() }));
+jest.mock("@server/services/team-questions/team-question.service", () => ({
+  teamQuestionService: { conversationIdsWithOpenQuestion: async () => new Set<string>() },
+}));
 
 const mockLogger = {
   debug: jest.fn(),

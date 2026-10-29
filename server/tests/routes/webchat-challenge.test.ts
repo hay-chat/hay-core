@@ -129,8 +129,13 @@ describe("GET /v1/webchat/challenge", () => {
   });
 
   it("rejects malformed origins and unknown contributions", async () => {
-    expect((await load({ org: ORG, c: challenge.id, origin: "https://shop.example.com/x" })).statusCode).toBe(400);
-    expect((await load({ org: ORG, c: "other.challenge", origin: "https://shop.example.com" })).statusCode).toBe(404);
+    expect(
+      (await load({ org: ORG, c: challenge.id, origin: "https://shop.example.com/x" })).statusCode,
+    ).toBe(400);
+    expect(
+      (await load({ org: ORG, c: "other.challenge", origin: "https://shop.example.com" }))
+        .statusCode,
+    ).toBe(404);
   });
 
   it("is unavailable when no challenge is configured (keys unset)", async () => {
@@ -141,7 +146,10 @@ describe("GET /v1/webchat/challenge", () => {
 
   it("escapes values embedded in the inline script", async () => {
     mockResolveChallenges.mockResolvedValue([
-      { ...challenge, props: { ...challenge.props, siteKey: "</script><script>alert(1)</script>" } },
+      {
+        ...challenge,
+        props: { ...challenge.props, siteKey: "</script><script>alert(1)</script>" },
+      },
     ]);
     const res = await load({ org: ORG, c: challenge.id, origin: "https://shop.example.com" });
     expect(res.body).not.toContain("</script><script>alert(1)");

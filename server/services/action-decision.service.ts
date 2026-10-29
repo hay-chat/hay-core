@@ -147,7 +147,8 @@ export class ActionDecisionService {
     for (const id of ids) {
       const { action, transitioned, blocked } = await this.approve(id, organizationId, decider);
       if (!action) results.push({ id, status: "not_found" });
-      else if (blocked === "conversation_closed") results.push({ id, status: "conversation_closed" });
+      else if (blocked === "conversation_closed")
+        results.push({ id, status: "conversation_closed" });
       else if (!transitioned) results.push({ id, status: "already_decided" });
       else results.push({ id, status: action.status === "executed" ? "executed" : "failed" });
     }

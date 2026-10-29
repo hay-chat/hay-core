@@ -52,7 +52,10 @@ export class PluginStateService {
     await repo.delete({ organizationId, pluginId, expiresAt: LessThan(new Date()) });
 
     const existing = await repo.findOne({ where: { organizationId, pluginId, key } });
-    if (!existing && (await repo.count({ where: { organizationId, pluginId } })) >= PLUGIN_STATE_MAX_KEYS) {
+    if (
+      !existing &&
+      (await repo.count({ where: { organizationId, pluginId } })) >= PLUGIN_STATE_MAX_KEYS
+    ) {
       throw new PluginStateLimitError(`A plugin keeps at most ${PLUGIN_STATE_MAX_KEYS} state keys`);
     }
     const expiresAt = ttlMs ? new Date(Date.now() + ttlMs) : null;

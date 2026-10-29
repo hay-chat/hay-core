@@ -1,7 +1,12 @@
 import { describe, it, expect } from "vitest";
 import { parseToolError } from "./tool-error";
 
-const error = { code: "PRECONDITION", retryable: false, message: "x", details: { reason: "ALREADY_SHIPPED" } };
+const error = {
+  code: "PRECONDITION",
+  retryable: false,
+  message: "x",
+  details: { reason: "ALREADY_SHIPPED" },
+};
 
 describe("parseToolError", () => {
   it("reads a JSON string, an object and an MCP content array", () => {

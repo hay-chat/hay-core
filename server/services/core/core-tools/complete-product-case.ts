@@ -42,10 +42,16 @@ export const completeProductCaseTool: CoreToolDefinition = {
     additionalProperties: false,
     required: ["summary", "howUsed", "timeline"],
     properties: {
-      summary: { type: "string", description: "2-4 sentences for the store's team: what happened." },
+      summary: {
+        type: "string",
+        description: "2-4 sentences for the store's team: what happened.",
+      },
       product: { type: "string", description: "The product, as the customer named it." },
       lotNumber: { type: "string", description: "Lot/batch number, if the customer typed it." },
-      invoiceNumber: { type: "string", description: "Invoice or order number, if the customer typed it." },
+      invoiceNumber: {
+        type: "string",
+        description: "Invoice or order number, if the customer typed it.",
+      },
       howUsed: { type: "string", description: "How the product was used and stored." },
       timeline: { type: "string", description: "Bought, first used, problem started." },
     },

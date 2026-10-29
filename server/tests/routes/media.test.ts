@@ -24,7 +24,8 @@ jest.mock("@server/services/storage.service", () => ({
   storageService: { download: mockDownload },
 }));
 
-const mockWaitForScans = jest.fn<(ids: string[], ms: number) => Promise<Map<string, string | null>>>();
+const mockWaitForScans =
+  jest.fn<(ids: string[], ms: number) => Promise<Map<string, string | null>>>();
 jest.mock("@server/services/media-scan.service", () => ({
   isScanCleared: (status: string | null | undefined) =>
     status === null || status === undefined || status === "skipped" || status === "clean",
@@ -109,7 +110,9 @@ describe("GET /v1/media/:id", () => {
     });
 
     it("never reveals scan state without access", async () => {
-      mockFindOne.mockResolvedValue(upload({ mimeType: "application/pdf", scanStatus: "infected" }));
+      mockFindOne.mockResolvedValue(
+        upload({ mimeType: "application/pdf", scanStatus: "infected" }),
+      );
       expect((await fetch(`${baseUrl}/v1/media/${UPLOAD_ID}`)).status).toBe(401);
     });
   });

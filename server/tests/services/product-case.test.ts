@@ -29,7 +29,12 @@ const DAMAGE_PHOTO = {
   url: "u",
   type: "image/jpeg",
   size: 1,
-  analysis: { status: "done", class: "damage", description: "Leaking.", fields: { lot_number: "L2309B" } },
+  analysis: {
+    status: "done",
+    class: "damage",
+    description: "Leaking.",
+    fields: { lot_number: "L2309B" },
+  },
 };
 const NOTA = {
   id: "n1",
@@ -51,7 +56,10 @@ const CARD_PHOTO = {
 const customer = (attachments: unknown[]) =>
   ({ type: "Customer", content: "", attachments }) as unknown as Message;
 
-const STORY = { howUsed: "Applied once a day on dry skin.", timeline: "Bought 2 Oct, opened 10 Oct, rash 12 Oct." };
+const STORY = {
+  howUsed: "Applied once a day on dry skin.",
+  timeline: "Bought 2 Oct, opened 10 Oct, rash 12 Oct.",
+};
 
 describe("evaluateProductCase", () => {
   it("finds photos, lot number and invoice in what the AI read", () => {
@@ -83,23 +91,42 @@ describe("evaluateProductCase", () => {
       lotNumber: "B-77",
       invoiceNumber: "NF 4471",
     });
-    expect(result).toMatchObject({ complete: true, evidence: { lotNumber: "B-77", invoiceNumber: "NF 4471" } });
+    expect(result).toMatchObject({
+      complete: true,
+      evidence: { lotNumber: "B-77", invoiceNumber: "NF 4471" },
+    });
   });
 
   it("never counts a withheld card photo, or a staff file, as evidence", () => {
-    const staff = { type: "HumanAgent", content: "", attachments: [DAMAGE_PHOTO] } as unknown as Message;
-    const result = evaluateProductCase([customer([CARD_PHOTO]), staff], { ...STORY, lotNumber: "L1", invoiceNumber: "1" });
+    const staff = {
+      type: "HumanAgent",
+      content: "",
+      attachments: [DAMAGE_PHOTO],
+    } as unknown as Message;
+    const result = evaluateProductCase([customer([CARD_PHOTO]), staff], {
+      ...STORY,
+      lotNumber: "L1",
+      invoiceNumber: "1",
+    });
     expect(result).toEqual({ complete: false, missing: ["photos"] });
   });
 });
 
 describe("complete_product_case core tool", () => {
   const conversation = (messages: Message[], metadata: Record<string, unknown> | null = null) =>
-    ({ id: "conv-1", organization_id: "org-1", metadata, getMessages: async () => messages }) as unknown as Conversation;
+    ({
+      id: "conv-1",
+      organization_id: "org-1",
+      metadata,
+      getMessages: async () => messages,
+    }) as unknown as Conversation;
 
   beforeEach(() => {
     jest.clearAllMocks();
-    mockFindConversation.mockResolvedValue({ organization_id: "org-1", metadata: { url: "https://shop" } });
+    mockFindConversation.mockResolvedValue({
+      organization_id: "org-1",
+      metadata: { url: "https://shop" },
+    });
   });
 
   it("returns what is missing without changing the conversation", async () => {
@@ -112,13 +139,20 @@ describe("complete_product_case core tool", () => {
   });
 
   it("marks the case complete on the conversation's metadata, keeping the rest", async () => {
-    const result = await completeProductCaseTool.execute(conversation([customer([DAMAGE_PHOTO, NOTA])]), {
-      summary: "Lotion bottle leaked; rash after use.",
-      product: "Body lotion 200ml",
-      ...STORY,
-    });
+    const result = await completeProductCaseTool.execute(
+      conversation([customer([DAMAGE_PHOTO, NOTA])]),
+      {
+        summary: "Lotion bottle leaked; rash after use.",
+        product: "Body lotion 200ml",
+        ...STORY,
+      },
+    );
     expect(result).toEqual({ complete: true });
-    const [id, orgId, patch] = mockUpdateConversation.mock.calls[0] as [string, string, { metadata: Record<string, unknown> }];
+    const [id, orgId, patch] = mockUpdateConversation.mock.calls[0] as [
+      string,
+      string,
+      { metadata: Record<string, unknown> },
+    ];
     expect([id, orgId]).toEqual(["conv-1", "org-1"]);
     expect(patch.metadata.url).toBe("https://shop");
     expect(patch.metadata.productCase).toMatchObject({
@@ -140,19 +174,28 @@ describe("complete_product_case core tool", () => {
 });
 
 describe("product-problem template", () => {
-  it.each(["en", "pt-BR"] as const)("%s: has the health guardrail and the full checklist", (locale) => {
-    const [template] = listPlaybookTemplates(locale);
-    expect(template.id).toBe("product-problem");
-    expect(template.instructions).toContain("complete_product_case");
-    expect(template.instructions).toContain("inspect_attachment");
-    expect(template.instructions).toMatch(locale === "en" ? /Never give medical/ : /Nunca dê orientação médica/);
-    expect(template.instructions).toMatch(locale === "en" ? /lot or batch number/ : /número do lote/);
-  });
+  it.each(["en", "pt-BR"] as const)(
+    "%s: has the health guardrail and the full checklist",
+    (locale) => {
+      const [template] = listPlaybookTemplates(locale);
+      expect(template.id).toBe("product-problem");
+      expect(template.instructions).toContain("complete_product_case");
+      expect(template.instructions).toContain("inspect_attachment");
+      expect(template.instructions).toMatch(
+        locale === "en" ? /Never give medical/ : /Nunca dê orientação médica/,
+      );
+      expect(template.instructions).toMatch(
+        locale === "en" ? /lot or batch number/ : /número do lote/,
+      );
+    },
+  );
 
   it("never claims approvals hold an action", () => {
     for (const locale of ["en", "pt-BR"] as const) {
       const [template] = listPlaybookTemplates(locale);
-      expect(template.instructions).not.toMatch(/require approval|requires approval|on hold|held for/i);
+      expect(template.instructions).not.toMatch(
+        /require approval|requires approval|on hold|held for/i,
+      );
     }
   });
 });

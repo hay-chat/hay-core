@@ -65,7 +65,9 @@ export const inspectAttachmentTool: CoreToolDefinition = {
 
     const attachment = await findCustomerFile(conversation, attachmentId);
     if (!attachment || !isAnalyzable(attachment)) {
-      return { error: "no photo or PDF with that id was sent by the customer in this conversation" };
+      return {
+        error: "no photo or PDF with that id was sent by the customer in this conversation",
+      };
     }
 
     const organization = await organizationRepository.findById(conversation.organization_id);
@@ -76,7 +78,11 @@ export const inspectAttachmentTool: CoreToolDefinition = {
     try {
       const file = await loadFileForVision(conversation.organization_id, attachment.id);
       if (!file.input) return { error: "this file could not be read" };
-      const result = await visionService.analyze(conversation.organization_id, file.input, question);
+      const result = await visionService.analyze(
+        conversation.organization_id,
+        file.input,
+        question,
+      );
       if (withheldClass(result, settings)) return { error: "this file is withheld for privacy" };
 
       const fields: Record<string, string> = {};

@@ -51,7 +51,11 @@ describe("missingRequiredFields", () => {
   it("skips managed, hidden and filled fields; masked secrets count as set", () => {
     expect(missingRequiredFields(schema, meta, { authMode: "oauth" })).toEqual(["shopDomain"]);
     expect(
-      missingRequiredFields(schema, meta, { authMode: "token", shopDomain: "x", token: "********" }),
+      missingRequiredFields(schema, meta, {
+        authMode: "token",
+        shopDomain: "x",
+        token: "********",
+      }),
     ).toEqual([]);
   });
 });
@@ -152,7 +156,14 @@ describe("buildSetupChecklist", () => {
         { id: "app", kind: "external", url: "https://example.com" },
       ],
     });
-    expect(steps.map((s) => s.id)).toEqual(["details", "store", "connect", "webhooks", "notify", "app"]);
+    expect(steps.map((s) => s.id)).toEqual([
+      "details",
+      "store",
+      "connect",
+      "webhooks",
+      "notify",
+      "app",
+    ]);
     expect(steps[0].fields).toEqual(["token"]);
     expect(steps[1].fields).toEqual(["shopDomain"]);
     expect(steps[4].optional).toBe(true);
@@ -192,9 +203,9 @@ describe("isStepDone", () => {
   });
 
   it("prefers what the plugin reported", () => {
-    expect(
-      isStepDone(s("external"), { ...signals, reported: { external: { done: true } } }),
-    ).toBe(true);
+    expect(isStepDone(s("external"), { ...signals, reported: { external: { done: true } } })).toBe(
+      true,
+    );
     expect(isStepDone(s("connect"), { ...signals, reported: { connect: { done: false } } })).toBe(
       false,
     );

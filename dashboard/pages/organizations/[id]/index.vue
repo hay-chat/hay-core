@@ -754,9 +754,7 @@ onMounted(async () => {
 // SEO
 useHead({
   title: computed(() =>
-    organization.value
-      ? `${organization.value.name} - Hay.chat`
-      : "Organization - Hay.chat",
+    organization.value ? `${organization.value.name} - Hay.chat` : "Organization - Hay.chat",
   ),
   meta: [
     {

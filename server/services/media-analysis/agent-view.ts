@@ -39,7 +39,10 @@ export function describeAttachmentForAgent(attachment: MessageAttachment): strin
   if (analysis.status === "skipped" && analysis.reason === "no_text") {
     return `[${head}): scanned PDF, its text could not be read]`;
   }
-  if (analysis.status === "skipped" && (analysis.reason === "spam" || analysis.reason === "unverified")) {
+  if (
+    analysis.status === "skipped" &&
+    (analysis.reason === "spam" || analysis.reason === "unverified")
+  ) {
     return `[${head}): not read, the conversation was held as suspicious]`;
   }
   if (analysis.status === "skipped" && analysis.reason === "not_scanned") {

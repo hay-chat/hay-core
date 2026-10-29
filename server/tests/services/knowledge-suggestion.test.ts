@@ -154,30 +154,43 @@ describe("KnowledgeSuggestionService.toResult", () => {
 });
 
 describe("Improve prompts", () => {
-
-  it.each(["en", "pt"])("renders the knowledge prompt with documents and feedback (%s)", async (lang) => {
-    const prompt: string = await PromptService.getInstance().getPrompt(
-      "knowledge/suggest-edits",
-      {
-        transcript: "Customer: Do you ship to Portugal?",
-        feedback: "Mention Portugal",
-        documentOnly: "",
-        documents: [{ id: "doc-1", title: "Shipping", editable: "yes", content: "Ships in 3 days." }],
-      },
-      { language: lang === "pt" ? SupportedLanguage.PORTUGUESE : SupportedLanguage.ENGLISH },
-    );
-    expect(prompt).toContain("Document id: doc-1");
-    expect(prompt).toContain("Ships in 3 days.");
-    expect(prompt).toContain("Mention Portugal");
-    expect(prompt).not.toContain("{{");
-    if (lang === "pt") expect(prompt).toContain("Sua Tarefa");
-  });
+  it.each(["en", "pt"])(
+    "renders the knowledge prompt with documents and feedback (%s)",
+    async (lang) => {
+      const prompt: string = await PromptService.getInstance().getPrompt(
+        "knowledge/suggest-edits",
+        {
+          transcript: "Customer: Do you ship to Portugal?",
+          feedback: "Mention Portugal",
+          documentOnly: "",
+          documents: [
+            { id: "doc-1", title: "Shipping", editable: "yes", content: "Ships in 3 days." },
+          ],
+        },
+        { language: lang === "pt" ? SupportedLanguage.PORTUGUESE : SupportedLanguage.ENGLISH },
+      );
+      expect(prompt).toContain("Document id: doc-1");
+      expect(prompt).toContain("Ships in 3 days.");
+      expect(prompt).toContain("Mention Portugal");
+      expect(prompt).not.toContain("{{");
+      if (lang === "pt") expect(prompt).toContain("Sua Tarefa");
+    },
+  );
 
   it("has Portuguese playbook prompts, and strips their echoed headings", async () => {
     const pt = { language: SupportedLanguage.PORTUGUESE };
     const suggest: string = await PromptService.getInstance().getPrompt(
       "playbook/suggest-edits",
-      { playbookTitle: "Trocas", playbookTrigger: "t", currentInstructions: "# Passo 1", transcript: "", feedback: "f", selection: "", actions: [], documents: [] },
+      {
+        playbookTitle: "Trocas",
+        playbookTrigger: "t",
+        currentInstructions: "# Passo 1",
+        transcript: "",
+        feedback: "f",
+        selection: "",
+        actions: [],
+        documents: [],
+      },
       pt,
     );
     expect(suggest).toContain("Instruções Atuais");
@@ -189,6 +202,8 @@ describe("Improve prompts", () => {
     expect(generate).toContain("português do Brasil");
 
     const current = "# Passo 1\n- Cumprimente o cliente.";
-    expect(sanitizeRevisedMarkdown(`${current}\n\n## Sua Tarefa\n\nRetorne JSON.`, current)).toBe(current);
+    expect(sanitizeRevisedMarkdown(`${current}\n\n## Sua Tarefa\n\nRetorne JSON.`, current)).toBe(
+      current,
+    );
   });
 });
