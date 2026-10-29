@@ -1,4 +1,5 @@
-import { describe, it, expect } from "@jest/globals";
+import { describe, it, expect, beforeAll, afterAll } from "@jest/globals";
+import { config as frozenConfig } from "@server/config/env";
 import {
   decideQuickCheck,
   dueTimerStep,
@@ -149,6 +150,17 @@ describe("quick check with the team (D19)", () => {
 
   describe("answer link token (D19-5)", () => {
     const now = Date.parse("2026-10-29T10:00:00Z");
+
+    // The signing key derives from JWT_SECRET; don't depend on the local .env.
+    // env.ts exports `as const`; the object itself is mutable.
+    const config = frozenConfig as { jwt: { secret: string } };
+    const originalSecret = config.jwt.secret;
+    beforeAll(() => {
+      config.jwt.secret = "test-jwt-secret";
+    });
+    afterAll(() => {
+      config.jwt.secret = originalSecret;
+    });
 
     it("round-trips for 24 hours, then expires", () => {
       const token = signAnswerToken("q-1", "u-1", now);
