@@ -38,6 +38,7 @@ const baseFacts: CloseFacts = {
   aiReplied: true,
   aiLastReplyIsAnswer: true,
   approvalRequested: false,
+  teamAssisted: false,
 };
 
 const verdict = (
@@ -101,6 +102,28 @@ describe("close outcome rules", () => {
       expect(decideOutcome(unhappy, verdict(false)).billable).toBe(false);
       const test = { ...facts, isTest: true };
       expect(decideOutcome(test, verdict(false)).outcome).toBe("test");
+    });
+
+    it("does not bill a request a teammate answered through a quick check (D19-6)", () => {
+      const facts = { ...baseFacts, teamAssisted: true };
+      expect(decideOutcome(facts, verdict(true))).toEqual({
+        outcome: "human",
+        billable: false,
+        aiResolved: false,
+      });
+      // Even when the AI also requested an approval in the same chat.
+      expect(decideOutcome({ ...facts, approvalRequested: true }, verdict(true)).outcome).toBe(
+        "human",
+      );
+      // Test, spam and unhappy still win.
+      expect(decideOutcome({ ...facts, isTest: true }, verdict(true)).outcome).toBe("test");
+      expect(decideOutcome({ ...facts, spamFlagged: true }, verdict(true)).outcome).toBe("spam");
+      const unhappy = { ...facts, closeReason: "user_indicated_close_unsatisfied" };
+      expect(decideOutcome(unhappy, verdict(true)).outcome).toBe("unhappy");
+      // A greeting-only chat with a stray team answer is still abandoned.
+      expect(decideOutcome({ ...facts, hadRealRequest: false }, verdict(false)).outcome).toBe(
+        "abandoned",
+      );
     });
 
     it("an unhappy close is never billed, whatever the model says", () => {
@@ -200,6 +223,28 @@ describe("close outcome rules", () => {
         msg(MessageType.BOT_AGENT, "I've requested the refund; the team will confirm here."),
       ]);
       expect(facts.approvalRequested).toBe(true);
+    });
+
+    it("notes a relayed team answer, and quick-check lines are not AI answers (D19)", () => {
+      const facts = collectCloseFacts(conversation, [
+        msg(MessageType.CUSTOMER, "Does the 40 cm vase ship in a gift box?"),
+        msg(MessageType.BOT_AGENT, "I don't have that information. I'm checking with the team.", {
+          metadata: { isTeamQuestionMessage: true, teamQuestionId: "q-1" },
+        }),
+        msg(MessageType.BOT_AGENT, "Thanks for waiting. The team confirmed: it does.", {
+          metadata: { isTeamAnswer: true, teamQuestionId: "q-1" },
+        }),
+      ]);
+      expect(facts.teamAssisted).toBe(true);
+
+      const waiting = collectCloseFacts(conversation, [
+        msg(MessageType.CUSTOMER, "Does the 40 cm vase ship in a gift box?"),
+        msg(MessageType.BOT_AGENT, "I don't have that information. I'm checking with the team.", {
+          metadata: { isTeamQuestionMessage: true, teamQuestionId: "q-1" },
+        }),
+      ]);
+      expect(waiting.teamAssisted).toBe(false);
+      expect(waiting.aiReplied).toBe(false);
     });
 
     it("treats a greeting and silence as no real request", () => {
