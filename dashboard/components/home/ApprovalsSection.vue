@@ -41,7 +41,11 @@
           <Button variant="outline" :disabled="applying" @click="graduationOpen = false">
             {{ $t("common.cancel") }}
           </Button>
-          <Button :loading="applying" data-testid="approvals-graduation-confirm" @click="applyNudge">
+          <Button
+            :loading="applying"
+            data-testid="approvals-graduation-confirm"
+            @click="applyNudge"
+          >
             {{ $t("aiActions.graduation.confirm") }}
           </Button>
         </DialogFooter>

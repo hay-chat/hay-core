@@ -22,7 +22,10 @@ jest.mock("../../services/vector-store.service", () => ({
 }));
 
 // Mock media deletion (D8-3)
-const mockDeleteConversationMedia = jest.fn(async (_params: unknown) => ({ deleted: 0, failed: 0 }));
+const mockDeleteConversationMedia = jest.fn(async (_params: unknown) => ({
+  deleted: 0,
+  failed: 0,
+}));
 jest.mock("../../services/conversation-media.service", () => ({
   deleteConversationMedia: (params: unknown) => mockDeleteConversationMedia(params),
 }));

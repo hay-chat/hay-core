@@ -120,7 +120,12 @@ describe("customer merge suggestions", () => {
 
     // The alias's inbound must not land in (and reply to) the target's thread.
     expect(
-      await conversations.findActiveByCustomerAndChannel(merged, "+5522222222222", "whatsapp", orgId),
+      await conversations.findActiveByCustomerAndChannel(
+        merged,
+        "+5522222222222",
+        "whatsapp",
+        orgId,
+      ),
     ).toBeNull();
     expect(
       (

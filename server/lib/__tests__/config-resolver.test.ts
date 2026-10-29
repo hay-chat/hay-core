@@ -72,8 +72,21 @@ describe("config-resolver", () => {
       expect(result.values.clientId).toBe("env-client-id-456");
       expect(result.metadata.apiKey.source).toBe("env");
       expect(result.metadata.clientId.source).toBe("env");
-      expect(result.metadata.apiKey.canOverride).toBe(true);
-      expect(result.metadata.clientId.canOverride).toBe(true);
+      // Server-managed values are read-only unless the override policy is on
+      expect(result.metadata.apiKey.canOverride).toBe(false);
+      expect(result.metadata.clientId.canOverride).toBe(false);
+    });
+
+    it("lets the merchant override an env value when PLUGIN_ALLOW_MANAGED_OVERRIDE is on", () => {
+      process.env.PLUGIN_ALLOW_MANAGED_OVERRIDE = "true";
+      try {
+        const result = resolveConfigWithEnv({}, schema);
+
+        expect(result.metadata.apiKey.source).toBe("env");
+        expect(result.metadata.apiKey.canOverride).toBe(true);
+      } finally {
+        delete process.env.PLUGIN_ALLOW_MANAGED_OVERRIDE;
+      }
     });
 
     it("should prioritize DB over env when both present", () => {

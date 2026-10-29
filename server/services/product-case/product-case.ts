@@ -88,7 +88,10 @@ function isEvidencePhoto(attachment: MessageAttachment): boolean {
 }
 
 /** Check the checklist against the conversation's files and the AI's input. */
-export function evaluateProductCase(messages: Message[], input: ProductCaseInput): EvaluationResult {
+export function evaluateProductCase(
+  messages: Message[],
+  input: ProductCaseInput,
+): EvaluationResult {
   const files = customerFiles(messages);
   const readFields = files
     .filter((file) => file.analysis?.status === "done" && !file.analysis.withheld)

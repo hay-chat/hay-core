@@ -91,7 +91,11 @@ async function save() {
     console.error("Failed to save media settings:", error);
     const invalidEmail = error instanceof TRPCClientError && error.data?.code === "BAD_REQUEST";
     toast.error(
-      t(invalidEmail ? "customerPrivacy.media.caseEmailInvalid" : "customerPrivacy.media.saveFailed"),
+      t(
+        invalidEmail
+          ? "customerPrivacy.media.caseEmailInvalid"
+          : "customerPrivacy.media.saveFailed",
+      ),
     );
   } finally {
     isSaving.value = false;

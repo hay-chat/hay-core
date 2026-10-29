@@ -76,7 +76,11 @@ describe("spam review", () => {
     ]);
     const items = await listSpam("o1", 50);
     expect(mockQuery.mock.calls[0][1]).toEqual(["o1", 50]);
-    expect(items[0]).toMatchObject({ source: "detector", signals: ["links"], classifierReason: "promo" });
+    expect(items[0]).toMatchObject({
+      source: "detector",
+      signals: ["links"],
+      classifierReason: "promo",
+    });
     expect(items[1]).toMatchObject({ source: "staff", signals: [], customerName: "Ana" });
   });
 
@@ -85,16 +89,26 @@ describe("spam review", () => {
     await expect(markNotSpam("o1", "c1", "u1")).resolves.toEqual({ reengaged: true });
     await settle();
     const update = mockUpdate.mock.calls[0][2] as Record<string, any>;
-    expect(update).toMatchObject({ spam_flagged_at: null, spam_reason: null, needs_processing: true });
+    expect(update).toMatchObject({
+      spam_flagged_at: null,
+      spam_reason: null,
+      needs_processing: true,
+    });
     expect(update.metadata.spamCheck).toMatchObject({ clearedBy: "u1", signals: ["links"] });
     expect(mockEnqueue).toHaveBeenCalledWith("c1", "o1", "ai_return");
-    expect(mockClearOutcomes).toHaveBeenCalledWith({ organizationId: "o1", conversationId: "c1", userId: "u1" });
+    expect(mockClearOutcomes).toHaveBeenCalledWith({
+      organizationId: "o1",
+      conversationId: "c1",
+      userId: "u1",
+    });
   });
 
   it("Not spam leaves closed or human-handled conversations alone", async () => {
     mockFindById.mockResolvedValueOnce(conversation({ status: "closed" }));
     await expect(markNotSpam("o1", "c1", "u1")).resolves.toEqual({ reengaged: false });
-    mockFindById.mockResolvedValueOnce(conversation({ assigned_user_id: "u2", status: "human-took-over" }));
+    mockFindById.mockResolvedValueOnce(
+      conversation({ assigned_user_id: "u2", status: "human-took-over" }),
+    );
     await expect(markNotSpam("o1", "c1", "u1")).resolves.toEqual({ reengaged: false });
     await settle();
     expect(mockEnqueue).not.toHaveBeenCalled();
@@ -127,14 +141,21 @@ describe("spam review", () => {
 
   it("Mark as spam flags and holds it, and re-arms screening", async () => {
     mockFindById.mockResolvedValueOnce(
-      conversation({ spam_flagged_at: null, metadata: { spamCheck: { clearedAt: "x", clearedBy: "u1" } } }),
+      conversation({
+        spam_flagged_at: null,
+        metadata: { spamCheck: { clearedAt: "x", clearedBy: "u1" } },
+      }),
     );
     await markSpam("o1", "c1", "u1");
     const update = mockUpdate.mock.calls[0][2] as Record<string, any>;
     expect(update).toMatchObject({ spam_reason: "staff", needs_processing: false });
     expect(update.spam_flagged_at).toBeInstanceOf(Date);
     expect(update.metadata.spamCheck).toEqual({});
-    expect(mockMarkOutcomes).toHaveBeenCalledWith({ organizationId: "o1", conversationId: "c1", userId: "u1" });
+    expect(mockMarkOutcomes).toHaveBeenCalledWith({
+      organizationId: "o1",
+      conversationId: "c1",
+      userId: "u1",
+    });
   });
 
   it("refuses conversations from another organization", async () => {

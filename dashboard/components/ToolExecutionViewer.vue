@@ -39,7 +39,7 @@
           <ChevronUp v-else class="h-3 w-3" />
         </button>
         <div v-show="inputsExpanded" class="tool-section__content">
-          <VueJsonPretty :data="toolInput" :deep="2" :show-length="true" :show-line="false" />
+          <VueJsonPretty :data="formattedInput" :deep="2" :show-length="true" :show-line="false" />
         </div>
       </div>
 
@@ -79,6 +79,7 @@ import { useI18n } from "vue-i18n";
 import VueJsonPretty from "vue-json-pretty";
 import "vue-json-pretty/lib/styles.css";
 import { parseToolError } from "@/utils/tool-error";
+import { unwrapJsonText } from "@/utils/json-text";
 import {
   Zap,
   ChevronDown,
@@ -160,33 +161,23 @@ const formattedToolName = computed(() => {
     .join(" ");
 });
 
-// Parse and format the tool output
+// Unwrap the MCP content array, then any JSON that arrived as text, so it renders as a tree
 const formattedOutput = computed(() => {
   if (!props.toolOutput) return null;
 
-  // Check if output has the MCP format with content array
   if (
     typeof props.toolOutput === "object" &&
-    props.toolOutput !== null &&
     "content" in props.toolOutput &&
     Array.isArray(props.toolOutput.content)
   ) {
-    // Extract text from content array
     const content = props.toolOutput.content as Array<{ text?: string; type?: string }>;
-    if (content.length > 0 && content[0].text) {
-      try {
-        // Try to parse the text as JSON
-        return JSON.parse(content[0].text);
-      } catch {
-        // If it's not valid JSON, return the text as-is
-        return content[0].text;
-      }
-    }
+    if (content.length > 0 && content[0].text) return unwrapJsonText(content[0].text);
   }
 
-  // Return the output as-is if it's not in MCP format
-  return props.toolOutput;
+  return unwrapJsonText(props.toolOutput);
 });
+
+const formattedInput = computed(() => unwrapJsonText(props.toolInput));
 
 const hasInputs = computed(() => {
   return props.toolInput && Object.keys(props.toolInput).length > 0;
