@@ -42,6 +42,10 @@ export { StdioMcpClient, type StdioMcpClientOptions, type McpTool } from "./stdi
 
 export { DISPUTE_EVIDENCE_ROUTE, DISPUTE_EVIDENCE_FILE_PREFIX } from "./dispute-source-runtime.js";
 
+/** Core-only worker routes of the `tickets` capability (see types/tickets.ts). */
+export const TICKET_FORM_ROUTE = "/tickets/form";
+export const TICKET_CREATE_ROUTE = "/tickets/create";
+
 // ============================================================================
 // Re-export types for convenience
 // ============================================================================
@@ -133,6 +137,15 @@ export type {
   DisputeEvidenceRequest,
   DisputeEvidenceErrorCode,
   DisputeEvidenceResponse,
+
+  // Helpdesk tickets
+  TicketFieldValue,
+  TicketFormOption,
+  TicketFormField,
+  TicketFormResponse,
+  TicketCreateRequest,
+  TicketErrorCode,
+  TicketCreateResponse,
 } from "../types/index.js";
 
 // ============================================================================

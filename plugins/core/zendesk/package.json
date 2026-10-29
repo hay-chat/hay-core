@@ -10,7 +10,8 @@
     "displayName": "Zendesk",
     "category": "integration",
     "capabilities": [
-      "mcp"
+      "mcp",
+      "tickets"
     ],
     "env": [
       "ZENDESK_SUBDOMAIN",

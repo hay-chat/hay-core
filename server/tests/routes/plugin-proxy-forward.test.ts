@@ -132,6 +132,8 @@ describe("isWorkerInternalPath", () => {
     "/ui/status",
     "/UI/status",
     "/disputes/evidence",
+    "/tickets/create",
+    "/tickets/form",
     "/Disputes/evidence",
   ])("blocks %s", (path) => {
     expect(isWorkerInternalPath(path)).toBe(true);

@@ -217,6 +217,10 @@
           "title": "Chargeback evidence",
           "description": "Collects the order and conversation history you need to answer a chargeback."
         },
+        "tickets": {
+          "title": "Helpdesk tickets",
+          "description": "Raises a ticket for your team when a customer needs a person and nobody is available."
+        },
         "documents": {
           "title": "Knowledge import",
           "description": "Imports pages and documents into your knowledge base."
