@@ -14,7 +14,12 @@
         <p class="text-xs text-emerald-900/70">
           {{ t("conversations.productCase.lot", { lot: productCase.evidence.lotNumber }) }}
           <template v-if="productCase.evidence.invoiceNumber">
-            · {{ t("conversations.productCase.invoice", { invoice: productCase.evidence.invoiceNumber }) }}
+            ·
+            {{
+              t("conversations.productCase.invoice", {
+                invoice: productCase.evidence.invoiceNumber,
+              })
+            }}
           </template>
           · {{ forwardText }}
         </p>
@@ -63,7 +68,8 @@ const forwarding = ref(false);
 const forwardText = computed(() => {
   const forward = props.productCase.forward;
   if (!forward) return t("conversations.productCase.forwardPending");
-  if (forward.status === "sent") return t("conversations.productCase.forwardSent", { to: forward.to });
+  if (forward.status === "sent")
+    return t("conversations.productCase.forwardSent", { to: forward.to });
   if (forward.status === "failed") return t("conversations.productCase.forwardFailed");
   return t("conversations.productCase.forwardNotConfigured");
 });

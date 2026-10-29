@@ -1245,7 +1245,10 @@ export const conversationsRouter = t.router({
       const { forwardProductCase } = await import("../../../services/product-case/forward");
       const forward = await forwardProductCase(conversation.id, ctx.organizationId!);
       if (!forward) {
-        throw new TRPCError({ code: "BAD_REQUEST", message: "This conversation has no complete product case" });
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "This conversation has no complete product case",
+        });
       }
       return forward;
     }),

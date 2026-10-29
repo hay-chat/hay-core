@@ -129,7 +129,9 @@ function makeConversation(agentId: string | null) {
     })),
     getPublicMessages: jest.fn(async () => []),
     addMessage: jest.fn(async (payload: { content: string }) => ({ id: "new", ...payload })),
-    addHandoffInstructions: jest.fn(async (_doc: unknown, _type: string, _context?: string) => undefined),
+    addHandoffInstructions: jest.fn(
+      async (_doc: unknown, _type: string, _context?: string) => undefined,
+    ),
     markProcessed: jest.fn(async () => true),
   };
 }

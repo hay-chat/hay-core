@@ -52,15 +52,17 @@ jest.mock("@server/services/websocket.service", () => ({
   websocketService: { sendToOrganization: (...args: unknown[]) => mockSendToOrganization(...args) },
 }));
 
-const mockWaitForScans = jest.fn<(ids: string[], timeout: number) => Promise<Map<string, string | null>>>();
-const mockPendingScans = jest.fn<(orgId: string, ids: string[]) => Promise<string[]>>(async () => []);
+const mockWaitForScans =
+  jest.fn<(ids: string[], timeout: number) => Promise<Map<string, string | null>>>();
+const mockPendingScans = jest.fn<(orgId: string, ids: string[]) => Promise<string[]>>(
+  async () => [],
+);
 jest.mock("@server/services/media-scan.service", () => ({
   isScanCleared: (status: string | null | undefined) =>
     status === null || status === undefined || status === "skipped" || status === "clean",
   pendingScans: (orgId: string, ids: string[]) => mockPendingScans(orgId, ids),
   waitForScans: (ids: string[], timeout: number) => mockWaitForScans(ids, timeout),
 }));
-
 
 const mockFindConversation = jest.fn<(...args: unknown[]) => Promise<unknown>>(async () => ({
   id: "conv-1",
@@ -322,7 +324,11 @@ describe("processMessageMedia", () => {
 
   it("does not spend a vision call on a spam-held or unverified conversation", async () => {
     mockFindMessage.mockResolvedValue(message(markAnalysisPending([photo()])!));
-    mockFindConversation.mockResolvedValueOnce({ id: "conv-1", spam_flagged_at: new Date(), metadata: {} });
+    mockFindConversation.mockResolvedValueOnce({
+      id: "conv-1",
+      spam_flagged_at: new Date(),
+      metadata: {},
+    });
     await processMessageMedia("msg-1", ORG);
     expect(storedAttachments()[0].analysis).toEqual({ status: "skipped", reason: "spam" });
 
@@ -343,7 +349,10 @@ describe("processMessageMedia", () => {
     mockFindConversation.mockResolvedValueOnce({
       id: "conv-1",
       spam_flagged_at: null,
-      metadata: { botCheck: { decision: "flag" }, spamCheck: { clearedAt: "2026-10-28T10:00:00Z" } },
+      metadata: {
+        botCheck: { decision: "flag" },
+        spamCheck: { clearedAt: "2026-10-28T10:00:00Z" },
+      },
     });
     mockChatCreate.mockResolvedValueOnce(visionReply(DAMAGE) as never);
     await processMessageMedia("msg-1", ORG);
@@ -457,7 +466,13 @@ describe("virus scan (D8-4)", () => {
     mockWaitForScans.mockResolvedValue(new Map([[PDF_ID, "clean"]]));
     mockDownload.mockResolvedValueOnce({
       buffer: Buffer.from("%PDF"),
-      upload: { organizationId: ORG, folder: "conversation-media", mimeType: "application/pdf", originalName: "nota.pdf", scanStatus: "clean" },
+      upload: {
+        organizationId: ORG,
+        folder: "conversation-media",
+        mimeType: "application/pdf",
+        originalName: "nota.pdf",
+        scanStatus: "clean",
+      },
     } as never);
     mockPdfParse.mockResolvedValue({ text: "NOTA FISCAL 123 Total R$ 59,90" } as never);
     mockChatCreate.mockResolvedValue(visionReply({ ...DAMAGE, class: "receipt" }) as never);
@@ -475,7 +490,12 @@ describe("virus scan (D8-4)", () => {
     mockWaitForScans.mockResolvedValue(new Map([[PDF_ID, "infected"]]));
     mockDownload.mockResolvedValueOnce({
       buffer: Buffer.from("%PDF"),
-      upload: { organizationId: ORG, folder: "conversation-media", mimeType: "application/pdf", scanStatus: "infected" },
+      upload: {
+        organizationId: ORG,
+        folder: "conversation-media",
+        mimeType: "application/pdf",
+        scanStatus: "infected",
+      },
     } as never);
 
     await processMessageMedia("msg-1", ORG);

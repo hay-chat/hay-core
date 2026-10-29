@@ -260,7 +260,8 @@ export interface StepSignals {
 export function isStepDone(s: ChecklistStep, signals: StepSignals): boolean | null {
   const reported = signals.reported?.[s.id];
   if (reported) return reported.done;
-  if (s.kind === "fields") return !s.fields.some((field) => signals.missingRequired.includes(field));
+  if (s.kind === "fields")
+    return !s.fields.some((field) => signals.missingRequired.includes(field));
   if (s.kind === "connect") return signals.oauthConnected;
   if (s.kind === "verify") return signals.testSuccess === true;
   return null;

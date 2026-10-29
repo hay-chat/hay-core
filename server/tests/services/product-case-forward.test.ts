@@ -21,7 +21,8 @@ const mockFindOrganization = jest.fn<(id: string) => Promise<unknown>>();
 jest.mock("@server/repositories/organization.repository", () => ({
   organizationRepository: { findById: (id: string) => mockFindOrganization(id) },
 }));
-const mockSend = jest.fn<(options: Record<string, unknown>) => Promise<{ success: boolean; error?: string }>>();
+const mockSend =
+  jest.fn<(options: Record<string, unknown>) => Promise<{ success: boolean; error?: string }>>();
 jest.mock("@server/services/email.service", () => ({
   emailService: { sendTemplateEmail: (options: Record<string, unknown>) => mockSend(options) },
   getOrganizationLocale: async () => "pt",
@@ -29,7 +30,13 @@ jest.mock("@server/services/email.service", () => ({
 
 import { forwardProductCase, validCaseEmail } from "@server/services/product-case/forward";
 
-const PHOTO = { id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", name: "leak.jpg", url: "u", type: "image/jpeg", size: 1 };
+const PHOTO = {
+  id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+  name: "leak.jpg",
+  url: "u",
+  type: "image/jpeg",
+  size: 1,
+};
 const CARD = {
   id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
   name: "card.jpg",
@@ -38,7 +45,13 @@ const CARD = {
   size: 1,
   analysis: { status: "done", class: "card", withheld: true },
 };
-const NOTA = { id: "cccccccc-cccc-4ccc-8ccc-cccccccccccc", name: "nota.pdf", url: "u", type: "application/pdf", size: 1 };
+const NOTA = {
+  id: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+  name: "nota.pdf",
+  url: "u",
+  type: "application/pdf",
+  size: 1,
+};
 
 const PRODUCT_CASE = {
   status: "complete",
@@ -61,14 +74,16 @@ function conversation(metadata: Record<string, unknown> | null) {
     id: "conv-1",
     organization_id: "org-1",
     metadata,
-    getMessages: async () => [
-      { type: "Customer", content: "", attachments: [PHOTO, CARD, NOTA] },
-    ],
+    getMessages: async () => [{ type: "Customer", content: "", attachments: [PHOTO, CARD, NOTA] }],
   };
 }
 
 function savedCase(): Record<string, unknown> {
-  const [, , patch] = mockUpdateConversation.mock.calls[0] as [string, string, { metadata: { productCase: Record<string, unknown> } }];
+  const [, , patch] = mockUpdateConversation.mock.calls[0] as [
+    string,
+    string,
+    { metadata: { productCase: Record<string, unknown> } },
+  ];
   return patch.metadata.productCase;
 }
 
@@ -76,20 +91,29 @@ describe("forwardProductCase", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockFindConversation.mockResolvedValue(conversation({ productCase: PRODUCT_CASE }));
-    mockFindOrganization.mockResolvedValue({ settings: { media: { caseEmail: "qualidade@loja.com.br" } } });
+    mockFindOrganization.mockResolvedValue({
+      settings: { media: { caseEmail: "qualidade@loja.com.br" } },
+    });
     mockSend.mockResolvedValue({ success: true });
   });
 
   it("emails the configured address with the evidence and signed links", async () => {
     const forward = await forwardProductCase("conv-1", "org-1");
 
-    expect(forward).toEqual({ status: "sent", to: "qualidade@loja.com.br", at: expect.any(String) });
+    expect(forward).toEqual({
+      status: "sent",
+      to: "qualidade@loja.com.br",
+      at: expect.any(String),
+    });
     expect(mockSend).toHaveBeenCalledTimes(1);
     const options = mockSend.mock.calls[0][0] as {
       to: string;
       locale: string;
       subject: string;
-      variables: { details: Array<{ value: string }>; relatedItems: Array<{ text: string; url: string }> };
+      variables: {
+        details: Array<{ value: string }>;
+        relatedItems: Array<{ text: string; url: string }>;
+      };
     };
     expect(options.to).toBe("qualidade@loja.com.br");
     expect(options.locale).toBe("pt-BR");
@@ -115,7 +139,9 @@ describe("forwardProductCase", () => {
 
   it("sends nothing when the stored address is not a valid email", async () => {
     mockFindOrganization.mockResolvedValue({ settings: { media: { caseEmail: "not an email" } } });
-    await expect(forwardProductCase("conv-1", "org-1")).resolves.toMatchObject({ status: "not_configured" });
+    await expect(forwardProductCase("conv-1", "org-1")).resolves.toMatchObject({
+      status: "not_configured",
+    });
     expect(mockSend).not.toHaveBeenCalled();
   });
 

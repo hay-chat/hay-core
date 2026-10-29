@@ -74,7 +74,10 @@ const updatePlaybookSchema = z.object({
   status: playbookStatusEnum.optional(),
   agentIds: z.array(z.string().uuid()).optional(),
   // D4-9: categories that always need approval while this playbook runs (tighten-only).
-  approvalCategories: z.array(z.enum(APPROVAL_CATEGORIES)).max(APPROVAL_CATEGORIES.length).optional(),
+  approvalCategories: z
+    .array(z.enum(APPROVAL_CATEGORIES))
+    .max(APPROVAL_CATEGORIES.length)
+    .optional(),
 });
 
 export const playbooksRouter = t.router({

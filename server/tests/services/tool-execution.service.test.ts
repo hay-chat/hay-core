@@ -314,7 +314,9 @@ describe("ToolExecutionService approval gate", () => {
   });
 
   it("runs a refund under the threshold", async () => {
-    mockFindOrg.mockResolvedValue({ settings: { actionApproval: { thresholdAmount: 50, ...NO_CONFIRM } } });
+    mockFindOrg.mockResolvedValue({
+      settings: { actionApproval: { thresholdAmount: 50, ...NO_CONFIRM } },
+    });
     mockCallTool.mockResolvedValue({ content: [{ type: "text", text: "refunded" }] });
     const res = await new ToolExecutionService().handleToolExecution(makeConversation(), {
       name: "shop:create_refund",
@@ -354,7 +356,9 @@ describe("ToolExecutionService approval gate", () => {
   });
 
   it("does not run a call still pending approval after the threshold was raised", async () => {
-    mockFindOrg.mockResolvedValue({ settings: { actionApproval: { thresholdAmount: 50, ...NO_CONFIRM } } });
+    mockFindOrg.mockResolvedValue({
+      settings: { actionApproval: { thresholdAmount: 50, ...NO_CONFIRM } },
+    });
     mockFindEarlierRequest.mockResolvedValue({ id: "pa-0", status: "pending" });
     const res = await new ToolExecutionService().handleToolExecution(makeConversation(), {
       name: "shop:create_refund",
@@ -366,8 +370,14 @@ describe("ToolExecutionService approval gate", () => {
   });
 
   it("does not run a call the team declined after the threshold was raised", async () => {
-    mockFindOrg.mockResolvedValue({ settings: { actionApproval: { thresholdAmount: 50, ...NO_CONFIRM } } });
-    mockFindEarlierRequest.mockResolvedValue({ id: "pa-0", status: "rejected", decision_note: null });
+    mockFindOrg.mockResolvedValue({
+      settings: { actionApproval: { thresholdAmount: 50, ...NO_CONFIRM } },
+    });
+    mockFindEarlierRequest.mockResolvedValue({
+      id: "pa-0",
+      status: "rejected",
+      decision_note: null,
+    });
     const res = await new ToolExecutionService().handleToolExecution(makeConversation(), {
       name: "shop:create_refund",
       args: { amount: "20.00" },
@@ -387,7 +397,12 @@ describe("ToolExecutionService approval gate", () => {
 });
 
 describe("ToolExecutionService over-cap approval (capEnforced tools)", () => {
-  const COUPON_RISK = { readOnly: false, category: "discount", classified: true, capEnforced: true };
+  const COUPON_RISK = {
+    readOnly: false,
+    category: "discount",
+    classified: true,
+    capEnforced: true,
+  };
   const needsApproval = {
     isError: true,
     content: [
@@ -435,7 +450,11 @@ describe("ToolExecutionService over-cap approval (capEnforced tools)", () => {
     const conversation = makeConversation();
     const res = await new ToolExecutionService().handleToolExecution(conversation, couponCall());
 
-    expect(res).toMatchObject({ success: false, pending: true, result: { pendingActionId: "pa-1" } });
+    expect(res).toMatchObject({
+      success: false,
+      pending: true,
+      result: { pendingActionId: "pa-1" },
+    });
     expect(mockHold).toHaveBeenCalledWith(
       expect.objectContaining({
         toolName: "shop:create_coupon",
@@ -528,7 +547,9 @@ describe("ToolExecutionService customer confirmation (D4-10)", () => {
   const customerReply = { id: "c-1", type: "Customer", metadata: {} };
 
   beforeEach(() => {
-    mockFindOrg.mockResolvedValue({ settings: { actionApproval: { moneyMovesNeedApproval: false } } });
+    mockFindOrg.mockResolvedValue({
+      settings: { actionApproval: { moneyMovesNeedApproval: false } },
+    });
     mockCallTool.mockResolvedValue({ content: [{ type: "text", text: '{"ok":true}' }] });
   });
 

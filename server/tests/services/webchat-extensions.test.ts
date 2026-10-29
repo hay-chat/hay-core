@@ -183,7 +183,10 @@ describe("webchat gates", () => {
 
     const [url, init] = fetchMock.mock.calls[0];
     expect(url).toBe("http://localhost:5555/webchat/gate/conversation.create");
-    expect(JSON.parse(String(init?.body)).input).toMatchObject({ token: "t", event: "conversation.create" });
+    expect(JSON.parse(String(init?.body)).input).toMatchObject({
+      token: "t",
+      event: "conversation.create",
+    });
   });
 
   it("fails open as a flag when the worker errors", async () => {
