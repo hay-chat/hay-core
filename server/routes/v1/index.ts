@@ -39,6 +39,7 @@ import { simulationsRouter } from "./simulations";
 import { testTranscriptsRouter } from "./test-transcripts";
 import { replaysRouter } from "./replays";
 import { testCasesRouter } from "./test-cases";
+import { teamQuestionsRouter } from "./team-questions";
 
 // Core routers - always available
 const coreRouters = {
@@ -81,6 +82,7 @@ const coreRouters = {
   testTranscripts: testTranscriptsRouter,
   replays: replaysRouter,
   testCases: testCasesRouter,
+  teamQuestions: teamQuestionsRouter,
 };
 
 // Create v1Router with core + plugin routers

@@ -25,6 +25,9 @@
     <!-- AI actions waiting for an approver (D4-6); hidden when none or not an approver -->
     <ApprovalsSection @changed="load()" />
 
+    <!-- Facts the AI is checking with the team (D19); hidden when none -->
+    <QuestionsSection @changed="load()" />
+
     <!-- Waiting for a human: the only thing that must be seen first -->
     <section aria-labelledby="home-waiting-heading">
       <h2 id="home-waiting-heading" class="mb-2 flex items-baseline gap-2 text-sm font-semibold">
