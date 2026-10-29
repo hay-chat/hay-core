@@ -6,7 +6,14 @@
  * happened_at) and the legacy shipping_tracking_number / _url.
  */
 import { daysAgo, DEMO_TAG, productBySku, trackingNumber } from "../lib/data";
-import type { Address, Customer, Localized, OrderFixture, Product, ProductVariant } from "../lib/types";
+import type {
+  Address,
+  Customer,
+  Localized,
+  OrderFixture,
+  Product,
+  ProductVariant,
+} from "../lib/types";
 
 export const CURRENCY = "BRL";
 /** Store languages we can fill from the catalogue (Nuvemshop "pt" = our pt-BR). */
@@ -19,10 +26,13 @@ export const MARKER_RE = /\[hay-demo:([\w-]+)\]/;
 const money = (n: number) => n.toFixed(2);
 const brl = (n: number) => `R$ ${n.toFixed(2).replace(".", ",")}`;
 const isoDay = (d: Date) => d.toISOString().slice(0, 10);
-const escapeHtml = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+const escapeHtml = (s: string) =>
+  s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
 export function localized(text: Localized, languages: StoreLanguage[]): Record<string, string> {
-  return Object.fromEntries(languages.map((lang) => [lang, lang === "pt" ? text["pt-BR"] : text.en]));
+  return Object.fromEntries(
+    languages.map((lang) => [lang, lang === "pt" ? text["pt-BR"] : text.en]),
+  );
 }
 
 // ---------- products ----------
@@ -32,7 +42,8 @@ export function productHtml(product: Product, locale: "en" | "pt-BR"): string {
   return `<p>${escapeHtml(product.description[locale])}</p><ul>${items}</ul>`;
 }
 
-export const variantPrice = (product: Product, variant: ProductVariant) => variant.price?.BRL ?? product.price.BRL;
+export const variantPrice = (product: Product, variant: ProductVariant) =>
+  variant.price?.BRL ?? product.price.BRL;
 
 /** Nuvemshop: `price` is the list ("de") price, `promotional_price` the selling ("por") price. */
 export function variantPayload(
@@ -55,8 +66,15 @@ export function variantPayload(
   };
 }
 
-export function productPayload(product: Product, categoryId: number, languages: StoreLanguage[]): Record<string, unknown> {
-  const description: Localized = { en: productHtml(product, "en"), "pt-BR": productHtml(product, "pt-BR") };
+export function productPayload(
+  product: Product,
+  categoryId: number,
+  languages: StoreLanguage[],
+): Record<string, unknown> {
+  const description: Localized = {
+    en: productHtml(product, "en"),
+    "pt-BR": productHtml(product, "pt-BR"),
+  };
   return {
     name: localized(product.title, languages),
     description: localized(description, languages),
@@ -80,7 +98,10 @@ export const CATEGORY_NAMES: Record<string, Localized> = {
 
 export function categoryPayload(slug: string, languages: StoreLanguage[]): Record<string, unknown> {
   const name = CATEGORY_NAMES[slug] ?? { en: slug, "pt-BR": slug };
-  return { name: localized(name, languages), handle: localized({ en: slug, "pt-BR": slug }, languages) };
+  return {
+    name: localized(name, languages),
+    handle: localized({ en: slug, "pt-BR": slug }, languages),
+  };
 }
 
 // ---------- customers ----------
@@ -169,7 +190,8 @@ export function refundDaysAgo(fixture: OrderFixture): number {
 
 /** Refund amount (BRL) the fixture represents, for the owner note. */
 export function refundAmount(fixture: OrderFixture, products: Product[]): number {
-  const lines = fixture.financialStatus === "refunded" ? fixture.lines : (fixture.refundLines ?? []);
+  const lines =
+    fixture.financialStatus === "refunded" ? fixture.lines : (fixture.refundLines ?? []);
   return lines.reduce((sum, line) => {
     const { product, variant } = productBySku(products, line.sku);
     return sum + variantPrice(product, variant) * line.quantity;
@@ -186,9 +208,10 @@ export function ownerNoteLines(fixture: OrderFixture, products: Product[], now: 
   if (fixture.note && !/^customer note:/i.test(fixture.note)) lines.push(fixture.note);
   if (fixture.financialStatus === "refunded" || fixture.financialStatus === "partially_refunded") {
     const kind = fixture.financialStatus === "refunded" ? "Reembolso total" : "Reembolso parcial";
-    const skus = fixture.financialStatus === "partially_refunded"
-      ? ` (${(fixture.refundLines ?? []).map((l) => `${l.quantity}× ${l.sku}`).join(", ")}, chegou quebrado)`
-      : "";
+    const skus =
+      fixture.financialStatus === "partially_refunded"
+        ? ` (${(fixture.refundLines ?? []).map((l) => `${l.quantity}× ${l.sku}`).join(", ")}, chegou quebrado)`
+        : "";
     lines.push(
       `${kind} de ${brl(refundAmount(fixture, products))}${skus} estornado via Mercado Pago em ${isoDay(daysAgo(refundDaysAgo(fixture), now))}.`,
     );
@@ -203,7 +226,11 @@ export interface OrderContext {
   now: Date;
 }
 
-export function orderPayload(fixture: OrderFixture, ctx: OrderContext, paymentStatus: string): Record<string, unknown> {
+export function orderPayload(
+  fixture: OrderFixture,
+  ctx: OrderContext,
+  paymentStatus: string,
+): Record<string, unknown> {
   const { customer, products, now } = ctx;
   const placedAt = daysAgo(fixture.placedDaysAgo, now);
   const customerNote = /^customer note:\s*(.*)$/i.exec(fixture.note ?? "")?.[1];
@@ -216,7 +243,11 @@ export function orderPayload(fixture: OrderFixture, ctx: OrderContext, paymentSt
     shipping_status: "unpacked",
     products: fixture.lines.map((line) => {
       const { product, variant } = productBySku(products, line.sku);
-      return { variant_id: ctx.variantId(line.sku), quantity: line.quantity, price: money(variantPrice(product, variant)) };
+      return {
+        variant_id: ctx.variantId(line.sku),
+        quantity: line.quantity,
+        price: money(variantPrice(product, variant)),
+      };
     }),
     customer: {
       name: `${customer.firstName} ${customer.lastName}`,
@@ -234,7 +265,9 @@ export function orderPayload(fixture: OrderFixture, ctx: OrderContext, paymentSt
     ...(customerNote ? { note: customerNote } : {}),
     owner_note: ownerNoteLines(fixture, products, now).join("\n"),
     created_at: placedAt.toISOString(),
-    ...(isPaid(fixture) ? { paid_at: new Date(placedAt.getTime() + 5 * 60 * 1000).toISOString() } : {}),
+    ...(isPaid(fixture)
+      ? { paid_at: new Date(placedAt.getTime() + 5 * 60 * 1000).toISOString() }
+      : {}),
   };
 }
 
@@ -259,29 +292,47 @@ export function fulfilmentSteps(fixture: OrderFixture, now: Date): FulfilmentSte
     {
       method: "PATCH",
       path: "",
-      body: { status: "DISPATCHED", tracking_info: { code, url: trackingUrl(carrier, code), notify_customer: false } },
+      body: {
+        status: "DISPATCHED",
+        tracking_info: { code, url: trackingUrl(carrier, code), notify_customer: false },
+      },
     },
     {
       method: "POST",
       path: "/tracking-events",
-      body: { status: "dispatched", description: `Objeto postado (${carrier})`, happened_at: shippedAt.toISOString() },
+      body: {
+        status: "dispatched",
+        description: `Objeto postado (${carrier})`,
+        happened_at: shippedAt.toISOString(),
+      },
     },
   ];
   if (fixture.fulfillmentStatus === "stale") return steps;
-  const delivered = fixture.deliveredDaysAgo !== undefined ? daysAgo(fixture.deliveredDaysAgo, now) : undefined;
+  const delivered =
+    fixture.deliveredDaysAgo !== undefined ? daysAgo(fixture.deliveredDaysAgo, now) : undefined;
   const lastMove = delivered ?? now;
-  const inTransitAt = new Date(shippedAt.getTime() + Math.min(24 * 3600e3, (lastMove.getTime() - shippedAt.getTime()) / 2));
+  const inTransitAt = new Date(
+    shippedAt.getTime() + Math.min(24 * 3600e3, (lastMove.getTime() - shippedAt.getTime()) / 2),
+  );
   steps.push({
     method: "POST",
     path: "/tracking-events",
-    body: { status: "in_transit", description: "Objeto em trânsito", happened_at: inTransitAt.toISOString() },
+    body: {
+      status: "in_transit",
+      description: "Objeto em trânsito",
+      happened_at: inTransitAt.toISOString(),
+    },
   });
   if (delivered) {
     steps.push(
       {
         method: "POST",
         path: "/tracking-events",
-        body: { status: "delivered", description: "Objeto entregue ao destinatário", happened_at: delivered.toISOString() },
+        body: {
+          status: "delivered",
+          description: "Objeto entregue ao destinatário",
+          happened_at: delivered.toISOString(),
+        },
       },
       { method: "PATCH", path: "", body: { status: "DELIVERED" } },
     );
@@ -292,12 +343,20 @@ export function fulfilmentSteps(fixture: OrderFixture, now: Date): FulfilmentSte
 /** Legacy fallback when fulfillment orders are unavailable: POST /orders/{id}/fulfill. */
 export function legacyFulfilPayload(fixture: OrderFixture): Record<string, unknown> {
   const code = trackingNumber(fixture, "nuvemshop");
-  return { shipping_tracking_number: code, shipping_tracking_url: trackingUrl(carrierFor(fixture), code), notify_customer: false };
+  return {
+    shipping_tracking_number: code,
+    shipping_tracking_url: trackingUrl(carrierFor(fixture), code),
+    notify_customer: false,
+  };
 }
 
 /** Cancel body (plugin: POST /orders/{id}/cancel {reason, email, restock}). */
 export function cancelPayload(fixture: OrderFixture): Record<string, unknown> {
-  return { reason: fixture.financialStatus === "voided" ? "other" : "customer", email: false, restock: true };
+  return {
+    reason: fixture.financialStatus === "voided" ? "other" : "customer",
+    email: false,
+    restock: true,
+  };
 }
 
 /** Order states the seed ends in: open | closed | cancelled. */

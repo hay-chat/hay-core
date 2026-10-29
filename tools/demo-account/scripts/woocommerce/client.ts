@@ -13,7 +13,13 @@ export interface Woo {
   get<T>(path: string, query?: Record<string, string | number>): Promise<T>;
   /** Every page of a list endpoint (100 per page). */
   list<T>(path: string, query?: Record<string, string | number>): Promise<T[]>;
-  write<T>(method: "POST" | "PUT" | "DELETE", path: string, body: unknown, dryRunResult: T, namespace?: string): Promise<T>;
+  write<T>(
+    method: "POST" | "PUT" | "DELETE",
+    path: string,
+    body: unknown,
+    dryRunResult: T,
+    namespace?: string,
+  ): Promise<T>;
   /** Uploads a local image to wp/v2/media (needs WP_USER + WP_APP_PASSWORD); returns its id. */
   uploadMedia(file: string, dryRunId: number): Promise<number>;
   canUploadMedia: boolean;
@@ -27,17 +33,25 @@ export interface WooConfig {
   wpAppPassword?: string;
 }
 
-const basic = (user: string, password: string) => `Basic ${Buffer.from(`${user}:${password}`).toString("base64")}`;
+const basic = (user: string, password: string) =>
+  `Basic ${Buffer.from(`${user}:${password}`).toString("base64")}`;
 
 export function createWoo(flags: Flags, config: WooConfig): Woo {
   const site = config.url.replace(/\/+$/, "");
   const https = site.startsWith("https://");
-  const secrets = [config.consumerKey, config.consumerSecret, config.wpAppPassword].filter(Boolean) as string[];
+  const secrets = [config.consumerKey, config.consumerSecret, config.wpAppPassword].filter(
+    Boolean,
+  ) as string[];
 
   // Never let a key reach the console (http errors quote the URL).
-  const redact = (text: string) => secrets.reduce((t, s) => t.split(encodeURIComponent(s)).join("***").split(s).join("***"), text);
+  const redact = (text: string) =>
+    secrets.reduce((t, s) => t.split(encodeURIComponent(s)).join("***").split(s).join("***"), text);
 
-  function url(path: string, query: Record<string, string | number> = {}, namespace = "wc/v3"): string {
+  function url(
+    path: string,
+    query: Record<string, string | number> = {},
+    namespace = "wc/v3",
+  ): string {
     const u = new URL(`${site}/wp-json/${namespace}${path}`);
     for (const [k, v] of Object.entries(query)) u.searchParams.set(k, String(v));
     if (!https && !flags.dryRun) {
@@ -50,7 +64,12 @@ export function createWoo(flags: Flags, config: WooConfig): Woo {
   const headers = (): Record<string, string> =>
     https ? { Authorization: basic(config.consumerKey, config.consumerSecret) } : {};
 
-  async function call<T>(method: string, target: string, body?: unknown, dryRunResult?: T): Promise<T> {
+  async function call<T>(
+    method: string,
+    target: string,
+    body?: unknown,
+    dryRunResult?: T,
+  ): Promise<T> {
     try {
       return await http<T>(flags, method, target, { headers: headers(), body, dryRunResult });
     } catch (err) {
@@ -90,7 +109,8 @@ export function createWoo(flags: Flags, config: WooConfig): Woo {
         body: readFileSync(file),
       });
       const text = await response.text();
-      if (!response.ok) throw new Error(redact(`POST ${target} → ${response.status}: ${text.slice(0, 300)}`));
+      if (!response.ok)
+        throw new Error(redact(`POST ${target} → ${response.status}: ${text.slice(0, 300)}`));
       return (JSON.parse(text) as { id: number }).id;
     },
   };

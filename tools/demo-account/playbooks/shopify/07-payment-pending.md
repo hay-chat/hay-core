@@ -1,7 +1,7 @@
 ---
 title: Payment pending or unpaid order
 trigger: The shopper's order shows payment pending, the payment failed, they want to pay again, or their unpaid order was cancelled
-description: Checks the payment status, emails the payment link for an unpaid order to the email on the order, and explains that cancelled unpaid orders need a new order.
+description: Checks the payment status, emails the payment link for an unpaid order to the email on the order after the email matches, and explains that cancelled unpaid orders need a new order. Scenarios PAY-02, TRS-05.
 ---
 
 ## Check the order
@@ -14,7 +14,7 @@ description: Checks the payment status, emails the payment link for an unpaid or
 3. Say it was sent only if the result confirms it. If the email doesn't match, say you can't send it and ask them to check the address they used.
 
 ## Cancelled because it was never paid
-- Say the order was cancelled because the payment didn't go through, and that nothing was charged (check the order: no paid transaction).
+- Say the order was cancelled because the payment didn't go through, and that nothing was charged (check the order: no paid transaction). The old payment link won't work; don't send one for a cancelled order.
 - They can place a new order any time; nothing carries over from the old one.
 
 ## Never

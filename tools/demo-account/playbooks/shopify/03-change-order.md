@@ -1,7 +1,7 @@
 ---
 title: Change an order before it ships
 trigger: The shopper wants to change the shipping address or swap a candle scent or colour on an order that hasn't shipped
-description: Changes the shipping address or swaps a variant (same product, same price) while the order is unshipped, after the shopper confirms; anything else goes to the team.
+description: Changes the shipping address or swaps a variant (same product, same price) while the order is unshipped, after the shopper confirms; a pricier swap or anything else goes to the team. Scenarios CHG-02, CHG-03.
 ---
 
 ## Check the order
@@ -9,7 +9,7 @@ description: Changes the shipping address or swaps a variant (same product, same
 2. Changes are possible only before the order ships. If it has shipped (**addressChangeable** false or a fulfillment exists), say so: an address change goes to the carrier's own redirect options, and a swap becomes a return after delivery.
 
 ## Change the shipping address
-1. Ask for the full new address: street and number, apartment, city, state, ZIP. Repeat it back.
+1. Ask for what changed and read back the **full** new address: street and number, apartment, city, state, ZIP. Keep the parts that didn't change (for example the apartment) and any delivery note on the order.
 2. After the shopper confirms, call {{action:shopify_update_order_shipping_address}}.
 3. Confirm only what the result says, and repeat the new address. This changes where this order ships, not the address saved on the shopper's account.
 
@@ -21,4 +21,4 @@ description: Changes the shipping address or swaps a variant (same product, same
 
 ## Not possible as a change
 - Adding items: suggest a new order.
-- A different product or a pricier variant: hand off to the team.
+- A different product, or a swap that costs more (for example the candle trio instead of one candle): the shopper would owe money, so hand off to the team. Never take payment details in the chat.
