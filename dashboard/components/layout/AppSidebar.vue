@@ -36,23 +36,13 @@ import {
   Sparkles,
   Inbox,
   MessageSquare,
-  FileText,
   AreaChart,
   Settings,
   BookOpen,
   Puzzle,
-  CreditCard,
-  Zap,
-  Globe,
-  ExternalLink,
-  Package,
-  ThumbsUp,
-  Lightbulb,
-  History,
   FileCheck,
   FlaskConical,
 } from "lucide-vue-next";
-import type { Component } from "vue";
 
 import OrgSwitcher from "./OrgSwitcher.vue";
 import NavMain from "./NavMain.vue";
@@ -79,20 +69,6 @@ const route = useRoute();
 
 // Plugin menu items
 const pluginMenuItems = ref<PluginMenuItem[]>([]);
-
-// Map icon name strings from CUSTOM_MENU to Lucide components
-const ICON_MAP: Record<string, Component> = {
-  CreditCard,
-  Zap,
-  Globe,
-  ExternalLink,
-  Settings,
-  Puzzle,
-};
-
-function resolveIcon(iconName?: string): Component {
-  return (iconName && ICON_MAP[iconName]) || ExternalLink;
-}
 
 // Get user data from store with validation
 const user = computed(() => {
@@ -170,64 +146,67 @@ const navMain = computed(() => {
       badge: conversationsBadge.value,
       isActive: isPathActive("/conversations"),
     },
-    {
-      title: t("nav.documents"),
-      url: "/documents",
-      icon: FileText,
-      isActive: isPathActive("/documents"),
-    },
-    {
-      title: t("nav.playbooks"),
-      url: "/playbooks",
-      icon: BookOpen,
-      isActive: isPathActive("/playbooks"),
-    },
-    {
-      title: t("nav.tests"),
-      url: "/tests",
-      icon: FlaskConical,
-      isActive: isPathActive("/tests"),
-    },
-    {
-      title: t("nav.actionLog"),
-      url: "/actions",
-      icon: History,
-      isActive: isPathActive("/actions"),
-    },
-    {
-      title: t("nav.evidencePacks"),
-      url: "/evidence",
-      icon: FileCheck,
-      isActive: isPathActive("/evidence"),
-    },
   );
 
-  // Insights and feedback on AI replies; the agent role cannot open /insights.
-  if (!userStore.isAgent) {
-    items.push({
-      title: t("nav.insights"),
-      url: "/insights",
-      icon: Lightbulb,
-      isActive: isPathActive("/insights") && !isPathActive("/insights/feedback"),
-    });
-    items.push({
-      title: t("nav.feedback"),
-      url: "/insights/feedback",
-      icon: ThumbsUp,
-      isActive: isPathActive("/insights/feedback"),
-    });
-  }
-
-  // Products nav — only shown when a product-source plugin is enabled
-  // (e.g. Shopify). Mirrors the marketplace's type.includes('channel') gate.
+  // Products only appear when a product-source plugin is enabled (e.g. Shopify).
+  // Mirrors the marketplace's type.includes('channel') gate.
+  const knowledgeItems = [
+    { title: t("nav.documents"), url: "/documents", isActive: isPathActive("/documents") },
+    { title: t("nav.playbooks"), url: "/playbooks", isActive: isPathActive("/playbooks") },
+  ];
   if (appStore.enabledPlugins.some((p) => p.type?.includes("products"))) {
-    items.push({
+    knowledgeItems.push({
       title: t("nav.products"),
       url: "/products",
-      icon: Package,
       isActive: isPathActive("/products"),
     });
   }
+
+  // Insights and feedback on AI replies; the agent role cannot open /insights.
+  const qualityItems = [{ title: t("nav.tests"), url: "/tests", isActive: isPathActive("/tests") }];
+  if (!userStore.isAgent) {
+    qualityItems.push(
+      {
+        title: t("nav.insights"),
+        url: "/insights",
+        isActive: isPathActive("/insights") && !isPathActive("/insights/feedback"),
+      },
+      {
+        title: t("nav.feedback"),
+        url: "/insights/feedback",
+        isActive: isPathActive("/insights/feedback"),
+      },
+    );
+  }
+
+  const complianceItems = [
+    { title: t("nav.actionLog"), url: "/actions", isActive: isPathActive("/actions") },
+    { title: t("nav.evidencePacks"), url: "/evidence", isActive: isPathActive("/evidence") },
+  ];
+
+  items.push(
+    {
+      title: t("nav.knowledge"),
+      url: "#",
+      icon: BookOpen,
+      isActive: knowledgeItems.some((item) => item.isActive),
+      items: knowledgeItems,
+    },
+    {
+      title: t("nav.quality"),
+      url: "#",
+      icon: FlaskConical,
+      isActive: qualityItems.some((item) => item.isActive),
+      items: qualityItems,
+    },
+    {
+      title: t("nav.compliance"),
+      url: "#",
+      icon: FileCheck,
+      isActive: complianceItems.some((item) => item.isActive),
+      items: complianceItems,
+    },
+  );
 
   // Only show Integrations if admin or owner
   if (isAdminOrOwner) {
@@ -251,18 +230,6 @@ const navMain = computed(() => {
       ],
     });
   }
-
-  // Add external/custom menu items at root level
-  const externalItems = pluginMenuItems.value
-    .filter((item) => (item.parent === "root" || !item.parent) && item.external)
-    .map((item) => ({
-      title: item.title,
-      url: item.url,
-      icon: resolveIcon(item.icon),
-      isActive: false,
-      external: true,
-    }));
-  items.push(...externalItems);
 
   // Settings submenu: one entry per section, linking to its first visible tab
   const settingsItems = SETTINGS_NAV.flatMap((section) => {
