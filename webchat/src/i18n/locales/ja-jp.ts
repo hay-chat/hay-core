@@ -44,7 +44,7 @@ export default {
   "attachment.photo": "写真",
   "attachment.file": "ファイル",
   "attachment.sending": "送信中...",
-  "error.verificationFailed": "We couldn't verify your message. Please refresh the page and try again.",
-  "challenge.label": "Security check",
-  "challenge.prompt": "Quick security check before we send your message.",
+  "error.verificationFailed": "メッセージを確認できませんでした。ページを再読み込みして、もう一度お試しください。",
+  "challenge.label": "セキュリティチェック",
+  "challenge.prompt": "メッセージを送信する前に、簡単なセキュリティチェックを行います。",
 } as const;

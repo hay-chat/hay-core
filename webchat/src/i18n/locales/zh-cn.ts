@@ -42,7 +42,7 @@ export default {
   "attachment.photo": "照片",
   "attachment.file": "文件",
   "attachment.sending": "正在发送...",
-  "error.verificationFailed": "We couldn't verify your message. Please refresh the page and try again.",
-  "challenge.label": "Security check",
-  "challenge.prompt": "Quick security check before we send your message.",
+  "error.verificationFailed": "无法验证您的消息，请刷新页面后重试。",
+  "challenge.label": "安全验证",
+  "challenge.prompt": "发送消息前需要进行一次快速安全验证。",
 } as const;

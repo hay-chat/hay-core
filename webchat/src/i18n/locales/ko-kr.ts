@@ -42,7 +42,7 @@ export default {
   "attachment.photo": "사진",
   "attachment.file": "파일",
   "attachment.sending": "보내는 중...",
-  "error.verificationFailed": "We couldn't verify your message. Please refresh the page and try again.",
-  "challenge.label": "Security check",
-  "challenge.prompt": "Quick security check before we send your message.",
+  "error.verificationFailed": "메시지를 확인하지 못했습니다. 페이지를 새로고침한 후 다시 시도해 주세요.",
+  "challenge.label": "보안 확인",
+  "challenge.prompt": "메시지를 보내기 전에 간단한 보안 확인을 진행합니다.",
 } as const;
