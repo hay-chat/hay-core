@@ -20,10 +20,6 @@ Currently, the application has multiple scattered `setInterval` calls across dif
    - Interval: Every 60 seconds (1 minute)
    - Purpose: Remove expired DPoP tokens
 
-4. **Plugin Route Health Check** - `plugin-route.service.ts:248`
-   - Interval: Not specified in grep output
-   - Purpose: Health checks for plugin routes
-
 5. **Orchestrator Worker** - `orchestrator.worker.ts:41,48`
    - Two intervals: Worker processing and inactivity checks
    - Purpose: Conversation orchestration
@@ -391,15 +387,6 @@ const jobRegistry: CronJobConfig[] = [
     schedule: 5000,  // Every 5 seconds
     handler: async () => jobQueueService.processQueue(),
     singleton: true,  // Prevent concurrent processing
-    enabled: true,
-  },
-
-  {
-    name: 'plugin-health-check',
-    description: 'Check health of plugin routes and instances',
-    schedule: 60000,  // Every 60 seconds
-    handler: async () => pluginRouteService.healthCheck(),
-    timeout: 30000,
     enabled: true,
   },
 

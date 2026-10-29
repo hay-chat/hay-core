@@ -67,6 +67,24 @@ export function isPublicUploadPath(requestPath: string): boolean {
   return segments.length >= 3 && isPublicFolder(segments[1]);
 }
 
+const RASTER_IMAGE_EXTENSIONS = new Set([".jpg", ".jpeg", ".png", ".gif", ".webp"]);
+
+/**
+ * Headers for files served from `/uploads`. Public folders only take raster
+ * images; any other file (stored before that rule) is downloaded, never
+ * rendered under our origin.
+ */
+export function setPublicUploadHeaders(
+  res: { setHeader(name: string, value: string): unknown },
+  filePath: string,
+): void {
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  res.setHeader("Content-Security-Policy", "default-src 'none'; sandbox");
+  if (!RASTER_IMAGE_EXTENSIONS.has(path.extname(filePath).toLowerCase())) {
+    res.setHeader("Content-Disposition", "attachment");
+  }
+}
+
 /** Stable, unsigned URL of a private upload. Requires a staff session to open. */
 export function mediaUrl(uploadId: string): string {
   return `${getApiUrl()}/v1/media/${uploadId}`;

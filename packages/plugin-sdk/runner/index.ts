@@ -88,6 +88,16 @@ async function main(): Promise<void> {
   const logger = createLogger({ orgId });
   logger.info("Starting plugin worker", { pluginPath, orgId, port, mode });
 
+  // Core authenticates to this worker with a per-worker secret. Take it out of
+  // the environment before any plugin code loads, so child processes the
+  // plugin spawns don't inherit it.
+  const workerSecret = process.env.HAY_WORKER_SECRET || undefined;
+  delete process.env.HAY_WORKER_SECRET;
+  if (!workerSecret && mode === "production") {
+    logger.error("HAY_WORKER_SECRET is required in production mode");
+    process.exit(1);
+  }
+
   let manifest;
   let registry: PluginRegistry;
 
@@ -133,7 +143,7 @@ async function main(): Promise<void> {
   // ============================================================================
 
   try {
-    state.httpServer = new PluginHttpServer(port, registry, logger);
+    state.httpServer = new PluginHttpServer(port, registry, logger, { secret: workerSecret });
 
     // Set plugin on HTTP server (for lifecycle hooks)
     state.httpServer.setPlugin(state.plugin);

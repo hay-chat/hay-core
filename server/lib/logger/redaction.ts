@@ -140,3 +140,20 @@ export function redactString(input: string): string {
     .replace(US_PHONE_REGEX, "[PHONE_REDACTED]")
     .replace(IPV4_REGEX, "[IP_REDACTED]");
 }
+
+const JSON_SENSITIVE_FIELD_REGEX = new RegExp(
+  `"(${[...SENSITIVE_FIELDS, "authorization", "cookie", "clientId", "client_id"]
+    .map((field) => field.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
+    .join("|")})"\\s*:\\s*"(?:[^"\\\\]|\\\\.)*"`,
+  "gi",
+);
+
+/**
+ * Redact sensitive JSON string fields embedded in freeform text, such as the
+ * `{"apiKey":"…"}` metadata a plugin worker's logger appends to its lines.
+ */
+export function redactEmbeddedJsonFields(input: string): string {
+  return input.replace(JSON_SENSITIVE_FIELD_REGEX, (_match, field: string) => {
+    return `"${field}":"${REDACT_CENSOR}"`;
+  });
+}
