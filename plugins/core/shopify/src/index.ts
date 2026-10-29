@@ -617,8 +617,10 @@ export default defineHayPlugin((globalCtx) => {
           // Size swap before dispatch (shopify_swap_order_item, D6-10).
           "write_order_edits",
           // Chargeback intake + evidence draft (D2-8, src/disputes.ts). Shopify Payments
-          // stores only. Protected scopes: the hay-shopify-app toml must request the same
-          // three and Shopify must approve them; ship with the D6 re-consent above.
+          // stores only. read_shopify_payments_disputes is in the hay-shopify-app toml
+          // (2026-10-29). The two evidence scopes are protected and Shopify only grants
+          // them to dispute-management apps, so they are not in the toml and Shopify drops
+          // them here; the evidence attach then returns SCOPE_MISSING. Intake still works.
           "read_shopify_payments_disputes",
           "read_shopify_payments_dispute_evidences",
           "write_shopify_payments_dispute_evidences",

@@ -7,6 +7,7 @@ import { describe, it, expect, vi } from "vitest";
 import {
   attachEvidence,
   createShopifyClient,
+  DISPUTE_SHOW,
   disputeIdFromWebhook,
   ensureWebhooks,
   mergeNote,
@@ -107,6 +108,11 @@ describe("Shopify dispute intake", () => {
     });
   });
 
+  it("reads a dispute without the protected evidence fields", () => {
+    // Only dispute-management apps get the evidence scopes; asking for them fails the query.
+    expect(DISPUTE_SHOW).not.toContain("disputeEvidence");
+  });
+
   it("turns a webhook body into a dispute gid and rejects anything else", () => {
     expect(disputeIdFromWebhook({ id: 777 })).toBe(GID);
     expect(disputeIdFromWebhook({ id: "777" })).toBe(GID);
@@ -153,7 +159,7 @@ describe("Shopify evidence attach", () => {
     }));
     const { client, calls } = mockShopify(
       {
-        DisputeShow: () => ({
+        DisputeEvidenceShow: () => ({
           dispute: dispute({
             disputeEvidence: { ...dispute().disputeEvidence, uncategorizedText: "Merchant note." },
           }),
@@ -188,7 +194,7 @@ describe("Shopify evidence attach", () => {
       const uploads: string[] = [];
       const { client } = mockShopify(
         {
-          DisputeShow: () => ({
+          DisputeEvidenceShow: () => ({
             dispute: dispute({
               disputeEvidence: {
                 ...dispute().disputeEvidence,
@@ -221,7 +227,7 @@ describe("Shopify evidence attach", () => {
 
   it("refuses full slots, decided disputes and missing scopes without writing", async () => {
     const full = mockShopify({
-      DisputeShow: () => ({
+      DisputeEvidenceShow: () => ({
         dispute: dispute({
           disputeEvidence: {
             ...dispute().disputeEvidence,
@@ -242,7 +248,7 @@ describe("Shopify evidence attach", () => {
       { evidenceSentOn: "2026-10-25" },
       { evidenceDueBy: "2020-01-01T00:00:00Z" },
     ]) {
-      const decided = mockShopify({ DisputeShow: () => ({ dispute: dispute(overrides) }) });
+      const decided = mockShopify({ DisputeEvidenceShow: () => ({ dispute: dispute(overrides) }) });
       expect(await attachEvidence(decided.client, request, PREFIX)).toMatchObject({
         ok: false,
         code: "NOT_EDITABLE",
@@ -256,7 +262,7 @@ describe("Shopify evidence attach", () => {
       code: "SCOPE_MISSING",
     });
 
-    const missing = mockShopify({ DisputeShow: () => ({ dispute: null }) });
+    const missing = mockShopify({ DisputeEvidenceShow: () => ({ dispute: null }) });
     expect(await attachEvidence(missing.client, request, PREFIX)).toMatchObject({
       ok: false,
       code: "NOT_FOUND",
