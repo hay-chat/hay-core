@@ -1,3 +1,25 @@
+## 2026-10-29 — master @ 62c1c332 — Shopify 2.1.1 fixed (pushed)
+- Reviewer's error = false "Connection Failed: Plugin requires authentication" while "Connected via OAuth": testConnection only read instance.config, ignored authState tokens. Now hasPluginCredentials() checks both (server/lib/plugin-health-tool.ts, tests added).
+- Next: deploy, verify on haychat-2 with a fresh account; then Shopify App Pricing (tasks/shopify-app-pricing.md, Roger: plans + Partner API client).
+
+## 2026-10-28 — master (uncommitted) — Shopify resubmission plan
+- Plan written: tasks/shopify-app-pricing.md (2.1.1 connect error + 1.2.1 → Shopify App Pricing).
+- App Pricing facts verified (pricing_plans URL, App Events meters, Partner API activeSubscription, no webhooks).
+- Half-built: nothing coded yet; 2.1.1 root cause unknown (no screencast, no prod logs).
+- Next: repro reviewer path on haychat-2 with a fresh Hay account; Roger: create plans + Partner API client.
+- Woo work paused (tasks/woo-marketplace.md, hay-wordpress-woo branch unpushed).
+
+## 2026-10-28 — Woo Marketplace started (plan only in hay-core)
+- Plan: tasks/woo-marketplace.md (uncommitted on master). Woo SaaS Billing API is mandatory for tiered monthly pricing (USD only, no usage → flat tiers, pause at limit).
+- Plugin work: hay-wordpress worktree ../hay-wordpress-woo branch claude/woo-marketplace (2 commits, not pushed).
+- Next: Roger applies for Woo vendor account + emails Marketplace team; me: Phase 1 in-WP sign-up/connect.
+
+## 2026-10-28 — master (research only, no code) — Shopify/Woo platform billing
+- Shopify review rejected app (1.2.1 off-platform billing, 2.1.1 error on connect). Resubmit after pause ends 2026-10-31.
+- Research done: Shopify App Pricing (Partner Dashboard plans + App Events usage meter + Partner API activeSubscription; no webhooks). Woo: WP.org plugin may keep external billing; Woo Marketplace needs Partnership Agreement or SaaS Billing API (USD only, no usage).
+- Seam: backoffice owns billing (Stripe-only Subscription entity); core is billing-agnostic via internal setAccessState/setLimits/setBillingPeriod.
+- Next: Roger decides scope (Shopify App Pricing now; Woo Marketplace yes/no); reproduce the 2.1.1 connect error from the screencast.
+
 ## 2026-10-28 — claude/always-fact-check (worktree, not pushed)
 - Stage 2 fact check now runs on every RESPOND, not only when Stage 1 sets requiresFactCheck (incident: "We absolutely do ship to Portugal" with zero docs went out).
 - Unflagged replies: one grounding-only LLM call (medium tier); >= mediumThreshold passes, below falls into the full assessment/recheck/escalate path (grounding score reused). Flagged replies unchanged.
