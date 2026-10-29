@@ -43,3 +43,14 @@ code {
   line-height: 1;
   display: inline-block;
 }
+
+/* iOS Safari zooms the page when a field under 16px gets focus. Touch devices
+   get 16px fields; !important beats the text-sm utilities on each field. */
+@media (hover: none) and (pointer: coarse) {
+  input,
+  textarea,
+  select,
+  [contenteditable="true"] {
+    font-size: 16px !important;
+  }
+}
