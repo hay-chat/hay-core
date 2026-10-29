@@ -1,5 +1,6 @@
 <template>
   <Page :title="$t('privacy.title')" :description="$t('privacy.description')">
+    <SettingsTabs />
     <!-- Privacy Overview -->
     <Card>
       <CardHeader>

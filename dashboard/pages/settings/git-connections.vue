@@ -1,5 +1,6 @@
 <template>
   <Page :title="$t('gitConnections.title')" :description="$t('gitConnections.description')">
+    <SettingsTabs />
     <template #header>
       <Button
         v-if="isConfigured"

@@ -1,5 +1,6 @@
 <template>
   <Page :title="$t('webchat.title')" :description="$t('webchat.description')" width="max">
+    <SettingsTabs />
     <!-- Appearance -->
     <Card>
       <CardHeader>

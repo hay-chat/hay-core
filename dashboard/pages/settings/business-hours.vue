@@ -1,5 +1,6 @@
 <template>
   <Page :title="$t('businessHours.title')" :description="$t('businessHours.description')">
+    <SettingsTabs />
     <template #header>
       <Button v-if="!draft" size="sm" @click="startDraft">
         {{ $t("businessHours.addSchedule") }}

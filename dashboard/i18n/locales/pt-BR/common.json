@@ -13,9 +13,7 @@
     "marketplace": "Marketplace",
     "settings": "Configurações",
     "general": "Geral",
-    "agents": "Agentes",
     "users": "Usuários",
-    "privacyData": "Privacidade e Dados",
     "apiTokens": "Tokens de API",
     "webchat": "Webchat",
     "customerPrivacy": "Privacidade do Cliente",
@@ -29,7 +27,15 @@
     "evidencePacks": "Pacotes de evidências",
     "tests": "Testes",
     "usage": "Uso",
-    "insights": "Insights"
+    "insights": "Insights",
+    "assistant": "Assistente",
+    "identity": "Identidade",
+    "channelList": "Lista de canais",
+    "workspace": "Espaço de trabalho",
+    "workspaceData": "Dados do espaço de trabalho",
+    "privacy": "Privacidade",
+    "developers": "Desenvolvedores",
+    "billingUsage": "Cobrança e Uso"
   },
   "user": {
     "status": "Status",

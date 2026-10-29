@@ -1,5 +1,6 @@
 <template>
   <Page :title="$t('users.title')" :description="$t('users.description')" width="max">
+    <SettingsTabs />
     <!-- Organization Members -->
     <Card>
       <CardHeader>
