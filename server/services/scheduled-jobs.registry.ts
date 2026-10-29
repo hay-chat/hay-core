@@ -468,6 +468,20 @@ const jobRegistry: CronJobConfig[] = [
   },
 
   {
+    name: "cleanup-old-audit-logs",
+    description: "Delete audit logs older than the 90-day retention period",
+    schedule: "45 3 * * *", // Daily at 3:45 AM
+    handler: async () => {
+      const { auditLogService } = await import("./audit-log.service");
+      const deleted = await auditLogService.cleanup();
+      logger.info({ deleted }, "Audit log retention cleanup finished");
+    },
+    timeout: 1800000,
+    singleton: true,
+    enabled: true,
+  },
+
+  {
     name: "conversation-media-sweep",
     description:
       "Delete conversation media past its retention (retentionDays, or 180 days when unset) and orphaned uploads",
@@ -545,15 +559,6 @@ const jobRegistry: CronJobConfig[] = [
   //   schedule: 300000,  // Every 5 minutes
   //   handler: async () => pluginInstanceManager.cleanup(),
   //   singleton: true,
-  //   enabled: false,  // Enable when ready
-  // },
-  //
-  // {
-  //   name: 'cleanup-old-audit-logs',
-  //   description: 'Archive audit logs older than retention period',
-  //   schedule: '0 4 * * 0',  // Weekly on Sunday at 4 AM
-  //   handler: async () => auditLogService.cleanupOldLogs(),
-  //   timeout: 1800000,  // 30 minutes
   //   enabled: false,  // Enable when ready
   // },
 ];

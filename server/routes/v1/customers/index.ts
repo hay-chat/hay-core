@@ -7,6 +7,7 @@ import { CustomerRepository } from "@server/repositories/customer.repository";
 import { RESOURCES, ACTIONS } from "@server/types/scopes";
 import { boundedJsonRecord } from "@server/lib/validation/json-record";
 import { identifierSchema, includeSchema, selectSchema } from "@server/types/list-input";
+import { auditLogService } from "@server/services/audit-log.service";
 
 const customerService = new CustomerService();
 const customerRepository = new CustomerRepository();
@@ -214,6 +215,15 @@ export const customersRouter = t.router({
           message: "Customer not found",
         });
       }
+      await auditLogService.record({
+        userId: ctx.user?.id,
+        organizationId: ctx.organizationId,
+        action: "customer.delete",
+        resource: "customer",
+        changes: { customerId: input.id },
+        ipAddress: ctx.ipAddress,
+        userAgent: ctx.userAgent,
+      });
 
       return { success: true };
     }),
@@ -233,6 +243,18 @@ export const customersRouter = t.router({
           message: "One or both customers not found",
         });
       }
+      await auditLogService.record({
+        userId: ctx.user?.id,
+        organizationId: ctx.organizationId,
+        action: "customer.merge",
+        resource: "customer",
+        changes: {
+          sourceCustomerId: input.sourceCustomerId,
+          targetCustomerId: input.targetCustomerId,
+        },
+        ipAddress: ctx.ipAddress,
+        userAgent: ctx.userAgent,
+      });
 
       return mergedCustomer;
     }),

@@ -228,7 +228,7 @@ describe("internal.organizations", () => {
     await expect(
       internalRouter.createCaller(ctx()).organizations.delete({ organizationId: ORG_ID }),
     ).resolves.toEqual({ success: true });
-    expect(mockDeleteWithData).toHaveBeenCalledWith(organization);
+    expect(mockDeleteWithData).toHaveBeenCalledWith(organization, { source: "operator" });
 
     mockFindOne.mockResolvedValueOnce(null);
     await expect(
