@@ -53,7 +53,6 @@ export interface CachedToolDescriptor {
 interface LocalMCPServerConfig {
   serverId: string;
   serverPath?: string;
-  startCommand?: string;
   tools?: MCPTool[];
 }
 
