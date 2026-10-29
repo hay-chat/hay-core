@@ -48,7 +48,10 @@ function allowedEnvName(
   if (allowedEnv.has(envVarName)) return envVarName;
   if (!refusedEnvNames.has(envVarName)) {
     refusedEnvNames.add(envVarName);
-    logger.warn({ envVar: envVarName }, "Config field env var not allowed for this plugin; ignored");
+    logger.warn(
+      { envVar: envVarName },
+      "Config field env var not allowed for this plugin; ignored",
+    );
   }
   return undefined;
 }

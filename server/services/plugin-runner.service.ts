@@ -14,11 +14,7 @@ import { getApiUrl } from "../config/env";
 import { oauthService } from "./oauth.service";
 import { createLogger } from "@server/lib/logger";
 import { redactEmbeddedJsonFields } from "@server/lib/logger/redaction";
-import {
-  issueWorkerSecret,
-  revokeWorkerSecret,
-  workerFetch,
-} from "@server/lib/worker-client";
+import { issueWorkerSecret, revokeWorkerSecret, workerFetch } from "@server/lib/worker-client";
 import type { HayPluginManifest } from "../types/plugin.types";
 
 const logger = createLogger("plugin-runner");
@@ -111,7 +107,7 @@ export class PluginRunnerService {
 
     // Get plugin instance
     const instanceRepo = AppDataSource.getRepository(PluginInstance);
-    let instance = await instanceRepo.findOne({
+    const instance = await instanceRepo.findOne({
       where: { organizationId: orgId, pluginId: plugin.id },
     });
     if (!instance || !instance.enabled) {
@@ -508,8 +504,16 @@ export class PluginRunnerService {
     capabilities: string[];
     allowedEnvVars: string[];
   }): Record<string, string> {
-    const { orgId, pluginId, port, workerSecret, orgConfig, orgAuth, capabilities, allowedEnvVars } =
-      params;
+    const {
+      orgId,
+      pluginId,
+      port,
+      workerSecret,
+      orgConfig,
+      orgAuth,
+      capabilities,
+      allowedEnvVars,
+    } = params;
 
     // Base environment
     const env: Record<string, string> = {

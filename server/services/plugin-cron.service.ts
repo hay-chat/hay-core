@@ -153,17 +153,15 @@ export class PluginCronService {
       worker = await runner.startWorker(orgId, pluginId);
     }
 
-    const response = await workerFetch(worker.port, `/cron/${encodeURIComponent(cronName)}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          config: resolvedConfig,
-          authState: instance.authState ?? null,
-        }),
-        signal: AbortSignal.timeout(60_000),
-      },
-    );
+    const response = await workerFetch(worker.port, `/cron/${encodeURIComponent(cronName)}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        config: resolvedConfig,
+        authState: instance.authState ?? null,
+      }),
+      signal: AbortSignal.timeout(60_000),
+    });
 
     if (!response.ok) {
       const text = await response.text();

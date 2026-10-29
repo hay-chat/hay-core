@@ -183,7 +183,7 @@ describe("webchat gates", () => {
     expect(outcome.results.map((r) => r.reason)).toEqual(["no_token", "invalid_token"]);
 
     const [url, init] = fetchMock.mock.calls[0];
-    expect(url).toBe("http://localhost:5555/webchat/gate/conversation.create");
+    expect(url).toBe("http://127.0.0.1:5555/webchat/gate/conversation.create");
     expect(JSON.parse(String(init?.body)).input).toMatchObject({
       token: "t",
       event: "conversation.create",
