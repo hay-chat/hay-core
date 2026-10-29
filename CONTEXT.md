@@ -5,7 +5,7 @@
 **Key Decisions**:
 
 - `@hay/form-schema` is a root workspace package: the server uses its CommonJS build (built on install via `prepare`), dashboard and webchat alias straight to `packages/form-schema/src`.
-- `validateResponse` is plain TypeScript (no zod) so the widget stays inside its 48 KB brotli budget; the form components load lazily.
+- `validateResponse` is plain TypeScript (no zod) so the widget stays inside its 48 KB brotli budget; the form components and the submit request load lazily; chat budget raised 48 → 52 KB (master was at 48.0).
 - Migrations renumbered to 1785960000000/1785960000001 (after the latest on master).
 
 **Next Steps**:
