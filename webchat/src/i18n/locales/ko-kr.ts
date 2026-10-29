@@ -45,4 +45,6 @@ export default {
   "error.verificationFailed": "메시지를 확인하지 못했습니다. 페이지를 새로고침한 후 다시 시도해 주세요.",
   "challenge.label": "보안 확인",
   "challenge.prompt": "메시지를 보내기 전에 간단한 보안 확인을 진행합니다.",
+  "csat.defaultQuestion": "오늘 받으신 지원을 어떻게 평가하시겠어요?",
+  "csat.thankYou": "의견 주셔서 감사합니다!",
 } as const;

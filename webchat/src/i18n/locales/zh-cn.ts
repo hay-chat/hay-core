@@ -45,4 +45,6 @@ export default {
   "error.verificationFailed": "无法验证您的消息，请刷新页面后重试。",
   "challenge.label": "安全验证",
   "challenge.prompt": "发送消息前需要进行一次快速安全验证。",
+  "csat.defaultQuestion": "您如何评价今天获得的支持？",
+  "csat.thankYou": "感谢您的反馈！",
 } as const;

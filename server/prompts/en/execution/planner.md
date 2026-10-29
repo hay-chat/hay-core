@@ -26,6 +26,14 @@ These tools are provided by Hay and may be called regardless of any playbook too
 
 {{toolsDetail}}
 {{/if}}
+{{#if pageToolsDetail}}
+
+### Page tools (this visitor's browser)
+
+The web page the customer is chatting from registered these tools. Calling one runs it in the customer's browser right away, in front of them (for example opening a page or adding to their cart), so call them when the customer asks for that action and tell them what you did in your next message:
+
+{{pageToolsDetail}}
+{{/if}}
 {{/if}}
 ASK_FORM - To present a structured form to the customer instead of asking for one piece of information at a time. Use this ONLY when the playbook explicitly defines a form to collect, AND the form's required fields are NOT already present in the user context. Set `formJson` to a JSON-serialized FormSchema (id, fields[], etc.) matching the playbook's form definition. Set userMessage to null. The conversation pauses until the customer submits the form; their answers will appear in user context on the next turn, so you should then continue normally without re-asking.
 

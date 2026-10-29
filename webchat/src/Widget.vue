@@ -12,6 +12,10 @@
         :is-typing="isTyping"
         :is-ready="isInitialized"
         :is-conversation-closed="isConversationClosed"
+        :csat-enabled="resolvedCsatEnabled"
+        :csat-question="resolvedCsatQuestion"
+        :csat-submitted="csatSubmitted"
+        :submit-csat="submitCsat"
         :is-expanded="isExpanded"
         :agent-name="resolvedAgentName"
         :agent-avatar-url="resolvedAvatarUrl"
@@ -115,6 +119,15 @@ const resolvedAgentName = computed(
 const challengeContribution =
   props.publicConfig?.contributions?.find((c) => c.type === "challenge@1") ?? null;
 
+// CSAT: host config wins, then server config; enabled by default.
+const resolvedCsatEnabled = computed(
+  () => props.config.csatEnabled ?? props.publicConfig?.csatEnabled ?? true,
+);
+
+const resolvedCsatQuestion = computed(
+  () => props.config.csatQuestion || props.publicConfig?.csatQuestion || t("csat.defaultQuestion"),
+);
+
 const {
   isOpen,
   isInitialized,
@@ -122,6 +135,7 @@ const {
   isTyping,
   unreadCount,
   isConversationClosed,
+  csatSubmitted,
   currentAgentType,
   currentAgentName,
   conversationStatus,
@@ -136,6 +150,7 @@ const {
   closeChat,
   sendMessage,
   sendAttachment,
+  submitCsat,
   startTyping,
   stopTyping,
   startNewConversation,
@@ -150,6 +165,8 @@ const {
     // localised default the empty state shows.
     showGreeting: props.config.showGreeting ?? true,
     greetingMessage: props.config.greetingMessage || t("widget.defaultGreeting"),
+    // Named on the "working" overlay while a page tool runs.
+    agentName: resolvedAgentName.value,
   },
   { challenge: challengeContribution, preChatForm: props.publicConfig?.preChatForm ?? null },
 );

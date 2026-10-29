@@ -9,6 +9,10 @@ export interface HayChatConfig {
   theme?: "blue" | "green" | "purple" | "black";
   showGreeting?: boolean;
   greetingMessage?: string;
+  /** Whether to show a 1–5 satisfaction rating when a conversation ends. Populated from public config. */
+  csatEnabled?: boolean;
+  /** Question shown above the satisfaction rating. Populated from public config. */
+  csatQuestion?: string;
   /** Public context passed to the AI prompt. Safe for non-sensitive data only. */
   context?: Record<string, unknown>;
   /**
@@ -77,6 +81,10 @@ export interface PublicConfig {
   aiLabelShown?: boolean;
   /** The org's label text; null = the localized default. */
   aiLabelText?: string | null;
+  /** Whether to ask for a 1–5 satisfaction rating when a conversation ends. */
+  csatEnabled?: boolean;
+  /** Question shown above the satisfaction rating; null = the localized default. */
+  csatQuestion?: string | null;
   /** Plugin contributions this widget advertised support for (never code). */
   contributions?: WidgetContribution[];
   /** The org's pre-chat form, asked before the first message. */
@@ -96,11 +104,43 @@ export interface LauncherBridge {
   setUnread(count: number): void;
 }
 
+/**
+ * A tool the host page registers for the AI to call in the visitor's browser
+ * (WebMCP shape, so `navigator.modelContext.registerTool` takes the same object).
+ */
+export interface PageTool {
+  /** Letters, digits, `_` and `-`; the AI sees it as `page:<name>`. */
+  name: string;
+  /** What the tool does and when to use it, for the AI. */
+  description: string;
+  /** JSON Schema of `execute`'s argument. Defaults to an open object. */
+  inputSchema?: Record<string, unknown>;
+  /** `readOnlyHint: true` for tools that only look or navigate. */
+  annotations?: { readOnlyHint?: boolean };
+  /**
+   * Runs in the page. Return an MCP result (`{ content: [{ type: "text", text }] }`)
+   * or any JSON value; throw (or return `isError: true`) to tell the AI it failed.
+   */
+  execute(args: Record<string, unknown>): unknown | Promise<unknown>;
+}
+
+/** Minimal `navigator.modelContext` (WebMCP draft) the widget fills in or tees into. */
+export interface ModelContext {
+  registerTool(tool: PageTool): void;
+  unregisterTool(name: string): void;
+  /** Replace every tool registered through this object (WebMCP `provideContext`). */
+  provideContext(context: { tools?: PageTool[] }): void;
+  clearContext(): void;
+}
+
 /** A host API call made before the chat chunk loaded, replayed in order. */
 export type HostCall =
   | { name: "addContext"; args: [key: string, value: unknown] }
   | { name: "grantConsent"; args: [] }
-  | { name: "revokeConsent"; args: [] };
+  | { name: "revokeConsent"; args: [] }
+  | { name: "registerTool"; args: [tool: PageTool] }
+  | { name: "unregisterTool"; args: [name: string] }
+  | { name: "provideContext"; args: [context: { tools?: PageTool[] }] };
 
 /** Contract between widget.js (the loader) and the chat chunk. */
 export interface ChatMountOptions {
@@ -161,6 +201,22 @@ declare global {
       grantConsent?: () => void;
       /** Withdraw visitor consent. Wipes persistent `hay-*` storage; session state stays until tab close. */
       revokeConsent?: () => void;
+      /**
+       * Tools pushed before widget.js ran (`(window.HayChat.tools ||= []).push(tool)`);
+       * after that, pushing registers straight away.
+       */
+      tools?: PageTool[] | { push: (...tools: PageTool[]) => void };
+      /** Register a page tool (WebMCP shape) the AI may call in this browser. */
+      registerTool?: (tool: PageTool) => void;
+      unregisterTool?: (name: string) => void;
+      /**
+       * Draw the AI's orange highlight around an element (selector or element)
+       * with an optional label; call it from a tool while it acts on the page.
+       */
+      highlight?: (target: Element | string | null, label?: string) => boolean;
     };
+  }
+  interface Navigator {
+    modelContext?: ModelContext;
   }
 }

@@ -1,0 +1,14 @@
+{
+  "name": "spacebring-mcp-server",
+  "version": "2.0.0",
+  "private": true,
+  "description": "Local Node MCP server for Spacebring: member-support actions (book, move, cancel, guests, issues, house info) over the Spacebring REST API.",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.6.1",
+    "zod": "^3.24.2"
+  }
+}

@@ -47,4 +47,6 @@ export default {
   "error.verificationFailed": "メッセージを確認できませんでした。ページを再読み込みして、もう一度お試しください。",
   "challenge.label": "セキュリティチェック",
   "challenge.prompt": "メッセージを送信する前に、簡単なセキュリティチェックを行います。",
+  "csat.defaultQuestion": "本日のサポートはいかがでしたか？",
+  "csat.thankYou": "フィードバックありがとうございます！",
 } as const;

@@ -78,6 +78,30 @@
       </CardContent>
     </Card>
 
+    <!-- Customer Satisfaction (CSAT) -->
+    <Card>
+      <CardHeader>
+        <CardTitle>{{ $t("webchat.csat") }}</CardTitle>
+        <CardDescription>{{ $t("webchat.csatDescription") }}</CardDescription>
+      </CardHeader>
+      <CardContent class="space-y-4">
+        <div class="flex items-center space-x-2">
+          <Switch id="csatEnabled" v-model:checked="settingsForm.csatEnabled" />
+          <Label for="csatEnabled">{{ $t("webchat.csatEnabled") }}</Label>
+        </div>
+
+        <Textarea
+          v-if="settingsForm.csatEnabled"
+          id="csatQuestion"
+          v-model="settingsForm.csatQuestion"
+          :label="$t('webchat.csatQuestion')"
+          :placeholder="$t('webchat.csatQuestionPlaceholder')"
+          :description="$t('webchat.csatQuestionDescription')"
+          :rows="2"
+        />
+      </CardContent>
+    </Card>
+
     <!-- Security -->
     <Card>
       <CardHeader>
@@ -273,6 +297,8 @@ const settingsForm = ref({
   theme: "blue" as NonNullable<UpdateSettingsInput["theme"]>,
   showGreeting: true,
   greetingMessage: "Hello! How can we help you today?",
+  csatEnabled: true,
+  csatQuestion: "",
   isEnabled: true,
   spamClassifierEnabled: false,
   spamGuidance: "",
@@ -344,6 +370,8 @@ async function loadSettings() {
       theme: settings.theme,
       showGreeting: settings.showGreeting,
       greetingMessage: settings.greetingMessage || "",
+      csatEnabled: settings.csatEnabled,
+      csatQuestion: settings.csatQuestion || "",
       isEnabled: settings.isEnabled,
       spamClassifierEnabled: settings.spamClassifierEnabled,
       spamGuidance: settings.spamGuidance || "",
@@ -371,6 +399,8 @@ async function saveSettings() {
       theme: settingsForm.value.theme,
       showGreeting: settingsForm.value.showGreeting,
       greetingMessage: settingsForm.value.greetingMessage || null,
+      csatEnabled: settingsForm.value.csatEnabled,
+      csatQuestion: settingsForm.value.csatQuestion.trim() || null,
       allowedDomains: allowedDomainsArray.value,
       isEnabled: settingsForm.value.isEnabled,
       spamClassifierEnabled: settingsForm.value.spamClassifierEnabled,

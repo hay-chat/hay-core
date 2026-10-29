@@ -1238,7 +1238,11 @@ async function handleExecutionLoop(
     if (executionResult.step === "CALL_TOOL" && executionResult.tool) {
       const enabledTools = conversation.enabled_tools;
       const { coreToolRegistry } = await import("@server/services/core/core-tools");
-      const isCoreTool = coreToolRegistry.has(executionResult.tool.name);
+      const { isPageTool } = await import("@server/services/webchat/page-tools.service");
+      // Page tools (registered by the host page in the browser) are exempt too:
+      // they exist only while that page is open, never in a playbook's list.
+      const isCoreTool =
+        coreToolRegistry.has(executionResult.tool.name) || isPageTool(executionResult.tool.name);
       if (!isCoreTool && enabledTools && enabledTools.length > 0) {
         if (!enabledTools.includes(executionResult.tool.name)) {
           log.warn(

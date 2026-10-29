@@ -76,6 +76,44 @@
               </div>
             </CardContent>
           </Card>
+
+          <!-- Page tools (WebMCP) -->
+          <Card class="mt-4">
+            <CardHeader>
+              <div class="flex items-center gap-2">
+                <MousePointerClick class="w-5 h-5 text-orange-500" />
+                <CardTitle class="text-base">Page tools (WebMCP)</CardTitle>
+              </div>
+            </CardHeader>
+            <CardContent class="space-y-3">
+              <p class="text-sm text-gray-600">
+                This page registers tools the AI can run in your browser. Ask the chat to do
+                something in the dashboard and watch the orange frame while it acts.
+              </p>
+              <div class="text-sm">
+                <span class="font-medium">Status:</span>
+                <span class="ml-2">{{
+                  pageToolsRegistered
+                    ? `${pageTools.length} tools registered`
+                    : "Waiting for the widget"
+                }}</span>
+              </div>
+              <ul class="text-sm space-y-1">
+                <li v-for="tool in pageTools" :key="tool.name" class="flex gap-2">
+                  <code class="text-xs bg-gray-100 px-1.5 py-0.5 rounded shrink-0"
+                    >page:{{ tool.name }}</code
+                  >
+                  <span class="text-gray-600 line-clamp-1">{{ tool.description }}</span>
+                </li>
+              </ul>
+              <div>
+                <p class="text-sm font-medium mb-1">Try asking</p>
+                <ul class="text-sm text-gray-600 space-y-1">
+                  <li v-for="prompt in pageToolPrompts" :key="prompt">“{{ prompt }}”</li>
+                </ul>
+              </div>
+            </CardContent>
+          </Card>
         </div>
 
         <!-- Controls -->
@@ -143,7 +181,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted, onBeforeUnmount } from "vue";
-import { Shield, Key, RefreshCw, Trash2, Download } from "lucide-vue-next";
+import { Shield, Key, RefreshCw, Trash2, Download, MousePointerClick } from "lucide-vue-next";
 import {
   isWebCryptoAvailable,
   getKeypair,
@@ -151,30 +189,21 @@ import {
   exportKeypairForBackup,
 } from "@/utils/dpop-crypto";
 import { useDomain } from "@/composables/useDomain";
-
-// Declare HayChat on window object
-declare global {
-  interface Window {
-    HayChat: {
-      config?: {
-        organizationId?: string;
-        pluginId?: string;
-        baseUrl?: string;
-        widgetTitle?: string;
-        widgetSubtitle?: string;
-        position?: string;
-        theme?: string;
-        showGreeting?: boolean;
-        greetingMessage?: string;
-      };
-    };
-  }
-}
+import { usePageTools } from "@/composables/usePageTools";
 
 // State
 // Get API URL from domain composable
 const { getApiUrl } = useDomain();
 const apiBaseUrl = getApiUrl();
+
+const { tools: pageTools, registerWithWidget } = usePageTools();
+const pageToolsRegistered = ref(false);
+const pageToolPrompts = [
+  "Take me to the playbooks page",
+  "Where do I change the business hours?",
+  "Show me where to connect a new channel",
+  "What am I looking at right now?",
+];
 
 const sessionInfo = ref({
   conversationId: null as string | null,
@@ -324,10 +353,14 @@ onMounted(() => {
       "👋 Hello! This is a demo of anonymous-but-authenticated conversations using DPoP.",
   };
 
-  // Load the widget script
+  // Load the widget script, then hand it this app's page tools (WebMCP), so the
+  // chat can drive the dashboard: "take me to playbooks", "where do I connect Shopify?".
   const script = document.createElement("script");
   script.src = `${apiBaseUrl}/v1/webchat/widget.js?v=${Date.now()}`;
   script.async = true;
+  script.onload = () => {
+    pageToolsRegistered.value = registerWithWidget();
+  };
   document.body.appendChild(script);
 
   // Start polling for session changes
