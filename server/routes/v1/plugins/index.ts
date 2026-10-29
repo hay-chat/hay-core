@@ -21,6 +21,7 @@ import {
   getPluginTranslations,
   callPluginUiRoute,
 } from "./plugins.handler";
+import { getSetupStatus } from "./setup-status.handler";
 
 export const pluginsRouter = t.router({
   getAll: getAllPlugins,
@@ -35,6 +36,7 @@ export const pluginsRouter = t.router({
   refreshMCPTools: refreshMCPTools,
   getMenuItems: getMenuItems,
   testConnection: testConnection,
+  setupStatus: getSetupStatus,
   validateAuth: validateAuth,
   getPluginTranslations: getPluginTranslations,
   callUiRoute: callPluginUiRoute,
