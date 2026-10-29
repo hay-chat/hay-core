@@ -101,6 +101,13 @@ export const config = {
     max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS || "100", 10),
   },
 
+  webchat: {
+    // Page tools (WebMCP): tools the host page registers in the browser for the
+    // AI to call in the visitor's session. Set WEBCHAT_PAGE_TOOLS=false to turn
+    // registration and dispatch off everywhere.
+    pageTools: process.env.WEBCHAT_PAGE_TOOLS !== "false",
+  },
+
   // Webchat under-attack mode (D9-10): more than `createThreshold` new
   // conversations for one org within `windowSeconds` challenges every visitor
   // for `hours`.

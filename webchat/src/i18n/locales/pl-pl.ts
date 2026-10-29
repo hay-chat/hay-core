@@ -46,4 +46,6 @@ export default {
   "error.verificationFailed": "Nie udało się zweryfikować wiadomości. Odśwież stronę i spróbuj ponownie.",
   "challenge.label": "Kontrola bezpieczeństwa",
   "challenge.prompt": "Szybka kontrola bezpieczeństwa przed wysłaniem wiadomości.",
+  "csat.defaultQuestion": "Jak oceniasz wsparcie, które otrzymałeś dzisiaj?",
+  "csat.thankYou": "Dziękujemy za opinię!",
 } as const;

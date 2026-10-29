@@ -110,6 +110,15 @@ const sendAttachmentSchema = z.object({
   context: z.record(z.any()).optional(),
 });
 
+// Schema for submitting a CSAT rating
+const submitCsatSchema = z.object({
+  conversationId: z.string().uuid(),
+  rating: z.number().int().min(1).max(5),
+  proof: z.string(), // DPoP proof
+  method: z.string(),
+  url: z.string(),
+});
+
 // Schema for getting messages
 const getMessagesSchema = z.object({
   conversationId: z.string().uuid(),
@@ -426,6 +435,7 @@ export const publicConversationsRouter = t.router({
         typing: isTyping,
         status: conversation?.status || "open",
         isClosed: ["closed", "resolved", "unresolved"].includes(conversation?.status ?? ""),
+        csatRating: conversation?.csat_rating ?? null,
         error: null,
         errorMessage: null,
       };
@@ -699,6 +709,48 @@ export const publicConversationsRouter = t.router({
 
       return { saved: true, nonce: verified.newNonce, error: null };
     }),
+
+  // The shopper rates the support once the conversation has ended (requires
+  // DPoP proof). One rating per conversation; a re-submit overwrites it.
+  submitCsat: publicProcedure.input(submitCsatSchema).mutation(async ({ input, ctx }) => {
+    if (await isPublicWidgetRateLimited([{ rule: "messagePerIp", id: clientIp(ctx.ipAddress) }])) {
+      throw tooManyRequests();
+    }
+
+    const verified = await verifyDPoPForRequest(
+      input.conversationId,
+      input.proof,
+      input.method,
+      input.url,
+    );
+    if (!verified.success) {
+      if (verified.newNonce && verified.error === "Invalid or expired nonce") {
+        return { saved: false, nonce: verified.newNonce, error: "NONCE_EXPIRED" };
+      }
+      throw new TRPCError({
+        code: "UNAUTHORIZED",
+        message: verified.error || "Invalid DPoP proof",
+      });
+    }
+
+    const conversation = await conversationRepository.findById(input.conversationId);
+    if (!conversation) {
+      throw new TRPCError({ code: "NOT_FOUND", message: "Conversation not found" });
+    }
+    if (!["closed", "resolved", "unresolved"].includes(conversation.status)) {
+      throw new TRPCError({
+        code: "BAD_REQUEST",
+        message: "Conversation has not ended",
+      });
+    }
+
+    await conversationRepository.updateById(conversation.id, {
+      csat_rating: input.rating,
+      csat_rated_at: new Date(),
+    });
+
+    return { saved: true, nonce: verified.newNonce, error: null };
+  }),
 
   // Rotate the keypair for a conversation (requires valid DPoP with old key)
   rotateKeys: publicProcedure

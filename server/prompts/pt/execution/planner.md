@@ -26,6 +26,14 @@ Estas ferramentas são fornecidas pelo Hay e podem ser chamadas independentement
 
 {{toolsDetail}}
 {{/if}}
+{{#if pageToolsDetail}}
+
+### Ferramentas da página (navegador deste cliente)
+
+A página web de onde o cliente está conversando registrou estas ferramentas. Chamar uma delas executa a ação na hora no navegador do cliente, na frente dele (por exemplo abrir uma página ou adicionar ao carrinho), então chame-as quando o cliente pedir essa ação e diga o que você fez na sua próxima mensagem:
+
+{{pageToolsDetail}}
+{{/if}}
 {{/if}}
 ASK_FORM - Para apresentar um formulário estruturado ao cliente em vez de perguntar uma informação por vez. Use APENAS quando o playbook definir explicitamente um formulário a coletar E os campos obrigatórios do formulário NÃO estiverem já presentes no contexto do usuário. Defina `formJson` com um JSON serializado do FormSchema (id, fields[], etc.) correspondente à definição do formulário no playbook. Defina userMessage como null. A conversa pausa até o cliente enviar o formulário; as respostas aparecerão no contexto do usuário no próximo turno, então continue normalmente sem repetir a pergunta.
 

@@ -5,16 +5,35 @@ import { createApp } from "vue";
 import Widget from "./Widget.vue";
 import { addContext } from "./composables/useWidgetContext";
 import { initConsent, grantConsent, revokeConsent } from "./composables/useConsent";
+import { registerTool, unregisterTool, provideContext } from "./composables/usePageTools";
+import { highlight } from "./utils/agentActivity";
 import { loadTranslations } from "./i18n";
 import { setDebug, debugLog } from "./utils/debug";
 import type { ChatHandle, ChatMountOptions, HostCall } from "./types";
 import "./styles/widget.css";
 
-const hostApi = { addContext, grantConsent, revokeConsent };
+const hostApi = {
+  addContext,
+  grantConsent,
+  revokeConsent,
+  registerTool,
+  unregisterTool,
+  highlight,
+};
 
 function replay(call: HostCall): void {
-  if (call.name === "addContext") addContext(...call.args);
-  else hostApi[call.name]();
+  switch (call.name) {
+    case "addContext":
+      return addContext(...call.args);
+    case "registerTool":
+      return registerTool(...call.args);
+    case "unregisterTool":
+      return unregisterTool(...call.args);
+    case "provideContext":
+      return provideContext(...call.args);
+    default:
+      return hostApi[call.name]();
+  }
 }
 
 export async function mountChat(options: ChatMountOptions): Promise<ChatHandle> {

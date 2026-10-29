@@ -52,8 +52,12 @@ Either way: **no vendored bloat** (see next).
   and even the **wrong key** (`input_schema` instead of `inputSchema`). The agent got zero
   parameter guidance and a tool list it could not pick from. Use zod schemas with `.describe()`
   on each param, and expose a prefixed semantic surface (`<platform>_get_order`,
-  `<platform>_create_refund`, …) that composes several endpoints — shopify, woocommerce, wix and
-  magento all follow this shape now.
+  `<platform>_create_refund`, …) that composes several endpoints — shopify, woocommerce, wix,
+  magento and spacebring follow this shape now. The full rules are in `tool-design.md`.
+- **Don't make the agent chain lookups.** Spacebring v1 had `find_membership` → `list_resources`
+  → `list_bookings` → `create_booking`: the agent carried UUIDs between four calls and did the
+  overlap maths itself. One `spacebring_book_space` taking the member's email and the room's name
+  does all of it, refuses a taken slot, and offers free alternatives.
 - **Return MCP content envelopes.** `{ content: [{ type: "text", text }] }`, `isError: true` on
   failure — not bare payloads.
 - **stdout is for JSON-RPC only.** Log to `console.error`. Writing logs to stdout corrupts the

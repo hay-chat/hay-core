@@ -1,5 +1,7 @@
 import { ref, shallowRef, computed, watch } from "vue";
-import { useWebSocket } from "./useWebSocket";
+import { useWebSocket, type PageToolCall } from "./useWebSocket";
+import { executePageTool, listPageTools, pageToolsVersion } from "./usePageTools";
+import { startActivity, endActivity } from "@/utils/agentActivity";
 import { useConversation, WidgetRequestError } from "./useConversation";
 import { useMessageQueue } from "./useMessageQueue";
 import { initContext, getContext } from "./useWidgetContext";
@@ -52,6 +54,7 @@ export function useChat(config: HayChatConfig, options: UseChatOptions = {}) {
   const keypair = shallowRef<Keypair | null>(null);
   const nonce = ref<string>("");
   const isConversationClosed = ref(false);
+  const csatSubmitted = ref(false);
   const isSending = ref(false);
   // Set when the server refuses the shopper's message (rate limited, website
   // not allowed, too long). The UI shows a short notice and restores the text.
@@ -100,9 +103,33 @@ export function useChat(config: HayChatConfig, options: UseChatOptions = {}) {
     connect,
     identify,
     sendTypingIndicator,
+    sendTools,
+    sendToolResult,
     disconnect,
     setStatusChangeCallback,
+    setToolCallHandler,
   } = useWebSocket(config.baseUrl, config.organizationId);
+
+  // Page tools (WebMCP): the host page's tools go up with identify and again
+  // whenever the page changes them; a tool_call runs here, under the orange
+  // "working" overlay, and its answer goes back on the same socket.
+  watch(pageToolsVersion, () => {
+    if (isConnected.value && conversationId.value) sendTools(listPageTools());
+  });
+  const runPageTool = async (call: PageToolCall) => {
+    debugLog("[Webchat] Page tool call", call);
+    startActivity(config.agentName || "Hay", describeToolCall(call.name));
+    try {
+      const result = await executePageTool(call.name, call.args);
+      sendToolResult(call.callId, { result: result === undefined ? null : result });
+    } catch (error) {
+      console.warn(`[Hay Webchat] Page tool "${call.name}" failed:`, error);
+      sendToolResult(call.callId, { error: (error as Error)?.message || String(error) });
+    } finally {
+      endActivity();
+    }
+  };
+  setToolCallHandler((call) => void runPageTool(call));
 
   // Initialize message queue for offline/retry handling
   const messageQueue = useMessageQueue();
@@ -244,6 +271,7 @@ export function useChat(config: HayChatConfig, options: UseChatOptions = {}) {
       existingConversationId.value = conversationData.id;
       conversationId.value = conversationData.id;
       isConversationClosed.value = false;
+      csatSubmitted.value = false;
 
       debugLog("[Webchat] Conversation created:", conversationData.id);
 
@@ -335,6 +363,11 @@ export function useChat(config: HayChatConfig, options: UseChatOptions = {}) {
         if (retryData.isClosed) {
           isConversationClosed.value = true;
         }
+
+        // Reflect a rating that was already submitted
+        if (retryData.csatRating != null) {
+          csatSubmitted.value = true;
+        }
       } else if (messagesData) {
         nonce.value = messagesData.nonce;
 
@@ -348,6 +381,11 @@ export function useChat(config: HayChatConfig, options: UseChatOptions = {}) {
         // Check if conversation is closed
         if (messagesData.isClosed) {
           isConversationClosed.value = true;
+        }
+
+        // Reflect a rating that was already submitted
+        if (messagesData.csatRating != null) {
+          csatSubmitted.value = true;
         }
       }
 
@@ -431,7 +469,7 @@ export function useChat(config: HayChatConfig, options: UseChatOptions = {}) {
 
     if (conversationId.value && isConnected.value) {
       debugLog("[Webchat] Identifying with WebSocket after connection...");
-      identify(customerId.value, conversationId.value);
+      identify(customerId.value, conversationId.value, listPageTools());
     }
   };
 
@@ -670,6 +708,7 @@ export function useChat(config: HayChatConfig, options: UseChatOptions = {}) {
     nonce.value = "";
     messages.value = [];
     isConversationClosed.value = false;
+    csatSubmitted.value = false;
     lastReadMessageId.value = null;
     conversationStatus.value = null;
     contactEmailSaved.value = false;
@@ -802,6 +841,11 @@ export function useChat(config: HayChatConfig, options: UseChatOptions = {}) {
       // Update conversation closed state
       if (messagesData?.isClosed) {
         isConversationClosed.value = true;
+      }
+
+      // Reflect a rating that was already submitted
+      if (messagesData?.csatRating != null) {
+        csatSubmitted.value = true;
       }
     } catch (error) {
       console.error("[Webchat] Failed to refresh messages:", error);
@@ -1189,9 +1233,7 @@ export function useChat(config: HayChatConfig, options: UseChatOptions = {}) {
   };
 
   // Submit a response to an in-conversation FORM message (ASK_FORM step).
-  // Optimistically mutates the local message, then POSTs to the server. The
-  // orchestrator resumes server-side; the updated message will also flow back
-  // via WS in case of any server-side rendering differences.
+  // The request code loads on demand: few conversations carry a form.
   const submitInConversationForm = async (
     messageId: string,
     response: FormResponse,
@@ -1200,48 +1242,46 @@ export function useChat(config: HayChatConfig, options: UseChatOptions = {}) {
       console.error("[Webchat] Cannot submit form: missing keypair or conversation");
       return false;
     }
-    const httpUrl = `${config.baseUrl}/v1/publicConversations.submitForm`;
+    const { submitFormMessage } = await import("./formSubmit");
+    return submitFormMessage({
+      config,
+      conversationId: conversationId.value,
+      keypair: keypair.value,
+      nonce,
+      messages: messages.value,
+      messageId,
+      response,
+    });
+  };
+
+  // Rate the support once the conversation has ended (CSAT).
+  const submitCsat = async (rating: number, retried = false): Promise<boolean> => {
+    if (!conversationId.value || !keypair.value) return false;
+    const url = `${config.baseUrl}/v1/publicConversations.submitCsat`;
     const proof = await createDPoPProof(
       "POST",
-      httpUrl,
+      url,
       keypair.value.privateKey,
       keypair.value.publicJwk,
       nonce.value || "initial",
     );
-    if (!proof) {
-      console.error("[Webchat] Failed to create DPoP proof for form submit");
+    if (!proof) return false;
+    try {
+      const result = await conversation.submitCsat(
+        conversationId.value,
+        rating,
+        proof,
+        "POST",
+        url,
+      );
+      if (result.nonce) nonce.value = result.nonce;
+      if (result.error === "NONCE_EXPIRED" && !retried) return submitCsat(rating, true);
+      csatSubmitted.value = result.saved;
+      return result.saved;
+    } catch (error) {
+      console.error("[Webchat] Failed to submit CSAT rating:", error);
       return false;
     }
-
-    // Optimistic UI update
-    const msg = messages.value.find((m) => m.id === messageId);
-    if (msg) {
-      const ui =
-        (msg.metadata?.ui as { schema?: unknown; status?: string } | undefined) ?? undefined;
-      msg.metadata = {
-        ...(msg.metadata ?? {}),
-        ui: {
-          ...(ui ?? {}),
-          kind: "form",
-          schema: ui?.schema,
-          status: "SUBMITTED",
-          response,
-          submittedAt: new Date().toISOString(),
-        },
-      };
-    }
-
-    const result = await conversation.submitFormMessage(
-      conversationId.value,
-      messageId,
-      response,
-      proof,
-      "POST",
-      httpUrl,
-    );
-    if (!result) return false;
-    if (result.nonce) nonce.value = result.nonce;
-    return true;
   };
 
   // Enhanced disconnect that also stops retry loop and polling
@@ -1266,6 +1306,7 @@ export function useChat(config: HayChatConfig, options: UseChatOptions = {}) {
     challengeHost: challenge.host,
     isChallengeInteractive: challenge.isInteractive,
     isConversationClosed,
+    csatSubmitted,
     currentAgentType,
     currentAgentName,
     conversationStatus,
@@ -1281,6 +1322,7 @@ export function useChat(config: HayChatConfig, options: UseChatOptions = {}) {
     closeChat,
     sendMessage,
     sendAttachment,
+    submitCsat,
     startTyping,
     stopTyping,
     disconnect: disconnectAll,
@@ -1290,4 +1332,10 @@ export function useChat(config: HayChatConfig, options: UseChatOptions = {}) {
     submitPreChatForm,
     submitInConversationForm,
   };
+}
+
+/** "open_conversation" → "Open conversation", for the overlay pill. */
+function describeToolCall(name: string): string {
+  const words = name.replace(/[_-]+/g, " ").trim();
+  return words.charAt(0).toUpperCase() + words.slice(1);
 }
