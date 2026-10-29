@@ -15,16 +15,16 @@ Logs,application_logs,Potential PII in error messages,No,No,No,Error logs may le
 Cache,redis,Session data|temporary message cache,No,No,No,Ephemeral data in Redis,P2
 Backups,database_backups,All tables,No,No,No,Point-in-time recovery backups,P1
 External,OpenAI API,message content sent for embeddings/chat,No,No,No,Subprocessor - no direct DSAR control,P0
-External,AWS RDS,All database data,No,No,No,Infrastructure provider - backup access,P1
-External,Redis Labs,Cache data,No,No,No,Infrastructure provider,P3
+External,DigitalOcean managed PostgreSQL,All database data,No,No,No,Infrastructure provider - automated backups keep erased data for the provider's retention window (to confirm),P1
+External,DigitalOcean managed Redis/Valkey,Cache data,No,No,No,Infrastructure provider - entries expire by TTL,P3
 WebChat,sessionStorage,conversation_id|keypair,No,No,No,Browser storage (ephemeral),P2
 WebChat,IndexedDB,DPoP keypairs,No,No,No,Browser storage (ephemeral),P2
-Analytics,analytics_events,user_id|session_id|metadata,No,No,No,Usage analytics (if implemented),P2
-Audit,audit_log,email|organization_id|action,Yes,Yes,No,DSAR request audit trail - anonymized on deletion,P1
+Analytics,PostHog (dashboard),opaque user_id|masked events,No,No,No,Dashboard analytics only when POSTHOG_KEY is set; no email or name sent; deletion via PostHog person deletion (manual),P2
+Audit,audit_logs,user_id|ip_address|user_agent|changes|metadata,Yes,Partial,No,Anonymized on user deletion (user_id cleared; IP truncated; PII redacted); rows otherwise append-only and deleted after 90 days,P1
 
 DSAR_Operation,Current_Implementation_Status,Gap_Severity,Estimated_Effort,GDPR_Article
 Data Export (Art.15),Implemented - ZIP with README and signature,None,Completed,Art.15
-Data Erasure (Art.17),Implemented - Includes embeddings,None,Completed,Art.17
+Data Erasure (Art.17),Implemented for database records incl. embeddings; not backups|external sub-processors|application logs,Medium,Partial,Art.17
 Data Rectification (Art.16),Not Implemented,High,1-2 weeks,Art.16
 Data Portability (Art.20),Implemented - JSON export in ZIP,None,Completed,Art.20
 Right to Object (Art.21),Not Implemented,Medium,1 week,Art.21
@@ -34,10 +34,10 @@ Coverage_Summary,Value,Notes
 Total Systems Analyzed,22,Including external subprocessors
 Systems with PII,19,86% of systems process personal data
 Export Coverage,100%,Full customer DSAR export (customers|conversations|messages|attachments|embeddings)
-Erasure Coverage,100%,Full customer DSAR erasure (customers|conversations|messages|attachments|embeddings)
+Erasure Coverage,Partial,Database records covered (customers|conversations|messages|attachments|embeddings); provider backups|sub-processor copies|application logs|Redis cache (TTL) not covered
 Rectification Coverage,0%,No DSAR rectification implemented
 High-Priority Gaps,0,All P0 customer systems have DSAR support
-External Dependencies,3,OpenAI|AWS|Redis - limited direct control
+External Dependencies,See Subprocessors.csv,Limited direct control over sub-processor copies
 
 Implementation_Details,Status,Notes
 Customer Data Export,Complete,"Traverses: customers → conversations → messages → attachments → embeddings"
@@ -49,5 +49,5 @@ Unit Tests,Complete,"Tests verify ""post-delete search returns 0"" in embeddings
 
 Recommendation,Action,Priority
 Implement DSAR Rectification API,Create /v1/privacy/rectify endpoint for name|email|phone updates,P1
-Document External DSAR,Provide instructions for requesting data from OpenAI|AWS via DPAs,P1
+Document External DSAR,Provide instructions for requesting data from sub-processors (OpenAI|DigitalOcean|PostHog) via DPAs,P1
 Add Portability Format Options,Support CSV and other formats in addition to JSON,P2
