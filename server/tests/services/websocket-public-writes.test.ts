@@ -8,7 +8,9 @@ import { EventEmitter } from "events";
  * `message` frames that reached the AI with no keypair, nonce or proof.
  */
 
-jest.mock("@server/config/env", () => ({ config: { jwt: { secret: "ws-test-secret" } } }));
+jest.mock("@server/config/env", () => ({
+  config: { jwt: { secret: "ws-test-secret" }, server: { trustProxy: 1 } },
+}));
 const mockLogger = { debug: jest.fn(), info: jest.fn(), warn: jest.fn(), error: jest.fn() };
 jest.mock("@server/lib/logger", () => ({ createLogger: () => mockLogger }));
 jest.mock("@server/services/redis.service", () => ({

@@ -1,7 +1,17 @@
+import crypto from "crypto";
 import { redisService } from "./redis.service";
 import { createLogger } from "@server/lib/logger";
 
 const logger = createLogger("rate-limit");
+
+/**
+ * Redis key for a per-identifier counter. Identifiers (IPs, emails) are
+ * hashed so personal data never appears in key names.
+ */
+export function rateLimitKey(type: string, identifier: string): string {
+  const digest = crypto.createHash("sha256").update(identifier.toLowerCase()).digest("hex");
+  return `rate_limit:${type}:${digest}`;
+}
 
 /**
  * Rate Limiting Service
@@ -22,7 +32,7 @@ export class RateLimitService {
     windowSeconds: number,
     failClosed: boolean = false,
   ): Promise<{ limited: boolean; remaining: number; resetAt: Date }> {
-    const key = `rate_limit:ip:${ipAddress}`;
+    const key = rateLimitKey("ip", ipAddress);
     return this.checkRateLimit(key, maxRequests, windowSeconds, failClosed);
   }
 
@@ -40,7 +50,7 @@ export class RateLimitService {
     windowSeconds: number,
     failClosed: boolean = false,
   ): Promise<{ limited: boolean; remaining: number; resetAt: Date }> {
-    const key = `rate_limit:email:${email.toLowerCase()}`;
+    const key = rateLimitKey("email", email);
     return this.checkRateLimit(key, maxRequests, windowSeconds, failClosed);
   }
 
@@ -59,7 +69,7 @@ export class RateLimitService {
     windowSeconds: number,
     failClosed: boolean = false,
   ): Promise<{ limited: boolean; remaining: number; resetAt: Date }> {
-    const key = `rate_limit:combined:${ipAddress}:${email.toLowerCase()}`;
+    const key = rateLimitKey("combined", `${ipAddress}:${email}`);
     return this.checkRateLimit(key, maxRequests, windowSeconds, failClosed);
   }
 
@@ -90,7 +100,7 @@ export class RateLimitService {
     maxRequests: number,
     windowSeconds: number,
   ): Promise<{ limited: boolean; remaining: number; resetAt: Date }> {
-    return this.checkRateLimit(`rate_limit:key:${key}`, maxRequests, windowSeconds);
+    return this.checkRateLimit(rateLimitKey("key", key), maxRequests, windowSeconds);
   }
 
   /**
@@ -189,7 +199,7 @@ export class RateLimitService {
       return;
     }
 
-    const key = `rate_limit:${type}:${identifier}`;
+    const key = rateLimitKey(type, identifier);
     await client.del(key);
     logger.debug({ key }, "Rate limit reset");
   }
@@ -211,7 +221,7 @@ export class RateLimitService {
       };
     }
 
-    const key = `rate_limit:${type}:${identifier}`;
+    const key = rateLimitKey(type, identifier);
     const currentCount = await client.get(key);
     const count = currentCount ? parseInt(currentCount, 10) : 0;
     const remaining = Math.max(0, maxRequests - count);

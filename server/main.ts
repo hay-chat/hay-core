@@ -2,15 +2,18 @@ import { createExpressMiddleware } from "@trpc/server/adapters/express";
 import express from "express";
 import type { FileFilterCallback } from "multer";
 import cors from "cors";
+import helmet from "helmet";
 import { httpCompression } from "@server/lib/http-compression";
 import { webchatStatic } from "@server/lib/webchat-static";
 import { createServer } from "http";
 import { config, validateProductionConfig } from "@server/config/env";
 import { createContext } from "@server/trpc/context";
-import { initializeDatabase } from "@server/database/data-source";
+import { AppDataSource, initializeDatabase } from "@server/database/data-source";
 import { createLogger } from "@server/lib/logger";
 import { initTelemetry, captureException, shutdownTelemetry } from "@server/lib/telemetry";
 import { isPublicUploadPath } from "@server/services/media-url.service";
+import { bodyLimitForPath } from "@server/lib/body-limits";
+import { httpIpRateLimit } from "@server/lib/http-rate-limit";
 import "reflect-metadata";
 import "dotenv/config";
 
@@ -34,9 +37,13 @@ const EXPECTED_TRPC_ERROR_CODES = new Set([
   "METHOD_NOT_SUPPORTED",
 ]);
 
+const SHUTDOWN_TIMEOUT_MS = 30000;
+
 async function startServer() {
   // Validate required environment variables in production
-  validateProductionConfig();
+  for (const warning of validateProductionConfig()) {
+    logger.warn(warning);
+  }
 
   // Set server timezone to UTC for consistent timestamp handling
   process.env.TZ = "UTC";
@@ -108,6 +115,23 @@ async function startServer() {
 
   const server = express();
 
+  // Behind the reverse proxy, req.ip is the address the proxy saw (see
+  // lib/client-ip.ts), not whatever X-Forwarded-For a client sent.
+  server.set("trust proxy", config.server.trustProxy);
+
+  // Baseline security headers. CSP and frame options are left to the routes
+  // that serve HTML (webchat challenge, media) since some must be framed;
+  // resources are loaded cross-origin by the dashboard and the widget.
+  server.use(
+    helmet({
+      contentSecurityPolicy: false,
+      frameguard: false,
+      crossOriginOpenerPolicy: false,
+      crossOriginResourcePolicy: { policy: "cross-origin" },
+      strictTransportSecurity: config.domain.useSSL,
+    }),
+  );
+
   // Add permissive CORS middleware for public widget endpoints
   // This allows the widget to be embedded on any domain
   server.use((req, res, next) => {
@@ -141,9 +165,13 @@ async function startServer() {
     }),
   );
 
+  // After CORS so a 429 still carries the CORS headers the browser needs to read it.
+  server.use((req, res, next) => void httpIpRateLimit(req, res, next));
+
   server.use(httpCompression());
 
-  // Add JSON parsing middleware with increased size limit for document uploads.
+  // JSON/urlencoded parsing with a 1 MB default and larger limits only on the
+  // routes that carry base64 files (lib/body-limits.ts).
   // The `verify` hook captures the raw request bytes on `req.rawBody` so that
   // downstream consumers (e.g. the plugin proxy → channel plugins) can verify
   // HMAC signatures that are computed over the exact bytes the client sent.
@@ -152,25 +180,48 @@ async function startServer() {
       (req as express.Request & { rawBody?: string }).rawBody = buf.toString("utf8");
     }
   };
-  server.use(express.json({ limit: "50mb", verify: captureRawBody }));
-  server.use(express.urlencoded({ extended: true, limit: "50mb", verify: captureRawBody }));
+  const bodyParsers = new Map<string, express.RequestHandler[]>();
+  server.use((req, res, next) => {
+    const limit = bodyLimitForPath(req.path);
+    let parsers = bodyParsers.get(limit);
+    if (!parsers) {
+      parsers = [
+        express.json({ limit, verify: captureRawBody }),
+        express.urlencoded({ extended: true, limit, verify: captureRawBody }),
+      ];
+      bodyParsers.set(limit, parsers);
+    }
+    const [json, urlencoded] = parsers;
+    json(req, res, (err?: unknown) => (err ? next(err) : urlencoded(req, res, next)));
+  });
 
   server.get("/", (req, res) => {
     res.send("Welcome to Hay.chat");
   });
 
-  // Health check endpoint.
-  // Registered at both `/health` (internal — used by deploy.sh) and `/v1/health`
-  // (externally reachable via the nginx `/v1` proxy; `/health` is not proxied).
+  // Liveness: the process is up and serving HTTP. Registered at both `/health`
+  // (internal — used by deploy.sh) and `/v1/health` (externally reachable via
+  // the nginx `/v1` proxy; `/health` is not proxied). Reveals no internals.
   const healthHandler = (_req: express.Request, res: express.Response): void => {
-    res.json({
-      status: "ok",
-      redis: redisService.isConnected(),
-      rabbitmq: rabbitmqService.isConnected(),
-    });
+    res.json({ status: "ok" });
   };
   server.get("/health", healthHandler);
   server.get("/v1/health", healthHandler);
+
+  // Readiness (internal, not proxied): 503 while a dependency is down so a
+  // load balancer or deploy script stops routing traffic to this instance.
+  server.get("/ready", async (_req, res) => {
+    const database = await AppDataSource.query("SELECT 1")
+      .then(() => true)
+      .catch(() => false);
+    const checks = {
+      database,
+      redis: redisService.isConnected(),
+      rabbitmq: rabbitmqService.isConnected(),
+    };
+    const ready = Object.values(checks).every(Boolean);
+    res.status(ready ? 200 : 503).json({ status: ready ? "ready" : "unavailable", checks });
+  });
 
   // Serve uploaded files from local storage
   const uploadDir = require("path").resolve(config.storage.local.uploadDir);
@@ -497,13 +548,8 @@ async function startServer() {
   // Create HTTP server
   const httpServer = createServer(server);
 
-  // Initialize WebSocket server
-  // If WS_PORT is different from PORT, run WebSocket on separate port
-  if (config.server.wsPort !== config.server.port) {
-    // await websocketService.initialize(config.server.wsPort);
-  } else {
-    await websocketService.initialize(httpServer);
-  }
+  // WebSocket server shares the HTTP server
+  await websocketService.initialize(httpServer);
 
   interface ServerError extends Error {
     code?: string;
@@ -520,7 +566,6 @@ async function startServer() {
 
   httpServer.listen(config.server.port, async () => {
     logger.info({ port: config.server.port }, "Server is running");
-    logger.info({ wsPort: config.server.wsPort }, "WebSocket server is running");
 
     // Start the orchestrator worker (subscribes to RabbitMQ queue)
     await orchestratorWorker.start();
@@ -549,28 +594,49 @@ async function startServer() {
     }
   });
 
-  // Graceful shutdown
-  process.on("SIGTERM", async () => {
-    logger.info("SIGTERM received, shutting down gracefully");
-    orchestratorWorker.stop();
-    pluginInstanceManagerService.stopCleanup();
-    websocketService.shutdown();
-    await rabbitmqService.shutdown();
-    await getPluginRunnerService().stopAllWorkers();
-    await shutdownTelemetry();
-    process.exit(0);
-  });
+  // Graceful shutdown: stop taking requests and background work, let in-flight
+  // work finish, then close connections. A hard timeout guarantees exit.
+  let shuttingDown = false;
+  const shutdown = async (signal: string): Promise<void> => {
+    if (shuttingDown) return;
+    shuttingDown = true;
+    logger.info({ signal }, "Shutting down gracefully");
 
-  process.on("SIGINT", async () => {
-    logger.info("SIGINT received, shutting down gracefully");
-    orchestratorWorker.stop();
-    pluginInstanceManagerService.stopCleanup();
-    websocketService.shutdown();
-    await rabbitmqService.shutdown();
-    await getPluginRunnerService().stopAllWorkers();
-    await shutdownTelemetry();
+    const forceExit = setTimeout(() => {
+      logger.error({ timeoutMs: SHUTDOWN_TIMEOUT_MS }, "Graceful shutdown timed out, exiting");
+      process.exit(1);
+    }, SHUTDOWN_TIMEOUT_MS);
+    forceExit.unref();
+
+    const step = async (name: string, fn: () => unknown): Promise<void> => {
+      try {
+        await fn();
+      } catch (error) {
+        logger.error({ err: error, step: name }, "Shutdown step failed");
+      }
+    };
+
+    const httpClosed = new Promise<void>((resolve) => httpServer.close(() => resolve()));
+    await step("orchestrator", () => orchestratorWorker.stop());
+    await step("plugin-cleanup", () => pluginInstanceManagerService.stopCleanup());
+    await step("websocket", () => websocketService.shutdown());
+    await step("scheduler", () => schedulerService.shutdown({ gracefulTimeout: 15000 }));
+    await step("http", () => {
+      httpServer.closeIdleConnections();
+      return httpClosed;
+    });
+    await step("rabbitmq", () => rabbitmqService.shutdown());
+    await step("plugin-workers", () => getPluginRunnerService().stopAllWorkers());
+    await step("redis", () => redisService.shutdown());
+    await step("database", () =>
+      AppDataSource.isInitialized ? AppDataSource.destroy() : undefined,
+    );
+    await step("telemetry", () => shutdownTelemetry());
     process.exit(0);
-  });
+  };
+
+  process.on("SIGTERM", () => void shutdown("SIGTERM"));
+  process.on("SIGINT", () => void shutdown("SIGINT"));
 }
 
 // Start the server
