@@ -24,31 +24,32 @@ export function getWebSocketUrl(): string {
 }
 
 /**
- * Create a WebSocket connection with authentication
+ * Create a WebSocket connection with authentication.
+ *
+ * The access token goes in the first frame rather than the URL, so it never
+ * lands in proxy or server access logs. The listener is added before callers
+ * set `onopen`, so the auth frame always goes out first.
  */
 export function createAuthenticatedWebSocket(): WebSocket | null {
   const authStore = useAuthStore();
   const userStore = useUserStore();
 
-  if (!authStore.isAuthenticated) {
-    console.error("Cannot create WebSocket: User not authenticated");
+  const token = authStore.tokens?.accessToken;
+  if (!authStore.isAuthenticated || !token) {
     return null;
   }
 
-  const wsUrl = getWebSocketUrl();
-  const token = authStore.tokens?.accessToken;
+  const url = new URL(getWebSocketUrl());
   const organizationId = userStore.activeOrganization?.id;
-
-  // Add authentication parameters to the WebSocket URL
-  const url = new URL(wsUrl);
-  if (token) {
-    url.searchParams.append("token", token);
-  }
   if (organizationId) {
     url.searchParams.append("org", organizationId);
   }
 
-  return new WebSocket(url.toString());
+  const socket = new WebSocket(url.toString());
+  socket.addEventListener("open", () => {
+    socket.send(JSON.stringify({ type: "auth", token }));
+  });
+  return socket;
 }
 
 /**

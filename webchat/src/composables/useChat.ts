@@ -443,9 +443,14 @@ export function useChat(config: HayChatConfig, options: UseChatOptions = {}) {
       });
     }
 
-    if (conversationId.value && isConnected.value) {
+    const key = keypair.value;
+    if (conversationId.value && key && isConnected.value) {
       debugLog("[Webchat] Identifying with WebSocket after connection...");
-      identify(customerId.value, conversationId.value, listPageTools());
+      await identify(
+        conversationId.value,
+        (url) => createDPoPProof("GET", url, key.privateKey, key.publicJwk),
+        listPageTools(),
+      );
     }
   };
 

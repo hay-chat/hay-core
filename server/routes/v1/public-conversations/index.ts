@@ -748,12 +748,15 @@ interface EcPublicJwk {
   y?: string;
 }
 
-// Helper function to verify DPoP proof for a request
+// Helper function to verify DPoP proof for a request. `checkNonce: false` is
+// for read-only attaches (the WebSocket identify) that must not race the
+// widget's HTTP calls for the single rotating nonce; jti and iat still apply.
 export async function verifyDPoPForRequest(
   conversationId: string,
   proof: string,
   method: string,
   url: string,
+  options: { checkNonce?: boolean } = {},
 ): Promise<{ success: boolean; newNonce?: string; error?: string }> {
   try {
     // Dynamically import jose using Function constructor to avoid static analysis
@@ -839,6 +842,10 @@ export async function verifyDPoPForRequest(
     const isNewJti = await dpopCacheService.checkAndStoreJTI(payload.jti);
     if (!isNewJti) {
       return { success: false, error: "JTI already used" };
+    }
+
+    if (options.checkNonce === false) {
+      return { success: true };
     }
 
     // Verify and rotate nonce
