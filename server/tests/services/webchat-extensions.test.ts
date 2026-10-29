@@ -70,6 +70,7 @@ describe("resolveContributionProps", () => {
       challenge.contributions[0],
       { secretKey: "should-not-leak" },
       schema,
+      new Set(["TEST_SITE_KEY"]),
     );
     expect(props).toEqual({
       provider: "turnstile",
