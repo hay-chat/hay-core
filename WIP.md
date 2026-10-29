@@ -1,3 +1,9 @@
+## 2026-10-29 — Shopify App Pricing: both branches done, contract checked
+- hay-backoffice claude/shopify-app-pricing (worktree hay-backoffice-shopify-pricing, 5 commits, 380 tests pass): provider column + migration 1785900000000 (runs on boot), Partner API sync, hourly reconcile, usage outbox → app, 409 on Stripe routes for Shopify orgs.
+- hay-shopify-app claude/shopify-app-pricing @ 85a9303 (5 commits): gate, /welcome, Change plan, /internal/app-events (422 = permanent, matches backoffice retry rules).
+- Neither pushed. Env: backoffice SHOPIFY_PARTNER_ORG_ID/TOKEN, SHOPIFY_APP_GID, SHOPIFY_APP_SHARED_SECRET, SHOPIFY_APP_URL; app HAY_BACKOFFICE_URL + HAY_BACKOFFICE_SHARED_SECRET (same secret).
+- Next: Roger saves Partner API client; hay-website billing.js hides Stripe UI when provider=shopify; test on haychat-2.
+
 ## 2026-10-29 — Shopify App Pricing: drafts done, code on branches
 - Partner Dashboard: 4 App Pricing DRAFT plans saved (solo $55/500, starter $149/2k, growth $799/20k, enterprise $2,999/100k; meter `resolution` graduated, overage $0.27/.22/.16/.11; trial 30d; redirect /welcome). "Enable Shopify App Pricing" NOT clicked.
 - Partner API client form filled ("hay-backoffice billing": Ver finanças + Gerenciar assinaturas de apps + Gerenciar apps) but NOT saved — Roger saves + copies token to Infisical (SHOPIFY_PARTNER_API_TOKEN, ORG_ID=4831019).
