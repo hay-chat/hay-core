@@ -11,7 +11,7 @@
  * @module services/llm/model-catalog
  */
 
-import type { TierModelMap } from "./provider.types";
+import type { ModelFlags, TierModelMap } from "./provider.types";
 
 /** A user-facing model family = the dashboard provider choice minus "custom". */
 export type ModelFamily = "openai" | "anthropic" | "gemini" | "mistral" | "grok";
@@ -108,3 +108,16 @@ export const DEFAULT_TIER_MAP: Record<ModelFamily, TierModelMap> = {
   },
   grok: { hard: "grok-4", medium: "grok-3", easy: "grok-3-mini" },
 };
+
+/**
+ * Per-model request flags, inferred from the model id. OpenAI's o-series and GPT-5
+ * models reject `max_tokens` (they need `max_completion_tokens`) and any non-default
+ * `temperature`, so a plain request to them fails with a 400. Custom model ids work
+ * too: the check is by prefix, not catalog membership.
+ */
+export function modelFlags(model: string): ModelFlags | undefined {
+  if (/^(o\d|gpt-5)/i.test(model)) {
+    return { reasoningModel: true, usesMaxCompletionTokens: true };
+  }
+  return undefined;
+}

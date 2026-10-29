@@ -60,7 +60,7 @@ export interface StructuredOutputSpec {
  * Per-model behavior flags. These vary by MODEL within a single provider (e.g. an
  * OpenAI reasoning model rejects `temperature` while gpt-4o-mini accepts it), so
  * they ride on the request rather than on the provider-level capability descriptor.
- * The factory attaches them when it resolves a tier → concrete model.
+ * LLMService attaches them (see `modelFlags`) when it resolves a tier → concrete model.
  */
 export interface ModelFlags {
   /** Reasoning model: omit sampling params and (usually) use max_completion_tokens. */
