@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+# Runs the hay CLI with the monorepo's tsx. Symlink it onto PATH, e.g.
+#   ln -s /srv/hay-core/repo/tools/hay-cli/bin/hay ~/.local/bin/hay
+set -euo pipefail
+here="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")" && pwd)"
+repo="$(cd "$here/../../.." && pwd)"
+exec "$repo/node_modules/.bin/tsx" "$here/../src/main.ts" "$@"

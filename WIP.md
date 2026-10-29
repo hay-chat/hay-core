@@ -1,3 +1,11 @@
+## 2026-10-29 — master — Hay deploy mapped, off Coolify, auto-redeploy in cron
+- /srv/hay/DEPLOYMENT.md documents every Hay service (core, backoffice, website, shopify, infra, edge).
+- hay.chat moved from Coolify into /srv/hay/compose.yml (hay-website). Coolify app deleted.
+- /srv/hay/redeploy-check.sh runs from cron every 5 min. It compares the deployed SHA with origin and runs each service's deploy path. It never runs hay-core migrations.
+- First run deployed backoffice b68e4ea4 (Shopify pricing, migrated on boot) and shopify 7c7338ed.
+- hay CLI merged to master, tools/hay-cli, verified on prod. Test org "Hay CLI Test", user roger+cli@hay.chat (email not yet verified); default account roger+demo@hay.chat via tools/hay-cli/.env (Roger fills HAY_PASSWORD).
+- Done: Coolify app deleted, apps.hay.chat added to cloudflare-ddns. Agent moving /srv/hay ops into hay-chat/hay-infra.
+
 ## 2026-10-29 — Wave 4 phase 1 live; Nuvemshop partner OAuth verified (bottom-up session)
 
 - master 49d88e11 deployed: D18 Nuvemshop OAuth, D19 quick check (migration AddTeamQuestions1785930000000 ran), D20 plugin setup page. NUVEMSHOP_OAUTH_* set in Infisical prod.
@@ -14,6 +22,12 @@
 - Env NOT on servers: Shopify keys aren't in hay-core Infisical; /srv/hay/.env.backoffice has no SHOPIFY_* and /srv/hay-shopify/.env has no HAY_BACKOFFICE_URL or SHOPIFY_APP_SHARED_SECRET. Until set, gate fails open (safe).
 - Next: Roger: app deploy + backoffice deploy + env vars; test on haychat-2; then Enable App Pricing + resubmit after 10-31.
 
+## 2026-10-29 — claude/hay-cli (worktree claude+hay-cli, not pushed) — hay CLI
+
+- Works on prod: `tools/hay-cli/bin/hay chat send "<msg>" --logs`, `conv list|show`, `logs <id|--since>`, `orgs`/`use`, `plugins list|tools|test`, `--json` everywhere. Plan/results: tasks/hay-cli.md.
+- Test account roger+cli@hay.chat / org "Hay CLI Test" (6e09a8b0-…); tokens in ~/.config/hay-cli/config.json. Email unverified → `hay login` fails until the link is clicked; refresh token keeps it alive.
+- Server: log context so every orchestrator-run line carries conversationId (lib/logger + worker). Needs deploy for retrieval/tool lines.
+- Missing: `plugins call` (no server endpoint). Next: review + merge, deploy, then `hay logs <id>` shows retrieval lines.
 ## 2026-10-29 — Shopify App Pricing: both branches done, contract checked
 
 - hay-backoffice claude/shopify-app-pricing (worktree hay-backoffice-shopify-pricing, 5 commits, 380 tests pass): provider column + migration 1785900000000 (runs on boot), Partner API sync, hourly reconcile, usage outbox → app, 409 on Stripe routes for Shopify orgs.
