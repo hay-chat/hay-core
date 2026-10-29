@@ -1,62 +1,31 @@
 <template>
   <Page width="max">
-    <!-- Header -->
-    <div class="flex items-center justify-between">
-      <div class="flex items-center space-x-4">
-        <Button variant="ghost" size="sm" @click="router.push('/integrations/marketplace')">
-          <ArrowLeft class="h-4 w-4 mr-2" />
-          {{ $t("pluginSettings.backToMarketplace") }}
-        </Button>
-      </div>
-      <div v-if="!loading && plugin && enabled" class="flex items-center space-x-2">
-        <Button variant="outline" size="sm" :disabled="restarting" @click="handleRestartPlugin">
-          <Loader2 v-if="restarting" class="h-4 w-4 mr-2 animate-spin" />
-          <RotateCw v-else class="h-4 w-4 mr-2" />
-          {{ restarting ? $t("pluginSettings.restarting") : $t("pluginSettings.restartWorker") }}
-        </Button>
-        <Button
-          variant="secondary"
-          size="sm"
-          :disabled="disabling"
-          @click="showDisableConfirm = true"
-        >
-          <Loader2 v-if="disabling" class="h-4 w-4 mr-2 animate-spin" />
-          {{ disabling ? $t("pluginSettings.disabling") : $t("pluginSettings.disablePlugin") }}
-        </Button>
-      </div>
+    <div>
+      <Button variant="ghost" size="sm" @click="router.push('/integrations/marketplace')">
+        <ArrowLeft class="h-4 w-4 mr-2" />
+        {{ $t("pluginSettings.backToMarketplace") }}
+      </Button>
     </div>
 
-    <!-- Disable Confirmation Dialog -->
     <ConfirmDialog
       v-model:open="showDisableConfirm"
       :title="$t('pluginSettings.disableConfirm.title')"
-      :description="
-        $t('pluginSettings.disableConfirm.description', {
-          name: plugin?.name || getPluginDisplayName(pluginId),
-        })
-      "
+      :description="$t('pluginSettings.disableConfirm.description', { name: displayName })"
       :confirm-text="$t('pluginSettings.disableConfirm.confirm')"
       destructive
       @confirm="handleDisablePlugin"
     />
 
     <!-- Loading State -->
-    <div v-if="loading" class="space-y-4">
-      <Card>
-        <CardHeader>
-          <div class="animate-pulse space-y-2">
-            <div class="h-6 bg-gray-200 rounded w-1/3"></div>
-            <div class="h-4 bg-gray-200 rounded w-2/3"></div>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <div class="animate-pulse space-y-4">
-            <div class="h-4 bg-gray-200 rounded w-full"></div>
-            <div class="h-4 bg-gray-200 rounded w-3/4"></div>
-            <div class="h-10 bg-gray-200 rounded w-full"></div>
-          </div>
-        </CardContent>
-      </Card>
+    <div v-if="loading" class="space-y-4" aria-busy="true">
+      <div class="flex items-center gap-4">
+        <div class="h-12 w-12 rounded-lg bg-muted animate-pulse"></div>
+        <div class="flex-1 space-y-2">
+          <div class="h-5 w-1/3 rounded bg-muted animate-pulse"></div>
+          <div class="h-4 w-2/3 rounded bg-muted animate-pulse"></div>
+        </div>
+      </div>
+      <div class="h-40 rounded-lg bg-muted animate-pulse"></div>
     </div>
 
     <!-- Error State -->
@@ -69,110 +38,113 @@
       </Button>
     </div>
 
-    <!-- Plugin Settings -->
     <div v-else-if="plugin" class="space-y-6">
-      <!-- Plugin Info Card -->
-      <Card>
-        <CardHeader>
-          <div class="flex items-start justify-between">
-            <div class="flex items-center space-x-4">
-              <div class="w-12 h-12 min-w-12 min-h-12 rounded-lg overflow-hidden">
-                <img
-                  :src="getPluginThumbnail(plugin.id)"
-                  :alt="`${plugin.name} thumbnail`"
-                  class="w-full h-full object-cover"
-                  onerror="
-                    this.style.display = 'none';
-                    this.nextElementSibling.style.display = 'flex';
-                  "
-                  @error="handleThumbnailError($event)"
-                />
-                <div
-                  :class="[
-                    'w-full h-full rounded-lg items-center justify-center hidden',
-                    getPluginIconBg(plugin.type),
-                  ]"
-                >
-                  <component :is="getPluginIcon(plugin.type)" class="h-6 w-6 text-white" />
-                </div>
-              </div>
-              <div>
-                <CardTitle>{{ plugin.name || getPluginDisplayName(plugin.id) }}</CardTitle>
-                <CardDescription>{{
-                  plugin.description || `Version ${plugin.version}`
-                }}</CardDescription>
-              </div>
-            </div>
-            <!-- Connection Status Badge (only for MCP plugins when enabled) -->
-            <div v-if="enabled && isMcpPlugin" class="flex items-center space-x-2">
-              <!-- Testing Badge -->
-              <div
-                v-if="testing && !testResult"
-                class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400"
-              >
-                <Loader2 class="w-3 h-3 mr-1.5 animate-spin" />
-                {{ $t("pluginSettings.connection.testing") }}
-              </div>
-              <!-- Result Badge -->
-              <div
-                v-else-if="testResult"
-                :class="[
-                  'inline-flex items-center px-2 py-1 rounded-full text-xs font-medium',
-                  testResult.success
-                    ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400'
-                    : 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400',
-                ]"
-              >
-                <div
-                  :class="[
-                    'w-2 h-2 rounded-full mr-1.5',
-                    testResult.success
-                      ? 'bg-green-600 dark:bg-green-400'
-                      : 'bg-red-600 dark:bg-red-400',
-                  ]"
-                ></div>
-                {{
-                  testResult.success
-                    ? $t("pluginSettings.connection.connected")
-                    : $t("pluginSettings.connection.failed")
-                }}
-              </div>
-            </div>
-
-            <!-- Enable Button (when not enabled) -->
-            <div v-if="!enabled">
-              <Button
-                :disabled="enabling"
-                size="lg"
-                :loading="enabling"
-                @click="handleEnablePlugin"
-              >
-                {{ $t("pluginSettings.enablePlugin") }}
-              </Button>
+      <!-- Status header: identity, status, one primary action, ⋯ menu -->
+      <header class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div class="flex items-start gap-4 min-w-0">
+          <div class="w-12 h-12 min-w-12 rounded-lg overflow-hidden bg-background-tertiary">
+            <img
+              v-if="!thumbnailFailed"
+              :src="getPluginThumbnail(plugin.id)"
+              alt=""
+              class="w-full h-full object-cover"
+              @error="thumbnailFailed = true"
+            />
+            <div
+              v-else
+              :class="[
+                'w-full h-full flex items-center justify-center',
+                getPluginIconBg(plugin.type),
+              ]"
+            >
+              <component :is="getPluginIcon(plugin.type)" class="h-6 w-6 text-white" />
             </div>
           </div>
-        </CardHeader>
-      </Card>
+          <div class="min-w-0 space-y-1">
+            <div class="flex flex-wrap items-center gap-2">
+              <h1 class="text-xl font-semibold leading-tight">{{ displayName }}</h1>
+              <Badge :variant="statusBadge.variant" data-testid="plugin-status">
+                <span
+                  :class="['mr-1.5 inline-block h-1.5 w-1.5 rounded-full', statusBadge.dot]"
+                  aria-hidden="true"
+                ></span>
+                {{ $t(`pluginSettings.status.${setupState}`) }}
+              </Badge>
+            </div>
+            <p v-if="pluginDescription" class="text-sm text-neutral-muted max-w-prose">
+              {{ pluginDescription }}
+            </p>
+            <p v-if="reportedStatus?.account" class="text-sm" data-testid="plugin-account">
+              {{ $t("pluginSettings.oauth.connectedAs", { account: reportedStatus.account }) }}
+            </p>
+          </div>
+        </div>
 
-      <!-- Plugin Extensions - Before Settings Slot (only when NOT enabled) -->
-      <template v-if="!enabled">
-        <Card v-for="ext in beforeSettingsExtensions" :key="ext.id">
-          <CardContent>
-            <PluginPageSlot
-              :plugin-id="plugin.id"
-              :plugin-path="plugin.pluginPath"
-              :component-name="ext.componentName"
-              :plugin="plugin"
-              :config="{
-                ...formData,
-                instanceId: instanceId,
-                organizationId: userStore.activeOrganizationId,
-              }"
-              :api-base-url="apiBaseUrl"
-            />
-          </CardContent>
-        </Card>
-      </template>
+        <div class="flex items-center gap-2 sm:shrink-0">
+          <Button
+            v-if="setupState === 'not_set_up'"
+            class="flex-1 sm:flex-none"
+            :loading="enabling"
+            data-testid="plugin-connect"
+            @click="handleConnect"
+          >
+            {{ $t("pluginSettings.actions.connect") }}
+          </Button>
+          <Button
+            v-else-if="setupState === 'needs_action' || setupState === 'error'"
+            class="flex-1 sm:flex-none"
+            :variant="setupState === 'error' ? 'outline' : 'default'"
+            @click="openSetup"
+          >
+            {{
+              setupState === "error"
+                ? $t("pluginSettings.actions.reviewSetup")
+                : $t("pluginSettings.actions.finishSetup")
+            }}
+          </Button>
+
+          <!-- DropdownMenu's root is w-full; the wrapper keeps it to the icon's width. -->
+          <div v-if="enabled" class="shrink-0">
+            <DropdownMenu>
+              <DropdownMenuTrigger as-child>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  :aria-label="$t('pluginSettings.actions.more')"
+                  data-testid="plugin-more-menu"
+                >
+                  <MoreHorizontal class="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem data-testid="advanced-mode-toggle" @click="toggleAdvancedMode">
+                  <Check v-if="advancedMode" class="h-4 w-4 mr-2" />
+                  <span v-else class="w-4 mr-2" aria-hidden="true"></span>
+                  {{ $t("pluginSettings.actions.advancedMode") }}
+                </DropdownMenuItem>
+                <template v-if="advancedMode">
+                  <DropdownMenuItem :disabled="restarting" @click="handleRestartPlugin">
+                    <RotateCw class="h-4 w-4 mr-2" />
+                    {{
+                      restarting
+                        ? $t("pluginSettings.restarting")
+                        : $t("pluginSettings.restartWorker")
+                    }}
+                  </DropdownMenuItem>
+                  <DropdownMenuLabel>
+                    {{ $t("pluginSettings.actions.version", { version: plugin.version }) }}
+                  </DropdownMenuLabel>
+                </template>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem class="text-destructive" @click="showDisableConfirm = true">
+                  <Power class="h-4 w-4 mr-2" />
+                  {{ $t("pluginSettings.disablePlugin") }}
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        </div>
+      </header>
 
       <!-- Channel health (D13-11): generic "channel failing" signal -->
       <Alert
@@ -202,226 +174,8 @@
         </AlertDescription>
       </Alert>
 
-      <!-- Connection Status Alert (only for MCP plugins when enabled) -->
-      <Alert
-        v-if="isMcpPlugin && enabled && testResult && !testResult.success"
-        :variant="testResult.status === 'unconfigured' ? 'default' : 'danger'"
-        :icon="testResult.status === 'unconfigured' ? Info : AlertTriangle"
-      >
-        <AlertTitle>
-          <span v-if="testResult.status === 'unconfigured'">
-            <Badge variant="secondary" class="mr-2">{{
-              $t("pluginSettings.connection.needsAuth")
-            }}</Badge>
-            {{ testResult.message || $t("pluginSettings.connection.configureCredentials") }}
-          </span>
-          <span v-else>
-            {{ testResult.message || $t("pluginSettings.connection.connectionFailed") }}
-          </span>
-        </AlertTitle>
-        <AlertDescription v-if="testResult.status !== 'unconfigured'">
-          <div
-            v-if="testResult.error"
-            class="font-mono text-xs bg-red-100 dark:bg-red-900/30 p-3 rounded border border-red-200 dark:border-red-800 mt-2"
-          >
-            {{ testResult.error }}
-          </div>
-          <div class="mt-3">
-            <Button variant="outline" size="sm" :loading="testing" @click="testConnection">
-              {{ $t("pluginSettings.connection.tryAgain") }}
-            </Button>
-          </div>
-        </AlertDescription>
-      </Alert>
-
-      <!-- Plugin Not Enabled - Show Overview -->
+      <!-- Not connected yet: a plugin's own pre-connect UI -->
       <template v-if="!enabled">
-        <!-- Description Card -->
-        <Card v-if="plugin.manifest?.description">
-          <CardHeader>
-            <CardTitle>{{ $t("pluginSettings.about") }}</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p class="text-muted-foreground">{{ plugin.manifest.description }}</p>
-          </CardContent>
-        </Card>
-
-        <!-- Capabilities Card -->
-        <Card v-if="plugin.manifest?.capabilities">
-          <CardHeader>
-            <CardTitle>{{ $t("pluginSettings.capabilities.title") }}</CardTitle>
-            <CardDescription>{{ $t("pluginSettings.capabilities.description") }}</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div class="space-y-4">
-              <!-- Chat Connector Capabilities -->
-              <div v-if="plugin.manifest.capabilities.chat_connector" class="space-y-3">
-                <div class="flex items-center gap-2">
-                  <MessageSquare class="h-5 w-5 text-primary" />
-                  <h4 class="font-medium">{{ $t("pluginSettings.capabilities.chatConnector") }}</h4>
-                </div>
-                <div class="pl-7 space-y-2 text-sm text-muted-foreground">
-                  <div v-if="plugin.manifest.capabilities.chat_connector.features?.send_message">
-                    <Check class="inline h-4 w-4 text-green-600 mr-2" />
-                    {{ $t("pluginSettings.capabilities.sendMessages") }}
-                  </div>
-                  <div v-if="plugin.manifest.capabilities.chat_connector.features?.receive_message">
-                    <Check class="inline h-4 w-4 text-green-600 mr-2" />
-                    {{ $t("pluginSettings.capabilities.receiveMessages") }}
-                  </div>
-                  <div
-                    v-if="plugin.manifest.capabilities.chat_connector.features?.list_conversations"
-                  >
-                    <Check class="inline h-4 w-4 text-green-600 mr-2" />
-                    {{ $t("pluginSettings.capabilities.listConversations") }}
-                  </div>
-                </div>
-              </div>
-
-              <!-- MCP Connector Capabilities -->
-              <div
-                v-if="
-                  Array.isArray(plugin.manifest.capabilities)
-                    ? plugin.manifest.capabilities.includes('mcp')
-                    : plugin.manifest.capabilities.mcp
-                "
-                class="space-y-3"
-              >
-                <div class="flex items-center gap-2">
-                  <Cpu class="h-5 w-5 text-primary" />
-                  <h4 class="font-medium">{{ $t("pluginSettings.capabilities.mcpConnector") }}</h4>
-                </div>
-                <p class="pl-7 text-sm text-muted-foreground">
-                  {{ $t("pluginSettings.capabilities.mcpDescription") }}
-                </p>
-              </div>
-
-              <!-- Document Importer Capabilities -->
-              <div v-if="plugin.manifest.capabilities.document_importer" class="space-y-3">
-                <div class="flex items-center gap-2">
-                  <FileText class="h-5 w-5 text-primary" />
-                  <h4 class="font-medium">
-                    {{ $t("pluginSettings.capabilities.documentImporter") }}
-                  </h4>
-                </div>
-                <p class="pl-7 text-sm text-muted-foreground">
-                  {{ $t("pluginSettings.capabilities.documentImporterDescription") }}
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </template>
-
-      <!-- Available Actions Card (for MCP plugins) -->
-      <!-- Renders for both enabled and disabled plugins. Prefers live tools registered
-           by the running worker; falls back to manifest tools when no worker is running. -->
-      <Card v-if="availableTools.length > 0">
-        <CardHeader>
-          <CardTitle>{{ $t("pluginSettings.availableActions.title") }}</CardTitle>
-          <CardDescription>{{
-            $t("pluginSettings.availableActions.toolsAvailable", {
-              count: availableTools.length,
-            })
-          }}</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div class="relative">
-            <div class="grid gap-2">
-              <div
-                v-for="tool in displayedTools"
-                :key="tool.name"
-                class="rounded-lg border border-border overflow-hidden"
-              >
-                <button
-                  type="button"
-                  class="w-full flex items-center gap-3 p-3 text-left hover:bg-muted/40 transition-colors"
-                  :aria-expanded="expandedTools.has(tool.name)"
-                  @click="toggleTool(tool.name)"
-                >
-                  <Badge :variant="getToolBadgeVariant(tool)" class="flex-shrink-0">
-                    {{ getToolBadgeLabel(tool) }}
-                  </Badge>
-                  <h4 class="font-medium text-sm flex-1 min-w-0 truncate">
-                    {{ getToolLabel(pluginId, tool.name) }}
-                  </h4>
-                  <ChevronDown
-                    class="h-4 w-4 text-muted-foreground flex-shrink-0 transition-transform"
-                    :class="{ 'rotate-180': expandedTools.has(tool.name) }"
-                  />
-                </button>
-                <div v-if="expandedTools.has(tool.name)" class="p-4 pt-1 space-y-2">
-                  <p v-if="tool.description" class="text-xs text-muted-foreground">
-                    {{ getToolDescription(pluginId, tool.name, tool.description) }}
-                  </p>
-                  <div v-if="tool.input_schema">
-                    <p class="text-[11px] font-medium uppercase text-muted-foreground mb-2">
-                      Parameters
-                    </p>
-                    <McpToolInputSchema :schema="tool.input_schema" />
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <!-- Fade overlay + Show all button (only when collapsed) -->
-            <div
-              v-if="!showAllTools && availableTools.length > 5"
-              class="pointer-events-none absolute inset-x-0 bottom-0 flex items-end justify-center pt-32 pb-2 bg-gradient-to-t from-background to-transparent"
-            >
-              <Button
-                variant="outline"
-                size="sm"
-                class="pointer-events-auto shadow-sm"
-                @click="showAllTools = true"
-              >
-                {{
-                  $t("pluginSettings.availableActions.showAll", { count: availableTools.length })
-                }}
-              </Button>
-            </div>
-          </div>
-
-          <!-- Hide button shown below the full list when expanded -->
-          <div v-if="showAllTools && availableTools.length > 5" class="mt-3 flex justify-center">
-            <Button variant="ghost" size="sm" @click="showAllTools = false">
-              {{ $t("pluginSettings.availableActions.hide") }}
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-
-      <!-- OAuth Connection Card (show when OAuth is available and configured) -->
-      <Card v-if="enabled && oauthAvailable && oauthConfigured">
-        <CardContent>
-          <PluginOAuthConnection
-            :plugin="plugin"
-            :config="{
-              ...formData,
-              instanceId: instanceId,
-              organizationId: userStore.activeOrganizationId,
-            }"
-            :api-base-url="apiBaseUrl"
-            :oauth-available="oauthAvailable"
-            :oauth-configured="oauthConfigured"
-          />
-        </CardContent>
-      </Card>
-
-      <!-- OAuth plugin whose client ID/secret are not set: Connect cannot work, say why -->
-      <Alert
-        v-if="enabled && oauthAvailable && !oauthConfigured"
-        :icon="Info"
-        data-testid="oauth-unavailable-alert"
-      >
-        <AlertTitle>{{ $t("pluginSettings.connection.oauthUnavailableTitle") }}</AlertTitle>
-        <AlertDescription>
-          {{ $t("pluginSettings.connection.oauthUnavailable", { name: plugin.name }) }}
-        </AlertDescription>
-      </Alert>
-
-      <!-- Plugin Settings Extensions - Before Settings Slot (only when enabled) -->
-      <template v-if="enabled">
         <Card v-for="ext in beforeSettingsExtensions" :key="ext.id">
           <CardContent>
             <PluginPageSlot
@@ -429,285 +183,434 @@
               :plugin-path="plugin.pluginPath"
               :component-name="ext.componentName"
               :plugin="plugin"
-              :config="{
-                ...formData,
-                instanceId: instanceId,
-                organizationId: userStore.activeOrganizationId,
-              }"
+              :config="slotConfig"
               :api-base-url="apiBaseUrl"
-              @update:config="
-                (newConfig: any) => {
-                  formData = { ...formData, ...newConfig };
-                }
-              "
             />
           </CardContent>
         </Card>
       </template>
 
-      <!-- Tabs Section: Show tabs if there are any tab extensions (only when enabled) -->
-      <Card v-if="enabled && tabExtensions.length > 0">
-        <CardContent class="p-0">
-          <Tabs :default-value="hasConfiguration ? 'settings' : tabExtensions[0]?.id">
-            <TabsList class="w-full justify-start rounded-none border-b">
-              <!-- Settings Tab (shown when there's configuration and tabs) -->
-              <TabsTrigger v-if="hasConfiguration" value="settings">{{
-                $t("pluginSettings.tabs.settings")
-              }}</TabsTrigger>
-              <!-- Custom Tab Extensions -->
-              <TabsTrigger v-for="tab in sortedTabExtensions" :key="tab.id" :value="tab.id">
-                {{ tab.name }}
-              </TabsTrigger>
-            </TabsList>
+      <!-- Tabs: Setup | What it can do | Advanced (Advanced mode only) -->
+      <div
+        v-if="enabled"
+        role="tablist"
+        :aria-label="$t('pluginSettings.tabs.label')"
+        :class="[
+          'grid gap-1 rounded-lg bg-muted p-1',
+          tabs.length === 3 ? 'grid-cols-3' : 'grid-cols-2',
+          'sm:flex sm:gap-0 sm:rounded-none sm:bg-transparent sm:p-0 sm:border-b',
+        ]"
+        @keydown="onTabKeydown"
+      >
+        <button
+          v-for="tab in tabs"
+          :id="`plugin-tab-${tab}`"
+          :key="tab"
+          type="button"
+          role="tab"
+          :aria-selected="activeTab === tab"
+          :aria-controls="`plugin-panel-${tab}`"
+          :tabindex="activeTab === tab ? 0 : -1"
+          :data-testid="`plugin-tab-${tab}`"
+          :class="[
+            'whitespace-nowrap rounded-md px-2 py-1.5 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary',
+            'sm:-mb-px sm:rounded-none sm:border-b-2 sm:px-4 sm:py-2',
+            activeTab === tab
+              ? 'bg-background text-foreground shadow-sm sm:bg-transparent sm:shadow-none sm:border-primary sm:text-primary'
+              : 'text-neutral-muted hover:text-foreground sm:border-transparent',
+          ]"
+          @click="activeTab = tab"
+        >
+          {{ $t(`pluginSettings.tabs.${tab}`) }}
+        </button>
+      </div>
 
-            <!-- Settings Tab Content -->
-            <TabsContent v-if="hasConfiguration" value="settings" class="p-6">
-              <!-- Custom Template (if available) -->
-              <div v-if="hasCustomTemplate && templateHtml" v-html="templateHtml"></div>
-
-              <!-- Auto-generated Form -->
-              <PluginConfigForm
-                v-model:formData="formData"
-                v-model:editingEncryptedFields="editingEncryptedFields"
-                v-model:editingEnvFields="editingEnvFields"
-                :configSchema="configSchema"
-                :originalFormData="originalFormData"
-                :configMetadata="configMetadata"
-                :saving="saving"
-                @submit="saveConfiguration"
-                @reset="resetForm"
-                @reset-to-env="handleResetToEnv"
-              />
-            </TabsContent>
-
-            <!-- Custom Tab Contents -->
-            <TabsContent
-              v-for="tab in sortedTabExtensions"
-              :key="tab.id"
-              :value="tab.id"
-              class="p-6"
-            >
-              <component
-                :is="tab.component"
-                :plugin="plugin"
-                :config="{
-                  ...formData,
-                  instanceId: instanceId,
-                  organizationId: userStore.activeOrganizationId,
-                }"
-                :api-base-url="apiBaseUrl"
-                :api="Hay"
-                :locale="locale"
-                @update:config="
-                  (newConfig: any) => {
-                    formData = { ...formData, ...newConfig };
-                  }
-                "
-              />
-            </TabsContent>
-          </Tabs>
-        </CardContent>
-      </Card>
-
-      <!-- Configuration Form (shown when no tabs are present and enabled) -->
-      <Card v-if="enabled && hasConfiguration && tabExtensions.length === 0">
-        <CardHeader>
-          <CardTitle>{{ $t("pluginSettings.configuration.title") }}</CardTitle>
-          <CardDescription>
-            {{
-              $t("pluginSettings.configuration.description", {
-                name: plugin.name || getPluginDisplayName(plugin.id),
-              })
-            }}
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <!-- Custom Template (if available) -->
-          <div v-if="hasCustomTemplate && templateHtml" v-html="templateHtml"></div>
-
-          <!-- Auto-generated Form -->
-          <PluginConfigForm
-            v-model:formData="formData"
-            v-model:editingEncryptedFields="editingEncryptedFields"
-            v-model:editingEnvFields="editingEnvFields"
-            :configSchema="configSchema"
-            :originalFormData="originalFormData"
-            :configMetadata="configMetadata"
-            :saving="saving"
-            @submit="saveConfiguration"
-            @reset="resetForm"
-            @reset-to-env="handleResetToEnv"
-          />
-        </CardContent>
-      </Card>
-
-      <!-- Test Connection for Connectors (only when enabled) -->
-      <Card v-if="enabled && plugin.type.includes('connector')">
-        <CardHeader>
-          <CardTitle>{{ $t("pluginSettings.connectionTest.title") }}</CardTitle>
-          <CardDescription>
-            {{
-              $t("pluginSettings.connectionTest.description", {
-                name: plugin.name || getPluginDisplayName(plugin.id),
-              })
-            }}
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div class="space-y-4">
-            <Button :disabled="testing" @click="testConnection">
-              <Zap v-if="!testing" class="h-4 w-4 mr-2" />
-              <Loader2 v-else class="h-4 w-4 mr-2 animate-spin" />
-              {{
-                testing
-                  ? $t("pluginSettings.connectionTest.testing")
-                  : $t("pluginSettings.connectionTest.testConnection")
-              }}
-            </Button>
-
-            {{ testResult }}
-
-            <div
-              v-if="testResult"
-              class="p-4 rounded-lg"
-              :class="
-                testResult.success
-                  ? 'bg-green-50 text-green-800 dark:bg-green-950/20 dark:text-green-200'
-                  : testResult.status === 'unconfigured'
-                    ? 'bg-gray-50 text-gray-800 dark:bg-gray-950/20 dark:text-gray-200'
-                    : 'bg-red-50 text-red-800 dark:bg-red-950/20 dark:text-red-200'
-              "
-            >
-              <div class="flex items-center space-x-2">
-                <CheckCircle v-if="testResult.success" class="h-5 w-5" />
-                <Info v-else-if="testResult.status === 'unconfigured'" class="h-5 w-5" />
-                <XCircle v-else class="h-5 w-5" />
-                <span class="font-medium">
-                  <Badge
-                    v-if="testResult.status === 'unconfigured'"
-                    variant="secondary"
-                    class="mr-2"
-                  >
-                    {{ $t("pluginSettings.connection.needsAuth") }}
-                  </Badge>
-                  {{
-                    testResult.success
-                      ? $t("pluginSettings.connectionTest.success")
-                      : testResult.status === "unconfigured"
-                        ? $t("pluginSettings.connectionTest.configRequired")
-                        : $t("pluginSettings.connectionTest.failed")
-                  }}
-                </span>
-              </div>
-              <p v-if="testResult.message" class="mt-2 text-sm">
-                {{ testResult.message }}
-              </p>
-              <p
-                v-if="
-                  !testResult.success && testResult.status !== 'unconfigured' && testResult.error
-                "
-                class="mt-2 text-sm font-mono bg-red-100 dark:bg-red-900/30 p-2 rounded border border-red-200 dark:border-red-800"
-              >
-                {{ testResult.error }}
-              </p>
-              <p
-                v-if="!testResult.success && testResult.status !== 'unconfigured'"
-                class="mt-2 text-xs opacity-75"
-              >
-                {{ $t("pluginSettings.connectionTest.checkConfig") }}
-              </p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      <!-- Plugin Settings Extensions - After Settings Slot (only when enabled) -->
-      <template v-if="enabled">
-        <Card v-for="ext in afterSettingsExtensions" :key="ext.id">
+      <!-- Setup -->
+      <section
+        v-if="enabled && activeTab === 'setup'"
+        id="plugin-panel-setup"
+        ref="setupPanel"
+        role="tabpanel"
+        aria-labelledby="plugin-tab-setup"
+        class="space-y-4"
+      >
+        <Card v-for="ext in checklistExtras.before" :key="ext.id">
           <CardContent>
             <PluginPageSlot
               :plugin-id="plugin.id"
               :plugin-path="plugin.pluginPath"
               :component-name="ext.componentName"
               :plugin="plugin"
-              :config="{
-                ...formData,
-                instanceId: instanceId,
-                organizationId: userStore.activeOrganizationId,
-              }"
+              :config="slotConfig"
               :api-base-url="apiBaseUrl"
-              @update:config="
-                (newConfig: any) => {
-                  formData = { ...formData, ...newConfig };
-                }
-              "
+              @update:config="onSlotConfig"
             />
           </CardContent>
         </Card>
-      </template>
+
+        <!-- The setup checklist: declared by the plugin (register.setup) or core's standard steps -->
+        <ol :aria-label="$t('pluginSettings.setup.stepsLabel')" data-testid="setup-checklist">
+          <li
+            v-for="(step, index) in checklistSteps"
+            :key="step.id"
+            class="flex gap-3 sm:gap-4"
+            :data-testid="`setup-step-${step.id}`"
+          >
+            <div class="flex flex-col items-center">
+              <span
+                :class="[
+                  'flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-sm font-medium',
+                  step.done
+                    ? 'bg-primary text-primary-foreground'
+                    : 'border border-border bg-background text-neutral-muted',
+                ]"
+              >
+                <Check v-if="step.done" class="h-4 w-4" aria-hidden="true" />
+                <span v-else aria-hidden="true">{{ index + 1 }}</span>
+                <span v-if="step.done" class="sr-only">{{ $t("pluginSettings.setup.stepDone") }}</span>
+              </span>
+              <span
+                v-if="index < checklistSteps.length - 1"
+                class="mt-2 w-px flex-1 bg-border"
+                aria-hidden="true"
+              ></span>
+            </div>
+
+            <div class="min-w-0 flex-1 space-y-3 pb-8">
+              <div v-if="step.title || step.description" class="space-y-1 pt-0.5">
+                <h3 v-if="step.title" class="flex flex-wrap items-center gap-2 font-medium leading-6">
+                  {{ step.title }}
+                  <Badge v-if="step.optional" variant="secondary">
+                    {{ $t("pluginSettings.setup.optional") }}
+                  </Badge>
+                </h3>
+                <p v-if="step.description" class="text-sm text-neutral-muted">
+                  {{ step.description }}
+                </p>
+                <p v-if="step.message" class="text-sm text-neutral-muted">{{ step.message }}</p>
+              </div>
+
+              <Card v-if="step.kind === 'fields'">
+                <CardContent class="pt-6">
+                  <PluginConfigForm
+                    v-model:formData="formData"
+                    v-model:editingEncryptedFields="editingEncryptedFields"
+                    v-model:editingEnvFields="editingEnvFields"
+                    :plugin-id="plugin.id"
+                    :configSchema="pickSchema(step.fields)"
+                    :originalFormData="originalFormData"
+                    :configMetadata="configMetadata"
+                    :saving="saving"
+                    @submit="saveConfiguration"
+                    @reset="resetForm"
+                    @reset-to-env="handleResetToEnv"
+                  />
+                </CardContent>
+              </Card>
+
+              <template v-else-if="step.kind === 'connect'">
+                <!-- OAuth client ID/secret not set: Connect cannot work, say why -->
+                <Alert v-if="!oauthConfigured" :icon="Info" data-testid="oauth-unavailable-alert">
+                  <AlertTitle>{{ $t("pluginSettings.connection.oauthUnavailableTitle") }}</AlertTitle>
+                  <AlertDescription>
+                    {{ $t("pluginSettings.connection.oauthUnavailable", { name: displayName }) }}
+                  </AlertDescription>
+                </Alert>
+                <PluginOAuthConnection
+                  v-else
+                  :plugin="plugin"
+                  :config="slotConfig"
+                  :api-base-url="apiBaseUrl"
+                  :oauth-available="oauthAvailable"
+                  :oauth-configured="oauthConfigured"
+                  hide-header
+                />
+              </template>
+
+              <Card v-else-if="step.kind === 'component' && step.extension">
+                <CardContent>
+                  <PluginPageSlot
+                    :plugin-id="plugin.id"
+                    :plugin-path="plugin.pluginPath"
+                    :component-name="step.extension.componentName"
+                    :plugin="plugin"
+                    :config="slotConfig"
+                    :api-base-url="apiBaseUrl"
+                    @update:config="onSlotConfig"
+                  />
+                </CardContent>
+              </Card>
+
+              <Button
+                v-else-if="step.kind === 'external' && step.url"
+                variant="outline"
+                :href="step.url"
+                target="_blank"
+              >
+                <ExternalLink class="h-4 w-4 mr-2" aria-hidden="true" />
+                {{ $t("pluginSettings.setup.openExternal") }}
+              </Button>
+
+              <div v-else-if="step.kind === 'verify'" class="space-y-3" data-testid="setup-verify">
+                <PluginTestResult v-if="testResult" :result="testResult" />
+                <Button variant="outline" :loading="testing" @click="testConnection">
+                  <Zap v-if="!testing" class="h-4 w-4 mr-2" />
+                  {{ $t("pluginSettings.connectionTest.testConnection") }}
+                </Button>
+              </div>
+            </div>
+          </li>
+        </ol>
+
+        <Card v-for="ext in checklistExtras.after" :key="ext.id">
+          <CardContent>
+            <PluginPageSlot
+              :plugin-id="plugin.id"
+              :plugin-path="plugin.pluginPath"
+              :component-name="ext.componentName"
+              :plugin="plugin"
+              :config="slotConfig"
+              :api-base-url="apiBaseUrl"
+              @update:config="onSlotConfig"
+            />
+          </CardContent>
+        </Card>
+      </section>
+
+      <!-- What it can do (also what a not-yet-connected plugin shows) -->
+      <section
+        v-if="!enabled || activeTab === 'capabilities'"
+        id="plugin-panel-capabilities"
+        :role="enabled ? 'tabpanel' : undefined"
+        :aria-labelledby="enabled ? 'plugin-tab-capabilities' : undefined"
+        class="space-y-4"
+      >
+        <Card v-if="capabilities.length > 0" data-testid="plugin-capabilities">
+          <CardHeader>
+            <CardTitle>{{ $t("pluginSettings.capabilities.title") }}</CardTitle>
+            <CardDescription>{{ $t("pluginSettings.capabilities.description") }}</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ul class="space-y-3">
+              <li v-for="capability in capabilities" :key="capability" class="flex gap-3">
+                <component
+                  :is="CAPABILITY_ICONS[capability]"
+                  class="h-5 w-5 text-primary flex-shrink-0 mt-0.5"
+                  aria-hidden="true"
+                />
+                <div>
+                  <p class="font-medium text-sm">
+                    {{ $t(`pluginSettings.capabilities.items.${capability}.title`) }}
+                  </p>
+                  <p class="text-sm text-neutral-muted">
+                    {{ $t(`pluginSettings.capabilities.items.${capability}.description`) }}
+                  </p>
+                </div>
+              </li>
+            </ul>
+          </CardContent>
+        </Card>
+
+        <!-- Actions the agent gets. Live tools from the worker, else the manifest's. -->
+        <Card v-if="availableTools.length > 0">
+          <CardHeader>
+            <CardTitle>{{ $t("pluginSettings.availableActions.title") }}</CardTitle>
+            <CardDescription>{{
+              $t("pluginSettings.availableActions.toolsAvailable", {
+                count: availableTools.length,
+              })
+            }}</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div class="relative">
+              <div class="grid gap-2">
+                <div
+                  v-for="tool in displayedTools"
+                  :key="tool.name"
+                  class="rounded-lg border border-border overflow-hidden"
+                >
+                  <button
+                    type="button"
+                    class="w-full flex items-center gap-3 p-3 text-left hover:bg-muted/40 transition-colors"
+                    :aria-expanded="expandedTools.has(tool.name)"
+                    @click="toggleTool(tool.name)"
+                  >
+                    <Badge :variant="getToolBadgeVariant(tool)" class="flex-shrink-0">
+                      {{ getToolBadgeLabel(tool) }}
+                    </Badge>
+                    <h4 class="font-medium text-sm flex-1 min-w-0 truncate">
+                      {{ getToolLabel(pluginId, tool.name) }}
+                    </h4>
+                    <ChevronDown
+                      class="h-4 w-4 text-neutral-muted flex-shrink-0 transition-transform"
+                      :class="{ 'rotate-180': expandedTools.has(tool.name) }"
+                    />
+                  </button>
+                  <div v-if="expandedTools.has(tool.name)" class="p-4 pt-1 space-y-2">
+                    <p v-if="tool.description" class="text-xs text-neutral-muted">
+                      {{ getToolDescription(pluginId, tool.name, tool.description) }}
+                    </p>
+                    <div v-if="tool.input_schema">
+                      <p class="text-[11px] font-medium uppercase text-neutral-muted mb-2">
+                        {{ $t("pluginSettings.availableActions.parameters") }}
+                      </p>
+                      <McpToolInputSchema :schema="tool.input_schema" />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div
+                v-if="!showAllTools && availableTools.length > COLLAPSED_TOOL_LIMIT"
+                class="pointer-events-none absolute inset-x-0 bottom-0 flex items-end justify-center pt-32 pb-2 bg-gradient-to-t from-background to-transparent"
+              >
+                <Button
+                  variant="outline"
+                  size="sm"
+                  class="pointer-events-auto shadow-sm"
+                  @click="showAllTools = true"
+                >
+                  {{
+                    $t("pluginSettings.availableActions.showAll", { count: availableTools.length })
+                  }}
+                </Button>
+              </div>
+            </div>
+
+            <div
+              v-if="showAllTools && availableTools.length > COLLAPSED_TOOL_LIMIT"
+              class="mt-3 flex justify-center"
+            >
+              <Button variant="ghost" size="sm" @click="showAllTools = false">
+                {{ $t("pluginSettings.availableActions.hide") }}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
+        <p
+          v-if="capabilities.length === 0 && availableTools.length === 0"
+          class="text-sm text-neutral-muted"
+        >
+          {{ $t("pluginSettings.capabilities.empty") }}
+        </p>
+      </section>
+
+      <!-- Advanced: managed and technical values -->
+      <section
+        v-if="enabled && activeTab === 'advanced'"
+        id="plugin-panel-advanced"
+        role="tabpanel"
+        aria-labelledby="plugin-tab-advanced"
+        class="space-y-4"
+      >
+        <Card data-testid="advanced-fields">
+          <CardHeader>
+            <CardTitle>{{ $t("pluginSettings.advanced.title") }}</CardTitle>
+            <CardDescription>
+              {{
+                hasEditableAdvancedFields
+                  ? $t("pluginSettings.advanced.description")
+                  : $t("pluginSettings.advanced.readOnlyDescription")
+              }}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <PluginConfigForm
+              v-model:formData="formData"
+              v-model:editingEncryptedFields="editingEncryptedFields"
+              v-model:editingEnvFields="editingEnvFields"
+              :plugin-id="plugin.id"
+              :configSchema="advancedSchema"
+              :originalFormData="originalFormData"
+              :configMetadata="configMetadata"
+              :saving="saving"
+              :hide-actions="!hasEditableAdvancedFields"
+              advanced-view
+              @submit="saveConfiguration"
+              @reset="resetForm"
+              @reset-to-env="handleResetToEnv"
+            />
+          </CardContent>
+        </Card>
+      </section>
     </div>
   </Page>
 </template>
 
 <script setup lang="ts">
-import { markRaw, defineAsyncComponent, computed, ref, onUnmounted } from "vue";
+import { computed, ref, watch, onUnmounted, nextTick, type Component } from "vue";
 import {
   ArrowLeft,
   AlertCircle,
   AlertTriangle,
-  Loader2,
-  CheckCircle,
-  XCircle,
   Zap,
   MessageSquare,
   Cpu,
   FileText,
   Database,
   Package,
-  Check,
   Info,
   RotateCw,
   ChevronDown,
+  Users,
+  ShoppingBag,
+  ShieldCheck,
+  MessageCircle,
+  MoreHorizontal,
+  Check,
+  Power,
+  ExternalLink,
 } from "lucide-vue-next";
 import { Hay } from "@/utils/api";
 import { useUserStore } from "@/stores/user";
+import { useAppStore } from "@/stores/app";
 import { useToast } from "@/composables/useToast";
 import { useDomain } from "@/composables/useDomain";
-import { sanitizeHtml } from "@/utils/sanitize";
 import { classifyTool } from "@/utils/toolClassification";
 import PluginOAuthConnection from "@/components/plugins/PluginOAuthConnection.vue";
 import PluginPageSlot from "@/components/plugins/PluginPageSlot.vue";
+import PluginTestResult from "@/components/plugins/PluginTestResult.vue";
 import McpToolInputSchema from "@/components/plugins/McpToolInputSchema.vue";
 import { useToolLabel } from "@/composables/useToolLabel";
+import { usePluginTranslations } from "@/composables/usePluginTranslations";
+import {
+  buildSetupChecklist,
+  isStepDone,
+  type DeclaredSetupStep,
+  deriveSetupState,
+  describedCapabilities,
+  isShown,
+  missingRequiredFields,
+  splitConfigFields,
+  type ConfigFieldMeta,
+  type DescribedCapability,
+  type SetupState,
+} from "@/utils/pluginSetup";
 
 const { t } = useI18n();
 const { locale } = useI18n({ useScope: "global" });
-const { getToolLabel, getToolDescription } = useToolLabel();
+const {
+  getToolLabel,
+  getToolDescription,
+  getPluginName,
+  getPluginDescription,
+  getSetupStepText,
+} = useToolLabel();
+const { loadTranslations: loadPluginTranslations } = usePluginTranslations();
 
-// Constants
-const AUTO_TEST_DELAY_MS = 0; // No delay needed - test connection immediately
-
-// Route and router
 const route = useRoute();
 const router = useRouter();
 const userStore = useUserStore();
+const appStore = useAppStore();
 const toast = useToast();
-const runtimeConfig = useRuntimeConfig();
 
 // Plugin ID from route (decode in case it contains special characters like /)
 const pluginId = computed(() => decodeURIComponent(route.params.pluginId as string));
 
-// API Base URL from runtime config
 const apiBaseUrl = computed(() => {
   const { getApiUrl } = useDomain();
   return getApiUrl();
-});
-
-// Vite glob imports for automatic plugin component discovery
-// Use relative path from this file to plugins directory (4 levels up)
-// @ts-ignore - Vite glob import not recognized by TypeScript in Nuxt
-const pluginComponents = import.meta.glob<any>("../../../../plugins/**/*.vue", {
-  eager: false,
 });
 
 // State
@@ -721,6 +624,7 @@ const enabling = ref(false);
 const disabling = ref(false);
 const restarting = ref(false);
 const showDisableConfirm = ref(false);
+const thumbnailFailed = ref(false);
 const testResult = ref<{
   success: boolean;
   message?: string;
@@ -729,24 +633,234 @@ const testResult = ref<{
 } | null>(null);
 const instanceId = ref<string | null>(null);
 
-// Cleanup tracking for auto-test race condition fix
+// Cleanup tracking for the auto-test race condition fix
 const autoTestTimeout = ref<NodeJS.Timeout | null>(null);
 const testAbortController = ref<AbortController | null>(null);
-const instanceAuth = ref<any>(null); // Auth config from plugin instance
 const oauthAvailable = ref(false); // Plugin has OAuth2 registered
 const oauthConfigured = ref(false); // OAuth credentials configured
 const oauthConnected = ref(false); // OAuth flow completed and access token exists
 
-// Whether this plugin has MCP capabilities (connection testing only applies to MCP plugins)
-const isMcpPlugin = computed(() => {
-  if (!plugin.value?.manifest?.capabilities) return false;
-  const caps = plugin.value.manifest.capabilities;
-  return Array.isArray(caps) ? caps.includes("mcp") : !!caps.mcp;
-});
+const displayName = computed(() =>
+  plugin.value ? getPluginName(plugin.value.id, plugin.value.name) : "",
+);
+const pluginDescription = computed(() =>
+  plugin.value ? getPluginDescription(plugin.value.id, plugin.value.manifest?.description) : "",
+);
 
-// Tools to render in the Available Actions card.
-// Prefers live tools registered by the running worker; falls back to manifest tools
-// for plugins that statically declare them.
+// Connection testing only applies to MCP plugins
+const isMcpPlugin = computed(() =>
+  describedCapabilities(plugin.value?.manifest?.capabilities).includes("mcp"),
+);
+
+// Configuration
+const configSchema = ref<Record<string, any>>({});
+const formData = ref<Record<string, any>>({});
+const originalFormData = ref<Record<string, any>>({});
+const configMetadata = ref<Record<string, ConfigFieldMeta>>({});
+// Encrypted / managed fields the merchant is currently editing
+const editingEncryptedFields = ref<Set<string>>(new Set());
+const editingEnvFields = ref<Set<string>>(new Set());
+
+const slotConfig = computed(() => ({
+  ...formData.value,
+  instanceId: instanceId.value,
+  organizationId: userStore.activeOrganizationId,
+}));
+const onSlotConfig = (newConfig: Record<string, unknown>) => {
+  formData.value = { ...formData.value, ...newConfig };
+};
+
+// Setup fields vs Advanced fields (managed by the server, or declared technical)
+const fieldSplit = computed(() =>
+  splitConfigFields(configSchema.value, configMetadata.value, formData.value),
+);
+const pickSchema = (keys: string[]) =>
+  Object.fromEntries(keys.map((key) => [key, configSchema.value[key]]));
+const advancedSchema = computed(() => pickSchema(fieldSplit.value.advanced));
+
+// What the plugin reports about itself (register.setup({ status })), when it does
+type ReportedStatus = {
+  state: SetupState;
+  account?: string;
+  steps: Record<string, { done: boolean; message?: string }>;
+};
+const reportedStatus = ref<ReportedStatus | null>(null);
+const fetchReportedStatus = async () => {
+  if (!enabled.value || !plugin.value?.metadata?.setup?.hasStatus) {
+    reportedStatus.value = null;
+    return;
+  }
+  try {
+    reportedStatus.value = await Hay.plugins.setupStatus.query({ pluginId: pluginId.value });
+  } catch {
+    reportedStatus.value = null; // core judges the status itself
+  }
+};
+
+// The setup checklist (D20-5)
+const extensionByName = (name?: string) =>
+  [...beforeSettingsExtensions.value, ...afterSettingsExtensions.value].find(
+    (ext) => ext.componentName === name,
+  );
+const checklist = computed(() =>
+  buildSetupChecklist({
+    declared: plugin.value?.metadata?.setup?.steps as DeclaredSetupStep[] | undefined,
+    setupFields: fieldSplit.value.setup,
+    before: beforeSettingsExtensions.value.map((ext) => ext.componentName),
+    after: afterSettingsExtensions.value.map((ext) => ext.componentName),
+    hasConnect: oauthAvailable.value,
+    hasVerify: isMcpPlugin.value,
+  }),
+);
+const checklistExtras = computed(() => ({
+  before: checklist.value.extraBefore.map(extensionByName).filter((ext) => !!ext),
+  after: checklist.value.extraAfter.map(extensionByName).filter((ext) => !!ext),
+}));
+const urlHost = (url?: string) => {
+  try {
+    return url ? new URL(url).host : "";
+  } catch {
+    return "";
+  }
+};
+// Titles core uses when the plugin ships no setupSteps.<id> translation
+const defaultStepText = (kind: DeclaredSetupStep["kind"], title?: string) => {
+  const name = displayName.value;
+  if (kind === "fields") {
+    return {
+      title: t("pluginSettings.setup.fieldsTitle"),
+      description: t("pluginSettings.setup.fieldsDescription", { name }),
+    };
+  }
+  if (kind === "connect") {
+    return {
+      title: t("pluginSettings.oauth.title", { name }),
+      description: t("pluginSettings.oauth.description", { name }),
+    };
+  }
+  if (kind === "verify") {
+    return {
+      title: t("pluginSettings.connectionTest.title"),
+      description: t("pluginSettings.connectionTest.description", { name }),
+    };
+  }
+  return { title: title ?? "", description: "" };
+};
+const checklistSteps = computed(() => {
+  const signals = {
+    missingRequired: missingRequiredFields(configSchema.value, configMetadata.value, formData.value),
+    oauthConnected: oauthConnected.value,
+    testSuccess: testResult.value ? testResult.value.success : null,
+    reported: reportedStatus.value?.steps,
+  };
+  return checklist.value.steps
+    .filter(
+      (step) =>
+        step.kind !== "fields" ||
+        step.fields.some((key) => isShown(configSchema.value[key], formData.value)),
+    )
+    .map((step) => {
+      const extension = step.kind === "component" ? extensionByName(step.component) : undefined;
+      const fallback = defaultStepText(step.kind, extension?.title ?? urlHost(step.url));
+      return {
+        ...step,
+        extension,
+        title: getSetupStepText(plugin.value!.id, step.id, "title", fallback.title),
+        description: getSetupStepText(
+          plugin.value!.id,
+          step.id,
+          "description",
+          fallback.description,
+        ),
+        message: reportedStatus.value?.steps[step.id]?.message,
+        done: isStepDone(step, signals) === true,
+      };
+    });
+});
+// Advanced fields hidden by showWhen (e.g. self-hosted credentials in managed mode) don't count.
+const visibleAdvancedFields = computed(() =>
+  fieldSplit.value.advanced.filter((key) => isShown(configSchema.value[key], formData.value)),
+);
+const hasEditableAdvancedFields = computed(() =>
+  visibleAdvancedFields.value.some((key) => {
+    const meta = configMetadata.value[key];
+    return !(meta?.source === "env" && !meta.canOverride);
+  }),
+);
+
+// Advanced mode: a remembered per-user preference (Roger's answer 2)
+const advancedMode = computed(
+  () => !!userStore.user?.id && !!appStore.pluginAdvancedMode[userStore.user.id],
+);
+const toggleAdvancedMode = () => {
+  if (!userStore.user?.id) return;
+  appStore.setPluginAdvancedMode(userStore.user.id, !advancedMode.value);
+};
+
+type PluginTab = "setup" | "capabilities" | "advanced";
+const activeTab = ref<PluginTab>("setup");
+const tabs = computed<PluginTab[]>(() =>
+  advancedMode.value && visibleAdvancedFields.value.length > 0
+    ? ["setup", "capabilities", "advanced"]
+    : ["setup", "capabilities"],
+);
+// A tab can disappear (Advanced mode off, no visible advanced fields): fall back to Setup.
+watch(tabs, (available) => {
+  if (!available.includes(activeTab.value)) activeTab.value = "setup";
+});
+const onTabKeydown = (event: KeyboardEvent) => {
+  if (event.key !== "ArrowRight" && event.key !== "ArrowLeft") return;
+  const index = tabs.value.indexOf(activeTab.value);
+  const step = event.key === "ArrowRight" ? 1 : -1;
+  const next = tabs.value[(index + step + tabs.value.length) % tabs.value.length];
+  activeTab.value = next;
+  void nextTick(() => document.getElementById(`plugin-tab-${next}`)?.focus());
+};
+
+const setupPanel = ref<HTMLElement | null>(null);
+const openSetup = async () => {
+  activeTab.value = "setup";
+  await nextTick();
+  setupPanel.value?.scrollIntoView({ behavior: "smooth", block: "start" });
+};
+
+// Status header
+const missingRequired = computed(
+  () => missingRequiredFields(configSchema.value, configMetadata.value, formData.value).length,
+);
+const setupState = computed<SetupState>(() =>
+  deriveSetupState({
+    enabled: enabled.value,
+    channelFailing: plugin.value?.channelHealth?.status === "failing",
+    missingRequired: missingRequired.value,
+    oauth: { available: oauthAvailable.value, connected: oauthConnected.value },
+    test: isMcpPlugin.value ? testResult.value : null,
+    reported: reportedStatus.value?.state ?? null,
+  }),
+);
+const STATUS_BADGES: Record<
+  SetupState,
+  { variant: "secondary" | "warning" | "success" | "destructive"; dot: string }
+> = {
+  not_set_up: { variant: "secondary", dot: "bg-neutral-400" },
+  needs_action: { variant: "warning", dot: "bg-amber-500" },
+  connected: { variant: "success", dot: "bg-green-600" },
+  error: { variant: "destructive", dot: "bg-red-600" },
+};
+const statusBadge = computed(() => STATUS_BADGES[setupState.value]);
+
+// What it can do
+const capabilities = computed(() => describedCapabilities(plugin.value?.manifest?.capabilities));
+const CAPABILITY_ICONS: Record<DescribedCapability, Component> = {
+  messages: MessageSquare,
+  customers: Users,
+  mcp: Zap,
+  products: ShoppingBag,
+  disputes: ShieldCheck,
+  documents: FileText,
+  webchat: MessageCircle,
+};
+
 type ToolAnnotations = {
   readOnlyHint?: boolean;
   destructiveHint?: boolean;
@@ -775,7 +889,6 @@ const availableTools = computed<DisplayTool[]>(() => {
 
 const showAllTools = ref(false);
 const expandedTools = ref<Set<string>>(new Set());
-
 const COLLAPSED_TOOL_LIMIT = 5;
 const displayedTools = computed(() =>
   showAllTools.value ? availableTools.value : availableTools.value.slice(0, COLLAPSED_TOOL_LIMIT),
@@ -804,90 +917,12 @@ function getToolBadgeLabel(tool: DisplayTool): string {
   return t(`pluginSettings.availableActions.classification.${classifyTool(tool)}`);
 }
 
-// Configuration
-const hasConfiguration = ref(false);
-const hasCustomTemplate = ref(false);
-const configSchema = ref<Record<string, any>>({});
-const formData = ref<Record<string, any>>({});
-const templateHtml = ref<string | null>(null);
-// Track which encrypted fields are being edited
-const editingEncryptedFields = ref<Set<string>>(new Set());
-// Track configuration metadata (source: env, database, default)
-const configMetadata = ref<Record<string, any>>({});
-// Track which env fields are being overridden
-const editingEnvFields = ref<Set<string>>(new Set());
+// Plugin UI pages (register.ui.page) by slot
+type SlotExtension = { id: string; componentName: string; title?: string };
+const beforeSettingsExtensions = ref<SlotExtension[]>([]);
+const afterSettingsExtensions = ref<SlotExtension[]>([]);
 
-// Plugin Extensions for slots
-const beforeSettingsExtensions = ref<
-  Array<{
-    id: string;
-    componentName: string;
-    title?: string;
-  }>
->([]);
-const afterSettingsExtensions = ref<
-  Array<{
-    id: string;
-    componentName: string;
-    title?: string;
-  }>
->([]);
-const tabExtensions = ref<Array<{ id: string; component: any; name: string; order?: number }>>([]);
-// Track original values to detect changes
-const originalFormData = ref<Record<string, any>>({});
-
-// Computed property to sort tab extensions by order
-const sortedTabExtensions = computed(() => {
-  return [...tabExtensions.value].sort((a, b) => {
-    if (a.order !== undefined && b.order !== undefined) {
-      return a.order - b.order;
-    }
-    if (a.order !== undefined) return -1;
-    if (b.order !== undefined) return 1;
-    return 0;
-  });
-});
-
-// Helper function to load plugin component dynamically using Vite's glob imports
-const loadPluginComponent = async (componentPath: string) => {
-  // Check if component is from dashboard (starts with @/)
-  if (componentPath.startsWith("@/")) {
-    // Dashboard component - use a resolver map for known components
-    const componentResolvers: Record<string, () => Promise<any>> = {
-      "@/components/plugins/PluginOAuthConnection.vue": () =>
-        import("@/components/plugins/PluginOAuthConnection.vue"),
-    };
-
-    if (componentResolvers[componentPath]) {
-      try {
-        const module = await componentResolvers[componentPath]();
-        return module.default;
-      } catch (error) {
-        console.error(`Failed to load dashboard component: ${componentPath}`, error);
-        throw new Error(`Dashboard component not found: ${componentPath}. Error: ${error}`);
-      }
-    } else {
-      throw new Error(
-        `Dashboard component not registered: ${componentPath}. Available: ${Object.keys(componentResolvers).join(", ")}`,
-      );
-    }
-  }
-
-  // Plugin component - use discovered components
-  const pluginName = pluginId.value.replace("hay-plugin-", "");
-  const fullPath = `../../../../plugins/${pluginName}/${componentPath}`;
-
-  if (pluginComponents[fullPath]) {
-    return defineAsyncComponent(pluginComponents[fullPath]);
-  }
-
-  throw new Error(
-    `Component not found: ${fullPath}. Available: ${Object.keys(pluginComponents).join(", ")}`,
-  );
-};
-
-// Methods
-const getPluginIcon = (types: string[]) => {
+const getPluginIcon = (types: string[] = []) => {
   if (types.includes("channel")) return MessageSquare;
   if (types.includes("mcp-connector")) return Cpu;
   if (types.includes("document_importer")) return FileText;
@@ -895,7 +930,7 @@ const getPluginIcon = (types: string[]) => {
   return Package;
 };
 
-const getPluginIconBg = (types: string[]) => {
+const getPluginIconBg = (types: string[] = []) => {
   if (types.includes("channel")) return "bg-blue-600";
   if (types.includes("mcp-connector")) return "bg-purple-600";
   if (types.includes("document_importer")) return "bg-green-600";
@@ -903,161 +938,66 @@ const getPluginIconBg = (types: string[]) => {
   return "bg-gray-600";
 };
 
-const getPluginDisplayName = (name: string) => {
-  return name
-    .replace("hay-plugin-", "")
-    .split("-")
-    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-    .join(" ");
-};
-
-const getPluginThumbnail = (pluginId: string) => {
+const getPluginThumbnail = (id: string) => {
   const { getApiUrl } = useDomain();
-  return getApiUrl(`/plugins/thumbnails/${encodeURIComponent(pluginId)}`);
+  return getApiUrl(`/plugins/thumbnails/${encodeURIComponent(id)}`);
 };
 
-const handleThumbnailError = (event: Event) => {
-  // Hide the image and show the fallback icon
-  const imgElement = event.target as HTMLImageElement;
-  const fallbackElement = imgElement.nextElementSibling as HTMLElement;
-
-  imgElement.style.display = "none";
-  if (fallbackElement) {
-    fallbackElement.style.display = "flex";
-  }
+const loadPluginExtensions = () => {
+  const pages: Array<{ id: string; component: string; slot: string; title?: string }> =
+    plugin.value?.metadata?.pages ?? [];
+  // './components/settings/AfterSettings.vue' -> 'AfterSettings'
+  const componentName = (path: string) => path.split("/").pop()?.replace(".vue", "") || "";
+  const bySlot = (slot: string) =>
+    pages
+      .filter((page) => page.slot === slot)
+      .map((page) => ({
+        id: page.id,
+        componentName: componentName(page.component),
+        title: page.title,
+      }));
+  beforeSettingsExtensions.value = bySlot("before-settings");
+  afterSettingsExtensions.value = bySlot("after-settings");
 };
 
-const loadPluginExtensions = async () => {
-  // Load dynamic pages (registered via ctx.register.ui.page())
-  const dynamicPages = plugin.value?.metadata?.pages;
-  if (!dynamicPages || dynamicPages.length === 0) {
-    console.log("[PluginSettings] No pages found in metadata");
-    return;
-  }
+const applyPluginData = (pluginData: any) => {
+  plugin.value = pluginData;
+  enabled.value = pluginData.enabled;
+  instanceId.value = pluginData.instanceId ?? null;
+  formData.value = { ...pluginData.configuration };
+  originalFormData.value = { ...pluginData.configuration };
+  configMetadata.value = pluginData.configMetadata ?? {};
+  oauthAvailable.value = !!pluginData.oauthAvailable;
+  oauthConfigured.value = !!pluginData.oauthConfigured;
+  oauthConnected.value = !!pluginData.oauthConnected;
 
-  console.log("[PluginSettings] Loading dynamic pages:", dynamicPages);
-
-  // Extract component name from path (e.g., './components/settings/AfterSettings.vue' -> 'AfterSettings')
-  const getComponentName = (componentPath: string): string => {
-    return componentPath.split("/").pop()?.replace(".vue", "") || "";
-  };
-
-  for (const page of dynamicPages) {
-    const componentName = getComponentName(page.component);
-
-    // Categorize by slot
-    if (page.slot === "before-settings") {
-      beforeSettingsExtensions.value.push({
-        id: page.id,
-        componentName,
-        title: page.title,
-      });
-    } else if (page.slot === "after-settings") {
-      afterSettingsExtensions.value.push({
-        id: page.id,
-        componentName,
-        title: page.title,
-      });
-    } else if (page.slot === "standalone") {
-      // Future: handle standalone pages (custom routes)
-      console.log("[PluginSettings] Standalone pages not yet supported:", page);
+  const schema = pluginData.metadata?.configSchema || pluginData.manifest?.configSchema || {};
+  configSchema.value = schema;
+  for (const [key, field] of Object.entries(schema) as Array<[string, any]>) {
+    if (formData.value[key] === undefined && field.default !== undefined) {
+      formData.value[key] = field.default;
     }
   }
+  editingEncryptedFields.value.clear();
+  editingEnvFields.value.clear();
+  loadPluginExtensions();
 };
 
 const fetchPlugin = async () => {
-  loading.value = true;
+  // Only the first load shows the skeleton; refreshes keep plugin components mounted.
+  loading.value = !plugin.value;
   error.value = null;
 
   try {
-    // Get plugin details and configuration (consolidated endpoint)
-    const pluginData = await Hay.plugins.get.query({
-      pluginId: pluginId.value,
-    });
-
-    // Plugin metadata
-    plugin.value = pluginData;
-
-    // Configuration data
-    enabled.value = pluginData.enabled;
-    instanceId.value = pluginData.instanceId ?? null;
-    formData.value = { ...pluginData.configuration };
-    originalFormData.value = { ...pluginData.configuration }; // Keep a copy of original values
-
-    // Store config metadata (source: env, database, default)
-    if (pluginData.configMetadata) {
-      configMetadata.value = pluginData.configMetadata;
-    }
-
-    // Store runtime auth config from instance
-    if (pluginData.auth) {
-      instanceAuth.value = pluginData.auth;
-    }
-
-    // Store OAuth availability, configuration, and connection status
-    if (pluginData.oauthAvailable !== undefined) {
-      oauthAvailable.value = pluginData.oauthAvailable;
-      console.log("[Plugin Settings] OAuth available:", pluginData.oauthAvailable);
-    }
-    if (pluginData.oauthConfigured !== undefined) {
-      oauthConfigured.value = pluginData.oauthConfigured;
-      console.log("[Plugin Settings] OAuth configured:", pluginData.oauthConfigured);
-    }
-    if (pluginData.oauthConnected !== undefined) {
-      oauthConnected.value = pluginData.oauthConnected;
-      console.log("[Plugin Settings] OAuth connected:", pluginData.oauthConnected);
-    }
-
-    console.log("[Plugin Settings] OAuth state:", {
-      oauthAvailable: oauthAvailable.value,
-      oauthConfigured: oauthConfigured.value,
-      oauthConnected: oauthConnected.value,
-      enabled: enabled.value,
-    });
-
-    // Set config schema from metadata or manifest (legacy)
-    const effectiveConfigSchema =
-      pluginData.metadata?.configSchema || pluginData.manifest?.configSchema;
-    if (effectiveConfigSchema && Object.keys(effectiveConfigSchema).length > 0) {
-      hasConfiguration.value = true;
-      configSchema.value = effectiveConfigSchema;
-
-      // Initialize form data with defaults
-      Object.entries(configSchema.value).forEach(([key, field]: [string, any]) => {
-        if (formData.value[key] === undefined && field.default !== undefined) {
-          formData.value[key] = field.default;
-        }
-      });
-    }
-
-    // Check for custom template
-    if (pluginData.manifest?.ui?.configuration) {
-      try {
-        const templateData = await Hay.plugins.getUITemplate.query({
-          pluginId: pluginId.value,
-        });
-        if (templateData.template) {
-          hasCustomTemplate.value = true;
-          // Sanitize HTML to prevent XSS attacks
-          templateHtml.value = sanitizeHtml(templateData.template);
-        }
-      } catch (err) {
-        console.log("No custom template, using auto-generated form");
-      }
-    }
-
-    // Load plugin extensions after plugin is loaded
-    await loadPluginExtensions();
+    applyPluginData(await Hay.plugins.get.query({ pluginId: pluginId.value }));
+    void fetchReportedStatus();
   } catch (err) {
     console.error("Failed to fetch plugin:", err);
     error.value = t("pluginSettings.error.loadFailed");
   } finally {
     loading.value = false;
-
-    // Auto-test connection asynchronously (only for MCP plugins, don't block page load)
-    // Wait 3 seconds to ensure metadata has been updated in the database
+    // Test the connection in the background (MCP plugins only)
     if (enabled.value && isMcpPlugin.value) {
-      console.log("[Plugin] MCP plugin enabled, checking auth methods:", plugin.value);
       scheduleAutoTest();
     }
   }
@@ -1067,38 +1007,26 @@ const saveConfiguration = async () => {
   saving.value = true;
 
   try {
-    // Build configuration to send to server
     const cleanedConfig: Record<string, any> = {};
 
     for (const [key, value] of Object.entries(formData.value)) {
       const field = configSchema.value[key];
       const metadata = configMetadata.value[key];
 
-      // Skip env fields that haven't been overridden
+      // Managed values not being overridden stay with the server
       if (metadata?.source === "env" && !editingEnvFields.value.has(key)) {
-        // Don't send to server, let it use env fallback
         continue;
       }
 
-      // Handle encrypted fields
       if (
         field?.encrypted &&
         originalFormData.value[key] &&
         /^\*+$/.test(originalFormData.value[key])
       ) {
-        // This is an existing encrypted field
-        if (editingEncryptedFields.value.has(key) && value && value !== "") {
-          // User edited this field, send the new value
-          cleanedConfig[key] = value;
-        } else if (!editingEncryptedFields.value.has(key)) {
-          // User didn't edit this field, send masked value to preserve existing
-          cleanedConfig[key] = originalFormData.value[key];
-        } else {
-          // User clicked edit but didn't enter a value, preserve existing
-          cleanedConfig[key] = originalFormData.value[key];
-        }
+        // Existing secret: send the new value only when the merchant typed one
+        cleanedConfig[key] =
+          editingEncryptedFields.value.has(key) && value ? value : originalFormData.value[key];
       } else {
-        // Regular field or new encrypted field
         cleanedConfig[key] = value;
       }
     }
@@ -1108,78 +1036,36 @@ const saveConfiguration = async () => {
       configuration: cleanedConfig,
     });
 
-    // Clear editing state for encrypted and env fields
-    editingEncryptedFields.value.clear();
-    editingEnvFields.value.clear();
-
-    // Show success toast
     toast.success(t("pluginSettings.toast.configSaved"));
-
-    // Reload the entire plugin configuration to get fresh state
     await fetchPlugin();
   } catch (err: any) {
     console.error("Failed to save configuration:", err);
-
-    // Show error toast
-    const errorMessage =
-      err?.message || err?.data?.message || t("pluginSettings.toast.configSaveFailed");
-    toast.error(errorMessage);
+    toast.error(err?.message || err?.data?.message || t("pluginSettings.toast.configSaveFailed"));
   } finally {
     saving.value = false;
   }
 };
 
 const resetForm = async () => {
-  // Reload configuration from server
-  const pluginData = await Hay.plugins.get.query({
-    pluginId: pluginId.value,
-  });
-  formData.value = { ...pluginData.configuration };
-  originalFormData.value = { ...pluginData.configuration };
-
-  // Store config metadata
-  if (pluginData.configMetadata) {
-    configMetadata.value = pluginData.configMetadata;
-  }
-
-  // Update OAuth state
-  if (pluginData.oauthAvailable !== undefined) {
-    oauthAvailable.value = pluginData.oauthAvailable;
-  }
-  if (pluginData.oauthConfigured !== undefined) {
-    oauthConfigured.value = pluginData.oauthConfigured;
-  }
-  if (pluginData.oauthConnected !== undefined) {
-    oauthConnected.value = pluginData.oauthConnected;
-  }
-
-  // Clear any editing state for encrypted and env fields
-  editingEncryptedFields.value.clear();
-  editingEnvFields.value.clear();
+  applyPluginData(await Hay.plugins.get.query({ pluginId: pluginId.value }));
 };
 
 const handleResetToEnv = async (key: string) => {
   try {
-    // Remove the field from formData
     const newFormData = { ...formData.value };
     delete newFormData[key];
 
-    // Save immediately with the field removed
+    // Saving without the field lets the managed value apply again
     await Hay.plugins.configure.mutate({
       pluginId: pluginId.value,
       configuration: newFormData,
     });
 
-    // Show success toast
     toast.success(t("pluginSettings.toast.resetToEnv"));
-
-    // Reload plugin configuration to refresh state
     await fetchPlugin();
   } catch (err: any) {
-    console.error("Failed to reset to env:", err);
-    const errorMessage =
-      err?.message || err?.data?.message || t("pluginSettings.toast.resetToEnvFailed");
-    toast.error(errorMessage);
+    console.error("Failed to reset to the managed value:", err);
+    toast.error(err?.message || err?.data?.message || t("pluginSettings.toast.resetToEnvFailed"));
   }
 };
 
@@ -1190,18 +1076,13 @@ const isAuthConfigured = (): boolean => {
   const authMethods = plugin.value?.metadata?.authMethods || plugin.value?.manifest?.authMethods;
 
   if (!authMethods || authMethods.length === 0) {
-    // No auth required
     return true;
   }
 
-  const hasOAuth2 = authMethods.some((m: any) => m.type === "oauth2");
-
-  if (hasOAuth2) {
-    // OAuth2: check if OAuth flow is complete
+  if (authMethods.some((m: any) => m.type === "oauth2")) {
     return oauthConnected.value;
   }
 
-  // API key/other auth: check if required config fields are filled
   const authConfigFields = authMethods
     .filter((m: any) => m.type === "apiKey")
     .map((m: any) => m.configField)
@@ -1211,91 +1092,61 @@ const isAuthConfigured = (): boolean => {
     return false;
   }
 
-  // Check if all auth config fields have values
+  // Masked values (e.g. '********') count as set
   return authConfigFields.every((field: string) => {
     const value = formData.value[field];
-    // Accept masked values (e.g., '********') as valid
     return value !== null && value !== undefined && value !== "";
   });
 };
 
 const scheduleAutoTest = () => {
-  // Clear any existing timeout to prevent duplicate tests
   if (autoTestTimeout.value) {
     clearTimeout(autoTestTimeout.value);
     autoTestTimeout.value = null;
   }
 
   autoTestTimeout.value = setTimeout(() => {
-    // Don't run if already testing
-    if (testing.value) {
-      console.log("[Plugin] Test already in progress, skipping auto-test");
-      return;
-    }
-
-    // Check if authentication is configured
-    if (isAuthConfigured()) {
-      console.log("[Plugin] Auth configured, testing connection...");
+    if (!testing.value && isAuthConfigured()) {
       testConnection();
-    } else {
-      console.log("[Plugin] Auth not configured yet, skipping auto-test");
     }
-
-    // Clear the timeout reference after it fires
     autoTestTimeout.value = null;
-  }, AUTO_TEST_DELAY_MS);
+  }, 0);
 };
 
 const testConnection = async () => {
-  // Prevent concurrent tests
-  if (testing.value) {
-    console.log("[Plugin] Test already in progress, skipping");
-    return;
-  }
+  if (testing.value) return;
 
-  // Abort any existing test
   if (testAbortController.value) {
     testAbortController.value.abort();
   }
 
   testing.value = true;
-  // Don't clear testResult immediately - keep showing previous result while testing
-
-  // Create abort controller for this test
+  // Keep showing the previous result while testing
   testAbortController.value = new AbortController();
   const currentController = testAbortController.value;
 
   try {
     const result = await Hay.plugins.testConnection.query({ pluginId: pluginId.value });
-
-    // Check if this request was aborted
-    if (currentController.signal.aborted) {
-      console.log("[Plugin] Test was aborted");
-      return;
-    }
+    if (currentController.signal.aborted) return;
 
     testResult.value = {
       success: result.success,
+      status: (result as { status?: string }).status,
       message:
         result.message ||
         (result.success
           ? t("pluginSettings.toast.connectionEstablished")
           : t("pluginSettings.connection.connectionFailed")),
-      error: result.error, // Include detailed error information
+      error: result.error,
     };
   } catch (err: any) {
-    // Check if this was an abort
-    if (err?.name === "AbortError" || currentController.signal.aborted) {
-      console.log("[Plugin] Test aborted");
-      return;
-    }
+    if (err?.name === "AbortError" || currentController.signal.aborted) return;
 
     testResult.value = {
       success: false,
       message: err?.message || t("pluginSettings.toast.connectionCheckFailed"),
     };
   } finally {
-    // Only clear testing state if this controller is still active
     if (testAbortController.value === currentController) {
       testing.value = false;
       testAbortController.value = null;
@@ -1303,25 +1154,19 @@ const testConnection = async () => {
   }
 };
 
-const handleEnablePlugin = async () => {
+/** One verb everywhere (Roger's answer 4): Connect adds the plugin and opens Setup. */
+const handleConnect = async () => {
   enabling.value = true;
 
   try {
-    await Hay.plugins.configure.mutate({
-      pluginId: pluginId.value,
-      configuration: {},
-    });
-
-    toast.success(t("pluginSettings.toast.enabledSuccess"));
-
-    // Reload plugin data to show settings
+    await appStore.enablePlugin(pluginId.value);
+    // Plugin translations are served for enabled plugins only: load this one's now.
+    void loadPluginTranslations();
     await fetchPlugin();
+    await openSetup();
   } catch (err: any) {
-    console.error("Failed to enable plugin:", err);
-
-    const errorMessage =
-      err?.message || err?.data?.message || t("pluginSettings.toast.enableFailed");
-    toast.error(errorMessage);
+    console.error("Failed to connect plugin:", err);
+    toast.error(err?.message || err?.data?.message || t("pluginSettings.toast.enableFailed"));
   } finally {
     enabling.value = false;
   }
@@ -1331,20 +1176,12 @@ const handleDisablePlugin = async () => {
   disabling.value = true;
 
   try {
-    await Hay.plugins.disable.mutate({
-      pluginId: pluginId.value,
-    });
-
+    await Hay.plugins.disable.mutate({ pluginId: pluginId.value });
     toast.success(t("pluginSettings.toast.disabledSuccess"));
-
-    // Redirect back to marketplace after disabling
     router.push("/integrations/marketplace");
   } catch (err: any) {
     console.error("Failed to disable plugin:", err);
-
-    const errorMessage =
-      err?.message || err?.data?.message || t("pluginSettings.toast.disableFailed");
-    toast.error(errorMessage);
+    toast.error(err?.message || err?.data?.message || t("pluginSettings.toast.disableFailed"));
   } finally {
     disabling.value = false;
   }
@@ -1354,25 +1191,14 @@ const handleRestartPlugin = async () => {
   restarting.value = true;
 
   try {
-    await Hay.plugins.restart.mutate({
-      pluginId: pluginId.value,
-    });
-
+    await Hay.plugins.restart.mutate({ pluginId: pluginId.value });
     toast.success(t("pluginSettings.toast.restartedSuccess"));
-
-    // Refresh plugin data and test connection after restart
     await fetchPlugin();
-
-    // Wait a moment for the worker to fully start before testing
-    setTimeout(() => {
-      testConnection();
-    }, 2000);
+    // Give the worker a moment to start before testing
+    setTimeout(() => testConnection(), 2000);
   } catch (err: any) {
     console.error("Failed to restart plugin:", err);
-
-    const errorMessage =
-      err?.message || err?.data?.message || t("pluginSettings.toast.restartFailed");
-    toast.error(errorMessage);
+    toast.error(err?.message || err?.data?.message || t("pluginSettings.toast.restartFailed"));
   } finally {
     restarting.value = false;
   }
@@ -1384,23 +1210,11 @@ const handleOAuthCallback = () => {
 
   if (oauthStatus === "success") {
     toast.success(t("pluginSettings.toast.oauthSuccess"));
-
-    // Clean up URL by removing query params
-    router.replace({
-      path: route.path,
-      query: {},
-    });
-
-    // Reload plugin data to refresh OAuth connection status
+    router.replace({ path: route.path, query: {} });
     fetchPlugin();
   } else if (oauthStatus === "error") {
     toast.error(t("pluginSettings.toast.oauthFailed"));
-
-    // Clean up URL
-    router.replace({
-      path: route.path,
-      query: {},
-    });
+    router.replace({ path: route.path, query: {} });
   }
 };
 
@@ -1446,21 +1260,16 @@ const handleConnectIntent = async (): Promise<boolean> => {
     toast.error(
       err?.message ||
         err?.data?.message ||
-        t("pluginSettings.toast.oauthConnectFailed", {
-          name: plugin.value?.name ?? pluginId.value,
-        }),
+        t("pluginSettings.toast.oauthConnectFailed", { name: displayName.value || pluginId.value }),
     );
     router.replace({ path: route.path, query: {} });
     return false;
   }
 };
 
-// Lifecycle
 onMounted(async () => {
-  // Check for OAuth callback first
   handleOAuthCallback();
 
-  // Then fetch plugin normally
   if (!route.query.oauth) {
     await fetchPlugin();
     if (await handleConnectIntent()) return;
@@ -1469,31 +1278,24 @@ onMounted(async () => {
 
 // Cleanup on unmount to prevent race conditions
 onUnmounted(() => {
-  // Clear auto-test timeout if it exists
   if (autoTestTimeout.value) {
-    console.log("[Plugin] Clearing auto-test timeout on unmount");
     clearTimeout(autoTestTimeout.value);
     autoTestTimeout.value = null;
   }
-
-  // Abort any ongoing test requests
   if (testAbortController.value) {
-    console.log("[Plugin] Aborting ongoing test request on unmount");
     testAbortController.value.abort();
     testAbortController.value = null;
   }
 });
 
-// Page meta
 definePageMeta({
   layout: "default",
 });
 
-// Head management
 useHead({
   title: computed(() =>
     plugin.value
-      ? t("pluginSettings.headTitleWithName", { name: getPluginDisplayName(plugin.value.name) })
+      ? t("pluginSettings.headTitleWithName", { name: displayName.value })
       : t("pluginSettings.headTitle"),
   ),
 });

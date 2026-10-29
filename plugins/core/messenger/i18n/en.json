@@ -2,7 +2,16 @@
   "name": "Messenger",
   "description": "Connect your Facebook Pages and answer Messenger conversations through Hay.chat's AI",
   "tools": {},
-  "config": {},
+  "config": {
+    "clientId": {
+      "label": "Meta app ID",
+      "description": "Set up for you by Hay.chat. Change it only if you run your own Hay.chat server with your own app."
+    },
+    "clientSecret": {
+      "label": "Meta app secret",
+      "description": "Set up for you by Hay.chat. Change it only if you run your own Hay.chat server with your own app."
+    }
+  },
   "setup": {
     "title": "Messenger Setup Guide",
     "intro": "Connect your Facebook Pages to Hay.chat. Once connected, Messenger conversations with your Pages are answered by Hay.chat's AI, and replies go straight back to the Messenger thread.",

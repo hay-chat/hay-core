@@ -23,6 +23,8 @@ import type {
   WebchatGateHandler,
   WebchatGateDescriptor,
   WebchatMetadata,
+  SetupOptions,
+  SetupMetadata,
 } from "../types/index.js";
 
 /**
@@ -107,6 +109,32 @@ export class PluginRegistry {
 
   /** Registered webchat gates (one per event). */
   private webchatGates: RegisteredWebchatGate[] = [];
+
+  /** Declared setup checklist and status handler, or undefined. */
+  private setup: SetupOptions | undefined;
+
+  /**
+   * Register the setup checklist (once per plugin).
+   *
+   * @param options - Steps and optional status handler
+   */
+  registerSetup(options: SetupOptions): void {
+    if (this.setup) {
+      throw new Error("Setup is already registered");
+    }
+    this.setup = { steps: options.steps.map((step) => ({ ...step })), status: options.status };
+  }
+
+  /** The declared setup (with handler), or undefined. */
+  getSetup(): SetupOptions | undefined {
+    return this.setup;
+  }
+
+  /** Serialisable setup descriptor for the `/metadata` endpoint. */
+  getSetupMetadata(): SetupMetadata | undefined {
+    if (!this.setup) return undefined;
+    return { steps: this.setup.steps, hasStatus: typeof this.setup.status === "function" };
+  }
 
   /**
    * Register a webchat contribution.

@@ -24,6 +24,22 @@ describe("Register API", () => {
   });
 
   describe("Config Registration", () => {
+    it("keeps the advanced flag in /metadata's config schema", () => {
+      registerAPI.config({
+        apiVersion: { type: "string", label: "API version", advanced: true, default: "2026-04" },
+      });
+
+      expect(registry.getConfigSchema().apiVersion.advanced).toBe(true);
+    });
+
+    it("rejects a non-boolean advanced flag", () => {
+      expect(() =>
+        registerAPI.config({
+          apiVersion: { type: "string", advanced: "yes" as unknown as boolean },
+        }),
+      ).toThrow('Config field "apiVersion" advanced must be a boolean');
+    });
+
     it("should register valid config schema", () => {
       registerAPI.config({
         apiKey: {
@@ -703,6 +719,64 @@ describe("Register API", () => {
       ).toThrow(/timeoutMs/);
       expect(() => registerAPI.webchat.gate("page.view" as never, handler)).toThrow(
         /not supported/,
+      );
+    });
+  });
+
+  describe("Setup Registration", () => {
+    it("stores the steps and exposes them without the handler in metadata", () => {
+      registerAPI.setup({
+        steps: [
+          { id: "store", kind: "fields", fields: ["shopDomain"] },
+          { id: "connect", kind: "connect" },
+          { id: "notify", kind: "fields", fields: ["recipients"], optional: true },
+        ],
+        status: () => ({ state: "connected" }),
+      });
+
+      expect(registry.getSetup()?.status).toBeTypeOf("function");
+      expect(registry.getSetupMetadata()).toEqual({
+        steps: [
+          { id: "store", kind: "fields", fields: ["shopDomain"] },
+          { id: "connect", kind: "connect" },
+          { id: "notify", kind: "fields", fields: ["recipients"], optional: true },
+        ],
+        hasStatus: true,
+      });
+    });
+
+    it("has no setup metadata until a plugin declares it", () => {
+      expect(registry.getSetupMetadata()).toBeUndefined();
+    });
+
+    it("rejects empty, duplicate, unknown-kind and malformed steps", () => {
+      expect(() => registerAPI.setup({ steps: [] })).toThrow(/at least one step/);
+      expect(() =>
+        registerAPI.setup({
+          steps: [
+            { id: "a", kind: "connect" },
+            { id: "a", kind: "verify" },
+          ],
+        }),
+      ).toThrow(/declared twice/);
+      expect(() =>
+        registerAPI.setup({ steps: [{ id: "a", kind: "wizard" as never }] }),
+      ).toThrow(/unknown kind/);
+      expect(() => registerAPI.setup({ steps: [{ id: "1st", kind: "connect" }] })).toThrow(
+        /must start with a letter/,
+      );
+      expect(() => registerAPI.setup({ steps: [{ id: "ui", kind: "component" }] })).toThrow(
+        /must name its component/,
+      );
+      expect(() =>
+        registerAPI.setup({ steps: [{ id: "site", kind: "external", url: "http://x.test" }] }),
+      ).toThrow(/https url/);
+    });
+
+    it("can only be declared once", () => {
+      registerAPI.setup({ steps: [{ id: "connect", kind: "connect" }] });
+      expect(() => registerAPI.setup({ steps: [{ id: "connect", kind: "connect" }] })).toThrow(
+        /already registered/,
       );
     });
   });

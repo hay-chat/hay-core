@@ -23,6 +23,8 @@ import type {
   WebchatGateEvent,
   WebchatGateHandler,
   WebchatGateOptions,
+  SetupOptions,
+  SetupStepKind,
 } from "../types/index.js";
 import { PluginRegistry } from "./registry.js";
 import type { HayLogger } from "../types/index.js";
@@ -188,6 +190,15 @@ export function createRegisterAPI(options: RegisterAPIOptions): HayRegisterAPI {
     },
 
     webchat,
+
+    setup(setupOptions: SetupOptions): void {
+      validateSetup(setupOptions);
+      registry.registerSetup(setupOptions);
+      logger.debug("Registered setup", {
+        steps: setupOptions.steps.length,
+        hasStatus: typeof setupOptions.status === "function",
+      });
+    },
   };
 
   return registerAPI;
@@ -316,6 +327,56 @@ function validateWebchatGate(
     throw new Error('Webchat gate failurePolicy must be "open" or "closed"');
   }
   return { timeoutMs, failurePolicy };
+}
+
+const SETUP_STEP_KINDS: SetupStepKind[] = ["fields", "connect", "component", "external", "verify"];
+const SETUP_STEP_ID = /^[a-zA-Z][a-zA-Z0-9_-]{0,63}$/;
+
+/**
+ * Validate a setup declaration. Field names are not checked against the config
+ * schema here (config may be registered after setup); core skips unknown ones.
+ *
+ * @internal
+ */
+function validateSetup(options: SetupOptions): void {
+  if (!options || !Array.isArray(options.steps) || options.steps.length === 0) {
+    throw new Error("Setup must declare at least one step");
+  }
+  const ids = new Set<string>();
+  for (const step of options.steps) {
+    if (!step || typeof step.id !== "string" || !SETUP_STEP_ID.test(step.id)) {
+      throw new Error(
+        `Setup step id "${step?.id}" must start with a letter and use letters, digits, - or _`,
+      );
+    }
+    if (ids.has(step.id)) {
+      throw new Error(`Setup step id "${step.id}" is declared twice`);
+    }
+    ids.add(step.id);
+    if (!SETUP_STEP_KINDS.includes(step.kind)) {
+      throw new Error(
+        `Setup step "${step.id}" has unknown kind "${step.kind}". Use one of: ${SETUP_STEP_KINDS.join(", ")}`,
+      );
+    }
+    if (step.optional !== undefined && typeof step.optional !== "boolean") {
+      throw new Error(`Setup step "${step.id}": optional must be a boolean`);
+    }
+    if (
+      step.fields !== undefined &&
+      (!Array.isArray(step.fields) || step.fields.some((field) => typeof field !== "string"))
+    ) {
+      throw new Error(`Setup step "${step.id}": fields must be an array of config field names`);
+    }
+    if (step.kind === "component" && (typeof step.component !== "string" || !step.component)) {
+      throw new Error(`Setup step "${step.id}" (component) must name its component`);
+    }
+    if (step.kind === "external" && (typeof step.url !== "string" || !/^https:\/\//.test(step.url))) {
+      throw new Error(`Setup step "${step.id}" (external) needs an https url`);
+    }
+  }
+  if (options.status !== undefined && typeof options.status !== "function") {
+    throw new Error("Setup status must be a function");
+  }
 }
 
 /**
@@ -531,6 +592,10 @@ function validateConfigSchema(
             `Add "${descriptor.env}" to the "env" array in package.json hay-plugin configuration.`,
         );
       }
+    }
+
+    if (descriptor.advanced !== undefined && typeof descriptor.advanced !== "boolean") {
+      throw new Error(`Config field "${fieldName}" advanced must be a boolean`);
     }
 
     // Validate default value type (if provided)

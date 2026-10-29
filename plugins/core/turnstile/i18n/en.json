@@ -4,7 +4,12 @@
   "config": {
     "mode": {
       "label": "Protection",
-      "description": "Invisible checks visitors in the background and only asks for a click when Cloudflare is unsure. Challenge everyone shows the check to every visitor before their first message."
+      "description": "Invisible checks visitors in the background and only asks for a click when Cloudflare is unsure. Challenge everyone shows the check to every visitor before their first message.",
+      "options": {
+        "off": "Off",
+        "invisible": "Invisible (recommended)",
+        "challenge_all": "Challenge everyone"
+      }
     },
     "siteKey": {
       "label": "Site key",
