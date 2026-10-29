@@ -191,7 +191,7 @@ export async function seedWooCommerce(options: SeedOptions): Promise<SeedResult>
 
   async function findProduct(product: Product): Promise<WooProduct | undefined> {
     if (woo.dryRun) return undefined;
-    const query = isSimple(product) ? { sku: product.variants[0].sku } : { slug: product.handle };
+    const query: Record<string, string> = isSimple(product) ? { sku: product.variants[0].sku } : { slug: product.handle };
     return (await woo.get<WooProduct[]>("/products", { ...query, status: "any" }))[0];
   }
 
