@@ -265,6 +265,33 @@ describe("webhookRouterService.dispatch", () => {
   });
 });
 
+describe("webhookRouterService.dispatch (single-object body)", () => {
+  beforeEach(() => {
+    jest.resetAllMocks();
+    startPluginWorker.mockResolvedValue({ port: 1234, instanceId: "inst" });
+    updateActivityTimestamp.mockResolvedValue(undefined);
+    global.fetch = jest.fn().mockResolvedValue({ ok: true });
+  });
+
+  const rootRouting = { routeKeyPath: { itemsPath: ".", keyPath: "store_id" } };
+
+  it("routes the whole body by a top-level key and forwards it unchanged", async () => {
+    setOwners({ "789": "org-store" });
+    const body = { store_id: 789, customer: { id: 1 }, orders_to_redact: [1, 2] };
+
+    await dispatch("p", rootRouting, body, fakeReq);
+
+    expect(findByKey).toHaveBeenCalledWith("p", "789");
+    expect(forwardedBodies()["org-store"]).toEqual(body);
+  });
+
+  it("drops a body whose key has no owner", async () => {
+    setOwners({});
+    await dispatch("p", rootRouting, { store_id: 1 }, fakeReq);
+    expect(global.fetch).not.toHaveBeenCalled();
+  });
+});
+
 describe("webhookRouterService.dispatch (email-address keys)", () => {
   beforeEach(() => {
     jest.resetAllMocks();

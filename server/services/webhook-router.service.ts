@@ -347,7 +347,8 @@ export class WebhookRouterService {
     const extractKey = (source: unknown, path: string): string | undefined =>
       routingKey(source, path, routing.routeKeyPath.keyTransform);
 
-    const items = getPath(body, itemsPath);
+    // "." = the body is one event (no array); it is routed and forwarded whole.
+    const items = itemsPath === "." ? [body] : getPath(body, itemsPath);
     if (!Array.isArray(items)) {
       logger.warn({ pluginId, itemsPath }, "Shared webhook itemsPath did not resolve to an array");
       return;
@@ -464,7 +465,8 @@ export class WebhookRouterService {
     const worker = await pluginManagerService.startPluginWorker(organizationId, pluginId);
     pluginInstanceManagerService.updateActivityTimestamp(organizationId, pluginId).catch(() => {});
 
-    const reconstructedBody = setPath({ ...originalBody }, itemsPath, orgItems);
+    const reconstructedBody =
+      itemsPath === "." ? originalBody : setPath({ ...originalBody }, itemsPath, orgItems);
     const serialized = JSON.stringify(reconstructedBody);
 
     const headers: Record<string, string> = {};

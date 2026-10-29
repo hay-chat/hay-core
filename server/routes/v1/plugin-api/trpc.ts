@@ -701,13 +701,16 @@ export const pluginApiTrpcRouter = router({
    * Messages Capability - Report that the provider revoked this plugin's credentials.
    *
    * Channel plugins call this when the provider signals the connection is gone
-   * (e.g. app uninstalled, token invalidated). Core disconnects the instance
-   * after responding, because the revoke stops the calling worker.
+   * (e.g. app uninstalled, token invalidated); `auth` plugins call it when the
+   * provider asks them to forget the store (e.g. an LGPD store/redact). Core
+   * disconnects the instance after responding, because the revoke stops the
+   * calling worker. Only channels raise a channel-health alert.
    */
   "connection.revoke": pluginProcedure
     .input(z.object({ reason: z.string().min(1).max(200) }))
     .mutation(({ input, ctx }) => {
-      requireCapability(ctx, "messages");
+      const isChannel = ctx.pluginAuth.capabilities.includes("messages");
+      if (!isChannel) requireCapability(ctx, "auth");
 
       const { organizationId, pluginId } = ctx.pluginAuth;
       logger.warn(
@@ -715,6 +718,7 @@ export const pluginApiTrpcRouter = router({
         "Plugin reported revoked connection",
       );
       scheduleConnectionRevoke(organizationId, pluginId);
+      if (!isChannel) return { revoked: true as const };
       void channelHealthService
         .markFailing(organizationId, pluginId, "token_revoked", input.reason)
         .catch((error: unknown) => {

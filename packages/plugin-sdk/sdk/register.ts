@@ -719,6 +719,14 @@ function validateOAuth2AuthOptions(options: OAuth2AuthOptions, registry: PluginR
     throw new Error('OAuth2 auth connectFlow must be "redirect" or "client"');
   }
 
+  if (
+    options.tokenRequestFormat !== undefined &&
+    options.tokenRequestFormat !== "form" &&
+    options.tokenRequestFormat !== "json"
+  ) {
+    throw new Error('OAuth2 auth tokenRequestFormat must be "form" or "json"');
+  }
+
   // Validate scopeSeparator (if provided)
   if (options.scopeSeparator !== undefined && typeof options.scopeSeparator !== "string") {
     throw new Error("OAuth2 auth scopeSeparator must be a string");
