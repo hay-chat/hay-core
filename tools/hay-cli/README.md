@@ -21,6 +21,9 @@ ln -s /srv/hay-core/repo/tools/hay-cli/bin/hay ~/.local/bin/hay   # optional
 | `hay plugins list [--all]` / `tools [<plugin>]` / `test <plugin>` | Plugins (enabled by default), MCP tools, connection test. Plugin names are matched against the org's list (`shopify` → `hay-plugin-shopify`).                                                                                                                                                        |
 | `hay login --email <e>` / `logout` / `whoami`                     | Password from `HAY_PASSWORD` or stdin.                                                                                                                                                                                                                                                               |
 
+| `hay demo seed [all\|hay\|shopify\|woocommerce\|nuvemshop]`     | Loads the Casa Aurora demo account (`tools/demo-account`) into the test stores and their Hay.chat orgs: catalogue, customers, orders in fixed states, knowledge base, playbooks. Store keys live in `tools/demo-account/.env` (see its `.env.example`); `all` skips stores without keys. `--dry-run` prints every write and needs no keys. `--reset-orders` recreates the demo orders. `--image-base-url <url>`. |
+| `hay demo images`                                                 | Regenerates the demo product images.                                                                                                                                                                                                                                                                 |
+
 Global flags: `--target prod|local`, `--org <id>`, `--json`, `--verbose`.
 Exit codes: 0 ok, 1 error, 2 check failed (no reply before the timeout, connection test failed).
 

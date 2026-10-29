@@ -1,0 +1,210 @@
+{
+  "$comment": "Order fixtures for every demo store. Shape: scripts/lib/types.ts OrderFixture. SKUs come from catalog/products.json. Keys are stable: seed scripts store them on the order and skip orders that already exist.",
+  "orders": [
+    {
+      "key": "paid-unfulfilled",
+      "platforms": ["shopify", "woocommerce", "nuvemshop"],
+      "purpose": "Just placed and paid, not shipped: 'where is my order', cancel before shipping, add a note.",
+      "customer": { "shopify": "us-emily", "woocommerce": "eu-joao", "nuvemshop": "br-camila" },
+      "lines": [
+        { "sku": "CA-CND-001-SAN", "quantity": 2 },
+        { "sku": "CA-NAP-001-NAT", "quantity": 1 }
+      ],
+      "financialStatus": "paid",
+      "fulfillmentStatus": "unfulfilled",
+      "paymentMethod": { "shopify": "card", "woocommerce": "card", "nuvemshop": "card" },
+      "placedDaysAgo": 1
+    },
+    {
+      "key": "address-change",
+      "platforms": ["shopify", "woocommerce", "nuvemshop"],
+      "purpose": "Paid, not shipped, shopper typed the wrong street number: address change before shipping.",
+      "customer": { "shopify": "us-daniel", "woocommerce": "eu-ines", "nuvemshop": "br-rafael" },
+      "lines": [{ "sku": "CA-POT-001-TER", "quantity": 1 }],
+      "financialStatus": "paid",
+      "fulfillmentStatus": "unfulfilled",
+      "paymentMethod": { "shopify": "card", "woocommerce": "card", "nuvemshop": "pix" },
+      "placedDaysAgo": 0,
+      "note": "Customer note: please leave with the doorman."
+    },
+    {
+      "key": "scent-swap",
+      "platforms": ["shopify", "woocommerce", "nuvemshop"],
+      "purpose": "Paid, not shipped: shopper wants a different candle scent (same price). Variant swap / order edit.",
+      "customer": { "shopify": "us-priya", "woocommerce": "eu-lena", "nuvemshop": "br-juliana" },
+      "lines": [
+        { "sku": "CA-CND-001-FIG", "quantity": 1 },
+        { "sku": "CA-MUG-001-SND", "quantity": 2 }
+      ],
+      "financialStatus": "paid",
+      "fulfillmentStatus": "unfulfilled",
+      "paymentMethod": { "shopify": "card", "woocommerce": "card", "nuvemshop": "card" },
+      "placedDaysAgo": 1
+    },
+    {
+      "key": "in-transit",
+      "platforms": ["shopify", "woocommerce", "nuvemshop"],
+      "purpose": "Shipped 2 days ago with tracking: WISMO, tracking link, expected delivery date.",
+      "customer": { "shopify": "us-emily", "woocommerce": "eu-joao", "nuvemshop": "br-camila" },
+      "lines": [
+        { "sku": "CA-VAS-001-WHT", "quantity": 1 },
+        { "sku": "CA-CND-002-LAV", "quantity": 1 }
+      ],
+      "financialStatus": "paid",
+      "fulfillmentStatus": "in_transit",
+      "paymentMethod": { "shopify": "card", "woocommerce": "card", "nuvemshop": "pix" },
+      "placedDaysAgo": 4,
+      "shippedDaysAgo": 2,
+      "carrier": { "shopify": "USPS", "woocommerce": "CTT", "nuvemshop": "Correios" }
+    },
+    {
+      "key": "stale-tracking",
+      "platforms": ["shopify", "woocommerce", "nuvemshop"],
+      "purpose": "Shipped 12 days ago, no tracking update since: stale-tracking flag, honest hand-off, possible reship.",
+      "customer": { "shopify": "us-marcus", "woocommerce": "eu-pierre", "nuvemshop": "br-thiago" },
+      "lines": [{ "sku": "CA-POT-002-L", "quantity": 1 }],
+      "financialStatus": "paid",
+      "fulfillmentStatus": "stale",
+      "paymentMethod": { "shopify": "card", "woocommerce": "card", "nuvemshop": "boleto" },
+      "placedDaysAgo": 15,
+      "shippedDaysAgo": 12,
+      "carrier": { "shopify": "UPS", "woocommerce": "DPD", "nuvemshop": "Jadlog" }
+    },
+    {
+      "key": "delivered",
+      "platforms": ["shopify", "woocommerce", "nuvemshop"],
+      "purpose": "Delivered 5 days ago, all fine: care questions, return inside the window, resend order email, review request.",
+      "customer": { "shopify": "us-priya", "woocommerce": "eu-ines", "nuvemshop": "br-juliana" },
+      "lines": [
+        { "sku": "CA-MUG-002-SET", "quantity": 1 },
+        { "sku": "CA-NAP-002-SET", "quantity": 1 }
+      ],
+      "financialStatus": "paid",
+      "fulfillmentStatus": "delivered",
+      "paymentMethod": { "shopify": "card", "woocommerce": "card", "nuvemshop": "pix" },
+      "placedDaysAgo": 10,
+      "shippedDaysAgo": 8,
+      "deliveredDaysAgo": 5,
+      "carrier": { "shopify": "USPS", "woocommerce": "CTT", "nuvemshop": "Correios" }
+    },
+    {
+      "key": "delivered-damaged",
+      "platforms": ["shopify", "woocommerce", "nuvemshop"],
+      "purpose": "Delivered yesterday; the shopper says a mug arrived broken: photo intake, refund or replacement through approval.",
+      "customer": { "shopify": "us-daniel", "woocommerce": "eu-lena", "nuvemshop": "br-rafael" },
+      "lines": [{ "sku": "CA-MUG-001-SND", "quantity": 4 }],
+      "financialStatus": "paid",
+      "fulfillmentStatus": "delivered",
+      "paymentMethod": { "shopify": "card", "woocommerce": "card", "nuvemshop": "card" },
+      "placedDaysAgo": 6,
+      "shippedDaysAgo": 4,
+      "deliveredDaysAgo": 1,
+      "carrier": { "shopify": "UPS", "woocommerce": "DPD", "nuvemshop": "Correios" }
+    },
+    {
+      "key": "delivered-old",
+      "platforms": ["shopify", "woocommerce", "nuvemshop"],
+      "purpose": "Delivered 45 days ago: return request outside the 30-day window (polite no, or hand-off for an exception).",
+      "customer": { "shopify": "us-marcus", "woocommerce": "eu-pierre", "nuvemshop": "br-thiago" },
+      "lines": [{ "sku": "CA-SRV-001-OAK", "quantity": 1 }],
+      "financialStatus": "paid",
+      "fulfillmentStatus": "delivered",
+      "paymentMethod": { "shopify": "card", "woocommerce": "card", "nuvemshop": "pix" },
+      "placedDaysAgo": 52,
+      "shippedDaysAgo": 50,
+      "deliveredDaysAgo": 45,
+      "carrier": { "shopify": "USPS", "woocommerce": "CTT", "nuvemshop": "Correios" }
+    },
+    {
+      "key": "pending-payment",
+      "platforms": ["shopify", "woocommerce", "nuvemshop"],
+      "purpose": "Placed but not paid: Pix code expired (BR), bank transfer waiting (EU), payment pending (US). Resend payment details.",
+      "customer": { "shopify": "us-emily", "woocommerce": "eu-joao", "nuvemshop": "br-camila" },
+      "lines": [{ "sku": "CA-CND-003-SET", "quantity": 1 }],
+      "financialStatus": "pending",
+      "fulfillmentStatus": "unfulfilled",
+      "paymentMethod": { "shopify": "manual", "woocommerce": "bacs", "nuvemshop": "pix" },
+      "placedDaysAgo": 2
+    },
+    {
+      "key": "refunded",
+      "platforms": ["shopify", "woocommerce", "nuvemshop"],
+      "purpose": "Cancelled and fully refunded 3 days ago: 'where is my money', refund status with the real date.",
+      "customer": { "shopify": "us-priya", "woocommerce": "eu-ines", "nuvemshop": "br-juliana" },
+      "lines": [{ "sku": "CA-VAS-002-BLU", "quantity": 1 }],
+      "financialStatus": "refunded",
+      "fulfillmentStatus": "unfulfilled",
+      "cancelled": true,
+      "paymentMethod": { "shopify": "card", "woocommerce": "card", "nuvemshop": "card" },
+      "placedDaysAgo": 8,
+      "note": "Cancelled at the customer's request before shipping."
+    },
+    {
+      "key": "partially-refunded",
+      "platforms": ["shopify", "woocommerce", "nuvemshop"],
+      "purpose": "Delivered; one item was refunded after a damage report: shopper asks why the refund is smaller than the order.",
+      "customer": { "shopify": "us-daniel", "woocommerce": "eu-lena", "nuvemshop": "br-rafael" },
+      "lines": [
+        { "sku": "CA-CND-001-SAN", "quantity": 1 },
+        { "sku": "CA-POT-001-TER", "quantity": 1 }
+      ],
+      "refundLines": [{ "sku": "CA-POT-001-TER", "quantity": 1 }],
+      "financialStatus": "partially_refunded",
+      "fulfillmentStatus": "delivered",
+      "paymentMethod": { "shopify": "card", "woocommerce": "card", "nuvemshop": "pix" },
+      "placedDaysAgo": 20,
+      "shippedDaysAgo": 18,
+      "deliveredDaysAgo": 14,
+      "carrier": { "shopify": "USPS", "woocommerce": "CTT", "nuvemshop": "Correios" }
+    },
+    {
+      "key": "cancelled-unpaid",
+      "platforms": ["shopify", "woocommerce", "nuvemshop"],
+      "purpose": "Never paid, cancelled automatically: shopper asks if they can still pay or reorder.",
+      "customer": { "shopify": "us-marcus", "woocommerce": "eu-pierre", "nuvemshop": "br-thiago" },
+      "lines": [{ "sku": "CA-NAP-001-NAT", "quantity": 4 }],
+      "financialStatus": "voided",
+      "fulfillmentStatus": "unfulfilled",
+      "cancelled": true,
+      "paymentMethod": { "shopify": "manual", "woocommerce": "bacs", "nuvemshop": "boleto" },
+      "placedDaysAgo": 9
+    },
+    {
+      "key": "high-value",
+      "platforms": ["shopify", "woocommerce", "nuvemshop"],
+      "purpose": "Large paid order above the approval threshold: refund or cancel must wait for Marina's approval.",
+      "customer": {
+        "shopify": "us-olivia",
+        "woocommerce": "eu-sophie",
+        "nuvemshop": "br-fernanda"
+      },
+      "lines": [
+        { "sku": "CA-POT-002-L", "quantity": 3 },
+        { "sku": "CA-VAS-001-WHT", "quantity": 2 },
+        { "sku": "CA-SRV-001-OAK", "quantity": 2 }
+      ],
+      "financialStatus": "paid",
+      "fulfillmentStatus": "unfulfilled",
+      "paymentMethod": { "shopify": "card", "woocommerce": "card", "nuvemshop": "card" },
+      "placedDaysAgo": 1
+    },
+    {
+      "key": "disputed-not-received",
+      "platforms": ["shopify", "woocommerce", "nuvemshop"],
+      "purpose": "Delivered per tracking 9 days ago, shopper claims it never arrived: honest answer, evidence pack, dispute prep.",
+      "customer": {
+        "shopify": "us-olivia",
+        "woocommerce": "eu-sophie",
+        "nuvemshop": "br-fernanda"
+      },
+      "lines": [{ "sku": "CA-CND-003-SET", "quantity": 2 }],
+      "financialStatus": "paid",
+      "fulfillmentStatus": "delivered",
+      "paymentMethod": { "shopify": "card", "woocommerce": "card", "nuvemshop": "card" },
+      "placedDaysAgo": 16,
+      "shippedDaysAgo": 14,
+      "deliveredDaysAgo": 9,
+      "carrier": { "shopify": "UPS", "woocommerce": "DPD", "nuvemshop": "Correios" }
+    }
+  ]
+}
