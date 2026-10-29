@@ -8,24 +8,27 @@ capability it also syncs the catalogue into core for `recommend_products` and pr
 
 ## How it connects
 
-A store-scoped **custom app** token:
+Two modes, picked with `authMode` (`src/connection.ts`):
 
-1. Store admin → **Aplicativos a medida** (BR) / **Aplicaciones a medida** (ES) → create an app.
-2. Permissions: read/write **orders**, **fulfillment orders**, **customers** and **coupons**;
-   read **products**. (Coupons and fulfillment orders are new in v2: tokens created for v1 must be
-   re-issued with them.)
-3. Paste the **access token** (shown once) and the numeric **store ID** into the plugin settings.
-   Hay verifies them against `GET /store`.
+- **Connect with Nuvemshop** (`oauth`, the default when the server sets
+  `NUVEMSHOP_OAUTH_CLIENT_ID`): the merchant clicks Connect and approves the Hay.chat partner app.
+  See [OAuth (partner app)](#oauth-partner-app).
+- **Custom app token** (`token`, the fallback): a store-scoped custom app.
+  1. Store admin → **Aplicativos a medida** (BR) / **Aplicaciones a medida** (ES) → create an app.
+  2. Permissions: read/write **orders**, **fulfillment orders**, **customers** and **coupons**;
+     read **products**.
+  3. Paste the **access token** (shown once) and the numeric **store ID** into the plugin settings.
+     Hay verifies them against `GET /store`.
 
-Tokens never expire; they are invalidated only when re-issued or when the app is uninstalled, so
-there is no refresh cron. OAuth is not wired yet; see [OAuth (partner app)](#oauth-partner-app).
+Tokens never expire in either mode; they end on uninstall or re-issue, so there is no refresh cron.
 
 ### Settings
 
 | Field              | Default   | Meaning                                                     |
 | ------------------ | --------- | ----------------------------------------------------------- |
-| `storeId`          | —         | Numeric store id (the OAuth `user_id`)                      |
-| `accessToken`      | —         | Custom-app token (encrypted)                                |
+| `authMode`         | see above | `oauth` (partner app) or `token` (custom app)               |
+| `storeId`          | —         | Token mode: numeric store id. OAuth: saved on connect       |
+| `accessToken`      | —         | Token mode: custom-app token. OAuth: stored by core         |
 | `apiVersion`       | `2025-03` | API version in every path                                   |
 | `couponsEnabled`   | `true`    | Allow `nuvemshop_create_coupon` at all                      |
 | `couponMaxPercent` | `10`      | Largest % coupon; `0` turns % coupons off                   |
@@ -118,30 +121,24 @@ only changes status, stock and the customer email. So:
 
 ## OAuth (partner app)
 
-Not built; the custom-app token stays. What a Hay partner app needs:
+- **Authorize**: `https://www.nuvemshop.com.br/apps/{client_id}/authorize?state=…`. Core fills
+  `{client_id}`; scopes and the redirect URL are fixed on the app, so the extra standard params
+  core appends are ignored.
+- **Token exchange**: `POST https://www.tiendanube.com/apps/authorize/token`, JSON body
+  (`tokenRequestFormat: "json"`). The response is `{ access_token, token_type, scope, user_id }`;
+  core keeps `user_id` (the store id) in the credentials, and `onConnected` saves it as `storeId`,
+  names the store from `GET /store` and returns the store id as the webhook routing key.
+- **LGPD webhooks** (`src/lgpd.ts`): `store/redact`, `customers/redact` and
+  `customers/data_request` go to `https://<hay>/v1/plugins/hay-plugin-nuvemshop/webhook`. Core
+  verifies `x-linkedstore-hmac-sha256` (HMAC-SHA256 hex of the body with the client secret) and
+  routes the single-object body by `store_id`. `store/redact` disconnects the store (token, store
+  id and routing key go). The two customer webhooks are acknowledged and logged by id: Hay.chat
+  keeps no copy of Nuvemshop customer records, and a shopper's chats follow Hay.chat's own
+  verified privacy flow.
 
-1. **Register** an app in the Nuvemshop partner portal (the docs link `dev.nuvemshop.com.br`) with scopes `read_products,
-write_orders, write_customers, write_coupons, write_fulfillment_orders`, redirect URL
-   `https://<hay>/oauth/callback`, plus the mandatory App URL, Preferences URL, privacy policy,
-   support URL/email and the three LGPD webhooks (`store/redact`, `customers/redact`,
-   `customers/data_request`, HMAC `x-linkedstore-hmac-sha256`).
-2. **Authorize**: `https://www.tiendanube.com/apps/{app_id}/authorize?state=…` (or the
-   `nuvemshop.com.br` twin). The app id is in the path, scopes are fixed at registration, and the
-   redirect URL comes from the app settings.
-3. **Token exchange**: `POST https://www.tiendanube.com/apps/authorize/token` with `client_id`,
-   `client_secret`, `grant_type=authorization_code`, `code` (code lives 5 minutes). The response is
-   `{ access_token, token_type: "bearer", scope, user_id }`; `user_id` is the store id. Tokens do
-   not expire.
-
-Core's OAuth (`server/services/oauth.service.ts`, used by Shopify) is close but misses two things:
-it substitutes only `{shop}` in the authorize URL (here the client id must go in the path), and
-`storeTokens` keeps only `access_token`/`refresh_token`/`expires_at`/`scope`, dropping `user_id`.
-`onConnected` cannot recover the store id from the token alone because every API path needs it.
-The core change is small: a `{client_id}` placeholder in `initiateOAuth`, and keeping `user_id` (or
-`store_id`) in the stored credentials. Then `src/index.ts` registers `auth.oauth2` and reads
-`storeId` from the merged credentials. The token exchange already posts form-encoded
-`grant_type/code/client_id/client_secret`; Nuvemshop documents a JSON body, so that needs checking
-against the live endpoint.
+Partner-portal registration: scopes `read_products, write_orders, write_customers, write_coupons,
+write_fulfillment_orders` (write implies read), redirect URL `https://<hay>/oauth/callback`, the
+three LGPD webhook URLs above, plus App URL, Preferences URL, privacy policy and support contact.
 
 ## Build & test
 

@@ -70,6 +70,12 @@ jest.mock("@server/services/oauth.service", () => ({
   oauthService: { revokeOAuth: mockRevokeOAuth },
 }));
 
+const mockMarkFailing =
+  jest.fn<(orgId: string, pluginId: string, kind: string, detail?: string) => Promise<void>>();
+jest.mock("@server/services/channel-health.service", () => ({
+  channelHealthService: { markFailing: mockMarkFailing },
+}));
+
 import { pluginApiTrpcRouter } from "@server/routes/v1/plugin-api/trpc";
 import type { PluginAuthContext } from "@server/trpc/middleware/plugin-auth";
 
@@ -94,7 +100,10 @@ const caller = (capabilities?: string[]) => pluginApiTrpcRouter.createCaller(ctx
 const nextTick = () => new Promise<void>((resolve) => setImmediate(resolve));
 
 describe("pluginApi.connection.revoke", () => {
-  beforeEach(() => jest.clearAllMocks());
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockMarkFailing.mockResolvedValue(undefined);
+  });
 
   it("responds revoked:true before revoking, then revokes the caller's connection", async () => {
     mockRevokeOAuth.mockResolvedValue(undefined);
@@ -135,7 +144,32 @@ describe("pluginApi.connection.revoke", () => {
     });
   });
 
-  it("requires the messages capability", async () => {
+  it("marks channel health failing for a channel plugin", async () => {
+    mockRevokeOAuth.mockResolvedValue(undefined);
+
+    await caller()["connection.revoke"]({ reason: "PARTNER_APP_UNINSTALLED" });
+
+    expect(mockMarkFailing).toHaveBeenCalledWith(
+      ORG_ID,
+      PLUGIN_ID,
+      "token_revoked",
+      "PARTNER_APP_UNINSTALLED",
+    );
+  });
+
+  it("lets an auth plugin revoke its connection without a channel-health alert", async () => {
+    mockRevokeOAuth.mockResolvedValue(undefined);
+
+    await expect(
+      caller(["auth", "products"])["connection.revoke"]({ reason: "store/redact" }),
+    ).resolves.toEqual({ revoked: true });
+    await nextTick();
+
+    expect(mockRevokeOAuth).toHaveBeenCalledWith(ORG_ID, PLUGIN_ID);
+    expect(mockMarkFailing).not.toHaveBeenCalled();
+  });
+
+  it("requires the messages or auth capability", async () => {
     await expect(caller(["customers"])["connection.revoke"]({ reason: "x" })).rejects.toMatchObject(
       { code: "FORBIDDEN" },
     );

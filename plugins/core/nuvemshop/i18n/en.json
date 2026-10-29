@@ -76,6 +76,18 @@
     }
   },
   "config": {
+    "authMode": {
+      "label": "Connection mode",
+      "description": "Connect with Nuvemshop: approve Hay.chat in your store in one click. Custom app token: paste a token from a custom app you created."
+    },
+    "clientId": {
+      "label": "OAuth client ID",
+      "description": "Set by the Hay.chat server. Leave empty."
+    },
+    "clientSecret": {
+      "label": "OAuth client secret",
+      "description": "Set by the Hay.chat server. Leave empty."
+    },
     "storeId": {
       "label": "Store ID",
       "description": "Your numeric store ID (the store's user_id, shown when creating the custom app)."
