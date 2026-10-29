@@ -19,13 +19,19 @@ const trpcLogger = createLogger("trpc");
 
 // Client-driven outcomes that say nothing about the health of the server.
 // NOT_FOUND covers bots/scanners probing nonexistent procedure paths (e.g. "/v1/.env"),
-// BAD_REQUEST covers input validation and precondition failures.
+// BAD_REQUEST covers input validation and precondition failures. PARSE_ERROR,
+// UNSUPPORTED_MEDIA_TYPE and METHOD_NOT_SUPPORTED are malformed HTTP requests
+// (bad JSON, a POST with no content-type, the wrong verb) that tRPC rejects
+// before any procedure runs.
 const EXPECTED_TRPC_ERROR_CODES = new Set([
   "UNAUTHORIZED",
   "FORBIDDEN",
   "TOO_MANY_REQUESTS",
   "NOT_FOUND",
   "BAD_REQUEST",
+  "PARSE_ERROR",
+  "UNSUPPORTED_MEDIA_TYPE",
+  "METHOD_NOT_SUPPORTED",
 ]);
 
 async function startServer() {

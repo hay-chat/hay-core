@@ -77,6 +77,17 @@ describe("LLM provider adapter — Slice 1 characterization", () => {
     });
   });
 
+  it.each(["o3-mini", "gpt-5.6-luna"])(
+    "sends max_completion_tokens and no temperature to %s",
+    async (model) => {
+      await llm.invoke({ history: "hi", model, max_tokens: 200, temperature: 0.3 });
+      const [body] = mockChatCreate.mock.calls[0] as [Record<string, unknown>];
+      expect(body.max_completion_tokens).toBe(200);
+      expect(body).not.toHaveProperty("max_tokens");
+      expect(body).not.toHaveProperty("temperature");
+    },
+  );
+
   it("uses json_object mode when strictSchema is false", async () => {
     await llm.invoke({
       history: "hi",
