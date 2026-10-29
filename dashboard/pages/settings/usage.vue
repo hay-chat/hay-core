@@ -12,6 +12,14 @@
         <Button variant="outline" :loading="loading" @click="loadAll">
           {{ $t("usage.refresh") }}
         </Button>
+        <Button
+          v-if="billingUrl"
+          variant="outline"
+          data-testid="usage-billing"
+          @click="openBilling"
+        >
+          {{ $t("usage.manageBilling") }}
+        </Button>
       </div>
     </template>
 
@@ -423,7 +431,24 @@ watch(page, async () => {
   }
 });
 
-onMounted(loadAll);
+// Billing lives outside core: the first external menu item (e.g. a hosted plan's "Billing" entry).
+const { open: openExternal } = useExternalLink();
+const billingUrl = ref<string | null>(null);
+const openBilling = () => billingUrl.value && openExternal(billingUrl.value);
+
+async function loadBillingUrl() {
+  try {
+    const response = await Hay.plugins.getMenuItems.query();
+    billingUrl.value = response.items.find((item) => item.external && item.url)?.url ?? null;
+  } catch (error) {
+    console.error("Failed to load menu items:", error);
+  }
+}
+
+onMounted(() => {
+  loadAll();
+  loadBillingUrl();
+});
 
 useHead({ title: t("usage.headTitle") });
 </script>

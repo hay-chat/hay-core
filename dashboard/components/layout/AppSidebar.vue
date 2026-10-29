@@ -264,87 +264,17 @@ const navMain = computed(() => {
     }));
   items.push(...externalItems);
 
-  // Build Settings submenu based on role
-  const settingsItems = [];
-
-  // Admin/Owner only settings
-  if (isAdminOrOwner) {
-    settingsItems.push(
+  // Settings submenu: one entry per section, linking to its first visible tab
+  const settingsItems = SETTINGS_NAV.flatMap((section) => {
+    const tabs = visibleSettingsTabs(section, !!isAdminOrOwner);
+    if (!tabs.length) return [];
+    return [
       {
-        title: t("nav.general"),
-        url: "/settings/general",
-        isActive: route.path === "/settings/general",
+        title: t(section.labelKey),
+        url: tabs[0].path,
+        isActive: tabs.some((tab) => isSettingsTabActive(tab, route.path)),
       },
-      {
-        title: t("nav.agents"),
-        url: "/agents",
-        isActive: isPathActive("/agents"),
-      },
-      {
-        title: t("nav.channels"),
-        url: "/channels",
-        isActive: isPathActive("/channels"),
-      },
-      {
-        title: t("nav.actionsSettings"),
-        url: "/settings/actions",
-        isActive: route.path === "/settings/actions",
-      },
-      {
-        title: t("nav.usage"),
-        url: "/settings/usage",
-        isActive: route.path === "/settings/usage",
-      },
-      {
-        title: t("nav.users"),
-        url: "/settings/users",
-        isActive: route.path === "/settings/users",
-      },
-      {
-        title: t("nav.privacyData"),
-        url: "/settings/privacy",
-        isActive: route.path === "/settings/privacy",
-      },
-      {
-        title: t("nav.apiTokens"),
-        url: "/settings/api-tokens",
-        isActive: route.path === "/settings/api-tokens",
-      },
-      {
-        title: t("nav.webchat"),
-        url: "/settings/webchat",
-        isActive: route.path === "/settings/webchat",
-      },
-      {
-        title: t("nav.businessHours"),
-        url: "/settings/business-hours",
-        isActive: route.path === "/settings/business-hours",
-      },
-      {
-        title: t("nav.gitConnections"),
-        url: "/settings/git-connections",
-        isActive: route.path === "/settings/git-connections",
-      },
-      {
-        title: t("nav.llmProviders"),
-        url: "/settings/llm",
-        isActive: route.path === "/settings/llm",
-      },
-    );
-  }
-
-  // Customer Privacy is available to all roles
-  settingsItems.push({
-    title: t("nav.customerPrivacy"),
-    url: "/settings/customer-privacy",
-    isActive: route.path === "/settings/customer-privacy",
-  });
-
-  // My Profile is available to all roles
-  settingsItems.push({
-    title: t("nav.myProfile"),
-    url: "/settings/profile",
-    isActive: route.path === "/settings/profile",
+    ];
   });
 
   // Add plugin menu items for settings (if admin/owner)
@@ -364,7 +294,7 @@ const navMain = computed(() => {
     title: t("nav.settings"),
     url: "#",
     icon: Settings,
-    isActive: isPathActive("/settings"),
+    isActive: isPathActive("/settings") || settingsItems.some((item) => item.isActive),
     items: settingsItems,
   });
 

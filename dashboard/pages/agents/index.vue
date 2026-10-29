@@ -3,6 +3,7 @@
     title="AI Agents"
     description="Create and manage your AI agents to automate customer interactions."
   >
+    <SettingsTabs />
     <!-- Page Header -->
     <template #header>
       <div class="mt-4 sm:mt-0 flex space-x-3">

@@ -1,5 +1,6 @@
 <template>
   <Page :title="$t('aiActions.settings.title')" :description="$t('aiActions.settings.description')">
+    <SettingsTabs />
     <Loading v-if="loading" />
 
     <template v-else-if="form">

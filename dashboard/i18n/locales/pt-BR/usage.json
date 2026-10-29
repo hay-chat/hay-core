@@ -69,6 +69,7 @@
       "excluded": "Resolução excluída",
       "sentForReview": "Enviada ao Hay.chat para análise",
       "failed": "Não foi possível excluir a resolução"
-    }
+    },
+    "manageBilling": "Gerenciar cobrança"
   }
 }

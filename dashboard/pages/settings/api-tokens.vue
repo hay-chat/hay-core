@@ -1,5 +1,6 @@
 <template>
   <Page :title="$t('apiTokens.title')" :description="$t('apiTokens.description')">
+    <SettingsTabs />
     <template #header>
       <Button variant="default" size="sm" @click="openCreateDialog">
         <Plus class="h-4 w-4 mr-2" />

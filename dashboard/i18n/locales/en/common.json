@@ -13,9 +13,7 @@
     "marketplace": "Marketplace",
     "settings": "Settings",
     "general": "General",
-    "agents": "Agents",
     "users": "Users",
-    "privacyData": "Privacy & Data",
     "apiTokens": "API Tokens",
     "webchat": "Webchat",
     "gitConnections": "Git Connections",
@@ -29,7 +27,15 @@
     "evidencePacks": "Evidence packs",
     "tests": "Tests",
     "usage": "Usage",
-    "insights": "Insights"
+    "insights": "Insights",
+    "assistant": "Assistant",
+    "identity": "Identity",
+    "channelList": "Channel list",
+    "workspace": "Workspace",
+    "workspaceData": "Workspace data",
+    "privacy": "Privacy",
+    "developers": "Developers",
+    "billingUsage": "Billing & Usage"
   },
   "user": {
     "status": "Status",
