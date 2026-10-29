@@ -86,6 +86,8 @@ const RETRYABLE_WORKER_STATUSES = new Set([429, 503]);
 
 /** 3 retries with exponential backoff (5 s, 15 s, 45 s). Meta's pair limit is ~1 msg / 6 s. */
 const DEFAULT_RETRY_DELAYS_MS = [5_000, 15_000, 45_000];
+/** Budget for one call to the channel worker (deliver / escalate). */
+const WORKER_REQUEST_TIMEOUT_MS = 30_000;
 
 type DeliveryAttemptOutcome =
   | { kind: "delivered"; providerMessageId?: string }
@@ -375,6 +377,7 @@ export class ChannelDeliveryService {
               conversation.organization_id,
             ),
           }),
+          signal: AbortSignal.timeout(WORKER_REQUEST_TIMEOUT_MS),
         });
 
         // 404 = plugin doesn't implement /escalate — that's fine.
@@ -559,6 +562,7 @@ export class ChannelDeliveryService {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body,
+        signal: AbortSignal.timeout(WORKER_REQUEST_TIMEOUT_MS),
       });
     } catch (error) {
       // Refused = the worker never saw the request. Any other network error may
