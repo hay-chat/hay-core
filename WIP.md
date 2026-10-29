@@ -1,3 +1,10 @@
+## 2026-10-29 — Shopify App Pricing: drafts done, code on branches
+- Partner Dashboard: 4 App Pricing DRAFT plans saved (solo $55/500, starter $149/2k, growth $799/20k, enterprise $2,999/100k; meter `resolution` graduated, overage $0.27/.22/.16/.11; trial 30d; redirect /welcome). "Enable Shopify App Pricing" NOT clicked.
+- Partner API client form filled ("hay-backoffice billing": Ver finanças + Gerenciar assinaturas de apps + Gerenciar apps) but NOT saved — Roger saves + copies token to Infisical (SHOPIFY_PARTNER_API_TOKEN, ORG_ID=4831019).
+- hay-shopify-app branch claude/shopify-app-pricing (4 commits, not pushed): plan gate, /welcome, Change plan, /internal/app-events. Needs HAY_BACKOFFICE_URL + HAY_BACKOFFICE_SHARED_SECRET.
+- hay-backoffice branch claude/shopify-app-pricing (worktree hay-backoffice-shopify-pricing): agent still building.
+- Next: review both branches, hay-core dashboard "Billed through Shopify", test on haychat-2, then enable App Pricing + resubmit after 10-31.
+
 ## 2026-10-29 — master — committed + Shopify app server redeployed
 - hay-core plans/WIP pushed (9e88f12e); hay-wordpress claude/woo-marketplace pushed to main (a8fc229, no release → no WP.org deploy).
 - apps.hay.chat rebuilt on homeserver at e5992a4, smoke 5/5. `shopify app deploy` NOT done: CLI needs Roger's device login.
