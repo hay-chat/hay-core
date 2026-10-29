@@ -5,6 +5,7 @@ import path from "path";
 import { createLogger } from "@server/lib/logger";
 import { llmProviderFactory } from "@server/services/llm/llm-provider.factory";
 import { emitUsage } from "@server/services/llm/usage-sink";
+import { modelFlags } from "@server/services/llm/model-catalog";
 import { describeAttachmentsForAgent } from "@server/services/media-analysis/agent-view";
 import {
   buildRepairMessages,
@@ -132,6 +133,7 @@ export class LLMService {
       messages: this.prepareMessages(history || "", prompt),
       temperature,
       maxTokens: max_tokens,
+      flags: modelFlags(resolvedModel),
       signal,
       ...(jsonSchema && {
         structured: {
