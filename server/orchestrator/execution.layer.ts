@@ -1104,13 +1104,15 @@ export class ExecutionLayer {
       // Fetch full document entities in parallel
       const fetchedDocs = await Promise.all(
         conversation.document_ids.map((docId) =>
-          documentRepository.findById(docId).catch((error) => {
-            log.error(
-              { documentId: docId, err: error },
-              "Error fetching document for confidence assessment",
-            );
-            return null;
-          }),
+          documentRepository
+            .findByIdAndOrganization(docId, conversation.organization_id)
+            .catch((error) => {
+              log.error(
+                { documentId: docId, err: error },
+                "Error fetching document for confidence assessment",
+              );
+              return null;
+            }),
         ),
       );
 
@@ -1349,10 +1351,9 @@ export class ExecutionLayer {
         (result) => (result.similarity || 0) > similarityThreshold,
       );
 
-      return filteredResults.map((result) => ({
-        id: result.documentId,
-        similarity: result.similarity || 0,
-      }));
+      return filteredResults.flatMap((result) =>
+        result.documentId ? [{ id: result.documentId, similarity: result.similarity || 0 }] : [],
+      );
     } catch (error) {
       log.error({ err: error }, "Error in relaxed retrieval");
       return [];
@@ -1418,7 +1419,11 @@ export class ExecutionLayer {
     const selectedIds = documentIds.slice(-MAX_KNOWLEDGE_DOCUMENTS);
 
     const documents = await Promise.all(
-      selectedIds.map((docId) => documentRepository.findById(docId).catch(() => null)),
+      selectedIds.map((docId) =>
+        documentRepository
+          .findByIdAndOrganization(docId, conversation.organization_id)
+          .catch(() => null),
+      ),
     );
 
     const blocks = documents

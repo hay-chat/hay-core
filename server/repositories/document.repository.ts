@@ -1,5 +1,5 @@
 import { Document } from "../entities/document.entity";
-import { BaseRepository } from "./base.repository";
+import { BaseRepository, assertSafeIdentifier } from "./base.repository";
 import { SelectQueryBuilder } from "typeorm";
 
 export class DocumentRepository extends BaseRepository<Document> {
@@ -63,7 +63,10 @@ export class DocumentRepository extends BaseRepository<Document> {
     const searchFields = search.searchFields || ["title", "content"];
 
     const searchConditions = searchFields
-      .map((field, index) => `entity.${field} ILIKE :searchQuery${index}`)
+      .map((field, index) => {
+        assertSafeIdentifier(field, "search field");
+        return `entity.${field} ILIKE :searchQuery${index}`;
+      })
       .join(" OR ");
 
     if (searchConditions) {
