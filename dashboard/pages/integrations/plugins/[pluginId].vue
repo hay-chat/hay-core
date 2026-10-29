@@ -74,6 +74,9 @@
             <p v-if="pluginDescription" class="text-sm text-neutral-muted max-w-prose">
               {{ pluginDescription }}
             </p>
+            <p v-if="reportedStatus?.account" class="text-sm" data-testid="plugin-account">
+              {{ $t("pluginSettings.oauth.connectedAs", { account: reportedStatus.account }) }}
+            </p>
           </div>
         </div>
 
@@ -231,19 +234,7 @@
         aria-labelledby="plugin-tab-setup"
         class="space-y-4"
       >
-        <!-- OAuth plugin whose client ID/secret are not set: Connect cannot work, say why -->
-        <Alert
-          v-if="oauthAvailable && !oauthConfigured"
-          :icon="Info"
-          data-testid="oauth-unavailable-alert"
-        >
-          <AlertTitle>{{ $t("pluginSettings.connection.oauthUnavailableTitle") }}</AlertTitle>
-          <AlertDescription>
-            {{ $t("pluginSettings.connection.oauthUnavailable", { name: displayName }) }}
-          </AlertDescription>
-        </Alert>
-
-        <Card v-for="ext in beforeSettingsExtensions" :key="ext.id">
+        <Card v-for="ext in checklistExtras.before" :key="ext.id">
           <CardContent>
             <PluginPageSlot
               :plugin-id="plugin.id"
@@ -257,45 +248,121 @@
           </CardContent>
         </Card>
 
-        <!-- Credentials: the fields the merchant fills in -->
-        <Card v-if="visibleSetupFieldCount > 0" data-testid="setup-fields">
-          <CardHeader>
-            <CardTitle>{{ $t("pluginSettings.setup.fieldsTitle") }}</CardTitle>
-            <CardDescription>
-              {{ $t("pluginSettings.setup.fieldsDescription", { name: displayName }) }}
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <PluginConfigForm
-              v-model:formData="formData"
-              v-model:editingEncryptedFields="editingEncryptedFields"
-              v-model:editingEnvFields="editingEnvFields"
-              :plugin-id="plugin.id"
-              :configSchema="setupSchema"
-              :originalFormData="originalFormData"
-              :configMetadata="configMetadata"
-              :saving="saving"
-              @submit="saveConfiguration"
-              @reset="resetForm"
-              @reset-to-env="handleResetToEnv"
-            />
-          </CardContent>
-        </Card>
+        <!-- The setup checklist: declared by the plugin (register.setup) or core's standard steps -->
+        <ol :aria-label="$t('pluginSettings.setup.stepsLabel')" data-testid="setup-checklist">
+          <li
+            v-for="(step, index) in checklistSteps"
+            :key="step.id"
+            class="flex gap-3 sm:gap-4"
+            :data-testid="`setup-step-${step.id}`"
+          >
+            <div class="flex flex-col items-center">
+              <span
+                :class="[
+                  'flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-sm font-medium',
+                  step.done
+                    ? 'bg-primary text-primary-foreground'
+                    : 'border border-border bg-background text-neutral-muted',
+                ]"
+              >
+                <Check v-if="step.done" class="h-4 w-4" aria-hidden="true" />
+                <span v-else aria-hidden="true">{{ index + 1 }}</span>
+                <span v-if="step.done" class="sr-only">{{ $t("pluginSettings.setup.stepDone") }}</span>
+              </span>
+              <span
+                v-if="index < checklistSteps.length - 1"
+                class="mt-2 w-px flex-1 bg-border"
+                aria-hidden="true"
+              ></span>
+            </div>
 
-        <!-- Connect (OAuth), after the fields it may need (e.g. a store domain) -->
-        <Card v-if="oauthAvailable && oauthConfigured">
-          <CardContent>
-            <PluginOAuthConnection
-              :plugin="plugin"
-              :config="slotConfig"
-              :api-base-url="apiBaseUrl"
-              :oauth-available="oauthAvailable"
-              :oauth-configured="oauthConfigured"
-            />
-          </CardContent>
-        </Card>
+            <div class="min-w-0 flex-1 space-y-3 pb-8">
+              <div v-if="step.title || step.description" class="space-y-1 pt-0.5">
+                <h3 v-if="step.title" class="flex flex-wrap items-center gap-2 font-medium leading-6">
+                  {{ step.title }}
+                  <Badge v-if="step.optional" variant="secondary">
+                    {{ $t("pluginSettings.setup.optional") }}
+                  </Badge>
+                </h3>
+                <p v-if="step.description" class="text-sm text-neutral-muted">
+                  {{ step.description }}
+                </p>
+                <p v-if="step.message" class="text-sm text-neutral-muted">{{ step.message }}</p>
+              </div>
 
-        <Card v-for="ext in afterSettingsExtensions" :key="ext.id">
+              <Card v-if="step.kind === 'fields'">
+                <CardContent class="pt-6">
+                  <PluginConfigForm
+                    v-model:formData="formData"
+                    v-model:editingEncryptedFields="editingEncryptedFields"
+                    v-model:editingEnvFields="editingEnvFields"
+                    :plugin-id="plugin.id"
+                    :configSchema="pickSchema(step.fields)"
+                    :originalFormData="originalFormData"
+                    :configMetadata="configMetadata"
+                    :saving="saving"
+                    @submit="saveConfiguration"
+                    @reset="resetForm"
+                    @reset-to-env="handleResetToEnv"
+                  />
+                </CardContent>
+              </Card>
+
+              <template v-else-if="step.kind === 'connect'">
+                <!-- OAuth client ID/secret not set: Connect cannot work, say why -->
+                <Alert v-if="!oauthConfigured" :icon="Info" data-testid="oauth-unavailable-alert">
+                  <AlertTitle>{{ $t("pluginSettings.connection.oauthUnavailableTitle") }}</AlertTitle>
+                  <AlertDescription>
+                    {{ $t("pluginSettings.connection.oauthUnavailable", { name: displayName }) }}
+                  </AlertDescription>
+                </Alert>
+                <PluginOAuthConnection
+                  v-else
+                  :plugin="plugin"
+                  :config="slotConfig"
+                  :api-base-url="apiBaseUrl"
+                  :oauth-available="oauthAvailable"
+                  :oauth-configured="oauthConfigured"
+                  hide-header
+                />
+              </template>
+
+              <Card v-else-if="step.kind === 'component' && step.extension">
+                <CardContent>
+                  <PluginPageSlot
+                    :plugin-id="plugin.id"
+                    :plugin-path="plugin.pluginPath"
+                    :component-name="step.extension.componentName"
+                    :plugin="plugin"
+                    :config="slotConfig"
+                    :api-base-url="apiBaseUrl"
+                    @update:config="onSlotConfig"
+                  />
+                </CardContent>
+              </Card>
+
+              <Button
+                v-else-if="step.kind === 'external' && step.url"
+                variant="outline"
+                :href="step.url"
+                target="_blank"
+              >
+                <ExternalLink class="h-4 w-4 mr-2" aria-hidden="true" />
+                {{ $t("pluginSettings.setup.openExternal") }}
+              </Button>
+
+              <div v-else-if="step.kind === 'verify'" class="space-y-3" data-testid="setup-verify">
+                <PluginTestResult v-if="testResult" :result="testResult" />
+                <Button variant="outline" :loading="testing" @click="testConnection">
+                  <Zap v-if="!testing" class="h-4 w-4 mr-2" />
+                  {{ $t("pluginSettings.connectionTest.testConnection") }}
+                </Button>
+              </div>
+            </div>
+          </li>
+        </ol>
+
+        <Card v-for="ext in checklistExtras.after" :key="ext.id">
           <CardContent>
             <PluginPageSlot
               :plugin-id="plugin.id"
@@ -306,23 +373,6 @@
               :api-base-url="apiBaseUrl"
               @update:config="onSlotConfig"
             />
-          </CardContent>
-        </Card>
-
-        <!-- Verify: test the connection (MCP plugins) -->
-        <Card v-if="isMcpPlugin" data-testid="setup-verify">
-          <CardHeader>
-            <CardTitle>{{ $t("pluginSettings.connectionTest.title") }}</CardTitle>
-            <CardDescription>
-              {{ $t("pluginSettings.connectionTest.description", { name: displayName }) }}
-            </CardDescription>
-          </CardHeader>
-          <CardContent class="space-y-4">
-            <PluginTestResult v-if="testResult" :result="testResult" />
-            <Button variant="outline" :loading="testing" @click="testConnection">
-              <Zap v-if="!testing" class="h-4 w-4 mr-2" />
-              {{ $t("pluginSettings.connectionTest.testConnection") }}
-            </Button>
           </CardContent>
         </Card>
       </section>
@@ -510,6 +560,7 @@ import {
   MoreHorizontal,
   Check,
   Power,
+  ExternalLink,
 } from "lucide-vue-next";
 import { Hay } from "@/utils/api";
 import { useUserStore } from "@/stores/user";
@@ -524,6 +575,9 @@ import McpToolInputSchema from "@/components/plugins/McpToolInputSchema.vue";
 import { useToolLabel } from "@/composables/useToolLabel";
 import { usePluginTranslations } from "@/composables/usePluginTranslations";
 import {
+  buildSetupChecklist,
+  isStepDone,
+  type DeclaredSetupStep,
   deriveSetupState,
   describedCapabilities,
   isShown,
@@ -536,7 +590,13 @@ import {
 
 const { t } = useI18n();
 const { locale } = useI18n({ useScope: "global" });
-const { getToolLabel, getToolDescription, getPluginName, getPluginDescription } = useToolLabel();
+const {
+  getToolLabel,
+  getToolDescription,
+  getPluginName,
+  getPluginDescription,
+  getSetupStepText,
+} = useToolLabel();
 const { loadTranslations: loadPluginTranslations } = usePluginTranslations();
 
 const route = useRoute();
@@ -616,12 +676,107 @@ const fieldSplit = computed(() =>
 );
 const pickSchema = (keys: string[]) =>
   Object.fromEntries(keys.map((key) => [key, configSchema.value[key]]));
-const setupSchema = computed(() => pickSchema(fieldSplit.value.setup));
 const advancedSchema = computed(() => pickSchema(fieldSplit.value.advanced));
-const visibleSetupFieldCount = computed(
-  () =>
-    fieldSplit.value.setup.filter((key) => isShown(configSchema.value[key], formData.value)).length,
+
+// What the plugin reports about itself (register.setup({ status })), when it does
+type ReportedStatus = {
+  state: SetupState;
+  account?: string;
+  steps: Record<string, { done: boolean; message?: string }>;
+};
+const reportedStatus = ref<ReportedStatus | null>(null);
+const fetchReportedStatus = async () => {
+  if (!enabled.value || !plugin.value?.metadata?.setup?.hasStatus) {
+    reportedStatus.value = null;
+    return;
+  }
+  try {
+    reportedStatus.value = await Hay.plugins.setupStatus.query({ pluginId: pluginId.value });
+  } catch {
+    reportedStatus.value = null; // core judges the status itself
+  }
+};
+
+// The setup checklist (D20-5)
+const extensionByName = (name?: string) =>
+  [...beforeSettingsExtensions.value, ...afterSettingsExtensions.value].find(
+    (ext) => ext.componentName === name,
+  );
+const checklist = computed(() =>
+  buildSetupChecklist({
+    declared: plugin.value?.metadata?.setup?.steps as DeclaredSetupStep[] | undefined,
+    setupFields: fieldSplit.value.setup,
+    before: beforeSettingsExtensions.value.map((ext) => ext.componentName),
+    after: afterSettingsExtensions.value.map((ext) => ext.componentName),
+    hasConnect: oauthAvailable.value,
+    hasVerify: isMcpPlugin.value,
+  }),
 );
+const checklistExtras = computed(() => ({
+  before: checklist.value.extraBefore.map(extensionByName).filter((ext) => !!ext),
+  after: checklist.value.extraAfter.map(extensionByName).filter((ext) => !!ext),
+}));
+const urlHost = (url?: string) => {
+  try {
+    return url ? new URL(url).host : "";
+  } catch {
+    return "";
+  }
+};
+// Titles core uses when the plugin ships no setupSteps.<id> translation
+const defaultStepText = (kind: DeclaredSetupStep["kind"], title?: string) => {
+  const name = displayName.value;
+  if (kind === "fields") {
+    return {
+      title: t("pluginSettings.setup.fieldsTitle"),
+      description: t("pluginSettings.setup.fieldsDescription", { name }),
+    };
+  }
+  if (kind === "connect") {
+    return {
+      title: t("pluginSettings.oauth.title", { name }),
+      description: t("pluginSettings.oauth.description", { name }),
+    };
+  }
+  if (kind === "verify") {
+    return {
+      title: t("pluginSettings.connectionTest.title"),
+      description: t("pluginSettings.connectionTest.description", { name }),
+    };
+  }
+  return { title: title ?? "", description: "" };
+};
+const checklistSteps = computed(() => {
+  const signals = {
+    missingRequired: missingRequiredFields(configSchema.value, configMetadata.value, formData.value),
+    oauthConnected: oauthConnected.value,
+    testSuccess: testResult.value ? testResult.value.success : null,
+    reported: reportedStatus.value?.steps,
+  };
+  return checklist.value.steps
+    .filter(
+      (step) =>
+        step.kind !== "fields" ||
+        step.fields.some((key) => isShown(configSchema.value[key], formData.value)),
+    )
+    .map((step) => {
+      const extension = step.kind === "component" ? extensionByName(step.component) : undefined;
+      const fallback = defaultStepText(step.kind, extension?.title ?? urlHost(step.url));
+      return {
+        ...step,
+        extension,
+        title: getSetupStepText(plugin.value!.id, step.id, "title", fallback.title),
+        description: getSetupStepText(
+          plugin.value!.id,
+          step.id,
+          "description",
+          fallback.description,
+        ),
+        message: reportedStatus.value?.steps[step.id]?.message,
+        done: isStepDone(step, signals) === true,
+      };
+    });
+});
 // Advanced fields hidden by showWhen (e.g. self-hosted credentials in managed mode) don't count.
 const visibleAdvancedFields = computed(() =>
   fieldSplit.value.advanced.filter((key) => isShown(configSchema.value[key], formData.value)),
@@ -680,6 +835,7 @@ const setupState = computed<SetupState>(() =>
     missingRequired: missingRequired.value,
     oauth: { available: oauthAvailable.value, connected: oauthConnected.value },
     test: isMcpPlugin.value ? testResult.value : null,
+    reported: reportedStatus.value?.state ?? null,
   }),
 );
 const STATUS_BADGES: Record<
@@ -834,6 +990,7 @@ const fetchPlugin = async () => {
 
   try {
     applyPluginData(await Hay.plugins.get.query({ pluginId: pluginId.value }));
+    void fetchReportedStatus();
   } catch (err) {
     console.error("Failed to fetch plugin:", err);
     error.value = t("pluginSettings.error.loadFailed");

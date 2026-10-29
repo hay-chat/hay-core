@@ -81,6 +81,11 @@ archetypes you're not using.
   for **every** MCP tool and a `config.<field>` for every config field. Keys must be the exact tool
   names. Without them the UI humanizes raw names (`list_event_types` → "List Event Types") and only
   serves English — translated playbook chips, the tool picker, and plugin settings all read from here.
+  Every config field needs `config.<field>.label` (+ `options.<value>` for selects) in **both**
+  `en.json` and `pt-BR.json`; the SDK test `core-plugin-labels.test.ts` fails otherwise.
+- **Setup checklist**: if the default order (components, fields, Connect, Verify) doesn't fit, call
+  `ctx.register.setup({ steps, status? })` and add `setupSteps.<id>.title` in both locales. Mark
+  technical fields `advanced: true`. See `reference/contract.md` → "Setup checklist".
 
 ### 5. Check against the anti-patterns
 
@@ -114,7 +119,8 @@ npm run typecheck:server   # plugin types compile against the SDK
 - [ ] (Channel) signature verified, inbound deduped, non-retryable errors return `200 {success:false}`.
 - [ ] No committed cruft: no `.git`/vendored repos, `node_modules` bloat, `test-results/`, design `.md` TODOs, or creds in fixtures.
 - [ ] Every MCP tool has a risk class (read, or a write category); a test keeps it complete.
-- [ ] `i18n/en.json` (+ `pt-BR.json`) exists with a `label`/`description` for every MCP tool and config field; tool keys match the exact tool names.
+- [ ] `i18n/en.json` and `i18n/pt-BR.json` exist with a `label`/`description` for every MCP tool and config field (and `setupSteps.<id>.title` for declared setup steps); tool keys match the exact tool names.
+- [ ] Technical fields are `advanced: true`; a custom setup order is declared with `register.setup`.
 - [ ] `npm run build` + `typecheck` pass; tools appear in `/mcp/list-tools`.
 
 ## Reference map
