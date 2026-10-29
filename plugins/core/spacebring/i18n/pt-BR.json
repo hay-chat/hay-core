@@ -1,106 +1,54 @@
 {
   "name": "Spacebring",
-  "description": "Conecte seu espaço de coworking Spacebring para que o assistente responda dúvidas dos membros e gerencie reservas de salas, eventos, visitantes e chamados de suporte.",
+  "description": "Conecte seu coworking Spacebring para que o assistente reserve, remarque e cancele salas para os membros, convide visitantes, relate problemas à equipe e responda dúvidas sobre o espaço.",
   "tools": {
-    "list_locations": {
-      "label": "Listar Unidades",
-      "description": "Lista as unidades de coworking que sua conta Spacebring pode acessar."
+    "spacebring_get_member": {
+      "label": "Consultar Membro",
+      "description": "Busca um membro pelo e-mail: plano, créditos, próximas reservas, visitas de convidados e chamados abertos."
     },
-    "find_membership": {
-      "label": "Buscar Membro",
-      "description": "Localiza um membro (por e-mail) para identificar quem você está atendendo."
+    "spacebring_find_available_spaces": {
+      "label": "Buscar Espaços Livres",
+      "description": "Mostra quais salas, mesas ou outros espaços estão livres em um horário."
     },
-    "get_membership": {
-      "label": "Obter Associação",
-      "description": "Obtém o perfil e o saldo de créditos de um membro pelo id."
+    "spacebring_book_space": {
+      "label": "Reservar Espaço",
+      "description": "Reserva uma sala ou mesa para um membro depois de confirmar que o horário está livre."
     },
-    "list_resources": {
-      "label": "Listar Salas e Mesas",
-      "description": "Lista salas de reunião, mesas, escritórios e vagas reserváveis."
+    "spacebring_move_booking": {
+      "label": "Remarcar Reserva",
+      "description": "Muda a reserva de um membro de horário ou de espaço, reservando o novo horário antes de liberar o antigo."
     },
-    "get_resource": {
-      "label": "Obter Sala/Mesa",
-      "description": "Obtém os detalhes de um recurso reservável, incluindo o horário."
-    },
-    "list_bookings": {
-      "label": "Listar Reservas",
-      "description": "Verifica a disponibilidade de salas ou lista as reservas de um membro."
-    },
-    "create_booking": {
-      "label": "Reservar Sala",
-      "description": "Reserva uma sala de reunião ou mesa para um horário."
-    },
-    "get_booking": {
-      "label": "Obter Reserva",
-      "description": "Obtém os detalhes de uma reserva."
-    },
-    "cancel_booking": {
+    "spacebring_cancel_booking": {
       "label": "Cancelar Reserva",
-      "description": "Cancela uma reserva e libera o horário."
+      "description": "Cancela uma reserva do próprio membro."
     },
-    "list_guides": {
-      "label": "Listar Guias",
-      "description": "Lista guias e dúvidas frequentes (Wi‑Fi, regras, instruções)."
+    "spacebring_invite_guest": {
+      "label": "Convidar Visitante",
+      "description": "Registra a visita de um convidado; o Spacebring envia o convite por e-mail."
     },
-    "get_guide": {
-      "label": "Obter Guia",
-      "description": "Lê o conteúdo completo de um guia, ex.: o artigo de Wi‑Fi."
-    },
-    "list_feed_posts": {
-      "label": "Listar Avisos",
-      "description": "Lista publicações e avisos do feed da comunidade."
-    },
-    "get_feed_post": {
-      "label": "Obter Aviso",
-      "description": "Lê uma publicação do feed da comunidade."
-    },
-    "list_events": {
-      "label": "Listar Eventos",
-      "description": "Lista os próximos eventos da comunidade."
-    },
-    "get_event": {
-      "label": "Obter Evento",
-      "description": "Obtém os detalhes de um evento."
-    },
-    "list_benefits": {
-      "label": "Listar Benefícios",
-      "description": "Lista benefícios para membros e parcerias."
-    },
-    "get_benefit": {
-      "label": "Obter Benefício",
-      "description": "Obtém um benefício e como resgatá-lo."
-    },
-    "list_plans": {
-      "label": "Listar Planos",
-      "description": "Lista os planos de associação e preços."
-    },
-    "list_visits": {
-      "label": "Listar Visitas",
-      "description": "Lista visitas de convidados, opcionalmente por anfitrião."
-    },
-    "create_visit": {
-      "label": "Registrar Convidado",
-      "description": "Registra ou convida um visitante."
-    },
-    "get_visit": {
-      "label": "Obter Visita",
-      "description": "Obtém uma visita, incluindo o código de acesso."
-    },
-    "cancel_visit": {
+    "spacebring_cancel_guest_visit": {
       "label": "Cancelar Visita",
-      "description": "Cancela uma visita registrada."
+      "description": "Cancela a visita de um convidado registrada pelo membro."
     },
-    "list_support_tickets": {
-      "label": "Listar Chamados",
-      "description": "Lista os chamados de suporte abertos pelos membros."
-    },
-    "create_support_ticket": {
+    "spacebring_report_issue": {
       "label": "Relatar Problema",
-      "description": "Abre um chamado de suporte (ar-condicionado, impressora, Wi‑Fi, etc.)."
+      "description": "Relata um problema no espaço (Wi-Fi, ar-condicionado, acesso, limpeza, manutenção) para a equipe."
     },
-    "get_support_ticket": {
-      "label": "Obter Chamado",
-      "description": "Obtém um chamado de suporte e seu status."
+    "spacebring_search_guides": {
+      "label": "Buscar nos Guias",
+      "description": "Responde dúvidas do espaço (Wi-Fi, horários, regras) a partir dos guias."
+    },
+    "spacebring_whats_on": {
+      "label": "Agenda do Espaço",
+      "description": "Próximos eventos da comunidade e os últimos avisos."
+    },
+    "spacebring_list_perks": {
+      "label": "Listar Benefícios",
+      "description": "Benefícios e descontos de parceiros para membros, com como resgatar."
+    },
+    "spacebring_list_plans": {
+      "label": "Listar Planos",
+      "description": "Planos de assinatura oferecidos, com preços."
     }
   },
   "config": {
@@ -113,8 +61,12 @@
       "description": "Segredo da chave de API do Spacebring (a senha do Basic auth). Armazenado de forma criptografada."
     },
     "locationRef": {
-      "label": "ID da Unidade Padrão",
-      "description": "UUID da unidade que este assistente atende. Usado como padrão em todas as ferramentas. Encontre-o com a ferramenta Listar Unidades ou na URL do seu painel Spacebring."
+      "label": "Unidade Padrão",
+      "description": "Nome ou ID da unidade que este assistente atende. Deixe vazio se sua rede tem uma única unidade; com várias, o membro é perguntado qual."
+    },
+    "timeZone": {
+      "label": "Fuso Horário",
+      "description": "Fuso horário IANA (ex.: America/Sao_Paulo) usado quando o Spacebring não informa o da unidade. Os horários dos membros são lidos e mostrados nele."
     }
   }
 }

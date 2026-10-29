@@ -1,13 +1,14 @@
 /**
  * Spacebring Plugin
  *
- * Connects a Spacebring co-working space to the Hay agent so it can power a member
- * chat: answer FAQs (Wi‑Fi, house rules), find and book meeting rooms / desks, cancel
- * reservations, surface events and perks, register guest visits, and file support tickets.
+ * Connects a Spacebring co-working space to the Hay agent so it can run a
+ * member chat: book, move and cancel rooms and desks, invite guests, report
+ * problems to the team, and answer house questions (Wi-Fi, rules, events,
+ * perks, plans).
  *
- * Spawns a local Node MCP server (./mcp/index.js) that calls the Spacebring REST API
- * directly using HTTP Basic auth (API Key ID + Secret). The default location and the
- * credentials are passed to the MCP child over env vars in onStart.
+ * Spawns a local Node MCP server (./mcp/index.js) whose tools are playbook
+ * steps, not Spacebring endpoints (see mcp/index.js). It calls the Spacebring
+ * REST API with HTTP Basic auth (API Key ID + Secret).
  */
 
 import { defineHayPlugin } from "@hay/plugin-sdk";
@@ -40,11 +41,20 @@ export default defineHayPlugin((globalCtx) => ({
       },
       locationRef: {
         type: "string",
-        label: "Default Location ID",
+        label: "Default Location",
         description:
-          "UUID of the co-working location (organization) this assistant serves. Used as the default for every tool (each tool can still override it). Find it with the list_locations tool or in your Spacebring dashboard URL.",
+          "Name or ID of the location this assistant serves. Leave empty if your network has a single location; with several, members are asked which one.",
         required: false,
         encrypted: false,
+      },
+      timeZone: {
+        type: "string",
+        label: "Time Zone",
+        description:
+          "IANA time zone (e.g. Europe/Lisbon) used when Spacebring does not report one for the location.",
+        required: false,
+        encrypted: false,
+        advanced: true,
       },
     });
 
@@ -107,6 +117,7 @@ export default defineHayPlugin((globalCtx) => ({
     }
 
     const locationRef = ctx.config.getOptional<string>("locationRef") ?? "";
+    const timeZone = ctx.config.getOptional<string>("timeZone") ?? "";
 
     await ctx.mcp.startLocalStdio({
       id: "spacebring-mcp",
@@ -117,6 +128,7 @@ export default defineHayPlugin((globalCtx) => ({
         SPACEBRING_API_KEY_ID: apiKeyId,
         SPACEBRING_API_KEY_SECRET: apiKeySecret,
         SPACEBRING_LOCATION_REF: locationRef,
+        SPACEBRING_TIME_ZONE: timeZone,
       },
     });
 
