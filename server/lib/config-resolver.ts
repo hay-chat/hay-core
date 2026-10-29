@@ -1,5 +1,5 @@
 import type { ConfigFieldDescriptor } from "@server/types/plugin-sdk.types";
-import { decryptConfig, decryptValue } from "@server/lib/auth/utils/encryption";
+import { decryptConfig } from "@server/lib/auth/utils/encryption";
 
 export interface ResolvedConfigField {
   value: unknown;
@@ -168,21 +168,10 @@ export function resolveConfigForWorker(
   });
   resolved.values = stripServerOnlyFields(resolved.values, configSchema);
 
-  // Merge with auth credentials (from authState)
-  // Auth credentials are stored as encrypted strings — decrypt before merging
+  // Merge with auth credentials (from authState). The PluginInstance entity
+  // transformer has already decrypted them, so they are merged as-is.
   if (authState?.credentials) {
-    for (const [key, value] of Object.entries(authState.credentials)) {
-      if (typeof value === "string") {
-        try {
-          resolved.values[key] = decryptValue(value);
-        } catch {
-          // If decryption fails, the value may not be encrypted — use as-is
-          resolved.values[key] = value;
-        }
-      } else {
-        resolved.values[key] = value;
-      }
-    }
+    Object.assign(resolved.values, authState.credentials);
   }
 
   return resolved.values;

@@ -12,20 +12,44 @@ const TAG_POSITION = SALT_LENGTH + IV_LENGTH;
 const ENCRYPTED_POSITION = TAG_POSITION + TAG_LENGTH;
 
 /**
- * Get the encryption key from environment or generate a default one
+ * Marks ciphertext written by encryptValue. Values without it are either
+ * ciphertext from before the prefix existed (same layout, decrypted the same
+ * way) or legacy plaintext credentials stored before encryption was added.
+ */
+export const CIPHERTEXT_PREFIX = "enc:v2:";
+
+let warnedJwtFallback = false;
+
+/**
+ * The key new values are encrypted with. Production requires a dedicated
+ * PLUGIN_ENCRYPTION_KEY (enforced at startup by validateProductionConfig);
+ * other environments fall back to JWT_SECRET.
  */
 function getEncryptionKey(): string {
   if (process.env.PLUGIN_ENCRYPTION_KEY) {
     return process.env.PLUGIN_ENCRYPTION_KEY;
   }
-  if (process.env.JWT_SECRET) {
-    logger.warn(
-      "PLUGIN_ENCRYPTION_KEY not set — falling back to JWT_SECRET for encryption. " +
-        "Set a dedicated PLUGIN_ENCRYPTION_KEY in production to isolate key compromise.",
-    );
+  if (process.env.NODE_ENV !== "production" && process.env.JWT_SECRET) {
+    if (!warnedJwtFallback) {
+      warnedJwtFallback = true;
+      logger.warn("PLUGIN_ENCRYPTION_KEY not set — falling back to JWT_SECRET for encryption");
+    }
     return process.env.JWT_SECRET;
   }
   throw new Error("PLUGIN_ENCRYPTION_KEY must be set for encryption");
+}
+
+/**
+ * Keys tried when decrypting: the current key, then PLUGIN_ENCRYPTION_KEY_PREVIOUS
+ * while a key rotation is in progress (see scripts/reencrypt-secrets.ts).
+ */
+function getDecryptionKeys(): string[] {
+  const keys = [getEncryptionKey()];
+  const previous = process.env.PLUGIN_ENCRYPTION_KEY_PREVIOUS;
+  if (previous && previous !== keys[0]) {
+    keys.push(previous);
+  }
+  return keys;
 }
 
 /**
@@ -60,36 +84,55 @@ export function encryptValue(text: string): string {
   // Combine salt + iv + tag + encrypted
   const combined = Buffer.concat([salt, iv, tag, encrypted]);
 
-  // Return as base64
-  return combined.toString("base64");
+  return CIPHERTEXT_PREFIX + combined.toString("base64");
+}
+
+function decryptWithKey(combined: Buffer, password: string): string {
+  // Extract components
+  const salt = combined.subarray(0, SALT_LENGTH);
+  const iv = combined.subarray(SALT_LENGTH, TAG_POSITION);
+  const tag = combined.subarray(TAG_POSITION, ENCRYPTED_POSITION);
+  const encrypted = combined.subarray(ENCRYPTED_POSITION);
+
+  const decipher = crypto.createDecipheriv(ALGORITHM, deriveKey(password, salt), iv);
+  decipher.setAuthTag(tag);
+
+  return Buffer.concat([decipher.update(encrypted), decipher.final()]).toString("utf8");
 }
 
 /**
- * Decrypt a string value encrypted with encryptValue
+ * Decrypt a string value encrypted with encryptValue. Throws when no
+ * configured key can decrypt it.
  */
 export function decryptValue(encryptedText: string): string {
-  const password = getEncryptionKey();
+  const body = encryptedText.startsWith(CIPHERTEXT_PREFIX)
+    ? encryptedText.slice(CIPHERTEXT_PREFIX.length)
+    : encryptedText;
+  const combined = Buffer.from(body, "base64");
 
-  // Decode from base64
-  const combined = Buffer.from(encryptedText, "base64");
+  let lastError: unknown;
+  for (const password of getDecryptionKeys()) {
+    try {
+      return decryptWithKey(combined, password);
+    } catch (error) {
+      lastError = error;
+    }
+  }
+  throw lastError;
+}
 
-  // Extract components
-  const salt = combined.slice(0, SALT_LENGTH);
-  const iv = combined.slice(SALT_LENGTH, TAG_POSITION);
-  const tag = combined.slice(TAG_POSITION, ENCRYPTED_POSITION);
-  const encrypted = combined.slice(ENCRYPTED_POSITION);
-
-  // Derive key from password and salt
-  const key = deriveKey(password, salt);
-
-  // Create decipher
-  const decipher = crypto.createDecipheriv(ALGORITHM, key, iv);
-  decipher.setAuthTag(tag);
-
-  // Decrypt
-  const decrypted = Buffer.concat([decipher.update(encrypted), decipher.final()]);
-
-  return decrypted.toString("utf8");
+/**
+ * Whether a stored string has the shape of encryptValue output (prefixed, or
+ * unprefixed base64 long enough to hold salt + iv + tag). Anything else is
+ * plaintext written before encryption was introduced.
+ */
+export function looksLikeCiphertext(value: string): boolean {
+  if (value.startsWith(CIPHERTEXT_PREFIX)) {
+    return true;
+  }
+  return (
+    /^[A-Za-z0-9+/]+={0,2}$/.test(value) && Buffer.from(value, "base64").length > ENCRYPTED_POSITION
+  );
 }
 
 /**
@@ -178,68 +221,6 @@ export function isEncrypted(value: unknown): value is EncryptedValue {
 }
 
 /**
- * Hash a value for comparison (non-reversible)
- */
-export function hashValue(value: string): string {
-  return crypto.createHash("sha256").update(value).digest("hex");
-}
-
-/**
- * Generate a random encryption key
- */
-export function generateEncryptionKey(): string {
-  return crypto.randomBytes(32).toString("base64");
-}
-
-/**
- * TypeORM transformer that encrypts/decrypts specific fields in a JSONB column
- */
-export class EncryptedTransformer {
-  constructor(private fieldsToEncrypt: string[]) {}
-
-  /**
-   * Transform value to database (encrypt)
-   */
-  to(value: unknown): unknown {
-    if (!value || typeof value !== "object") {
-      return value;
-    }
-
-    const encrypted: Record<string, unknown> = { ...(value as Record<string, unknown>) };
-    for (const field of this.fieldsToEncrypt) {
-      const fieldValue = encrypted[field];
-      if (typeof fieldValue === "string") {
-        encrypted[field] = encryptValue(fieldValue);
-      }
-    }
-    return encrypted;
-  }
-
-  /**
-   * Transform value from database (decrypt)
-   */
-  from(value: unknown): unknown {
-    if (!value || typeof value !== "object") {
-      return value;
-    }
-
-    const decrypted: Record<string, unknown> = { ...(value as Record<string, unknown>) };
-    for (const field of this.fieldsToEncrypt) {
-      const fieldValue = decrypted[field];
-      if (typeof fieldValue === "string") {
-        try {
-          decrypted[field] = decryptValue(fieldValue);
-        } catch (error) {
-          logger.error({ err: error, field }, "Failed to decrypt field");
-          // Keep encrypted value if decryption fails
-        }
-      }
-    }
-    return decrypted;
-  }
-}
-
-/**
  * TypeORM transformer specifically for AuthState that encrypts all fields in credentials
  */
 export class AuthStateEncryptedTransformer {
@@ -308,13 +289,17 @@ export class AuthStateEncryptedTransformer {
               decryptedCredentials[key] = decryptedVal;
             }
           } catch (error) {
-            // Decryption failed - this is legacy plaintext data from before encryption
-            // Return as-is for backwards compatibility (will be encrypted on next save)
-            logger.warn(
-              { err: error, key },
-              "Failed to decrypt credential, using as-is (legacy data?)",
-            );
-            decryptedCredentials[key] = val;
+            if (looksLikeCiphertext(val)) {
+              // Ciphertext no configured key can open (wrong or rotated key):
+              // never hand it on as if it were the credential.
+              logger.error({ err: error, key }, "Failed to decrypt credential");
+              decryptedCredentials[key] = null;
+            } else {
+              // Plaintext stored before credentials were encrypted; it is
+              // encrypted on the next save (or by scripts/reencrypt-secrets.ts).
+              logger.warn({ key }, "Unencrypted legacy credential found");
+              decryptedCredentials[key] = val;
+            }
           }
         } else {
           decryptedCredentials[key] = val;
