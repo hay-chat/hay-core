@@ -153,7 +153,7 @@
             <Button
               variant="ghost"
               size="icon"
-              class="lg:hidden"
+              class="lg:!hidden"
               data-testid="conversation-details-toggle"
               :aria-label="$t('conversations.detail.details')"
               @click="showDetailsSheet = true"
@@ -209,79 +209,21 @@
                 })
               }}
             </Badge>
-            <!-- Desktop secondary actions -->
-            <div class="hidden md:flex items-center gap-2">
-              <Button v-if="isLocalhost" variant="outline" size="sm" @click="copyConversationJson">
-                <Braces class="h-4 w-4 mr-2" />
-                Copy JSON
-              </Button>
-              <Button
-                v-if="conversation?.playbook_id"
-                variant="outline"
-                size="sm"
-                @click="showSuggestDialog = true"
-              >
-                <Sparkles class="h-4 w-4 mr-2" />
-                {{ $t("suggest.improveFromConversation") }}
-              </Button>
-              <Button
-                v-if="conversation"
-                variant="outline"
-                size="sm"
-                data-testid="improve-knowledge-button"
-                @click="showKnowledgeDialog = true"
-              >
-                <BookOpen class="h-4 w-4 mr-2" />
-                {{ $t("knowledgeSuggest.improveFromConversation") }}
-              </Button>
-              <DropdownMenu>
-                <DropdownMenuTrigger as-child>
-                  <Button variant="outline" size="sm" :loading="isExporting">
-                    <Download class="h-4 w-4 mr-2" />
-                    {{ $t("conversations.detail.export") }}
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem @click="exportConversation('pdf')">
-                    <FileText class="mr-2 h-4 w-4" />
-                    {{ $t("conversations.detail.exportPdf") }}
-                  </DropdownMenuItem>
-                  <DropdownMenuItem @click="exportConversation('csv')">
-                    <FileSpreadsheet class="mr-2 h-4 w-4" />
-                    {{ $t("conversations.detail.exportCsv") }}
-                  </DropdownMenuItem>
-                  <DropdownMenuItem data-testid="open-evidence-pack" @click="openEvidencePack">
-                    <FileCheck class="mr-2 h-4 w-4" />
-                    {{ $t("conversations.detail.evidencePack") }}
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-              <Button
-                v-if="conversation && !conversation.spam_flagged_at"
-                variant="outline"
-                size="sm"
-                data-testid="mark-spam-button"
-                :loading="isMarkingSpam"
-                @click="markSpam"
-              >
-                <ShieldAlert class="h-4 w-4 mr-2" />
-                {{ $t("home.spam.markSpam") }}
-              </Button>
-              <Button
-                v-if="conversation?.status === 'open'"
-                variant="outline"
-                size="sm"
-                :class="supervisionMode ? 'bg-orange-50 border-orange-200' : ''"
-                @click="toggleSupervisionMode"
-              >
-                <Eye class="h-4 w-4 mr-2" />
-                {{
-                  supervisionMode
-                    ? $t("conversations.detail.exitSupervision")
-                    : $t("conversations.detail.supervise")
-                }}
-              </Button>
-            </div>
+            <Button
+              v-if="conversation?.status === 'open'"
+              variant="outline"
+              size="sm"
+              class="max-md:!hidden"
+              :class="supervisionMode ? 'bg-orange-50 border-orange-200' : ''"
+              @click="toggleSupervisionMode"
+            >
+              <Eye class="h-4 w-4 mr-2" />
+              {{
+                supervisionMode
+                  ? $t("conversations.detail.exitSupervision")
+                  : $t("conversations.detail.supervise")
+              }}
+            </Button>
             <Button
               v-if="conversation?.status === 'open' || conversation?.status === 'pending-human'"
               size="sm"
@@ -291,56 +233,23 @@
               <UserCheck class="h-4 w-4 mr-2" />
               {{ $t("conversations.detail.takeOver") }}
             </Button>
-            <!-- Mobile secondary actions -->
-            <DropdownMenu class="md:hidden">
+            <!-- Secondary actions -->
+            <DropdownMenu>
               <DropdownMenuTrigger as-child>
                 <Button
                   variant="outline"
                   size="icon"
-                  :loading="isExporting"
+                  data-testid="conversation-actions-menu"
+                  :loading="isExporting || isMarkingSpam"
                   :aria-label="$t('conversations.detail.moreActions')"
                 >
                   <MoreHorizontal class="h-4 w-4" />
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                <DropdownMenuItem v-if="isLocalhost" @click="copyConversationJson">
-                  <Braces class="mr-2 h-4 w-4" />
-                  Copy JSON
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  v-if="conversation?.playbook_id"
-                  @click="showSuggestDialog = true"
-                >
-                  <Sparkles class="mr-2 h-4 w-4" />
-                  {{ $t("suggest.improveFromConversation") }}
-                </DropdownMenuItem>
-                <DropdownMenuItem v-if="conversation" @click="showKnowledgeDialog = true">
-                  <BookOpen class="mr-2 h-4 w-4" />
-                  {{ $t("knowledgeSuggest.improveFromConversation") }}
-                </DropdownMenuItem>
-                <DropdownMenuItem @click="exportConversation('pdf')">
-                  <FileText class="mr-2 h-4 w-4" />
-                  {{ $t("conversations.detail.exportPdf") }}
-                </DropdownMenuItem>
-                <DropdownMenuItem @click="exportConversation('csv')">
-                  <FileSpreadsheet class="mr-2 h-4 w-4" />
-                  {{ $t("conversations.detail.exportCsv") }}
-                </DropdownMenuItem>
-                <DropdownMenuItem data-testid="open-evidence-pack" @click="openEvidencePack">
-                  <FileCheck class="mr-2 h-4 w-4" />
-                  {{ $t("conversations.detail.evidencePack") }}
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  v-if="conversation && !conversation.spam_flagged_at"
-                  :disabled="isMarkingSpam"
-                  @click="markSpam"
-                >
-                  <ShieldAlert class="mr-2 h-4 w-4" />
-                  {{ $t("home.spam.markSpam") }}
-                </DropdownMenuItem>
                 <DropdownMenuItem
                   v-if="conversation?.status === 'open'"
+                  class="md:hidden"
                   @click="toggleSupervisionMode"
                 >
                   <Eye class="mr-2 h-4 w-4" />
@@ -350,12 +259,57 @@
                       : $t("conversations.detail.supervise")
                   }}
                 </DropdownMenuItem>
+                <DropdownMenuItem
+                  v-if="conversation?.playbook_id"
+                  @click="showSuggestDialog = true"
+                >
+                  <Sparkles class="mr-2 h-4 w-4" />
+                  {{ $t("suggest.improveFromConversation") }}
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  v-if="conversation"
+                  data-testid="improve-knowledge-button"
+                  @click="showKnowledgeDialog = true"
+                >
+                  <BookOpen class="mr-2 h-4 w-4" />
+                  {{ $t("knowledgeSuggest.improveFromConversation") }}
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem :disabled="isExporting" @click="exportConversation('pdf')">
+                  <FileText class="mr-2 h-4 w-4" />
+                  {{ $t("conversations.detail.exportPdf") }}
+                </DropdownMenuItem>
+                <DropdownMenuItem :disabled="isExporting" @click="exportConversation('csv')">
+                  <FileSpreadsheet class="mr-2 h-4 w-4" />
+                  {{ $t("conversations.detail.exportCsv") }}
+                </DropdownMenuItem>
+                <DropdownMenuItem data-testid="open-evidence-pack" @click="openEvidencePack">
+                  <FileCheck class="mr-2 h-4 w-4" />
+                  {{ $t("conversations.detail.evidencePack") }}
+                </DropdownMenuItem>
+                <DropdownMenuItem v-if="isLocalhost" @click="copyConversationJson">
+                  <Braces class="mr-2 h-4 w-4" />
+                  Copy JSON
+                </DropdownMenuItem>
+                <template v-if="conversation && !conversation.spam_flagged_at">
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    class="text-destructive"
+                    data-testid="mark-spam-button"
+                    :disabled="isMarkingSpam"
+                    @click="markSpam"
+                  >
+                    <ShieldAlert class="mr-2 h-4 w-4" />
+                    {{ $t("home.spam.markSpam") }}
+                  </DropdownMenuItem>
+                </template>
               </DropdownMenuContent>
             </DropdownMenu>
+            <!-- The details panel is inline on lg+; Button's scoped display beats a plain lg:hidden -->
             <Button
               variant="ghost"
               size="icon"
-              class="lg:hidden"
+              class="lg:!hidden"
               data-testid="conversation-details-toggle"
               :aria-label="$t('conversations.detail.details')"
               @click="showDetailsSheet = true"
@@ -1113,7 +1067,6 @@
 <script setup lang="ts">
 import {
   ArrowLeft,
-  Download,
   Eye,
   UserCheck,
   MessageSquare,
