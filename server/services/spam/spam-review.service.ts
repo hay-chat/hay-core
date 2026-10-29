@@ -119,7 +119,9 @@ export async function markSpam(
 ): Promise<void> {
   const conversation = await findInOrg(organizationId, conversationId);
   if (conversation.spam_flagged_at) return;
-  const spamCheck = { ...((conversation.metadata?.spamCheck as object) ?? {}) } as Partial<SpamCheckRecord>;
+  const spamCheck = {
+    ...((conversation.metadata?.spamCheck as object) ?? {}),
+  } as Partial<SpamCheckRecord>;
   delete spamCheck.clearedAt;
   delete spamCheck.clearedBy;
   await conversationRepository.update(conversation.id, organizationId, {
@@ -146,7 +148,8 @@ export async function markNotSpam(
   };
 
   // Re-engage the AI only for a live conversation it would otherwise answer.
-  const aiOwned = ["open", "processing"].includes(conversation.status) && !conversation.assigned_user_id;
+  const aiOwned =
+    ["open", "processing"].includes(conversation.status) && !conversation.assigned_user_id;
   const reengage =
     aiOwned && (await conversationRepository.hasUnansweredCustomerMessage(conversation.id));
 
@@ -179,7 +182,8 @@ async function answerAfterHeldMedia(
   }
   if (!reengage) return;
   try {
-    const { orchestratorQueueService } = await import("@server/services/orchestrator-queue.service");
+    const { orchestratorQueueService } =
+      await import("@server/services/orchestrator-queue.service");
     await orchestratorQueueService.enqueue(conversationId, organizationId, "ai_return");
   } catch (error) {
     logger.error({ err: error, conversationId }, "Could not hand the conversation back to the AI");

@@ -1,6 +1,10 @@
 import { router, scopedProcedure, publicProcedure } from "@server/trpc";
 import { webchatExtensionsService } from "@server/services/webchat/webchat-extensions.service";
-import { isUnderAttack, setUnderAttack, stateOf } from "@server/services/webchat/under-attack.service";
+import {
+  isUnderAttack,
+  setUnderAttack,
+  stateOf,
+} from "@server/services/webchat/under-attack.service";
 import { config } from "@server/config/env";
 import { z } from "zod";
 import { webchatSettingsService } from "@server/services/webchat/webchat-settings.service";
@@ -147,9 +151,13 @@ export const webchatRouter = router({
       const underAttack = await isUnderAttack(input.organizationId);
       const [config, contributions] = await Promise.all([
         webchatSettingsService.getPublicConfig(input.organizationId),
-        webchatExtensionsService.getPublicContributions(input.organizationId, input.supports ?? [], {
-          underAttack,
-        }),
+        webchatExtensionsService.getPublicContributions(
+          input.organizationId,
+          input.supports ?? [],
+          {
+            underAttack,
+          },
+        ),
       ]);
       return {
         enabled: true as const,

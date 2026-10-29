@@ -1,5 +1,9 @@
 import { describe, it, expect } from "@jest/globals";
-import { scoreSpam, SPAM_THRESHOLD, SUSPICIOUS_THRESHOLD } from "@server/services/spam/spam-heuristics";
+import {
+  scoreSpam,
+  SPAM_THRESHOLD,
+  SUSPICIOUS_THRESHOLD,
+} from "@server/services/spam/spam-heuristics";
 
 describe("scoreSpam", () => {
   it("leaves ordinary shopper questions alone, even with one product link", () => {
@@ -24,7 +28,9 @@ describe("scoreSpam", () => {
   });
 
   it("holds the same message sent over and over", () => {
-    const result = scoreSpam({ messages: ["buy now https://x.test", "buy now https://x.test", "buy now https://x.test"] });
+    const result = scoreSpam({
+      messages: ["buy now https://x.test", "buy now https://x.test", "buy now https://x.test"],
+    });
     expect(result.score).toBeGreaterThanOrEqual(SPAM_THRESHOLD);
     expect(result.signals).toEqual(expect.arrayContaining(["repeated", "links"]));
   });
@@ -38,10 +44,15 @@ describe("scoreSpam", () => {
 
   it("tips a borderline chat when the bot check could not verify the visitor", () => {
     const plain = scoreSpam({ messages: ["https://promo.test/deal"] });
-    const unverified = scoreSpam({ messages: ["https://promo.test/deal"], botCheckDecision: "flag" });
+    const unverified = scoreSpam({
+      messages: ["https://promo.test/deal"],
+      botCheckDecision: "flag",
+    });
     expect(unverified.score).toBeGreaterThan(plain.score);
     expect(unverified.signals).toContain("unverified");
-    expect(scoreSpam({ messages: ["Hello"], botCheckDecision: "flag" }).score).toBeLessThan(SUSPICIOUS_THRESHOLD);
+    expect(scoreSpam({ messages: ["Hello"], botCheckDecision: "flag" }).score).toBeLessThan(
+      SUSPICIOUS_THRESHOLD,
+    );
   });
 
   it("flags walls of text and messages with no letters", () => {

@@ -77,7 +77,12 @@ describe("pluginStateService (H4)", () => {
 
   it("rejects oversized values", async () => {
     await expect(
-      pluginStateService.set(orgId, "hay-plugin-a", "k", "x".repeat(PLUGIN_STATE_MAX_VALUE_LENGTH + 1)),
+      pluginStateService.set(
+        orgId,
+        "hay-plugin-a",
+        "k",
+        "x".repeat(PLUGIN_STATE_MAX_VALUE_LENGTH + 1),
+      ),
     ).rejects.toBeInstanceOf(PluginStateLimitError);
   });
 });

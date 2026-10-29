@@ -34,7 +34,9 @@ function fakeClamd(): net.Server {
         const size = data.readUInt32BE(offset);
         if (size === 0) {
           const text = Buffer.concat(body).toString();
-          socket.end(text.includes("EICAR") ? "stream: Eicar-Test-Signature FOUND\0" : "stream: OK\0");
+          socket.end(
+            text.includes("EICAR") ? "stream: Eicar-Test-Signature FOUND\0" : "stream: OK\0",
+          );
           return;
         }
         if (offset + 4 + size > data.length) return;
@@ -100,7 +102,9 @@ describe("media scan", () => {
     expect(parseClamdReply("stream: OK\0")).toBe("clean");
     expect(parseClamdReply("stream: Win.Test FOUND\0")).toBe("infected");
     expect(parseClamdReply("INSTREAM size limit exceeded. ERROR\0")).toBe("error");
-    expect([null, undefined, "skipped", "clean"].every((s) => isScanCleared(s as never))).toBe(true);
+    expect([null, undefined, "skipped", "clean"].every((s) => isScanCleared(s as never))).toBe(
+      true,
+    );
     expect(["pending", "infected", "error"].some((s) => isScanCleared(s as never))).toBe(false);
   });
 });

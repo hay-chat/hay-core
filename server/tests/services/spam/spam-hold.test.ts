@@ -10,7 +10,9 @@ const mockFindSettings = jest.fn<(...args: unknown[]) => Promise<unknown>>();
 jest.mock("@server/database/data-source", () => ({
   AppDataSource: {
     getRepository: (entity: { name: string }) =>
-      entity.name === "WebchatSettings" ? { findOne: mockFindSettings } : { find: mockFindMessages },
+      entity.name === "WebchatSettings"
+        ? { findOne: mockFindSettings }
+        : { find: mockFindMessages },
   },
 }));
 
@@ -65,7 +67,9 @@ describe("holdIfSpam", () => {
   });
 
   it("keeps an already flagged conversation away from the AI", async () => {
-    await expect(holdIfSpam(conversation({ spam_flagged_at: new Date() }), log)).resolves.toBe(true);
+    await expect(holdIfSpam(conversation({ spam_flagged_at: new Date() }), log)).resolves.toBe(
+      true,
+    );
     expect(mockUpdate).toHaveBeenCalledWith("c1", "o1", { needs_processing: false });
     expect(mockFindMessages).not.toHaveBeenCalled();
   });
@@ -83,7 +87,9 @@ describe("holdIfSpam", () => {
     expect(mockInvoke).not.toHaveBeenCalled();
 
     mockFindSettings.mockResolvedValue({ spamClassifierEnabled: true, spamGuidance: "No promos" });
-    mockInvoke.mockResolvedValueOnce({ content: JSON.stringify({ is_spam: true, reason: "promo" }) });
+    mockInvoke.mockResolvedValueOnce({
+      content: JSON.stringify({ is_spam: true, reason: "promo" }),
+    });
     await expect(holdIfSpam(conversation(), log)).resolves.toBe(true);
     expect(mockUpdate.mock.lastCall?.[2]).toMatchObject({ spam_reason: "detector:classifier" });
   });
