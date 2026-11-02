@@ -14,7 +14,7 @@ describe("runWorker", () => {
 
     await expect(
       runWorker(
-        fixture("spin.worker.js"),
+        fixture("spin.worker.cjs"),
         { counter },
         { timeoutMs: 300, maxOldGenerationSizeMb: 64 },
       ),
@@ -30,13 +30,13 @@ describe("runWorker", () => {
 
   it("rejects a parser that exceeds its memory limit", async () => {
     await expect(
-      runWorker(fixture("hog.worker.js"), {}, { timeoutMs: 30_000, maxOldGenerationSizeMb: 32 }),
+      runWorker(fixture("hog.worker.cjs"), {}, { timeoutMs: 30_000, maxOldGenerationSizeMb: 32 }),
     ).rejects.toThrow(new DocumentRejectedError("Document needs too much memory to process"));
   });
 
   it("passes a parser error through", async () => {
     await expect(
-      runWorker(fixture("throw.worker.js"), {}, { timeoutMs: 5_000, maxOldGenerationSizeMb: 64 }),
+      runWorker(fixture("throw.worker.cjs"), {}, { timeoutMs: 5_000, maxOldGenerationSizeMb: 64 }),
     ).rejects.toThrow("Malformed document");
   });
 });
