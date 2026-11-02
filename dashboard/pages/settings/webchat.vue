@@ -234,8 +234,7 @@
         <pre
           v-if="identitySecret"
           class="bg-muted p-4 rounded-lg text-sm overflow-x-auto break-all whitespace-pre-wrap"
-          >{{ identitySecret }}</pre
-        >
+          >{{ identitySecret }}</pre>
         <p v-else class="text-sm text-neutral-muted">{{ $t("webchat.customerIdentityHidden") }}</p>
         <div class="flex flex-wrap gap-2">
           <Button
