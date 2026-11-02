@@ -162,7 +162,6 @@ async function cleanup(): Promise<void> {
   await AppDataSource.query(`DELETE FROM conversations WHERE organization_id = ANY($1)`, [ids]);
   await AppDataSource.query(`DELETE FROM customers WHERE organization_id = ANY($1)`, [ids]);
   await AppDataSource.query(`DELETE FROM uploads WHERE organization_id = ANY($1)`, [ids]);
-  await AppDataSource.query(`DELETE FROM audit_logs WHERE organization_id = ANY($1)`, [ids]);
   await AppDataSource.query(`DELETE FROM plugin_instances WHERE plugin_id = $1`, [REGISTRY_ID]);
   await AppDataSource.query(`DELETE FROM plugin_registry WHERE id = $1`, [REGISTRY_ID]);
   await AppDataSource.query(`DELETE FROM organizations WHERE id = ANY($1)`, [ids]);
