@@ -47,7 +47,7 @@ export function scriptHashSource(body: string): string {
 /** Bodies of the inline (no `src`) scripts in an HTML fragment. */
 export function inlineScriptBodies(html: string): string[] {
   const bodies: string[] = [];
-  for (const match of html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/gi)) {
+  for (const match of html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script\s*>/gi)) {
     if (!/\bsrc\s*=/i.test(match[1]) && match[2]) bodies.push(match[2]);
   }
   return bodies;
