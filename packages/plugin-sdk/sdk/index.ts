@@ -86,6 +86,8 @@ export type {
 
   // MCP
   McpServerInstance,
+  ToolCallCustomer,
+  ToolCallMeta,
   McpInitializerContext,
   ExternalMcpOptions,
   LocalMcpOptions,

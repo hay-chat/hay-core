@@ -7,6 +7,8 @@
 
 const { z } = require("zod");
 
+const STAFF = { trust: "staff" };
+
 function createFakeServer() {
   const tools = new Map();
   return {
@@ -15,11 +17,15 @@ function createFakeServer() {
       if (tools.has(name)) throw new Error(`duplicate tool ${name}`);
       tools.set(name, { description, shape, handler });
     },
-    async call(name, args = {}) {
+    /**
+     * `customer`: the identity core sends with the call. Defaults to staff (the
+     * dashboard playground), so tool behaviour is tested apart from identity.
+     */
+    async call(name, args = {}, customer = STAFF) {
       const t = tools.get(name);
       if (!t) throw new Error(`no tool ${name}`);
       const parsed = z.object(t.shape).parse(args);
-      const res = await t.handler(parsed);
+      const res = await t.handler(parsed, { _meta: { "chat.hay/customer": customer } });
       const text = res.content[0].text;
       return {
         isError: Boolean(res.isError),
@@ -73,4 +79,11 @@ function response(status, body) {
   };
 }
 
-module.exports = { createFakeServer, mockFetch };
+/** A customer core verified for the conversation (signed webchat, or a channel sender). */
+function verified({ email = null, phone = null } = {}) {
+  return { trust: "verified", source: "webchat_signature", externalId: "ext-1", email, phone };
+}
+
+const NOBODY = { trust: "none" };
+
+module.exports = { createFakeServer, mockFetch, verified, STAFF, NOBODY };

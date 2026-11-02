@@ -15,6 +15,7 @@ import { ProductVariant, VariantAvailability } from "@server/entities/product-va
 import { productVectorStoreService } from "@server/services/product-vector-store.service";
 import { createLogger } from "@server/lib/logger";
 import type { CoreToolDefinition } from "./index";
+import { READ_RISK } from "../tool-risk";
 
 const logger = createLogger("core-tool:recommend-products");
 
@@ -65,6 +66,7 @@ export const recommendProductsTool: CoreToolDefinition = {
     "product, asking for recommendations, comparing options). DO NOT use on " +
     "support, billing, returns, or status questions. If important attributes are " +
     "missing (budget, use-case, size), ASK first, then call this tool.",
+  risk: READ_RISK,
   inputSchema: {
     type: "object",
     additionalProperties: false,

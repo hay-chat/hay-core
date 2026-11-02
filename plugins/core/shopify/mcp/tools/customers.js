@@ -3,9 +3,20 @@
 // deprecated on Customer in 2026-04). Exactly two lookups on purpose: find (email or
 // phone → list for disambiguation) and get (by id, enriched) — overlapping lookup
 // tools waste an agent decision and get picked wrong.
+//
+// Both return a customer's personal data (toolRisk customerData), so they answer
+// only for the customer Hay.chat verified for the conversation (or for staff):
+// see @hay/plugin-sdk/identity.
 
 const { z } = require("zod");
 const { shopifyGql } = require("../lib/client");
+const {
+  callerIdentity,
+  ownsRecord,
+  lookupFor,
+  assertOwnsRecord,
+  NOT_VERIFIED,
+} = require("@hay/plugin-sdk/identity");
 const {
   ok,
   fail,
@@ -14,7 +25,16 @@ const {
   pageInfo,
   toGid,
   assertNoUserErrors,
+  searchTerm,
 } = require("../lib/format");
+
+/** The emails/phones on a Shopify customer, for the identity checks. */
+function contactsOf(customer) {
+  return {
+    emails: [customer?.defaultEmailAddress?.emailAddress],
+    phones: [customer?.defaultPhoneNumber?.phoneNumber],
+  };
+}
 
 function registerCustomerTools(server) {
   // 1. Find customers by email and/or phone
@@ -36,15 +56,17 @@ function registerCustomerTools(server) {
         .optional()
         .describe("Max number of customers to return (default 10)."),
     },
-    async (args) => {
+    async (args, extra) => {
       try {
-        if (!args.email && !args.phone) {
+        const identity = callerIdentity(extra);
+        if (identity.trust === "staff" && !args.email && !args.phone) {
           throw toolError("BAD_INPUT", "Provide an email and/or a phone number to search for.");
         }
+        const { email, phone } = lookupFor(identity, args);
         // Shopify search syntax: `email:` and `phone:` filters, uppercase OR.
         const parts = [];
-        if (args.email) parts.push(`email:"${args.email}"`);
-        if (args.phone) parts.push(`phone:"${args.phone}"`);
+        if (email) parts.push(searchTerm("email", email));
+        if (phone) parts.push(searchTerm("phone", phone));
         const query = `
           query FindCustomer($first: Int!, $query: String!) {
             customers(first: $first, query: $query) {
@@ -81,10 +103,13 @@ function registerCustomerTools(server) {
         const data = await shopifyGql(query, variables);
         const conn = data.customers;
         return ok({
-          items: unwrapConnection(conn).map(({ orders, ...rest }) => ({
-            ...rest,
-            recentOrders: unwrapConnection(orders),
-          })),
+          // Shopify's search is fuzzy: keep only exact matches of the identity.
+          items: unwrapConnection(conn)
+            .filter((customer) => ownsRecord(identity, contactsOf(customer)))
+            .map(({ orders, ...rest }) => ({
+              ...rest,
+              recentOrders: unwrapConnection(orders),
+            })),
           pageInfo: pageInfo(conn),
         });
       } catch (err) {
@@ -101,8 +126,10 @@ function registerCustomerTools(server) {
     {
       customerId: z.string().describe("Customer GID or bare numeric id."),
     },
-    async (args) => {
+    async (args, extra) => {
       try {
+        const identity = callerIdentity(extra);
+        if (identity.trust === "none") throw toolError("PRECONDITION", NOT_VERIFIED);
         // recentOrders capped at 5: enough to collapse the email→customer→orders
         // flow into one call without blowing up context for long-tenured customers.
         const query = `
@@ -156,6 +183,7 @@ function registerCustomerTools(server) {
               "(email/phone).",
           );
         }
+        assertOwnsRecord(identity, contactsOf(customer));
         const { orders, ...rest } = customer;
         return ok({ ...rest, recentOrders: unwrapConnection(orders) });
       } catch (err) {
@@ -272,4 +300,4 @@ function registerCustomerTools(server) {
   );
 }
 
-module.exports = { registerCustomerTools };
+module.exports = { registerCustomerTools, contactsOf };

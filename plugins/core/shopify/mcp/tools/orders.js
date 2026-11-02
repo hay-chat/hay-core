@@ -8,6 +8,13 @@ const { staleTracking, stalestShipment } = require("@hay/plugin-sdk/stale-tracki
 const { readReturnInstructions } = require("@hay/plugin-sdk/return-instructions");
 const { orderNotFoundError } = require("@hay/plugin-sdk/marketplace-orders");
 const {
+  callerIdentity,
+  lookupFor,
+  assertOwnsRecord,
+  NOT_VERIFIED,
+} = require("@hay/plugin-sdk/identity");
+const { contactsOf } = require("./customers");
+const {
   ok,
   fail,
   toolError,
@@ -15,6 +22,7 @@ const {
   pageInfo,
   toGid,
   assertNoUserErrors,
+  searchTerm,
 } = require("../lib/format");
 
 // Shared field set for single-order reads. Precomputes everything the support
@@ -335,7 +343,7 @@ function registerOrderTools(server) {
         let data;
         let first;
         for (const name of candidates) {
-          data = await shopifyGql(QUERY, { query: `name:"${name}"` });
+          data = await shopifyGql(QUERY, { query: searchTerm("name", name) });
           first = unwrapConnection(data.orders)[0];
           if (first) break;
         }
@@ -364,16 +372,19 @@ function registerOrderTools(server) {
         .describe("Customer GID, bare numeric id, or the customer's email address."),
       limit: z.number().int().optional().describe("Max orders to return (default 10)."),
     },
-    async (args) => {
+    async (args, extra) => {
       try {
+        const identity = callerIdentity(extra);
+        if (identity.trust === "none") throw toolError("PRECONDITION", NOT_VERIFIED);
         let id;
         if (args.customer_id.includes("@")) {
+          const { email } = lookupFor(identity, { email: args.customer_id.trim() });
           const FIND = `
             query FindCustomerByEmail($query: String!) {
               customers(first: 1, query: $query) { edges { node { id } } }
             }
           `;
-          const found = await shopifyGql(FIND, { query: `email:"${args.customer_id.trim()}"` });
+          const found = await shopifyGql(FIND, { query: searchTerm("email", email) });
           const customer = unwrapConnection(found.customers)[0];
           if (!customer) {
             throw toolError("NOT_FOUND", `No customer with the email ${args.customer_id}.`);
@@ -386,6 +397,8 @@ function registerOrderTools(server) {
         const QUERY = `
           query ListCustomerOrders($id: ID!, $first: Int!) {
             customer(id: $id) {
+              defaultEmailAddress { emailAddress }
+              defaultPhoneNumber { phoneNumber }
               orders(first: $first, sortKey: CREATED_AT, reverse: true) {
                 edges {
                   node {
@@ -409,6 +422,7 @@ function registerOrderTools(server) {
               "shopify_find_customer (email/phone).",
           );
         }
+        assertOwnsRecord(identity, contactsOf(data.customer));
         const conn = data.customer.orders;
         return ok({ items: unwrapConnection(conn), pageInfo: pageInfo(conn) });
       } catch (err) {
@@ -418,8 +432,9 @@ function registerOrderTools(server) {
   );
 
   // NOTE: no broad order-search tool on purpose. A customer-facing agent must only
-  // see orders belonging to the verified customer (shopify_list_customer_orders);
-  // a store-wide search is a data-exposure vector under prompt injection.
+  // see orders belonging to the verified customer (shopify_list_customer_orders
+  // checks the identity core sends with the call); a store-wide search is a
+  // data-exposure vector under prompt injection.
 
   server.tool(
     "shopify_update_order_shipping_address",
