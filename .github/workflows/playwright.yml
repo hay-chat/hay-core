@@ -4,6 +4,9 @@ name: Playwright Tests
 # required checks). Run on demand from the Actions tab via "Run workflow".
 on:
   workflow_dispatch:
+permissions:
+  contents: read
+
 jobs:
   test:
     timeout-minutes: 60
@@ -35,8 +38,8 @@ jobs:
           --health-retries 5
 
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: lts/*
       - name: Install dependencies
@@ -73,7 +76,7 @@ jobs:
           APP_PROTOCOL: http
           API_DOMAIN: localhost:3001
           DASHBOARD_DOMAIN: localhost:3000
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         if: ${{ !cancelled() }}
         with:
           name: playwright-report
