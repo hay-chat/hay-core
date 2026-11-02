@@ -7,7 +7,8 @@
  *   (optional) /escalate for human handoff, conversation-status sync
  *
  * package.json hay-plugin: { category: "channel", channel: "<provider>",
- *   capabilities: ["messages", "customers"] }
+ *   capabilities: ["messages", "customers"],
+ *   inactivity: { warningMinutes: 60, closeMinutes: 120 } }  // optional, see archetypes.md
  */
 
 import { defineHayPlugin } from "@hay/plugin-sdk";

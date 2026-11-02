@@ -10,6 +10,11 @@ import { getPluginRunnerService } from "./plugin-runner.service";
 import type { WorkerInfo } from "@server/types/plugin-sdk.types";
 import { createLogger } from "@server/lib/logger";
 import { registerServerAliasForPlugins } from "@server/lib/plugin-router-alias";
+import {
+  INACTIVITY_MINUTES_LIMITS,
+  isValidInactivityTiming,
+  type InactivityTiming,
+} from "@server/lib/inactivity-timing";
 import { config } from "@server/config/env";
 
 const logger = createLogger("plugin-manager");
@@ -31,6 +36,7 @@ interface HayPluginBlock {
   auth?: HayPluginManifest["auth"];
   channel?: string;
   rendering?: HayPluginManifest["rendering"];
+  inactivity?: unknown;
   autoActivate?: boolean;
   /** Enable this plugin automatically for newly created organizations. */
   defaultEnabled?: boolean;
@@ -276,6 +282,7 @@ export class PluginManagerService {
         auth: hayPlugin.auth || undefined, // Include auth config if present
         channel: hayPlugin.channel || undefined, // For channel-type plugins
         rendering: hayPlugin.rendering || undefined, // What the channel can show (D13-12)
+        inactivity: this.readInactivityTiming(pluginId, hayPlugin.inactivity),
         autoActivate: hayPlugin.autoActivate === true, // Eagerly load router at boot
         defaultEnabled: hayPlugin.defaultEnabled === true, // Enabled for new orgs
         trpcRouter: hayPlugin.trpcRouter || undefined, // Optional plugin-side tRPC router file
@@ -1053,6 +1060,22 @@ export class PluginManagerService {
     }
 
     return matches[0] ?? null;
+  }
+
+  /** When a channel plugin checks in on and closes a silent conversation; undefined = env default. */
+  getChannelInactivity(pluginId: string): InactivityTiming | undefined {
+    return this.registry.get(pluginId)?.manifest?.inactivity;
+  }
+
+  /** A declared `hay-plugin.inactivity`, or undefined (with a warning) when it is malformed. */
+  private readInactivityTiming(pluginId: string, value: unknown): InactivityTiming | undefined {
+    if (value === undefined) return undefined;
+    if (isValidInactivityTiming(value)) return value;
+    logger.warn(
+      { pluginId, inactivity: value, limits: INACTIVITY_MINUTES_LIMITS },
+      "Ignoring invalid hay-plugin.inactivity: closeMinutes and warningMinutes must be whole minutes in range, the check-in before the close",
+    );
+    return undefined;
   }
 
   /** What a channel plugin declares it can show (D13-12). Empty when nothing is declared. */

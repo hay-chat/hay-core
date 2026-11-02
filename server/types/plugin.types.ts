@@ -1,4 +1,5 @@
 import type { ChannelRendering } from "@server/lib/channel-rendering";
+import type { InactivityTiming } from "@server/lib/inactivity-timing";
 
 export interface HayPluginManifest {
   id: string;
@@ -18,6 +19,8 @@ export interface HayPluginManifest {
   channel?: string; // For channel-type plugins: which conversation channel this plugin handles (e.g., "whatsapp")
   /** What a channel can show (D13-12): see server/lib/channel-rendering.ts. */
   rendering?: ChannelRendering;
+  /** When a silent customer is checked in on and closed: see server/lib/inactivity-timing.ts. */
+  inactivity?: InactivityTiming;
   autoActivate?: boolean;
   /** Enabled automatically for newly created organizations (package.json hay-plugin.defaultEnabled). */
   defaultEnabled?: boolean;

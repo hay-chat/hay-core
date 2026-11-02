@@ -10,6 +10,10 @@
     "displayName": "Messenger",
     "category": "channel",
     "channel": "messenger",
+    "inactivity": {
+      "warningMinutes": 60,
+      "closeMinutes": 120
+    },
     "rendering": {
       "markdown": "plain",
       "productRecommendations": "text"
