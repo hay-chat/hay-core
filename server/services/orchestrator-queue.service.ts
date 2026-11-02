@@ -25,7 +25,9 @@ export type OrchestratorTrigger =
   // A person approved or rejected a held action (D4-5): one follow-up AI turn.
   | "approval_decided"
   // One simulated conversation of an offline run (D7-7), answered once.
-  | "simulation";
+  | "simulation"
+  // The shopper submitted an in-conversation form; the AI turn resumes with its answers.
+  | "form_submission";
 
 export interface OrchestratorMessage {
   messageId: string;

@@ -1,5 +1,6 @@
 <template>
   <Page :title="$t('channels.title')" :description="$t('channels.description')">
+    <SettingsTabs />
     <template #header>
       <Button variant="outline" size="sm" @click="goToMarketplace">
         <Store class="h-4 w-4 mr-2" />

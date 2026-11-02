@@ -1,118 +1,137 @@
-import { t, authenticatedProcedure } from "@server/trpc";
+import { t, scopedProcedure } from "@server/trpc";
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { vectorStoreService } from "@server/services/vector-store.service";
+import { documentRepository } from "@server/repositories/document.repository";
 import { createLogger } from "@server/lib/logger";
+import { boundedJsonRecord } from "@server/lib/validation/json-record";
+import { RESOURCES, ACTIONS } from "@server/types/scopes";
 
 const logger = createLogger("embeddings");
 
+const CHUNK_MAX_LENGTH = 20_000;
+const CHUNKS_MAX_COUNT = 100;
+const CHUNK_METADATA_MAX_BYTES = 4_096;
+
 const embedInput = z.object({
   documentId: z.string().uuid().nullable().optional(),
-  content: z.string().min(1),
-  metadata: z.record(z.any()).optional(),
+  content: z.string().min(1).max(CHUNK_MAX_LENGTH),
+  metadata: boundedJsonRecord(CHUNK_METADATA_MAX_BYTES).optional(),
   chunks: z
     .array(
       z.object({
-        content: z.string().min(1),
-        metadata: z.record(z.any()).optional(),
+        content: z.string().min(1).max(CHUNK_MAX_LENGTH),
+        metadata: boundedJsonRecord(CHUNK_METADATA_MAX_BYTES).optional(),
       }),
     )
+    .max(CHUNKS_MAX_COUNT)
     .optional(),
 });
 
 const searchInput = z.object({
-  query: z.string().min(1),
+  query: z.string().min(1).max(2_000),
   limit: z.number().min(1).max(100).default(10),
 });
 
 export const embeddingsRouter = t.router({
   // Add document embeddings
-  add: authenticatedProcedure.input(embedInput).mutation(async ({ ctx, input }) => {
-    const organizationId = ctx.organizationId;
+  add: scopedProcedure(RESOURCES.DOCUMENTS, ACTIONS.UPDATE)
+    .input(embedInput)
+    .mutation(async ({ ctx, input }) => {
+      const organizationId = ctx.organizationId;
 
-    if (!organizationId) {
-      throw new TRPCError({
-        code: "UNAUTHORIZED",
-        message: "Organization ID is required",
-      });
-    }
-
-    try {
-      // Initialize vector store if needed
-      if (!vectorStoreService.initialized) {
-        await vectorStoreService.initialize();
+      if (!organizationId) {
+        throw new TRPCError({
+          code: "UNAUTHORIZED",
+          message: "Organization ID is required",
+        });
       }
 
-      let chunks: Array<{ content: string; metadata?: Record<string, unknown> }> = [];
-
-      if (input.chunks && input.chunks.length > 0) {
-        // Use provided chunks
-        chunks = input.chunks;
-      } else {
-        // Create a single chunk from content
-        chunks = [
-          {
-            content: input.content,
-            metadata: input.metadata,
-          },
-        ];
+      if (
+        input.documentId &&
+        !(await documentRepository.findByIdAndOrganization(input.documentId, organizationId))
+      ) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Document not found" });
       }
 
-      // Add chunks to vector store
-      const ids = await vectorStoreService.addChunks(
-        organizationId,
-        input.documentId || null,
-        chunks,
-      );
+      try {
+        // Initialize vector store if needed
+        if (!vectorStoreService.initialized) {
+          await vectorStoreService.initialize();
+        }
 
-      return {
-        success: true,
-        embeddingIds: ids,
-        count: ids.length,
-      };
-    } catch (error) {
-      logger.error({ err: error }, "Error adding embeddings");
-      throw new TRPCError({
-        code: "INTERNAL_SERVER_ERROR",
-        message: "Failed to add embeddings",
-      });
-    }
-  }),
+        let chunks: Array<{ content: string; metadata?: Record<string, unknown> }> = [];
+
+        if (input.chunks && input.chunks.length > 0) {
+          // Use provided chunks
+          chunks = input.chunks;
+        } else {
+          // Create a single chunk from content
+          chunks = [
+            {
+              content: input.content,
+              metadata: input.metadata,
+            },
+          ];
+        }
+
+        // Add chunks to vector store
+        const ids = await vectorStoreService.addChunks(
+          organizationId,
+          input.documentId || null,
+          chunks,
+        );
+
+        return {
+          success: true,
+          embeddingIds: ids,
+          count: ids.length,
+        };
+      } catch (error) {
+        logger.error({ err: error }, "Error adding embeddings");
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "Failed to add embeddings",
+        });
+      }
+    }),
 
   // Search embeddings
-  search: authenticatedProcedure.input(searchInput).query(async ({ ctx, input }) => {
-    const organizationId = ctx.organizationId;
+  search: scopedProcedure(RESOURCES.DOCUMENTS, ACTIONS.READ)
+    .input(searchInput)
+    .query(async ({ ctx, input }) => {
+      const organizationId = ctx.organizationId;
 
-    if (!organizationId) {
-      throw new TRPCError({
-        code: "UNAUTHORIZED",
-        message: "Organization ID is required",
-      });
-    }
-
-    try {
-      // Initialize vector store if needed
-      if (!vectorStoreService.initialized) {
-        await vectorStoreService.initialize();
+      if (!organizationId) {
+        throw new TRPCError({
+          code: "UNAUTHORIZED",
+          message: "Organization ID is required",
+        });
       }
 
-      const results = await vectorStoreService.search(organizationId, input.query, input.limit);
+      try {
+        // Initialize vector store if needed
+        if (!vectorStoreService.initialized) {
+          await vectorStoreService.initialize();
+        }
 
-      return {
-        results,
-        count: results.length,
-      };
-    } catch (error) {
-      logger.error({ err: error }, "Error searching embeddings");
-      throw new TRPCError({
-        code: "INTERNAL_SERVER_ERROR",
-        message: "Failed to search embeddings",
-      });
-    }
-  }),
+        const results = await vectorStoreService.search(organizationId, input.query, input.limit);
+
+        return {
+          results,
+          count: results.length,
+        };
+      } catch (error) {
+        logger.error({ err: error }, "Error searching embeddings");
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "Failed to search embeddings",
+        });
+      }
+    }),
 
   // Get statistics
-  stats: authenticatedProcedure.query(async ({ ctx }) => {
+  stats: scopedProcedure(RESOURCES.DOCUMENTS, ACTIONS.READ).query(async ({ ctx }) => {
     const organizationId = ctx.organizationId;
 
     if (!organizationId) {
@@ -135,7 +154,7 @@ export const embeddingsRouter = t.router({
   }),
 
   // Delete by document
-  deleteByDocument: authenticatedProcedure
+  deleteByDocument: scopedProcedure(RESOURCES.DOCUMENTS, ACTIONS.DELETE)
     .input(
       z.object({
         documentId: z.string().uuid(),

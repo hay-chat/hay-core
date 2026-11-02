@@ -25,6 +25,7 @@ import { pluginInstanceRepository } from "@server/repositories/plugin-instance.r
 import { hookManager } from "@server/services/hooks/hook-manager";
 import type { HandoffTicketConfig, HandoffTicketState } from "@server/types/handoff-ticket.types";
 import { getUTCNow } from "@server/utils/date.utils";
+import { workerFetch } from "@server/lib/worker-client";
 
 const logger = createLogger("handoff-tickets");
 
@@ -323,7 +324,7 @@ export class HandoffTicketsService {
     const timeout = setTimeout(() => controller.abort(), WORKER_TIMEOUT_MS);
     try {
       const port = await (this.deps.workerPort ?? defaultWorkerPort)(organizationId, pluginId);
-      const response = await fetch(`http://localhost:${port}${path}`, {
+      const response = await workerFetch(port, `${path}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),

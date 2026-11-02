@@ -1,5 +1,6 @@
 <template>
   <Page :title="$t('general.title')" :description="$t('general.description')">
+    <SettingsTabs />
     <!-- Header -->
     <template #header>
       <div class="flex items-center space-x-2">
@@ -43,6 +44,14 @@
           :placeholder="$t('organization.aboutPlaceholder')"
           :helper-text="$t('organization.aboutHelper')"
           :maxlength="10000"
+        />
+
+        <Input
+          v-model="settings.organizationWebsite"
+          :label="$t('organization.website')"
+          :placeholder="$t('organization.websitePlaceholder')"
+          :helper-text="$t('organization.websiteHelper')"
+          :maxlength="255"
         />
 
         <!-- Organization Logo -->
@@ -538,6 +547,7 @@ type DataRetentionSettings = {
 type PlatformSettings = {
   organizationName: string;
   organizationAbout: string;
+  organizationWebsite: string;
   defaultLanguage: NonNullable<UpdateSettingsInput["defaultLanguage"]>;
   timezone: NonNullable<UpdateSettingsInput["timezone"]>;
   dateFormat: NonNullable<UpdateSettingsInput["dateFormat"]>;
@@ -557,6 +567,7 @@ const isSaving = ref(false);
 const settings = ref<PlatformSettings>({
   organizationName: "",
   organizationAbout: "",
+  organizationWebsite: "",
   defaultLanguage: "en" as SupportedLanguage,
   timezone: "UTC" as Timezone,
   dateFormat: "MM/DD/YYYY" as DateFormat,
@@ -732,6 +743,7 @@ const saveSettings = async () => {
     const response = await Hay.organizations.updateSettings.mutate({
       name: settings.value.organizationName,
       about: settings.value.organizationAbout,
+      website: settings.value.organizationWebsite,
       defaultLanguage: settings.value.defaultLanguage,
       timezone: settings.value.timezone,
       dateFormat: settings.value.dateFormat,
@@ -757,6 +769,8 @@ const saveSettings = async () => {
     });
 
     if (response.success) {
+      // The server normalizes the website ("shop.com" → "https://shop.com").
+      settings.value.organizationWebsite = response.data.website;
       // Update original settings to new saved state
       originalSettings.value = JSON.parse(JSON.stringify(settings.value));
 
@@ -835,6 +849,7 @@ const resetToDefaults = () => {
     settings.value = {
       organizationName: originalSettings.value.organizationName,
       organizationAbout: originalSettings.value.organizationAbout,
+      organizationWebsite: originalSettings.value.organizationWebsite,
       defaultLanguage: "en" as SupportedLanguage,
       timezone: "UTC" as Timezone,
       dateFormat: "MM/DD/YYYY" as DateFormat,
@@ -904,6 +919,7 @@ onMounted(async () => {
     // Update only platform settings, keep other settings as mock for now
     settings.value.organizationName = orgSettings.name;
     settings.value.organizationAbout = orgSettings.about || "";
+    settings.value.organizationWebsite = orgSettings.website || "";
     settings.value.defaultLanguage = orgSettings.defaultLanguage;
     settings.value.timezone = orgSettings.timezone;
     settings.value.dateFormat = orgSettings.dateFormat;

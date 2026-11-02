@@ -6,6 +6,10 @@ jest.mock("@server/services/webhook-router.service", () => ({ webhookRouterServi
 jest.mock("@server/repositories/organization.repository", () => ({
   organizationRepository: {},
 }));
+jest.mock("@server/repositories/plugin-instance.repository", () => ({
+  pluginInstanceRepository: {},
+}));
+jest.mock("@server/services/plugin-runner.service", () => ({ getPluginRunnerService: jest.fn() }));
 
 import type { Request } from "express";
 import { buildWorkerForward, isWorkerInternalPath } from "../../routes/v1/plugins/proxy";
@@ -46,7 +50,7 @@ describe("buildWorkerForward", () => {
 
     expect(body).toBe(raw);
     expect(headers["content-type"]).toBe("application/x-www-form-urlencoded");
-    expect(headers.host).toBe("localhost:4321");
+    expect(headers.host).toBe("127.0.0.1:4321");
     expect(headers["x-original-body-base64"]).toBeUndefined();
     expect(headers["x-original-content-type"]).toBeUndefined();
   });
@@ -110,6 +114,15 @@ describe("buildWorkerForward header hygiene", () => {
 
     expect(headers["x-hay-webhook-verified"]).toBeUndefined();
   });
+
+  it("never forwards a caller-supplied worker secret header", () => {
+    const { headers } = buildWorkerForward(
+      fakeRequest({ rawBody: "{}", headers: { "x-hay-worker-secret": "guess" } }),
+      1,
+    );
+
+    expect(headers["x-hay-worker-secret"]).toBeUndefined();
+  });
 });
 
 describe("isWorkerInternalPath", () => {
@@ -135,6 +148,8 @@ describe("isWorkerInternalPath", () => {
     "/tickets/create",
     "/tickets/form",
     "/Disputes/evidence",
+    "/setup/status",
+    "/webchat/gate/conversation.create",
   ])("blocks %s", (path) => {
     expect(isWorkerInternalPath(path)).toBe(true);
   });

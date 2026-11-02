@@ -1,9 +1,12 @@
-import { t, authenticatedProcedure, scopedProcedure } from "@server/trpc";
+import { t, scopedProcedure } from "@server/trpc";
 import { RESOURCES, ACTIONS } from "@server/types/scopes";
 import { auditLogService } from "@server/services/audit-log.service";
 import { conversationSecretService } from "../../../services/conversation-secret.service";
 import { z } from "zod";
-import { ConversationService } from "../../../services/conversation.service";
+import {
+  ConversationReferenceNotFoundError,
+  ConversationService,
+} from "../../../services/conversation.service";
 import { MessageType } from "../../../database/entities/message.entity";
 import { Conversation } from "../../../database/entities/conversation.entity";
 import { TRPCError } from "@trpc/server";
@@ -101,14 +104,28 @@ const settableStatusSchema = z.enum([
   "closed",
 ]);
 
+/**
+ * The only conversation metadata a dashboard or API client may set: marking a
+ * playground conversation and its starting action mode. Everything else in
+ * metadata (isPlayground, runKind, channel ids, ...) is set by the server and
+ * decides whether writes are simulated or the conversation is billed.
+ */
+export function clientConversationMetadata(
+  metadata: Record<string, unknown> | undefined,
+): Record<string, unknown> {
+  const kept: Record<string, unknown> = {};
+  if (metadata?.sourceId === "playground") kept.sourceId = "playground";
+  if (typeof metadata?.dryRun === "boolean") kept.dryRun = metadata.dryRun;
+  return kept;
+}
+
 const createConversationSchema = z.object({
   title: z.string().min(1).max(255).optional(),
   agentId: z.string().uuid().optional(),
-  language: z.string().optional(),
-  metadata: z.record(z.any()).optional(),
+  language: z.string().max(35).optional(),
+  metadata: z.record(z.unknown()).optional(),
   status: settableStatusSchema.optional(),
   customerId: z.string().uuid().optional(),
-  organizationId: z.string().uuid().optional(),
   /** D7-5: a test conversation that runs this playbook version (usually the draft). */
   playbookVersionOverride: z
     .object({ playbookId: z.string().uuid(), versionId: z.string().uuid() })
@@ -118,25 +135,14 @@ const createConversationSchema = z.object({
 const updateConversationSchema = z.object({
   title: z.string().min(1).max(255).optional(),
   status: settableStatusSchema.optional(),
-  metadata: z.record(z.any()).optional(),
-  customer_id: z.string().uuid().optional(),
 });
 
-const messageSchema = z.object({
-  type: z.nativeEnum(MessageType),
-  content: z.string(),
-  usage_metadata: z.record(z.any()).optional(),
-});
-
-const addMessageSchema = z.object({
-  conversationId: z.string().uuid(),
-  message: messageSchema,
-});
+const MESSAGE_CONTENT_MAX_LENGTH = 20_000;
 
 const sendMessageSchema = z
   .object({
     conversationId: z.string().uuid(),
-    content: z.string(),
+    content: z.string().max(MESSAGE_CONTENT_MAX_LENGTH),
     role: z.enum(["user", "assistant"]).optional().default("user"),
     /** D8-16: files from `uploadAttachment`, sent by a person who took over. */
     attachmentIds: z.array(z.string().uuid()).max(STAFF_ATTACHMENT_MAX_COUNT).optional(),
@@ -160,7 +166,7 @@ export const conversationsRouter = t.router({
    * first) and the ones a human is currently handling. One query, no paging:
    * both sets are small by nature (a backlog here is the problem to surface).
    */
-  attention: authenticatedProcedure.query(async ({ ctx }) => {
+  attention: scopedProcedure(RESOURCES.CONVERSATIONS, ACTIONS.READ).query(async ({ ctx }) => {
     const rows = (await AppDataSource.query(
       `
         SELECT
@@ -239,7 +245,7 @@ export const conversationsRouter = t.router({
    * Active conversations for dashboard widgets.
    * Includes conversations handled by Hay or a human.
    */
-  active: authenticatedProcedure.query(async ({ ctx }) => {
+  active: scopedProcedure(RESOURCES.CONVERSATIONS, ACTIONS.READ).query(async ({ ctx }) => {
     const organizationId = ctx.organizationId;
     if (!organizationId) {
       throw new TRPCError({ code: "UNAUTHORIZED", message: "Organization context required" });
@@ -315,7 +321,10 @@ export const conversationsRouter = t.router({
    */
   byCustomer: scopedProcedure(RESOURCES.CONVERSATIONS, ACTIONS.READ)
     .input(
-      z.object({ customerId: z.string().uuid(), limit: z.number().min(1).max(100).default(50) }),
+      z.object({
+        customerId: z.string().uuid(),
+        limit: z.number().int().min(1).max(100).default(50),
+      }),
     )
     .query(async ({ ctx, input }) => {
       const organizationId = ctx.organizationId;
@@ -365,7 +374,7 @@ export const conversationsRouter = t.router({
   /**
    * Escalation (takeover) counts for dashboard widgets.
    */
-  escalations: authenticatedProcedure
+  escalations: scopedProcedure(RESOURCES.CONVERSATIONS, ACTIONS.READ)
     .input(z.object({ period: z.enum(["today", "week"]) }))
     .query(async ({ ctx, input }) => {
       const organizationId = ctx.organizationId;
@@ -446,9 +455,12 @@ export const conversationsRouter = t.router({
       };
     }),
 
-  escalatedConversations: authenticatedProcedure
+  escalatedConversations: scopedProcedure(RESOURCES.CONVERSATIONS, ACTIONS.READ)
     .input(
-      z.object({ period: z.enum(["today", "week"]), limit: z.number().optional().default(50) }),
+      z.object({
+        period: z.enum(["today", "week"]),
+        limit: z.number().int().min(1).max(200).optional().default(50),
+      }),
     )
     .query(async ({ ctx, input }) => {
       const organizationId = ctx.organizationId;
@@ -503,10 +515,10 @@ export const conversationsRouter = t.router({
       return conversations;
     }),
 
-  dailyStats: authenticatedProcedure
+  dailyStats: scopedProcedure(RESOURCES.CONVERSATIONS, ACTIONS.READ)
     .input(
       z.object({
-        days: z.number().optional().default(30),
+        days: z.number().int().min(1).max(366).optional().default(30),
         startDate: z.string().datetime().optional(),
         endDate: z.string().datetime().optional(),
       }),
@@ -521,7 +533,7 @@ export const conversationsRouter = t.router({
       return stats;
     }),
 
-  listByAgent: authenticatedProcedure
+  listByAgent: scopedProcedure(RESOURCES.CONVERSATIONS, ACTIONS.READ)
     .input(z.object({ agentId: z.string().uuid() }))
     .query(async ({ ctx, input }) => {
       const conversations = await conversationService.getConversationsByAgent(
@@ -531,7 +543,7 @@ export const conversationsRouter = t.router({
       return conversations;
     }),
 
-  get: authenticatedProcedure
+  get: scopedProcedure(RESOURCES.CONVERSATIONS, ACTIONS.READ)
     .input(z.object({ id: z.string().uuid() }))
     .query(async ({ ctx, input }) => {
       const organizationId = ctx.organizationId;
@@ -553,18 +565,16 @@ export const conversationsRouter = t.router({
       return conversation;
     }),
 
-  create: authenticatedProcedure
+  create: scopedProcedure(RESOURCES.CONVERSATIONS, ACTIONS.CREATE)
     .input(createConversationSchema)
     .mutation(async ({ ctx, input }) => {
-      // Organization ID must come from auth context or explicit input field (validated as UUID above)
-      const organizationId = ctx.organizationId || input.organizationId;
-      if (!organizationId) {
-        throw new TRPCError({
-          code: "BAD_REQUEST",
-          message: "Organization ID is required",
-        });
-      }
-      const { playbookVersionOverride, ...data } = input;
+      const organizationId = ctx.organizationId!;
+      const { playbookVersionOverride, customerId, ...rest } = input;
+      const data = {
+        ...rest,
+        customer_id: customerId,
+        metadata: clientConversationMetadata(rest.metadata),
+      };
       if (playbookVersionOverride) {
         if (!isTestConversation(data.metadata)) {
           throw new TRPCError({
@@ -587,12 +597,20 @@ export const conversationsRouter = t.router({
           [PLAYBOOK_VERSION_OVERRIDE_KEY]: playbookVersionOverride,
         };
       }
-      const conversation = await conversationService.createConversation(organizationId, data);
+      let conversation: Conversation;
+      try {
+        conversation = await conversationService.createConversation(organizationId, data);
+      } catch (error) {
+        if (error instanceof ConversationReferenceNotFoundError) {
+          throw new TRPCError({ code: "NOT_FOUND", message: error.message });
+        }
+        throw error;
+      }
 
       return conversation;
     }),
 
-  update: authenticatedProcedure
+  update: scopedProcedure(RESOURCES.CONVERSATIONS, ACTIONS.UPDATE)
     .input(
       z.object({
         id: z.string().uuid(),
@@ -621,7 +639,7 @@ export const conversationsRouter = t.router({
       return conversation;
     }),
 
-  delete: authenticatedProcedure
+  delete: scopedProcedure(RESOURCES.CONVERSATIONS, ACTIONS.DELETE)
     .input(z.object({ id: z.string().uuid() }))
     .mutation(async ({ ctx, input }) => {
       const deleted = await conversationService.deleteConversation(ctx.organizationId!, input.id);
@@ -645,11 +663,11 @@ export const conversationsRouter = t.router({
       return { success: true };
     }),
 
-  getMessages: authenticatedProcedure
+  getMessages: scopedProcedure(RESOURCES.CONVERSATIONS, ACTIONS.READ)
     .input(
       z.object({
         conversationId: z.string().uuid(),
-        limit: z.number().optional().default(50),
+        limit: z.number().int().min(1).max(500).optional().default(50),
       }),
     )
     .query(async ({ ctx, input }) => {
@@ -676,110 +694,87 @@ export const conversationsRouter = t.router({
       return messages;
     }),
 
-  addMessage: authenticatedProcedure.input(addMessageSchema).mutation(async ({ ctx, input }) => {
-    const conversation = await conversationService.getConversation(
-      input.conversationId,
-      ctx.organizationId!,
-    );
+  sendMessage: scopedProcedure(RESOURCES.MESSAGES, ACTIONS.CREATE)
+    .input(sendMessageSchema)
+    .mutation(async ({ input, ctx }) => {
+      const conversation = await conversationRepository.findById(input.conversationId);
 
-    if (!conversation) {
-      throw new TRPCError({
-        code: "NOT_FOUND",
-        message: "Conversation not found",
-      });
-    }
-
-    // The addMessage method now handles cooldown logic for Customer messages
-    const message = await conversation.addMessage({
-      content: input.message.content,
-      type: input.message.type,
-      metadata: input.message.usage_metadata,
-    });
-
-    // Resolution detection is now handled by the perception layer
-    // which checks for MessageIntent.CLOSE_SATISFIED or CLOSE_UNSATISFIED
-
-    return message;
-  }),
-
-  sendMessage: authenticatedProcedure.input(sendMessageSchema).mutation(async ({ input, ctx }) => {
-    const conversation = await conversationRepository.findById(input.conversationId);
-
-    if (!conversation) {
-      throw new TRPCError({
-        code: "NOT_FOUND",
-        message: "Conversation not found",
-      });
-    }
-
-    // Verify organization access
-    if (conversation.organization_id !== ctx.organizationId) {
-      throw new TRPCError({
-        code: "NOT_FOUND",
-        message: "Conversation not found",
-      });
-    }
-
-    // Determine message type based on role and takeover status
-    let messageType: MessageType;
-    if (input.role === "assistant") {
-      // If conversation is taken over by current user, it's a human agent message
-      const isTakenOverByCurrentUser =
-        conversation.status === "human-took-over" && conversation.assigned_user_id === ctx.user?.id;
-
-      messageType = isTakenOverByCurrentUser ? MessageType.HUMAN_AGENT : MessageType.BOT_AGENT;
-    } else {
-      messageType = MessageType.CUSTOMER;
-    }
-
-    // D8-16: only a person who took over sends files (delivered by the channel).
-    let attachments: Awaited<ReturnType<typeof staffAttachmentsFromUploads>> = [];
-    if (input.attachmentIds?.length) {
-      if (messageType !== MessageType.HUMAN_AGENT) {
+      if (!conversation) {
         throw new TRPCError({
-          code: "PRECONDITION_FAILED",
-          message: "Take over the conversation before sending files",
+          code: "NOT_FOUND",
+          message: "Conversation not found",
         });
       }
-      try {
-        attachments = await staffAttachmentsFromUploads({
-          organizationId: conversation.organization_id,
-          userId: ctx.user!.id,
-          uploadIds: input.attachmentIds,
+
+      // Verify organization access
+      if (conversation.organization_id !== ctx.organizationId) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Conversation not found",
         });
-      } catch (error) {
-        if (!(error instanceof StaffAttachmentRejectedError)) throw error;
-        throw new TRPCError({ code: "BAD_REQUEST", message: error.message });
       }
-    }
 
-    // The widget shows a person's reply as "10:42 · Marina" (first name only)
-    let senderFirstName: string | undefined;
-    if (messageType === MessageType.HUMAN_AGENT) {
-      const { userRepository } = await import("../../../repositories/user.repository");
-      senderFirstName = agentFirstName(await userRepository.findById(ctx.user!.id));
-    }
+      // Determine message type based on role and takeover status
+      let messageType: MessageType;
+      if (input.role === "assistant") {
+        // If conversation is taken over by current user, it's a human agent message
+        const isTakenOverByCurrentUser =
+          conversation.status === "human-took-over" &&
+          conversation.assigned_user_id === ctx.user?.id;
 
-    // The addMessage method now handles cooldown logic for Customer messages
-    const message = await conversation.addMessage({
-      content: input.content,
-      type: messageType,
-      ...(attachments.length ? { attachments } : {}),
-      metadata: {
-        sender: input.role || "user",
-        sentByUserId: ctx.user?.id,
-        agentFirstName: senderFirstName,
-      },
-    });
+        messageType = isTakenOverByCurrentUser ? MessageType.HUMAN_AGENT : MessageType.BOT_AGENT;
+      } else {
+        messageType = MessageType.CUSTOMER;
+      }
 
-    return message;
-  }),
+      // D8-16: only a person who took over sends files (delivered by the channel).
+      let attachments: Awaited<ReturnType<typeof staffAttachmentsFromUploads>> = [];
+      if (input.attachmentIds?.length) {
+        if (messageType !== MessageType.HUMAN_AGENT) {
+          throw new TRPCError({
+            code: "PRECONDITION_FAILED",
+            message: "Take over the conversation before sending files",
+          });
+        }
+        try {
+          attachments = await staffAttachmentsFromUploads({
+            organizationId: conversation.organization_id,
+            userId: ctx.user!.id,
+            uploadIds: input.attachmentIds,
+          });
+        } catch (error) {
+          if (!(error instanceof StaffAttachmentRejectedError)) throw error;
+          throw new TRPCError({ code: "BAD_REQUEST", message: error.message });
+        }
+      }
+
+      // The widget shows a person's reply as "10:42 · Marina" (first name only)
+      let senderFirstName: string | undefined;
+      if (messageType === MessageType.HUMAN_AGENT) {
+        const { userRepository } = await import("../../../repositories/user.repository");
+        senderFirstName = agentFirstName(await userRepository.findById(ctx.user!.id));
+      }
+
+      // The addMessage method now handles cooldown logic for Customer messages
+      const message = await conversation.addMessage({
+        content: input.content,
+        type: messageType,
+        ...(attachments.length ? { attachments } : {}),
+        metadata: {
+          sender: input.role || "user",
+          sentByUserId: ctx.user?.id,
+          agentFirstName: senderFirstName,
+        },
+      });
+
+      return message;
+    }),
 
   /**
    * D8-16: store a file a person picked in the Inbox composer. Sent with the
    * next `sendMessage` (attachmentIds); unsent files are swept after a day.
    */
-  uploadAttachment: authenticatedProcedure
+  uploadAttachment: scopedProcedure(RESOURCES.MESSAGES, ACTIONS.CREATE)
     .input(
       z.object({
         conversationId: z.string().uuid(),
@@ -825,7 +820,7 @@ export const conversationsRouter = t.router({
    * templates once the 24 h reply window closed). `supported: false` when the
    * channel has none.
    */
-  channelTemplates: authenticatedProcedure
+  channelTemplates: scopedProcedure(RESOURCES.CONVERSATIONS, ACTIONS.READ)
     .input(z.object({ conversationId: z.string().uuid() }))
     .query(async ({ ctx, input }) => {
       const conversation = await conversationRepository.findById(input.conversationId);
@@ -848,7 +843,7 @@ export const conversationsRouter = t.router({
    * Stored as a human-agent message with the rendered text; the channel plugin
    * sends the template itself from `metadata.channelTemplate` on delivery.
    */
-  sendChannelTemplate: authenticatedProcedure
+  sendChannelTemplate: scopedProcedure(RESOURCES.MESSAGES, ACTIONS.CREATE)
     .input(
       z.object({
         conversationId: z.string().uuid(),
@@ -912,7 +907,7 @@ export const conversationsRouter = t.router({
       return message;
     }),
 
-  takeover: authenticatedProcedure
+  takeover: scopedProcedure(RESOURCES.CONVERSATIONS, ACTIONS.UPDATE)
     .input(
       z.object({
         conversationId: z.string().uuid(),
@@ -1018,7 +1013,7 @@ export const conversationsRouter = t.router({
       return conversation;
     }),
 
-  release: authenticatedProcedure
+  release: scopedProcedure(RESOURCES.CONVERSATIONS, ACTIONS.UPDATE)
     .input(
       z.object({
         conversationId: z.string().uuid(),
@@ -1107,7 +1102,7 @@ export const conversationsRouter = t.router({
       return conversation;
     }),
 
-  getAssignedUser: authenticatedProcedure
+  getAssignedUser: scopedProcedure(RESOURCES.CONVERSATIONS, ACTIONS.READ)
     .input(z.object({ conversationId: z.string().uuid() }))
     .query(async ({ ctx, input }) => {
       const conversation = await conversationRepository.findById(input.conversationId);
@@ -1147,7 +1142,7 @@ export const conversationsRouter = t.router({
       };
     }),
 
-  close: authenticatedProcedure
+  close: scopedProcedure(RESOURCES.CONVERSATIONS, ACTIONS.UPDATE)
     .input(z.object({ conversationId: z.string().uuid() }))
     .mutation(async ({ ctx, input }) => {
       const conversation = await conversationRepository.findById(input.conversationId);
@@ -1215,12 +1210,12 @@ export const conversationsRouter = t.router({
    * Release a reply held by approval mode. Delivery to the customer (webchat,
    * WhatsApp, Instagram, ...) happens inside the service.
    */
-  approveMessage: authenticatedProcedure
+  approveMessage: scopedProcedure(RESOURCES.CONVERSATIONS, ACTIONS.UPDATE)
     .input(
       z.object({
         messageId: z.string().uuid(),
         // An empty edit would be delivered as an empty bubble; reject it here.
-        editedContent: z.string().trim().min(1).optional(),
+        editedContent: z.string().trim().min(1).max(MESSAGE_CONTENT_MAX_LENGTH).optional(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
@@ -1232,11 +1227,11 @@ export const conversationsRouter = t.router({
       });
     }),
 
-  blockMessage: authenticatedProcedure
+  blockMessage: scopedProcedure(RESOURCES.CONVERSATIONS, ACTIONS.UPDATE)
     .input(
       z.object({
         messageId: z.string().uuid(),
-        reason: z.string().optional(),
+        reason: z.string().max(2000).optional(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
@@ -1297,7 +1292,7 @@ export const conversationsRouter = t.router({
    * Set or remove legal hold on a conversation
    * Conversations with legal hold are exempt from automatic data retention anonymization
    */
-  setLegalHold: authenticatedProcedure
+  setLegalHold: scopedProcedure(RESOURCES.CONVERSATIONS, ACTIONS.MANAGE)
     .input(
       z.object({
         conversationId: z.string().uuid(),
@@ -1354,7 +1349,7 @@ export const conversationsRouter = t.router({
       return { success: true };
     }),
 
-  export: authenticatedProcedure
+  export: scopedProcedure(RESOURCES.CONVERSATIONS, ACTIONS.READ)
     .input(
       z.object({
         conversationId: z.string().uuid(),
