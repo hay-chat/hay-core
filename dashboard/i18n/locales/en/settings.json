@@ -81,7 +81,14 @@
     "similarityThresholdHelper": "Lower threshold for broader search (default: 0.3)",
     "fallbackMessage": "Fallback Message",
     "fallbackMessagePlaceholder": "Enter fallback message...",
-    "fallbackMessageHelper": "Message shown when confidence is low and escalation is disabled. Will be automatically translated to match conversation language."
+    "fallbackMessageHelper": "Message shown when confidence is low and escalation is disabled. Will be automatically translated to match conversation language.",
+    "escalationOff": {
+      "title": "Switch human escalation off?",
+      "description": "Replies the AI is not confident about will be sent to customers instead of going to your team.",
+      "instruction": "Type {word} to confirm.",
+      "word": "TURN OFF",
+      "confirm": "Switch off escalation"
+    }
   },
   "danger": {
     "title": "Danger Zone",

@@ -102,7 +102,6 @@ interface RedisEvent {
 
 interface RedisEventPayload {
   type?: string;
-  isPlayground?: boolean;
   deliveryState?: string;
   [key: string]: unknown;
 }
@@ -212,15 +211,12 @@ export class WebSocketService {
 
       // Customer-facing types plus agent join/leave lines (visible via webchat)
       const isPublicMessage = isWidgetVisibleMessage(payload?.type, payload?.metadata);
-      const isPlayground = payload?.isPlayground === true;
 
       // Always send ALL messages to dashboard (organization clients) for full visibility
       const orgSent = this.sendToOrganization(organizationId, messagePayload);
 
-      // Send to conversation clients (webchat) if:
-      // 1. Public message type with SENT delivery state (normal webchat), OR
-      // 2. ANY message type for playground conversations (demo mode shows all internal events)
-      if ((isPublicMessage && payload?.deliveryState === "sent") || isPlayground) {
+      // Conversation clients (webchat) only get public messages once SENT.
+      if (isPublicMessage && payload?.deliveryState === "sent") {
         // Files get signed links first (a DB lookup), so this send is async.
         void toPublicAttachments(payload?.attachments, organizationId)
           .catch((error) => {
@@ -230,12 +226,10 @@ export class WebSocketService {
           .then((attachments) => {
             const conversationSent = this.sendToConversation(
               conversationId,
-              isPlayground
-                ? { ...messagePayload, data: { ...payload, attachments } }
-                : toPublicMessageEvent(conversationId, payload, attachments),
+              toPublicMessageEvent(conversationId, payload, attachments),
             );
             logger.debug(
-              { messageType: payload?.type, conversationSent, orgSent, isPlayground },
+              { messageType: payload?.type, conversationSent, orgSent },
               "Broadcasted message to conversation and org clients",
             );
           });

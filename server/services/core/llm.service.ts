@@ -1,12 +1,11 @@
 import { Message, MessageType } from "@server/database/entities/message.entity";
 import { config } from "@server/config/env";
-import fs from "fs";
-import path from "path";
 import { createLogger } from "@server/lib/logger";
 import { llmProviderFactory } from "@server/services/llm/llm-provider.factory";
 import { emitUsage } from "@server/services/llm/usage-sink";
 import { modelFlags } from "@server/services/llm/model-catalog";
 import { describeAttachmentsForAgent } from "@server/services/media-analysis/agent-view";
+import { renderToolResult } from "@server/services/core/prompt-data";
 import {
   buildRepairMessages,
   StructuredOutputError,
@@ -91,20 +90,6 @@ export interface EmbeddingOptions {
 }
 
 export class LLMService {
-  private logFilePath: string;
-
-  constructor() {
-    // Create logs directory if it doesn't exist
-    const logsDir = path.join(process.cwd(), "logs");
-    if (!fs.existsSync(logsDir)) {
-      fs.mkdirSync(logsDir, { recursive: true });
-    }
-
-    // Create log file path with current date
-    const today = new Date().toISOString().split("T")[0];
-    this.logFilePath = path.join(logsDir, `llm-${today}.log`);
-  }
-
   /** Resolve the org's provider bundle and build the provider-neutral request. */
   private async resolveChat(options: ChatOptions): Promise<{
     bundle: Awaited<ReturnType<typeof llmProviderFactory.forOrganization>>;
@@ -205,7 +190,18 @@ export class LLMService {
       tier,
       region: bundle.region,
     });
-    this.logChatResultDebugInfo(result);
+    logger.debug(
+      {
+        provider: result.provider,
+        model: result.model,
+        finishReason: result.finishReason,
+        promptTokens: result.usage.promptTokens,
+        cachedPromptTokens: result.usage.cachedPromptTokens,
+        completionTokens: result.usage.completionTokens,
+        responseLength: result.content?.length ?? 0,
+      },
+      "LLM chat completed",
+    );
 
     if (!result.content) {
       throw new Error("No content received from LLM provider");
@@ -369,105 +365,83 @@ export class LLMService {
     return messages;
   }
 
+  /**
+   * Conversation messages as chat turns. Only what the customer and the agents
+   * said keeps its speaker's role. Tool results are data from outside systems:
+   * they go in a user turn fenced as <tool_result>, never as something the
+   * assistant said. Document messages are skipped: their content (and source
+   * URL) reaches the planner once, in the prompt's <knowledge> block. They stay
+   * stored in full for the inbox, the link check and the fact check. The active playbook is
+   * the business's own instructions, so it is a system turn.
+   */
   private serializeMessages(messages: Message[]): ChatMessage[] {
-    return messages.map((message) => {
-      let role: "system" | "user" | "assistant";
-
+    const turns: ChatMessage[] = [];
+    for (const message of messages) {
       switch (message.type) {
-        case MessageType.CUSTOMER:
-          role = "user";
-          break;
-        case MessageType.SYSTEM:
-          role = "system";
-          break;
-        case MessageType.HUMAN_AGENT:
-        case MessageType.BOT_AGENT:
-        case MessageType.TOOL:
-        case MessageType.PRODUCT_RECOMMENDATION:
-        default:
-          role = "assistant";
-          break;
-      }
-
-      // For TOOL messages, include the actual tool output in the content
-      let content = message.content;
-      if (message.type === MessageType.TOOL && message.metadata?.toolOutput) {
-        const toolOutput = message.metadata.toolOutput;
-
-        // Extract the actual data from MCP format if present
-        let formattedOutput = toolOutput;
-        if (
-          typeof toolOutput === "object" &&
-          toolOutput !== null &&
-          "content" in toolOutput &&
-          Array.isArray(toolOutput.content)
-        ) {
-          const mcpContent = toolOutput.content as Array<{ text?: string; type?: string }>;
-          if (mcpContent.length > 0 && mcpContent[0].text) {
-            try {
-              formattedOutput = JSON.parse(mcpContent[0].text);
-            } catch {
-              formattedOutput = mcpContent[0].text;
-            }
-          }
+        case MessageType.DOCUMENT:
+          continue;
+        case MessageType.CUSTOMER: {
+          // What the vision pass read from the customer's photos and PDFs (D8-11).
+          const files = message.attachments?.length
+            ? describeAttachmentsForAgent(message.attachments)
+            : "";
+          const content = files
+            ? message.content
+              ? `${message.content}\n${files}`
+              : files
+            : message.content;
+          turns.push({ role: "user", content });
+          continue;
         }
-
-        // Include the arguments that were sent so the planner can see exactly
-        // what it submitted — essential for correcting a failed call (e.g. it
-        // sent `product_id` when the tool's schema requires `id`).
-        const toolInput = message.metadata.toolInput;
-        const inputLine =
-          toolInput !== undefined ? `\nArguments sent:\n${JSON.stringify(toolInput, null, 2)}` : "";
-
-        content = `Tool: ${message.metadata.toolName || "unknown"}\nStatus: ${message.metadata.toolStatus || "unknown"}${inputLine}\nResult:\n${JSON.stringify(formattedOutput, null, 2)}`;
+        case MessageType.SYSTEM:
+        case MessageType.PLAYBOOK:
+          turns.push({ role: "system", content: message.content });
+          continue;
+        case MessageType.TOOL:
+          turns.push({ role: "user", content: this.serializeToolMessage(message) });
+          continue;
+        default:
+          turns.push({ role: "assistant", content: message.content });
       }
-
-      // What the vision pass read from the customer's photos and PDFs (D8-11).
-      if (message.type === MessageType.CUSTOMER && message.attachments?.length) {
-        const files = describeAttachmentsForAgent(message.attachments);
-        if (files) content = content ? `${content}\n${files}` : files;
-      }
-
-      return {
-        role,
-        content,
-      };
-    });
-  }
-
-  private writeToLog(message: string): void {
-    const timestamp = new Date().toISOString();
-    const logEntry = `[${timestamp}] ${message}\n`;
-
-    try {
-      fs.appendFileSync(this.logFilePath, logEntry, "utf8");
-    } catch (error) {
-      logger.error({ err: error }, "Failed to write to log file");
     }
+    return turns;
   }
 
-  private logChatResultDebugInfo(result: ChatResult): void {
-    this.writeToLog("=== LLM RESPONSE DEBUG INFO ===");
-    this.writeToLog(`Provider: ${result.provider}`);
-    this.writeToLog(`Model: ${result.model}`);
-    this.writeToLog(`Finish reason: ${result.finishReason}`);
-    this.writeToLog("--- TOKEN USAGE ---");
-    this.writeToLog(`Prompt tokens: ${result.usage.promptTokens}`);
-    const cached = result.usage.cachedPromptTokens;
-    const hitRate = result.usage.promptTokens > 0 ? (cached / result.usage.promptTokens) * 100 : 0;
-    this.writeToLog(`Cached prompt tokens: ${cached} (${hitRate.toFixed(1)}% hit)`);
-    this.writeToLog(`Completion tokens: ${result.usage.completionTokens}`);
-    this.writeToLog(
-      `Total tokens: ${result.usage.totalTokens}${result.usage.estimated ? " (estimated)" : ""}`,
-    );
+  private serializeToolMessage(message: Message): string {
+    const toolOutput = message.metadata?.toolOutput;
+    if (toolOutput === undefined || toolOutput === null) {
+      return renderToolResult({
+        toolName: String(message.metadata?.toolName || "unknown"),
+        status: String(message.metadata?.toolStatus || "unknown"),
+        output: message.content,
+      });
+    }
 
-    const responseContent = result.content;
-    this.writeToLog(`Response length: ${responseContent.length} chars`);
-    this.writeToLog(
-      `Response preview: "${responseContent.substring(0, 200)}${
-        responseContent.length > 200 ? "..." : ""
-      }"`,
-    );
-    this.writeToLog("=== END LLM RESPONSE DEBUG INFO ===");
+    // Extract the actual data from MCP format if present
+    let formattedOutput: unknown = toolOutput;
+    if (
+      typeof toolOutput === "object" &&
+      "content" in toolOutput &&
+      Array.isArray(toolOutput.content)
+    ) {
+      const mcpContent = toolOutput.content as Array<{ text?: string; type?: string }>;
+      if (mcpContent.length > 0 && mcpContent[0].text) {
+        try {
+          formattedOutput = JSON.parse(mcpContent[0].text);
+        } catch {
+          formattedOutput = mcpContent[0].text;
+        }
+      }
+    }
+
+    // Include the arguments that were sent so the planner can see exactly
+    // what it submitted — essential for correcting a failed call (e.g. it
+    // sent `product_id` when the tool's schema requires `id`).
+    return renderToolResult({
+      toolName: String(message.metadata?.toolName || "unknown"),
+      status: String(message.metadata?.toolStatus || "unknown"),
+      input: message.metadata?.toolInput,
+      output: formattedOutput,
+    });
   }
 }
