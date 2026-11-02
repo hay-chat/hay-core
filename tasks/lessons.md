@@ -254,3 +254,8 @@
 - **Failure mode**: The first Spacebring plugin (PR hay-chat/hay-core#58) exposed 25 tools, one per kept endpoint. Booking a room meant the agent chaining `find_membership` → `list_resources` → `list_bookings` → `create_booking`, passing UUIDs, guessing `startDate[gte]` syntax and computing overlaps itself, with no ownership check on cancel. Roger: tools should be the actions a playbook takes; serialise requests and fix input inside the tool, and give the LLM text feedback.
 - **Detection signal**: Tool names that read like HTTP routes (`list_x`/`get_x`/`create_x` per resource), tools that need an id the customer cannot give, a plugin with 20+ tools, or tool descriptions that tell the agent to "call X first, then Y".
 - **Prevention**: Write the playbooks before opening the API spec; follow `.claude/skills/build-plugin/reference/tool-design.md` (playbook-step tools, lenient input, rules enforced in code, `ToolError` messages that say what to do next) and its checklist.
+
+## 2026-11-02: Claimed a field was set somewhere from a grep hit on a comment
+- Failure: told Roger `organization.website` "is set only in getting-started" — the grep match was a code comment; nothing writes that column.
+- Detection: tracing the write path while building the settings field.
+- Prevention: before stating where a value is written, find the actual assignment/mutation (`website:` in an update payload), not just a word match.
