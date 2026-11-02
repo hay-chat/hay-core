@@ -21,9 +21,9 @@ export const CIPHERTEXT_PREFIX = "enc:v2:";
 let warnedJwtFallback = false;
 
 /**
- * The key new values are encrypted with. Production requires a dedicated
- * PLUGIN_ENCRYPTION_KEY (enforced at startup by validateProductionConfig);
- * other environments fall back to JWT_SECRET.
+ * The key stored secrets are encrypted and decrypted with. Production
+ * requires a dedicated PLUGIN_ENCRYPTION_KEY (enforced at startup by
+ * validateProductionConfig); other environments fall back to JWT_SECRET.
  */
 function getEncryptionKey(): string {
   if (process.env.PLUGIN_ENCRYPTION_KEY) {
@@ -37,19 +37,6 @@ function getEncryptionKey(): string {
     return process.env.JWT_SECRET;
   }
   throw new Error("PLUGIN_ENCRYPTION_KEY must be set for encryption");
-}
-
-/**
- * Keys tried when decrypting: the current key, then PLUGIN_ENCRYPTION_KEY_PREVIOUS
- * while a key rotation is in progress (see scripts/reencrypt-secrets.ts).
- */
-function getDecryptionKeys(): string[] {
-  const keys = [getEncryptionKey()];
-  const previous = process.env.PLUGIN_ENCRYPTION_KEY_PREVIOUS;
-  if (previous && previous !== keys[0]) {
-    keys.push(previous);
-  }
-  return keys;
 }
 
 /**
@@ -101,24 +88,14 @@ function decryptWithKey(combined: Buffer, password: string): string {
 }
 
 /**
- * Decrypt a string value encrypted with encryptValue. Throws when no
- * configured key can decrypt it.
+ * Decrypt a string value encrypted with encryptValue. Throws when the
+ * current key cannot decrypt it.
  */
 export function decryptValue(encryptedText: string): string {
   const body = encryptedText.startsWith(CIPHERTEXT_PREFIX)
     ? encryptedText.slice(CIPHERTEXT_PREFIX.length)
     : encryptedText;
-  const combined = Buffer.from(body, "base64");
-
-  let lastError: unknown;
-  for (const password of getDecryptionKeys()) {
-    try {
-      return decryptWithKey(combined, password);
-    } catch (error) {
-      lastError = error;
-    }
-  }
-  throw lastError;
+  return decryptWithKey(Buffer.from(body, "base64"), getEncryptionKey());
 }
 
 /**
@@ -290,13 +267,13 @@ export class AuthStateEncryptedTransformer {
             }
           } catch (error) {
             if (looksLikeCiphertext(val)) {
-              // Ciphertext no configured key can open (wrong or rotated key):
+              // Ciphertext the current key cannot open (wrong or changed key):
               // never hand it on as if it were the credential.
               logger.error({ err: error, key }, "Failed to decrypt credential");
               decryptedCredentials[key] = null;
             } else {
               // Plaintext stored before credentials were encrypted; it is
-              // encrypted on the next save (or by scripts/reencrypt-secrets.ts).
+              // encrypted on the next save.
               logger.warn({ key }, "Unencrypted legacy credential found");
               decryptedCredentials[key] = val;
             }

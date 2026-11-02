@@ -20,7 +20,6 @@ describe("stored secret encryption", () => {
 
   beforeEach(() => {
     process.env = { ...originalEnv, NODE_ENV: "test", PLUGIN_ENCRYPTION_KEY: KEY };
-    delete process.env.PLUGIN_ENCRYPTION_KEY_PREVIOUS;
   });
 
   afterAll(() => {
@@ -38,15 +37,12 @@ describe("stored secret encryption", () => {
     expect(decryptValue(legacy)).toBe("token");
   });
 
-  it("decrypts with PLUGIN_ENCRYPTION_KEY_PREVIOUS during a key rotation", () => {
+  it("cannot decrypt values encrypted under another key", () => {
     process.env.PLUGIN_ENCRYPTION_KEY = OLD_KEY;
     const underOldKey = encryptValue("token");
 
     process.env.PLUGIN_ENCRYPTION_KEY = KEY;
     expect(() => decryptValue(underOldKey)).toThrow();
-
-    process.env.PLUGIN_ENCRYPTION_KEY_PREVIOUS = OLD_KEY;
-    expect(decryptValue(underOldKey)).toBe("token");
   });
 
   it("refuses the JWT_SECRET fallback in production", () => {

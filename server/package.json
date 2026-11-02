@@ -27,8 +27,7 @@
     "migration:check": "tsx scripts/ensure-migrations.ts",
     "order-links:backfill": "tsx scripts/backfill-order-links.ts",
     "insights:backfill-feedback": "tsx scripts/backfill-feedback-insights.ts",
-    "plugins:enable-defaults": "tsx scripts/enable-default-plugins.ts",
-    "secrets:reencrypt": "tsx scripts/reencrypt-secrets.ts"
+    "plugins:enable-defaults": "tsx scripts/enable-default-plugins.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.100.1",
