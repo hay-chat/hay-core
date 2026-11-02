@@ -1,6 +1,6 @@
 {
   "name": "hay-v3",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "private": true,
   "description": "Hay platform - Unified monorepo for dashboard, server, and plugins",
   "author": "Hay Labs",
