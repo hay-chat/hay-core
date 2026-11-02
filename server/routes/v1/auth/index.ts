@@ -153,6 +153,7 @@ export const authRouter = t.router({
         password,
         "$argon2id$v=19$m=65536,t=3,p=4$c29tZXNhbHQ$SOWWcWsDNrEh+WTm3Hh5F3hH5KPLz9JRDYbAj2BJUn4",
       );
+      await auditLogService.logFailedLogin(email, ctx.ipAddress, ctx.userAgent);
       throw new TRPCError({
         code: "UNAUTHORIZED",
         message: "Invalid credentials",
@@ -162,6 +163,7 @@ export const authRouter = t.router({
     // Verify password
     const isValidPassword = await verifyPassword(password, user.password);
     if (!isValidPassword) {
+      await auditLogService.logFailedLogin(email, ctx.ipAddress, ctx.userAgent);
       throw new TRPCError({
         code: "UNAUTHORIZED",
         message: "Invalid credentials",
@@ -191,6 +193,13 @@ export const authRouter = t.router({
     await userRepository.save(user);
 
     const tokens = await authSessionService.createSession(user, ctx);
+    await auditLogService.record({
+      userId: user.id,
+      action: "user.login",
+      resource: "auth",
+      ipAddress: ctx.ipAddress,
+      userAgent: ctx.userAgent,
+    });
 
     // Load all user organizations (multi-org support)
     const organizations = await getUserOrganizations(user.id);
@@ -374,6 +383,14 @@ export const authRouter = t.router({
 
     // After commit: give the new organization its default plugins (fire-and-forget).
     if (createdOrganizationId) void enableDefaultPlugins(createdOrganizationId);
+    await auditLogService.record({
+      userId: result.user.id,
+      organizationId: createdOrganizationId ?? undefined,
+      action: "user.register",
+      resource: "auth",
+      ipAddress: ctx.ipAddress,
+      userAgent: ctx.userAgent,
+    });
 
     return result;
   }),
@@ -746,8 +763,16 @@ export const authRouter = t.router({
    */
   logout: publicProcedure
     .input(refreshTokenSchema.extend({ pushEndpoint: z.string().url().max(2048).optional() }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
       const userId = await authSessionService.revoke(input.refreshToken);
+      if (userId)
+        await auditLogService.record({
+          userId,
+          action: "user.logout",
+          resource: "auth",
+          ipAddress: ctx.ipAddress,
+          userAgent: ctx.userAgent,
+        });
       if (userId && input.pushEndpoint) {
         await pushNotificationService.unsubscribe(userId, input.pushEndpoint);
       }
@@ -1698,7 +1723,7 @@ export const authRouter = t.router({
 
   deactivateUser: adminProcedure
     .input(z.object({ userId: z.string().uuid() }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
       const userRepository = AppDataSource.getRepository(User);
       const user = await userRepository.findOne({
         where: { id: input.userId },
@@ -1713,6 +1738,15 @@ export const authRouter = t.router({
 
       user.isActive = false;
       await userRepository.save(user);
+      await auditLogService.record({
+        userId: ctx.user!.id,
+        organizationId: ctx.organizationId,
+        action: "user.deactivate",
+        resource: "user",
+        changes: { targetUserId: user.id },
+        ipAddress: ctx.ipAddress,
+        userAgent: ctx.userAgent,
+      });
 
       return { success: true };
     }),

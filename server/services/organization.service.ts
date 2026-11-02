@@ -4,6 +4,7 @@ import type { DeepPartial, QueryDeepPartialEntity } from "typeorm";
 import { StorageService } from "./storage.service";
 import { vectorStoreService } from "./vector-store.service";
 import { createLogger } from "@server/lib/logger";
+import { AuditLog } from "@server/entities/audit-log.entity";
 
 const logger = createLogger("organization-service");
 
@@ -94,12 +95,30 @@ class OrganizationService {
    * Delete an organization and every piece of data that belongs to it.
    * Shared by the owner-facing `organizations.delete` procedure and the
    * operator-facing `internal.organizations.delete`.
+   *
+   * The `organization.delete` audit row is written in the same transaction;
+   * the organization FK on audit_logs is SET NULL, so it (and the rest of the
+   * org's audit trail) survives, attributable via `originalOrganizationId`.
    */
-  async deleteWithData(organization: Organization): Promise<void> {
+  async deleteWithData(
+    organization: Organization,
+    actor: { userId?: string; source: "owner" | "operator" },
+  ): Promise<void> {
     const orgId = organization.id;
 
     // Use transaction to ensure all related data is deleted
     await AppDataSource.transaction(async (manager) => {
+      await manager.getRepository(AuditLog).save(
+        AuditLog.createLog({
+          userId: actor.userId,
+          organizationId: orgId,
+          action: "organization.delete",
+          resource: "organization",
+          metadata: { source: actor.source },
+          status: "success",
+        }),
+      );
+
       // Delete organization logo from storage if exists
       if (organization.logoUploadId) {
         try {
@@ -135,15 +154,13 @@ class OrganizationService {
       // - Uploads (onDelete: CASCADE)
       // - PluginInstances (onDelete: CASCADE)
       // - ScheduledJobs (onDelete: CASCADE)
-      // - AuditLogs (onDelete: CASCADE)
+      // - AuditLogs (onDelete: SET NULL, kept)
       // - PrivacyRequests (onDelete: CASCADE)
       // - Products / ProductVariants (onDelete: CASCADE; product_embeddings
       //   handled above because it's a raw-SQL table without an entity FK)
       await manager.getRepository(Organization).delete({ id: orgId });
     });
 
-    // Note: Can't log to audit_logs since the org is deleted
-    // TODO: Log to external audit service for compliance tracking
     logger.info({ orgName: organization.name, orgId }, "Organization deleted");
   }
 

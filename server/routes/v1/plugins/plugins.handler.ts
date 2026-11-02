@@ -17,6 +17,7 @@ import { decryptConfig, isEncrypted } from "@server/lib/auth/utils/encryption";
 import { dropManagedOverrides, resolveConfigWithEnv } from "@server/lib/config-resolver";
 import { configEnvAllowList } from "@server/lib/plugin-env";
 import { oauthService } from "@server/services/oauth.service";
+import { auditLogService } from "@server/services/audit-log.service";
 import { v4 as uuidv4 } from "uuid";
 import type { HayPluginManifest } from "@server/types/plugin.types";
 import type { AuthMethodDescriptor, ConfigFieldDescriptor } from "@server/types/plugin-sdk.types";
@@ -414,6 +415,15 @@ export const enablePlugin = pluginManageProcedure
       );
 
       logger.info({ pluginName: plugin.name }, "Plugin successfully enabled");
+      await auditLogService.record({
+        userId: ctx.user?.id,
+        organizationId: ctx.organizationId,
+        action: "plugin.enable",
+        resource: "plugin",
+        changes: { pluginId: input.pluginId },
+        ipAddress: ctx.ipAddress,
+        userAgent: ctx.userAgent,
+      });
 
       // Register any plugin-declared cron jobs for this org (HAY-221). Non-fatal.
       try {
@@ -514,6 +524,15 @@ export const disablePlugin = pluginManageProcedure
 
     // Disable in database
     await pluginInstanceRepository.disablePlugin(ctx.organizationId!, input.pluginId);
+    await auditLogService.record({
+      userId: ctx.user?.id,
+      organizationId: ctx.organizationId,
+      action: "plugin.disable",
+      resource: "plugin",
+      changes: { pluginId: input.pluginId },
+      ipAddress: ctx.ipAddress,
+      userAgent: ctx.userAgent,
+    });
 
     return {
       success: true,
@@ -781,6 +800,15 @@ export const configurePlugin = pluginManageProcedure
           authState,
         );
       }
+      await auditLogService.record({
+        userId: ctx.user?.id,
+        organizationId: ctx.organizationId,
+        action: authState ? "plugin.credentials.update" : "plugin.configure",
+        resource: "plugin",
+        changes: { pluginId: input.pluginId, configKeys: Object.keys(config) },
+        ipAddress: ctx.ipAddress,
+        userAgent: ctx.userAgent,
+      });
 
       return {
         success: true,
@@ -795,6 +823,15 @@ export const configurePlugin = pluginManageProcedure
     if (authState) {
       await pluginInstanceRepository.updateAuthState(instance.id, ctx.organizationId!, authState);
     }
+    await auditLogService.record({
+      userId: ctx.user?.id,
+      organizationId: ctx.organizationId,
+      action: authState ? "plugin.credentials.update" : "plugin.configure",
+      resource: "plugin",
+      changes: { pluginId: input.pluginId, configKeys: Object.keys(config) },
+      ipAddress: ctx.ipAddress,
+      userAgent: ctx.userAgent,
+    });
 
     // Restart the plugin if it's currently running to apply new configuration
     const runner = getPluginRunnerService();
@@ -1432,12 +1469,22 @@ export const completeOAuthWithCode = pluginManageProcedure
     }),
   )
   .mutation(async ({ ctx, input }) => {
-    return oauthService.completeWithCode(
+    const result = await oauthService.completeWithCode(
       ctx.organizationId!,
       input.pluginId,
       input.code,
       input.extras,
     );
+    await auditLogService.record({
+      userId: ctx.user?.id,
+      organizationId: ctx.organizationId,
+      action: "plugin.credentials.update",
+      resource: "plugin",
+      changes: { pluginId: input.pluginId, oauthConnected: true },
+      ipAddress: ctx.ipAddress,
+      userAgent: ctx.userAgent,
+    });
+    return result;
   });
 
 const PLUGIN_UI_PATH_PATTERN = /^\/ui\/[a-z0-9/-]*$/;
@@ -1631,6 +1678,15 @@ export const revokeOAuth = pluginManageProcedure
   )
   .mutation(async ({ ctx, input }) => {
     await oauthService.revokeOAuth(ctx.organizationId!, input.pluginId);
+    await auditLogService.record({
+      userId: ctx.user?.id,
+      organizationId: ctx.organizationId,
+      action: "plugin.credentials.update",
+      resource: "plugin",
+      changes: { pluginId: input.pluginId, oauthRevoked: true },
+      ipAddress: ctx.ipAddress,
+      userAgent: ctx.userAgent,
+    });
     return { success: true };
   });
 
