@@ -33,6 +33,8 @@ export function markdownToTiptapJSON(
   const html = marked.parse(protectedMarkdown, { async: false }) as string;
   const doc = generateJSON(html, [
     StarterKit.configure({
+      link: false,
+      underline: false,
       heading: { levels: [1, 2] },
     }),
   ]);
