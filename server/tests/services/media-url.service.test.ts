@@ -23,7 +23,11 @@ import {
   mediaUrl,
   setPublicUploadHeaders,
   signAttachmentUrls,
+  signDocumentImageUrls,
+  signDocumentImageUrlsInJson,
   signMediaUrl,
+  stripMediaSignatures,
+  stripMediaSignaturesInJson,
   verifyMediaSignature,
 } from "@server/services/media-url.service";
 
@@ -77,7 +81,7 @@ describe("isPublicUploadPath", () => {
   it("serves only public folders from local /uploads", () => {
     expect(isPublicUploadPath(`/${ORG_ID}/organizations/logo.png`)).toBe(true);
     expect(isPublicUploadPath(`/${ORG_ID}/avatars/a.png`)).toBe(true);
-    expect(isPublicUploadPath(`/${ORG_ID}/document-images/i.png`)).toBe(true);
+    expect(isPublicUploadPath(`/${ORG_ID}/document-images/i.png`)).toBe(false);
     expect(isPublicUploadPath(`/${ORG_ID}/conversation-media/photo.jpg`)).toBe(false);
     expect(isPublicUploadPath(`/${ORG_ID}/plugin-zips/p/x.zip`)).toBe(false);
     expect(isPublicUploadPath(`/${ORG_ID}/documents/${ORG_ID}/d.pdf`)).toBe(false);
@@ -209,7 +213,7 @@ describe("signAttachmentUrls", () => {
   });
 
   it("keeps direct URLs for uploads in public folders", async () => {
-    mockFind.mockResolvedValue([{ id: UPLOAD_ID, folder: "document-images" }]);
+    mockFind.mockResolvedValue([{ id: UPLOAD_ID, folder: "avatars" }]);
     const attachments = [{ id: UPLOAD_ID, url: "https://bucket.example/img.png" }];
 
     expect(await signAttachmentUrls(attachments, ORG_ID, 900)).toEqual(attachments);
@@ -219,6 +223,59 @@ describe("signAttachmentUrls", () => {
     const attachments = [{ id: "att-1", url: "https://cdn.example/x.jpg" }];
 
     expect(await signAttachmentUrls(attachments, ORG_ID, 900)).toBe(attachments);
+    expect(mockFind).not.toHaveBeenCalled();
+  });
+});
+
+describe("document image URLs", () => {
+  beforeEach(() => mockFind.mockReset());
+
+  const stable = `https://api.example.test/v1/media/${UPLOAD_ID}`;
+  const other = `https://api.example.test/v1/media/${OTHER_ID}`;
+
+  it("strips signatures, including HTML-escaped ones, so they are never stored", () => {
+    const html =
+      `<img src="${stable}?expires=123&amp;sig=abc_-"><img src="${other}?expires=1&sig=x">` +
+      `<img src="https://cdn.example/a.png?expires=1&sig=x">`;
+
+    expect(stripMediaSignatures(html)).toBe(
+      `<img src="${stable}"><img src="${other}"><img src="https://cdn.example/a.png?expires=1&sig=x">`,
+    );
+    expect(stripMediaSignaturesInJson({ attrs: { src: `${stable}?expires=9&sig=s` } })).toEqual({
+      attrs: { src: stable },
+    });
+  });
+
+  it("signs only this organization's document images, replacing stale signatures", async () => {
+    mockFind.mockResolvedValue([{ id: UPLOAD_ID, folder: "document-images" }]);
+    const html = `<img src="${stable}?expires=1&amp;sig=old"><img src="${other}">`;
+
+    const signed = await signDocumentImageUrls(html, ORG_ID, 600);
+
+    expect(mockFind).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ organizationId: ORG_ID, folder: "document-images" }),
+      }),
+    );
+    const [, signedUrl] = signed.match(/src="([^"]+)"/)!;
+    const { path, expires, sig } = parse(signedUrl);
+    expect(path).toBe(`/v1/media/${UPLOAD_ID}`);
+    expect(sig).not.toBe("old");
+    expect(verifyMediaSignature(UPLOAD_ID, expires, sig)).toBe(true);
+    expect(signed).toContain(`<img src="${other}">`);
+  });
+
+  it("signs image sources in editor JSON", async () => {
+    mockFind.mockResolvedValue([{ id: UPLOAD_ID, folder: "document-images" }]);
+    const json = { type: "doc", content: [{ type: "image", attrs: { src: stable } }] };
+
+    const signed = await signDocumentImageUrlsInJson(json, ORG_ID, 600);
+    const { expires, sig } = parse(signed.content[0].attrs.src);
+    expect(verifyMediaSignature(UPLOAD_ID, expires, sig)).toBe(true);
+  });
+
+  it("skips the lookup when the text has no media URL", async () => {
+    expect(await signDocumentImageUrls("<p>plain</p>", ORG_ID)).toBe("<p>plain</p>");
     expect(mockFind).not.toHaveBeenCalled();
   });
 });

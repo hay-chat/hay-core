@@ -37,9 +37,19 @@ const mockStorageUpload = jest.fn<(options: Record<string, unknown>) => Promise<
 jest.mock("@server/services/storage.service", () => ({
   storageService: { upload: mockStorageUpload },
 }));
+const mockUploadFind = jest.fn<(options: unknown) => Promise<Array<{ id: string }>>>();
+jest.mock("@server/entities/upload.entity", () => ({
+  Upload: { find: (options: unknown) => mockUploadFind(options) },
+}));
+const mockRunWorker = jest.fn<(...args: unknown[]) => Promise<unknown>>();
+jest.mock("@server/processors/run-worker", () => ({
+  runWorker: (...args: unknown[]) => mockRunWorker(...args),
+}));
 
 import { documentsRouter } from "@server/routes/v1/documents";
 import type { Context } from "@server/trpc/context";
+import { DocumentRejectedError } from "@server/processors";
+import { mediaUrl, verifyMediaSignature } from "@server/services/media-url.service";
 
 const ORG_ID = "11111111-1111-4111-8111-111111111111";
 const ctx = {
@@ -124,7 +134,20 @@ describe("document file uploads", () => {
     expect(mockCreate).not.toHaveBeenCalled();
   });
 
+  it("fails the request cleanly when parsing is stopped", async () => {
+    mockRunWorker.mockRejectedValue(new DocumentRejectedError("Document took too long to process"));
+
+    await expect(
+      createWithFile(Buffer.from("hello"), "text/plain", "notes.txt"),
+    ).rejects.toMatchObject({
+      code: "BAD_REQUEST",
+      message: "Document took too long to process",
+    });
+    expect(mockCreate).not.toHaveBeenCalled();
+  });
+
   it("stores the file under the detected type", async () => {
+    mockRunWorker.mockResolvedValue({ content: "hello", metadata: {} });
     mockStorageUpload.mockResolvedValue({
       upload: { id: "u1", mimeType: "text/plain" },
       url: "https://api.test/v1/media/u1",
@@ -135,5 +158,66 @@ describe("document file uploads", () => {
     expect(mockCreate.mock.calls[0][0].attachments).toEqual([
       expect.objectContaining({ type: "text/plain" }),
     ]);
+  });
+});
+
+describe("document images", () => {
+  const IMAGE_ID = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+  const signedQuery = /\?expires=\d+&(amp;)?sig=[\w-]+/;
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockUploadFind.mockResolvedValue([{ id: IMAGE_ID }]);
+  });
+
+  it("stores uploaded images in the private folder and returns a signed URL", async () => {
+    mockStorageUpload.mockResolvedValue({
+      upload: { id: IMAGE_ID },
+      url: mediaUrl(IMAGE_ID),
+    });
+
+    const { url } = await caller().uploadImage({
+      fileBuffer: Buffer.from("png").toString("base64"),
+      mimeType: "image/png",
+      fileName: "a.png",
+    });
+
+    expect(mockStorageUpload.mock.calls[0][0].folder).toBe("document-images");
+    expect(url.startsWith(`${mediaUrl(IMAGE_ID)}?`)).toBe(true);
+    const query = new URLSearchParams(url.split("?")[1]);
+    expect(verifyMediaSignature(IMAGE_ID, query.get("expires"), query.get("sig"))).toBe(true);
+  });
+
+  it("stores the stable URL, never a signature", async () => {
+    existing = { id: "doc-1", organizationId: ORG_ID, importMethod: "editor" };
+    const signed = `${mediaUrl(IMAGE_ID)}?expires=99&sig=abc`;
+
+    await caller().update({
+      id: "doc-1",
+      contentHtml: `<p>x</p><img src="${signed}">`,
+      contentJson: { type: "doc", content: [{ type: "image", attrs: { src: signed } }] },
+    });
+
+    const data = mockUpdate.mock.calls[0][2];
+    expect(data.content).toContain(`src="${mediaUrl(IMAGE_ID)}"`);
+    expect(data.content).not.toMatch(signedQuery);
+    expect(JSON.stringify(data.contentJson)).not.toMatch(signedQuery);
+  });
+
+  it("signs image URLs when the document is read", async () => {
+    existing = {
+      id: "doc-1",
+      organizationId: ORG_ID,
+      content: `<img src="${mediaUrl(IMAGE_ID)}">`,
+      contentJson: {
+        type: "doc",
+        content: [{ type: "image", attrs: { src: mediaUrl(IMAGE_ID) } }],
+      },
+    };
+
+    const document = await caller().getById({ id: "11111111-1111-4111-8111-111111111112" });
+
+    expect(document.content).toMatch(signedQuery);
+    expect(JSON.stringify(document.contentJson)).toMatch(signedQuery);
   });
 });

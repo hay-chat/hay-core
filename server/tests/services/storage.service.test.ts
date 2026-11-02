@@ -41,6 +41,7 @@ const mockS3Send = jest.fn(async () => ({}));
 jest.mock("@aws-sdk/client-s3", () => ({
   S3Client: jest.fn(() => ({ send: mockS3Send })),
   DeleteObjectCommand: jest.fn(),
+  PutObjectAclCommand: jest.fn((input: Record<string, unknown>) => ({ input })),
 }));
 
 const mockFindOne = jest.fn<(options: unknown) => Promise<Record<string, unknown> | null>>();
@@ -115,6 +116,36 @@ describe("StorageService private uploads", () => {
       expect(mockS3Params).toHaveLength(0);
     },
   );
+
+  it("stores document images privately, re-encoded, behind the /v1/media URL", async () => {
+    const result = await new StorageService().upload({
+      buffer: PNG,
+      originalName: "diagram.png",
+      mimeType: "image/png",
+      folder: "document-images",
+      organizationId: ORG_ID,
+    });
+
+    expect(mockS3Params[0].ACL).toBe("private");
+    expect(result.upload.mimeType).toBe("image/png");
+    expect(result.url).toBe(
+      "https://api.example.test/v1/media/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+    );
+  });
+
+  it("revokes public read on an S3 object, and does nothing for local files", async () => {
+    const storage = new StorageService();
+    await storage.makePrivate({
+      storageType: "s3",
+      path: "uploads/o/document-images/a.png",
+    } as never);
+    await storage.makePrivate({ storageType: "local", path: "o/document-images/a.png" } as never);
+
+    expect(mockS3Send).toHaveBeenCalledTimes(1);
+    expect((mockS3Send.mock.calls[0] as unknown[])[0]).toEqual({
+      input: { Bucket: "hay-test", Key: "uploads/o/document-images/a.png", ACL: "private" },
+    });
+  });
 
   it("refuses non-images declared as images in public folders", async () => {
     await expect(

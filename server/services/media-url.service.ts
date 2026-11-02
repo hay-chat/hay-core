@@ -21,10 +21,22 @@ import { Upload } from "../entities/upload.entity";
 /**
  * Folders whose files stay publicly readable: merchant branding shown to
  * anonymous shoppers (organization logos, agent avatars in the widget and in
- * emails) and images embedded in knowledge-base documents. Nothing a shopper
- * sends ever lands here.
+ * emails). Nothing a shopper sends ever lands here.
  */
-const PUBLIC_UPLOAD_FOLDERS = new Set(["organizations", "avatars", "document-images"]);
+const PUBLIC_UPLOAD_FOLDERS = new Set(["organizations", "avatars"]);
+
+/**
+ * Images embedded in knowledge-base documents. Private: the document HTML
+ * stores the stable `/v1/media/:id` URL and readers get it signed
+ * (signDocumentImageUrls).
+ */
+export const DOCUMENT_IMAGES_FOLDER = "document-images";
+
+/**
+ * Lifetime of signed document-image URLs. Covers a dashboard session and the
+ * conversation the AI copies the document into (its reply may embed them).
+ */
+export const DOCUMENT_IMAGE_SIGNED_URL_TTL_SECONDS = 7 * 24 * 60 * 60;
 
 /** Lifetime of a signed URL handed to a channel worker for one delivery. */
 export const DELIVERY_SIGNED_URL_TTL_SECONDS = 15 * 60;
@@ -157,4 +169,61 @@ export async function signAttachmentUrls<T extends { id?: string; url: string }>
       ? { ...attachment, url: signMediaUrl(attachment.id, ttlSeconds) }
       : attachment,
   );
+}
+
+/**
+ * `{api}/v1/media/{id}`, optionally followed by a signature (`&` may be
+ * HTML-escaped). Group 1 is the upload id.
+ */
+function mediaUrlPattern(): RegExp {
+  const base = mediaUrl("").replace(/[.*+?^${}()|[\]\\/]/g, "\\$&");
+  return new RegExp(
+    `${base}([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})` +
+      `(?:\\?expires=\\d+&(?:amp;)?sig=[A-Za-z0-9_-]+)?`,
+    "gi",
+  );
+}
+
+/** Replace signed media URLs with their stable form, so signatures are never stored. */
+export function stripMediaSignatures(text: string): string {
+  return text.replace(mediaUrlPattern(), (_match, id: string) => mediaUrl(id));
+}
+
+/**
+ * Sign every media URL in `text` that points at a document image of this
+ * organization; existing signatures are replaced with fresh ones. Other media
+ * URLs (other folders, other organizations) are left as they are.
+ */
+export async function signDocumentImageUrls(
+  text: string,
+  organizationId: string,
+  ttlSeconds = DOCUMENT_IMAGE_SIGNED_URL_TTL_SECONDS,
+): Promise<string> {
+  const ids = [...new Set([...text.matchAll(mediaUrlPattern())].map((match) => match[1]))];
+  if (!ids.length) return text;
+
+  const uploads = await Upload.find({
+    select: { id: true },
+    where: { id: In(ids), organizationId, folder: DOCUMENT_IMAGES_FOLDER },
+  });
+  const imageIds = new Set(uploads.map((upload) => upload.id));
+  return text.replace(mediaUrlPattern(), (match, id: string) =>
+    imageIds.has(id) ? signMediaUrl(id, ttlSeconds) : match,
+  );
+}
+
+/** signDocumentImageUrls for editor JSON (image nodes keep the URL in `attrs.src`). */
+export async function signDocumentImageUrlsInJson<T>(
+  json: T,
+  organizationId: string,
+  ttlSeconds = DOCUMENT_IMAGE_SIGNED_URL_TTL_SECONDS,
+): Promise<T> {
+  if (json === null || json === undefined) return json;
+  return JSON.parse(await signDocumentImageUrls(JSON.stringify(json), organizationId, ttlSeconds));
+}
+
+/** stripMediaSignatures for editor JSON. */
+export function stripMediaSignaturesInJson<T>(json: T): T {
+  if (json === null || json === undefined) return json;
+  return JSON.parse(stripMediaSignatures(JSON.stringify(json)));
 }
