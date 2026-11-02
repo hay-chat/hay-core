@@ -177,8 +177,11 @@ export class GitConnectionService {
     organizationId: string,
     removePlugins: boolean = false,
   ): Promise<void> {
-    const connection = await gitConnectionRepository.findById(connectionId);
-    if (!connection || connection.organizationId !== organizationId) {
+    const connection = await gitConnectionRepository.findByIdAndOrganization(
+      connectionId,
+      organizationId,
+    );
+    if (!connection) {
       throw new Error("Git connection not found");
     }
 
@@ -495,8 +498,11 @@ export class GitConnectionService {
     connectionId: string,
     organizationId: string,
   ): Promise<GitConnection> {
-    const connection = await gitConnectionRepository.findById(connectionId);
-    if (!connection || connection.organizationId !== organizationId) {
+    const connection = await gitConnectionRepository.findByIdAndOrganization(
+      connectionId,
+      organizationId,
+    );
+    if (!connection) {
       throw new Error("Git connection not found");
     }
     if (connection.status !== "active") {

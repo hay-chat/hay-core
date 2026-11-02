@@ -42,9 +42,12 @@ export const documentsRouter = t.router({
       }),
     )
     .query(async ({ ctx, input }) => {
-      const document = await documentRepository.findById(input.id);
+      const document = await documentRepository.findByIdAndOrganization(
+        input.id,
+        ctx.organizationId!,
+      );
 
-      if (!document || document.organizationId !== ctx.organizationId) {
+      if (!document) {
         throw new Error("Document not found");
       }
 
@@ -154,8 +157,12 @@ export const documentsRouter = t.router({
 
       // Fetch full document details for all matched documents
       const documents = (
-        await Promise.all(rankedDocIds.map(({ docId }) => documentRepository.findById(docId)))
-      ).filter((doc) => doc && doc.organizationId === organizationId);
+        await Promise.all(
+          rankedDocIds.map(({ docId }) =>
+            documentRepository.findByIdAndOrganization(docId, organizationId),
+          ),
+        )
+      ).filter((doc) => doc !== null);
 
       // Return documents in ranked order, skipping any not found
       const results = [];
@@ -324,8 +331,11 @@ export const documentsRouter = t.router({
     )
     .mutation(async ({ ctx, input }) => {
       // Find existing document
-      const document = await documentRepository.findById(input.id);
-      if (!document || document.organizationId !== ctx.organizationId) {
+      const document = await documentRepository.findByIdAndOrganization(
+        input.id,
+        ctx.organizationId!,
+      );
+      if (!document) {
         throw new Error("Document not found");
       }
 
@@ -445,8 +455,11 @@ export const documentsRouter = t.router({
     )
     .mutation(async ({ ctx, input }) => {
       // Find existing document
-      const document = await documentRepository.findById(input.id);
-      if (!document || document.organizationId !== ctx.organizationId) {
+      const document = await documentRepository.findByIdAndOrganization(
+        input.id,
+        ctx.organizationId!,
+      );
+      if (!document) {
         throw new Error("Document not found");
       }
 
@@ -524,8 +537,11 @@ export const documentsRouter = t.router({
 
       // If documentId is provided, regenerate for single document
       if (input.documentId) {
-        const document = await documentRepository.findById(input.documentId);
-        if (!document || document.organizationId !== ctx.organizationId) {
+        const document = await documentRepository.findByIdAndOrganization(
+          input.documentId,
+          ctx.organizationId!,
+        );
+        if (!document) {
           throw new Error("Document not found");
         }
 
@@ -719,9 +735,12 @@ export const documentsRouter = t.router({
       }),
     )
     .query(async ({ ctx, input }) => {
-      const document = await documentRepository.findById(input.documentId);
+      const document = await documentRepository.findByIdAndOrganization(
+        input.documentId,
+        ctx.organizationId!,
+      );
 
-      if (!document || document.organizationId !== ctx.organizationId) {
+      if (!document) {
         throw new Error("Document not found");
       }
 

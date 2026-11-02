@@ -23,7 +23,10 @@ jest.mock("@server/repositories/document.repository", () => ({
     create: (data: Record<string, unknown>) => mockCreate(data),
     update: (id: string, organizationId: string, data: Record<string, unknown>) =>
       mockUpdate(id, organizationId, data),
-    findById: async () => existing,
+    findByIdAndOrganization: async (id: string, organizationId: string) =>
+      existing && existing.id === id && existing.organizationId === organizationId
+        ? existing
+        : null,
   },
 }));
 jest.mock("@server/services/vector-store.service", () => ({
@@ -83,6 +86,15 @@ describe("editor document content", () => {
     await caller().update({ id: "doc-1", content: "# Title\n\n<b>x</b>" });
 
     expect(mockUpdate.mock.calls[0][2].content).toBe("# Title\n\n<b>x</b>");
+  });
+
+  it("does not update a document owned by another organization", async () => {
+    existing = { ...existing!, organizationId: "22222222-2222-4222-8222-222222222222" };
+
+    await expect(caller().update({ id: "doc-1", content: "x" })).rejects.toThrow(
+      "Document not found",
+    );
+    expect(mockUpdate).not.toHaveBeenCalled();
   });
 
   it("sanitizes content on create when no contentHtml is sent", async () => {
