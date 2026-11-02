@@ -218,7 +218,7 @@ describe("document images", () => {
 
   it("signs image URLs when the document is read", async () => {
     existing = {
-      id: "doc-1",
+      id: "11111111-1111-4111-8111-111111111112",
       organizationId: ORG_ID,
       content: `<img src="${mediaUrl(IMAGE_ID)}">`,
       contentJson: {

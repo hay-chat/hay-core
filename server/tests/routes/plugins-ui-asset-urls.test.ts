@@ -9,7 +9,7 @@ jest.mock("@server/lib/logger", () => ({ createLogger: () => mockLogger }));
 
 jest.mock("@server/trpc", () => {
   const { t } = jest.requireActual<typeof import("@server/trpc/init")>("@server/trpc/init");
-  return { authenticatedProcedure: t.procedure };
+  return { authenticatedProcedure: t.procedure, scopedProcedure: () => t.procedure };
 });
 
 const mockFindByPluginId = jest.fn<(pluginId: string) => Promise<unknown>>();
