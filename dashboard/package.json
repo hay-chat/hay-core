@@ -27,7 +27,7 @@
     "@types/node": "^24.5.2",
     "@types/pdf-parse": "^1.1.5",
     "@types/uuid": "^9.0.8",
-    "@vitejs/plugin-vue": "^6.0.3",
+    "@vitejs/plugin-vue": "^6.0.10",
     "@vue/test-utils": "^2.5.1",
     "@vueuse/nuxt": "^10.5.0",
     "jsdom": "^24.1.3",
