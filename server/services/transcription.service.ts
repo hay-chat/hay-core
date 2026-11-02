@@ -51,8 +51,7 @@ function transcriptionUsage(
   result: unknown,
 ): { input: number; output: number; total: number } | null {
   const usage = (result as { usage?: unknown } | null)?.usage as
-    | { input_tokens?: unknown; output_tokens?: unknown; total_tokens?: unknown }
-    | undefined;
+    { input_tokens?: unknown; output_tokens?: unknown; total_tokens?: unknown } | undefined;
   if (!usage || typeof usage.total_tokens !== "number") return null;
   return {
     input: typeof usage.input_tokens === "number" ? usage.input_tokens : 0,

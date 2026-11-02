@@ -11,13 +11,7 @@ export const SPAM_THRESHOLD = 0.7;
 export const SUSPICIOUS_THRESHOLD = 0.3;
 
 export type SpamSignal =
-  | "links"
-  | "link_only"
-  | "repeated"
-  | "too_long"
-  | "no_text"
-  | "known_pattern"
-  | "unverified";
+  "links" | "link_only" | "repeated" | "too_long" | "no_text" | "known_pattern" | "unverified";
 
 export interface SpamHeuristicsInput {
   /** Customer message texts, oldest first. */
