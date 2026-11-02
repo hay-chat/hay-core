@@ -182,6 +182,17 @@ export interface WebhookDeauthorizationDescriptor {
 }
 
 /**
+ * Opt-in delivery deduplication. Mirrors the SDK's WebhookDedupeDescriptor.
+ */
+export type WebhookDedupeDescriptor = (
+  | { source: "header"; header: string }
+  | { source: "body-path"; path: string }
+  | { source: "raw-body" }
+) & {
+  windowSeconds?: number;
+};
+
+/**
  * Full webhook routing strategy a plugin declares.
  *
  * Mirrors the SDK's WebhookRoutingDescriptor. Read from plugin metadata and
@@ -193,6 +204,7 @@ export interface WebhookRoutingDescriptor {
   verificationChallenge?: WebhookVerificationChallengeDescriptor;
   routeKeyPath: WebhookRouteKeyPathDescriptor;
   deauthorization?: WebhookDeauthorizationDescriptor;
+  dedupe?: WebhookDedupeDescriptor;
 }
 
 /**

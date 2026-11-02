@@ -116,6 +116,7 @@ export type {
   WebhookVerificationChallengeDescriptor,
   WebhookRouteKeyPathDescriptor,
   WebhookDeauthorizationDescriptor,
+  WebhookDedupeDescriptor,
   WebhookRoutingDescriptor,
 } from "./webhook-routing";
 
