@@ -17,6 +17,7 @@ import type {
   RouteHandler,
   PluginPage,
   CronJobOptions,
+  WebhookDedupeDescriptor,
   WebhookRoutingDescriptor,
   RegisterWebchatAPI,
   WebchatContributionOptions,
@@ -293,7 +294,9 @@ function validateWebchatContribution(
         );
       }
     } else if (!["string", "number", "boolean"].includes(typeof value)) {
-      throw new Error(`Webchat contribution prop "${key}" must be a string, number, boolean or config field reference`);
+      throw new Error(
+        `Webchat contribution prop "${key}" must be a string, number, boolean or config field reference`,
+      );
     }
   }
 }
@@ -370,7 +373,10 @@ function validateSetup(options: SetupOptions): void {
     if (step.kind === "component" && (typeof step.component !== "string" || !step.component)) {
       throw new Error(`Setup step "${step.id}" (component) must name its component`);
     }
-    if (step.kind === "external" && (typeof step.url !== "string" || !/^https:\/\//.test(step.url))) {
+    if (
+      step.kind === "external" &&
+      (typeof step.url !== "string" || !/^https:\/\//.test(step.url))
+    ) {
       throw new Error(`Setup step "${step.id}" (external) needs an https url`);
     }
   }
@@ -387,12 +393,43 @@ function validateSetup(options: SetupOptions): void {
  *
  * @internal
  */
+/** Longest dedupe window a plugin may declare (7 days). */
+const MAX_DEDUPE_WINDOW_SECONDS = 7 * 24 * 60 * 60;
+
+function validateWebhookDedupe(dedupe: WebhookDedupeDescriptor): void {
+  if (typeof dedupe !== "object" || dedupe === null) {
+    throw new Error("Webhook routing dedupe must be an object");
+  }
+  if (dedupe.source === "header") {
+    if (!dedupe.header || typeof dedupe.header !== "string") {
+      throw new Error("Webhook routing dedupe.header must be a non-empty string");
+    }
+  } else if (dedupe.source === "body-path") {
+    if (!dedupe.path || typeof dedupe.path !== "string") {
+      throw new Error("Webhook routing dedupe.path must be a non-empty string");
+    }
+  } else if (dedupe.source !== "raw-body") {
+    throw new Error('Webhook routing dedupe.source must be "header", "body-path" or "raw-body"');
+  }
+  const { windowSeconds } = dedupe;
+  if (
+    windowSeconds !== undefined &&
+    (!Number.isInteger(windowSeconds) ||
+      windowSeconds < 1 ||
+      windowSeconds > MAX_DEDUPE_WINDOW_SECONDS)
+  ) {
+    throw new Error(
+      `Webhook routing dedupe.windowSeconds must be an integer from 1 to ${MAX_DEDUPE_WINDOW_SECONDS}`,
+    );
+  }
+}
+
 function validateWebhookRouting(descriptor: WebhookRoutingDescriptor): void {
   if (!descriptor || typeof descriptor !== "object") {
     throw new Error("Webhook routing descriptor must be an object");
   }
 
-  const { signature, verificationChallenge, routeKeyPath } = descriptor;
+  const { signature, verificationChallenge, routeKeyPath, dedupe } = descriptor;
 
   if (!signature || typeof signature !== "object") {
     throw new Error("Webhook routing signature must be an object");
@@ -435,6 +472,10 @@ function validateWebhookRouting(descriptor: WebhookRoutingDescriptor): void {
     if (!nested.keyPath || typeof nested.keyPath !== "string") {
       throw new Error("Webhook routing routeKeyPath.nested.keyPath must be a non-empty string");
     }
+  }
+
+  if (dedupe !== undefined) {
+    validateWebhookDedupe(dedupe);
   }
 
   if (verificationChallenge !== undefined) {
