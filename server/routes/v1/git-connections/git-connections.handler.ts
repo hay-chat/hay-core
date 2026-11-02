@@ -1,8 +1,8 @@
 import { z } from "zod";
-import { TRPCError } from "@trpc/server";
 import { scopedProcedure } from "@server/trpc";
 import { RESOURCES, ACTIONS } from "@server/types/scopes";
 import { gitConnectionService } from "@server/services/git-connection.service";
+import { toClientError } from "@server/trpc/client-error";
 
 /** Git connections install plugin code, so every procedure needs plugin-manage access. */
 const gitManageProcedure = scopedProcedure(RESOURCES.PLUGINS, ACTIONS.MANAGE);
@@ -38,8 +38,7 @@ export const completeInstallation = gitManageProcedure
         accountLogin: connection.accountLogin,
       };
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Installation failed";
-      throw new TRPCError({ code: "BAD_REQUEST", message });
+      throw toClientError(error, "BAD_REQUEST", "Installation failed");
     }
   });
 
@@ -94,8 +93,7 @@ export const listRepos = gitManageProcedure
       );
       return repos;
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Failed to list repos";
-      throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message });
+      throw toClientError(error, "INTERNAL_SERVER_ERROR", "Failed to list repos");
     }
   });
 
@@ -130,8 +128,7 @@ export const installPlugin = gitManageProcedure
         commitSha: plugin.gitLastCommitSha,
       };
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Failed to install plugin";
-      throw new TRPCError({ code: "BAD_REQUEST", message });
+      throw toClientError(error, "BAD_REQUEST", "Failed to install plugin");
     }
   });
 
@@ -145,8 +142,7 @@ export const syncPlugin = gitManageProcedure
       const result = await gitConnectionService.syncPlugin(input.pluginId, ctx.organizationId!);
       return result;
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Sync failed";
-      throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message });
+      throw toClientError(error, "INTERNAL_SERVER_ERROR", "Sync failed");
     }
   });
 
@@ -159,7 +155,6 @@ export const checkForUpdates = gitManageProcedure
     try {
       return await gitConnectionService.checkForUpdates(input.pluginId, ctx.organizationId!);
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Check failed";
-      throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message });
+      throw toClientError(error, "INTERNAL_SERVER_ERROR", "Check failed");
     }
   });

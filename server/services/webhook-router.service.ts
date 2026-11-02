@@ -6,8 +6,10 @@ import { pluginInstanceRepository } from "../repositories/plugin-instance.reposi
 import { pluginWebhookRouteRepository } from "../repositories/plugin-webhook-route.repository";
 import { verifyHmacSha256 } from "@server/lib/hmac-signature";
 import { normalizeEmailAddressKey, verifySvixSignature } from "@server/lib/svix-signature";
+import { claimWebhookDelivery, releaseWebhookDelivery } from "@server/lib/webhook-replay";
 import type {
   WebhookDeauthorizationDescriptor,
+  WebhookDedupeDescriptor,
   WebhookRouteKeyPathDescriptor,
   WebhookRoutingDescriptor,
 } from "../types/plugin-sdk.types";
@@ -140,11 +142,45 @@ export class WebhookRouterService {
       return;
     }
 
-    // Always respond 200 promptly; fan-out happens asynchronously so a slow or
+    // Svix deliveries carry a unique id: process each one once. (Plain HMAC
+    // formats have no delivery id or timestamp, and two legitimate events can
+    // have identical bodies, so they are not deduplicated here.)
+    const deliveryId = routing.signature.format === "svix" ? req.headers["svix-id"] : undefined;
+    if (
+      typeof deliveryId === "string" &&
+      !(await claimWebhookDelivery(`webhook-router:${pluginId}`, deliveryId))
+    ) {
+      res.status(200).json({ received: true, duplicate: true });
+      return;
+    }
+
+    const byOrg = await this.groupByOrg(pluginId, routing, body);
+
+    // Plugin-declared dedupe: claim the key once per routed org. A delivery
+    // every org has already seen is acknowledged without forwarding.
+    const dedupeKey = routing.dedupe ? extractDedupeKey(routing.dedupe, req, rawBody, body) : null;
+    if (dedupeKey !== null && byOrg.size > 0) {
+      for (const organizationId of Array.from(byOrg.keys())) {
+        const fresh = await claimWebhookDelivery(
+          dedupeNamespace(pluginId, organizationId),
+          dedupeKey,
+          routing.dedupe?.windowSeconds,
+        );
+        if (!fresh) {
+          byOrg.delete(organizationId);
+        }
+      }
+      if (byOrg.size === 0) {
+        res.status(200).json({ received: true, duplicate: true });
+        return;
+      }
+    }
+
+    // Respond 200 promptly; forwarding happens asynchronously so a slow or
     // failing worker never blocks the provider's delivery pipeline.
     res.status(200).json({ received: true });
 
-    void this.dispatch(pluginId, routing, body, req).catch((err) => {
+    void this.forwardAll(pluginId, routing, body, byOrg, req, dedupeKey).catch((err) => {
       logger.error({ err, pluginId }, "Unexpected error during shared webhook dispatch");
     });
   }
@@ -352,8 +388,7 @@ export class WebhookRouterService {
   }
 
   /**
-   * Resolve routing keys to orgs, group items per org, and forward each org's
-   * reconstructed body to its worker.
+   * Resolve routing keys to orgs and group items per org.
    *
    * Without `routeKeyPath.nested`, every item goes whole to the org owning its
    * item-level key. With `nested`, each item's sub-array is split per sub-item
@@ -362,24 +397,24 @@ export class WebhookRouterService {
    * nested key go to the item-level owner. Each org receives one clone of the
    * item holding only its own sub-items.
    */
-  private async dispatch(
+  private async groupByOrg(
     pluginId: string,
     routing: WebhookRoutingDescriptor,
     body: Record<string, unknown>,
-    req: Request,
-  ): Promise<void> {
+  ): Promise<Map<string, unknown[]>> {
     const { itemsPath, keyPath, nested } = routing.routeKeyPath;
     const extractKey = (source: unknown, path: string): string | undefined =>
       routingKey(source, path, routing.routeKeyPath.keyTransform);
 
     // "." = the body is one event (no array); it is routed and forwarded whole.
     const items = itemsPath === "." ? [body] : getPath(body, itemsPath);
+    const byOrg = new Map<string, unknown[]>();
     if (!Array.isArray(items)) {
       logger.warn({ pluginId, itemsPath }, "Shared webhook itemsPath did not resolve to an array");
-      return;
+      return byOrg;
     }
 
-    // One repository lookup per distinct key within this dispatch.
+    // One repository lookup per distinct key within this delivery.
     const ownerCache = new Map<string, Promise<RouteOwner>>();
     const resolveOwner = (routingKey: string): Promise<RouteOwner> => {
       let pending = ownerCache.get(routingKey);
@@ -391,7 +426,6 @@ export class WebhookRouterService {
     };
 
     // Group items by org, preserving the original top-level fields.
-    const byOrg = new Map<string, unknown[]>();
     const addToOrg = (organizationId: string, item: unknown): void => {
       const list = byOrg.get(organizationId) ?? [];
       list.push(item);
@@ -451,25 +485,49 @@ export class WebhookRouterService {
       }
     }
 
-    if (byOrg.size === 0) {
-      return;
-    }
+    return byOrg;
+  }
 
+  /**
+   * Forward each org's items to its worker. When the delivery was claimed for
+   * dedupe, a failed org's claim is released so the provider's retry of the
+   * same delivery is accepted.
+   */
+  private async forwardAll(
+    pluginId: string,
+    routing: WebhookRoutingDescriptor,
+    body: Record<string, unknown>,
+    byOrg: Map<string, unknown[]>,
+    req: Request,
+    dedupeKey: string | null,
+  ): Promise<void> {
+    const entries = Array.from(byOrg.entries());
     const results = await Promise.allSettled(
-      Array.from(byOrg.entries()).map(([organizationId, orgItems]) =>
-        this.forwardToOrg(pluginId, organizationId, itemsPath, body, orgItems, req),
+      entries.map(([organizationId, orgItems]) =>
+        this.forwardToOrg(
+          pluginId,
+          organizationId,
+          routing.routeKeyPath.itemsPath,
+          body,
+          orgItems,
+          req,
+        ),
       ),
     );
 
-    results.forEach((result, index) => {
-      if (result.status === "rejected") {
-        const organizationId = Array.from(byOrg.keys())[index];
-        logger.error(
-          { err: result.reason, pluginId, organizationId },
-          "Failed to forward shared webhook to org worker",
-        );
+    for (const [index, result] of results.entries()) {
+      if (result.status === "fulfilled") {
+        continue;
       }
-    });
+      const organizationId = entries[index][0];
+      logger.error(
+        { err: result.reason, pluginId, organizationId },
+        "Failed to forward shared webhook to org worker",
+      );
+      if (dedupeKey !== null) {
+        await releaseWebhookDelivery(dedupeNamespace(pluginId, organizationId), dedupeKey);
+      }
+    }
   }
 
   /**
@@ -538,6 +596,39 @@ export class WebhookRouterService {
     }
     return null;
   }
+}
+
+/** Redis namespace for plugin-declared dedupe keys: one per plugin and org. */
+function dedupeNamespace(pluginId: string, organizationId: string): string {
+  return `webhook-dedupe:${pluginId}:${organizationId}`;
+}
+
+/**
+ * Read the plugin-declared dedupe key from a verified delivery, or null when
+ * the delivery carries none (it is then processed without dedupe).
+ */
+function extractDedupeKey(
+  dedupe: WebhookDedupeDescriptor,
+  req: Request,
+  rawBody: Buffer,
+  body: Record<string, unknown>,
+): string | null {
+  if (dedupe.source === "raw-body") {
+    return rawBody.toString("utf8");
+  }
+  if (dedupe.source === "header") {
+    const value = req.headers[dedupe.header.toLowerCase()];
+    const first = Array.isArray(value) ? value[0] : value;
+    return first ? first : null;
+  }
+  const value = getPath(body, dedupe.path);
+  if (typeof value === "string" && value.length > 0) {
+    return value;
+  }
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return String(value);
+  }
+  return null;
 }
 
 /**
@@ -624,4 +715,10 @@ function withPath(source: unknown, path: string, value: unknown): Record<string,
 export const webhookRouterService = new WebhookRouterService();
 
 // Exported for unit tests of the no-eval path extractor / body reconstruction.
-export const __webhookRouterInternals = { getPath, setPath, withPath, routingKey };
+export const __webhookRouterInternals = {
+  getPath,
+  setPath,
+  withPath,
+  routingKey,
+  extractDedupeKey,
+};

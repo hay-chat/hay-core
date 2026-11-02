@@ -6,9 +6,7 @@ import { rateLimitService } from "@server/services/rate-limit.service";
 import { AppDataSource } from "@server/database/data-source";
 import type { FindOptionsWhere } from "typeorm";
 import { PrivacyRequest } from "@server/entities/privacy-request.entity";
-import { createLogger } from "@server/lib/logger";
-
-const logger = createLogger("customer-privacy");
+import { toClientError } from "@server/trpc/client-error";
 
 /**
  * Customer Privacy Router
@@ -131,15 +129,11 @@ export const customerPrivacyRouter = t.router({
           expiresAt: result.expiresAt,
         };
       } catch (error) {
-        logger.error({ err: error }, "Export request failed");
-        const message =
-          error instanceof Error
-            ? error.message
-            : "Failed to process customer export request. Please try again later.";
-        throw new TRPCError({
-          code: "BAD_REQUEST",
-          message,
-        });
+        throw toClientError(
+          error,
+          "BAD_REQUEST",
+          "Failed to process customer export request. Please try again later.",
+        );
       }
     }),
 
@@ -183,11 +177,11 @@ export const customerPrivacyRouter = t.router({
           expiresAt: result.expiresAt,
         };
       } catch (error) {
-        const message = error instanceof Error ? error.message : "Unknown error";
-        throw new TRPCError({
-          code: "BAD_REQUEST",
-          message,
-        });
+        throw toClientError(
+          error,
+          "BAD_REQUEST",
+          "Failed to process the customer deletion request. Check the identifier and try again.",
+        );
       }
     }),
 
@@ -245,14 +239,11 @@ export const customerPrivacyRouter = t.router({
           errorMessage: request.errorMessage,
         };
       } catch (error) {
-        if (error instanceof TRPCError) {
-          throw error;
-        }
-        const message = error instanceof Error ? error.message : "Unknown error";
-        throw new TRPCError({
-          code: "INTERNAL_SERVER_ERROR",
-          message,
-        });
+        throw toClientError(
+          error,
+          "INTERNAL_SERVER_ERROR",
+          "Failed to load the privacy request status.",
+        );
       }
     }),
 
@@ -344,11 +335,7 @@ export const customerPrivacyRouter = t.router({
           },
         };
       } catch (error) {
-        const message = error instanceof Error ? error.message : "Unknown error";
-        throw new TRPCError({
-          code: "INTERNAL_SERVER_ERROR",
-          message,
-        });
+        throw toClientError(error, "INTERNAL_SERVER_ERROR", "Failed to load privacy requests.");
       }
     }),
 });
