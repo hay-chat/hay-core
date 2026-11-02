@@ -66,7 +66,11 @@ endpoints directly.
 agent. Inbound webhooks become Hay messages; Hay replies are delivered back.
 
 **Shape:** `category: "channel"`, `capabilities: ["messages","customers"]`, plus a `channel:`
-key. Register routes instead of (or alongside) MCP:
+key. Optionally declare `inactivity: { warningMinutes?, closeMinutes }`: after `warningMinutes`
+of customer silence the AI checks in (leave it out for no check-in), after `closeMinutes` it
+closes with a sign-off. Without it the channel uses the `CONVERSATION_INACTIVITY_INTERVAL`
+default. Keep `closeMinutes` inside the platform's reply window (WhatsApp: 24 h). Register routes
+instead of (or alongside) MCP:
 
 - `POST /webhook` (or `/messages`) — **verify signature → filter → `messages.receive`**.
 - `POST /deliver` — send Hay's reply via the provider API.

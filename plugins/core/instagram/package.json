@@ -10,6 +10,10 @@
     "displayName": "Instagram",
     "category": "channel",
     "channel": "instagram",
+    "inactivity": {
+      "warningMinutes": 60,
+      "closeMinutes": 120
+    },
     "rendering": {
       "markdown": "plain",
       "productRecommendations": "text"

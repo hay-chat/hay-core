@@ -20,11 +20,7 @@ import {
   resolveChannelAiMode,
   CHANNEL_AI_MODES,
   type ChannelAiMode,
-  DEFAULT_INACTIVITY_TIMEOUTS,
-  INACTIVITY_MINUTES_LIMITS,
-  isValidInactivityTimeout,
 } from "@server/types/organization-settings.types";
-import { config } from "@server/config/env";
 import type { DeepPartial } from "typeorm";
 import { AppDataSource } from "@server/database/data-source";
 import { Organization } from "@server/entities/organization.entity";
@@ -598,79 +594,6 @@ export const organizationsRouter = t.router({
         settings: { ...(organization.settings || {}), media },
       });
       return resolveMediaSettings({ media });
-    }),
-
-  // Inactivity warning/close delays per channel (org overrides over built-in defaults).
-  getInactivityTimeouts: scopedProcedure(RESOURCES.ORGANIZATION_SETTINGS, ACTIONS.READ).query(
-    async ({ ctx }) => {
-      const organization = await organizationService.findOne(ctx.organizationId!);
-      if (!organization) {
-        throw new TRPCError({ code: "NOT_FOUND", message: "Organization not found" });
-      }
-      const fallbackCloseMinutes = Math.max(
-        1,
-        Math.round(config.conversation.inactivityInterval / 60_000),
-      );
-      return {
-        defaults: DEFAULT_INACTIVITY_TIMEOUTS,
-        overrides: Object.fromEntries(
-          Object.entries(organization.settings?.inactivityTimeouts ?? {}).filter(([, value]) =>
-            isValidInactivityTimeout(value),
-          ),
-        ),
-        // Channels with neither: close at the env interval, warn at half.
-        fallback: {
-          warningMinutes: Math.max(1, Math.floor(fallbackCloseMinutes / 2)),
-          closeMinutes: fallbackCloseMinutes,
-        },
-        limits: INACTIVITY_MINUTES_LIMITS,
-      };
-    },
-  ),
-
-  updateInactivityTimeouts: scopedProcedure(RESOURCES.ORGANIZATION_SETTINGS, ACTIONS.UPDATE)
-    .input(
-      z.object({
-        // Replaces all overrides. Keyed by channel id; unknown channels are allowed.
-        timeouts: z
-          .record(
-            z.string().regex(/^[a-z0-9_-]{1,64}$/),
-            z
-              .object({
-                // null = no check-in before the close.
-                warningMinutes: z
-                  .number()
-                  .int()
-                  .min(INACTIVITY_MINUTES_LIMITS.min)
-                  .max(INACTIVITY_MINUTES_LIMITS.max)
-                  .nullable(),
-                closeMinutes: z
-                  .number()
-                  .int()
-                  .min(INACTIVITY_MINUTES_LIMITS.min)
-                  .max(INACTIVITY_MINUTES_LIMITS.max),
-              })
-              .refine(
-                (value) =>
-                  value.warningMinutes === null || value.warningMinutes < value.closeMinutes,
-                {
-                  message: "The warning must come before the close.",
-                  path: ["warningMinutes"],
-                },
-              ),
-          )
-          .refine((value) => Object.keys(value).length <= 50, { message: "Too many channels" }),
-      }),
-    )
-    .mutation(async ({ ctx, input }) => {
-      const organization = await organizationService.findOne(ctx.organizationId!);
-      if (!organization) {
-        throw new TRPCError({ code: "NOT_FOUND", message: "Organization not found" });
-      }
-      await organizationService.update(ctx.organizationId!, {
-        settings: { ...(organization.settings || {}), inactivityTimeouts: input.timeouts },
-      });
-      return { overrides: input.timeouts };
     }),
 
   updateSettings: scopedProcedure(RESOURCES.ORGANIZATION_SETTINGS, ACTIONS.UPDATE)

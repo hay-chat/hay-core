@@ -479,77 +479,6 @@ export function resolveQuickCheckSettings(
 }
 
 /**
- * Inactivity timeouts per channel. Keyed by channel id ("web" or a channel
- * plugin's manifest `channel`, never a plugin id). After `warningMinutes` of
- * customer silence the AI nudges (`null` = no nudge); after `closeMinutes` it
- * closes with a sign-off; after 2x `closeMinutes` (the old rule) it closes
- * silently. Email skips the nudge by default: a "still there?" email reads as
- * noise, so it only gets the close message.
- *
- * Built-in defaults stay well inside WhatsApp's 24 h customer-service window
- * (the 2 h close sign-off still goes out). Channels not listed, and not
- * overridden by the organization, use the CONVERSATION_INACTIVITY_INTERVAL
- * env value as the close delay and half of it as the warning.
- */
-export interface InactivityTimeout {
-  warningMinutes: number | null;
-  closeMinutes: number;
-}
-
-export const INACTIVITY_MINUTES_LIMITS = { min: 1, max: 14 * 24 * 60 } as const;
-
-const HOUR = 60;
-const DAY = 24 * HOUR;
-const MESSAGING_TIMEOUT: InactivityTimeout = { warningMinutes: HOUR, closeMinutes: 2 * HOUR };
-
-export const DEFAULT_INACTIVITY_TIMEOUTS: Readonly<Record<string, InactivityTimeout>> = {
-  web: { warningMinutes: 15, closeMinutes: 30 },
-  whatsapp: MESSAGING_TIMEOUT,
-  messenger: MESSAGING_TIMEOUT,
-  instagram: MESSAGING_TIMEOUT,
-  email: { warningMinutes: null, closeMinutes: 2 * DAY },
-};
-
-export function isValidInactivityTimeout(value: unknown): value is InactivityTimeout {
-  if (!value || typeof value !== "object") return false;
-  const { warningMinutes, closeMinutes } = value as Partial<InactivityTimeout>;
-  const inRange = (n: unknown): n is number =>
-    typeof n === "number" &&
-    Number.isInteger(n) &&
-    n >= INACTIVITY_MINUTES_LIMITS.min &&
-    n <= INACTIVITY_MINUTES_LIMITS.max;
-  if (!inRange(closeMinutes)) return false;
-  return warningMinutes === null || (inRange(warningMinutes) && warningMinutes < closeMinutes);
-}
-
-export interface ResolvedInactivityThresholds {
-  /** null = this channel gets no check-in before the close. */
-  warningMs: number | null;
-  closeMs: number;
-  silentCloseMs: number;
-}
-
-/** Organization override, else the built-in channel default, else the env fallback. */
-export function resolveInactivityThresholds(
-  settings: OrganizationSettings | null | undefined,
-  channel: string,
-  fallbackCloseMs: number,
-): ResolvedInactivityThresholds {
-  const override = settings?.inactivityTimeouts?.[channel];
-  const timeout = isValidInactivityTimeout(override)
-    ? override
-    : (DEFAULT_INACTIVITY_TIMEOUTS[channel] ?? null);
-  const closeMs = timeout ? timeout.closeMinutes * 60_000 : fallbackCloseMs;
-  const warningMs = !timeout
-    ? fallbackCloseMs / 2
-    : timeout.warningMinutes === null
-      ? null
-      : timeout.warningMinutes * 60_000;
-  // Silent close stays 2x the close delay, as it was with the single global interval.
-  return { warningMs, closeMs, silentCloseMs: closeMs * 2 };
-}
-
-/**
  * Organization Settings JSONB structure
  * This type defines the complete structure of the settings field in the Organization entity
  */
@@ -567,7 +496,6 @@ export interface OrganizationSettings {
   aiDisclosure?: AiDisclosureConfig; // AI label on replies, per channel
   channelAiModes?: Record<string, ChannelAiMode>; // Per-channel AI mode; missing = "on"
   media?: MediaSettings; // Customer photos/PDFs: AI reading, ID documents, case email
-  inactivityTimeouts?: Record<string, InactivityTimeout>; // Per-channel overrides of the inactivity warning/close delays
   quickCheck?: QuickCheckSettings; // Ask the team one fact instead of handing off (D19)
   [key: string]: unknown;
 }

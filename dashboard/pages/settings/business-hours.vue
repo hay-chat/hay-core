@@ -29,8 +29,6 @@
 
       <QuickCheckSettingsCard />
 
-      <InactivityTimeoutsCard :channels="channels" />
-
       <p v-if="schedules.length === 0 && !draft" class="text-sm text-muted-foreground">
         {{ $t("businessHours.empty") }}
       </p>

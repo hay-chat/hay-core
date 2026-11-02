@@ -10,11 +10,11 @@ import {
 import { hookManager } from "@server/services/hooks/hook-manager";
 import { recheckAiReply } from "./reply-guard";
 import { createLogger } from "@server/lib/logger";
-import { organizationRepository } from "@server/repositories/organization.repository";
 import {
+  WEB_INACTIVITY,
   resolveInactivityThresholds,
-  type OrganizationSettings,
-} from "@server/types/organization-settings.types";
+  type InactivityTiming,
+} from "@server/lib/inactivity-timing";
 
 const logger = createLogger("orchestrator");
 
@@ -85,8 +85,25 @@ export class Orchestrator {
       const waitingOnTeam = await teamQuestionService.conversationIdsWithOpenQuestion();
 
       const now = new Date();
-      // Thresholds depend on the conversation's channel and the org's overrides.
-      const settingsByOrg = new Map<string, OrganizationSettings | null>();
+      // Thresholds depend on the channel: webchat's are core's, any other
+      // channel's come from the manifest of the plugin that handles it.
+      const { pluginManagerService } = await import("@server/services/plugin-manager.service");
+      const timingByChannel = new Map<string, InactivityTiming | undefined>();
+      const channelTiming = async (organizationId: string, channel: string) => {
+        if (channel === "web") return WEB_INACTIVITY;
+        const key = `${organizationId}:${channel}`;
+        if (!timingByChannel.has(key)) {
+          const pluginId = await pluginManagerService.findPluginIdByChannel(
+            organizationId,
+            channel,
+          );
+          timingByChannel.set(
+            key,
+            pluginId ? pluginManagerService.getChannelInactivity(pluginId) : undefined,
+          );
+        }
+        return timingByChannel.get(key);
+      };
 
       for (const conversation of openConversations) {
         const log = logger.child({
@@ -99,19 +116,12 @@ export class Orchestrator {
             continue;
           }
 
-          if (!settingsByOrg.has(conversation.organization_id)) {
-            const organization = await organizationRepository.findById(
-              conversation.organization_id,
-            );
-            settingsByOrg.set(conversation.organization_id, organization?.settings ?? null);
-          }
           const {
             warningMs: warningThreshold,
             closeMs: inactivityThreshold,
             silentCloseMs: silentCloseThreshold,
           } = resolveInactivityThresholds(
-            settingsByOrg.get(conversation.organization_id),
-            conversation.channel,
+            await channelTiming(conversation.organization_id, conversation.channel),
             config.conversation.inactivityInterval,
           );
 

@@ -683,22 +683,6 @@
       "invalid": "Use minutos inteiros de 1 a 60, com o aviso antes da transferência.",
       "saved": "Configurações da verificação rápida salvas"
     },
-    "inactivity": {
-      "title": "Tempo de inatividade",
-      "description": "Quanto tempo o cliente pode ficar em silêncio antes de a IA perguntar se ainda precisa de ajuda, e antes de encerrar a conversa, por canal. A classificação de encerramento e a janela de 72 horas para reabrir continuam valendo.",
-      "warnAfter": "Perguntar após",
-      "closeAfter": "Encerrar após",
-      "unit": "Unidade",
-      "noCheckIn": "Sem pergunta",
-      "hint": "Deixe “Perguntar após” vazio para encerrar sem perguntar antes. Canais sem configuração própria encerram no intervalo padrão e perguntam na metade dele. Se a janela de resposta do canal (como as 24 horas do WhatsApp) já tiver fechado, a pergunta e a despedida são puladas e a conversa é encerrada em silêncio.",
-      "invalid": "Use números inteiros de até {max} dias, com a pergunta antes do encerramento.",
-      "saved": "Tempo de inatividade salvo",
-      "units": {
-        "minutes": "Minutos",
-        "hours": "Horas",
-        "days": "Dias"
-      }
-    },
     "empty": "Ainda não há horário, então todos os canais contam como abertos. Adicione um para dizer aos clientes quando a equipe volta.",
     "untitled": "Horário sem nome",
     "defaultName": "Horário padrão",

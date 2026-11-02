@@ -18,9 +18,17 @@ jest.mock("@server/repositories/conversation.repository", () => ({
   },
   conversationRepository: { findById: (id: string) => mockFindById(id) },
 }));
-const mockOrgSettings = jest.fn<() => Record<string, unknown> | null>(() => null);
-jest.mock("@server/repositories/organization.repository", () => ({
-  organizationRepository: { findById: async () => ({ settings: mockOrgSettings() }) },
+// Channel plugins declare their timing in their manifest; these stand in for them.
+const mockChannelTiming: Record<string, unknown> = {
+  whatsapp: { warningMinutes: 60, closeMinutes: 120 },
+  email: { closeMinutes: 2880 },
+};
+jest.mock("@server/services/plugin-manager.service", () => ({
+  pluginManagerService: {
+    findPluginIdByChannel: async (_organizationId: string, channel: string) =>
+      channel in mockChannelTiming ? `plugin-${channel}` : null,
+    getChannelInactivity: (pluginId: string) => mockChannelTiming[pluginId.replace("plugin-", "")],
+  },
 }));
 jest.mock("@server/repositories/message.repository", () => ({ MessageRepository: class {} }));
 
@@ -203,7 +211,6 @@ describe("checkInactivity per channel", () => {
     jest.clearAllMocks();
     addMessage = jest.fn(async () => ({}));
     mockInvoke.mockResolvedValue("Do you still need help?");
-    mockOrgSettings.mockReturnValue(null);
   });
 
   const warned = () =>
@@ -253,11 +260,10 @@ describe("checkInactivity per channel", () => {
     expect(closedAsResolved()).toBe(false);
   });
 
-  it("uses the organization's override", async () => {
-    mockOrgSettings.mockReturnValue({
-      inactivityTimeouts: { email: { warningMinutes: 30, closeMinutes: 60 } },
-    });
-    withChannel("email", 45 * MIN);
+  it("uses the env interval for a channel whose plugin declares no timing", async () => {
+    // CONVERSATION_INACTIVITY_INTERVAL in tests: check-in at half, close at the full value.
+    const interval = config.conversation.inactivityInterval;
+    withChannel("chatwoot", interval / 2 + MIN);
     await new Orchestrator().checkInactivity();
     expect(warned()).toBe(true);
   });
