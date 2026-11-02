@@ -26,8 +26,7 @@ import { READ_RISK } from "../tool-risk";
 const logger = createLogger("core-tool:inspect-attachment");
 
 type InspectResult =
-  | { answer: string; class: string; fields: Record<string, string> }
-  | { error: string };
+  { answer: string; class: string; fields: Record<string, string> } | { error: string };
 
 async function findCustomerFile(
   conversation: Conversation,
