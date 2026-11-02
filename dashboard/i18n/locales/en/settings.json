@@ -759,6 +759,21 @@
       "invalid": "Use whole minutes from 1 to 60, with the update before the hand-off.",
       "saved": "Quick check settings saved"
     },
+    "inactivity": {
+      "title": "Inactivity timing",
+      "description": "How long a customer can stay silent before the AI checks in, and before it closes the conversation, per channel. The usual close classification and 72-hour reopen window still apply.",
+      "warnAfter": "Check in after",
+      "closeAfter": "Close after",
+      "unit": "Unit",
+      "hint": "Channels without their own setting close after the default interval and check in at half of it. If a channel's reply window (such as WhatsApp's 24 hours) has already closed, the check-in and sign-off are skipped and the conversation closes quietly.",
+      "invalid": "Use whole numbers up to {max} days, with the check-in before the close.",
+      "saved": "Inactivity timing saved",
+      "units": {
+        "minutes": "Minutes",
+        "hours": "Hours",
+        "days": "Days"
+      }
+    },
     "empty": "No schedule yet, so every channel counts as open. Add one to tell shoppers when your team is back.",
     "untitled": "Untitled schedule",
     "defaultName": "Default hours",
