@@ -35,8 +35,9 @@ module.exports = {
       { tsconfig: { allowJs: true, esModuleInterop: true }, diagnostics: false },
     ],
   },
+  // linkedom keeps its own copy of the css-select chain, also ESM only.
   transformIgnorePatterns: [
-    "/node_modules/(?!(htmlparser2|domhandler|domutils|domelementtype|dom-serializer|entities)/)",
+    "/node_modules/(?!(linkedom/node_modules/)?(htmlparser2|domhandler|domutils|domelementtype|dom-serializer|entities|css-select|css-what|nth-check|boolbase)/)",
   ],
   collectCoverageFrom: [
     "services/**/*.ts",
