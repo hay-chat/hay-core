@@ -367,6 +367,16 @@ describe("privacy requests: jobs, exports and erasure", () => {
     await runQueuedJobs();
 
     expect((await PrivacyRequest.findOneByOrFail({ id: requestId })).status).toBe("completed");
+    const auditRows: Array<{ action: string; user_id: string | null }> = await AppDataSource.query(
+      `SELECT action, user_id FROM audit_logs WHERE changes->>'requestId' = $1 ORDER BY created_at`,
+      [requestId],
+    );
+    expect(auditRows.map((row) => row.action)).toEqual([
+      "customer.privacy.deletion.request",
+      "customer.privacy.deletion.confirm",
+      "customer.privacy.deletion.complete",
+    ]);
+    expect(auditRows.every((row) => row.user_id === null)).toBe(true);
     for (const needle of [CUSTOMER_EMAIL, CUSTOMER_PHONE]) {
       expect(await findPii(needle)).toEqual([]);
     }

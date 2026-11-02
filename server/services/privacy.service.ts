@@ -921,7 +921,11 @@ export class PrivacyService {
   ): Promise<void> {
     try {
       await auditLogService.log({
-        userId: userId || "anonymous",
+        // Customers and unverified requesters are not users: no user reference,
+        // the requestId in `changes` points at the request.
+        userId,
+        organizationId:
+          typeof metadata?.organizationId === "string" ? metadata.organizationId : undefined,
         // Privacy logging uses a broader action vocabulary than the core
         // AuditAction union (e.g. customer.* and ip_mismatch events). The DB
         // column is a plain varchar, so widening here is safe.
