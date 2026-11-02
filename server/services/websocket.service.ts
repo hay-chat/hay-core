@@ -37,7 +37,7 @@ const ATTACH_TIMEOUT_MS = 10_000;
 /** Pings go out this often; a socket that missed the previous pong is terminated. */
 const HEARTBEAT_INTERVAL_MS = 30_000;
 /** Open sockets allowed per client IP (shared NATs keep this generous). */
-const MAX_CONNECTIONS_PER_IP = 50;
+const MAX_CONNECTIONS_PER_IP = 100;
 /** DPoP proofs on identify are made for this method and the `/ws` endpoint. */
 const IDENTIFY_PROOF_METHOD = "GET";
 const IDENTIFY_PROOF_PATH = "/ws";
@@ -572,11 +572,6 @@ export class WebSocketService {
       return;
     }
 
-    if (client.conversationId) {
-      this.sendError(client, "Already identified");
-      return;
-    }
-
     if (typeof proof !== "string" || typeof url !== "string" || !isIdentifyProofUrl(url)) {
       this.sendError(client, "DPoP authentication required: proof and url must be provided");
       return;
@@ -610,6 +605,8 @@ export class WebSocketService {
     // The socket may have closed while the proof was verified.
     if (!this.clients.has(clientId)) return;
 
+    // A shopper who starts a new conversation identifies again on the same socket.
+    if (client.conversationId !== conversation.id) this.detachFromConversation(clientId, client);
     client.conversationId = conversation.id;
 
     if (!this.conversationClients.has(conversation.id)) {
@@ -829,22 +826,7 @@ export class WebSocketService {
     if (openFromIp > 0) this.connectionsPerIp.set(client.ip, openFromIp);
     else this.connectionsPerIp.delete(client.ip);
 
-    // Remove from conversation clients
-    if (client.conversationId) {
-      const conversationClients = this.conversationClients.get(client.conversationId);
-      if (conversationClients) {
-        conversationClients.delete(clientId);
-        if (conversationClients.size === 0) {
-          this.conversationClients.delete(client.conversationId);
-          void pageToolService.clear(client.conversationId);
-        }
-      }
-
-      logger.debug(
-        { conversationId: client.conversationId },
-        "Webchat client disconnected from conversation",
-      );
-    }
+    this.detachFromConversation(clientId, client);
 
     // Remove from organization clients
     if (client.organizationId) {
@@ -859,6 +841,26 @@ export class WebSocketService {
 
     // Remove client
     this.clients.delete(clientId);
+  }
+
+  /** Stop streaming a conversation to this client. */
+  private detachFromConversation(clientId: string, client: WebSocketClient): void {
+    if (!client.conversationId) return;
+
+    const conversationClients = this.conversationClients.get(client.conversationId);
+    if (conversationClients) {
+      conversationClients.delete(clientId);
+      if (conversationClients.size === 0) {
+        this.conversationClients.delete(client.conversationId);
+        void pageToolService.clear(client.conversationId);
+      }
+    }
+
+    logger.debug(
+      { conversationId: client.conversationId },
+      "Webchat client disconnected from conversation",
+    );
+    client.conversationId = undefined;
   }
 
   /**

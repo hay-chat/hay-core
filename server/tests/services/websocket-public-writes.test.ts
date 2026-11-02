@@ -14,7 +14,7 @@ jest.mock("@server/config/env", () => ({
 const mockLogger = { debug: jest.fn(), info: jest.fn(), warn: jest.fn(), error: jest.fn() };
 jest.mock("@server/lib/logger", () => ({ createLogger: () => mockLogger }));
 jest.mock("@server/services/redis.service", () => ({
-  redisService: { subscribe: jest.fn(async () => undefined) },
+  redisService: { subscribe: jest.fn(async () => undefined), isConnected: () => false },
 }));
 
 const mockUserOrgFindOne = jest.fn<(options: unknown) => Promise<unknown>>();
@@ -375,6 +375,18 @@ describe("WebSocket identify requires proof of the conversation key", () => {
     expect(ws.last()).toEqual({ type: "identified", conversationId: CONV_ID });
   });
 
+  it("moves a socket to a new conversation when it identifies again", async () => {
+    mockVerifyDPoP.mockResolvedValue({ success: true });
+    mockConversationRepo.findById.mockImplementation(async (id) => webConversation({ id }));
+    const { send, clientId, internals } = connect(service);
+
+    await send(identifyFrame());
+    await send(identifyFrame(OTHER_CONV_ID));
+
+    expect(internals.conversationClients.get(CONV_ID)?.has(clientId) ?? false).toBe(false);
+    expect(internals.conversationClients.get(OTHER_CONV_ID)?.has(clientId)).toBe(true);
+  });
+
   it("does not relay a client-chosen identity in typing events", async () => {
     mockVerifyDPoP.mockResolvedValue({ success: true });
     const first = connect(service);
@@ -432,12 +444,12 @@ describe("WebSocket connection lifecycle", () => {
 
   it("caps open connections per client IP", () => {
     const service = new WebSocketService();
-    for (let i = 0; i < 50; i++) connect(service);
+    for (let i = 0; i < 100; i++) connect(service);
 
     const { ws } = connect(service);
 
     expect(ws.closedWith).toBe(1008);
-    expect(service.getConnectionCount()).toBe(50);
+    expect(service.getConnectionCount()).toBe(100);
   });
 });
 
