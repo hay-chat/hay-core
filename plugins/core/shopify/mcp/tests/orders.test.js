@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach } from "vitest";
 import { createRequire } from "node:module";
 
 const require = createRequire(import.meta.url);
-const { createFakeServer, mockShopify } = require("./harness");
+const { createFakeServer, mockShopify, verified } = require("./harness");
 const { registerOrderTools, cancelBlocker, enrichOrder } = require("../tools/orders");
 const { registerFulfillmentTools } = require("../tools/fulfillments");
 
@@ -646,15 +646,22 @@ describe("order lookups as customers phrase them (haychat-2, 2026-10-29)", () =>
       FindCustomerByEmail: () => ({
         customers: { edges: [{ node: { id: "gid://shopify/Customer/9" } }] },
       }),
-      ListCustomerOrders: () => ({ customer: { orders: { edges: [], pageInfo: {} } } }),
+      ListCustomerOrders: () => ({
+        customer: {
+          defaultEmailAddress: { emailAddress: "russel.winfield@example.com" },
+          orders: { edges: [], pageInfo: {} },
+        },
+      }),
     });
     const server = createFakeServer();
     registerOrderTools(server);
-    const res = await server.call("shopify_list_customer_orders", {
-      customer_id: "Russel.winfield@example.com",
-    });
+    const res = await server.call(
+      "shopify_list_customer_orders",
+      { customer_id: "Russel.winfield@example.com" },
+      verified({ email: "russel.winfield@example.com" }),
+    );
     expect(res.isError).toBe(false);
-    expect(calls[0].variables.query).toBe('email:"Russel.winfield@example.com"');
+    expect(calls[0].variables.query).toBe('email:"russel.winfield@example.com"');
     expect(calls[1].variables.id).toBe("gid://shopify/Customer/9");
   });
 });

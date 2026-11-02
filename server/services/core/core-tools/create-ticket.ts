@@ -6,6 +6,7 @@
 
 import { handoffTicketsService } from "@server/services/handoff-tickets/handoff-tickets.service";
 import type { CoreToolDefinition } from "./index";
+import { CORE_WRITE_RISK } from "../tool-risk";
 
 function text(value: unknown): string | undefined {
   return typeof value === "string" ? value : undefined;
@@ -16,6 +17,7 @@ export const createTicketTool: CoreToolDefinition = {
   description:
     "Only when your hand-off instructions say to raise a ticket: create a ticket for the team in the " +
     "store's helpdesk. Returns what is still missing (e.g. the customer's email address), or confirms the ticket.",
+  risk: CORE_WRITE_RISK,
   inputSchema: {
     type: "object",
     additionalProperties: false,

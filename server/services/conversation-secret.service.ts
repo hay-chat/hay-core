@@ -26,11 +26,6 @@ export class ConversationSecretService {
     }
   }
 
-  async getSecretKeys(conversationId: string): Promise<string[]> {
-    const secrets = await this.getSecrets(conversationId);
-    return Object.keys(secrets);
-  }
-
   async deleteSecrets(conversationId: string): Promise<void> {
     const client = redisService.getClient();
     if (!client) return;

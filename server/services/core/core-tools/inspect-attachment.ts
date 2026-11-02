@@ -21,6 +21,7 @@ import { isAnalyzable } from "@server/services/media-analysis/readable";
 import { redactCardNumbers } from "@server/services/media-analysis/redact";
 import { visionService } from "@server/services/media-analysis/vision.service";
 import type { CoreToolDefinition } from "./index";
+import { READ_RISK } from "../tool-risk";
 
 const logger = createLogger("core-tool:inspect-attachment");
 
@@ -48,6 +49,7 @@ export const inspectAttachmentTool: CoreToolDefinition = {
     "(e.g. the lot number on a label, whether a seal is broken, the total on an invoice). " +
     "Use the file id shown in the conversation as [File <id> ...]. Read-only. " +
     "Do not use it on files marked as withheld for privacy.",
+  risk: READ_RISK,
   inputSchema: {
     type: "object",
     additionalProperties: false,
