@@ -165,6 +165,9 @@ export const config = {
     // Self-hosted installs without email delivery set this to "false" so new
     // signups are marked verified and can log in. Hosted Hay keeps the default.
     requireEmailVerification: process.env.REQUIRE_EMAIL_VERIFICATION !== "false",
+    // "false" closes public signup: only the very first account (the instance
+    // owner) and people with a pending invitation can register.
+    allowSignup: process.env.ALLOW_SIGNUP !== "false",
   },
 
   orchestrator: {

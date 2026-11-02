@@ -5,7 +5,9 @@ import { AppDataSource } from "@server/database/data-source";
 import { User } from "@server/entities/user.entity";
 import { Organization } from "@server/entities/organization.entity";
 import { UserOrganization } from "@server/entities/user-organization.entity";
+import type { EntityManager } from "typeorm";
 import { AuthCode } from "@server/entities/auth-code.entity";
+import { OrganizationInvitation } from "@server/entities/organization-invitation.entity";
 import {
   hashPassword,
   verifyPassword,
@@ -91,6 +93,28 @@ const registerSchema = z
 const refreshTokenSchema = z.object({
   refreshToken: z.string(),
 });
+
+/**
+ * With ALLOW_SIGNUP=false, a new account may only be created by the instance's
+ * first user or by someone holding a pending invitation.
+ */
+async function assertSignupAllowed(manager: EntityManager, email: string): Promise<void> {
+  const userCount = await manager.getRepository(User).count();
+  if (userCount === 0) return;
+
+  const invitations = await manager
+    .getRepository(OrganizationInvitation)
+    .createQueryBuilder("invitation")
+    .where("LOWER(invitation.email) = :email", { email: email.toLowerCase() })
+    .getMany();
+  if (invitations.some((invitation) => invitation.canAccept())) return;
+
+  throw new TRPCError({
+    code: "FORBIDDEN",
+    message: "Sign-up is closed on this server. Ask an administrator for an invitation.",
+    cause: { type: "SIGNUP_CLOSED" },
+  });
+}
 
 export const authRouter = t.router({
   // Public endpoints
@@ -211,6 +235,10 @@ export const authRouter = t.router({
       const existingUser = await userRepository.findOne({
         where: { email: email.toLowerCase() },
       });
+
+      if (!existingUser && !config.auth.allowSignup) {
+        await assertSignupAllowed(manager, email);
+      }
 
       // Helper to create an organization
       const createOrg = async () => {

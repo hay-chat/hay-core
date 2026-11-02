@@ -60,10 +60,10 @@ docker compose logs -f server
 When `server` reports healthy, open `https://<HAY_DOMAIN>` and sign up. The first
 signup creates your organization and makes you its owner.
 
-> **Signups are open.** Anyone who can reach your domain can create their own
-> organization on your instance. Organizations are fully isolated from each
-> other, but if you don't want strangers using your OpenAI key, keep the server
-> behind a firewall/VPN until you've signed up, or restrict access at the proxy.
+> **Close signups after you register.** Anyone who can reach your domain can
+> create their own organization until you set `ALLOW_SIGNUP=false` in `.env`
+> and run `docker compose up -d` again. With signups closed, only the very first
+> account (the instance owner) and people you invite can register.
 
 ## Email
 
