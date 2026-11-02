@@ -28,6 +28,10 @@ import { readFile } from "fs/promises";
 import { join, resolve } from "path";
 import { existsSync } from "fs";
 import { createLogger } from "@server/lib/logger";
+import {
+  canOrganizationLoadPluginUI,
+  signPluginUiUrl,
+} from "@server/services/plugin-asset.service";
 import { workerFetch } from "@server/lib/worker-client";
 
 const logger = createLogger("plugins");
@@ -308,6 +312,7 @@ export const getPlugin = authenticatedProcedure
       version: plugin.version,
       type: manifest.type,
       pluginPath: plugin.pluginPath,
+      sourceType: plugin.sourceType,
       manifest,
       metadata: plugin.metadata,
       installed: plugin.installed,
@@ -1729,5 +1734,19 @@ export const getPluginTranslations = authenticatedProcedure
     return translations;
   });
 
-// Note: Plugin UI assets are now served via HTTP endpoint at /plugins/ui/:pluginName/:assetPath
-// See server/main.ts for the Express route handler and server/services/plugin-asset.service.ts for implementation
+/**
+ * Short-lived URLs of a plugin's UI bundle (`ui.js`, `style.css`) for the
+ * caller's organization. The `/plugins/ui/*` route serves nothing without one.
+ */
+export const getPluginUiAssetUrls = authenticatedProcedure
+  .input(z.object({ pluginId: z.string() }))
+  .query(async ({ ctx, input }) => {
+    const plugin = await pluginRegistryRepository.findByPluginId(input.pluginId);
+    if (!plugin || !(await canOrganizationLoadPluginUI(plugin, ctx.organizationId!))) {
+      throw new TRPCError({ code: "NOT_FOUND", message: `Plugin ${input.pluginId} not found` });
+    }
+    return {
+      script: signPluginUiUrl(plugin.pluginId, "ui.js", ctx.organizationId!),
+      style: signPluginUiUrl(plugin.pluginId, "style.css", ctx.organizationId!),
+    };
+  });

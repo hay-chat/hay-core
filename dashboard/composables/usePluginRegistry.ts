@@ -2,7 +2,8 @@
  * Plugin Registry Composable
  *
  * Provides dynamic loading of plugin UI components from built bundles.
- * Components are loaded through authenticated HTTP endpoints.
+ * Bundles are loaded from short-lived URLs signed for the current organization
+ * (`Hay.plugins.getUiAssetUrls`), since <script>/<link> tags send no auth header.
  *
  * @example
  * ```typescript
@@ -13,7 +14,7 @@
 
 import { logger } from "@/utils/logger";
 import { defineAsyncComponent, type Component, type ComponentOptions } from "vue";
-import { useDomain } from "@/composables/useDomain";
+import { Hay } from "@/utils/api";
 
 interface PluginComponentCache {
   [key: string]: Component;
@@ -46,7 +47,6 @@ function convertPluginIdToGlobalVar(pluginId: string): string {
 export const usePluginRegistry = () => {
   const componentCache: PluginComponentCache = {};
   const loadedResources = new Set<string>(); // Track loaded scripts and styles
-  const { getApiUrl } = useDomain();
 
   /**
    * Load a plugin component dynamically from its UI bundle.
@@ -96,6 +96,10 @@ export const usePluginRegistry = () => {
               `[PluginRegistry] Plugin ${pluginId} resources already loaded, skipping script/style`,
             );
           } else {
+            // Signed URLs of the UMD bundle and its stylesheet
+            const { script: bundleUrl, style: styleUrl } = await Hay.plugins.getUiAssetUrls.query({
+              pluginId,
+            });
             // Load CSS first (if not already loaded)
             const styleId = `plugin-style-${pluginId}`;
             if (!document.getElementById(styleId)) {
@@ -130,7 +134,7 @@ export const usePluginRegistry = () => {
                   resolve();
                 };
                 script.onerror = () => {
-                  reject(new Error(`Failed to load plugin bundle from ${bundleUrl}`));
+                  reject(new Error(`Failed to load plugin bundle for ${pluginId}`));
                 };
                 document.head.appendChild(script);
               });

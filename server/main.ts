@@ -239,8 +239,8 @@ async function startServer() {
   });
 
   // Plugin UI assets route - serve dist/ files (ui.js, etc.). The dashboard
-  // loads these with <script>/<link> tags, which carry no auth header, so the
-  // route serves static bundles of registered plugins only.
+  // loads these with <script>/<link> tags, which carry no auth header, so each
+  // URL is signed for one organization by `plugins.getUiAssetUrls`.
   server.get(/^\/plugins\/ui\/([^/]+)\/(.+)$/, async (req, res) => {
     req.params = { pluginName: req.params[0], assetPath: req.params[1] };
 
