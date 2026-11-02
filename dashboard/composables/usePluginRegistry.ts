@@ -11,6 +11,7 @@
  * ```
  */
 
+import { logger } from "@/utils/logger";
 import { defineAsyncComponent, type Component, type ComponentOptions } from "vue";
 import { useDomain } from "@/composables/useDomain";
 
@@ -68,7 +69,7 @@ export const usePluginRegistry = () => {
     }
 
     try {
-      console.log(`[PluginRegistry] Loading ${componentName} from ${pluginId}`);
+      logger.debug(`[PluginRegistry] Loading ${componentName} from ${pluginId}`);
 
       const component = defineAsyncComponent({
         loader: async () => {
@@ -78,7 +79,7 @@ export const usePluginRegistry = () => {
             // Import Vue and expose it globally
             const Vue = await import("vue");
             globalWindow.Vue = Vue;
-            console.log("[PluginRegistry] Vue exposed globally for UMD bundles");
+            logger.debug("[PluginRegistry] Vue exposed globally for UMD bundles");
           }
 
           // Build authenticated URL to plugin UI bundle (UMD format)
@@ -87,11 +88,11 @@ export const usePluginRegistry = () => {
           const bundleUrl = `${apiBaseUrl}/plugins/ui/${encodeURIComponent(pluginId)}/ui.js`;
           const styleUrl = `${apiBaseUrl}/plugins/ui/${encodeURIComponent(pluginId)}/style.css`;
 
-          console.log(`[PluginRegistry] Loading UMD bundle from ${bundleUrl}`);
+          logger.debug(`[PluginRegistry] Loading UMD bundle from ${bundleUrl}`);
 
           // Check if plugin resources are already loaded
           if (loadedResources.has(pluginId)) {
-            console.log(
+            logger.debug(
               `[PluginRegistry] Plugin ${pluginId} resources already loaded, skipping script/style`,
             );
           } else {
@@ -104,7 +105,7 @@ export const usePluginRegistry = () => {
                 link.rel = "stylesheet";
                 link.href = styleUrl;
                 link.onload = () => {
-                  console.log(`[PluginRegistry] CSS loaded for ${pluginId}`);
+                  logger.debug(`[PluginRegistry] CSS loaded for ${pluginId}`);
                   resolve();
                 };
                 link.onerror = () => {
@@ -125,7 +126,7 @@ export const usePluginRegistry = () => {
                 script.src = bundleUrl;
                 script.async = true;
                 script.onload = () => {
-                  console.log(`[PluginRegistry] UMD bundle loaded for ${pluginId}`);
+                  logger.debug(`[PluginRegistry] UMD bundle loaded for ${pluginId}`);
                   resolve();
                 };
                 script.onerror = () => {
@@ -159,7 +160,7 @@ export const usePluginRegistry = () => {
             );
           }
 
-          console.log(`[PluginRegistry] Successfully loaded ${componentName} from ${pluginId}`);
+          logger.debug(`[PluginRegistry] Successfully loaded ${componentName} from ${pluginId}`);
           // PluginPageSlot passes every component the same props (api, locale, ...).
           // A prop the component doesn't declare would fall through to its root
           // element as a DOM attribute, and stringifying the tRPC client (`api`)
@@ -198,14 +199,14 @@ export const usePluginRegistry = () => {
    * @param pluginId - Plugin identifier to unload
    */
   const unloadPlugin = (pluginId: string) => {
-    console.log(`[PluginRegistry] Unloading plugin ${pluginId}`);
+    logger.debug(`[PluginRegistry] Unloading plugin ${pluginId}`);
 
     // Remove script tag
     const scriptId = `plugin-script-${pluginId}`;
     const script = document.getElementById(scriptId);
     if (script) {
       script.remove();
-      console.log(`[PluginRegistry] Removed script for ${pluginId}`);
+      logger.debug(`[PluginRegistry] Removed script for ${pluginId}`);
     }
 
     // Remove style tag
@@ -213,7 +214,7 @@ export const usePluginRegistry = () => {
     const style = document.getElementById(styleId);
     if (style) {
       style.remove();
-      console.log(`[PluginRegistry] Removed styles for ${pluginId}`);
+      logger.debug(`[PluginRegistry] Removed styles for ${pluginId}`);
     }
 
     // Remove from loaded resources set
@@ -224,7 +225,7 @@ export const usePluginRegistry = () => {
       .filter((key) => key.startsWith(`${pluginId}:`))
       .forEach((key) => {
         delete componentCache[key];
-        console.log(`[PluginRegistry] Removed cached component ${key}`);
+        logger.debug(`[PluginRegistry] Removed cached component ${key}`);
       });
 
     // Clear the global variable (if it exists)
@@ -232,7 +233,7 @@ export const usePluginRegistry = () => {
     const globalWindow = window as unknown as WindowWithVue;
     if (globalWindow[pluginNamePascal]) {
       delete globalWindow[pluginNamePascal];
-      console.log(`[PluginRegistry] Removed global variable ${pluginNamePascal}`);
+      logger.debug(`[PluginRegistry] Removed global variable ${pluginNamePascal}`);
     }
   };
 

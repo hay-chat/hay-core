@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { createApp } from "vue";
 import { useWebSocket } from "../useWebSocket";
 
@@ -29,6 +29,8 @@ class FakeWebSocket {
     this.onmessage?.({ data: JSON.stringify(payload) });
   }
 }
+
+const proofFor = async (url: string) => `proof-for:${url}`;
 
 function setup() {
   let result!: ReturnType<typeof useWebSocket>;
@@ -61,13 +63,13 @@ describe("useWebSocket", () => {
     app.unmount();
   });
 
-  it("only ever sends identify and typing frames", () => {
+  it("only ever sends identify and typing frames", async () => {
     const { ws, app } = setup();
     ws.connect();
     const socket = FakeWebSocket.instances[0];
     socket.onopen?.();
 
-    ws.identify("anon_1", "conv-1");
+    await ws.identify("conv-1", proofFor);
     ws.sendTypingIndicator(true);
 
     const types = socket.sent.map((frame) => JSON.parse(frame).type);
@@ -75,13 +77,53 @@ describe("useWebSocket", () => {
     app.unmount();
   });
 
-  it("sends page tools with identify and answers tool_call with tool_result", () => {
+  it("signs identify with a proof for the socket URL", async () => {
+    const { ws, app } = setup();
+    ws.connect();
+    const socket = FakeWebSocket.instances[0];
+    socket.onopen?.();
+
+    await ws.identify("conv-1", proofFor);
+
+    expect(JSON.parse(socket.sent[0])).toEqual({
+      type: "identify",
+      conversationId: "conv-1",
+      proof: "proof-for:wss://api.example.test/ws",
+      url: "wss://api.example.test/ws",
+    });
+    app.unmount();
+  });
+
+  it("identifies again with a fresh proof after the socket reconnects", async () => {
+    vi.useFakeTimers();
+    const { ws, app } = setup();
+    ws.connect();
+    FakeWebSocket.instances[0].onopen?.();
+    let signed = 0;
+    await ws.identify("conv-1", async (url) => `proof-${++signed}:${url}`);
+
+    FakeWebSocket.instances[0].onclose?.();
+    vi.advanceTimersByTime(1000);
+    vi.useRealTimers();
+    const second = FakeWebSocket.instances[1];
+    second.onopen?.();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(JSON.parse(second.sent[0])).toMatchObject({
+      type: "identify",
+      conversationId: "conv-1",
+      proof: "proof-2:wss://api.example.test/ws",
+    });
+    app.unmount();
+  });
+
+  it("sends page tools with identify and answers tool_call with tool_result", async () => {
     const { ws, app } = setup();
     ws.connect();
     const socket = FakeWebSocket.instances[0];
     socket.onopen?.();
     const tools = [{ name: "navigate", description: "Go", inputSchema: { type: "object" } }];
-    ws.identify("anon_1", "conv-1", tools);
+    await ws.identify("conv-1", proofFor, tools);
     expect(JSON.parse(socket.sent[0]).tools).toEqual(tools);
 
     const calls: unknown[] = [];

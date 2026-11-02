@@ -51,7 +51,7 @@
               <a
                 v-for="p in (message.metadata as any).productRecommendation.products as any[]"
                 :key="p.id || p.externalId"
-                :href="p.sourceUrl || '#'"
+                :href="safeHttpUrl(p.sourceUrl) ?? '#'"
                 target="_blank"
                 rel="noopener noreferrer"
                 class="hay-product-card"
@@ -148,7 +148,12 @@
 <script setup lang="ts">
 import { defineAsyncComponent, ref, watch, nextTick, type Directive } from "vue";
 import type { Message } from "@/types";
-import { parseMarkdown, wrapWordsForAnimation, splitMarkdownImages } from "@/utils/markdown";
+import {
+  parseMarkdown,
+  safeHttpUrl,
+  wrapWordsForAnimation,
+  splitMarkdownImages,
+} from "@/utils/markdown";
 import { useI18n } from "@/i18n";
 import { agentFirstName, agentNoticeText } from "@/utils/agentNotice";
 import { formatFileSize, isImageAttachment } from "@/utils/attachments";

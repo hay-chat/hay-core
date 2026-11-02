@@ -248,6 +248,7 @@ import { ref, computed, watch, onMounted } from "vue";
 import { Download } from "lucide-vue-next";
 import { Hay } from "@/utils/api";
 import { useToast } from "@/composables/useToast";
+import { useExternalLink } from "@/composables/useExternalLink";
 import type { RouterOutputs } from "@/types/trpc";
 
 /**

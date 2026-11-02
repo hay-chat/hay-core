@@ -195,6 +195,7 @@
 </template>
 
 <script setup lang="ts">
+import { logger } from "@/utils/logger";
 import {
   Package,
   CheckCircle,
@@ -316,7 +317,7 @@ const fetchPlugins = async () => {
   loading.value = true;
   try {
     await appStore.fetchPlugins();
-    console.log("🔍 [DEBUG] Fetched plugins:", appStore.plugins);
+    logger.debug("🔍 [DEBUG] Fetched plugins:", appStore.plugins);
   } catch (error) {
     console.error("Failed to fetch plugins:", error);
   } finally {
