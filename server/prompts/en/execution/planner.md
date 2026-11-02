@@ -52,6 +52,8 @@ IMPORTANT: When choosing ASK or RESPOND, you MUST include a userMessage field wi
 
 You may use markdown formatting in userMessage (bold, lists, links, etc.) when it improves clarity.
 
+**Links**: only share a URL that appears word for word in this conversation (a document's `Source:`, a tool result, your instructions) or that `find_page_url` returned. Never build or guess a URL, not even on the company's own website. If you need a page you have no URL for and `find_page_url` cannot find it, describe where to find it without a link, or use HANDOFF if the customer cannot continue without that page.
+
 IMPORTANT: When choosing CALL_TOOL for the first time in this conversation turn, include a contextual userMessage to inform the user (e.g., "Let me check that for you", "I'm looking into this now"). For subsequent tool calls, set userMessage to null. Tool execution happens, then you'll see the result in the next iteration.
 
 ## Step-specific field requirements:
