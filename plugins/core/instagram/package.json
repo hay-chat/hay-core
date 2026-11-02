@@ -22,6 +22,11 @@
       "META_APP_ID",
       "META_APP_SECRET",
       "META_VERIFY_TOKEN"
+    ],
+    "oauthHosts": [
+      "www.instagram.com",
+      "api.instagram.com",
+      "graph.instagram.com"
     ]
   },
   "scripts": {

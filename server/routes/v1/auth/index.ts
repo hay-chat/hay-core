@@ -913,15 +913,10 @@ export const authRouter = t.router({
           { maxSize: 2 * 1024 * 1024 }, // 2MB for avatars
         );
 
-        // Delete old avatar upload if exists (extract ID from old URL)
+        // Delete old avatar upload if exists
         if (user.avatarUrl) {
           try {
-            // The avatarUrl might contain the upload ID
-            // We'll try to extract and delete the old upload
-            const uploadIdMatch = user.avatarUrl.match(/\/uploads\/([a-f0-9-]+)/);
-            if (uploadIdMatch) {
-              await storageService.delete(uploadIdMatch[1]);
-            }
+            await storageService.deleteByPublicUrl(user.avatarUrl, "avatars", user.id);
           } catch (error) {
             logger.error({ err: error }, "Failed to delete old avatar");
             // Continue even if deletion fails
@@ -968,11 +963,7 @@ export const authRouter = t.router({
     try {
       const storageService = new StorageService();
 
-      // Extract upload ID from URL
-      const uploadIdMatch = user.avatarUrl.match(/\/uploads\/([a-f0-9-]+)/);
-      if (uploadIdMatch) {
-        await storageService.delete(uploadIdMatch[1]);
-      }
+      await storageService.deleteByPublicUrl(user.avatarUrl, "avatars", user.id);
 
       // Clear avatar URL from user
       await userRepository.update(user.id, { avatarUrl: () => "NULL" });

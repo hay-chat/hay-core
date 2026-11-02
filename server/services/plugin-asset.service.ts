@@ -13,6 +13,65 @@ function isErrnoException(error: unknown): error is NodeJS.ErrnoException {
   return error instanceof Error && "code" in error;
 }
 
+/** Plugin ids as they appear in asset URLs (no slashes, no traversal). */
+const PLUGIN_NAME_PATTERN = /^[@a-z0-9._-]+$/;
+
+/** Files never rendered as documents on the API origin. */
+const INERT_EXTENSIONS = new Set([".html", ".htm", ".xhtml", ".xml"]);
+
+export function isValidPluginName(pluginName: unknown): pluginName is string {
+  return (
+    typeof pluginName === "string" &&
+    PLUGIN_NAME_PATTERN.test(pluginName) &&
+    pluginName !== "." &&
+    pluginName !== ".."
+  );
+}
+
+/**
+ * Resolve `relativePath` inside `baseDir`, or null when it would land outside
+ * it (including through a symlink) or the file does not exist.
+ */
+export async function resolveWithin(baseDir: string, relativePath: string): Promise<string | null> {
+  const isInside = (base: string, target: string): boolean => {
+    const rel = path.relative(base, target);
+    return rel !== "" && !rel.startsWith("..") && !path.isAbsolute(rel);
+  };
+
+  const candidate = path.resolve(baseDir, relativePath);
+  if (!isInside(baseDir, candidate)) return null;
+
+  try {
+    const [realBase, realCandidate] = await Promise.all([
+      fs.realpath(baseDir),
+      fs.realpath(candidate),
+    ]);
+    return isInside(realBase, realCandidate) ? realCandidate : null;
+  } catch (error) {
+    if (isErrnoException(error) && (error.code === "ENOENT" || error.code === "ENOTDIR")) {
+      return null;
+    }
+    throw error;
+  }
+}
+
+function pluginDirFor(pluginPath: string): string {
+  return path.join(process.cwd(), "..", "plugins", pluginPath);
+}
+
+/**
+ * Headers for files served from a plugin directory: no MIME sniffing, a
+ * sandbox for anything opened as a document (e.g. an SVG), and document types
+ * are downloaded rather than rendered.
+ */
+function setFileSafetyHeaders(res: Response, filePath: string): void {
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  res.setHeader("Content-Security-Policy", "sandbox");
+  if (INERT_EXTENSIONS.has(path.extname(filePath).toLowerCase())) {
+    res.setHeader("Content-Disposition", "attachment");
+  }
+}
+
 interface AssetCache {
   content: string | Buffer;
   contentType: string;
@@ -63,6 +122,10 @@ export class PluginAssetService {
    */
   async serveThumbnail(req: Request, res: Response): Promise<void> {
     const { pluginName } = req.params;
+    if (!isValidPluginName(pluginName)) {
+      res.status(404).json({ error: "Thumbnail not found" });
+      return;
+    }
     const cacheKey = `${pluginName}/thumbnail`;
 
     // Check cache first
@@ -75,6 +138,7 @@ export class PluginAssetService {
         return;
       }
 
+      setFileSafetyHeaders(res, cacheKey);
       res.setHeader("Content-Type", cached.contentType);
       res.setHeader("ETag", cached.etag);
       res.setHeader("Cache-Control", "public, max-age=86400"); // Cache for 24 hours
@@ -83,15 +147,13 @@ export class PluginAssetService {
       return;
     }
 
-    // Resolve the plugin directory. If the plugin isn't registered, fall back to
-    // treating pluginName as the directory name.
+    // Only registered plugins have thumbnails served.
     const plugin = await pluginRegistryRepository.findByPluginId(pluginName);
-    const pluginDir = path.join(
-      process.cwd(),
-      "..",
-      "plugins",
-      plugin ? plugin.pluginPath : pluginName,
-    );
+    if (!plugin) {
+      res.status(404).json({ error: "Thumbnail not found" });
+      return;
+    }
+    const pluginDir = pluginDirFor(plugin.pluginPath);
 
     try {
       const thumbnail = await this.readThumbnail(pluginDir);
@@ -113,7 +175,7 @@ export class PluginAssetService {
           this.assetCache.delete(cacheKey);
         },
         24 * 60 * 60 * 1000,
-      );
+      ).unref();
 
       // Check if-none-match header for etag
       if (req.headers["if-none-match"] === etag) {
@@ -121,9 +183,7 @@ export class PluginAssetService {
         return;
       }
 
-      // SVGs are served from the same origin; nosniff + img-only usage keeps them
-      // from being executed as documents.
-      res.setHeader("X-Content-Type-Options", "nosniff");
+      setFileSafetyHeaders(res, cacheKey);
       res.setHeader("Content-Type", contentType);
       res.setHeader("ETag", etag);
       res.setHeader("Cache-Control", "public, max-age=86400"); // Cache for 24 hours
@@ -168,6 +228,10 @@ export class PluginAssetService {
    */
   async servePublicFile(req: Request, res: Response): Promise<void> {
     const { pluginName, filePath } = req.params;
+    if (!isValidPluginName(pluginName)) {
+      res.status(404).json({ error: "Plugin not found" });
+      return;
+    }
     const cacheKey = `${pluginName}/public/${filePath}`;
 
     // Check cache first
@@ -180,6 +244,7 @@ export class PluginAssetService {
         return;
       }
 
+      setFileSafetyHeaders(res, cacheKey);
       res.setHeader("Content-Type", cached.contentType);
       res.setHeader("ETag", cached.etag);
       res.setHeader("Cache-Control", "public, max-age=3600");
@@ -196,26 +261,15 @@ export class PluginAssetService {
       return;
     }
 
-    // Sanitize the file path to prevent directory traversal
-    const sanitizedPath = filePath.replace(/\.\./g, "");
-
-    // Build path to plugin public directory
-    const pluginDir = path.join(
-      process.cwd(),
-      "..",
-      "plugins",
-      plugin.pluginPath, // Use the actual directory name stored in DB
-    );
-    const publicDir = path.join(pluginDir, "public");
-    const fullPath = path.join(publicDir, sanitizedPath);
-
-    // Ensure the path is within the public directory
-    if (!fullPath.startsWith(publicDir)) {
-      res.status(403).json({ error: "Access denied" });
-      return;
-    }
+    const publicDir = path.join(pluginDirFor(plugin.pluginPath), "public");
 
     try {
+      const fullPath = await resolveWithin(publicDir, filePath);
+      if (!fullPath) {
+        res.status(404).json({ error: "File not found" });
+        return;
+      }
+
       const content = await fs.readFile(fullPath);
       const contentType = this.getContentTypeFromPath(fullPath);
       const etag = this.generateETag(content);
@@ -232,7 +286,7 @@ export class PluginAssetService {
       // Set cache timeout
       setTimeout(() => {
         this.assetCache.delete(cacheKey);
-      }, this.cacheTimeout);
+      }, this.cacheTimeout).unref();
 
       // Check if-none-match header for etag
       if (req.headers["if-none-match"] === etag) {
@@ -240,6 +294,7 @@ export class PluginAssetService {
         return;
       }
 
+      setFileSafetyHeaders(res, fullPath);
       res.setHeader("Content-Type", contentType);
       res.setHeader("ETag", etag);
       res.setHeader("Cache-Control", "public, max-age=3600");
@@ -261,6 +316,10 @@ export class PluginAssetService {
    */
   async serveUIAsset(req: Request, res: Response): Promise<void> {
     const { pluginName, assetPath } = req.params;
+    if (!isValidPluginName(pluginName)) {
+      res.status(404).json({ error: "Plugin not found" });
+      return;
+    }
     const cacheKey = `${pluginName}/ui/${assetPath}`;
 
     // Security: Whitelist allowed file types
@@ -291,6 +350,7 @@ export class PluginAssetService {
         return;
       }
 
+      setFileSafetyHeaders(res, cacheKey);
       res.setHeader("Content-Type", cached.contentType);
       res.setHeader("ETag", cached.etag);
       res.setHeader("Cache-Control", "public, max-age=3600");
@@ -307,21 +367,15 @@ export class PluginAssetService {
       return;
     }
 
-    // Sanitize the file path to prevent directory traversal
-    const sanitizedPath = assetPath.replace(/\.\./g, "");
-
-    // Build path to plugin dist directory
-    const pluginDir = path.join(process.cwd(), "..", "plugins", plugin.pluginPath);
-    const distDir = path.join(pluginDir, "dist");
-    const fullPath = path.join(distDir, sanitizedPath);
-
-    // Ensure the path is within the dist directory
-    if (!fullPath.startsWith(distDir)) {
-      res.status(403).json({ error: "Access denied" });
-      return;
-    }
+    const distDir = path.join(pluginDirFor(plugin.pluginPath), "dist");
 
     try {
+      const fullPath = await resolveWithin(distDir, assetPath);
+      if (!fullPath) {
+        res.status(404).json({ error: "File not found" });
+        return;
+      }
+
       const content = await fs.readFile(fullPath);
       const contentType = this.getContentTypeFromPath(fullPath);
       const etag = this.generateETag(content);
@@ -338,7 +392,7 @@ export class PluginAssetService {
       // Set cache timeout
       setTimeout(() => {
         this.assetCache.delete(cacheKey);
-      }, this.cacheTimeout);
+      }, this.cacheTimeout).unref();
 
       // Check if-none-match header for etag
       if (req.headers["if-none-match"] === etag) {
@@ -346,6 +400,7 @@ export class PluginAssetService {
         return;
       }
 
+      setFileSafetyHeaders(res, fullPath);
       res.setHeader("Content-Type", contentType);
       res.setHeader("ETag", etag);
       res.setHeader("Cache-Control", "public, max-age=3600");

@@ -7,8 +7,9 @@
  * @module @hay/plugin-sdk/runner/http-server
  */
 
-import express, { type Express, type Request, type Response } from "express";
+import express, { type Express, type NextFunction, type Request, type Response } from "express";
 import type { Server } from "http";
+import { createHash, timingSafeEqual } from "crypto";
 import type {
   HayLogger,
   HayMcpRuntimeAPI,
@@ -45,6 +46,19 @@ interface RegisteredMcpServer {
 
 export const WORKER_BODY_LIMIT = "5mb";
 
+/** Header carrying the per-worker secret core minted for this worker (HAY_WORKER_SECRET). */
+export const WORKER_SECRET_HEADER = "x-hay-worker-secret";
+
+/** Interface the worker listens on: core is the only caller, over loopback. */
+export const WORKER_LISTEN_HOST = "127.0.0.1";
+
+function secretsMatch(provided: string, expected: string): boolean {
+  // Hash both sides so the comparison is constant-time regardless of length.
+  const a = createHash("sha256").update(provided).digest();
+  const b = createHash("sha256").update(expected).digest();
+  return timingSafeEqual(a, b);
+}
+
 function captureRawBody(req: Request, _res: Response, buf: Buffer): void {
   if (buf?.length) {
     (req as Request & { rawBody?: string }).rawBody = buf.toString("utf8");
@@ -67,11 +81,24 @@ export class PluginHttpServer {
   // Track MCP servers registered via mcp.startLocal() or mcp.startExternal()
   private mcpServers: Map<string, RegisteredMcpServer> = new Map();
 
-  constructor(port: number, registry: PluginRegistry, logger: HayLogger) {
+  /**
+   * @param options.secret - When set, every request must carry it in
+   *   {@link WORKER_SECRET_HEADER}. The runner always sets it in production.
+   */
+  constructor(
+    port: number,
+    registry: PluginRegistry,
+    logger: HayLogger,
+    options: { secret?: string } = {},
+  ) {
     this.port = port;
     this.logger = logger;
     this.registry = registry;
     this.app = express();
+
+    if (options.secret) {
+      this.app.use(this.requireWorkerSecret(options.secret));
+    }
 
     // Middleware. Core forwards provider webhooks byte-for-byte (Meta payloads
     // reach 3 MB), and plugins verifying HMAC signatures need the exact bytes,
@@ -91,6 +118,22 @@ export class PluginHttpServer {
     this.setupMcpEndpoints();
     this.setupPluginRoutes();
     this.setupErrorHandler();
+  }
+
+  /**
+   * Reject any request that does not carry this worker's secret. The header is
+   * removed once checked so plugin route handlers never see it.
+   */
+  private requireWorkerSecret(secret: string) {
+    return (req: Request, res: Response, next: NextFunction): void => {
+      const provided = req.headers[WORKER_SECRET_HEADER];
+      if (typeof provided !== "string" || !secretsMatch(provided, secret)) {
+        res.status(401).json({ error: "Unauthorized" });
+        return;
+      }
+      delete req.headers[WORKER_SECRET_HEADER];
+      next();
+    };
   }
 
   /**
@@ -1078,8 +1121,8 @@ export class PluginHttpServer {
   async start(): Promise<void> {
     return new Promise((resolve, reject) => {
       try {
-        this.server = this.app.listen(this.port, () => {
-          this.logger.info(`HTTP server listening on port ${this.port}`);
+        this.server = this.app.listen(this.port, WORKER_LISTEN_HOST, () => {
+          this.logger.info(`HTTP server listening on ${WORKER_LISTEN_HOST}:${this.port}`);
           resolve();
         });
 

@@ -1133,7 +1133,7 @@ async function handleExecutionLoop(
   const toolsCalledThisTurn: ToolLedgerEntry[] = [...decidedActions];
   // Shared (by reference) with the execution layer so corrective re-plans are
   // budgeted per turn, not per execute() call.
-  const turnGuardrailState = { actionClaimRetries: 0, companyInterestRetries: 0 };
+  const turnGuardrailState = { actionClaimRetries: 0, companyInterestRetries: 0, linkRetries: 0 };
   // One playbook re-selection per turn, so a planner that keeps saying "doesn't fit"
   // can't ping-pong between playbooks.
   let playbookReselected = false;
@@ -1368,6 +1368,27 @@ async function handleExecutionLoop(
 
       // The tool execution service now updates the message internally
       // Continue the loop to let LLM analyze the result
+    } else if (executionResult.step === "ASK_FORM" && executionResult.form) {
+      // Emit a FORM message in PENDING state and pause the orchestrator loop.
+      // The conversation resumes when the customer submits the form via the
+      // submitForm endpoint, which mutates this message to SUBMITTED, writes
+      // the response into conversation.context, and re-invokes run().
+      await conversation.addMessage({
+        content: "",
+        type: MessageType.FORM,
+        metadata: {
+          ui: {
+            kind: "form",
+            schema: executionResult.form as unknown as Record<string, unknown>,
+            status: "PENDING",
+          },
+        },
+      });
+      log.debug(
+        { schemaId: executionResult.form.id },
+        "Emitted ASK_FORM message; pausing orchestrator until submission",
+      );
+      break;
     } else if (executionResult.step === "HANDOFF") {
       // Handle human handoff
       log.debug(
