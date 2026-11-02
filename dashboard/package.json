@@ -41,7 +41,7 @@
     "@floating-ui/vue": "^1.1.9",
     "@headlessui/vue": "^1.7.16",
     "@tiptap/extension-image": "^2.27.2",
-    "@tiptap/extension-link": "^2.27.2",
+    "@tiptap/extension-link": "^3.32.2",
     "@tiptap/extension-mention": "^2.26.3",
     "@tiptap/extension-placeholder": "^2.10.5",
     "@tiptap/html": "^2.27.2",
