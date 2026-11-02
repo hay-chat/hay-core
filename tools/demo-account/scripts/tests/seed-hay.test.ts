@@ -14,7 +14,7 @@ import { seedHay, type SeedOptions, type TrpcClient } from "../hay/seed";
 import { listPluginTools, pluginIdForTool } from "../hay/tools";
 import { resolveOrg, resolvePlatforms } from "../seed-hay";
 
-const ALL_STEPS = new Set(["settings", "agent", "docs", "playbooks"] as const);
+const ALL_STEPS = new Set(["settings", "assistant", "docs", "playbooks"] as const);
 
 function options(platform: Platform, overrides: Partial<SeedOptions> = {}): SeedOptions {
   return {
@@ -190,8 +190,7 @@ describe("content files", () => {
 function fakeApi(
   state: {
     documents?: { id: string; title: string; content: string; status: string }[];
-    playbooks?: { id: string; title: string; agents: { id: string }[] }[];
-    agents?: { id: string; name: string }[];
+    playbooks?: { id: string; title: string }[];
   } = {},
 ) {
   const calls: { kind: "query" | "mutation"; path: string; input: unknown }[] = [];
@@ -201,7 +200,6 @@ function fakeApi(
       const results: Record<string, unknown> = {
         "documents.list": { items: state.documents ?? [], pagination: { hasNext: false } },
         "playbooks.list": state.playbooks ?? [],
-        "agents.list": state.agents ?? [],
         "businessHours.list": [],
         "teamQuestions.getSettings": {
           enabled: false,
@@ -213,7 +211,6 @@ function fakeApi(
     },
     async mutation<T>(path: string, input?: unknown) {
       calls.push({ kind: "mutation", path, input });
-      if (path === "agents.create") return { id: "00000000-0000-4000-8000-00000000a6e7" } as T;
       if (path.startsWith("playbooks.")) return { id: "pb-new", actionWarnings: [] } as T;
       return {} as T;
     },
@@ -239,7 +236,7 @@ describe("seedHay", () => {
     expect(calls).toEqual([]);
   });
 
-  it("creates everything in an empty org and attaches playbooks to the agent", async () => {
+  it("creates everything in an empty org and sets the org's assistant", async () => {
     const { api, mutations } = fakeApi();
     await seedHay(api, options("woocommerce", { quickCheck: true }));
     expect(mutations("organizations.updateSettings")[0].input).toEqual({
@@ -252,16 +249,16 @@ describe("seedHay", () => {
       updateAfterMinutes: 5,
       giveUpAfterMinutes: 10,
     });
-    expect(mutations("agents.create")).toHaveLength(1);
-    expect(mutations("agents.setAsDefault")).toHaveLength(1);
+    expect(mutations("organizations.assistant.update")[0].input).toMatchObject({
+      name: "Casa Aurora Assistant",
+      instructions: { type: "doc" },
+    });
     expect(mutations("documents.create")).toHaveLength(loadKnowledge("woocommerce").length);
     const created = mutations("playbooks.create");
     expect(created).toHaveLength(loadPlaybooks("woocommerce").length);
     for (const call of created) {
-      expect(call.input).toMatchObject({
-        status: "active",
-        agentIds: ["00000000-0000-4000-8000-00000000a6e7"],
-      });
+      expect(call.input).toMatchObject({ status: "active" });
+      expect(call.input).not.toHaveProperty("agentIds");
     }
     // create takes no approvalCategories, so playbooks with categories get a follow-up update.
     const withCategories = loadPlaybooks("woocommerce").filter(
@@ -273,19 +270,16 @@ describe("seedHay", () => {
   it("is idempotent: existing titles are updated in place, unchanged documents are skipped", async () => {
     const [firstDoc, secondDoc] = loadKnowledge("shopify");
     const [firstPlaybook] = loadPlaybooks("shopify");
-    const agentId = "00000000-0000-4000-8000-0000000000a1";
     const { api, mutations } = fakeApi({
-      agents: [{ id: agentId, name: "Casa Aurora Assistant" }],
       documents: [
         { id: "doc-1", title: firstDoc.title, content: firstDoc.content, status: "published" },
         { id: "doc-2", title: secondDoc.title, content: "old text", status: "published" },
       ],
-      playbooks: [{ id: "pb-1", title: firstPlaybook.title, agents: [{ id: "other-agent" }] }],
+      playbooks: [{ id: "pb-1", title: firstPlaybook.title }],
     });
     const report = await seedHay(api, options("shopify", { playbookStatus: "draft" }));
 
-    expect(mutations("agents.create")).toHaveLength(0);
-    expect(mutations("agents.update")[0].input).toMatchObject({ id: agentId });
+    expect(mutations("organizations.assistant.update")).toHaveLength(1);
     expect(report.unchanged).toEqual([`document "${firstDoc.title}"`]);
     expect(mutations("documents.update").map((c) => c.input)).toEqual([
       { id: "doc-2", title: secondDoc.title, content: secondDoc.content, status: "published" },
@@ -296,7 +290,7 @@ describe("seedHay", () => {
       (c) => (c.input as { id: string }).id === "pb-1",
     );
     expect(update?.input).toMatchObject({
-      data: { title: firstPlaybook.title, status: "draft", agentIds: ["other-agent", agentId] },
+      data: { title: firstPlaybook.title, status: "draft" },
     });
     expect(mutations("playbooks.create")).toHaveLength(loadPlaybooks("shopify").length - 1);
   });

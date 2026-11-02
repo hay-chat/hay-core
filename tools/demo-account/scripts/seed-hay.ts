@@ -1,10 +1,10 @@
 /**
  * Seed the Hay.chat side of a Casa Aurora demo store: knowledge documents, playbooks, the
- * "Casa Aurora Assistant" agent and org settings (time zone, language, business hours, optional
+ * "Casa Aurora Assistant" assistant and org settings (time zone, language, business hours, optional
  * Quick check). Safe to re-run: everything is matched by title/name and updated in place.
  *
  *   tsx tools/demo-account/scripts/seed-hay.ts --platform shopify|woocommerce|nuvemshop|all
- *     [--dry-run] [--draft] [--only settings,agent,docs,playbooks] [--quick-check on|off]
+ *     [--dry-run] [--draft] [--only settings,assistant,docs,playbooks] [--quick-check on|off]
  *     [--target prod|local] [--org <id>]
  *
  * Auth (real env vars win over tools/demo-account/.env, then tools/hay-cli/.env):
@@ -33,7 +33,7 @@ import { seedHay, STEPS, type SeedReport, type Step } from "./hay/seed";
 import { REPO_ROOT } from "./hay/tools";
 
 const USAGE = `Usage: seed-hay --platform shopify|woocommerce|nuvemshop|all [--dry-run] [--draft]
-  [--only settings,agent,docs,playbooks] [--quick-check on|off] [--target prod|local] [--org <id>]`;
+  [--only settings,assistant,docs,playbooks] [--quick-check on|off] [--target prod|local] [--org <id>]`;
 
 const BOOLEAN_FLAGS = new Set(["dry-run", "draft", "help", "verbose"]);
 
