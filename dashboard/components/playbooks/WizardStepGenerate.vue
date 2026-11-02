@@ -113,6 +113,7 @@
 import { computed } from "vue";
 import { Sparkles, Loader2, RefreshCw, Info as InfoIcon } from "lucide-vue-next";
 import { marked } from "marked";
+import { sanitizeHtml } from "@/utils/sanitize";
 import { renderTokensForPreview, type MentionReferences } from "@/utils/markdownToTiptap";
 import { useToolLabel } from "@/composables/useToolLabel";
 
@@ -152,11 +153,18 @@ const hasBoundaries = computed(() => {
 
 const { getToolLabel } = useToolLabel();
 
+// AI-generated markdown: sanitized, keeping only the mention chip classes.
+const MENTION_CLASSES = ["mention-token", "mention-action", "mention-document"];
+const renderInstructions = (markdown: string): string =>
+  sanitizeHtml(marked.parse(markdown, { async: false }) as string, {
+    allowedClasses: MENTION_CLASSES,
+  });
+
 const instructionsHtml = computed(() => {
   if (!props.generatedResult?.instructions) return "";
   const refs = props.generatedResult.references;
   if (!refs) {
-    return marked.parse(props.generatedResult.instructions, { async: false }) as string;
+    return renderInstructions(props.generatedResult.instructions);
   }
   // Resolve action labels to their translated/humanized form so preview chips
   // match what the saved editor renders (instead of the raw tool name).
@@ -165,7 +173,7 @@ const instructionsHtml = computed(() => {
     actions: refs.actions.map((a) => ({ ...a, name: getToolLabel(a.pluginId, a.name) })),
   };
   const preprocessed = renderTokensForPreview(props.generatedResult.instructions, localizedRefs);
-  return marked.parse(preprocessed, { async: false }) as string;
+  return renderInstructions(preprocessed);
 });
 </script>
 

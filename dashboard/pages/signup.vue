@@ -64,10 +64,13 @@
         class="p-4 rounded-md bg-green-50 border border-green-200 space-y-3"
         role="status"
       >
-        <p class="text-sm text-green-800 font-medium">{{ $t("signup.checkInboxTitle") }}</p>
-        <p class="text-sm text-green-700">
-          {{ $t("signup.checkInboxDescription", { email: form.email }) }}
-        </p>
+        <template v-if="emailVerificationRequired">
+          <p class="text-sm text-green-800 font-medium">{{ $t("signup.checkInboxTitle") }}</p>
+          <p class="text-sm text-green-700">
+            {{ $t("signup.checkInboxDescription", { email: form.email }) }}
+          </p>
+        </template>
+        <p v-else class="text-sm text-green-800 font-medium">{{ $t("signup.accountReady") }}</p>
         <Button class="w-full" @click="router.push({ path: '/login', query: loginQuery })">
           {{ $t("signup.signIn") }}
         </Button>
@@ -250,6 +253,7 @@ const loginQuery = computed(() =>
   redirectUrl.value === "/" ? {} : { redirect: redirectUrl.value },
 );
 const signupComplete = ref(false);
+const emailVerificationRequired = ref(true);
 
 // Invitation context
 interface InvitationContext {
@@ -443,7 +447,7 @@ const handleSubmit = async () => {
   error.value = "";
 
   try {
-    await authStore.signup({
+    const result = await authStore.signup({
       // Don't create an organization if accepting an invitation
       organizationName: invitationContext.value ? "" : form.organizationName,
       email: form.email,
@@ -454,11 +458,14 @@ const handleSubmit = async () => {
     });
 
     // No session yet: the user signs in after verifying their email.
+    emailVerificationRequired.value = result.emailVerificationRequired;
     signupComplete.value = true;
   } catch (err) {
     // Handle different types of registration errors
     const errorMessage = err instanceof Error ? err.message : String(err);
-    if (errorMessage.includes("Password")) {
+    if (errorMessage.includes("Sign-up is closed")) {
+      error.value = t("signup.errors.signupClosed");
+    } else if (errorMessage.includes("Password")) {
       error.value = t("signup.errors.weakPassword");
     } else {
       error.value = t("signup.errors.generic");

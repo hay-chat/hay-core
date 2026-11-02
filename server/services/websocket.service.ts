@@ -9,6 +9,7 @@ import { MessageType } from "../database/entities/message.entity";
 import { createLogger } from "@server/lib/logger";
 import { AppDataSource } from "@server/database/data-source";
 import { UserOrganization } from "@server/entities/user-organization.entity";
+import { User } from "@server/entities/user.entity";
 
 const logger = createLogger("websocket");
 import { verifyDPoPForRequest } from "../routes/v1/public-conversations";
@@ -31,18 +32,34 @@ import {
 // default of 100 MiB would let one frame exhaust memory.
 const MAX_FRAME_BYTES = 64 * 1024;
 
+/** A socket that has neither authenticated nor identified by then is closed. */
+const ATTACH_TIMEOUT_MS = 10_000;
+/** Pings go out this often; a socket that missed the previous pong is terminated. */
+const HEARTBEAT_INTERVAL_MS = 30_000;
+/** Open sockets allowed per client IP (shared NATs keep this generous). */
+const MAX_CONNECTIONS_PER_IP = 100;
+/** DPoP proofs on identify are made for this method and the `/ws` endpoint. */
+const IDENTIFY_PROOF_METHOD = "GET";
+const IDENTIFY_PROOF_PATH = "/ws";
+/** WebSocket close code for a policy violation (RFC 6455). */
+const CLOSE_POLICY_VIOLATION = 1008;
+
 interface WebSocketClient {
   ws: WebSocket;
   organizationId: string;
-  customerId: string;
   conversationId?: string;
-  pluginId?: string;
   authenticated: boolean;
-  /** Client IP from the proxy headers; kept out of `metadata`, which identify lets the client extend. */
+  /** Client IP from the proxy headers. */
   ip: string;
+  /** The Origin header of the upgrade request; browsers always send it. */
+  origin?: string;
   /** Resolves once token authentication (if any) has finished. */
   ready: Promise<void>;
-  metadata: Record<string, unknown>;
+  /** Whether an `auth` frame was already received; only the first one counts. */
+  authAttempted: boolean;
+  /** Cleared by every pong; a socket still not alive at the next ping is dead. */
+  isAlive: boolean;
+  attachTimer?: ReturnType<typeof setTimeout>;
 }
 
 interface WebSocketMessage {
@@ -50,10 +67,15 @@ interface WebSocketMessage {
   [key: string]: unknown;
 }
 
+interface AuthMessage extends WebSocketMessage {
+  token?: unknown;
+}
+
 interface IdentifyMessage extends WebSocketMessage {
-  customerId: string;
   conversationId?: string;
-  metadata?: Record<string, unknown>;
+  /** DPoP proof (method GET, url `<api>/ws`) signed with the conversation's key. */
+  proof?: unknown;
+  url?: unknown;
   /** Page tools (WebMCP) the host page registered; see page-tools.service. */
   tools?: unknown;
 }
@@ -85,8 +107,8 @@ interface SubscribeMessage extends WebSocketMessage {
   events?: string[];
 }
 
-interface JWTPayloadWithOrg extends JWTPayload {
-  organizationId?: string;
+interface DashboardTokenPayload extends JWTPayload {
+  scope?: string;
 }
 
 /**
@@ -102,7 +124,6 @@ interface RedisEvent {
 
 interface RedisEventPayload {
   type?: string;
-  isPlayground?: boolean;
   deliveryState?: string;
   [key: string]: unknown;
 }
@@ -124,6 +145,8 @@ export class WebSocketService {
   private clients = new Map<string, WebSocketClient>();
   private conversationClients = new Map<string, Set<string>>();
   private organizationClients = new Map<string, Set<string>>();
+  private connectionsPerIp = new Map<string, number>();
+  private heartbeatTimer?: ReturnType<typeof setInterval>;
   private redisInitialized = false;
 
   /**
@@ -154,6 +177,9 @@ export class WebSocketService {
     this.wss.on("connection", (ws, req) => {
       this.handleConnection(ws, req);
     });
+
+    this.heartbeatTimer = setInterval(() => this.checkHeartbeats(), HEARTBEAT_INTERVAL_MS);
+    this.heartbeatTimer.unref();
 
     // Initialize Redis for cross-server event broadcasting
     await this.initializeRedis();
@@ -212,15 +238,12 @@ export class WebSocketService {
 
       // Customer-facing types plus agent join/leave lines (visible via webchat)
       const isPublicMessage = isWidgetVisibleMessage(payload?.type, payload?.metadata);
-      const isPlayground = payload?.isPlayground === true;
 
       // Always send ALL messages to dashboard (organization clients) for full visibility
       const orgSent = this.sendToOrganization(organizationId, messagePayload);
 
-      // Send to conversation clients (webchat) if:
-      // 1. Public message type with SENT delivery state (normal webchat), OR
-      // 2. ANY message type for playground conversations (demo mode shows all internal events)
-      if ((isPublicMessage && payload?.deliveryState === "sent") || isPlayground) {
+      // Conversation clients (webchat) only get public messages once SENT.
+      if (isPublicMessage && payload?.deliveryState === "sent") {
         // Files get signed links first (a DB lookup), so this send is async.
         void toPublicAttachments(payload?.attachments, organizationId)
           .catch((error) => {
@@ -230,12 +253,10 @@ export class WebSocketService {
           .then((attachments) => {
             const conversationSent = this.sendToConversation(
               conversationId,
-              isPlayground
-                ? { ...messagePayload, data: { ...payload, attachments } }
-                : toPublicMessageEvent(conversationId, payload, attachments),
+              toPublicMessageEvent(conversationId, payload, attachments),
             );
             logger.debug(
-              { messageType: payload?.type, conversationSent, orgSent, isPlayground },
+              { messageType: payload?.type, conversationSent, orgSent },
               "Broadcasted message to conversation and org clients",
             );
           });
@@ -306,34 +327,48 @@ export class WebSocketService {
   }
 
   /**
-   * Handle new WebSocket connection
+   * Handle new WebSocket connection.
+   *
+   * A socket has ATTACH_TIMEOUT_MS to either authenticate (dashboard: an
+   * `auth` frame with an access token) or identify (webchat: an `identify`
+   * frame with a DPoP proof for its conversation); otherwise it is closed.
    */
   private handleConnection(ws: WebSocket, req: IncomingMessage): void {
+    const ip = getClientIp(req.headers, req.socket.remoteAddress);
+    const openFromIp = this.connectionsPerIp.get(ip) ?? 0;
+    if (openFromIp >= MAX_CONNECTIONS_PER_IP) {
+      ws.close(CLOSE_POLICY_VIOLATION, "Too many connections");
+      return;
+    }
+    this.connectionsPerIp.set(ip, openFromIp + 1);
+
     const clientId = this.generateClientId();
     const url = new URL(req.url!, `http://${req.headers.host}`);
-    const token = url.searchParams.get("token");
-    const organizationId = url.searchParams.get("org");
 
-    // Create client object
     const client: WebSocketClient = {
       ws,
-      organizationId: organizationId || "",
-      customerId: "",
+      organizationId: url.searchParams.get("org") || "",
       authenticated: false,
-      ip: getClientIp(req.headers, req.socket.remoteAddress),
+      ip,
+      origin: req.headers.origin,
       ready: Promise.resolve(),
-      metadata: {
-        userAgent: req.headers["user-agent"],
-      },
+      authAttempted: false,
+      isAlive: true,
     };
 
     this.clients.set(clientId, client);
 
-    // Authentication checks org membership against the database, so it is
-    // async. Frames that arrive meanwhile wait for it in handleMessage.
-    client.ready = token ? this.authenticateClient(clientId, token) : Promise.resolve();
+    client.attachTimer = setTimeout(() => {
+      if (!client.authenticated && !client.conversationId) {
+        ws.close(CLOSE_POLICY_VIOLATION, "Authentication timeout");
+      }
+    }, ATTACH_TIMEOUT_MS);
+    client.attachTimer.unref?.();
 
-    // Set up event handlers
+    ws.on("pong", () => {
+      client.isAlive = true;
+    });
+
     ws.on("message", (data) => {
       this.handleMessage(clientId, data.toString());
     });
@@ -356,42 +391,98 @@ export class WebSocketService {
     );
   }
 
+  /** Terminate sockets that did not answer the previous ping, then ping the rest. */
+  private checkHeartbeats(): void {
+    for (const client of this.clients.values()) {
+      if (!client.isAlive) {
+        client.ws.terminate();
+        continue;
+      }
+      client.isAlive = false;
+      client.ws.ping();
+    }
+  }
+
+  /** Browsers send an Origin; the dashboard's must be one of the CORS origins. */
+  private isAllowedDashboardOrigin(origin: string | undefined): boolean {
+    if (!origin) return true; // not a browser, so no cross-site request to guard against
+    const allowed = config.cors.origin;
+    return Array.isArray(allowed) ? allowed.includes(origin) : allowed === origin;
+  }
+
   /**
-   * Authenticate WebSocket client
+   * Authenticate a dashboard client with a user access token, applying the
+   * same checks as bearer auth on the HTTP API.
    */
   private async authenticateClient(clientId: string, token: string): Promise<void> {
     const client = this.clients.get(clientId);
     if (!client) return;
 
-    let decoded: JWTPayloadWithOrg;
+    if (!this.isAllowedDashboardOrigin(client.origin)) {
+      logger.warn({ clientId }, "WebSocket authentication from a disallowed origin");
+      return;
+    }
+
+    let decoded: DashboardTokenPayload;
     try {
-      decoded = jwt.verify(token, config.jwt.secret) as JWTPayloadWithOrg;
+      decoded = jwt.verify(token, config.jwt.secret, {
+        algorithms: ["HS256"],
+      }) as DashboardTokenPayload;
     } catch {
       return;
     }
 
-    if (decoded.organizationId) {
-      // The token is scoped to one organization.
-      client.organizationId = decoded.organizationId;
-    } else {
-      // User access tokens carry no organization: the `org` query parameter is
-      // only a request, so confirm the user is an active member before
-      // streaming that organization's events.
-      if (!decoded.userId || !client.organizationId) return;
-      const membership = await AppDataSource.getRepository(UserOrganization).findOne({
-        where: { userId: decoded.userId, organizationId: client.organizationId, isActive: true },
-      });
-      if (!membership) {
-        logger.warn({ clientId }, "WebSocket client is not a member of the requested organization");
-        return;
-      }
+    // Only user access tokens open a dashboard stream (not plugin or refresh tokens).
+    if (decoded.scope !== undefined || decoded.type !== "access" || !decoded.userId) return;
+    if (!client.organizationId) return;
+
+    const user = await AppDataSource.getRepository(User).findOne({
+      where: { id: decoded.userId },
+    });
+    if (
+      !user ||
+      !user.isActive ||
+      !user.emailVerified ||
+      user.email !== decoded.email ||
+      (decoded.tokenVersion !== undefined && decoded.tokenVersion !== (user.tokenVersion ?? 0))
+    ) {
+      logger.warn({ clientId }, "WebSocket token rejected");
+      return;
     }
+
+    // The `org` query parameter is only a request: confirm the user is an
+    // active member before streaming that organization's events.
+    const membership = await AppDataSource.getRepository(UserOrganization).findOne({
+      where: { userId: decoded.userId, organizationId: client.organizationId, isActive: true },
+    });
+    if (!membership) {
+      logger.warn({ clientId }, "WebSocket client is not a member of the requested organization");
+      return;
+    }
+
+    // The socket may have closed while the lookups ran.
+    if (!this.clients.has(clientId)) return;
 
     client.authenticated = true;
     if (!this.organizationClients.has(client.organizationId)) {
       this.organizationClients.set(client.organizationId, new Set());
     }
     this.organizationClients.get(client.organizationId)!.add(clientId);
+  }
+
+  /** First `auth` frame of a dashboard socket; the result is sent back as a frame. */
+  private async handleAuth(clientId: string, message: AuthMessage): Promise<void> {
+    const client = this.clients.get(clientId);
+    if (!client) return;
+    if (typeof message.token === "string" && message.token) {
+      await this.authenticateClient(clientId, message.token);
+    }
+    if (client.authenticated) {
+      client.ws.send(JSON.stringify({ type: "authenticated" }));
+    } else {
+      this.sendError(client, "Unauthorized");
+      client.ws.close(CLOSE_POLICY_VIOLATION, "Unauthorized");
+    }
   }
 
   /**
@@ -402,8 +493,18 @@ export class WebSocketService {
     if (!client) return;
 
     try {
-      await client.ready;
       const message = JSON.parse(data);
+
+      // Authentication starts synchronously so frames queued behind it wait.
+      if (message?.type === "auth") {
+        if (client.authAttempted) return;
+        client.authAttempted = true;
+        client.ready = this.handleAuth(clientId, message);
+        await client.ready;
+        return;
+      }
+
+      await client.ready;
 
       switch (message.type) {
         case "identify":
@@ -448,18 +549,25 @@ export class WebSocketService {
    * Handle customer identification: attach a webchat client to an existing
    * conversation so it receives that conversation's public events.
    *
-   * Conversations are only ever created through `publicConversations.create`,
-   * which registers the browser's DPoP key. Creating one here would produce a
+   * The frame carries a DPoP proof signed with the key the browser registered
+   * when it created the conversation, so only the holder of that key can
+   * listen. Conversations are only ever created through
+   * `publicConversations.create`; creating one here would produce a
    * conversation with no key, writable by anyone.
    */
   private async handleIdentify(clientId: string, message: IdentifyMessage): Promise<void> {
     const client = this.clients.get(clientId);
     if (!client) return;
 
-    const { customerId, conversationId, metadata } = message;
+    const { conversationId, proof, url } = message;
 
-    if (!conversationId) {
+    if (typeof conversationId !== "string" || !conversationId) {
       this.sendError(client, "conversationId is required");
+      return;
+    }
+
+    if (typeof proof !== "string" || typeof url !== "string" || !isIdentifyProofUrl(url)) {
+      this.sendError(client, "DPoP authentication required: proof and url must be provided");
       return;
     }
 
@@ -467,15 +575,33 @@ export class WebSocketService {
     if (
       !conversation ||
       conversation.organization_id !== client.organizationId ||
-      conversation.channel !== "web"
+      conversation.channel !== "web" ||
+      !conversation.publicJwk
     ) {
       this.sendError(client, "Conversation not found");
       return;
     }
 
-    client.customerId = customerId;
+    // The nonce is left alone: the widget's HTTP calls rotate it concurrently,
+    // and the one-time jti plus the iat window already stop replays.
+    const verification = await verifyDPoPForRequest(
+      conversation.id,
+      proof,
+      IDENTIFY_PROOF_METHOD,
+      url,
+      { checkNonce: false },
+    );
+    if (!verification.success) {
+      this.sendError(client, "Unauthorized");
+      return;
+    }
+
+    // The socket may have closed while the proof was verified.
+    if (!this.clients.has(clientId)) return;
+
+    // A shopper who starts a new conversation identifies again on the same socket.
+    if (client.conversationId !== conversation.id) this.detachFromConversation(clientId, client);
     client.conversationId = conversation.id;
-    client.metadata = { ...client.metadata, ...metadata };
 
     if (!this.conversationClients.has(conversation.id)) {
       this.conversationClients.set(conversation.id, new Set());
@@ -490,7 +616,6 @@ export class WebSocketService {
       JSON.stringify({
         type: "identified",
         conversationId: client.conversationId,
-        customerId: client.customerId,
       }),
     );
   }
@@ -649,8 +774,7 @@ export class WebSocketService {
       client.conversationId,
       {
         type: "typing",
-        userId: client.customerId,
-        isTyping: message.isTyping,
+        isTyping: message.isTyping === true,
       },
       clientId,
     );
@@ -679,7 +803,7 @@ export class WebSocketService {
     }
 
     // Webchat clients attach to their conversation through `identify`, which
-    // checks the organization and channel. An unchecked subscribe would let
+    // requires a DPoP proof for it. An unchecked subscribe would let
     // anyone listen to any conversation id.
     this.sendError(client, "Unauthorized");
   }
@@ -691,22 +815,12 @@ export class WebSocketService {
     const client = this.clients.get(clientId);
     if (!client) return;
 
-    // Remove from conversation clients
-    if (client.conversationId) {
-      const conversationClients = this.conversationClients.get(client.conversationId);
-      if (conversationClients) {
-        conversationClients.delete(clientId);
-        if (conversationClients.size === 0) {
-          this.conversationClients.delete(client.conversationId);
-          void pageToolService.clear(client.conversationId);
-        }
-      }
+    clearTimeout(client.attachTimer);
+    const openFromIp = (this.connectionsPerIp.get(client.ip) ?? 1) - 1;
+    if (openFromIp > 0) this.connectionsPerIp.set(client.ip, openFromIp);
+    else this.connectionsPerIp.delete(client.ip);
 
-      logger.debug(
-        { conversationId: client.conversationId },
-        "Webchat client disconnected from conversation",
-      );
-    }
+    this.detachFromConversation(clientId, client);
 
     // Remove from organization clients
     if (client.organizationId) {
@@ -721,6 +835,26 @@ export class WebSocketService {
 
     // Remove client
     this.clients.delete(clientId);
+  }
+
+  /** Stop streaming a conversation to this client. */
+  private detachFromConversation(clientId: string, client: WebSocketClient): void {
+    if (!client.conversationId) return;
+
+    const conversationClients = this.conversationClients.get(client.conversationId);
+    if (conversationClients) {
+      conversationClients.delete(clientId);
+      if (conversationClients.size === 0) {
+        this.conversationClients.delete(client.conversationId);
+        void pageToolService.clear(client.conversationId);
+      }
+    }
+
+    logger.debug(
+      { conversationId: client.conversationId },
+      "Webchat client disconnected from conversation",
+    );
+    client.conversationId = undefined;
   }
 
   /**
@@ -834,6 +968,8 @@ export class WebSocketService {
    * Shutdown WebSocket server
    */
   shutdown(): void {
+    clearInterval(this.heartbeatTimer);
+
     // Close all client connections
     for (const [_clientId, client] of this.clients) {
       client.ws.close(1000, "Server shutting down");
@@ -843,6 +979,7 @@ export class WebSocketService {
     this.clients.clear();
     this.conversationClients.clear();
     this.organizationClients.clear();
+    this.connectionsPerIp.clear();
 
     // Close server
     if (this.wss) {
@@ -852,3 +989,16 @@ export class WebSocketService {
 }
 
 export const websocketService = new WebSocketService();
+
+/** An identify proof is made for the `/ws` endpoint, not reused from an HTTP call. */
+function isIdentifyProofUrl(url: string): boolean {
+  try {
+    const parsed = new URL(url);
+    return (
+      (parsed.protocol === "ws:" || parsed.protocol === "wss:") &&
+      parsed.pathname === IDENTIFY_PROOF_PATH
+    );
+  } catch {
+    return false;
+  }
+}

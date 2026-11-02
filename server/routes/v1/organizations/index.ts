@@ -57,6 +57,11 @@ import { handleUpload } from "@server/lib/upload-helper";
 import { StorageService } from "@server/services/storage.service";
 import { createLogger } from "@server/lib/logger";
 import { notifyOperator } from "@server/services/operator-events.service";
+import {
+  ConfidenceGuardrailService,
+  ESCALATION_OFF_CONFIRMATION,
+  confidenceGuardrailLoosening,
+} from "@server/services/core/confidence-guardrail.service";
 
 const logger = createLogger("organizations");
 
@@ -86,6 +91,8 @@ const confidenceGuardrailSchema = z.object({
       similarityThreshold: z.number().min(0).max(1).optional(),
     })
     .optional(),
+  /** Required when the change switches human escalation off (typed confirm). */
+  confirmSwitchOff: z.literal(ESCALATION_OFF_CONFIRMATION).optional(),
 });
 
 const tierModelSchema = z.object({
@@ -114,7 +121,7 @@ const actionApprovalSchema = z
     moneyMovesNeedApproval: z.boolean(),
     thresholdAmount: z.number().min(0).max(1_000_000),
     approverRoles: z.array(z.enum(["admin", "contributor", "member"])).max(3),
-    categories: z.record(z.enum(APPROVAL_CATEGORIES), z.boolean()),
+    categories: z.partialRecord(z.enum(APPROVAL_CATEGORIES), z.boolean()),
     customerConfirmation: z.boolean(),
     /** Required when the change switches approval off for a money move (typed confirm). */
     confirmSwitchOff: z.literal(SWITCH_OFF_CONFIRMATION),
@@ -604,7 +611,7 @@ export const organizationsRouter = t.router({
       // Extract settings fields from input as they go into the settings JSONB field
       const {
         testModeDefault,
-        confidenceGuardrail,
+        confidenceGuardrail: confidenceInput,
         retentionDays,
         actionApproval: approvalInput,
         ...topLevelFields
@@ -642,6 +649,27 @@ export const organizationsRouter = t.router({
         });
       }
 
+      // Weakening the fact-grounding guardrail is owner-only like loosening
+      // approval, and switching escalation off needs the typed confirm.
+      const { confirmSwitchOff: confirmEscalationOff, ...confidenceGuardrail } =
+        confidenceInput ?? {};
+      const confidenceLoosening = confidenceGuardrailLoosening(
+        ConfidenceGuardrailService.mergeConfig(organization.settings as Record<string, unknown>),
+        confidenceGuardrail,
+      );
+      if (confidenceLoosening.loosened && ctx.user?.getRole() !== "owner") {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "Only the organization owner can switch escalation off or lower the threshold",
+        });
+      }
+      if (confidenceLoosening.escalationOff && !confirmEscalationOff) {
+        throw new TRPCError({
+          code: "PRECONDITION_FAILED",
+          message: "Switching human escalation off needs the typed confirmation",
+        });
+      }
+
       // Prepare update payload
       const updatePayload: DeepPartial<Organization> = {
         ...topLevelFields,
@@ -650,7 +678,7 @@ export const organizationsRouter = t.router({
       // Handle settings JSONB field updates
       if (
         testModeDefault !== undefined ||
-        confidenceGuardrail !== undefined ||
+        confidenceInput !== undefined ||
         retentionDays !== undefined ||
         approvalChanged
       ) {
@@ -662,7 +690,7 @@ export const organizationsRouter = t.router({
           updatePayload.settings.testModeDefault = testModeDefault;
         }
 
-        if (confidenceGuardrail !== undefined) {
+        if (confidenceInput !== undefined) {
           updatePayload.settings.confidenceGuardrail = {
             ...(organization.settings?.confidenceGuardrail || {}),
             ...confidenceGuardrail,
@@ -1158,7 +1186,10 @@ export const organizationsRouter = t.router({
       });
     }
 
-    await organizationService.deleteWithData(organization);
+    await organizationService.deleteWithData(organization, {
+      userId: ctx.user!.id,
+      source: "owner",
+    });
     logger.info({ orgId: organization.id, userId: ctx.user!.id }, "Organization deleted by owner");
     // A hosted operator stops billing for the deleted workspace (D15-11).
     await notifyOperator({

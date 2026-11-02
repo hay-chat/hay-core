@@ -1,11 +1,12 @@
 import { t } from "@server/trpc";
 import { z } from "zod";
-import { IsNull } from "typeorm";
+import { IsNull, type EntityManager } from "typeorm";
 import { TRPCError } from "@trpc/server";
 import { AppDataSource } from "@server/database/data-source";
 import { User } from "@server/entities/user.entity";
 import { UserOrganization } from "@server/entities/user-organization.entity";
 import { AuthCode } from "@server/entities/auth-code.entity";
+import { OrganizationInvitation } from "@server/entities/organization-invitation.entity";
 import {
   hashPassword,
   verifyPassword,
@@ -23,7 +24,7 @@ import { auditLogService } from "@server/services/audit-log.service";
 import { emailService, getOrganizationLocale } from "@server/services/email.service";
 import { DEFAULT_LANGUAGE } from "@server/types/language.types";
 import * as crypto from "crypto";
-import { getDashboardUrl } from "@server/config/env";
+import { config, getDashboardUrl } from "@server/config/env";
 import { StorageService } from "@server/services/storage.service";
 import { handleUpload } from "@server/lib/upload-helper";
 import { rateLimitService } from "@server/services/rate-limit.service";
@@ -146,6 +147,28 @@ async function createAuthCode(userId: string): Promise<{ code: string; expiresAt
   return { code, expiresAt: authCode.expiresAt };
 }
 
+/**
+ * With ALLOW_SIGNUP=false, a new account may only be created by the instance's
+ * first user or by someone holding a pending invitation.
+ */
+async function assertSignupAllowed(manager: EntityManager, email: string): Promise<void> {
+  const userCount = await manager.getRepository(User).count();
+  if (userCount === 0) return;
+
+  const invitations = await manager
+    .getRepository(OrganizationInvitation)
+    .createQueryBuilder("invitation")
+    .where("LOWER(invitation.email) = :email", { email: email.toLowerCase() })
+    .getMany();
+  if (invitations.some((invitation) => invitation.canAccept())) return;
+
+  throw new TRPCError({
+    code: "FORBIDDEN",
+    message: "Sign-up is closed on this server. Ask an administrator for an invitation.",
+    cause: { type: "SIGNUP_CLOSED" },
+  });
+}
+
 export const authRouter = t.router({
   // Public endpoints
   login: publicProcedure.input(loginSchema).mutation(async ({ input, ctx }) => {
@@ -183,6 +206,7 @@ export const authRouter = t.router({
         password,
         "$argon2id$v=19$m=65536,t=3,p=4$c29tZXNhbHQ$SOWWcWsDNrEh+WTm3Hh5F3hH5KPLz9JRDYbAj2BJUn4",
       );
+      await auditLogService.logFailedLogin(email, ctx.ipAddress, ctx.userAgent);
       throw new TRPCError({
         code: "UNAUTHORIZED",
         message: "Invalid credentials",
@@ -192,6 +216,7 @@ export const authRouter = t.router({
     // Verify password
     const isValidPassword = await verifyPassword(password, user.password);
     if (!isValidPassword) {
+      await auditLogService.logFailedLogin(email, ctx.ipAddress, ctx.userAgent);
       throw new TRPCError({
         code: "UNAUTHORIZED",
         message: "Invalid credentials",
@@ -221,6 +246,13 @@ export const authRouter = t.router({
     await userRepository.save(user);
 
     const tokens = await authSessionService.createSession(user, ctx);
+    await auditLogService.record({
+      userId: user.id,
+      action: "user.login",
+      resource: "auth",
+      ipAddress: ctx.ipAddress,
+      userAgent: ctx.userAgent,
+    });
 
     // Load all user organizations (multi-org support)
     const organizations = await getUserOrganizations(user.id);
@@ -276,9 +308,16 @@ export const authRouter = t.router({
       });
     }
 
+    if (!config.auth.allowSignup) {
+      await assertSignupAllowed(AppDataSource.manager, input.email);
+    }
+
     const response = {
       success: true,
-      message: "Check your inbox to verify your email address, then sign in.",
+      emailVerificationRequired: config.auth.requireEmailVerification,
+      message: config.auth.requireEmailVerification
+        ? "Check your inbox to verify your email address, then sign in."
+        : "Your account is ready. Sign in to continue.",
     };
 
     const existingUser = await AppDataSource.getRepository(User).findOne({
@@ -291,11 +330,24 @@ export const authRouter = t.router({
     }
 
     const { user, organization } = await AppDataSource.transaction((manager) =>
-      createAccount(manager, input),
+      createAccount(manager, {
+        ...input,
+        emailVerified: !config.auth.requireEmailVerification,
+      }),
     );
 
     // After commit: give the new organization its default plugins (fire-and-forget).
     if (organization) void enableDefaultPlugins(organization.id);
+    await auditLogService.record({
+      userId: user.id,
+      organizationId: organization?.id,
+      action: "user.register",
+      resource: "auth",
+      ipAddress: ctx.ipAddress,
+      userAgent: ctx.userAgent,
+    });
+
+    if (!config.auth.requireEmailVerification) return response;
 
     // Off the response path, so timing doesn't tell new and existing emails apart.
     // On failure the user can request a new link from the login page.
@@ -673,8 +725,16 @@ export const authRouter = t.router({
    */
   logout: publicProcedure
     .input(refreshTokenSchema.extend({ pushEndpoint: z.string().url().max(2048).optional() }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
       const userId = await authSessionService.revoke(input.refreshToken);
+      if (userId)
+        await auditLogService.record({
+          userId,
+          action: "user.logout",
+          resource: "auth",
+          ipAddress: ctx.ipAddress,
+          userAgent: ctx.userAgent,
+        });
       if (userId && input.pushEndpoint) {
         await pushNotificationService.unsubscribe(userId, input.pushEndpoint);
       }
@@ -996,7 +1056,7 @@ export const authRouter = t.router({
         await emailService.initialize();
         logger.debug("Email service initialized");
 
-        const baseUrl = process.env.FRONTEND_URL || "http://localhost:3000";
+        const baseUrl = process.env.FRONTEND_URL || getDashboardUrl();
         const verificationUrl = `${baseUrl}/verify-email?token=${verificationToken}`;
 
         logger.debug(
@@ -1356,7 +1416,7 @@ export const authRouter = t.router({
     try {
       await emailService.initialize();
 
-      const baseUrl = process.env.FRONTEND_URL || "http://localhost:3000";
+      const baseUrl = process.env.FRONTEND_URL || getDashboardUrl();
       const verificationUrl = `${baseUrl}/verify-email?token=${verificationToken}`;
 
       const commonVariables = {

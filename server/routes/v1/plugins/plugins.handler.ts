@@ -1,8 +1,13 @@
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
-import { authenticatedProcedure } from "@server/trpc";
+import { authenticatedProcedure, scopedProcedure } from "@server/trpc";
+import { RESOURCES, ACTIONS } from "@server/types/scopes";
 import { hasPluginCredentials, pickHealthCheckTool } from "@server/lib/plugin-health-tool";
-import { pluginManagerService } from "@server/services/plugin-manager.service";
+import {
+  assertCustomPluginsAllowed,
+  isPluginVisibleToOrganization,
+  pluginManagerService,
+} from "@server/services/plugin-manager.service";
 import { pluginRegistryRepository } from "@server/repositories/plugin-registry.repository";
 import { pluginInstanceRepository } from "@server/repositories/plugin-instance.repository";
 import { pluginUIService } from "@server/services/plugin-ui.service";
@@ -12,6 +17,7 @@ import { decryptConfig, isEncrypted } from "@server/lib/auth/utils/encryption";
 import { dropManagedOverrides, resolveConfigWithEnv } from "@server/lib/config-resolver";
 import { configEnvAllowList } from "@server/lib/plugin-env";
 import { oauthService } from "@server/services/oauth.service";
+import { auditLogService } from "@server/services/audit-log.service";
 import { v4 as uuidv4 } from "uuid";
 import type { HayPluginManifest } from "@server/types/plugin.types";
 import type { AuthMethodDescriptor, ConfigFieldDescriptor } from "@server/types/plugin-sdk.types";
@@ -28,9 +34,16 @@ import { readFile } from "fs/promises";
 import { join, resolve } from "path";
 import { existsSync } from "fs";
 import { createLogger } from "@server/lib/logger";
+import {
+  canOrganizationLoadPluginUI,
+  signPluginUiUrl,
+} from "@server/services/plugin-asset.service";
 import { workerFetch } from "@server/lib/worker-client";
 
 const logger = createLogger("plugins");
+
+/** Installing, enabling and configuring plugins is reserved for plugin managers (admins). */
+const pluginManageProcedure = scopedProcedure(RESOURCES.PLUGINS, ACTIONS.MANAGE);
 
 interface PluginHealthCheckResult {
   success: boolean;
@@ -101,6 +114,7 @@ export const getAllPlugins = authenticatedProcedure.query(async ({ ctx }) => {
         gitLastCommitSha: plugin.gitLastCommitSha,
         gitLastSyncAt: plugin.gitLastSyncAt,
         gitSyncError: plugin.gitSyncError,
+        gitAvailableCommitSha: plugin.gitAvailableCommitSha,
       };
 
       return result;
@@ -119,7 +133,7 @@ export const getPlugin = authenticatedProcedure
   .query(async ({ ctx, input }) => {
     const plugin = pluginManagerService.getPlugin(input.pluginId);
 
-    if (!plugin) {
+    if (!plugin || !isPluginVisibleToOrganization(plugin, ctx.organizationId!)) {
       throw new TRPCError({
         code: "NOT_FOUND",
         message: `Plugin ${input.pluginId} not found`,
@@ -308,6 +322,7 @@ export const getPlugin = authenticatedProcedure
       version: plugin.version,
       type: manifest.type,
       pluginPath: plugin.pluginPath,
+      sourceType: plugin.sourceType,
       manifest,
       metadata: plugin.metadata,
       installed: plugin.installed,
@@ -339,11 +354,11 @@ export const getPluginInstances = authenticatedProcedure.query(async ({ ctx }) =
 /**
  * Enable a plugin for the organization
  */
-export const enablePlugin = authenticatedProcedure
+export const enablePlugin = pluginManageProcedure
   .input(
     z.object({
       pluginId: z.string(),
-      configuration: z.record(z.any()).optional(),
+      configuration: z.record(z.string(), z.any()).optional(),
     }),
   )
   .mutation(async ({ ctx, input }) => {
@@ -356,12 +371,20 @@ export const enablePlugin = authenticatedProcedure
       });
     }
 
-    // Validate organization access for custom plugins
-    if (plugin.sourceType === "custom" && plugin.organizationId !== ctx.organizationId) {
+    // Validate organization access for custom and git plugins
+    if (!isPluginVisibleToOrganization(plugin, ctx.organizationId!)) {
       throw new TRPCError({
         code: "FORBIDDEN",
         message: "Cannot enable plugins from other organizations",
       });
+    }
+
+    if (plugin.sourceType !== "core") {
+      try {
+        assertCustomPluginsAllowed();
+      } catch (error) {
+        throw new TRPCError({ code: "FORBIDDEN", message: (error as Error).message });
+      }
     }
 
     try {
@@ -392,6 +415,15 @@ export const enablePlugin = authenticatedProcedure
       );
 
       logger.info({ pluginName: plugin.name }, "Plugin successfully enabled");
+      await auditLogService.record({
+        userId: ctx.user?.id,
+        organizationId: ctx.organizationId,
+        action: "plugin.enable",
+        resource: "plugin",
+        changes: { pluginId: input.pluginId },
+        ipAddress: ctx.ipAddress,
+        userAgent: ctx.userAgent,
+      });
 
       // Register any plugin-declared cron jobs for this org (HAY-221). Non-fatal.
       try {
@@ -449,7 +481,7 @@ export const enablePlugin = authenticatedProcedure
 /**
  * Disable a plugin for the organization
  */
-export const disablePlugin = authenticatedProcedure
+export const disablePlugin = pluginManageProcedure
   .input(
     z.object({
       pluginId: z.string(),
@@ -492,6 +524,15 @@ export const disablePlugin = authenticatedProcedure
 
     // Disable in database
     await pluginInstanceRepository.disablePlugin(ctx.organizationId!, input.pluginId);
+    await auditLogService.record({
+      userId: ctx.user?.id,
+      organizationId: ctx.organizationId,
+      action: "plugin.disable",
+      resource: "plugin",
+      changes: { pluginId: input.pluginId },
+      ipAddress: ctx.ipAddress,
+      userAgent: ctx.userAgent,
+    });
 
     return {
       success: true,
@@ -501,7 +542,7 @@ export const disablePlugin = authenticatedProcedure
 /**
  * Restart a plugin worker without losing configuration
  */
-export const restartPlugin = authenticatedProcedure
+export const restartPlugin = pluginManageProcedure
   .input(
     z.object({
       pluginId: z.string(),
@@ -598,11 +639,11 @@ export const restartPlugin = authenticatedProcedure
 /**
  * Configure a plugin (with auth separation)
  */
-export const configurePlugin = authenticatedProcedure
+export const configurePlugin = pluginManageProcedure
   .input(
     z.object({
       pluginId: z.string(),
-      configuration: z.record(z.any()),
+      configuration: z.record(z.string(), z.any()),
     }),
   )
   .mutation(async ({ ctx, input }) => {
@@ -759,6 +800,15 @@ export const configurePlugin = authenticatedProcedure
           authState,
         );
       }
+      await auditLogService.record({
+        userId: ctx.user?.id,
+        organizationId: ctx.organizationId,
+        action: authState ? "plugin.credentials.update" : "plugin.configure",
+        resource: "plugin",
+        changes: { pluginId: input.pluginId, configKeys: Object.keys(config) },
+        ipAddress: ctx.ipAddress,
+        userAgent: ctx.userAgent,
+      });
 
       return {
         success: true,
@@ -773,6 +823,15 @@ export const configurePlugin = authenticatedProcedure
     if (authState) {
       await pluginInstanceRepository.updateAuthState(instance.id, ctx.organizationId!, authState);
     }
+    await auditLogService.record({
+      userId: ctx.user?.id,
+      organizationId: ctx.organizationId,
+      action: authState ? "plugin.credentials.update" : "plugin.configure",
+      resource: "plugin",
+      changes: { pluginId: input.pluginId, configKeys: Object.keys(config) },
+      ipAddress: ctx.ipAddress,
+      userAgent: ctx.userAgent,
+    });
 
     // Restart the plugin if it's currently running to apply new configuration
     const runner = getPluginRunnerService();
@@ -976,7 +1035,7 @@ function getToolsFromConfig(config: any): any[] {
  *
  * Useful after plugin updates or when tools need to be re-discovered
  */
-export const refreshMCPTools = authenticatedProcedure
+export const refreshMCPTools = pluginManageProcedure
   .input(z.object({ pluginId: z.string() }))
   .mutation(async ({ ctx, input }) => {
     // Get plugin
@@ -1358,7 +1417,7 @@ export const testConnection = authenticatedProcedure
 /**
  * Initiate OAuth authorization flow
  */
-export const initiateOAuth = authenticatedProcedure
+export const initiateOAuth = pluginManageProcedure
   .input(
     z.object({
       pluginId: z.string(),
@@ -1399,7 +1458,7 @@ export const initiateOAuth = authenticatedProcedure
  * Signup). The code is exchanged synchronously (30 s TTL); `extras` are
  * untrusted hints forwarded to the plugin's onConnected hook.
  */
-export const completeOAuthWithCode = authenticatedProcedure
+export const completeOAuthWithCode = pluginManageProcedure
   .input(
     z.object({
       pluginId: z.string(),
@@ -1410,12 +1469,22 @@ export const completeOAuthWithCode = authenticatedProcedure
     }),
   )
   .mutation(async ({ ctx, input }) => {
-    return oauthService.completeWithCode(
+    const result = await oauthService.completeWithCode(
       ctx.organizationId!,
       input.pluginId,
       input.code,
       input.extras,
     );
+    await auditLogService.record({
+      userId: ctx.user?.id,
+      organizationId: ctx.organizationId,
+      action: "plugin.credentials.update",
+      resource: "plugin",
+      changes: { pluginId: input.pluginId, oauthConnected: true },
+      ipAddress: ctx.ipAddress,
+      userAgent: ctx.userAgent,
+    });
+    return result;
   });
 
 const PLUGIN_UI_PATH_PATTERN = /^\/ui\/[a-z0-9/-]*$/;
@@ -1601,7 +1670,7 @@ export const getOAuthStatus = authenticatedProcedure
 /**
  * Revoke OAuth connection
  */
-export const revokeOAuth = authenticatedProcedure
+export const revokeOAuth = pluginManageProcedure
   .input(
     z.object({
       pluginId: z.string(),
@@ -1609,6 +1678,15 @@ export const revokeOAuth = authenticatedProcedure
   )
   .mutation(async ({ ctx, input }) => {
     await oauthService.revokeOAuth(ctx.organizationId!, input.pluginId);
+    await auditLogService.record({
+      userId: ctx.user?.id,
+      organizationId: ctx.organizationId,
+      action: "plugin.credentials.update",
+      resource: "plugin",
+      changes: { pluginId: input.pluginId, oauthRevoked: true },
+      ipAddress: ctx.ipAddress,
+      userAgent: ctx.userAgent,
+    });
     return { success: true };
   });
 
@@ -1617,13 +1695,13 @@ export const revokeOAuth = authenticatedProcedure
  *
  * Calls the plugin worker's /validate-auth endpoint to validate credentials
  */
-export const validateAuth = authenticatedProcedure
+export const validateAuth = pluginManageProcedure
   .input(
     z.object({
       pluginId: z.string(),
       authState: z.object({
         methodId: z.string(),
-        credentials: z.record(z.any()),
+        credentials: z.record(z.string(), z.any()),
       }),
     }),
   )
@@ -1729,5 +1807,19 @@ export const getPluginTranslations = authenticatedProcedure
     return translations;
   });
 
-// Note: Plugin UI assets are now served via HTTP endpoint at /plugins/ui/:pluginName/:assetPath
-// See server/main.ts for the Express route handler and server/services/plugin-asset.service.ts for implementation
+/**
+ * Short-lived URLs of a plugin's UI bundle (`ui.js`, `style.css`) for the
+ * caller's organization. The `/plugins/ui/*` route serves nothing without one.
+ */
+export const getPluginUiAssetUrls = authenticatedProcedure
+  .input(z.object({ pluginId: z.string() }))
+  .query(async ({ ctx, input }) => {
+    const plugin = await pluginRegistryRepository.findByPluginId(input.pluginId);
+    if (!plugin || !(await canOrganizationLoadPluginUI(plugin, ctx.organizationId!))) {
+      throw new TRPCError({ code: "NOT_FOUND", message: `Plugin ${input.pluginId} not found` });
+    }
+    return {
+      script: signPluginUiUrl(plugin.pluginId, "ui.js", ctx.organizationId!),
+      style: signPluginUiUrl(plugin.pluginId, "style.css", ctx.organizationId!),
+    };
+  });

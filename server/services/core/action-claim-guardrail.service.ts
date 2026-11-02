@@ -2,6 +2,7 @@ import { LLMService } from "./llm.service";
 import { PromptService } from "../prompt.service";
 import { Message, MessageType } from "@server/database/entities/message.entity";
 import { createLogger } from "@server/lib/logger";
+import { isWriteAdjacentReply } from "./reply-risk";
 import {
   type ActionClaimGuardrailConfig,
   DEFAULT_ACTION_CLAIM_GUARDRAIL_CONFIG,
@@ -31,6 +32,8 @@ export interface ActionClaimAssessment {
   backedByTools: boolean; // Whether ALL claims are backed by successful tool calls this turn
   reasoning: string; // Explanation of the decision
   passed: boolean; // !claimsAction || backedByTools
+  /** The check itself failed; the reply was held because it could not be verified. */
+  evaluationFailed?: boolean;
 }
 
 /**
@@ -134,8 +137,20 @@ export class ActionClaimGuardrailService {
       };
     } catch (error) {
       logger.error({ err: error }, "Error in action claim assessment");
-      // Fail open: never block conversations on guardrail outages
-      return this.createPassingAssessment("Error during evaluation - defaulting to allow");
+      // A reply that could not be checked passes only when it cannot claim an
+      // action: no tool ran this turn and it states no amount, link or
+      // state-changing verb. Anything else goes to a person.
+      if (context.toolsCalledThisTurn.length > 0 || isWriteAdjacentReply(context.response)) {
+        return {
+          claimsAction: true,
+          claimedActions: [],
+          backedByTools: false,
+          reasoning: "Action claim check unavailable - reply needs review",
+          passed: false,
+          evaluationFailed: true,
+        };
+      }
+      return this.createPassingAssessment("Error during evaluation - reply claims no action");
     }
   }
 
@@ -153,7 +168,7 @@ export class ActionClaimGuardrailService {
    * Format conversation history for prompt
    */
   private formatConversationHistory(messages: Message[]): string {
-    const recentMessages = messages.slice(-5);
+    const recentMessages = messages.filter((msg) => msg.type !== MessageType.DOCUMENT).slice(-5);
 
     return recentMessages
       .map((msg) => {
@@ -162,7 +177,9 @@ export class ActionClaimGuardrailService {
             ? "Customer"
             : msg.type === MessageType.SYSTEM
               ? "System note"
-              : "Assistant";
+              : msg.type === MessageType.TOOL
+                ? "Tool result"
+                : "Assistant";
         return `${role}: ${msg.content}`;
       })
       .join("\n");

@@ -11,6 +11,17 @@ function escapeHtml(text: string): string {
     .replace(/"/g, "&quot;");
 }
 
+/** The URL if it is an absolute http(s) URL, otherwise undefined (for `:href` from tools). */
+export function safeHttpUrl(url: unknown): string | undefined {
+  if (typeof url !== "string") return undefined;
+  try {
+    const parsed = new URL(url.trim());
+    return parsed.protocol === "http:" || parsed.protocol === "https:" ? parsed.href : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 export function parseMarkdown(text: string): string {
   // Escape HTML to prevent XSS
   let html = escapeHtml(text);
