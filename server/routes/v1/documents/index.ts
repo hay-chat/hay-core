@@ -34,7 +34,7 @@ import { TRPCError } from "@trpc/server";
 const logger = createLogger("documents");
 
 export const documentsRouter = t.router({
-  list: createListProcedure(documentListInputSchema, documentRepository),
+  list: createListProcedure(RESOURCES.DOCUMENTS, documentListInputSchema, documentRepository),
   getById: scopedProcedure(RESOURCES.DOCUMENTS, ACTIONS.READ)
     .input(
       z.object({
