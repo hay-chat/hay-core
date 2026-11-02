@@ -37,6 +37,7 @@ import { validateUrlForSSRF } from "@server/utils/ssrf";
 import { emailDomainService } from "@server/services/email-domains.service";
 import { channelHealthService } from "@server/services/channel-health.service";
 import type { Conversation } from "@server/database/entities/conversation.entity";
+import { providerPrivacyService } from "@server/services/provider-privacy.service";
 
 // Channel names become keys of conversation.metadata, so they are kept
 // lowercase: a plugin must not be able to write a core key such as `runKind`.
@@ -47,6 +48,22 @@ const channelNameSchema = z
   .regex(/^[a-z0-9][a-z0-9_-]*$/, "Channel names are lowercase letters, digits, - and _");
 
 const logger = createLogger("plugin-api-trpc");
+
+// How a provider names the data subject of a privacy request (privacy.*).
+const privacySubjectSchema = z
+  .object({
+    externalIds: z.array(z.string().min(1).max(255)).max(10).optional(),
+    emails: z.array(z.string().min(1).max(255)).max(10).optional(),
+    phones: z.array(z.string().min(1).max(50)).max(10).optional(),
+    // The provider's own request id, kept with the privacy request.
+    reference: z.string().max(255).optional(),
+  })
+  .refine(
+    (input) =>
+      (input.externalIds?.length ?? 0) + (input.emails?.length ?? 0) + (input.phones?.length ?? 0) >
+      0,
+    "At least one identifier is required",
+  );
 
 /**
  * Auth configuration accepted for remote MCP servers.
@@ -962,6 +979,45 @@ export const pluginApiTrpcRouter = router({
             ...metadata,
           },
         },
+      });
+    }),
+
+  /**
+   * Privacy Capability - Erase a data subject on the provider's request (e.g.
+   * a store's customers/redact webhook). Every customer of the token's
+   * organization matching an identifier gets the same erasure a verified
+   * deletion request runs, as a background job. Idempotent while in flight.
+   */
+  "privacy.eraseCustomer": pluginProcedure
+    .input(privacySubjectSchema)
+    .mutation(async ({ input, ctx }) => {
+      requireCapability(ctx, "privacy");
+      const { organizationId, pluginId } = ctx.pluginAuth;
+      const { reference, ...identifiers } = input;
+      const result = await providerPrivacyService.queueForSubject(
+        "deletion",
+        organizationId,
+        identifiers,
+        { pluginId, reference },
+      );
+      return { matched: result.matched, requestIds: result.requestIds };
+    }),
+
+  /**
+   * Privacy Capability - Export a data subject's data on the provider's
+   * request (e.g. customers/data_request). Queues the DSAR export for each
+   * matching customer; the download link goes to the email on the customer
+   * record. Customers without one are reported as `undeliverable`.
+   */
+  "privacy.exportCustomer": pluginProcedure
+    .input(privacySubjectSchema)
+    .mutation(async ({ input, ctx }) => {
+      requireCapability(ctx, "privacy");
+      const { organizationId, pluginId } = ctx.pluginAuth;
+      const { reference, ...identifiers } = input;
+      return providerPrivacyService.queueForSubject("export", organizationId, identifiers, {
+        pluginId,
+        reference,
       });
     }),
 

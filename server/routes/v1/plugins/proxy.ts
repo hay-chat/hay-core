@@ -57,7 +57,7 @@ router.all(/^\/([^/]+)\/(.*)?$/, async (req: Request, res: Response): Promise<vo
         ?.deauthorization;
       if (deauthorization) {
         if (path === "/data-deletion" && req.method === "GET") {
-          webhookRouterService.handleDataDeletionStatus(req, res);
+          await webhookRouterService.handleDataDeletionStatus(req, res, pluginId);
           return;
         }
         await webhookRouterService.handleDeauthorization(

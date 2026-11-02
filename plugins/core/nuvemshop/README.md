@@ -132,9 +132,10 @@ only changes status, stock and the customer email. So:
   `customers/data_request` go to `https://<hay>/v1/plugins/hay-plugin-nuvemshop/webhook`. Core
   verifies `x-linkedstore-hmac-sha256` (HMAC-SHA256 hex of the body with the client secret) and
   routes the single-object body by `store_id`. `store/redact` disconnects the store (token, store
-  id and routing key go). The two customer webhooks are acknowledged and logged by id: Hay.chat
-  keeps no copy of Nuvemshop customer records, and a shopper's chats follow Hay.chat's own
-  verified privacy flow.
+  id and routing key go). `customers/redact` asks core (`privacy.eraseCustomer`) to erase the
+  Hay.chat customers matching the shopper's email or phone; `customers/data_request` asks core
+  (`privacy.exportCustomer`) to email the data export to the address on the matching customer
+  record. Both run as background jobs; Nuvemshop customer records themselves are never copied.
 
 Partner-portal registration: scopes `read_products, write_orders, write_customers, write_coupons,
 write_fulfillment_orders` (write implies read), redirect URL `https://<hay>/oauth/callback`, the

@@ -593,6 +593,11 @@ export default defineHayPlugin((globalCtx) => {
           revokeConnection: async (reason) => {
             await pluginApiMutation("connection.revoke", { reason });
           },
+          requestPrivacy: async (action, subject) =>
+            (await pluginApiMutation(
+              action === "erase" ? "privacy.eraseCustomer" : "privacy.exportCustomer",
+              { ...subject },
+            )) as { matched: number; undeliverable?: number },
           logger: globalCtx.logger,
         }),
       );

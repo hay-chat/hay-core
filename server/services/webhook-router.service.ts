@@ -1,4 +1,3 @@
-import crypto from "crypto";
 import type { Request, Response } from "express";
 import { pluginManagerService } from "./plugin-manager.service";
 import { pluginInstanceManagerService } from "./plugin-instance-manager.service";
@@ -17,6 +16,7 @@ import { parseSignedRequest } from "@server/lib/signed-request";
 import { isValidUuid } from "@server/lib/validation/uuid";
 import { getApiUrl } from "@server/config/env";
 import { WORKER_HOST, workerFetch } from "@server/lib/worker-client";
+import { providerPrivacyService } from "./provider-privacy.service";
 
 const logger = createLogger("webhook-router");
 
@@ -175,7 +175,12 @@ export class WebhookRouterService {
       );
     }
 
-    return verifyHmacSha256(rawBody, header(routing.signature.header), secret);
+    return verifyHmacSha256(
+      rawBody,
+      header(routing.signature.header),
+      secret,
+      routing.signature.format === "sha256-hmac-base64" ? "base64" : "hex",
+    );
   }
 
   /**
@@ -185,11 +190,12 @@ export class WebhookRouterService {
    * disconnects that org's instance: clears its credentials and routing keys
    * and stops its worker so no cached token survives.
    *
-   * Data deletion answers `{ url, confirmation_code }` as the provider
-   * requires; `url` is the status page served by `handleDataDeletionStatus`.
-   * The deletion runs synchronously, so a returned code means it is done.
-   * Conversations and customers stay with the org: they are the business's
-   * records, not the connecting account's.
+   * Data deletion also erases, in every org with this plugin installed, the
+   * customers whose channel identity is the payload's routing key (the
+   * person's provider-scoped id), as background jobs. It answers
+   * `{ url, confirmation_code }` as the provider requires; the code is stored
+   * with those jobs and `url` is the status page served by
+   * `handleDataDeletionStatus`.
    */
   async handleDeauthorization(
     req: Request,
@@ -248,8 +254,10 @@ export class WebhookRouterService {
       return;
     }
 
-    const confirmationCode = crypto.randomUUID();
-    logger.info({ pluginId, confirmationCode }, "Data deletion request completed");
+    const confirmationCode = await providerPrivacyService.eraseProviderIdentity(
+      pluginId,
+      String(keyValue),
+    );
     res.status(200).json({
       url: `${getApiUrl()}/v1/plugins/${encodeURIComponent(pluginId)}/data-deletion?code=${confirmationCode}`,
       confirmation_code: confirmationCode,
@@ -257,24 +265,37 @@ export class WebhookRouterService {
   }
 
   /**
-   * Public status page for a data-deletion confirmation code. Deletion runs
-   * synchronously when the request is received, so any issued code is complete.
+   * Public status page for a data-deletion confirmation code issued by
+   * `handleDeauthorization`: in progress until every erasure job filed under
+   * it has run.
    */
-  handleDataDeletionStatus(req: Request, res: Response): void {
+  async handleDataDeletionStatus(req: Request, res: Response, pluginId: string): Promise<void> {
     const code = req.query.code;
     if (typeof code !== "string" || !isValidUuid(code)) {
       res.status(400).send("Invalid confirmation code");
       return;
     }
 
+    const status = await providerPrivacyService.getConfirmationStatus(pluginId, code);
+    if (!status) {
+      res.status(404).send("Unknown confirmation code");
+      return;
+    }
+
+    const heading = {
+      completed: "Data deletion completed",
+      in_progress: "Data deletion in progress",
+      failed: "Data deletion failed. Please submit the request again.",
+    }[status];
     res
       .status(200)
       .type("html")
       .send(
         `<html><head><title>Data deletion status</title></head><body>` +
-          `<h1>Data deletion completed</h1>` +
+          `<h1>${heading}</h1>` +
           `<p>Confirmation code: <code>${code}</code></p>` +
-          `<p>Hay.chat removed the access token and account identifiers it stored for this connection.</p>` +
+          `<p>Hay.chat removes the access token and account identifiers it stored for this ` +
+          `connection, and the conversations, messages and contact details it held for you.</p>` +
           `</body></html>`,
       );
   }

@@ -31,14 +31,13 @@ import * as archiver from "archiver";
 import { config, getDashboardUrl } from "@server/config/env";
 import { IsNull, In } from "typeorm";
 import type { ExportPackageData } from "@server/types/privacy.types";
+import { PRIVACY_DELETION_JOB_TYPE, PRIVACY_EXPORT_JOB_TYPE } from "@server/types/privacy.types";
 import { storageService } from "@server/services/storage.service";
 import { deleteConversationMedia } from "@server/services/conversation-media.service";
 import { isUuid } from "@server/services/media-url.service";
 import { fetchPublicFile } from "@server/utils/fetch-public-file";
 
 /** Job `data.type` values run by the background job queue (job-queue.service). */
-export const PRIVACY_EXPORT_JOB_TYPE = "privacy_export";
-export const PRIVACY_DELETION_JOB_TYPE = "privacy_deletion";
 const PRIVACY_JOB_TYPES = [PRIVACY_EXPORT_JOB_TYPE, PRIVACY_DELETION_JOB_TYPE];
 /** Private upload folder for export ZIPs; read only through downloadExport. */
 export const PRIVACY_EXPORT_FOLDER = "privacy-exports";
@@ -366,7 +365,10 @@ export class PrivacyService {
   private async runDeletion(request: PrivacyRequest): Promise<Record<string, unknown>> {
     const email = request.email;
     if (request.isCustomerRequest()) {
-      await this.executeCustomerDeletion(request.customerId!, request.organizationId!);
+      // customer_id is cleared when the customer is deleted: already erased.
+      if (request.customerId) {
+        await this.executeCustomerDeletion(request.customerId, request.organizationId!);
+      }
     } else {
       await this.executeDataDeletion(request.userId!);
     }
@@ -384,9 +386,12 @@ export class PrivacyService {
       customerId: request.customerId,
     });
 
-    await this.sendDeletionCompleteEmail(email, request.organizationId).catch((error) =>
-      logger.error({ err: error, requestId: request.id }, "Failed to send deletion email"),
-    );
+    // A provider-initiated erasure is confirmed to the subject by the provider.
+    if (email && !request.metadata?.source) {
+      await this.sendDeletionCompleteEmail(email, request.organizationId).catch((error) =>
+        logger.error({ err: error, requestId: request.id }, "Failed to send deletion email"),
+      );
+    }
 
     // The confirmation is sent: the subject's own requests keep no contact details.
     await this.anonymizeRequests(
@@ -804,16 +809,17 @@ export class PrivacyService {
   ): Promise<void> {
     await manager.query(
       `UPDATE privacy_requests
-       SET email = $1, identifier_value = NULL, ip_address = NULL, user_agent = NULL,
-           download_ip_address = NULL
+       SET email = coalesce($1, email), identifier_value = NULL, ip_address = NULL,
+           user_agent = NULL, download_ip_address = NULL
        WHERE (user_id = $2 OR customer_id = $3 OR lower(email) = $4)
          AND email NOT LIKE 'erased:%'
          AND status NOT IN ('pending_verification', 'verified', 'processing')`,
+      // A provider-initiated request may have no email: match it by subject only.
       [
-        erasedEmail(subject.email),
+        subject.email ? erasedEmail(subject.email) : null,
         subject.userId ?? null,
         subject.customerId ?? null,
-        subject.email.toLowerCase(),
+        subject.email ? subject.email.toLowerCase() : null,
       ],
     );
   }
