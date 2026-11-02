@@ -1,5 +1,6 @@
 <template>
   <Page :title="$t('customerPrivacy.title')" :description="$t('customerPrivacy.description')">
+    <SettingsTabs />
     <!-- Info Alert -->
     <Alert class="mb-6">
       <AlertTitle>{{ $t("customerPrivacy.infoTitle") }}</AlertTitle>

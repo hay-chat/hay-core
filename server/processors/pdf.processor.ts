@@ -3,11 +3,14 @@ import { BaseProcessor } from "./base.processor";
 import type { ProcessedDocument } from "./base.processor";
 import { sanitizeContent } from "../utils/sanitize";
 
+/** Pages read from one PDF; text past this is not indexed. */
+export const MAX_PDF_PAGES = 500;
+
 export class PdfProcessor extends BaseProcessor {
   supportedTypes = ["pdf", "application/pdf"];
 
   async process(buffer: Buffer, fileName?: string): Promise<ProcessedDocument> {
-    const data = await pdfParse(buffer);
+    const data = await pdfParse(buffer, { max: MAX_PDF_PAGES });
 
     return {
       content: sanitizeContent(data.text),

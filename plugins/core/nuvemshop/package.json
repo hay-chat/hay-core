@@ -17,6 +17,10 @@
     "env": [
       "NUVEMSHOP_OAUTH_CLIENT_ID",
       "NUVEMSHOP_OAUTH_CLIENT_SECRET"
+    ],
+    "oauthHosts": [
+      "www.nuvemshop.com.br",
+      "www.tiendanube.com"
     ]
   },
   "scripts": {

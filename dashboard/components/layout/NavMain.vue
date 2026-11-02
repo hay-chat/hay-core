@@ -1,18 +1,8 @@
 <template>
   <div class="space-y-1">
     <template v-for="item in items" :key="item.title">
-      <a
-        v-if="!item.items && item.url && item.external"
-        href="#"
-        class="flex min-h-11 items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground md:min-h-0"
-        @click.prevent="handleExternalClick(item.url!)"
-      >
-        <component :is="item.icon" class="h-4 w-4" />
-        <span>{{ item.title }}</span>
-        <ExternalLink class="ml-auto h-4 w-4 text-muted-foreground" />
-      </a>
       <NuxtLink
-        v-else-if="!item.items && item.url"
+        v-if="!item.items && item.url"
         :to="item.url"
         class="flex min-h-11 items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground md:min-h-0"
         :class="{
@@ -58,8 +48,7 @@
 
 <script setup lang="ts">
 import { reactive, watchEffect, type Component } from "vue";
-import { ChevronRight, ExternalLink } from "lucide-vue-next";
-import { useExternalLink } from "@/composables/useExternalLink";
+import { ChevronRight } from "lucide-vue-next";
 
 interface NavItem {
   title: string;
@@ -67,7 +56,6 @@ interface NavItem {
   icon?: Component;
   badge?: string;
   isActive?: boolean;
-  external?: boolean;
   items?: {
     title: string;
     url: string;
@@ -98,10 +86,4 @@ watchEffect(() => {
 const toggleExpanded = (title: string) => {
   expanded[title] = !expanded[title];
 };
-
-const { open: openExternalLink } = useExternalLink();
-
-function handleExternalClick(url: string) {
-  void openExternalLink(url);
-}
 </script>

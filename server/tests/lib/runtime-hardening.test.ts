@@ -37,7 +37,7 @@ describe("bodyLimitForPath", () => {
 
   it("gives the public widget and plugin routes intermediate limits", () => {
     expect(bodyLimitForPath("/v1/publicConversations.sendMessage")).toBe("15mb");
-    expect(bodyLimitForPath("/plugins/webhooks/hay-plugin/events")).toBe("10mb");
+    expect(bodyLimitForPath("/v1/plugins/hay-plugin/webhook")).toBe("10mb");
     expect(bodyLimitForPath("/v1/plugins/hay-plugin/action")).toBe("10mb");
   });
 });
@@ -78,7 +78,7 @@ describe("httpIpRateLimit", () => {
       limited: true,
       resetAt: new Date(Date.now() + 30_000),
     });
-    const { res, next } = await run("/plugins/webhooks/p/events");
+    const { res, next } = await run("/v1/plugins/p/webhook");
     expect(next).not.toHaveBeenCalled();
     expect(res.statusCode).toBe(429);
     expect(Number(res.headers["Retry-After"])).toBeGreaterThan(0);

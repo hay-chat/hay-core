@@ -19,6 +19,11 @@ import {
   type ActionClaimAssessment,
   type ToolLedgerEntry,
 } from "@server/services/core/action-claim-guardrail.service";
+import {
+  LinkGuardrailService,
+  extractUrls,
+  type BadLink,
+} from "@server/services/core/link-guardrail.service";
 import { MessageIntent, Message } from "@server/database/entities/message.entity";
 import { Document } from "@server/entities/document.entity";
 import { describeLocalTime } from "./local-time";
@@ -27,6 +32,8 @@ import {
   resolveQuickCheckSettings,
   type OrganizationSettings,
 } from "@server/types/organization-settings.types";
+import type { FormSchema } from "@hay/form-schema";
+import { formSchemaSchema } from "@hay/form-schema";
 
 /**
  * Minimal shape of a retrieved document needed for confidence assessment.
@@ -56,12 +63,16 @@ interface OrchestrationRagStatus {
  */
 export interface ExecuteOptions {
   toolsCalledThisTurn?: ToolLedgerEntry[];
-  turnGuardrailState?: { actionClaimRetries: number; companyInterestRetries: number };
+  turnGuardrailState?: {
+    actionClaimRetries: number;
+    companyInterestRetries: number;
+    linkRetries: number;
+  };
   plannerFeedback?: string;
 }
 
 export interface ExecutionResult {
-  step: "ASK" | "RESPOND" | "CALL_TOOL" | "HANDOFF" | "CLOSE" | "ASK_TEAM";
+  step: "ASK" | "RESPOND" | "CALL_TOOL" | "HANDOFF" | "CLOSE" | "ASK_TEAM" | "ASK_FORM";
   userMessage?: string | null;
   /**
    * ASK_TEAM (D19): the fact to check with the team. The shopper gets fixed
@@ -78,6 +89,7 @@ export interface ExecutionResult {
    * retry). The turn becomes a hand-off that must not need the LLM again.
    */
   aiUnavailable?: boolean;
+  formJson?: string | null; // JSON string of FormSchema (for ASK_FORM step only)
   rationale?: string;
   /**
    * Planner's verdict on whether the conversation's current playbook still fits
@@ -90,6 +102,8 @@ export interface ExecutionResult {
   // Guardrail fields
   actionClaim?: ActionClaimAssessment; // Stage 0: Action-claim vs tool-call consistency
   actionClaimRetryAttempted?: boolean;
+  badLinks?: BadLink[]; // Link check: links in the reply that are dead or not on the site
+  linkRetryAttempted?: boolean;
   companyInterest?: CompanyInterestAssessment; // Stage 1: Company interest protection
   companyInterestRetryAttempted?: boolean;
   confidence?: ConfidenceAssessment; // Stage 2: Fact grounding
@@ -109,6 +123,7 @@ export interface ExecutionResult {
   close?: {
     reason: string;
   };
+  form?: FormSchema; // Parsed form schema for ASK_FORM step
 }
 
 /** The shopper's latest message text, for a quick check the planner left blank. */
@@ -125,6 +140,7 @@ export class ExecutionLayer {
   private companyInterestService: CompanyInterestGuardrailService;
   private confidenceService: ConfidenceGuardrailService;
   private actionClaimService: ActionClaimGuardrailService;
+  private linkService = new LinkGuardrailService();
   // Per-instance memo for organization settings — both guardrail config
   // helpers read the same row. ExecutionLayer is constructed per turn so this
   // is naturally short-lived.
@@ -174,6 +190,7 @@ export class ExecutionLayer {
             "HANDOFF",
             "CLOSE",
             ...(quickCheck ? ["ASK_TEAM"] : []),
+            "ASK_FORM",
           ],
         },
         userMessage: {
@@ -202,6 +219,11 @@ export class ExecutionLayer {
               },
             }
           : {}),
+        formJson: {
+          type: ["string", "null"],
+          description:
+            "JSON string of the FormSchema to render (for ASK_FORM step only). Must conform to the form-schema package shape.",
+        },
         rationale: {
           type: "string",
           description: "Explanation of why this step was chosen",
@@ -222,6 +244,7 @@ export class ExecutionLayer {
         "closeReason",
         "playbookFits",
         ...(quickCheck ? ["teamQuestion"] : []),
+        "formJson",
       ],
       additionalProperties: false,
     };
@@ -470,6 +493,39 @@ export class ExecutionLayer {
         }
       }
 
+      // Validate ASK_FORM step has a parseable FormSchema in formJson.
+      if (result.step === "ASK_FORM") {
+        if (!result.formJson) {
+          logger.warn({ rationale: result.rationale }, "Invalid ASK_FORM: missing formJson");
+          return null;
+        }
+        let parsedForm: unknown;
+        try {
+          parsedForm = JSON.parse(result.formJson);
+        } catch (error) {
+          logger.warn(
+            { error: error instanceof Error ? error.message : String(error) },
+            "Invalid ASK_FORM: formJson is not valid JSON",
+          );
+          return null;
+        }
+        const validated = formSchemaSchema.safeParse(parsedForm);
+        if (!validated.success) {
+          logger.warn(
+            { errors: validated.error.issues },
+            "Invalid ASK_FORM: formJson does not conform to FormSchema",
+          );
+          return null;
+        }
+        result.form = validated.data as FormSchema;
+        // ASK_FORM steps must not also try to send a chat message — the form
+        // itself is the prompt to the user.
+        if (result.userMessage) {
+          logger.warn("Removing userMessage from ASK_FORM step");
+          result.userMessage = undefined;
+        }
+      }
+
       // Validate that ASK and RESPOND steps have userMessage
       if ((result.step === "ASK" || result.step === "RESPOND") && !result.userMessage) {
         log.warn(
@@ -549,6 +605,18 @@ export class ExecutionLayer {
     );
     if (stageZeroResult) {
       return stageZeroResult;
+    }
+
+    // Link check (no LLM). Also before the intent exemption: a made-up link in
+    // a goodbye message is just as broken.
+    const linkResult = await this.applyLinkGuardrail(
+      result,
+      conversation,
+      customerLanguage,
+      options,
+    );
+    if (linkResult) {
+      return linkResult;
     }
 
     // Check if we should skip guardrail checks based on user intent
@@ -933,6 +1001,123 @@ export class ExecutionLayer {
   }
 
   /**
+   * Link check: every URL in the reply must come from the conversation context
+   * or the site index, or at least answer. A bad link gets one re-plan where
+   * the planner fixes it, drops it, or hands off (a link alone can go, but "go
+   * to our sales page" with no such page cannot be answered without it). A
+   * dead link that survives the re-plan hands off. Returns null to continue.
+   */
+  private async applyLinkGuardrail(
+    result: ExecutionResult,
+    conversation: Conversation,
+    customerLanguage?: string,
+    options: ExecuteOptions = {},
+  ): Promise<ExecutionResult | null> {
+    const response = result.userMessage;
+    if (!response || extractUrls(response).length === 0) {
+      return null;
+    }
+
+    const log = logger.child({
+      organizationId: conversation.organization_id,
+      conversationId: conversation.id,
+    });
+
+    let badLinks: BadLink[];
+    try {
+      const messages = await conversation.getMessages();
+      const { website, siteUrls } = await this.getLinkContext(conversation);
+      badLinks = await this.linkService.assessLinks({
+        response,
+        // Metadata carries tool outputs; the playbook and documents are messages.
+        contextTexts: messages.map(
+          (msg) => `${msg.content ?? ""}\n${JSON.stringify(msg.metadata ?? {})}`,
+        ),
+        siteUrls,
+        website,
+      });
+    } catch (error) {
+      // The check must never break a turn.
+      log.warn({ error }, "Link check failed, sending the reply unchecked");
+      return null;
+    }
+
+    if (badLinks.length === 0) {
+      return null;
+    }
+    result.badLinks = badLinks;
+
+    const retriesUsed = options.turnGuardrailState?.linkRetries ?? 0;
+    if (options.turnGuardrailState && retriesUsed < 1) {
+      options.turnGuardrailState.linkRetries++;
+
+      const list = badLinks
+        .map((link) =>
+          link.reason === "dead"
+            ? `${link.url} (does not exist)`
+            : `${link.url} (not a known page of the website)`,
+        )
+        .join("; ");
+      const plannerFeedback =
+        `Your previous response linked to: ${list}. Do not share a URL you did not find in ` +
+        `this conversation or get from find_page_url. Use find_page_url if it is available to ` +
+        `get the real page, or RESPOND without the link if the answer still helps the customer ` +
+        `without it. If the customer needs that page to continue and you have no real URL for ` +
+        `it, use HANDOFF.`;
+
+      log.warn({ badLinks }, "Link check: re-planning with corrective feedback");
+
+      const retryResult = await this.execute(conversation, customerLanguage, {
+        ...options,
+        plannerFeedback,
+      });
+      if (retryResult) {
+        retryResult.linkRetryAttempted = true;
+        return retryResult;
+      }
+    }
+
+    // After the re-plan only a proven dead link stops the reply: an unlisted
+    // page the planner kept on purpose may simply be missing from the sitemap.
+    const deadLinks = badLinks.filter((link) => link.reason === "dead");
+    if (deadLinks.length === 0) {
+      log.debug({ badLinks }, "Link check: keeping unlisted links after the re-plan");
+      return null;
+    }
+
+    log.warn({ deadLinks }, "Link check: dead link after the re-plan, handing off");
+    const confidenceConfig = await this.getConfidenceConfig(conversation);
+    const fallbackMessage = await this.composeContextualFallbackMessage(
+      conversation,
+      confidenceConfig.fallbackMessage,
+      customerLanguage,
+    );
+    return {
+      step: "HANDOFF",
+      userMessage: fallbackMessage,
+      handoff: {
+        reason: "Reply linked to a page that does not exist",
+        fields: { deadLinks: deadLinks.map((link) => link.url) },
+      },
+      badLinks,
+      linkRetryAttempted: retriesUsed > 0 || undefined,
+      originalMessage: response,
+    };
+  }
+
+  /** The organization's website and known page URLs, for the link check. */
+  private async getLinkContext(
+    conversation: Conversation,
+  ): Promise<{ website: string | null; siteUrls: string[] }> {
+    const { siteIndexService } = await import("@server/services/site-index.service");
+    const [website, siteUrls] = await Promise.all([
+      siteIndexService.resolveWebsite(conversation.organization_id),
+      siteIndexService.listUrls(conversation.organization_id),
+    ]);
+    return { website, siteUrls };
+  }
+
+  /**
    * Stage 1: Assess if response serves company interests
    */
   private async assessCompanyInterest(
@@ -1060,13 +1245,15 @@ export class ExecutionLayer {
       // Fetch full document entities in parallel
       const fetchedDocs = await Promise.all(
         conversation.document_ids.map((docId) =>
-          documentRepository.findById(docId).catch((error) => {
-            log.error(
-              { documentId: docId, err: error },
-              "Error fetching document for confidence assessment",
-            );
-            return null;
-          }),
+          documentRepository
+            .findByIdAndOrganization(docId, conversation.organization_id)
+            .catch((error) => {
+              log.error(
+                { documentId: docId, err: error },
+                "Error fetching document for confidence assessment",
+              );
+              return null;
+            }),
         ),
       );
 
@@ -1305,10 +1492,9 @@ export class ExecutionLayer {
         (result) => (result.similarity || 0) > similarityThreshold,
       );
 
-      return filteredResults.map((result) => ({
-        id: result.documentId,
-        similarity: result.similarity || 0,
-      }));
+      return filteredResults.flatMap((result) =>
+        result.documentId ? [{ id: result.documentId, similarity: result.similarity || 0 }] : [],
+      );
     } catch (error) {
       log.error({ err: error }, "Error in relaxed retrieval");
       return [];
@@ -1374,7 +1560,11 @@ export class ExecutionLayer {
     const selectedIds = documentIds.slice(-MAX_KNOWLEDGE_DOCUMENTS);
 
     const documents = await Promise.all(
-      selectedIds.map((docId) => documentRepository.findById(docId).catch(() => null)),
+      selectedIds.map((docId) =>
+        documentRepository
+          .findByIdAndOrganization(docId, conversation.organization_id)
+          .catch(() => null),
+      ),
     );
 
     const blocks = documents

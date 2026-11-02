@@ -5,7 +5,7 @@
  * base64 in a JSON body get more room: staff uploads (documents, avatars,
  * logos, conversation attachments, transcript imports) and plugin callbacks
  * (channel media) up to 50 MB, the public widget enough for one attachment,
- * and plugin webhooks/proxy calls for provider payloads.
+ * and plugin proxy calls (including provider webhooks) for provider payloads.
  */
 
 export const DEFAULT_BODY_LIMIT = "1mb";
@@ -35,7 +35,7 @@ export function bodyLimitForPath(path: string): string {
   if (path.startsWith("/v1/plugin-api/")) {
     return UPLOAD_BODY_LIMIT;
   }
-  if (path.startsWith("/v1/plugins/") || path.startsWith("/plugins/webhooks/")) {
+  if (path.startsWith("/v1/plugins/")) {
     return PLUGIN_BODY_LIMIT;
   }
   if (path.startsWith("/v1/")) {
