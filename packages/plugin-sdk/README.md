@@ -631,12 +631,16 @@ The runner is used by Hay Core to execute plugins in isolated worker processes.
 ### Command Line
 
 ```bash
-node runner/index.js \
+HAY_WORKER_SECRET=<random secret> node runner/index.js \
   --plugin-path ./examples/stripe \
   --org-id org_123 \
   --port 3100 \
   --mode production
 ```
+
+The worker listens on `127.0.0.1` only. In production mode it requires
+`HAY_WORKER_SECRET` (core mints one per worker) and rejects any request that
+does not send it in the `x-hay-worker-secret` header. Test mode runs without it.
 
 ### Options
 
@@ -666,7 +670,7 @@ Uses mock data for standalone testing without Hay Core.
 The runner exposes a `/metadata` endpoint that returns plugin metadata:
 
 ```bash
-curl http://localhost:3100/metadata
+curl http://127.0.0.1:3100/metadata
 ```
 
 Response:

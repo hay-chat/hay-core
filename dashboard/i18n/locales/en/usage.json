@@ -69,6 +69,7 @@
       "excluded": "Resolution excluded",
       "sentForReview": "Sent to Hay.chat for review",
       "failed": "Could not exclude the resolution"
-    }
+    },
+    "manageBilling": "Manage billing"
   }
 }

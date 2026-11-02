@@ -155,7 +155,10 @@ function sanitizeAttributes(element: Element): void {
 
     // Sanitize href and src attributes
     if (attrName === "href" || attrName === "src") {
-      const value = attr.value.toLowerCase().trim();
+      // Browsers ignore whitespace and control characters inside a URL scheme
+      // ("java\tscript:"), so drop them before checking it.
+      // eslint-disable-next-line no-control-regex
+      const value = attr.value.replace(/[\u0000-\u0020]/g, "").toLowerCase();
 
       // Remove dangerous protocols
       if (

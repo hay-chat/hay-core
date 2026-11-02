@@ -37,6 +37,8 @@ export interface HayPluginManifest {
     handler: string;
   }>;
   trpcRouter?: string;
+  /** Hosts a server-managed OAuth client secret may be sent to (exact or `*.suffix`). */
+  oauthHosts?: string[];
   services?: Array<{
     name: string;
     path: string;
@@ -87,12 +89,6 @@ export interface HayPluginManifest {
     };
     chat_connector?: {
       type: "webhook" | "polling" | "websocket";
-      webhooks?: Array<{
-        path: string;
-        method: "GET" | "POST" | "PUT" | "DELETE";
-        verificationToken?: boolean;
-        signatureHeader?: string;
-      }>;
       publicDirectory?: string;
       realtime?: {
         type: "websocket" | "sse";
@@ -200,11 +196,7 @@ export interface MCPToolDefinition {
 export interface LocalMCPServerConfig {
   serverId: string;
   serverPath: string;
-  startCommand: string;
-  installCommand?: string;
-  buildCommand?: string;
   tools?: MCPToolDefinition[]; // Optional - will be discovered from MCP server via listTools()
-  env?: Record<string, string>;
 }
 
 /**

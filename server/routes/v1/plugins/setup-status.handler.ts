@@ -4,8 +4,10 @@ import { pluginManagerService } from "@server/services/plugin-manager.service";
 import { pluginInstanceRepository } from "@server/repositories/plugin-instance.repository";
 import { getPluginRunnerService } from "@server/services/plugin-runner.service";
 import { resolveConfigForWorker } from "@server/lib/config-resolver";
+import { configEnvAllowList } from "@server/lib/plugin-env";
 import type { ConfigFieldDescriptor, PluginMetadata } from "@server/types/plugin-sdk.types";
 import { createLogger } from "@server/lib/logger";
+import { workerFetch } from "@server/lib/worker-client";
 
 const logger = createLogger("plugins");
 
@@ -45,13 +47,14 @@ export const getSetupStatus = authenticatedProcedure
         instance.config,
         instance.authState,
         (metadata.configSchema ?? {}) as Record<string, ConfigFieldDescriptor>,
+        configEnvAllowList(plugin),
       );
       const runner = getPluginRunnerService();
       const worker =
         runner.getWorker(ctx.organizationId!, input.pluginId) ??
         (await runner.startWorker(ctx.organizationId!, input.pluginId));
 
-      const response = await fetch(`http://localhost:${worker.port}/setup/status`, {
+      const response = await workerFetch(worker.port, "/setup/status", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ config, authState: instance.authState ?? null }),

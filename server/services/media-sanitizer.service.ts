@@ -132,6 +132,15 @@ async function reencodeImage(buffer: Buffer, mimeType: string): Promise<Buffer> 
   }
 }
 
+async function reencodeOrReject(buffer: Buffer, mimeType: string): Promise<SanitizedMedia> {
+  try {
+    return { buffer: await reencodeImage(buffer, mimeType), mimeType };
+  } catch (error) {
+    if (error instanceof MediaRejectedError) throw error;
+    throw new MediaRejectedError(`Image could not be processed (${mimeType})`);
+  }
+}
+
 export async function sanitizeConversationMedia(
   buffer: Buffer,
   declaredMimeType: string,
@@ -142,10 +151,18 @@ export async function sanitizeConversationMedia(
     return { buffer, mimeType };
   }
 
-  try {
-    return { buffer: await reencodeImage(buffer, mimeType), mimeType };
-  } catch (error) {
-    if (error instanceof MediaRejectedError) throw error;
-    throw new MediaRejectedError(`Image could not be processed (${mimeType})`);
+  return reencodeOrReject(buffer, mimeType);
+}
+
+/**
+ * Images for public folders (logos, avatars, document images): raster only,
+ * detected from content and re-encoded. SVG and anything else is refused, as
+ * these files are served from a public URL under our origin.
+ */
+export async function sanitizePublicImage(buffer: Buffer): Promise<SanitizedMedia> {
+  const detected = await FileType.fromBuffer(buffer);
+  if (!detected || !REENCODED_IMAGE_TYPES.has(detected.mime)) {
+    throw new MediaRejectedError("Only JPEG, PNG, GIF or WebP images are allowed");
   }
+  return reencodeOrReject(buffer, detected.mime);
 }

@@ -2,7 +2,7 @@ import { In, Repository, SelectQueryBuilder } from "typeorm";
 import type { QueryDeepPartialEntity } from "typeorm";
 import { Customer } from "../database/entities/customer.entity";
 import { AppDataSource } from "../database/data-source";
-import { BaseRepository } from "./base.repository";
+import { BaseRepository, assertSafeIdentifier } from "./base.repository";
 import type { ListParams } from "../trpc/middleware/pagination";
 import { createLogger } from "@server/lib/logger";
 
@@ -150,6 +150,7 @@ export class CustomerRepository extends BaseRepository<Customer> {
     // Add base where conditions if provided
     if (baseWhere) {
       Object.entries(baseWhere).forEach(([key, value], index) => {
+        assertSafeIdentifier(key, "baseWhere column");
         queryBuilder.andWhere(`entity.${key} = :baseWhere${index}`, {
           [`baseWhere${index}`]: value,
         });
@@ -179,7 +180,10 @@ export class CustomerRepository extends BaseRepository<Customer> {
 
     // Apply select fields if specified
     if (listParams.select && listParams.select.length > 0) {
-      const selectFields = listParams.select.map((field: string) => `entity.${field}`);
+      const selectFields = listParams.select.map((field: string) => {
+        assertSafeIdentifier(field, "select field");
+        return `entity.${field}`;
+      });
       queryBuilder.select(selectFields);
     }
 
@@ -247,7 +251,10 @@ export class CustomerRepository extends BaseRepository<Customer> {
     const searchFields = search.searchFields || ["name", "email", "external_id"];
 
     const searchConditions = searchFields
-      .map((field, index) => `entity.${field} ILIKE :searchQuery${index}`)
+      .map((field, index) => {
+        assertSafeIdentifier(field, "search field");
+        return `entity.${field} ILIKE :searchQuery${index}`;
+      })
       .join(" OR ");
 
     if (searchConditions) {
@@ -283,6 +290,7 @@ export class CustomerRepository extends BaseRepository<Customer> {
           break;
         default:
           // Try to apply generic relation
+          assertSafeIdentifier(relation, "relation name");
           try {
             queryBuilder.leftJoinAndSelect(`entity.${relation}`, relation);
           } catch (error) {
