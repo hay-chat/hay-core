@@ -4,7 +4,8 @@ import { server } from "./server.js";
 import dotenv from "dotenv";
 
 // Load environment variables
-dotenv.config();
+// quiet: dotenv 17+ otherwise logs to stdout, which would corrupt the JSON-RPC stream.
+dotenv.config({ quiet: true });
 
 // Note: Use console.error() for logging in stdio MCP servers (stdout is reserved for JSON-RPC)
 console.error("Starting Zendesk API MCP server...");

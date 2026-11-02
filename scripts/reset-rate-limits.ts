@@ -14,7 +14,7 @@ import Redis from "ioredis";
 import dotenv from "dotenv";
 import path from "path";
 
-dotenv.config({ path: path.resolve(__dirname, "../.env") });
+dotenv.config({ path: path.resolve(__dirname, "../.env"), quiet: true });
 
 const RATE_LIMIT_PATTERNS = ["rate_limit:*", "ratelimit:*"];
 
