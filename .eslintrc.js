@@ -214,6 +214,10 @@ module.exports = {
         useToast: "readonly",
         useDomain: "readonly",
         usePagination: "readonly",
+        useExternalLink: "readonly",
+        SETTINGS_NAV: "readonly",
+        isSettingsTabActive: "readonly",
+        visibleSettingsTabs: "readonly",
         // Node.js types
         NodeJS: "readonly",
       },
