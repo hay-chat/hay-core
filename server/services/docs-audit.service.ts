@@ -409,8 +409,7 @@ Score from 0-100 based on how well the documentation covers the product's featur
         ...response.coveredTopics.map(
           (t: { topic: string; coveredBy: string[]; adequacy: string }) => ({
             type: (t.adequacy === "well_covered" ? "positive" : "suggestion") as
-              | "positive"
-              | "suggestion",
+              "positive" | "suggestion",
             title: t.adequacy === "well_covered" ? `${t.topic}` : `${t.topic} (partial)`,
             detail:
               t.adequacy === "well_covered"

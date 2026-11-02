@@ -9,10 +9,7 @@
 export type EvidenceLocale = "en" | "pt-BR";
 
 export type EvidenceTemplate =
-  | "generic"
-  | "item_not_received"
-  | "not_as_described"
-  | "cancelled_credit";
+  "generic" | "item_not_received" | "not_as_described" | "cancelled_credit";
 
 export const EVIDENCE_TEMPLATES: readonly EvidenceTemplate[] = [
   "generic",

@@ -223,8 +223,7 @@ export const documentsRouter = t.router({
       let processedContent = input.content;
       let metadata: Record<string, unknown> = {};
       let attachments:
-        | Array<{ type: string; url: string; name: string; size?: number }>
-        | undefined;
+        Array<{ type: string; url: string; name: string; size?: number }> | undefined;
 
       // Editor documents are rendered as HTML, so their content is always sanitized
       const isEditorAuthored = !!input.contentJson;

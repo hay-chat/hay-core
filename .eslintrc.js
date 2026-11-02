@@ -23,12 +23,13 @@ module.exports = {
         argsIgnorePattern: "^_",
         varsIgnorePattern: "^_",
         caughtErrorsIgnorePattern: "^_",
+        caughtErrors: "none", // typescript-eslint 8 defaults to "all"
       },
     ],
     "@typescript-eslint/no-explicit-any": "error",
     "@typescript-eslint/explicit-module-boundary-types": "off",
     "@typescript-eslint/no-non-null-assertion": "off",
-    "@typescript-eslint/no-var-requires": "off",
+    "@typescript-eslint/no-require-imports": "off",
     "@typescript-eslint/ban-ts-comment": "off",
     "@typescript-eslint/no-empty-interface": "off",
     "@typescript-eslint/no-empty-function": "off",
@@ -52,7 +53,7 @@ module.exports = {
         sourceType: "module",
         extraFileExtensions: [".vue"],
       },
-      extends: ["plugin:vue/vue3-recommended", "plugin:@typescript-eslint/recommended", "prettier"],
+      extends: ["plugin:vue/recommended", "plugin:@typescript-eslint/recommended", "prettier"],
       plugins: ["vue"],
       rules: {
         // Match base config: any and unused vars are errors (consistent with server files)
@@ -63,6 +64,7 @@ module.exports = {
             argsIgnorePattern: "^_",
             varsIgnorePattern: "^_",
             caughtErrorsIgnorePattern: "^_",
+            caughtErrors: "none", // typescript-eslint 8 defaults to "all"
           },
         ],
 
@@ -89,7 +91,7 @@ module.exports = {
         "vue/require-default-prop": "off",
         "vue/no-multiple-template-root": "off",
         "vue/no-setup-props-destructure": "off",
-        "vue/component-tags-order": [
+        "vue/block-order": [
           "error",
           {
             order: ["template", "script", "style"],
@@ -230,23 +232,20 @@ module.exports = {
         defineI18nConfig: "readonly",
       },
       rules: {
-        "@typescript-eslint/no-var-requires": "off",
+        "@typescript-eslint/no-require-imports": "off",
       },
     },
     // Server TypeScript files
     {
       files: ["server/**/*.ts", "server/**/*.js"],
       rules: {
-        "@typescript-eslint/no-var-requires": "off",
+        "@typescript-eslint/no-require-imports": "off",
         "no-console": "error", // Use createLogger() from @server/lib/logger instead
       },
     },
     // Server scripts and migrations (CLI tools, not app code)
     {
-      files: [
-        "server/scripts/**/*.ts",
-        "server/database/migrations/**/*.ts",
-      ],
+      files: ["server/scripts/**/*.ts", "server/database/migrations/**/*.ts"],
       rules: {
         "no-console": "off", // CLI tools can use console directly
       },
@@ -255,7 +254,7 @@ module.exports = {
     {
       files: ["*.config.js", "*.config.ts", ".eslintrc.js"],
       rules: {
-        "@typescript-eslint/no-var-requires": "off",
+        "@typescript-eslint/no-require-imports": "off",
       },
     },
     // Test files
