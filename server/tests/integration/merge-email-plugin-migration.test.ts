@@ -69,7 +69,6 @@ describe("MergeEmailPluginIntoEmailInbox1785300000000", () => {
   const cleanup = async () => {
     await q(`DELETE FROM conversations WHERE organization_id = ANY($1)`, [orgs]);
     await q(`DELETE FROM playbooks WHERE organization_id = ANY($1)`, [orgs]);
-    await q(`DELETE FROM agents WHERE organization_id = ANY($1)`, [orgs]);
     await q(`DELETE FROM plugin_instances WHERE organization_id = ANY($1)`, [orgs]);
     await q(`DELETE FROM plugin_registry WHERE plugin_id = $1`, [OLD]);
   };
@@ -226,17 +225,6 @@ describe("MergeEmailPluginIntoEmailInbox1785300000000", () => {
         ],
       )
     )[0].id;
-    const agent = (
-      await q<{ id: string }>(
-        `INSERT INTO agents (name, organization_id, instructions, human_handoff_available_instructions)
-         VALUES ('Agent', $1, $2, $3::jsonb) RETURNING id`,
-        [
-          onlyOldOrg,
-          "call hay-plugin-email:send-email",
-          JSON.stringify(chip("hay-plugin-email:send-email")),
-        ],
-      )
-    )[0].id;
     const conversation = (
       await q<{ id: string }>(
         `INSERT INTO conversations (title, organization_id, enabled_tools)
@@ -256,13 +244,6 @@ describe("MergeEmailPluginIntoEmailInbox1785300000000", () => {
     expect(pb.prompt_template).toBe(
       "Use <<action:hay-channel-email:send-email>> then <<action:hay-plugin-email:healthcheck>>",
     );
-
-    const [ag] = await q<{ instructions: string; human_handoff_available_instructions: unknown }>(
-      `SELECT instructions, human_handoff_available_instructions FROM agents WHERE id = $1`,
-      [agent],
-    );
-    expect(ag.instructions).toBe("call hay-channel-email:send-email");
-    expect(ag.human_handoff_available_instructions).toEqual(chip("hay-channel-email:send-email"));
 
     const [conv] = await q<{ enabled_tools: string[] }>(
       `SELECT enabled_tools FROM conversations WHERE id = $1`,

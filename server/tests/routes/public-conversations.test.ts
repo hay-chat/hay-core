@@ -51,7 +51,6 @@ jest.mock("@server/repositories/organization.repository", () => ({
 jest.mock("@server/repositories/webchat-settings.repository", () => ({
   webchatSettingsRepository: {},
 }));
-jest.mock("@server/repositories/agent.repository", () => ({ agentRepository: {} }));
 jest.mock("@server/services/storage.service", () => ({ storageService: {} }));
 
 const mockIsEnabled = jest.fn<(orgId: string) => Promise<boolean>>();

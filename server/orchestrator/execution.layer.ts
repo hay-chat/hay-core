@@ -262,7 +262,6 @@ export class ExecutionLayer {
     try {
       log.debug(
         {
-          agentId: conversation.agent_id,
           playbookId: conversation.playbook_id,
           enabledTools: conversation.enabled_tools,
           customerLanguage,

@@ -7,7 +7,7 @@
  *   conversations.jsonl / conversations.csv
  *   messages.jsonl      / messages.csv
  *   customers.jsonl     / customers.csv
- *   documents.jsonl, playbooks.jsonl, playbook_versions.jsonl, agents.jsonl,
+ *   documents.jsonl, playbooks.jsonl, playbook_versions.jsonl,
  *   webchat_settings.jsonl, business_hours.jsonl, organization.json, README.txt
  *   attachments.jsonl + attachments/<upload id>-<name>: the chat files still stored
  *
@@ -63,7 +63,7 @@ interface ExportTable {
 const EXPORT_TABLES: ExportTable[] = [
   {
     name: "conversations",
-    select: `c.id, c.title, c.channel, c.status, c.language, c.customer_id, c.agent_id,
+    select: `c.id, c.title, c.channel, c.status, c.language, c.customer_id,
       c.playbook_id, c.assigned_user_id, c.summary, c.resolution_metadata, c.metadata,
       c.created_at, c.updated_at, c.last_message_at, c.closed_at, c.ended_at,
       c.handed_off_at, c.spam_flagged_at, c.spam_reason`,
@@ -77,7 +77,6 @@ const EXPORT_TABLES: ExportTable[] = [
       "title",
       "language",
       "customer_id",
-      "agent_id",
       "assigned_user_id",
       "last_message_at",
       "closed_at",
@@ -123,12 +122,6 @@ const EXPORT_TABLES: ExportTable[] = [
     from: `playbook_versions pv JOIN playbooks p ON p.id = pv.playbook_id
       WHERE p.organization_id = $1`,
     key: "pv.id",
-  },
-  {
-    name: "agents",
-    select: `a.*`,
-    from: `agents a WHERE a.organization_id = $1`,
-    key: "a.id",
   },
   {
     name: "webchat_settings",
@@ -504,6 +497,9 @@ export class OrganizationExportService {
     const [row] = (await AppDataSource.query(
       `SELECT id, name, slug, description, about, website, contact_email, default_language, timezone,
               date_format, time_format, settings,
+              assistant_name, assistant_description, assistant_instructions, assistant_tone,
+              assistant_avoid, initial_greeting, human_handoff_available_instructions,
+              human_handoff_unavailable_instructions, human_handoff_unavailable_ticket,
               created_at
          FROM organizations WHERE id = $1`,
       [organizationId],
@@ -581,7 +577,7 @@ export function readme(generatedAt: Date, counts: Record<string, number>): strin
     "Everything your organization keeps in Hay.chat. Each .jsonl file has one JSON",
     "object per line; the .csv files hold the main columns for spreadsheets.",
     "Times are UTC. Ids link the files together (messages.conversation_id,",
-    "conversations.customer_id, conversations.agent_id, playbook_versions.playbook_id).",
+    "conversations.customer_id, playbook_versions.playbook_id).",
     "",
     "Files:",
     ...EXPORT_TABLES.map(

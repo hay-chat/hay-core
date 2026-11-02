@@ -84,7 +84,6 @@ function makeConversation(silentForMs: number, withWarning = false) {
     title: "Order status",
     playbook_id: null,
     created_at: new Date(Date.now() - silentForMs - 60_000),
-    agent: { enabled: true },
     organization: { suspendedAt: null, agentPausedAt: null },
     getMessages: async () => messages,
     getPublicMessages: async () => messages,
@@ -128,7 +127,7 @@ describe("checkInactivity", () => {
 
   it.each([
     ["assigned to a human", { assigned_user_id: "user-1" }],
-    ["with the agent switched off", { agent: { enabled: false } }],
+    ["with the AI paused by the owner", { organization: { aiPausedAt: new Date() } }],
     ["with the organization paused", { organization: { agentPausedAt: new Date() } }],
   ])("does not nudge a conversation %s", async (_label, changes) => {
     given(makeConversation(WARN_AT), changes);
@@ -152,8 +151,8 @@ describe("checkInactivity", () => {
     expect(closedAsResolved()).toBe(false);
   });
 
-  it("does not close while the agent is switched off", async () => {
-    given(makeConversation(CLOSE_AT, true), { agent: { enabled: false } });
+  it("does not close while the AI is paused", async () => {
+    given(makeConversation(CLOSE_AT, true), { organization: { aiPausedAt: new Date() } });
 
     await new Orchestrator().checkInactivity();
 
@@ -175,10 +174,10 @@ describe("checkInactivity", () => {
     expect(mockEnqueue).not.toHaveBeenCalled();
   });
 
-  it("drops the closing message and keeps the conversation open when the agent is paused meanwhile", async () => {
+  it("drops the closing message and keeps the conversation open when the AI is paused meanwhile", async () => {
     given(makeConversation(CLOSE_AT));
     mockInvoke.mockImplementationOnce(async () => {
-      row = { ...row, agent: { enabled: false } };
+      row = { ...row, organization: { aiPausedAt: new Date() } };
       return "I'll close this conversation now.";
     });
 

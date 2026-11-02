@@ -120,7 +120,6 @@ export function clientConversationMetadata(
 
 const createConversationSchema = z.object({
   title: z.string().min(1).max(255).optional(),
-  agentId: z.string().uuid().optional(),
   language: z.string().max(35).optional(),
   metadata: z.record(z.unknown()).optional(),
   status: settableStatusSchema.optional(),
@@ -530,16 +529,6 @@ export const conversationsRouter = t.router({
         input.endDate ? new Date(input.endDate) : undefined,
       );
       return stats;
-    }),
-
-  listByAgent: scopedProcedure(RESOURCES.CONVERSATIONS, ACTIONS.READ)
-    .input(z.object({ agentId: z.string().uuid() }))
-    .query(async ({ ctx, input }) => {
-      const conversations = await conversationService.getConversationsByAgent(
-        ctx.organizationId!,
-        input.agentId,
-      );
-      return conversations;
     }),
 
   get: scopedProcedure(RESOURCES.CONVERSATIONS, ACTIONS.READ)

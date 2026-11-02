@@ -19,9 +19,9 @@ function toSupportedLanguage(value: string | null | undefined): SupportedLanguag
   return primary && SUPPORTED_LANGUAGE_VALUES.has(primary) ? (primary as SupportedLanguage) : null;
 }
 
-/** A customer or agent id given for a new conversation is not in its organization. */
+/** A customer id given for a new conversation is not in its organization. */
 export class ConversationReferenceNotFoundError extends Error {
-  constructor(kind: "Customer" | "Agent") {
+  constructor(kind: "Customer") {
     super(`${kind} not found`);
     this.name = "ConversationReferenceNotFoundError";
   }
@@ -42,7 +42,6 @@ export class ConversationService {
     organizationId: string,
     data: {
       title?: string;
-      agentId?: string | null;
       playbook_id?: string | null;
       metadata?: Record<string, unknown>;
       status?: ConversationStatus;
@@ -61,31 +60,8 @@ export class ConversationService {
       customerId = anonymousCustomer.id;
     }
 
-    // Determine agent_id: use provided, or fall back to organization's default agent, or first agent
-    let agentId = data.agentId || null;
-    if (agentId) {
-      const { agentRepository } = await import("../repositories/agent.repository");
-      if (!(await agentRepository.findByIdAndOrganization(agentId, organizationId))) {
-        throw new ConversationReferenceNotFoundError("Agent");
-      }
-    } else {
-      const { organizationRepository } = await import("../repositories/organization.repository");
-      const org = await organizationRepository.findById(organizationId);
-      if (org?.defaultAgentId) {
-        agentId = org.defaultAgentId;
-      } else {
-        // Fallback to first agent if no default is set
-        const { agentRepository } = await import("../repositories/agent.repository");
-        const agents = await agentRepository.findByOrganization(organizationId);
-        if (agents && agents.length > 0) {
-          agentId = agents[0].id;
-        }
-      }
-    }
-
     const conversation = await this.conversationRepository.create({
       title: data.title || "",
-      agent_id: agentId,
       playbook_id: data.playbook_id || null,
       organization_id: organizationId,
       status: data.status || "open",
@@ -104,7 +80,7 @@ export class ConversationService {
     if (data.status === "open" || data.status === "processing") {
       try {
         await conversation.addInitialSystemMessage();
-        await conversation.addInitialAgentInstructions();
+        await conversation.addInitialAssistantInstructions();
         await conversation.addInitialBotMessage();
       } catch (error) {
         logger.warn(
@@ -121,7 +97,6 @@ export class ConversationService {
       organizationId,
       conversationId: conversation.id,
       metadata: {
-        agentId,
         customerId,
         status: data.status || "open",
         language: data.language,
@@ -141,10 +116,6 @@ export class ConversationService {
     return await this.conversationRepository.findByOrganization(organizationId);
   }
 
-  async getConversationsByAgent(organizationId: string, agentId: string): Promise<Conversation[]> {
-    return await this.conversationRepository.findByAgent(agentId, organizationId);
-  }
-
   async getConversation(
     conversationId: string,
     organizationId: string,
@@ -153,10 +124,12 @@ export class ConversationService {
     if (!conversation || conversation.organization_id !== organizationId) {
       return null;
     }
-    // Surface a usable avatar URL for the conversation's agent (the entity only
-    // carries the raw upload record). Lets the dashboard render the agent avatar.
-    if (conversation.agent?.avatarUpload) {
-      conversation.agent.avatarUrl = new StorageService().getUrl(conversation.agent.avatarUpload);
+    // Surface a usable URL for the assistant's avatar (the entity only carries
+    // the raw upload record), so the dashboard can show it on AI messages.
+    if (conversation.organization?.assistantAvatarUpload) {
+      conversation.organization.assistantAvatarUrl = new StorageService().getUrl(
+        conversation.organization.assistantAvatarUpload,
+      );
     }
     return conversation;
   }
@@ -169,7 +142,6 @@ export class ConversationService {
       status?: ConversationStatus;
       needs_processing?: boolean;
       last_processed_at?: Date | null;
-      agent_id?: string | null;
       cooldown_until?: Date | null;
       processing_locked_until?: Date | null;
       processing_locked_by?: string | null;

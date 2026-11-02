@@ -39,10 +39,6 @@ jest.mock("@server/repositories/conversation.repository", () => ({
 jest.mock("@server/repositories/customer.repository", () => ({
   CustomerRepository: jest.fn(() => ({})),
 }));
-jest.mock("@server/repositories/agent.repository", () => ({
-  AgentRepository: jest.fn(() => ({})),
-  agentRepository: {},
-}));
 
 type OrgRow = { isActive: boolean; suspendedAt: Date | null } | null;
 const mockFindOrg = jest.fn<(id: string) => Promise<OrgRow>>();

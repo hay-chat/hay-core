@@ -12,7 +12,6 @@ jest.mock("@server/repositories/conversation.repository", () => ({
   conversationRepository: { findById: mockFindById, update: mockUpdate },
 }));
 jest.mock("@server/repositories/playbook.repository", () => ({ playbookRepository: {} }));
-jest.mock("@server/repositories/agent.repository", () => ({ agentRepository: {} }));
 jest.mock("@server/repositories/user.repository", () => ({ userRepository: {} }));
 jest.mock("@server/services/conversation-secret.service", () => ({
   conversationSecretService: {},
@@ -50,7 +49,6 @@ import { runConversation } from "../../orchestrator/run";
 
 const ORG_ID = "11111111-1111-4111-8111-111111111111";
 const CONVERSATION_ID = "22222222-2222-4222-8222-222222222222";
-const AGENT_ID = "33333333-3333-4333-8333-333333333333";
 
 const conversation = (overrides: Record<string, unknown>) => ({
   id: CONVERSATION_ID,
@@ -59,8 +57,6 @@ const conversation = (overrides: Record<string, unknown>) => ({
     suspendedAt: null,
     settings: { channelAiModes: { whatsapp: "off", email: "drafts" } },
   },
-  agent_id: AGENT_ID,
-  agent: { id: AGENT_ID, enabled: true },
   channel: "whatsapp",
   metadata: {},
   title: "Where is my order?",

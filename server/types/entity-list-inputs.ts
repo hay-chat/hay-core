@@ -12,7 +12,6 @@ export const documentFiltersSchema = z
     type: z.nativeEnum(DocumentationType).optional(),
     status: z.nativeEnum(DocumentationStatus).optional(),
     visibility: z.nativeEnum(DocumentVisibility).optional(),
-    agentId: z.string().uuid().optional(),
     playbookId: z.string().uuid().optional(),
   })
   .optional();
@@ -55,7 +54,6 @@ export const conversationFiltersSchema = z
         "closed",
       ])
       .optional(),
-    agentId: z.string().uuid().optional(),
     playbookId: z.string().uuid().optional(),
     hasMessages: z.boolean().optional(),
   })
@@ -82,40 +80,10 @@ export const conversationListInputSchema = baseListInputSchema.extend({
     .optional(),
 });
 
-// Agent-specific filters
-export const agentFiltersSchema = z
-  .object({
-    enabled: z.boolean().optional(),
-    hasPlaybooks: z.boolean().optional(),
-  })
-  .optional();
-
-// Agent list input schema
-export const agentListInputSchema = baseListInputSchema.extend({
-  filters: agentFiltersSchema,
-  sorting: z
-    .object({
-      orderBy: z.enum(["created_at", "updated_at", "name", "enabled"]).default("created_at"),
-      orderDirection: z.enum(["asc", "desc"]).default("desc"),
-    })
-    .optional()
-    .default({}),
-  search: z
-    .object({
-      query: z.string().optional(),
-      searchFields: z
-        .array(z.enum(["name", "description"]))
-        .optional()
-        .default(["name", "description"]),
-    })
-    .optional(),
-});
-
 // Playbook-specific filters
 export const playbookFiltersSchema = z
   .object({
     status: z.enum(["active", "inactive", "draft"]).optional(),
-    agentIds: z.array(z.string().uuid()).optional(),
   })
   .optional();
 
@@ -173,6 +141,5 @@ export const messageListInputSchema = baseListInputSchema.extend({
 // Type exports
 export type DocumentListInput = z.infer<typeof documentListInputSchema>;
 export type ConversationListInput = z.infer<typeof conversationListInputSchema>;
-export type AgentListInput = z.infer<typeof agentListInputSchema>;
 export type PlaybookListInput = z.infer<typeof playbookListInputSchema>;
 export type MessageListInput = z.infer<typeof messageListInputSchema>;

@@ -11,7 +11,6 @@ import {
 } from "typeorm";
 import { Organization } from "../../entities/organization.entity";
 import { User } from "../../entities/user.entity";
-import { Agent } from "./agent.entity";
 import { Message } from "./message.entity";
 import { Customer } from "./customer.entity";
 import { MessageType, MessageStatus, type MessageAttachment } from "./message.entity";
@@ -152,13 +151,6 @@ export class Conversation {
     reason: string;
   } | null;
 
-  @Column({ type: "uuid", nullable: true })
-  agent_id!: string | null;
-
-  @ManyToOne(() => Agent, { onDelete: "SET NULL", nullable: true })
-  @JoinColumn()
-  agent!: Agent | null;
-
   @Column({ type: "uuid" })
   organization_id!: string;
 
@@ -286,31 +278,6 @@ export class Conversation {
   async unlock(lockerId: string): Promise<void> {
     const { conversationRepository } = await import("../../repositories/conversation.repository");
     await conversationRepository.releaseLock(this.id, lockerId);
-  }
-
-  async updateAgent(agentId: string): Promise<void> {
-    const { agentRepository } = await import("../../repositories/agent.repository");
-
-    const { conversationRepository } = await import("../../repositories/conversation.repository");
-
-    const agent = await agentRepository.findById(agentId);
-    this.agent_id = agentId;
-
-    let content = "";
-
-    content += `You are the agent: ${agent?.name}`;
-    content += `\nYour tone should be: ${agent?.tone}`;
-    content += `\nYou should avoid: ${agent?.avoid}`;
-    content += `\nHere are some general instructions: ${agent?.instructions}`;
-
-    await this.addMessage({
-      content,
-      type: "System",
-    });
-
-    await conversationRepository.update(this.id, this.organization_id, {
-      agent_id: agentId,
-    });
   }
 
   async updatePlaybook(playbookId: string): Promise<void> {
@@ -996,11 +963,9 @@ The following tools are available for you to use. You MUST return only valid JSO
       messageData.type === MessageType.BOT_AGENT ||
       messageData.type === MessageType.PRODUCT_RECOMMENDATION
     ) {
-      // Get agent and organization to check test mode
-      const { agentRepository } = await import("../../repositories/agent.repository");
+      // Get the organization to check test mode
       const { organizationRepository } = await import("../../repositories/organization.repository");
 
-      const agent = this.agent_id ? await agentRepository.findById(this.agent_id) : null;
       const organization = await organizationRepository.findById(this.organization_id);
 
       // Where AI was processed for this reply (D14-5), shown in the dashboard debug view.
@@ -1011,15 +976,8 @@ The following tools are available for you to use. You MUST return only valid JSO
       const messages = await this.getMessages();
       const hasCustomerMessages = messages.some((msg) => msg.type === MessageType.CUSTOMER);
 
-      // Determine if test mode is enabled
-      let testModeEnabled = false;
-      if (agent && agent.testMode !== null && agent.testMode !== undefined) {
-        // Agent has explicit test mode setting
-        testModeEnabled = agent.testMode;
-      } else if (organization && organization.settings?.testModeDefault) {
-        // Fall back to organization default
-        testModeEnabled = organization.settings.testModeDefault;
-      }
+      // Test mode (Require Approval) is an organization setting
+      const testModeEnabled = organization?.settings?.testModeDefault ?? false;
 
       // A channel set to "drafts only" (D14-7) queues every AI reply for a person
       // to approve, through the same gate as test mode.
@@ -1267,19 +1225,13 @@ Translated message:`;
   }
 
   async addInitialBotMessage(): Promise<Message> {
-    // Fetch the agent to get custom greeting
-    const { agentRepository } = await import("../../repositories/agent.repository");
+    // The assistant's custom greeting, if the organization set one
+    const { organizationRepository } = await import("../../repositories/organization.repository");
     const { PromptService } = await import("../../services/prompt.service");
     const promptService = PromptService.getInstance();
 
-    let greetingText = "Hello! How can I help you today?";
-
-    if (this.agent_id) {
-      const agent = await agentRepository.findById(this.agent_id);
-      if (agent?.initialGreeting) {
-        greetingText = agent.initialGreeting;
-      }
-    }
+    const organization = await organizationRepository.findById(this.organization_id);
+    let greetingText = organization?.initialGreeting || "Hello! How can I help you today?";
 
     // Determine the target language for this conversation
     const targetLanguage = await promptService["determineLanguage"]({
@@ -1301,63 +1253,22 @@ Translated message:`;
     });
   }
 
-  async addInitialAgentInstructions(): Promise<Message | null> {
-    // Return early if no agent assigned
-    if (!this.agent_id) {
-      logger.debug("No agent assigned, skipping agent instructions");
-      return null;
-    }
+  /** The organization's assistant persona (name, tone, avoid, instructions) as a system message. */
+  async addInitialAssistantInstructions(): Promise<Message | null> {
+    const { organizationRepository } = await import("../../repositories/organization.repository");
+    const { buildAssistantInstructions } = await import("../../services/assistant");
+    const organization = await organizationRepository.findById(this.organization_id);
+    const content = organization ? buildAssistantInstructions(organization) : null;
 
-    // Fetch agent details
-    const { agentRepository } = await import("../../repositories/agent.repository");
-    const agent = await agentRepository.findById(this.agent_id);
-
-    if (!agent) {
-      logger.warn({ agentId: this.agent_id }, "Agent not found, skipping instructions");
-      return null;
-    }
-
-    // Build agent instruction content (same format as updateAgent)
-    let content = "";
-
-    if (agent.name) {
-      content += `You are the agent: ${agent.name}`;
-    }
-
-    if (agent.tone) {
-      content += content ? `\n` : "";
-      content += `Your tone should be: ${agent.tone}`;
-    }
-
-    if (agent.avoid) {
-      content += content ? `\n` : "";
-      content += `You should avoid: ${agent.avoid}`;
-    }
-
-    // Handle Tiptap-formatted instructions
-    if (agent.instructions) {
-      const analysis = analyzeTiptapInstructions(toTiptapInstructions(agent.instructions));
-
-      if (analysis.formattedText) {
-        content += content ? `\n` : "";
-        content += `Here are some general instructions: ${analysis.formattedText}`;
-      }
-    }
-
-    // Skip if no content
     if (!content) {
-      logger.debug("Agent has no instructions to add");
+      logger.debug("Assistant has no instructions to add");
       return null;
     }
 
     return this.addMessage({
       content,
       type: "System",
-      metadata: {
-        isAgentInstructions: true,
-        agentId: agent.id,
-        agentName: agent.name,
-      },
+      metadata: { isAssistantInstructions: true },
     });
   }
 

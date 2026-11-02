@@ -5,7 +5,6 @@ import {
   WebchatTheme,
 } from "@server/database/entities/webchat-settings.entity";
 import { organizationRepository } from "@server/repositories/organization.repository";
-import { agentRepository } from "@server/repositories/agent.repository";
 import { storageService } from "@server/services/storage.service";
 import type { FormSchema } from "@hay/form-schema";
 import { formSchemaSchema } from "@hay/form-schema";
@@ -77,22 +76,11 @@ export class WebchatSettingsService {
     // Load organization with logo
     const organization = await organizationRepository.findById(organizationId);
 
-    // Load default agent with avatar
-    let agentName: string | null = null;
-    let agentAvatarUrl: string | null = null;
-
-    if (organization?.defaultAgentId) {
-      const agent = await agentRepository.findByIdAndOrganization(
-        organization.defaultAgentId,
-        organizationId,
-      );
-      if (agent) {
-        agentName = agent.name;
-        if (agent.avatarUpload) {
-          agentAvatarUrl = storageService.getUrl(agent.avatarUpload);
-        }
-      }
-    }
+    // The assistant's name and avatar (the widget falls back to its title)
+    const agentName = organization?.assistantName?.trim() || null;
+    const agentAvatarUrl = organization?.assistantAvatarUpload
+      ? storageService.getUrl(organization.assistantAvatarUpload)
+      : null;
 
     // Get organization logo URL
     const organizationLogoUrl = organization?.logoUpload

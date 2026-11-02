@@ -5,14 +5,12 @@ import { vectorStoreService } from "../../services/vector-store.service";
 import { ConversationService } from "../../services/conversation.service";
 import type { VectorChunk } from "../../services/vector-store.service";
 import { Organization } from "../../entities/organization.entity";
-import { Agent } from "../../database/entities/agent.entity";
 import { Conversation } from "../../database/entities/conversation.entity";
 import { MessageType } from "../../database/entities/message.entity";
 import { Customer } from "../../database/entities/customer.entity";
 
 describe("ConversationService - Cascade Delete Embeddings", () => {
   const testOrgId = "c5ce4567-e89b-12d3-a456-426614174000";
-  const testAgentId = "a9e14567-e89b-12d3-a456-426614174000";
   const testCustomerId = "c0574567-e89b-12d3-a456-426614174000";
   let conversationService: ConversationService;
 
@@ -40,18 +38,6 @@ describe("ConversationService - Cascade Delete Embeddings", () => {
       await orgRepo.save(testOrg);
     }
 
-    // Create test agent
-    const agentRepo = AppDataSource.getRepository(Agent);
-    const existingAgent = await agentRepo.findOne({ where: { id: testAgentId } });
-    if (!existingAgent) {
-      const testAgent = agentRepo.create({
-        id: testAgentId,
-        name: "Test Agent",
-        organization_id: testOrgId,
-      });
-      await agentRepo.save(testAgent);
-    }
-
     // Create test customer
     const customerRepo = AppDataSource.getRepository(Customer);
     const existingCustomer = await customerRepo.findOne({ where: { id: testCustomerId } });
@@ -72,9 +58,6 @@ describe("ConversationService - Cascade Delete Embeddings", () => {
 
     const conversationRepo = AppDataSource.getRepository(Conversation);
     await conversationRepo.delete({ organization_id: testOrgId });
-
-    const agentRepo = AppDataSource.getRepository(Agent);
-    await agentRepo.delete({ id: testAgentId });
 
     const customerRepo = AppDataSource.getRepository(Customer);
     await customerRepo.delete({ id: testCustomerId });
@@ -98,7 +81,6 @@ describe("ConversationService - Cascade Delete Embeddings", () => {
       // Create a conversation
       const conversation = await conversationService.createConversation(testOrgId, {
         title: "Test Conversation for Embedding Deletion",
-        agentId: testAgentId,
         customer_id: testCustomerId,
       });
 
@@ -167,7 +149,6 @@ describe("ConversationService - Cascade Delete Embeddings", () => {
       // Create a conversation
       const conversation = await conversationService.createConversation(testOrgId, {
         title: "Test Org Mismatch",
-        agentId: testAgentId,
         customer_id: testCustomerId,
       });
 
@@ -186,7 +167,6 @@ describe("ConversationService - Cascade Delete Embeddings", () => {
       // Create a conversation without any embeddings
       const conversation = await conversationService.createConversation(testOrgId, {
         title: "Conversation Without Embeddings",
-        agentId: testAgentId,
         customer_id: testCustomerId,
       });
 
@@ -199,7 +179,6 @@ describe("ConversationService - Cascade Delete Embeddings", () => {
       // Create a conversation
       const conversation = await conversationService.createConversation(testOrgId, {
         title: "Multi-Message Conversation",
-        agentId: testAgentId,
         customer_id: testCustomerId,
       });
 

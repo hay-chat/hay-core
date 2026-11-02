@@ -34,12 +34,6 @@ export class DocumentRepository extends BaseRepository<Document> {
       });
     }
 
-    if (filters.agentId) {
-      queryBuilder.andWhere("entity.agentId = :agentId", {
-        agentId: filters.agentId,
-      });
-    }
-
     if (filters.playbookId) {
       queryBuilder.andWhere("entity.playbookId = :playbookId", {
         playbookId: filters.playbookId,

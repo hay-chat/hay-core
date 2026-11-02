@@ -19,7 +19,7 @@ export const RESOURCES = {
   EMBEDDINGS: "embeddings",
 
   // AI & Automation
-  AGENTS: "agents",
+  ASSISTANT: "assistant",
   PLAYBOOKS: "playbooks",
   SOURCES: "sources",
 
@@ -62,7 +62,7 @@ export const ACTIONS = {
 
   // Extended operations
   MANAGE: "manage", // Full control (create, read, update, delete)
-  EXECUTE: "execute", // Run or trigger (for agents, playbooks, etc.)
+  EXECUTE: "execute", // Run or trigger (playbooks, etc.)
   PUBLISH: "publish", // Publish content (playbooks, etc.)
   INVITE: "invite", // Invite users
   EXPORT: "export", // Export data
@@ -125,7 +125,7 @@ export const VIEWER_SCOPES = [
   buildScope(RESOURCES.MESSAGES, ACTIONS.READ),
   buildScope(RESOURCES.CUSTOMERS, ACTIONS.READ),
   buildScope(RESOURCES.DOCUMENTS, ACTIONS.READ),
-  buildScope(RESOURCES.AGENTS, ACTIONS.READ),
+  buildScope(RESOURCES.ASSISTANT, ACTIONS.READ),
   buildScope(RESOURCES.PLAYBOOKS, ACTIONS.READ),
   buildScope(RESOURCES.ANALYTICS, ACTIONS.READ),
   buildScope(RESOURCES.ORGANIZATION_MEMBERS, ACTIONS.READ),
@@ -144,7 +144,7 @@ export const MEMBER_SCOPES = [
   buildScope(RESOURCES.SOURCES, ACTIONS.READ),
   buildScope(RESOURCES.SOURCES, ACTIONS.CREATE),
   buildScope(RESOURCES.SOURCES, ACTIONS.UPDATE),
-  buildScope(RESOURCES.AGENTS, ACTIONS.READ),
+  buildScope(RESOURCES.ASSISTANT, ACTIONS.READ),
   buildScope(RESOURCES.PLAYBOOKS, ACTIONS.READ),
   buildScope(RESOURCES.ANALYTICS, ACTIONS.READ),
   buildScope(RESOURCES.ORGANIZATION_MEMBERS, ACTIONS.READ),
@@ -166,9 +166,8 @@ export const CONTRIBUTOR_SCOPES = [
   buildScope(RESOURCES.SOURCES, ACTIONS.READ),
   buildScope(RESOURCES.SOURCES, ACTIONS.CREATE),
   buildScope(RESOURCES.SOURCES, ACTIONS.UPDATE),
-  buildScope(RESOURCES.AGENTS, ACTIONS.READ),
-  buildScope(RESOURCES.AGENTS, ACTIONS.CREATE),
-  buildScope(RESOURCES.AGENTS, ACTIONS.UPDATE),
+  buildScope(RESOURCES.ASSISTANT, ACTIONS.READ),
+  buildScope(RESOURCES.ASSISTANT, ACTIONS.UPDATE),
   buildScope(RESOURCES.PLAYBOOKS, ACTIONS.READ),
   buildScope(RESOURCES.PLAYBOOKS, ACTIONS.CREATE),
   buildScope(RESOURCES.PLAYBOOKS, ACTIONS.UPDATE),

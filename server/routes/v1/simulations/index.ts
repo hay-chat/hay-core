@@ -26,7 +26,6 @@ export const playbookVersionOverrideSchema = z.object({
 
 const startSchema = z.object({
   label: z.string().max(255).optional(),
-  agentId: z.string().uuid().optional(),
   playbookVersionOverride: playbookVersionOverrideSchema.optional(),
   cases: z
     .array(
@@ -63,7 +62,6 @@ export const simulationsRouter = t.router({
           organizationId: ctx.organizationId!,
           createdById: ctx.user?.id ?? null,
           label: input.label ?? null,
-          agentId: input.agentId ?? null,
           playbookVersionOverride: input.playbookVersionOverride ?? null,
           cases: input.cases,
         });

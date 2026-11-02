@@ -214,7 +214,6 @@ describe("organization export", () => {
         "documents.jsonl",
         "playbooks.jsonl",
         "playbook_versions.jsonl",
-        "agents.jsonl",
         "webchat_settings.jsonl",
         "business_hours.jsonl",
         "attachments.jsonl",
