@@ -14,6 +14,7 @@ import type { Conversation } from "@server/database/entities/conversation.entity
 import { createLogger } from "@server/lib/logger";
 import { completeProductCaseTool } from "./complete-product-case";
 import { createTicketTool } from "./create-ticket";
+import { findPageUrlTool } from "./find-page-url";
 import { inspectAttachmentTool } from "./inspect-attachment";
 import { recommendProductsTool } from "./recommend-products";
 import { sendAttachmentTool } from "./send-attachment";
@@ -72,3 +73,4 @@ coreToolRegistry.register(sendAttachmentTool);
 coreToolRegistry.register(inspectAttachmentTool);
 coreToolRegistry.register(completeProductCaseTool);
 coreToolRegistry.register(createTicketTool);
+coreToolRegistry.register(findPageUrlTool);

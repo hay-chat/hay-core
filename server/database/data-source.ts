@@ -34,6 +34,7 @@ import { ProductEmbedding } from "../entities/product-embedding.entity";
 import { ConversationTakeoverEvent } from "./entities/conversation-takeover-event.entity";
 import { ConversationOutcome } from "./entities/conversation-outcome.entity";
 import { OperatorEventRecord } from "./entities/operator-event.entity";
+import { SitePage } from "./entities/site-page.entity";
 import { InsightIssue } from "./entities/insight-issue.entity";
 import { PushSubscription } from "./entities/push-subscription.entity";
 import { NotificationDelivery } from "./entities/notification-delivery.entity";
@@ -126,6 +127,7 @@ export const AppDataSource = new DataSource({
     TestTranscript,
     TestCase,
     OperatorEventRecord,
+    SitePage,
   ],
   migrations: __filename.includes("dist")
     ? [__dirname + "/migrations/*.js"] // Production: compiled JS files in same relative location

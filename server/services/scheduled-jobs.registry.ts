@@ -71,6 +71,19 @@ const jobRegistry: CronJobConfig[] = [
     enabled: true,
   },
 
+  {
+    name: "site-index-sync",
+    description:
+      "Re-read each organization's sitemap into the site page index (find_page_url, link check)",
+    schedule: "15 4 * * *", // Daily at 4:15 AM
+    handler: async () => {
+      const { siteIndexService } = await import("./site-index.service");
+      await siteIndexService.syncAll();
+    },
+    singleton: true,
+    enabled: true,
+  },
+
   // ============================================================
   // BACKGROUND PROCESSING JOBS
   // ============================================================
