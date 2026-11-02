@@ -539,7 +539,6 @@ const response = await Hay.conversations.create();
 │   └── agents/               # Custom agent definitions
 │
 ├── docs/                      # Documentation
-├── gdpr-audit/                # GDPR compliance audit
 └── tests/                     # E2E tests (Playwright)
 ```
 

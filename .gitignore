@@ -72,3 +72,11 @@ plugins/custom/
 server/uploads/plugin-zips/
 .dual-graph/
 .impeccable/
+
+# Maintainer working notes: kept locally, never committed
+/WIP.md
+/CONTEXT.md
+/tasks/
+/gdpr-audit/
+/.claude/plans/
+/.claude/settings.json
