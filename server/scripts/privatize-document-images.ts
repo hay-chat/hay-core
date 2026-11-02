@@ -45,7 +45,7 @@ async function main() {
 
   const documents = await AppDataSource.getRepository(Document)
     .createQueryBuilder("d")
-    .where("d.content LIKE :needle OR d.contentJson::text LIKE :needle", {
+    .where("d.content LIKE :needle OR d.content_json::text LIKE :needle", {
       needle: `%/${DOCUMENT_IMAGES_FOLDER}/%`,
     })
     .getMany();
