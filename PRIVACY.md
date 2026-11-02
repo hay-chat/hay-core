@@ -586,8 +586,7 @@ This implementation complies with:
 - Rate limits reset automatically
 - **Development Only:** Reset rate limits manually:
   ```bash
-  cd server
-  ./scripts/reset-rate-limits.sh
+  npm run reset:rate-limits
   ```
 
 ### Download Token Invalid

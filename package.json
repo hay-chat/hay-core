@@ -61,9 +61,6 @@
     "test:hay-cli": "vitest run --root tools/hay-cli",
     "typecheck:hay-cli": "tsc -p tools/hay-cli/tsconfig.json",
     "generate:trpc": "cd dashboard && npm run generate:trpc",
-    "env:local": "./scripts/switch-env.sh local",
-    "env:cloud": "./scripts/switch-env.sh cloud",
-    "env:status": "./scripts/switch-env.sh status",
     "postinstall": "git submodule update --init --recursive || echo 'Warning: git submodule update failed (non-fatal)'; cd dashboard && nuxt prepare"
   },
   "overrides": {
