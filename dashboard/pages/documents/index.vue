@@ -430,6 +430,7 @@
 </template>
 
 <script setup lang="ts">
+import { logger } from "@/utils/logger";
 import { HayApi } from "@/utils/api";
 import { useToast } from "@/composables/useToast";
 import { useWebSocket } from "@/composables/useWebSocket";
@@ -787,7 +788,7 @@ const deleteDocument = (document: Document) => {
 const bulkArchive = async () => {
   try {
     // TODO: Bulk archive via API
-    console.log("Bulk archive:", selectedDocuments.value);
+    logger.debug("Bulk archive:", selectedDocuments.value);
     selectedDocuments.value = [];
     toast.success(t("documents.toast.bulkArchiveSuccess"));
   } catch (error) {
@@ -799,7 +800,7 @@ const bulkArchive = async () => {
 const bulkDownload = async () => {
   try {
     // TODO: Bulk download via API
-    console.log("Bulk download:", selectedDocuments.value);
+    logger.debug("Bulk download:", selectedDocuments.value);
     toast.info(t("documents.toast.bulkDownloadStarted"));
   } catch (error) {
     console.error("Error downloading documents:", error);
@@ -1042,7 +1043,7 @@ onMounted(async () => {
 
   // Listen for document status updates
   const unsubscribe = websocket.on("document:status-updated", (data: unknown) => {
-    console.log("[Documents] Received document status update:", data);
+    logger.debug("[Documents] Received document status update:", data);
 
     const isStatusUpdate = (payload: unknown): payload is { documentId: string; status: string } =>
       typeof payload === "object" &&
@@ -1061,7 +1062,7 @@ onMounted(async () => {
       const oldStatus = document.status;
       document.status = data.status;
 
-      console.log(
+      logger.debug(
         `[Documents] Updated document ${data.documentId} status: ${oldStatus} → ${data.status}`,
       );
 

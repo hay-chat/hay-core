@@ -394,5 +394,7 @@ export const useUserStore = defineStore("user", {
       useTelemetry().reset();
     },
   },
-  persist: true,
+  persist: {
+    pick: ["user", "activeOrganizationId", "organizations"],
+  },
 });

@@ -348,7 +348,7 @@ export const enablePlugin = authenticatedProcedure
   .input(
     z.object({
       pluginId: z.string(),
-      configuration: z.record(z.any()).optional(),
+      configuration: z.record(z.string(), z.any()).optional(),
     }),
   )
   .mutation(async ({ ctx, input }) => {
@@ -607,7 +607,7 @@ export const configurePlugin = authenticatedProcedure
   .input(
     z.object({
       pluginId: z.string(),
-      configuration: z.record(z.any()),
+      configuration: z.record(z.string(), z.any()),
     }),
   )
   .mutation(async ({ ctx, input }) => {
@@ -1628,7 +1628,7 @@ export const validateAuth = authenticatedProcedure
       pluginId: z.string(),
       authState: z.object({
         methodId: z.string(),
-        credentials: z.record(z.any()),
+        credentials: z.record(z.string(), z.any()),
       }),
     }),
   )

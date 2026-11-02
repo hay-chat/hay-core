@@ -12,6 +12,9 @@ concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+permissions:
+  contents: read
+
 jobs:
   # Fast static checks — no database or services required. These are the cheap,
   # high-signal gates that should pass before any PR merges.
@@ -21,10 +24,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
-          node-version: "20"
+          node-version: "22"
           cache: "npm"
       - name: Install dependencies
         run: npm ci
@@ -82,17 +85,78 @@ jobs:
       NODE_ENV: test
 
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
-          node-version: "20"
+          node-version: "22"
           cache: "npm"
       - name: Install dependencies
         run: npm ci
       - name: Run database migrations
         run: cd server && npm run migration:run
       - name: Run server tests
-        run: cd server && npm test
+        run: npm run test:server
+
+  # Dashboard, shared packages, core plugins and the hay CLI (Vitest). No
+  # services needed. Plugin MCP servers are not npm workspaces, so their own
+  # lockfiles are installed the way the plugin runtime does it.
+  workspace-tests:
+    name: Dashboard, Packages & Plugin Tests
+    if: github.ref_name != 'staging' && github.base_ref != 'staging'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: "22"
+          cache: "npm"
+      - name: Install dependencies
+        run: npm ci
+      - name: Install plugin MCP server dependencies
+        run: |
+          for dir in plugins/core/*/mcp; do
+            if [ -f "$dir/package-lock.json" ]; then
+              (cd "$dir" && npm ci --omit=dev --no-audit --no-fund)
+            fi
+          done
+      - name: Build shared packages
+        run: npm run build:plugin-sdk && npm run build:form-schema
+      - name: Run dashboard tests
+        run: npm run test:dashboard
+      - name: Run package and plugin tests
+        run: |
+          failed=""
+          for dir in packages/* plugins/core/*; do
+            if node -e "process.exit(require('./$dir/package.json').scripts?.test ? 0 : 1)" 2>/dev/null; then
+              echo "::group::$dir"
+              (cd "$dir" && npm test) || failed="$failed $dir"
+              echo "::endgroup::"
+            fi
+          done
+          if [ -n "$failed" ]; then
+            echo "::error::Tests failed in:$failed"
+            exit 1
+          fi
+      - name: Run hay CLI tests
+        run: npm run test:hay-cli
+
+  # High-severity advisories in production dependencies block both the webchat
+  # widget and the monorepo.
+  dependency-audit:
+    name: Dependency Audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: "22"
+      - name: Audit webchat
+        working-directory: webchat
+        run: npm audit --omit=dev --audit-level=high
+      - name: Audit monorepo
+        run: npm audit --omit=dev --audit-level=high
 
   # Webchat widget: unit tests, then the performance budget on a fresh build
   # (D12-9). The budget fails the job when widget.js grows past 10 KB brotli or
@@ -106,10 +170,10 @@ jobs:
       run:
         working-directory: webchat
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
-          node-version: "20"
+          node-version: "22"
           cache: "npm"
           cache-dependency-path: webchat/package-lock.json
       - name: Install dependencies

@@ -63,7 +63,6 @@ describe("conversationEventsService.broadcastMessageReceived", () => {
         attachments: [],
         status: "approved",
         deliveryState: "sent",
-        isPlayground: false,
       },
     });
     expect(mockSendToConversation).not.toHaveBeenCalled();
@@ -140,13 +139,13 @@ describe("conversationEventsService.broadcastMessageReceived", () => {
       expect(mockSendToConversation).not.toHaveBeenCalled();
     });
 
-    it("shows everything in playground conversations", async () => {
+    it("keeps internal messages off the widget in playground conversations too", async () => {
       await conversationEventsService.broadcastMessageReceived(
         { ...conversation, metadata: { isPlayground: true } },
         message({ type: "Tool" } as Partial<Message>),
       );
 
-      expect(mockSendToConversation).toHaveBeenCalledTimes(1);
+      expect(mockSendToConversation).not.toHaveBeenCalled();
     });
   });
 });

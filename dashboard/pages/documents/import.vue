@@ -581,6 +581,7 @@
 </template>
 
 <script setup lang="ts">
+import { logger } from "@/utils/logger";
 import {
   Upload,
   ChevronRight,
@@ -964,9 +965,6 @@ const startUpload = async () => {
   isProcessing.value = true;
   uploadedCount.value = 0;
 
-  const authToken = useCookie("auth-token");
-  const organizationId = authToken.value ? "org_default" : "default";
-
   try {
     // Upload files sequentially
     for (let i = 0; i < selectedFiles.value.length; i++) {
@@ -984,7 +982,6 @@ const startUpload = async () => {
           fileBuffer: fileBuffer,
           mimeType: file.type,
           fileName: file.name,
-          organizationId: organizationId,
           type: mapCategoryToDocumentType(file.category || ""),
           status: file.isActive ? DocumentationStatus.PUBLISHED : DocumentationStatus.DRAFT,
           visibility: DocumentVisibility.PRIVATE,
@@ -1012,7 +1009,7 @@ const startUpload = async () => {
     const allSuccess = selectedFiles.value.every((f) => f.uploadStatus === "completed");
 
     if (allSuccess) {
-      console.log(`Successfully uploaded ${uploadedCount.value} document(s)`);
+      logger.debug(`Successfully uploaded ${uploadedCount.value} document(s)`);
       toast.success(
         t(
           "documents.import.toast.uploadSuccess",
@@ -1024,7 +1021,7 @@ const startUpload = async () => {
       const failedCount = selectedFiles.value.filter((f) => f.uploadStatus === "error").length;
 
       if (failedCount > 0) {
-        console.log(`${uploadedCount.value} succeeded, ${failedCount} failed`);
+        logger.debug(`${uploadedCount.value} succeeded, ${failedCount} failed`);
         if (uploadedCount.value > 0) {
           toast.warning(
             t(

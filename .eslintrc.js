@@ -214,6 +214,10 @@ module.exports = {
         useToast: "readonly",
         useDomain: "readonly",
         usePagination: "readonly",
+        useExternalLink: "readonly",
+        SETTINGS_NAV: "readonly",
+        isSettingsTabActive: "readonly",
+        visibleSettingsTabs: "readonly",
         // Node.js types
         NodeJS: "readonly",
       },
@@ -271,6 +275,14 @@ module.exports = {
       rules: {
         "@typescript-eslint/no-explicit-any": "off",
         "no-console": "off",
+      },
+    },
+    // Dashboard app code: debug output goes through utils/logger (dev builds only).
+    {
+      files: ["dashboard/**/*.ts", "dashboard/**/*.vue"],
+      excludedFiles: ["dashboard/tests/**", "dashboard/scripts/**", "dashboard/**/*.test.ts"],
+      rules: {
+        "no-console": ["error", { allow: ["warn", "error"] }],
       },
     },
   ],

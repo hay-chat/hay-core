@@ -150,7 +150,6 @@ describe("messageApprovalService", () => {
           deliveryState: "sent",
           status: "approved",
           attachments: [],
-          isPlayground: false,
         },
       });
 

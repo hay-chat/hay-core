@@ -1,3 +1,4 @@
+import { logger } from "@/utils/logger";
 import { ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { useToast } from "@/composables/useToast";
@@ -178,7 +179,7 @@ export function useNotifications() {
     const lastShown = recentNotifications.get(dedupeKey);
 
     if (lastShown && now - lastShown < NOTIFICATION_DEDUPE_WINDOW) {
-      console.log(
+      logger.debug(
         `[Notifications] Skipping duplicate notification for conversation ${conversation.id} (shown ${now - lastShown}ms ago)`,
       );
       return;

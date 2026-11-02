@@ -76,17 +76,7 @@ const errorLink: TRPCLink<AppRouter> = () => {
         error(err) {
           // Check if the error is due to authentication failure
           if (err instanceof TRPCClientError) {
-            const message = err.message?.toLowerCase();
             const data = err.data;
-
-            // Debug logging
-            console.log("[API Error Link] Error detected:", {
-              message: err.message,
-              messageLower: message,
-              code: data?.code,
-              httpStatus: data?.httpStatus,
-              fullData: data,
-            });
 
             // The organization was suspended by the operator: lock the dashboard.
             if (data?.code === "FORBIDDEN" && data?.type === "ORGANIZATION_SUSPENDED") {

@@ -1,4 +1,4 @@
-import { describe, it, expect, jest, beforeEach } from "@jest/globals";
+import { describe, it, expect, jest, beforeEach, afterEach } from "@jest/globals";
 import { EventEmitter } from "events";
 
 /**
@@ -8,18 +8,27 @@ import { EventEmitter } from "events";
  * `message` frames that reached the AI with no keypair, nonce or proof.
  */
 
-jest.mock("@server/config/env", () => ({ config: { jwt: { secret: "ws-test-secret" } } }));
+jest.mock("@server/config/env", () => ({
+  config: { jwt: { secret: "ws-test-secret" }, cors: { origin: ["https://app.example.test"] } },
+}));
 const mockLogger = { debug: jest.fn(), info: jest.fn(), warn: jest.fn(), error: jest.fn() };
 jest.mock("@server/lib/logger", () => ({ createLogger: () => mockLogger }));
 jest.mock("@server/services/redis.service", () => ({
-  redisService: { subscribe: jest.fn(async () => undefined) },
+  redisService: { subscribe: jest.fn(async () => undefined), isConnected: () => false },
 }));
 
 const mockUserOrgFindOne = jest.fn<(options: unknown) => Promise<unknown>>();
-jest.mock("@server/database/data-source", () => ({
-  AppDataSource: { isInitialized: false, getRepository: () => ({ findOne: mockUserOrgFindOne }) },
-}));
+const mockUserFindOne = jest.fn<(options: unknown) => Promise<unknown>>();
+jest.mock("@server/entities/user.entity", () => ({ User: class MockUser {} }));
 jest.mock("@server/entities/user-organization.entity", () => ({ UserOrganization: class {} }));
+jest.mock("@server/database/data-source", () => ({
+  AppDataSource: {
+    isInitialized: false,
+    getRepository: (entity: { name?: string }) => ({
+      findOne: entity.name === "MockUser" ? mockUserFindOne : mockUserOrgFindOne,
+    }),
+  },
+}));
 
 const mockConversationRepo = {
   findById: jest.fn<(id: string) => Promise<unknown>>(),
@@ -36,6 +45,7 @@ const mockVerifyDPoP =
       proof: string,
       method: string,
       url: string,
+      options?: { checkNonce?: boolean },
     ) => Promise<{ success: boolean; newNonce?: string; error?: string }>
   >();
 jest.mock("@server/routes/v1/public-conversations", () => ({
@@ -62,7 +72,18 @@ class FakeSocket extends EventEmitter {
   send(data: string): void {
     this.sent.push(JSON.parse(data));
   }
-  close(): void {}
+  closedWith?: number;
+  close(code?: number): void {
+    this.closedWith = code;
+  }
+  terminated = false;
+  terminate(): void {
+    this.terminated = true;
+  }
+  pinged = 0;
+  ping(): void {
+    this.pinged++;
+  }
   last(): Record<string, unknown> | undefined {
     return this.sent[this.sent.length - 1];
   }
@@ -71,18 +92,23 @@ class FakeSocket extends EventEmitter {
 interface ServiceInternals {
   handleConnection(ws: unknown, req: unknown): void;
   handleMessage(clientId: string, data: string): Promise<void>;
+  checkHeartbeats(): void;
   conversationClients: Map<string, Set<string>>;
 }
 
-function connect(service: WebSocketService, query = `org=${ORG_ID}`) {
+function connect(
+  service: WebSocketService,
+  query = `org=${ORG_ID}`,
+  headers: Record<string, string> = {},
+) {
   const internals = service as unknown as ServiceInternals;
   const ws = new FakeSocket();
   internals.handleConnection(ws, {
     url: `/ws?${query}`,
-    headers: { host: "localhost:3001", "x-forwarded-for": "203.0.113.7" },
+    headers: { host: "localhost:3001", "x-forwarded-for": "203.0.113.7", ...headers },
     socket: { remoteAddress: "10.0.0.1" },
   });
-  const clientId = ws.sent[0].clientId as string;
+  const clientId = ws.sent[0]?.clientId as string;
   const send = (frame: Record<string, unknown>) =>
     internals.handleMessage(clientId, JSON.stringify(frame));
   return { ws, clientId, send, internals };
@@ -97,6 +123,13 @@ function webConversation(overrides: Record<string, unknown> = {}) {
     addMessage: jest.fn(async (_input: Record<string, unknown>) => ({ id: "msg-1" })),
     ...overrides,
   };
+}
+
+const WS_URL = "ws://localhost:3001/ws";
+
+/** An identify frame carrying a (mocked) DPoP proof for the /ws endpoint. */
+function identifyFrame(conversationId: string = CONV_ID) {
+  return { type: "identify", conversationId, proof: "identify.jwt", url: WS_URL };
 }
 
 const validFrame = {
@@ -121,7 +154,7 @@ describe("WebSocket public writes require DPoP", () => {
   it("identify without a conversationId does not create a conversation", async () => {
     const { ws, send } = connect(service);
 
-    await send({ type: "identify", customerId: "visitor-1" });
+    await send({ type: "identify" });
 
     expect(mockConversationRepo.create).not.toHaveBeenCalled();
     expect(ws.last()).toMatchObject({ type: "error" });
@@ -132,7 +165,7 @@ describe("WebSocket public writes require DPoP", () => {
     mockConversationRepo.findById.mockResolvedValue(conversation);
     const { ws, send } = connect(service);
 
-    await send({ type: "identify", customerId: "visitor-1", conversationId: CONV_ID });
+    await send(identifyFrame());
     await send({ type: "message", content: "hello" });
 
     expect(conversation.addMessage).not.toHaveBeenCalled();
@@ -144,11 +177,11 @@ describe("WebSocket public writes require DPoP", () => {
     mockConversationRepo.findById.mockResolvedValue(conversation);
     const { ws, send } = connect(service);
 
-    await send({ type: "identify", customerId: "visitor-1", conversationId: CONV_ID });
+    await send(identifyFrame());
     await send({ type: "message", content: "hello" });
 
     expect(conversation.addMessage).not.toHaveBeenCalled();
-    expect(mockVerifyDPoP).not.toHaveBeenCalled();
+    expect(mockVerifyDPoP).toHaveBeenCalledTimes(1); // the identify proof only
     expect(ws.last()).toMatchObject({ type: "error" });
   });
 
@@ -157,7 +190,7 @@ describe("WebSocket public writes require DPoP", () => {
     mockConversationRepo.findById.mockResolvedValue(conversation);
     const { send } = connect(service);
 
-    await send({ type: "identify", customerId: "visitor-1", conversationId: CONV_ID });
+    await send(identifyFrame());
     await send(validFrame);
 
     expect(conversation.addMessage).not.toHaveBeenCalled();
@@ -168,7 +201,7 @@ describe("WebSocket public writes require DPoP", () => {
     mockConversationRepo.findById.mockResolvedValue(conversation);
     const { ws, send } = connect(service);
 
-    await send({ type: "identify", customerId: "visitor-1", conversationId: CONV_ID });
+    await send(identifyFrame());
     // A valid proof for the attacker's own conversation must not write into CONV_ID.
     await send({ ...validFrame, conversationId: OTHER_CONV_ID });
 
@@ -179,14 +212,14 @@ describe("WebSocket public writes require DPoP", () => {
   it("returns the fresh nonce when the proof's nonce expired", async () => {
     const conversation = webConversation();
     mockConversationRepo.findById.mockResolvedValue(conversation);
-    mockVerifyDPoP.mockResolvedValue({
+    mockVerifyDPoP.mockResolvedValueOnce({ success: true }).mockResolvedValue({
       success: false,
       error: "Invalid or expired nonce",
       newNonce: "fresh",
     });
     const { ws, send } = connect(service);
 
-    await send({ type: "identify", customerId: "visitor-1", conversationId: CONV_ID });
+    await send(identifyFrame());
     await send(validFrame);
 
     expect(conversation.addMessage).not.toHaveBeenCalled();
@@ -198,7 +231,7 @@ describe("WebSocket public writes require DPoP", () => {
     mockConversationRepo.findById.mockResolvedValue(conversation);
     const { ws, send } = connect(service);
 
-    await send({ type: "identify", customerId: "visitor-1", conversationId: CONV_ID });
+    await send(identifyFrame());
     await send(validFrame);
 
     expect(mockVerifyDPoP).toHaveBeenCalledWith(
@@ -218,10 +251,10 @@ describe("WebSocket public writes require DPoP", () => {
     mockConversationRepo.findById.mockResolvedValue(conversation);
     const { ws, send } = connect(service);
 
-    await send({ type: "identify", customerId: "visitor-1", conversationId: CONV_ID });
+    await send(identifyFrame());
     await send({ ...validFrame, content: "x".repeat(4001) });
 
-    expect(mockVerifyDPoP).not.toHaveBeenCalled();
+    expect(mockVerifyDPoP).toHaveBeenCalledTimes(1); // the identify proof only
     expect(conversation.addMessage).not.toHaveBeenCalled();
     expect(ws.last()).toEqual({ type: "error", error: "Invalid message content" });
   });
@@ -232,17 +265,12 @@ describe("WebSocket public writes require DPoP", () => {
     mockRateLimited.mockResolvedValue(true);
     const { ws, send } = connect(service);
 
-    await send({
-      type: "identify",
-      customerId: "v",
-      conversationId: CONV_ID,
-      metadata: { ip: "1.1.1.1" },
-    });
+    await send(identifyFrame());
     await send(validFrame);
 
     expect(mockRateLimited).toHaveBeenCalledTimes(1);
     expect(mockRateLimited).toHaveBeenCalledWith([{ rule: "messagePerIp", id: "203.0.113.7" }]);
-    expect(mockVerifyDPoP).not.toHaveBeenCalled();
+    expect(mockVerifyDPoP).toHaveBeenCalledTimes(1); // the identify proof only
     expect(conversation.addMessage).not.toHaveBeenCalled();
     expect(ws.last()).toEqual({ type: "error", error: "RATE_LIMITED" });
   });
@@ -250,10 +278,12 @@ describe("WebSocket public writes require DPoP", () => {
   it("does not spend the per-conversation budget on a frame with a bad proof", async () => {
     const conversation = webConversation();
     mockConversationRepo.findById.mockResolvedValue(conversation);
-    mockVerifyDPoP.mockResolvedValue({ success: false, error: "Public key mismatch" });
+    mockVerifyDPoP
+      .mockResolvedValueOnce({ success: true })
+      .mockResolvedValue({ success: false, error: "Public key mismatch" });
     const { send } = connect(service);
 
-    await send({ type: "identify", customerId: "v", conversationId: CONV_ID });
+    await send(identifyFrame());
     await send(validFrame);
 
     expect(mockRateLimited).not.toHaveBeenCalledWith([
@@ -269,7 +299,7 @@ describe("WebSocket public writes require DPoP", () => {
     );
     const { ws, send } = connect(service);
 
-    await send({ type: "identify", customerId: "v", conversationId: CONV_ID });
+    await send(identifyFrame());
     await send(validFrame);
 
     expect(mockVerifyDPoP).toHaveBeenCalled();
@@ -289,9 +319,154 @@ describe("WebSocket public writes require DPoP", () => {
   });
 });
 
+describe("WebSocket identify requires proof of the conversation key", () => {
+  let service: WebSocketService;
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    service = new WebSocketService();
+    mockConversationRepo.findById.mockResolvedValue(webConversation());
+  });
+
+  it("rejects identify without a DPoP proof and streams nothing to that socket", async () => {
+    const { ws, send, clientId, internals } = connect(service);
+
+    await send({ type: "identify", conversationId: CONV_ID });
+
+    expect(mockVerifyDPoP).not.toHaveBeenCalled();
+    expect(internals.conversationClients.get(CONV_ID)?.has(clientId) ?? false).toBe(false);
+    expect(ws.last()).toMatchObject({ type: "error" });
+    expect(service.sendToConversation(CONV_ID, { type: "message" })).toBe(0);
+  });
+
+  it("rejects identify whose proof does not verify", async () => {
+    mockVerifyDPoP.mockResolvedValue({ success: false, error: "Public key mismatch" });
+    const { ws, send, clientId, internals } = connect(service);
+
+    await send(identifyFrame());
+
+    expect(internals.conversationClients.get(CONV_ID)?.has(clientId) ?? false).toBe(false);
+    expect(ws.last()).toEqual({ type: "error", error: "Unauthorized" });
+  });
+
+  it("rejects a proof made for another endpoint", async () => {
+    mockVerifyDPoP.mockResolvedValue({ success: true });
+    const { send, clientId, internals } = connect(service);
+
+    await send({
+      ...identifyFrame(),
+      url: "http://localhost:3001/v1/publicConversations.getMessages",
+    });
+
+    expect(mockVerifyDPoP).not.toHaveBeenCalled();
+    expect(internals.conversationClients.get(CONV_ID)?.has(clientId) ?? false).toBe(false);
+  });
+
+  it("attaches a client whose proof verifies, without consuming the HTTP nonce", async () => {
+    mockVerifyDPoP.mockResolvedValue({ success: true });
+    const { ws, send, clientId, internals } = connect(service);
+
+    await send(identifyFrame());
+
+    expect(mockVerifyDPoP).toHaveBeenCalledWith(CONV_ID, "identify.jwt", "GET", WS_URL, {
+      checkNonce: false,
+    });
+    expect(internals.conversationClients.get(CONV_ID)?.has(clientId)).toBe(true);
+    expect(ws.last()).toEqual({ type: "identified", conversationId: CONV_ID });
+  });
+
+  it("moves a socket to a new conversation when it identifies again", async () => {
+    mockVerifyDPoP.mockResolvedValue({ success: true });
+    mockConversationRepo.findById.mockImplementation(async (id) => webConversation({ id }));
+    const { send, clientId, internals } = connect(service);
+
+    await send(identifyFrame());
+    await send(identifyFrame(OTHER_CONV_ID));
+
+    expect(internals.conversationClients.get(CONV_ID)?.has(clientId) ?? false).toBe(false);
+    expect(internals.conversationClients.get(OTHER_CONV_ID)?.has(clientId)).toBe(true);
+  });
+
+  it("does not relay a client-chosen identity in typing events", async () => {
+    mockVerifyDPoP.mockResolvedValue({ success: true });
+    const first = connect(service);
+    const second = connect(service);
+    await first.send(identifyFrame());
+    await second.send(identifyFrame());
+
+    await first.send({ type: "typing", isTyping: true, customerId: "someone-else" });
+
+    expect(second.ws.last()).toEqual({ type: "typing", isTyping: true });
+  });
+});
+
+describe("WebSocket connection lifecycle", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    jest.useFakeTimers();
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
+  it("closes a socket that neither authenticates nor identifies in time", () => {
+    const service = new WebSocketService();
+    const { ws } = connect(service);
+
+    jest.advanceTimersByTime(10_000);
+
+    expect(ws.closedWith).toBe(1008);
+  });
+
+  it("terminates a socket that missed a heartbeat", () => {
+    const service = new WebSocketService();
+    const { ws, internals } = connect(service);
+
+    internals.checkHeartbeats();
+    expect(ws.pinged).toBe(1);
+    expect(ws.terminated).toBe(false);
+
+    internals.checkHeartbeats();
+    expect(ws.terminated).toBe(true);
+  });
+
+  it("keeps a socket that answers pings", () => {
+    const service = new WebSocketService();
+    const { ws, internals } = connect(service);
+
+    internals.checkHeartbeats();
+    ws.emit("pong");
+    internals.checkHeartbeats();
+
+    expect(ws.terminated).toBe(false);
+  });
+
+  it("caps open connections per client IP", () => {
+    const service = new WebSocketService();
+    for (let i = 0; i < 100; i++) connect(service);
+
+    const { ws } = connect(service);
+
+    expect(ws.closedWith).toBe(1008);
+    expect(service.getConnectionCount()).toBe(100);
+  });
+});
+
 describe("WebSocket dashboard authentication", () => {
   let service: WebSocketService;
-  const token = jwt.sign({ userId: "user-1", email: "a@b.c", type: "access" }, "ws-test-secret");
+  const activeUser = {
+    id: "user-1",
+    email: "a@b.c",
+    isActive: true,
+    emailVerified: true,
+    tokenVersion: 2,
+  };
+  const sign = (payload: Record<string, unknown>) =>
+    jwt.sign(
+      { userId: "user-1", email: "a@b.c", type: "access", tokenVersion: 2, ...payload },
+      "ws-test-secret",
+    );
 
   const orgMembers = (service: WebSocketService) =>
     (service as unknown as { organizationClients: Map<string, Set<string>> }).organizationClients;
@@ -299,23 +474,78 @@ describe("WebSocket dashboard authentication", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     service = new WebSocketService();
+    mockUserFindOne.mockResolvedValue(activeUser);
+    mockUserOrgFindOne.mockResolvedValue({ id: "membership-1" });
+  });
+
+  it("streams org events to an active member of the requested org", async () => {
+    const { ws, send, clientId } = connect(service);
+    await send({ type: "auth", token: sign({}) });
+
+    expect(orgMembers(service).get(ORG_ID)?.has(clientId)).toBe(true);
+    expect(ws.last()).toEqual({ type: "authenticated" });
+  });
+
+  it("ignores a token passed in the query string", async () => {
+    const { send, clientId } = connect(service, `org=${ORG_ID}&token=${sign({})}`);
+    await send({ type: "subscribe" });
+
+    expect(mockUserFindOne).not.toHaveBeenCalled();
+    expect(orgMembers(service).get(ORG_ID)?.has(clientId) ?? false).toBe(false);
   });
 
   it("does not stream org events to a user who is not a member of the requested org", async () => {
     mockUserOrgFindOne.mockResolvedValue(null);
-    const { send, clientId } = connect(service, `org=${ORG_ID}&token=${token}`);
-    await send({ type: "subscribe" });
+    const { ws, send, clientId } = connect(service);
+    await send({ type: "auth", token: sign({}) });
 
     expect(mockUserOrgFindOne).toHaveBeenCalledWith({
       where: { userId: "user-1", organizationId: ORG_ID, isActive: true },
     });
     expect(orgMembers(service).get(ORG_ID)?.has(clientId) ?? false).toBe(false);
+    expect(ws.closedWith).toBe(1008);
   });
 
-  it("streams org events to an active member of the requested org", async () => {
-    mockUserOrgFindOne.mockResolvedValue({ id: "membership-1" });
-    const { send, clientId } = connect(service, `org=${ORG_ID}&token=${token}`);
-    await send({ type: "subscribe" });
+  it.each([
+    ["a revoked token (tokenVersion bumped)", {}, { ...activeUser, tokenVersion: 3 }],
+    ["a deactivated user", {}, { ...activeUser, isActive: false }],
+    ["an unverified email", {}, { ...activeUser, emailVerified: false }],
+    ["a plugin API token", { scope: "plugin-api", organizationId: ORG_ID }, activeUser],
+    ["a refresh token", { type: "refresh" }, activeUser],
+  ])("rejects %s", async (_label, claims, user) => {
+    mockUserFindOne.mockResolvedValue(user);
+    const { send, clientId } = connect(service);
+    await send({ type: "auth", token: sign(claims) });
+
+    expect(orgMembers(service).get(ORG_ID)?.has(clientId) ?? false).toBe(false);
+  });
+
+  it("rejects a token signed with another algorithm", async () => {
+    const token = jwt.sign(
+      { userId: "user-1", email: "a@b.c", type: "access", tokenVersion: 2 },
+      "ws-test-secret",
+      { algorithm: "HS512" },
+    );
+    const { send, clientId } = connect(service);
+    await send({ type: "auth", token });
+
+    expect(orgMembers(service).get(ORG_ID)?.has(clientId) ?? false).toBe(false);
+  });
+
+  it("rejects a browser connection from an origin outside the CORS list", async () => {
+    const { send, clientId } = connect(service, `org=${ORG_ID}`, {
+      origin: "https://evil.example.test",
+    });
+    await send({ type: "auth", token: sign({}) });
+
+    expect(orgMembers(service).get(ORG_ID)?.has(clientId) ?? false).toBe(false);
+  });
+
+  it("accepts the dashboard origin", async () => {
+    const { send, clientId } = connect(service, `org=${ORG_ID}`, {
+      origin: "https://app.example.test",
+    });
+    await send({ type: "auth", token: sign({}) });
 
     expect(orgMembers(service).get(ORG_ID)?.has(clientId)).toBe(true);
   });
@@ -326,8 +556,9 @@ describe("WebSocket message events for webchat clients", () => {
     jest.clearAllMocks();
     const service = new WebSocketService();
     mockConversationRepo.findById.mockResolvedValue(webConversation());
+    mockVerifyDPoP.mockResolvedValue({ success: true });
     const { ws, send } = connect(service);
-    await send({ type: "identify", customerId: "visitor-1", conversationId: CONV_ID });
+    await send(identifyFrame());
 
     (service as unknown as { handleRedisEvent(e: unknown): void }).handleRedisEvent({
       type: "message_received",
