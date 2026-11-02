@@ -56,7 +56,7 @@
     "jose": "^6.2.14",
     "jsonwebtoken": "^9.0.2",
     "jszip": "^3.10.2",
-    "linkedom": "^0.18.14",
+    "linkedom": "0.18.12",
     "mammoth": "^1.13.0",
     "mime-types": "^3.0.2",
     "mjml": "^4.16.1",
