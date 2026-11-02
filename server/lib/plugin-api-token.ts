@@ -22,6 +22,7 @@ export function mintPluginApiToken(
     { organizationId, pluginId, scope: PLUGIN_API_TOKEN_SCOPE, capabilities },
     config.jwt.secret,
     {
+      algorithm: "HS256",
       expiresIn: "24h",
       issuer: PLUGIN_API_TOKEN_ISSUER,
       audience: PLUGIN_API_TOKEN_AUDIENCE,

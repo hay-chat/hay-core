@@ -107,6 +107,7 @@ export class PluginAPIService {
   validateToken(token: string): PluginAPITokenPayload | null {
     try {
       const decoded = jwt.verify(token, config.jwt.secret, {
+        algorithms: ["HS256"],
         issuer: PLUGIN_API_TOKEN_ISSUER,
         audience: PLUGIN_API_TOKEN_AUDIENCE,
       }) as PluginAPITokenPayload;

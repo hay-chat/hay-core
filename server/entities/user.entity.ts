@@ -2,12 +2,6 @@ import { Entity, Column, Index, ManyToOne, OneToMany, JoinColumn } from "typeorm
 import { BaseEntity } from "./base.entity";
 import { Organization } from "./organization.entity";
 import { UserOrganization } from "./user-organization.entity";
-import {
-  getDefaultScopesForRole,
-  hasRequiredScope,
-  type Resource,
-  type Action,
-} from "@server/types/scopes";
 
 @Entity("users")
 @Index("idx_users_email", ["email"])
@@ -105,46 +99,6 @@ export class User extends BaseEntity {
       ...safeUser
     } = this;
     return safeUser;
-  }
-
-  /**
-   * Check if user has a specific scope (legacy user-level permissions)
-   * This is used as a fallback when there's no organization context
-   * Uses the same scope matching system as UserOrganization
-   */
-  hasScope(resource: string, action: string): boolean {
-    if (!this.isActive) {
-      return false;
-    }
-
-    // Get default scopes for the user's role
-    const defaultScopes = getDefaultScopesForRole(this.role);
-
-    // Combine default role scopes with custom permissions
-    const allScopes = [...defaultScopes, ...(this.permissions || [])];
-
-    // Use the scope matching system to check permissions
-    return hasRequiredScope(resource as Resource, action as Action, allScopes);
-  }
-
-  /**
-   * Get all scopes for the user (legacy user-level permissions)
-   * Combines role-based default scopes with custom permissions
-   */
-  getScopes(): string[] {
-    const defaultScopes = getDefaultScopesForRole(this.role);
-    return [...defaultScopes, ...(this.permissions || [])];
-  }
-
-  /**
-   * Check if user can access a specific resource (legacy user-level check)
-   * Validates user is active and has organization context
-   */
-  canAccess(resource: string, action: string = "read"): boolean {
-    if (!this.isActive || !this.organizationId) {
-      return false;
-    }
-    return this.hasScope(resource, action);
   }
 
   getFullName(): string {

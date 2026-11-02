@@ -1,9 +1,9 @@
 import { t } from "@server/trpc";
 import { z } from "zod";
+import { IsNull } from "typeorm";
 import { TRPCError } from "@trpc/server";
 import { AppDataSource } from "@server/database/data-source";
 import { User } from "@server/entities/user.entity";
-import { Organization } from "@server/entities/organization.entity";
 import { UserOrganization } from "@server/entities/user-organization.entity";
 import { AuthCode } from "@server/entities/auth-code.entity";
 import {
@@ -18,7 +18,6 @@ import {
   protectedProcedure,
   protectedProcedureWithoutOrg,
   publicProcedure,
-  adminProcedure,
 } from "@server/trpc/middleware/auth";
 import { auditLogService } from "@server/services/audit-log.service";
 import { emailService, getOrganizationLocale } from "@server/services/email.service";
@@ -28,7 +27,7 @@ import { getDashboardUrl } from "@server/config/env";
 import { StorageService } from "@server/services/storage.service";
 import { handleUpload } from "@server/lib/upload-helper";
 import { rateLimitService } from "@server/services/rate-limit.service";
-import { DEFAULT_NEW_ORG_RETENTION_DAYS } from "@server/types/organization-settings.types";
+import { rateLimitMiddleware } from "@server/trpc/middleware/rate-limit";
 import { toAccessState } from "@server/services/organization-access.service";
 import {
   AGENT_PAUSE_REASONS,
@@ -37,6 +36,11 @@ import {
 } from "@server/types/organization-access.types";
 import { createLogger } from "@server/lib/logger";
 import { enableDefaultPlugins } from "@server/services/default-plugins.service";
+import {
+  createAccount,
+  issueSignupVerificationToken,
+  sendSignupVerificationEmail,
+} from "@server/services/account-registration.service";
 
 const logger = createLogger("auth");
 
@@ -68,20 +72,21 @@ async function getUserOrganizations(userId: string) {
   }));
 }
 
+const passwordSchema = z.string().min(8).max(128);
+
 const loginSchema = z.object({
   email: z.string().email(),
-  password: z.string().min(8),
+  password: passwordSchema,
 });
 
 const registerSchema = z
   .object({
     email: z.string().email(),
-    password: z.string().min(8),
-    confirmPassword: z.string(),
-    firstName: z.string().optional(),
-    lastName: z.string().optional(),
-    organizationName: z.string().optional(),
-    organizationSlug: z.string().optional(),
+    password: passwordSchema,
+    confirmPassword: z.string().max(128),
+    firstName: z.string().max(255).optional(),
+    lastName: z.string().max(255).optional(),
+    organizationName: z.string().max(255).optional(),
   })
   .refine((data) => data.password === data.confirmPassword, {
     message: "Passwords don't match",
@@ -91,6 +96,55 @@ const registerSchema = z
 const refreshTokenSchema = z.object({
   refreshToken: z.string(),
 });
+
+/** Re-authentication checks (password confirm, password/email change): 5 per 15 minutes. */
+const PASSWORD_CHECK_RATE_LIMIT = {
+  max: 5,
+  windowMs: 15 * 60 * 1000,
+  keyPrefix: "password_check",
+  useUserId: true,
+  failClosed: true,
+};
+
+/**
+ * Auth codes only go to origins in CONNECT_ALLOWED_REDIRECT_ORIGINS
+ * (comma-separated). Deny-by-default: unset means no destination is allowed.
+ */
+function allowlistedRedirectUrl(redirectUri: string): URL {
+  const allowed = (process.env.CONNECT_ALLOWED_REDIRECT_ORIGINS || "")
+    .split(",")
+    .map((origin) => origin.trim())
+    .filter(Boolean);
+
+  let redirectUrl: URL;
+  try {
+    redirectUrl = new URL(redirectUri);
+  } catch {
+    throw new TRPCError({ code: "BAD_REQUEST", message: "Invalid redirect_uri" });
+  }
+
+  if (!allowed.includes(redirectUrl.origin)) {
+    throw new TRPCError({
+      code: "FORBIDDEN",
+      message: "redirect_uri origin is not allowlisted",
+    });
+  }
+  return redirectUrl;
+}
+
+/** A single-use, 10-minute auth code for the user. */
+async function createAuthCode(userId: string): Promise<{ code: string; expiresAt: Date }> {
+  const code = generateSecureToken(32);
+  const authCodeRepo = AppDataSource.getRepository(AuthCode);
+  const authCode = authCodeRepo.create({
+    userId,
+    codeHash: await hashApiKey(code),
+    expiresAt: new Date(Date.now() + 10 * 60 * 1000),
+    used: false,
+  });
+  await authCodeRepo.save(authCode);
+  return { code, expiresAt: authCode.expiresAt };
+}
 
 export const authRouter = t.router({
   // Public endpoints
@@ -196,158 +250,60 @@ export const authRouter = t.router({
     };
   }),
 
+  /**
+   * Create an account and email a verification link. No session is issued:
+   * the user signs in once the email is verified. The response is the same
+   * whether or not the email is already registered.
+   */
   register: publicProcedure.input(registerSchema).mutation(async ({ input, ctx }) => {
-    const { email, password, firstName, lastName, organizationName, organizationSlug } = input;
-
-    // Set inside the transaction when a new organization is created.
-    let createdOrganizationId: string | null = null;
-
-    // Use a transaction for atomicity
-    const result = await AppDataSource.transaction(async (manager) => {
-      const userRepository = manager.getRepository(User);
-      const organizationRepository = manager.getRepository(Organization);
-
-      // Check if user already exists
-      const existingUser = await userRepository.findOne({
-        where: { email: email.toLowerCase() },
+    // Per IP: 10 signups per hour. Per email: 5 attempts per 15 minutes.
+    const ipLimit = await rateLimitService.checkKeyRateLimit(
+      `signup:ip:${ctx.ipAddress || "unknown"}`,
+      10,
+      60 * 60,
+      true,
+    );
+    const emailLimit = await rateLimitService.checkKeyRateLimit(
+      `signup:email:${input.email.toLowerCase()}`,
+      5,
+      15 * 60,
+      true,
+    );
+    if (ipLimit.limited || emailLimit.limited) {
+      throw new TRPCError({
+        code: "TOO_MANY_REQUESTS",
+        message: "Too many signup attempts. Please try again later.",
       });
+    }
 
-      // Helper to create an organization
-      const createOrg = async () => {
-        if (!organizationName) return null;
+    const response = {
+      success: true,
+      message: "Check your inbox to verify your email address, then sign in.",
+    };
 
-        const { organizationService } = await import("@server/services/organization.service");
-
-        let orgSlug: string;
-        if (organizationSlug) {
-          const existingOrg = await organizationService.findBySlug(organizationSlug);
-          if (existingOrg) {
-            throw new TRPCError({
-              code: "CONFLICT",
-              message: "Organization slug already exists",
-            });
-          }
-          orgSlug = organizationSlug;
-        } else {
-          orgSlug = await organizationService.generateUniqueSlug(organizationName);
-        }
-
-        const org = organizationRepository.create({
-          name: organizationName,
-          slug: orgSlug,
-          isActive: true,
-          limits: {
-            maxUsers: 5,
-            maxDocuments: 100,
-            maxApiKeys: 10,
-            maxJobs: 50,
-            maxStorageGb: 1,
-          },
-          settings: { retentionDays: DEFAULT_NEW_ORG_RETENTION_DAYS },
-        });
-
-        await organizationRepository.save(org);
-        createdOrganizationId = org.id;
-        return org;
-      };
-
-      if (existingUser) {
-        // User already exists — verify password, create a new org, and link them
-        const isValidPassword = await verifyPassword(password, existingUser.password);
-        if (!isValidPassword) {
-          throw new TRPCError({
-            code: "UNAUTHORIZED",
-            message: "User already exists. Please log in with the correct password.",
-          });
-        }
-
-        const organization = await createOrg();
-
-        if (organization) {
-          const userOrgRepository = manager.getRepository(UserOrganization);
-          const userOrg = userOrgRepository.create({
-            userId: existingUser.id,
-            organizationId: organization.id,
-            role: "owner",
-            isActive: true,
-            joinedAt: new Date(),
-          });
-          await userOrgRepository.save(userOrg);
-
-          // Update user's active organization to the new one
-          existingUser.organizationId = organization.id;
-          existingUser.updateLastSeen();
-          await userRepository.save(existingUser);
-        }
-
-        const tokens = await authSessionService.createSession(existingUser, ctx, manager);
-        const organizations = await getUserOrganizations(existingUser.id);
-
-        return {
-          user: {
-            ...existingUser.toJSON(),
-            organizations,
-            activeOrganizationId: organization?.id || existingUser.organizationId,
-            onlineStatus: existingUser.getOnlineStatus(),
-          },
-          ...tokens,
-        };
-      }
-
-      const organization = await createOrg();
-
-      // Hash password
-      const hashedPassword = await hashPassword(password, "argon2");
-
-      // Create new user
-      const user = userRepository.create({
-        email: email.toLowerCase(),
-        password: hashedPassword,
-        firstName: firstName || undefined,
-        lastName: lastName || undefined,
-        isActive: true,
-        emailVerified: false,
-        organizationId: organization?.id,
-        role: organization ? "owner" : "member", // Owner if creating org, otherwise member
-      });
-
-      // Update last seen on registration
-      user.updateLastSeen();
-      await userRepository.save(user);
-
-      // Create UserOrganization entry if organization exists (multi-org support)
-      if (organization) {
-        const userOrgRepository = manager.getRepository(UserOrganization);
-        const userOrg = userOrgRepository.create({
-          userId: user.id,
-          organizationId: organization.id,
-          role: "owner",
-          isActive: true,
-          joinedAt: new Date(),
-        });
-        await userOrgRepository.save(userOrg);
-      }
-
-      const tokens = await authSessionService.createSession(user, ctx, manager);
-
-      // Load all user organizations (multi-org support)
-      const organizations = await getUserOrganizations(user.id);
-
-      return {
-        user: {
-          ...user.toJSON(),
-          organizations,
-          activeOrganizationId: user.organizationId,
-          onlineStatus: user.getOnlineStatus(),
-        },
-        ...tokens,
-      };
+    const existingUser = await AppDataSource.getRepository(User).findOne({
+      where: { email: input.email.toLowerCase() },
     });
+    if (existingUser) {
+      // Same work as a real signup so response time doesn't reveal the account.
+      await hashPassword(input.password, "argon2");
+      return response;
+    }
+
+    const { user, organization } = await AppDataSource.transaction((manager) =>
+      createAccount(manager, input),
+    );
 
     // After commit: give the new organization its default plugins (fire-and-forget).
-    if (createdOrganizationId) void enableDefaultPlugins(createdOrganizationId);
+    if (organization) void enableDefaultPlugins(organization.id);
 
-    return result;
+    // Off the response path, so timing doesn't tell new and existing emails apart.
+    // On failure the user can request a new link from the login page.
+    void issueSignupVerificationToken(user)
+      .then((token) => sendSignupVerificationEmail(user, token))
+      .catch((error) => logger.error({ err: error }, "Failed to send signup verification email"));
+
+    return response;
   }),
 
   /**
@@ -425,9 +381,9 @@ export const authRouter = t.router({
         const resetToken = crypto.randomBytes(32).toString("hex");
         const tokenHash = crypto.createHash("sha256").update(resetToken).digest("hex");
 
-        // Store token hash and expiration (24 hours)
+        // Store token hash and expiration (1 hour)
         user.passwordResetTokenHash = tokenHash;
-        user.passwordResetExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+        user.passwordResetExpiresAt = new Date(Date.now() + 60 * 60 * 1000);
         await userRepository.save(user);
 
         // Send password reset email
@@ -450,7 +406,6 @@ export const authRouter = t.router({
             userEmail: user.email,
             companyName: "Hay.chat",
             resetLink,
-            expirationHours: "24",
             requestTime: new Date().toLocaleString(),
             requestIP: ctx.ipAddress || "Unknown",
             requestBrowser: ctx.userAgent || "Unknown",
@@ -525,7 +480,7 @@ export const authRouter = t.router({
     .input(
       z.object({
         token: z.string(),
-        newPassword: z.string().min(8),
+        newPassword: passwordSchema,
       }),
     )
     .mutation(async ({ input, ctx }) => {
@@ -727,10 +682,11 @@ export const authRouter = t.router({
     }),
 
   changePassword: protectedProcedure
+    .use(rateLimitMiddleware(PASSWORD_CHECK_RATE_LIMIT))
     .input(
       z.object({
-        currentPassword: z.string(),
-        newPassword: z.string().min(8),
+        currentPassword: z.string().max(128),
+        newPassword: passwordSchema,
       }),
     )
     .mutation(async ({ input, ctx }) => {
@@ -799,9 +755,10 @@ export const authRouter = t.router({
     }),
 
   verifyPassword: protectedProcedure
+    .use(rateLimitMiddleware(PASSWORD_CHECK_RATE_LIMIT))
     .input(
       z.object({
-        password: z.string(),
+        password: z.string().max(128),
       }),
     )
     .mutation(async ({ input, ctx }) => {
@@ -990,10 +947,11 @@ export const authRouter = t.router({
   }),
 
   updateEmail: protectedProcedure
+    .use(rateLimitMiddleware(PASSWORD_CHECK_RATE_LIMIT))
     .input(
       z.object({
         newEmail: z.string().email(),
-        currentPassword: z.string(),
+        currentPassword: z.string().max(128),
       }),
     )
     .mutation(async ({ input, ctx }) => {
@@ -1287,41 +1245,6 @@ export const authRouter = t.router({
   // ─── Signup Email Verification ──────────────────────────────
 
   /**
-   * Request a signup verification token for the authenticated user.
-   * Called right after registration when emailVerified is false.
-   * Returns the plain token so the caller (backoffice) can include it in the verification email.
-   */
-  requestEmailVerification: protectedProcedureWithoutOrg.mutation(async ({ ctx }) => {
-    const userRepository = AppDataSource.getRepository(User);
-    const user = await userRepository.findOne({
-      where: { id: ctx.user!.id },
-    });
-
-    if (!user) {
-      throw new TRPCError({ code: "NOT_FOUND", message: "User not found" });
-    }
-
-    if (user.emailVerified) {
-      return { success: true, token: null, expiresAt: null, message: "Email already verified" };
-    }
-
-    // Generate verification token (SHA-256 for O(1) DB lookup)
-    const verificationToken = crypto.randomBytes(32).toString("hex");
-    const tokenHash = crypto.createHash("sha256").update(verificationToken).digest("hex");
-
-    user.emailVerificationTokenHash = tokenHash;
-    user.emailVerificationExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
-    await userRepository.save(user);
-
-    return {
-      success: true,
-      token: verificationToken,
-      expiresAt: user.emailVerificationExpiresAt.toISOString(),
-      message: "Verification token generated",
-    };
-  }),
-
-  /**
    * Verify a user's email using a signup verification token.
    * Public endpoint — no auth required.
    */
@@ -1331,8 +1254,9 @@ export const authRouter = t.router({
       const tokenHash = crypto.createHash("sha256").update(input.token).digest("hex");
 
       const userRepository = AppDataSource.getRepository(User);
+      // Email-change tokens (pendingEmail set) are only accepted by verifyEmailChange.
       const user = await userRepository.findOne({
-        where: { emailVerificationTokenHash: tokenHash },
+        where: { emailVerificationTokenHash: tokenHash, pendingEmail: IsNull() },
       });
 
       if (!user) {
@@ -1393,43 +1317,11 @@ export const authRouter = t.router({
         };
       }
 
-      // Generate new verification token
-      const verificationToken = crypto.randomBytes(32).toString("hex");
-      const tokenHash = crypto.createHash("sha256").update(verificationToken).digest("hex");
-
-      user.emailVerificationTokenHash = tokenHash;
-      user.emailVerificationExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
-      await userRepository.save(user);
-
-      // Send verification email
       try {
-        await emailService.initialize();
-
-        const baseUrl = getDashboardUrl();
-        const verificationUrl = `${baseUrl}/verify-email?token=${verificationToken}&type=signup`;
-
-        const userOrg = await AppDataSource.getRepository(UserOrganization).findOne({
-          where: { userId: user.id },
-          relations: ["organization"],
-        });
-        const locale = userOrg?.organization?.defaultLanguage || DEFAULT_LANGUAGE;
-
-        await emailService.sendTemplateEmail({
-          to: user.email,
-          locale,
-          template: "verify-signup-email",
-          variables: {
-            userName: user.getFullName(),
-            verificationUrl,
-            companyName: "Hay.chat",
-            currentYear: new Date().getFullYear().toString(),
-            companyAddress: "Hay.chat",
-            websiteUrl: "https://hay.chat",
-          },
-        });
+        const token = await issueSignupVerificationToken(user);
+        await sendSignupVerificationEmail(user, token);
       } catch (error) {
         logger.error({ err: error }, "Failed to send signup verification email");
-        // Don't throw - token was saved, user can retry
       }
 
       return {
@@ -1519,35 +1411,21 @@ export const authRouter = t.router({
     };
   }),
 
-  // Auth code exchange (for cross-domain authentication, e.g. backoffice → dashboard)
-  generateAuthCode: protectedProcedureWithoutOrg.mutation(async ({ ctx }) => {
-    const rawCode = generateSecureToken(32);
-    const codeHash = await hashApiKey(rawCode);
-
-    const authCodeRepo = AppDataSource.getRepository(AuthCode);
-    const authCode = authCodeRepo.create({
-      userId: ctx.user!.id,
-      codeHash,
-      expiresAt: new Date(Date.now() + 10 * 60 * 1000), // 10 minutes
-      used: false,
-    });
-    await authCodeRepo.save(authCode);
-
-    return {
-      code: rawCode,
-      expiresAt: authCode.expiresAt,
-    };
-  }),
+  // Single-use auth code for an allowlisted external destination (billing
+  // portal, suspension redirect, custom menu links on an allowlisted origin):
+  // the destination exchanges it with exchangeAuthCode for its own session.
+  generateAuthCode: protectedProcedureWithoutOrg
+    .input(z.object({ redirectUri: z.string().url() }))
+    .mutation(async ({ ctx, input }) => {
+      allowlistedRedirectUrl(input.redirectUri);
+      return createAuthCode(ctx.user!.id);
+    }),
 
   // Issue a single-use auth code bound to an allowlisted external redirect URI.
   // Powers the "Connect to Hay" handshake for external apps (e.g. the Shopify
   // embedded app): the app sends the merchant to the dashboard /connect/authorize
   // page, which (once the merchant is logged in) calls this and redirects back to
   // `redirectUri?code=...&state=...`. The external app then calls exchangeAuthCode.
-  //
-  // Security: the redirect origin is validated SERVER-SIDE against the
-  // CONNECT_ALLOWED_REDIRECT_ORIGINS allowlist (comma-separated origins).
-  // Deny-by-default: if the env var is unset/empty, no redirect is permitted.
   generateConnectAuthCode: protectedProcedureWithoutOrg
     .input(
       z.object({
@@ -1556,38 +1434,10 @@ export const authRouter = t.router({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      const allowed = (process.env.CONNECT_ALLOWED_REDIRECT_ORIGINS || "")
-        .split(",")
-        .map((s) => s.trim())
-        .filter(Boolean);
+      const redirectUrl = allowlistedRedirectUrl(input.redirectUri);
+      const { code } = await createAuthCode(ctx.user!.id);
 
-      let redirectUrl: URL;
-      try {
-        redirectUrl = new URL(input.redirectUri);
-      } catch {
-        throw new TRPCError({ code: "BAD_REQUEST", message: "Invalid redirect_uri" });
-      }
-
-      if (!allowed.includes(redirectUrl.origin)) {
-        throw new TRPCError({
-          code: "FORBIDDEN",
-          message: "redirect_uri origin is not allowlisted for connect handshakes",
-        });
-      }
-
-      const rawCode = generateSecureToken(32);
-      const codeHash = await hashApiKey(rawCode);
-
-      const authCodeRepo = AppDataSource.getRepository(AuthCode);
-      const authCode = authCodeRepo.create({
-        userId: ctx.user!.id,
-        codeHash,
-        expiresAt: new Date(Date.now() + 10 * 60 * 1000), // 10 minutes
-        used: false,
-      });
-      await authCodeRepo.save(authCode);
-
-      redirectUrl.searchParams.set("code", rawCode);
+      redirectUrl.searchParams.set("code", code);
       if (input.state) redirectUrl.searchParams.set("state", input.state);
 
       return { redirectUrl: redirectUrl.toString() };
@@ -1598,24 +1448,24 @@ export const authRouter = t.router({
     .mutation(async ({ input, ctx }) => {
       const codeHash = await hashApiKey(input.code);
 
-      const authCodeRepo = AppDataSource.getRepository(AuthCode);
-      const authCode = await authCodeRepo.findOne({
-        where: { codeHash, used: false },
-        relations: ["user"],
-      });
+      // Claim the code in one statement so concurrent exchanges can't both succeed.
+      const claimed = await AppDataSource.createQueryBuilder()
+        .update(AuthCode)
+        .set({ used: true })
+        .where("code_hash = :codeHash AND used = false AND expires_at > now()", { codeHash })
+        .returning("user_id")
+        .execute();
+      const userId = (claimed.raw as Array<{ user_id: string }>)[0]?.user_id;
+      const user = userId
+        ? await AppDataSource.getRepository(User).findOne({ where: { id: userId } })
+        : null;
 
-      if (!authCode || !authCode.isValid()) {
+      if (!user) {
         throw new TRPCError({
           code: "BAD_REQUEST",
           message: "Invalid or expired auth code",
         });
       }
-
-      // Mark as used immediately (single-use)
-      authCode.used = true;
-      await authCodeRepo.save(authCode);
-
-      const user = authCode.user!;
 
       if (!user.isActive) {
         throw new TRPCError({
@@ -1664,38 +1514,6 @@ export const authRouter = t.router({
         },
         ...tokens,
       };
-    }),
-
-  // Admin endpoints
-  listUsers: adminProcedure.query(async () => {
-    const userRepository = AppDataSource.getRepository(User);
-    const users = await userRepository.find({
-      select: ["id", "email", "isActive", "createdAt", "lastLoginAt"],
-      order: { createdAt: "DESC" },
-    });
-
-    return users;
-  }),
-
-  deactivateUser: adminProcedure
-    .input(z.object({ userId: z.string().uuid() }))
-    .mutation(async ({ input }) => {
-      const userRepository = AppDataSource.getRepository(User);
-      const user = await userRepository.findOne({
-        where: { id: input.userId },
-      });
-
-      if (!user) {
-        throw new TRPCError({
-          code: "NOT_FOUND",
-          message: "User not found",
-        });
-      }
-
-      user.isActive = false;
-      await userRepository.save(user);
-
-      return { success: true };
     }),
 
   // Online status endpoints

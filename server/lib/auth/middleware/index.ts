@@ -1,5 +1,4 @@
 import { AuthUser } from "@server/lib/auth/AuthUser";
-import { authenticateBasicAuth } from "./basicAuth";
 import { authenticateBearerAuth } from "./bearerAuth";
 import { authenticateApiKeyAuth } from "./apiKeyAuth";
 import type { Request } from "express";
@@ -109,14 +108,6 @@ export async function authenticate(req: Request): Promise<AuthUser | null> {
       baseAuthUser = await authenticateBearerAuth(authHeader);
       if (baseAuthUser) {
         logAuthSuccess("jwt", baseAuthUser.id);
-      }
-    }
-
-    // Try Basic authentication
-    if (!baseAuthUser && authHeader.startsWith("Basic ")) {
-      baseAuthUser = await authenticateBasicAuth(authHeader);
-      if (baseAuthUser) {
-        logAuthSuccess("basic", baseAuthUser.id);
       }
     }
 

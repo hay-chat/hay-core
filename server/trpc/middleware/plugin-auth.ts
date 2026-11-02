@@ -59,7 +59,9 @@ export const verifyPluginAuth = t.middleware(async ({ ctx, next }) => {
 
   try {
     // Verify JWT token
-    const decoded = jwt.verify(token, config.jwt.secret) as PluginTokenPayload;
+    const decoded = jwt.verify(token, config.jwt.secret, {
+      algorithms: ["HS256"],
+    }) as PluginTokenPayload;
 
     // Verify scope
     if (decoded.scope !== "plugin-api") {

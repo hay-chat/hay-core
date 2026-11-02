@@ -11,6 +11,7 @@ import {
 } from "@server/types/organization-access.types";
 import { resolutionLedgerService } from "@server/services/resolution-ledger.service";
 import { createLogger } from "@server/lib/logger";
+import { internalUsersRouter } from "./users";
 
 const logger = createLogger("internal");
 
@@ -141,4 +142,5 @@ const internalResolutionsRouter = router({
 export const internalRouter = router({
   organizations: internalOrganizationsRouter,
   resolutions: internalResolutionsRouter,
+  users: internalUsersRouter,
 });

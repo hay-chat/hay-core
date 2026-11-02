@@ -89,8 +89,9 @@ export class RateLimitService {
     key: string,
     maxRequests: number,
     windowSeconds: number,
+    failClosed: boolean = false,
   ): Promise<{ limited: boolean; remaining: number; resetAt: Date }> {
-    return this.checkRateLimit(`rate_limit:key:${key}`, maxRequests, windowSeconds);
+    return this.checkRateLimit(`rate_limit:key:${key}`, maxRequests, windowSeconds, failClosed);
   }
 
   /**
