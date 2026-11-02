@@ -3,6 +3,7 @@ import { oauthAuthStrategy } from "./oauth-auth-strategy.service";
 import { pluginInstanceRepository } from "../repositories/plugin-instance.repository";
 import { decryptConfig } from "../lib/auth/utils/encryption";
 import { createLogger } from "@server/lib/logger";
+import { safeFetch } from "@server/utils/ssrf";
 import { v4 as uuidv4 } from "uuid";
 
 const logger = createLogger("remote-mcp");
@@ -44,71 +45,8 @@ interface ApiKeyConfig {
   api_key?: string;
 }
 
-/**
- * Validate that a URL does not point to private/internal networks (SSRF protection).
- * Rejects private IP ranges, localhost, link-local, cloud metadata endpoints,
- * and non-HTTP(S) schemes.
- */
-function validatePublicUrl(url: string): void {
-  let parsed: URL;
-  try {
-    parsed = new URL(url);
-  } catch {
-    throw new Error(`Invalid MCP server URL: ${url}`);
-  }
-
-  // Only allow HTTP(S) schemes
-  if (!["http:", "https:"].includes(parsed.protocol)) {
-    throw new Error(`Invalid URL scheme "${parsed.protocol}" — only http: and https: are allowed`);
-  }
-
-  const hostname = parsed.hostname.toLowerCase();
-
-  // Block localhost variants
-  if (
-    hostname === "localhost" ||
-    hostname === "127.0.0.1" ||
-    hostname === "[::1]" ||
-    hostname === "::1" ||
-    hostname === "0.0.0.0"
-  ) {
-    throw new Error("MCP server URL must not point to localhost");
-  }
-
-  // Block cloud metadata endpoints
-  if (hostname === "metadata.google.internal" || hostname === "169.254.169.254") {
-    throw new Error("MCP server URL must not point to cloud metadata endpoints");
-  }
-
-  // Block private/reserved IPv4 ranges
-  const ipv4Match = hostname.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
-  if (ipv4Match) {
-    const [, a, b] = ipv4Match.map(Number);
-    if (
-      a === 10 || // 10.0.0.0/8
-      (a === 172 && b >= 16 && b <= 31) || // 172.16.0.0/12
-      (a === 192 && b === 168) || // 192.168.0.0/16
-      a === 127 || // 127.0.0.0/8
-      (a === 169 && b === 254) || // 169.254.0.0/16 (link-local)
-      a === 0 // 0.0.0.0/8
-    ) {
-      throw new Error("MCP server URL must not point to a private or reserved IP range");
-    }
-  }
-
-  // Block IPv6 private ranges (fc00::/7 = fc and fd prefixes, fe80::/10 = link-local)
-  if (hostname.startsWith("[")) {
-    const ipv6 = hostname.slice(1, -1).toLowerCase();
-    if (
-      ipv6.startsWith("fc") ||
-      ipv6.startsWith("fd") ||
-      ipv6.startsWith("fe80") ||
-      ipv6 === "::1"
-    ) {
-      throw new Error("MCP server URL must not point to a private or link-local IPv6 address");
-    }
-  }
-}
+/** Tool calls can be slow; matches the local MCP client's tool-execution budget. */
+const REQUEST_TIMEOUT_MS = 60_000;
 
 /**
  * Remote MCP Client
@@ -122,7 +60,6 @@ export class RemoteMCPClient implements MCPClient {
   private connected: boolean = false;
 
   constructor(baseUrl: string, organizationId: string, pluginId: string) {
-    validatePublicUrl(baseUrl);
     this.baseUrl = baseUrl.replace(/\/$/, ""); // Remove trailing slash
     this.organizationId = organizationId;
     this.pluginId = pluginId;
@@ -145,10 +82,12 @@ export class RemoteMCPClient implements MCPClient {
     logger.debug({ method: request.method }, "Sending SSE request");
     logger.debug({ hasAuthHeader: !!headers.Authorization }, "Request headers prepared");
 
-    const response = await fetch(this.baseUrl, {
+    // The server URL comes from plugin/tenant config: SSRF-checked, pinned, no redirects.
+    const response = await safeFetch(this.baseUrl, {
       method: "POST",
       headers,
       body: JSON.stringify(request),
+      timeoutMs: REQUEST_TIMEOUT_MS,
     });
 
     logger.debug(

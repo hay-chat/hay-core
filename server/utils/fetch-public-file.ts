@@ -1,19 +1,15 @@
-import { validateUrlForSSRF } from "@server/utils/ssrf";
+import { safeFetch } from "@server/utils/ssrf";
 
 /**
- * Download a file from a public URL: SSRF-checked, no redirects (a redirect
- * could point past the check), a timeout, and a size cap enforced while
- * reading so an oversized body is never held in memory.
+ * Download a file from a public URL: SSRF-checked and pinned (`safeFetch`, so
+ * no redirects and a timeout), with a size cap enforced while reading so an
+ * oversized body is never held in memory.
  */
 export async function fetchPublicFile(
   url: string,
   options: { maxBytes: number; timeoutMs: number },
 ): Promise<{ buffer: Buffer; mimeType: string }> {
-  await validateUrlForSSRF(url);
-  const response = await fetch(url, {
-    redirect: "manual",
-    signal: AbortSignal.timeout(options.timeoutMs),
-  });
+  const response = await safeFetch(url, { timeoutMs: options.timeoutMs });
   if (!response.ok) throw new Error(`download failed with status ${response.status}`);
   const declared = Number(response.headers.get("content-length") ?? "0");
   if (declared > options.maxBytes) throw new Error("file too large");
