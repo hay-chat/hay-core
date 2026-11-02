@@ -153,15 +153,6 @@
           />
         </div>
 
-        <Input
-          v-model="settings.defaultAgent"
-          type="select"
-          :label="$t('platform.defaultAgent')"
-          :options="agentOptions"
-          :placeholder="$t('platform.defaultAgentPlaceholder')"
-          :helper-text="$t('platform.defaultAgentHelper')"
-        />
-
         <div class="space-y-2 pt-2 border-t">
           <Label>{{ $t("platform.testMode") }}</Label>
           <p class="text-sm text-neutral-muted mb-3">
@@ -483,7 +474,7 @@ import { TIMEZONE_GROUPS } from "@/utils/timezones";
 // string values (cast to the type) for defaults — the casts erase at build time.
 import type { SupportedLanguage } from "@server/types/language.types";
 import type { DateFormat, TimeFormat, Timezone } from "@server/types/organization-settings.types";
-import type { RouterInputs, RouterOutputs } from "@/types/trpc";
+import type { RouterInputs } from "@/types/trpc";
 
 type UpdateSettingsInput = RouterInputs["organizations"]["updateSettings"];
 
@@ -552,7 +543,6 @@ type PlatformSettings = {
   timezone: NonNullable<UpdateSettingsInput["timezone"]>;
   dateFormat: NonNullable<UpdateSettingsInput["dateFormat"]>;
   timeFormat: NonNullable<UpdateSettingsInput["timeFormat"]>;
-  defaultAgent: string;
   testModeDefault: boolean;
   confidenceGuardrail: ConfidenceGuardrailSettings;
   notifications: NotificationSettings;
@@ -572,7 +562,6 @@ const settings = ref<PlatformSettings>({
   timezone: "UTC" as Timezone,
   dateFormat: "MM/DD/YYYY" as DateFormat,
   timeFormat: "12h" as TimeFormat,
-  defaultAgent: "",
   testModeDefault: false,
   confidenceGuardrail: {
     highThreshold: 0.8,
@@ -617,10 +606,6 @@ const settings = ref<PlatformSettings>({
   },
 });
 
-// Agents data
-type AgentListItem = RouterOutputs["agents"]["list"][number];
-const agents = ref<AgentListItem[]>([]);
-
 // Computed properties
 const hasChanges = computed(() => {
   return JSON.stringify(settings.value) !== JSON.stringify(originalSettings.value);
@@ -634,13 +619,6 @@ const timezoneOptions = computed(() => {
     });
   });
   return options;
-});
-
-const agentOptions = computed(() => {
-  return agents.value.map((agent) => ({
-    label: agent.name,
-    value: agent.id,
-  }));
 });
 
 const isOwner = computed(() => userStore.isOwner);
@@ -748,7 +726,6 @@ const saveSettings = async () => {
       timezone: settings.value.timezone,
       dateFormat: settings.value.dateFormat,
       timeFormat: settings.value.timeFormat,
-      defaultAgentId: settings.value.defaultAgent || null,
       testModeDefault: settings.value.testModeDefault,
       retentionDays: settings.value.retentionDays,
       confidenceGuardrail: {
@@ -854,7 +831,6 @@ const resetToDefaults = () => {
       timezone: "UTC" as Timezone,
       dateFormat: "MM/DD/YYYY" as DateFormat,
       timeFormat: "12h" as TimeFormat,
-      defaultAgent: "",
       testModeDefault: false,
       confidenceGuardrail: {
         highThreshold: 0.8,
@@ -909,10 +885,6 @@ const onOrganizationDeleted = () => {
 // Lifecycle
 onMounted(async () => {
   try {
-    // Load agents
-    const agentsResponse = await Hay.agents.list.query();
-    agents.value = agentsResponse || [];
-
     // Load current platform settings from API
     const orgSettings = await Hay.organizations.getSettings.query();
 
@@ -924,7 +896,6 @@ onMounted(async () => {
     settings.value.timezone = orgSettings.timezone;
     settings.value.dateFormat = orgSettings.dateFormat;
     settings.value.timeFormat = orgSettings.timeFormat;
-    settings.value.defaultAgent = orgSettings.defaultAgentId || "";
     settings.value.testModeDefault =
       "testModeDefault" in orgSettings
         ? ((orgSettings as Record<string, unknown>).testModeDefault as boolean)

@@ -147,33 +147,6 @@ export const useUserStore = defineStore("user", {
     },
 
     // Enhanced permission helpers for common operations
-    canCreateAgents: (state) => {
-      const activeOrg = state.organizations.find((org) => org.id === state.activeOrganizationId);
-      if (activeOrg?.role === "owner" || activeOrg?.role === "admin") return true;
-      const permissions = activeOrg?.permissions || [];
-      return permissions.some(
-        (p) => p === "agents:create" || p === "agents:*" || p === "*:*" || p === "*:create",
-      );
-    },
-
-    canEditAgents: (state) => {
-      const activeOrg = state.organizations.find((org) => org.id === state.activeOrganizationId);
-      if (activeOrg?.role === "owner" || activeOrg?.role === "admin") return true;
-      const permissions = activeOrg?.permissions || [];
-      return permissions.some(
-        (p) => p === "agents:update" || p === "agents:*" || p === "*:*" || p === "*:update",
-      );
-    },
-
-    canDeleteAgents: (state) => {
-      const activeOrg = state.organizations.find((org) => org.id === state.activeOrganizationId);
-      if (activeOrg?.role === "owner" || activeOrg?.role === "admin") return true;
-      const permissions = activeOrg?.permissions || [];
-      return permissions.some(
-        (p) => p === "agents:delete" || p === "agents:*" || p === "*:*" || p === "*:delete",
-      );
-    },
-
     canCreatePlaybooks: (state) => {
       const activeOrg = state.organizations.find((org) => org.id === state.activeOrganizationId);
       if (activeOrg?.role === "owner" || activeOrg?.role === "admin") return true;

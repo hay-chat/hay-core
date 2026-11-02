@@ -80,13 +80,13 @@ const requiredRole = computed(() => {
     attemptedPath.includes("/settings/general") ||
     attemptedPath.includes("/settings/privacy") ||
     attemptedPath.includes("/settings/webchat") ||
-    attemptedPath.includes("/agents") ||
+    attemptedPath.includes("/settings/assistant") ||
     attemptedPath.includes("/integrations/marketplace")
   ) {
     return t("unauthorized.roles.adminOrOwner");
   }
 
-  if (attemptedPath.includes("/agents/create") || attemptedPath.includes("/playbooks/create")) {
+  if (attemptedPath.includes("/playbooks/create")) {
     return t("unauthorized.roles.contributorAdminOrOwner");
   }
 

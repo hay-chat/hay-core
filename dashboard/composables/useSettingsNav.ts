@@ -17,8 +17,7 @@ export const SETTINGS_NAV: SettingsSection[] = [
     id: "assistant",
     labelKey: "nav.assistant",
     tabs: [
-      // TODO: Identity becomes the organization's own page when agents are removed.
-      { labelKey: "nav.identity", path: "/agents", adminOnly: true },
+      { labelKey: "nav.identity", path: "/settings/assistant", adminOnly: true },
       { labelKey: "nav.actionsSettings", path: "/settings/actions", adminOnly: true },
       { labelKey: "nav.llmProviders", path: "/settings/llm", adminOnly: true },
     ],

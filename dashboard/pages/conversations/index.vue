@@ -308,7 +308,6 @@ const error = ref<string | null>(null);
 const _realTimeEnabled = ref(true);
 const searchQuery = ref("");
 const selectedStatus = ref("");
-const selectedAgent = ref("");
 const selectedTimeframe = ref("week");
 const bulkMode = ref(false);
 const selectedConversations = ref<string[]>([]);
@@ -328,7 +327,6 @@ interface Conversation {
   title?: string;
   status: string;
   channel?: string;
-  agent_id?: string;
   created_at: string;
   updated_at: string;
   ended_at?: string;
@@ -431,12 +429,10 @@ const filteredConversations = computed(() => {
 
     const matchesStatus = !selectedStatus.value || conversation.status === selectedStatus.value;
 
-    const matchesAgent = !selectedAgent.value || conversation.agent_id === selectedAgent.value;
-
     // TODO: Implement timeframe filtering
     const matchesTimeframe = true;
 
-    return matchesSearch && matchesStatus && matchesAgent && matchesTimeframe;
+    return matchesSearch && matchesStatus && matchesTimeframe;
   });
 });
 

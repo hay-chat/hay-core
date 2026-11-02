@@ -17,14 +17,12 @@ export const roleProtectedRoutes: Record<string, string[]> = {
   "/settings/webchat": ["owner", "admin"],
   "/settings/business-hours": ["owner", "admin"],
   "/settings/usage": ["owner", "admin"],
-  "/agents": ["owner", "admin"],
+  "/settings/assistant": ["owner", "admin"],
 
   // Insights - all except agent
   "/insights": ["owner", "admin", "contributor", "member", "viewer"],
 
   // Content creation - contributor+
-  "/agents/create": ["owner", "admin", "contributor"],
-  "/agents/new": ["owner", "admin", "contributor"],
   "/playbooks/create": ["owner", "admin", "contributor"],
   "/playbooks/new": ["owner", "admin", "contributor"],
 

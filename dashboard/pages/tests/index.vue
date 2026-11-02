@@ -20,6 +20,8 @@
       </CardContent>
     </Card>
 
+    <ReadinessCard />
+
     <Card>
       <CardHeader>
         <CardTitle class="text-base">{{ $t("tests.replay.title") }}</CardTitle>
@@ -197,7 +199,7 @@ import type { RouterOutputs } from "@/types/trpc";
 
 /**
  * Tests (D7-11): replay past conversations (recent Hay.chat ones or imported
- * transcripts) against the agent, optionally a playbook draft, and open the
+ * transcripts) against the assistant, optionally a playbook draft, and open the
  * report. Runs are dry, never delivered and never billed.
  */
 type Run = RouterOutputs["simulations"]["list"][number];

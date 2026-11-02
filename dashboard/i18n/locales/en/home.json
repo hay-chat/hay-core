@@ -96,7 +96,6 @@
       "pausedBy": "Paused by {name} on {when}.",
       "pausedAt": "Paused on {when}.",
       "perChannel": "Turn the AI off on one channel only (drafts only)",
-      "perAgent": "Switch off one agent",
       "banner": "The AI is paused everywhere. Your team answers every conversation.",
       "resume": "Resume AI",
       "paused": "AI paused everywhere",

@@ -132,19 +132,19 @@
           </CardContent>
         </Card>
 
-        <!-- Step 2: Create an Agent -->
-        <Card variant="accordion" :default-open="isStepOpen('agent')">
+        <!-- Step 2: Describe your assistant -->
+        <Card variant="accordion" :default-open="isStepOpen('assistant')">
           <CardHeader>
             <div class="flex items-center gap-3 flex-1">
-              <div class="onboarding-check" :class="{ checked: agent?.completed }">
-                <Check v-if="agent?.completed" class="w-3 h-3 text-white" />
+              <div class="onboarding-check" :class="{ checked: assistant?.completed }">
+                <Check v-if="assistant?.completed" class="w-3 h-3 text-white" />
               </div>
               <div class="flex-1">
-                <CardTitle class="text-lg" :class="{ 'line-through': agent?.completed }">
-                  {{ $t("dashboard.gettingStarted.agent.title") }}
+                <CardTitle class="text-lg" :class="{ 'line-through': assistant?.completed }">
+                  {{ $t("dashboard.gettingStarted.assistant.title") }}
                 </CardTitle>
                 <p class="text-sm text-neutral-muted">
-                  {{ $t("dashboard.gettingStarted.agent.subtitle") }}
+                  {{ $t("dashboard.gettingStarted.assistant.subtitle") }}
                 </p>
               </div>
             </div>
@@ -152,26 +152,19 @@
           <CardContent class="!pt-0">
             <div class="space-y-4">
               <p>
-                {{ $t("dashboard.gettingStarted.agent.description") }}
+                {{ $t("dashboard.gettingStarted.assistant.description") }}
               </p>
 
-              <div v-if="agent && agent.count > 0" class="text-sm">
-                {{
-                  agent.count === 1
-                    ? $t("dashboard.gettingStarted.agent.countOne", { count: agent.count })
-                    : $t("dashboard.gettingStarted.agent.countOther", { count: agent.count })
-                }}
-              </div>
-
-              <div v-if="!agent?.completed">
-                <Button @click="navigateTo('/agents/new?redirect=/getting-started')">
-                  {{ $t("dashboard.gettingStarted.agent.createAgent") }}
-                  <ArrowRight class="w-3 h-3 ml-2" />
-                </Button>
-              </div>
-              <div v-else>
-                <Button variant="outline" @click="navigateTo('/agents')">
-                  {{ $t("dashboard.gettingStarted.agent.viewAgents") }}
+              <div>
+                <Button
+                  :variant="assistant?.completed ? 'outline' : 'default'"
+                  @click="navigateTo('/settings/assistant')"
+                >
+                  {{
+                    assistant?.completed
+                      ? $t("dashboard.gettingStarted.assistant.edit")
+                      : $t("dashboard.gettingStarted.assistant.describe")
+                  }}
                   <ArrowRight class="w-3 h-3 ml-2" />
                 </Button>
               </div>
@@ -430,7 +423,7 @@ const allPlugins = ref<Plugin[]>([]);
 // Individual step refs
 const integrations = computed(() => stepsData.value?.steps.find((s) => s.id === "integrations"));
 
-const agent = computed(() => stepsData.value?.steps.find((s) => s.id === "agent"));
+const assistant = computed(() => stepsData.value?.steps.find((s) => s.id === "assistant"));
 
 const documents = computed(() => stepsData.value?.steps.find((s) => s.id === "documents"));
 
@@ -461,7 +454,7 @@ const progress = computed(() => {
 
 // Step dependencies (step 1 is optional, so not in dependencies)
 const stepDependencies: Record<string, string> = {
-  documents: "agent",
+  documents: "assistant",
   playbook: "documents",
   playground: "playbook",
 };
@@ -480,7 +473,7 @@ const isStepOpen = (stepId: string) => {
   if (!stepsData.value) return false;
 
   // Find the first incomplete step
-  const steps = ["integrations", "agent", "documents", "playbook", "playground"];
+  const steps = ["integrations", "assistant", "documents", "playbook", "playground"];
   const firstIncompleteStepId = steps.find((id) => {
     const step = stepsData.value?.steps.find((s) => s.id === id);
     return !step?.completed && !isStepLocked(id);

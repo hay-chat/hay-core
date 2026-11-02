@@ -44,11 +44,8 @@
     "dateFormatHelper": "Prévia: {preview}",
     "timeFormat": "Formato de Hora",
     "timeFormatHelper": "Prévia: {preview}",
-    "defaultAgent": "Agente Padrão",
-    "defaultAgentPlaceholder": "Nenhum agente padrão",
-    "defaultAgentHelper": "Agente para atender conversas quando nenhum agente específico está atribuído",
     "testMode": "Modo de Teste Padrão",
-    "testModeDescription": "Quando ativado, as mensagens de IA precisam de aprovação antes de serem enviadas aos clientes. Agentes individuais podem sobrescrever esta configuração.",
+    "testModeDescription": "Quando ativado, as mensagens de IA precisam de aprovação antes de serem enviadas aos clientes.",
     "testModeCheckbox": "Exigir aprovação para mensagens de IA por padrão",
     "testModeNote": "Nota: Conversas no Playground sempre enviam automaticamente, independente desta configuração.",
     "languages": {
@@ -94,7 +91,7 @@
     "description": "Esta ação não pode ser desfeita. Isso excluirá permanentemente a organização e todos os dados associados.",
     "warningTitle": "Aviso: Isso irá imediatamente:",
     "impact1": "Parar todas as conversas ativas",
-    "impact2": "Excluir todos os agentes, playbooks e documentos",
+    "impact2": "Excluir o assistente, os playbooks e os documentos",
     "impact3": "Remover todos os membros da equipe da organização",
     "impact4": "Excluir todos os dados de clientes e histórico de conversas",
     "impact5": "Invalidar todas as chaves de API",
@@ -597,7 +594,7 @@
   },
   "llmSettings": {
     "title": "Modelos de IA",
-    "description": "Escolha qual provedor e modelos de IA alimentam seus agentes. Os embeddings continuam gerenciados pelo Hay.chat.",
+    "description": "Escolha qual provedor e modelos de IA alimentam seu assistente. Os embeddings continuam gerenciados pelo Hay.chat.",
     "save": "Salvar Alterações",
     "saveSuccess": "Configurações de modelos de IA salvas",
     "saveFailed": "Falha ao salvar as configurações de modelos de IA",
@@ -605,14 +602,14 @@
     "modelCustom": "Personalizado…",
     "modelCustomPlaceholder": "Insira o id de um modelo",
     "warning": {
-      "title": "Avançado — alterações aqui afetam todos os agentes",
-      "description": "Estas configurações controlam o provedor e os modelos de IA por trás dos seus agentes. Alterar os padrões pode mudar radicalmente a qualidade das respostas, o custo, a latência e a confiabilidade. Só prossiga se souber o que está fazendo.",
+      "title": "Avançado — alterações aqui afetam todas as respostas de IA",
+      "description": "Estas configurações controlam o provedor e os modelos de IA por trás do seu assistente. Alterar os padrões pode mudar radicalmente a qualidade das respostas, o custo, a latência e a confiabilidade. Só prossiga se souber o que está fazendo.",
       "unlock": "Eu entendo — deixe-me editar",
-      "unlocked": "Edição desbloqueada. Salve com cuidado — as alterações se aplicam a todos os agentes desta organização."
+      "unlocked": "Edição desbloqueada. Salve com cuidado — as alterações se aplicam a todas as respostas de IA desta organização."
     },
     "chat": {
       "title": "Provedor de Chat",
-      "description": "O provedor e a conta usados para gerar as respostas dos agentes.",
+      "description": "O provedor e a conta usados para gerar as respostas do assistente.",
       "provider": "Provedor",
       "providerHelper": "Compatível com OpenAI cobre OpenAI, Mistral, Grok e endpoints personalizados.",
       "vendor": "Fornecedor",
@@ -631,7 +628,7 @@
     },
     "tiers": {
       "title": "Níveis de Modelo",
-      "description": "Os agentes escolhem um nível pela complexidade da tarefa; mapeie cada nível para um modelo do seu provedor.",
+      "description": "O assistente escolhe um nível pela complexidade da tarefa; mapeie cada nível para um modelo do seu provedor.",
       "hard": "Difícil (mais capaz)",
       "hardHelper": "Orquestração, planejamento e guardrails.",
       "medium": "Médio (equilibrado)",
@@ -649,7 +646,7 @@
       "title": "Região de processamento de IA",
       "description": "Escolha onde as mensagens dos seus clientes são processadas pela IA.",
       "euOnly": "Processar IA somente na UE",
-      "euOnlyHint": "Todas as respostas de IA, buscas em documentos e produtos e transcrições de mensagens de voz desta organização rodam no endpoint de residência de dados na UE da OpenAI. Enquanto isso estiver ativo, os agentes usam os modelos gerenciados na UE do Hay.chat.",
+      "euOnlyHint": "Todas as respostas de IA, buscas em documentos e produtos e transcrições de mensagens de voz desta organização rodam no endpoint de residência de dados na UE da OpenAI. Enquanto isso estiver ativo, o assistente usa os modelos gerenciados na UE do Hay.chat.",
       "statusEu": "Processamento de IA: data centers na UE (residência de dados na UE da OpenAI).",
       "statusDefault": "Processamento de IA: provedor de IA padrão do Hay.chat, que pode rodar fora da UE.",
       "unavailable": "O processamento somente na UE ainda não está disponível. Ele aparecerá aqui quando estiver pronto.",
@@ -721,7 +718,7 @@
   },
   "workspaceExport": {
     "title": "Baixar todos os dados do workspace",
-    "description": "Tudo o que este workspace guarda no Hay.chat em um único ZIP: conversas e mensagens, clientes, documentos, playbooks e configurações dos agentes.",
+    "description": "Tudo o que este workspace guarda no Hay.chat em um único ZIP: conversas e mensagens, clientes, documentos, playbooks e configurações do assistente.",
     "includes": "O ZIP traz um arquivo JSON Lines por tipo de dado e arquivos CSV de conversas, mensagens e clientes. Os arquivos enviados nas conversas estão incluídos, até 1,5 GB no total. Só donos e administradores podem baixar, e cada download fica registrado.",
     "request": "Preparar exportação",
     "requestAgain": "Preparar nova exportação",

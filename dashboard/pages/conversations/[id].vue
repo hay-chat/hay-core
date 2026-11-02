@@ -847,15 +847,6 @@
               <CardContent class="space-y-3 text-sm">
                 <div class="flex justify-between">
                   <span class="text-neutral-muted">{{
-                    $t("conversations.conversationDetails.agent")
-                  }}</span>
-                  <span>{{
-                    conversation?.agent?.name ||
-                    $t("conversations.conversationDetails.defaultAgent")
-                  }}</span>
-                </div>
-                <div class="flex justify-between">
-                  <span class="text-neutral-muted">{{
                     $t("conversations.conversationDetails.status")
                   }}</span>
                   <span>{{ formatStatus(conversation?.status) }}</span>
@@ -1409,27 +1400,21 @@ const isTakenOverByCurrentUser = computed(() => {
   );
 });
 
-// Check if test mode is enabled for this conversation
-const isTestMode = computed(() => {
-  const agent = conversation.value?.agent;
-  const organization = conversation.value?.organization;
-
-  if (!agent) return false;
-
-  // Check agent's testMode setting
-  // If agent has explicit setting, use it; otherwise check org default
-  const orgDefault = organization?.settings?.testModeDefault ?? false;
-  return agent.testMode ?? orgDefault;
-});
+// Test mode (Require Approval) is the organization's setting
+const isTestMode = computed(
+  () => conversation.value?.organization?.settings?.testModeDefault ?? false,
+);
 
 // Check if conversation status is pending-human (needs human attention)
 const isPendingHuman = computed(() => {
   return conversation.value?.status === "pending-human";
 });
 
-// Avatar URLs passed to message bubbles: the AI agent avatar for BotAgent
+// Avatar URLs passed to message bubbles: the assistant's avatar for BotAgent
 // messages, the assigned human's avatar for HumanAgent messages.
-const botAvatarUrl = computed<string | null>(() => conversation.value?.agent?.avatarUrl ?? null);
+const botAvatarUrl = computed<string | null>(
+  () => conversation.value?.organization?.assistantAvatarUrl ?? null,
+);
 const humanAvatarUrl = computed<string | null>(() => assignedUser.value?.avatarUrl ?? null);
 
 // Message types that render a sender header + timestamp.
