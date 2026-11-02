@@ -1,0 +1,44 @@
+<mj-section background-color="#ffffff" padding-bottom="20px" padding-top="20px">
+  <mj-column width="100%">
+    <mj-text align="center" color="#333333" font-size="24px" font-weight="bold" padding-bottom="10px">
+      {{ t.privacy-export-ready-merchant.title }}
+    </mj-text>
+  </mj-column>
+</mj-section>
+
+<mj-section background-color="#ffffff" padding-bottom="20px" padding-top="0px">
+  <mj-column width="100%">
+    <mj-text color="#555555" font-size="16px" line-height="24px">
+      {{ t.privacy-export-ready-merchant.body }}
+    </mj-text>
+
+    <mj-text color="#555555" font-size="14px" line-height="20px">
+      <strong>{{ t.privacy-export-ready-merchant.customer }}</strong> {{customerLabel}} ({{customerId}})<br/>
+      <strong>{{ t.privacy-export-ready-merchant.request }}</strong> {{requestReference}}
+    </mj-text>
+
+    <mj-button background-color="#0066ff" color="#ffffff" href="{{downloadUrl}}" padding-top="20px" padding-bottom="20px">
+      {{ t.privacy-export-ready-merchant.downloadButton }}
+    </mj-button>
+
+    <mj-text color="#555555" font-size="14px" line-height="20px" padding-top="10px">
+      {{ t.common.copyPasteLink }}
+    </mj-text>
+
+    <mj-text color="#0066ff" font-size="12px" line-height="18px" padding-bottom="20px">
+      {{downloadUrl}}
+    </mj-text>
+
+    <mj-divider border-color="#e0e0e0" border-width="1px" />
+
+    <mj-text color="#555555" font-size="14px" line-height="20px" padding-top="20px">
+      • {{ t.privacy-export-ready-merchant.info1 }}<br/>
+      • {{ t.privacy-export-ready-merchant.info2 }}<br/>
+      • {{ t.privacy-export-ready-merchant.info3 }}
+    </mj-text>
+
+    <mj-text color="#777777" font-size="14px" line-height="20px" padding-top="20px" padding-bottom="20px">
+      {{ t.common.needHelp }} <a href="{{supportUrl}}" style="color: #0066ff;">{{supportUrl}}</a>
+    </mj-text>
+  </mj-column>
+</mj-section>

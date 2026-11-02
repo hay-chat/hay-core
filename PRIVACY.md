@@ -360,7 +360,14 @@ When a deletion request is confirmed, the following actions are taken:
 - **Customer erasure** deletes the customer's messages, action logs, pending actions, order links and team questions; conversations remain as anonymous soft-deleted rows _(pending PR #133)_.
 - Audit rows written by _other_ users (e.g. an invitation sent to the erased person) may still contain the erased person's email address.
 - Operator event payloads are not erased yet.
-- Erasure does not reach sub-processors' copies (e.g. AI providers, email provider) or commerce platforms connected through plugins; provider-initiated redaction webhooks are not implemented.
+- Erasure does not reach sub-processors' copies (e.g. AI providers, email provider) or commerce platforms connected through plugins.
+
+### Provider-initiated requests
+
+Store platforms connected through plugins (Nuvemshop LGPD webhooks, Shopify compliance webhooks) can ask Hay to act on a shopper, matched by email, phone or channel identity within the store's organization:
+
+- **Redact** (`customers/redact`): the matching customers are erased as above. The shopper gets no email from Hay; the platform answers them.
+- **Data request** (`customers/data_request`): the store is the controller and Hay the processor, so the export goes to the organization's active owners and admins (template `privacy-export-ready-merchant`), naming the customer and the platform's request id and asking them to forward it. The shopper is never emailed. A request with no matching customer is recorded as answered (`metadata.outcome = "no_match"`); one whose organization has no owner or admin with an email is recorded as failed (`metadata.outcome = "no_recipient"`) and no export is made.
 
 ### Retention for Compliance
 

@@ -20,9 +20,11 @@
  *   a background job. Nuvemshop customer records themselves are never copied;
  *   the agent reads them live through the API.
  * - customers/data_request: core queues the same data export a verified
- *   self-service request produces and emails its download link to the address
- *   on the matching Hay.chat customer record. A match with no email on record
- *   cannot be delivered and is logged as such.
+ *   self-service request produces and emails its download link to the
+ *   store's owners and admins in Hay.chat, asking them to forward it: under
+ *   LGPD the store is the controller and answers its shopper, so the shopper
+ *   is never emailed. No match, or no owner/admin email, is logged here and
+ *   recorded by core.
  *
  * Both are idempotent while the job is in flight, so a retried delivery does
  * not queue a second job.
@@ -154,7 +156,16 @@ export async function handleLgpdWebhook(
   try {
     const action = kind === "customers/redact" ? "erase" : "export";
     const result = await deps.requestPrivacy(action, subject);
-    deps.logger.info(`Nuvemshop ${kind}: ${action} queued`, { ...meta, ...result });
+    if (action === "export" && (result.matched === 0 || result.undeliverable)) {
+      deps.logger.warn(
+        result.matched === 0
+          ? `Nuvemshop ${kind}: no Hay.chat customer matches; nothing to export`
+          : `Nuvemshop ${kind}: no store owner or admin email to send the export to`,
+        { ...meta, ...result },
+      );
+    } else {
+      deps.logger.info(`Nuvemshop ${kind}: ${action} queued`, { ...meta, ...result });
+    }
     res.status(200).json({ received: true, handled: true });
   } catch (error) {
     deps.logger.error(`Nuvemshop ${kind}: request failed`, {

@@ -134,8 +134,9 @@ only changes status, stock and the customer email. So:
   routes the single-object body by `store_id`. `store/redact` disconnects the store (token, store
   id and routing key go). `customers/redact` asks core (`privacy.eraseCustomer`) to erase the
   Hay.chat customers matching the shopper's email or phone; `customers/data_request` asks core
-  (`privacy.exportCustomer`) to email the data export to the address on the matching customer
-  record. Both run as background jobs; Nuvemshop customer records themselves are never copied.
+  (`privacy.exportCustomer`) to email the data export to the store's owners and admins in
+  Hay.chat, who forward it to the shopper (the store is the LGPD controller; the shopper is
+  never emailed). Both run as background jobs; Nuvemshop customer records themselves are never copied.
 
 Partner-portal registration: scopes `read_products, write_orders, write_customers, write_coupons,
 write_fulfillment_orders` (write implies read), redirect URL `https://<hay>/oauth/callback`, the

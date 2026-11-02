@@ -173,6 +173,17 @@
     "included4": "Documentos e conteúdo",
     "included5": "Dados de associação à organização"
   },
+  "privacy-export-ready-merchant": {
+    "subject": "A exportação de dados de um cliente está pronta para encaminhar",
+    "title": "Exportação de dados do cliente pronta",
+    "body": "Sua loja recebeu um pedido de acesso aos dados de um cliente. O {{ companyName }} preparou os dados que mantém sobre ele. Como loja, você responde a este pedido: baixe a exportação e encaminhe-a ao cliente.",
+    "customer": "Cliente:",
+    "request": "Pedido:",
+    "downloadButton": "Baixar exportação",
+    "info1": "O link expira em {{ expiresIn }} e pode ser usado uma vez; baixe o arquivo antes de encaminhá-lo.",
+    "info2": "O {{ companyName }} não entrou em contato com o cliente.",
+    "info3": "O arquivo contém dados pessoais do cliente. Envie-o apenas a ele e guarde-o com segurança."
+  },
   "privacy-deletion-request": {
     "subject": "Verifique Sua Solicitação de Exclusão de Dados",
     "title": "Verifique a Solicitação de Exclusão de Dados",
