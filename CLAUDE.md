@@ -424,7 +424,6 @@ const response = await Hay.conversations.create();
 5. **Composables**: Auto-imported from `/composables` directory:
    - `useWebSocket.ts` - WebSocket connection management
    - `useNotifications.ts` - Toast notifications
-   - `useFormValidation.ts` - Form validation helpers
    - `useConversationTakeover.ts` - Agent takeover functionality
    - And more...
 
