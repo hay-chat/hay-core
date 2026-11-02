@@ -27,8 +27,7 @@ export const documentListInputSchema = baseListInputSchema.extend({
         .default("created_at"),
       orderDirection: z.enum(["asc", "desc"]).default("desc"),
     })
-    .optional()
-    .default({}),
+    .prefault({}),
   search: z
     .object({
       query: z.string().optional(),
@@ -69,8 +68,7 @@ export const conversationListInputSchema = baseListInputSchema.extend({
       orderBy: z.enum(["created_at", "updated_at", "title", "status"]).default("created_at"),
       orderDirection: z.enum(["asc", "desc"]).default("desc"),
     })
-    .optional()
-    .default({}),
+    .prefault({}),
   search: z
     .object({
       query: z.string().optional(),
@@ -98,8 +96,7 @@ export const agentListInputSchema = baseListInputSchema.extend({
       orderBy: z.enum(["created_at", "updated_at", "name", "enabled"]).default("created_at"),
       orderDirection: z.enum(["asc", "desc"]).default("desc"),
     })
-    .optional()
-    .default({}),
+    .prefault({}),
   search: z
     .object({
       query: z.string().optional(),
@@ -127,8 +124,7 @@ export const playbookListInputSchema = baseListInputSchema.extend({
       orderBy: z.enum(["created_at", "updated_at", "name", "status"]).default("created_at"),
       orderDirection: z.enum(["asc", "desc"]).default("desc"),
     })
-    .optional()
-    .default({}),
+    .prefault({}),
   search: z
     .object({
       query: z.string().optional(),
@@ -157,8 +153,7 @@ export const messageListInputSchema = baseListInputSchema.extend({
       orderBy: z.enum(["created_at", "updated_at", "type"]).default("created_at"),
       orderDirection: z.enum(["asc", "desc"]).default("desc"),
     })
-    .optional()
-    .default({}),
+    .prefault({}),
   search: z
     .object({
       query: z.string().optional(),
