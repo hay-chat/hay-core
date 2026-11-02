@@ -124,6 +124,7 @@
 </template>
 
 <script setup lang="ts">
+import { logger } from "@/utils/logger";
 import { Loader2, Shield, Download, Trash2, Edit, Eye, Clock } from "lucide-vue-next";
 import type { RouterOutputs } from "@/types/trpc";
 
@@ -177,6 +178,6 @@ const formatDate = (dateString: string): string => {
 
 const viewDetails = (requestId: string) => {
   // TODO: Implement details modal or navigation
-  console.log("View details for request:", requestId);
+  logger.debug("View details for request:", requestId);
 };
 </script>

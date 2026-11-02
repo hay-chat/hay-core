@@ -73,6 +73,8 @@ These rules define how an AI coding agent should plan, execute, verify, communic
 
 ## Task Management (File-Based, Auditable)
 
+`tasks/todo.md` and `CONTEXT.md` are local working notes and are gitignored; create them if missing. Only `tasks/lessons.md` is tracked.
+
 1. **Plan First**
    - Write a checklist to `tasks/todo.md` for any non-trivial work.
    - Include "Verify" tasks explicitly (lint/tests/build/manual checks).
@@ -424,7 +426,6 @@ const response = await Hay.conversations.create();
 5. **Composables**: Auto-imported from `/composables` directory:
    - `useWebSocket.ts` - WebSocket connection management
    - `useNotifications.ts` - Toast notifications
-   - `useFormValidation.ts` - Form validation helpers
    - `useConversationTakeover.ts` - Agent takeover functionality
    - And more...
 
@@ -520,12 +521,10 @@ const response = await Hay.conversations.create();
 │   └── tests/                # Server tests (Jest)
 │
 ├── plugins/                   # Plugin ecosystem
-│   ├── base/                 # Plugin schema and base types
-│   │   └── plugin-manifest.schema.json
-│   ├── shopify/              # E-commerce plugin example
-│   ├── stripe/               # Payment plugin example
-│   ├── zendesk/              # Support plugin example
-│   └── ...                   # Other plugins
+│   └── core/                 # Bundled plugins (shopify/, stripe/, zendesk/, ...)
+│
+├── packages/
+│   └── plugin-sdk/           # SDK plugins are built on (@hay/plugin-sdk)
 │
 ├── webchat/                   # Embeddable chat widget
 │   └── src/                  # Vite + TypeScript source
@@ -540,7 +539,6 @@ const response = await Hay.conversations.create();
 │   └── agents/               # Custom agent definitions
 │
 ├── docs/                      # Documentation
-├── gdpr-audit/                # GDPR compliance audit
 └── tests/                     # E2E tests (Playwright)
 ```
 
@@ -587,13 +585,15 @@ Plugins extend Hay's functionality with MCP (Model Context Protocol) support.
 Each plugin contains:
 
 ```
-plugins/{plugin-name}/
-├── manifest.json       # Plugin configuration (follows plugin-manifest.schema.json)
-├── package.json        # NPM package config
+plugins/core/{plugin-name}/
+├── package.json        # NPM package config; the "hay-plugin" field is the manifest
+│                       # (entry, displayName, category, capabilities, env, ...)
+├── src/                # Plugin code built on @hay/plugin-sdk
 ├── mcp/                # MCP server code (if local)
-├── components/         # Vue components for UI extensions
-└── public/             # Static assets
+└── thumbnail.svg       # Marketplace thumbnail
 ```
+
+See `packages/plugin-sdk/README.md`.
 
 ### Plugin Types
 
@@ -608,9 +608,11 @@ plugins/{plugin-name}/
 
 **Comprehensive guides for plugin development:**
 
-- **[docs/PLUGIN_API.md](docs/PLUGIN_API.md)** - Complete plugin API reference with architecture, manifest structure, best practices, and troubleshooting
-- **[docs/PLUGIN_QUICK_REFERENCE.md](docs/PLUGIN_QUICK_REFERENCE.md)** - Fast reference for common development tasks and code patterns
-- **[docs/PLUGIN_CHANNEL_REGISTRATION.md](docs/PLUGIN_CHANNEL_REGISTRATION.md)** - Guide for registering communication channels
+The `docs/` directory is the `hay-docs` git submodule (`git submodule update --init docs`).
+
+- **[docs/technical/plugins/api-reference.md](docs/technical/plugins/api-reference.md)** - Complete plugin API reference with architecture, manifest structure, best practices, and troubleshooting
+- **[docs/technical/plugins/quick-reference.md](docs/technical/plugins/quick-reference.md)** - Fast reference for common development tasks and code patterns
+- **[docs/technical/plugins/channel-registration.md](docs/technical/plugins/channel-registration.md)** - Guide for registering communication channels
 - **[.claude/PLUGIN_GENERATION_WORKFLOW.md](.claude/PLUGIN_GENERATION_WORKFLOW.md)** - Workflow for generating plugins from MCP servers
 
 ### Plugin Generation
@@ -652,7 +654,7 @@ npx playwright test             # Run E2E tests
 - `/server/trpc/index.ts` - tRPC router setup
 - `/server/database/data-source.ts` - Database configuration
 - `/server/orchestrator/index.ts` - AI orchestrator entry
-- `/plugins/base/plugin-manifest.schema.json` - Plugin manifest schema
+- `/packages/plugin-sdk/` - Plugin SDK (plugin manifest lives in each plugin's `package.json` `hay-plugin` field)
 
 ## Debugging
 

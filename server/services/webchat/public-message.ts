@@ -128,11 +128,11 @@ export function toPublicMessageMetadata(metadata: unknown): PublicMessageMetadat
  */
 export function toPublicMessage(
   message: Message,
-  options: { isPlayground: boolean; attachments?: PublicAttachment[] },
+  options: { attachments?: PublicAttachment[] } = {},
 ) {
   return {
     id: message.id,
-    content: options.isPlayground ? message.content : publicContent(message.type, message.content),
+    content: publicContent(message.type, message.content),
     type: message.type,
     sender: message.sender,
     direction:
@@ -140,7 +140,7 @@ export function toPublicMessage(
       (message.type === MessageType.CUSTOMER ? MessageDirection.IN : MessageDirection.OUT),
     createdAt: message.created_at,
     attachments: options.attachments ?? [],
-    metadata: options.isPlayground ? message.metadata : toPublicMessageMetadata(message.metadata),
+    metadata: toPublicMessageMetadata(message.metadata),
   };
 }
 

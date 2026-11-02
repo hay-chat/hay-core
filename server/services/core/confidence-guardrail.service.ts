@@ -65,6 +65,27 @@ export const NO_DOCUMENTS_PLACEHOLDER =
   "No documents or tool results were retrieved for this conversation.";
 
 /**
+ * The literal an API caller must send as `confidenceGuardrail.confirmSwitchOff`
+ * to switch human escalation off: low-confidence replies then reach the
+ * customer instead of a person. The dashboard sends it after a typed confirm.
+ */
+export const ESCALATION_OFF_CONFIRMATION = "SWITCH OFF ESCALATION";
+
+/**
+ * How a settings change weakens the fact-grounding guardrail: switching
+ * escalation off, or lowering the score below which replies are not trusted.
+ */
+export function confidenceGuardrailLoosening(
+  current: ConfidenceConfig,
+  change: Partial<Pick<ConfidenceConfig, "enableEscalation" | "mediumThreshold">>,
+): { escalationOff: boolean; loosened: boolean } {
+  const escalationOff = current.enableEscalation && change.enableEscalation === false;
+  const thresholdLowered =
+    change.mediumThreshold !== undefined && change.mediumThreshold < current.mediumThreshold;
+  return { escalationOff, loosened: escalationOff || thresholdLowered };
+}
+
+/**
  * Service responsible for evaluating confidence in AI responses
  * and implementing guardrails to prevent hallucinated or low-quality responses.
  */

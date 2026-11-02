@@ -964,7 +964,10 @@ const loadPluginExtensions = () => {
         componentName: componentName(page.component),
         title: page.title,
       }));
-  beforeSettingsExtensions.value = bySlot("before-settings");
+  // Only core plugins render UI before they are enabled; the server serves a
+  // custom plugin's bundle only once its organization has enabled it.
+  beforeSettingsExtensions.value =
+    plugin.value?.sourceType === "core" ? bySlot("before-settings") : [];
   afterSettingsExtensions.value = bySlot("after-settings");
 };
 

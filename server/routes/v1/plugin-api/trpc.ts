@@ -145,7 +145,7 @@ export const pluginApiTrpcRouter = router({
         from: z.string().min(1, "from is required"),
         content: z.string(),
         channel: channelNameSchema,
-        metadata: z.record(z.any()).optional(),
+        metadata: z.record(z.string(), z.any()).optional(),
         // Optional sender type — defaults to customer. "human_agent" is used when
         // an external system (e.g. Chatwoot) forwards a message written by a
         // human agent so Hay flips the conversation to human-took-over and the
@@ -463,7 +463,7 @@ export const pluginApiTrpcRouter = router({
         content: z.string().min(1, "content is required"),
         channel: channelNameSchema,
         conversationId: z.string().uuid().optional(),
-        metadata: z.record(z.any()).optional(),
+        metadata: z.record(z.string(), z.any()).optional(),
       }),
     )
     .mutation(async ({ input, ctx }) => {
@@ -936,7 +936,7 @@ export const pluginApiTrpcRouter = router({
         email: z.string().email().optional(),
         phone: z.string().optional(),
         name: z.string().optional(),
-        metadata: z.record(z.any()).optional(),
+        metadata: z.record(z.string(), z.any()).optional(),
       }),
     )
     .mutation(async ({ input, ctx }) => {
@@ -1036,7 +1036,7 @@ export const pluginApiTrpcRouter = router({
         name: z.string(),
         category: z.enum(["messaging", "social", "email", "helpdesk"]),
         icon: z.string().optional(),
-        metadata: z.record(z.any()).optional(),
+        metadata: z.record(z.string(), z.any()).optional(),
       }),
     )
     .mutation(async ({ input, ctx }) => {
@@ -1069,7 +1069,7 @@ export const pluginApiTrpcRouter = router({
           z.object({
             name: z.string(),
             description: z.string(),
-            input_schema: z.record(z.any()),
+            input_schema: z.record(z.string(), z.any()),
           }),
         ),
       }),
@@ -1178,7 +1178,7 @@ export const pluginApiTrpcRouter = router({
           z.object({
             name: z.string(),
             description: z.string(),
-            input_schema: z.record(z.any()),
+            input_schema: z.record(z.string(), z.any()),
           }),
         ),
       }),
@@ -1333,12 +1333,12 @@ export const pluginApiTrpcRouter = router({
               productType: z.string().optional(),
               status: z.nativeEnum(ProductStatus).optional(),
               tags: z.array(z.string()).optional(),
-              categories: z.array(z.record(z.any())).optional(),
-              options: z.array(z.record(z.any())).optional(),
-              images: z.array(z.record(z.any())).optional(),
+              categories: z.array(z.record(z.string(), z.any())).optional(),
+              options: z.array(z.record(z.string(), z.any())).optional(),
+              images: z.array(z.record(z.string(), z.any())).optional(),
               currency: z.string().optional(),
               sourceUrl: z.string().optional(),
-              attributes: z.record(z.any()).optional(),
+              attributes: z.record(z.string(), z.any()).optional(),
               variants: z
                 .array(
                   z.object({
@@ -1346,7 +1346,7 @@ export const pluginApiTrpcRouter = router({
                     sku: z.string().optional(),
                     barcode: z.string().optional(),
                     title: z.string(),
-                    selectedOptions: z.array(z.record(z.any())).optional(),
+                    selectedOptions: z.array(z.record(z.string(), z.any())).optional(),
                     position: z.number().int().optional(),
                     price: z.number().nonnegative().optional(),
                     compareAtPrice: z.number().nonnegative().optional(),
@@ -1357,7 +1357,7 @@ export const pluginApiTrpcRouter = router({
                     weightValue: z.number().optional(),
                     weightUnit: z.string().optional(),
                     imageSrc: z.string().optional(),
-                    attributes: z.record(z.any()).optional(),
+                    attributes: z.record(z.string(), z.any()).optional(),
                   }),
                 )
                 .min(1),

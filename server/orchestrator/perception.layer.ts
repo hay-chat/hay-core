@@ -31,7 +31,7 @@ export class PerceptionLayer {
     log.debug(
       {
         messageId: message.id,
-        messageContent: message.content.substring(0, 100),
+        messageLength: message.content.length,
       },
       "Starting intent and sentiment analysis",
     );

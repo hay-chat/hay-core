@@ -290,6 +290,7 @@
 </template>
 
 <script setup lang="ts">
+import { logger } from "@/utils/logger";
 import { Save, Mail, Lock, Shield, Key, UserX, Trash2 } from "lucide-vue-next";
 import type { Icon as LucideIcon } from "lucide-vue-next";
 import type { RouterOutputs } from "@/types/trpc";
@@ -544,10 +545,10 @@ const executeEmailChange = async (password: string) => {
       currentPassword: password,
     });
 
-    console.log("Email change response:", response);
+    logger.debug("Email change response:", response);
 
     if (response.success) {
-      console.log("Email change successful, pending email:", response.pendingEmail);
+      logger.debug("Email change successful, pending email:", response.pendingEmail);
 
       // Update user in store with pending email
       if (currentUser.value) {
@@ -555,9 +556,9 @@ const executeEmailChange = async (password: string) => {
           ...currentUser.value,
           pendingEmail: response.pendingEmail,
         };
-        console.log("Updating user in store:", updatedUser);
+        logger.debug("Updating user in store:", updatedUser);
         userStore.setUser(updatedUser);
-        console.log("User store updated, currentUser now:", currentUser.value);
+        logger.debug("User store updated, currentUser now:", currentUser.value);
       }
       emailForm.newEmail = "";
 

@@ -41,9 +41,9 @@ export const messageFeedbackRouter = t.router({
   get: scopedProcedure(RESOURCES.MESSAGES, ACTIONS.READ)
     .input(z.object({ id: z.string().uuid() }))
     .query(async ({ ctx, input }) => {
-      const feedback = await feedbackService.getFeedbackById(input.id);
+      const feedback = await feedbackService.getFeedbackById(input.id, ctx.organizationId!);
 
-      if (!feedback || feedback.organizationId !== ctx.organizationId) {
+      if (!feedback) {
         throw new TRPCError({
           code: "NOT_FOUND",
           message: "Feedback not found",
@@ -101,8 +101,8 @@ export const messageFeedbackRouter = t.router({
     .input(z.object({ id: z.string().uuid() }))
     .mutation(async ({ ctx, input }) => {
       // Verify ownership before deletion
-      const feedback = await feedbackService.getFeedbackById(input.id);
-      if (!feedback || feedback.organizationId !== ctx.organizationId) {
+      const feedback = await feedbackService.getFeedbackById(input.id, ctx.organizationId!);
+      if (!feedback) {
         throw new TRPCError({
           code: "NOT_FOUND",
           message: "Feedback not found",

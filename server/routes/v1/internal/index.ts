@@ -104,7 +104,7 @@ const internalOrganizationsRouter = router({
       throw new TRPCError({ code: "NOT_FOUND", message: "Organization not found" });
     }
 
-    await organizationService.deleteWithData(organization);
+    await organizationService.deleteWithData(organization, { source: "operator" });
     logger.warn({ orgId: organization.id }, "Organization deleted by operator");
 
     return { success: true };

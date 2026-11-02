@@ -14,7 +14,7 @@ const registerSourceSchema = z.object({
   category: z.nativeEnum(SourceCategory),
   pluginId: z.string().max(100).optional(),
   icon: z.string().max(50).optional(),
-  metadata: z.record(z.any()).optional(),
+  metadata: z.record(z.string(), z.any()).optional(),
 });
 
 export const sourcesRouter = t.router({

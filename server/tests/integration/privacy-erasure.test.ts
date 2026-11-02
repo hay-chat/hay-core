@@ -70,6 +70,7 @@ import { jobQueueService } from "@server/services/job-queue.service";
 import { CustomerService } from "@server/services/customer.service";
 import { PrivacyRequest } from "@server/entities/privacy-request.entity";
 import { User } from "@server/entities/user.entity";
+import { purgeAuditLogs } from "../helpers/audit-logs";
 
 const ORG_A = "b0000001-0000-4000-8000-0000000000a1";
 const ORG_B = "b0000001-0000-4000-8000-0000000000b2";
@@ -121,14 +122,14 @@ async function cleanup(): Promise<void> {
   await AppDataSource.query(`DELETE FROM conversations WHERE organization_id = ANY($1)`, [ids]);
   await AppDataSource.query(`DELETE FROM customers WHERE organization_id = ANY($1)`, [ids]);
   await AppDataSource.query(`DELETE FROM uploads WHERE organization_id = ANY($1)`, [ids]);
-  await AppDataSource.query(`DELETE FROM audit_logs WHERE organization_id = ANY($1)`, [ids]);
+  await purgeAuditLogs(`organization_id = ANY($1) OR original_organization_id = ANY($1)`, [ids]);
   const users: Array<{ id: string }> = await AppDataSource.query(
     `SELECT id FROM users WHERE email = $1 OR organization_id = ANY($2) OR id IN (
        SELECT user_id FROM user_organizations WHERE organization_id = ANY($2))`,
     [STAFF_EMAIL, ids],
   );
   const userIds = users.map((u) => u.id);
-  await AppDataSource.query(`DELETE FROM audit_logs WHERE user_id = ANY($1)`, [userIds]);
+  await purgeAuditLogs(`user_id = ANY($1)`, [userIds]);
   await AppDataSource.query(`DELETE FROM users WHERE id = ANY($1)`, [userIds]);
   await AppDataSource.query(`DELETE FROM users WHERE email LIKE 'deleted-%@deleted.local'`);
   await AppDataSource.query(`DELETE FROM organizations WHERE id = ANY($1)`, [ids]);
