@@ -153,10 +153,8 @@ const downloaded = ref(false);
 const error = ref(false);
 const errorMessage = ref("");
 const fileSize = ref("~500 KB");
-const exportData = ref<unknown>(null);
-const isZipFormat = ref(true);
 
-const exportFormat = computed(() => (isZipFormat.value ? "ZIP Archive" : "JSON"));
+const exportFormat = "ZIP Archive";
 
 const requestId = computed(() => route.query.requestId as string);
 const downloadToken = computed(() => route.query.token as string);
@@ -250,30 +248,13 @@ const startDownload = async () => {
       downloadToken: downloadToken.value,
     });
 
-    let blob: Blob;
-    let fileName: string;
-
-    // Handle ZIP format (new) vs JSON format (legacy)
-    // Type guard: check if base64Data exists in result
-    if ("base64Data" in result && result.base64Data) {
-      // Decode base64 to binary
-      const binaryString = atob(result.base64Data);
-      const bytes = new Uint8Array(binaryString.length);
-      for (let i = 0; i < binaryString.length; i++) {
-        bytes[i] = binaryString.charCodeAt(i);
-      }
-      blob = new Blob([bytes], { type: "application/zip" });
-      fileName = result.fileName || "data-export.zip";
-      isZipFormat.value = true;
-    } else {
-      // Legacy JSON format
-      exportData.value = result.data;
-      blob = new Blob([JSON.stringify(result.data, null, 2)], {
-        type: "application/json",
-      });
-      fileName = result.fileName || "data-export.json";
-      isZipFormat.value = false;
+    const binaryString = atob(result.base64Data);
+    const bytes = new Uint8Array(binaryString.length);
+    for (let i = 0; i < binaryString.length; i++) {
+      bytes[i] = binaryString.charCodeAt(i);
     }
+    const blob = new Blob([bytes], { type: "application/zip" });
+    const fileName = result.fileName || "data-export.zip";
 
     // Create download link
     const url = window.URL.createObjectURL(blob);

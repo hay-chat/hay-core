@@ -189,7 +189,6 @@ describe("Customer Privacy DSAR Integration Tests", () => {
 
       expect(requestResult.requestId).toBeDefined();
       expect(requestResult.expiresAt).toBeInstanceOf(Date);
-      expect(requestResult.customerFound).toBe(true);
 
       // Verify privacy request was created
       const privacyRequestRepo = AppDataSource.getRepository(PrivacyRequest);
@@ -266,7 +265,6 @@ describe("Customer Privacy DSAR Integration Tests", () => {
       });
 
       expect(requestResult.requestId).toBeDefined();
-      expect(requestResult.customerFound).toBe(true);
     }, 10000);
 
     it("should support external ID identifier", async () => {
@@ -276,7 +274,6 @@ describe("Customer Privacy DSAR Integration Tests", () => {
       });
 
       expect(requestResult.requestId).toBeDefined();
-      expect(requestResult.customerFound).toBe(true);
     }, 10000);
   });
 
@@ -331,18 +328,12 @@ describe("Customer Privacy DSAR Integration Tests", () => {
       expect(anonymizedConversation?.customer_id).toBeNull();
       expect(anonymizedConversation?.title).toBe("[deleted]");
 
-      // Verify messages were anonymized
+      // Verify messages were deleted
       const messageRepo = AppDataSource.getRepository(Message);
       const messages = await messageRepo.find({
         where: { conversation_id: testConversation.id },
       });
-      // Privacy service may create a deletion notification message, so we expect at least 2 messages
-      expect(messages.length).toBeGreaterThanOrEqual(2);
-      messages.forEach((msg) => {
-        expect(msg.content).toBe("[deleted]");
-        expect(msg.sender).toBe("[deleted]");
-        expect(msg.metadata).toBeNull();
-      });
+      expect(messages).toHaveLength(0);
 
       // Verify embeddings were deleted (CRITICAL GDPR TEST)
       const embeddingsAfterDeletion = await vectorStoreService.findByConversationIds(testOrgId, [

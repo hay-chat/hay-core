@@ -174,6 +174,7 @@ export interface ExportPackageStatistics {
   totalDocuments?: number;
   totalUploads?: number;
   totalAuditLogs?: number;
+  totalOrganizations?: number;
 }
 
 export interface ExportPackageData {

@@ -312,9 +312,8 @@ export const privacyRouter = t.router({
     }),
 
   /**
-   * Download export data
+   * Download export data (ZIP, base64-encoded)
    * Requires valid request ID and download token
-   * Supports both JSON (legacy) and ZIP (new) formats
    * Rate limited: 20 downloads per hour per IP
    */
   downloadExport: publicProcedure
@@ -350,27 +349,10 @@ export const privacyRouter = t.router({
           ipAddress,
         );
 
-        // Handle ZIP format - read file and return as base64
-        if (result.isZip && result.filePath) {
-          const fs = await import("fs/promises");
-          const fileBuffer = await fs.readFile(result.filePath);
-          const base64Data = fileBuffer.toString("base64");
-
-          return {
-            success: true,
-            data: null,
-            fileName: result.fileName,
-            isZip: true,
-            base64Data,
-          };
-        }
-
-        // Legacy JSON format
         return {
           success: true,
-          data: result.data,
           fileName: result.fileName,
-          isZip: false,
+          base64Data: result.buffer.toString("base64"),
         };
       } catch (error) {
         const message = error instanceof Error ? error.message : "Unknown error";
