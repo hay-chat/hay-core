@@ -81,3 +81,6 @@ server/uploads/plugin-zips/
 /gdpr-audit/
 /.claude/plans/
 /.claude/settings.local.json
+
+# Redis snapshots
+*.rdb
