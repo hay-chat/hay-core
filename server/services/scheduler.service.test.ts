@@ -182,6 +182,32 @@ describe("SchedulerService", () => {
       expect(status?.lastError).toContain("timeout");
     });
 
+    it("keeps a timed-out job marked running until its handler settles", async () => {
+      let finished = false;
+      const handler = jest.fn().mockImplementation(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 2500));
+        finished = true;
+      });
+
+      scheduler.registerJob({
+        name: "slow-timeout-job",
+        description: "Job that outlives its timeout",
+        schedule: 60000,
+        handler,
+        timeout: 1000,
+      });
+
+      const run = scheduler.runJob("slow-timeout-job");
+      await new Promise((resolve) => setTimeout(resolve, 1500));
+      // Timeout fired, but the handler is still going: the job must stay running.
+      expect(scheduler.getJobStatus("slow-timeout-job")?.lastStatus).toBe("timeout");
+      expect(scheduler.getJobStatus("slow-timeout-job")?.isRunning).toBe(true);
+
+      await run;
+      expect(finished).toBe(true);
+      expect(scheduler.getJobStatus("slow-timeout-job")?.isRunning).toBe(false);
+    });
+
     it("should enforce singleton constraint", async () => {
       let concurrentExecutions = 0;
       let maxConcurrent = 0;

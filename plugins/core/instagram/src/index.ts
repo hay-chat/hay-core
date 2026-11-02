@@ -123,6 +123,11 @@ export default defineHayPlugin((globalCtx) => {
           itemsPath: "entry",
           keyPath: "id",
         },
+        // Meta sends no delivery id header, but every payload carries entry[].time
+        // plus per-event ids and timestamps (message mids, comment ids, read
+        // watermarks), so identical signed bytes can only be a re-delivery or a
+        // replay.
+        dedupe: { source: "raw-body", windowSeconds: 24 * 60 * 60 },
         // Meta's Deauthorize + Data Deletion callbacks (required for App
         // Review). Meta POSTs `signed_request` whose payload carries the IG
         // `user_id`, one of the routing keys returned from onConnected. Core
