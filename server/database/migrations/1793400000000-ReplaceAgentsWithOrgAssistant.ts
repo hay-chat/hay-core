@@ -2,15 +2,16 @@ import { MigrationInterface, QueryRunner } from "typeorm";
 
 /** A stored JSON document as is; plain text as one paragraph per line. */
 function toTiptapDoc(stored: string): unknown {
+  let value: unknown = stored;
   try {
-    const parsed: unknown = JSON.parse(stored);
-    if (parsed === null || typeof parsed === "object") return parsed;
+    value = JSON.parse(stored);
   } catch {
     // plain text
   }
+  if (value === null || typeof value === "object") return value;
   return {
     type: "doc",
-    content: stored
+    content: String(value)
       .split("\n")
       .map((line) => line.trim())
       .filter(Boolean)
