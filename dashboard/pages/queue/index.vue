@@ -417,6 +417,7 @@
 </template>
 
 <script setup lang="ts">
+import { logger } from "@/utils/logger";
 import { useI18n } from "vue-i18n";
 import {
   Activity,
@@ -567,7 +568,7 @@ const setupWebSocket = () => {
     }
 
     ws.onopen = () => {
-      console.log("WebSocket connected for queue updates");
+      logger.debug("WebSocket connected for queue updates");
       // Stop polling if it was running
       if (pollInterval) {
         clearInterval(pollInterval);
@@ -589,7 +590,7 @@ const setupWebSocket = () => {
     };
 
     ws.onclose = () => {
-      console.log("WebSocket disconnected, falling back to polling");
+      logger.debug("WebSocket disconnected, falling back to polling");
       // Fall back to polling and try to reconnect
       startPolling();
 

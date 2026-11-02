@@ -1,10 +1,11 @@
-import axios, { type AxiosResponse } from "axios";
+import axios, { type AxiosRequestConfig, type AxiosResponse } from "axios";
 import * as cheerio from "cheerio";
 import type { Element } from "domhandler";
 import { URL } from "url";
 import { EventEmitter } from "events";
 import { createLogger } from "@server/lib/logger";
-import { validateUrlForSSRF } from "@server/utils/ssrf";
+import { removeHiddenElements } from "@server/utils/strip-hidden-html";
+import { ssrfSafeHttpAgent, ssrfSafeHttpsAgent, validateUrlForSSRF } from "@server/utils/ssrf";
 
 const logger = createLogger("web-scraper");
 
@@ -43,6 +44,30 @@ export interface SitemapEntry {
 const HAY_USER_AGENT = "Mozilla/5.0 (compatible; HayDocumentImporter/1.0)";
 const BROWSER_USER_AGENT =
   "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36";
+
+const MAX_REDIRECTS = 5;
+
+/** Every scraper request: pinned to checked addresses, no env proxy, redirects handled by `get`. */
+const PINNED_REQUEST_CONFIG: AxiosRequestConfig = {
+  maxRedirects: 0,
+  proxy: false,
+  httpAgent: ssrfSafeHttpAgent,
+  httpsAgent: ssrfSafeHttpsAgent,
+  validateStatus: () => true,
+};
+
+/** Sitemaps may move anywhere (another host, a CDN); each hop is still SSRF-checked. */
+const followAnyRedirect = () => true;
+
+/** Pages: follow only normalizations of the same page (http→https, trailing slash). */
+export function isSamePageRedirect(from: URL, to: URL): boolean {
+  const normalizePath = (p: string) => p.replace(/\/+$/, "");
+  return (
+    from.hostname === to.hostname &&
+    normalizePath(from.pathname) === normalizePath(to.pathname) &&
+    from.search === to.search
+  );
+}
 
 export class WebScraperService extends EventEmitter {
   private visitedUrls = new Set<string>();
@@ -145,40 +170,6 @@ export class WebScraperService extends EventEmitter {
     }
   }
 
-  async scrapeWebsite(url: string): Promise<ScrapedPage[]> {
-    await validateUrlForSSRF(url);
-
-    this.baseUrl = new URL(url);
-    this.visitedUrls.clear();
-    this.urlQueue = [url];
-    this.scrapedPages = [];
-
-    try {
-      // Step 1: Try to find sitemap
-      this.emitProgress("discovering", 0, 0);
-      const sitemapEntries = await this.discoverSitemap();
-      const sitemapUrls = sitemapEntries.map((e) => e.url);
-
-      if (sitemapUrls.length > 0) {
-        this.urlQueue = sitemapUrls;
-        logger.info({ count: sitemapUrls.length }, "Found URLs from sitemap(s)");
-      } else {
-        // Step 2: Crawl the website starting from the base URL
-        logger.info("No sitemap found, crawling from base URL");
-      }
-
-      // Step 3: Process all URLs
-      await this.crawlUrls();
-
-      this.emitProgress("completed", this.scrapedPages.length, this.scrapedPages.length);
-      return this.scrapedPages;
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : "Unknown error";
-      this.emitProgress("error", 0, 0, undefined, errorMessage);
-      throw error;
-    }
-  }
-
   private emitProgress(
     status: ScrapeProgress["status"],
     totalPages: number,
@@ -208,7 +199,6 @@ export class WebScraperService extends EventEmitter {
     for (const path of possibleSitemapPaths) {
       try {
         const sitemapUrl = new URL(path, this.baseUrl).href;
-        await validateUrlForSSRF(sitemapUrl);
 
         const fetchConfig = {
           timeout: 10000,
@@ -216,15 +206,16 @@ export class WebScraperService extends EventEmitter {
           headers: { "User-Agent": HAY_USER_AGENT },
         };
 
-        let response = await axios.get(sitemapUrl, fetchConfig);
+        let response = await this.get(sitemapUrl, fetchConfig, followAnyRedirect);
 
         // Retry with browser User-Agent on 403
         if (response.status === 403) {
           logger.debug({ sitemapUrl }, "Sitemap returned 403, retrying with browser User-Agent");
-          response = await axios.get(sitemapUrl, {
-            ...fetchConfig,
-            headers: { "User-Agent": BROWSER_USER_AGENT },
-          });
+          response = await this.get(
+            sitemapUrl,
+            { ...fetchConfig, headers: { "User-Agent": BROWSER_USER_AGENT } },
+            followAnyRedirect,
+          );
         }
 
         if (response.status === 200) {
@@ -270,12 +261,15 @@ export class WebScraperService extends EventEmitter {
         const batchPromises = batch.map(async (subSitemapUrl) => {
           try {
             logger.debug({ subSitemapUrl }, "Fetching sub-sitemap");
-            await validateUrlForSSRF(subSitemapUrl);
-            const response = await axios.get(subSitemapUrl, {
-              timeout: 10000,
-              maxContentLength: 5 * 1024 * 1024,
-              headers: { "User-Agent": HAY_USER_AGENT },
-            });
+            const response = await this.get(
+              subSitemapUrl,
+              {
+                timeout: 10000,
+                maxContentLength: 5 * 1024 * 1024,
+                headers: { "User-Agent": HAY_USER_AGENT },
+              },
+              followAnyRedirect,
+            );
 
             if (response.status === 200) {
               // Recursively parse the sub-sitemap
@@ -334,45 +328,6 @@ export class WebScraperService extends EventEmitter {
     return this.prioritizeEntries(entries, this.maxPages);
   }
 
-  private async crawlUrls(): Promise<void> {
-    const totalUrls = this.urlQueue.length;
-    let processedCount = 0;
-
-    while (this.urlQueue.length > 0 && this.scrapedPages.length < this.maxPages) {
-      const url = this.urlQueue.shift()!;
-
-      if (this.visitedUrls.has(url)) {
-        continue;
-      }
-
-      this.visitedUrls.add(url);
-      processedCount++;
-
-      this.emitProgress("crawling", totalUrls, processedCount, url);
-
-      try {
-        const page = await this.scrapePage(url);
-        if (page) {
-          this.scrapedPages.push(page);
-
-          // Extract and queue new URLs from the page
-          const newUrls = this.extractUrls(page.html, url);
-          for (const newUrl of newUrls) {
-            if (!this.visitedUrls.has(newUrl) && !this.urlQueue.includes(newUrl)) {
-              this.urlQueue.push(newUrl);
-            }
-          }
-        }
-      } catch (error) {
-        logger.error({ err: error, url }, "Failed to scrape URL");
-        // Continue with other URLs
-      }
-
-      // Delay between pages to avoid rate limiting
-      await this.delay(200);
-    }
-  }
-
   /**
    * Fetch a page and return the full HTML for Readability processing.
    * Handles 429 rate limiting by respecting Retry-After headers.
@@ -387,14 +342,9 @@ export class WebScraperService extends EventEmitter {
         },
       });
 
+      // A redirect to a different page comes back as its 3xx and is skipped here.
       if (response.status !== 200) {
         logger.debug({ url, status: response.status }, "Skipping scrape: non-200 status");
-        return null;
-      }
-
-      // Skip HTTP redirects (URL changed materially after following redirects)
-      if (this.wasHttpRedirected(response, url)) {
-        logger.debug({ url }, "Skipping scrape: redirected to different page");
         return null;
       }
 
@@ -411,6 +361,10 @@ export class WebScraperService extends EventEmitter {
       // Extract title from the page
       const title = $("title").text() || $("h1").first().text() || "Untitled";
 
+      // Only text a visitor can see goes into the knowledge base.
+      removeHiddenElements($);
+      const html = $.html();
+
       // Get plain text for the content field
       $("script, style").remove();
       const textContent = $.text().replace(/\s+/g, " ").trim();
@@ -421,7 +375,7 @@ export class WebScraperService extends EventEmitter {
         url,
         title: title.trim(),
         content: textContent,
-        html: fullHtml, // Return full HTML — Readability handles content extraction
+        html, // Full HTML minus hidden elements — Readability handles content extraction
         crawledAt: new Date(),
         lastModified: typeof lastModifiedHeader === "string" ? lastModifiedHeader : undefined,
       };
@@ -433,7 +387,7 @@ export class WebScraperService extends EventEmitter {
 
   /**
    * Public, stateless primitives used by the website document-source importer.
-   * Unlike discoverUrls/scrapeWebsite these do not crawl the whole site or
+   * Unlike discoverUrls these do not crawl the whole site or
    * emit progress events — they fetch exactly what is asked for.
    */
 
@@ -455,16 +409,9 @@ export class WebScraperService extends EventEmitter {
    */
   private async fetchWithRetryAfter(
     url: string,
-    config: Record<string, unknown>,
+    config: AxiosRequestConfig,
   ): Promise<AxiosResponse> {
-    await validateUrlForSSRF(url);
-
-    const fetchConfig = {
-      ...config,
-      validateStatus: () => true, // Accept all status codes so callers can inspect them
-    };
-
-    let response = await axios.get(url, fetchConfig);
+    let response = await this.get(url, config, isSamePageRedirect);
 
     // Handle 429 with single retry respecting Retry-After header
     if (response.status === 429) {
@@ -475,7 +422,7 @@ export class WebScraperService extends EventEmitter {
       logger.debug({ url, waitMs: clampedWaitMs }, "Rate limited (429), retrying");
       await this.delay(clampedWaitMs);
 
-      response = await axios.get(url, fetchConfig);
+      response = await this.get(url, config, isSamePageRedirect);
     }
 
     // Handle 403 by retrying with a browser-like User-Agent (bot protection fallback)
@@ -484,17 +431,50 @@ export class WebScraperService extends EventEmitter {
       if (currentUA !== BROWSER_USER_AGENT) {
         logger.debug({ url }, "Got 403, retrying with browser User-Agent");
         const fallbackConfig = {
-          ...fetchConfig,
+          ...config,
           headers: {
             ...((config.headers as Record<string, string>) || {}),
             "User-Agent": BROWSER_USER_AGENT,
           },
         };
-        response = await axios.get(url, fallbackConfig);
+        response = await this.get(url, fallbackConfig, isSamePageRedirect);
       }
     }
 
     return response;
+  }
+
+  /**
+   * GET with SSRF protection on every hop: the connection is pinned to a
+   * checked public address, redirects are followed manually (up to
+   * MAX_REDIRECTS) and only when `follow` allows it. A redirect that is not
+   * followed is returned as its 3xx response. Never throws on HTTP status.
+   */
+  private async get(
+    url: string,
+    config: AxiosRequestConfig,
+    follow: (from: URL, to: URL) => boolean,
+  ): Promise<AxiosResponse> {
+    let current = url;
+    for (let hop = 0; ; hop++) {
+      await validateUrlForSSRF(current);
+      const response = await axios.get(current, { ...config, ...PINNED_REQUEST_CONFIG });
+      const location: unknown = response.headers["location"];
+      if (response.status < 300 || response.status >= 400 || typeof location !== "string") {
+        return response;
+      }
+      let next: URL;
+      try {
+        next = new URL(location, current);
+      } catch {
+        return response;
+      }
+      if (hop >= MAX_REDIRECTS || !follow(new URL(current), next)) {
+        logger.debug({ url, location: next.href }, "Not following redirect");
+        return response;
+      }
+      current = next.href;
+    }
   }
 
   /**
@@ -531,29 +511,7 @@ export class WebScraperService extends EventEmitter {
   }
 
   /**
-   * Sort URLs by priority and return the top N.
-   * Keeps higher-value pages (root locale, products, collections) over
-   * lower-value ones (locale duplicates, blog posts).
-   */
-  private prioritizeUrls(urls: string[], limit: number): string[] {
-    if (urls.length <= limit) {
-      return urls;
-    }
-
-    const sorted = [...urls].sort((a, b) => this.scoreUrl(a) - this.scoreUrl(b));
-    const result = sorted.slice(0, limit);
-
-    const dropped = urls.length - limit;
-    logger.info(
-      { total: urls.length, kept: limit, dropped },
-      "Prioritized URLs: dropped lowest-priority pages to stay within limit",
-    );
-
-    return result;
-  }
-
-  /**
-   * Like prioritizeUrls but preserves each entry's lastmod. Deterministic sort
+   * Sort sitemap entries by priority (scoreUrl) and keep the top N. Deterministic sort
    * (by scoreUrl) so callers paginating by offset get a stable ordering across
    * runs — important for the document-source importer's resumable cursor.
    */
@@ -640,49 +598,6 @@ export class WebScraperService extends EventEmitter {
     return false;
   }
 
-  /**
-   * Check if an HTTP response was the result of following a redirect.
-   * Allows benign normalizations (http→https, trailing slash).
-   */
-  private wasHttpRedirected(response: AxiosResponse, originalUrl: string): boolean {
-    // axios surfaces the post-redirect URL on the underlying Node request's
-    // response object (`request.res.responseUrl`), which is not part of the
-    // typed axios surface — narrow it from `unknown` instead of casting.
-    const request: unknown = response.request;
-    const res =
-      typeof request === "object" && request !== null && "res" in request
-        ? (request as { res?: unknown }).res
-        : undefined;
-    const responseUrl =
-      typeof res === "object" && res !== null && "responseUrl" in res
-        ? (res as { responseUrl?: unknown }).responseUrl
-        : undefined;
-    const finalUrl = typeof responseUrl === "string" ? responseUrl : undefined;
-    if (!finalUrl) {
-      return false;
-    }
-
-    try {
-      const original = new URL(originalUrl);
-      const final_ = new URL(finalUrl);
-
-      const normalizePath = (p: string) => p.replace(/\/+$/, "");
-
-      // Allow http→https upgrade and trailing slash normalization
-      if (
-        original.hostname === final_.hostname &&
-        normalizePath(original.pathname) === normalizePath(final_.pathname) &&
-        original.search === final_.search
-      ) {
-        return false;
-      }
-
-      return true;
-    } catch {
-      return false;
-    }
-  }
-
   private async discoverPages(): Promise<void> {
     const initialQueueSize = this.urlQueue.length;
     let processedCount = 0;
@@ -746,12 +661,7 @@ export class WebScraperService extends EventEmitter {
           continue;
         }
 
-        // Skip HTTP redirects (URL changed materially after following redirects)
-        if (this.wasHttpRedirected(response, url)) {
-          logger.debug({ url }, "Skipping URL: redirected to different page");
-          continue;
-        }
-
+        // A redirect to a different page comes back as its 3xx and is skipped here.
         if (response.status === 200) {
           const html = response.data;
 

@@ -100,3 +100,38 @@ describe("CompanyInterestGuardrailService conversation history", () => {
     expect(history).toContain("Customer: yes, cancel it");
   });
 });
+
+describe("CompanyInterestGuardrailService when the check errors", () => {
+  let service: CompanyInterestGuardrailService;
+
+  beforeEach(() => {
+    service = new CompanyInterestGuardrailService();
+    const anyService = service as unknown as Record<string, unknown>;
+    anyService.promptService = { getPrompt: jest.fn(async () => "prompt") };
+    anyService.llmService = { invoke: jest.fn(async () => Promise.reject(new Error("down"))) };
+  });
+
+  const assess = (response: string) =>
+    service.assessCompanyInterest({
+      response,
+      customerQuery: "hi",
+      conversationHistory: [],
+      hasRetrievedDocuments: false,
+      hasToolResults: false,
+      organizationId: "org-1",
+    });
+
+  it("blocks a reply with an amount or a claimed action", async () => {
+    const assessment = await assess("I've refunded you $20.");
+
+    expect(assessment.shouldBlock).toBe(true);
+    expect(assessment.evaluationFailed).toBe(true);
+  });
+
+  it("sends a plain reply on to the fact check", async () => {
+    const assessment = await assess("Happy to help! What would you like to know?");
+
+    expect(assessment.shouldBlock).toBe(false);
+    expect(assessment.requiresFactCheck).toBe(true);
+  });
+});

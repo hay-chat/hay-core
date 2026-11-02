@@ -1,10 +1,10 @@
 import { Marked, type Tokens } from "marked";
 import { get as getEmoji } from "node-emoji";
-import { sanitizeHtml } from "@/utils/sanitize";
+import { sanitizeHtml, type SanitizeOptions } from "@/utils/sanitize";
 
 /**
- * Isolated marked instance so our options (GFM tables, line breaks, link
- * renderer) don't leak into the global `marked` used by markdownToTiptap.ts.
+ * Isolated marked instance so our options (GFM tables, line breaks, emoji)
+ * don't leak into the global `marked` used by markdownToTiptap.ts.
  *
  * GFM is enabled, which gives us pipe-table support out of the box.
  */
@@ -16,14 +16,6 @@ interface EmojiToken extends Tokens.Generic {
 }
 
 md.use({
-  renderer: {
-    // Open links in a new tab; sanitizeHtml enforces rel="noopener noreferrer".
-    link(token) {
-      const text = this.parser.parseInline(token.tokens);
-      const title = token.title ? ` title="${token.title}"` : "";
-      return `<a href="${token.href}"${title} target="_blank" rel="noopener noreferrer">${text}</a>`;
-    },
-  },
   // Expand GitHub-style emoji shortcodes (e.g. :clipboard: -> 📋). As an inline
   // tokenizer it only fires on text, so shortcodes inside code stay literal.
   extensions: [
@@ -52,13 +44,14 @@ md.use({
  *
  * Uses `marked` (GFM) for correct parsing — including tables, blockquotes,
  * nested lists and code fences — then runs the result through sanitizeHtml
- * to strip scripts, event handlers and dangerous protocols.
+ * (DOMPurify) to strip scripts, event handlers and unsafe URLs. Links open in
+ * a new tab with rel="noopener noreferrer".
  */
-export function markdownToHtml(markdown: string): string {
+export function markdownToHtml(markdown: string, options: SanitizeOptions = {}): string {
   if (!markdown || typeof markdown !== "string") {
     return "";
   }
 
   const html = md.parse(markdown, { async: false }) as string;
-  return sanitizeHtml(html);
+  return sanitizeHtml(html, options);
 }

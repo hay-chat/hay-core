@@ -18,7 +18,7 @@ import { PromptService } from "@server/services/prompt.service";
 import { createLogger } from "@server/lib/logger";
 import { hasTiptapContent } from "@server/types/tiptap.types";
 import { closureCopy } from "./closure-copy";
-import { availabilityContext, availabilityHandoffLine } from "./handoff-copy";
+import { availabilityContext, availabilityHandoffLine, handoffCopy } from "./handoff-copy";
 import { getAvailability, typicalFirstReplyMinutes } from "@server/services/business-hours.service";
 import {
   handoffTicketsService,
@@ -76,7 +76,7 @@ async function sendBotMessage(
     {
       durationMs: Date.now() - processingStartedAt,
       messageType: payload.type,
-      messagePreview: payload.content.substring(0, 100),
+      messageLength: payload.content.length,
     },
     "Bot message sent",
   );
@@ -1166,7 +1166,7 @@ async function handleExecutionLoop(
         await sendBotMessage(
           conversation,
           {
-            content: "I'm here to help! How can I assist you today?",
+            content: handoffCopy("planningFallback", customerLanguage, conversation.language),
             type: MessageType.BOT_AGENT,
             metadata: {
               isFallbackResponse: true,
@@ -1192,7 +1192,7 @@ async function handleExecutionLoop(
       {
         step: executionResult.step,
         hasUserMessage: !!executionResult.userMessage,
-        userMessagePreview: executionResult.userMessage?.substring(0, 100),
+        userMessageLength: executionResult.userMessage?.length ?? 0,
         hasTool: !!executionResult.tool,
         toolName: executionResult.tool?.name,
         hasHandoff: !!executionResult.handoff,
@@ -1561,7 +1561,7 @@ async function handleExecutionLoop(
           log.error(
             {
               toolName: executionResult.tool.name,
-              messagePreview: executionResult.userMessage.substring(0, 100),
+              messageLength: executionResult.userMessage.length,
             },
             "HALLUCINATION DETECTED: Saved user message with unpopulated tool field",
           );
@@ -1584,7 +1584,7 @@ async function handleExecutionLoop(
         );
         log.debug(
           {
-            messagePreview: executionResult.userMessage.substring(0, 100),
+            messageLength: executionResult.userMessage.length,
             confidenceScore: executionResult.confidence?.score,
             confidenceTier: executionResult.confidence?.tier,
           },
@@ -1617,7 +1617,7 @@ async function handleExecutionLoop(
           await sendBotMessage(
             conversation,
             {
-              content: "I'm here to help! How can I assist you today?",
+              content: handoffCopy("planningFallback", customerLanguage, conversation.language),
               type: MessageType.BOT_AGENT,
               metadata: {
                 isFallbackResponse: true,

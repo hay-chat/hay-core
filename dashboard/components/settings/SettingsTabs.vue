@@ -24,6 +24,11 @@
 
 <script setup lang="ts">
 import { computed } from "vue";
+import {
+  SETTINGS_NAV,
+  isSettingsTabActive,
+  visibleSettingsTabs,
+} from "@/composables/useSettingsNav";
 import { useUserStore } from "@/stores/user";
 
 const route = useRoute();

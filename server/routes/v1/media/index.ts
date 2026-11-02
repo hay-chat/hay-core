@@ -4,7 +4,11 @@ import { requireAuth } from "@server/lib/auth/middleware";
 import { createLogger } from "@server/lib/logger";
 import { Upload } from "@server/entities/upload.entity";
 import { storageService } from "@server/services/storage.service";
-import { isUuid, verifyMediaSignature } from "@server/services/media-url.service";
+import {
+  DOCUMENT_IMAGES_FOLDER,
+  isUuid,
+  verifyMediaSignature,
+} from "@server/services/media-url.service";
 import { isScanCleared, waitForScans } from "@server/services/media-scan.service";
 import { ACTIONS, RESOURCES } from "@server/types/scopes";
 
@@ -47,7 +51,8 @@ export function contentDisposition(mimeType: string, originalName: string): stri
 /** Resource/action a staff member needs to read files in this folder. */
 function requiredScope(folder: string): [string, string] {
   if (folder === "conversation-media") return [RESOURCES.CONVERSATIONS, ACTIONS.READ];
-  if (folder.startsWith("documents")) return [RESOURCES.DOCUMENTS, ACTIONS.READ];
+  if (folder.startsWith("documents") || folder === DOCUMENT_IMAGES_FOLDER)
+    return [RESOURCES.DOCUMENTS, ACTIONS.READ];
   return [RESOURCES.ALL, RESOURCES.ALL];
 }
 

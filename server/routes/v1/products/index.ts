@@ -36,7 +36,7 @@ const variantSchema = z.object({
   weightValue: z.number().optional(),
   weightUnit: z.string().optional(),
   imageSrc: z.string().url().optional(),
-  attributes: z.record(z.unknown()).optional(),
+  attributes: z.record(z.string(), z.unknown()).optional(),
 });
 
 const canonicalProductSchema = z.object({
@@ -72,7 +72,7 @@ const canonicalProductSchema = z.object({
     .optional(),
   currency: z.string().length(3).optional(),
   sourceUrl: z.string().url().optional(),
-  attributes: z.record(z.unknown()).optional(),
+  attributes: z.record(z.string(), z.unknown()).optional(),
   variants: z.array(variantSchema).min(1, "At least one variant is required"),
 });
 

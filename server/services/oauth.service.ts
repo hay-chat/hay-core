@@ -20,10 +20,16 @@ import type { HayPluginManifest } from "../types/plugin.types";
 import type { AuthMethodDescriptor, ConfigFieldDescriptor } from "../types/plugin-sdk.types";
 import { parseConnectedAccount, parseConnectedCredentials } from "../lib/connected-account";
 import { createLogger } from "@server/lib/logger";
+import { safeFetch } from "@server/utils/ssrf";
 import { TRPCError } from "@trpc/server";
 import { workerFetch } from "@server/lib/worker-client";
 
 const logger = createLogger("oauth");
+
+/** Budget for calls to a provider's token endpoint. */
+const TOKEN_REQUEST_TIMEOUT_MS = 15_000;
+/** Budget for the worker's on-connected hook. */
+const WORKER_HOOK_TIMEOUT_MS = 30_000;
 
 /**
  * Coerce a resolved config/credential value (typed `unknown`) to a string,
@@ -335,7 +341,10 @@ export class OAuthService {
     url.searchParams.set("code", code);
 
     // Never log `url` — it carries the client secret.
-    const response = await fetch(url.toString(), { method: "GET" });
+    const response = await safeFetch(url.toString(), {
+      method: "GET",
+      timeoutMs: TOKEN_REQUEST_TIMEOUT_MS,
+    });
     if (!response.ok) {
       const errorText = await response.text();
       logger.warn(
@@ -725,7 +734,10 @@ export class OAuthService {
       url.searchParams.set("client_secret", clientSecret);
     }
 
-    const response = await fetch(url.toString(), { method: "GET" });
+    const response = await safeFetch(url.toString(), {
+      method: "GET",
+      timeoutMs: TOKEN_REQUEST_TIMEOUT_MS,
+    });
     if (!response.ok) {
       const errorText = await response.text();
       throw new Error(`Token op (${op.grantType}) failed: ${response.status} ${errorText}`);
@@ -781,7 +793,8 @@ export class OAuthService {
       "Token exchange request",
     );
 
-    const response = await fetch(oauthConfig.tokenUrl, {
+    const response = await safeFetch(oauthConfig.tokenUrl, {
+      timeoutMs: TOKEN_REQUEST_TIMEOUT_MS,
       method: "POST",
       headers: {
         "Content-Type": json ? "application/json" : "application/x-www-form-urlencoded",
@@ -948,6 +961,7 @@ export class OAuthService {
           authState: instance.authState,
           extras,
         }),
+        signal: AbortSignal.timeout(WORKER_HOOK_TIMEOUT_MS),
       });
 
       if (!response.ok) {
@@ -1185,7 +1199,8 @@ export class OAuthService {
     }
 
     assertOAuthEndpoint(oauthConfig.tokenUrl, endpointPolicy);
-    const response = await fetch(oauthConfig.tokenUrl, {
+    const response = await safeFetch(oauthConfig.tokenUrl, {
+      timeoutMs: TOKEN_REQUEST_TIMEOUT_MS,
       method: "POST",
       headers: {
         "Content-Type": "application/x-www-form-urlencoded",

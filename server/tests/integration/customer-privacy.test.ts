@@ -452,7 +452,7 @@ describe("Customer Privacy DSAR Integration Tests", () => {
       // Verify no embeddings in search results
       const searchResults = await vectorStoreService.search(testOrgId, "help", 100);
       const hasOrphanedData = searchResults.some(
-        (r) => r.metadata.conversationId === conversationId,
+        (r) => r.metadata?.conversationId === conversationId,
       );
       expect(hasOrphanedData).toBe(false);
     }, 20000);

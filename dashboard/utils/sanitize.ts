@@ -1,13 +1,12 @@
-/**
- * HTML sanitization utilities for the dashboard
- *
- * IMPORTANT: This is a basic sanitizer for trusted plugin templates.
- * For user-generated content, use a more robust library like DOMPurify.
- */
+import DOMPurify from "dompurify";
 
 /**
- * Allowed HTML tags for plugin templates
+ * HTML sanitization for rendered markdown (customer, AI and document content).
  */
+
+/** Links and images may only point at http(s), mailto or same-origin paths. */
+const SAFE_URI = /^(?:(?:https?|mailto):|\/(?![/\\])|#)/i;
+
 const ALLOWED_TAGS = [
   "div",
   "span",
@@ -32,6 +31,7 @@ const ALLOWED_TAGS = [
   "pre",
   "blockquote",
   "del",
+  "s",
   "table",
   "thead",
   "tbody",
@@ -42,171 +42,84 @@ const ALLOWED_TAGS = [
   "hr",
 ];
 
-/**
- * Allowed attributes for HTML elements
- */
-const ALLOWED_ATTRS: Record<string, string[]> = {
-  a: ["href", "title", "target", "rel"],
-  img: ["src", "alt", "title", "width", "height"],
-  div: ["class", "id"],
-  span: ["class", "id"],
-  p: ["class", "id"],
-  h1: ["class", "id"],
-  h2: ["class", "id"],
-  h3: ["class", "id"],
-  h4: ["class", "id"],
-  h5: ["class", "id"],
-  h6: ["class", "id"],
-  table: ["class", "id"],
-  td: ["class", "id", "colspan", "rowspan", "align"],
-  th: ["class", "id", "colspan", "rowspan", "align"],
-};
+const ALLOWED_ATTR = [
+  "href",
+  "title",
+  "src",
+  "alt",
+  "width",
+  "height",
+  "colspan",
+  "rowspan",
+  "align",
+];
 
-/**
- * Sanitize HTML content by removing dangerous tags and attributes.
- *
- * This is a basic implementation for trusted plugin templates.
- * It removes:
- * - Script tags and event handlers
- * - Potentially dangerous protocols (javascript:, data:, etc.)
- * - Unauthorized tags and attributes
- *
- * @param html - HTML string to sanitize
- * @returns Sanitized HTML string
- */
-export function sanitizeHtml(html: string): string {
+// A dedicated instance, so the hook below doesn't affect other DOMPurify users
+// in the bundle. Created on first use: it needs the browser's `window`.
+let purifier: ReturnType<typeof DOMPurify> | null = null;
+// Classes the current sanitizeHtml call keeps (sanitize runs synchronously).
+let keptClasses: ReadonlySet<string> = new Set();
+
+function getPurifier(): ReturnType<typeof DOMPurify> {
+  if (!purifier) {
+    purifier = DOMPurify(window);
+    // Every link opens in a new tab without access to this window.
+    purifier.addHook("afterSanitizeAttributes", (node) => {
+      if (node.tagName === "A") {
+        node.setAttribute("target", "_blank");
+        node.setAttribute("rel", "noopener noreferrer");
+      }
+      const classes = node.getAttribute("class");
+      if (classes !== null) {
+        const kept = classes.split(/\s+/).filter((name) => keptClasses.has(name));
+        if (kept.length > 0) node.setAttribute("class", kept.join(" "));
+        else node.removeAttribute("class");
+      }
+    });
+  }
+  return purifier;
+}
+
+export interface SanitizeOptions {
+  /** Keep `<img>` tags. Off for content a customer wrote. */
+  allowImages?: boolean;
+  /** Class names to keep (all others are dropped). Styling hooks for our own markup. */
+  allowedClasses?: readonly string[];
+}
+
+/** Sanitize an HTML string for use with `v-html`. */
+export function sanitizeHtml(html: string, options: SanitizeOptions = {}): string {
   if (!html || typeof html !== "string") {
     return "";
   }
 
-  // Create a temporary DOM element to parse HTML
-  const template = document.createElement("template");
-  template.innerHTML = html;
-
-  // Recursively sanitize all nodes
-  sanitizeNode(template.content);
-
-  return template.innerHTML;
-}
-
-/**
- * Recursively sanitize a DOM node and its children
- */
-function sanitizeNode(node: Node): void {
-  // Process all child nodes
-  const children = Array.from(node.childNodes);
-
-  for (const child of children) {
-    if (child.nodeType === Node.ELEMENT_NODE) {
-      const element = child as Element;
-      const tagName = element.tagName.toLowerCase();
-
-      // Remove disallowed tags
-      if (!ALLOWED_TAGS.includes(tagName)) {
-        child.remove();
-        continue;
-      }
-
-      // Sanitize attributes
-      sanitizeAttributes(element);
-
-      // Recursively sanitize children
-      sanitizeNode(child);
-    } else if (child.nodeType === Node.TEXT_NODE) {
-      // Text nodes are safe, keep them
-      continue;
-    } else {
-      // Remove other node types (comments, etc.)
-      child.remove();
-    }
+  const allowImages = options.allowImages ?? true;
+  const allowedClasses = options.allowedClasses ?? [];
+  const sanitizer = getPurifier();
+  keptClasses = new Set(allowedClasses);
+  try {
+    return sanitizer.sanitize(html, {
+      ALLOWED_TAGS: allowImages ? ALLOWED_TAGS : ALLOWED_TAGS.filter((tag) => tag !== "img"),
+      ALLOWED_ATTR: allowedClasses.length > 0 ? [...ALLOWED_ATTR, "class"] : ALLOWED_ATTR,
+      ALLOWED_URI_REGEXP: SAFE_URI,
+      FORBID_ATTR: allowedClasses.length > 0 ? ["id", "style"] : ["id", "class", "style"],
+      ALLOW_DATA_ATTR: false,
+    });
+  } finally {
+    keptClasses = new Set();
   }
 }
 
 /**
- * Sanitize element attributes
+ * Returns the URL if it is an absolute http(s) URL, otherwise undefined.
+ * Use it for `:href` bound to URLs that come from plugins or the AI.
  */
-function sanitizeAttributes(element: Element): void {
-  const tagName = element.tagName.toLowerCase();
-  const allowedAttrs = ALLOWED_ATTRS[tagName] || [];
-
-  // Get all attributes
-  const attrs = Array.from(element.attributes);
-
-  for (const attr of attrs) {
-    const attrName = attr.name.toLowerCase();
-
-    // Remove event handlers (onclick, onerror, etc.)
-    if (attrName.startsWith("on")) {
-      element.removeAttribute(attr.name);
-      continue;
-    }
-
-    // Remove style attribute (can contain javascript:)
-    if (attrName === "style") {
-      element.removeAttribute(attr.name);
-      continue;
-    }
-
-    // Check if attribute is allowed for this tag
-    if (!allowedAttrs.includes(attrName)) {
-      element.removeAttribute(attr.name);
-      continue;
-    }
-
-    // Sanitize href and src attributes
-    if (attrName === "href" || attrName === "src") {
-      // Browsers ignore whitespace and control characters inside a URL scheme
-      // ("java\tscript:"), so drop them before checking it.
-      // eslint-disable-next-line no-control-regex
-      const value = attr.value.replace(/[\u0000-\u0020]/g, "").toLowerCase();
-
-      // Remove dangerous protocols
-      if (
-        value.startsWith("javascript:") ||
-        value.startsWith("data:") ||
-        value.startsWith("vbscript:") ||
-        value.startsWith("file:")
-      ) {
-        element.removeAttribute(attr.name);
-        continue;
-      }
-    }
-
-    // Sanitize target attribute (prevent tabnabbing)
-    if (attrName === "target" && attr.value === "_blank") {
-      // Ensure rel="noopener noreferrer" is set
-      if (!element.getAttribute("rel")?.includes("noopener")) {
-        element.setAttribute("rel", "noopener noreferrer");
-      }
-    }
+export function safeHttpUrl(url: unknown): string | undefined {
+  if (typeof url !== "string") return undefined;
+  try {
+    const parsed = new URL(url.trim());
+    return parsed.protocol === "http:" || parsed.protocol === "https:" ? parsed.href : undefined;
+  } catch {
+    return undefined;
   }
-}
-
-/**
- * Check if HTML string is safe (basic validation)
- *
- * @param html - HTML string to check
- * @returns true if HTML appears safe
- */
-export function isHtmlSafe(html: string): boolean {
-  if (!html || typeof html !== "string") {
-    return true;
-  }
-
-  // Check for obvious script tags
-  if (/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi.test(html)) {
-    return false;
-  }
-
-  // Check for event handlers
-  if (/on\w+\s*=/gi.test(html)) {
-    return false;
-  }
-
-  // Check for javascript: protocol
-  if (/javascript:/gi.test(html)) {
-    return false;
-  }
-
-  return true;
 }

@@ -246,8 +246,8 @@ export class JobQueueService {
     progress: Record<string, unknown>,
   ): Promise<Job | null> {
     // Get current job data
-    const job = await jobRepository.findById(jobId);
-    if (!job || job.organizationId !== organizationId) {
+    const job = await jobRepository.findByIdAndOrganization(jobId, organizationId);
+    if (!job) {
       return null;
     }
 
@@ -294,9 +294,9 @@ export class JobQueueService {
    * Cancel a job
    */
   async cancelJob(jobId: string, organizationId: string): Promise<Job | null> {
-    const job = await jobRepository.findById(jobId);
+    const job = await jobRepository.findByIdAndOrganization(jobId, organizationId);
 
-    if (!job || job.organizationId !== organizationId) {
+    if (!job) {
       logger.error({ jobId }, "Job not found or unauthorized");
       return null;
     }

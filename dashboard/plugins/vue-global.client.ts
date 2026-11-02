@@ -4,12 +4,13 @@
  * Plugin UMD bundles built with Vite expect Vue to be available as window.Vue.
  * This plugin ensures Vue is available globally before any plugin components load.
  */
-import * as Vue from 'vue';
+import { logger } from "@/utils/logger";
+import * as Vue from "vue";
 
 export default defineNuxtPlugin(() => {
   // Expose Vue globally for UMD bundles
-  if (typeof window !== 'undefined') {
+  if (typeof window !== "undefined") {
     (window as any).Vue = Vue;
-    console.log('[VueGlobal] Vue exposed globally for plugin UMD bundles');
+    logger.debug("[VueGlobal] Vue exposed globally for plugin UMD bundles");
   }
 });

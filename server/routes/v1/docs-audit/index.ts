@@ -48,9 +48,9 @@ export const docsAuditRouter = t.router({
     )
     .query(async ({ ctx, input }) => {
       const organizationId = ctx.organizationId!;
-      const job = await jobRepository.findById(input.jobId);
+      const job = await jobRepository.findByIdAndOrganization(input.jobId, organizationId);
 
-      if (!job || job.organizationId !== organizationId) {
+      if (!job) {
         throw new Error("Audit job not found");
       }
 
