@@ -1,7 +1,8 @@
-import { Request, Response } from "express";
-import AdmZip from "adm-zip";
+import type { NextFunction, Request, Response } from "express";
+import multer from "multer";
 import path from "path";
 import fs from "fs";
+import { config } from "@server/config/env";
 import { AppDataSource } from "@server/database/data-source";
 import { PluginRegistry } from "@server/entities/plugin-registry.entity";
 import { PluginInstance } from "@server/entities/plugin-instance.entity";
@@ -10,43 +11,9 @@ import { pluginInstanceRepository } from "@server/repositories/plugin-instance.r
 import { storageService } from "./storage.service";
 import { pluginManagerService } from "./plugin-manager.service";
 import { createLogger } from "@server/lib/logger";
+import { extractPluginZip, validatePluginZip } from "@server/lib/plugin-archive";
 
 const logger = createLogger("plugin-upload");
-
-/**
- * Minimal view of a plugin's package.json used during upload validation.
- * Only the fields read by `validateZipStructure` are declared; the parsed
- * JSON is treated as `unknown` and narrowed against this shape.
- */
-interface PluginPackageJson {
-  name?: string;
-  version?: string;
-  description?: string;
-  author?: string;
-  "hay-plugin"?: {
-    entry?: string;
-    displayName?: string;
-    category?: string;
-    capabilities?: string[];
-  };
-}
-
-/**
- * Summary manifest derived from a plugin's package.json during upload.
- * This is distinct from the full `HayPluginManifest` persisted by
- * `pluginManagerService.registerPlugin`; it is only used to validate the
- * upload and to populate the HTTP response.
- */
-interface UploadedPluginManifest {
-  id: string;
-  name: string;
-  version: string;
-  description: string;
-  author?: string;
-  category?: string;
-  entry: string;
-  capabilities: string[];
-}
 
 export class PluginUploadService {
   private pluginsDir: string;
@@ -76,17 +43,19 @@ export class PluginUploadService {
       const originalName = req.file.originalname;
 
       // Validate ZIP structure
-      const { manifest, pluginId } = await this.validateZipStructure(zipBuffer);
+      const { manifest, pluginId } = validatePluginZip(zipBuffer);
 
-      // Check if plugin already exists
-      const existing = await pluginRegistryRepository.findCustomByPluginId(
-        pluginId,
-        req.organizationId,
-      );
+      // Plugin ids are global: any existing row (core, another org's, or this
+      // org's) blocks a new upload under the same id.
+      const existing = await pluginRegistryRepository.findByPluginId(pluginId);
 
       if (existing) {
+        const ownCustom =
+          existing.sourceType === "custom" && existing.organizationId === req.organizationId;
         res.status(409).json({
-          error: `Plugin ${pluginId} already exists. Use PUT /v1/plugins/${pluginId} to update.`,
+          error: ownCustom
+            ? `Plugin ${pluginId} already exists. Use PUT /v1/plugins/${pluginId} to update.`
+            : `Plugin id ${pluginId} is not available. Choose a different package name.`,
         });
         return;
       }
@@ -153,7 +122,7 @@ export class PluginUploadService {
       const zipBuffer = req.file.buffer;
 
       // Validate ZIP
-      const { manifest, pluginId } = await this.validateZipStructure(zipBuffer);
+      const { manifest, pluginId } = validatePluginZip(zipBuffer);
 
       // Validate pluginId matches URL parameter
       if (req.params.pluginId !== pluginId) {
@@ -298,97 +267,6 @@ export class PluginUploadService {
   }
 
   /**
-   * Validate ZIP structure and package.json with hay-plugin field
-   */
-  private async validateZipStructure(zipBuffer: Buffer): Promise<{
-    manifest: UploadedPluginManifest;
-    pluginId: string;
-  }> {
-    try {
-      const zip = new AdmZip(zipBuffer);
-      const zipEntries = zip.getEntries();
-
-      // Security: Check for zip bombs
-      let totalUncompressedSize = 0;
-      for (const entry of zipEntries) {
-        totalUncompressedSize += entry.header.size;
-
-        // Prevent zip bombs (uncompressed > 500MB)
-        if (totalUncompressedSize > 500 * 1024 * 1024) {
-          throw new Error("ZIP file exceeds maximum uncompressed size (500MB)");
-        }
-
-        // Prevent path traversal
-        const normalizedPath = path.normalize(entry.entryName);
-        if (normalizedPath.startsWith("..") || path.isAbsolute(normalizedPath)) {
-          throw new Error(`Invalid file path in ZIP: ${entry.entryName}`);
-        }
-      }
-
-      // Find package.json
-      const packageEntry = zipEntries.find(
-        (e) => e.entryName === "package.json" || e.entryName.endsWith("/package.json"),
-      );
-
-      if (!packageEntry) {
-        throw new Error("package.json not found in ZIP root");
-      }
-
-      // Parse package.json
-      const packageContent = zip.readAsText(packageEntry);
-      const parsed: unknown = JSON.parse(packageContent);
-
-      if (typeof parsed !== "object" || parsed === null) {
-        throw new Error("package.json must contain a JSON object");
-      }
-
-      const packageJson = parsed as PluginPackageJson;
-
-      // Validate hay-plugin field exists
-      const hayPlugin = packageJson["hay-plugin"];
-      if (!hayPlugin) {
-        throw new Error("package.json must contain a 'hay-plugin' field");
-      }
-
-      // Validate required fields
-      if (!packageJson.name) {
-        throw new Error("package.json missing required 'name' field");
-      }
-
-      if (!hayPlugin.entry) {
-        throw new Error("hay-plugin missing required 'entry' field");
-      }
-
-      // Validate plugin ID format (npm package name)
-      const pluginId = packageJson.name;
-      if (!/^(@[a-z0-9-]+\/)?[a-z0-9-]+$/.test(pluginId)) {
-        throw new Error(
-          "Plugin ID (package name) must be a valid npm package name (lowercase letters, numbers, hyphens, optional scope)",
-        );
-      }
-
-      // Build manifest from package.json for compatibility with rest of upload flow
-      const manifest: UploadedPluginManifest = {
-        id: pluginId,
-        name: hayPlugin.displayName || pluginId,
-        version: packageJson.version || "1.0.0",
-        description: packageJson.description || "",
-        author: packageJson.author,
-        category: hayPlugin.category,
-        entry: hayPlugin.entry,
-        capabilities: hayPlugin.capabilities || [],
-      };
-
-      return { manifest, pluginId };
-    } catch (error) {
-      if (error instanceof Error) {
-        throw error;
-      }
-      throw new Error("Invalid ZIP file structure");
-    }
-  }
-
-  /**
    * Extract plugin to file system
    */
   private async extractPlugin(
@@ -409,12 +287,48 @@ export class PluginUploadService {
       await fs.promises.rm(extractPath, { recursive: true, force: true });
     }
 
-    // Extract ZIP
-    const zip = new AdmZip(zipBuffer);
-    zip.extractAllTo(extractPath, true);
+    extractPluginZip(zipBuffer, extractPath);
 
     return extractPath;
   }
 }
 
 export const pluginUploadService = new PluginUploadService();
+
+/**
+ * Reject plugin uploads/updates up front (before the body is buffered) when
+ * the server does not accept organization-supplied plugin code.
+ */
+export function requireCustomPluginsAllowed(
+  _req: Request,
+  res: Response,
+  next: NextFunction,
+): void {
+  if (!config.plugins.allowCustomPlugins) {
+    res.status(403).json({ error: "Custom plugins are disabled on this server" });
+    return;
+  }
+  next();
+}
+
+/**
+ * Route-level error handler for the multer upload middleware: turn limit and
+ * file-filter errors into 4xx responses instead of unhandled 500s.
+ */
+export function handlePluginUploadError(
+  err: unknown,
+  _req: Request,
+  res: Response,
+  next: NextFunction,
+): void {
+  if (err instanceof multer.MulterError) {
+    const status = err.code === "LIMIT_FILE_SIZE" ? 413 : 400;
+    res.status(status).json({ error: err.message });
+    return;
+  }
+  if (err instanceof Error) {
+    res.status(400).json({ error: err.message });
+    return;
+  }
+  next(err);
+}

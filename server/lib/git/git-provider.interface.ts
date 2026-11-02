@@ -34,9 +34,16 @@ export interface GitProvider {
   listRepositories(installationId: string): Promise<GitRepoInfo[]>;
 
   /**
-   * Download repository archive for a specific branch.
+   * Download the repository archive at an exact commit (callers resolve the
+   * branch head with getLatestCommit first, so the archive matches the SHA
+   * that gets recorded). Fails when the archive exceeds `maxBytes`.
    */
-  downloadArchive(installationId: string, repo: string, branch: string): Promise<GitArchiveResult>;
+  downloadArchive(
+    installationId: string,
+    repo: string,
+    commitSha: string,
+    maxBytes: number,
+  ): Promise<GitArchiveResult>;
 
   /**
    * Get the latest commit on a branch (for change detection).

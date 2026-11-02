@@ -409,7 +409,8 @@ async function startServer() {
   // Plugin upload endpoints
   const multer = await import("multer");
   const { withAdminAuth } = await import("@server/middleware/auth");
-  const { pluginUploadService } = await import("@server/services/plugin-upload.service");
+  const { pluginUploadService, requireCustomPluginsAllowed, handlePluginUploadError } =
+    await import("@server/services/plugin-upload.service");
 
   // Multer configuration for plugin uploads
   const pluginUpload = multer.default({
@@ -431,19 +432,23 @@ async function startServer() {
   server.post(
     "/v1/plugins/upload",
     withAdminAuth,
+    requireCustomPluginsAllowed,
     pluginUpload.single("plugin"),
-    async (req, res) => {
+    async (req: express.Request, res: express.Response) => {
       await pluginUploadService.handleUpload(req, res);
     },
+    handlePluginUploadError,
   );
 
   server.put(
     "/v1/plugins/:pluginId",
     withAdminAuth,
+    requireCustomPluginsAllowed,
     pluginUpload.single("plugin"),
-    async (req, res) => {
+    async (req: express.Request, res: express.Response) => {
       await pluginUploadService.handleUpdate(req, res);
     },
+    handlePluginUploadError,
   );
 
   server.delete("/v1/plugins/:pluginId", withAdminAuth, async (req, res) => {

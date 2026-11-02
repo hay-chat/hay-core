@@ -115,6 +115,9 @@
               <div class="flex items-center gap-2 mb-1">
                 <h4 class="font-medium">{{ plugin.name }}</h4>
                 <Badge variant="outline">v{{ plugin.version }}</Badge>
+                <Badge v-if="plugin.gitAvailableCommitSha" variant="secondary">
+                  {{ $t("gitConnections.updateAvailable") }}
+                </Badge>
                 <Badge v-if="plugin.gitSyncError" variant="destructive">
                   {{ $t("gitConnections.syncError") }}
                 </Badge>

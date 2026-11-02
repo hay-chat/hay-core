@@ -487,12 +487,12 @@ const jobRegistry: CronJobConfig[] = [
   // GIT PLUGIN SYNC
   // ============================================================
   {
-    name: "git-plugin-sync",
-    description: "Check git-sourced plugins for updates and sync if changed",
+    name: "git-plugin-update-check",
+    description: "Flag git-sourced plugins whose branch has a newer commit (applied by an admin)",
     schedule: 900000, // Every 15 minutes
     handler: async () => {
       const { gitConnectionService } = await import("./git-connection.service");
-      await gitConnectionService.syncAllGitPlugins();
+      await gitConnectionService.checkAllGitPluginsForUpdates();
     },
     singleton: true,
     enabled: true,

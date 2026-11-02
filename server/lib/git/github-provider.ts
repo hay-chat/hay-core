@@ -12,6 +12,34 @@ const logger = createLogger("github-provider");
 
 const GITHUB_API_BASE = "https://api.github.com";
 
+/** Read a response body into memory, failing as soon as it exceeds `maxBytes`. */
+export async function readBodyWithLimit(response: Response, maxBytes: number): Promise<Buffer> {
+  const tooLarge = () => new Error(`Archive exceeds maximum size (${maxBytes} bytes)`);
+
+  const declared = Number(response.headers.get("content-length"));
+  if (Number.isFinite(declared) && declared > maxBytes) {
+    throw tooLarge();
+  }
+  if (!response.body) {
+    return Buffer.alloc(0);
+  }
+
+  const reader = response.body.getReader();
+  const chunks: Buffer[] = [];
+  let total = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    total += value.byteLength;
+    if (total > maxBytes) {
+      await reader.cancel().catch(() => {});
+      throw tooLarge();
+    }
+    chunks.push(Buffer.from(value));
+  }
+  return Buffer.concat(chunks);
+}
+
 export class GitHubProvider implements GitProvider {
   readonly id = "github";
 
@@ -150,41 +178,37 @@ export class GitHubProvider implements GitProvider {
   async downloadArchive(
     installationId: string,
     repo: string,
-    branch: string,
+    commitSha: string,
+    maxBytes: number,
   ): Promise<GitArchiveResult> {
     const token = await this.getAccessToken(installationId);
 
-    // First, get the latest commit SHA for this branch
-    const commit = await this.getLatestCommit(installationId, repo, branch);
-
-    // Download tarball
-    const response = await fetch(`${GITHUB_API_BASE}/repos/${repo}/tarball/${branch}`, {
-      headers: {
-        Authorization: `token ${token}`,
-        Accept: "application/vnd.github+json",
-        "X-GitHub-Api-Version": "2022-11-28",
+    const response = await fetch(
+      `${GITHUB_API_BASE}/repos/${repo}/tarball/${encodeURIComponent(commitSha)}`,
+      {
+        headers: {
+          Authorization: `token ${token}`,
+          Accept: "application/vnd.github+json",
+          "X-GitHub-Api-Version": "2022-11-28",
+        },
+        redirect: "follow",
       },
-      redirect: "follow",
-    });
+    );
 
     if (!response.ok) {
       const errorText = await response.text();
       throw new Error(
-        `Failed to download archive for ${repo}@${branch}: ${response.status} ${errorText}`,
+        `Failed to download archive for ${repo}@${commitSha}: ${response.status} ${errorText}`,
       );
     }
 
-    const arrayBuffer = await response.arrayBuffer();
-    const buffer = Buffer.from(arrayBuffer);
+    const buffer = await readBodyWithLimit(response, maxBytes);
 
-    logger.info(
-      { repo, branch, commitSha: commit.sha, sizeBytes: buffer.length },
-      "Downloaded archive",
-    );
+    logger.info({ repo, commitSha, sizeBytes: buffer.length }, "Downloaded archive");
 
     return {
       buffer,
-      commitSha: commit.sha,
+      commitSha,
     };
   }
 
