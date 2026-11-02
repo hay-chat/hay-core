@@ -105,9 +105,10 @@ export class AuditLog extends TypeOrmBaseEntity {
   /**
    * Organization the row was written for. Plain column (no FK) filled by a DB
    * trigger on insert, so the row stays attributable after the organization
-   * is deleted and `organizationId` is set to NULL.
+   * is deleted and `organizationId` is set to NULL. Never selected, inserted
+   * or updated by TypeORM, so code stays compatible before the migration runs.
    */
-  @Column({ type: "uuid", nullable: true, insert: false, update: false })
+  @Column({ type: "uuid", nullable: true, select: false, insert: false, update: false })
   originalOrganizationId?: string;
 
   @Column({ type: "varchar", length: 100 })

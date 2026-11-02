@@ -21,6 +21,7 @@ WebChat,sessionStorage,conversation_id|keypair,No,No,No,Browser storage (ephemer
 WebChat,IndexedDB,DPoP keypairs,No,No,No,Browser storage (ephemeral),P2
 Analytics,PostHog (dashboard),opaque user_id|masked events,No,No,No,Dashboard analytics only when POSTHOG_KEY is set; no email or name sent; deletion via PostHog person deletion (manual),P2
 Audit,audit_logs,user_id|ip_address|user_agent|changes|metadata,Yes,Partial,No,Anonymized on user deletion (user_id cleared; IP truncated; PII redacted); rows otherwise append-only and deleted after 90 days,P1
+Integrations,operator_events,payload (may contain customer data),No,No,No,Not erased yet,P2
 
 DSAR_Operation,Current_Implementation_Status,Gap_Severity,Estimated_Effort,GDPR_Article
 Data Export (Art.15),Implemented - ZIP with README and signature,None,Completed,Art.15

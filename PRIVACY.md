@@ -340,7 +340,7 @@ When a deletion request is confirmed, the following actions are taken:
 
 ### Account Access
 
-- **Sessions:** All of the user's refresh sessions are revoked, so no device stays signed in. _(Pending: depends on the erasure changes in the current security batch; until they land, sign-in is blocked by the password and email reset below, but existing sessions are not revoked.)_
+- **Sessions and access:** The user's sessions, push subscriptions, auth codes, organization memberships and pending invitations are deleted and the token version is bumped, so no device stays signed in. User references on other records are cleared. _(Pending PR #133: until it lands, sign-in is blocked by the password and email reset below, but existing sessions are not revoked.)_
 - **API Keys:** API keys belong to the organization, not to a user, and are **not** deleted with a user account. Organization owners manage them under Settings → API keys; key creation, revocation and deletion are recorded in the audit log.
 
 ### Soft Deletion
@@ -354,6 +354,13 @@ When a deletion request is confirmed, the following actions are taken:
 
 - **Audit Logs:** `userId` set to `NULL`, IP addresses truncated (last IPv4 octet / IPv6 suffix zeroed), user agents replaced with `"deleted"`, and personal fields inside `changes`/`metadata` redacted. The event itself (action, time, organization) is kept.
 - **Created/Updated Records:** User references in documents/content anonymized
+
+### Known Limits
+
+- **Customer erasure** deletes the customer's messages, action logs, pending actions, order links and team questions; conversations remain as anonymous soft-deleted rows _(pending PR #133)_.
+- Audit rows written by _other_ users (e.g. an invitation sent to the erased person) may still contain the erased person's email address.
+- Operator event payloads are not erased yet.
+- Erasure does not reach sub-processors' copies (e.g. AI providers, email provider) or commerce platforms connected through plugins; provider-initiated redaction webhooks are not implemented.
 
 ### Retention for Compliance
 
@@ -373,7 +380,8 @@ When a deletion request is confirmed, the following actions are taken:
 ### 2. Download Tokens
 
 - Separate download token generated for export access
-- The download link and the export file expire together, 7 days after the export is ready; expired files are deleted by the `cleanup-expired-privacy-exports` daily job. _(Pending: the erasure/export changes in the current security batch may shorten this; confirm the final value before merge.)_
+- The download link and the export file expire together after `PRIVACY_EXPORT_RETENTION_DAYS` (default 7 days); expired files are deleted by the `cleanup-expired-privacy-exports` daily job.
+- Exports allow a single download by default (`PRIVACY_MAX_DOWNLOAD_COUNT`); the file is deleted after the last allowed download. _(Pending PR #133 for the setting names and delete-after-download.)_
 
 ### 3. Audit Trail
 
@@ -557,7 +565,7 @@ Plugins an organization enables (e.g. Shopify, WhatsApp, Zendesk) send data to t
 | **Conversations**    | Per-org `retentionDays` | Automatically anonymized by daily cleanup worker (see [RETENTION.md](RETENTION.md)) |
 | **Embeddings**       | Per-org `retentionDays` | Deleted alongside anonymized conversations                                          |
 | **Export Files**     | 7 days                  | Automatically deleted after download link expires                                   |
-| **Privacy Requests** | Permanent               | Audit trail for compliance                                                          |
+| **Privacy Requests** | 365 days                | Anonymized after 365 days (pending PR #133)                                         |
 | **Audit Logs**       | 90 days                 | Deleted daily by the `cleanup-old-audit-logs` job; kept after organization deletion |
 | **Database Backups** | Provider's retention    | Managed-database automated backups; no Hay-side rotation (period _to confirm_)      |
 
@@ -600,7 +608,7 @@ This implementation complies with:
 
 ### Download Token Invalid
 
-- Download links expire after 7 days (see Download Tokens above)
+- Download links expire after the export retention period (default 7 days, see Download Tokens above)
 - Request new export if expired
 
 ---
