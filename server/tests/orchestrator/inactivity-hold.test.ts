@@ -18,6 +18,10 @@ jest.mock("@server/repositories/conversation.repository", () => ({
   },
   conversationRepository: { findById: (id: string) => mockFindById(id) },
 }));
+const mockOrgSettings = jest.fn<() => Record<string, unknown> | null>(() => null);
+jest.mock("@server/repositories/organization.repository", () => ({
+  organizationRepository: { findById: async () => ({ settings: mockOrgSettings() }) },
+}));
 jest.mock("@server/repositories/message.repository", () => ({ MessageRepository: class {} }));
 
 const mockInvoke = jest.fn<() => Promise<string>>();
@@ -92,7 +96,7 @@ function makeConversation(silentForMs: number, withWarning = false) {
 }
 
 /** Load a conversation into the reaper, with `changes` applied to the DB row. */
-function given(conversation: ReturnType<typeof makeConversation>, changes = {}) {
+function given(conversation: Record<string, unknown>, changes = {}) {
   row = { ...conversation, ...changes };
   mockFindAllOpen.mockResolvedValue([conversation]);
   mockFindById.mockImplementation(async () => ({ ...row, addMessage }));
@@ -187,5 +191,81 @@ describe("checkInactivity", () => {
     expect(mockInvoke).toHaveBeenCalledTimes(1);
     expect(addMessage).not.toHaveBeenCalled();
     expect(closedAsResolved()).toBe(false);
+  });
+});
+
+describe("checkInactivity per channel", () => {
+  const MIN = 60_000;
+  const withChannel = (channel: string, silentFor: number, warned = false, extra = {}) =>
+    given({ ...makeConversation(silentFor, warned), channel, ...extra }, { channel, ...extra });
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    addMessage = jest.fn(async () => ({}));
+    mockInvoke.mockResolvedValue("Do you still need help?");
+    mockOrgSettings.mockReturnValue(null);
+  });
+
+  const warned = () =>
+    addMessage.mock.calls.some(
+      ([m]) =>
+        (m as { metadata?: { isInactivityWarning?: boolean } }).metadata?.isInactivityWarning,
+    );
+
+  it("does not warn an email conversation after 2 hours, but does after a day", async () => {
+    withChannel("email", 2 * 60 * MIN);
+    await new Orchestrator().checkInactivity();
+    expect(addMessage).not.toHaveBeenCalled();
+
+    withChannel("email", 25 * 60 * MIN);
+    await new Orchestrator().checkInactivity();
+    expect(warned()).toBe(true);
+    expect(closedAsResolved()).toBe(false);
+  });
+
+  it("warns WhatsApp after 1 hour and closes with a sign-off after 2 hours", async () => {
+    withChannel("whatsapp", 70 * MIN);
+    await new Orchestrator().checkInactivity();
+    expect(warned()).toBe(true);
+
+    jest.clearAllMocks();
+    addMessage = jest.fn(async () => ({}));
+    mockInvoke.mockResolvedValue("Closing this chat.");
+    withChannel("whatsapp", 130 * MIN, true);
+    await new Orchestrator().checkInactivity();
+    expect(addMessage).toHaveBeenCalledTimes(1);
+    expect(closedAsResolved()).toBe(true);
+  });
+
+  it("closes web chat after 30 minutes, which email would not", async () => {
+    withChannel("web", 40 * MIN, true);
+    await new Orchestrator().checkInactivity();
+    expect(closedAsResolved()).toBe(true);
+
+    jest.clearAllMocks();
+    withChannel("email", 40 * MIN, true);
+    await new Orchestrator().checkInactivity();
+    expect(closedAsResolved()).toBe(false);
+  });
+
+  it("uses the organization's override", async () => {
+    mockOrgSettings.mockReturnValue({
+      inactivityTimeouts: { email: { warningMinutes: 30, closeMinutes: 60 } },
+    });
+    withChannel("email", 45 * MIN);
+    await new Orchestrator().checkInactivity();
+    expect(warned()).toBe(true);
+  });
+
+  it("neither warns nor signs off once the channel reply window has closed", async () => {
+    const closedWindow = new Date(Date.now() - MIN);
+    withChannel("whatsapp", 70 * MIN, false, { reply_window_expires_at: closedWindow });
+    await new Orchestrator().checkInactivity();
+    expect(addMessage).not.toHaveBeenCalled();
+
+    withChannel("whatsapp", 130 * MIN, true, { reply_window_expires_at: closedWindow });
+    await new Orchestrator().checkInactivity();
+    expect(addMessage).not.toHaveBeenCalled();
+    expect(closedAsResolved()).toBe(true);
   });
 });

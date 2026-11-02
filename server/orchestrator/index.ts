@@ -10,6 +10,11 @@ import {
 import { hookManager } from "@server/services/hooks/hook-manager";
 import { recheckAiReply } from "./reply-guard";
 import { createLogger } from "@server/lib/logger";
+import { organizationRepository } from "@server/repositories/organization.repository";
+import {
+  resolveInactivityThresholds,
+  type OrganizationSettings,
+} from "@server/types/organization-settings.types";
 
 const logger = createLogger("orchestrator");
 
@@ -80,9 +85,8 @@ export class Orchestrator {
       const waitingOnTeam = await teamQuestionService.conversationIdsWithOpenQuestion();
 
       const now = new Date();
-      const inactivityThreshold = config.conversation.inactivityInterval;
-      const warningThreshold = inactivityThreshold / 2; // Send warning at half the timeout
-      const silentCloseThreshold = inactivityThreshold * 2; // Close silently at 2x timeout
+      // Thresholds depend on the conversation's channel and the org's overrides.
+      const settingsByOrg = new Map<string, OrganizationSettings | null>();
 
       for (const conversation of openConversations) {
         const log = logger.child({
@@ -94,6 +98,28 @@ export class Orchestrator {
             log.debug("Skipping inactivity check - quick check with the team open");
             continue;
           }
+
+          if (!settingsByOrg.has(conversation.organization_id)) {
+            const organization = await organizationRepository.findById(
+              conversation.organization_id,
+            );
+            settingsByOrg.set(conversation.organization_id, organization?.settings ?? null);
+          }
+          const {
+            warningMs: warningThreshold,
+            closeMs: inactivityThreshold,
+            silentCloseMs: silentCloseThreshold,
+          } = resolveInactivityThresholds(
+            settingsByOrg.get(conversation.organization_id),
+            conversation.channel,
+            config.conversation.inactivityInterval,
+          );
+
+          // A channel reply window (WhatsApp's 24 h) that has closed refuses the
+          // warning and the sign-off, so those are skipped and the close is silent.
+          const replyWindowClosed =
+            !!conversation.reply_window_expires_at &&
+            new Date(conversation.reply_window_expires_at).getTime() <= now.getTime();
 
           // Get the last message in the conversation
           const messages = await conversation.getMessages();
@@ -171,7 +197,7 @@ export class Orchestrator {
                 conversation.id,
                 conversation.organization_id,
                 timeSinceLastMessage,
-                true, // Send closure message
+                !replyWindowClosed, // Send closure message unless the channel would refuse it
               );
             } else {
               // No warning sent yet but past full timeout, close with message
@@ -180,14 +206,14 @@ export class Orchestrator {
                 conversation.id,
                 conversation.organization_id,
                 timeSinceLastMessage,
-                true, // Send closure message
+                !replyWindowClosed, // Send closure message unless the channel would refuse it
               );
             }
           } else if (timeSinceLastMessage > warningThreshold) {
             // Half timeout: Send warning if not already sent
             const hasWarning = messages.some((m) => m.metadata?.isInactivityWarning === true);
 
-            if (!hasWarning) {
+            if (!hasWarning && !replyWindowClosed) {
               log.debug(
                 { timeSinceLastMessage, warningThreshold },
                 "Conversation reached warning threshold, sending warning",
