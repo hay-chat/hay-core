@@ -41,6 +41,9 @@ const editor = shallowRef<Editor>();
 const initializeEditor = () => {
   const extensions = [
     StarterKit.configure({
+      // StarterKit 3 bundles link and underline; this editor has never offered them.
+      link: false,
+      underline: false,
       heading: {
         levels: [1, 2],
       },
@@ -86,7 +89,7 @@ watch(
     if (editor.value && newContent) {
       const currentContent = editor.value.getJSON();
       if (JSON.stringify(currentContent) !== JSON.stringify(newContent)) {
-        editor.value.commands.setContent(newContent, false);
+        editor.value.commands.setContent(newContent, { emitUpdate: false });
       }
     }
   },
