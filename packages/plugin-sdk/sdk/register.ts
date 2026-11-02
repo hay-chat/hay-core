@@ -400,8 +400,10 @@ function validateWebhookRouting(descriptor: WebhookRoutingDescriptor): void {
   if (!signature.header || typeof signature.header !== "string") {
     throw new Error("Webhook routing signature.header must be a non-empty string");
   }
-  if (signature.format !== "sha256-hmac" && signature.format !== "svix") {
-    throw new Error('Webhook routing signature.format must be "sha256-hmac" or "svix"');
+  if (!["sha256-hmac", "sha256-hmac-base64", "svix"].includes(signature.format)) {
+    throw new Error(
+      'Webhook routing signature.format must be "sha256-hmac", "sha256-hmac-base64" or "svix"',
+    );
   }
   if (signature.format === "svix" && signature.header.toLowerCase() !== "svix-signature") {
     throw new Error(
