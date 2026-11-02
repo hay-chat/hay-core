@@ -212,15 +212,20 @@ describe("checkInactivity per channel", () => {
         (m as { metadata?: { isInactivityWarning?: boolean } }).metadata?.isInactivityWarning,
     );
 
-  it("does not warn an email conversation after 2 hours, but does after a day", async () => {
-    withChannel("email", 2 * 60 * MIN);
-    await new Orchestrator().checkInactivity();
-    expect(addMessage).not.toHaveBeenCalled();
-
+  it("never checks in on email, and closes it with a sign-off after 2 days", async () => {
     withChannel("email", 25 * 60 * MIN);
     await new Orchestrator().checkInactivity();
-    expect(warned()).toBe(true);
+    expect(addMessage).not.toHaveBeenCalled();
     expect(closedAsResolved()).toBe(false);
+
+    jest.clearAllMocks();
+    addMessage = jest.fn(async () => ({}));
+    mockInvoke.mockResolvedValue("Closing this conversation.");
+    withChannel("email", 49 * 60 * MIN);
+    await new Orchestrator().checkInactivity();
+    expect(addMessage).toHaveBeenCalledTimes(1);
+    expect(warned()).toBe(false);
+    expect(closedAsResolved()).toBe(true);
   });
 
   it("warns WhatsApp after 1 hour and closes with a sign-off after 2 hours", async () => {

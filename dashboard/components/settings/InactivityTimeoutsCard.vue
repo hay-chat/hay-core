@@ -17,6 +17,7 @@
           type="number"
           :min="1"
           :label="$t('businessHours.inactivity.warnAfter')"
+          :placeholder="$t('businessHours.inactivity.noCheckIn')"
         />
         <Input
           v-model.number="row.close"
@@ -71,12 +72,13 @@ const UNIT_MINUTES: Record<Unit, number> = { minutes: 1, hours: 60, days: 1440 }
 interface Row {
   channel: string;
   name: string;
-  warning: number;
+  /** Empty = no check-in before the close. */
+  warning: number | "" | null;
   close: number;
   unit: Unit;
 }
 interface Timeout {
-  warningMinutes: number;
+  warningMinutes: number | null;
   closeMinutes: number;
 }
 
@@ -95,9 +97,11 @@ const unitOptions = computed(() =>
   })),
 );
 
-function pickUnit(warningMinutes: number, closeMinutes: number): Unit {
-  if (warningMinutes % 1440 === 0 && closeMinutes % 1440 === 0) return "days";
-  if (warningMinutes % 60 === 0 && closeMinutes % 60 === 0) return "hours";
+function pickUnit(warningMinutes: number | null, closeMinutes: number): Unit {
+  const fits = (size: number) =>
+    closeMinutes % size === 0 && (warningMinutes === null || warningMinutes % size === 0);
+  if (fits(1440)) return "days";
+  if (fits(60)) return "hours";
   return "minutes";
 }
 
@@ -107,14 +111,17 @@ function toRow(channel: string, name: string, timeout: Timeout): Row {
     channel,
     name,
     unit,
-    warning: timeout.warningMinutes / UNIT_MINUTES[unit],
+    warning: timeout.warningMinutes === null ? "" : timeout.warningMinutes / UNIT_MINUTES[unit],
     close: timeout.closeMinutes / UNIT_MINUTES[unit],
   };
 }
 
 function toMinutes(row: Row): Timeout {
   return {
-    warningMinutes: Math.round(row.warning * UNIT_MINUTES[row.unit]),
+    warningMinutes:
+      row.warning === "" || row.warning === null
+        ? null
+        : Math.round(row.warning * UNIT_MINUTES[row.unit]),
     closeMinutes: Math.round(row.close * UNIT_MINUTES[row.unit]),
   };
 }
@@ -123,7 +130,8 @@ const valid = computed(() =>
   (rows.value ?? []).every((row) => {
     const { warningMinutes, closeMinutes } = toMinutes(row);
     const ok = (n: number) => Number.isInteger(n) && n >= limits.value.min && n <= limits.value.max;
-    return ok(warningMinutes) && ok(closeMinutes) && warningMinutes < closeMinutes;
+    if (!ok(closeMinutes)) return false;
+    return warningMinutes === null || (ok(warningMinutes) && warningMinutes < closeMinutes);
   }),
 );
 

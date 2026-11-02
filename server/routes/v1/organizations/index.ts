@@ -606,21 +606,27 @@ export const organizationsRouter = t.router({
             z.string().regex(/^[a-z0-9_-]{1,64}$/),
             z
               .object({
+                // null = no check-in before the close.
                 warningMinutes: z
                   .number()
                   .int()
                   .min(INACTIVITY_MINUTES_LIMITS.min)
-                  .max(INACTIVITY_MINUTES_LIMITS.max),
+                  .max(INACTIVITY_MINUTES_LIMITS.max)
+                  .nullable(),
                 closeMinutes: z
                   .number()
                   .int()
                   .min(INACTIVITY_MINUTES_LIMITS.min)
                   .max(INACTIVITY_MINUTES_LIMITS.max),
               })
-              .refine((value) => value.warningMinutes < value.closeMinutes, {
-                message: "The warning must come before the close.",
-                path: ["warningMinutes"],
-              }),
+              .refine(
+                (value) =>
+                  value.warningMinutes === null || value.warningMinutes < value.closeMinutes,
+                {
+                  message: "The warning must come before the close.",
+                  path: ["warningMinutes"],
+                },
+              ),
           )
           .refine((value) => Object.keys(value).length <= 50, { message: "Too many channels" }),
       }),

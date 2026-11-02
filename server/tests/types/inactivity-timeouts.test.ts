@@ -14,10 +14,10 @@ describe("resolveInactivityThresholds", () => {
     ["whatsapp", 60, 120],
     ["messenger", 60, 120],
     ["instagram", 60, 120],
-    ["email", 24 * 60, 48 * 60],
+    ["email", null, 48 * 60],
   ])("uses the built-in default for %s", (channel, warn, close) => {
     expect(resolveInactivityThresholds(null, channel, FALLBACK)).toEqual({
-      warningMs: warn * MIN,
+      warningMs: warn === null ? null : warn * MIN,
       closeMs: close * MIN,
       silentCloseMs: close * 2 * MIN,
     });
@@ -65,6 +65,8 @@ describe("isValidInactivityTimeout", () => {
     [{ warningMinutes: "10", closeMinutes: 20 }, false],
     [null, false],
     [{ warningMinutes: 10, closeMinutes: 20 }, true],
+    [{ warningMinutes: null, closeMinutes: 20 }, true],
+    [{ warningMinutes: null, closeMinutes: 0 }, false],
   ])("%j -> %s", (value, expected) => {
     expect(isValidInactivityTimeout(value)).toBe(expected);
   });

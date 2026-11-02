@@ -481,8 +481,10 @@ export function resolveQuickCheckSettings(
 /**
  * Inactivity timeouts per channel. Keyed by channel id ("web" or a channel
  * plugin's manifest `channel`, never a plugin id). After `warningMinutes` of
- * customer silence the AI nudges; after `closeMinutes` it closes with a
- * sign-off; after 2x `closeMinutes` (the old rule) it closes silently.
+ * customer silence the AI nudges (`null` = no nudge); after `closeMinutes` it
+ * closes with a sign-off; after 2x `closeMinutes` (the old rule) it closes
+ * silently. Email skips the nudge by default: a "still there?" email reads as
+ * noise, so it only gets the close message.
  *
  * Built-in defaults stay well inside WhatsApp's 24 h customer-service window
  * (the 2 h close sign-off still goes out). Channels not listed, and not
@@ -490,7 +492,7 @@ export function resolveQuickCheckSettings(
  * env value as the close delay and half of it as the warning.
  */
 export interface InactivityTimeout {
-  warningMinutes: number;
+  warningMinutes: number | null;
   closeMinutes: number;
 }
 
@@ -505,7 +507,7 @@ export const DEFAULT_INACTIVITY_TIMEOUTS: Readonly<Record<string, InactivityTime
   whatsapp: MESSAGING_TIMEOUT,
   messenger: MESSAGING_TIMEOUT,
   instagram: MESSAGING_TIMEOUT,
-  email: { warningMinutes: DAY, closeMinutes: 2 * DAY },
+  email: { warningMinutes: null, closeMinutes: 2 * DAY },
 };
 
 export function isValidInactivityTimeout(value: unknown): value is InactivityTimeout {
@@ -516,11 +518,13 @@ export function isValidInactivityTimeout(value: unknown): value is InactivityTim
     Number.isInteger(n) &&
     n >= INACTIVITY_MINUTES_LIMITS.min &&
     n <= INACTIVITY_MINUTES_LIMITS.max;
-  return inRange(warningMinutes) && inRange(closeMinutes) && warningMinutes < closeMinutes;
+  if (!inRange(closeMinutes)) return false;
+  return warningMinutes === null || (inRange(warningMinutes) && warningMinutes < closeMinutes);
 }
 
 export interface ResolvedInactivityThresholds {
-  warningMs: number;
+  /** null = this channel gets no check-in before the close. */
+  warningMs: number | null;
   closeMs: number;
   silentCloseMs: number;
 }
@@ -536,7 +540,11 @@ export function resolveInactivityThresholds(
     ? override
     : (DEFAULT_INACTIVITY_TIMEOUTS[channel] ?? null);
   const closeMs = timeout ? timeout.closeMinutes * 60_000 : fallbackCloseMs;
-  const warningMs = timeout ? timeout.warningMinutes * 60_000 : fallbackCloseMs / 2;
+  const warningMs = !timeout
+    ? fallbackCloseMs / 2
+    : timeout.warningMinutes === null
+      ? null
+      : timeout.warningMinutes * 60_000;
   // Silent close stays 2x the close delay, as it was with the single global interval.
   return { warningMs, closeMs, silentCloseMs: closeMs * 2 };
 }

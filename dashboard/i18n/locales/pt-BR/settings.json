@@ -765,7 +765,8 @@
       "warnAfter": "Perguntar após",
       "closeAfter": "Encerrar após",
       "unit": "Unidade",
-      "hint": "Canais sem configuração própria encerram no intervalo padrão e perguntam na metade dele. Se a janela de resposta do canal (como as 24 horas do WhatsApp) já tiver fechado, a pergunta e a despedida são puladas e a conversa é encerrada em silêncio.",
+      "noCheckIn": "Sem pergunta",
+      "hint": "Deixe “Perguntar após” vazio para encerrar sem perguntar antes. Canais sem configuração própria encerram no intervalo padrão e perguntam na metade dele. Se a janela de resposta do canal (como as 24 horas do WhatsApp) já tiver fechado, a pergunta e a despedida são puladas e a conversa é encerrada em silêncio.",
       "invalid": "Use números inteiros de até {max} dias, com a pergunta antes do encerramento.",
       "saved": "Tempo de inatividade salvo",
       "units": {

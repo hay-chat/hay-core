@@ -209,7 +209,7 @@ export class Orchestrator {
                 !replyWindowClosed, // Send closure message unless the channel would refuse it
               );
             }
-          } else if (timeSinceLastMessage > warningThreshold) {
+          } else if (warningThreshold !== null && timeSinceLastMessage > warningThreshold) {
             // Half timeout: Send warning if not already sent
             const hasWarning = messages.some((m) => m.metadata?.isInactivityWarning === true);
 

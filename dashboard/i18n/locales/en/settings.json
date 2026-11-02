@@ -765,7 +765,8 @@
       "warnAfter": "Check in after",
       "closeAfter": "Close after",
       "unit": "Unit",
-      "hint": "Channels without their own setting close after the default interval and check in at half of it. If a channel's reply window (such as WhatsApp's 24 hours) has already closed, the check-in and sign-off are skipped and the conversation closes quietly.",
+      "noCheckIn": "No check-in",
+      "hint": "Leave “Check in after” empty to close without checking in first. Channels without their own setting close after the default interval and check in at half of it. If a channel's reply window (such as WhatsApp's 24 hours) has already closed, the check-in and sign-off are skipped and the conversation closes quietly.",
       "invalid": "Use whole numbers up to {max} days, with the check-in before the close.",
       "saved": "Inactivity timing saved",
       "units": {
