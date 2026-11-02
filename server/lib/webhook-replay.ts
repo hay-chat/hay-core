@@ -16,14 +16,15 @@ function seenKey(namespace: string, deliveryId: string): string {
 }
 
 /**
- * Record a verified webhook delivery id. Returns false when the id was
- * already processed (a replay or a provider re-delivery), true otherwise.
- * Fails open when Redis is unavailable: the signature and timestamp checks
- * still apply.
+ * Record a verified webhook delivery id for `ttlSeconds`. Returns false when
+ * the id was already processed (a replay or a provider re-delivery), true
+ * otherwise. Fails open when Redis is unavailable: the signature and timestamp
+ * checks still apply.
  */
 export async function claimWebhookDelivery(
   namespace: string,
   deliveryId: string,
+  ttlSeconds: number = SEEN_TTL_SECONDS,
 ): Promise<boolean> {
   const client = redisService.getClient();
   if (!client || !redisService.isConnected()) {
@@ -31,13 +32,7 @@ export async function claimWebhookDelivery(
     return true;
   }
   try {
-    const result = await client.set(
-      seenKey(namespace, deliveryId),
-      "1",
-      "EX",
-      SEEN_TTL_SECONDS,
-      "NX",
-    );
+    const result = await client.set(seenKey(namespace, deliveryId), "1", "EX", ttlSeconds, "NX");
     return result === "OK";
   } catch (error) {
     logger.warn({ err: error, namespace }, "Webhook replay check failed, allowing delivery");
