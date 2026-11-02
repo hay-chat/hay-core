@@ -24,7 +24,7 @@ import { auditLogService } from "@server/services/audit-log.service";
 import { emailService, getOrganizationLocale } from "@server/services/email.service";
 import { DEFAULT_LANGUAGE } from "@server/types/language.types";
 import * as crypto from "crypto";
-import { getDashboardUrl } from "@server/config/env";
+import { config, getDashboardUrl } from "@server/config/env";
 import { StorageService } from "@server/services/storage.service";
 import { handleUpload } from "@server/lib/upload-helper";
 import { rateLimitService } from "@server/services/rate-limit.service";
@@ -306,7 +306,7 @@ export const authRouter = t.router({
         firstName: firstName || undefined,
         lastName: lastName || undefined,
         isActive: true,
-        emailVerified: false,
+        emailVerified: !config.auth.requireEmailVerification,
         organizationId: organization?.id,
         role: organization ? "owner" : "member", // Owner if creating org, otherwise member
       });
@@ -1038,7 +1038,7 @@ export const authRouter = t.router({
         await emailService.initialize();
         logger.debug("Email service initialized");
 
-        const baseUrl = process.env.FRONTEND_URL || "http://localhost:3000";
+        const baseUrl = process.env.FRONTEND_URL || getDashboardUrl();
         const verificationUrl = `${baseUrl}/verify-email?token=${verificationToken}`;
 
         logger.debug(
@@ -1464,7 +1464,7 @@ export const authRouter = t.router({
     try {
       await emailService.initialize();
 
-      const baseUrl = process.env.FRONTEND_URL || "http://localhost:3000";
+      const baseUrl = process.env.FRONTEND_URL || getDashboardUrl();
       const verificationUrl = `${baseUrl}/verify-email?token=${verificationToken}`;
 
       const commonVariables = {

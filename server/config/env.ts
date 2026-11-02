@@ -161,6 +161,12 @@ export const config = {
     refreshSecret: process.env.JWT_REFRESH_SECRET || "",
   },
 
+  auth: {
+    // Self-hosted installs without email delivery set this to "false" so new
+    // signups are marked verified and can log in. Hosted Hay keeps the default.
+    requireEmailVerification: process.env.REQUIRE_EMAIL_VERIFICATION !== "false",
+  },
+
   orchestrator: {
     interval: parseInt(process.env.ORCHESTRATOR_INTERVAL || "5000", 10),
   },
