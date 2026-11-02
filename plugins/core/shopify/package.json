@@ -19,6 +19,9 @@
     "env": [
       "SHOPIFY_OAUTH_CLIENT_ID",
       "SHOPIFY_OAUTH_CLIENT_SECRET"
+    ],
+    "oauthHosts": [
+      "*.myshopify.com"
     ]
   },
   "scripts": {

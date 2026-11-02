@@ -95,7 +95,7 @@ describe("forwardPluginUiRoute", () => {
     expect(mockFindByOrgAndPlugin).toHaveBeenCalledWith(ORG_ID, PLUGIN_ID);
     expect(mockStartPluginWorker).toHaveBeenCalledWith(ORG_ID, PLUGIN_ID);
     const [url, init] = fetchMock.mock.calls[0];
-    expect(url).toBe("http://localhost:5555/ui/status");
+    expect(url).toBe("http://127.0.0.1:5555/ui/status");
     expect(init?.method).toBe("GET");
     expect(init?.body).toBeUndefined();
   });

@@ -31,6 +31,9 @@
         :save-contact-email="saveContactEmail"
         :set-challenge-host="challengeContribution ? setChallengeHost : undefined"
         :challenge-interactive="isChallengeInteractive"
+        :pending-pre-chat-form="pendingPreChatForm"
+        :pre-chat-form-schema="preChatFormSchema"
+        :context="config.context"
         @close="closeChat"
         @send="sendMessage"
         @attach="sendAttachment"
@@ -38,6 +41,8 @@
         @stop-typing="stopTyping"
         @start-new-conversation="startNewConversation"
         @toggle-expand="toggleExpand"
+        @submit-pre-chat-form="submitPreChatForm"
+        @submit-in-conversation-form="submitInConversationForm"
       />
     </Transition>
   </div>
@@ -138,6 +143,8 @@ const {
   sendFailure,
   challengeHost,
   isChallengeInteractive,
+  pendingPreChatForm,
+  preChatFormSchema,
   toggleChat,
   openChat,
   closeChat,
@@ -149,6 +156,8 @@ const {
   startNewConversation,
   resumeActiveConversation,
   saveContactEmail,
+  submitPreChatForm,
+  submitInConversationForm,
 } = useChat(
   {
     ...props.config,
@@ -159,7 +168,7 @@ const {
     // Named on the "working" overlay while a page tool runs.
     agentName: resolvedAgentName.value,
   },
-  { challenge: challengeContribution },
+  { challenge: challengeContribution, preChatForm: props.publicConfig?.preChatForm ?? null },
 );
 
 function setChallengeHost(el: HTMLElement | null) {

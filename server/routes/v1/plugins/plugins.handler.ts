@@ -15,6 +15,7 @@ import { getPluginRunnerService } from "@server/services/plugin-runner.service";
 import { pluginCronService } from "@server/services/plugin-cron.service";
 import { decryptConfig, isEncrypted } from "@server/lib/auth/utils/encryption";
 import { dropManagedOverrides, resolveConfigWithEnv } from "@server/lib/config-resolver";
+import { configEnvAllowList } from "@server/lib/plugin-env";
 import { oauthService } from "@server/services/oauth.service";
 import { v4 as uuidv4 } from "uuid";
 import type { HayPluginManifest } from "@server/types/plugin.types";
@@ -32,6 +33,7 @@ import { readFile } from "fs/promises";
 import { join, resolve } from "path";
 import { existsSync } from "fs";
 import { createLogger } from "@server/lib/logger";
+import { workerFetch } from "@server/lib/worker-client";
 
 const logger = createLogger("plugins");
 
@@ -163,7 +165,9 @@ export const getPlugin = authenticatedProcedure
         const runner = getPluginRunnerService();
         const worker = runner.getWorker(ctx.organizationId!, input.pluginId);
         if (worker && worker.port) {
-          const metadataResponse = await fetch(`http://localhost:${worker.port}/metadata`);
+          const metadataResponse = await workerFetch(worker.port, "/metadata", {
+            signal: AbortSignal.timeout(5000),
+          });
           if (metadataResponse.ok) {
             const metadata = await metadataResponse.json();
             if (metadata.configSchema) {
@@ -186,7 +190,9 @@ export const getPlugin = authenticatedProcedure
           // Worker not running, try to start it
           const newWorker = await runner.startWorker(ctx.organizationId!, input.pluginId);
           if (newWorker && newWorker.port) {
-            const metadataResponse2 = await fetch(`http://localhost:${newWorker.port}/metadata`);
+            const metadataResponse2 = await workerFetch(newWorker.port, "/metadata", {
+              signal: AbortSignal.timeout(5000),
+            });
             if (metadataResponse2.ok) {
               const metadata2 = await metadataResponse2.json();
               if (metadata2.configSchema) {
@@ -240,6 +246,7 @@ export const getPlugin = authenticatedProcedure
             {
               decrypt: true,
               maskSecrets: true,
+              allowedEnv: configEnvAllowList(plugin),
             },
           )
         : { values: {}, metadata: {} };
@@ -394,10 +401,10 @@ export const enablePlugin = pluginManageProcedure
         input.pluginId,
         dropManagedOverrides(
           input.configuration || {},
-          (plugin.metadata?.configSchema ??
-            (plugin.manifest as HayPluginManifest).configSchema) as
+          (plugin.metadata?.configSchema ?? (plugin.manifest as HayPluginManifest).configSchema) as
             | Record<string, ConfigFieldDescriptor>
             | undefined,
+          configEnvAllowList(plugin),
         ),
       );
 
@@ -481,7 +488,7 @@ export const disablePlugin = pluginManageProcedure
         const abortController = new AbortController();
         const timeoutId = setTimeout(() => abortController.abort(), 5000);
 
-        await fetch(`http://localhost:${worker.port}/disable`, {
+        await workerFetch(worker.port, "/disable", {
           method: "POST",
           signal: abortController.signal,
         });
@@ -556,7 +563,7 @@ export const restartPlugin = pluginManageProcedure
           const abortController = new AbortController();
           const timeoutId = setTimeout(() => abortController.abort(), 5000);
 
-          await fetch(`http://localhost:${worker.port}/disable`, {
+          await workerFetch(worker.port, "/disable", {
             method: "POST",
             signal: abortController.signal,
           });
@@ -636,9 +643,11 @@ export const configurePlugin = pluginManageProcedure
 
     const configSchema = metadata?.configSchema || manifest.configSchema;
     // Managed values are read-only unless the instance allows overriding them.
+    const allowedEnv = configEnvAllowList(plugin);
     const submitted = dropManagedOverrides(
       input.configuration,
       configSchema as Record<string, ConfigFieldDescriptor> | undefined,
+      allowedEnv,
     );
     // Masked or omitted fields keep their stored value (config or auth credentials).
     const finalConfig = instance
@@ -669,6 +678,7 @@ export const configurePlugin = pluginManageProcedure
         {
           decrypt: false,
           maskSecrets: false,
+          allowedEnv,
         },
       );
 
@@ -696,7 +706,7 @@ export const configurePlugin = pluginManageProcedure
           const timeoutId = setTimeout(() => abortController.abort(), 10000);
 
           try {
-            const response = await fetch(`http://localhost:${worker.port}/validate-auth`, {
+            const response = await workerFetch(worker.port, "/validate-auth", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({ config, authState }),
@@ -896,7 +906,7 @@ export const getMCPTools = authenticatedProcedure.query(async ({ ctx }) => {
         const abortController = new AbortController();
         const timeoutId = setTimeout(() => abortController.abort(), 3000); // 3s timeout
 
-        const response = await fetch(`http://localhost:${workerInfo.port}/mcp/list-tools`, {
+        const response = await workerFetch(workerInfo.port, "/mcp/list-tools", {
           signal: abortController.signal,
         });
 
@@ -1274,7 +1284,7 @@ export const testConnection = authenticatedProcedure
         // Call tool via worker HTTP API (only if no required parameters)
         try {
           logger.debug("Calling tool with empty arguments for health check");
-          const callResponse = await fetch(`http://localhost:${worker.port}/mcp/call-tool`, {
+          const callResponse = await workerFetch(worker.port, "/mcp/call-tool", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
@@ -1478,7 +1488,7 @@ export async function forwardPluginUiRoute(
   const timeoutId = setTimeout(() => abortController.abort(), PLUGIN_UI_ROUTE_TIMEOUT_MS);
   let response: Response;
   try {
-    response = await fetch(`http://localhost:${worker.port}${input.path}`, {
+    response = await workerFetch(worker.port, input.path, {
       method: input.method,
       headers: input.method === "POST" ? { "Content-Type": "application/json" } : undefined,
       body: input.method === "POST" ? JSON.stringify(input.body ?? {}) : undefined,
@@ -1652,7 +1662,7 @@ export const validateAuth = pluginManageProcedure
     const timeoutId = setTimeout(() => abortController.abort(), 10000); // 10 second timeout
 
     try {
-      const response = await fetch(`http://localhost:${worker.port}/validate-auth`, {
+      const response = await workerFetch(worker.port, "/validate-auth", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

@@ -138,6 +138,8 @@ export HAY_ORG_AUTH='{
   "credentials": {"apiKey": "sk_live_xyz789"}
 }'
 
+export HAY_WORKER_SECRET=local-dev-secret
+
 node runner/index.js \
   --plugin-path=./examples/stripe \
   --org-id=org_abc123 \
@@ -145,12 +147,14 @@ node runner/index.js \
   --mode=production
 ```
 
+Requests to the worker must then send `x-hay-worker-secret: local-dev-secret`.
+
 ## Testing the Plugin
 
 ### 1. Check Metadata Endpoint
 
 ```bash
-curl http://localhost:48001/metadata | jq
+curl -H "x-hay-worker-secret: $HAY_WORKER_SECRET" http://127.0.0.1:48001/metadata | jq
 ```
 
 Expected response:
@@ -190,7 +194,7 @@ Expected response:
 ### 2. Test Health Endpoint
 
 ```bash
-curl http://localhost:48001/health
+curl -H "x-hay-worker-secret: $HAY_WORKER_SECRET" http://127.0.0.1:48001/health
 ```
 
 Expected: `{"status":"ok","plugin":"stripe"}`
@@ -198,7 +202,7 @@ Expected: `{"status":"ok","plugin":"stripe"}`
 ### 3. Test Webhook Endpoint
 
 ```bash
-curl -X POST http://localhost:48001/webhook \
+curl -X POST -H "x-hay-worker-secret: $HAY_WORKER_SECRET" http://127.0.0.1:48001/webhook \
   -H "Content-Type: application/json" \
   -d '{
     "id": "evt_test123",
