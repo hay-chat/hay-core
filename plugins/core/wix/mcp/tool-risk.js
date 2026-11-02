@@ -17,4 +17,10 @@ module.exports = {
     wix_create_refund: "refund",
     wix_update_order_shipping_address: "address_change",
   },
+  // Return a customer's profile or order history: core runs them only for a
+  // verified customer, and they return only that customer's records.
+  customerData: [
+    "wix_find_customer",
+    "wix_list_customer_orders",
+  ],
 };

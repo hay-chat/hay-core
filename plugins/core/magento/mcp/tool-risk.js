@@ -21,4 +21,10 @@ module.exports = {
     magento_add_order_note: "note",
     magento_resend_order_confirmation: "note",
   },
+  // Return a customer's profile or order history: core runs them only for a
+  // verified customer, and they return only that customer's records.
+  customerData: [
+    "magento_find_customer",
+    "magento_list_customer_orders",
+  ],
 };

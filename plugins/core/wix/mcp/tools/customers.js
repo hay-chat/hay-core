@@ -10,6 +10,7 @@
  */
 
 const { z } = require("zod");
+const { callerIdentity, verifiedEmail } = require("@hay/plugin-sdk/identity");
 const { ok, fail } = require("../lib/format");
 const { searchOrdersByEmail, summarizeOrder } = require("../lib/orders");
 
@@ -38,9 +39,10 @@ function registerCustomerTools(server) {
     {
       email: z.string().describe("The buyer's email address."),
     },
-    async ({ email }) => {
+    async ({ email: asked }, extra) => {
       try {
-        const needle = email.trim();
+        // Customer data: only the verified customer's own (see @hay/plugin-sdk/identity).
+        const needle = verifiedEmail(callerIdentity(extra), asked.trim());
         if (!needle) throw new Error("Provide the buyer's email address.");
         const { orders, hasNext } = await searchOrdersByEmail(needle, { limit: 5 });
         if (!orders.length) {
@@ -69,9 +71,9 @@ function registerCustomerTools(server) {
       limit: z.number().int().optional().describe("Max orders per page (default 10, max 100)."),
       cursor: z.string().optional().describe("nextCursor from a previous page."),
     },
-    async ({ email, limit, cursor }) => {
+    async ({ email: asked, limit, cursor }, extra) => {
       try {
-        const needle = email.trim();
+        const needle = verifiedEmail(callerIdentity(extra), asked.trim());
         if (!needle) throw new Error("Provide the buyer's email address.");
         const page = await searchOrdersByEmail(needle, {
           limit: Math.min(limit ?? 10, 100),

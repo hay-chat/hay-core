@@ -82,13 +82,14 @@ export class LocalHTTPMCPClient implements MCPClient {
   /**
    * Call a tool on the SDK worker
    */
-  async callTool(toolName: string, args: Record<string, unknown>): Promise<MCPCallResult> {
+  async callTool(
+    toolName: string,
+    args: Record<string, unknown>,
+    meta?: Record<string, unknown>,
+  ): Promise<MCPCallResult> {
     const baseUrl = await this.ensureWorkerRunning();
 
-    logger.debug(
-      { url: `${baseUrl}/mcp/call-tool`, args },
-      `Calling tool ${toolName} on ${this.pluginId}`,
-    );
+    logger.debug({ url: `${baseUrl}/mcp/call-tool` }, `Calling tool ${toolName} on ${this.pluginId}`);
 
     try {
       const response = await fetch(`${baseUrl}/mcp/call-tool`, {
@@ -99,6 +100,7 @@ export class LocalHTTPMCPClient implements MCPClient {
         body: JSON.stringify({
           toolName,
           arguments: args,
+          ...(meta ? { meta } : {}),
         }),
         signal: AbortSignal.timeout(60000), // 60 second timeout for tool execution
       });

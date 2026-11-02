@@ -18,6 +18,14 @@ export const TOOL_CATEGORY_META_KEY = "chat.hay/category";
 export const TOOL_CAP_ENFORCED_META_KEY = "chat.hay/capEnforced";
 
 /**
+ * A read tool that returns a customer's personal data (profile, order history).
+ * Core runs it only when the conversation has a verified customer identity
+ * (see customer-identity.ts) and passes that identity to the plugin, which
+ * returns only that customer's records.
+ */
+export const TOOL_CUSTOMER_DATA_META_KEY = "chat.hay/customerData";
+
+/**
  * The argument core fills with the pending action's id when it re-runs an
  * approved over-cap call. Core always overwrites it, so the model cannot set it.
  */
@@ -54,8 +62,20 @@ export const MONEY_CATEGORIES: ReadonlySet<WriteCategory> = new Set([
 ]);
 
 export type ToolRisk =
-  | { readOnly: true; category: null; classified: true; capEnforced?: undefined }
-  | { readOnly: false; category: WriteCategory; classified: boolean; capEnforced?: true };
+  | {
+      readOnly: true;
+      category: null;
+      classified: true;
+      capEnforced?: undefined;
+      customerData?: true;
+    }
+  | {
+      readOnly: false;
+      category: WriteCategory;
+      classified: boolean;
+      capEnforced?: true;
+      customerData?: undefined;
+    };
 
 export interface ToolRiskSource {
   annotations?: { readOnlyHint?: boolean; destructiveHint?: boolean } | null;
@@ -64,13 +84,15 @@ export interface ToolRiskSource {
 
 /**
  * Classify a tool from its cached MCP descriptor.
- *  - readOnlyHint === true -> read
+ *  - readOnlyHint === true -> read (plus customerData when declared)
  *  - a known category -> that write category (plus capEnforced when declared)
  *  - anything else -> unclassified write ("other_write", classified: false)
  */
 export function classifyTool(tool: ToolRiskSource | null | undefined): ToolRisk {
   if (tool?.annotations?.readOnlyHint === true) {
-    return { readOnly: true, category: null, classified: true };
+    const risk: ToolRisk = { readOnly: true, category: null, classified: true };
+    if (tool._meta?.[TOOL_CUSTOMER_DATA_META_KEY] === true) risk.customerData = true;
+    return risk;
   }
   const raw = tool?._meta?.[TOOL_CATEGORY_META_KEY];
   if (typeof raw === "string" && (WRITE_CATEGORIES as readonly string[]).includes(raw)) {
@@ -81,5 +103,12 @@ export function classifyTool(tool: ToolRiskSource | null | undefined): ToolRisk 
   return { readOnly: false, category: "other_write", classified: false };
 }
 
-/** Core tools are built in and read-only (today: product recommendations). */
-export const CORE_TOOL_RISK: ToolRisk = { readOnly: true, category: null, classified: true };
+export const READ_RISK: ToolRisk = { readOnly: true, category: null, classified: true };
+
+/**
+ * A core tool with a side effect inside Hay.chat itself (a message to this
+ * shopper, a ticket or case for the team). Simulated in a dry-run
+ * conversation; never touches the merchant's store, so it skips the shopper
+ * confirmation and the approval gate (see ToolExecutionService.runStep).
+ */
+export const CORE_WRITE_RISK: ToolRisk = { readOnly: false, category: "note", classified: true };

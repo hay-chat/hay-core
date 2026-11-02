@@ -13,6 +13,13 @@
 
 const { z } = require("zod");
 const { nsApi, nsList, NuvemshopApiError } = require("../lib/client");
+const {
+  callerIdentity,
+  lookupFor,
+  verifiedEmail,
+  assertOwnsRecord,
+  NOT_VERIFIED,
+} = require("@hay/plugin-sdk/identity");
 const { ok, fail, toolError, sameEmail, digits, READ } = require("../lib/format");
 const { summarizeOrder } = require("../lib/orders");
 
@@ -96,10 +103,13 @@ function registerCustomerTools(server) {
       },
       annotations: READ,
     },
-    async ({ email, identification }) => {
+    async ({ email, identification }, extra) => {
       try {
-        const e = email?.trim() || undefined;
-        const d = identification?.trim() || undefined;
+        // Customer data: only the verified customer's own (see @hay/plugin-sdk/identity).
+        // A document number is not part of a verified identity, so only staff search by it.
+        const identity = callerIdentity(extra);
+        const e = lookupFor(identity, { email: email?.trim() || undefined }).email || undefined;
+        const d = identity.trust === "staff" ? identification?.trim() || undefined : undefined;
         if (!e && !d) {
           throw toolError(
             "BAD_INPUT",
@@ -146,8 +156,10 @@ function registerCustomerTools(server) {
       inputSchema: { customer_id: z.string().describe("Nuvemshop customer id.") },
       annotations: READ,
     },
-    async ({ customer_id: customerId }) => {
+    async ({ customer_id: customerId }, extra) => {
       try {
+        const identity = callerIdentity(extra);
+        if (identity.trust === "none") throw toolError("PRECONDITION", NOT_VERIFIED);
         let c;
         try {
           c = await nsApi("GET", `/customers/${encodeURIComponent(customerId)}`);
@@ -160,6 +172,7 @@ function registerCustomerTools(server) {
           }
           throw err;
         }
+        assertOwnsRecord(identity, { emails: [c.email], phones: [c.phone] });
         return ok({
           ...summarizeCustomer(c),
           note: c.note || null,
@@ -185,12 +198,13 @@ function registerCustomerTools(server) {
       },
       annotations: READ,
     },
-    async ({ email, limit, page }) => {
+    async ({ email: asked, limit, page }, extra) => {
       try {
+        const email = verifiedEmail(callerIdentity(extra), asked.trim());
         const perPage = Math.min(limit ?? 10, 50);
-        const account = await findByEmail(email.trim());
+        const account = await findByEmail(email);
         const { items, total } = await ordersForEmail(
-          email.trim(),
+          email,
           { perPage, page: page ?? 1 },
           account,
         );

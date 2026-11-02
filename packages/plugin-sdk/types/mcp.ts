@@ -45,6 +45,35 @@ import type { HayLogger } from "./logger";
  * @see PLUGIN.md Section 5.3.4 (lines 525-564)
  * @see PLUGIN.md Section 8 (lines 701-750)
  */
+/**
+ * The customer a conversation is verifiably with, as Hay.chat core sends it on
+ * every tool call (see `@hay/plugin-sdk/identity`). "verified": the store
+ * signed the webchat customer, or the channel provider named the sender;
+ * "staff": the org's own team in the dashboard playground or a simulation;
+ * "none": nobody verified. A tool that returns a customer's personal data
+ * returns only records matching a verified identity.
+ */
+export type ToolCallCustomer =
+  | {
+      trust: "verified";
+      source: "webchat_signature" | "channel";
+      externalId: string | null;
+      email: string | null;
+      phone: string | null;
+    }
+  | { trust: "staff" }
+  | { trust: "none" };
+
+/**
+ * Core-owned context for one tool call, kept apart from the model-written
+ * arguments so the model cannot set it. Local stdio servers receive it as the
+ * MCP request's `_meta`.
+ */
+export interface ToolCallMeta {
+  "chat.hay/customer"?: ToolCallCustomer;
+  [key: string]: unknown;
+}
+
 export interface McpServerInstance {
   /**
    * List all tools available from the MCP server.
@@ -62,13 +91,14 @@ export interface McpServerInstance {
    *
    * @param name - Tool name
    * @param args - Tool arguments
+   * @param meta - Core-owned call context (the verified customer)
    * @returns Tool execution result
    *
    * @remarks
    * Called by the platform when a tool needs to be executed.
    * Required for local stdio MCP servers.
    */
-  callTool?(name: string, args?: Record<string, any>): Promise<any>;
+  callTool?(name: string, args?: Record<string, any>, meta?: ToolCallMeta): Promise<any>;
 
   /**
    * Stop the MCP server and clean up resources.
@@ -158,6 +188,13 @@ export interface ToolRiskSpec {
    * approved retry carries `hay_approval_id`. Each must also be in `write`.
    */
   capped?: string[];
+  /**
+   * Read tools that return a customer's personal data (profile, order
+   * history). Core runs them only when the conversation has a verified
+   * customer, and the tool must return only that customer's records (see
+   * `@hay/plugin-sdk/identity`). Each must also be in `read`.
+   */
+  customerData?: string[];
 }
 
 /**
