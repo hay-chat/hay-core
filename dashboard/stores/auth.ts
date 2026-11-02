@@ -156,7 +156,8 @@ export const useAuthStore = defineStore("auth", {
     }) {
       this.isLoading = true;
       try {
-        const result = await HayAuthApi.auth.register.mutate({
+        // No session from signup: the user signs in afterwards (once verified, when required).
+        return await HayAuthApi.auth.register.mutate({
           organizationName: data.organizationName,
           email: data.email,
           firstName: data.fullName.split(" ")[0],
@@ -164,19 +165,6 @@ export const useAuthStore = defineStore("auth", {
           password: data.password,
           confirmPassword: data.password,
         });
-
-        // Store tokens
-        this.tokens = {
-          accessToken: result.accessToken,
-          refreshToken: result.refreshToken,
-          expiresAt: Date.now() + result.expiresIn * 1000, // Convert seconds to milliseconds
-        };
-
-        // Store user data with organization
-        const userStore = useUserStore();
-        userStore.setUser(result.user as User);
-        this.isAuthenticated = true;
-        this.updateActivity();
       } finally {
         this.isLoading = false;
       }

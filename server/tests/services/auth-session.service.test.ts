@@ -49,6 +49,7 @@ describe("auth sessions: rotating, sliding refresh tokens (D11-3)", () => {
         email: "d11-session@example.com",
         password: "x",
         isActive: true,
+        emailVerified: true,
         tokenVersion: 0,
       }),
     );
@@ -58,7 +59,7 @@ describe("auth sessions: rotating, sliding refresh tokens (D11-3)", () => {
     await sessions().delete({ userId });
     await AppDataSource.getRepository(User).update(
       { id: userId },
-      { isActive: true, tokenVersion: 0 },
+      { isActive: true, emailVerified: true, tokenVersion: 0 },
     );
     user.isActive = true;
     user.tokenVersion = 0;
@@ -190,6 +191,12 @@ describe("auth sessions: rotating, sliding refresh tokens (D11-3)", () => {
   it("rejects refresh for a deactivated user", async () => {
     const tokens = await authSessionService.createSession(user);
     await AppDataSource.getRepository(User).update({ id: userId }, { isActive: false });
+    await expectRejected(tokens.refreshToken, "revoked");
+  });
+
+  it("rejects refresh for a user whose email is not verified", async () => {
+    const tokens = await authSessionService.createSession(user);
+    await AppDataSource.getRepository(User).update({ id: userId }, { emailVerified: false });
     await expectRejected(tokens.refreshToken, "revoked");
   });
 

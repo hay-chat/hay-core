@@ -96,11 +96,6 @@ export const config = {
     credentials: true,
   },
 
-  rateLimit: {
-    windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS || "60000", 10), // 1 minute
-    max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS || "100", 10),
-  },
-
   webchat: {
     // Page tools (WebMCP): tools the host page registers in the browser for the
     // AI to call in the visitor's session. Set WEBCHAT_PAGE_TOOLS=false to turn

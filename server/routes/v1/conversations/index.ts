@@ -159,7 +159,11 @@ const STAFF_ATTACHMENT_MAX_BASE64_LENGTH =
   Math.ceil(config.storage.limits.conversationMediaMaxFileSize / 3) * 4;
 
 export const conversationsRouter = t.router({
-  list: createListProcedure(conversationListInputSchema, conversationRepository),
+  list: createListProcedure(
+    RESOURCES.CONVERSATIONS,
+    conversationListInputSchema,
+    conversationRepository,
+  ),
 
   /**
    * What the Home screen shows: conversations waiting for a human (longest wait

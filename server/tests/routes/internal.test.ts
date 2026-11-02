@@ -38,6 +38,9 @@ jest.mock("@server/services/organization.service", () => ({
   organizationService: { findOne: mockFindOne, deleteWithData: mockDeleteWithData },
 }));
 
+// Account provisioning is covered by tests/integration/auth-account-access.test.ts.
+jest.mock("@server/routes/v1/internal/users", () => ({ internalUsersRouter: {} }));
+
 import { internalRouter } from "@server/routes/v1/internal";
 import { INTERNAL_SECRET_HEADER } from "@server/trpc/middleware/internal";
 import type { Context } from "@server/trpc/context";
