@@ -441,6 +441,8 @@ const handleSubmit = async () => {
     const errorMessage = err instanceof Error ? err.message : String(err);
     if (errorMessage.includes("already exists")) {
       error.value = t("signup.errors.emailExists");
+    } else if (errorMessage.includes("Sign-up is closed")) {
+      error.value = t("signup.errors.signupClosed");
     } else if (errorMessage.includes("Password")) {
       error.value = t("signup.errors.weakPassword");
     } else {

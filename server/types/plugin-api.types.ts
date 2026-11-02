@@ -127,69 +127,6 @@ export interface EmailResult {
   error?: string;
 }
 
-// TODO: [PLUGIN-API] Add SchedulerAPI interface
-// export interface SchedulerAPI {
-//   /**
-//    * Register a cron job for this plugin
-//    * Jobs are scoped to the plugin and auto-cleaned on unload
-//    */
-//   registerCron(schedule: string, handler: () => Promise<void>): string;
-//   unregisterCron(jobId: string): void;
-//   listJobs(): Array<{ id: string; schedule: string; nextRun: Date }>;
-// }
-
-// TODO: [PLUGIN-API] Add StorageAPI interface
-// export interface StorageAPI {
-//   /**
-//    * Key-value storage scoped to this plugin
-//    * Keys are automatically prefixed with plugin ID to prevent conflicts
-//    */
-//   get(key: string): Promise<any>;
-//   set(key: string, value: any): Promise<void>;
-//   delete(key: string): Promise<void>;
-//   list(prefix?: string): Promise<string[]>;
-//   clear(): Promise<void>;
-// }
-
-// TODO: [PLUGIN-API] Add AccountsAPI interface
-// export interface AccountsAPI {
-//   /**
-//    * Get account details (sanitized - no sensitive fields)
-//    */
-//   getCurrentAccount(): Promise<Account>;
-//   getAccountMetadata(key: string): Promise<any>;
-//   setAccountMetadata(key: string, value: any): Promise<void>;
-// }
-
-// TODO: [PLUGIN-API] Add EventsAPI interface
-// export interface EventsAPI {
-//   /**
-//    * Subscribe to app events
-//    */
-//   on(event: 'message.created' | 'conversation.updated' | 'customer.created', handler: (data: any) => Promise<void>): void;
-//   off(event: string, handler: (data: any) => Promise<void>): void;
-//
-//   /**
-//    * Emit custom plugin events (namespaced to plugin)
-//    */
-//   emit(event: string, data: any): void;
-// }
-
-// TODO: [PLUGIN-API] Add HttpAPI interface
-// export interface HttpAPI {
-//   /**
-//    * Make external HTTP requests (rate-limited per plugin)
-//    */
-//   fetch(url: string, options?: RequestInit): Promise<Response>;
-//
-//   /**
-//    * Register webhook endpoints for this plugin
-//    * Available at /api/plugins/{pluginId}/webhook/{path}
-//    */
-//   registerWebhook(path: string, handler: (req: Request) => Promise<Response>): void;
-//   unregisterWebhook(path: string): void;
-// }
-
 /**
  * HTTP-based Plugin API for external MCP plugins
  * Used when plugins run in separate processes and need to call back to the server
