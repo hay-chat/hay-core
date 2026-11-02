@@ -11,6 +11,9 @@ import type {
 const logger = createLogger("github-provider");
 
 const GITHUB_API_BASE = "https://api.github.com";
+const API_TIMEOUT_MS = 15_000;
+// Covers streaming the whole archive body, not just the response headers
+const ARCHIVE_TIMEOUT_MS = 120_000;
 
 /** Read a response body into memory, failing as soon as it exceeds `maxBytes`. */
 export async function readBodyWithLimit(response: Response, maxBytes: number): Promise<Buffer> {
@@ -77,6 +80,7 @@ export class GitHubProvider implements GitProvider {
       `${GITHUB_API_BASE}/app/installations/${installationId}/access_tokens`,
       {
         method: "POST",
+        signal: AbortSignal.timeout(API_TIMEOUT_MS),
         headers: {
           Authorization: `Bearer ${appJwt}`,
           Accept: "application/vnd.github+json",
@@ -109,6 +113,7 @@ export class GitHubProvider implements GitProvider {
     const appJwt = this.generateAppJwt();
 
     const response = await fetch(`${GITHUB_API_BASE}/app/installations/${installationId}`, {
+      signal: AbortSignal.timeout(API_TIMEOUT_MS),
       headers: {
         Authorization: `Bearer ${appJwt}`,
         Accept: "application/vnd.github+json",
@@ -139,6 +144,7 @@ export class GitHubProvider implements GitProvider {
       const response = await fetch(
         `${GITHUB_API_BASE}/installation/repositories?per_page=100&page=${page}`,
         {
+          signal: AbortSignal.timeout(API_TIMEOUT_MS),
           headers: {
             Authorization: `token ${token}`,
             Accept: "application/vnd.github+json",
@@ -186,6 +192,7 @@ export class GitHubProvider implements GitProvider {
     const response = await fetch(
       `${GITHUB_API_BASE}/repos/${repo}/tarball/${encodeURIComponent(commitSha)}`,
       {
+        signal: AbortSignal.timeout(ARCHIVE_TIMEOUT_MS),
         headers: {
           Authorization: `token ${token}`,
           Accept: "application/vnd.github+json",
@@ -222,6 +229,7 @@ export class GitHubProvider implements GitProvider {
     const response = await fetch(
       `${GITHUB_API_BASE}/repos/${repo}/commits/${encodeURIComponent(branch)}`,
       {
+        signal: AbortSignal.timeout(API_TIMEOUT_MS),
         headers: {
           Authorization: `token ${token}`,
           Accept: "application/vnd.github+json",
