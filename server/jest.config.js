@@ -22,7 +22,16 @@ module.exports = {
         },
       },
     ],
+    // sanitize-html's parser chain ships ESM only. Node loads it through
+    // require(esm) at runtime, but Jest's CommonJS runtime cannot, so compile it.
+    "^.+\\.js$": [
+      "ts-jest",
+      { tsconfig: { allowJs: true, esModuleInterop: true }, diagnostics: false },
+    ],
   },
+  transformIgnorePatterns: [
+    "/node_modules/(?!(htmlparser2|domhandler|domutils|domelementtype|dom-serializer|entities)/)",
+  ],
   collectCoverageFrom: [
     "services/**/*.ts",
     "routes/**/*.ts",
