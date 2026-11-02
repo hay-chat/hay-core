@@ -2,7 +2,7 @@
 
 A reproducible test environment for Hay.chat: a fake home-goods brand with the same catalogue,
 customers and orders in three e-commerce stores, plus the Hay.chat side (knowledge base, playbooks,
-agent) for each store's org. Seed it, run the conversation scenarios, re-seed to reset.
+assistant) for each store's org. Seed it, run the conversation scenarios, re-seed to reset.
 
 Everything is fake: shoppers use `@example.com`, CPFs are generated, and every store order is a test
 order with customer emails off. Use **test stores only**, never a real merchant's store.
@@ -78,7 +78,7 @@ Flags for `hay demo seed`: `--dry-run`, `--reset-orders`, `--image-base-url <url
 images from that URL instead of uploading local files), plus the CLI's `--target` and `--org`.
 The scripts also run on their own: `node_modules/.bin/tsx tools/demo-account/scripts/seed-<x>.ts --help`
 style flags (`--only products|customers|orders`, `--orders key1,key2`; seed-hay: `--platform`,
-`--draft`, `--quick-check on|off`, `--only settings,agent,docs,playbooks`).
+`--draft`, `--quick-check on|off`, `--only settings,assistant,docs,playbooks`).
 
 ## What each platform can't reproduce
 
@@ -97,7 +97,7 @@ None of the store scripts has run against a real store yet; the first run on eac
 - **Images:** the default image URL is this repo's `master`, which only resolves after merge. Until then
   Shopify uses staged uploads, Nuvemshop base64, and WooCommerce needs `WP_USER` + `WP_APP_PASSWORD`
   or `--image-base-url`.
-- **Hay.chat seed:** makes "Casa Aurora Assistant" the org's default agent and publishes the playbooks
+- **Hay.chat seed:** sets the org's assistant to "Casa Aurora Assistant" and publishes the playbooks
   (`--draft` to keep them drafts), so point it at demo orgs only.
 
 ## Development

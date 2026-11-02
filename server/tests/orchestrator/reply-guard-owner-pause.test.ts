@@ -3,7 +3,7 @@ import { getAiReplyBlocker } from "../../orchestrator/reply-guard";
 
 /** The owner's "Pause AI everywhere" (D11-9) blocks every AI message, like the operator's pause. */
 describe("getAiReplyBlocker with the owner's pause", () => {
-  const base = { status: "open" as const, assigned_user_id: null, agent: { enabled: true } };
+  const base = { status: "open" as const, assigned_user_id: null };
 
   it("blocks while the owner paused the AI", () => {
     expect(

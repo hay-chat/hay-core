@@ -34,10 +34,6 @@ jest.mock("@server/repositories/conversation.repository", () => ({
 jest.mock("@server/repositories/customer.repository", () => ({
   CustomerRepository: jest.fn(() => ({})),
 }));
-jest.mock("@server/repositories/agent.repository", () => ({
-  AgentRepository: jest.fn(() => ({})),
-  agentRepository: {},
-}));
 jest.mock("@server/repositories/organization.repository", () => ({
   organizationRepository: {
     findById: jest.fn(async () => ({ isActive: true, suspendedAt: null })),

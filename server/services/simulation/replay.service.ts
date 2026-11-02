@@ -52,7 +52,6 @@ export interface StartReplayInput {
   organizationId: string;
   createdById?: string | null;
   label?: string | null;
-  agentId?: string | null;
   playbookVersionOverride?: PlaybookVersionOverride | null;
   transcriptIds?: string[];
   conversationIds?: string[];
@@ -266,7 +265,6 @@ export class ReplayService {
       createdById: input.createdById ?? null,
       kind: REPLAY_RUN_KIND,
       label: input.label ?? null,
-      agentId: input.agentId ?? null,
       playbookVersionOverride: input.playbookVersionOverride ?? null,
       cases,
     });

@@ -2,18 +2,15 @@
   "dashboard": {
     "page": {
     "title": "Dashboard",
-    "description": "Welcome back! Here's what's happening with your AI agents.",
+    "description": "Welcome back! Here's what's happening with your AI assistant.",
     "seoTitle": "Dashboard - Hay.chat",
-    "seoDescription": "Manage your AI agents and view performance metrics"
+    "seoDescription": "Manage your AI assistant and view performance metrics"
   },
   "actions": {
     "refresh": "Refresh",
-    "viewAll": "View All",
-    "createFirstAgent": "Create Your First Agent"
+    "viewAll": "View All"
   },
   "metrics": {
-    "activeAgents": "Active Agents",
-    "newThisWeek": "new this week",
     "totalConversations": "Total Conversations",
     "resolved": "resolved",
     "resolutionRate": "Resolution Rate",
@@ -29,18 +26,11 @@
     "title": "Conversation Activity",
     "description": "Daily conversation volume"
   },
-  "topAgents": {
-    "title": "Top Agents",
-    "description": "Agents with the most conversations in this period",
-    "conversations": "{count} conversations",
-    "resolutionRate": "resolution rate",
-    "emptyTitle": "No agents created yet"
-  },
   "recentConversations": {
     "title": "Recent Conversations",
     "description": "Latest customer interactions",
     "emptyTitle": "No conversations yet",
-    "emptyDescription": "Start chatting with your agents to see conversations here"
+    "emptyDescription": "Start chatting with your assistant to see conversations here"
   },
   "sentiment": {
     "scoreTitle": "Customer Sentiment Score",
@@ -74,15 +64,12 @@
       "browseAll": "Browse All Integrations",
       "suggest": "Suggest an Integration"
     },
-    "agent": {
-      "title": "Create an agent",
+    "assistant": {
+      "title": "Describe your assistant",
       "subtitle": "Your AI teammate starts here.",
-      "description": "Define your first Hay.chat agent — give it a name, choose its tone, and decide which channels it should handle.",
-      "count": "{count} agents created",
-      "countOne": "{count} agent created",
-      "countOther": "{count} agents created",
-      "createAgent": "Create Agent",
-      "viewAgents": "View Agents"
+      "description": "Give your assistant a name, choose its tone and write the rules it always follows. It answers on every channel where the AI is on.",
+      "describe": "Describe Assistant",
+      "edit": "Edit Assistant"
     },
     "documents": {
       "title": "Upload training documents",
@@ -105,8 +92,8 @@
       "locked": "Finish the previous steps before doing this. Hay.chat will work better this way."
     },
     "playground": {
-      "title": "Test the agent in a playground chat",
-      "subtitle": "See your agent in action before going live.",
+      "title": "Test the assistant in a playground chat",
+      "subtitle": "See your assistant in action before going live.",
       "description": "Use the built-in playground to test how Hay.chat responds, tweak instructions, and perfect the experience before connecting to real customers.",
       "countOne": "{count} conversation started",
       "countOther": "{count} conversations started",

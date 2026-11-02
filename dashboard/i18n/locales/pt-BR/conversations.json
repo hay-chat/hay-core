@@ -65,8 +65,7 @@
       "today": "Hoje",
       "thisWeek": "Esta Semana",
       "thisMonth": "Este Mês",
-      "allTime": "Todo o Período",
-      "allAgents": "Todos os Agentes"
+      "allTime": "Todo o Período"
     },
     "table": {
       "conversation": "Conversa",
@@ -186,8 +185,6 @@
     },
     "conversationDetails": {
       "title": "Detalhes da Conversa",
-      "agent": "Agente:",
-      "defaultAgent": "Assistente IA",
       "status": "Status:",
       "messages": "Mensagens:",
       "created": "Criada em:",

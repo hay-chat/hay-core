@@ -1,7 +1,7 @@
 {
   "page": {
     "title": "Playbooks",
-    "description": "Fluxos de conversação automatizados e respostas para seus agentes",
+    "description": "Fluxos de conversação automatizados e respostas para seu assistente",
     "headTitle": "Playbooks - Hay.chat"
   },
   "actions": {
@@ -42,8 +42,6 @@
   "table": {
     "playbooks": "Playbooks",
     "name": "Nome",
-    "agents": "Agentes",
-    "agentsCount": "{count} agentes",
     "status": "Status",
     "created": "Criado",
     "actions": "Ações"
@@ -63,15 +61,11 @@
     "descriptionLabel": "Descrição",
     "descriptionPlaceholder": "Descreva o que este playbook faz...",
     "instructionsLabel": "Instruções",
-    "instructionsHint": "Crie instruções passo a passo numeradas que os agentes seguirão ao executar este playbook",
+    "instructionsHint": "Crie instruções passo a passo numeradas que o assistente seguirá ao executar este playbook",
     "editorHintMention": "para Ações/Documentos",
     "editorHintBlocks": "para blocos",
     "editorHintUndo": "para desfazer",
     "statusLabel": "Status",
-    "assignAgents": "Atribuir Agentes",
-    "assignedAgents": "Agentes Atribuídos",
-    "loadingAgents": "Carregando agentes...",
-    "noAgentsAvailable": "Nenhum agente disponível. Crie agentes primeiro.",
     "createdDate": "Criado: {date}",
     "lastUpdated": "Última atualização: {date}"
   },
@@ -82,7 +76,7 @@
   },
   "create": {
     "title": "Criar Novo",
-    "description": "Defina fluxos de conversação automatizados para seus agentes",
+    "description": "Defina fluxos de conversação automatizados para seu assistente",
     "headTitle": "Criar Playbook - Hay.chat",
     "headDescription": "Crie um novo playbook de conversação automatizada",
     "editHeadDescription": "Edite seu playbook de conversação automatizada"
@@ -100,7 +94,6 @@
     "createSuccess": "Playbook criado com sucesso",
     "saveFailed": "Falha ao {action} playbook. Tente novamente.",
     "loadFailed": "Falha ao carregar playbooks",
-    "loadAgentsFailed": "Falha ao carregar agentes",
     "playbookNotFound": "Playbook não encontrado",
     "generateFailed": "Falha ao gerar instruções. Tente novamente.",
     "createFailed": "Falha ao criar playbook. Tente novamente."
@@ -117,7 +110,7 @@
     "retry": "Tentar novamente",
     "publish": "Publicar",
     "publishTitle": "Publicar Playbook",
-    "publishDescription": "Isso atualizará o comportamento do assistente para todos os agentes vinculados. O rascunho atual se tornará a versão ativa.",
+    "publishDescription": "Isso atualizará o comportamento do assistente. O rascunho atual se tornará a versão ativa.",
     "publishConfirm": "Publicar Agora",
     "publishNoteLabel": "O que mudou? (opcional)",
     "publishNotePlaceholder": "ex: Atualizei os passos da política de reembolso...",
@@ -261,7 +254,6 @@
     "titlePlaceholder": "Playbook sem título",
     "documentLabel": "Corpo do playbook",
     "detailsSection": "Detalhes",
-    "agentsSection": "Agentes",
     "actionsSection": "Ações disponíveis",
     "actionsHint": "Digite {'@'} no corpo para inserir uma ação ou documento.",
     "actionsLoading": "Carregando ações...",

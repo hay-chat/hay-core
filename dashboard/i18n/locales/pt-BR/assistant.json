@@ -1,0 +1,81 @@
+{
+  "assistant": {
+    "page": {
+      "title": "Assistente",
+      "description": "Quem responde aos seus clientes: um assistente de IA para toda a organização, em todos os canais.",
+      "loading": "Carregando assistente...",
+      "leavePage": "Sair da página",
+      "metaTitle": "Assistente - Hay.chat",
+      "metaDescription": "Configure seu assistente de IA"
+    },
+    "actions": {
+      "cancel": "Descartar alterações",
+      "save": "Salvar alterações"
+    },
+    "toast": {
+      "updatedSuccess": "Assistente salvo",
+      "updateFailed": "Falha ao salvar o assistente. Tente novamente.",
+      "loadFailed": "Falha ao carregar o assistente"
+    },
+    "form": {
+      "cardTitle": "Identidade",
+      "cardDescription": "Como o assistente se apresenta e como ele fala. Os playbooks descrevem o que fazer em situações específicas; todos se aplicam.",
+      "name": {
+        "label": "Nome",
+        "placeholder": "ex.: Assistente {organization}",
+        "helperText": "Aparece para os clientes no widget de chat. Deixe vazio para mostrar o título do widget.",
+        "tooLong": "O nome deve ter menos de 255 caracteres"
+      },
+      "description": {
+        "label": "Descrição",
+        "helperText": "Uma nota interna; clientes e o assistente nunca a veem.",
+        "placeholder": "Para que serve este assistente..."
+      },
+      "instructions": {
+        "label": "Instruções",
+        "hint": "O comportamento geral do assistente e as regras que valem sempre. Coloque os passos de cada situação nos Playbooks."
+      },
+      "initialGreeting": {
+        "label": "Mensagem de saudação inicial",
+        "helperText": "A primeira mensagem que os clientes veem ao iniciar uma conversa. Se ficar vazia, uma saudação padrão é usada. A mensagem é traduzida automaticamente para o idioma da conversa.",
+        "placeholder": "Olá! Como posso ajudar você hoje?"
+      },
+      "tone": {
+        "label": "Tom",
+        "professional": "Profissional",
+        "casual": "Descontraído",
+        "enthusiastic": "Entusiasmado",
+        "placeholder": "Descreva o tom de comunicação (ex.: profissional, simpático, descontraído)...",
+        "presets": {
+          "professional": "Seu tom é profissional, calmo e conciso. Você se comunica com clareza, usa frases completas e evita gírias e emojis. Você soa confiante, mas acessível, como um especialista de atendimento bem treinado que respeita o tempo do cliente. Demonstra empatia quando faz sentido, mas mantém o foco em resolver o problema com eficiência.\n\nExemplo: \"Entendo como isso pode ser frustrante. Vamos verificar juntos o status do seu pedido. Você pode confirmar o número do pedido?\"",
+          "casual": "Você soa como uma pessoa de verdade conversando por mensagem: descontraída, calorosa e acessível. Use frases simples e, quando combinar com o clima, alguns emojis. Mantenha as respostas úteis, mas em tom de conversa, como um colega ajudando um amigo.\n\nExemplo: \"Oi! Entendo total, isso acontece às vezes 😅 Deixa eu dar uma olhada no seu pedido rapidinho pra gente resolver.\"",
+          "enthusiastic": "Você faz cada atendimento parecer animado e positivo. Usa pontos de exclamação com moderação, mostra entusiasmo em ajudar e comemora pequenas conquistas. O cliente se sente ouvido e valorizado, e as respostas continuam curtas e certeiras.\n\nExemplo: \"Ótima pergunta! Vamos resolver isso agora mesmo 🎉 Só preciso do seu e-mail para encontrar o seu pedido!\""
+        }
+      },
+      "avoid": {
+        "label": "O que evitar",
+        "placeholder": "Liste o que o assistente deve evitar (ex.: jargão técnico, certos assuntos)..."
+      },
+      "languageNote": "O assistente responde no idioma do cliente e, se não souber, no idioma padrão da organização em Configurações gerais."
+    },
+    "escalation": {
+      "title": "Escalonamento humano",
+      "description": "O que o assistente faz quando um cliente precisa de uma pessoa.",
+      "availableLabel": "Se algum atendente humano estiver disponível",
+      "availableHint": "Instruções para o assistente quando houver um atendente humano disponível. Deixe vazio para apenas mover a conversa para a fila.",
+      "unavailableLabel": "Se nenhum atendente humano estiver disponível",
+      "unavailableHint": "Instruções para o assistente quando não houver atendentes humanos disponíveis (ex.: pedir o e-mail).",
+      "unavailableModeHint": "O que o assistente faz quando um cliente precisa de uma pessoa e ninguém pode assumir a conversa (fora do horário de atendimento ou sem ninguém online).",
+      "modeInstructions": "Seguir minhas instruções",
+      "modeTicket": "Abrir um chamado",
+      "modeTicketIn": "Abrir um chamado no {name}",
+      "noHelpdesk": "Conecte um help desk como o Zendesk para abrir chamados automaticamente.",
+      "connectHelpdesk": "Ver integrações",
+      "ticketExplainer": "O assistente garante que tem o e-mail do cliente, abre um chamado com um resumo e a conversa completa e avisa o cliente que a equipe vai retornar. Depois a conversa é encerrada em vez de ficar esperando na fila.",
+      "helpdesk": "Help desk",
+      "prefillTitle": "Preencher todo chamado com",
+      "notSet": "Não definido",
+      "formError": "Não foi possível carregar os campos de chamado do seu help desk: {message}"
+    }
+  }
+}

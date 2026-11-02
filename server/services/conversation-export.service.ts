@@ -57,9 +57,6 @@ export class ConversationExportService {
         doc.text(`Closed: ${at(conversation.closed_at)}`);
       }
 
-      if (conversation.agent?.name) {
-        doc.text(`Agent: ${conversation.agent.name}`);
-      }
       if (conversation.customer) {
         const parts = [
           conversation.customer.name,
@@ -128,7 +125,6 @@ export class ConversationExportService {
       "language",
       "conversation_created_at",
       "conversation_ended_at",
-      "agent_name",
       "customer_name",
       "customer_email",
       "customer_phone",
@@ -160,7 +156,6 @@ export class ConversationExportService {
         conversation.language || "",
         conversation.created_at?.toISOString() || "",
         conversation.ended_at?.toISOString() || "",
-        conversation.agent?.name || "",
         conversation.customer?.name || "",
         conversation.customer?.email || "",
         conversation.customer?.phone || "",

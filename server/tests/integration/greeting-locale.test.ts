@@ -2,7 +2,6 @@ import "reflect-metadata";
 import { describe, it, expect, beforeAll, afterAll, beforeEach, jest } from "@jest/globals";
 import { AppDataSource } from "../../database/data-source";
 import { Organization } from "../../entities/organization.entity";
-import { Agent } from "../../database/entities/agent.entity";
 import { Customer } from "../../database/entities/customer.entity";
 import { Conversation } from "../../database/entities/conversation.entity";
 import { Message, MessageType } from "../../database/entities/message.entity";
@@ -38,7 +37,6 @@ jest.mock("../../services/redis.service", () => ({
 }));
 
 const ORG_ID = "91ee0000-0000-4000-8000-000000000001";
-const AGENT_ID = "91ee0000-0000-4000-8000-000000000002";
 const ORG_GREETING = "Hello! How can I help you today?";
 
 const conversationService = new ConversationService();
@@ -71,25 +69,12 @@ beforeAll(async () => {
       orgRepo.create({ id: ORG_ID, name: "Greeting Locale Org", slug: "greeting-locale-org" }),
     );
   }
-  const agentRepo = AppDataSource.getRepository(Agent);
-  if (!(await agentRepo.findOne({ where: { id: AGENT_ID } }))) {
-    await agentRepo.save(
-      agentRepo.create({
-        id: AGENT_ID,
-        name: "Greeting Agent",
-        organization_id: ORG_ID,
-        initialGreeting: ORG_GREETING,
-      }),
-    );
-  }
-  await orgRepo.update({ id: ORG_ID }, { defaultAgentId: AGENT_ID });
+  await orgRepo.update({ id: ORG_ID }, { initialGreeting: ORG_GREETING });
 });
 
 afterAll(async () => {
   await AppDataSource.getRepository(Conversation).delete({ organization_id: ORG_ID });
   await AppDataSource.getRepository(Customer).delete({ organization_id: ORG_ID });
-  await AppDataSource.getRepository(Organization).update({ id: ORG_ID }, { defaultAgentId: null });
-  await AppDataSource.getRepository(Agent).delete({ id: AGENT_ID });
   await AppDataSource.getRepository(Organization).delete({ id: ORG_ID });
   if (AppDataSource.isInitialized) await AppDataSource.destroy();
 });

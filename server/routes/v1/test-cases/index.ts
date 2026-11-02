@@ -86,7 +86,6 @@ export const testCasesRouter = t.router({
       z.object({
         playbookId: z.string().uuid().optional(),
         playbookVersionOverride: playbookVersionOverrideSchema.optional(),
-        agentId: z.string().uuid().optional(),
         label: z.string().max(255).optional(),
       }),
     )
@@ -104,7 +103,6 @@ export const testCasesRouter = t.router({
           createdById: ctx.user?.id ?? null,
           playbookId: input.playbookId ?? null,
           playbookVersionOverride: input.playbookVersionOverride ?? null,
-          agentId: input.agentId ?? null,
           label: input.label ?? null,
         });
       } catch (error) {

@@ -42,7 +42,7 @@ This document defines the architectural principles and best practices for the Or
 **Location**: `@server/database/entities/*.entity.ts`
 
 **Should contain**:
-- State manipulation methods (`updateAgent()`, `addMessage()`)
+- State manipulation methods (`updatePlaybook()`, `addMessage()`)
 - Business validation methods
 - Helper methods for entity relationships
 - Methods that operate on the entity's own data
@@ -71,13 +71,11 @@ This document defines the architectural principles and best practices for the Or
 ### Perception Layer
 **Primary Functions**:
 - Analyze message intent and sentiment
-- Find agent candidates based on triggers
 - Process and interpret user input
 
 **Method Signatures**:
 ```typescript
 async perceive(message: Message): Promise<Perception>
-async getAgentCandidate(message: Message, agents: Agent[]): Promise<Agent | null>
 ```
 
 **Dependencies**: LLMService, Entity types
@@ -107,7 +105,26 @@ async getRelevantDocuments(messages: Message[], organizationId: string): Promise
 async execute(conversation: Conversation, messages: Message[]): Promise<ExecutionResult | null>
 ```
 
-**Dependencies**: LLMService, Agent instructions, Playbook logic
+**Dependencies**: LLMService, assistant instructions, Playbook logic
+
+## The Assistant
+
+Each organization has exactly one assistant, configured on the organization
+(`assistantName`, `assistantTone`, `assistantAvoid`, `assistantInstructions`,
+`initialGreeting` and the `humanHandoff*` settings). There is no agent entity and
+no routing: every conversation of the organization is answered by its assistant,
+and all of its playbooks apply.
+
+- `Conversation.addInitialAssistantInstructions()` writes the persona as a system
+  message, built by `buildAssistantInstructions()` in `services/assistant.ts`.
+- `Conversation.addInitialBotMessage()` uses the organization's `initialGreeting`.
+- Hand-off instructions and the "create a ticket" hand-off come from the
+  organization (`run.ts`, `handoff-tickets.service.ts`).
+- The reply language falls back to `organization.defaultLanguage`; Require
+  Approval is `organization.settings.testModeDefault`.
+- Whether the AI replies at all is the organization-level pause
+  (`agentPausedAt` by the operator, `aiPausedAt` by the owner) and the
+  per-channel AI mode in the organization settings.
 
 ## Data Flow Rules
 
@@ -115,7 +132,7 @@ async execute(conversation: Conversation, messages: Message[]): Promise<Executio
 ```typescript
 // ✅ GOOD: Repository loads entity, entity has business methods, service coordinates
 const conversation = await conversationRepository.findById(id);
-await conversation.updateAgent(agentId); // Entity method
+await conversation.updatePlaybook(playbookId); // Entity method
 const result = await executionLayer.execute(conversation, messages); // Service method
 ```
 
@@ -131,10 +148,10 @@ const conversation = await conversationRepository.findById(id);
 ### 3. Entity Methods for State Changes
 ```typescript
 // ❌ BAD: Direct property manipulation
-conversation.agent_id = newAgentId;
+conversation.playbook_id = newPlaybookId;
 
 // ✅ GOOD: Using entity method
-await conversation.updateAgent(newAgentId);
+await conversation.updatePlaybook(newPlaybookId);
 ```
 
 ## Type Usage Guidelines
@@ -202,7 +219,7 @@ interface ExecutionResult {
 ## Code Style
 
 ### 1. Naming Conventions
-- Methods: `camelCase` verbs (`perceive`, `getAgentCandidate`)
+- Methods: `camelCase` verbs (`perceive`, `getPlaybookCandidate`)
 - Interfaces: `PascalCase` nouns (`Perception`, `ExecutionResult`)
 - Files: `kebab-case.type.ts` (`perception.layer.ts`)
 

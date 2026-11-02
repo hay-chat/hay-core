@@ -9,7 +9,7 @@ import { playbookVersionOverrideSchema, toTrpcError } from "../simulations";
 
 /**
  * Replays (D7-9): past conversations (imported transcripts or Hay.chat's own)
- * replayed one customer turn at a time against the agent, in dry run. Free,
+ * replayed one customer turn at a time against the assistant, in dry run. Free,
  * never billed, counted against the monthly simulation allowance.
  */
 export const replaysRouter = t.router({
@@ -18,7 +18,6 @@ export const replaysRouter = t.router({
       z
         .object({
           label: z.string().max(255).optional(),
-          agentId: z.string().uuid().optional(),
           playbookVersionOverride: playbookVersionOverrideSchema.optional(),
           transcriptIds: z.array(z.string().uuid()).max(200).optional(),
           conversationIds: z.array(z.string().uuid()).max(200).optional(),
@@ -42,7 +41,6 @@ export const replaysRouter = t.router({
           organizationId: ctx.organizationId!,
           createdById: ctx.user?.id ?? null,
           label: input.label ?? null,
-          agentId: input.agentId ?? null,
           playbookVersionOverride: input.playbookVersionOverride ?? null,
           transcriptIds: input.transcriptIds,
           conversationIds: input.conversationIds,
@@ -84,7 +82,6 @@ export const replaysRouter = t.router({
           organizationId: ctx.organizationId!,
           createdById: ctx.user?.id ?? null,
           label: input.label ?? null,
-          agentId: null,
           playbookVersionOverride: input.playbookVersionOverride ?? null,
           conversationIds,
           recentConversations: null,

@@ -123,7 +123,7 @@ export function formatConversationHeader(conv: Raw, options: { verbose?: boolean
   const lines = [
     `${String(conv.id)}  status=${String(conv.status)} channel=${String(conv.channel ?? "-")}` +
       ` lang=${String(conv.language ?? "-")} title=${JSON.stringify(conv.title ?? "")}`,
-    `created=${String(conv.created_at ?? conv.createdAt ?? "-")} agent=${String(conv.agent_id ?? "-")}` +
+    `created=${String(conv.created_at ?? conv.createdAt ?? "-")}` +
       ` playbook=${String(conv.playbook_id ?? "-")} customer=${String(conv.customer_id ?? "-")}`,
   ];
   if (conv.last_processing_error) {

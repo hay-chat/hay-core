@@ -13,7 +13,6 @@ jest.mock("@server/repositories/conversation.repository", () => ({
   conversationRepository: { findById: mockFindById, update: mockUpdate },
 }));
 jest.mock("@server/repositories/playbook.repository", () => ({ playbookRepository: {} }));
-jest.mock("@server/repositories/agent.repository", () => ({ agentRepository: {} }));
 jest.mock("@server/repositories/user.repository", () => ({ userRepository: {} }));
 jest.mock("@server/services/conversation-secret.service", () => ({
   conversationSecretService: {},

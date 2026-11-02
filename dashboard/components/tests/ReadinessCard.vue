@@ -1,5 +1,5 @@
 <template>
-  <Card v-if="readiness" data-testid="agent-readiness">
+  <Card v-if="readiness" data-testid="assistant-readiness">
     <CardHeader>
       <CardTitle>{{ $t("tests.readiness.title") }}</CardTitle>
       <CardDescription>{{ $t("tests.readiness.description") }}</CardDescription>
@@ -52,18 +52,16 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, watch } from "vue";
+import { ref, onMounted } from "vue";
 import { Hay } from "@/utils/api";
 import type { RouterOutputs } from "@/types/trpc";
 
 /**
- * Soft-launch readiness (D7-13): weekly approve / edit / block counts for an
- * agent under Require Approval, and a hint on when Auto-Send may be safe.
- * Require Approval holds replies only, never actions. No percentages.
+ * Soft-launch readiness (D7-13): weekly approve / edit / block counts for the
+ * assistant's replies under Require Approval, and a hint on when Auto-Send may
+ * be safe. Require Approval holds replies only, never actions. No percentages.
  */
-type Readiness = RouterOutputs["agents"]["readiness"][number];
-
-const props = defineProps<{ agentId: string }>();
+type Readiness = RouterOutputs["organizations"]["assistant"]["readiness"];
 
 const readiness = ref<Readiness | null>(null);
 
@@ -73,14 +71,12 @@ function formatDate(isoDate: string) {
 
 async function load() {
   try {
-    const [result] = await Hay.agents.readiness.query({ agentId: props.agentId });
-    readiness.value = result ?? null;
+    readiness.value = await Hay.organizations.assistant.readiness.query();
   } catch {
-    // Readiness is advisory; the agent page works without it.
+    // Readiness is advisory; the page works without it.
     readiness.value = null;
   }
 }
 
 onMounted(load);
-watch(() => props.agentId, load);
 </script>

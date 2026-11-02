@@ -1,13 +1,14 @@
-import { Entity, Column, Index, OneToMany, ManyToOne, JoinColumn, OneToOne } from "typeorm";
+import { Entity, Column, Index, OneToMany, JoinColumn, OneToOne } from "typeorm";
 import { BaseEntity } from "./base.entity";
 import { User } from "./user.entity";
 import { UserOrganization } from "./user-organization.entity";
 import { Document } from "./document.entity";
 import { ApiKey } from "./apikey.entity";
 import { Job } from "./job.entity";
-import { Agent } from "../database/entities/agent.entity";
 import { Upload } from "./upload.entity";
 import { SupportedLanguage, DEFAULT_LANGUAGE } from "../types/language.types";
+import type { TiptapDoc } from "../types/tiptap.types";
+import type { HandoffTicketConfig } from "../types/handoff-ticket.types";
 import {
   DateFormat,
   TimeFormat,
@@ -138,13 +139,48 @@ export class Organization extends BaseEntity {
   })
   timezone!: Timezone;
 
+  // The organization's AI assistant (one per organization). Its name is
+  // separate from the organization name; null falls back to the org name.
+  // Its reply language is defaultLanguage; approval is settings.testModeDefault.
+  @Column({ type: "varchar", length: 255, nullable: true })
+  assistantName?: string | null;
+
+  @Column({ type: "text", nullable: true })
+  assistantDescription?: string | null;
+
+  @OneToOne(() => Upload, { nullable: true, eager: true, onDelete: "SET NULL" })
+  @JoinColumn({ name: "assistant_avatar_upload_id" })
+  assistantAvatarUpload?: Upload | null;
+
   @Column({ type: "uuid", nullable: true })
-  defaultAgentId?: string | null;
+  assistantAvatarUploadId?: string | null;
+
+  /** Public URL for {@link assistantAvatarUpload}, derived on read (not a column). */
+  assistantAvatarUrl?: string | null;
+
+  @Column({ type: "jsonb", nullable: true })
+  assistantInstructions?: TiptapDoc | null;
+
+  @Column({ type: "text", nullable: true })
+  assistantTone?: string | null;
+
+  @Column({ type: "text", nullable: true })
+  assistantAvoid?: string | null;
+
+  @Column({ type: "text", nullable: true })
+  initialGreeting?: string | null;
+
+  @Column({ type: "jsonb", nullable: true })
+  humanHandoffAvailableInstructions?: TiptapDoc | null;
+
+  @Column({ type: "jsonb", nullable: true })
+  humanHandoffUnavailableInstructions?: TiptapDoc | null;
+
+  /** When set, a hand-off nobody can take raises a helpdesk ticket instead of following the instructions above. */
+  @Column({ type: "jsonb", nullable: true })
+  humanHandoffUnavailableTicket?: HandoffTicketConfig | null;
 
   // Relationships
-  @ManyToOne(() => Agent, { nullable: true, onDelete: "SET NULL" })
-  @JoinColumn({ name: "default_agent_id" })
-  defaultAgent?: Agent | null;
 
   @OneToMany(() => User, (user) => user.organization)
   users!: User[];

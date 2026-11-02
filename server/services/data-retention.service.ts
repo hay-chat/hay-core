@@ -17,7 +17,7 @@ const logger = createLogger("data-retention");
  *
  * What gets preserved (for analytics):
  * - timestamps (created_at, closed_at, updated_at)
- * - status, channel, agent_id
+ * - status, channel
  * - organization_id
  *
  * What gets removed (PII):
@@ -155,7 +155,7 @@ export class DataRetentionService {
             context: null,
             metadata: null,
             document_ids: null,
-            // Keep analytics-relevant fields: status, channel, agent_id, timestamps
+            // Keep analytics-relevant fields: status, channel, timestamps
           })
           .where("id IN (:...ids)", { ids: conversationIds })
           .execute();

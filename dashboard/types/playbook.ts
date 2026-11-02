@@ -10,21 +10,6 @@ export enum PlaybookVersionStatus {
   ARCHIVED = "archived",
 }
 
-export interface Agent {
-  id: string;
-  name: string;
-  description?: string | null;
-  instructions?: unknown;
-  tone?: string | null;
-  avoid?: string | null;
-  trigger?: string | null;
-  enabled: boolean;
-  organization_id?: string;
-  created_at?: string;
-  updated_at?: string;
-  [key: string]: unknown; // Allow additional properties from API
-}
-
 export interface Playbook {
   id: string;
   title: string;
@@ -38,7 +23,6 @@ export interface Playbook {
   draft_version_id?: string | null;
   /** Write categories that always need approval while this playbook runs (D4-9). */
   approval_categories?: string[] | null;
-  agents?: Agent[];
   created_at?: string;
   updated_at?: string;
   [key: string]: unknown; // Allow additional properties from API

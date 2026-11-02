@@ -37,15 +37,6 @@
           <ChevronRight class="h-4 w-4" />
         </NuxtLink>
       </li>
-      <li>
-        <NuxtLink
-          to="/agents"
-          class="inline-flex min-h-11 items-center gap-1 text-primary hover:underline sm:min-h-0"
-        >
-          {{ $t("home.aiPause.perAgent") }}
-          <ChevronRight class="h-4 w-4" />
-        </NuxtLink>
-      </li>
     </ul>
   </section>
 </template>

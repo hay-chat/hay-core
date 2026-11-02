@@ -3,7 +3,6 @@ import { describe, it, expect, beforeAll, afterAll, beforeEach, jest } from "@je
 import { AppDataSource } from "../../database/data-source";
 import { Organization } from "../../entities/organization.entity";
 import { User } from "../../entities/user.entity";
-import { Agent } from "../../database/entities/agent.entity";
 import { Customer } from "../../database/entities/customer.entity";
 import { Conversation } from "../../database/entities/conversation.entity";
 import { Message, MessageType } from "../../database/entities/message.entity";
@@ -100,7 +99,6 @@ jest.mock("../../orchestrator/execution.layer", () => ({
 }));
 
 const ORG_ID = "7ace0000-0000-4000-8000-000000000001";
-const AGENT_ID = "7ace0000-0000-4000-8000-000000000002";
 const USER_ID = "7ace0000-0000-4000-8000-000000000003";
 
 const conversationService = new ConversationService();
@@ -159,13 +157,7 @@ beforeAll(async () => {
       orgRepo.create({ id: ORG_ID, name: "Run Race Test Org", slug: "run-race-test-org" }),
     );
   }
-  const agentRepo = AppDataSource.getRepository(Agent);
-  if (!(await agentRepo.findOne({ where: { id: AGENT_ID } }))) {
-    await agentRepo.save(
-      agentRepo.create({ id: AGENT_ID, name: "Race Agent", organization_id: ORG_ID }),
-    );
-  }
-  await orgRepo.update({ id: ORG_ID }, { defaultAgentId: AGENT_ID });
+  await orgRepo.update({ id: ORG_ID }, { assistantName: "Race Assistant" });
   const userRepo = AppDataSource.getRepository(User);
   if (!(await userRepo.findOne({ where: { id: USER_ID } }))) {
     await userRepo.save(
@@ -177,8 +169,6 @@ beforeAll(async () => {
 afterAll(async () => {
   await AppDataSource.getRepository(Conversation).delete({ organization_id: ORG_ID });
   await AppDataSource.getRepository(Customer).delete({ organization_id: ORG_ID });
-  await AppDataSource.getRepository(Organization).update({ id: ORG_ID }, { defaultAgentId: null });
-  await AppDataSource.getRepository(Agent).delete({ id: AGENT_ID });
   await AppDataSource.getRepository(User).delete({ id: USER_ID });
   await AppDataSource.getRepository(Organization).delete({ id: ORG_ID });
   if (AppDataSource.isInitialized) {

@@ -63,7 +63,6 @@ const createPlaybookSchema = z.object({
   description: z.string().optional(),
   instructions: instructionsSchema.optional(),
   status: playbookStatusEnum.optional().default(PlaybookStatus.DRAFT),
-  agentIds: z.array(z.string().uuid()).optional(),
 });
 
 const updatePlaybookSchema = z.object({
@@ -72,7 +71,6 @@ const updatePlaybookSchema = z.object({
   description: z.string().optional(),
   instructions: instructionsSchema.optional(),
   status: playbookStatusEnum.optional(),
-  agentIds: z.array(z.string().uuid()).optional(),
   // D4-9: categories that always need approval while this playbook runs (tighten-only).
   approvalCategories: z
     .array(z.enum(APPROVAL_CATEGORIES))
@@ -190,64 +188,6 @@ export const playbooksRouter = t.router({
       }
 
       return { success: true };
-    }),
-
-  addAgent: scopedProcedure(RESOURCES.PLAYBOOKS, ACTIONS.UPDATE)
-    .input(
-      z.object({
-        playbookId: z.string().uuid(),
-        agentId: z.string().uuid(),
-      }),
-    )
-    .mutation(async ({ ctx, input }) => {
-      try {
-        const playbook = await playbookService.addAgentToPlaybook(
-          ctx.organizationId!,
-          input.playbookId,
-          input.agentId,
-        );
-
-        if (!playbook) {
-          throw new TRPCError({
-            code: "NOT_FOUND",
-            message: "Playbook not found",
-          });
-        }
-
-        return playbook;
-      } catch (error) {
-        if (error instanceof Error && error.message === "Agent not found") {
-          throw new TRPCError({
-            code: "NOT_FOUND",
-            message: "Agent not found",
-          });
-        }
-        throw error;
-      }
-    }),
-
-  removeAgent: scopedProcedure(RESOURCES.PLAYBOOKS, ACTIONS.UPDATE)
-    .input(
-      z.object({
-        playbookId: z.string().uuid(),
-        agentId: z.string().uuid(),
-      }),
-    )
-    .mutation(async ({ ctx, input }) => {
-      const playbook = await playbookService.removeAgentFromPlaybook(
-        ctx.organizationId!,
-        input.playbookId,
-        input.agentId,
-      );
-
-      if (!playbook) {
-        throw new TRPCError({
-          code: "NOT_FOUND",
-          message: "Playbook not found",
-        });
-      }
-
-      return playbook;
     }),
 
   versions: t.router({
