@@ -178,7 +178,11 @@ describe("account access", () => {
         organizationName: "New Signup Org",
       });
 
-      expect(result).toEqual({ success: true, message: expect.any(String) });
+      expect(result).toEqual({
+        success: true,
+        emailVerificationRequired: true,
+        message: expect.any(String),
+      });
       expect(result).not.toHaveProperty("accessToken");
 
       const user = await AppDataSource.getRepository(User).findOneOrFail({ where: { email } });
@@ -209,7 +213,11 @@ describe("account access", () => {
         organizationName: "Second Org",
       });
 
-      expect(result).toEqual({ success: true, message: expect.any(String) });
+      expect(result).toEqual({
+        success: true,
+        emailVerificationRequired: true,
+        message: expect.any(String),
+      });
       expect(
         await AppDataSource.getRepository(Session).count({ where: { userId: owner.id } }),
       ).toBe(0);
