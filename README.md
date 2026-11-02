@@ -11,7 +11,7 @@ Best for Shopify and WooCommerce stores that want AI to actually issue refunds a
 ![GitHub issues](https://img.shields.io/github/issues/hay-chat/hay-core)
 ![GitHub pull requests](https://img.shields.io/github/issues-pr/hay-chat/hay-core)
 ![GitHub repo size](https://img.shields.io/github/repo-size/hay-chat/hay-core)
-![Node.js version](https://img.shields.io/badge/node-%3E%3D18-brightgreen)
+![Node.js version](https://img.shields.io/badge/node-%3E%3D20-brightgreen)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5-blue)
 
 ## What is Hay.chat?
@@ -31,7 +31,7 @@ Hay.chat lets businesses deploy AI agents that handle customer support 24/7 acro
 
 ## Self-host Hay.chat
 
-Hay.chat runs with Docker, PostgreSQL 16 with pgvector, and Redis 7. See [Getting Started](#getting-started) below.
+Hay.chat runs on one server with Docker Compose: PostgreSQL 16 with pgvector, Redis 7, RabbitMQ and a Caddy proxy with automatic HTTPS. Follow **[SELF_HOSTING.md](SELF_HOSTING.md)** for install, email, integrations, upgrades and backups. [Getting Started](#getting-started) below is for local development.
 
 Chat models: OpenAI, Anthropic, Gemini, or any OpenAI-compatible endpoint (for example DigitalOcean Gradient, or a local server such as Ollama, which is untested). Embeddings use OpenAI `text-embedding-3-small`, so an OpenAI key is still required. No telemetry is sent unless you set `POSTHOG_KEY`.
 
@@ -72,15 +72,15 @@ Teams comparing Chatwoot, Zammad or Dify for self-hosted AI support use Hay.chat
 
 ### Prerequisites
 
-- Node.js >= 18
+- Node.js 20 or newer (22 recommended; the Docker image uses 22)
 - npm >= 9
-- Docker (for PostgreSQL and Redis)
+- Docker (for PostgreSQL, Redis and RabbitMQ)
 
 ### Setup
 
 ```bash
 # Clone the repository
-git clone <repo-url>
+git clone https://github.com/hay-chat/hay-core.git
 cd hay-core
 
 # Start infrastructure
@@ -108,10 +108,11 @@ The dashboard runs on `http://localhost:3000` and the API on `http://localhost:3
 | ------------------------------------------------------------- | ---------- | --------------------------------- |
 | `DB_HOST`, `DB_PORT`, `DB_USERNAME`, `DB_PASSWORD`, `DB_NAME` | Yes        | PostgreSQL connection             |
 | `REDIS_HOST`, `REDIS_PORT`                                    | Yes        | Redis connection                  |
+| `RABBITMQ_URL`                                                | Yes        | Message queue (AI replies)        |
 | `JWT_SECRET`, `JWT_REFRESH_SECRET`                            | Yes        | Auth secrets (min 32 chars)       |
 | `OPENAI_API_KEY`                                              | Yes        | OpenAI API key for AI features    |
 | `LLM_BASE_URL`, `LLM_VENDOR`, `LLM_API_KEY`, `LLM_TIER_*`     | No         | Other OpenAI-compatible chat host |
-| `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`        | No         | Email sending                     |
+| `SMTP_ENABLED`, `SMTP_HOST`, `SMTP_PORT`, `SMTP_AUTH_USER`, `SMTP_AUTH_PASS` | No | Email sending              |
 | `BASE_DOMAIN`, `API_DOMAIN`, `DASHBOARD_DOMAIN`               | Production | Domain configuration              |
 
 ## Development
@@ -195,7 +196,7 @@ Embed the chat widget on any website:
     },
   };
 </script>
-<script src="https://your-cdn/webchat.js" async></script>
+<script src="https://your-api-domain.com/v1/webchat/widget.js" async></script>
 ```
 
 If you use a cookie banner, set `window.HayChat.config` only after the user accepts:
@@ -210,7 +211,7 @@ If you use a cookie banner, set `window.HayChat.config` only after the user acce
       consent: "strict",
     };
     const s = document.createElement("script");
-    s.src = "https://your-cdn/webchat.js";
+    s.src = "https://your-api-domain.com/v1/webchat/widget.js";
     s.async = true;
     document.head.appendChild(s);
   }

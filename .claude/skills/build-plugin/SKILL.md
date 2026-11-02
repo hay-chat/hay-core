@@ -5,9 +5,9 @@ description: Build a new Hay plugin from scratch that connects an external platf
 
 # Build a Hay Plugin
 
-This skill is the authoritative, code-verified guide for building a new Hay plugin. It supersedes
-the older `plugins/PLUGIN_DEVELOPMENT_GUIDE.md` (stale) and the `generate-plugin` command (which
-generates from an existing MCP repo). Use **this** when building from scratch to connect a platform.
+This skill is the authoritative, code-verified guide for building a new Hay plugin. The
+`generate-plugin` command is for the other case: generating a plugin from an existing MCP repo.
+Use **this** when building from scratch to connect a platform.
 
 > The existing `plugins/core/*` are a mix of good and rough. This skill distills what's actually
 > correct against the SDK and explicitly flags what NOT to copy. When in doubt, prefer the

@@ -173,6 +173,11 @@ module.exports = {
         useNuxtData: "readonly",
         useRuntimeConfig: "readonly",
         useState: "readonly",
+        // Project composables used without an explicit import
+        useExternalLink: "readonly",
+        SETTINGS_NAV: "readonly",
+        isSettingsTabActive: "readonly",
+        visibleSettingsTabs: "readonly",
         useCookie: "readonly",
         useRequestEvent: "readonly",
         useRequestHeaders: "readonly",
@@ -241,8 +246,6 @@ module.exports = {
       files: [
         "server/scripts/**/*.ts",
         "server/database/migrations/**/*.ts",
-        "server/run-migration.ts",
-        "server/run-migrations.ts",
       ],
       rules: {
         "no-console": "off", // CLI tools can use console directly
@@ -265,7 +268,6 @@ module.exports = {
         "**/*.test.example.ts",
         "**/tests/test-*.ts",
         "**/tests/setup.ts",
-        "**/email-usage-example.ts",
       ],
       env: {
         jest: true,
