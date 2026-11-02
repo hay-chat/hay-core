@@ -5,7 +5,9 @@ import { AppDataSource } from "@server/database/data-source";
 import { User } from "@server/entities/user.entity";
 import { Organization } from "@server/entities/organization.entity";
 import { UserOrganization } from "@server/entities/user-organization.entity";
+import type { EntityManager } from "typeorm";
 import { AuthCode } from "@server/entities/auth-code.entity";
+import { OrganizationInvitation } from "@server/entities/organization-invitation.entity";
 import {
   hashPassword,
   verifyPassword,
@@ -24,7 +26,7 @@ import { auditLogService } from "@server/services/audit-log.service";
 import { emailService, getOrganizationLocale } from "@server/services/email.service";
 import { DEFAULT_LANGUAGE } from "@server/types/language.types";
 import * as crypto from "crypto";
-import { getDashboardUrl } from "@server/config/env";
+import { config, getDashboardUrl } from "@server/config/env";
 import { StorageService } from "@server/services/storage.service";
 import { handleUpload } from "@server/lib/upload-helper";
 import { rateLimitService } from "@server/services/rate-limit.service";
@@ -91,6 +93,28 @@ const registerSchema = z
 const refreshTokenSchema = z.object({
   refreshToken: z.string(),
 });
+
+/**
+ * With ALLOW_SIGNUP=false, a new account may only be created by the instance's
+ * first user or by someone holding a pending invitation.
+ */
+async function assertSignupAllowed(manager: EntityManager, email: string): Promise<void> {
+  const userCount = await manager.getRepository(User).count();
+  if (userCount === 0) return;
+
+  const invitations = await manager
+    .getRepository(OrganizationInvitation)
+    .createQueryBuilder("invitation")
+    .where("LOWER(invitation.email) = :email", { email: email.toLowerCase() })
+    .getMany();
+  if (invitations.some((invitation) => invitation.canAccept())) return;
+
+  throw new TRPCError({
+    code: "FORBIDDEN",
+    message: "Sign-up is closed on this server. Ask an administrator for an invitation.",
+    cause: { type: "SIGNUP_CLOSED" },
+  });
+}
 
 export const authRouter = t.router({
   // Public endpoints
@@ -212,6 +236,10 @@ export const authRouter = t.router({
         where: { email: email.toLowerCase() },
       });
 
+      if (!existingUser && !config.auth.allowSignup) {
+        await assertSignupAllowed(manager, email);
+      }
+
       // Helper to create an organization
       const createOrg = async () => {
         if (!organizationName) return null;
@@ -306,7 +334,7 @@ export const authRouter = t.router({
         firstName: firstName || undefined,
         lastName: lastName || undefined,
         isActive: true,
-        emailVerified: false,
+        emailVerified: !config.auth.requireEmailVerification,
         organizationId: organization?.id,
         role: organization ? "owner" : "member", // Owner if creating org, otherwise member
       });
@@ -1038,7 +1066,7 @@ export const authRouter = t.router({
         await emailService.initialize();
         logger.debug("Email service initialized");
 
-        const baseUrl = process.env.FRONTEND_URL || "http://localhost:3000";
+        const baseUrl = process.env.FRONTEND_URL || getDashboardUrl();
         const verificationUrl = `${baseUrl}/verify-email?token=${verificationToken}`;
 
         logger.debug(
@@ -1464,7 +1492,7 @@ export const authRouter = t.router({
     try {
       await emailService.initialize();
 
-      const baseUrl = process.env.FRONTEND_URL || "http://localhost:3000";
+      const baseUrl = process.env.FRONTEND_URL || getDashboardUrl();
       const verificationUrl = `${baseUrl}/verify-email?token=${verificationToken}`;
 
       const commonVariables = {

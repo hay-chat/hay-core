@@ -41,8 +41,8 @@ export const selectSchema = z.array(identifierSchema).max(100).optional();
 
 // Base list input schema that combines all the above
 export const baseListInputSchema = z.object({
-  pagination: paginationSchema.optional().default({}),
-  sorting: sortingSchema.optional().default({}),
+  pagination: paginationSchema.prefault({}),
+  sorting: sortingSchema.prefault({}),
   search: searchSchema.optional(),
   filters: filtersSchema,
   dateRange: dateRangeSchema,

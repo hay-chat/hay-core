@@ -66,7 +66,7 @@ const createPublicConversationSchema = z.object({
     alg: z.string().optional(),
     use: z.string().optional(),
   }),
-  metadata: z.record(z.unknown()).optional(),
+  metadata: z.record(z.string(), z.any()).optional(),
   // The widget's UI locale (BCP-47, e.g. "pt-BR"). Sets the conversation
   // language so the greeting is written in it; unsupported languages are ignored.
   language: z
@@ -74,7 +74,7 @@ const createPublicConversationSchema = z.object({
     .max(35)
     .regex(/^[A-Za-z]{2,3}(-[A-Za-z0-9]{1,8})*$/)
     .optional(),
-  context: z.record(z.unknown()).optional(),
+  context: z.record(z.string(), z.any()).optional(),
   // The store's customer id, linked only when signed by the store's server
   // with the organization's identity secret (D1, webchat-identity.service).
   customerExternalId: z.string().max(255).optional(),
@@ -87,7 +87,7 @@ const createPublicConversationSchema = z.object({
   preChatForm: z
     .object({
       schema: formSchemaSchema,
-      response: z.record(z.union([z.string(), z.number(), z.boolean(), z.null()])),
+      response: z.record(z.string(), z.union([z.string(), z.number(), z.boolean(), z.null()])),
     })
     .optional(),
 });
@@ -99,7 +99,7 @@ const sendMessageSchema = z.object({
   proof: z.string(), // DPoP proof
   method: z.string(),
   url: z.string(),
-  context: z.record(z.unknown()).optional(),
+  context: z.record(z.string(), z.any()).optional(),
 });
 
 // Schema for sending a photo or PDF, with an optional caption (D8-9)
@@ -112,7 +112,7 @@ const sendAttachmentSchema = z.object({
   proof: z.string(), // DPoP proof
   method: z.string(),
   url: z.string(),
-  context: z.record(z.unknown()).optional(),
+  context: z.record(z.string(), z.any()).optional(),
 });
 
 // Schema for submitting a CSAT rating
@@ -847,7 +847,7 @@ export const publicConversationsRouter = t.router({
       z.object({
         conversationId: z.string().uuid(),
         messageId: z.string().uuid(),
-        response: z.record(z.union([z.string(), z.number(), z.boolean(), z.null()])),
+        response: z.record(z.string(), z.union([z.string(), z.number(), z.boolean(), z.null()])),
         proof: z.string(),
         method: z.string(),
         url: z.string(),

@@ -1,11 +1,11 @@
 {
   "name": "hay-v3",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "private": true,
   "description": "Hay platform - Unified monorepo for dashboard, server, and plugins",
   "author": "Hay Labs",
   "license": "SEE LICENSE IN LICENSE",
-  "node-version": "22.10.0",
+  "node-version": "22.12.0",
   "workspaces": [
     "dashboard",
     "server",
@@ -61,32 +61,35 @@
     "test:hay-cli": "vitest run --root tools/hay-cli",
     "typecheck:hay-cli": "tsc -p tools/hay-cli/tsconfig.json",
     "generate:trpc": "cd dashboard && npm run generate:trpc",
-    "env:local": "./scripts/switch-env.sh local",
-    "env:cloud": "./scripts/switch-env.sh cloud",
-    "env:status": "./scripts/switch-env.sh status",
     "postinstall": "git submodule update --init --recursive || echo 'Warning: git submodule update failed (non-fatal)'; cd dashboard && nuxt prepare"
   },
   "overrides": {
     "vite": "^6.0.0",
     "html-minifier": "npm:html-minifier-next@^4.16.4",
-    "@modelcontextprotocol/sdk": "^1.25.2"
+    "@modelcontextprotocol/sdk": "^1.32.2",
+    "minimatch@>=9.0.0 <9.0.7": "^9.0.7"
+  },
+  "//overrides": {
+    "vite": "Keeps every tool in the tree (nuxt, vitest, plugin builds) on one patched vite major instead of older vite 5 copies.",
+    "html-minifier": "mjml depends on the unmaintained html-minifier, which has an unfixed ReDoS; html-minifier-next is the maintained drop-in fork.",
+    "@modelcontextprotocol/sdk": "Floor for transitive copies (e.g. optional peer of @google/genai) so none resolve below the patched release.",
+    "minimatch@>=9.0.0 <9.0.7": "@typescript-eslint/typescript-estree 6 pins minimatch 9.0.3 exactly and mjml-cli dedupes onto that copy; lift the 9.x line to the patched ReDoS release."
   },
   "engines": {
-    "node": ">=18.0.0",
+    "node": ">=22.12.0",
     "npm": ">=9.0.0"
   },
-  "dependencies": {
-    "@hay/plugin-sdk": "file:packages/plugin-sdk",
-    "@mozilla/readability": "^0.6.0",
-    "@types/amqplib": "^0.10.8",
-    "@types/archiver": "^7.0.0",
-    "@types/turndown": "^5.0.6",
-    "amqplib": "^0.10.9",
-    "linkedom": "^0.18.12",
-    "turndown": "^7.2.2"
-  },
   "devDependencies": {
+    "@playwright/test": "^1.55.0",
+    "@typescript-eslint/eslint-plugin": "^6.12.0",
+    "@typescript-eslint/parser": "^6.12.0",
     "dotenv": "^16.6.1",
+    "eslint": "^8.54.0",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-prettier": "^5.5.4",
+    "eslint-plugin-vue": "^9.18.1",
+    "prettier": "^3.6.2",
+    "prettier-plugin-vue": "^1.1.6",
     "ts-jest": "^29.4.6"
   }
 }

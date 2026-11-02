@@ -6,6 +6,8 @@ module.exports = {
   moduleNameMapper: {
     "^@server/(.*)$": "<rootDir>/$1",
     "^@plugins/(.*)$": "<rootDir>/../plugins/$1",
+    // ESM-only; see tests/helpers/puppeteer-stub.ts.
+    "^(puppeteer-core|@puppeteer/browsers)$": "<rootDir>/tests/helpers/puppeteer-stub.ts",
   },
   transform: {
     "^.+\\.ts$": [
@@ -15,6 +17,10 @@ module.exports = {
           esModuleInterop: true,
           allowSyntheticDefaultImports: true,
           strict: false,
+          // zod 4 infers object types only with strictNullChecks; noImplicitAny keeps
+          // evolving `let x = null` declarations typed the way the build sees them.
+          strictNullChecks: true,
+          noImplicitAny: true,
           skipLibCheck: true,
         },
         diagnostics: {
@@ -22,7 +28,16 @@ module.exports = {
         },
       },
     ],
+    // sanitize-html's parser chain ships ESM only. Node loads it through
+    // require(esm) at runtime, but Jest's CommonJS runtime cannot, so compile it.
+    "^.+\\.js$": [
+      "ts-jest",
+      { tsconfig: { allowJs: true, esModuleInterop: true }, diagnostics: false },
+    ],
   },
+  transformIgnorePatterns: [
+    "/node_modules/(?!(htmlparser2|domhandler|domutils|domelementtype|dom-serializer|entities)/)",
+  ],
   collectCoverageFrom: [
     "services/**/*.ts",
     "routes/**/*.ts",

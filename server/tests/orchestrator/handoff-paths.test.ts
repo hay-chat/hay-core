@@ -297,10 +297,34 @@ describe("hand-off line", () => {
 
   it("says when the team is back outside business hours (D5-7)", async () => {
     given({ id: AGENT_ID }, 0);
-    // Fri 30 Oct 2026 20:00 Lisbon → back Mon 2 Nov 09:00
+    // Fri 30 Oct 2026 20:00 Lisbon → back Mon 2 Nov 09:00. Only Date is faked:
+    // the wording is relative to "now".
+    jest.useFakeTimers({
+      now: new Date("2026-10-30T20:00:00Z"),
+      doNotFake: [
+        "hrtime",
+        "nextTick",
+        "performance",
+        "queueMicrotask",
+        "requestAnimationFrame",
+        "cancelAnimationFrame",
+        "requestIdleCallback",
+        "cancelIdleCallback",
+        "setImmediate",
+        "clearImmediate",
+        "setInterval",
+        "clearInterval",
+        "setTimeout",
+        "clearTimeout",
+      ],
+    });
     setAvailability("closed", new Date("2026-11-02T09:00:00Z"));
 
-    await runConversation(CONVERSATION_ID);
+    try {
+      await runConversation(CONVERSATION_ID);
+    } finally {
+      jest.useRealTimers();
+    }
 
     const [message] = botMessages();
     expect(message.content).toMatch(/away right now and back on Monday at 09:00 \(Lisbon time\)/);

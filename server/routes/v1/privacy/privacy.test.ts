@@ -587,9 +587,10 @@ describe("Privacy DSAR Integration Tests", () => {
 
       // Verify arrays were anonymized
       const anonymizedLog = await auditLogRepo.findOne({ where: { id: log.id } });
-      expect(anonymizedLog?.metadata.users[0].email).toBe("[REDACTED]");
-      expect(anonymizedLog?.metadata.users[1].email).toBe("[REDACTED]");
-      expect(anonymizedLog?.metadata.users[0].name).toBe("[REDACTED]");
+      const users = anonymizedLog?.metadata?.users as Array<{ email: string; name: string }>;
+      expect(users[0].email).toBe("[REDACTED]");
+      expect(users[1].email).toBe("[REDACTED]");
+      expect(users[0].name).toBe("[REDACTED]");
     });
 
     it("should handle deletion of already-deleted users", async () => {

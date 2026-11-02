@@ -9,7 +9,13 @@ jest.mock("@server/lib/logger", () => ({
   createLogger: () => ({ debug: jest.fn(), info: jest.fn(), warn: jest.fn(), error: jest.fn() }),
 }));
 const mockValidate = jest.fn<(url: string) => Promise<void>>(async () => undefined);
-jest.mock("@server/utils/ssrf", () => ({ validateUrlForSSRF: (url: string) => mockValidate(url) }));
+jest.mock("@server/utils/ssrf", () => ({
+  safeFetch: async (url: string, init: RequestInit & { timeoutMs: number }) => {
+    await mockValidate(url);
+    const { timeoutMs: _timeoutMs, ...rest } = init;
+    return global.fetch(url, { ...rest, redirect: "manual" });
+  },
+}));
 const mockRecheck = jest.fn<(id: string) => Promise<unknown>>(async () => null);
 jest.mock("@server/orchestrator/reply-guard", () => ({
   recheckAiReply: (id: string) => mockRecheck(id),

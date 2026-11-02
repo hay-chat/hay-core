@@ -120,7 +120,7 @@ const actionApprovalSchema = z
     moneyMovesNeedApproval: z.boolean(),
     thresholdAmount: z.number().min(0).max(1_000_000),
     approverRoles: z.array(z.enum(["admin", "contributor", "member"])).max(3),
-    categories: z.record(z.enum(APPROVAL_CATEGORIES), z.boolean()),
+    categories: z.partialRecord(z.enum(APPROVAL_CATEGORIES), z.boolean()),
     customerConfirmation: z.boolean(),
     /** Required when the change switches approval off for a money move (typed confirm). */
     confirmSwitchOff: z.literal(SWITCH_OFF_CONFIRMATION),
