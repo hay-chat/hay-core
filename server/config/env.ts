@@ -332,7 +332,8 @@ export const config = {
 
   plugins: {
     maxUploadSizeMB: parseInt(process.env.PLUGIN_MAX_UPLOAD_SIZE_MB || "50", 10),
-    allowCustomPlugins: process.env.ALLOW_CUSTOM_PLUGINS !== "false",
+    // Organization-supplied (custom/git) plugin code; off unless explicitly enabled
+    allowCustomPlugins: process.env.ALLOW_CUSTOM_PLUGINS === "true",
   },
 
   // Telemetry is entirely optional: with no key the client is never constructed

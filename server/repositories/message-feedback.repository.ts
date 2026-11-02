@@ -10,9 +10,12 @@ export class MessageFeedbackRepository {
     this.repository = AppDataSource.getRepository(MessageFeedback);
   }
 
-  async findById(id: string): Promise<MessageFeedback | null> {
+  async findByIdAndOrganization(
+    id: string,
+    organizationId: string,
+  ): Promise<MessageFeedback | null> {
     return this.repository.findOne({
-      where: { id },
+      where: { id, organizationId },
       relations: ["message", "message.source", "reviewer"],
     });
   }

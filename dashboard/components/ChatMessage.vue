@@ -61,7 +61,7 @@
             },
           ]"
         >
-          <div class="chat-message__text" v-html="markdownToHtml(segment)" />
+          <div class="chat-message__text" v-html="renderMarkdown(segment)" />
         </div>
       </template>
       <div
@@ -173,7 +173,7 @@
             v-else
             ref="systemMessageRef"
             class="chat-message__text"
-            v-html="markdownToHtml(message.content)"
+            v-html="renderMarkdown(message.content)"
           />
         </div>
       </div>
@@ -706,6 +706,11 @@ const emit = defineEmits<{
 // messages qualify — never the special types (Playbook/Document/Tool/System/
 // ProductRecommendation), the low-confidence fallback viewer, or messages
 // pending approval, so those keep their single-bubble layout.
+// Customers can't embed images in their text: an <img> would load from any
+// host the moment staff open the conversation. Their files come as attachments.
+const renderMarkdown = (markdown: string): string =>
+  markdownToHtml(markdown, { allowImages: props.message.type !== "Customer" });
+
 const SPLIT_EXCLUDED_TYPES = ["Playbook", "Document", "Tool", "ProductRecommendation", "System"];
 const contentSegments = computed(() => splitMarkdownImages(props.message.content || ""));
 const isImageSegment = (segment: string): boolean =>

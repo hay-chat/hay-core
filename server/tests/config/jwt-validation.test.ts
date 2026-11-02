@@ -9,7 +9,7 @@
 
 // Helper to load env.ts module with controlled environment variables.
 // Uses jest.resetModules() + require() so each call gets a fresh config.
-function loadConfigWith(envOverrides) {
+function loadConfigWith(envOverrides: Record<string, string | undefined>) {
   jest.resetModules();
 
   const originalEnv = { ...process.env };

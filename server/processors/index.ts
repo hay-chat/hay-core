@@ -1,11 +1,8 @@
 import FileType from "file-type";
 import JSZip from "jszip";
-import { PdfProcessor } from "./pdf.processor";
-import { TextProcessor } from "./text.processor";
-import { HtmlProcessor } from "./html.processor";
-import { WordProcessor } from "./word.processor";
-import { PptxProcessor } from "./pptx.processor";
-import { BaseProcessor } from "./base.processor";
+import path from "path";
+import { DocumentRejectedError, type ProcessedDocument } from "./base.processor";
+import { runWorker } from "./run-worker";
 
 const DOCX = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
 const PPTX = "application/vnd.openxmlformats-officedocument.presentationml.presentation";
@@ -17,14 +14,13 @@ const TEXT_TYPES = new Set(["text/plain", "text/markdown", "text/html", "applica
 
 /** Total inflated size of an OOXML package, checked before any part is decompressed. */
 export const MAX_OOXML_UNCOMPRESSED_BYTES = 100 * 1024 * 1024;
-/**
- * Upper bound on one document's processing. Parsing runs on the main thread,
- * so this bounds the request, not the CPU work already started.
- * TODO: move document parsing to a worker thread so it can be stopped.
- */
+/** Parsing runs in a worker thread that is terminated after this long. */
 export const DOCUMENT_PROCESSING_TIMEOUT_MS = 60_000;
+/** Heap cap of the parse worker thread. */
+export const DOCUMENT_PROCESSING_MAX_HEAP_MB = 512;
 
-export class DocumentRejectedError extends Error {}
+/** Same extension as this module: .ts under tsx/ts-jest, .js in the build. */
+const PARSE_WORKER = path.join(__dirname, `parse.worker${path.extname(__filename)}`);
 
 /** Document type from the file's content; the declared type only breaks ties. */
 export async function detectDocumentType(
@@ -62,31 +58,7 @@ async function assertSafeOoxml(buffer: Buffer): Promise<void> {
   }
 }
 
-function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
-  let timer: NodeJS.Timeout | undefined;
-  const timeout = new Promise<never>((_, reject) => {
-    timer = setTimeout(
-      () => reject(new DocumentRejectedError("Document took too long to process")),
-      ms,
-    );
-  });
-  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
-}
-
 export class DocumentProcessorFactory {
-  private processors: BaseProcessor[] = [
-    new PdfProcessor(),
-    new TextProcessor(),
-    new HtmlProcessor(),
-    new WordProcessor(),
-    new PptxProcessor(),
-  ];
-
-  getProcessor(mimeType: string): BaseProcessor | null {
-    const processor = this.processors.find((p) => p.canProcess(mimeType));
-    return processor || null;
-  }
-
   /**
    * Process an uploaded document. The caller checks the size first; the type
    * is detected from the content, never taken from the client.
@@ -96,10 +68,13 @@ export class DocumentProcessorFactory {
     if (OOXML_TYPES.has(mimeType)) {
       await assertSafeOoxml(buffer);
     }
-    const processor = this.getProcessor(mimeType) ?? new TextProcessor();
-    const processed = await withTimeout(
-      processor.process(buffer, fileName),
-      DOCUMENT_PROCESSING_TIMEOUT_MS,
+    const processed = await runWorker<ProcessedDocument>(
+      PARSE_WORKER,
+      { bytes: buffer, mimeType, fileName },
+      {
+        timeoutMs: DOCUMENT_PROCESSING_TIMEOUT_MS,
+        maxOldGenerationSizeMb: DOCUMENT_PROCESSING_MAX_HEAP_MB,
+      },
     );
     return { ...processed, mimeType };
   }

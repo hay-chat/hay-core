@@ -8,11 +8,31 @@ jest.mock("@server/repositories/plugin-registry.repository", () => ({
   pluginRegistryRepository: { findByPluginId: (...args: unknown[]) => findByPluginId(...args) },
 }));
 
+const findByOrgAndPlugin = jest.fn();
+jest.mock("@server/repositories/plugin-instance.repository", () => ({
+  pluginInstanceRepository: {
+    findByOrgAndPlugin: (...args: unknown[]) => findByOrgAndPlugin(...args),
+  },
+}));
+
+jest.mock("../../config/env", () => {
+  const actual = jest.requireActual("../../config/env");
+  return {
+    ...actual,
+    config: { ...actual.config, jwt: { ...actual.config.jwt, secret: "test-jwt-secret" } },
+    getApiUrl: () => "http://api.test",
+  };
+});
+
 import {
   PluginAssetService,
+  canOrganizationLoadPluginUI,
   isValidPluginName,
   resolveWithin,
+  signPluginUiUrl,
+  verifyPluginUiSignature,
 } from "../../services/plugin-asset.service";
+import type { PluginRegistry } from "../../entities/plugin-registry.entity";
 
 interface CapturedResponse {
   statusCode: number;
@@ -46,9 +66,18 @@ function mockResponse(): { res: Response; captured: CapturedResponse } {
   return { res, captured };
 }
 
-function mockRequest(params: Record<string, string>): Request {
-  return { params, headers: {} } as unknown as Request;
+function mockRequest(params: Record<string, string>, query: Record<string, string> = {}): Request {
+  return { params, query, headers: {} } as unknown as Request;
 }
+
+/** Query of a URL signed by signPluginUiUrl. */
+function signedQuery(pluginId: string, organizationId: string, ttlSeconds?: number) {
+  const url = new URL(signPluginUiUrl(pluginId, "ui.js", organizationId, ttlSeconds));
+  return Object.fromEntries(url.searchParams);
+}
+
+const ORG_A = "11111111-1111-1111-1111-111111111111";
+const ORG_B = "22222222-2222-2222-2222-222222222222";
 
 describe("plugin asset serving", () => {
   let root: string;
@@ -83,8 +112,9 @@ describe("plugin asset serving", () => {
     service = new PluginAssetService();
     findByPluginId.mockReset();
     findByPluginId.mockImplementation(async (pluginId: string) =>
-      pluginId === "demo" ? { pluginId: "demo", pluginPath: "demo" } : null,
+      pluginId === "demo" ? { pluginId: "demo", pluginPath: "demo", sourceType: "core" } : null,
     );
+    findByOrgAndPlugin.mockReset();
   });
 
   describe("isValidPluginName", () => {
@@ -172,22 +202,127 @@ describe("plugin asset serving", () => {
 
   it("serves UI bundles for registered plugins and refuses escapes", async () => {
     const ok = mockResponse();
-    await service.serveUIAsset(mockRequest({ pluginName: "demo", assetPath: "ui.js" }), ok.res);
+    await service.serveUIAsset(
+      mockRequest({ pluginName: "demo", assetPath: "ui.js" }, signedQuery("demo", ORG_A)),
+      ok.res,
+    );
     expect(ok.captured.statusCode).toBe(200);
     expect(ok.captured.headers["content-type"]).toBe("application/javascript");
+    expect(ok.captured.headers["cache-control"]).toBe("private, max-age=600");
 
     const unregistered = mockResponse();
     await service.serveUIAsset(
-      mockRequest({ pluginName: "unregistered", assetPath: "ui.js" }),
+      mockRequest(
+        { pluginName: "unregistered", assetPath: "ui.js" },
+        signedQuery("unregistered", ORG_A),
+      ),
       unregistered.res,
     );
     expect(unregistered.captured.statusCode).toBe(404);
 
     const linked = mockResponse();
     await service.serveUIAsset(
-      mockRequest({ pluginName: "demo", assetPath: "linked.js" }),
+      mockRequest({ pluginName: "demo", assetPath: "linked.js" }, signedQuery("demo", ORG_A)),
       linked.res,
     );
     expect(linked.captured.statusCode).toBe(404);
   });
+
+  it("refuses UI bundle requests without a valid signature, even when cached", async () => {
+    // Warm the cache with a signed request first.
+    const warm = mockResponse();
+    await service.serveUIAsset(
+      mockRequest({ pluginName: "demo", assetPath: "ui.js" }, signedQuery("demo", ORG_A)),
+      warm.res,
+    );
+    expect(warm.captured.statusCode).toBe(200);
+
+    const valid = signedQuery("demo", ORG_A);
+    const cases: Record<string, string>[] = [
+      {},
+      { ...valid, sig: "forged" },
+      { ...valid, org: ORG_B },
+      signedQuery("demo", ORG_A, -1),
+      signedQuery("other", ORG_A),
+    ];
+    for (const query of cases) {
+      const refused = mockResponse();
+      await service.serveUIAsset(
+        mockRequest({ pluginName: "demo", assetPath: "ui.js" }, query),
+        refused.res,
+      );
+      expect(refused.captured.statusCode).toBe(401);
+      expect(refused.captured.body).not.toBe("window.x = 1;");
+    }
+  });
+
+  it("refuses a custom plugin's UI bundle to organizations that may not load it", async () => {
+    findByPluginId.mockResolvedValue({
+      pluginId: "demo",
+      pluginPath: "demo",
+      sourceType: "custom",
+      organizationId: ORG_A,
+    });
+    findByOrgAndPlugin.mockResolvedValue({ enabled: true });
+
+    const otherOrg = mockResponse();
+    await service.serveUIAsset(
+      mockRequest({ pluginName: "demo", assetPath: "ui.js" }, signedQuery("demo", ORG_B)),
+      otherOrg.res,
+    );
+    expect(otherOrg.captured.statusCode).toBe(404);
+
+    const owner = mockResponse();
+    await service.serveUIAsset(
+      mockRequest({ pluginName: "demo", assetPath: "ui.js" }, signedQuery("demo", ORG_A)),
+      owner.res,
+    );
+    expect(owner.captured.statusCode).toBe(200);
+  });
+});
+
+describe("plugin UI URL signatures", () => {
+  it("signs a URL for one plugin and organization that verifies until it expires", () => {
+    const now = Date.UTC(2026, 0, 1);
+    const url = new URL(signPluginUiUrl("demo", "style.css", ORG_A, 600, now));
+    expect(url.origin + url.pathname).toBe("http://api.test/plugins/ui/demo/style.css");
+
+    const query = Object.fromEntries(url.searchParams);
+    expect(verifyPluginUiSignature("demo", query, now)).toBe(ORG_A);
+    expect(verifyPluginUiSignature("demo", query, now + 601_000)).toBeNull();
+    expect(verifyPluginUiSignature("other", query, now)).toBeNull();
+    expect(verifyPluginUiSignature("demo", { ...query, org: ORG_B }, now)).toBeNull();
+    expect(verifyPluginUiSignature("demo", { ...query, expires: "9999999999" }, now)).toBeNull();
+  });
+});
+
+describe("canOrganizationLoadPluginUI", () => {
+  const registry = (fields: Partial<PluginRegistry>) =>
+    ({ pluginId: "demo", ...fields }) as PluginRegistry;
+
+  beforeEach(() => findByOrgAndPlugin.mockReset());
+
+  it("allows core plugins before they are enabled", async () => {
+    findByOrgAndPlugin.mockResolvedValue(null);
+    await expect(
+      canOrganizationLoadPluginUI(registry({ sourceType: "core" }), ORG_A),
+    ).resolves.toBe(true);
+  });
+
+  it.each(["custom", "git"] as const)(
+    "allows a %s plugin only for its organization once enabled",
+    async (sourceType) => {
+      const plugin = registry({ sourceType, organizationId: ORG_A });
+
+      findByOrgAndPlugin.mockResolvedValue({ enabled: true });
+      await expect(canOrganizationLoadPluginUI(plugin, ORG_A)).resolves.toBe(true);
+      await expect(canOrganizationLoadPluginUI(plugin, ORG_B)).resolves.toBe(false);
+
+      findByOrgAndPlugin.mockResolvedValue({ enabled: false });
+      await expect(canOrganizationLoadPluginUI(plugin, ORG_A)).resolves.toBe(false);
+
+      findByOrgAndPlugin.mockResolvedValue(null);
+      await expect(canOrganizationLoadPluginUI(plugin, ORG_A)).resolves.toBe(false);
+    },
+  );
 });

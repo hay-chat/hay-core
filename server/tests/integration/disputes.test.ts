@@ -5,6 +5,7 @@ import { Organization } from "../../entities/organization.entity";
 import { Conversation } from "../../database/entities/conversation.entity";
 import { Dispute } from "../../database/entities/dispute.entity";
 import { OrderConversationLink } from "../../database/entities/order-conversation-link.entity";
+import { purgeAuditLogs } from "../helpers/audit-logs";
 
 /**
  * D2-7 / D2-8: dispute intake (idempotent upsert, order match, one alert),
@@ -217,7 +218,7 @@ describe("disputes (D2-7, D2-8)", () => {
       [orgId],
     );
     expect(audit[0]?.metadata).toMatchObject({ ok: true, submitted: false });
-    await AppDataSource.query(`DELETE FROM audit_logs WHERE organization_id = $1`, [orgId]);
+    await purgeAuditLogs("organization_id = $1", [orgId]);
   });
 
   it("records the plugin's refusal and never pushes for a decided dispute", async () => {
@@ -234,7 +235,7 @@ describe("disputes (D2-7, D2-8)", () => {
     const late = await service.attachEvidence(orgId, dispute.id, null);
     expect(late).toMatchObject({ ok: false, code: "NOT_EDITABLE" });
     expect(fetchMock).not.toHaveBeenCalled();
-    await AppDataSource.query(`DELETE FROM audit_logs WHERE organization_id = $1`, [orgId]);
+    await purgeAuditLogs("organization_id = $1", [orgId]);
   });
 
   it("refuses a pack over the push cap and a dispute with no matching order", async () => {

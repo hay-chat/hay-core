@@ -141,9 +141,8 @@ jobs:
       - name: Run hay CLI tests
         run: npm run test:hay-cli
 
-  # Known advisories in production dependencies. Blocking for the webchat
-  # widget (clean). Non-blocking for the monorepo until the remaining
-  # high-severity advisories, which all need major upgrades, are cleared.
+  # High-severity advisories in production dependencies block both the webchat
+  # widget and the monorepo.
   dependency-audit:
     name: Dependency Audit
     runs-on: ubuntu-latest
@@ -156,8 +155,7 @@ jobs:
       - name: Audit webchat
         working-directory: webchat
         run: npm audit --omit=dev --audit-level=high
-      - name: Audit monorepo (non-blocking)
-        continue-on-error: true
+      - name: Audit monorepo
         run: npm audit --omit=dev --audit-level=high
 
   # Webchat widget: unit tests, then the performance budget on a fresh build

@@ -64,6 +64,9 @@ function apiKey(): string {
   return key;
 }
 
+/** Budget for one Resend API call. */
+const RESEND_TIMEOUT_MS = 15_000;
+
 async function resend<T>(method: string, path: string, body?: unknown): Promise<T> {
   const response = await fetch(`${RESEND_API_BASE}${path}`, {
     method,
@@ -72,6 +75,7 @@ async function resend<T>(method: string, path: string, body?: unknown): Promise<
       "Content-Type": "application/json",
     },
     body: body === undefined ? undefined : JSON.stringify(body),
+    signal: AbortSignal.timeout(RESEND_TIMEOUT_MS),
   });
   const text = await response.text();
   if (!response.ok) {

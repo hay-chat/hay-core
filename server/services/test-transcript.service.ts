@@ -179,8 +179,8 @@ export class TestTranscriptService {
     imported: number;
     error: string | null;
   } | null> {
-    const job = await jobRepository.findById(jobId);
-    if (!job || job.organizationId !== organizationId) return null;
+    const job = await jobRepository.findByIdAndOrganization(jobId, organizationId);
+    if (!job) return null;
     if (job.data?.kind !== "transcript_import") return null;
     const result = job.result ?? {};
     return {

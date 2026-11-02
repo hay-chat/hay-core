@@ -4,7 +4,7 @@ This document describes the implementation of GDPR-compliant Data Subject Access
 
 ## Overview
 
-Hay provides comprehensive DSAR capabilities allowing users to exercise their rights under GDPR Article 15 (Right of Access), Article 17 (Right to Erasure), and Article 16 (Right to Rectification).
+Hay provides DSAR capabilities allowing users to exercise their rights under GDPR Article 15 (Right of Access) and Article 17 (Right to Erasure). Article 16 (Right to Rectification) has no self-service endpoint yet: users correct their own profile in the dashboard, and other rectification requests are handled manually.
 
 ## API Endpoints
 
@@ -338,27 +338,34 @@ Exports are provided in JSON format and include:
 
 When a deletion request is confirmed, the following actions are taken:
 
-### Hard Deletion
+### Account Access
 
-- **API Keys:** Permanently deleted
-- **Sessions:** Permanently revoked
+- **Sessions and access:** The user's sessions, push subscriptions, auth codes, organization memberships and pending invitations are deleted and the token version is bumped, so no device stays signed in. User references on other records are cleared. _(Pending PR #133: until it lands, sign-in is blocked by the password and email reset below, but existing sessions are not revoked.)_
+- **API Keys:** API keys belong to the organization, not to a user, and are **not** deleted with a user account. Organization owners manage them under Settings → API keys; key creation, revocation and deletion are recorded in the audit log.
 
 ### Soft Deletion
 
 - **User Account:** `deletedAt` timestamp set, `isActive` set to `false`
 - **Email:** Changed to `deleted-{userId}@deleted.local`
 - **Name:** First and last names removed
-- **Password:** Replaced with placeholder
+- **Password:** Replaced with a value no password can match
 
 ### Anonymization
 
-- **Audit Logs:** `userId` replaced with `"deleted-user"`, IP addresses and user agents anonymized
+- **Audit Logs:** `userId` set to `NULL`, IP addresses truncated (last IPv4 octet / IPv6 suffix zeroed), user agents replaced with `"deleted"`, and personal fields inside `changes`/`metadata` redacted. The event itself (action, time, organization) is kept.
 - **Created/Updated Records:** User references in documents/content anonymized
+
+### Known Limits
+
+- **Customer erasure** deletes the customer's messages, action logs, pending actions, order links and team questions; conversations remain as anonymous soft-deleted rows _(pending PR #133)_.
+- Audit rows written by _other_ users (e.g. an invitation sent to the erased person) may still contain the erased person's email address.
+- Operator event payloads are not erased yet.
+- Erasure does not reach sub-processors' copies (e.g. AI providers, email provider) or commerce platforms connected through plugins; provider-initiated redaction webhooks are not implemented.
 
 ### Retention for Compliance
 
-- Anonymized audit logs retained for 90 days (legal requirement)
-- Backup copies deleted as part of regular rotation (within 90 days)
+- Audit logs (anonymized or not) are deleted after **90 days** by the `cleanup-old-audit-logs` daily job.
+- Backups: production databases run on a managed provider (DigitalOcean) with the provider's automated backups. Hay has no backup rotation of its own, so deleted data can remain in provider backups for the provider's backup retention window. _(To confirm: the configured backup retention period.)_
 
 ---
 
@@ -367,18 +374,18 @@ When a deletion request is confirmed, the following actions are taken:
 ### 1. Email Verification
 
 - Verification tokens are cryptographically secure (32 bytes)
-- Tokens are hashed using Argon2 before storage
+- Tokens are hashed with SHA-256 before storage (they are high-entropy random values, so a slow password hash is not needed)
 - Verification links expire after 24 hours
 
 ### 2. Download Tokens
 
 - Separate download token generated for export access
-- Download tokens expire after 4 hours
-- Export files expire after 7 days
+- The download link and the export file expire together after `PRIVACY_EXPORT_RETENTION_DAYS` (default 7 days); expired files are deleted by the `cleanup-expired-privacy-exports` daily job.
+- Exports allow a single download by default (`PRIVACY_MAX_DOWNLOAD_COUNT`); the file is deleted after the last allowed download. _(Pending PR #133 for the setting names and delete-after-download.)_
 
 ### 3. Audit Trail
 
-All DSAR actions are logged immutably in the audit log:
+All DSAR actions are recorded in the audit log. Audit rows are append-only at the database level: they cannot be edited or deleted, except for the erasure anonymization above and the 90-day retention cleanup. Deleting an organization keeps its audit rows (the organization reference is cleared; the original organization id is retained).
 
 - `privacy.export.request`
 - `privacy.export.confirm`
@@ -536,22 +543,42 @@ curl http://localhost:3001/v1/privacy/downloadExport?requestId=REQUEST_ID&downlo
 
 Third parties that process visitor data on behalf of Hay.chat customers.
 
-| Sub-processor | Purpose | Data | When |
-| --- | --- | --- | --- |
-| Cloudflare, Inc. (Turnstile) | Bot protection on the webchat widget | Visitor IP address, browser and device signals collected by the challenge, the Hay.chat API hostname. No message content. | When a visitor sends their first webchat message and the org has bot protection on (default for new orgs, invisible mode). Strict consent mode still runs it after the first message, as a strictly necessary security measure. |
+Sub-processors of the hosted Hay.chat service. Self-hosted installs use whichever providers they configure. Entries marked _to confirm_ (including DPA status) have not been verified yet.
 
-<!-- TODO: list the other sub-processors (AI providers, email, hosting) here. -->
+| Sub-processor                                                     | Purpose                                                                                   | Data                                                                                                                                                                                    | Region                                                              | When                                                                                                                                                                                                                            |
+| ----------------------------------------------------------------- | ----------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| OpenAI, L.L.C.                                                    | AI chat, embeddings, voice-note transcription, vision on customer photos and PDFs         | Conversation content, customer files the AI reads, knowledge-base content                                                                                                               | Outside the EU (US) by default; see AI processing location below    | Every AI reply, knowledge-base indexing, and file/voice-note processing when enabled                                                                                                                                            |
+| DigitalOcean, LLC (Gradient AI inference)                         | AI chat inference when the deployment's default model provider is DigitalOcean            | Conversation content                                                                                                                                                                    | _To confirm_; may be outside the EU                                 | Every AI reply when configured as the deployment's default provider (not used for organizations with EU-only processing on)                                                                                                     |
+| DigitalOcean, LLC (managed PostgreSQL, Redis/Valkey, app hosting) | Hosting of the application, database and cache                                            | All data stored by Hay                                                                                                                                                                  | EU (Amsterdam) for the cache; _to confirm_ for the database and app | Always                                                                                                                                                                                                                          |
+| S3-compatible object storage (provider _to confirm_)              | Uploaded files, conversation media, export archives                                       | Files customers and users upload, DSAR and organization exports                                                                                                                         | _To confirm_                                                        | When files are uploaded or exports are generated                                                                                                                                                                                |
+| Resend, Inc.                                                      | Transactional email over SMTP (verification, invitations, notifications, DSAR emails)     | Recipient email address and name, email content                                                                                                                                         | _To confirm_                                                        | Every transactional email                                                                                                                                                                                                       |
+| Cloudflare, Inc. (Turnstile)                                      | Bot protection on the webchat widget                                                      | Visitor IP address, browser and device signals collected by the challenge, the Hay.chat API hostname. No message content.                                                               | Global network                                                      | When a visitor sends their first webchat message and the org has bot protection on (default for new orgs, invisible mode). Strict consent mode still runs it after the first message, as a strictly necessary security measure. |
+| Stripe, Inc.                                                      | Subscription billing for Hay.chat organizations                                           | Billing contact, organization name, payment metadata (card data stays with Stripe)                                                                                                      | US / EU                                                             | Hosted billing only                                                                                                                                                                                                             |
+| PostHog, Inc.                                                     | Product analytics and error/session diagnostics in the dashboard (not the webchat widget) | Opaque user id, organization id and name, page paths without query strings, interaction events with element text and attributes masked, session replays with all text and inputs masked | EU (eu.posthog.com)                                                 | Dashboard sessions, only when `POSTHOG_KEY` is set                                                                                                                                                                              |
+
+### AI processing location
+
+AI inference (chat replies, embeddings for search, voice-note transcription and the vision pass on photos and PDFs) **may be processed outside the EU** by the AI providers listed above. Hay.chat does not currently guarantee EU-only AI processing.
+
+What the code does today (`server/services/llm/ai-region.ts`):
+
+- An organization can set `aiRegion: "eu"` (Settings → Customer Privacy). The option can only be turned on when the deployment has an EU endpoint configured (`OPENAI_EU_BASE_URL` + `OPENAI_EU_API_KEY`).
+- With it on, chat, embeddings and transcription use that EU endpoint. If the endpoint later becomes unavailable, those calls fail instead of falling back to another region.
+- The vision pass on photos and PDFs is not covered: it uses the EU endpoint when one is configured, otherwise the default endpoint, for every organization including those with EU-only processing on.
+- Without the setting, all AI calls go to the deployment's default provider (or the organization's own configured provider), which may run outside the EU.
+
+Plugins an organization enables (e.g. Shopify, WhatsApp, Zendesk) send data to that platform on the organization's instruction; those platforms are the organization's own processors, not Hay.chat sub-processors.
 
 ## Data Retention Policy
 
-| Data Type                 | Retention Period        | Notes                                                                               |
-| ------------------------- | ----------------------- | ----------------------------------------------------------------------------------- |
-| **Conversations**         | Per-org `retentionDays` | Automatically anonymized by daily cleanup worker (see [RETENTION.md](RETENTION.md)) |
-| **Embeddings**            | Per-org `retentionDays` | Deleted alongside anonymized conversations                                          |
-| **Export Files**          | 7 days                  | Automatically deleted after download link expires                                   |
-| **Privacy Requests**      | Permanent               | Audit trail for compliance                                                          |
-| **Anonymized Audit Logs** | 90 days                 | Legal requirement for fraud prevention                                              |
-| **Deleted User Backups**  | 90 days                 | Removed during regular backup rotation                                              |
+| Data Type            | Retention Period        | Notes                                                                               |
+| -------------------- | ----------------------- | ----------------------------------------------------------------------------------- |
+| **Conversations**    | Per-org `retentionDays` | Automatically anonymized by daily cleanup worker (see [RETENTION.md](RETENTION.md)) |
+| **Embeddings**       | Per-org `retentionDays` | Deleted alongside anonymized conversations                                          |
+| **Export Files**     | 7 days                  | Automatically deleted after download link expires                                   |
+| **Privacy Requests** | 365 days                | Anonymized after 365 days (pending PR #133)                                         |
+| **Audit Logs**       | 90 days                 | Deleted daily by the `cleanup-old-audit-logs` job; kept after organization deletion |
+| **Database Backups** | Provider's retention    | Managed-database automated backups; no Hay-side rotation (period _to confirm_)      |
 
 ---
 
@@ -591,8 +618,7 @@ This implementation complies with:
 
 ### Download Token Invalid
 
-- Tokens are single-use (planned for future)
-- Download links expire after 7 days
+- Download links expire after the export retention period (default 7 days, see Download Tokens above)
 - Request new export if expired
 
 ---
@@ -601,7 +627,7 @@ This implementation complies with:
 
 - [ ] Data rectification endpoint (GDPR Article 16)
 - [ ] Data portability in multiple formats (CSV, XML)
-- [ ] Automated anonymization of old backups
+- [ ] Documented backup retention period and restore-time re-erasure procedure
 - [ ] Self-service request cancellation
 - [ ] Admin dashboard for DSAR monitoring
 - [ ] Multi-language email templates

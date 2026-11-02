@@ -167,7 +167,6 @@ export class RetrievalLayer {
       log.debug(
         {
           queryLength: query.length,
-          queryPreview: query.substring(0, 150),
         },
         "Built search query",
       );
@@ -196,7 +195,6 @@ export class RetrievalLayer {
           results: searchResults?.map((r) => ({
             documentId: r.documentId,
             similarity: r.similarity,
-            contentPreview: r.content?.substring(0, 100),
           })),
         },
         "Vector store search complete",

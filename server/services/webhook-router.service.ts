@@ -21,6 +21,9 @@ import { WORKER_HOST, workerFetch } from "@server/lib/worker-client";
 
 const logger = createLogger("webhook-router");
 
+/** Budget for the worker to handle one forwarded webhook. */
+const WORKER_WEBHOOK_TIMEOUT_MS = 30_000;
+
 /**
  * Headers that must never be forwarded to a plugin worker (credential leakage)
  * or that the proxy re-encodes. Mirrors proxy.ts.
@@ -507,6 +510,7 @@ export class WebhookRouterService {
       method: "POST",
       headers,
       body: serialized,
+      signal: AbortSignal.timeout(WORKER_WEBHOOK_TIMEOUT_MS),
     });
 
     if (!response.ok) {

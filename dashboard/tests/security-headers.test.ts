@@ -1,0 +1,58 @@
+import { describe, expect, it } from "vitest";
+import {
+  contentSecurityPolicy,
+  inlineScriptBodies,
+  scriptHashSource,
+} from "../server/utils/security-headers";
+
+function directives(policy: string): Record<string, string> {
+  return Object.fromEntries(
+    policy.split("; ").map((directive) => {
+      const [name, ...values] = directive.split(" ");
+      return [name, values.join(" ")];
+    }),
+  );
+}
+
+describe("dashboard Content-Security-Policy", () => {
+  it("allows the API (https + wss) and PostHog, and nothing else off-origin for scripts", () => {
+    const csp = directives(
+      contentSecurityPolicy({
+        apiBaseUrl: "https://api.hay.example/",
+        posthogHost: "https://eu.i.posthog.com",
+        useSSL: true,
+      }),
+    );
+
+    expect(csp["default-src"]).toBe("'self'");
+    expect(csp["script-src"]).toBe(
+      "'self' https://api.hay.example https://eu-assets.i.posthog.com",
+    );
+    expect(csp["connect-src"]).toBe(
+      "'self' https://api.hay.example wss://api.hay.example https://eu.i.posthog.com https://eu-assets.i.posthog.com",
+    );
+    expect(csp["frame-ancestors"]).toBe("'none'");
+    expect(csp["object-src"]).toBe("'none'");
+    expect(csp).toHaveProperty("upgrade-insecure-requests");
+  });
+
+  it("falls back to same-origin when no API host or telemetry is configured", () => {
+    const csp = directives(contentSecurityPolicy({ apiBaseUrl: "", useSSL: false }));
+
+    expect(csp["script-src"]).toBe("'self'");
+    expect(csp["connect-src"]).toBe("'self'");
+    expect(csp).not.toHaveProperty("upgrade-insecure-requests");
+  });
+
+  it("allows inline scripts only by hash", () => {
+    const html =
+      '<script type="module" src="/_nuxt/a.js"></script><script>window.__NUXT__={}</script>';
+    const hashes = inlineScriptBodies(html).map(scriptHashSource);
+
+    expect(hashes).toHaveLength(1);
+    expect(hashes[0]).toMatch(/^'sha256-[A-Za-z0-9+/]+=*'$/);
+    expect(
+      directives(contentSecurityPolicy({ apiBaseUrl: "", useSSL: false }, hashes))["script-src"],
+    ).toBe(`'self' ${hashes[0]}`);
+  });
+});

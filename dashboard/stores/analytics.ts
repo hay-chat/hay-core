@@ -138,5 +138,5 @@ export const useAnalyticsStore = defineStore("analytics", {
       return "Just now";
     },
   },
-  persist: true,
+  // Not persisted: a short-lived cache of org analytics that stays in memory.
 });

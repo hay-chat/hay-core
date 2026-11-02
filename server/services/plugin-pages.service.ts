@@ -45,9 +45,9 @@ export class PluginPagesService {
     const plugins = pluginManagerService.getAllPlugins();
 
     for (const plugin of plugins) {
-      // Only process system plugins (autoActivate)
-      // Organization-specific plugins would be handled separately when enabled
-      if (plugin.manifest.autoActivate) {
+      // Only core plugins (autoActivate) may add pages to the dashboard build;
+      // organization-supplied plugins never do
+      if (plugin.sourceType === "core" && plugin.manifest.autoActivate) {
         await this.syncPluginPages(plugin.pluginId);
       }
     }

@@ -6,6 +6,8 @@ module.exports = {
   moduleNameMapper: {
     "^@server/(.*)$": "<rootDir>/$1",
     "^@plugins/(.*)$": "<rootDir>/../plugins/$1",
+    // ESM-only; see tests/helpers/puppeteer-stub.ts.
+    "^(puppeteer-core|@puppeteer/browsers)$": "<rootDir>/tests/helpers/puppeteer-stub.ts",
   },
   transform: {
     "^.+\\.ts$": [
@@ -15,6 +17,10 @@ module.exports = {
           esModuleInterop: true,
           allowSyntheticDefaultImports: true,
           strict: false,
+          // zod 4 infers object types only with strictNullChecks; noImplicitAny keeps
+          // evolving `let x = null` declarations typed the way the build sees them.
+          strictNullChecks: true,
+          noImplicitAny: true,
           skipLibCheck: true,
         },
         diagnostics: {

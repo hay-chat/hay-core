@@ -304,8 +304,8 @@ async function startServer() {
   });
 
   // Plugin UI assets route - serve dist/ files (ui.js, etc.). The dashboard
-  // loads these with <script>/<link> tags, which carry no auth header, so the
-  // route serves static bundles of registered plugins only.
+  // loads these with <script>/<link> tags, which carry no auth header, so each
+  // URL is signed for one organization by `plugins.getUiAssetUrls`.
   server.get(/^\/plugins\/ui\/([^/]+)\/(.+)$/, async (req, res) => {
     req.params = { pluginName: req.params[0], assetPath: req.params[1] };
 
@@ -454,7 +454,8 @@ async function startServer() {
   // Plugin upload endpoints
   const multer = await import("multer");
   const { withAdminAuth } = await import("@server/middleware/auth");
-  const { pluginUploadService } = await import("@server/services/plugin-upload.service");
+  const { pluginUploadService, requireCustomPluginsAllowed, handlePluginUploadError } =
+    await import("@server/services/plugin-upload.service");
 
   // Multer configuration for plugin uploads
   const pluginUpload = multer.default({
@@ -476,19 +477,23 @@ async function startServer() {
   server.post(
     "/v1/plugins/upload",
     withAdminAuth,
+    requireCustomPluginsAllowed,
     pluginUpload.single("plugin"),
-    async (req, res) => {
+    async (req: express.Request, res: express.Response) => {
       await pluginUploadService.handleUpload(req, res);
     },
+    handlePluginUploadError,
   );
 
   server.put(
     "/v1/plugins/:pluginId",
     withAdminAuth,
+    requireCustomPluginsAllowed,
     pluginUpload.single("plugin"),
-    async (req, res) => {
+    async (req: express.Request, res: express.Response) => {
       await pluginUploadService.handleUpdate(req, res);
     },
+    handlePluginUploadError,
   );
 
   server.delete("/v1/plugins/:pluginId", withAdminAuth, async (req, res) => {

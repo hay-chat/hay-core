@@ -1054,7 +1054,7 @@ export class PrivacyService {
 
     if (!customer) {
       logger.debug(
-        { organizationId, identifierType: identifier.type, identifierValue: identifier.value },
+        { organizationId, identifierType: identifier.type },
         "Customer not found for export request",
       );
     }
