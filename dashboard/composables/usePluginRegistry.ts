@@ -82,26 +82,21 @@ export const usePluginRegistry = () => {
             logger.debug("[PluginRegistry] Vue exposed globally for UMD bundles");
           }
 
-          // Build authenticated URL to plugin UI bundle (UMD format)
-          // URL format: http://localhost:3001/plugins/ui/hay-plugin-zendesk/ui.js
-          const apiBaseUrl = getApiUrl();
-          const bundleUrl = `${apiBaseUrl}/plugins/ui/${encodeURIComponent(pluginId)}/ui.js`;
-          const styleUrl = `${apiBaseUrl}/plugins/ui/${encodeURIComponent(pluginId)}/style.css`;
-
-          logger.debug(`[PluginRegistry] Loading UMD bundle from ${bundleUrl}`);
-
           // Check if plugin resources are already loaded
           if (loadedResources.has(pluginId)) {
             logger.debug(
               `[PluginRegistry] Plugin ${pluginId} resources already loaded, skipping script/style`,
             );
           } else {
-            // Signed URLs of the UMD bundle and its stylesheet
-            const { script: bundleUrl, style: styleUrl } = await Hay.plugins.getUiAssetUrls.query({
-              pluginId,
-            });
-            // Load CSS first (if not already loaded)
             const styleId = `plugin-style-${pluginId}`;
+            const scriptId = `plugin-script-${pluginId}`;
+            // Signed URLs of the UMD bundle and its stylesheet, only fetched when a tag is missing
+            const needsAssets =
+              !document.getElementById(styleId) || !document.getElementById(scriptId);
+            const { script: bundleUrl, style: styleUrl } = needsAssets
+              ? await Hay.plugins.getUiAssetUrls.query({ pluginId })
+              : { script: "", style: "" };
+            // Load CSS first (if not already loaded)
             if (!document.getElementById(styleId)) {
               await new Promise<void>((resolve) => {
                 const link = document.createElement("link");
@@ -122,7 +117,6 @@ export const usePluginRegistry = () => {
             }
 
             // Load the UMD bundle as a script tag (it will set a global variable)
-            const scriptId = `plugin-script-${pluginId}`;
             if (!document.getElementById(scriptId)) {
               await new Promise<void>((resolve, reject) => {
                 const script = document.createElement("script");
