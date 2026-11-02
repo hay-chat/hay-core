@@ -5,7 +5,7 @@
   "description": "Hay platform - Unified monorepo for dashboard, server, and plugins",
   "author": "Hay Labs",
   "license": "SEE LICENSE IN LICENSE",
-  "node-version": "22.10.0",
+  "node-version": "22.12.0",
   "workspaces": [
     "dashboard",
     "server",
@@ -69,15 +69,17 @@
   "overrides": {
     "vite": "^6.0.0",
     "html-minifier": "npm:html-minifier-next@^4.16.4",
-    "@modelcontextprotocol/sdk": "^1.32.2"
+    "@modelcontextprotocol/sdk": "^1.32.2",
+    "minimatch@>=9.0.0 <9.0.7": "^9.0.7"
   },
   "//overrides": {
     "vite": "Keeps every tool in the tree (nuxt, vitest, plugin builds) on one patched vite major instead of older vite 5 copies.",
     "html-minifier": "mjml depends on the unmaintained html-minifier, which has an unfixed ReDoS; html-minifier-next is the maintained drop-in fork.",
-    "@modelcontextprotocol/sdk": "Floor for transitive copies (e.g. optional peer of @google/genai) so none resolve below the patched release."
+    "@modelcontextprotocol/sdk": "Floor for transitive copies (e.g. optional peer of @google/genai) so none resolve below the patched release.",
+    "minimatch@>=9.0.0 <9.0.7": "@typescript-eslint/typescript-estree 6 pins minimatch 9.0.3 exactly and mjml-cli dedupes onto that copy; lift the 9.x line to the patched ReDoS release."
   },
   "engines": {
-    "node": ">=18.0.0",
+    "node": ">=22.12.0",
     "npm": ">=9.0.0"
   },
   "devDependencies": {

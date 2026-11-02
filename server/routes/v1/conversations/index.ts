@@ -122,7 +122,7 @@ const createConversationSchema = z.object({
   title: z.string().min(1).max(255).optional(),
   agentId: z.string().uuid().optional(),
   language: z.string().max(35).optional(),
-  metadata: z.record(z.unknown()).optional(),
+  metadata: z.record(z.string(), z.unknown()).optional(),
   status: settableStatusSchema.optional(),
   customerId: z.string().uuid().optional(),
   /** D7-5: a test conversation that runs this playbook version (usually the draft). */
@@ -1315,7 +1315,7 @@ export const conversationsRouter = t.router({
   // Attach server-side secrets to a conversation (server-to-server, API key auth)
   // Secrets are stored in Redis, never reach the LLM — injected into MCP tool calls only
   addSecrets: scopedProcedure(RESOURCES.CONVERSATIONS, ACTIONS.UPDATE)
-    .input(z.object({ id: z.string().uuid(), secrets: z.record(z.string()) }))
+    .input(z.object({ id: z.string().uuid(), secrets: z.record(z.string(), z.string()) }))
     .mutation(async ({ ctx, input }) => {
       const conversation = await conversationRepository.findById(input.id);
       if (!conversation || conversation.organization_id !== ctx.organizationId) {
@@ -1328,7 +1328,7 @@ export const conversationsRouter = t.router({
   // Merge public context into a conversation (server-to-server, API key auth)
   // Context is stored in DB conversation.context JSONB and injected into the LLM prompt
   addContext: scopedProcedure(RESOURCES.CONVERSATIONS, ACTIONS.UPDATE)
-    .input(z.object({ id: z.string().uuid(), context: z.record(z.any()) }))
+    .input(z.object({ id: z.string().uuid(), context: z.record(z.string(), z.any()) }))
     .mutation(async ({ ctx, input }) => {
       const conversation = await conversationRepository.findById(input.id);
       if (!conversation || conversation.organization_id !== ctx.organizationId) {
