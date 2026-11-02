@@ -1,7 +1,11 @@
-import { Request, Response } from "express";
+import type { Request, Response } from "express";
+import { createHmac, timingSafeEqual } from "crypto";
 import path from "path";
 import fs from "fs/promises";
+import { config, getApiUrl } from "../config/env";
+import type { PluginRegistry } from "../entities/plugin-registry.entity";
 import { pluginRegistryRepository } from "../repositories/plugin-registry.repository";
+import { pluginInstanceRepository } from "../repositories/plugin-instance.repository";
 import { createLogger } from "@server/lib/logger";
 
 const logger = createLogger("plugin-asset");
@@ -53,6 +57,90 @@ export async function resolveWithin(baseDir: string, relativePath: string): Prom
     }
     throw error;
   }
+}
+
+/**
+ * Plugin UI bundles (`/plugins/ui/:pluginId/*`) run inside the dashboard, so
+ * they are only served to organizations allowed to load them, through
+ * short-lived URLs minted by `plugins.getUiAssetUrls` for a staff session
+ * (a <script>/<link> tag cannot send the Bearer header).
+ *
+ * One signature covers every asset of one plugin for one organization.
+ */
+export const PLUGIN_UI_URL_TTL_SECONDS = 10 * 60;
+
+/** Dedicated key, derived from JWT_SECRET, so it never doubles as a session or media signature. */
+function uiSigningKey(): Buffer {
+  if (!config.jwt.secret) {
+    throw new Error("JWT_SECRET is required to sign plugin UI URLs");
+  }
+  return createHmac("sha256", config.jwt.secret).update("hay:plugin-ui-url:v1").digest();
+}
+
+function uiSignature(pluginId: string, organizationId: string, expires: number): string {
+  return createHmac("sha256", uiSigningKey())
+    .update(`${pluginId}.${organizationId}.${expires}`)
+    .digest("base64url");
+}
+
+/** Signed URL of one UI asset of `pluginId`, valid for `organizationId` until it expires. */
+export function signPluginUiUrl(
+  pluginId: string,
+  assetPath: string,
+  organizationId: string,
+  ttlSeconds = PLUGIN_UI_URL_TTL_SECONDS,
+  now = Date.now(),
+): string {
+  const expires = Math.floor(now / 1000) + ttlSeconds;
+  const query = new URLSearchParams({
+    org: organizationId,
+    expires: String(expires),
+    sig: uiSignature(pluginId, organizationId, expires),
+  });
+  return `${getApiUrl()}/plugins/ui/${encodeURIComponent(pluginId)}/${assetPath}?${query}`;
+}
+
+/** The organization a plugin UI URL was signed for, or null when it is missing, forged or expired. */
+export function verifyPluginUiSignature(
+  pluginId: string,
+  query: Request["query"],
+  now = Date.now(),
+): string | null {
+  const { org, expires, sig } = query;
+  if (
+    typeof org !== "string" ||
+    typeof expires !== "string" ||
+    typeof sig !== "string" ||
+    !/^\d{1,12}$/.test(expires)
+  ) {
+    return null;
+  }
+  const expiresAt = Number(expires);
+  if (expiresAt * 1000 < now) return null;
+
+  const expected = Buffer.from(uiSignature(pluginId, org, expiresAt));
+  const given = Buffer.from(sig);
+  return expected.length === given.length && timingSafeEqual(expected, given) ? org : null;
+}
+
+/**
+ * Whether an organization may load a plugin's UI bundle.
+ * - core plugins: yes, also before enable (first-party code; the settings page
+ *   renders their pre-connect components before the plugin is enabled);
+ * - custom/git plugins: only the owning organization, and only once it has
+ *   enabled the plugin (no pre-enable rendering of uploaded code).
+ */
+export async function canOrganizationLoadPluginUI(
+  plugin: PluginRegistry,
+  organizationId: string,
+): Promise<boolean> {
+  if (plugin.sourceType === "core") return true;
+  if (plugin.organizationId !== organizationId) return false;
+  const instance = await pluginInstanceRepository.findByOrgAndPlugin(
+    organizationId,
+    plugin.pluginId,
+  );
+  return instance?.enabled === true;
 }
 
 function pluginDirFor(pluginPath: string): string {
@@ -311,8 +399,8 @@ export class PluginAssetService {
   }
 
   /**
-   * Serve UI asset files (from dist/ directory) with authentication
-   * Only allows whitelisted file types for security
+   * Serve UI asset files (from dist/ directory) to a signed URL whose
+   * organization may load the plugin's UI. Only whitelisted file types.
    */
   async serveUIAsset(req: Request, res: Response): Promise<void> {
     const { pluginName, assetPath } = req.params;
@@ -320,6 +408,19 @@ export class PluginAssetService {
       res.status(404).json({ error: "Plugin not found" });
       return;
     }
+
+    const organizationId = verifyPluginUiSignature(pluginName, req.query);
+    if (!organizationId) {
+      res.status(401).json({ error: "Invalid or expired asset URL" });
+      return;
+    }
+
+    const plugin = await pluginRegistryRepository.findByPluginId(pluginName);
+    if (!plugin || !(await canOrganizationLoadPluginUI(plugin, organizationId))) {
+      res.status(404).json({ error: "Plugin not found" });
+      return;
+    }
+
     const cacheKey = `${pluginName}/ui/${assetPath}`;
 
     // Security: Whitelist allowed file types
@@ -353,17 +454,9 @@ export class PluginAssetService {
       setFileSafetyHeaders(res, cacheKey);
       res.setHeader("Content-Type", cached.contentType);
       res.setHeader("ETag", cached.etag);
-      res.setHeader("Cache-Control", "public, max-age=3600");
+      res.setHeader("Cache-Control", "private, max-age=600");
       res.setHeader("Last-Modified", cached.lastModified.toUTCString());
       res.send(cached.content);
-      return;
-    }
-
-    // Find the plugin
-    const plugin = await pluginRegistryRepository.findByPluginId(pluginName);
-
-    if (!plugin) {
-      res.status(404).json({ error: "Plugin not found" });
       return;
     }
 
@@ -403,7 +496,7 @@ export class PluginAssetService {
       setFileSafetyHeaders(res, fullPath);
       res.setHeader("Content-Type", contentType);
       res.setHeader("ETag", etag);
-      res.setHeader("Cache-Control", "public, max-age=3600");
+      res.setHeader("Cache-Control", "private, max-age=600");
       res.setHeader("Last-Modified", lastModified.toUTCString());
       res.send(content);
     } catch (error: unknown) {
