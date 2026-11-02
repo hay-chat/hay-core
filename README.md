@@ -1,6 +1,8 @@
-![Hay — Open-source Automated Customer Support](git-hero.jpg)
+![Hay.chat: self-hosted AI customer support](git-hero.jpg)
 
-AI-powered customer support platform. Automate conversations with configurable AI agents, train them on your knowledge base, and integrate with your existing tools — all from a single dashboard.
+Hay.chat is self-hosted AI customer support software. Its AI agents resolve customer requests instead of just answering them: they look up orders, issue refunds and update orders through Shopify, WooCommerce and Stripe, and hand off to a human when they aren't confident. Run it on your own server with Docker, or use the hosted version at [hay.chat](https://hay.chat).
+
+Best for Shopify and WooCommerce stores that want AI to actually issue refunds and update orders, on a flat monthly plan with no per-seat fees, with a human approval step available on any action.
 
 [Website](https://hay.chat) · [Documentation](https://hay.chat/docs/technical/)
 
@@ -12,20 +14,28 @@ AI-powered customer support platform. Automate conversations with configurable A
 ![Node.js version](https://img.shields.io/badge/node-%3E%3D18-brightgreen)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5-blue)
 
-## What is Hay?
+## What is Hay.chat?
 
-Hay lets businesses deploy AI agents that handle customer support 24/7 across multiple channels. Agents are grounded in your documentation, follow structured playbooks, and seamlessly escalate to humans when needed.
+Hay.chat lets businesses deploy AI agents that handle customer support 24/7 across multiple channels. Agents are grounded in your documentation, follow structured playbooks, and seamlessly escalate to humans when needed.
 
 **Key capabilities:**
 
 - **AI Agents** — Configure tone, instructions, and behavior. Test before deploying.
 - **Knowledge Base** — Upload PDFs, Word docs, text, markdown, or import from URLs. Agents use vector search to ground answers in your content.
 - **Playbooks** — Step-by-step workflows for specific scenarios (refunds, order lookups, greetings, etc.).
-- **Multi-channel** — Web chat widget, WhatsApp, email, and more via plugins.
-- **Human Handoff** — Automatic escalation with full conversation context.
-- **Plugin Ecosystem** — Extend functionality with Stripe, HubSpot, Zendesk, WooCommerce, Magento, and more via MCP (Model Context Protocol).
+- **Multi-channel** — Live chat widget, WhatsApp, Instagram DMs, Messenger and email, via plugins.
+- **Human Handoff** — Automatic escalation with full conversation context, plus an approval step for refunds, cancellations and discounts.
+- **Plugin Ecosystem** — Shopify, WooCommerce, Magento, Wix, Nuvemshop, Stripe, HubSpot, Zendesk and more via MCP (Model Context Protocol).
 - **Analytics** — Resolution rate, response time, customer satisfaction, and conversation insights.
 - **Privacy** — GDPR-compliant data handling with DSAR support.
+
+## Self-host Hay.chat
+
+Hay.chat runs with Docker, PostgreSQL 16 with pgvector, and Redis 7. See [Getting Started](#getting-started) below.
+
+Chat models: OpenAI, Anthropic, Gemini, or any OpenAI-compatible endpoint (for example DigitalOcean Gradient, or a local server such as Ollama, which is untested). Embeddings use OpenAI `text-embedding-3-small`, so an OpenAI key is still required. No telemetry is sent unless you set `POSTHOG_KEY`.
+
+Teams comparing Chatwoot, Zammad or Dify for self-hosted AI support use Hay.chat when they need the agent to take actions, not just reply.
 
 ## Tech Stack
 
@@ -35,7 +45,7 @@ Hay lets businesses deploy AI agents that handle customer support 24/7 across mu
 | Backend  | Express 5, tRPC v11, TypeORM                        |
 | Database | PostgreSQL 16 + pgvector                            |
 | Cache    | Redis 7                                             |
-| AI       | OpenAI (GPT-4o, text-embedding-3-small)             |
+| AI       | OpenAI, Anthropic, Gemini or OpenAI-compatible      |
 | Auth     | JWT, API Keys, OAuth 2.0                            |
 | Plugins  | Model Context Protocol (MCP)                        |
 | Webchat  | Vue 3 embeddable widget (Vite)                      |
@@ -94,14 +104,15 @@ The dashboard runs on `http://localhost:3000` and the API on `http://localhost:3
 
 ### Environment Variables
 
-| Variable                                                      | Required   | Description                    |
-| ------------------------------------------------------------- | ---------- | ------------------------------ |
-| `DB_HOST`, `DB_PORT`, `DB_USERNAME`, `DB_PASSWORD`, `DB_NAME` | Yes        | PostgreSQL connection          |
-| `REDIS_HOST`, `REDIS_PORT`                                    | Yes        | Redis connection               |
-| `JWT_SECRET`, `JWT_REFRESH_SECRET`                            | Yes        | Auth secrets (min 32 chars)    |
-| `OPENAI_API_KEY`                                              | Yes        | OpenAI API key for AI features |
-| `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`        | No         | Email sending                  |
-| `BASE_DOMAIN`, `API_DOMAIN`, `DASHBOARD_DOMAIN`               | Production | Domain configuration           |
+| Variable                                                      | Required   | Description                       |
+| ------------------------------------------------------------- | ---------- | --------------------------------- |
+| `DB_HOST`, `DB_PORT`, `DB_USERNAME`, `DB_PASSWORD`, `DB_NAME` | Yes        | PostgreSQL connection             |
+| `REDIS_HOST`, `REDIS_PORT`                                    | Yes        | Redis connection                  |
+| `JWT_SECRET`, `JWT_REFRESH_SECRET`                            | Yes        | Auth secrets (min 32 chars)       |
+| `OPENAI_API_KEY`                                              | Yes        | OpenAI API key for AI features    |
+| `LLM_BASE_URL`, `LLM_VENDOR`, `LLM_API_KEY`, `LLM_TIER_*`     | No         | Other OpenAI-compatible chat host |
+| `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`        | No         | Email sending                     |
+| `BASE_DOMAIN`, `API_DOMAIN`, `DASHBOARD_DOMAIN`               | Production | Domain configuration              |
 
 ## Development
 
@@ -147,18 +158,22 @@ A two-stage guardrail system protects response quality:
 
 ### Plugin System
 
-Plugins extend Hay via the Model Context Protocol (MCP). Each plugin is loaded dynamically at runtime — the core never hardcodes plugin references.
+Plugins extend Hay.chat via the Model Context Protocol (MCP). Each plugin is loaded dynamically at runtime — the core never hardcodes plugin references.
 
 **Core plugins:**
 
-| Plugin      | Category   | Description                         |
-| ----------- | ---------- | ----------------------------------- |
-| Email       | Channel    | Send emails via SMTP                |
-| HubSpot     | CRM        | Contacts, companies, deals, tickets |
-| Magento     | E-commerce | Products, orders, customers         |
-| Stripe      | Payments   | Customers, subscriptions, invoices  |
-| WooCommerce | E-commerce | Products, orders, customers         |
-| Zendesk     | Help desk  | Tickets, customers, workflows       |
+| Plugin                         | Category   | Description                                       |
+| ------------------------------ | ---------- | ------------------------------------------------- |
+| Shopify                        | E-commerce | Orders, tracking, refunds, returns, exchanges     |
+| WooCommerce                    | E-commerce | Orders, tracking, cancellations, refunds, coupons |
+| Magento, Wix, Nuvemshop        | E-commerce | Orders, tracking, cancellations, refunds          |
+| Stripe, Mercado Pago           | Payments   | Customers, payments, subscriptions, disputes      |
+| WhatsApp, Instagram, Messenger | Channel    | Meta channels (Cloud API, Instagram DMs)          |
+| Email inbox                    | Channel    | AI replies in the same email thread               |
+| Chatwoot                       | Channel    | Hay.chat as the bot inside a Chatwoot inbox       |
+| HubSpot, Twenty, Klaviyo       | CRM        | Contacts, companies, deals, marketing             |
+| Zendesk                        | Help desk  | Tickets, customers, workflows                     |
+| Notion, Atlassian, Cal.com     | Other      | Knowledge import, tickets, bookings               |
 
 See the [Plugin API docs](https://hay.chat/docs/technical/plugins/api-reference/) for the plugin development guide.
 

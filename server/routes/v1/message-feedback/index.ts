@@ -1,4 +1,5 @@
-import { t, authenticatedProcedure } from "@server/trpc";
+import { t, scopedProcedure } from "@server/trpc";
+import { RESOURCES, ACTIONS } from "@server/types/scopes";
 import { z } from "zod";
 import {
   FeedbackMessageNotFoundError,
@@ -12,7 +13,7 @@ const feedbackService = new MessageFeedbackService();
 const createFeedbackSchema = z.object({
   messageId: z.string().uuid(),
   rating: z.nativeEnum(FeedbackRating),
-  comment: z.string().optional(),
+  comment: z.string().max(5_000).optional(),
 });
 
 const listFeedbackSchema = z.object({
@@ -24,18 +25,20 @@ const listFeedbackSchema = z.object({
 });
 
 export const messageFeedbackRouter = t.router({
-  create: authenticatedProcedure.input(createFeedbackSchema).mutation(async ({ ctx, input }) => {
-    try {
-      return await feedbackService.createFeedback(ctx.organizationId!, ctx.user!.id, input);
-    } catch (error) {
-      if (error instanceof FeedbackMessageNotFoundError) {
-        throw new TRPCError({ code: "NOT_FOUND", message: error.message });
+  create: scopedProcedure(RESOURCES.MESSAGES, ACTIONS.CREATE)
+    .input(createFeedbackSchema)
+    .mutation(async ({ ctx, input }) => {
+      try {
+        return await feedbackService.createFeedback(ctx.organizationId!, ctx.user!.id, input);
+      } catch (error) {
+        if (error instanceof FeedbackMessageNotFoundError) {
+          throw new TRPCError({ code: "NOT_FOUND", message: error.message });
+        }
+        throw error;
       }
-      throw error;
-    }
-  }),
+    }),
 
-  get: authenticatedProcedure
+  get: scopedProcedure(RESOURCES.MESSAGES, ACTIONS.READ)
     .input(z.object({ id: z.string().uuid() }))
     .query(async ({ ctx, input }) => {
       const feedback = await feedbackService.getFeedbackById(input.id);
@@ -50,7 +53,7 @@ export const messageFeedbackRouter = t.router({
       return feedback;
     }),
 
-  getByMessage: authenticatedProcedure
+  getByMessage: scopedProcedure(RESOURCES.MESSAGES, ACTIONS.READ)
     .input(z.object({ messageId: z.string().uuid() }))
     .query(async ({ ctx, input }) => {
       const feedback = await feedbackService.getFeedbackByMessage(input.messageId);
@@ -58,39 +61,43 @@ export const messageFeedbackRouter = t.router({
       return feedback.filter((f) => f.organizationId === ctx.organizationId);
     }),
 
-  list: authenticatedProcedure.input(listFeedbackSchema).query(async ({ ctx, input }) => {
-    const filter = {
-      messageId: input.messageId,
-      rating: input.rating,
-      reviewerId: input.reviewerId,
-      startDate: input.startDate ? new Date(input.startDate) : undefined,
-      endDate: input.endDate ? new Date(input.endDate) : undefined,
-    };
+  list: scopedProcedure(RESOURCES.MESSAGES, ACTIONS.READ)
+    .input(listFeedbackSchema)
+    .query(async ({ ctx, input }) => {
+      const filter = {
+        messageId: input.messageId,
+        rating: input.rating,
+        reviewerId: input.reviewerId,
+        startDate: input.startDate ? new Date(input.startDate) : undefined,
+        endDate: input.endDate ? new Date(input.endDate) : undefined,
+      };
 
-    const feedback = await feedbackService.getFeedbackByOrganization(ctx.organizationId!, filter);
+      const feedback = await feedbackService.getFeedbackByOrganization(ctx.organizationId!, filter);
 
-    return feedback;
-  }),
+      return feedback;
+    }),
 
-  stats: authenticatedProcedure.query(async ({ ctx }) => {
+  stats: scopedProcedure(RESOURCES.MESSAGES, ACTIONS.READ).query(async ({ ctx }) => {
     const stats = await feedbackService.getFeedbackStats(ctx.organizationId!);
     return stats;
   }),
 
-  export: authenticatedProcedure.input(listFeedbackSchema).query(async ({ ctx, input }) => {
-    const filter = {
-      messageId: input.messageId,
-      rating: input.rating,
-      reviewerId: input.reviewerId,
-      startDate: input.startDate ? new Date(input.startDate) : undefined,
-      endDate: input.endDate ? new Date(input.endDate) : undefined,
-    };
+  export: scopedProcedure(RESOURCES.MESSAGES, ACTIONS.READ)
+    .input(listFeedbackSchema)
+    .query(async ({ ctx, input }) => {
+      const filter = {
+        messageId: input.messageId,
+        rating: input.rating,
+        reviewerId: input.reviewerId,
+        startDate: input.startDate ? new Date(input.startDate) : undefined,
+        endDate: input.endDate ? new Date(input.endDate) : undefined,
+      };
 
-    const csv = await feedbackService.exportFeedbackToCSV(ctx.organizationId!, filter);
-    return { csv };
-  }),
+      const csv = await feedbackService.exportFeedbackToCSV(ctx.organizationId!, filter);
+      return { csv };
+    }),
 
-  delete: authenticatedProcedure
+  delete: scopedProcedure(RESOURCES.MESSAGES, ACTIONS.DELETE)
     .input(z.object({ id: z.string().uuid() }))
     .mutation(async ({ ctx, input }) => {
       // Verify ownership before deletion

@@ -5,17 +5,22 @@ import { TRPCError } from "@trpc/server";
 import { createListProcedure } from "@server/trpc/procedures/list";
 import { CustomerRepository } from "@server/repositories/customer.repository";
 import { RESOURCES, ACTIONS } from "@server/types/scopes";
+import { boundedJsonRecord } from "@server/lib/validation/json-record";
+import { identifierSchema, includeSchema, selectSchema } from "@server/types/list-input";
 
 const customerService = new CustomerService();
 const customerRepository = new CustomerRepository();
+
+const CUSTOMER_NOTES_MAX_LENGTH = 10_000;
+const CUSTOMER_EXTERNAL_METADATA_MAX_BYTES = 16_384;
 
 const createCustomerSchema = z.object({
   external_id: z.string().min(1).max(255).nullish(),
   email: z.string().email().max(255).nullish(),
   phone: z.string().max(50).nullish(),
   name: z.string().max(255).nullish(),
-  notes: z.string().nullish(),
-  external_metadata: z.record(z.any()).nullish(),
+  notes: z.string().max(CUSTOMER_NOTES_MAX_LENGTH).nullish(),
+  external_metadata: boundedJsonRecord(CUSTOMER_EXTERNAL_METADATA_MAX_BYTES).nullish(),
 });
 
 const updateCustomerSchema = z.object({
@@ -23,8 +28,8 @@ const updateCustomerSchema = z.object({
   email: z.string().email().max(255).nullish(),
   phone: z.string().max(50).nullish(),
   name: z.string().max(255).nullish(),
-  notes: z.string().nullish(),
-  external_metadata: z.record(z.any()).nullish(),
+  notes: z.string().max(CUSTOMER_NOTES_MAX_LENGTH).nullish(),
+  external_metadata: boundedJsonRecord(CUSTOMER_EXTERNAL_METADATA_MAX_BYTES).nullish(),
 });
 
 const mergeCustomersSchema = z.object({
@@ -48,13 +53,13 @@ const customerListInputSchema = z.object({
     .optional(),
   search: z
     .object({
-      query: z.string().optional(),
-      searchFields: z.array(z.string()).optional(),
+      query: z.string().max(500).optional(),
+      searchFields: z.array(identifierSchema).max(20).optional(),
     })
     .optional(),
   sorting: z
     .object({
-      orderBy: z.string().optional(),
+      orderBy: identifierSchema.optional(),
       orderDirection: z.enum(["asc", "desc"]).default("desc"),
     })
     .default({ orderDirection: "desc" }),
@@ -64,8 +69,8 @@ const customerListInputSchema = z.object({
       to: z.string().datetime().optional(),
     })
     .optional(),
-  include: z.array(z.string()).optional(),
-  select: z.array(z.string()).optional(),
+  include: includeSchema,
+  select: selectSchema,
 });
 
 export const customersRouter = t.router({

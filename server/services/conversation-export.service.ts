@@ -12,6 +12,7 @@ const MESSAGE_TYPE_LABELS: Record<MessageType, string> = {
   [MessageType.DOCUMENT]: "Document",
   [MessageType.PLAYBOOK]: "Playbook",
   [MessageType.PRODUCT_RECOMMENDATION]: "Product Recommendation",
+  [MessageType.FORM]: "Form",
 };
 
 export interface PdfExportOptions {

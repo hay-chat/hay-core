@@ -128,9 +128,31 @@ const channelIdSchema = z
   .max(64)
   .regex(/^[a-z0-9][a-z0-9_-]*$/i);
 
+/** "shop.com" → "https://shop.com"; empty clears it. */
+const websiteSchema = z
+  .string()
+  .trim()
+  .max(255)
+  .transform((value, ctx) => {
+    if (!value) return null;
+    const withScheme = /^https?:\/\//i.test(value) ? value : `https://${value}`;
+    try {
+      const url = new URL(withScheme);
+      if (!url.hostname.includes(".")) throw new Error("no domain");
+      return url.origin + url.pathname.replace(/\/+$/, "");
+    } catch {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Enter a website address like shop.com",
+      });
+      return z.NEVER;
+    }
+  });
+
 const updateSettingsSchema = z.object({
   name: z.string().min(1).max(100).optional(),
   about: z.string().max(10000).optional(),
+  website: websiteSchema.nullable().optional(),
   defaultLanguage: z.nativeEnum(SupportedLanguage).optional(),
   dateFormat: z.nativeEnum(DateFormat).optional(),
   timeFormat: z.nativeEnum(TimeFormat).optional(),
@@ -278,6 +300,7 @@ export const organizationsRouter = t.router({
       return {
         name: organization.name,
         about: organization.about || "",
+        website: organization.website || "",
         defaultLanguage: organization.defaultLanguage,
         dateFormat: organization.dateFormat,
         timeFormat: organization.timeFormat,
@@ -664,6 +687,21 @@ export const organizationsRouter = t.router({
 
       const updatedOrg = await organizationService.update(ctx.organizationId!, updatePayload);
 
+      // A new website means a new page index for find_page_url and the link check.
+      if (input.website !== undefined && input.website !== (organization.website ?? null)) {
+        const organizationId = ctx.organizationId!;
+        void import("@server/services/site-index.service").then(({ siteIndexService }) =>
+          siteIndexService
+            .sync(organizationId)
+            .catch((error) =>
+              logger.error(
+                { error, organizationId },
+                "Site index sync after a website change failed",
+              ),
+            ),
+        );
+      }
+
       // Drop any cached LLM provider bundle so settings changes take effect immediately.
       llmProviderFactory.invalidate(ctx.organizationId!);
 
@@ -673,6 +711,7 @@ export const organizationsRouter = t.router({
         data: {
           name: updatedOrg.name,
           about: updatedOrg.about,
+          website: updatedOrg.website || "",
           defaultLanguage: updatedOrg.defaultLanguage,
           dateFormat: updatedOrg.dateFormat,
           timeFormat: updatedOrg.timeFormat,

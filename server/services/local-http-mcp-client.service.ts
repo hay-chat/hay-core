@@ -1,6 +1,7 @@
 import type { MCPClient, MCPTool, MCPCallResult } from "./mcp-client.interface";
 import { getPluginRunnerService } from "./plugin-runner.service";
 import { createLogger } from "@server/lib/logger";
+import { workerFetch } from "@server/lib/worker-client";
 
 const logger = createLogger("local-http-mcp");
 
@@ -27,9 +28,9 @@ export class LocalHTTPMCPClient implements MCPClient {
   }
 
   /**
-   * Ensure worker is running and get base URL
+   * Ensure worker is running and get its port
    */
-  private async ensureWorkerRunning(): Promise<string> {
+  private async ensureWorkerRunning(): Promise<number> {
     const runner = getPluginRunnerService();
 
     // Check if worker is running
@@ -44,19 +45,19 @@ export class LocalHTTPMCPClient implements MCPClient {
       throw new Error(`Failed to get worker info for ${this.pluginId}`);
     }
 
-    return `http://localhost:${worker.port}`;
+    return worker.port;
   }
 
   /**
    * List available tools from the SDK worker
    */
   async listTools(): Promise<MCPTool[]> {
-    const baseUrl = await this.ensureWorkerRunning();
+    const port = await this.ensureWorkerRunning();
 
-    logger.debug({ url: `${baseUrl}/mcp/list-tools` }, `Fetching tools from ${this.pluginId}`);
+    logger.debug({ port }, `Fetching tools from ${this.pluginId}`);
 
     try {
-      const response = await fetch(`${baseUrl}/mcp/list-tools`, {
+      const response = await workerFetch(port, "/mcp/list-tools", {
         signal: AbortSignal.timeout(10000),
       });
 
@@ -83,15 +84,12 @@ export class LocalHTTPMCPClient implements MCPClient {
    * Call a tool on the SDK worker
    */
   async callTool(toolName: string, args: Record<string, unknown>): Promise<MCPCallResult> {
-    const baseUrl = await this.ensureWorkerRunning();
+    const port = await this.ensureWorkerRunning();
 
-    logger.debug(
-      { url: `${baseUrl}/mcp/call-tool`, args },
-      `Calling tool ${toolName} on ${this.pluginId}`,
-    );
+    logger.debug({ port, args }, `Calling tool ${toolName} on ${this.pluginId}`);
 
     try {
-      const response = await fetch(`${baseUrl}/mcp/call-tool`, {
+      const response = await workerFetch(port, "/mcp/call-tool", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
