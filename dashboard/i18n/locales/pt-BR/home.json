@@ -96,7 +96,6 @@
       "pausedBy": "Pausada por {name} em {when}.",
       "pausedAt": "Pausada em {when}.",
       "perChannel": "Desligar a IA em um canal só (apenas rascunhos)",
-      "perAgent": "Desligar um agente",
       "banner": "A IA está pausada em tudo. Sua equipe responde todas as conversas.",
       "resume": "Retomar a IA",
       "paused": "IA pausada em tudo",

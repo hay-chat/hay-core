@@ -20,7 +20,6 @@ jest.mock("@server/repositories/conversation.repository", () => ({
 jest.mock("@server/repositories/playbook.repository", () => ({
   playbookRepository: { findByStatus: async () => [] },
 }));
-jest.mock("@server/repositories/agent.repository", () => ({ agentRepository: {} }));
 jest.mock("@server/repositories/user.repository", () => ({ userRepository: {} }));
 jest.mock("@server/services/conversation-secret.service", () => ({
   conversationSecretService: { deleteSecrets: jest.fn() },
@@ -80,7 +79,6 @@ import { getAiReplyBlocker } from "../../orchestrator/reply-guard";
 
 const ORG_ID = "11111111-1111-4111-8111-111111111111";
 const CONVERSATION_ID = "22222222-2222-4222-8222-222222222222";
-const AGENT_ID = "33333333-3333-4333-8333-333333333333";
 
 /** The DB row as a fresh re-read sees it; tests flip fields "mid-run". */
 let row: Record<string, unknown>;
@@ -92,14 +90,12 @@ const freshRow = () => ({
   assigned_user_id: null,
   needs_processing: true,
   deleted_at: null,
-  agent: { id: AGENT_ID, enabled: true },
-  organization: { suspendedAt: null, agentPausedAt: null },
+  organization: { suspendedAt: null, agentPausedAt: null, aiPausedAt: null },
 });
 
 function makeConversation() {
   return {
     ...freshRow(),
-    agent_id: AGENT_ID,
     title: "Where is my order?",
     needs_processing: true,
     processing_attempts: 0,
@@ -174,9 +170,12 @@ describe("runConversation re-checks before sending", () => {
     expect(mockUpdate).not.toHaveBeenCalled();
   });
 
-  it("drops the reply and parks the conversation when the agent was switched off", async () => {
+  it("drops the reply and parks the conversation when the owner paused the AI", async () => {
     mockExecute.mockImplementationOnce(async () => {
-      row = { ...row, agent: { id: AGENT_ID, enabled: false } };
+      row = {
+        ...row,
+        organization: { suspendedAt: null, agentPausedAt: null, aiPausedAt: new Date() },
+      };
       return respond("It ships tomorrow.");
     });
 
@@ -244,7 +243,7 @@ describe("runConversation re-checks before sending", () => {
 describe("getAiReplyBlocker", () => {
   const base = freshRow();
 
-  it("allows an open, unassigned conversation with an enabled agent", () => {
+  it("allows an open, unassigned conversation while the AI is on", () => {
     expect(getAiReplyBlocker(base)).toBeNull();
     // The hand-off flow sets pending-human and then sends its message.
     expect(getAiReplyBlocker({ ...base, status: "pending-human" })).toBeNull();
@@ -255,7 +254,7 @@ describe("getAiReplyBlocker", () => {
     [{ assigned_user_id: "user-1" }, "assigned_to_human"],
     [{ organization: { suspendedAt: new Date(), agentPausedAt: null } }, "organization_suspended"],
     [{ organization: { suspendedAt: null, agentPausedAt: new Date() } }, "organization_paused"],
-    [{ agent: { enabled: false } }, "agent_disabled"],
+    [{ organization: { suspendedAt: null, aiPausedAt: new Date() } }, "organization_paused"],
     [{ deleted_at: new Date() }, "conversation_missing"],
   ])("blocks %o as %s", (overrides, blocker) => {
     expect(getAiReplyBlocker({ ...base, ...overrides } as typeof base)).toBe(blocker);

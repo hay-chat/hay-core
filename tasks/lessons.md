@@ -259,3 +259,17 @@
 - Failure: told Roger `organization.website` "is set only in getting-started" — the grep match was a code comment; nothing writes that column.
 - Detection: tracing the write path while building the settings field.
 - Prevention: before stating where a value is written, find the actual assignment/mutation (`website:` in an update payload), not just a word match.
+
+## 2026-11-02: Removing agents (PR 3)
+
+### The cloud session's shell points DB_*/REDIS_* at a remote managed database
+
+- **Failure mode**: the session environment exports `DB_HOST`/`DB_NAME`/`DB_USERNAME`/`DB_SSL` for a remote managed Postgres (and Redis, SMTP, Stripe). Server integration tests call `AppDataSource.runMigrations()`, so a plain `npm run test:server` would have applied this branch's migration (which drops `agents`) to that database.
+- **Detection signal**: `env | grep ^DB_` shows a non-local host; a local `migration:run` failed with a password error for the remote user name, which had leaked through.
+- **Prevention**: before any test or migration command, check `env | grep -E '^(DB|REDIS)_'`. Run them through a wrapper that exports a local `DB_*` (throwaway cluster) and a local Redis, and unsets third-party keys.
+
+### `agents.instructions` is text on fresh installs and jsonb on others
+
+- **Failure mode**: the entity declared `type: "jsonb"`, but the column created by the initial schema is `text` (production has jsonb); the copy step `assistant_instructions = c.instructions` failed with `column is of type jsonb but expression is of type text`.
+- **Detection signal**: running the migration against a DB migrated from scratch (`\d agents`).
+- **Prevention**: check the real column type (`\d table`) before writing a data-copy migration, and test both shapes; read such columns as `::text` and convert in code (parse JSON, wrap plain text) rather than trusting the entity decorator.

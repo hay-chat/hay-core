@@ -2,18 +2,15 @@
   "dashboard": {
     "page": {
     "title": "Painel",
-    "description": "Bem-vindo de volta! Veja o que está acontecendo com seus agentes de IA.",
+    "description": "Bem-vindo de volta! Veja o que está acontecendo com seu assistente de IA.",
     "seoTitle": "Painel - Hay.chat",
-    "seoDescription": "Gerencie seus agentes de IA e veja métricas de desempenho"
+    "seoDescription": "Gerencie seu assistente de IA e veja métricas de desempenho"
   },
   "actions": {
     "refresh": "Atualizar",
-    "viewAll": "Ver Todos",
-    "createFirstAgent": "Crie Seu Primeiro Agente"
+    "viewAll": "Ver Todos"
   },
   "metrics": {
-    "activeAgents": "Agentes Ativos",
-    "newThisWeek": "novos esta semana",
     "totalConversations": "Total de Conversas",
     "resolved": "resolvidas",
     "resolutionRate": "Taxa de Resolução",
@@ -29,18 +26,11 @@
     "title": "Atividade de Conversas",
     "description": "Volume diário de conversas"
   },
-  "topAgents": {
-    "title": "Principais Agentes",
-    "description": "Agentes com mais conversas neste período",
-    "conversations": "{count} conversas",
-    "resolutionRate": "taxa de resolução",
-    "emptyTitle": "Nenhum agente criado ainda"
-  },
   "recentConversations": {
     "title": "Conversas Recentes",
     "description": "Últimas interações com clientes",
     "emptyTitle": "Nenhuma conversa ainda",
-    "emptyDescription": "Comece a conversar com seus agentes para ver as conversas aqui"
+    "emptyDescription": "Comece a conversar com seu assistente para ver as conversas aqui"
   },
   "sentiment": {
     "scoreTitle": "Pontuação de Sentimento do Cliente",
@@ -74,15 +64,12 @@
       "browseAll": "Ver Todas as Integrações",
       "suggest": "Sugerir uma Integração"
     },
-    "agent": {
-      "title": "Crie um agente",
+    "assistant": {
+      "title": "Descreva seu assistente",
       "subtitle": "Seu colega de equipe de IA começa aqui.",
-      "description": "Defina seu primeiro agente Hay.chat — dê um nome, escolha o tom e decida quais canais ele deve atender.",
-      "count": "{count} agentes criados",
-      "countOne": "{count} agente criado",
-      "countOther": "{count} agentes criados",
-      "createAgent": "Criar Agente",
-      "viewAgents": "Ver Agentes"
+      "description": "Dê um nome ao seu assistente, escolha o tom e escreva as regras que ele sempre segue. Ele responde em todos os canais onde a IA está ligada.",
+      "describe": "Descrever assistente",
+      "edit": "Editar assistente"
     },
     "documents": {
       "title": "Envie documentos de treinamento",
@@ -105,8 +92,8 @@
       "locked": "Termine as etapas anteriores antes de fazer isso. O Hay.chat vai funcionar melhor assim."
     },
     "playground": {
-      "title": "Teste o agente em um chat playground",
-      "subtitle": "Veja seu agente em ação antes de ir ao ar.",
+      "title": "Teste o assistente em um chat playground",
+      "subtitle": "Veja seu assistente em ação antes de ir ao ar.",
       "description": "Use o playground integrado para testar como o Hay.chat responde, ajustar instruções e aperfeiçoar a experiência antes de conectar com clientes reais.",
       "countOne": "{count} conversa iniciada",
       "countOther": "{count} conversas iniciadas",

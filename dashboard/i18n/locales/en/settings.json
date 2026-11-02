@@ -44,11 +44,8 @@
     "dateFormatHelper": "Preview: {preview}",
     "timeFormat": "Time Format",
     "timeFormatHelper": "Preview: {preview}",
-    "defaultAgent": "Default Agent",
-    "defaultAgentPlaceholder": "No default agent",
-    "defaultAgentHelper": "Agent to handle conversations when no specific agent is assigned",
     "testMode": "Test Mode Default",
-    "testModeDescription": "When enabled, AI messages require approval before sending to customers. Individual agents can override this setting.",
+    "testModeDescription": "When enabled, AI messages require approval before sending to customers.",
     "testModeCheckbox": "Require approval for AI messages by default",
     "testModeNote": "Note: Playground conversations always auto-send regardless of this setting.",
     "languages": {
@@ -101,7 +98,7 @@
     "description": "This action cannot be undone. This will permanently delete the organization and all associated data.",
     "warningTitle": "Warning: This will immediately:",
     "impact1": "Stop all active conversations",
-    "impact2": "Delete all agents, playbooks, and documents",
+    "impact2": "Delete the assistant, playbooks, and documents",
     "impact3": "Remove all team members from the organization",
     "impact4": "Delete all customer data and conversation history",
     "impact5": "Invalidate all API keys",
@@ -604,7 +601,7 @@
   },
   "llmSettings": {
     "title": "AI Models",
-    "description": "Choose which AI provider and models power your agents. Embeddings stay managed by Hay.chat.",
+    "description": "Choose which AI provider and models power your assistant. Embeddings stay managed by Hay.chat.",
     "save": "Save Changes",
     "saveSuccess": "AI model settings saved",
     "saveFailed": "Failed to save AI model settings",
@@ -612,14 +609,14 @@
     "modelCustom": "Custom…",
     "modelCustomPlaceholder": "Enter a model id",
     "warning": {
-      "title": "Advanced — changes here affect every agent",
-      "description": "These settings control the AI provider and models behind your agents. Changing the defaults can radically change response quality, cost, latency, and reliability. Only proceed if you know what you're doing.",
+      "title": "Advanced — changes here affect every AI reply",
+      "description": "These settings control the AI provider and models behind your assistant. Changing the defaults can radically change response quality, cost, latency, and reliability. Only proceed if you know what you're doing.",
       "unlock": "I understand — let me edit",
-      "unlocked": "Editing unlocked. Save carefully — changes apply to all agents in this organization."
+      "unlocked": "Editing unlocked. Save carefully — changes apply to every AI reply in this organization."
     },
     "chat": {
       "title": "Chat Provider",
-      "description": "The provider and account used to generate agent responses.",
+      "description": "The provider and account used to generate the assistant's replies.",
       "provider": "Provider",
       "providerHelper": "OpenAI-compatible covers OpenAI, Mistral, Grok, and custom endpoints.",
       "vendor": "Vendor",
@@ -638,7 +635,7 @@
     },
     "tiers": {
       "title": "Model Tiers",
-      "description": "Agents pick a tier by task complexity; map each tier to a model for your provider.",
+      "description": "The assistant picks a tier by task complexity; map each tier to a model for your provider.",
       "hard": "Hard (most capable)",
       "hardHelper": "Orchestration, planning, and guardrails.",
       "medium": "Medium (balanced)",
@@ -656,7 +653,7 @@
       "title": "AI processing region",
       "description": "Choose where your customers' messages are processed by AI.",
       "euOnly": "Process AI in the EU only",
-      "euOnlyHint": "Every AI reply, document and product search, and voice-note transcript for this organization runs on OpenAI's EU data residency endpoint. Agents use Hay.chat's managed EU models while this is on.",
+      "euOnlyHint": "Every AI reply, document and product search, and voice-note transcript for this organization runs on OpenAI's EU data residency endpoint. The assistant uses Hay.chat's managed EU models while this is on.",
       "statusEu": "AI processing: EU data centres (OpenAI EU data residency).",
       "statusDefault": "AI processing: Hay.chat's default AI provider, which may run outside the EU.",
       "unavailable": "EU-only processing is not available yet. It will appear here once it is ready.",
@@ -728,7 +725,7 @@
   },
   "workspaceExport": {
     "title": "Download all workspace data",
-    "description": "Everything this workspace keeps in Hay.chat in one ZIP: conversations and messages, customers, documents, playbooks and agent settings.",
+    "description": "Everything this workspace keeps in Hay.chat in one ZIP: conversations and messages, customers, documents, playbooks and assistant settings.",
     "includes": "The ZIP has a JSON Lines file per kind of data and CSV files for conversations, messages and customers. Files sent in your chats are included, up to 1.5 GB in total. Only owners and admins can download it, and each download is logged.",
     "request": "Prepare export",
     "requestAgain": "Prepare a new export",

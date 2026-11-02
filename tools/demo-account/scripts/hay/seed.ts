@@ -1,12 +1,12 @@
 /**
- * Loads one Casa Aurora store's knowledge, playbooks, agent and settings into a Hay.chat org.
- * Idempotent: documents, playbooks and the agent are matched by title/name and updated in place;
- * settings are set to fixed values. In dry-run nothing is sent, not even reads, so it needs no
+ * Loads one Casa Aurora store's knowledge, playbooks, assistant and settings into a Hay.chat org.
+ * Idempotent: documents and playbooks are matched by title and updated in place; the assistant
+ * and settings are set to fixed values. In dry-run nothing is sent, not even reads, so it needs no
  * credentials: every item is reported as "create". Playbook tool references are always also
  * checked offline against the plugin sources.
  */
 import type { Platform } from "../lib/types";
-import { agentDefinition } from "./agent";
+import { assistantDefinition } from "./assistant";
 import {
   LOCALE_BY_PLATFORM,
   loadKnowledge,
@@ -23,8 +23,8 @@ export interface TrpcClient {
   mutation<T>(path: string, input?: unknown): Promise<T>;
 }
 
-export type Step = "settings" | "agent" | "docs" | "playbooks";
-export const STEPS: Step[] = ["settings", "agent", "docs", "playbooks"];
+export type Step = "settings" | "assistant" | "docs" | "playbooks";
+export const STEPS: Step[] = ["settings", "assistant", "docs", "playbooks"];
 
 export interface SeedOptions {
   platform: Platform;
@@ -69,11 +69,6 @@ interface RemoteDocument {
 interface RemotePlaybook {
   id: string;
   title: string;
-  agents?: { id: string }[];
-}
-interface RemoteAgent {
-  id: string;
-  name: string;
 }
 interface Schedule {
   id: string;
@@ -175,34 +170,20 @@ export async function seedHay(api: TrpcClient | null, options: SeedOptions): Pro
     }
   }
 
-  // ---- agent
-  let agentId: string | undefined;
-  if (options.steps.has("agent") || options.steps.has("playbooks")) {
-    const definition = agentDefinition(locale);
-    const agents = dryRun ? [] : await client.query<RemoteAgent[]>("agents.list");
-    agentId = agents.find((a) => a.name === definition.name)?.id;
-    if (options.steps.has("agent")) {
-      log(`Agent "${definition.name}"`);
-      const data = {
+  // ---- assistant (one per org: the org answers as Casa Aurora)
+  if (options.steps.has("assistant")) {
+    const definition = assistantDefinition(locale);
+    log(`Assistant "${definition.name}"`);
+    if (!dryRun) {
+      await client.mutation("organizations.assistant.update", {
         name: definition.name,
         description: definition.description,
-        enabled: true,
-        language: definition.language,
         tone: definition.tone,
         avoid: definition.avoid,
         instructions: markdownToTiptap(definition.instructions, pluginIdForTool),
-      };
-      if (agentId) {
-        await client.mutation("agents.update", { id: agentId, data });
-        write("update", `agent "${definition.name}"`);
-      } else {
-        if (!dryRun) agentId = (await client.mutation<RemoteAgent>("agents.create", data)).id;
-        write("create", `agent "${definition.name}"`);
-      }
-      // The demo org answers as Casa Aurora: make it the default agent.
-      if (!dryRun) await client.mutation("agents.setAsDefault", { agentId });
-      log(`  ${dryRun ? "[dry-run] would set" : "set"} it as the default agent`);
+      });
     }
+    write("update", `assistant "${definition.name}"`);
   }
 
   // ---- knowledge documents
@@ -239,10 +220,6 @@ export async function seedHay(api: TrpcClient | null, options: SeedOptions): Pro
   // ---- playbooks
   if (options.steps.has("playbooks")) {
     log(`Playbooks (${playbooks.length}, ${options.playbookStatus})`);
-    if (!dryRun && !agentId)
-      throw new Error(
-        `Agent "${agentDefinition(locale).name}" not found: run with the agent step first`,
-      );
     const existing = dryRun ? [] : await client.query<RemotePlaybook[]>("playbooks.list");
     for (const playbook of playbooks) {
       const match = existing.find((p) => p.title === playbook.title);
@@ -255,20 +232,14 @@ export async function seedHay(api: TrpcClient | null, options: SeedOptions): Pro
       };
       let saved: SavedPlaybook | undefined;
       if (match) {
-        const agentIds = [
-          ...new Set([...(match.agents ?? []).map((a) => a.id), agentId as string]),
-        ];
         saved = await client.mutation<SavedPlaybook>("playbooks.update", {
           id: match.id,
-          data: { ...fields, agentIds, approvalCategories: playbook.approvalCategories },
+          data: { ...fields, approvalCategories: playbook.approvalCategories },
         });
         write("update", `playbook "${playbook.title}"`);
       } else {
         if (!dryRun) {
-          saved = await client.mutation<SavedPlaybook>("playbooks.create", {
-            ...fields,
-            agentIds: [agentId],
-          });
+          saved = await client.mutation<SavedPlaybook>("playbooks.create", fields);
           // create takes no approvalCategories; update sets them.
           if (playbook.approvalCategories.length > 0) {
             saved = await client.mutation<SavedPlaybook>("playbooks.update", {

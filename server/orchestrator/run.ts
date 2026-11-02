@@ -8,7 +8,6 @@ import { PlaybookStatus } from "@server/database/entities/playbook.entity";
 import type { Playbook } from "@server/database/entities/playbook.entity";
 import { shouldReselectPlaybook } from "./playbook-gate";
 import { withOverridePlaybook } from "@server/services/playbook-version-override";
-import { agentRepository } from "@server/repositories/agent.repository";
 import { MessageType } from "@server/database/entities/message.entity";
 import { ToolExecutionService } from "@server/services/core/tool-execution.service";
 import { Conversation } from "@server/database/entities/conversation.entity";
@@ -345,26 +344,20 @@ async function saveConfidenceLog(
 }
 
 /**
- * A paused agent never replies, whether the owner switched the agent off or the
- * operator paused the whole organization (e.g. included resolutions used up).
+ * A paused AI never replies, whether the owner paused it ("Pause AI everywhere")
+ * or the operator paused the organization (e.g. included resolutions used up).
  * A conversation that already holds a shopper message goes to "pending-human"
  * (Needs Attention) so a human picks it up, and the shopper is told once that
  * the team will reply there; a conversation with no shopper
  * message yet (widget just opened) only has its needs_processing flag cleared,
  * so no greeting is sent and the sweep stops.
  */
-async function parkForPausedAgent(
-  conversation: Conversation,
-  log: pino.Logger,
-  cause: "agent_disabled" | "organization_paused",
-): Promise<void> {
+async function parkForPausedAgent(conversation: Conversation, log: pino.Logger): Promise<void> {
   const lastCustomerMessage = await conversation.getLastCustomerMessage();
   const shouldQueue = !!lastCustomerMessage && conversation.status !== "pending-human";
 
   log.info(
     {
-      agentId: conversation.agent_id,
-      cause,
       reason: conversation.organization?.agentPauseReason ?? null,
       queued: shouldQueue,
     },
@@ -501,17 +494,13 @@ export const runConversation = async (conversationId: string) => {
     }
   }
 
-  // A paused agent never replies: either the operator paused the organization
-  // (usage allowance used up, overage refused) or the owner switched the agent
-  // off (agents.enabled = false). Shopper messages are still stored; the
-  // conversation is parked in the queue as pending-human so the team sees it,
-  // and needs_processing is cleared so the sweep stops re-enqueuing it.
+  // A paused AI never replies: either the operator paused the organization
+  // (usage allowance used up, overage refused) or the owner paused the AI.
+  // Shopper messages are still stored; the conversation is parked in the queue
+  // as pending-human so the team sees it, and needs_processing is cleared so
+  // the sweep stops re-enqueuing it.
   if (isOrganizationAiPaused(conversation.organization)) {
-    await parkForPausedAgent(conversation, log, "organization_paused");
-    return;
-  }
-  if (conversation.agent && !conversation.agent.enabled) {
-    await parkForPausedAgent(conversation, log, "agent_disabled");
+    await parkForPausedAgent(conversation, log);
     return;
   }
 
@@ -576,7 +565,7 @@ export const runConversation = async (conversationId: string) => {
 
     if (systemMessages.length === 0) {
       await conversation.addInitialSystemMessage();
-      await conversation.addInitialAgentInstructions();
+      await conversation.addInitialAssistantInstructions();
     }
 
     if (botMessages.length === 0 && !lastCustomerMessage) {
@@ -737,18 +726,6 @@ export const runConversation = async (conversationId: string) => {
       return; // Exit early since conversation is closed
     }
 
-    // 01.2. Agent Assignment
-    // Agents are now required at conversation creation and fall back to organization default agent.
-    // Automatic agent selection during orchestration is no longer used.
-    const currentAgent = conversation.agent_id;
-    if (!currentAgent) {
-      log.debug("WARNING: No agent assigned to conversation");
-      // This shouldn't happen if conversation creation is working correctly
-      // Agent should be set at creation time or fall back to organization default
-    } else {
-      log.debug({ agentId: currentAgent }, "Agent assigned");
-    }
-
     // Update processing state to retrieving
     await updateProcessingState(conversation, "retrieving", "Finding relevant information");
 
@@ -852,7 +829,6 @@ export const runConversation = async (conversationId: string) => {
         playbookId: conversation.playbook_id,
         enabledTools: conversation.enabled_tools,
         enabledToolsCount: conversation.enabled_tools?.length || 0,
-        agentId: conversation.agent_id,
       },
       "Conversation state before execution",
     );
@@ -902,7 +878,7 @@ export const runConversation = async (conversationId: string) => {
       // organization was paused while this run was thinking. Nothing was sent.
       log.info({ blocker: error.blocker }, "Dropped in-flight AI reply");
       if (isPauseBlocker(error.blocker)) {
-        await parkForPausedAgent(conversation, log, error.blocker);
+        await parkForPausedAgent(conversation, log);
       }
     } else if (
       error instanceof Error &&
@@ -1437,9 +1413,7 @@ async function handleExecutionLoop(
         conversation.title,
       );
 
-      const agent = conversation.agent_id
-        ? await agentRepository.findById(conversation.agent_id)
-        : null;
+      const assistant = conversation.organization;
       // Business hours + who is reachable on this channel (D5-7): open (someone
       // reachable), open_nobody_online (team alerted) or closed (back at the
       // next opening; the AI keeps answering, only the human queue waits).
@@ -1454,14 +1428,14 @@ async function handleExecutionLoop(
             : null,
       };
       const handoffType = availability.state === "open" ? "available" : "unavailable";
-      log.debug({ hasAgent: !!agent, availability: availability.state }, "Handing off to the team");
+      log.debug({ availability: availability.state }, "Handing off to the team");
 
       // The merchant's own hand-off instructions for this situation, if any,
       // are run through the planner on the next iteration, with the facts.
       const customInstructions =
         handoffType === "available"
-          ? agent?.human_handoff_available_instructions
-          : agent?.human_handoff_unavailable_instructions;
+          ? assistant?.humanHandoffAvailableInstructions
+          : assistant?.humanHandoffUnavailableInstructions;
       const handoffLine: Parameters<typeof sendBotMessage>[1] = {
         content: availabilityHandoffLine(
           handoffAvailability,
@@ -1491,7 +1465,7 @@ async function handleExecutionLoop(
       // then closes the conversation instead of leaving it in the queue. Like
       // custom instructions, it needs the AI, so not when it is unavailable.
       const ticketConfig =
-        handoffType === "unavailable" ? agent?.human_handoff_unavailable_ticket : null;
+        handoffType === "unavailable" ? assistant?.humanHandoffUnavailableTicket : null;
       if (
         ticketConfig &&
         !executionResult.aiUnavailable &&

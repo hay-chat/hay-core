@@ -5,9 +5,6 @@ import { TRPCError } from "@trpc/server";
 import { CustomerRepository } from "@server/repositories/customer.repository";
 import { ConversationRepository } from "@server/repositories/conversation.repository";
 import { MessageRepository } from "@server/repositories/message.repository";
-import { AgentRepository } from "@server/repositories/agent.repository";
-import { organizationRepository } from "@server/repositories/organization.repository";
-import { pickAgentForChannel } from "@server/services/agent-channel-routing";
 import { pluginInstanceRepository } from "@server/repositories/plugin-instance.repository";
 import { pluginWebhookRouteRepository } from "@server/repositories/plugin-webhook-route.repository";
 import {
@@ -106,7 +103,6 @@ type PluginInstanceConfigState = Omit<PluginInstanceConfig, "mcpServers"> & {
 const customerRepository = new CustomerRepository();
 const conversationRepository = new ConversationRepository();
 const messageRepository = new MessageRepository();
-const agentRepository = new AgentRepository();
 
 /**
  * Conversation metadata for a customer reached through an identity it took
@@ -269,11 +265,7 @@ export const pluginApiTrpcRouter = router({
           }
         }
 
-        // Get agent for this channel. An org with no agent at all still gets
-        // the message: it lands in the inbox parked for a human (below) rather
-        // than being rejected, which would drop it after the provider's retries.
-        const agentId = await getAgentForChannel(organizationId, channel);
-        const holdForHuman = input.holdForHuman || !agentId;
+        const holdForHuman = !!input.holdForHuman;
 
         // Resolve the conversation: a Hay id the plugin recovered from its own
         // outbound message wins, then the provider-side thread id. Both must
@@ -327,7 +319,6 @@ export const pluginApiTrpcRouter = router({
           conversation = await conversationRepository.create({
             organization_id: organizationId,
             customer_id: customer.id,
-            agent_id: agentId,
             channel,
             status: "open",
             title: title ?? "",
@@ -505,16 +496,6 @@ export const pluginApiTrpcRouter = router({
             });
           }
 
-          // Get agent for this channel
-          const agentId = await getAgentForChannel(organizationId, channel);
-
-          if (!agentId) {
-            throw new TRPCError({
-              code: "NOT_FOUND",
-              message: "No agent configured for this channel",
-            });
-          }
-
           // Find active conversation or create a new one
           conversation = await conversationRepository.findActiveByCustomerAndChannel(
             customer,
@@ -528,7 +509,6 @@ export const pluginApiTrpcRouter = router({
             conversation = await conversationRepository.create({
               organization_id: organizationId,
               customer_id: customer.id,
-              agent_id: agentId,
               channel,
               status: "open",
               title: "",
@@ -1513,15 +1493,6 @@ async function claimProviderMessage(
     logger.error({ err: error, organizationId, channel, mid }, "Inbound dedupe check failed");
     return true;
   }
-}
-
-/** The single agent that answers on a channel: see pickAgentForChannel (D7-14). */
-async function getAgentForChannel(organizationId: string, channel: string): Promise<string | null> {
-  const [agents, org] = await Promise.all([
-    agentRepository.findByOrganization(organizationId),
-    organizationRepository.findById(organizationId),
-  ]);
-  return pickAgentForChannel(agents, org?.defaultAgentId, channel)?.id ?? null;
 }
 
 /**

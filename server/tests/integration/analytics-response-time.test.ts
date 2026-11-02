@@ -2,7 +2,6 @@ import "reflect-metadata";
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from "@jest/globals";
 import { AppDataSource } from "../../database/data-source";
 import { Organization } from "../../entities/organization.entity";
-import { Agent } from "../../database/entities/agent.entity";
 import { Conversation } from "../../database/entities/conversation.entity";
 import { Message, MessageType } from "../../database/entities/message.entity";
 import { DeliveryState } from "../../types/message-feedback.types";
@@ -12,10 +11,8 @@ import { AnalyticsService } from "../../services/analytics.service";
  * DB-backed: both metrics are raw SQL (window-free subqueries, percentiles,
  * FILTER), so a mock would only restate the implementation.
  */
-describe("analytics: response time and per-agent performance", () => {
+describe("analytics: response time", () => {
   const orgId = "a7a10710-0000-4000-8000-000000000001";
-  const agentA = "a7a10710-0000-4000-8000-0000000000a1";
-  const agentB = "a7a10710-0000-4000-8000-0000000000b2";
   const t0 = new Date("2026-10-15T12:00:00Z");
   const at = (seconds: number) => new Date(t0.getTime() + seconds * 1000);
 
@@ -72,19 +69,12 @@ describe("analytics: response time and per-agent performance", () => {
         orgRepo.create({ id: orgId, name: "Analytics Test Org", slug: "analytics-test-org" }),
       );
     }
-    const agentRepo = AppDataSource.getRepository(Agent);
-    for (const id of [agentA, agentB]) {
-      if (!(await agentRepo.findOne({ where: { id } }))) {
-        await agentRepo.save(agentRepo.create({ id, name: id, organization_id: orgId }));
-      }
-    }
   });
 
   beforeEach(cleanup);
 
   afterAll(async () => {
     await cleanup();
-    await AppDataSource.getRepository(Agent).delete({ organization_id: orgId });
     await AppDataSource.getRepository(Organization).delete({ id: orgId });
     if (AppDataSource.isInitialized) {
       await AppDataSource.destroy();
@@ -163,40 +153,6 @@ describe("analytics: response time and per-agent performance", () => {
       });
       expect(result.sampleSize).toBe(1);
       expect(result.averageResponseTime).toBeCloseTo(4);
-    });
-  });
-
-  describe("getAgentPerformance", () => {
-    it("computes the real resolution rate per agent, busiest first", async () => {
-      await seedConversation({ agent_id: agentA, status: "resolved" });
-      await seedConversation({ agent_id: agentA, status: "resolved" });
-      await seedConversation({ agent_id: agentA, status: "open" });
-      await seedConversation({ agent_id: agentB, status: "closed" });
-      await seedConversation({ agent_id: null, status: "resolved" });
-      await seedConversation({
-        agent_id: agentB,
-        status: "resolved",
-        created_at: new Date("2026-09-01T00:00:00Z"),
-      });
-
-      const result = await analytics.getAgentPerformance({
-        organizationId: orgId,
-        startDate: new Date("2026-10-01T00:00:00Z"),
-      });
-
-      expect(result).toHaveLength(2);
-      expect(result[0]).toMatchObject({
-        agentId: agentA,
-        totalConversations: 3,
-        resolvedConversations: 2,
-      });
-      expect(result[0].resolutionRate).toBeCloseTo(66.667, 2);
-      expect(result[1]).toEqual({
-        agentId: agentB,
-        totalConversations: 1,
-        resolvedConversations: 0,
-        resolutionRate: 0,
-      });
     });
   });
 });

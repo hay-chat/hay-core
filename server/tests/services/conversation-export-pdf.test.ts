@@ -36,7 +36,6 @@ describe("ConversationExportService.generatePdf (D2-2)", () => {
       created_at: new Date("2026-10-10T09:00:00Z"),
       ended_at: null,
       closed_at: null,
-      agent: null,
       customer: null,
       messages: [
         {

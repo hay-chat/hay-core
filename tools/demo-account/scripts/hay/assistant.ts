@@ -1,27 +1,25 @@
 /**
- * The "Casa Aurora Assistant" agent: tone and standing rules from company/brand.md. Playbooks carry
- * the per-situation steps; this holds what applies to every conversation.
+ * The org's assistant, "Casa Aurora Assistant": tone and standing rules from company/brand.md.
+ * Playbooks carry the per-situation steps; this holds what applies to every conversation.
+ * The reply language is the org's default language, set by the settings step.
  */
 import type { Locale } from "../lib/types";
 
-export const AGENT_NAME = "Casa Aurora Assistant";
+export const ASSISTANT_NAME = "Casa Aurora Assistant";
 
-export interface AgentDefinition {
+export interface AssistantDefinition {
   name: string;
   description: string;
-  /** server/types/language.types.ts SupportedLanguage. */
-  language: "en" | "pt";
   tone: string;
   avoid: string;
   /** Markdown, converted to the editor's Tiptap document. */
   instructions: string;
 }
 
-const EN: AgentDefinition = {
-  name: AGENT_NAME,
+const EN: AssistantDefinition = {
+  name: ASSISTANT_NAME,
   description:
-    "Casa Aurora's Hay.chat AI agent (demo account). Seeded by tools/demo-account/scripts/seed-hay.ts.",
-  language: "en",
+    "Casa Aurora's Hay.chat AI assistant (demo account). Seeded by tools/demo-account/scripts/seed-hay.ts.",
   tone:
     "Warm, short and practical. Use the shopper's first name. Name the next step and the date. " +
     "No exclamation-mark overload, no corporate apologies.",
@@ -41,11 +39,10 @@ You help shoppers of Casa Aurora, a small home-goods brand from São Paulo: hand
 - People answer Monday to Friday, 09:00–18:00 store time. When you hand off, say honestly whether anyone is online. Never say someone will reply "shortly".`,
 };
 
-const PT: AgentDefinition = {
-  name: AGENT_NAME,
+const PT: AssistantDefinition = {
+  name: ASSISTANT_NAME,
   description:
-    "Agente de IA da Casa Aurora no Hay.chat (conta de demonstração). Criado por tools/demo-account/scripts/seed-hay.ts.",
-  language: "pt",
+    "Assistente de IA da Casa Aurora no Hay.chat (conta de demonstração). Criado por tools/demo-account/scripts/seed-hay.ts.",
   tone:
     "Acolhedor, curto e prático. Chame o cliente pelo primeiro nome. Diga o próximo passo e a data. " +
     "Sem excesso de pontos de exclamação, sem desculpas corporativas.",
@@ -65,6 +62,6 @@ Você atende clientes da Casa Aurora, uma marca de casa de São Paulo: velas de 
 - A equipe atende de segunda a sexta, das 09:00 às 18:00 (horário de Brasília). Ao transferir, diga com sinceridade se tem alguém online. Nunca diga que alguém vai responder "em instantes".`,
 };
 
-export function agentDefinition(locale: Locale): AgentDefinition {
+export function assistantDefinition(locale: Locale): AssistantDefinition {
   return locale === "pt-BR" ? PT : EN;
 }

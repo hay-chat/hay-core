@@ -37,15 +37,9 @@ jest.mock("@server/services/customer.service", () => ({
   })),
 }));
 
-const mockAgentFind =
-  jest.fn<(id: string, orgId: string) => Promise<Record<string, unknown> | null>>();
-jest.mock("@server/repositories/agent.repository", () => ({
-  AgentRepository: jest.fn(() => ({})),
-  agentRepository: { findByIdAndOrganization: mockAgentFind, findByOrganization: async () => [] },
-}));
 jest.mock("@server/repositories/organization.repository", () => ({
   OrganizationRepository: jest.fn(() => ({})),
-  organizationRepository: { findById: async () => ({ defaultAgentId: null }) },
+  organizationRepository: { findById: async () => ({}) },
 }));
 jest.mock("@server/services/hooks/hook-manager", () => ({
   hookManager: { trigger: async () => undefined },
@@ -83,7 +77,6 @@ describe("conversations router tenancy", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockGetCustomer.mockResolvedValue(null);
-    mockAgentFind.mockResolvedValue(null);
   });
 
   describe("permissions", () => {
@@ -131,14 +124,6 @@ describe("conversations router tenancy", () => {
         code: "NOT_FOUND",
       });
       expect(mockGetCustomer).toHaveBeenCalledWith(OTHER_ID, ORG_ID);
-      expect(mockConversationCreate).not.toHaveBeenCalled();
-    });
-
-    it("refuses an agent from another organization", async () => {
-      await expect(callerAs("member").create({ agentId: OTHER_ID })).rejects.toMatchObject({
-        code: "NOT_FOUND",
-      });
-      expect(mockAgentFind).toHaveBeenCalledWith(OTHER_ID, ORG_ID);
       expect(mockConversationCreate).not.toHaveBeenCalled();
     });
 

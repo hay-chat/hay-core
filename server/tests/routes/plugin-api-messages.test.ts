@@ -55,12 +55,6 @@ jest.mock("@server/repositories/customer.repository", () => ({
   CustomerRepository: jest.fn(() => mockCustomerRepo),
 }));
 
-const mockAgentRepo = { findByOrganization: jest.fn<() => Promise<unknown[]>>() };
-jest.mock("@server/repositories/agent.repository", () => ({
-  AgentRepository: jest.fn(() => mockAgentRepo),
-  agentRepository: mockAgentRepo,
-}));
-
 jest.mock("@server/repositories/organization.repository", () => ({
   organizationRepository: {
     findById: jest.fn(async () => ({ isActive: true, suspendedAt: null })),
@@ -123,7 +117,6 @@ const makeConversation = () => {
   const conversation = new Conversation();
   conversation.id = CONVERSATION_ID;
   conversation.organization_id = ORG_ID;
-  conversation.agent_id = "agent-1";
   conversation.channel = "whatsapp";
   conversation.status = "open";
   conversation.metadata = null;
@@ -147,7 +140,6 @@ describe("pluginApi.messages.receive attachments", () => {
       phone: null,
       external_metadata: {},
     });
-    mockAgentRepo.findByOrganization.mockResolvedValue([{ id: "agent-1", channels: ["whatsapp"] }]);
     mockConversationRepo.findActiveByCustomerAndChannel.mockResolvedValue(makeConversation());
     mockConversationRepo.getMessages.mockResolvedValue([]);
     mockMessageRepo.create.mockImplementation(async (data) => ({ id: "msg-new", ...data }));
@@ -251,7 +243,6 @@ describe("pluginApi.messages.receive conversation lookup", () => {
       email: null,
       external_metadata: {},
     });
-    mockAgentRepo.findByOrganization.mockResolvedValue([{ id: "agent-1", channels: ["email"] }]);
     mockConversationRepo.findActiveByCustomerAndChannel.mockResolvedValue(null);
     mockConversationRepo.findByExternalConversationId.mockResolvedValue(null);
     mockConversationRepo.findByIdAndOrganization.mockResolvedValue(null);
@@ -468,7 +459,6 @@ describe("pluginApi.messages.receive holdForHuman", () => {
       email: null,
       external_metadata: {},
     });
-    mockAgentRepo.findByOrganization.mockResolvedValue([{ id: "agent-1", channels: ["email"] }]);
     mockConversationRepo.findByIdAndOrganization.mockResolvedValue(null);
     mockConversationRepo.findByExternalConversationId.mockResolvedValue(null);
     const conversation = makeConversation();
@@ -514,24 +504,6 @@ describe("pluginApi.messages.receive holdForHuman", () => {
     );
     expect(statuses).not.toContain("pending-human");
   });
-
-  it("parks the conversation for a human when the org has no agent", async () => {
-    mockAgentRepo.findByOrganization.mockResolvedValue([]);
-
-    const result = await caller()["messages.receive"]({
-      from: "ana@shopper.com",
-      content: "hello?",
-      channel: "email",
-    });
-
-    expect(result.processed).toBe(true);
-    expect(mockMessageRepo.create).toHaveBeenCalled();
-    expect(mockConversationRepo.update).toHaveBeenLastCalledWith(
-      CONVERSATION_ID,
-      ORG_ID,
-      expect.objectContaining({ status: "pending-human", needs_processing: false }),
-    );
-  });
 });
 
 describe("pluginApi.messages.receive replyWindowExpiresAt (D13-2)", () => {
@@ -543,7 +515,6 @@ describe("pluginApi.messages.receive replyWindowExpiresAt (D13-2)", () => {
       phone: null,
       external_metadata: {},
     });
-    mockAgentRepo.findByOrganization.mockResolvedValue([{ id: "agent-1", channels: ["whatsapp"] }]);
     mockConversationRepo.findByIdAndOrganization.mockResolvedValue(null);
     mockConversationRepo.findByExternalConversationId.mockResolvedValue(null);
     mockConversationRepo.getMessages.mockResolvedValue([]);
@@ -597,7 +568,6 @@ describe("pluginApi.messages.receive human echoes (D13-8, D11-11)", () => {
       phone: null,
       external_metadata: {},
     });
-    mockAgentRepo.findByOrganization.mockResolvedValue([{ id: "agent-1", channels: ["whatsapp"] }]);
     mockConversationRepo.findByIdAndOrganization.mockResolvedValue(null);
     mockConversationRepo.findByExternalConversationId.mockResolvedValue(null);
     mockConversationRepo.findActiveByCustomerAndChannel.mockResolvedValue(makeConversation());

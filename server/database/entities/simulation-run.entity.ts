@@ -45,10 +45,6 @@ export class SimulationRun {
   @Column({ type: "varchar", length: 16, default: "running" })
   status!: SimulationRunStatus;
 
-  /** Null: the organization's default agent at the time of each conversation. */
-  @Column({ type: "uuid", nullable: true })
-  agent_id!: string | null;
-
   /** A playbook draft (or any version) to run instead of the live one (D7-5). */
   @Column({ type: "uuid", nullable: true })
   playbook_id!: string | null;

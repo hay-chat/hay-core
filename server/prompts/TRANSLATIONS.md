@@ -16,7 +16,6 @@ Currently, the prompt system has full translations for:
 ### Perception Layer
 
 - `perception/intent-analysis.md` - Análise de intenção do usuário
-- `perception/agent-selection.md` - Seleção de agente apropriado
 
 ### Retrieval Layer
 

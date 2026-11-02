@@ -42,34 +42,6 @@ async function testPortuguesePrompts() {
   }
   console.log();
 
-  // Test 2: Load and render Portuguese agent selection prompt
-  console.log(`${YELLOW}Test 2: Portuguese Agent Selection Prompt${RESET}`);
-  try {
-    const prompt = await promptService.getPrompt(
-      "perception/agent-selection",
-      {
-        message: "Preciso de ajuda com minha conta",
-        agents: [{ id: "1", name: "Suporte", trigger: "ajuda", description: "Agente de suporte" }],
-      },
-      { language: SupportedLanguage.PORTUGUESE },
-    );
-
-    if (
-      prompt.includes("Dada a mensagem do usuário abaixo") &&
-      prompt.includes("Agentes disponíveis")
-    ) {
-      console.log(`${GREEN}✅ PASS${RESET}: Portuguese agent selection loaded correctly`);
-      passedTests++;
-    } else {
-      console.log(`${RED}❌ FAIL${RESET}: Portuguese agent selection not loaded correctly`);
-      failedTests++;
-    }
-  } catch (error) {
-    console.log(`${RED}❌ FAIL${RESET}: Error: ${error}`);
-    failedTests++;
-  }
-  console.log();
-
   // Test 3: Load and render Portuguese playbook selection prompt
   console.log(`${YELLOW}Test 3: Portuguese Playbook Selection Prompt${RESET}`);
   try {

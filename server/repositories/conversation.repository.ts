@@ -77,7 +77,6 @@ export class ConversationRepository extends BaseRepository<Conversation> {
 
     queryBuilder
       .leftJoinAndSelect("conversation.messages", "messages")
-      .leftJoinAndSelect("conversation.agent", "agent")
       .leftJoinAndSelect("conversation.organization", "organization")
       .leftJoinAndSelect("conversation.customer", "customer")
       .orderBy("messages.created_at", "ASC");
@@ -101,23 +100,11 @@ export class ConversationRepository extends BaseRepository<Conversation> {
 
     queryBuilder
       .leftJoinAndSelect("conversation.messages", "messages")
-      .leftJoinAndSelect("conversation.agent", "agent")
       .leftJoinAndSelect("conversation.organization", "organization")
       .leftJoinAndSelect("conversation.customer", "customer")
       .orderBy("messages.created_at", "ASC");
 
     return await queryBuilder.getOne();
-  }
-
-  async findByAgent(agentId: string, organizationId: string): Promise<Conversation[]> {
-    return await this.getRepository()
-      .createQueryBuilder("conversation")
-      .where("conversation.agent_id = :agentId", { agentId })
-      .andWhere("conversation.organization_id = :organizationId", { organizationId })
-      .andWhere("conversation.deleted_at IS NULL")
-      .andWhere(notSimulationSql("conversation"))
-      .orderBy("conversation.created_at", "DESC")
-      .getMany();
   }
 
   override async findByOrganization(organizationId: string): Promise<Conversation[]> {
@@ -427,12 +414,6 @@ export class ConversationRepository extends BaseRepository<Conversation> {
       });
     }
 
-    if (filters.agentId) {
-      queryBuilder.andWhere("entity.agent_id = :agentId", {
-        agentId: filters.agentId,
-      });
-    }
-
     if (filters.playbookId) {
       queryBuilder.andWhere("entity.playbook_id = :playbookId", {
         playbookId: filters.playbookId,
@@ -498,9 +479,6 @@ export class ConversationRepository extends BaseRepository<Conversation> {
       switch (relation) {
         case "messages":
           queryBuilder.leftJoinAndSelect("entity.messages", "messages");
-          break;
-        case "agent":
-          queryBuilder.leftJoinAndSelect("entity.agent", "agent");
           break;
         case "organization":
           queryBuilder.leftJoinAndSelect("entity.organization", "organization");

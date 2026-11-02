@@ -4,7 +4,6 @@ jest.mock("@server/repositories/webchat-settings.repository", () => ({
   webchatSettingsRepository: {},
 }));
 jest.mock("@server/repositories/organization.repository", () => ({ organizationRepository: {} }));
-jest.mock("@server/repositories/agent.repository", () => ({ agentRepository: {} }));
 jest.mock("@server/services/storage.service", () => ({ storageService: {} }));
 jest.mock("@server/database/data-source", () => ({ AppDataSource: { isInitialized: false } }));
 

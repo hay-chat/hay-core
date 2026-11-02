@@ -3,7 +3,7 @@ import { describe, it, expect, jest, beforeEach } from "@jest/globals";
 /**
  * D5-2 regression: on every hand-off path the shopper gets the fixed, honest
  * line. The planner's own hand-off text ("Please hold on for a moment",
- * "right away") was sent verbatim on staging, where the org had no agent.
+ * "right away") was sent verbatim on staging, where the org had no hand-off settings.
  */
 
 const mockFindById = jest.fn<(id: string) => Promise<unknown>>();
@@ -17,10 +17,6 @@ jest.mock("@server/repositories/conversation.repository", () => ({
 }));
 jest.mock("@server/repositories/playbook.repository", () => ({
   playbookRepository: { findByStatus: async () => [] },
-}));
-const mockFindAgent = jest.fn<(id: string) => Promise<unknown>>();
-jest.mock("@server/repositories/agent.repository", () => ({
-  agentRepository: { findById: (id: string) => mockFindAgent(id) },
 }));
 type MockAvailability = {
   state: "open" | "open_nobody_online" | "closed";
@@ -89,7 +85,6 @@ import { handoffCopy } from "../../orchestrator/handoff-copy";
 
 const ORG_ID = "11111111-1111-4111-8111-111111111111";
 const CONVERSATION_ID = "22222222-2222-4222-8222-222222222222";
-const AGENT_ID = "33333333-3333-4333-8333-333333333333";
 
 const PLANNER_LINE =
   "I'll connect you with a human agent who can assist you further. Please hold on for a moment.";
@@ -98,16 +93,15 @@ const INSTRUCTIONS = {
   content: [{ type: "paragraph", content: [{ type: "text", text: "Ask for their email." }] }],
 };
 
-function makeConversation(agentId: string | null) {
+/** `assistant`: the organization's hand-off settings. */
+function makeConversation(assistant: Record<string, unknown>) {
   return {
     id: CONVERSATION_ID,
     organization_id: ORG_ID,
     status: "open",
     assigned_user_id: null,
     deleted_at: null,
-    agent_id: agentId,
-    agent: agentId ? { id: agentId, enabled: true } : null,
-    organization: { suspendedAt: null, agentPausedAt: null, defaultLanguage: "en" },
+    organization: { suspendedAt: null, agentPausedAt: null, defaultLanguage: "en", ...assistant },
     language: null,
     title: "",
     needs_processing: true,
@@ -138,10 +132,9 @@ function makeConversation(agentId: string | null) {
 
 let conversation: ReturnType<typeof makeConversation>;
 
-function given(agent: Record<string, unknown> | null, onlineHumans: number) {
-  conversation = makeConversation(agent ? AGENT_ID : null);
+function given(assistant: Record<string, unknown>, onlineHumans: number) {
+  conversation = makeConversation(assistant);
   mockFindById.mockImplementation(async () => conversation);
-  mockFindAgent.mockResolvedValue(agent);
   setAvailability(onlineHumans > 0 ? "open" : "open_nobody_online");
 }
 
@@ -173,8 +166,8 @@ describe("hand-off line", () => {
     mockWithinHours.mockResolvedValue(true);
   });
 
-  it("uses the honest line, not the planner's, when the org has no agent and nobody is online", async () => {
-    given(null, 0);
+  it("uses the honest line, not the planner's, when the org set no hand-off and nobody is online", async () => {
+    given({}, 0);
 
     await runConversation(CONVERSATION_ID);
 
@@ -188,7 +181,6 @@ describe("hand-off line", () => {
         }),
       }),
     ]);
-    expect(mockFindAgent).not.toHaveBeenCalled();
     expect(mockUpdate).toHaveBeenCalledWith(CONVERSATION_ID, ORG_ID, { status: "pending-human" });
   });
 
@@ -199,7 +191,7 @@ describe("hand-off line", () => {
       userMessage:
         "Claro, vou transferir você para um agente humano agora. Por favor, aguarde um momento.",
     });
-    given(null, 0);
+    given({}, 0);
 
     await runConversation(CONVERSATION_ID);
 
@@ -207,7 +199,7 @@ describe("hand-off line", () => {
   });
 
   it("uses the queued line when someone is online", async () => {
-    given({ id: AGENT_ID }, 1);
+    given({}, 1);
 
     await runConversation(CONVERSATION_ID);
 
@@ -220,7 +212,7 @@ describe("hand-off line", () => {
       userMessage: "I'm bringing in a team member who can look into it for you right away.",
       handoff: { reason: "Low confidence" },
     });
-    given({ id: AGENT_ID }, 0);
+    given({}, 0);
 
     await runConversation(CONVERSATION_ID);
 
@@ -228,15 +220,15 @@ describe("hand-off line", () => {
   });
 
   it.each([
-    ["online", 1, "human_handoff_available_instructions", "available"],
-    ["offline", 0, "human_handoff_unavailable_instructions", "unavailable"],
+    ["online", 1, "humanHandoffAvailableInstructions", "available"],
+    ["offline", 0, "humanHandoffUnavailableInstructions", "unavailable"],
   ])(
     "queues the conversation and runs the merchant's instructions (%s)",
     async (_label, online, field, handoffType) => {
       mockExecute
         .mockResolvedValueOnce({ step: "HANDOFF", userMessage: PLANNER_LINE })
         .mockResolvedValueOnce({ step: "RESPOND", userMessage: "What's your email?" });
-      given({ id: AGENT_ID, [field]: INSTRUCTIONS }, online);
+      given({ [field]: INSTRUCTIONS }, online);
 
       await runConversation(CONVERSATION_ID);
 
@@ -258,7 +250,7 @@ describe("hand-off line", () => {
       handoff: { reason: "The AI could not answer (provider unavailable)" },
       aiUnavailable: true,
     });
-    given({ id: AGENT_ID, human_handoff_available_instructions: INSTRUCTIONS }, 1);
+    given({ humanHandoffAvailableInstructions: INSTRUCTIONS }, 1);
 
     await runConversation(CONVERSATION_ID);
 
@@ -274,7 +266,7 @@ describe("hand-off line", () => {
 
   it("sends the fixed line once when the planner hands off again while following the instructions", async () => {
     mockExecute.mockResolvedValue({ step: "HANDOFF", userMessage: PLANNER_LINE });
-    given({ id: AGENT_ID, human_handoff_unavailable_instructions: INSTRUCTIONS }, 0);
+    given({ humanHandoffUnavailableInstructions: INSTRUCTIONS }, 0);
 
     await runConversation(CONVERSATION_ID);
 
@@ -285,7 +277,7 @@ describe("hand-off line", () => {
   });
 
   it("tells the shopper the team usually replies within the median time when known (D5-7)", async () => {
-    given({ id: AGENT_ID }, 0);
+    given({}, 0);
     mockTypicalReply.mockResolvedValue(12);
 
     await runConversation(CONVERSATION_ID);
@@ -296,7 +288,7 @@ describe("hand-off line", () => {
   });
 
   it("says when the team is back outside business hours (D5-7)", async () => {
-    given({ id: AGENT_ID }, 0);
+    given({}, 0);
     // Fri 30 Oct 2026 20:00 Lisbon → back Mon 2 Nov 09:00. Only Date is faked:
     // the wording is relative to "now".
     jest.useFakeTimers({
@@ -351,7 +343,7 @@ describe("conversation waiting for a person (D5-7)", () => {
   });
 
   it("stays quiet within business hours and clears the processing flag", async () => {
-    given({ id: AGENT_ID }, 0);
+    given({}, 0);
     conversation.status = "pending-human";
     mockWithinHours.mockResolvedValue(true);
 
@@ -363,7 +355,7 @@ describe("conversation waiting for a person (D5-7)", () => {
   });
 
   it("keeps answering outside business hours", async () => {
-    given({ id: AGENT_ID }, 0);
+    given({}, 0);
     conversation.status = "pending-human";
     mockWithinHours.mockResolvedValue(false);
 

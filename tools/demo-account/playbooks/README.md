@@ -54,8 +54,8 @@ accuse a shopper; say honestly whether anyone is online. Write "Hay.chat", never
 
 ## How they're loaded
 
-`scripts/seed-hay.ts` creates or updates each playbook by title, attaches it to the
-"Casa Aurora Assistant" agent (keeping other agents already attached) and sets its status:
+`scripts/seed-hay.ts` creates or updates each playbook by title (every playbook of the org
+applies to its assistant, no assignment step) and sets its status:
 **active by default** so the demo AI uses it straight away (draft playbooks are never selected);
 `--draft` writes them as drafts instead. Approval categories are set with a follow-up
 `playbooks.update` because `playbooks.create` doesn't take them.

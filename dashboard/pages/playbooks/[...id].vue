@@ -212,43 +212,6 @@
               </CardContent>
             </Card>
 
-            <!-- Assigned Agents -->
-            <Card>
-              <CardHeader>
-                <CardTitle class="text-base">
-                  {{ isEditMode ? t("form.assignedAgents") : t("form.assignAgents") }}
-                </CardTitle>
-              </CardHeader>
-              <CardContent class="space-y-3">
-                <div v-if="loadingAgents" class="py-2 text-center text-sm text-neutral-muted">
-                  {{ t("form.loadingAgents") }}
-                </div>
-                <div
-                  v-else-if="agents.length === 0"
-                  class="py-2 text-center text-sm text-neutral-muted"
-                >
-                  {{ t("form.noAgentsAvailable") }}
-                </div>
-                <div v-else class="space-y-2">
-                  <div v-for="agent in agents" :key="agent.id" class="flex items-center space-x-3">
-                    <input
-                      :id="`agent-${agent.id}`"
-                      v-model="form.agentIds"
-                      type="checkbox"
-                      :value="agent.id"
-                      class="h-4 w-4 rounded border-gray-300"
-                    />
-                    <label :for="`agent-${agent.id}`" class="flex-1 cursor-pointer">
-                      <div class="text-sm font-medium">{{ agent.name }}</div>
-                      <div v-if="agent.description" class="text-xs text-neutral-muted">
-                        {{ agent.description }}
-                      </div>
-                    </label>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
             <!-- Available Actions -->
             <Card>
               <CardHeader>
@@ -399,7 +362,7 @@ import {
 } from "lucide-vue-next";
 import type { JSONContent } from "@tiptap/vue-3";
 import type { MCPTool } from "@/components/tiptap/MentionExtension";
-import type { PlaybookStatus, Agent, Playbook, PlaybookVersion } from "~/types/playbook";
+import type { PlaybookStatus, Playbook, PlaybookVersion } from "~/types/playbook";
 
 // Instructions are authored in the Tiptap editor and stored as a Tiptap document.
 const EMPTY_INSTRUCTIONS: JSONContent = { type: "doc", content: [] };
@@ -455,7 +418,6 @@ const initialForm = ref({
   trigger: "",
   description: "",
   status: "draft" as PlaybookStatus,
-  agentIds: [] as string[],
 });
 
 const form = ref({
@@ -464,7 +426,6 @@ const form = ref({
   description: "",
   instructions: EMPTY_INSTRUCTIONS as JSONContent,
   status: "draft" as PlaybookStatus,
-  agentIds: [] as string[],
 });
 
 // UI state
@@ -488,8 +449,6 @@ const handleAddAction = (tool: MCPTool) => {
 
 // Number of available actions, surfaced by the panel for the card header badge.
 const actionsCount = ref(0);
-const loadingAgents = ref(true);
-const agents = ref<Agent[]>([]);
 const playbook = ref<Playbook | null>(null);
 const errors = ref<Record<string, string>>({});
 
@@ -586,7 +545,6 @@ const {
     trigger: form.value.trigger,
     description: form.value.description,
     status: form.value.status,
-    agentIds: form.value.agentIds,
   })),
   computed(() => !loading.value && !isSubmitting.value),
 );
@@ -601,11 +559,6 @@ const handleInstructionsUpdate = () => {
 // Load data on mount
 onMounted(async () => {
   try {
-    // Load agents
-    loadingAgents.value = true;
-    const agentsResponse = await HayApi.agents.list.query();
-    agents.value = agentsResponse || [];
-
     // Load playbook if in edit mode
     if (isEditMode.value && playbookId.value) {
       loading.value = true;
@@ -640,7 +593,6 @@ onMounted(async () => {
         trigger: playbookResponse.trigger,
         description: playbookResponse.description || "",
         status: playbookResponse.status,
-        agentIds: playbookResponse.agents?.map((a: Agent) => a.id) || [],
       };
 
       form.value = {
@@ -656,12 +608,9 @@ onMounted(async () => {
     if (isEditMode.value) {
       toast.error(t("toast.playbookNotFound"));
       await router.push("/playbooks");
-    } else {
-      toast.error(t("toast.loadAgentsFailed"));
     }
   } finally {
     loading.value = false;
-    loadingAgents.value = false;
   }
 });
 
@@ -712,7 +661,6 @@ const handleSubmit = async () => {
           title: form.value.title,
           trigger: form.value.trigger,
           description: form.value.description || undefined,
-          agentIds: form.value.agentIds.length > 0 ? form.value.agentIds : undefined,
         },
       });
       toast.success(t("toast.updateSuccess"));
@@ -727,7 +675,6 @@ const handleSubmit = async () => {
         description: form.value.description || undefined,
         instructions: savedInstructions ?? EMPTY_INSTRUCTIONS,
         status: form.value.status,
-        agentIds: form.value.agentIds.length > 0 ? form.value.agentIds : undefined,
       };
 
       const response = await HayApi.playbooks.create.mutate(payload);
@@ -806,7 +753,6 @@ const handleRollback = async () => {
         trigger: updated.trigger,
         description: updated.description || "",
         status: updated.status,
-        agentIds: updated.agents?.map((a: Agent) => a.id) || [],
       }),
     );
   }

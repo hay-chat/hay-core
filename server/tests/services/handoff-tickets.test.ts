@@ -32,8 +32,8 @@ function conversation(overrides: Record<string, unknown> = {}): Conversation & {
     channel: "web",
     status: "pending-human",
     metadata: { handoffTicket: { pluginId: "zendesk", status: "requested" } },
-    agent: {
-      human_handoff_unavailable_ticket: { pluginId: "zendesk", fields: { priority: "high" } },
+    organization: {
+      humanHandoffUnavailableTicket: { pluginId: "zendesk", fields: { priority: "high" } },
     },
     customer: { name: "Ana", email: null, phone: null },
     getMessages: async () =>
