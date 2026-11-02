@@ -17,7 +17,13 @@ jest.mock("@server/entities/plugin-registry.entity", () => ({ PluginRegistry: cl
 
 const findConnection = jest.fn<(id: string) => Promise<unknown>>();
 jest.mock("@server/repositories/git-connection.repository", () => ({
-  gitConnectionRepository: { findById: findConnection },
+  gitConnectionRepository: {
+    findById: findConnection,
+    findByIdAndOrganization: async (id: string, organizationId: string) => {
+      const found = (await findConnection(id)) as { organizationId?: string } | null;
+      return found && found.organizationId === organizationId ? found : null;
+    },
+  },
 }));
 const findByPluginId = jest.fn<(id: string) => Promise<unknown>>();
 const findById = jest.fn<(id: string) => Promise<unknown>>();
