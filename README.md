@@ -20,7 +20,7 @@ Hay.chat lets businesses deploy AI agents that handle customer support 24/7 acro
 
 **Key capabilities:**
 
-- **AI Agents** — Configure tone, instructions, and behavior. Test before deploying.
+- **AI Assistant** — One assistant per organization: configure its name, tone, instructions and hand-off behavior. Test before deploying.
 - **Knowledge Base** — Upload PDFs, Word docs, text, markdown, or import from URLs. Agents use vector search to ground answers in your content.
 - **Playbooks** — Step-by-step workflows for specific scenarios (refunds, order lookups, greetings, etc.).
 - **Multi-channel** — Live chat widget, WhatsApp, Instagram DMs, Messenger and email, via plugins.
