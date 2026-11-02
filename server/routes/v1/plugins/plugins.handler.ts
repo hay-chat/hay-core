@@ -1,8 +1,13 @@
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
-import { authenticatedProcedure } from "@server/trpc";
+import { authenticatedProcedure, scopedProcedure } from "@server/trpc";
+import { RESOURCES, ACTIONS } from "@server/types/scopes";
 import { hasPluginCredentials, pickHealthCheckTool } from "@server/lib/plugin-health-tool";
-import { pluginManagerService } from "@server/services/plugin-manager.service";
+import {
+  assertCustomPluginsAllowed,
+  isPluginVisibleToOrganization,
+  pluginManagerService,
+} from "@server/services/plugin-manager.service";
 import { pluginRegistryRepository } from "@server/repositories/plugin-registry.repository";
 import { pluginInstanceRepository } from "@server/repositories/plugin-instance.repository";
 import { pluginUIService } from "@server/services/plugin-ui.service";
@@ -35,6 +40,9 @@ import {
 import { workerFetch } from "@server/lib/worker-client";
 
 const logger = createLogger("plugins");
+
+/** Installing, enabling and configuring plugins is reserved for plugin managers (admins). */
+const pluginManageProcedure = scopedProcedure(RESOURCES.PLUGINS, ACTIONS.MANAGE);
 
 interface PluginHealthCheckResult {
   success: boolean;
@@ -105,6 +113,7 @@ export const getAllPlugins = authenticatedProcedure.query(async ({ ctx }) => {
         gitLastCommitSha: plugin.gitLastCommitSha,
         gitLastSyncAt: plugin.gitLastSyncAt,
         gitSyncError: plugin.gitSyncError,
+        gitAvailableCommitSha: plugin.gitAvailableCommitSha,
       };
 
       return result;
@@ -123,7 +132,7 @@ export const getPlugin = authenticatedProcedure
   .query(async ({ ctx, input }) => {
     const plugin = pluginManagerService.getPlugin(input.pluginId);
 
-    if (!plugin) {
+    if (!plugin || !isPluginVisibleToOrganization(plugin, ctx.organizationId!)) {
       throw new TRPCError({
         code: "NOT_FOUND",
         message: `Plugin ${input.pluginId} not found`,
@@ -344,7 +353,7 @@ export const getPluginInstances = authenticatedProcedure.query(async ({ ctx }) =
 /**
  * Enable a plugin for the organization
  */
-export const enablePlugin = authenticatedProcedure
+export const enablePlugin = pluginManageProcedure
   .input(
     z.object({
       pluginId: z.string(),
@@ -361,12 +370,20 @@ export const enablePlugin = authenticatedProcedure
       });
     }
 
-    // Validate organization access for custom plugins
-    if (plugin.sourceType === "custom" && plugin.organizationId !== ctx.organizationId) {
+    // Validate organization access for custom and git plugins
+    if (!isPluginVisibleToOrganization(plugin, ctx.organizationId!)) {
       throw new TRPCError({
         code: "FORBIDDEN",
         message: "Cannot enable plugins from other organizations",
       });
+    }
+
+    if (plugin.sourceType !== "core") {
+      try {
+        assertCustomPluginsAllowed();
+      } catch (error) {
+        throw new TRPCError({ code: "FORBIDDEN", message: (error as Error).message });
+      }
     }
 
     try {
@@ -454,7 +471,7 @@ export const enablePlugin = authenticatedProcedure
 /**
  * Disable a plugin for the organization
  */
-export const disablePlugin = authenticatedProcedure
+export const disablePlugin = pluginManageProcedure
   .input(
     z.object({
       pluginId: z.string(),
@@ -506,7 +523,7 @@ export const disablePlugin = authenticatedProcedure
 /**
  * Restart a plugin worker without losing configuration
  */
-export const restartPlugin = authenticatedProcedure
+export const restartPlugin = pluginManageProcedure
   .input(
     z.object({
       pluginId: z.string(),
@@ -603,7 +620,7 @@ export const restartPlugin = authenticatedProcedure
 /**
  * Configure a plugin (with auth separation)
  */
-export const configurePlugin = authenticatedProcedure
+export const configurePlugin = pluginManageProcedure
   .input(
     z.object({
       pluginId: z.string(),
@@ -981,7 +998,7 @@ function getToolsFromConfig(config: any): any[] {
  *
  * Useful after plugin updates or when tools need to be re-discovered
  */
-export const refreshMCPTools = authenticatedProcedure
+export const refreshMCPTools = pluginManageProcedure
   .input(z.object({ pluginId: z.string() }))
   .mutation(async ({ ctx, input }) => {
     // Get plugin
@@ -1363,7 +1380,7 @@ export const testConnection = authenticatedProcedure
 /**
  * Initiate OAuth authorization flow
  */
-export const initiateOAuth = authenticatedProcedure
+export const initiateOAuth = pluginManageProcedure
   .input(
     z.object({
       pluginId: z.string(),
@@ -1404,7 +1421,7 @@ export const initiateOAuth = authenticatedProcedure
  * Signup). The code is exchanged synchronously (30 s TTL); `extras` are
  * untrusted hints forwarded to the plugin's onConnected hook.
  */
-export const completeOAuthWithCode = authenticatedProcedure
+export const completeOAuthWithCode = pluginManageProcedure
   .input(
     z.object({
       pluginId: z.string(),
@@ -1606,7 +1623,7 @@ export const getOAuthStatus = authenticatedProcedure
 /**
  * Revoke OAuth connection
  */
-export const revokeOAuth = authenticatedProcedure
+export const revokeOAuth = pluginManageProcedure
   .input(
     z.object({
       pluginId: z.string(),
@@ -1622,7 +1639,7 @@ export const revokeOAuth = authenticatedProcedure
  *
  * Calls the plugin worker's /validate-auth endpoint to validate credentials
  */
-export const validateAuth = authenticatedProcedure
+export const validateAuth = pluginManageProcedure
   .input(
     z.object({
       pluginId: z.string(),

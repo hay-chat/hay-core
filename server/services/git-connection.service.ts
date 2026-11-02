@@ -37,6 +37,7 @@ interface GitMetadataUpdate {
   gitLastCommitSha?: string;
   gitLastSyncAt?: Date;
   gitSyncError?: string | null;
+  gitAvailableCommitSha?: string | null;
   zipFilePath?: string;
   zipUploadId?: string;
   uploadedById?: string;
@@ -45,11 +46,16 @@ interface GitMetadataUpdate {
 
 /**
  * Narrow a fully-typed git-metadata payload to TypeORM's update type at a
- * single, documented boundary. The only divergence is `gitSyncError: null`,
- * which the nullable DB column accepts at runtime, so the conversion is safe.
+ * single, documented boundary. The only divergence is the explicit `null`s,
+ * which the nullable DB columns accept at runtime, so the conversion is safe.
  */
 function toUpdatePayload(fields: GitMetadataUpdate): PluginRegistryUpdate {
   return fields as PluginRegistryUpdate;
+}
+
+/** Largest repository archive accepted, matching the ZIP upload limit. */
+function maxArchiveBytes(): number {
+  return config.plugins.maxUploadSizeMB * 1024 * 1024;
 }
 
 export class GitConnectionService {
@@ -216,6 +222,8 @@ export class GitConnectionService {
     userId: string;
   }): Promise<PluginRegistry> {
     const { connectionId, organizationId, repoFullName, userId } = params;
+    const { assertCustomPluginsAllowed } = await import("./plugin-manager.service");
+    assertCustomPluginsAllowed();
     const connection = await this.getValidConnection(connectionId, organizationId);
     const provider = this.getProvider(connection.provider);
 
@@ -229,16 +237,28 @@ export class GitConnectionService {
 
     logger.info({ repoFullName, branch, organizationId }, "Installing plugin from git repo");
 
-    // Download archive
-    const archive = await provider.downloadArchive(connection.installationId, repoFullName, branch);
+    // Download the archive at the branch head's exact commit
+    const head = await provider.getLatestCommit(connection.installationId, repoFullName, branch);
+    const archive = await provider.downloadArchive(
+      connection.installationId,
+      repoFullName,
+      head.sha,
+      maxArchiveBytes(),
+    );
 
     // Validate the tarball contains a valid plugin
     const { pluginId } = await validateTarball(archive.buffer);
 
-    // Check if plugin already exists for this org
+    // Plugin ids are global: any existing row (core, another org's, or this
+    // org's) blocks installing a new plugin under the same id.
     const existing = await pluginRegistryRepository.findByPluginId(pluginId);
-    if (existing && existing.organizationId === organizationId) {
-      throw new Error(`Plugin ${pluginId} already exists. Use syncPlugin to update it.`);
+    if (existing) {
+      const ownGit = existing.sourceType === "git" && existing.organizationId === organizationId;
+      throw new Error(
+        ownGit
+          ? `Plugin ${pluginId} already exists. Use syncPlugin to update it.`
+          : `Plugin id ${pluginId} is not available. Choose a different package name.`,
+      );
     }
 
     // Upload archive to S3/local storage
@@ -264,7 +284,7 @@ export class GitConnectionService {
     const { pluginManagerService } = await import("./plugin-manager.service");
     await pluginManagerService.registerPlugin(extractPath, "git", organizationId);
 
-    // Install dependencies and build
+    // Install dependencies (lifecycle scripts disabled) and check the shipped build
     await pluginManagerService.installPlugin(pluginId);
     await pluginManagerService.buildPlugin(pluginId);
 
@@ -300,21 +320,15 @@ export class GitConnectionService {
   /**
    * Check if a git-sourced plugin has updates available.
    */
-  async checkForUpdates(pluginRegistryId: string): Promise<{
+  async checkForUpdates(
+    pluginRegistryId: string,
+    organizationId: string,
+  ): Promise<{
     hasUpdate: boolean;
     currentSha?: string;
     latestSha?: string;
   }> {
-    const plugin = await pluginRegistryRepository.findById(pluginRegistryId);
-    if (!plugin || plugin.sourceType !== "git" || !plugin.gitConnectionId) {
-      throw new Error("Plugin is not a git-sourced plugin");
-    }
-
-    const connection = await gitConnectionRepository.findById(plugin.gitConnectionId);
-    if (!connection || connection.status !== "active") {
-      throw new Error("Git connection not found or inactive");
-    }
-
+    const { plugin, connection } = await this.getGitPlugin(pluginRegistryId, organizationId);
     const provider = this.getProvider(connection.provider);
     const latest = await provider.getLatestCommit(
       connection.installationId,
@@ -330,19 +344,17 @@ export class GitConnectionService {
   }
 
   /**
-   * Sync a single git-sourced plugin (re-download if changed).
+   * Apply the latest commit of a git-sourced plugin's branch (re-download if
+   * changed). Only runs on an explicit admin request; the scheduled job only
+   * flags available updates.
    */
-  async syncPlugin(pluginRegistryId: string): Promise<{ updated: boolean; newSha?: string }> {
-    const plugin = await pluginRegistryRepository.findById(pluginRegistryId);
-    if (!plugin || plugin.sourceType !== "git" || !plugin.gitConnectionId) {
-      throw new Error("Plugin is not a git-sourced plugin");
-    }
-
-    const connection = await gitConnectionRepository.findById(plugin.gitConnectionId);
-    if (!connection || connection.status !== "active") {
-      throw new Error("Git connection not found or inactive");
-    }
-
+  async syncPlugin(
+    pluginRegistryId: string,
+    organizationId: string,
+  ): Promise<{ updated: boolean; newSha?: string }> {
+    const { assertCustomPluginsAllowed } = await import("./plugin-manager.service");
+    assertCustomPluginsAllowed();
+    const { plugin, connection } = await this.getGitPlugin(pluginRegistryId, organizationId);
     const provider = this.getProvider(connection.provider);
 
     // Check if there's an update
@@ -361,6 +373,7 @@ export class GitConnectionService {
         toUpdatePayload({
           gitLastSyncAt: new Date(),
           gitSyncError: null,
+          gitAvailableCommitSha: null,
         }),
       );
       return { updated: false };
@@ -371,12 +384,21 @@ export class GitConnectionService {
       "Plugin update detected, syncing",
     );
 
-    // Download new archive
+    // Download the archive at exactly the commit that was checked
     const archive = await provider.downloadArchive(
       connection.installationId,
       plugin.gitRepoFullName!,
-      plugin.gitBranch!,
+      latest.sha,
+      maxArchiveBytes(),
     );
+
+    // Validate before touching the installed copy; the plugin id must not change
+    const { pluginId: archivePluginId } = await validateTarball(archive.buffer);
+    if (archivePluginId !== plugin.pluginId) {
+      throw new Error(
+        `Repository now contains plugin ${archivePluginId}, expected ${plugin.pluginId}`,
+      );
+    }
 
     // Stop running workers — track if it was running so we can restart after update
     let wasRunning = false;
@@ -414,7 +436,7 @@ export class GitConnectionService {
     await fs.rm(extractPath, { recursive: true, force: true }).catch(() => {});
     await extractTarball(archive.buffer, extractPath);
 
-    // Re-register plugin, reinstall dependencies, and rebuild
+    // Re-register plugin, reinstall dependencies, and check the shipped build
     const { pluginManagerService } = await import("./plugin-manager.service");
     await pluginManagerService.registerPlugin(extractPath, "git", plugin.organizationId!);
     await pluginManagerService.installPlugin(plugin.pluginId);
@@ -429,6 +451,7 @@ export class GitConnectionService {
         gitLastCommitSha: archive.commitSha,
         gitLastSyncAt: new Date(),
         gitSyncError: null,
+        gitAvailableCommitSha: null,
         zipFilePath: uploadResult.upload.path,
         zipUploadId: uploadResult.upload.id,
       }),
@@ -453,43 +476,50 @@ export class GitConnectionService {
   }
 
   /**
-   * Sync all git-sourced plugins across all organizations.
-   * Called by the scheduled job.
+   * Check every git-sourced plugin for a newer commit and flag it as an
+   * available update. Never downloads or installs code: applying an update is
+   * an explicit admin action (syncPlugin). Called by the scheduled job.
    */
-  async syncAllGitPlugins(): Promise<void> {
+  async checkAllGitPluginsForUpdates(): Promise<void> {
     const gitPlugins = await pluginRegistryRepository.findAllGitPlugins();
     if (gitPlugins.length === 0) return;
 
-    logger.info({ count: gitPlugins.length }, "Starting git plugin sync");
+    const repository = AppDataSource.getRepository(
+      (await import("@server/entities/plugin-registry.entity")).PluginRegistry,
+    );
 
-    let updated = 0;
+    let available = 0;
     let errors = 0;
 
     for (const plugin of gitPlugins) {
       try {
-        const result = await this.syncPlugin(plugin.id);
-        if (result.updated) updated++;
+        if (!plugin.organizationId) continue;
+        const { hasUpdate, latestSha } = await this.checkForUpdates(
+          plugin.id,
+          plugin.organizationId,
+        );
+        if (hasUpdate) available++;
+        await repository.update(
+          plugin.id,
+          toUpdatePayload({
+            gitAvailableCommitSha: hasUpdate ? latestSha : null,
+            gitSyncError: null,
+          }),
+        );
       } catch (error) {
         errors++;
         const message = error instanceof Error ? error.message : String(error);
-        logger.error({ err: error, pluginId: plugin.pluginId }, "Failed to sync git plugin");
-
-        // Record the error on the plugin
-        await AppDataSource.getRepository(
-          (await import("@server/entities/plugin-registry.entity")).PluginRegistry,
-        )
-          .update(
-            plugin.id,
-            toUpdatePayload({
-              gitSyncError: message,
-              gitLastSyncAt: new Date(),
-            }),
-          )
+        logger.error({ err: error, pluginId: plugin.pluginId }, "Failed to check git plugin");
+        await repository
+          .update(plugin.id, toUpdatePayload({ gitSyncError: message }))
           .catch(() => {});
       }
     }
 
-    logger.info({ total: gitPlugins.length, updated, errors }, "Git plugin sync complete");
+    logger.info(
+      { total: gitPlugins.length, available, errors },
+      "Git plugin update check complete",
+    );
   }
 
   // --- Private helpers ---
@@ -509,6 +539,33 @@ export class GitConnectionService {
       throw new Error(`Git connection is ${connection.status}`);
     }
     return connection;
+  }
+
+  /** Load a git-sourced plugin owned by `organizationId`, with its active connection. */
+  private async getGitPlugin(
+    pluginRegistryId: string,
+    organizationId: string,
+  ): Promise<{ plugin: PluginRegistry; connection: GitConnection }> {
+    const plugin = await pluginRegistryRepository.findById(pluginRegistryId);
+    if (
+      !plugin ||
+      plugin.sourceType !== "git" ||
+      !plugin.gitConnectionId ||
+      plugin.organizationId !== organizationId
+    ) {
+      throw new Error("Plugin is not a git-sourced plugin");
+    }
+
+    const connection = await gitConnectionRepository.findById(plugin.gitConnectionId);
+    if (
+      !connection ||
+      connection.status !== "active" ||
+      connection.organizationId !== organizationId
+    ) {
+      throw new Error("Git connection not found or inactive");
+    }
+
+    return { plugin, connection };
   }
 
   private async removeGitPlugin(plugin: PluginRegistry, organizationId: string): Promise<void> {
