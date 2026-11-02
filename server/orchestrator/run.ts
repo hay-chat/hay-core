@@ -1133,7 +1133,7 @@ async function handleExecutionLoop(
   const toolsCalledThisTurn: ToolLedgerEntry[] = [...decidedActions];
   // Shared (by reference) with the execution layer so corrective re-plans are
   // budgeted per turn, not per execute() call.
-  const turnGuardrailState = { actionClaimRetries: 0, companyInterestRetries: 0 };
+  const turnGuardrailState = { actionClaimRetries: 0, companyInterestRetries: 0, linkRetries: 0 };
   // One playbook re-selection per turn, so a planner that keeps saying "doesn't fit"
   // can't ping-pong between playbooks.
   let playbookReselected = false;
