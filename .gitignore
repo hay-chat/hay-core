@@ -47,7 +47,9 @@ node_modules/
 # tasks/
 
 # Playwright
-/test-results/
+**/test-results/
+.nuxt/
+.claude/scheduled_tasks.lock
 /playwright-report/
 /blob-report/
 /playwright/.cache/
