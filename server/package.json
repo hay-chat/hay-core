@@ -36,7 +36,7 @@
     "@google/genai": "^2.8.0",
     "@hay/form-schema": "*",
     "@mozilla/readability": "^0.6.0",
-    "@puppeteer/browsers": "^2.13.0",
+    "@puppeteer/browsers": "^3.2.6",
     "@trpc/server": "^11.5.0",
     "adm-zip": "^0.6.1",
     "ajv": "^8.20.0",
@@ -62,13 +62,13 @@
     "multer": "^2.5.0",
     "node-cron": "^4.2.1",
     "nodemailer": "^10.3.1",
-    "openai": "^4.62.1",
+    "openai": "^6.49.0",
     "pdf-parse": "^1.1.1",
     "pdfkit": "^0.18.0",
     "pg": "^8.16.3",
     "pino": "^10.3.1",
     "posthog-node": "^5.21.2",
-    "puppeteer-core": "^24.40.0",
+    "puppeteer-core": "^25.16.0",
     "reflect-metadata": "^0.2.2",
     "sanitize-html": "^2.18.1",
     "sharp": "^0.35.5",
@@ -85,7 +85,7 @@
     "word-extractor": "^1.0.4",
     "ws": "^8.14.2",
     "xml2js": "^0.6.2",
-    "zod": "^3.25.76"
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "@types/adm-zip": "^0.5.7",

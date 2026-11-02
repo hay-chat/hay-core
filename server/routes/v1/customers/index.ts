@@ -283,7 +283,7 @@ export const customersRouter = t.router({
   // Merge persistent public context into a customer by external ID (server-to-server, API key auth)
   // Context is stored in customer.external_metadata and injected into the LLM prompt on every conversation
   addContext: scopedProcedure(RESOURCES.CUSTOMERS, ACTIONS.UPDATE)
-    .input(z.object({ externalId: z.string(), context: z.record(z.any()) }))
+    .input(z.object({ externalId: z.string(), context: z.record(z.string(), z.any()) }))
     .mutation(async ({ ctx, input }) => {
       const customer = await customerRepository.findByExternalId(
         input.externalId,

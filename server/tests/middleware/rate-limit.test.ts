@@ -101,7 +101,7 @@ describe("Rate Limiting Middleware", () => {
 
     it("should use IP address for unauthenticated users", () => {
       const useUserId = true;
-      const user = null;
+      const user = null as { id: string } | null;
       const ipAddress = "192.168.1.1";
 
       const identifier = useUserId && user ? user.id : ipAddress;

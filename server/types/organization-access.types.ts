@@ -48,7 +48,7 @@ export interface AccessNotice {
 export const accessNoticeSchema = z.object({
   key: z.string().min(1).max(64),
   level: z.enum(ACCESS_NOTICE_LEVELS).default("info"),
-  params: z.record(z.union([z.string(), z.number()])).optional(),
+  params: z.record(z.string(), z.union([z.string(), z.number()])).optional(),
   text: z.string().max(500).optional(),
   ctaUrl: z.string().url().max(2048).optional(),
   ctaLabel: z.string().max(80).optional(),
