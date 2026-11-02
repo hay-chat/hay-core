@@ -27,8 +27,9 @@ const BUDGETS = {
   // Vue + chat window, loaded when idle or on intent. 48 → 52 KB with the
   // form feature (hay-chat/hay-core#115): master sat at 48.0 KB after CSAT and
   // page tools, and the pre-chat gating + form message plumbing add 2.6 KB
-  // (the form components themselves load on demand).
-  chat: 52 * KB,
+  // (the form components themselves load on demand). 52 → 53 KB for the Vue
+  // 3.5.24 → 3.5.44 patch upgrade, which adds 1.5 KB to the runtime.
+  chat: 53 * KB,
   locale: 2 * KB, // one locale chunk, loaded with the chat
 };
 
