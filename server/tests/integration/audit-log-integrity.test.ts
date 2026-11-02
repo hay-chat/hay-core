@@ -16,6 +16,13 @@ describe("audit log integrity", () => {
   const orgId = "a0d17000-0000-4000-8000-000000000001";
   const userId = "a0d17000-0000-4000-8000-0000000000aa";
   const audits = () => AppDataSource.getRepository(AuditLog);
+  // original_organization_id is never selected by default (pre-migration compatibility).
+  const originalOrg = async (id: string) =>
+    (
+      await AppDataSource.query(`SELECT original_organization_id FROM audit_logs WHERE id = $1`, [
+        id,
+      ])
+    )[0]?.original_organization_id;
 
   beforeAll(async () => {
     if (!AppDataSource.isInitialized) await AppDataSource.initialize();
@@ -66,13 +73,13 @@ describe("audit log integrity", () => {
       organizationId: orgId,
       action: "agent.create",
     });
-    expect((await audits().findOneByOrFail({ id: log.id })).originalOrganizationId).toBe(orgId);
+    expect(await originalOrg(log.id)).toBe(orgId);
 
     await AppDataSource.getRepository(Organization).delete({ id: orgId });
 
     const kept = await audits().findOneByOrFail({ id: log.id });
     expect(kept.organizationId).toBeNull();
-    expect(kept.originalOrganizationId).toBe(orgId);
+    expect(await originalOrg(log.id)).toBe(orgId);
     expect(kept.action).toBe("agent.create");
   });
 
@@ -107,28 +114,20 @@ describe("audit log integrity", () => {
 
   it("purges only rows past retention through the retention job", async () => {
     await freshOrg();
-    const old = await auditLogService.log({
-      userId,
-      organizationId: orgId,
-      action: "agent.update",
-    });
+    // Inserts are allowed, so the expired row is written already backdated.
+    const [{ id: oldId }] = await AppDataSource.query(
+      `INSERT INTO audit_logs (user_id, organization_id, action, created_at)
+       VALUES ($1, $2, 'agent.update', now() - interval '91 days') RETURNING id`,
+      [userId, orgId],
+    );
     const recent = await auditLogService.log({
       userId,
       organizationId: orgId,
       action: "agent.update",
     });
-    // Backdating needs the guard off for a moment (test-only).
-    await AppDataSource.transaction(async (manager) => {
-      await manager.query(`ALTER TABLE audit_logs DISABLE TRIGGER audit_logs_guard`);
-      await manager.query(
-        `UPDATE audit_logs SET created_at = now() - interval '91 days' WHERE id = $1`,
-        [old.id],
-      );
-      await manager.query(`ALTER TABLE audit_logs ENABLE TRIGGER audit_logs_guard`);
-    });
 
     expect(await auditLogService.cleanup()).toBeGreaterThanOrEqual(1);
-    expect(await audits().findOneBy({ id: old.id })).toBeNull();
+    expect(await audits().findOneBy({ id: oldId })).toBeNull();
     expect(await audits().findOneBy({ id: recent.id })).not.toBeNull();
   });
 
