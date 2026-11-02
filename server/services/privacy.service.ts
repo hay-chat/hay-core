@@ -32,6 +32,7 @@ import { config, getDashboardUrl } from "@server/config/env";
 import { IsNull, In } from "typeorm";
 import type { ExportPackageData } from "@server/types/privacy.types";
 import { PRIVACY_DELETION_JOB_TYPE, PRIVACY_EXPORT_JOB_TYPE } from "@server/types/privacy.types";
+import { NO_RECIPIENT_ERROR, organizationAdminEmails } from "./provider-privacy.service";
 import { storageService } from "@server/services/storage.service";
 import { deleteConversationMedia } from "@server/services/conversation-media.service";
 import { isUuid } from "@server/services/media-url.service";
@@ -337,12 +338,16 @@ export class PrivacyService {
 
     // Without the email the link can never be used, so the file goes too.
     try {
-      await this.sendExportReadyEmail(
-        request.email,
-        request.id,
-        downloadToken,
-        request.organizationId,
-      );
+      if (request.metadata?.source) {
+        await this.sendMerchantExportReadyEmail(request, downloadToken);
+      } else {
+        await this.sendExportReadyEmail(
+          request.email,
+          request.id,
+          downloadToken,
+          request.organizationId,
+        );
+      }
     } catch (error) {
       await storageService.delete(upload.id).catch(() => undefined);
       throw error;
@@ -890,6 +895,58 @@ export class PrivacyService {
         recipientEmail: email,
       },
     });
+  }
+
+  /**
+   * A provider-requested export (a store's customers/data_request) goes to
+   * the organization's owners and admins: the store is the controller and
+   * answers its shopper. They are asked to forward it; the shopper is never
+   * emailed.
+   */
+  private async sendMerchantExportReadyEmail(
+    request: PrivacyRequest,
+    downloadToken: string,
+  ): Promise<void> {
+    const organizationId = request.organizationId!;
+    const recipients = await organizationAdminEmails(organizationId);
+    if (recipients.length === 0) throw new Error(NO_RECIPIENT_ERROR);
+
+    const customer = request.customerId
+      ? await AppDataSource.getRepository(Customer).findOne({
+          where: { id: request.customerId, organization_id: organizationId },
+        })
+      : null;
+    const customerLabel =
+      [customer?.name, customer?.email ?? customer?.phone].filter(Boolean).join(" · ") ||
+      "Customer";
+    const reference =
+      typeof request.metadata?.reference === "string" ? request.metadata.reference : request.id;
+
+    await emailService.initialize();
+    const baseUrl = getDashboardUrl();
+    const downloadUrl = `${baseUrl}/privacy/download?requestId=${request.id}&token=${downloadToken}`;
+    const locale = await getOrganizationLocale(organizationId);
+
+    for (const to of recipients) {
+      await emailService.sendTemplateEmail({
+        to,
+        template: "privacy-export-ready-merchant",
+        locale,
+        variables: {
+          downloadUrl,
+          customerLabel,
+          customerId: request.customerId ?? "",
+          requestReference: reference,
+          expiresIn: `${this.exportRetentionDays} days`,
+          companyName: "Hay.chat",
+          supportUrl: `${baseUrl}/support`,
+          currentYear: new Date().getFullYear().toString(),
+          companyAddress: "Hay.chat",
+          websiteUrl: baseUrl,
+          recipientEmail: to,
+        },
+      });
+    }
   }
 
   /**

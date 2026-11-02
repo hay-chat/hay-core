@@ -986,8 +986,9 @@ export const pluginApiTrpcRouter = router({
   /**
    * Privacy Capability - Export a data subject's data on the provider's
    * request (e.g. customers/data_request). Queues the DSAR export for each
-   * matching customer; the download link goes to the email on the customer
-   * record. Customers without one are reported as `undeliverable`.
+   * matching customer; the download link goes to the organization's owners
+   * and admins (the controller) to forward, never to the shopper. With no
+   * owner/admin email the matches are reported as `undeliverable`.
    */
   "privacy.exportCustomer": pluginProcedure
     .input(privacySubjectSchema)

@@ -14,8 +14,9 @@
  *   background job. Shopify customer records are never copied; the agent reads
  *   them live through the Admin API.
  * - customers/data_request: core queues the data export a verified
- *   self-service request produces and emails its download link to the address
- *   on the matching Hay.chat customer record.
+ *   self-service request produces and emails its download link to the shop's
+ *   owners and admins in Hay.chat to forward (the merchant answers its
+ *   customer); the customer is never emailed.
  * - shop/redact: disconnect the shop (core clears the token and routing keys
  *   and stops the worker).
  *

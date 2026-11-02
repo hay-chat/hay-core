@@ -41,11 +41,15 @@ jest.mock("../../services/storage.service", () => {
   };
 });
 
-const sentEmails: Array<{ to: string; template: string }> = [];
+const sentEmails: Array<{ to: string; template: string; variables: Record<string, string> }> = [];
 jest.mock("../../services/email.service", () => ({
   emailService: {
     initialize: async () => undefined,
-    sendTemplateEmail: async (email: { to: string; template: string }) => {
+    sendTemplateEmail: async (email: {
+      to: string;
+      template: string;
+      variables: Record<string, string>;
+    }) => {
       sentEmails.push(email);
     },
   },
@@ -152,8 +156,37 @@ function fakeResponse() {
   return res;
 }
 
+const MERCHANT_OWNER = "provider-owner@example.com";
+const MERCHANT_ADMIN = "provider-admin@example.com";
+const MERCHANT_MEMBER = "provider-member@example.com";
+const MERCHANT_FORMER_ADMIN = "provider-former-admin@example.com";
+
+/** Org members of every kind; only the active owner and admin should get an export. */
+async function seedMembers(organizationId: string): Promise<void> {
+  for (const [email, role, active] of [
+    [MERCHANT_OWNER, "owner", true],
+    [MERCHANT_ADMIN, "admin", true],
+    [MERCHANT_MEMBER, "member", true],
+    [MERCHANT_FORMER_ADMIN, "admin", false],
+  ] as const) {
+    const [user] = await AppDataSource.query(
+      `INSERT INTO users (email, password, first_name, is_active, organization_id, role)
+       VALUES ($1, 'x', 'Merchant', true, $2, $3) RETURNING id`,
+      [email, organizationId, role],
+    );
+    await AppDataSource.query(
+      `INSERT INTO user_organizations (user_id, organization_id, role, is_active)
+       VALUES ($1, $2, $3, $4)`,
+      [user.id, organizationId, role, active],
+    );
+  }
+}
+
 async function cleanup(): Promise<void> {
   const ids = [ORG_A, ORG_B];
+  await AppDataSource.query(`DELETE FROM users WHERE email = ANY($1)`, [
+    [MERCHANT_OWNER, MERCHANT_ADMIN, MERCHANT_MEMBER, MERCHANT_FORMER_ADMIN],
+  ]);
   await AppDataSource.query(
     `DELETE FROM privacy_requests WHERE organization_id = ANY($1) OR metadata ->> 'source' = $2`,
     [ids, `plugin:${PLUGIN_ID}`],
@@ -273,8 +306,9 @@ describe("provider-initiated privacy requests", () => {
   });
 
   describe("privacy.exportCustomer", () => {
-    it("emails the export to the address on the customer record", async () => {
-      await seedCustomer(ORG_A, { email: EMAIL });
+    it("emails the export to the store's owners and admins, never the shopper", async () => {
+      await seedMembers(ORG_A);
+      const customerId = await seedCustomer(ORG_A, { email: EMAIL });
       await seedCustomer(ORG_A, { phone: "+5511988887777" });
 
       const result = await caller(ORG_A)["privacy.exportCustomer"]({
@@ -282,21 +316,80 @@ describe("provider-initiated privacy requests", () => {
         phones: ["+5511988887777"],
         reference: "nuvemshop:data_request:456",
       });
-      expect(result).toMatchObject({ matched: 2, undeliverable: 1 });
-      expect(result.requestIds).toHaveLength(1);
+      expect(result).toMatchObject({ matched: 2, undeliverable: 0 });
+      expect(result.requestIds).toHaveLength(2);
 
       await runQueuedJobs();
 
-      expect(sentEmails.map((e) => [e.to, e.template])).toEqual([[EMAIL, "privacy-export-ready"]]);
-      const [request] = await AppDataSource.query(
-        `SELECT status, metadata FROM privacy_requests WHERE id = $1`,
-        [result.requestIds[0]],
-      );
-      expect(request.status).toBe("completed");
-      expect(request.metadata).toMatchObject({
-        source: `plugin:${PLUGIN_ID}`,
-        reference: "nuvemshop:data_request:456",
+      expect(sentEmails.map((e) => e.to).sort()).toEqual([
+        MERCHANT_ADMIN,
+        MERCHANT_ADMIN,
+        MERCHANT_OWNER,
+        MERCHANT_OWNER,
+      ]);
+      expect(sentEmails.every((e) => e.template === "privacy-export-ready-merchant")).toBe(true);
+      const forShopper = sentEmails.find((e) => e.variables.customerId === customerId)!;
+      expect(forShopper.variables).toMatchObject({
+        customerLabel: `Provider Shopper · ${EMAIL}`,
+        requestReference: "nuvemshop:data_request:456",
       });
+
+      const requests = await AppDataSource.query(
+        `SELECT status, email, metadata FROM privacy_requests WHERE id = ANY($1)`,
+        [result.requestIds],
+      );
+      for (const request of requests) {
+        expect(request.status).toBe("completed");
+        expect(request.email).toBe("");
+        expect(request.metadata).toMatchObject({
+          source: `plugin:${PLUGIN_ID}`,
+          reference: "nuvemshop:data_request:456",
+        });
+      }
+    });
+
+    it("records a request with no matching customer as answered, sending nothing", async () => {
+      await seedMembers(ORG_A);
+      const result = await caller(ORG_A)["privacy.exportCustomer"]({
+        emails: ["nobody@example.com"],
+        reference: "nuvemshop:data_request:457",
+      });
+      expect(result).toEqual({ matched: 0, requestIds: [], undeliverable: 0 });
+      const [request] = await AppDataSource.query(
+        `SELECT status, customer_id, job_id, metadata FROM privacy_requests
+         WHERE organization_id = $1 AND type = 'export'`,
+        [ORG_A],
+      );
+      expect(request).toMatchObject({ status: "completed", customer_id: null, job_id: null });
+      expect(request.metadata).toMatchObject({
+        outcome: "no_match",
+        reference: "nuvemshop:data_request:457",
+      });
+      expect(sentEmails).toHaveLength(0);
+    });
+
+    it("records the export as undeliverable when the store has no owner or admin email", async () => {
+      const customerId = await seedCustomer(ORG_A, { email: EMAIL });
+      const result = await caller(ORG_A)["privacy.exportCustomer"]({ emails: [EMAIL] });
+      expect(result).toEqual({ matched: 1, requestIds: [], undeliverable: 1 });
+      const [request] = await AppDataSource.query(
+        `SELECT status, customer_id, job_id, error_message, metadata FROM privacy_requests
+         WHERE organization_id = $1 AND type = 'export'`,
+        [ORG_A],
+      );
+      expect(request).toMatchObject({
+        status: "failed",
+        customer_id: customerId,
+        job_id: null,
+        error_message: "No owner or admin with an email to deliver the export to",
+      });
+      expect(request.metadata).toMatchObject({ outcome: "no_recipient" });
+      const [jobs] = await AppDataSource.query(
+        `SELECT count(*)::int AS n FROM jobs WHERE organization_id = $1`,
+        [ORG_A],
+      );
+      expect(jobs.n).toBe(0);
+      expect(sentEmails).toHaveLength(0);
     });
   });
 

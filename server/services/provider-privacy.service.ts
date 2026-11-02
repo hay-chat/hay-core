@@ -31,8 +31,33 @@ export interface ProviderRequestResult {
   matched: number;
   /** Privacy requests queued (or already in flight) for those customers. */
   requestIds: string[];
-  /** Exports only: matched customers with no email to deliver the export to. */
+  /** Exports only: matched customers whose export has no one to go to (no owner/admin email). */
   undeliverable: number;
+}
+
+/** Why a provider request queued no job; kept in the privacy request's metadata.outcome. */
+const NO_MATCH = "no_match";
+const NO_RECIPIENT = "no_recipient";
+export const NO_RECIPIENT_ERROR = "No owner or admin with an email to deliver the export to";
+
+/**
+ * Emails of the active owners and admins of an organization: the merchant,
+ * who as controller answers a shopper's access request. Provider-requested
+ * exports go to them, never to the shopper.
+ */
+export async function organizationAdminEmails(organizationId: string): Promise<string[]> {
+  const rows: Array<{ email: string }> = await AppDataSource.query(
+    `SELECT DISTINCT u.email
+       FROM user_organizations uo
+       JOIN users u ON u.id = uo.user_id
+      WHERE uo.organization_id = $1
+        AND uo.is_active = true
+        AND uo.role IN ('owner', 'admin')
+        AND u.is_active = true
+        AND coalesce(u.email, '') <> ''`,
+    [organizationId],
+  );
+  return rows.map((row) => row.email);
 }
 
 /** Aggregate status of every request filed under one data-deletion confirmation code. */
@@ -84,9 +109,12 @@ export class ProviderPrivacyService {
   /**
    * Queue an export or erasure for every customer of the organization the
    * identifiers match. A customer with a request of the same type already in
-   * flight keeps it (providers retry webhooks). Exports are emailed to the
-   * address on the customer record, the same inbox the self-service flow
-   * verifies; a customer without one is counted as undeliverable.
+   * flight keeps it (providers retry webhooks).
+   *
+   * Exports go to the organization's owners and admins (the controller), who
+   * forward them to the shopper; the shopper is never emailed. An export with
+   * no match, or with no owner/admin email to go to, queues no job and is
+   * recorded as a privacy request with that outcome.
    */
   async queueForSubject(
     type: "export" | "deletion",
@@ -98,12 +126,17 @@ export class ProviderPrivacyService {
     const requestIds: string[] = [];
     let undeliverable = 0;
 
-    for (const customer of customers) {
-      if (type === "export" && !customer.email) {
-        undeliverable += 1;
-        continue;
+    if (type === "export" && customers.length === 0) {
+      await this.recordUnqueued(organizationId, null, source, NO_MATCH);
+    } else if (type === "export" && (await organizationAdminEmails(organizationId)).length === 0) {
+      for (const customer of customers) {
+        await this.recordUnqueued(organizationId, customer.id, source, NO_RECIPIENT);
       }
-      requestIds.push(await this.queueForCustomer(type, customer, source));
+      undeliverable = customers.length;
+    } else {
+      for (const customer of customers) {
+        requestIds.push(await this.queueForCustomer(type, customer, source));
+      }
     }
 
     logger.info(
@@ -118,6 +151,34 @@ export class ProviderPrivacyService {
       "Provider privacy request queued",
     );
     return { matched: customers.length, requestIds, undeliverable };
+  }
+
+  /** An export request that queued no job: kept so the provider request leaves a record. */
+  private async recordUnqueued(
+    organizationId: string,
+    customerId: string | null,
+    source: { pluginId: string; reference?: string },
+    outcome: typeof NO_MATCH | typeof NO_RECIPIENT,
+  ): Promise<void> {
+    const requestRepository = AppDataSource.getRepository(PrivacyRequest);
+    await requestRepository.save(
+      requestRepository.create({
+        email: "",
+        customerId: customerId ?? undefined,
+        organizationId,
+        type: "export",
+        subjectType: "customer",
+        // Nothing is held for an unmatched subject: the request is answered.
+        status: outcome === NO_MATCH ? "completed" : "failed",
+        completedAt: new Date(),
+        errorMessage: outcome === NO_RECIPIENT ? NO_RECIPIENT_ERROR : undefined,
+        metadata: {
+          source: `plugin:${source.pluginId}`,
+          outcome,
+          ...(source.reference ? { reference: source.reference } : {}),
+        },
+      }),
+    );
   }
 
   private async queueForCustomer(
@@ -138,9 +199,10 @@ export class ProviderPrivacyService {
       if (inFlight) return inFlight.id;
 
       const request = requestRepository.create({
-        // Exports are delivered here; erasures send no email (the provider
-        // answers the data subject), so the column may stay blank.
-        email: customer.email ?? "",
+        // Never used to contact the shopper: exports go to the organization's
+        // owners and admins, erasures send no email (the provider answers). An
+        // erasure keeps it to anonymize the shopper's other requests.
+        email: type === "deletion" ? (customer.email ?? "") : "",
         customerId: customer.id,
         organizationId: customer.organization_id,
         type,

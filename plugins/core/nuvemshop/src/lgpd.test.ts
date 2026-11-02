@@ -130,6 +130,21 @@ describe("handleLgpdWebhook", () => {
     expect(logged).not.toContain("5511999999999");
   });
 
+  it.each([
+    [{ matched: 0, requestIds: [], undeliverable: 0 }, "no Hay.chat customer matches"],
+    [{ matched: 1, requestIds: [], undeliverable: 1 }, "no store owner or admin email"],
+  ])(
+    "customers/data_request acknowledges and warns when the export reaches no one (%o)",
+    async (result, message) => {
+      const d = deps({ requestPrivacy: vi.fn(async () => result) });
+      const res = response();
+      await handleLgpdWebhook({ headers: verified, body: DATA_REQUEST }, res, d);
+      expect(res.statusCode).toBe(200);
+      expect(vi.mocked(d.logger.warn).mock.calls[0][0]).toContain(message);
+      expect(JSON.stringify(vi.mocked(d.logger.warn).mock.calls)).not.toContain("a@b.com");
+    },
+  );
+
   it("answers 500 when core rejects the request, so Nuvemshop retries", async () => {
     const d = deps({ requestPrivacy: vi.fn(async () => Promise.reject(new Error("down"))) });
     const res = response();

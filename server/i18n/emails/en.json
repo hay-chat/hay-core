@@ -173,6 +173,17 @@
     "included4": "Documents and content",
     "included5": "Organization membership data"
   },
+  "privacy-export-ready-merchant": {
+    "subject": "A customer's data export is ready to forward",
+    "title": "Customer data export ready",
+    "body": "Your store received a data access request from one of its customers. {{ companyName }} has prepared the data it holds about them. As the store, you answer this request: download the export and forward it to the customer.",
+    "customer": "Customer:",
+    "request": "Request:",
+    "downloadButton": "Download export",
+    "info1": "The link expires in {{ expiresIn }} and can be used once, so download the file before forwarding it.",
+    "info2": "{{ companyName }} has not contacted the customer.",
+    "info3": "The file contains the customer's personal data. Send it only to them and store it securely."
+  },
   "privacy-deletion-request": {
     "subject": "Verify Your Data Deletion Request",
     "title": "Verify Data Deletion Request",
