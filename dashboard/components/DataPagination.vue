@@ -62,9 +62,9 @@
 
 <script setup lang="ts">
 export interface DataPaginationProps {
-  currentPage: number;
-  totalPages: number;
-  itemsPerPage: number;
+  currentPage?: number;
+  totalPages?: number;
+  itemsPerPage?: number;
   totalItems?: number;
 }
 
