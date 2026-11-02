@@ -1,199 +1,89 @@
-# Database Naming Conventions and Strategy
+# Database Conventions
 
-## Decision Summary
-**Database**: PostgreSQL with snake_case naming
-**Application**: TypeScript with camelCase naming  
-**Bridge**: TypeORM SnakeNamingStrategy for automatic conversion
+PostgreSQL 16 + pgvector, accessed through TypeORM. Read this before touching entities,
+migrations, indexes or raw SQL.
 
-## Why This Approach?
+## Naming
 
-1. **Database Best Practices**: snake_case is the SQL/PostgreSQL standard
-2. **TypeScript Best Practices**: camelCase is the JavaScript/TypeScript standard
-3. **Automatic Conversion**: TypeORM's naming strategy handles the mapping seamlessly
-4. **No Confusion**: Clear separation between database and application layers
-5. **Industry Standard**: This is how most professional Node.js/PostgreSQL applications are built
+- **Database**: snake_case tables (plural) and columns: `site_pages`, `organization_id`, `created_at`.
+- **TypeScript**: camelCase properties: `organizationId`, `createdAt`.
+- `SnakeNamingStrategy` (`database/naming-strategy.ts`, wired in `database/data-source.ts`) converts
+  between them. Don't pass `name:` to `@Column`; set the table name explicitly in `@Entity("table_name")`.
+- Constraint/index names: `pk_<table>`, `fk_<table>_<target>`, `idx_<table>_<cols>`, `uq_<table>_<cols>`.
+- Known deviation: `ActionLog` (`database/entities/action-log.entity.ts`) uses snake_case properties.
+  Don't copy it.
 
-## Naming Rules
+## Entities
 
-### Database Layer (PostgreSQL)
-- **Tables**: Plural, snake_case (e.g., `users`, `api_keys`, `plugin_instances`)
-- **Columns**: snake_case (e.g., `first_name`, `created_at`, `organization_id`)
-- **Indexes**: `idx_tablename_column` (e.g., `idx_users_email`)
-- **Foreign Keys**: `fk_tablename_column` (e.g., `fk_users_organization_id`)
-- **Primary Keys**: Always `id` (UUID type)
-- **Timestamps**: `created_at`, `updated_at` (timestamptz)
-- **Booleans**: `is_` prefix (e.g., `is_active`, `is_deleted`)
-- **Foreign Key Columns**: `entity_id` (e.g., `user_id`, `organization_id`)
+- Two directories, both in use: `server/entities/` (older core entities) and
+  `server/database/entities/` (newer ones; put new entities here).
+- Every entity is listed explicitly in the `entities` array of `database/data-source.ts`; add new ones there.
+- Extend `BaseEntity` (uuid `id`, `createdAt`/`updatedAt` as `timestamptz`) or, for tenant data,
+  `OrganizationScopedEntity` (`entities/base.entity.ts`), which adds `organizationId`.
+- Org-scoped reads by id go through `findByIdAndOrganization(id, organizationId)`, never `findById`
+  followed by a manual `organizationId` check.
+- `synchronize` is always `false`. Schema only changes through migrations.
 
-### Application Layer (TypeScript/TypeORM)
-- **Entity Classes**: PascalCase singular (e.g., `User`, `ApiKey`, `PluginInstance`)
-- **Properties**: camelCase (e.g., `firstName`, `createdAt`, `organizationId`)
-- **Methods**: camelCase (e.g., `getFullName()`, `hasPermission()`)
-- **Relations**: camelCase (e.g., `organization`, `users`)
+### jsonb
 
-### TypeORM Entity Rules
+Type jsonb columns with a real TypeScript type, not `any`:
 
-#### DO NOT:
-```typescript
-// ❌ WRONG - Don't specify column names explicitly
-@Column({ name: "first_name" })
-firstName: string;
+```ts
+@Column({ type: "jsonb", default: () => "'[]'" })
+orderRefs!: string[];
 
-// ❌ WRONG - Don't use snake_case in TypeScript
-@Column()
-first_name: string;
+@Column({ type: "jsonb", nullable: true })
+result?: Record<string, unknown>;
 ```
 
-#### DO:
-```typescript
-// ✅ CORRECT - Let naming strategy handle it
-@Column()
-firstName: string;
+### Indexes
 
-// ✅ CORRECT - Only specify name for special cases (legacy compatibility)
-@JoinColumn({ name: "organization_id" }) // Only for foreign keys if needed
-organization: Organization;
+Every index created in a migration is mirrored on the entity with `@Index`, using the same name, so
+`migration:generate` doesn't try to drop or recreate it:
+
+```ts
+@Index("uq_site_pages_org_url", ["organizationId", "url"], { unique: true })
 ```
 
-## Base Entity Pattern
+## Migrations
 
-All entities should extend from our BaseEntity:
-
-```typescript
-@Entity("table_name") // Table name explicitly in snake_case plural
-export class EntityName extends BaseEntity {
-  // Properties in camelCase
-  @Column()
-  propertyName: string;
-}
-```
-
-## Migration Strategy
-
-1. **Initial Migration**: Single migration file that creates entire schema
-2. **Development**: Generate new migrations for schema changes
-3. **Production**: Run migrations in order, never use `synchronize: true`
-4. **Naming**: Migration files use descriptive names (e.g., `1234567890-CreateInitialSchema.ts`)
-
-## Data Source Configuration
-
-```typescript
-export const AppDataSource = new DataSource({
-  // ... other config
-  namingStrategy: new SnakeNamingStrategy(), // CRITICAL: Always include this
-  synchronize: false, // NEVER true in production
-  // ...
-});
-```
-
-## Common Patterns
-
-### Timestamps
-Every entity gets these from BaseEntity:
-- `createdAt` → `created_at` in database
-- `updatedAt` → `updated_at` in database
-
-### Soft Deletes
-If needed:
-- `deletedAt` → `deleted_at` in database
-
-### User Tracking
-- `createdBy` → `created_by` in database  
-- `updatedBy` → `updated_by` in database
-
-### Organization Scoping
-- `organizationId` → `organization_id` in database
-
-## Examples
-
-### Entity Definition
-```typescript
-@Entity("products")
-export class Product extends BaseEntity {
-  @Column({ type: "varchar", length: 255 })
-  productName: string; // → product_name in DB
-
-  @Column({ type: "decimal", precision: 10, scale: 2 })
-  unitPrice: number; // → unit_price in DB
-
-  @Column({ type: "boolean", default: true })
-  isActive: boolean; // → is_active in DB
-
-  @ManyToOne(() => Category)
-  @JoinColumn() // Let naming strategy handle the column name
-  category: Category; // → category_id in DB
-}
-```
-
-### Query Examples
-```typescript
-// TypeScript uses camelCase
-const user = await userRepository.findOne({
-  where: { 
-    firstName: "John",  // TypeORM converts to first_name
-    isActive: true      // TypeORM converts to is_active
-  }
-});
-
-// Raw SQL uses snake_case
-const result = await queryRunner.query(
-  `SELECT * FROM users WHERE first_name = $1 AND is_active = $2`,
-  ["John", true]
-);
-```
-
-## Troubleshooting
-
-### Issue: Column not found
-**Cause**: Explicit column name overriding naming strategy
-**Fix**: Remove `name` property from `@Column()` decorator
-
-### Issue: Duplicate columns after migration
-**Cause**: Changing between explicit names and naming strategy
-**Fix**: Create new migration to drop old columns
-
-### Issue: Foreign key constraints failing
-**Cause**: Mismatched column names between entities
-**Fix**: Ensure both entities use same naming approach
-
-## Checklist for New Entities
-
-- [ ] Entity extends BaseEntity or OrganizationScopedEntity
-- [ ] No explicit `name` in @Column decorators (unless special case)
-- [ ] Properties use camelCase
-- [ ] Table name specified in @Entity decorator (snake_case, plural)
-- [ ] Foreign keys use @JoinColumn without explicit name
-- [ ] Indexes defined with clear naming pattern
-- [ ] No raw SQL with camelCase column names
-
-## Database Initialization Commands
+- Location: `server/database/migrations/<timestamp>-<PascalName>.ts`. The timestamp is epoch
+  milliseconds and must be greater than every existing one; the class is `<PascalName><timestamp>` and
+  sets `name` to the same string.
+- Hand-write SQL with `queryRunner.query`. Review anything from `migration:generate` before keeping it.
+- Make them idempotent: `CREATE TABLE IF NOT EXISTS`, `ADD COLUMN IF NOT EXISTS`,
+  `CREATE INDEX IF NOT EXISTS`, `DROP ... IF EXISTS`. Always provide a working `down`.
+- **Migrations are run by hand after deploy.** Production deploys every merge to `master`
+  automatically, and the new code runs before its migration does. Code must keep working while a
+  migration is pending: add columns as nullable or with defaults, don't read a new column/table on a
+  path that would fail without it, and drop or rename old columns only in a later release once nothing
+  reads them. If a change can't meet this, say so in the PR's deploy notes.
+- Never rename or edit a migration that has been applied.
+- Known duplicate timestamps (already applied; leave them as they are, TypeORM tracks them by class
+  name): `1761000000000` (AddMultiOrganizationSupport, CreatePrivacyRequestsAndUserDeletion),
+  `1781100000000` (AddEditorDocuments, ConvertConversationChannelToVarchar), `1784500000000`
+  (AddOrganizationAgentPause, AddPushSubscriptions). Don't add new ones.
 
 ```bash
-# Development - Fresh start
-dropdb hay && createdb hay
 cd server
-npm run migration:run
-
-# Generate new migration after entity changes
-npm run migration:generate -- ./database/migrations/DescriptiveName
-
-# Run pending migrations
-npm run migration:run
-
-# Revert last migration
-npm run migration:revert
+npm run migration:show                       # status
+npm run migration:run                        # apply pending
+npm run migration:revert                     # revert the last one
+npm run migration:generate -- ./database/migrations/Name   # draft from entity diff
 ```
 
-## Important Notes
+## Raw SQL
 
-1. **NEVER** mix naming conventions in the same table
-2. **NEVER** use `synchronize: true` in production
-3. **ALWAYS** review generated migrations before running
-4. **ALWAYS** test migrations on a copy of production data
-5. **DOCUMENT** any deviations from these conventions
+- Raw SQL uses snake_case column names.
+- Values are always parameters: `$1, $2` in `query()`, `:name` in QueryBuilder. Never interpolate
+  values into SQL strings.
+- Identifiers (column/relation names) can't be parameters. When one is dynamic (filters, sort,
+  search fields), validate it with `assertSafeIdentifier(name, context)` from
+  `repositories/base.repository.ts` before interpolating it, or map it from a fixed allow-list.
 
-## References
-
-- [TypeORM Naming Strategy](https://typeorm.io/naming-strategy)
-- [PostgreSQL Naming Conventions](https://www.postgresql.org/docs/current/sql-syntax-lexical.html)
-- [SQL Style Guide](https://www.sqlstyle.guide/)
+```ts
+await queryRunner.query(`SELECT id FROM documents WHERE organization_id = $1 AND status = $2`, [
+  organizationId,
+  status,
+]);
+```
