@@ -3,7 +3,6 @@ import { dpopCacheService } from "./dpop-cache.service";
 import { jobQueueService } from "./job-queue.service";
 import { privacyService } from "./privacy.service";
 import { pluginInstanceManagerService } from "./plugin-instance-manager.service";
-import { pluginRouteService } from "./plugin-route.service";
 import { orchestratorWorker } from "@server/workers/orchestrator.worker";
 import { refreshOAuthTokens } from "./oauth-token-refresh.job";
 import { documentRetryService } from "./document-retry.service";
@@ -48,16 +47,6 @@ const jobRegistry: CronJobConfig[] = [
   },
 
   {
-    name: "plugin-rate-limit-cleanup",
-    description: "Clear expired plugin route rate limit entries",
-    schedule: 60000, // Every 60 seconds
-    handler: async () => pluginRouteService.clearRateLimits(),
-    singleton: true,
-    enabled: true,
-    skipDatabaseLogging: true, // Don't log frequent cleanups
-  },
-
-  {
     name: "plugin-worker-cleanup",
     description: "Clean up inactive plugin workers (TypeScript-based plugins)",
     schedule: 300000, // Every 5 minutes
@@ -77,6 +66,19 @@ const jobRegistry: CronJobConfig[] = [
     handler: async () => {
       const { authSessionService } = await import("./auth-session.service");
       await authSessionService.cleanupEndedSessions();
+    },
+    singleton: true,
+    enabled: true,
+  },
+
+  {
+    name: "site-index-sync",
+    description:
+      "Re-read each organization's sitemap into the site page index (find_page_url, link check)",
+    schedule: "15 4 * * *", // Daily at 4:15 AM
+    handler: async () => {
+      const { siteIndexService } = await import("./site-index.service");
+      await siteIndexService.syncAll();
     },
     singleton: true,
     enabled: true,
@@ -543,15 +545,6 @@ const jobRegistry: CronJobConfig[] = [
   //   schedule: 300000,  // Every 5 minutes
   //   handler: async () => pluginInstanceManager.cleanup(),
   //   singleton: true,
-  //   enabled: false,  // Enable when ready
-  // },
-  //
-  // {
-  //   name: 'plugin-health-check',
-  //   description: 'Check health of plugin routes and instances',
-  //   schedule: 60000,  // Every 60 seconds
-  //   handler: async () => pluginRouteService.healthCheck(),
-  //   timeout: 30000,
   //   enabled: false,  // Enable when ready
   // },
   //

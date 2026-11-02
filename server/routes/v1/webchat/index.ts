@@ -55,6 +55,7 @@ async function widgetAvailability(organizationId: string): Promise<WidgetAvailab
     typicalReplyMinutes,
   };
 }
+import { formSchemaSchema } from "@hay/form-schema";
 
 export const webchatRouter = router({
   /**
@@ -98,6 +99,7 @@ export const webchatRouter = router({
         customCss: z.string().nullable().optional(),
         spamClassifierEnabled: z.boolean().optional(),
         spamGuidance: z.string().max(2000).nullable().optional(),
+        preChatForm: formSchemaSchema.nullable().optional(),
       }),
     )
     .mutation(async ({ ctx, input }) => {

@@ -10,8 +10,6 @@ export class WordProcessor extends BaseProcessor {
   supportedTypes = [
     "application/msword", // .doc
     "application/vnd.openxmlformats-officedocument.wordprocessingml.document", // .docx
-    "application/vnd.ms-word.document.macroEnabled.12", // .docm
-    "application/vnd.ms-word.template.macroEnabled.12", // .dotm
     "application/vnd.openxmlformats-officedocument.wordprocessingml.template", // .dotx
   ];
 
@@ -40,15 +38,12 @@ export class WordProcessor extends BaseProcessor {
       // Use mammoth for .docx files
       const result = await mammoth.extractRawText({ buffer });
 
-      // Also get messages/warnings if any
-      const fullResult = await mammoth.convertToHtml({ buffer });
-
       return {
         content: sanitizeContent(result.value || ""),
         metadata: {
           fileName,
           fileType: "docx",
-          messages: fullResult.messages,
+          messages: result.messages,
         },
       };
     } catch (error) {
@@ -99,7 +94,7 @@ export class WordProcessor extends BaseProcessor {
     // Check file extension first
     if (fileName) {
       const ext = fileName.toLowerCase().split(".").pop();
-      if (ext === "docx" || ext === "docm" || ext === "dotx" || ext === "dotm") {
+      if (ext === "docx" || ext === "dotx") {
         return true;
       }
       if (ext === "doc" || ext === "dot") {

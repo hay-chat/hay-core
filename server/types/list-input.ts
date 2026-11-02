@@ -1,5 +1,11 @@
 import { z } from "zod";
 
+/** A column or relation name a client may name in a list query (interpolated into SQL). */
+export const identifierSchema = z
+  .string()
+  .max(64)
+  .regex(/^[a-zA-Z_][a-zA-Z0-9_]*$/, "Invalid field name");
+
 // Base pagination schema
 export const paginationSchema = z.object({
   page: z.number().min(1).default(1),
@@ -8,14 +14,14 @@ export const paginationSchema = z.object({
 
 // Sorting schema
 export const sortingSchema = z.object({
-  orderBy: z.string().optional(),
+  orderBy: identifierSchema.optional(),
   orderDirection: z.enum(["asc", "desc"]).default("desc"),
 });
 
 // Search schema
 export const searchSchema = z.object({
-  query: z.string().optional(),
-  searchFields: z.array(z.string()).optional(),
+  query: z.string().max(500).optional(),
+  searchFields: z.array(identifierSchema).max(20).optional(),
 });
 
 // Generic filters schema (key-value pairs)
@@ -30,8 +36,8 @@ export const dateRangeSchema = z
   .optional();
 
 // Include and select schemas
-export const includeSchema = z.array(z.string()).optional();
-export const selectSchema = z.array(z.string()).optional();
+export const includeSchema = z.array(identifierSchema).max(20).optional();
+export const selectSchema = z.array(identifierSchema).max(100).optional();
 
 // Base list input schema that combines all the above
 export const baseListInputSchema = z.object({

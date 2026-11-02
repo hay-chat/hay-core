@@ -1,5 +1,6 @@
 import type { Attachment, HayChatConfig } from "@/types";
 import { resolveLocale } from "@/i18n/resolve";
+import type { FormResponse, FormSchema } from "@hay/form-schema";
 
 interface ConversationMetadata {
   source: string;
@@ -102,6 +103,7 @@ export function useConversation(config: HayChatConfig) {
     context?: Record<string, unknown>,
     customer?: { externalId?: string; signature?: string },
     challenge?: { token?: string; error?: string },
+    preChatForm?: { schema: FormSchema; response: FormResponse },
   ): Promise<CreateConversationResponse> => {
     const metadata: ConversationMetadata = {
       source: "web-embed",
@@ -129,6 +131,7 @@ export function useConversation(config: HayChatConfig) {
           : {}),
         ...(challenge?.token ? { challengeToken: challenge.token } : {}),
         ...(challenge?.error ? { challengeError: challenge.error } : {}),
+        ...(preChatForm ? { preChatForm } : {}),
       }),
     });
 

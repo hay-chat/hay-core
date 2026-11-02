@@ -83,7 +83,7 @@ export class Organization extends BaseEntity {
   aiPausedByUserId?: string | null;
 
   @Column({ type: "varchar", length: 255, nullable: true })
-  website?: string;
+  website?: string | null;
 
   // Logo upload relationship
   @OneToOne(() => Upload, { nullable: true, eager: true, onDelete: "SET NULL" })

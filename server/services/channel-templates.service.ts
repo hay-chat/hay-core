@@ -17,6 +17,7 @@
 import { z } from "zod";
 import { createLogger } from "@server/lib/logger";
 import { pluginManagerService } from "./plugin-manager.service";
+import { workerFetch } from "@server/lib/worker-client";
 
 const logger = createLogger("channel-templates");
 
@@ -73,7 +74,7 @@ export async function listChannelTemplates(
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), TEMPLATES_TIMEOUT_MS);
   try {
-    const response = await fetch(`http://localhost:${worker.port}/templates`, {
+    const response = await workerFetch(worker.port, "/templates", {
       method: "GET",
       signal: controller.signal,
     });

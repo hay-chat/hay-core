@@ -22,6 +22,7 @@ export enum MessageType {
   DOCUMENT = "Document",
   PLAYBOOK = "Playbook",
   PRODUCT_RECOMMENDATION = "ProductRecommendation",
+  FORM = "Form",
 }
 
 export enum MessageDirection {
@@ -225,6 +226,14 @@ export class Message {
     /** The relayed answer of a teammate (rephrased or as written). */
     isTeamAnswer?: boolean;
     teamQuestionId?: string;
+    // Form metadata (FORM message type — schema is the FormSchema from @hay/form-schema)
+    ui?: {
+      kind: "form" | "custom";
+      schema?: Record<string, unknown>;
+      status?: "PENDING" | "SUBMITTED" | "SKIPPED";
+      response?: Record<string, unknown>;
+      submittedAt?: string;
+    };
   } | null;
 
   @Column({

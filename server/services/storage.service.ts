@@ -1,3 +1,4 @@
+import FileType from "file-type";
 import { S3Client, DeleteObjectCommand } from "@aws-sdk/client-s3";
 import { Upload as S3Upload } from "@aws-sdk/lib-storage";
 import * as fs from "fs";
@@ -6,42 +7,95 @@ import { v4 as uuidv4 } from "uuid";
 import { config } from "../config/env";
 import { Upload } from "../entities/upload.entity";
 import { isPublicFolder, mediaUrl } from "./media-url.service";
-import { CONVERSATION_MEDIA_TYPES, sanitizeConversationMedia } from "./media-sanitizer.service";
+import {
+  CONVERSATION_MEDIA_TYPES,
+  sanitizeConversationMedia,
+  sanitizePublicImage,
+} from "./media-sanitizer.service";
 import { initialScanStatus, startScan } from "./media-scan.service";
 
 /** Folder for files received from shoppers through channels; see media-sanitizer.service. */
 export const CONVERSATION_MEDIA_FOLDER = "conversation-media";
 
-// Allowed file types for every other folder (logos, documents, plugin ZIPs)
-const ALLOWED_MIME_TYPES: Record<string, string[]> = {
-  // Images
-  "image/jpeg": [".jpg", ".jpeg"],
-  "image/png": [".png"],
-  "image/gif": [".gif"],
-  "image/webp": [".webp"],
-  "image/svg+xml": [".svg"],
-  "image/bmp": [".bmp"],
-  "image/tiff": [".tiff", ".tif"],
+// Allowed types for every other private folder (documents, plugin ZIPs,
+// exports), keyed by the stored type, with the extension each is stored with.
+// Public folders take raster images only (sanitizePublicImage).
+const STORED_FILE_TYPES: Record<string, string> = {
+  "image/jpeg": ".jpg",
+  "image/png": ".png",
+  "image/gif": ".gif",
+  "image/webp": ".webp",
 
-  // Documents
-  "application/pdf": [".pdf"],
-  "application/msword": [".doc"],
-  "application/vnd.openxmlformats-officedocument.wordprocessingml.document": [".docx"],
-  "application/vnd.ms-excel": [".xls"],
-  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": [".xlsx"],
-  "application/vnd.ms-powerpoint": [".ppt"],
-  "application/vnd.openxmlformats-officedocument.presentationml.presentation": [".pptx"],
-  "text/csv": [".csv"],
-  "text/plain": [".txt"],
-  "application/rtf": [".rtf"],
-  "application/vnd.oasis.opendocument.text": [".odt"],
-  "application/vnd.oasis.opendocument.spreadsheet": [".ods"],
-  "application/vnd.oasis.opendocument.presentation": [".odp"],
+  "application/pdf": ".pdf",
+  "application/msword": ".doc",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document": ".docx",
+  "application/vnd.ms-excel": ".xls",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": ".xlsx",
+  "application/vnd.ms-powerpoint": ".ppt",
+  "application/vnd.openxmlformats-officedocument.presentationml.presentation": ".pptx",
+  "text/csv": ".csv",
+  "text/plain": ".txt",
+  "application/rtf": ".rtf",
+  "application/vnd.oasis.opendocument.text": ".odt",
+  "application/vnd.oasis.opendocument.spreadsheet": ".ods",
+  "application/vnd.oasis.opendocument.presentation": ".odp",
 
-  // Archives
-  "application/zip": [".zip"],
-  "application/x-zip-compressed": [".zip"],
+  "application/zip": ".zip",
 };
+
+/** Text has no magic bytes; accepted as declared only when nothing binary is detected. */
+const TEXT_TYPES = new Set(["text/plain", "text/csv"]);
+
+/**
+ * Containers file-type can't always tell apart (legacy Office is OLE/CFB,
+ * OOXML and ODF are ZIP): the declared type is kept when it belongs to the
+ * detected container.
+ */
+const CONTAINER_TYPES: Record<string, Set<string>> = {
+  "application/x-cfb": new Set([
+    "application/msword",
+    "application/vnd.ms-excel",
+    "application/vnd.ms-powerpoint",
+  ]),
+  "application/zip": new Set([
+    "application/zip",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+    "application/vnd.oasis.opendocument.text",
+    "application/vnd.oasis.opendocument.spreadsheet",
+    "application/vnd.oasis.opendocument.presentation",
+  ]),
+};
+
+const DECLARED_ALIASES: Record<string, string> = {
+  "application/x-zip-compressed": "application/zip",
+};
+
+/**
+ * Type of a file for a private non-conversation folder, from its magic bytes.
+ * The declared type only decides between types the content can't distinguish.
+ */
+export async function detectStoredFileType(
+  buffer: Buffer,
+  declaredMimeType: string,
+): Promise<string> {
+  const bare = declaredMimeType.split(";")[0].trim().toLowerCase();
+  const declared = DECLARED_ALIASES[bare] ?? bare;
+  const detected = await FileType.fromBuffer(buffer);
+
+  if (!detected) {
+    if (TEXT_TYPES.has(declared)) return declared;
+    throw new Error(`File content is not a supported type (declared ${declared || "unknown"})`);
+  }
+  const zipBased = CONTAINER_TYPES["application/zip"].has(detected.mime);
+  const container = zipBased ? "application/zip" : detected.mime;
+  if (CONTAINER_TYPES[container]?.has(declared)) return declared;
+  if (!STORED_FILE_TYPES[detected.mime]) {
+    throw new Error(`File type not allowed: ${detected.mime}`);
+  }
+  return detected.mime;
+}
 
 export interface UploadOptions {
   buffer: Buffer;
@@ -107,7 +161,8 @@ export class StorageService {
    * private files are served only through /v1/media/:id.
    */
   async upload(options: UploadOptions): Promise<UploadResult> {
-    // 1. Validate file; conversation media is checked by content and re-encoded
+    // 1. Validate file: the type always comes from the content, and the stored
+    // extension from that type. Images are re-encoded.
     let { buffer, mimeType } = options;
     let extension: string;
     if (options.folder === CONVERSATION_MEDIA_FOLDER) {
@@ -117,9 +172,14 @@ export class StorageService {
       );
       ({ buffer, mimeType } = await sanitizeConversationMedia(buffer, mimeType));
       extension = CONVERSATION_MEDIA_TYPES[mimeType];
+    } else if (isPublicFolder(options.folder)) {
+      this.validateSize(buffer.length, options.maxSize);
+      ({ buffer, mimeType } = await sanitizePublicImage(buffer));
+      extension = STORED_FILE_TYPES[mimeType];
     } else {
-      this.validateFile(mimeType, buffer.length, options.maxSize);
-      extension = path.extname(options.originalName).toLowerCase();
+      this.validateSize(buffer.length, options.maxSize);
+      mimeType = await detectStoredFileType(buffer, mimeType);
+      extension = STORED_FILE_TYPES[mimeType];
     }
 
     // 2. Generate filename (UUID + extension only)
@@ -203,6 +263,17 @@ export class StorageService {
   }
 
   /**
+   * Delete the upload a public URL points to (stored file names are unique),
+   * provided it is in `folder` and was uploaded by `uploadedById`.
+   */
+  async deleteByPublicUrl(url: string, folder: string, uploadedById: string): Promise<void> {
+    const filename = url.split(/[?#]/)[0].split("/").pop();
+    if (!filename) return;
+    const upload = await Upload.findOne({ where: { filename, folder, uploadedById } });
+    if (upload) await this.delete(upload.id);
+  }
+
+  /**
    * Specialized upload for plugin ZIP files
    * Local: {uploadDir}/{organizationId}/plugin-zips/{pluginId}/{uuid}.zip
    * S3: uploads/{organizationId}/plugin-zips/{pluginId}/{uuid}.zip
@@ -217,9 +288,6 @@ export class StorageService {
     maxSize?: number;
   }): Promise<UploadResult> {
     const maxSize = options.maxSize || config.plugins.maxUploadSizeMB * 1024 * 1024;
-
-    // Validate ZIP
-    this.validateFile("application/zip", options.buffer.length, maxSize);
 
     // Folder structure: plugin-zips/{pluginId}
     const folder = `plugin-zips/${options.pluginId}`;
@@ -276,20 +344,6 @@ export class StorageService {
    */
   private getStorageType(): "local" | "s3" {
     return this.isS3Configured() ? "s3" : "local";
-  }
-
-  /**
-   * Validate file
-   */
-  private validateFile(mimeType: string, size: number, maxSize?: number): void {
-    // Check MIME type
-    if (!ALLOWED_MIME_TYPES[mimeType]) {
-      throw new Error(
-        `File type not allowed: ${mimeType}. Allowed types: ${Object.keys(ALLOWED_MIME_TYPES).join(", ")}`,
-      );
-    }
-
-    this.validateSize(size, maxSize);
   }
 
   private validateSize(size: number, maxSize?: number): void {
