@@ -73,6 +73,8 @@ These rules define how an AI coding agent should plan, execute, verify, communic
 
 ## Task Management (File-Based, Auditable)
 
+`tasks/todo.md` and `CONTEXT.md` are local working notes and are gitignored; create them if missing. Only `tasks/lessons.md` is tracked.
+
 1. **Plan First**
    - Write a checklist to `tasks/todo.md` for any non-trivial work.
    - Include "Verify" tasks explicitly (lint/tests/build/manual checks).

@@ -73,10 +73,11 @@ server/uploads/plugin-zips/
 .dual-graph/
 .impeccable/
 
-# Maintainer working notes: kept locally, never committed
+# Maintainer working notes: kept locally, never committed (tasks/lessons.md stays tracked)
 /WIP.md
 /CONTEXT.md
-/tasks/
+/tasks/*
+!/tasks/lessons.md
 /gdpr-audit/
 /.claude/plans/
-/.claude/settings.json
+/.claude/settings.local.json
