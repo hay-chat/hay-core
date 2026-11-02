@@ -31,6 +31,7 @@ const ALLOWED_TAGS = [
   "pre",
   "blockquote",
   "del",
+  "s",
   "table",
   "thead",
   "tbody",
