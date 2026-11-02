@@ -21,11 +21,13 @@ function createFakeServer() {
       if (tools.has(name)) throw new Error(`duplicate tool ${name}`);
       tools.set(name, { description, shape, handler });
     },
-    async call(name, args = {}) {
+    /** `customer`: the identity core would send with the call (see verified()). */
+    async call(name, args = {}, customer = undefined) {
       const t = tools.get(name);
       if (!t) throw new Error(`no tool ${name}`);
       const parsed = z.object(t.shape).parse(args);
-      const res = await t.handler(parsed);
+      const extra = customer ? { _meta: { "chat.hay/customer": customer } } : {};
+      const res = await t.handler(parsed, extra);
       const text = res.content[0].text;
       let data = null;
       try {
@@ -84,4 +86,11 @@ function response(status, body) {
   };
 }
 
-module.exports = { createFakeServer, mockShopify, operationName };
+/** A customer core verified for the conversation (signed webchat, or a channel sender). */
+function verified({ email = null, phone = null } = {}) {
+  return { trust: "verified", source: "webchat_signature", externalId: "ext-1", email, phone };
+}
+
+const STAFF = { trust: "staff" };
+
+module.exports = { createFakeServer, mockShopify, operationName, verified, STAFF };

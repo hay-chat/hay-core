@@ -168,25 +168,34 @@ export class PrivacyRequest extends TypeOrmBaseEntity {
     );
   }
 
-  getDownloadToken(): string | null {
-    if (this.metadata && typeof this.metadata.downloadToken === "string") {
-      return this.metadata.downloadToken;
+  /** SHA-256 of the download token emailed to the requester (the token itself is never stored). */
+  getDownloadTokenHash(): string | null {
+    if (this.metadata && typeof this.metadata.downloadTokenHash === "string") {
+      return this.metadata.downloadTokenHash;
     }
     return null;
   }
 
-  getExportUrl(): string | null {
-    if (this.metadata && typeof this.metadata.exportUrl === "string") {
-      return this.metadata.exportUrl;
+  /** Upload id of the export ZIP while it is still stored. */
+  getExportUploadId(): string | null {
+    if (this.metadata && typeof this.metadata.uploadId === "string") {
+      return this.metadata.uploadId;
     }
     return null;
   }
 
-  setExportMetadata(exportUrl: string, downloadToken: string, expiresAt: Date): void {
+  getExportExpiresAt(): Date | null {
+    if (this.metadata && typeof this.metadata.exportExpiresAt === "string") {
+      return new Date(this.metadata.exportExpiresAt);
+    }
+    return null;
+  }
+
+  setExportMetadata(uploadId: string, downloadTokenHash: string, expiresAt: Date): void {
     this.metadata = {
       ...this.metadata,
-      exportUrl,
-      downloadToken,
+      uploadId,
+      downloadTokenHash,
       exportExpiresAt: expiresAt.toISOString(),
     };
   }

@@ -34,7 +34,7 @@ export {
 export interface AuthContext {
   user: User | null;
   sessionId?: string;
-  authMethod?: "basic" | "jwt" | "apikey";
+  authMethod?: "jwt" | "apikey";
   apiKeyId?: string;
   scopes?: ApiKeyScope[];
 }

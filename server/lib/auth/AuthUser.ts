@@ -2,6 +2,8 @@ import { User } from "@server/entities/user.entity";
 import { UserOrganization } from "@server/entities/user-organization.entity";
 import type { ApiKeyScope } from "@server/types/auth.types";
 
+const WRITE_ACTIONS = ["create", "update"];
+
 /**
  * AuthUser class represents an authenticated user in the tRPC context
  * This class wraps the User entity and adds authentication-specific methods
@@ -14,7 +16,7 @@ export class AuthUser {
   public readonly lastLoginAt?: Date;
 
   // Authentication metadata
-  public readonly authMethod: "basic" | "jwt" | "apikey";
+  public readonly authMethod: "jwt" | "apikey";
   public readonly sessionId?: string;
   public readonly apiKeyId?: string;
   public readonly scopes?: ApiKeyScope[];
@@ -27,7 +29,7 @@ export class AuthUser {
 
   constructor(
     user: User,
-    authMethod: "basic" | "jwt" | "apikey",
+    authMethod: "jwt" | "apikey",
     metadata?: {
       sessionId?: string;
       apiKeyId?: string;
@@ -53,8 +55,8 @@ export class AuthUser {
   /**
    * Check if the user has a specific scope
    * For API key auth: checks API key scopes
-   * For JWT/Basic auth with org context: checks organization-scoped role
-   * For JWT/Basic auth without org context: falls back to user role
+   * For JWT auth: checks the role and permissions of the membership in the
+   * current organization. Without organization context there are no scopes.
    */
   hasScope(resource: string, action: string): boolean {
     // For API key auth, check the API key scopes
@@ -66,17 +68,14 @@ export class AuthUser {
       return this.scopes.some(
         (scope) =>
           (scope.resource === resource || scope.resource === "*") &&
-          (scope.actions.includes(action) || scope.actions.includes("*")),
+          (scope.actions.includes(action) ||
+            scope.actions.includes("*") ||
+            // Token "write" scopes ("Create and update ...") cover both actions.
+            (scope.actions.includes("write") && WRITE_ACTIONS.includes(action))),
       );
     }
 
-    // For JWT/Basic auth with organization context, use UserOrganization permissions
-    if (this.userOrganization) {
-      return this.userOrganization.hasScope(resource, action);
-    }
-
-    // Fallback to user-level permissions (legacy support)
-    return this._user.hasScope(resource, action);
+    return this.userOrganization?.hasScope(resource, action) ?? false;
   }
 
   /**
@@ -100,12 +99,7 @@ export class AuthUser {
    * Note: Use scope checks (hasScope) for permission validation, not role checks
    */
   getRole(): "owner" | "admin" | "member" | "viewer" | "contributor" | "agent" | undefined {
-    if (this.userOrganization) {
-      return this.userOrganization.role;
-    }
-
-    // Fallback to user-level role (legacy support)
-    return this._user.role;
+    return this.userOrganization?.role;
   }
 
   /**

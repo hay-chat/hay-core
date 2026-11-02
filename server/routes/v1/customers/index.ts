@@ -77,7 +77,7 @@ const customerListInputSchema = z.object({
 });
 
 export const customersRouter = t.router({
-  list: createListProcedure(customerListInputSchema, customerRepository),
+  list: createListProcedure(RESOURCES.CUSTOMERS, customerListInputSchema, customerRepository),
 
   get: scopedProcedure(RESOURCES.CUSTOMERS, ACTIONS.READ)
     .input(z.object({ id: z.string().uuid() }))

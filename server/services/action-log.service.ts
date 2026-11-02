@@ -12,7 +12,7 @@ const REDACTED = "[redacted]";
 
 /**
  * Copy of the args with sensitive values replaced. Conversation secrets are
- * injected after this point, so `<<secret.x>>` placeholders stay as written.
+ * injected after this point, so they never reach the log.
  */
 export function redactArgs(value: unknown, depth = 0): unknown {
   if (depth > 6) return REDACTED;

@@ -5,33 +5,75 @@ import type {
   PrivacyRequestIdentifierType,
 } from "@server/entities/privacy-request.entity";
 import { User } from "@server/entities/user.entity";
+import { UserOrganization } from "@server/entities/user-organization.entity";
 import { AuditLog } from "@server/entities/audit-log.entity";
 import type { AuditAction } from "@server/entities/audit-log.entity";
-import { ApiKey } from "@server/entities/apikey.entity";
 import { Document } from "@server/entities/document.entity";
 import { Upload } from "@server/entities/upload.entity";
 import { Job, JobStatus, JobPriority } from "@server/entities/job.entity";
 import { Customer } from "@server/database/entities/customer.entity";
 import { Conversation } from "@server/database/entities/conversation.entity";
 import { Message } from "@server/database/entities/message.entity";
+import type { EntityManager } from "typeorm";
 
 import { emailService, getOrganizationLocale } from "./email.service";
 import { auditLogService } from "./audit-log.service";
-import { jobQueueService } from "./job-queue.service";
 import { vectorStoreService } from "./vector-store.service";
 import { createLogger } from "@server/lib/logger";
 
 const logger = createLogger("privacy");
 import * as crypto from "crypto";
+import { createWriteStream } from "fs";
 import * as fs from "fs/promises";
+import * as os from "os";
 import * as path from "path";
 import * as archiver from "archiver";
-import { getDashboardUrl } from "@server/config/env";
+import { config, getDashboardUrl } from "@server/config/env";
 import { IsNull, In } from "typeorm";
 import type { ExportPackageData } from "@server/types/privacy.types";
+import { PRIVACY_DELETION_JOB_TYPE, PRIVACY_EXPORT_JOB_TYPE } from "@server/types/privacy.types";
 import { storageService } from "@server/services/storage.service";
 import { deleteConversationMedia } from "@server/services/conversation-media.service";
 import { isUuid } from "@server/services/media-url.service";
+import { fetchPublicFile } from "@server/utils/fetch-public-file";
+
+/** Job `data.type` values run by the background job queue (job-queue.service). */
+const PRIVACY_JOB_TYPES = [PRIVACY_EXPORT_JOB_TYPE, PRIVACY_DELETION_JOB_TYPE];
+/** Private upload folder for export ZIPs; read only through downloadExport. */
+export const PRIVACY_EXPORT_FOLDER = "privacy-exports";
+/** A privacy job "processing" longer than this died with its server and is queued again. */
+const STALE_PROCESSING_MS = 2 * 60 * 60 * 1000;
+/** A job requeued this many times is failed instead. */
+const MAX_JOB_ATTEMPTS = 3;
+/**
+ * Finished privacy requests keep the requester's email, IP address and user
+ * agent this long (proof the request was handled), then they are anonymized.
+ */
+export const PRIVACY_REQUEST_RETENTION_DAYS = 365;
+const MAX_EXPORT_BYTES = 1024 * 1024 * 1024;
+/** Attachment files stop being added past this total. */
+const MAX_ATTACHMENT_BYTES = 512 * 1024 * 1024;
+const REMOTE_ATTACHMENT_FETCH = { maxBytes: 25 * 1024 * 1024, timeoutMs: 15_000 };
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+const CANCELLABLE_STATUSES = ["pending_verification", "verified", "processing"];
+
+function hashToken(token: string): string {
+  return crypto.createHash("sha256").update(token).digest("hex");
+}
+
+/** Constant-time comparison of a presented token against a stored SHA-256 hash. */
+function tokenMatches(token: string, storedHash: string | null | undefined): boolean {
+  if (!storedHash) return false;
+  const presented = Buffer.from(hashToken(token), "hex");
+  const stored = Buffer.from(storedHash, "hex");
+  return presented.length === stored.length && crypto.timingSafeEqual(presented, stored);
+}
+
+/** What a privacy request keeps of the requester's email once it is anonymized. */
+export function erasedEmail(email: string): string {
+  return `erased:${hashToken(email.toLowerCase())}`;
+}
 
 /**
  * Privacy Service
@@ -39,8 +81,23 @@ import { isUuid } from "@server/services/media-url.service";
  */
 export class PrivacyService {
   private readonly VERIFICATION_EXPIRY_HOURS = 24;
-  private readonly EXPORT_EXPIRY_HOURS = 168; // 7 days
-  private readonly DOWNLOAD_TOKEN_EXPIRY_HOURS = 4;
+
+  /** Days an export ZIP (and its download link) is kept. */
+  private get exportRetentionDays(): number {
+    return config.privacy.exportRetentionDays;
+  }
+
+  private async checkPublicRateLimits(email: string, ipAddress?: string): Promise<void> {
+    // Defense in depth - also checked at router level
+    if (!ipAddress) return;
+    const { rateLimitService } = await import("./rate-limit.service");
+    const ipLimit = await rateLimitService.checkIpRateLimit(ipAddress, 10, 3600);
+    const emailLimit = await rateLimitService.checkEmailRateLimit(email, 3, 86400);
+    const combinedLimit = await rateLimitService.checkCombinedRateLimit(ipAddress, email, 2, 86400);
+    if (ipLimit.limited || emailLimit.limited || combinedLimit.limited) {
+      throw new Error("Rate limit exceeded. Please try again later.");
+    }
+  }
 
   /**
    * Request a data export
@@ -50,173 +107,7 @@ export class PrivacyService {
     ipAddress?: string,
     userAgent?: string,
   ): Promise<{ requestId: string; expiresAt: Date }> {
-    email = email.toLowerCase();
-
-    // Check rate limits (defense in depth - also checked at router level)
-    if (ipAddress) {
-      const { rateLimitService } = await import("./rate-limit.service");
-      const ipLimit = await rateLimitService.checkIpRateLimit(ipAddress, 10, 3600);
-      if (ipLimit.limited) {
-        throw new Error("Rate limit exceeded. Please try again later.");
-      }
-
-      const emailLimit = await rateLimitService.checkEmailRateLimit(email, 3, 86400);
-      if (emailLimit.limited) {
-        throw new Error("Rate limit exceeded. Please try again later.");
-      }
-
-      const combinedLimit = await rateLimitService.checkCombinedRateLimit(
-        ipAddress,
-        email,
-        2,
-        86400,
-      );
-      if (combinedLimit.limited) {
-        throw new Error("Rate limit exceeded. Please try again later.");
-      }
-    }
-
-    const userRepository = AppDataSource.getRepository(User);
-    const requestRepository = AppDataSource.getRepository(PrivacyRequest);
-
-    // Find user by email
-    const user = await userRepository.findOne({
-      where: { email, deletedAt: IsNull() },
-    });
-
-    // Generate verification token (SHA-256 for high-entropy tokens — enables O(1) DB lookup)
-    const verificationToken = crypto.randomBytes(32).toString("hex");
-    const tokenHash = crypto.createHash("sha256").update(verificationToken).digest("hex");
-
-    const expiresAt = new Date(Date.now() + this.VERIFICATION_EXPIRY_HOURS * 60 * 60 * 1000);
-
-    // Get max downloads from config
-    const { config } = await import("@server/config/env");
-
-    // Create privacy request
-    const request = requestRepository.create({
-      email,
-      userId: user?.id,
-      type: "export",
-      status: "pending_verification",
-      verificationTokenHash: tokenHash,
-      verificationExpiresAt: expiresAt,
-      ipAddress,
-      userAgent,
-      maxDownloads: config.privacy.maxDownloadCount,
-    });
-
-    await requestRepository.save(request);
-
-    // Log audit trail
-    await this.logPrivacyAction("privacy.export.request", email, user?.id, {
-      requestId: request.id,
-      ipAddress,
-      userAgent,
-    });
-
-    // Send verification email with error handling
-    try {
-      await this.sendVerificationEmail(email, verificationToken, "export", user?.firstName);
-    } catch (error) {
-      // Mark request as failed if email cannot be sent
-      logger.error({ err: error }, "Failed to send verification email");
-      request.status = "failed";
-      request.errorMessage = "Failed to send verification email. Please try again.";
-      await requestRepository.save(request);
-
-      throw new Error("Failed to send verification email. Please try again later.");
-    }
-
-    logger.debug({ email, requestId: request.id, hasUser: !!user }, "Export request created");
-
-    return {
-      requestId: request.id,
-      expiresAt,
-    };
-  }
-
-  /**
-   * Confirm data export with verification token
-   */
-  async confirmExport(token: string): Promise<{ requestId: string; jobId: string }> {
-    // Use transaction to prevent race conditions
-    return AppDataSource.transaction(async (manager) => {
-      const requestRepository = manager.getRepository(PrivacyRequest);
-
-      // SHA-256 hash the token for direct DB lookup (O(1) instead of O(n) argon2 scan)
-      const tokenHash = crypto.createHash("sha256").update(token).digest("hex");
-
-      const request = await requestRepository.findOne({
-        where: {
-          type: "export",
-          status: "pending_verification",
-          verificationTokenHash: tokenHash,
-        },
-      });
-
-      if (!request) {
-        throw new Error("Invalid or expired verification token");
-      }
-
-      if (request.isExpired()) {
-        request.status = "expired";
-        await requestRepository.save(request);
-        throw new Error("Verification token has expired");
-      }
-
-      // Mark as verified and save immediately to prevent concurrent confirmations
-      request.markVerified();
-      await requestRepository.save(request);
-
-      // Create background job for export
-      const jobRepository = manager.getRepository(Job);
-      const userRepository = manager.getRepository(User);
-
-      const user = request.userId
-        ? await userRepository.findOne({ where: { id: request.userId } })
-        : null;
-
-      const job = jobRepository.create({
-        title: `Data Export for ${request.email}`,
-        description: `GDPR data export request`,
-        status: JobStatus.PENDING,
-        priority: JobPriority.HIGH,
-        organizationId: user?.organizationId,
-        data: {
-          requestId: request.id,
-          email: request.email,
-          userId: request.userId,
-        },
-      });
-
-      await jobRepository.save(job);
-
-      // Link job to request
-      request.markProcessing(job.id);
-      await requestRepository.save(request);
-
-      // Log audit trail
-      await this.logPrivacyAction("privacy.export.confirm", request.email, request.userId, {
-        requestId: request.id,
-        jobId: job.id,
-      });
-
-      // Process export asynchronously
-      this.processExportJob(job.id, request.id).catch((error) => {
-        logger.error({ err: error }, "Export job failed");
-      });
-
-      logger.debug(
-        { email: request.email, requestId: request.id, jobId: job.id },
-        "Export confirmed",
-      );
-
-      return {
-        requestId: request.id,
-        jobId: job.id,
-      };
-    });
+    return this.requestForUser("export", email, ipAddress, userAgent);
   }
 
   /**
@@ -227,171 +118,291 @@ export class PrivacyService {
     ipAddress?: string,
     userAgent?: string,
   ): Promise<{ requestId: string; expiresAt: Date }> {
-    email = email.toLowerCase();
-
-    // Check rate limits (defense in depth - also checked at router level)
-    if (ipAddress) {
-      const { rateLimitService } = await import("./rate-limit.service");
-      const ipLimit = await rateLimitService.checkIpRateLimit(ipAddress, 10, 3600);
-      if (ipLimit.limited) {
-        throw new Error("Rate limit exceeded. Please try again later.");
-      }
-
-      const emailLimit = await rateLimitService.checkEmailRateLimit(email, 3, 86400);
-      if (emailLimit.limited) {
-        throw new Error("Rate limit exceeded. Please try again later.");
-      }
-
-      const combinedLimit = await rateLimitService.checkCombinedRateLimit(
-        ipAddress,
-        email,
-        2,
-        86400,
-      );
-      if (combinedLimit.limited) {
-        throw new Error("Rate limit exceeded. Please try again later.");
-      }
-    }
-
-    const userRepository = AppDataSource.getRepository(User);
-    const requestRepository = AppDataSource.getRepository(PrivacyRequest);
-
-    // Find user by email
-    const user = await userRepository.findOne({
-      where: { email, deletedAt: IsNull() },
-    });
-
-    if (!user) {
-      throw new Error("No account found with this email address");
-    }
-
-    // Generate verification token (SHA-256 for high-entropy tokens — enables O(1) DB lookup)
-    const verificationToken = crypto.randomBytes(32).toString("hex");
-    const tokenHash = crypto.createHash("sha256").update(verificationToken).digest("hex");
-
-    const expiresAt = new Date(Date.now() + this.VERIFICATION_EXPIRY_HOURS * 60 * 60 * 1000);
-
-    // Create privacy request
-    const request = requestRepository.create({
-      email,
-      userId: user.id,
-      type: "deletion",
-      status: "pending_verification",
-      verificationTokenHash: tokenHash,
-      verificationExpiresAt: expiresAt,
-      ipAddress,
-      userAgent,
-    });
-
-    await requestRepository.save(request);
-
-    // Log audit trail
-    await this.logPrivacyAction("privacy.deletion.request", email, user.id, {
-      requestId: request.id,
-      ipAddress,
-      userAgent,
-    });
-
-    // Send verification email with error handling
-    try {
-      await this.sendVerificationEmail(email, verificationToken, "deletion", user.firstName);
-    } catch (error) {
-      // Mark request as failed if email cannot be sent
-      logger.error({ err: error }, "Failed to send verification email");
-      request.status = "failed";
-      request.errorMessage = "Failed to send verification email. Please try again.";
-      await requestRepository.save(request);
-
-      throw new Error("Failed to send verification email. Please try again later.");
-    }
-
-    logger.debug({ email, requestId: request.id, userId: user.id }, "Deletion request created");
-
-    return {
-      requestId: request.id,
-      expiresAt,
-    };
+    return this.requestForUser("deletion", email, ipAddress, userAgent);
   }
 
   /**
-   * Confirm data deletion with verification token
+   * Start a staff-user request. The answer is the same whether or not an
+   * account uses this email: a request row is always created, but the
+   * verification email only goes to an address that has an account.
    */
-  async confirmDeletion(token: string): Promise<{ requestId: string; jobId: string }> {
+  private async requestForUser(
+    type: "export" | "deletion",
+    email: string,
+    ipAddress?: string,
+    userAgent?: string,
+  ): Promise<{ requestId: string; expiresAt: Date }> {
+    email = email.toLowerCase();
+    await this.checkPublicRateLimits(email, ipAddress);
+
     const requestRepository = AppDataSource.getRepository(PrivacyRequest);
-
-    // SHA-256 hash the token for direct DB lookup (O(1) instead of O(n) argon2 scan)
-    const tokenHash = crypto.createHash("sha256").update(token).digest("hex");
-
-    const request = await requestRepository.findOne({
-      where: {
-        type: "deletion",
-        status: "pending_verification",
-        verificationTokenHash: tokenHash,
-      },
+    const user = await AppDataSource.getRepository(User).findOne({
+      where: { email, deletedAt: IsNull() },
     });
 
-    if (!request) {
-      throw new Error("Invalid or expired verification token");
-    }
+    // Generate verification token (SHA-256 for high-entropy tokens — enables O(1) DB lookup)
+    const verificationToken = crypto.randomBytes(32).toString("hex");
+    const expiresAt = new Date(Date.now() + this.VERIFICATION_EXPIRY_HOURS * 60 * 60 * 1000);
 
-    if (request.isExpired()) {
-      request.status = "expired";
-      await requestRepository.save(request);
-      throw new Error("Verification token has expired");
-    }
-
-    if (!request.userId) {
-      throw new Error("No user found for this deletion request");
-    }
-
-    // Mark as verified
-    request.markVerified();
-
-    // Create background job for deletion
-    const jobRepository = AppDataSource.getRepository(Job);
-    const userRepository = AppDataSource.getRepository(User);
-
-    const user = await userRepository.findOne({ where: { id: request.userId } });
-
-    const job = jobRepository.create({
-      title: `Data Deletion for ${request.email}`,
-      description: `GDPR data deletion request`,
-      status: JobStatus.PENDING,
-      priority: JobPriority.CRITICAL,
-      organizationId: user?.organizationId,
-      data: {
-        requestId: request.id,
-        email: request.email,
-        userId: request.userId,
-      },
+    const request = requestRepository.create({
+      email,
+      userId: user?.id,
+      type,
+      status: "pending_verification",
+      verificationTokenHash: hashToken(verificationToken),
+      verificationExpiresAt: expiresAt,
+      ipAddress,
+      userAgent,
+      maxDownloads: config.privacy.maxDownloadCount,
     });
-
-    await jobRepository.save(job);
-
-    // Link job to request
-    request.markProcessing(job.id);
     await requestRepository.save(request);
 
-    // Log audit trail
-    await this.logPrivacyAction("privacy.deletion.confirm", request.email, request.userId, {
+    await this.logPrivacyAction(`privacy.${type}.request`, user?.id, {
       requestId: request.id,
-      jobId: job.id,
+      ipAddress,
+      userAgent,
     });
 
-    // Process deletion asynchronously
-    this.processDeletionJob(job.id, request.id).catch((error) => {
-      logger.error({ err: error }, "Deletion job failed");
+    if (user) {
+      try {
+        await this.sendVerificationEmail(email, verificationToken, type, user.firstName);
+      } catch (error) {
+        logger.error({ err: error }, "Failed to send verification email");
+        request.status = "failed";
+        request.errorMessage = "Failed to send verification email. Please try again.";
+        await requestRepository.save(request);
+        throw new Error("Failed to send verification email. Please try again later.");
+      }
+    }
+
+    logger.debug({ requestId: request.id, type, hasUser: !!user }, "Privacy request created");
+    return { requestId: request.id, expiresAt };
+  }
+
+  /**
+   * Confirm a data export with its verification token (staff user or customer)
+   */
+  async confirmExport(token: string): Promise<{ requestId: string; jobId: string }> {
+    return this.confirmRequest(token, "export");
+  }
+
+  /**
+   * Confirm a data deletion with its verification token (staff user or customer)
+   */
+  async confirmDeletion(token: string): Promise<{ requestId: string; jobId: string }> {
+    return this.confirmRequest(token, "deletion");
+  }
+
+  /**
+   * Verify the token and queue the background job. The verification link in
+   * both the staff and the customer emails lands here.
+   */
+  private async confirmRequest(
+    token: string,
+    type: "export" | "deletion",
+  ): Promise<{ requestId: string; jobId: string }> {
+    const outcome = await AppDataSource.transaction(async (manager) => {
+      const requestRepository = manager.getRepository(PrivacyRequest);
+      // The row lock makes a second confirmation of the same token wait, then miss.
+      const request = await requestRepository.findOne({
+        where: {
+          type,
+          status: "pending_verification",
+          verificationTokenHash: hashToken(token),
+        },
+        lock: { mode: "pessimistic_write" },
+      });
+
+      if (!request) return { error: "Invalid or expired verification token" };
+
+      if (request.isExpired()) {
+        request.status = "expired";
+        await requestRepository.save(request);
+        return { error: "Verification token has expired" };
+      }
+
+      const subjectId = request.isCustomerRequest() ? request.customerId : request.userId;
+      const organizationId =
+        request.organizationId ?? (await this.primaryOrganizationId(manager, request.userId));
+      if (!subjectId || !organizationId) {
+        return { error: "Invalid or expired verification token" };
+      }
+
+      request.markVerified();
+      const job = await manager.getRepository(Job).save(
+        manager.getRepository(Job).create({
+          title: type === "export" ? "Privacy data export" : "Privacy data deletion",
+          description: "Data subject request",
+          status: JobStatus.QUEUED,
+          priority: type === "export" ? JobPriority.HIGH : JobPriority.CRITICAL,
+          organizationId,
+          data: {
+            type: type === "export" ? PRIVACY_EXPORT_JOB_TYPE : PRIVACY_DELETION_JOB_TYPE,
+            requestId: request.id,
+          },
+        }),
+      );
+      request.markProcessing(job.id);
+      await requestRepository.save(request);
+      return { request, jobId: job.id };
     });
 
-    logger.debug(
-      { email: request.email, requestId: request.id, jobId: job.id },
-      "Deletion confirmed",
+    if ("error" in outcome) throw new Error(outcome.error);
+    const { request, jobId } = outcome;
+
+    await this.logPrivacyAction(this.actionName(request, "confirm"), request.userId, {
+      requestId: request.id,
+      jobId,
+      organizationId: request.organizationId,
+      customerId: request.customerId,
+    });
+
+    logger.debug({ requestId: request.id, jobId }, "Privacy request confirmed");
+    return { requestId: request.id, jobId };
+  }
+
+  /** The organization a staff user's job is filed under: their current one, else any membership. */
+  private async primaryOrganizationId(
+    manager: EntityManager,
+    userId: string | undefined,
+  ): Promise<string | null> {
+    if (!userId) return null;
+    const user = await manager.getRepository(User).findOne({ where: { id: userId } });
+    if (user?.organizationId) return user.organizationId;
+    const membership = await manager
+      .getRepository(UserOrganization)
+      .findOne({ where: { userId }, order: { createdAt: "ASC" } });
+    return membership?.organizationId ?? null;
+  }
+
+  private actionName(request: PrivacyRequest, step: string): string {
+    const prefix = request.isCustomerRequest() ? "customer.privacy" : "privacy";
+    return `${prefix}.${request.type}.${step}`;
+  }
+
+  /**
+   * Run a claimed privacy job (job-queue.service, BACKGROUND_JOB_TYPES). A
+   * failure marks the request failed and is rethrown so the queue fails the job.
+   */
+  async processJob(job: Job): Promise<Record<string, unknown>> {
+    const requestRepository = AppDataSource.getRepository(PrivacyRequest);
+    const requestId = job.data?.requestId as string | undefined;
+    const request = requestId
+      ? await requestRepository.findOne({ where: { id: requestId } })
+      : null;
+    if (!request) throw new Error("Privacy request not found");
+    if (request.status === "cancelled") return { cancelled: true };
+
+    try {
+      if (request.type === "export") return await this.runExport(request, job.organizationId);
+      if (request.type === "deletion") return await this.runDeletion(request);
+      throw new Error(`Unsupported privacy request type: ${request.type}`);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Unknown error";
+      logger.error({ err: error, requestId: request.id }, "Privacy job failed");
+      request.setError(errorMessage);
+      await requestRepository.update(request.id, {
+        status: request.status,
+        errorMessage: request.errorMessage,
+        completedAt: request.completedAt,
+      });
+      throw error;
+    }
+  }
+
+  private async runExport(
+    request: PrivacyRequest,
+    organizationId: string,
+  ): Promise<Record<string, unknown>> {
+    const exportData = request.isCustomerRequest()
+      ? await this.collectCustomerData(request.customerId!, request.organizationId!)
+      : await this.collectUserData(request.userId!);
+
+    const { buffer, signature } = await this.createSignedZipExport(
+      exportData,
+      request.id,
+      organizationId,
+    );
+    const { upload } = await storageService.upload({
+      buffer,
+      originalName: `data-export-${new Date().toISOString().slice(0, 10)}.zip`,
+      mimeType: "application/zip",
+      folder: PRIVACY_EXPORT_FOLDER,
+      organizationId,
+      maxSize: MAX_EXPORT_BYTES,
+    });
+
+    const downloadToken = crypto.randomBytes(32).toString("hex");
+    const expiresAt = new Date(Date.now() + this.exportRetentionDays * DAY_MS);
+
+    // Without the email the link can never be used, so the file goes too.
+    try {
+      await this.sendExportReadyEmail(
+        request.email,
+        request.id,
+        downloadToken,
+        request.organizationId,
+      );
+    } catch (error) {
+      await storageService.delete(upload.id).catch(() => undefined);
+      throw error;
+    }
+
+    request.setExportMetadata(upload.id, hashToken(downloadToken), expiresAt);
+    request.metadata = { ...request.metadata, signature };
+    request.markCompleted();
+    await AppDataSource.getRepository(PrivacyRequest).save(request);
+
+    await this.logPrivacyAction(this.actionName(request, "complete"), request.userId, {
+      requestId: request.id,
+      organizationId: request.organizationId,
+      customerId: request.customerId,
+    });
+    logger.debug({ requestId: request.id, uploadId: upload.id }, "Export completed");
+    return { uploadId: upload.id, expiresAt: expiresAt.toISOString() };
+  }
+
+  private async runDeletion(request: PrivacyRequest): Promise<Record<string, unknown>> {
+    const email = request.email;
+    if (request.isCustomerRequest()) {
+      // customer_id is cleared when the customer is deleted: already erased.
+      if (request.customerId) {
+        await this.executeCustomerDeletion(request.customerId, request.organizationId!);
+      }
+    } else {
+      await this.executeDataDeletion(request.userId!);
+    }
+
+    // update(), not save(): the erased customer's id is no longer a valid reference.
+    request.markCompleted();
+    await AppDataSource.getRepository(PrivacyRequest).update(request.id, {
+      status: request.status,
+      completedAt: request.completedAt,
+    });
+
+    await this.logPrivacyAction(this.actionName(request, "complete"), undefined, {
+      requestId: request.id,
+      organizationId: request.organizationId,
+      customerId: request.customerId,
+    });
+
+    // A provider-initiated erasure is confirmed to the subject by the provider.
+    if (email && !request.metadata?.source) {
+      await this.sendDeletionCompleteEmail(email, request.organizationId).catch((error) =>
+        logger.error({ err: error, requestId: request.id }, "Failed to send deletion email"),
+      );
+    }
+
+    // The confirmation is sent: the subject's own requests keep no contact details.
+    await this.anonymizeRequests(
+      AppDataSource.manager,
+      request.isCustomerRequest()
+        ? { customerId: request.customerId!, email }
+        : { userId: request.userId!, email },
     );
 
-    return {
-      requestId: request.id,
-      jobId: job.id,
-    };
+    logger.debug({ requestId: request.id }, "Deletion completed");
+    return { deletedAt: new Date().toISOString() };
   }
 
   /**
@@ -426,49 +437,50 @@ export class PrivacyService {
       completedAt: request.completedAt,
       jobId: request.jobId,
       jobStatus: request.job?.status,
-      downloadAvailable: request.status === "completed" && request.type === "export",
+      downloadAvailable: this.isDownloadAvailable(request),
       errorMessage: request.errorMessage,
     };
   }
 
+  private isDownloadAvailable(request: PrivacyRequest, now = new Date()): boolean {
+    const expiresAt = request.getExportExpiresAt();
+    return (
+      request.type === "export" &&
+      request.status === "completed" &&
+      !!request.getExportUploadId() &&
+      !!expiresAt &&
+      expiresAt > now &&
+      request.downloadCount < request.maxDownloads
+    );
+  }
+
   /**
    * Cancel a privacy request
-   * Only pending_verification or verified requests can be cancelled
+   * Only pending_verification, verified or processing requests can be cancelled
    */
   async cancelRequest(requestId: string, token: string, ipAddress?: string): Promise<void> {
     const requestRepository = AppDataSource.getRepository(PrivacyRequest);
     const jobRepository = AppDataSource.getRepository(Job);
 
-    // Find the request
-    const request = await requestRepository.findOne({
-      where: { id: requestId },
-    });
-
+    const request = await requestRepository.findOne({ where: { id: requestId } });
     if (!request) {
       throw new Error("Privacy request not found");
     }
 
-    // Verify token
     if (!request.verificationTokenHash) {
       throw new Error("This request cannot be cancelled (no verification token)");
     }
-
-    // SHA-256 compare (tokens are high-entropy, no need for argon2)
-    const tokenHash = crypto.createHash("sha256").update(token).digest("hex");
-    if (tokenHash !== request.verificationTokenHash) {
+    if (!tokenMatches(token, request.verificationTokenHash)) {
       throw new Error("Invalid verification token");
     }
 
-    // Check if request can be cancelled
-    const cancellableStatuses = ["pending_verification", "verified", "processing"];
-    if (!cancellableStatuses.includes(request.status)) {
+    if (!CANCELLABLE_STATUSES.includes(request.status)) {
       throw new Error(
         `Cannot cancel request with status '${request.status}'. ` +
           `Only pending, verified, or processing requests can be cancelled.`,
       );
     }
 
-    // If there's an associated job, cancel it
     if (request.jobId) {
       const job = await jobRepository.findOne({ where: { id: request.jobId } });
       if (job && job.status !== JobStatus.COMPLETED && job.status !== JobStatus.FAILED) {
@@ -477,32 +489,27 @@ export class PrivacyService {
       }
     }
 
-    // Mark request as cancelled
     request.status = "cancelled";
     await requestRepository.save(request);
 
-    // Log audit trail
-    await this.logPrivacyAction("privacy.request.cancelled", request.email, request.userId, {
+    await this.logPrivacyAction("privacy.request.cancelled", request.userId, {
       requestId: request.id,
       type: request.type,
       ipAddress,
     });
 
-    logger.debug(
-      { requestId, type: request.type, email: request.email },
-      "Privacy request cancelled",
-    );
+    logger.debug({ requestId, type: request.type }, "Privacy request cancelled");
   }
 
   /**
-   * Download export data
-   * Supports both legacy JSON and new ZIP format
+   * Download an export ZIP. Each successful call uses one of the request's
+   * allowed downloads; the file is deleted after the last one.
    */
   async downloadExport(
     requestId: string,
     downloadToken: string,
     ipAddress?: string,
-  ): Promise<{ data: unknown; fileName: string; isZip?: boolean; filePath?: string }> {
+  ): Promise<{ buffer: Buffer; fileName: string }> {
     const requestRepository = AppDataSource.getRepository(PrivacyRequest);
     const request = await requestRepository.findOne({
       where: { id: requestId, type: "export", status: "completed" },
@@ -512,46 +519,24 @@ export class PrivacyService {
       throw new Error("Export request not found or not ready");
     }
 
-    // Verify download token
-    const storedToken = request.getDownloadToken();
-    if (!storedToken || storedToken !== downloadToken) {
+    if (!tokenMatches(downloadToken, request.getDownloadTokenHash())) {
       throw new Error("Invalid download token");
     }
 
-    // Check if export has expired
-    const exportExpiresAt = request.metadata?.exportExpiresAt as string | undefined;
-    if (exportExpiresAt && new Date(exportExpiresAt) < new Date()) {
+    const expiresAt = request.getExportExpiresAt();
+    const uploadId = request.getExportUploadId();
+    if (!uploadId || !expiresAt || expiresAt <= new Date()) {
       throw new Error("Export has expired");
     }
 
-    // Check if already downloaded (single-use)
-    // Note: maxDownloads is set at request creation time and doesn't change
-    // if PRIVACY_MAX_DOWNLOAD_COUNT env var is updated later. This is intentional
-    // for security - we don't want to retroactively increase limits on existing requests.
-    if (request.downloadCount >= request.maxDownloads) {
-      throw new Error(
-        "Download limit exceeded. This link has already been used. " +
-          "Please request a new export if needed.",
-      );
-    }
-
     // Check IP restriction (optional - can be disabled for mobile users)
-    const { config } = await import("@server/config/env");
-    const ENABLE_IP_RESTRICTION = config.privacy.downloadIpRestriction;
-
     if (
-      ENABLE_IP_RESTRICTION &&
+      config.privacy.downloadIpRestriction &&
       ipAddress &&
       request.downloadIpAddress &&
       request.downloadIpAddress !== ipAddress
     ) {
-      logger.debug(
-        { requestId, originalIp: request.downloadIpAddress, currentIp: ipAddress },
-        "Download attempt from different IP",
-      );
-
-      // Log security event
-      await this.logPrivacyAction("privacy.download.ip_mismatch", request.email, request.userId, {
+      await this.logPrivacyAction("privacy.download.ip_mismatch", request.userId, {
         requestId,
         originalIp: request.downloadIpAddress,
         attemptedIp: ipAddress,
@@ -563,94 +548,87 @@ export class PrivacyService {
       );
     }
 
-    // Read export file
-    const exportUrl = request.getExportUrl();
-    if (!exportUrl) {
-      throw new Error("Export file not found");
+    // Claim a download atomically so concurrent requests can't exceed the limit.
+    // Note: maxDownloads is fixed at request creation time on purpose.
+    const [claimed]: [Array<{ download_count: number }>, number] = await AppDataSource.query(
+      `UPDATE privacy_requests
+       SET download_count = download_count + 1,
+           downloaded_at = COALESCE(downloaded_at, now()),
+           download_ip_address = COALESCE(download_ip_address, $2)
+       WHERE id = $1 AND download_count < max_downloads
+       RETURNING download_count`,
+      [request.id, ipAddress ?? null],
+    );
+    if (!claimed?.length) {
+      throw new Error(
+        "Download limit exceeded. This link has already been used. " +
+          "Please request a new export if needed.",
+      );
+    }
+    request.downloadCount = claimed[0].download_count;
+
+    const { buffer } = await storageService.download(uploadId);
+
+    if (request.downloadCount >= request.maxDownloads) {
+      await this.deleteExportFile(request);
     }
 
-    // Record download
-    if (!request.downloadedAt) {
-      request.downloadIpAddress = ipAddress;
-      request.downloadedAt = new Date();
-    }
-    request.downloadCount += 1;
-    await requestRepository.save(request);
-
-    // Log download
-    await this.logPrivacyAction("privacy.export.download", request.email, request.userId, {
+    await this.logPrivacyAction("privacy.export.download", request.userId, {
       requestId: request.id,
       downloadCount: request.downloadCount,
       ipAddress,
     });
 
-    logger.debug(
-      { email: request.email, requestId: request.id, downloadCount: request.downloadCount },
-      "Export downloaded",
-    );
+    return { buffer, fileName: `data-export-${new Date().toISOString().slice(0, 10)}.zip` };
+  }
 
-    // Check if it's a ZIP file (new format) or JSON (legacy)
-    const isZip = exportUrl.endsWith(".zip") || request.metadata?.exportFormat === "zip";
-    const dateStr = new Date().toISOString().split("T")[0];
-
-    if (isZip) {
-      // Return ZIP file path for streaming
-      return {
-        data: null,
-        fileName: `data-export-${request.email}-${dateStr}.zip`,
-        isZip: true,
-        filePath: exportUrl,
-      };
+  /** Remove an export's ZIP; the request row stays as the record. */
+  private async deleteExportFile(request: PrivacyRequest): Promise<void> {
+    const uploadId = request.getExportUploadId();
+    if (!uploadId) return;
+    try {
+      await storageService.delete(uploadId);
+    } catch (error) {
+      logger.warn({ err: error, requestId: request.id }, "Could not delete an export file");
+      return;
     }
-
-    // Legacy JSON format
-    const exportData = await fs.readFile(exportUrl, "utf-8");
-    const data = JSON.parse(exportData);
-
-    return {
-      data,
-      fileName: `data-export-${request.email}-${dateStr}.json`,
-      isZip: false,
-    };
+    await AppDataSource.query(
+      `UPDATE privacy_requests SET metadata = metadata - 'uploadId' WHERE id = $1`,
+      [request.id],
+    );
   }
 
   /**
-   * Collect all user data for export
+   * Collect all user data for export, across every organization they belong to
    */
-  private async collectUserData(userId: string, _email: string): Promise<ExportPackageData> {
+  private async collectUserData(userId: string): Promise<ExportPackageData> {
     const userRepository = AppDataSource.getRepository(User);
     const auditLogRepository = AppDataSource.getRepository(AuditLog);
     const documentRepository = AppDataSource.getRepository(Document);
     const uploadRepository = AppDataSource.getRepository(Upload);
 
-    // Get user profile
-    const user = await userRepository.findOne({
-      where: { id: userId },
-      relations: ["organization"],
-    });
-
+    const user = await userRepository.findOne({ where: { id: userId } });
     if (!user) {
       throw new Error("User not found");
     }
 
-    // Note: API keys are now organization-scoped, not user-scoped
-    // They are not included in individual user data exports
-    const apiKeys: ApiKey[] = [];
+    const memberships = await AppDataSource.getRepository(UserOrganization).find({
+      where: { userId },
+      relations: ["organization"],
+      order: { createdAt: "ASC" },
+    });
 
-    // Get audit logs
     const auditLogs = await auditLogRepository.find({
       where: { userId },
       order: { createdAt: "DESC" },
       take: 1000, // Limit to last 1000 events
     });
 
-    // Get documents created/updated by this user
     const documents = await documentRepository.find({
       where: [{ createdBy: userId }, { updatedBy: userId }],
       select: ["id", "title", "createdAt", "updatedAt", "metadata", "attachments"],
     });
 
-    // Get files uploaded by this user
     const uploads = await uploadRepository.find({
       where: { uploadedById: userId },
       order: { createdAt: "DESC" },
@@ -668,27 +646,20 @@ export class PrivacyService {
           email: user.email,
           firstName: user.firstName,
           lastName: user.lastName,
+          avatarUrl: user.avatarUrl,
           createdAt: user.createdAt,
           lastLoginAt: user.lastLoginAt,
           lastSeenAt: user.lastSeenAt,
-          role: user.role,
           status: user.status,
         },
-        organization: user.organization
-          ? {
-              id: user.organization.id,
-              name: user.organization.name,
-              role: user.role,
-            }
-          : null,
-        apiKeys: apiKeys.map((key) => ({
-          id: key.id,
-          name: key.name,
-          createdAt: key.createdAt,
-          lastUsedAt: key.lastUsedAt,
-          expiresAt: key.expiresAt,
-          scopes: key.scopes,
-          isActive: key.isActive,
+        organizations: memberships.map((membership) => ({
+          id: membership.organizationId,
+          name: membership.organization?.name,
+          role: membership.role,
+          permissions: membership.permissions ?? [],
+          isActive: membership.isActive,
+          joinedAt: membership.joinedAt,
+          lastAccessedAt: membership.lastAccessedAt,
         })),
         auditLogs: auditLogs.map((log) => ({
           id: log.id,
@@ -718,6 +689,7 @@ export class PrivacyService {
           createdAt: upload.createdAt,
         })),
         statistics: {
+          totalOrganizations: memberships.length,
           totalDocuments: documents.length,
           totalUploads: uploads.length,
           totalAuditLogs: auditLogs.length,
@@ -727,190 +699,129 @@ export class PrivacyService {
   }
 
   /**
-   * Process export job in background
+   * Erase a staff user: every row that identifies them is deleted or cleared,
+   * and the user row itself is kept only as an anonymous placeholder (other
+   * rows such as takeover events still point at it).
    */
-  private async processExportJob(jobId: string, requestId: string): Promise<void> {
-    const requestRepository = AppDataSource.getRepository(PrivacyRequest);
-
-    try {
-      // Update job status
-      await jobQueueService.updateJobStatus(jobId, "", {
-        status: JobStatus.PROCESSING,
-      });
-
-      const request = await requestRepository.findOne({ where: { id: requestId } });
-      if (!request || !request.userId) {
-        throw new Error("Invalid request or no user associated");
-      }
-
-      // Collect user data
-      const exportData = await this.collectUserData(request.userId, request.email);
-
-      // Create signed ZIP export
-      const { filePath, signature } = await this.createSignedZipExport(
-        exportData,
-        requestId,
-        request.email,
-      );
-
-      // Generate download token
-      const downloadToken = crypto.randomBytes(32).toString("hex");
-      const expiresAt = new Date(Date.now() + this.EXPORT_EXPIRY_HOURS * 60 * 60 * 1000);
-
-      // Update request with export metadata
-      request.setExportMetadata(filePath, downloadToken, expiresAt);
-      request.metadata = {
-        ...request.metadata,
-        signature,
-        exportFormat: "zip",
-      };
-      request.markCompleted();
-      await requestRepository.save(request);
-
-      // Complete job
-      await jobQueueService.completeJob(jobId, "", {
-        exportUrl: filePath,
-        downloadToken,
-        expiresAt: expiresAt.toISOString(),
-      });
-
-      // Send notification email
-      await this.sendExportReadyEmail(request.email, requestId, downloadToken);
-
-      logger.debug({ email: request.email, requestId, jobId, filePath }, "Export completed");
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : "Unknown error";
-      logger.error({ err: error }, "Export job failed");
-
-      // Update request
-      const request = await requestRepository.findOne({ where: { id: requestId } });
-      if (request) {
-        request.setError(errorMessage);
-        await requestRepository.save(request);
-      }
-
-      // Fail job
-      await jobQueueService.failJob(jobId, "", errorMessage);
-    }
-  }
-
-  /**
-   * Process deletion job in background
-   */
-  private async processDeletionJob(jobId: string, requestId: string): Promise<void> {
-    const requestRepository = AppDataSource.getRepository(PrivacyRequest);
-
-    try {
-      // Update job status
-      await jobQueueService.updateJobStatus(jobId, "", {
-        status: JobStatus.PROCESSING,
-      });
-
-      const request = await requestRepository.findOne({ where: { id: requestId } });
-      if (!request || !request.userId) {
-        throw new Error("Invalid request or no user associated");
-      }
-
-      // Execute deletion
-      await this.executeDataDeletion(request.userId, request.email);
-
-      // Update request
-      request.markCompleted();
-      await requestRepository.save(request);
-
-      // Complete job
-      await jobQueueService.completeJob(jobId, "", {
-        deletedAt: new Date().toISOString(),
-        userId: request.userId,
-      });
-
-      // Log completion
-      await this.logPrivacyAction("privacy.deletion.complete", request.email, request.userId, {
-        requestId,
-        jobId,
-      });
-
-      // Send confirmation email
-      await this.sendDeletionCompleteEmail(request.email);
-
-      logger.debug({ email: request.email, requestId, jobId }, "Deletion completed");
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : "Unknown error";
-      logger.error({ err: error }, "Deletion job failed");
-
-      // Update request
-      const request = await requestRepository.findOne({ where: { id: requestId } });
-      if (request) {
-        request.setError(errorMessage);
-        await requestRepository.save(request);
-      }
-
-      // Fail job
-      await jobQueueService.failJob(jobId, "", errorMessage);
-    }
-  }
-
-  /**
-   * Execute data deletion (soft delete user, hard delete sensitive data)
-   */
-  private async executeDataDeletion(userId: string, email: string): Promise<void> {
+  private async executeDataDeletion(userId: string): Promise<void> {
     return AppDataSource.transaction(async (manager) => {
       const userRepository = manager.getRepository(User);
       const auditLogRepository = manager.getRepository(AuditLog);
 
-      // Get user
       const user = await userRepository.findOne({ where: { id: userId } });
       if (!user) {
         throw new Error("User not found");
       }
-
-      // Note: API keys are now organization-scoped, not user-scoped
-      // They are managed at the organization level and not deleted with individual users
+      const email = user.email.toLowerCase();
 
       // Anonymize audit logs (keep for compliance but remove PII)
       const auditLogs = await auditLogRepository.find({ where: { userId } });
-
       for (const log of auditLogs) {
-        // Anonymize user identifier - clear the nullable userId column.
         // The entity types userId as `string | undefined`, but the DB column is
         // nullable, so we explicitly null it to erase the association.
         log.userId = null as unknown as undefined;
-
-        // Anonymize IP addresses
         if (log.ipAddress) {
           log.ipAddress = this.anonymizeIpAddress(log.ipAddress);
         }
-
-        // Anonymize user agent
         if (log.userAgent) {
           log.userAgent = "deleted";
         }
-
-        // Anonymize PII in changes/metadata JSON fields
         if (log.changes) {
           log.changes = this.anonymizeJsonPii(log.changes) as Record<string, unknown>;
         }
-
         if (log.metadata) {
           log.metadata = this.anonymizeJsonPii(log.metadata) as Record<string, unknown>;
         }
-
         await auditLogRepository.save(log);
       }
 
-      // Soft delete user
+      // Rows that exist only for this person: sign-ins, devices, one-time codes,
+      // alert deliveries, memberships in every organization, invitations to them.
+      await manager.query(`DELETE FROM sessions WHERE user_id = $1`, [userId]);
+      await manager.query(`DELETE FROM push_subscriptions WHERE user_id = $1`, [userId]);
+      await manager.query(`DELETE FROM auth_codes WHERE user_id = $1`, [userId]);
+      await manager.query(`DELETE FROM notification_deliveries WHERE user_id = $1`, [userId]);
+      await manager.query(`DELETE FROM user_organizations WHERE user_id = $1`, [userId]);
+      await manager.query(
+        `DELETE FROM organization_invitations WHERE invited_user_id = $1 OR lower(email) = $2`,
+        [userId, email],
+      );
+
+      // Every nullable reference to the user (uploader, assignee, author,
+      // approver, …) is cleared. Read from the schema so a new table with a
+      // user reference is covered without a change here. Audit logs are handled
+      // above and privacy requests keep their link as the record of this erasure.
+      const references: Array<{ table_name: string; column_name: string }> = await manager.query(
+        `SELECT kcu.table_name, kcu.column_name
+         FROM information_schema.referential_constraints rc
+         JOIN information_schema.key_column_usage kcu
+           ON kcu.constraint_name = rc.constraint_name AND kcu.constraint_schema = rc.constraint_schema
+         JOIN information_schema.constraint_column_usage ccu
+           ON ccu.constraint_name = rc.constraint_name AND ccu.constraint_schema = rc.constraint_schema
+         WHERE ccu.table_name = 'users' AND ccu.column_name = 'id'
+           AND rc.delete_rule = 'SET NULL'
+           AND kcu.table_schema = current_schema()
+           AND kcu.table_name NOT IN ('audit_logs', 'privacy_requests')`,
+      );
+      for (const { table_name, column_name } of references) {
+        await manager.query(
+          `UPDATE "${table_name}" SET "${column_name}" = NULL WHERE "${column_name}" = $1`,
+          [userId],
+        );
+      }
+
+      // Replies they sent in conversations carry their name.
+      await manager.query(
+        `UPDATE messages
+         SET sender = '[deleted]', metadata = metadata - 'agentFirstName'
+         WHERE type = 'HumanAgent'
+           AND (metadata->>'sentByUserId' = $1 OR metadata->>'answeredBy' = $1)`,
+        [userId],
+      );
+
       user.softDelete();
+      user.isActive = false;
       user.email = `deleted-${userId}@deleted.local`;
-      // Clear nullable name columns. Entity types them as `string | undefined`,
-      // but the DB columns are nullable, so we null them to erase the PII.
+      // Nullable columns are typed `string | undefined`; null them to erase the PII.
       user.firstName = null as unknown as undefined;
       user.lastName = null as unknown as undefined;
+      user.avatarUrl = null as unknown as undefined;
+      user.pendingEmail = null;
+      user.metadata = null as unknown as undefined;
+      user.organizationId = null as unknown as undefined;
       user.password = "deleted";
-
+      // Access tokens already issued stop working.
+      user.tokenVersion = (user.tokenVersion ?? 0) + 1;
       await userRepository.save(user);
 
-      logger.debug({ email, userId }, "User data deleted");
+      logger.debug({ userId }, "User data deleted");
     });
+  }
+
+  /**
+   * Remove the contact details from a subject's privacy requests: the email is
+   * replaced by its hash (so a repeat request can still be matched to this
+   * record), network details and identifiers are dropped.
+   */
+  private async anonymizeRequests(
+    manager: EntityManager,
+    subject: { userId?: string; customerId?: string; email: string },
+  ): Promise<void> {
+    await manager.query(
+      `UPDATE privacy_requests
+       SET email = coalesce($1, email), identifier_value = NULL, ip_address = NULL,
+           user_agent = NULL, download_ip_address = NULL
+       WHERE (user_id = $2 OR customer_id = $3 OR lower(email) = $4)
+         AND email NOT LIKE 'erased:%'
+         AND status NOT IN ('pending_verification', 'verified', 'processing')`,
+      // A provider-initiated request may have no email: match it by subject only.
+      [
+        subject.email ? erasedEmail(subject.email) : null,
+        subject.userId ?? null,
+        subject.customerId ?? null,
+        subject.email ? subject.email.toLowerCase() : null,
+      ],
+    );
   }
 
   /**
@@ -920,7 +831,7 @@ export class PrivacyService {
     email: string,
     token: string,
     type: "export" | "deletion",
-    firstName?: string,
+    recipientName?: string | null,
     organizationId?: string,
   ): Promise<void> {
     await emailService.initialize();
@@ -936,7 +847,7 @@ export class PrivacyService {
       template,
       locale,
       variables: {
-        userName: firstName || email,
+        userName: recipientName || email,
         verificationUrl,
         companyName: "Hay.chat",
         expiresIn: `${this.VERIFICATION_EXPIRY_HOURS} hours`,
@@ -970,7 +881,7 @@ export class PrivacyService {
       locale,
       variables: {
         downloadUrl,
-        expiresIn: `${this.EXPORT_EXPIRY_HOURS / 24} days`,
+        expiresIn: `${this.exportRetentionDays} days`,
         companyName: "Hay.chat",
         supportUrl: `${baseUrl}/support`,
         currentYear: new Date().getFullYear().toString(),
@@ -1006,23 +917,27 @@ export class PrivacyService {
   }
 
   /**
-   * Log privacy action to audit log
+   * Log privacy action to audit log. The requester's email is not written:
+   * the requestId points at the privacy request, which holds it.
    */
   private async logPrivacyAction(
     action: string,
-    email: string,
     userId?: string,
     metadata?: Record<string, unknown>,
   ): Promise<void> {
     try {
       await auditLogService.log({
-        userId: userId || "anonymous",
+        // Customers and unverified requesters are not users: no user reference,
+        // the requestId in `changes` points at the request.
+        userId,
+        organizationId:
+          typeof metadata?.organizationId === "string" ? metadata.organizationId : undefined,
         // Privacy logging uses a broader action vocabulary than the core
         // AuditAction union (e.g. customer.* and ip_mismatch events). The DB
         // column is a plain varchar, so widening here is safe.
         action: action as AuditAction,
         resource: "privacy_request",
-        changes: { email, ...metadata },
+        changes: { ...metadata },
         status: "success",
         ipAddress: typeof metadata?.ipAddress === "string" ? metadata.ipAddress : undefined,
         userAgent: typeof metadata?.userAgent === "string" ? metadata.userAgent : undefined,
@@ -1046,170 +961,8 @@ export class PrivacyService {
     identifier: { type: PrivacyRequestIdentifierType; value: string },
     ipAddress?: string,
     userAgent?: string,
-  ): Promise<{ requestId: string; expiresAt: Date; customerFound: boolean }> {
-    const requestRepository = AppDataSource.getRepository(PrivacyRequest);
-
-    // Find customer by identifier
-    const customer = await this.findCustomer(organizationId, identifier);
-
-    if (!customer) {
-      logger.debug(
-        { organizationId, identifierType: identifier.type },
-        "Customer not found for export request",
-      );
-    }
-
-    // Generate verification token (SHA-256 for high-entropy tokens — enables O(1) DB lookup)
-    const verificationToken = crypto.randomBytes(32).toString("hex");
-    const tokenHash = crypto.createHash("sha256").update(verificationToken).digest("hex");
-
-    const expiresAt = new Date(Date.now() + this.VERIFICATION_EXPIRY_HOURS * 60 * 60 * 1000);
-
-    // Determine email for verification
-    const verificationEmail = this.getVerificationEmail(customer, identifier);
-
-    if (!verificationEmail) {
-      throw new Error("Cannot send verification email: no email address available");
-    }
-
-    // Create privacy request
-    // Get max downloads from config
-    const { config: envConfig } = await import("@server/config/env");
-
-    const request = requestRepository.create({
-      email: verificationEmail,
-      customerId: customer?.id,
-      organizationId,
-      type: "export",
-      subjectType: "customer",
-      status: "pending_verification",
-      verificationTokenHash: tokenHash,
-      verificationExpiresAt: expiresAt,
-      identifierType: identifier.type,
-      identifierValue: identifier.value,
-      ipAddress,
-      userAgent,
-      maxDownloads: envConfig.privacy.maxDownloadCount,
-    });
-
-    await requestRepository.save(request);
-
-    // Log audit trail
-    await this.logPrivacyAction("customer.privacy.export.request", verificationEmail, undefined, {
-      requestId: request.id,
-      organizationId,
-      customerId: customer?.id,
-      identifierType: identifier.type,
-      ipAddress,
-      userAgent,
-    });
-
-    // Send verification email
-    await this.sendCustomerVerificationEmail(
-      verificationEmail,
-      verificationToken,
-      "export",
-      organizationId,
-      customer?.name,
-    );
-
-    logger.debug(
-      {
-        requestId: request.id,
-        organizationId,
-        hasCustomer: !!customer,
-        identifierType: identifier.type,
-      },
-      "Customer export request created",
-    );
-
-    return {
-      requestId: request.id,
-      expiresAt,
-      customerFound: !!customer,
-    };
-  }
-
-  /**
-   * Confirm customer data export with verification token
-   */
-  async confirmCustomerExport(token: string): Promise<{ requestId: string; jobId: string }> {
-    const requestRepository = AppDataSource.getRepository(PrivacyRequest);
-
-    // SHA-256 hash the token for direct DB lookup (O(1) instead of O(n) argon2 scan)
-    const tokenHash = crypto.createHash("sha256").update(token).digest("hex");
-
-    const request = await requestRepository.findOne({
-      where: {
-        type: "export",
-        subjectType: "customer",
-        status: "pending_verification",
-        verificationTokenHash: tokenHash,
-      },
-    });
-
-    if (!request) {
-      throw new Error("Invalid or expired verification token");
-    }
-
-    if (request.isExpired()) {
-      request.status = "expired";
-      await requestRepository.save(request);
-      throw new Error("Verification token has expired");
-    }
-
-    if (!request.customerId) {
-      throw new Error("No customer found for this export request");
-    }
-
-    // Mark as verified
-    request.markVerified();
-
-    // Create background job for export
-    const jobRepository = AppDataSource.getRepository(Job);
-
-    const job = jobRepository.create({
-      title: `Customer Data Export for ${request.email}`,
-      description: `GDPR customer data export request`,
-      status: JobStatus.PENDING,
-      priority: JobPriority.HIGH,
-      organizationId: request.organizationId,
-      data: {
-        requestId: request.id,
-        email: request.email,
-        customerId: request.customerId,
-        organizationId: request.organizationId,
-      },
-    });
-
-    await jobRepository.save(job);
-
-    // Link job to request
-    request.markProcessing(job.id);
-    await requestRepository.save(request);
-
-    // Log audit trail
-    await this.logPrivacyAction("customer.privacy.export.confirm", request.email, undefined, {
-      requestId: request.id,
-      jobId: job.id,
-      organizationId: request.organizationId,
-      customerId: request.customerId,
-    });
-
-    // Process export asynchronously
-    this.processCustomerExportJob(job.id, request.id).catch((error) => {
-      logger.error({ err: error }, "Customer export job failed");
-    });
-
-    logger.debug(
-      { requestId: request.id, jobId: job.id, organizationId: request.organizationId },
-      "Customer export confirmed",
-    );
-
-    return {
-      requestId: request.id,
-      jobId: job.id,
-    };
+  ): Promise<{ requestId: string; expiresAt: Date }> {
+    return this.requestForCustomer("export", organizationId, identifier, ipAddress, userAgent);
   }
 
   /**
@@ -1221,48 +974,51 @@ export class PrivacyService {
     ipAddress?: string,
     userAgent?: string,
   ): Promise<{ requestId: string; expiresAt: Date }> {
+    return this.requestForCustomer("deletion", organizationId, identifier, ipAddress, userAgent);
+  }
+
+  /**
+   * Start a customer request on the organization's behalf. The verification
+   * email only goes to the address stored on the customer record.
+   */
+  private async requestForCustomer(
+    type: "export" | "deletion",
+    organizationId: string,
+    identifier: { type: PrivacyRequestIdentifierType; value: string },
+    ipAddress?: string,
+    userAgent?: string,
+  ): Promise<{ requestId: string; expiresAt: Date }> {
     const requestRepository = AppDataSource.getRepository(PrivacyRequest);
 
-    // Find customer by identifier
     const customer = await this.findCustomer(organizationId, identifier);
-
     if (!customer) {
       throw new Error("No customer found with this identifier");
     }
-
-    // Generate verification token (SHA-256 for high-entropy tokens — enables O(1) DB lookup)
-    const verificationToken = crypto.randomBytes(32).toString("hex");
-    const tokenHash = crypto.createHash("sha256").update(verificationToken).digest("hex");
-
-    const expiresAt = new Date(Date.now() + this.VERIFICATION_EXPIRY_HOURS * 60 * 60 * 1000);
-
-    // Determine email for verification
-    const verificationEmail = this.getVerificationEmail(customer, identifier);
-
-    if (!verificationEmail) {
+    if (!customer.email) {
       throw new Error("Cannot send verification email: no email address available");
     }
 
-    // Create privacy request
+    const verificationToken = crypto.randomBytes(32).toString("hex");
+    const expiresAt = new Date(Date.now() + this.VERIFICATION_EXPIRY_HOURS * 60 * 60 * 1000);
+
     const request = requestRepository.create({
-      email: verificationEmail,
+      email: customer.email,
       customerId: customer.id,
       organizationId,
-      type: "deletion",
+      type,
       subjectType: "customer",
       status: "pending_verification",
-      verificationTokenHash: tokenHash,
+      verificationTokenHash: hashToken(verificationToken),
       verificationExpiresAt: expiresAt,
       identifierType: identifier.type,
       identifierValue: identifier.value,
       ipAddress,
       userAgent,
+      maxDownloads: config.privacy.maxDownloadCount,
     });
-
     await requestRepository.save(request);
 
-    // Log audit trail
-    await this.logPrivacyAction("customer.privacy.deletion.request", verificationEmail, undefined, {
+    await this.logPrivacyAction(`customer.privacy.${type}.request`, undefined, {
       requestId: request.id,
       organizationId,
       customerId: customer.id,
@@ -1271,106 +1027,38 @@ export class PrivacyService {
       userAgent,
     });
 
-    // Send verification email
-    await this.sendCustomerVerificationEmail(
-      verificationEmail,
+    await this.sendVerificationEmail(
+      customer.email,
       verificationToken,
-      "deletion",
-      organizationId,
+      type,
       customer.name,
+      organizationId,
     );
 
     logger.debug(
-      { requestId: request.id, organizationId, customerId: customer.id },
-      "Customer deletion request created",
+      { requestId: request.id, organizationId, customerId: customer.id, type },
+      "Customer privacy request created",
     );
-
-    return {
-      requestId: request.id,
-      expiresAt,
-    };
+    return { requestId: request.id, expiresAt };
   }
 
   /**
-   * Confirm customer data deletion with verification token
+   * Erase a customer from the dashboard (Customers → Delete): the same erasure
+   * a verified customer deletion request runs. Returns false when the customer
+   * is not in the organization.
    */
-  async confirmCustomerDeletion(token: string): Promise<{ requestId: string; jobId: string }> {
-    const requestRepository = AppDataSource.getRepository(PrivacyRequest);
-
-    // SHA-256 hash the token for direct DB lookup (O(1) instead of O(n) argon2 scan)
-    const tokenHash = crypto.createHash("sha256").update(token).digest("hex");
-
-    const request = await requestRepository.findOne({
-      where: {
-        type: "deletion",
-        subjectType: "customer",
-        status: "pending_verification",
-        verificationTokenHash: tokenHash,
-      },
+  async eraseCustomer(customerId: string, organizationId: string): Promise<boolean> {
+    const customer = await AppDataSource.getRepository(Customer).findOne({
+      where: { id: customerId, organization_id: organizationId },
     });
-
-    if (!request) {
-      throw new Error("Invalid or expired verification token");
+    if (!customer) return false;
+    const email = customer.email;
+    await this.executeCustomerDeletion(customerId, organizationId);
+    if (email) {
+      await this.anonymizeRequests(AppDataSource.manager, { customerId, email });
     }
-
-    if (request.isExpired()) {
-      request.status = "expired";
-      await requestRepository.save(request);
-      throw new Error("Verification token has expired");
-    }
-
-    if (!request.customerId) {
-      throw new Error("No customer found for this deletion request");
-    }
-
-    // Mark as verified
-    request.markVerified();
-
-    // Create background job for deletion
-    const jobRepository = AppDataSource.getRepository(Job);
-
-    const job = jobRepository.create({
-      title: `Customer Data Deletion for ${request.email}`,
-      description: `GDPR customer data deletion request`,
-      status: JobStatus.PENDING,
-      priority: JobPriority.CRITICAL,
-      organizationId: request.organizationId,
-      data: {
-        requestId: request.id,
-        email: request.email,
-        customerId: request.customerId,
-        organizationId: request.organizationId,
-      },
-    });
-
-    await jobRepository.save(job);
-
-    // Link job to request
-    request.markProcessing(job.id);
-    await requestRepository.save(request);
-
-    // Log audit trail
-    await this.logPrivacyAction("customer.privacy.deletion.confirm", request.email, undefined, {
-      requestId: request.id,
-      jobId: job.id,
-      organizationId: request.organizationId,
-      customerId: request.customerId,
-    });
-
-    // Process deletion asynchronously
-    this.processCustomerDeletionJob(job.id, request.id).catch((error) => {
-      logger.error({ err: error }, "Customer deletion job failed");
-    });
-
-    logger.debug(
-      { requestId: request.id, jobId: job.id, organizationId: request.organizationId },
-      "Customer deletion confirmed",
-    );
-
-    return {
-      requestId: request.id,
-      jobId: job.id,
-    };
+    // TODO: audit event for dashboard-initiated customer erasure (audit-log coverage work).
+    return true;
   }
 
   /**
@@ -1405,27 +1093,6 @@ export class PrivacyService {
     }
 
     return customer;
-  }
-
-  /**
-   * Get verification email from customer or identifier
-   */
-  private getVerificationEmail(
-    customer: Customer | null,
-    identifier: { type: PrivacyRequestIdentifierType; value: string },
-  ): string | null {
-    // If customer has email, use it
-    if (customer?.email) {
-      return customer.email;
-    }
-
-    // If identifier is email, use that
-    if (identifier.type === "email") {
-      return identifier.value;
-    }
-
-    // No email available
-    return null;
   }
 
   /**
@@ -1594,104 +1261,16 @@ export class PrivacyService {
   }
 
   /**
-   * Process customer export job in background
-   * Creates a signed ZIP file with data.json, README.md, and manifest.json
-   */
-  private async processCustomerExportJob(jobId: string, requestId: string): Promise<void> {
-    const requestRepository = AppDataSource.getRepository(PrivacyRequest);
-
-    try {
-      // Update job status
-      await jobQueueService.updateJobStatus(jobId, "", {
-        status: JobStatus.PROCESSING,
-      });
-
-      const request = await requestRepository.findOne({ where: { id: requestId } });
-      if (!request || !request.customerId || !request.organizationId) {
-        throw new Error("Invalid request or no customer associated");
-      }
-
-      // Collect customer data
-      const exportData = await this.collectCustomerData(request.customerId, request.organizationId);
-
-      // Create signed ZIP export
-      const { filePath, signature } = await this.createSignedZipExport(
-        exportData,
-        requestId,
-        request.email,
-      );
-
-      // Generate download token
-      const downloadToken = crypto.randomBytes(32).toString("hex");
-      const expiresAt = new Date(Date.now() + this.EXPORT_EXPIRY_HOURS * 60 * 60 * 1000);
-
-      // Update request with export metadata
-      request.setExportMetadata(filePath, downloadToken, expiresAt);
-      request.metadata = {
-        ...request.metadata,
-        signature,
-        exportFormat: "zip",
-      };
-      request.markCompleted();
-      await requestRepository.save(request);
-
-      // Complete job
-      await jobQueueService.completeJob(jobId, "", {
-        exportUrl: filePath,
-        downloadToken,
-        expiresAt: expiresAt.toISOString(),
-        signature,
-      });
-
-      // Send notification email
-      await this.sendCustomerExportReadyEmail(
-        request.email,
-        requestId,
-        downloadToken,
-        request.organizationId!,
-      );
-
-      logger.debug(
-        {
-          requestId,
-          jobId,
-          customerId: request.customerId,
-          organizationId: request.organizationId,
-          exportFormat: "zip",
-        },
-        "Customer export completed",
-      );
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : "Unknown error";
-      logger.error({ err: error }, "Customer export job failed");
-
-      // Update request
-      const request = await requestRepository.findOne({ where: { id: requestId } });
-      if (request) {
-        request.setError(errorMessage);
-        await requestRepository.save(request);
-      }
-
-      // Fail job
-      await jobQueueService.failJob(jobId, "", errorMessage);
-    }
-  }
-
-  /**
-   * Create a signed ZIP export file containing data.json, README.md, manifest.json, and attachments
+   * Build the signed ZIP (data.json, README.md, manifest.json, signature.txt
+   * and the subject's files). Files are read from storage only when they
+   * belong to the export's organization; remote attachment URLs go through
+   * fetchPublicFile (SSRF check, timeout, size cap).
    */
   private async createSignedZipExport(
     exportData: ExportPackageData,
     requestId: string,
-    _email: string,
-  ): Promise<{ filePath: string; signature: string }> {
-    const exportDir = path.join(process.cwd(), "exports");
-    await fs.mkdir(exportDir, { recursive: true });
-
-    const zipFileName = `customer-export-${requestId}.zip`;
-    const zipFilePath = path.join(exportDir, zipFileName);
-
-    // Collect all attachments from conversations/messages
+    organizationId: string,
+  ): Promise<{ buffer: Buffer; signature: string }> {
     const attachments: Array<{
       messageId: string;
       conversationId: string;
@@ -1702,119 +1281,53 @@ export class PrivacyService {
       size: number;
     }> = [];
 
-    if (exportData.personalData?.conversations) {
-      for (const conv of exportData.personalData.conversations) {
-        for (const msg of conv.messages || []) {
-          for (const attachment of msg.attachments || []) {
-            attachments.push({
-              messageId: msg.id,
-              conversationId: conv.id,
-              ...attachment,
-            });
-          }
+    for (const conv of exportData.personalData?.conversations ?? []) {
+      for (const msg of conv.messages || []) {
+        for (const attachment of msg.attachments || []) {
+          attachments.push({ messageId: msg.id, conversationId: conv.id, ...attachment });
         }
       }
     }
 
-    // Download attachments and prepare for archive
-    const downloadedFiles: Array<{
-      path: string;
-      buffer: Buffer;
-      originalUrl: string;
-    }> = [];
+    const downloadedFiles: Array<{ path: string; buffer: Buffer; source: string }> = [];
+    let totalBytes = 0;
+    const add = (file: { path: string; buffer: Buffer; source: string }) => {
+      if (totalBytes + file.buffer.length > MAX_ATTACHMENT_BYTES) return;
+      totalBytes += file.buffer.length;
+      downloadedFiles.push(file);
+    };
 
     for (const attachment of attachments) {
+      const zipPath = `attachments/${attachment.conversationId}/${attachment.id}_${safeFileName(attachment.name)}`;
       try {
-        // Hay uploads (private storage) are read straight from storage by upload id
         const stored = isUuid(attachment.id)
-          ? await storageService.download(attachment.id).catch(() => null)
+          ? await this.readStoredFile(attachment.id, organizationId)
           : null;
         if (stored) {
-          downloadedFiles.push({
-            path: `attachments/${attachment.conversationId}/${attachment.id}_${attachment.name}`,
-            buffer: stored.buffer,
-            originalUrl: attachment.url,
-          });
-        } else if (attachment.url.startsWith("/") || attachment.url.startsWith("./")) {
-          // Local file - read directly
-          const localPath = path.join(
-            process.cwd(),
-            "uploads",
-            attachment.url.replace(/^\.?\//, ""),
-          );
-          try {
-            const fileBuffer = await fs.readFile(localPath);
-            downloadedFiles.push({
-              path: `attachments/${attachment.conversationId}/${attachment.id}_${attachment.name}`,
-              buffer: fileBuffer,
-              originalUrl: attachment.url,
-            });
-          } catch (err) {
-            logger.debug({ localPath, error: err }, "Could not read local attachment");
-          }
-        } else if (attachment.url.startsWith("http")) {
-          // Remote URL - download
-          try {
-            const response = await fetch(attachment.url);
-            if (response.ok) {
-              const arrayBuffer = await response.arrayBuffer();
-              downloadedFiles.push({
-                path: `attachments/${attachment.conversationId}/${attachment.id}_${attachment.name}`,
-                buffer: Buffer.from(arrayBuffer),
-                originalUrl: attachment.url,
-              });
-            }
-          } catch (err) {
-            logger.debug({ url: attachment.url, error: err }, "Could not download attachment");
-          }
+          add({ path: zipPath, buffer: stored, source: attachment.url });
+        } else if (/^https?:\/\//i.test(attachment.url)) {
+          const { buffer } = await fetchPublicFile(attachment.url, REMOTE_ATTACHMENT_FETCH);
+          add({ path: zipPath, buffer, source: attachment.url });
         }
       } catch (err) {
-        logger.debug({ attachmentId: attachment.id, error: err }, "Error processing attachment");
+        logger.debug({ attachmentId: attachment.id, error: err }, "Could not include attachment");
       }
     }
 
-    // Handle user uploads (for user exports)
-    const userUploads: Array<{ id: string; path: string; originalName: string; folder: string }> =
-      [];
-    if (exportData.personalData?.uploads) {
-      for (const upload of exportData.personalData.uploads) {
-        userUploads.push({
-          id: upload.id,
-          path: upload.path,
-          originalName: upload.originalName,
-          folder: upload.folder,
+    const userUploads = exportData.personalData?.uploads ?? [];
+    for (const upload of userUploads) {
+      const stored = await this.readStoredFile(upload.id, organizationId, true);
+      if (stored) {
+        add({
+          path: `uploads/${upload.folder}/${upload.id}_${safeFileName(upload.originalName)}`,
+          buffer: stored,
+          source: upload.id,
         });
       }
     }
 
-    // Download user uploads
-    for (const upload of userUploads) {
-      try {
-        const { config } = await import("@server/config/env");
-        const localPath = path.join(config.storage.local.uploadDir, upload.path);
-        try {
-          const fileBuffer = await fs.readFile(localPath);
-          downloadedFiles.push({
-            path: `uploads/${upload.folder}/${upload.originalName}`,
-            buffer: fileBuffer,
-            originalUrl: upload.path,
-          });
-        } catch (err) {
-          logger.debug({ localPath, error: err }, "Could not read upload file");
-        }
-      } catch (err) {
-        logger.debug({ uploadId: upload.id, error: err }, "Error processing upload");
-      }
-    }
-
-    // Prepare JSON data
     const dataJson = JSON.stringify(exportData, null, 2);
-
-    // Generate manifest with attachments
-    const fileList = ["data.json", "README.md", "manifest.json", "signature.txt"];
-    if (downloadedFiles.length > 0) {
-      fileList.push(...downloadedFiles.map((f) => f.path));
-    }
+    const included = new Set(downloadedFiles.map((f) => f.source));
 
     const manifest = {
       version: "2.0",
@@ -1828,7 +1341,13 @@ export class PrivacyService {
         downloadedFiles: downloadedFiles.length,
       },
       format: "GDPR DSAR Export",
-      files: fileList,
+      files: [
+        "data.json",
+        "README.md",
+        "manifest.json",
+        "signature.txt",
+        ...downloadedFiles.map((f) => f.path),
+      ],
       attachments: attachments.map((a) => ({
         id: a.id,
         name: a.name,
@@ -1836,53 +1355,65 @@ export class PrivacyService {
         conversationId: a.conversationId,
         type: a.type,
         size: a.size,
-        included: downloadedFiles.some((f) => f.originalUrl === a.url),
+        included: included.has(a.url),
       })),
       uploads: userUploads.map((u) => ({
         id: u.id,
         originalName: u.originalName,
         folder: u.folder,
-        included: downloadedFiles.some((f) => f.originalUrl === u.path),
+        included: included.has(u.id),
       })),
     };
-    const manifestJson = JSON.stringify(manifest, null, 2);
 
-    // Generate README with attachment info
     const readme = this.generateExportReadme(
       exportData,
       requestId,
       attachments.length,
-      downloadedFiles.length,
+      downloadedFiles.filter((f) => f.path.startsWith("attachments/")).length,
     );
-
     // Sign the data (HMAC-SHA256 of data.json content)
     const signature = this.signExportData(dataJson);
 
-    // Create ZIP archive
-    const { createWriteStream } = await import("fs");
-    const output = createWriteStream(zipFilePath);
-    const archive = archiver.default("zip", { zlib: { level: 9 } });
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), "hay-privacy-export-"));
+    try {
+      const zipPath = path.join(dir, "export.zip");
+      await new Promise<void>((resolve, reject) => {
+        const output = createWriteStream(zipPath);
+        const archive = archiver.default("zip", { zlib: { level: 9 } });
+        output.on("close", () => resolve());
+        output.on("error", reject);
+        archive.on("error", reject);
+        archive.pipe(output);
+        archive.append(dataJson, { name: "data.json" });
+        archive.append(readme, { name: "README.md" });
+        archive.append(JSON.stringify(manifest, null, 2), { name: "manifest.json" });
+        archive.append(signature, { name: "signature.txt" });
+        for (const file of downloadedFiles) archive.append(file.buffer, { name: file.path });
+        void archive.finalize();
+      });
+      return { buffer: await fs.readFile(zipPath), signature };
+    } finally {
+      await fs.rm(dir, { recursive: true, force: true });
+    }
+  }
 
-    await new Promise<void>((resolve, reject) => {
-      output.on("close", resolve);
-      output.on("error", reject);
-      archive.on("error", reject);
-
-      archive.pipe(output);
-      archive.append(dataJson, { name: "data.json" });
-      archive.append(readme, { name: "README.md" });
-      archive.append(manifestJson, { name: "manifest.json" });
-      archive.append(signature, { name: "signature.txt" });
-
-      // Add downloaded attachments
-      for (const file of downloadedFiles) {
-        archive.append(file.buffer, { name: file.path });
-      }
-
-      archive.finalize();
-    });
-
-    return { filePath: zipFilePath, signature };
+  /**
+   * A stored upload's bytes, or null when it is missing or belongs to another
+   * organization. A staff user's own uploads may sit in any of their organizations.
+   */
+  private async readStoredFile(
+    uploadId: string,
+    organizationId: string,
+    anyOrganization = false,
+  ): Promise<Buffer | null> {
+    try {
+      const { buffer, upload } = await storageService.download(uploadId);
+      if (!anyOrganization && upload.organizationId !== organizationId) return null;
+      return buffer;
+    } catch (err) {
+      logger.debug({ uploadId, error: err }, "Stored file not available for export");
+      return null;
+    }
   }
 
   /**
@@ -2066,310 +1597,89 @@ please contact ${supportContact}.
   }
 
   /**
-   * Process customer deletion job in background
-   */
-  private async processCustomerDeletionJob(jobId: string, requestId: string): Promise<void> {
-    const requestRepository = AppDataSource.getRepository(PrivacyRequest);
-
-    try {
-      // Update job status
-      await jobQueueService.updateJobStatus(jobId, "", {
-        status: JobStatus.PROCESSING,
-      });
-
-      const request = await requestRepository.findOne({ where: { id: requestId } });
-      if (!request || !request.customerId || !request.organizationId) {
-        throw new Error("Invalid request or no customer associated");
-      }
-
-      // Execute deletion
-      await this.executeCustomerDeletion(request.customerId, request.organizationId);
-
-      // Update request
-      request.markCompleted();
-      await requestRepository.save(request);
-
-      // Complete job
-      await jobQueueService.completeJob(jobId, "", {
-        deletedAt: new Date().toISOString(),
-        customerId: request.customerId,
-      });
-
-      // Log completion
-      await this.logPrivacyAction("customer.privacy.deletion.complete", request.email, undefined, {
-        requestId,
-        jobId,
-        customerId: request.customerId,
-        organizationId: request.organizationId,
-      });
-
-      // Send confirmation email
-      await this.sendCustomerDeletionCompleteEmail(request.email, request.organizationId);
-
-      logger.debug(
-        {
-          requestId,
-          jobId,
-          customerId: request.customerId,
-          organizationId: request.organizationId,
-        },
-        "Customer deletion completed",
-      );
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : "Unknown error";
-      logger.error({ err: error }, "Customer deletion job failed");
-
-      // Update request
-      const request = await requestRepository.findOne({ where: { id: requestId } });
-      if (request) {
-        request.setError(errorMessage);
-        await requestRepository.save(request);
-      }
-
-      // Fail job
-      await jobQueueService.failJob(jobId, "", errorMessage);
-    }
-  }
-
-  /**
-   * Execute customer data deletion
-   * Soft delete customer, anonymize conversations and messages, delete embeddings
-   * GDPR Article 17 - Right to Erasure
+   * Erase a customer (GDPR Article 17): media files and embeddings are deleted,
+   * their messages and every conversation-scoped record that quotes them are
+   * deleted, the conversations are kept only as anonymous analytics rows (like
+   * retention does) and the customer record is deleted.
    */
   private async executeCustomerDeletion(customerId: string, organizationId: string): Promise<void> {
-    return AppDataSource.transaction(async (manager) => {
-      const customerRepository = manager.getRepository(Customer);
-      const conversationRepository = manager.getRepository(Conversation);
-      const messageRepository = manager.getRepository(Message);
+    const conversations: Array<{ id: string }> = await AppDataSource.query(
+      `SELECT id FROM conversations WHERE customer_id = $1 AND organization_id = $2`,
+      [customerId, organizationId],
+    );
+    const conversationIds = conversations.map((c) => c.id);
 
-      // Get customer
+    // Media files can't be restored, so they go first, outside the transaction;
+    // failures are logged and never block the erasure.
+    const mediaResult = await deleteConversationMedia({
+      organizationId,
+      conversationIds,
+      customerId,
+    });
+    logger.debug(
+      { customerId, deleted: mediaResult.deleted, failed: mediaResult.failed },
+      "Customer media deletion completed",
+    );
+
+    await AppDataSource.transaction(async (manager) => {
+      const customerRepository = manager.getRepository(Customer);
       const customer = await customerRepository.findOne({
         where: { id: customerId, organization_id: organizationId },
       });
-
       if (!customer) {
         throw new Error("Customer not found");
       }
 
-      // Get all conversations
-      const conversations = await conversationRepository.find({
-        where: { customer_id: customerId, organization_id: organizationId },
-      });
-
-      const conversationIds = conversations.map((c) => c.id);
-
-      // Get all message IDs for embedding and attachment deletion (optimized query)
-      const allMessageIds: string[] = [];
       if (conversationIds.length > 0) {
-        const messages = await messageRepository.find({
+        const messages = await manager.getRepository(Message).find({
           where: { conversation_id: In(conversationIds) },
           select: ["id"],
         });
-        allMessageIds.push(...messages.map((m) => m.id));
-      }
+        const messageIds = messages.map((m) => m.id);
 
-      // Delete the customer's media files from storage (S3 or disk) with their
-      // upload rows (D8-3). Files can't be restored, so this runs outside the
-      // transaction and failures are logged, never block the erasure.
-      const mediaResult = await deleteConversationMedia({
-        organizationId,
-        conversationIds,
-        customerId,
-      });
-      logger.debug(
-        { customerId, deleted: mediaResult.deleted, failed: mediaResult.failed },
-        "Customer media deletion completed",
-      );
-
-      // Delete embeddings associated with conversations and messages
-      // This ensures no orphaned vectors remain (GDPR compliance)
-      let embeddingsDeleted = 0;
-      try {
-        if (conversationIds.length > 0) {
-          const deletedByConversation = await vectorStoreService.deleteByConversationIds(
-            organizationId,
-            conversationIds,
-            manager, // Pass transaction manager
-          );
-          embeddingsDeleted += deletedByConversation;
+        // Embeddings are linked by metadata, not foreign keys.
+        await vectorStoreService.deleteByConversationIds(organizationId, conversationIds, manager);
+        if (messageIds.length > 0) {
+          await vectorStoreService.deleteByMessageIds(organizationId, messageIds, manager);
         }
 
-        if (allMessageIds.length > 0) {
-          const deletedByMessage = await vectorStoreService.deleteByMessageIds(
-            organizationId,
-            allMessageIds,
-            manager, // Pass transaction manager
-          );
-          embeddingsDeleted += deletedByMessage;
+        const ids = [conversationIds];
+        await manager.query(`DELETE FROM messages WHERE conversation_id = ANY($1)`, ids);
+        for (const table of [
+          "action_log",
+          "pending_actions",
+          "order_conversation_links",
+          "team_questions",
+          "notification_deliveries",
+          "insight_issues",
+        ]) {
+          await manager.query(`DELETE FROM "${table}" WHERE conversation_id = ANY($1)`, ids);
         }
-
-        logger.debug(
-          {
-            customerId,
-            organizationId,
-            embeddingsDeleted,
-            conversationIds: conversationIds.length,
-            messageIds: allMessageIds.length,
-          },
-          "Deleted embeddings for customer",
+        await manager.query(
+          `UPDATE conversation_outcomes
+           SET classification_reason = NULL, exclusion_reason = NULL, exclusion_review_note = NULL
+           WHERE conversation_id = ANY($1)`,
+          ids,
         );
-      } catch (error) {
-        // Log but don't fail the transaction - embeddings might not exist
-        logger.debug(
-          { customerId, error: error instanceof Error ? error.message : "Unknown error" },
-          "Error deleting embeddings (continuing)",
-        );
-      }
-
-      // Anonymize messages in all conversations
-      for (const conversation of conversations) {
-        await messageRepository.update(
-          { conversation_id: conversation.id },
-          {
-            content: "[deleted]",
-            sender: "[deleted]",
-            metadata: null,
-          },
-        );
-      }
-
-      // The hand-off email the shopper left lives on the conversation (D5-8).
-      if (conversationIds.length > 0) {
         await manager.query(
           `UPDATE conversations
-           SET metadata = metadata - 'contactEmail' - 'contactEmailConsentAt'
-           WHERE id = ANY($1) AND metadata IS NOT NULL`,
-          [conversationIds],
+           SET customer_id = NULL, title = '[deleted]', context = NULL, metadata = NULL,
+               summary = NULL, resolution_metadata = NULL, orchestration_status = NULL,
+               document_ids = NULL, public_jwk = NULL, spam_reason = NULL, stuck_reason = NULL,
+               last_processing_error = NULL, needs_processing = false,
+               deleted_at = COALESCE(deleted_at, now())
+           WHERE id = ANY($1)`,
+          ids,
         );
       }
 
-      // Update conversations to remove customer reference and anonymize
-      await conversationRepository.update(
-        { customer_id: customerId, organization_id: organizationId },
-        {
-          customer_id: null,
-          title: "[deleted]",
-          context: null,
-        },
-      );
-
-      // Anonymize and soft delete customer
-      customer.email = `deleted-${customerId}@deleted.local`;
-      customer.phone = null;
-      customer.name = "[deleted]";
-      customer.notes = null;
-      customer.external_id = null;
-      customer.external_metadata = null;
-
-      await customerRepository.save(customer);
-
-      // Hard delete the customer record
+      // Merge dismissals cascade with the customer row.
       await customerRepository.delete({ id: customerId, organization_id: organizationId });
 
       logger.debug(
-        {
-          customerId,
-          organizationId,
-          conversationsAffected: conversations.length,
-          embeddingsDeleted,
-        },
+        { customerId, organizationId, conversationsAffected: conversationIds.length },
         "Customer data deleted",
       );
-    });
-  }
-
-  /**
-   * Send verification email for customer privacy request
-   */
-  private async sendCustomerVerificationEmail(
-    email: string,
-    token: string,
-    type: "export" | "deletion",
-    organizationId: string,
-    customerName?: string | null,
-  ): Promise<void> {
-    await emailService.initialize();
-
-    const baseUrl = getDashboardUrl();
-    const verificationUrl = `${baseUrl}/privacy/verify?token=${token}&type=${type}`;
-
-    const template = type === "export" ? "privacy-export-request" : "privacy-deletion-request";
-    const locale = await getOrganizationLocale(organizationId);
-
-    await emailService.sendTemplateEmail({
-      to: email,
-      template,
-      locale,
-      variables: {
-        userName: customerName || email,
-        verificationUrl,
-        companyName: "Hay.chat",
-        expiresIn: `${this.VERIFICATION_EXPIRY_HOURS} hours`,
-        supportUrl: `${baseUrl}/support`,
-        currentYear: new Date().getFullYear().toString(),
-        companyAddress: "Hay.chat",
-        websiteUrl: baseUrl,
-        recipientEmail: email,
-      },
-    });
-  }
-
-  /**
-   * Send customer export ready notification
-   */
-  private async sendCustomerExportReadyEmail(
-    email: string,
-    requestId: string,
-    downloadToken: string,
-    organizationId: string,
-  ): Promise<void> {
-    await emailService.initialize();
-
-    const baseUrl = getDashboardUrl();
-    const downloadUrl = `${baseUrl}/privacy/download?requestId=${requestId}&token=${downloadToken}`;
-    const locale = await getOrganizationLocale(organizationId);
-
-    await emailService.sendTemplateEmail({
-      to: email,
-      template: "privacy-export-ready",
-      locale,
-      variables: {
-        downloadUrl,
-        expiresIn: `${this.EXPORT_EXPIRY_HOURS / 24} days`,
-        companyName: "Hay.chat",
-        supportUrl: `${baseUrl}/support`,
-        currentYear: new Date().getFullYear().toString(),
-        companyAddress: "Hay.chat",
-        websiteUrl: baseUrl,
-        recipientEmail: email,
-      },
-    });
-  }
-
-  /**
-   * Send customer deletion complete notification
-   */
-  private async sendCustomerDeletionCompleteEmail(
-    email: string,
-    organizationId: string,
-  ): Promise<void> {
-    await emailService.initialize();
-
-    const baseUrl = getDashboardUrl();
-    const locale = await getOrganizationLocale(organizationId);
-
-    await emailService.sendTemplateEmail({
-      to: email,
-      template: "privacy-deletion-complete",
-      locale,
-      variables: {
-        companyName: "Hay.chat",
-        supportUrl: `${baseUrl}/support`,
-        currentYear: new Date().getFullYear().toString(),
-        companyAddress: "Hay.chat",
-        websiteUrl: baseUrl,
-        recipientEmail: email,
-      },
     });
   }
 
@@ -2490,50 +1800,98 @@ please contact ${supportContact}.
   }
 
   /**
-   * Clean up expired privacy export files
-   * Called by scheduled job: 'cleanup-expired-privacy-exports'
-   * Deletes export files older than 7 days (supports both JSON and ZIP formats)
+   * Daily: delete export ZIPs past their expiry (scheduled-jobs.registry).
+   * A ZIP downloaded the allowed number of times is deleted right away.
    */
-  async cleanupExpiredExports(): Promise<void> {
-    const { config } = await import("@server/config/env");
-    const retentionDays = config.privacy.exportRetentionDays;
-
-    const exportsDir = path.join(__dirname, "../../exports");
-    let deletedCount = 0;
-    let errorCount = 0;
-
-    try {
-      // Ensure directory exists
-      await fs.mkdir(exportsDir, { recursive: true });
-
-      const files = await fs.readdir(exportsDir);
-
-      for (const file of files) {
-        // Process both JSON and ZIP files
-        if (!file.endsWith(".json") && !file.endsWith(".zip")) continue;
-
-        try {
-          const filePath = path.join(exportsDir, file);
-          const stats = await fs.stat(filePath);
-          const ageInDays = (Date.now() - stats.mtime.getTime()) / (1000 * 60 * 60 * 24);
-
-          if (ageInDays > retentionDays) {
-            await fs.unlink(filePath);
-            deletedCount++;
-            logger.debug({ file, ageInDays: Math.round(ageInDays) }, "Deleted expired export");
-          }
-        } catch (error) {
-          errorCount++;
-          logger.error({ err: error, file }, "Error processing file during cleanup");
-        }
-      }
-
-      logger.info({ deletedCount, errorCount }, "Cleanup complete");
-    } catch (error) {
-      logger.error({ err: error }, "Failed to cleanup expired exports");
-      throw error;
-    }
+  async cleanupExpiredExports(now = new Date()): Promise<number> {
+    const requests = await AppDataSource.getRepository(PrivacyRequest)
+      .createQueryBuilder("request")
+      .where("request.type = 'export'")
+      .andWhere("request.metadata ->> 'uploadId' IS NOT NULL")
+      .andWhere(
+        "(request.metadata ->> 'exportExpiresAt' IS NULL OR " +
+          "(request.metadata ->> 'exportExpiresAt')::timestamptz <= :now)",
+        { now },
+      )
+      .getMany();
+    for (const request of requests) await this.deleteExportFile(request);
+    logger.info({ deleted: requests.length }, "Expired privacy exports cleaned up");
+    return requests.length;
   }
+
+  /**
+   * Requeue privacy jobs whose server died mid-run; after MAX_JOB_ATTEMPTS the
+   * job and its request are failed instead.
+   */
+  async requeueStaleJobs(now = new Date()): Promise<{ requeued: number; failed: number }> {
+    const cutoff = new Date(now.getTime() - STALE_PROCESSING_MS);
+    const [rows]: [Array<{ status: string; request_id: string | null }>, number] =
+      await AppDataSource.query(
+        `UPDATE jobs
+         SET status = CASE WHEN COALESCE((data->>'attempts')::int, 0) + 1 >= $3
+                           THEN 'failed'::jobs_status_enum ELSE 'queued'::jobs_status_enum END,
+             data = jsonb_set(data, '{attempts}', to_jsonb(COALESCE((data->>'attempts')::int, 0) + 1)),
+             updated_at = now()
+         WHERE status = 'processing' AND data->>'type' = ANY($1::text[]) AND updated_at < $2
+         RETURNING status, data->>'requestId' AS request_id`,
+        [PRIVACY_JOB_TYPES, cutoff, MAX_JOB_ATTEMPTS],
+      );
+    const failedRequestIds = rows
+      .filter((row) => row.status === "failed" && row.request_id)
+      .map((row) => row.request_id as string);
+    if (failedRequestIds.length > 0) {
+      await AppDataSource.query(
+        `UPDATE privacy_requests
+         SET status = 'failed', error_message = 'Processing did not finish', completed_at = now()
+         WHERE id = ANY($1::uuid[]) AND status = 'processing'`,
+        [failedRequestIds],
+      );
+    }
+    const result = {
+      requeued: rows.length - failedRequestIds.length,
+      failed: failedRequestIds.length,
+    };
+    if (rows.length > 0) logger.warn(result, "Stale privacy jobs handled");
+    return result;
+  }
+
+  /**
+   * Daily: privacy requests older than PRIVACY_REQUEST_RETENTION_DAYS keep no
+   * contact details (email hashed, IP, user agent and identifier dropped).
+   */
+  async anonymizeExpiredRequests(now = new Date()): Promise<number> {
+    const cutoff = new Date(now.getTime() - PRIVACY_REQUEST_RETENTION_DAYS * DAY_MS);
+    const [rows]: [Array<{ id: string }>, number] = await AppDataSource.query(
+      `UPDATE privacy_requests
+       SET email = 'erased:' || encode(sha256(convert_to(lower(email), 'UTF8')), 'hex'),
+           identifier_value = NULL, ip_address = NULL, user_agent = NULL,
+           download_ip_address = NULL, verification_token_hash = NULL
+       WHERE created_at < $1 AND email NOT LIKE 'erased:%'
+         AND status NOT IN ('verified', 'processing')
+       RETURNING id`,
+      [cutoff],
+    );
+    // Privacy jobs created before jobs carried only the request id named the
+    // requester and kept the download token in their result.
+    await AppDataSource.query(
+      `UPDATE jobs
+       SET title = 'Privacy data request', data = jsonb_build_object('requestId', data->'requestId'),
+           result = NULL
+       WHERE id IN (SELECT job_id FROM privacy_requests WHERE job_id IS NOT NULL)
+         AND (title LIKE '%Data Export for %' OR title LIKE '%Data Deletion for %')`,
+    );
+    return rows.length;
+  }
+}
+
+/** A file name safe inside a ZIP on any OS. */
+function safeFileName(name: string): string {
+  const cleaned = (name || "")
+    .normalize("NFKD")
+    .replace(/[^\w.-]+/g, "_")
+    .replace(/^[._]+/, "")
+    .slice(0, 80);
+  return cleaned || "file";
 }
 
 // Export singleton instance

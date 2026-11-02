@@ -424,16 +424,29 @@ const jobRegistry: CronJobConfig[] = [
   // ============================================================
   {
     name: "cleanup-expired-privacy-exports",
-    description: "Delete GDPR export files older than 7 days",
+    description: "Delete DSAR export ZIPs past their expiry (PRIVACY_EXPORT_RETENTION_DAYS)",
     schedule: "0 2 * * *", // Daily at 2 AM
-    handler: async () => privacyService.cleanupExpiredExports(),
-    // NOTE: Retention period is 7 days (configurable via PRIVACY_EXPORT_RETENTION_DAYS)
-    // Supports both legacy JSON and new ZIP export formats
-    // Files are cleaned up after expiration OR after max download count reached
+    handler: async () => {
+      await privacyService.cleanupExpiredExports();
+      // Requests older than a year keep no contact details.
+      await privacyService.anonymizeExpiredRequests();
+    },
     timeout: 600000, // 10 minutes max
     retryOnFailure: true,
     maxRetries: 3,
     enabled: true,
+  },
+
+  {
+    name: "requeue-stale-privacy-jobs",
+    description: "Queue again DSAR export/deletion jobs whose server stopped mid-run",
+    schedule: "*/10 * * * *", // Every 10 minutes
+    handler: async () => {
+      await privacyService.requeueStaleJobs();
+    },
+    singleton: true,
+    enabled: true,
+    skipDatabaseLogging: true,
   },
 
   {

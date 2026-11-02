@@ -588,6 +588,19 @@ describe("Register API", () => {
       ).not.toThrow();
     });
 
+    it("accepts the base64 HMAC format", () => {
+      expect(() =>
+        registerAPI.webhookRouting({
+          signature: {
+            header: "x-shopify-hmac-sha256",
+            format: "sha256-hmac-base64",
+            secretEnv: "ALLOWED_VAR",
+          },
+          routeKeyPath: { itemsPath: ".", keyPath: "shop_domain" },
+        }),
+      ).not.toThrow();
+    });
+
     it("rejects svix with a non-svix header, unknown formats and unknown transforms", () => {
       expect(() =>
         registerAPI.webhookRouting({

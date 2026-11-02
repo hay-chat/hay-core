@@ -1,4 +1,4 @@
-import { t, authenticatedProcedure, publicProcedure } from "@server/trpc";
+import { t, authenticatedProcedure } from "@server/trpc";
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { privacyService } from "@server/services/privacy.service";
@@ -124,47 +124,15 @@ export const customerPrivacyRouter = t.router({
         return {
           success: true,
           requestId: result.requestId,
-          customerFound: result.customerFound,
-          message: result.customerFound
-            ? "A verification email has been sent to the customer. They must click the link to confirm the data export request."
-            : "No customer found with this identifier, but a verification email has been sent if the identifier is an email address.",
+          message:
+            "A verification email has been sent to the customer. They must click the link to confirm the data export request.",
           expiresAt: result.expiresAt,
         };
       } catch (error) {
         throw toClientError(
           error,
-          "INTERNAL_SERVER_ERROR",
-          "Failed to process customer export request. Please try again later.",
-        );
-      }
-    }),
-
-  /**
-   * Confirm customer data export with verification token
-   * Can be public (customer verifies via email) or authenticated
-   */
-  confirmExport: publicProcedure
-    .input(
-      z.object({
-        token: z.string().min(1, "Verification token is required"),
-      }),
-    )
-    .mutation(async ({ input }) => {
-      try {
-        const result = await privacyService.confirmCustomerExport(input.token);
-
-        return {
-          success: true,
-          requestId: result.requestId,
-          jobId: result.jobId,
-          message:
-            "Your data export request has been confirmed. We are processing your data and will send you an email when it's ready to download.",
-        };
-      } catch (error) {
-        throw toClientError(
-          error,
           "BAD_REQUEST",
-          "This verification link is invalid or has expired.",
+          "Failed to process customer export request. Please try again later.",
         );
       }
     }),
@@ -218,36 +186,6 @@ export const customerPrivacyRouter = t.router({
     }),
 
   /**
-   * Confirm customer data deletion with verification token
-   * Can be public (customer verifies via email)
-   */
-  confirmDeletion: publicProcedure
-    .input(
-      z.object({
-        token: z.string().min(1, "Verification token is required"),
-      }),
-    )
-    .mutation(async ({ input }) => {
-      try {
-        const result = await privacyService.confirmCustomerDeletion(input.token);
-
-        return {
-          success: true,
-          requestId: result.requestId,
-          jobId: result.jobId,
-          message:
-            "Your data deletion request has been confirmed. We are processing your request and will send you a confirmation email when complete.",
-        };
-      } catch (error) {
-        throw toClientError(
-          error,
-          "BAD_REQUEST",
-          "This verification link is invalid or has expired.",
-        );
-      }
-    }),
-
-  /**
    * Get status of a customer privacy request
    * Organization can check status of their customer's requests
    */
@@ -294,44 +232,18 @@ export const customerPrivacyRouter = t.router({
           completedAt: request.completedAt,
           jobId: request.jobId,
           jobStatus: request.job?.status,
-          downloadAvailable: request.status === "completed" && request.type === "export",
+          downloadAvailable:
+            request.status === "completed" &&
+            request.type === "export" &&
+            !!request.getExportUploadId(),
           errorMessage: request.errorMessage,
         };
       } catch (error) {
-        if (error instanceof TRPCError) {
-          throw error;
-        }
         throw toClientError(
           error,
           "INTERNAL_SERVER_ERROR",
           "Failed to load the privacy request status.",
         );
-      }
-    }),
-
-  /**
-   * Download customer export data
-   * Requires valid request ID and download token
-   * Public endpoint (customer downloads via email link)
-   */
-  downloadExport: publicProcedure
-    .input(
-      z.object({
-        requestId: z.string().uuid("Invalid request ID"),
-        downloadToken: z.string().min(1, "Download token is required"),
-      }),
-    )
-    .query(async ({ input }) => {
-      try {
-        const result = await privacyService.downloadExport(input.requestId, input.downloadToken);
-
-        return {
-          success: true,
-          data: result.data,
-          fileName: result.fileName,
-        };
-      } catch (error) {
-        throw toClientError(error, "BAD_REQUEST", "This download link is invalid or has expired.");
       }
     }),
 

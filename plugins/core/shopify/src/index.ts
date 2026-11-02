@@ -46,6 +46,7 @@ import {
   webhookUrl,
   type ShopifyClient,
 } from "./disputes.js";
+import { complianceTopic, handleComplianceWebhook, pluginApiMutation } from "./compliance.js";
 import type {
   CanonicalProduct,
   CanonicalVariant,
@@ -482,6 +483,8 @@ export default defineHayPlugin((globalCtx) => {
     client: ShopifyClient;
     report: (dispute: CanonicalDispute) => Promise<{ created: boolean }>;
   } | null = null;
+  /** Set by onStart: this org's shop domain (compliance webhooks for another shop are ignored). */
+  let connectedShop: string | undefined;
 
   return {
     name: "Shopify",
@@ -647,9 +650,37 @@ export default defineHayPlugin((globalCtx) => {
         retryPolicy: { maxRetries: 3, backoff: "exponential" },
       });
 
+      // Mandatory compliance webhooks (./compliance.ts) arrive at the shared
+      // /v1/plugins/<id>/webhook with no org id. Core verifies the base64 HMAC
+      // and routes by shop_domain (registered as a routing key on connect).
+      ctx.register.webhookRouting({
+        signature: {
+          header: "x-shopify-hmac-sha256",
+          format: "sha256-hmac-base64",
+          secretEnv: "SHOPIFY_OAUTH_CLIENT_SECRET",
+        },
+        routeKeyPath: { itemsPath: ".", keyPath: "shop_domain" },
+      });
+
       // Disputes (D2-8). A webhook body is a hint only: the dispute is re-read with
       // the shop's own token before anything is reported.
       ctx.register.route("POST", "/webhook", async (req, res) => {
+        const topic = complianceTopic(req.headers);
+        if (topic) {
+          await handleComplianceWebhook(topic, req, res, {
+            shopDomain: () => connectedShop,
+            revokeConnection: async (reason) => {
+              await pluginApiMutation("connection.revoke", { reason });
+            },
+            requestPrivacy: async (action, subject) =>
+              (await pluginApiMutation(
+                action === "erase" ? "privacy.eraseCustomer" : "privacy.exportCustomer",
+                { ...subject },
+              )) as { matched: number; undeliverable?: number },
+            logger: globalCtx.logger,
+          });
+          return;
+        }
         const id = disputeIdFromWebhook(req.body);
         if (!id || !disputes) {
           res.status(200).json({ received: true, handled: false });
@@ -696,6 +727,17 @@ export default defineHayPlugin((globalCtx) => {
       globalCtx.logger.info("Shopify plugin config, auth, dispute routes and cron registered");
     },
 
+    /** OAuth connect: the shop domain is the compliance-webhook routing key. */
+    async onConnected(ctx) {
+      const shopRaw = ctx.config.getOptional<string>("shopDomain");
+      if (!shopRaw) {
+        ctx.logger.warn("Shopify connect: no shop domain; compliance webhooks cannot be routed");
+        return { routingKeys: [] };
+      }
+      // Shopify sends shop_domain in lowercase.
+      return { routingKeys: [normalizeShopDomain(shopRaw).toLowerCase()] };
+    },
+
     async onValidateAuth(ctx) {
       const mode = getAuthMode(ctx);
       ctx.logger.info("Validating Shopify credentials", { authMode: mode });
@@ -737,6 +779,7 @@ export default defineHayPlugin((globalCtx) => {
         return;
       }
       const shop = normalizeShopDomain(shopRaw);
+      connectedShop = shop.toLowerCase();
       const apiVersion = ctx.config.getOptional<string>("apiVersion") || "2026-04";
 
       let accessToken: string | undefined;

@@ -74,6 +74,8 @@ export type {
 
 export type {
   McpServerInstance,
+  ToolCallCustomer,
+  ToolCallMeta,
   McpInitializerContext,
   StdioMcpOptions,
   ExternalMcpOptions,

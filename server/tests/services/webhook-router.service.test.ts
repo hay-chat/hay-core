@@ -583,6 +583,37 @@ describe("webhookRouterService.handle plugin-declared dedupe", () => {
   });
 });
 
+describe("webhookRouterService.handle base64 HMAC", () => {
+  it("verifies a sha256-hmac-base64 signature as base64", async () => {
+    jest.resetAllMocks();
+    process.env.TEST_B64_SECRET = "s";
+    const { verifyHmacSha256 } = jest.requireMock("@server/lib/hmac-signature") as {
+      verifyHmacSha256: jest.Mock;
+    };
+    verifyHmacSha256.mockReturnValue(false);
+    const res = { status: jest.fn(), json: jest.fn() };
+    res.status.mockReturnValue(res);
+    const req = {
+      method: "POST",
+      headers: { "x-shopify-hmac-sha256": "abc=" },
+      rawBody: "{}",
+    } as never;
+
+    await webhookRouterService.handle(req, res as never, "p", {
+      signature: {
+        header: "x-shopify-hmac-sha256",
+        format: "sha256-hmac-base64",
+        secretEnv: "TEST_B64_SECRET",
+      },
+      routeKeyPath: { itemsPath: ".", keyPath: "shop_domain" },
+    });
+
+    expect(verifyHmacSha256).toHaveBeenCalledWith(expect.any(Buffer), "abc=", "s", "base64");
+    expect(res.status).toHaveBeenCalledWith(401);
+    delete process.env.TEST_B64_SECRET;
+  });
+});
+
 describe("__webhookRouterInternals", () => {
   const { getPath, withPath, routingKey } = __webhookRouterInternals;
 

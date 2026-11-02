@@ -25,11 +25,6 @@ const mockLogger = {
 };
 jest.mock("@server/lib/logger", () => ({ createLogger: () => mockLogger }));
 
-const getSecretKeys = jest.fn<(id: string) => Promise<string[]>>(async () => []);
-jest.mock("@server/services/conversation-secret.service", () => ({
-  conversationSecretService: { getSecretKeys: (id: string) => getSecretKeys(id) },
-}));
-
 import { ExecutionLayer } from "../../orchestrator/execution.layer";
 
 type Buildable = { buildContextPrompt: (conversation: unknown) => Promise<string> };
@@ -38,8 +33,6 @@ describe("ExecutionLayer.buildContextPrompt", () => {
   let layer: ExecutionLayer;
 
   beforeEach(() => {
-    getSecretKeys.mockReset();
-    getSecretKeys.mockResolvedValue([]);
     layer = new ExecutionLayer();
   });
 
@@ -81,10 +74,8 @@ describe("ExecutionLayer.buildContextPrompt", () => {
     expect(block.length).toBeLessThan(2_000);
   });
 
-  it("lists secret names only", async () => {
-    getSecretKeys.mockResolvedValue(["apiToken"]);
+  it("never mentions conversation secrets (core fills them into annotated tool args)", async () => {
     const block = await build({ context: null });
-    expect(block).toContain("Available secrets");
-    expect(block).toContain("apiToken");
+    expect(block).not.toMatch(/secret/i);
   });
 });

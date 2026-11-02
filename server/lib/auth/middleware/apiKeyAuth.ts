@@ -2,7 +2,7 @@ import { User } from "@server/entities/user.entity";
 import { ApiKey } from "@server/entities/apikey.entity";
 import { Organization } from "@server/entities/organization.entity";
 import { AuthUser } from "@server/lib/auth/AuthUser";
-import { extractApiKeyFromHeader, verifyApiKey } from "@server/lib/auth/utils/hashing";
+import { extractApiKeyFromHeader, hashApiKey } from "@server/lib/auth/utils/hashing";
 import { AppDataSource } from "@server/database/data-source";
 
 /**
@@ -20,21 +20,12 @@ export async function authenticateApiKeyAuth(authHeader?: string): Promise<AuthU
     return null;
   }
 
-  // Find the API key by comparing hashes
+  // Keys are 256-bit random values stored as SHA-256, so look them up directly by hash.
   const apiKeyRepository = AppDataSource.getRepository(ApiKey);
-  const apiKeys = await apiKeyRepository.find({
-    where: { isActive: true },
+  const matchedApiKey = await apiKeyRepository.findOne({
+    where: { keyHash: await hashApiKey(apiKey), isActive: true },
     relations: ["organization"],
   });
-
-  // Find matching API key by verifying against all active keys
-  let matchedApiKey: ApiKey | null = null;
-  for (const key of apiKeys) {
-    if (verifyApiKey(apiKey, key.keyHash)) {
-      matchedApiKey = key;
-      break;
-    }
-  }
 
   if (!matchedApiKey) {
     throw new Error("Invalid API key");
@@ -93,65 +84,4 @@ export async function authenticateApiKeyAuth(authHeader?: string): Promise<AuthU
   });
 
   return authUser;
-}
-
-/**
- * Validate an API key without fetching the full organization
- * Used for quick authorization checks
- */
-export async function validateApiKey(
-  authHeader?: string,
-): Promise<{ apiKeyId: string; organizationId: string } | null> {
-  if (!authHeader) {
-    return null;
-  }
-
-  const apiKey = extractApiKeyFromHeader(authHeader);
-  if (!apiKey) {
-    return null;
-  }
-
-  // Find the API key
-  const apiKeyRepository = AppDataSource.getRepository(ApiKey);
-  const apiKeys = await apiKeyRepository.find({
-    where: { isActive: true },
-    select: ["id", "organizationId", "keyHash", "expiresAt"],
-  });
-
-  // Find matching API key
-  for (const key of apiKeys) {
-    if (verifyApiKey(apiKey, key.keyHash)) {
-      // Check expiration
-      if (key.expiresAt && new Date() > key.expiresAt) {
-        return null;
-      }
-
-      return {
-        apiKeyId: key.id,
-        organizationId: key.organizationId,
-      };
-    }
-  }
-
-  return null;
-}
-
-/**
- * Check if an API key has a specific scope
- */
-export async function checkApiKeyScope(
-  apiKeyId: string,
-  resource: string,
-  action: string,
-): Promise<boolean> {
-  const apiKeyRepository = AppDataSource.getRepository(ApiKey);
-  const apiKey = await apiKeyRepository.findOne({
-    where: { id: apiKeyId, isActive: true },
-  });
-
-  if (!apiKey) {
-    return false;
-  }
-
-  return apiKey.hasScope(resource, action);
 }

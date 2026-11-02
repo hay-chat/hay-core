@@ -46,6 +46,7 @@ import {
 import { UserOrganization } from "@server/entities/user-organization.entity";
 import { User } from "@server/entities/user.entity";
 import { RESOURCES, ACTIONS } from "@server/types/scopes";
+import { assertCanGrantMembership } from "@server/lib/auth/membership-grants";
 import {
   loosensActionApproval,
   moneyApprovalSwitchedOff,
@@ -942,6 +943,12 @@ export const organizationsRouter = t.router({
         // Store old role for audit log
         const oldRole = userOrg.role;
 
+        assertCanGrantMembership(ctx.user, {
+          role: input.role,
+          permissions: input.permissions,
+          currentRole: oldRole,
+        });
+
         // Prevent demoting last owner
         if (oldRole === "owner" && input.role !== "owner") {
           const ownerCount = await getOwnerCount(ctx.organizationId!);
@@ -1021,6 +1028,9 @@ export const organizationsRouter = t.router({
           message: "Member not found in this organization",
         });
       }
+
+      // Only an owner may remove an owner
+      assertCanGrantMembership(ctx.user, { currentRole: userOrg.role });
 
       // Prevent removing last owner
       if (userOrg.role === "owner") {

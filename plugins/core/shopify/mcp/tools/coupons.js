@@ -36,6 +36,7 @@ const {
   pageInfo,
   toGid,
   assertNoUserErrors,
+  searchTerm,
 } = require("../lib/format");
 
 const TITLE_PREFIX = "Hay.chat goodwill coupon";
@@ -55,7 +56,7 @@ async function findCustomer(email) {
       }
     }
   `,
-    { query: `email:"${email}"` },
+    { query: searchTerm("email", email) },
   );
   return (
     unwrapConnection(data.customers).find(
@@ -107,7 +108,7 @@ async function findActiveGoodwill(customerGid, now) {
         }
       }
     `,
-      { query: `title:"${title}"`, first: GOODWILL_PAGE_SIZE, after },
+      { query: searchTerm("title", title), first: GOODWILL_PAGE_SIZE, after },
     );
     const match = unwrapConnection(data.codeDiscountNodes).find(
       (n) => n.codeDiscount?.title === title && isActive(n.codeDiscount, now),

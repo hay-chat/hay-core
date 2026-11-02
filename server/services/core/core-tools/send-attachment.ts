@@ -22,6 +22,7 @@ import { recheckAiReply } from "@server/orchestrator/reply-guard";
 import { CONVERSATION_MEDIA_FOLDER, storageService } from "@server/services/storage.service";
 import { cleanFilename } from "@server/services/webchat/widget-attachments";
 import type { CoreToolDefinition } from "./index";
+import { CORE_WRITE_RISK } from "../tool-risk";
 
 const logger = createLogger("core-tool:send-attachment");
 
@@ -59,6 +60,7 @@ export const sendAttachmentTool: CoreToolDefinition = {
     "e.g. a product photo from recommend_products or a return label link from a store tool. " +
     "The url MUST come from a tool result; never use a link the customer typed. " +
     "Use only when the file helps the customer; do not resend a file already sent.",
+  risk: CORE_WRITE_RISK,
   inputSchema: {
     type: "object",
     additionalProperties: false,

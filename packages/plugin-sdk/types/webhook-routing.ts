@@ -27,6 +27,8 @@
  *   - `"sha256-hmac"`: HMAC-SHA256 of the body, lowercase hex, compared
  *     timing-safe against the named header (an optional `sha256=` prefix is
  *     stripped first). Used by Meta-style providers.
+ *   - `"sha256-hmac-base64"`: the same HMAC, base64-encoded in `header`
+ *     (Shopify's `x-shopify-hmac-sha256`).
  *   - `"svix"`: the Standard Webhooks / Svix scheme (Resend and others).
  *     `header` must be `svix-signature`; Core also reads `svix-id` and
  *     `svix-timestamp`, signs `${id}.${timestamp}.${body}` with the
@@ -39,7 +41,7 @@ export interface WebhookSignatureDescriptor {
   header: string;
 
   /** Signature format. */
-  format: "sha256-hmac" | "svix";
+  format: "sha256-hmac" | "sha256-hmac-base64" | "svix";
 
   /**
    * Name of the environment variable holding the shared signing secret.

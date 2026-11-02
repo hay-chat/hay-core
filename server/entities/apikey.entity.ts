@@ -36,14 +36,4 @@ export class ApiKey extends OrganizationScopedEntity {
     if (!this.expiresAt) return false;
     return new Date() > this.expiresAt;
   }
-
-  hasScope(resource: string, action: string): boolean {
-    if (!this.scopes || this.scopes.length === 0) return true;
-
-    return this.scopes.some(
-      (scope) =>
-        scope.resource === resource &&
-        (scope.actions.includes(action) || scope.actions.includes("*")),
-    );
-  }
 }

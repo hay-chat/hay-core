@@ -136,8 +136,11 @@ export interface SetupMetadata {
  */
 export interface WebhookSignatureDescriptor {
   header: string;
-  /** "sha256-hmac" = hex HMAC of the body in `header`; "svix" = Standard Webhooks (svix-id/timestamp/signature). */
-  format: "sha256-hmac" | "svix";
+  /**
+   * "sha256-hmac" = hex HMAC of the body in `header`; "sha256-hmac-base64" = the
+   * same HMAC base64-encoded; "svix" = Standard Webhooks (svix-id/timestamp/signature).
+   */
+  format: "sha256-hmac" | "sha256-hmac-base64" | "svix";
   secretEnv: string;
 }
 

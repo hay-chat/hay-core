@@ -10,6 +10,7 @@ const {
   pageInfo,
   toGid,
   assertNoUserErrors,
+  searchTerm,
 } = require("../lib/format");
 
 const VARIANT_NODE_FIELDS = `
@@ -82,7 +83,7 @@ function registerInventoryTools(server) {
         // the SKU path MUST use productVariants(query:"sku:...").
         // TODO(HAY-219 §8): verify productVariantByIdentifier does not accept SKU against a real dev store.
         const variables = {
-          query: `sku:${args.sku}`,
+          query: searchTerm("sku", args.sku),
           quantityNames,
         };
         const query = `

@@ -21,7 +21,6 @@ export type AuditAction =
   | "user.login"
   | "user.logout"
   | "user.register"
-  | "user.deactivate"
   | "apikey.create"
   | "apikey.revoke"
   | "security.setting.change"

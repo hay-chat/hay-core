@@ -2,7 +2,6 @@ import { LLMService } from "../services/core/llm.service";
 import { Conversation } from "@server/database/entities/conversation.entity";
 import { PromptService } from "../services/prompt.service";
 import { createLogger } from "@server/lib/logger";
-import { conversationSecretService } from "../services/conversation-secret.service";
 import {
   BUSINESS_CONTEXT_LIMITS,
   VISITOR_CONTEXT_KEY,
@@ -363,7 +362,7 @@ export class ExecutionLayer {
         }
       }
 
-      // Inject conversation context and secret key hints into the prompt
+      // Inject conversation context into the prompt
       const contextBlock = await this.buildContextPrompt(conversation);
       if (contextBlock) {
         finalPrompt = finalPrompt + contextBlock;
@@ -1522,7 +1521,8 @@ export class ExecutionLayer {
   /**
    * Build the context block appended to the planner prompt: the business's own
    * context (server SDK, customer metadata), the unverified context the
-   * webchat page set, and the names of available secrets (values never shown).
+   * webchat page set. Conversation secrets are not listed: core fills them
+   * into the tool properties that ask for them (`x-hay-secret`).
    * Everything is size-bounded and presented as data, never as instructions.
    */
   private async buildContextPrompt(conversation: Conversation): Promise<string> {
@@ -1534,8 +1534,6 @@ export class ExecutionLayer {
       BUSINESS_CONTEXT_LIMITS,
     );
     const visitorContext = boundContext(visitorRaw, VISITOR_CONTEXT_LIMITS);
-
-    const secretKeys = await conversationSecretService.getSecretKeys(conversation.id);
 
     const blocks: string[] = [];
     if (Object.keys(businessContext).length > 0) {
@@ -1557,12 +1555,6 @@ export class ExecutionLayer {
           "\n</context>",
       );
     }
-    if (secretKeys.length > 0) {
-      blocks.push(
-        `Available secrets (values are hidden — reference as <<secret.keyname>> in tool call arguments): ${secretKeys.join(", ")}`,
-      );
-    }
-
     return blocks.length > 0 ? `\n\n${blocks.join("\n\n")}` : "";
   }
 

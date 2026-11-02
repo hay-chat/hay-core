@@ -21,12 +21,4 @@ export class AuthCode extends BaseEntity {
 
   @Column({ type: "boolean", default: false })
   used!: boolean;
-
-  isExpired(): boolean {
-    return new Date() > this.expiresAt;
-  }
-
-  isValid(): boolean {
-    return !this.used && !this.isExpired();
-  }
 }
