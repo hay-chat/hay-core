@@ -157,7 +157,7 @@ router.post("/send-email", authenticatePlugin, async (req: AuthenticatedRequest,
 
     return res.status(500).json({
       success: false,
-      error: error instanceof Error ? error.message : "Internal server error",
+      error: "Internal server error",
     } as PluginAPIHttpResponse);
   }
 });

@@ -119,6 +119,11 @@ export default defineHayPlugin((globalCtx) => {
           verifyTokenEnv: "META_VERIFY_TOKEN",
         },
         routeKeyPath: { itemsPath: "entry", keyPath: "id" },
+        // Meta sends no delivery id header, but every payload carries entry[].time
+        // plus per-event ids and timestamps (message ids, status id + status +
+        // timestamp, read watermarks), so identical signed bytes can only be a
+        // re-delivery or a replay.
+        dedupe: { source: "raw-body", windowSeconds: 24 * 60 * 60 },
         // Meta's Deauthorize + Data Deletion callbacks carry the person's
         // app-scoped `user_id`, which onConnected adds to the routing keys.
         deauthorization: {

@@ -17,7 +17,6 @@ export class RabbitMQService extends EventEmitter {
   private isInitialized = false;
   private reconnecting = false;
   private reconnectAttempts = 0;
-  private readonly maxReconnectAttempts = 10;
   private readonly maxReconnectDelay = 30000;
   private consumers = new Map<
     string,
@@ -90,17 +89,24 @@ export class RabbitMQService extends EventEmitter {
     if (this.reconnecting || !this.isInitialized) return;
     this.reconnecting = true;
 
-    if (this.reconnectAttempts >= this.maxReconnectAttempts) {
-      logger.error("Max reconnect attempts reached, giving up");
-      return;
-    }
-
-    const delay = Math.min(Math.pow(2, this.reconnectAttempts) * 1000, this.maxReconnectDelay);
+    // Reconnect forever with capped exponential backoff.
+    const delay = Math.min(
+      Math.pow(2, Math.min(this.reconnectAttempts, 15)) * 1000,
+      this.maxReconnectDelay,
+    );
     this.reconnectAttempts++;
+    if (this.reconnectAttempts % 10 === 0) {
+      logger.error({ attempt: this.reconnectAttempts }, "RabbitMQ still unreachable, retrying");
+    }
 
     logger.debug(`Reconnecting in ${delay}ms (attempt ${this.reconnectAttempts})`);
 
     setTimeout(async () => {
+      if (!this.isInitialized) {
+        // Shut down while waiting.
+        this.reconnecting = false;
+        return;
+      }
       try {
         await this.connect();
         // Re-declare queues and re-attach consumers

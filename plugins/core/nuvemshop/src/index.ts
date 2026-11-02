@@ -585,6 +585,9 @@ export default defineHayPlugin((globalCtx) => {
           secretEnv: "NUVEMSHOP_OAUTH_CLIENT_SECRET",
         },
         routeKeyPath: { itemsPath: ".", keyPath: "store_id" },
+        // No `dedupe`: LGPD bodies ({ store_id, event, id }) carry no delivery id
+        // or timestamp, so a legitimate repeat of the same event would have the
+        // same bytes as a replay and be dropped.
       });
 
       ctx.register.route("POST", "/webhook", (req, res) =>
