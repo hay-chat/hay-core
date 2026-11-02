@@ -1,0 +1,13 @@
+# One domain for everything. API paths go to the server, the rest to the dashboard.
+{$HAY_DOMAIN} {
+	encode gzip
+
+	@api path /v1 /v1/* /ws /ws/* /plugins/* /uploads/* /github/* /oauth/callback* /.well-known/oauth-client* /health
+	handle @api {
+		reverse_proxy server:3001
+	}
+
+	handle {
+		reverse_proxy dashboard:3000
+	}
+}

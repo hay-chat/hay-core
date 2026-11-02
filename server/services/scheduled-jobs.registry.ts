@@ -16,6 +16,9 @@ const logger = createLogger("scheduled-jobs");
  * All cron jobs and scheduled tasks are registered here.
  * This makes it easy to see all scheduled jobs at a glance.
  *
+ * Jobs run on one server instance at a time (Postgres advisory lock) unless
+ * marked `perInstance`, for work on in-memory state or local plugin workers.
+ *
  * To add a new job:
  * 1. Ensure the service exposes a public async method for the task
  * 2. Add the job configuration to the jobRegistry array below
@@ -32,6 +35,7 @@ const jobRegistry: CronJobConfig[] = [
     schedule: 60000, // Every 60 seconds
     handler: async () => dpopCacheService.cleanupExpired(),
     singleton: true,
+    perInstance: true,
     enabled: true,
     skipDatabaseLogging: true, // Don't log frequent cache cleanups
   },
@@ -42,6 +46,7 @@ const jobRegistry: CronJobConfig[] = [
     schedule: 60000, // Every 60 seconds
     handler: async () => pluginInstanceManagerService.cleanupInactiveInstances(),
     singleton: true,
+    perInstance: true,
     enabled: true,
     skipDatabaseLogging: true, // Don't log frequent cleanups
   },
@@ -55,6 +60,7 @@ const jobRegistry: CronJobConfig[] = [
       await pluginManagerService.cleanupInactiveWorkers();
     },
     singleton: true,
+    perInstance: true,
     enabled: true,
     skipDatabaseLogging: true, // Don't log frequent cleanups
   },
@@ -71,6 +77,19 @@ const jobRegistry: CronJobConfig[] = [
     enabled: true,
   },
 
+  {
+    name: "site-index-sync",
+    description:
+      "Re-read each organization's sitemap into the site page index (find_page_url, link check)",
+    schedule: "15 4 * * *", // Daily at 4:15 AM
+    handler: async () => {
+      const { siteIndexService } = await import("./site-index.service");
+      await siteIndexService.syncAll();
+    },
+    singleton: true,
+    enabled: true,
+  },
+
   // ============================================================
   // BACKGROUND PROCESSING JOBS
   // ============================================================
@@ -80,6 +99,7 @@ const jobRegistry: CronJobConfig[] = [
     schedule: 5000, // Every 5 seconds
     handler: async () => jobQueueService.processNextJob(),
     singleton: true, // Prevent concurrent processing
+    perInstance: true,
     enabled: true,
     skipDatabaseLogging: true, // Don't log frequent checks
   },
@@ -230,6 +250,7 @@ const jobRegistry: CronJobConfig[] = [
     schedule: 1000,
     handler: async () => orchestratorWorker.tick(),
     singleton: true,
+    perInstance: true,
     enabled: false, // Disabled: RabbitMQ consumer handles processing now
     skipDatabaseLogging: true,
   },
@@ -403,16 +424,29 @@ const jobRegistry: CronJobConfig[] = [
   // ============================================================
   {
     name: "cleanup-expired-privacy-exports",
-    description: "Delete GDPR export files older than 7 days",
+    description: "Delete DSAR export ZIPs past their expiry (PRIVACY_EXPORT_RETENTION_DAYS)",
     schedule: "0 2 * * *", // Daily at 2 AM
-    handler: async () => privacyService.cleanupExpiredExports(),
-    // NOTE: Retention period is 7 days (configurable via PRIVACY_EXPORT_RETENTION_DAYS)
-    // Supports both legacy JSON and new ZIP export formats
-    // Files are cleaned up after expiration OR after max download count reached
+    handler: async () => {
+      await privacyService.cleanupExpiredExports();
+      // Requests older than a year keep no contact details.
+      await privacyService.anonymizeExpiredRequests();
+    },
     timeout: 600000, // 10 minutes max
     retryOnFailure: true,
     maxRetries: 3,
     enabled: true,
+  },
+
+  {
+    name: "requeue-stale-privacy-jobs",
+    description: "Queue again DSAR export/deletion jobs whose server stopped mid-run",
+    schedule: "*/10 * * * *", // Every 10 minutes
+    handler: async () => {
+      await privacyService.requeueStaleJobs();
+    },
+    singleton: true,
+    enabled: true,
+    skipDatabaseLogging: true,
   },
 
   {
@@ -455,6 +489,20 @@ const jobRegistry: CronJobConfig[] = [
   },
 
   {
+    name: "cleanup-old-audit-logs",
+    description: "Delete audit logs older than the 90-day retention period",
+    schedule: "45 3 * * *", // Daily at 3:45 AM
+    handler: async () => {
+      const { auditLogService } = await import("./audit-log.service");
+      const deleted = await auditLogService.cleanup();
+      logger.info({ deleted }, "Audit log retention cleanup finished");
+    },
+    timeout: 1800000,
+    singleton: true,
+    enabled: true,
+  },
+
+  {
     name: "conversation-media-sweep",
     description:
       "Delete conversation media past its retention (retentionDays, or 180 days when unset) and orphaned uploads",
@@ -476,14 +524,15 @@ const jobRegistry: CronJobConfig[] = [
   // GIT PLUGIN SYNC
   // ============================================================
   {
-    name: "git-plugin-sync",
-    description: "Check git-sourced plugins for updates and sync if changed",
+    name: "git-plugin-update-check",
+    description: "Flag git-sourced plugins whose branch has a newer commit (applied by an admin)",
     schedule: 900000, // Every 15 minutes
     handler: async () => {
       const { gitConnectionService } = await import("./git-connection.service");
-      await gitConnectionService.syncAllGitPlugins();
+      await gitConnectionService.checkAllGitPluginsForUpdates();
     },
     singleton: true,
+    perInstance: true,
     enabled: true,
     timeout: 600000, // 10 minutes max
     retryOnFailure: true,
@@ -516,6 +565,7 @@ const jobRegistry: CronJobConfig[] = [
       await productSourceCoordinator.syncAllOrgs();
     },
     singleton: true,
+    perInstance: true,
     enabled: true,
     timeout: 600000, // 10 minutes max
     retryOnFailure: true,
@@ -532,15 +582,6 @@ const jobRegistry: CronJobConfig[] = [
   //   schedule: 300000,  // Every 5 minutes
   //   handler: async () => pluginInstanceManager.cleanup(),
   //   singleton: true,
-  //   enabled: false,  // Enable when ready
-  // },
-  //
-  // {
-  //   name: 'cleanup-old-audit-logs',
-  //   description: 'Archive audit logs older than retention period',
-  //   schedule: '0 4 * * 0',  // Weekly on Sunday at 4 AM
-  //   handler: async () => auditLogService.cleanupOldLogs(),
-  //   timeout: 1800000,  // 30 minutes
   //   enabled: false,  // Enable when ready
   // },
 ];

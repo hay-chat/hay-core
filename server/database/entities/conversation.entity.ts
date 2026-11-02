@@ -21,6 +21,7 @@ import { analyzeTiptapInstructions } from "../../utils/tiptap-formatter";
 import { asTiptapDocument } from "../../services/playbook-instructions-text";
 import type { PlaybookInstructions } from "./playbook.entity";
 import { documentRepository } from "../../repositories/document.repository";
+import { signDocumentImageUrls } from "../../services/media-url.service";
 import { createLogger } from "@server/lib/logger";
 import { SupportedLanguage } from "../../types/language.types";
 
@@ -928,7 +929,11 @@ The following tools are available for you to use. You MUST return only valid JSO
       this.document_ids = updatedDocIds;
 
       await this.addMessage({
-        content: `# ${document.title} added to conversation \n ${document.content}`,
+        // The source URL lets the planner link to the real page instead of
+        // guessing one (the link guardrail trusts URLs found in context).
+        content: `# ${document.title} added to conversation \n${
+          document.sourceUrl ? `Source: ${document.sourceUrl}\n` : ""
+        } ${await signDocumentImageUrls(document.content ?? "", this.organization_id)}`,
         type: "Document",
         metadata: {
           documentId: document.id,
@@ -971,7 +976,7 @@ The following tools are available for you to use. You MUST return only valid JSO
         logger.debug(
           {
             conversationId: this.id,
-            content: messageData.content.substring(0, 100),
+            contentLength: messageData.content.length,
             type: messageData.type,
           },
           "Duplicate message detected, skipping",

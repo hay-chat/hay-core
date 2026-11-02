@@ -7,7 +7,7 @@ import { markdownToHtml } from "@/utils/markdownToHtml";
 
 // Same schema as DocumentTiptap.vue, so the result opens in the document editor.
 const documentExtensions = [
-  StarterKit.configure({ heading: { levels: [1, 2, 3] } }),
+  StarterKit.configure({ link: false, underline: false, heading: { levels: [1, 2, 3] } }),
   Link.configure({ protocols: ["http", "https", "mailto"] }),
   Image.configure({ inline: false }),
 ];

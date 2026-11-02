@@ -21,18 +21,3 @@
 // HTTP-based Plugin API (for external MCP plugins)
 export { PluginAPIService } from "./plugin-api.service";
 export { PluginAPIClient, createPluginAPIClient } from "./plugin-api-client";
-
-// TODO: [PLUGIN-API] Add SchedulerAPIImpl for cron jobs
-// export { SchedulerAPIImpl } from './scheduler.api';
-
-// TODO: [PLUGIN-API] Add StorageAPIImpl for key-value storage
-// export { StorageAPIImpl } from './storage.api';
-
-// TODO: [PLUGIN-API] Add AccountsAPIImpl for account data access
-// export { AccountsAPIImpl } from './accounts.api';
-
-// TODO: [PLUGIN-API] Add EventsAPIImpl for event subscriptions
-// export { EventsAPIImpl } from './events.api';
-
-// TODO: [PLUGIN-API] Add HttpAPIImpl for external requests and webhooks
-// export { HttpAPIImpl } from './http.api';

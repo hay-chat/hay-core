@@ -56,15 +56,6 @@ export async function hashApiKey(apiKey: string): Promise<string> {
 }
 
 /**
- * Verify an API key against its hash
- */
-export function verifyApiKey(apiKey: string, hash: string): boolean {
-  const apiKeyHash = crypto.createHash("sha256").update(apiKey).digest("hex");
-  // Use timing-safe comparison to prevent timing attacks
-  return crypto.timingSafeEqual(Buffer.from(apiKeyHash), Buffer.from(hash));
-}
-
-/**
  * Generate a secure random token (for sessions, CSRF tokens, etc.)
  */
 export function generateSecureToken(bytes: number = 32): string {
@@ -80,29 +71,6 @@ export function secureCompare(a: string, b: string): boolean {
   }
 
   return crypto.timingSafeEqual(Buffer.from(a), Buffer.from(b));
-}
-
-/**
- * Parse Basic Auth header
- */
-export function parseBasicAuth(authHeader: string): { email: string; password: string } | null {
-  if (!authHeader || !authHeader.startsWith("Basic ")) {
-    return null;
-  }
-
-  try {
-    const base64Credentials = authHeader.slice(6);
-    const credentials = Buffer.from(base64Credentials, "base64").toString("utf-8");
-    const [email, password] = credentials.split(":");
-
-    if (!email || !password) {
-      return null;
-    }
-
-    return { email, password };
-  } catch {
-    return null;
-  }
 }
 
 /**

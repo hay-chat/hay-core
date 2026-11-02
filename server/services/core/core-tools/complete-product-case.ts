@@ -16,6 +16,7 @@ import {
 } from "@server/services/product-case/product-case";
 import { scheduleProductCaseForward } from "@server/services/product-case/forward";
 import type { CoreToolDefinition } from "./index";
+import { CORE_WRITE_RISK } from "../tool-risk";
 
 const logger = createLogger("core-tool:complete-product-case");
 
@@ -37,6 +38,7 @@ export const completeProductCaseTool: CoreToolDefinition = {
     "Only during a product-problem intake playbook: mark the case complete once the customer has given " +
     "photos, the lot/batch number, the invoice (file or number), how the product was used, and a timeline. " +
     "Returns the items still missing, if any. Photos, lot and invoice numbers the customer sent as files are found automatically.",
+  risk: CORE_WRITE_RISK,
   inputSchema: {
     type: "object",
     additionalProperties: false,

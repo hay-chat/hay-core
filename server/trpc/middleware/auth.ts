@@ -61,45 +61,6 @@ export const isAuthed = t.middleware<{ ctx: Context }>(({ ctx, path, next }) => 
 });
 
 /**
- * Middleware to ensure user has admin access (full permissions)
- * Checks for *:* scope (full access to all resources)
- */
-const isAdmin = t.middleware(async ({ ctx, next }) => {
-  if (!ctx.user) {
-    throw new TRPCError({
-      code: "UNAUTHORIZED",
-      message: "Authentication required",
-    });
-  }
-
-  // Check if user has full access (*:* scope)
-  if (!ctx.user.hasScope("*", "*")) {
-    // Log permission denial
-    try {
-      await auditLogService.logPermissionDenied(ctx.user.id, ctx.organizationId || "", "*", "*", {
-        userRole: ctx.user.getRole(),
-        requestedResource: "*",
-        requestedAction: "*",
-      });
-    } catch (error) {
-      logger.error({ err: error }, "Failed to log permission denial");
-    }
-
-    throw new TRPCError({
-      code: "FORBIDDEN",
-      message: "Admin access required",
-    });
-  }
-
-  return next({
-    ctx: {
-      ...ctx,
-      user: ctx.user as AuthUser,
-    },
-  });
-});
-
-/**
  * Middleware factory to check for specific scopes
  */
 const hasScope = (resource: string, action: string) => {
@@ -195,11 +156,6 @@ export const protectedProcedure = t.procedure.use(isAuthed);
  * Used for endpoints that need to work before organization context is established
  */
 export const protectedProcedureWithoutOrg = t.procedure.use(isAuthedWithoutOrg);
-
-/**
- * Admin procedure - requires admin role
- */
-export const adminProcedure = t.procedure.use(isAdmin);
 
 /**
  * Create a scoped procedure with specific permissions

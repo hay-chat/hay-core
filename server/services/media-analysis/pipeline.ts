@@ -13,7 +13,7 @@
  * @module services/media-analysis/pipeline
  */
 
-import pdfParse from "pdf-parse";
+import { readPdfText } from "@server/lib/read-pdf-text";
 import { MAX_PDF_PAGES } from "@server/processors/pdf.processor";
 import { AppDataSource } from "@server/database/data-source";
 import { Conversation } from "@server/database/entities/conversation.entity";
@@ -118,7 +118,7 @@ export async function loadFileForVision(
   }
 
   if (upload.mimeType === PDF_TYPE) {
-    const parsed = await pdfParse(buffer, { max: MAX_PDF_PAGES });
+    const parsed = await readPdfText(buffer, MAX_PDF_PAGES);
     // Card numbers are removed before the text reaches the vision model (D8-12).
     const text = redactCardNumbers((parsed.text ?? "").replace(/\s+\n/g, "\n").trim());
     if (text.length < MIN_PDF_TEXT) {

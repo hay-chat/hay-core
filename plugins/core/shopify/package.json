@@ -14,7 +14,8 @@
       "auth",
       "cron",
       "products",
-      "disputes"
+      "disputes",
+      "privacy"
     ],
     "env": [
       "SHOPIFY_OAUTH_CLIENT_ID",

@@ -200,6 +200,9 @@ const initEditor = () => {
     content: props.content ?? { type: "doc", content: [] },
     extensions: [
       StarterKit.configure({
+        // Link is configured below; StarterKit 3 would add its own. No underline, as before.
+        link: false,
+        underline: false,
         heading: { levels: [1, 2, 3] },
         bulletList: { HTMLAttributes: { class: "list-disc list-inside" } },
         orderedList: { HTMLAttributes: { class: "list-decimal list-inside" } },
@@ -358,7 +361,7 @@ watch(
     if (!editor.value || !next) return;
     const current = editor.value.getJSON();
     if (JSON.stringify(current) !== JSON.stringify(next)) {
-      editor.value.commands.setContent(next, false);
+      editor.value.commands.setContent(next, { emitUpdate: false });
     }
   },
   { deep: true },

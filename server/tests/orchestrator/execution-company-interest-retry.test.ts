@@ -104,7 +104,7 @@ describe("ExecutionLayer company-interest retry (Stage 1)", () => {
       userMessage: "Since your order is unfulfilled, I can cancel it instead. Shall I?",
     };
     executeSpy.mockResolvedValue(retryResult);
-    const turnGuardrailState = { actionClaimRetries: 0, companyInterestRetries: 0 };
+    const turnGuardrailState = { actionClaimRetries: 0, companyInterestRetries: 0, linkRetries: 0 };
 
     const outcome = await invoke({ turnGuardrailState });
 
@@ -119,7 +119,7 @@ describe("ExecutionLayer company-interest retry (Stage 1)", () => {
 
   it("escalates to HANDOFF when the retry budget is exhausted", async () => {
     const outcome = await invoke({
-      turnGuardrailState: { actionClaimRetries: 0, companyInterestRetries: 1 },
+      turnGuardrailState: { actionClaimRetries: 0, companyInterestRetries: 1, linkRetries: 0 },
     });
 
     expect(executeSpy).not.toHaveBeenCalled();
@@ -133,7 +133,7 @@ describe("ExecutionLayer company-interest retry (Stage 1)", () => {
     executeSpy.mockResolvedValue(null);
 
     const outcome = await invoke({
-      turnGuardrailState: { actionClaimRetries: 0, companyInterestRetries: 0 },
+      turnGuardrailState: { actionClaimRetries: 0, companyInterestRetries: 0, linkRetries: 0 },
     });
 
     expect(executeSpy).toHaveBeenCalledTimes(1);

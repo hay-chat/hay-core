@@ -4,11 +4,17 @@ import type { ConversationContext } from "@server/orchestrator/types";
 import { MessageService } from "./message.service";
 import { pluginManagerService } from "@server/services/plugin-manager.service";
 import { v4 as uuidv4 } from "uuid";
-import type { HayPluginManifest } from "@server/types/plugin.types";
+import Ajv, { type ValidateFunction } from "ajv";
 import { conversationSecretService } from "../conversation-secret.service";
 import { createLogger } from "@server/lib/logger";
 import { actionLogService, toolErrorCode } from "../action-log.service";
-import { classifyTool, CORE_TOOL_RISK, TOOL_APPROVAL_ARG, type ToolRisk } from "./tool-risk";
+import { classifyTool, READ_RISK, TOOL_APPROVAL_ARG, type ToolRisk } from "./tool-risk";
+import {
+  CUSTOMER_IDENTITY_META_KEY,
+  resolveCustomerIdentity,
+  type CustomerIdentity,
+} from "./customer-identity";
+import { isToolEnabled } from "./enabled-tools";
 import { isDryRun, simulatedResult } from "./dry-run";
 import type { ActionOutcome } from "@server/database/entities/action-log.entity";
 import type {
@@ -42,6 +48,36 @@ import {
 const CONFIRMATION_LOOKBACK_MESSAGES = 50;
 
 const logger = createLogger("tool-execution");
+
+// Plugin tools' input schemas come from their cached tools/list. Compiled once
+// per schema object; `strict: false` because MCP schemas carry extra keywords.
+const ajv = new Ajv({ allErrors: true, strict: false });
+const validators = new WeakMap<object, ValidateFunction>();
+
+/** Error messages when `args` do not match the tool's input schema; empty when they do. */
+function schemaErrors(schema: Record<string, unknown>, args: Record<string, unknown>): string[] {
+  let validate = validators.get(schema);
+  if (!validate) {
+    try {
+      validate = ajv.compile(schema);
+    } catch (err) {
+      logger.warn({ err }, "Tool input schema does not compile; skipping argument validation");
+      return [];
+    }
+    validators.set(schema, validate);
+  }
+  if (validate(args)) return [];
+  return (validate.errors ?? []).map((e) => `${e.instancePath || "arguments"} ${e.message ?? ""}`);
+}
+
+/** Size of a value as JSON, for logs that must not contain the value itself. */
+function jsonSize(value: unknown): number {
+  try {
+    return JSON.stringify(value)?.length ?? 0;
+  } catch {
+    return 0;
+  }
+}
 
 /** `details.amount` from a NEEDS_APPROVAL tool error, when the plugin stated one. */
 function overCapAmount(mcpErrorDetails: unknown): number | null {
@@ -83,6 +119,10 @@ interface ToolTarget {
   pluginId: string | null;
   toolName: string;
   risk: ToolRisk;
+  /** A built-in core tool (not a plugin or page tool). */
+  isCore: boolean;
+  /** The plugin tool's cached input schema, when known. */
+  inputSchema: Record<string, unknown> | null;
 }
 
 /** Everything known about a call before it runs. */
@@ -96,6 +136,8 @@ interface PreparedCall {
   executedAt: string;
   /** Set only when re-running a call a person approved (fills TOOL_APPROVAL_ARG). */
   approvedActionId?: string;
+  /** Who the conversation is verifiably with; sent to plugin tools beside the args. */
+  identity: CustomerIdentity;
 }
 
 /** How a call ended, for the caller, the action log and the tool log. */
@@ -106,35 +148,12 @@ interface CallStep {
   errorClass?: string;
 }
 
-interface ToolCallData {
-  tool_name: string;
-  arguments: Record<string, unknown>;
-}
-
 /**
  * Error enriched with MCP-specific failure details, attached by `executeMCPTool`
  * when an MCP tool call returns an error response.
  */
 interface MCPError extends Error {
   mcpErrorDetails?: unknown;
-}
-
-interface ToolSchema {
-  name: string;
-  description?: string;
-  inputSchema?: {
-    type: string;
-    properties?: Record<
-      string,
-      {
-        type: string;
-        description?: string;
-        enum?: unknown[];
-        required?: boolean;
-      }
-    >;
-    required?: string[];
-  };
 }
 
 export class ToolExecutionService {
@@ -152,7 +171,14 @@ export class ToolExecutionService {
     messageId?: string,
   ): Promise<ToolExecutionResult> {
     try {
-      logger.info({ toolName: toolCall.name, args: toolCall.args }, "Executing tool");
+      logger.info(
+        {
+          conversationId: conversation.id,
+          toolName: toolCall.name,
+          argsSize: jsonSize(toolCall.args),
+        },
+        "Executing tool",
+      );
 
       const currentContext =
         conversation.orchestration_status as unknown as ConversationContext | null;
@@ -175,6 +201,7 @@ export class ToolExecutionService {
         idempotencyKey: uuidv4(),
         startedAt: Date.now(),
         executedAt: new Date().toISOString(),
+        identity: await this.identityFor(conversation, target),
       };
 
       const step = await this.runStep(call);
@@ -216,15 +243,17 @@ export class ToolExecutionService {
     conversation: Conversation,
     action: Pick<PendingAction, "id" | "tool_name" | "args" | "message_id" | "idempotency_key">,
   ): Promise<ToolExecutionResult & { errorCode: string | null }> {
+    const target = await this.resolveTarget(conversation.organization_id, action.tool_name);
     const call: PreparedCall = {
       approvedActionId: action.id,
       conversation,
       toolCall: { name: action.tool_name, args: action.args },
       messageId: action.message_id ?? undefined,
-      target: await this.resolveTarget(conversation.organization_id, action.tool_name),
+      target,
       idempotencyKey: action.idempotency_key,
       startedAt: Date.now(),
       executedAt: new Date().toISOString(),
+      identity: await this.identityFor(conversation, target),
     };
     const step = await this.runLive(call);
     await this.recordAction(call, step);
@@ -262,13 +291,57 @@ export class ToolExecutionService {
     return latencyMs;
   }
 
+  /** Plugin tools get the conversation's verified customer; core and page tools need none. */
+  private async identityFor(
+    conversation: Conversation,
+    target: ToolTarget,
+  ): Promise<CustomerIdentity> {
+    if (!target.pluginId) return { trust: "none" };
+    return resolveCustomerIdentity(conversation);
+  }
+
   /**
-   * Reads run. A write first needs the shopper's go-ahead (D4-10); then it is
+   * A tool the conversation's playbook does not enable, or args that do not
+   * match the tool's schema, are refused before anything else. Reads run,
+   * except a customer-data read in a conversation with no verified customer.
+   * Core writes act only inside Hay.chat: simulated in a dry-run, else run. A
+   * plugin write first needs the shopper's go-ahead (D4-10); then it is
    * simulated in a dry-run conversation, held when the org's approval policy
    * says so, and run otherwise.
    */
   private async runStep(call: PreparedCall): Promise<CallStep> {
-    if (call.target.risk.readOnly) return this.runLive(call);
+    if (!(await isToolEnabled(call.conversation, call.toolCall.name))) {
+      return this.refuse(call, "TOOL_NOT_ENABLED", {
+        status: "not_available",
+        message: `Tool "${call.toolCall.name}" is not available in this conversation.`,
+      });
+    }
+    const errors = call.target.inputSchema
+      ? schemaErrors(call.target.inputSchema, call.toolCall.args)
+      : [];
+    if (errors.length > 0) {
+      return this.refuse(call, "BAD_INPUT", {
+        status: "invalid_arguments",
+        message: `Invalid tool arguments: ${errors.join("; ")}`,
+      });
+    }
+    if (call.target.risk.readOnly) {
+      if (call.target.risk.customerData && call.identity.trust === "none") {
+        return this.refuse(call, "IDENTITY_REQUIRED", {
+          status: "identity_required",
+          message:
+            "NOT DONE. This lookup returns a customer's personal details, and the customer in " +
+            "this conversation is not verified, so it cannot run. Do not look up anyone by an " +
+            "email, phone or name typed in the chat. Tell the customer you cannot open account " +
+            "details here: they can sign in to their account on the store and open the chat " +
+            "again, or you can hand the conversation to the team.",
+        });
+      }
+      return this.runLive(call);
+    }
+    if (call.target.isCore) {
+      return isDryRun(call.conversation.metadata) ? this.simulate(call) : this.runLive(call);
+    }
     const organization = await organizationRepository.findById(call.conversation.organization_id);
     const config = resolveActionApprovalConfig(organization?.settings);
     if (needsCustomerConfirmation(call.target.risk, config)) {
@@ -457,6 +530,25 @@ export class ToolExecutionService {
     };
   }
 
+  /** Refused by core before the tool ran: the AI gets why, the provider sees nothing. */
+  private async refuse(
+    call: PreparedCall,
+    errorCode: string,
+    result: { status: string; message: string },
+  ): Promise<CallStep> {
+    await this.finishToolMessage(call, `Action refused: ${call.toolCall.name}`, {
+      toolOutput: result,
+      toolStatus: "ERROR",
+      toolErrorCode: errorCode,
+    });
+    return {
+      result: { success: false, error: result.message, result },
+      logOutcome: "error",
+      errorCode,
+      errorClass: "ToolRefused",
+    };
+  }
+
   /** Dry-run write: nothing reaches the provider, the AI gets a structured mock. */
   private async simulate(call: PreparedCall): Promise<CallStep> {
     const result = simulatedResult(call.toolCall.name, call.toolCall.args);
@@ -473,14 +565,9 @@ export class ToolExecutionService {
 
   /** Send the call to the core tool or plugin and record the answer. */
   private async runLive(call: PreparedCall): Promise<CallStep> {
-    const { conversation, toolCall } = call;
+    const { toolCall } = call;
     try {
-      const result = await this.executeToolCall(
-        conversation,
-        { tool_name: toolCall.name, arguments: toolCall.args },
-        call.idempotencyKey,
-        call.approvedActionId,
-      );
+      const result = await this.executeToolCall(call);
       await this.finishToolMessage(call, `Action completed: ${toolCall.name}`, {
         toolOutput: result,
         toolStatus: "SUCCESS",
@@ -518,32 +605,63 @@ export class ToolExecutionService {
   }
 
   /**
-   * Split `pluginId:toolName` (or a core tool name) and look up its risk class.
-   * An unparseable or uncached tool resolves to an unclassified write.
+   * Split `pluginId:toolName` (or a core tool name) and look up its risk class
+   * and cached input schema. An unparseable or uncached tool resolves to an
+   * unclassified write.
    */
   private async resolveTarget(organizationId: string, fullToolName: string): Promise<ToolTarget> {
     const { coreToolRegistry } = await import("./core-tools");
-    if (coreToolRegistry.has(fullToolName)) {
-      return { pluginId: null, toolName: fullToolName, risk: CORE_TOOL_RISK };
+    const coreTool = coreToolRegistry.get(fullToolName);
+    if (coreTool) {
+      return {
+        pluginId: null,
+        toolName: fullToolName,
+        risk: coreTool.risk,
+        isCore: true,
+        inputSchema: null,
+      };
     }
     // Page tools run in the visitor's own browser, in front of the visitor,
-    // with no provider and no secret involved: no approval gate, like core tools.
+    // with no provider and no secret involved: no approval gate.
     if (isPageTool(fullToolName)) {
-      return { pluginId: null, toolName: fullToolName, risk: CORE_TOOL_RISK };
+      return {
+        pluginId: null,
+        toolName: fullToolName,
+        risk: READ_RISK,
+        isCore: false,
+        inputSchema: null,
+      };
     }
     const colonIndex = fullToolName.lastIndexOf(":");
     if (colonIndex === -1) {
-      return { pluginId: null, toolName: fullToolName, risk: classifyTool(null) };
+      return {
+        pluginId: null,
+        toolName: fullToolName,
+        risk: classifyTool(null),
+        isCore: false,
+        inputSchema: null,
+      };
     }
     const pluginId = fullToolName.substring(0, colonIndex);
     const toolName = fullToolName.substring(colonIndex + 1);
     try {
       const { mcpRegistryService } = await import("@server/services/mcp-registry.service");
-      const risk = await mcpRegistryService.getToolRisk(organizationId, pluginId, toolName);
-      return { pluginId, toolName, risk };
+      const [risk, tools] = await Promise.all([
+        mcpRegistryService.getToolRisk(organizationId, pluginId, toolName),
+        mcpRegistryService.getToolsForOrg(organizationId),
+      ]);
+      const tool = tools.find((t) => t.pluginId === pluginId && t.name === toolName);
+      const schema = tool?.input_schema as Record<string, unknown> | undefined;
+      return {
+        pluginId,
+        toolName,
+        risk,
+        isCore: false,
+        inputSchema: schema && typeof schema === "object" ? schema : null,
+      };
     } catch (err) {
       logger.warn({ err, pluginId, toolName }, "Could not resolve tool risk; treating as a write");
-      return { pluginId, toolName, risk: classifyTool(null) };
+      return { pluginId, toolName, risk: classifyTool(null), isCore: false, inputSchema: null };
     }
   }
 
@@ -566,22 +684,17 @@ export class ToolExecutionService {
     await this.broadcastMessageUpdate(call.conversation, message.id, { content, metadata });
   }
 
-  private async executeToolCall(
-    conversation: Conversation,
-    toolCall: ToolCallData,
-    idempotencyKey?: string,
-    approvedActionId?: string,
-  ): Promise<unknown> {
-    const { tool_name: fullToolName, arguments: toolArgs } = toolCall;
-
-    logger.debug({ fullToolName, toolArgs }, "Executing tool");
+  private async executeToolCall(call: PreparedCall): Promise<unknown> {
+    const { conversation, target } = call;
+    const fullToolName = call.toolCall.name;
+    const toolArgs = call.toolCall.args ?? {};
 
     // Core tools — unprefixed names handled in-process. The absence of a
     // colon is the natural dispatch fork between core and plugin/MCP tools.
-    const { coreToolRegistry } = await import("./core-tools");
-    if (coreToolRegistry.has(fullToolName)) {
+    if (target.isCore) {
+      const { coreToolRegistry } = await import("./core-tools");
       logger.debug({ fullToolName }, "Dispatching to core tool");
-      return coreToolRegistry.execute(fullToolName, conversation, toolArgs ?? {});
+      return coreToolRegistry.execute(fullToolName, conversation, toolArgs);
     }
 
     // Page tools (`page:name`) — run by the host page over the conversation's
@@ -592,154 +705,61 @@ export class ToolExecutionService {
         conversation.id,
         conversation.organization_id,
         pageToolName(fullToolName),
-        toolArgs ?? {},
+        toolArgs,
       );
       return unwrapPageToolResult(result);
     }
 
-    // Parse the tool name to extract plugin and tool parts
     // Expected format: "{pluginId}:{toolName}"
-    const colonIndex = fullToolName.lastIndexOf(":");
-    if (colonIndex === -1) {
+    const { pluginId, toolName } = target;
+    if (!pluginId) {
       throw new Error(
         `Invalid tool name format: ${fullToolName}. Expected format: {pluginId}:{toolName}`,
       );
     }
 
-    const pluginId = fullToolName.substring(0, colonIndex);
-    const actualToolName = fullToolName.substring(colonIndex + 1);
-
-    logger.debug({ pluginId, actualToolName }, "Parsed tool name");
-
-    // Find the plugin that contains this tool
-    const allPlugins = pluginManagerService.getAllPlugins();
-    logger.debug(
-      { availablePlugins: allPlugins.map((p) => ({ id: p.pluginId, name: p.name })) },
-      "Available plugins",
-    );
-
-    let matchingPlugin = null;
-    let toolSchema = null;
-
-    for (const plugin of allPlugins) {
-      logger.debug({ pluginId: plugin.pluginId, pluginName: plugin.name }, "Checking plugin");
-      if (plugin.pluginId === pluginId) {
-        logger.debug({ pluginId }, "Found matching plugin ID");
-        const manifest = plugin.manifest as HayPluginManifest;
-
-        // Check if this plugin has dynamic MCP tools (no static tool definitions)
-        const capabilities = Array.isArray(manifest.capabilities) ? manifest.capabilities : [];
-        const hasMCPCapability = capabilities.includes("mcp");
-
-        if (hasMCPCapability && !manifest.capabilities?.mcp?.tools) {
-          // Plugin with dynamic tools - fetched from the running MCP server
-          logger.debug("Plugin has dynamic tools, skipping manifest validation");
-          matchingPlugin = plugin;
-          // No toolSchema needed - the MCP client will handle validation
-          break;
-        } else if (manifest.capabilities?.mcp?.tools) {
-          // Legacy plugin with static tool definitions in manifest
-          const mcpTools = manifest.capabilities.mcp.tools;
-          logger.debug({ tools: mcpTools.map((t) => t.name) }, "Available tools in plugin");
-          const tool = mcpTools.find((t) => t.name === actualToolName);
-          if (tool) {
-            matchingPlugin = plugin;
-            toolSchema = tool;
-            logger.debug({ toolName: tool.name }, "Found matching tool");
-            break;
-          } else {
-            logger.debug({ actualToolName }, "Tool not found in this plugin");
-          }
-        } else {
-          logger.debug("Plugin has no MCP capability or tools defined");
-        }
-      }
-    }
-
-    if (!matchingPlugin) {
-      const availableTools = allPlugins.flatMap(
-        (p) =>
-          (p.manifest as HayPluginManifest)?.capabilities?.mcp?.tools?.map(
-            (t) => `${p.pluginId}:${t.name}`,
-          ) || [],
-      );
-      throw new Error(
-        `Plugin '${pluginId}' not found. Available tools: ${availableTools.join(", ")}`,
-      );
-    }
-
-    logger.info(
-      { toolName: actualToolName, pluginName: matchingPlugin.name },
-      "Found tool in plugin",
-    );
-
-    // Validate tool arguments against input schema (only for legacy plugins with static schemas)
-    if (toolSchema && toolSchema.input_schema) {
-      // Ensure input_schema is an object before validation
-      if (typeof toolSchema.input_schema === "object") {
-        const validation = this.validateToolArguments(
-          toolArgs,
-          toolSchema.input_schema as ToolSchema["inputSchema"],
-        );
-        if (!validation.valid) {
-          throw new Error(`Invalid tool arguments: ${validation.errors.join(", ")}`);
-        }
-      }
-    } else if (!toolSchema) {
-      logger.debug("Skipping argument validation for dynamic plugin (handled by MCP server)");
+    const plugin = pluginManagerService.getAllPlugins().find((p) => p.pluginId === pluginId);
+    if (!plugin) {
+      throw new Error(`Plugin '${pluginId}' not found`);
     }
 
     // Check if plugin needs installation/building
-    if (pluginManagerService.needsInstallation(matchingPlugin.pluginId)) {
-      logger.info({ pluginName: matchingPlugin.name }, "Installing plugin");
-      await pluginManagerService.installPlugin(matchingPlugin.pluginId);
+    if (pluginManagerService.needsInstallation(plugin.pluginId)) {
+      logger.info({ pluginName: plugin.name }, "Installing plugin");
+      await pluginManagerService.installPlugin(plugin.pluginId);
     }
 
-    if (pluginManagerService.needsBuilding(matchingPlugin.pluginId)) {
-      logger.info({ pluginName: matchingPlugin.name }, "Building plugin");
-      await pluginManagerService.buildPlugin(matchingPlugin.pluginId);
+    if (pluginManagerService.needsBuilding(plugin.pluginId)) {
+      logger.info({ pluginName: plugin.name }, "Building plugin");
+      await pluginManagerService.buildPlugin(plugin.pluginId);
     }
 
-    // Get the plugin's start command
-    const startCommand = pluginManagerService.getStartCommand(matchingPlugin.pluginId);
-    if (!startCommand) {
-      throw new Error(`Plugin '${matchingPlugin.name}' has no start command defined`);
+    if (!pluginManagerService.getStartCommand(plugin.pluginId)) {
+      throw new Error(`Plugin '${plugin.name}' has no start command defined`);
     }
 
-    logger.debug({ startCommand }, "Plugin start command");
-
-    // Get organization ID from the conversation parameter passed to the parent method
-    const organizationId = conversation.organization_id;
-
-    // Inject conversation secrets into tool args before execution
     // Copy first: core-owned args must not leak into the logged / held call args.
     const enrichedArgs = await this.injectConversationSecrets(
       conversation.id,
       { ...toolArgs },
-      toolSchema as Record<string, unknown> | null,
+      target.inputSchema,
     );
 
     // Inject the core-generated idempotency key and approval id. The LLM must
     // never invent these — a made-up key defeats retry deduplication on the
     // provider side, and a made-up approval would skip a merchant's cap — so
     // core's values always override whatever was sent.
-    await this.injectCoreArgs(
-      organizationId,
-      matchingPlugin.pluginId,
-      actualToolName,
-      enrichedArgs,
-      {
-        idempotencyKey,
-        approvedActionId,
-      },
-    );
+    this.injectCoreArgs(target, enrichedArgs, {
+      idempotencyKey: call.idempotencyKey,
+      approvedActionId: call.approvedActionId,
+    });
 
-    // Execute the MCP tool via the running process
     return await this.executeMCPTool(
-      organizationId,
-      matchingPlugin.pluginId,
-      actualToolName,
+      conversation.organization_id,
+      pluginId,
+      toolName,
       enrichedArgs,
+      call.identity,
     );
   }
 
@@ -751,139 +771,56 @@ export class ToolExecutionService {
    * MCP servers using strict schemas reject unknown arguments, so blind
    * injection is not safe. Mutates `args` in place, overriding any
    * LLM-provided value; the approval arg is always removed unless this is an
-   * approved run. Failure to resolve the schema is non-fatal for the key: the
-   * call proceeds without it (and never with an approval id).
+   * approved run. Without a cached schema the call proceeds without the key
+   * (and never with an approval id).
    */
-  private async injectCoreArgs(
-    organizationId: string,
-    pluginId: string,
-    toolName: string,
+  private injectCoreArgs(
+    target: ToolTarget,
     args: Record<string, unknown>,
     values: { idempotencyKey?: string; approvedActionId?: string },
-  ): Promise<void> {
+  ): void {
     delete args[TOOL_APPROVAL_ARG];
-    if (!values.idempotencyKey && !values.approvedActionId) return;
-    try {
-      const { mcpRegistryService } = await import("@server/services/mcp-registry.service");
-      const tools = await mcpRegistryService.getToolsForOrg(organizationId);
-      const tool = tools.find((t) => t.pluginId === pluginId && t.name === toolName);
-      const properties = (
-        tool?.input_schema as { properties?: Record<string, unknown> } | undefined
-      )?.properties;
-
-      if (values.idempotencyKey && properties && "idempotency_key" in properties) {
-        args.idempotency_key = values.idempotencyKey;
-        logger.debug(
-          { pluginId, toolName, idempotencyKey: values.idempotencyKey },
-          "Injected idempotency key",
-        );
-      }
-      if (values.approvedActionId && properties && TOOL_APPROVAL_ARG in properties) {
-        args[TOOL_APPROVAL_ARG] = values.approvedActionId;
-        logger.debug({ pluginId, toolName }, "Injected approval id for an approved call");
-      }
-    } catch (error) {
-      logger.warn(
-        { err: error, pluginId, toolName },
-        "Failed to resolve tool schema for core argument injection",
+    const properties = (target.inputSchema as { properties?: Record<string, unknown> } | null)
+      ?.properties;
+    if (!properties) return;
+    if (values.idempotencyKey && "idempotency_key" in properties) {
+      args.idempotency_key = values.idempotencyKey;
+    }
+    if (values.approvedActionId && TOOL_APPROVAL_ARG in properties) {
+      args[TOOL_APPROVAL_ARG] = values.approvedActionId;
+      logger.debug(
+        { pluginId: target.pluginId, toolName: target.toolName },
+        "Injected approval id for an approved call",
       );
     }
   }
 
-  private validateToolArguments(
-    args: Record<string, unknown>,
-    schema: ToolSchema["inputSchema"],
-  ): { valid: boolean; errors: string[] } {
-    const errors: string[] = [];
-
-    if (!schema) {
-      return { valid: true, errors: [] };
-    }
-
-    // Basic validation - check required properties
-    if (schema.required && Array.isArray(schema.required)) {
-      for (const requiredField of schema.required) {
-        if (!(requiredField in args)) {
-          errors.push(`Missing required field: ${requiredField}`);
-        }
-      }
-    }
-
-    // Type validation for properties
-    if (schema.properties) {
-      for (const [fieldName, fieldSchema] of Object.entries(schema.properties)) {
-        if (fieldName in args) {
-          const fieldValue = args[fieldName];
-          const fieldType = fieldSchema.type;
-
-          if (fieldType === "string" && typeof fieldValue !== "string") {
-            errors.push(`Field '${fieldName}' must be a string`);
-          } else if (fieldType === "number" && typeof fieldValue !== "number") {
-            errors.push(`Field '${fieldName}' must be a number`);
-          } else if (fieldType === "boolean" && typeof fieldValue !== "boolean") {
-            errors.push(`Field '${fieldName}' must be a boolean`);
-          }
-
-          // Validate enum values
-          const enumValues = fieldSchema.enum;
-          if (enumValues && Array.isArray(enumValues)) {
-            if (!enumValues.includes(fieldValue)) {
-              errors.push(`Field '${fieldName}' must be one of: ${enumValues.join(", ")}`);
-            }
-          }
-        }
-      }
-    }
-
-    return { valid: errors.length === 0, errors };
-  }
-
   /**
-   * Substitute conversation secrets into tool arguments before MCP execution.
-   *
-   * Two injection modes:
-   *  1. `x-hay-secret` annotation on a schema property → inject secret value by key name directly
-   *  2. `<<secret.keyname>>` placeholder in any string arg value → replace with real value
-   *
-   * Secret values never appear in logs or LLM context — only in the actual MCP call.
+   * Fill conversation secrets into the properties the tool's input schema
+   * marks with `x-hay-secret: "<key>"`. Only those properties: a secret never
+   * lands in an argument the tool did not ask for it in. Secret values never
+   * appear in logs or LLM context — only in the actual MCP call.
    */
   private async injectConversationSecrets(
     conversationId: string,
     args: Record<string, unknown>,
-    toolSchema: Record<string, unknown> | null,
+    inputSchema: Record<string, unknown> | null,
   ): Promise<Record<string, unknown>> {
+    const properties = inputSchema?.["properties"];
+    if (!properties || typeof properties !== "object" || Array.isArray(properties)) return args;
+    const wanted = Object.entries(properties as Record<string, unknown>).flatMap(
+      ([propName, propDef]) => {
+        const key = (propDef as Record<string, unknown> | null)?.["x-hay-secret"];
+        return typeof key === "string" ? [[propName, key] as const] : [];
+      },
+    );
+    if (wanted.length === 0) return args;
+
     const secrets = await conversationSecretService.getSecrets(conversationId);
-    if (Object.keys(secrets).length === 0) {
-      return args;
-    }
-
     const enriched = { ...args };
-
-    // Mode 1: x-hay-secret annotation on schema properties
-    const inputSchema = toolSchema?.["input_schema"];
-    if (inputSchema && typeof inputSchema === "object" && !Array.isArray(inputSchema)) {
-      const properties = (inputSchema as Record<string, unknown>)["properties"];
-      if (properties && typeof properties === "object" && !Array.isArray(properties)) {
-        for (const [propName, propDef] of Object.entries(properties as Record<string, unknown>)) {
-          if (propDef && typeof propDef === "object" && !Array.isArray(propDef)) {
-            const secretKey = (propDef as Record<string, unknown>)["x-hay-secret"];
-            if (typeof secretKey === "string" && secrets[secretKey] !== undefined) {
-              enriched[propName] = secrets[secretKey];
-            }
-          }
-        }
-      }
+    for (const [propName, key] of wanted) {
+      if (secrets[key] !== undefined) enriched[propName] = secrets[key];
     }
-
-    // Mode 2: <<secret.keyname>> placeholder substitution in string values
-    for (const [argKey, argValue] of Object.entries(enriched)) {
-      if (typeof argValue === "string") {
-        enriched[argKey] = argValue.replace(/<<secret\.([^>]+)>>/g, (_, keyName: string) => {
-          return secrets[keyName] ?? `<<secret.${keyName}>>`;
-        });
-      }
-    }
-
     return enriched;
   }
 
@@ -963,8 +900,9 @@ export class ToolExecutionService {
     pluginId: string,
     toolName: string,
     toolArgs: Record<string, unknown>,
+    identity: CustomerIdentity,
   ): Promise<unknown> {
-    logger.debug({ pluginId, toolName, organizationId, toolArgs }, "Executing MCP tool via client");
+    logger.debug({ pluginId, toolName, organizationId }, "Executing MCP tool via client");
 
     try {
       // Use MCP client factory to get the appropriate client (local or remote)
@@ -972,9 +910,14 @@ export class ToolExecutionService {
       const client = await MCPClientFactory.createClient(organizationId, pluginId);
 
       // Call the tool
-      const result = await client.callTool(toolName, toolArgs);
+      const result = await client.callTool(toolName, toolArgs, {
+        [CUSTOMER_IDENTITY_META_KEY]: identity,
+      });
 
-      logger.debug({ result }, "MCP response received");
+      logger.debug(
+        { pluginId, toolName, isError: Boolean(result.isError), resultSize: jsonSize(result) },
+        "MCP response received",
+      );
 
       if (result.isError) {
         // Extract error from MCP response — error text may be in content or error field

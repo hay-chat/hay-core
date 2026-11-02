@@ -23,6 +23,10 @@ jest.mock("@server/services/plugin-instance-manager.service", () => ({
 jest.mock("@server/lib/hmac-signature", () => ({
   verifyHmacSha256: jest.fn(),
 }));
+const claimWebhookDelivery = jest.fn();
+const releaseWebhookDelivery = jest.fn();
+jest.mock("@server/lib/webhook-replay", () => ({ claimWebhookDelivery, releaseWebhookDelivery }));
+import { verifyHmacSha256 } from "@server/lib/hmac-signature";
 
 import {
   webhookRouterService,
@@ -82,20 +86,33 @@ type RouteKeyPath = {
   nested?: { itemsPath: string; keyPath: string };
 };
 
-type Dispatch = (
+type RouterInternals = {
+  groupByOrg(
+    pluginId: string,
+    routing: { routeKeyPath: RouteKeyPath },
+    body: Record<string, unknown>,
+  ): Promise<Map<string, unknown[]>>;
+  forwardAll(
+    pluginId: string,
+    routing: { routeKeyPath: RouteKeyPath },
+    body: Record<string, unknown>,
+    byOrg: Map<string, unknown[]>,
+    req: unknown,
+    dedupeKey: string | null,
+  ): Promise<void>;
+};
+
+/** Group a body by org and forward it, as `handle` does after verification. */
+async function dispatch(
   pluginId: string,
-  routing: { routeKeyPath: RouteKeyPath },
+  routingDescriptor: { routeKeyPath: RouteKeyPath },
   body: Record<string, unknown>,
   req: unknown,
-) => Promise<void>;
-
-const dispatch: Dispatch = (pluginId, routingDescriptor, body, req) =>
-  (webhookRouterService as unknown as { dispatch: Dispatch }).dispatch(
-    pluginId,
-    routingDescriptor,
-    body,
-    req,
-  );
+): Promise<void> {
+  const router = webhookRouterService as unknown as RouterInternals;
+  const byOrg = await router.groupByOrg(pluginId, routingDescriptor, body);
+  await router.forwardAll(pluginId, routingDescriptor, body, byOrg, req, null);
+}
 
 const fakeReq = {
   headers: {},
@@ -357,6 +374,7 @@ describe("webhookRouterService.handle signature formats", () => {
     jest.resetAllMocks();
     process.env.TEST_SVIX_SECRET = svixSecret;
     findByKey.mockResolvedValue(null);
+    claimWebhookDelivery.mockResolvedValue(true);
   });
 
   afterEach(() => {
@@ -384,6 +402,20 @@ describe("webhookRouterService.handle signature formats", () => {
     await webhookRouterService.handle(req, res as never, "p", svixRouting as never);
 
     expect(res.statusCode).toBe(200);
+    expect(claimWebhookDelivery).toHaveBeenCalledWith("webhook-router:p", "msg_1");
+  });
+
+  it("acknowledges a repeated svix-id without dispatching it again", async () => {
+    claimWebhookDelivery.mockResolvedValue(false);
+    const ts = Math.floor(Date.now() / 1000);
+    const req = { method: "POST", headers: svixHeaders(ts, rawBody), rawBody } as never;
+    const res = makeRes();
+
+    await webhookRouterService.handle(req, res as never, "p", svixRouting as never);
+
+    expect(res.statusCode).toBe(200);
+    expect(res.body).toEqual({ received: true, duplicate: true });
+    expect(findByKey).not.toHaveBeenCalled();
   });
 
   it("rejects a svix request signed with another secret", async () => {
@@ -398,6 +430,187 @@ describe("webhookRouterService.handle signature formats", () => {
     await webhookRouterService.handle(req, res as never, "p", svixRouting as never);
 
     expect(res.statusCode).toBe(401);
+  });
+});
+
+describe("webhookRouterService.handle plugin-declared dedupe", () => {
+  const verifyHmac = verifyHmacSha256 as jest.Mock;
+
+  function makeRes() {
+    const res: { statusCode?: number; body?: unknown; status: jest.Mock; json: jest.Mock } = {
+      status: jest.fn(),
+      json: jest.fn(),
+    };
+    res.status.mockImplementation((code: number) => {
+      res.statusCode = code;
+      return res;
+    });
+    res.json.mockImplementation((payload: unknown) => {
+      res.body = payload;
+      return res;
+    });
+    return res;
+  }
+
+  const flush = () => new Promise((resolve) => setImmediate(resolve));
+
+  function post(rawBody: string, headers: Record<string, string> = {}) {
+    return {
+      method: "POST",
+      headers: { "x-sig": "sha256=valid", ...headers },
+      rawBody,
+      get: () => "host",
+      protocol: "https",
+      originalUrl: "/v1/plugins/p/webhook",
+    } as never;
+  }
+
+  const signature = { header: "x-sig", format: "sha256-hmac" as const, secretEnv: "TEST_HMAC" };
+  const metaRouting = {
+    signature,
+    routeKeyPath: { itemsPath: "entry", keyPath: "id" },
+    dedupe: { source: "raw-body" as const, windowSeconds: 86400 },
+  };
+  const metaBody = JSON.stringify({
+    object: "page",
+    entry: [
+      { id: "PAGE_A", time: 1, messaging: [{ message: { mid: "m.1" } }] },
+      { id: "PAGE_B", time: 1, messaging: [{ message: { mid: "m.2" } }] },
+    ],
+  });
+
+  beforeEach(() => {
+    jest.resetAllMocks();
+    process.env.TEST_HMAC = "secret";
+    verifyHmac.mockReturnValue(true);
+    setOwners({ PAGE_A: "org-a", PAGE_B: "org-b", STORE_1: "org-a" });
+    startPluginWorker.mockResolvedValue({ port: 1234, instanceId: "inst" });
+    updateActivityTimestamp.mockResolvedValue(undefined);
+    releaseWebhookDelivery.mockResolvedValue(undefined);
+    global.fetch = jest.fn().mockResolvedValue({ ok: true });
+  });
+
+  afterEach(() => {
+    delete process.env.TEST_HMAC;
+  });
+
+  it("claims the key per routed org with the declared window and forwards a first delivery", async () => {
+    claimWebhookDelivery.mockResolvedValue(true);
+    const res = makeRes();
+
+    await webhookRouterService.handle(post(metaBody), res as never, "p", metaRouting as never);
+    await flush();
+
+    expect(res.body).toEqual({ received: true });
+    expect(claimWebhookDelivery).toHaveBeenCalledWith("webhook-dedupe:p:org-a", metaBody, 86400);
+    expect(claimWebhookDelivery).toHaveBeenCalledWith("webhook-dedupe:p:org-b", metaBody, 86400);
+    expect(global.fetch).toHaveBeenCalledTimes(2);
+  });
+
+  it("acknowledges a repeated delivery as a duplicate without forwarding it", async () => {
+    claimWebhookDelivery.mockResolvedValue(false);
+    const res = makeRes();
+
+    await webhookRouterService.handle(post(metaBody), res as never, "p", metaRouting as never);
+    await flush();
+
+    expect(res.statusCode).toBe(200);
+    expect(res.body).toEqual({ received: true, duplicate: true });
+    expect(startPluginWorker).not.toHaveBeenCalled();
+    expect(global.fetch).not.toHaveBeenCalled();
+  });
+
+  it("forwards only to the orgs that have not seen the delivery", async () => {
+    claimWebhookDelivery.mockImplementation(async (namespace: string) =>
+      namespace.endsWith(":org-b"),
+    );
+    const res = makeRes();
+
+    await webhookRouterService.handle(post(metaBody), res as never, "p", metaRouting as never);
+    await flush();
+
+    expect(res.body).toEqual({ received: true });
+    expect(startPluginWorker).toHaveBeenCalledTimes(1);
+    expect(startPluginWorker).toHaveBeenCalledWith("org-b", "p");
+  });
+
+  it("releases an org's claim when forwarding to it fails, so a retry is accepted", async () => {
+    claimWebhookDelivery.mockResolvedValue(true);
+    global.fetch = jest
+      .fn()
+      .mockResolvedValueOnce({ ok: true })
+      .mockResolvedValueOnce({ ok: false, status: 500, text: async () => "boom" });
+    const res = makeRes();
+
+    await webhookRouterService.handle(post(metaBody), res as never, "p", metaRouting as never);
+    await flush();
+    await flush();
+
+    const failedOrg = startPluginWorker.mock.calls[1][0] as string;
+    expect(releaseWebhookDelivery).toHaveBeenCalledTimes(1);
+    expect(releaseWebhookDelivery).toHaveBeenCalledWith(`webhook-dedupe:p:${failedOrg}`, metaBody);
+  });
+
+  it("processes identical bodies every time when the plugin declares no dedupe", async () => {
+    const storeRouting = { signature, routeKeyPath: { itemsPath: ".", keyPath: "store_id" } };
+    const storeBody = JSON.stringify({ store_id: "STORE_1", event: "store/redact", id: 1 });
+
+    await webhookRouterService.handle(
+      post(storeBody),
+      makeRes() as never,
+      "p",
+      storeRouting as never,
+    );
+    const res = makeRes();
+    await webhookRouterService.handle(post(storeBody), res as never, "p", storeRouting as never);
+    await flush();
+
+    expect(res.body).toEqual({ received: true });
+    expect(claimWebhookDelivery).not.toHaveBeenCalled();
+    expect(global.fetch).toHaveBeenCalledTimes(2);
+  });
+
+  it("processes a delivery without the declared key, without dedupe", async () => {
+    const headerRouting = { ...metaRouting, dedupe: { source: "header", header: "X-Delivery-Id" } };
+    const res = makeRes();
+
+    await webhookRouterService.handle(post(metaBody), res as never, "p", headerRouting as never);
+    await flush();
+
+    expect(res.body).toEqual({ received: true });
+    expect(claimWebhookDelivery).not.toHaveBeenCalled();
+    expect(global.fetch).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe("webhookRouterService.handle base64 HMAC", () => {
+  it("verifies a sha256-hmac-base64 signature as base64", async () => {
+    jest.resetAllMocks();
+    process.env.TEST_B64_SECRET = "s";
+    const { verifyHmacSha256 } = jest.requireMock("@server/lib/hmac-signature") as {
+      verifyHmacSha256: jest.Mock;
+    };
+    verifyHmacSha256.mockReturnValue(false);
+    const res = { status: jest.fn(), json: jest.fn() };
+    res.status.mockReturnValue(res);
+    const req = {
+      method: "POST",
+      headers: { "x-shopify-hmac-sha256": "abc=" },
+      rawBody: "{}",
+    } as never;
+
+    await webhookRouterService.handle(req, res as never, "p", {
+      signature: {
+        header: "x-shopify-hmac-sha256",
+        format: "sha256-hmac-base64",
+        secretEnv: "TEST_B64_SECRET",
+      },
+      routeKeyPath: { itemsPath: ".", keyPath: "shop_domain" },
+    });
+
+    expect(verifyHmacSha256).toHaveBeenCalledWith(expect.any(Buffer), "abc=", "s", "base64");
+    expect(res.status).toHaveBeenCalledWith(401);
+    delete process.env.TEST_B64_SECRET;
   });
 });
 
@@ -429,5 +642,20 @@ describe("__webhookRouterInternals", () => {
     expect(source).toEqual(snapshot);
     expect(copy.meta).not.toBe(source.meta);
     expect(withPath({ a: 1 }, "b.c", 2)).toEqual({ a: 1, b: { c: 2 } });
+  });
+
+  it("extractDedupeKey reads a header, a body path or the raw bytes", () => {
+    const { extractDedupeKey } = __webhookRouterInternals;
+    const req = { headers: { "x-delivery-id": "d-1" } } as never;
+    const raw = Buffer.from('{"a":{"id":7}}');
+    const body = { a: { id: 7, name: "" } };
+
+    expect(extractDedupeKey({ source: "header", header: "X-Delivery-Id" }, req, raw, body)).toBe(
+      "d-1",
+    );
+    expect(extractDedupeKey({ source: "body-path", path: "a.id" }, req, raw, body)).toBe("7");
+    expect(extractDedupeKey({ source: "body-path", path: "a.name" }, req, raw, body)).toBeNull();
+    expect(extractDedupeKey({ source: "body-path", path: "a.x" }, req, raw, body)).toBeNull();
+    expect(extractDedupeKey({ source: "raw-body" }, req, raw, body)).toBe('{"a":{"id":7}}');
   });
 });

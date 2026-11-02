@@ -760,7 +760,9 @@ export class PluginHttpServer {
     // POST /mcp/call-tool
     this.app.post("/mcp/call-tool", async (req: Request, res: Response): Promise<void> => {
       try {
-        const { toolName, arguments: toolArgs } = req.body;
+        // `meta` is core-owned call context (the verified customer). Only
+        // local servers get it; it is never sent to an external server.
+        const { toolName, arguments: toolArgs, meta } = req.body;
 
         if (!toolName || typeof toolName !== "string") {
           res.status(400).json({
@@ -769,7 +771,7 @@ export class PluginHttpServer {
           return;
         }
 
-        this.logger.debug("MCP tool call requested", { toolName, arguments: toolArgs });
+        this.logger.debug("MCP tool call requested", { toolName });
 
         // Find which MCP server has this tool
         // First, we need to check all servers to find which one has the tool
@@ -839,7 +841,11 @@ export class PluginHttpServer {
         if (targetServer.type === "local" && targetServer.instance?.callTool) {
           // Local MCP server
           try {
-            const result = await targetServer.instance.callTool(toolName, toolArgs || {});
+            const result = await targetServer.instance.callTool(
+              toolName,
+              toolArgs || {},
+              meta && typeof meta === "object" && !Array.isArray(meta) ? meta : undefined,
+            );
             res.json(result);
             this.logger.debug("MCP tool call successful", { toolName, serverId: targetServer.id });
           } catch (toolErr: any) {

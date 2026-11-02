@@ -18,18 +18,25 @@ export function useWebSocket(baseUrl: string, organizationId: string) {
   let statusChangeCallback: ((status: string, payload: any) => void) | null = null;
   let toolCallCallback: ((call: PageToolCall) => void) | null = null;
 
-  const connect = (token?: string) => {
-    const wsUrl = new URL("/ws", baseUrl.replace("http", "ws"));
+  // The identify proof is signed for the socket endpoint itself (no query).
+  const socketUrl = new URL("/ws", baseUrl.replace("http", "ws")).toString();
+  // The last identify, replayed with a fresh proof when the socket reconnects.
+  let identity: {
+    conversationId: string;
+    createProof: IdentifyProofFactory;
+    tools?: PageToolDescriptor[];
+  } | null = null;
+
+  const connect = () => {
+    const wsUrl = new URL(socketUrl);
     wsUrl.searchParams.set("org", organizationId);
-    if (token) {
-      wsUrl.searchParams.set("token", token);
-    }
 
     ws.value = new WebSocket(wsUrl.toString());
 
     ws.value.onopen = () => {
       isConnected.value = true;
       reconnectAttempts = 0;
+      if (identity) void sendIdentify();
     };
 
     ws.value.onmessage = (event) => {
@@ -146,25 +153,44 @@ export function useWebSocket(baseUrl: string, organizationId: string) {
     insertMessage(messages.value, message);
   };
 
-  const identify = (
-    customerId: string,
-    existingConversationId?: string,
+  /**
+   * Attach the socket to a conversation. The server only streams a
+   * conversation to a socket that proves it holds the conversation's DPoP key,
+   * so `createProof` signs a proof for the socket URL.
+   */
+  const identify = async (
+    existingConversationId: string,
+    createProof: IdentifyProofFactory,
     tools?: PageToolDescriptor[],
   ) => {
-    if (!ws.value || ws.value.readyState !== WebSocket.OPEN) {
+    identity = { conversationId: existingConversationId, createProof, tools };
+    await sendIdentify();
+  };
+
+  const sendIdentify = async () => {
+    if (!identity) return;
+    const socket = ws.value;
+    if (!socket || socket.readyState !== WebSocket.OPEN) {
       console.error("[Webchat] WebSocket not connected");
       return;
     }
 
-    ws.value.send(
+    const { conversationId: convId, createProof, tools } = identity;
+    let proof: string;
+    try {
+      proof = await createProof(socketUrl);
+    } catch (error) {
+      console.error("[Webchat] Could not sign the socket identify:", error);
+      return;
+    }
+    if (socket.readyState !== WebSocket.OPEN) return;
+
+    socket.send(
       JSON.stringify({
         type: "identify",
-        customerId,
-        conversationId: existingConversationId,
-        metadata: {
-          userAgent: navigator.userAgent,
-          timestamp: Date.now(),
-        },
+        conversationId: convId,
+        proof,
+        url: socketUrl,
         // Page tools (WebMCP) the host page registered, if any.
         ...(tools && tools.length > 0 ? { tools } : {}),
       }),
@@ -173,6 +199,7 @@ export function useWebSocket(baseUrl: string, organizationId: string) {
 
   /** The page's tool list changed after identify: send the whole list again. */
   const sendTools = (tools: PageToolDescriptor[]) => {
+    if (identity) identity.tools = tools;
     if (!ws.value || ws.value.readyState !== WebSocket.OPEN) return;
     ws.value.send(JSON.stringify({ type: "register_tools", tools }));
   };
@@ -204,6 +231,7 @@ export function useWebSocket(baseUrl: string, organizationId: string) {
   };
 
   const disconnect = () => {
+    identity = null;
     if (reconnectTimeout) {
       clearTimeout(reconnectTimeout);
       reconnectTimeout = null;
@@ -237,6 +265,9 @@ export function useWebSocket(baseUrl: string, organizationId: string) {
     disconnect,
   };
 }
+
+/** Signs a DPoP proof (method GET) for the given socket URL. */
+export type IdentifyProofFactory = (url: string) => Promise<string>;
 
 /** A `tool_call` frame: the AI asked for page tool `name` with `args`. */
 export interface PageToolCall {

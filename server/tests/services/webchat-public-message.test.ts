@@ -59,7 +59,7 @@ describe("toPublicMessage", () => {
   } as unknown as Message;
 
   it("never sends reasoning or replaced answers to the widget", () => {
-    const result = toPublicMessage(message, { isPlayground: false });
+    const result = toPublicMessage(message);
     expect(result).toEqual({
       id: "m1",
       content: "Hi",
@@ -71,10 +71,6 @@ describe("toPublicMessage", () => {
       metadata: { isClosureMessage: true, productRecommendation: { products: [{ id: "p1" }] } },
     });
     expect(JSON.stringify(result)).not.toContain("replaced low-confidence");
-  });
-
-  it("keeps full metadata for playground (staff demo) conversations", () => {
-    expect(toPublicMessage(message, { isPlayground: true }).metadata).toBe(internalMetadata);
   });
 });
 
@@ -119,7 +115,7 @@ describe("agent join/leave notices", () => {
       metadata: takeoverMetadata,
     } as unknown as Message;
 
-    const result = toPublicMessage(message, { isPlayground: false });
+    const result = toPublicMessage(message);
     expect(result.content).toBe("");
     expect(JSON.stringify(result)).not.toContain("Souza");
 

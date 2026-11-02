@@ -17,6 +17,12 @@
  * tool error; core then holds the call for a person, and an approved retry
  * reaches the tool with the `approvalArg` argument filled in by core.
  *
+ * A read tool that returns a customer's personal data (a profile, an order
+ * history) says so with `customerData: [name]`. That sets
+ * _meta["chat.hay/customerData"] = true: core runs it only for a verified
+ * customer and passes that identity with the call (see ../identity); the tool
+ * returns only that customer's records.
+ *
  * A tool the plugin does not classify gets no annotations, and core treats it
  * as an unknown write (the safe default).
  *
@@ -26,6 +32,7 @@
 
 const CATEGORY_META_KEY = "chat.hay/category";
 const CAP_ENFORCED_META_KEY = "chat.hay/capEnforced";
+const CUSTOMER_DATA_META_KEY = "chat.hay/customerData";
 /**
  * Argument a capped tool declares (optional string) to learn that a person
  * approved this exact call. Core always overwrites it: empty on normal calls,
@@ -63,11 +70,13 @@ function isWriteCategory(category) {
  * mention it.
  *
  * @param {string} name
- * @param {{ read?: string[], write?: Record<string, string>, capped?: string[] }} spec
+ * @param {{ read?: string[], write?: Record<string, string>, capped?: string[], customerData?: string[] }} spec
  */
 function riskFor(name, spec) {
   if ((spec.read || []).includes(name)) {
-    return { annotations: { readOnlyHint: true, destructiveHint: false } };
+    const risk = { annotations: { readOnlyHint: true, destructiveHint: false } };
+    if ((spec.customerData || []).includes(name)) risk._meta = { [CUSTOMER_DATA_META_KEY]: true };
+    return risk;
   }
   const write = spec.write || {};
   const category = Object.prototype.hasOwnProperty.call(write, name) ? write[name] : undefined;
@@ -85,18 +94,22 @@ function riskFor(name, spec) {
 
 /**
  * Check a risk spec once, where the plugin declares it, so a typo fails loudly
- * at startup instead of leaving a tool unclassified. `read`, `write` and
- * `capped` are all optional. Returns the spec with all three present.
+ * at startup instead of leaving a tool unclassified. `read`, `write`,
+ * `capped` and `customerData` are all optional. Returns the spec with all
+ * four present.
  *
- * @param {{ read?: string[], write?: Record<string, string>, capped?: string[] } | undefined} spec
- * @returns {{ read: string[], write: Record<string, string>, capped: string[] }}
+ * @param {{ read?: string[], write?: Record<string, string>, capped?: string[], customerData?: string[] } | undefined} spec
+ * @returns {{ read: string[], write: Record<string, string>, capped: string[], customerData: string[] }}
  */
 function normalizeToolRiskSpec(spec) {
-  if (spec === undefined || spec === null) return { read: [], write: {}, capped: [] };
+  if (spec === undefined || spec === null) {
+    return { read: [], write: {}, capped: [], customerData: [] };
+  }
   if (typeof spec !== "object") throw new Error("toolRisk must be an object");
   const read = spec.read ?? [];
   const write = spec.write ?? {};
   const capped = spec.capped ?? [];
+  const customerData = spec.customerData ?? [];
   if (!Array.isArray(read) || read.some((name) => typeof name !== "string")) {
     throw new Error("toolRisk.read must be an array of tool names");
   }
@@ -120,7 +133,15 @@ function normalizeToolRiskSpec(spec) {
       throw new Error(`Capped tool ${name} must also be declared in toolRisk.write`);
     }
   }
-  return { read, write, capped };
+  if (!Array.isArray(customerData) || customerData.some((name) => typeof name !== "string")) {
+    throw new Error("toolRisk.customerData must be an array of tool names");
+  }
+  for (const name of customerData) {
+    if (!read.includes(name)) {
+      throw new Error(`Customer-data tool ${name} must also be declared in toolRisk.read`);
+    }
+  }
+  return { read, write, capped, customerData };
 }
 
 /**
@@ -133,7 +154,7 @@ function normalizeToolRiskSpec(spec) {
  *
  * @template {{ name: string, annotations?: object, _meta?: object }} T
  * @param {T[]} tools
- * @param {{ read?: string[], write?: Record<string, string>, capped?: string[] } | undefined} spec
+ * @param {{ read?: string[], write?: Record<string, string>, capped?: string[], customerData?: string[] } | undefined} spec
  * @returns {T[]}
  */
 function withToolRisk(tools, spec) {
@@ -155,7 +176,7 @@ function withToolRisk(tools, spec) {
  *
  * @template T
  * @param {T} server an McpServer
- * @param {{ read?: string[], write?: Record<string, string>, capped?: string[] }} spec
+ * @param {{ read?: string[], write?: Record<string, string>, capped?: string[], customerData?: string[] }} spec
  * @returns {T}
  */
 function applyToolRisk(server, spec) {
@@ -192,6 +213,7 @@ function applyToolRisk(server, spec) {
 module.exports = {
   CATEGORY_META_KEY,
   CAP_ENFORCED_META_KEY,
+  CUSTOMER_DATA_META_KEY,
   APPROVAL_ARG,
   WRITE_CATEGORIES,
   riskFor,

@@ -6,6 +6,7 @@
 
 const { z } = require("zod");
 const { magentoApi, searchCriteria } = require("../lib/client");
+const { callerIdentity, verifiedEmail } = require("@hay/plugin-sdk/identity");
 const { ok, fail } = require("../lib/format");
 const { listOrdersByEmail, summarizeOrder } = require("../lib/orders");
 
@@ -16,9 +17,10 @@ function registerCustomerTools(server) {
       "customer with their 5 most recent orders (recentOrders, with ids and numbers) so the next " +
       "step needs no extra lookup. found=false when nothing matches.",
     { email: z.string().describe("Email address used at checkout.") },
-    async ({ email }) => {
+    async ({ email: asked }, extra) => {
       try {
-        const needle = email.trim();
+        // Customer data: only the verified customer's own (see @hay/plugin-sdk/identity).
+        const needle = verifiedEmail(callerIdentity(extra), asked.trim());
         if (!needle) throw new Error("Provide the customer's email address.");
         const [accounts, orders] = await Promise.all([
           magentoApi("GET", "/customers/search", {
@@ -60,8 +62,9 @@ function registerCustomerTools(server) {
       limit: z.number().int().optional().describe("Orders per page (default 10, max 100)."),
       page: z.number().int().optional().describe("Page number (default 1)."),
     },
-    async ({ email, limit, page }) => {
+    async ({ email: asked, limit, page }, extra) => {
       try {
+        const email = verifiedEmail(callerIdentity(extra), asked.trim());
         const pageSize = Math.min(limit ?? 10, 100);
         const { items, total } = await listOrdersByEmail(email.trim(), {
           pageSize,

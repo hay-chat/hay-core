@@ -1,6 +1,6 @@
 {
   "name": "@hay/webchat",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "description": "Hay Webchat Widget - Vue 3 chat widget for customer support",
   "type": "module",
   "scripts": {
@@ -15,15 +15,15 @@
     "perf:lighthouse": "node scripts/perf/lighthouse.mjs"
   },
   "dependencies": {
-    "vue": "^3.4.21"
+    "vue": "^3.5.44"
   },
   "devDependencies": {
-    "@vitejs/plugin-vue": "^5.0.4",
+    "@vitejs/plugin-vue": "^6.0.10",
     "@vue/test-utils": "^2.5.1",
-    "@vue/tsconfig": "^0.5.1",
-    "fake-indexeddb": "^6.0.0",
+    "@vue/tsconfig": "^0.9.1",
+    "fake-indexeddb": "^6.2.7",
     "jsdom": "^24.0.0",
-    "terser": "^5.44.1",
+    "terser": "^5.51.2",
     "typescript": "^5.4.2",
     "vite": "^5.1.6",
     "vitest": "^1.6.0",

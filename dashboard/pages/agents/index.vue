@@ -321,6 +321,7 @@
 </template>
 
 <script setup lang="ts">
+import { logger } from "@/utils/logger";
 import {
   Plus,
   RefreshCw,
@@ -570,7 +571,7 @@ const deleteAgent = (agent: AgentData) => {
 const bulkToggleStatus = async () => {
   try {
     // TODO: Bulk toggle status for selected agents
-    console.log("Bulk toggle status for:", selectedAgents.value);
+    logger.debug("Bulk toggle status for:", selectedAgents.value);
 
     // TODO: Show success notification
     selectedAgents.value = [];
@@ -617,7 +618,7 @@ const performSingleDelete = async () => {
         agents.value.splice(index, 1);
       }
 
-      console.log("Agent deleted successfully");
+      logger.debug("Agent deleted successfully");
 
       toast.success(t("agents.toast.deletedSuccess"));
     }

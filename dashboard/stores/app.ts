@@ -206,7 +206,10 @@ export const useAppStore = defineStore("app", {
       this.pluginAdvancedMode = { ...this.pluginAdvancedMode, [userId]: on };
     },
   },
-  persist: true,
+  persist: {
+    // Preferences only: counts and the plugin list are refetched each load.
+    pick: ["rowsPerPage", "onboardingCompleted", "pluginAdvancedMode"],
+  },
 });
 
 export type AppStore = ReturnType<typeof useAppStore>;

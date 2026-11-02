@@ -61,4 +61,22 @@ function assertNoUserErrors(payload, field = "userErrors") {
   }
 }
 
-module.exports = { ok, fail, toolError, unwrapConnection, pageInfo, toGid, assertNoUserErrors };
+/**
+ * One `field:"value"` term of a Shopify search query, with the value quoted so
+ * quotes, spaces, `OR` or `field:` inside it stay part of the value.
+ */
+function searchTerm(field, value) {
+  const escaped = String(value).replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+  return `${field}:"${escaped}"`;
+}
+
+module.exports = {
+  ok,
+  fail,
+  toolError,
+  unwrapConnection,
+  pageInfo,
+  toGid,
+  assertNoUserErrors,
+  searchTerm,
+};

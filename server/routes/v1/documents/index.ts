@@ -18,6 +18,15 @@ import { createListProcedure } from "@server/trpc/procedures/list";
 import { documentRetryService } from "@server/services/document-retry.service";
 import { storageService } from "@server/services/storage.service";
 import { MediaRejectedError } from "@server/services/media-sanitizer.service";
+import {
+  DOCUMENT_IMAGES_FOLDER,
+  signDocumentImageUrls,
+  signDocumentImageUrlsInJson,
+  signMediaUrl,
+  DOCUMENT_IMAGE_SIGNED_URL_TTL_SECONDS,
+  stripMediaSignatures,
+  stripMediaSignaturesInJson,
+} from "@server/services/media-url.service";
 import { config } from "@server/config/env";
 import { AppDataSource } from "@server/database/data-source";
 import { createLogger } from "@server/lib/logger";
@@ -34,7 +43,7 @@ import { TRPCError } from "@trpc/server";
 const logger = createLogger("documents");
 
 export const documentsRouter = t.router({
-  list: createListProcedure(documentListInputSchema, documentRepository),
+  list: createListProcedure(RESOURCES.DOCUMENTS, documentListInputSchema, documentRepository),
   getById: scopedProcedure(RESOURCES.DOCUMENTS, ACTIONS.READ)
     .input(
       z.object({
@@ -42,9 +51,12 @@ export const documentsRouter = t.router({
       }),
     )
     .query(async ({ ctx, input }) => {
-      const document = await documentRepository.findById(input.id);
+      const document = await documentRepository.findByIdAndOrganization(
+        input.id,
+        ctx.organizationId!,
+      );
 
-      if (!document || document.organizationId !== ctx.organizationId) {
+      if (!document) {
         throw new Error("Document not found");
       }
 
@@ -52,8 +64,13 @@ export const documentsRouter = t.router({
         id: document.id,
         title: document.title,
         description: document.description,
-        content: document.content,
-        contentJson: document.contentJson,
+        content: document.content
+          ? await signDocumentImageUrls(document.content, document.organizationId)
+          : document.content,
+        contentJson: await signDocumentImageUrlsInJson(
+          document.contentJson,
+          document.organizationId,
+        ),
         type: document.type,
         status: document.status,
         visibility: document.visibility,
@@ -154,8 +171,12 @@ export const documentsRouter = t.router({
 
       // Fetch full document details for all matched documents
       const documents = (
-        await Promise.all(rankedDocIds.map(({ docId }) => documentRepository.findById(docId)))
-      ).filter((doc) => doc && doc.organizationId === organizationId);
+        await Promise.all(
+          rankedDocIds.map(({ docId }) =>
+            documentRepository.findByIdAndOrganization(docId, organizationId),
+          ),
+        )
+      ).filter((doc) => doc !== null);
 
       // Return documents in ranked order, skipping any not found
       const results = [];
@@ -202,13 +223,14 @@ export const documentsRouter = t.router({
       let processedContent = input.content;
       let metadata: Record<string, unknown> = {};
       let attachments:
-        | Array<{ type: string; url: string; name: string; size?: number }>
-        | undefined;
+        Array<{ type: string; url: string; name: string; size?: number }> | undefined;
 
       // Editor documents are rendered as HTML, so their content is always sanitized
       const isEditorAuthored = !!input.contentJson;
       if (isEditorAuthored) {
-        processedContent = sanitizeEditorHtml(input.contentHtml ?? input.content);
+        processedContent = stripMediaSignatures(
+          sanitizeEditorHtml(input.contentHtml ?? input.content),
+        );
       }
 
       // Process file if provided
@@ -264,7 +286,7 @@ export const documentsRouter = t.router({
       const document = await documentRepository.create({
         title: sanitizeContent(input.title),
         content: sanitizedContent,
-        contentJson: input.contentJson,
+        contentJson: stripMediaSignaturesInJson(input.contentJson),
         type: input.type || DocumentationType.ARTICLE,
         status: input.status || DocumentationStatus.DRAFT,
         visibility: input.visibility || DocumentVisibility.PRIVATE,
@@ -324,8 +346,11 @@ export const documentsRouter = t.router({
     )
     .mutation(async ({ ctx, input }) => {
       // Find existing document
-      const document = await documentRepository.findById(input.id);
-      if (!document || document.organizationId !== ctx.organizationId) {
+      const document = await documentRepository.findByIdAndOrganization(
+        input.id,
+        ctx.organizationId!,
+      );
+      if (!document) {
         throw new Error("Document not found");
       }
 
@@ -333,13 +358,14 @@ export const documentsRouter = t.router({
       const html =
         input.contentHtml ??
         (document.importMethod === ImportMethod.EDITOR ? input.content : undefined);
-      const nextContent = html !== undefined ? sanitizeEditorHtml(html) : input.content;
+      const nextContent =
+        html !== undefined ? stripMediaSignatures(sanitizeEditorHtml(html)) : input.content;
 
       // Update document
       const updatedDocument = await documentRepository.update(document.id, ctx.organizationId!, {
         ...(input.title && { title: input.title }),
         ...(nextContent !== undefined && { content: nextContent }),
-        ...(input.contentJson && { contentJson: input.contentJson }),
+        ...(input.contentJson && { contentJson: stripMediaSignaturesInJson(input.contentJson) }),
         ...(input.status && { status: input.status }),
       });
 
@@ -445,8 +471,11 @@ export const documentsRouter = t.router({
     )
     .mutation(async ({ ctx, input }) => {
       // Find existing document
-      const document = await documentRepository.findById(input.id);
-      if (!document || document.organizationId !== ctx.organizationId) {
+      const document = await documentRepository.findByIdAndOrganization(
+        input.id,
+        ctx.organizationId!,
+      );
+      if (!document) {
         throw new Error("Document not found");
       }
 
@@ -494,12 +523,13 @@ export const documentsRouter = t.router({
           buffer,
           originalName: input.fileName,
           mimeType: input.mimeType,
-          folder: "document-images",
+          folder: DOCUMENT_IMAGES_FOLDER,
           organizationId: ctx.organizationId,
           uploadedById: ctx.user.id,
           maxSize,
         });
-        return { url: result.url };
+        // Signed so the editor can show it; stripped back to the stable URL on save.
+        return { url: signMediaUrl(result.upload.id, DOCUMENT_IMAGE_SIGNED_URL_TTL_SECONDS) };
       } catch (error) {
         if (error instanceof MediaRejectedError) {
           throw new TRPCError({ code: "BAD_REQUEST", message: error.message });
@@ -524,8 +554,11 @@ export const documentsRouter = t.router({
 
       // If documentId is provided, regenerate for single document
       if (input.documentId) {
-        const document = await documentRepository.findById(input.documentId);
-        if (!document || document.organizationId !== ctx.organizationId) {
+        const document = await documentRepository.findByIdAndOrganization(
+          input.documentId,
+          ctx.organizationId!,
+        );
+        if (!document) {
           throw new Error("Document not found");
         }
 
@@ -719,9 +752,12 @@ export const documentsRouter = t.router({
       }),
     )
     .query(async ({ ctx, input }) => {
-      const document = await documentRepository.findById(input.documentId);
+      const document = await documentRepository.findByIdAndOrganization(
+        input.documentId,
+        ctx.organizationId!,
+      );
 
-      if (!document || document.organizationId !== ctx.organizationId) {
+      if (!document) {
         throw new Error("Document not found");
       }
 

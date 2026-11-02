@@ -50,6 +50,7 @@ import {
 import { UserOrganization } from "@server/entities/user-organization.entity";
 import { User } from "@server/entities/user.entity";
 import { RESOURCES, ACTIONS } from "@server/types/scopes";
+import { assertCanGrantMembership } from "@server/lib/auth/membership-grants";
 import {
   loosensActionApproval,
   moneyApprovalSwitchedOff,
@@ -60,6 +61,11 @@ import { handleUpload } from "@server/lib/upload-helper";
 import { StorageService } from "@server/services/storage.service";
 import { createLogger } from "@server/lib/logger";
 import { notifyOperator } from "@server/services/operator-events.service";
+import {
+  ConfidenceGuardrailService,
+  ESCALATION_OFF_CONFIRMATION,
+  confidenceGuardrailLoosening,
+} from "@server/services/core/confidence-guardrail.service";
 
 const logger = createLogger("organizations");
 
@@ -89,6 +95,8 @@ const confidenceGuardrailSchema = z.object({
       similarityThreshold: z.number().min(0).max(1).optional(),
     })
     .optional(),
+  /** Required when the change switches human escalation off (typed confirm). */
+  confirmSwitchOff: z.literal(ESCALATION_OFF_CONFIRMATION).optional(),
 });
 
 const tierModelSchema = z.object({
@@ -117,7 +125,7 @@ const actionApprovalSchema = z
     moneyMovesNeedApproval: z.boolean(),
     thresholdAmount: z.number().min(0).max(1_000_000),
     approverRoles: z.array(z.enum(["admin", "contributor", "member"])).max(3),
-    categories: z.record(z.enum(APPROVAL_CATEGORIES), z.boolean()),
+    categories: z.partialRecord(z.enum(APPROVAL_CATEGORIES), z.boolean()),
     customerConfirmation: z.boolean(),
     /** Required when the change switches approval off for a money move (typed confirm). */
     confirmSwitchOff: z.literal(SWITCH_OFF_CONFIRMATION),
@@ -131,9 +139,31 @@ const channelIdSchema = z
   .max(64)
   .regex(/^[a-z0-9][a-z0-9_-]*$/i);
 
+/** "shop.com" → "https://shop.com"; empty clears it. */
+const websiteSchema = z
+  .string()
+  .trim()
+  .max(255)
+  .transform((value, ctx) => {
+    if (!value) return null;
+    const withScheme = /^https?:\/\//i.test(value) ? value : `https://${value}`;
+    try {
+      const url = new URL(withScheme);
+      if (!url.hostname.includes(".")) throw new Error("no domain");
+      return url.origin + url.pathname.replace(/\/+$/, "");
+    } catch {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Enter a website address like shop.com",
+      });
+      return z.NEVER;
+    }
+  });
+
 const updateSettingsSchema = z.object({
   name: z.string().min(1).max(100).optional(),
   about: z.string().max(10000).optional(),
+  website: websiteSchema.nullable().optional(),
   defaultLanguage: z.nativeEnum(SupportedLanguage).optional(),
   dateFormat: z.nativeEnum(DateFormat).optional(),
   timeFormat: z.nativeEnum(TimeFormat).optional(),
@@ -281,6 +311,7 @@ export const organizationsRouter = t.router({
       return {
         name: organization.name,
         about: organization.about || "",
+        website: organization.website || "",
         defaultLanguage: organization.defaultLanguage,
         dateFormat: organization.dateFormat,
         timeFormat: organization.timeFormat,
@@ -657,7 +688,7 @@ export const organizationsRouter = t.router({
       // Extract settings fields from input as they go into the settings JSONB field
       const {
         testModeDefault,
-        confidenceGuardrail,
+        confidenceGuardrail: confidenceInput,
         retentionDays,
         actionApproval: approvalInput,
         ...topLevelFields
@@ -695,6 +726,27 @@ export const organizationsRouter = t.router({
         });
       }
 
+      // Weakening the fact-grounding guardrail is owner-only like loosening
+      // approval, and switching escalation off needs the typed confirm.
+      const { confirmSwitchOff: confirmEscalationOff, ...confidenceGuardrail } =
+        confidenceInput ?? {};
+      const confidenceLoosening = confidenceGuardrailLoosening(
+        ConfidenceGuardrailService.mergeConfig(organization.settings as Record<string, unknown>),
+        confidenceGuardrail,
+      );
+      if (confidenceLoosening.loosened && ctx.user?.getRole() !== "owner") {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "Only the organization owner can switch escalation off or lower the threshold",
+        });
+      }
+      if (confidenceLoosening.escalationOff && !confirmEscalationOff) {
+        throw new TRPCError({
+          code: "PRECONDITION_FAILED",
+          message: "Switching human escalation off needs the typed confirmation",
+        });
+      }
+
       // Prepare update payload
       const updatePayload: DeepPartial<Organization> = {
         ...topLevelFields,
@@ -703,7 +755,7 @@ export const organizationsRouter = t.router({
       // Handle settings JSONB field updates
       if (
         testModeDefault !== undefined ||
-        confidenceGuardrail !== undefined ||
+        confidenceInput !== undefined ||
         retentionDays !== undefined ||
         approvalChanged
       ) {
@@ -715,7 +767,7 @@ export const organizationsRouter = t.router({
           updatePayload.settings.testModeDefault = testModeDefault;
         }
 
-        if (confidenceGuardrail !== undefined) {
+        if (confidenceInput !== undefined) {
           updatePayload.settings.confidenceGuardrail = {
             ...(organization.settings?.confidenceGuardrail || {}),
             ...confidenceGuardrail,
@@ -740,6 +792,21 @@ export const organizationsRouter = t.router({
 
       const updatedOrg = await organizationService.update(ctx.organizationId!, updatePayload);
 
+      // A new website means a new page index for find_page_url and the link check.
+      if (input.website !== undefined && input.website !== (organization.website ?? null)) {
+        const organizationId = ctx.organizationId!;
+        void import("@server/services/site-index.service").then(({ siteIndexService }) =>
+          siteIndexService
+            .sync(organizationId)
+            .catch((error) =>
+              logger.error(
+                { error, organizationId },
+                "Site index sync after a website change failed",
+              ),
+            ),
+        );
+      }
+
       // Drop any cached LLM provider bundle so settings changes take effect immediately.
       llmProviderFactory.invalidate(ctx.organizationId!);
 
@@ -749,6 +816,7 @@ export const organizationsRouter = t.router({
         data: {
           name: updatedOrg.name,
           about: updatedOrg.about,
+          website: updatedOrg.website || "",
           defaultLanguage: updatedOrg.defaultLanguage,
           dateFormat: updatedOrg.dateFormat,
           timeFormat: updatedOrg.timeFormat,
@@ -952,6 +1020,12 @@ export const organizationsRouter = t.router({
         // Store old role for audit log
         const oldRole = userOrg.role;
 
+        assertCanGrantMembership(ctx.user, {
+          role: input.role,
+          permissions: input.permissions,
+          currentRole: oldRole,
+        });
+
         // Prevent demoting last owner
         if (oldRole === "owner" && input.role !== "owner") {
           const ownerCount = await getOwnerCount(ctx.organizationId!);
@@ -1031,6 +1105,9 @@ export const organizationsRouter = t.router({
           message: "Member not found in this organization",
         });
       }
+
+      // Only an owner may remove an owner
+      assertCanGrantMembership(ctx.user, { currentRole: userOrg.role });
 
       // Prevent removing last owner
       if (userOrg.role === "owner") {
@@ -1186,7 +1263,10 @@ export const organizationsRouter = t.router({
       });
     }
 
-    await organizationService.deleteWithData(organization);
+    await organizationService.deleteWithData(organization, {
+      userId: ctx.user!.id,
+      source: "owner",
+    });
     logger.info({ orgId: organization.id, userId: ctx.user!.id }, "Organization deleted by owner");
     // A hosted operator stops billing for the deleted workspace (D15-11).
     await notifyOperator({

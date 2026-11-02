@@ -150,7 +150,7 @@ export class AuthSessionService {
       if (session.expiresAt.getTime() <= now.getTime()) return { rejected: "expired" };
 
       const user = await manager.getRepository(User).findOne({ where: { id: session.userId } });
-      if (!user || !user.isActive) {
+      if (!user || !user.isActive || !user.emailVerified) {
         return { rejected: "revoked" };
       }
       if ((user.tokenVersion ?? 0) !== session.tokenVersion) {
@@ -216,7 +216,7 @@ export class AuthSessionService {
     const user = await AppDataSource.getRepository(User).findOne({
       where: { id: payload.userId },
     });
-    if (!user || !user.isActive) throw new RefreshRejectedError("revoked");
+    if (!user || !user.isActive || !user.emailVerified) throw new RefreshRejectedError("revoked");
     if (payload.tokenVersion !== undefined && payload.tokenVersion !== (user.tokenVersion ?? 0)) {
       throw new RefreshRejectedError("revoked");
     }

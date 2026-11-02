@@ -139,14 +139,6 @@ export interface AppRouter {
         success: boolean;
       };
     };
-    deactivateUser: {
-      input: {
-        userId: string;
-      };
-      output: {
-        success: boolean;
-      };
-    };
   };
   documents: {
     list: {

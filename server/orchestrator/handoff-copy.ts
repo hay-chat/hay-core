@@ -23,7 +23,9 @@ export type HandoffCopyKey =
   /** The AI is paused (owner, operator or agent off): sent once per conversation (D11-9). */
   | "pausedTeamWillReply"
   /** The organization is locked (billing or admin): sent once per conversation on non-web channels (D15-4). */
-  | "suspendedHoldingReply";
+  | "suspendedHoldingReply"
+  /** The planner gave no usable reply after its retries. */
+  | "planningFallback";
 
 type CopyLanguage = "en" | "pt" | "es";
 
@@ -48,6 +50,7 @@ const HANDOFF_COPY: Record<CopyLanguage, Record<HandoffCopyKey, string>> = {
       "I've asked the team to approve this. It hasn't been done yet, and you'll get their answer here in this chat.",
     pausedTeamWillReply: "Thanks for your message. Our team will reply to you here in this chat.",
     suspendedHoldingReply: "Thanks for your message. We've received it.",
+    planningFallback: "I'm here to help! How can I assist you today?",
   },
   pt: {
     handoffQueued: "Encaminhei sua mensagem para a equipe. Eles vão te responder aqui neste chat.",
@@ -62,6 +65,7 @@ const HANDOFF_COPY: Record<CopyLanguage, Record<HandoffCopyKey, string>> = {
     pausedTeamWillReply:
       "Obrigado pela sua mensagem. Nossa equipe vai te responder aqui neste chat.",
     suspendedHoldingReply: "Obrigado pela sua mensagem. Nós a recebemos.",
+    planningFallback: "Estou aqui para ajudar! Como posso te ajudar hoje?",
   },
   es: {
     handoffQueued: "Le pasé tu mensaje al equipo. Te responderán aquí, en este chat.",
@@ -75,6 +79,7 @@ const HANDOFF_COPY: Record<CopyLanguage, Record<HandoffCopyKey, string>> = {
       "Le pedí al equipo que lo apruebe. Todavía no está hecho y recibirás su respuesta aquí, en este chat.",
     pausedTeamWillReply: "Gracias por tu mensaje. Nuestro equipo te responderá aquí, en este chat.",
     suspendedHoldingReply: "Gracias por tu mensaje. Lo hemos recibido.",
+    planningFallback: "¡Estoy aquí para ayudarte! ¿En qué puedo ayudarte hoy?",
   },
 };
 

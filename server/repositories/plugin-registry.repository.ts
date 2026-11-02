@@ -29,6 +29,28 @@ function toUpdatePayload(fields: DeepPartial<PluginRegistry>): PluginRegistryUpd
   return fields as PluginRegistryUpdate;
 }
 
+/** Thrown when a plugin id is already registered by a different owner. */
+export class PluginIdConflictError extends Error {
+  constructor(pluginId: string) {
+    super(`Plugin id "${pluginId}" is already registered by another source`);
+    this.name = "PluginIdConflictError";
+  }
+}
+
+/**
+ * Whether `incoming` would be written by the same owner as `existing`: both
+ * core, or both non-core (custom and git are the same tenant-owned kind, since
+ * filesystem re-discovery reports git plugins as custom) in the same org.
+ */
+function isSameOwner(existing: PluginRegistry, incoming: Partial<PluginRegistry>): boolean {
+  const existingIsCore = existing.sourceType === "core";
+  const incomingIsCore = (incoming.sourceType ?? "core") === "core";
+  if (existingIsCore || incomingIsCore) {
+    return existingIsCore && incomingIsCore;
+  }
+  return (existing.organizationId ?? null) === (incoming.organizationId ?? null);
+}
+
 export class PluginRegistryRepository extends BaseRepository<PluginRegistry> {
   constructor() {
     super(PluginRegistry);
@@ -83,6 +105,13 @@ export class PluginRegistryRepository extends BaseRepository<PluginRegistry> {
     const existing = await this.findByPluginId(plugin.pluginId!);
 
     if (existing) {
+      // A registry row belongs to whoever registered it first: core rows to the
+      // platform, custom/git rows to one organization. Re-registration may
+      // refresh the row's files and manifest but never move it across owners.
+      if (!isSameOwner(existing, plugin)) {
+        throw new PluginIdConflictError(plugin.pluginId!);
+      }
+
       // Preserve sourceType — it's set at installation time and shouldn't be
       // overwritten by filesystem re-discovery (which always passes "custom"
       // for plugins under the custom/ directory, even if they're git-sourced)

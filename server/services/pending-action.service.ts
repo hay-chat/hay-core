@@ -18,16 +18,48 @@ import {
   type GraduationSuggestion,
 } from "@server/services/core/approval-graduation";
 import { Conversation } from "@server/database/entities/conversation.entity";
-import { amountEditable, extractCurrency } from "@server/services/core/action-policy";
+import {
+  amountEditable,
+  extractAmount,
+  extractCurrency,
+} from "@server/services/core/action-policy";
 
 const logger = createLogger("pending-action");
 
+/** Top-level args that name what a call acts on (order_id, orderId, id, name, number, ...). */
+const TARGET_ARG = /^(id|name|number)$|_(id|name|number)$|[a-z](Id|Name|Number)$/;
+
+function canonical(value: unknown): string {
+  if (Array.isArray(value)) return `[${value.map(canonical).join(",")}]`;
+  if (value && typeof value === "object") {
+    const entries = Object.entries(value as Record<string, unknown>)
+      .filter(([, v]) => v !== undefined)
+      .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
+    return `{${entries.map(([k, v]) => `${JSON.stringify(k)}:${canonical(v)}`).join(",")}}`;
+  }
+  return JSON.stringify(typeof value === "string" ? value.trim().toLowerCase() : value) ?? "null";
+}
+
+/**
+ * What makes two calls of one tool the same request: the records they act on
+ * and the money amount, not the wording around them (a reworded reason or
+ * note is still the same refund). A call with neither ids nor an amount falls
+ * back to all of its args.
+ */
+export function requestKey(args: Record<string, unknown>): string {
+  const targets = Object.fromEntries(
+    Object.entries(args).filter(
+      ([key, value]) =>
+        TARGET_ARG.test(key) && (typeof value === "string" || typeof value === "number"),
+    ),
+  );
+  const amount = extractAmount(args);
+  if (Object.keys(targets).length === 0 && amount === null) return canonical(args);
+  return canonical({ targets, amount });
+}
+
 export type PendingActionEvent =
-  | "action_requested"
-  | "action_approved"
-  | "action_rejected"
-  | "action_executed"
-  | "action_expired";
+  "action_requested" | "action_approved" | "action_rejected" | "action_executed" | "action_expired";
 
 export interface HoldInput {
   organizationId: string;
@@ -215,17 +247,18 @@ export class PendingActionService {
   }
 
   /**
-   * The latest request in this conversation for the same tool with the same
-   * args that is still waiting or was turned down, if any. Lets the gate
-   * answer a repeated call without opening a second request. A request handed
-   * to the team ("I'll reply myself") was not declined, so it does not count.
+   * The latest request in this conversation for the same tool and the same
+   * request (see requestKey) that is still waiting or was turned down, if
+   * any. Lets the gate answer a repeated call without opening a second
+   * request. A request handed to the team ("I'll reply myself") was not
+   * declined, so it does not count.
    */
   async findEarlierRequest(
     conversationId: string,
     toolName: string,
     args: Record<string, unknown>,
   ): Promise<PendingAction | null> {
-    return this.repo
+    const candidates = await this.repo
       .createQueryBuilder("pa")
       .where("pa.conversation_id = :conversationId", { conversationId })
       .andWhere("pa.tool_name = :toolName", { toolName })
@@ -233,9 +266,10 @@ export class PendingActionService {
       .andWhere("pa.decision_note IS DISTINCT FROM :handledByTeam", {
         handledByTeam: HANDLED_BY_TEAM_NOTE,
       })
-      .andWhere("pa.args = CAST(:args AS jsonb)", { args: JSON.stringify(args) })
       .orderBy("pa.created_at", "DESC")
-      .getOne();
+      .getMany();
+    const key = requestKey(args);
+    return candidates.find((candidate) => requestKey(candidate.args) === key) ?? null;
   }
 
   /**

@@ -50,7 +50,7 @@
     "body": "We received a request to reset the password for your {{ companyName }} account associated with",
     "clickToReset": "If you made this request, click the button below to reset your password:",
     "resetPassword": "Reset Password",
-    "expirationWarning": "This password reset link will expire in {{ expirationHours }} hours for security reasons.",
+    "expirationWarning": "This password reset link will expire in 1 hour for security reasons.",
     "important": "Important",
     "didntRequest": "Didn't request this?",
     "ignoreEmail": "If you didn't request a password reset, please ignore this email. Your password will remain unchanged.",

@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   CATEGORY_META_KEY,
   CAP_ENFORCED_META_KEY,
+  CUSTOMER_DATA_META_KEY,
   WRITE_CATEGORIES,
   riskFor,
   applyToolRisk,
@@ -55,6 +56,17 @@ describe("tool-risk", () => {
   });
 });
 
+describe("customer-data reads", () => {
+  it("mark a declared read as customer data", () => {
+    const declared = { read: ["find_customer", "get_shop"], customerData: ["find_customer"] };
+    expect(riskFor("find_customer", declared)).toEqual({
+      annotations: { readOnlyHint: true, destructiveHint: false },
+      _meta: { [CUSTOMER_DATA_META_KEY]: true },
+    });
+    expect(riskFor("get_shop", declared)?._meta).toBeUndefined();
+  });
+});
+
 describe("tool-risk declarations", () => {
   it("keeps the TypeScript category union in step with the helper", () => {
     const typed: Record<ToolWriteCategory, true> = {
@@ -79,12 +91,24 @@ describe("tool-risk declarations", () => {
 
   describe("normalizeToolRiskSpec", () => {
     it("fills in missing halves", () => {
-      expect(normalizeToolRiskSpec(undefined)).toEqual({ read: [], write: {}, capped: [] });
+      expect(normalizeToolRiskSpec(undefined)).toEqual({
+        read: [],
+        write: {},
+        capped: [],
+        customerData: [],
+      });
       expect(normalizeToolRiskSpec({ read: ["a"] })).toEqual({
         read: ["a"],
         write: {},
         capped: [],
+        customerData: [],
       });
+    });
+
+    it("requires customer-data tools to be reads", () => {
+      expect(() => normalizeToolRiskSpec({ write: { a: "note" }, customerData: ["a"] })).toThrow(
+        /must also be declared in toolRisk.read/,
+      );
     });
 
     it("accepts capped writes and rejects a capped tool that is not a write", () => {

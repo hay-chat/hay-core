@@ -158,8 +158,7 @@ export class HandoffTicketsService {
       .filter((instance) => {
         // Stored manifests use the flat registry form (capabilities: string[]).
         const manifest = instance.plugin?.manifest as unknown as
-          | { capabilities?: unknown }
-          | undefined;
+          { capabilities?: unknown } | undefined;
         return (
           Array.isArray(manifest?.capabilities) &&
           manifest.capabilities.includes(TICKETS_CAPABILITY)

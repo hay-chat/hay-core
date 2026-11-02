@@ -3,8 +3,18 @@ import { ScheduledJob } from "@server/entities/scheduled-job.entity";
 import { ScheduledJobHistory } from "@server/entities/scheduled-job-history.entity";
 import { createLogger } from "@server/lib/logger";
 import * as cron from "node-cron";
+import type { QueryRunner } from "typeorm";
 
 const logger = createLogger("scheduler");
+
+/** Namespace for the scheduler's advisory lock keys. */
+const CLUSTER_LOCK_PREFIX = "scheduler:";
+
+class JobTimeoutError extends Error {
+  constructor(timeout: number) {
+    super(`Job timeout after ${timeout}ms`);
+  }
+}
 
 export type CronJobConfig = {
   name: string; // Unique job identifier
@@ -17,6 +27,9 @@ export type CronJobConfig = {
   maxRetries?: number; // Max retry attempts
   runOnStartup?: boolean; // Run immediately on service start
   singleton?: boolean; // Prevent concurrent executions
+  // Run on every server instance (in-memory or local-process work). Default:
+  // one instance at a time cluster-wide, via a Postgres advisory lock.
+  perInstance?: boolean;
   skipDatabaseLogging?: boolean; // Skip saving execution history to database (default: false)
 };
 
@@ -62,6 +75,7 @@ export class SchedulerService {
   private jobs: Map<string, RegisteredJob> = new Map();
   private isInitialized = false;
   private isShuttingDown = false;
+  private lockRunner: QueryRunner | null = null;
 
   /**
    * Initialize the scheduler service
@@ -267,6 +281,7 @@ export class SchedulerService {
 
     // Clear all jobs
     this.jobs.clear();
+    await this.closeLockRunner();
 
     this.isInitialized = false;
     logger.info("Scheduler service shut down");
@@ -327,9 +342,13 @@ export class SchedulerService {
   }
 
   /**
-   * Execute a job with error handling, timeout, and retries
+   * Execute a job with error handling, timeout, and retries.
+   *
+   * Unless the job is `perInstance`, a Postgres advisory lock makes sure only
+   * one server instance runs it at a time; an instance that cannot take the
+   * lock skips the run.
    */
-  private async executeJob(name: string, retryCount = 0): Promise<void> {
+  private async executeJob(name: string): Promise<void> {
     const job = this.jobs.get(name);
     if (!job) return;
 
@@ -347,82 +366,160 @@ export class SchedulerService {
 
     // Mark as running
     job.isRunning = true;
-    const startTime = Date.now();
-
-    // logger.debug({ jobName: name }, "Executing job");
+    let locked = false;
 
     try {
-      // Execute with optional timeout
-      if (job.config.timeout) {
-        await this.executeWithTimeout(job.config.handler, job.config.timeout);
-      } else {
-        await job.config.handler();
+      if (!job.config.perInstance) {
+        locked = await this.tryAcquireClusterLock(name);
+        if (!locked) {
+          logger.debug({ jobName: name }, "Skipping job - running on another instance");
+          return;
+        }
       }
 
-      // Success
-      const duration = Date.now() - startTime;
-      job.lastRun = new Date();
-      job.lastStatus = "success";
-      job.lastError = undefined;
-      job.lastDuration = duration;
-      job.totalRuns++;
-      job.totalDuration += duration;
+      const maxRetries = job.config.retryOnFailure ? (job.config.maxRetries ?? 0) : 0;
+      for (let retryCount = 0; ; retryCount++) {
+        const outcome = await this.runOnce(job, name);
+        const canRetry =
+          outcome.status === "failed" && retryCount < maxRetries && !this.isShuttingDown;
 
-      // logger.debug({ jobName: name, durationMs: duration }, "Job completed");
+        if (canRetry) {
+          logger.info({ jobName: name, attempt: retryCount + 1, maxRetries }, "Retrying job");
+          await new Promise((resolve) => setTimeout(resolve, 1000)); // Wait 1s between retries
+          continue;
+        }
 
-      // Save to database (unless skipped)
-      if (!job.config.skipDatabaseLogging) {
-        await this.saveJobExecution(name, "success", duration);
-      }
-    } catch (error) {
-      // Failure
-      const duration = Date.now() - startTime;
-      const errorMessage = error instanceof Error ? error.message : String(error);
-
-      job.lastRun = new Date();
-      job.lastStatus =
-        error instanceof Error && error.message.includes("timeout") ? "timeout" : "failed";
-      job.lastError = errorMessage;
-      job.lastDuration = duration;
-      job.totalRuns++;
-      job.totalFailures++;
-      job.totalDuration += duration;
-
-      logger.error({ err: error, jobName: name }, "Job failed");
-
-      // Retry if configured
-      if (
-        job.config.retryOnFailure &&
-        job.config.maxRetries &&
-        retryCount < job.config.maxRetries
-      ) {
-        logger.info(
-          { jobName: name, attempt: retryCount + 1, maxRetries: job.config.maxRetries },
-          "Retrying job",
-        );
-        await new Promise((resolve) => setTimeout(resolve, 1000)); // Wait 1s between retries
-        return this.executeJob(name, retryCount + 1);
-      }
-
-      // Save to database (unless skipped)
-      if (!job.config.skipDatabaseLogging) {
-        await this.saveJobExecution(name, job.lastStatus, duration, errorMessage);
+        // Save to database (unless skipped)
+        if (!job.config.skipDatabaseLogging) {
+          await this.saveJobExecution(name, outcome.status, outcome.duration, outcome.error);
+        }
+        return;
       }
     } finally {
+      if (locked) {
+        await this.releaseClusterLock(name);
+      }
       job.isRunning = false;
     }
   }
 
   /**
-   * Execute a function with timeout
+   * Run the handler once and record the outcome on the job. When the timeout
+   * fires the run is reported as timed out, but this still waits for the
+   * handler to settle so the job is never marked idle (or unlocked) while
+   * its handler is still running.
    */
-  private async executeWithTimeout(fn: () => Promise<void>, timeout: number): Promise<void> {
-    return Promise.race([
-      fn(),
-      new Promise<void>((_, reject) =>
-        setTimeout(() => reject(new Error(`Job timeout after ${timeout}ms`)), timeout),
-      ),
-    ]);
+  private async runOnce(
+    job: RegisteredJob,
+    name: string,
+  ): Promise<{ status: "success" | "failed" | "timeout"; duration: number; error?: string }> {
+    const startTime = Date.now();
+    const run = Promise.resolve().then(() => job.config.handler());
+
+    let status: "success" | "failed" | "timeout" = "success";
+    let errorMessage: string | undefined;
+    try {
+      if (job.config.timeout) {
+        await this.waitWithTimeout(run, job.config.timeout);
+      } else {
+        await run;
+      }
+    } catch (error) {
+      status = error instanceof JobTimeoutError ? "timeout" : "failed";
+      errorMessage = error instanceof Error ? error.message : String(error);
+      logger.error({ err: error, jobName: name }, "Job failed");
+    }
+
+    const duration = Date.now() - startTime;
+    job.lastRun = new Date();
+    job.lastStatus = status;
+    job.lastError = errorMessage;
+    job.lastDuration = duration;
+    job.totalRuns++;
+    job.totalDuration += duration;
+    if (status !== "success") {
+      job.totalFailures++;
+    }
+
+    if (status === "timeout") {
+      await run.catch(() => undefined);
+      logger.warn(
+        { jobName: name, durationMs: Date.now() - startTime },
+        "Timed-out job handler finished",
+      );
+    }
+
+    return { status, duration, error: errorMessage };
+  }
+
+  /**
+   * Wait for a run, rejecting with JobTimeoutError after `timeout` ms. The
+   * run itself is not cancelled.
+   */
+  private async waitWithTimeout(run: Promise<void>, timeout: number): Promise<void> {
+    let timer: NodeJS.Timeout | undefined;
+    try {
+      await Promise.race([
+        run,
+        new Promise<never>((_, reject) => {
+          timer = setTimeout(() => reject(new JobTimeoutError(timeout)), timeout);
+        }),
+      ]);
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
+  /**
+   * Take the cluster-wide lock for a job on the scheduler's dedicated
+   * connection (session-level advisory locks belong to one connection).
+   * Without a database there is nothing to coordinate with, so the job runs.
+   */
+  private async tryAcquireClusterLock(name: string): Promise<boolean> {
+    if (!AppDataSource.isInitialized) {
+      return true;
+    }
+    try {
+      const runner = await this.getLockRunner();
+      const [row] = await runner.query("SELECT pg_try_advisory_lock(hashtext($1)) AS locked", [
+        `${CLUSTER_LOCK_PREFIX}${name}`,
+      ]);
+      return row?.locked === true;
+    } catch (error) {
+      logger.error({ err: error, jobName: name }, "Could not take job lock, skipping run");
+      await this.closeLockRunner();
+      return false;
+    }
+  }
+
+  private async releaseClusterLock(name: string): Promise<void> {
+    try {
+      await this.lockRunner?.query("SELECT pg_advisory_unlock(hashtext($1))", [
+        `${CLUSTER_LOCK_PREFIX}${name}`,
+      ]);
+    } catch (error) {
+      // A lost connection releases its session locks on the server side.
+      logger.warn({ err: error, jobName: name }, "Could not release job lock");
+      await this.closeLockRunner();
+    }
+  }
+
+  private async getLockRunner(): Promise<QueryRunner> {
+    if (!this.lockRunner || this.lockRunner.isReleased) {
+      this.lockRunner = AppDataSource.createQueryRunner();
+      await this.lockRunner.connect();
+    }
+    return this.lockRunner;
+  }
+
+  private async closeLockRunner(): Promise<void> {
+    const runner = this.lockRunner;
+    this.lockRunner = null;
+    try {
+      await runner?.release();
+    } catch {
+      // Connection already gone
+    }
   }
 
   /**

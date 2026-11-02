@@ -8,6 +8,7 @@ import { UserOrganization } from "@server/entities/user-organization.entity";
 import { User } from "@server/entities/user.entity";
 import { Organization } from "@server/entities/organization.entity";
 import { RESOURCES, ACTIONS } from "@server/types/scopes";
+import { assertCanGrantMembership } from "@server/lib/auth/membership-grants";
 import { emailService, getOrganizationLocale } from "@server/services/email.service";
 import { getDashboardUrl } from "@server/config/env";
 import { rateLimitMiddleware, RateLimits } from "@server/trpc/middleware/rate-limit";
@@ -108,6 +109,8 @@ export const invitationsRouter = t.router({
           message: "Organization ID required",
         });
       }
+
+      assertCanGrantMembership(ctx.user, { role: input.role, permissions: input.permissions });
 
       const invitationRepository = AppDataSource.getRepository(OrganizationInvitation);
       const userRepository = AppDataSource.getRepository(User);

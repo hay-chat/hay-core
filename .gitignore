@@ -47,7 +47,9 @@ node_modules/
 # tasks/
 
 # Playwright
-/test-results/
+**/test-results/
+.nuxt/
+.claude/scheduled_tasks.lock
 /playwright-report/
 /blob-report/
 /playwright/.cache/
@@ -70,3 +72,15 @@ plugins/custom/
 server/uploads/plugin-zips/
 .dual-graph/
 .impeccable/
+
+# Maintainer working notes: kept locally, never committed (tasks/lessons.md stays tracked)
+/WIP.md
+/CONTEXT.md
+/tasks/*
+!/tasks/lessons.md
+/gdpr-audit/
+/.claude/plans/
+/.claude/settings.local.json
+
+# Redis snapshots
+*.rdb

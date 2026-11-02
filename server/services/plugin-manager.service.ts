@@ -10,6 +10,7 @@ import { getPluginRunnerService } from "./plugin-runner.service";
 import type { WorkerInfo } from "@server/types/plugin-sdk.types";
 import { createLogger } from "@server/lib/logger";
 import { registerServerAliasForPlugins } from "@server/lib/plugin-router-alias";
+import { config } from "@server/config/env";
 
 const logger = createLogger("plugin-manager");
 
@@ -62,6 +63,21 @@ interface PluginPackageJson {
 type RegistryManifest = Omit<HayPluginManifest, "capabilities"> & {
   capabilities: string[];
 };
+
+/** Whether an organization may see and use a registered plugin. */
+export function isPluginVisibleToOrganization(
+  plugin: Pick<PluginRegistry, "sourceType" | "organizationId">,
+  organizationId: string,
+): boolean {
+  return plugin.sourceType === "core" || plugin.organizationId === organizationId;
+}
+
+/** Throws when the server does not accept organization-supplied plugin code. */
+export function assertCustomPluginsAllowed(): void {
+  if (!config.plugins.allowCustomPlugins) {
+    throw new Error("Custom plugins are disabled on this server");
+  }
+}
 
 export class PluginManagerService {
   private pluginsDir: string;
@@ -120,10 +136,12 @@ export class PluginManagerService {
 
       // Scan custom plugins for all organizations
       const customDir = path.join(this.pluginsDir, "custom");
-      const customExists = await fs
-        .access(customDir)
-        .then(() => true)
-        .catch(() => false);
+      const customExists =
+        config.plugins.allowCustomPlugins &&
+        (await fs
+          .access(customDir)
+          .then(() => true)
+          .catch(() => false));
 
       if (customExists) {
         const orgDirs = await fs.readdir(customDir, { withFileTypes: true });
@@ -164,7 +182,8 @@ export class PluginManagerService {
       for (const entry of entries) {
         if (entry.isDirectory() && !entry.name.startsWith(".")) {
           const pluginPath = path.join(directory, entry.name);
-          await this.registerPlugin(pluginPath, sourceType, organizationId);
+          // One invalid plugin (already logged) must not stop discovery
+          await this.registerPlugin(pluginPath, sourceType, organizationId).catch(() => {});
         }
       }
     } catch (error) {
@@ -177,6 +196,7 @@ export class PluginManagerService {
    *
    * Reads package.json to discover plugins (TypeScript-first approach).
    * Full metadata is fetched from the plugin worker when it starts.
+   * Throws when the plugin is invalid or its id belongs to another owner.
    */
   public async registerPlugin(
     pluginPath: string,
@@ -213,6 +233,12 @@ export class PluginManagerService {
       if (!pluginId) {
         logger.warn({ pluginPath }, "No package name found");
         return;
+      }
+
+      // Organization-supplied plugins only ever run inside their own worker:
+      // eager activation and in-process tRPC routers are reserved for core.
+      if (sourceType !== "core" && (hayPlugin.autoActivate || hayPlugin.trpcRouter)) {
+        throw new Error("autoActivate and trpcRouter are only supported for core plugins");
       }
 
       // Display name from hay-plugin or parse from package name
@@ -301,6 +327,7 @@ export class PluginManagerService {
       logger.info({ pluginId, path: relativePath }, "Registered plugin");
     } catch (error) {
       logger.error({ err: error, pluginPath }, "Failed to register plugin");
+      throw error;
     }
   }
 
@@ -373,6 +400,9 @@ export class PluginManagerService {
   private async loadRegistryFromDatabase(): Promise<void> {
     const plugins = await pluginRegistryRepository.getAllPlugins();
     for (const plugin of plugins) {
+      if (plugin.sourceType !== "core" && !config.plugins.allowCustomPlugins) {
+        continue;
+      }
       this.registry.set(plugin.pluginId, plugin);
     }
   }
@@ -420,7 +450,7 @@ export class PluginManagerService {
   private async restorePluginsFromZip(): Promise<void> {
     try {
       const { storageService } = await import("./storage.service");
-      const AdmZip = (await import("adm-zip")).default;
+      const { extractPluginZip } = await import("@server/lib/plugin-archive");
 
       // Get all custom/git plugins that have ZIP/archive uploads
       const customPlugins = Array.from(this.registry.values()).filter(
@@ -463,15 +493,15 @@ export class PluginManagerService {
               await fs.mkdir(orgDir, { recursive: true });
             }
 
-            // Extract based on source type
+            // Extract based on source type. Both extractors re-validate the
+            // stored archive (paths, links, size) before writing anything.
             if (plugin.sourceType === "git") {
               // Git plugins are stored as tar.gz archives
               const { extractTarball } = await import("@server/lib/git/tarball");
               await extractTarball(buffer, pluginPath);
             } else {
               // Custom plugins are stored as ZIP files
-              const zip = new AdmZip(buffer);
-              zip.extractAllTo(pluginPath, true);
+              extractPluginZip(buffer, pluginPath);
             }
 
             // Re-register the plugin so it's discovered and status is reset to AVAILABLE
@@ -593,6 +623,23 @@ export class PluginManagerService {
     const pluginPath = path.join(this.pluginsDir, plugin.pluginPath);
     const isWorkspacePlugin = plugin.pluginPath.startsWith("core/");
 
+    // Organization-supplied plugins are never built on the host (a build
+    // script is arbitrary code): they must ship their compiled entry file.
+    if (plugin.sourceType !== "core") {
+      const entry = (plugin.manifest as HayPluginManifest).entry;
+      const entryPath = entry ? path.resolve(pluginPath, entry) : "";
+      const hasEntry = entryPath.startsWith(pluginPath + path.sep) && existsSync(entryPath);
+      const error = hasEntry
+        ? undefined
+        : `Plugin ${plugin.name} must include its pre-built entry file (${entry || "hay-plugin.entry"})`;
+      await pluginRegistryRepository.updateBuildStatus(plugin.id, hasEntry, error);
+      plugin.built = hasEntry;
+      if (error) {
+        throw new Error(error);
+      }
+      return;
+    }
+
     // Check for build script in package.json
     let buildCommand: string | undefined;
     try {
@@ -713,7 +760,7 @@ export class PluginManagerService {
     for (const plugin of this.registry.values()) {
       const manifest = plugin.manifest as HayPluginManifest;
 
-      if (manifest.autoActivate && manifest.trpcRouter) {
+      if (plugin.sourceType === "core" && manifest.autoActivate && manifest.trpcRouter) {
         await this.ensurePluginRouterRegistered(plugin.pluginId);
       }
     }
@@ -739,7 +786,8 @@ export class PluginManagerService {
     }
 
     const plugin = this.registry.get(pluginId);
-    if (!plugin) {
+    // Routers load into the server process, so only core plugins may have one.
+    if (!plugin || plugin.sourceType !== "core") {
       return false;
     }
 

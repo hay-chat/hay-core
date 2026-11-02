@@ -31,4 +31,11 @@ module.exports = {
   },
   // Enforces the merchant's coupon cap itself; above it, core holds the call.
   capped: ["nuvemshop_create_coupon"],
+  // Return a customer's profile or order history: core runs them only for a
+  // verified customer, and they return only that customer's records.
+  customerData: [
+    "nuvemshop_find_customer",
+    "nuvemshop_get_customer",
+    "nuvemshop_list_customer_orders",
+  ],
 };

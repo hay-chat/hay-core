@@ -74,6 +74,8 @@ export type {
 
 export type {
   McpServerInstance,
+  ToolCallCustomer,
+  ToolCallMeta,
   McpInitializerContext,
   StdioMcpOptions,
   ExternalMcpOptions,
@@ -116,6 +118,7 @@ export type {
   WebhookVerificationChallengeDescriptor,
   WebhookRouteKeyPathDescriptor,
   WebhookDeauthorizationDescriptor,
+  WebhookDedupeDescriptor,
   WebhookRoutingDescriptor,
 } from "./webhook-routing";
 

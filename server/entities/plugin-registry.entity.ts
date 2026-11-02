@@ -142,6 +142,10 @@ export class PluginRegistry {
   @Column({ type: "text", nullable: true })
   gitSyncError?: string;
 
+  // Newer branch commit found by the scheduled check; applied only by an admin sync
+  @Column({ type: "varchar", length: 64, nullable: true })
+  gitAvailableCommitSha?: string;
+
   @CreateDateColumn({ type: "timestamptz" })
   createdAt!: Date;
 

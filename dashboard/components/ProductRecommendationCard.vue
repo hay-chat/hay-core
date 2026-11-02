@@ -8,7 +8,7 @@
       <a
         v-for="p in products"
         :key="p.id"
-        :href="p.sourceUrl || '#'"
+        :href="safeHttpUrl(p.sourceUrl) ?? '#'"
         target="_blank"
         rel="noopener noreferrer"
         class="product-recommendation__card"
@@ -45,6 +45,7 @@
 
 <script setup lang="ts">
 import { Package, ShoppingBag } from "lucide-vue-next";
+import { safeHttpUrl } from "@/utils/sanitize";
 import type { ProductRecommendationCardProduct } from "@/types/message";
 
 interface Props {

@@ -23,12 +23,13 @@ module.exports = {
         argsIgnorePattern: "^_",
         varsIgnorePattern: "^_",
         caughtErrorsIgnorePattern: "^_",
+        caughtErrors: "none", // typescript-eslint 8 defaults to "all"
       },
     ],
     "@typescript-eslint/no-explicit-any": "error",
     "@typescript-eslint/explicit-module-boundary-types": "off",
     "@typescript-eslint/no-non-null-assertion": "off",
-    "@typescript-eslint/no-var-requires": "off",
+    "@typescript-eslint/no-require-imports": "off",
     "@typescript-eslint/ban-ts-comment": "off",
     "@typescript-eslint/no-empty-interface": "off",
     "@typescript-eslint/no-empty-function": "off",
@@ -52,7 +53,7 @@ module.exports = {
         sourceType: "module",
         extraFileExtensions: [".vue"],
       },
-      extends: ["plugin:vue/vue3-recommended", "plugin:@typescript-eslint/recommended", "prettier"],
+      extends: ["plugin:vue/recommended", "plugin:@typescript-eslint/recommended", "prettier"],
       plugins: ["vue"],
       rules: {
         // Match base config: any and unused vars are errors (consistent with server files)
@@ -63,6 +64,7 @@ module.exports = {
             argsIgnorePattern: "^_",
             varsIgnorePattern: "^_",
             caughtErrorsIgnorePattern: "^_",
+            caughtErrors: "none", // typescript-eslint 8 defaults to "all"
           },
         ],
 
@@ -89,7 +91,7 @@ module.exports = {
         "vue/require-default-prop": "off",
         "vue/no-multiple-template-root": "off",
         "vue/no-setup-props-destructure": "off",
-        "vue/component-tags-order": [
+        "vue/block-order": [
           "error",
           {
             order: ["template", "script", "style"],
@@ -173,6 +175,11 @@ module.exports = {
         useNuxtData: "readonly",
         useRuntimeConfig: "readonly",
         useState: "readonly",
+        // Project composables used without an explicit import
+        useExternalLink: "readonly",
+        SETTINGS_NAV: "readonly",
+        isSettingsTabActive: "readonly",
+        visibleSettingsTabs: "readonly",
         useCookie: "readonly",
         useRequestEvent: "readonly",
         useRequestHeaders: "readonly",
@@ -209,6 +216,10 @@ module.exports = {
         useToast: "readonly",
         useDomain: "readonly",
         usePagination: "readonly",
+        useExternalLink: "readonly",
+        SETTINGS_NAV: "readonly",
+        isSettingsTabActive: "readonly",
+        visibleSettingsTabs: "readonly",
         // Node.js types
         NodeJS: "readonly",
       },
@@ -221,25 +232,20 @@ module.exports = {
         defineI18nConfig: "readonly",
       },
       rules: {
-        "@typescript-eslint/no-var-requires": "off",
+        "@typescript-eslint/no-require-imports": "off",
       },
     },
     // Server TypeScript files
     {
       files: ["server/**/*.ts", "server/**/*.js"],
       rules: {
-        "@typescript-eslint/no-var-requires": "off",
+        "@typescript-eslint/no-require-imports": "off",
         "no-console": "error", // Use createLogger() from @server/lib/logger instead
       },
     },
     // Server scripts and migrations (CLI tools, not app code)
     {
-      files: [
-        "server/scripts/**/*.ts",
-        "server/database/migrations/**/*.ts",
-        "server/run-migration.ts",
-        "server/run-migrations.ts",
-      ],
+      files: ["server/scripts/**/*.ts", "server/database/migrations/**/*.ts"],
       rules: {
         "no-console": "off", // CLI tools can use console directly
       },
@@ -248,7 +254,7 @@ module.exports = {
     {
       files: ["*.config.js", "*.config.ts", ".eslintrc.js"],
       rules: {
-        "@typescript-eslint/no-var-requires": "off",
+        "@typescript-eslint/no-require-imports": "off",
       },
     },
     // Test files
@@ -261,7 +267,6 @@ module.exports = {
         "**/*.test.example.ts",
         "**/tests/test-*.ts",
         "**/tests/setup.ts",
-        "**/email-usage-example.ts",
       ],
       env: {
         jest: true,
@@ -269,6 +274,14 @@ module.exports = {
       rules: {
         "@typescript-eslint/no-explicit-any": "off",
         "no-console": "off",
+      },
+    },
+    // Dashboard app code: debug output goes through utils/logger (dev builds only).
+    {
+      files: ["dashboard/**/*.ts", "dashboard/**/*.vue"],
+      excludedFiles: ["dashboard/tests/**", "dashboard/scripts/**", "dashboard/**/*.test.ts"],
+      rules: {
+        "no-console": ["error", { allow: ["warn", "error"] }],
       },
     },
   ],
