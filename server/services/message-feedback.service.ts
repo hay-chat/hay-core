@@ -43,8 +43,8 @@ export class MessageFeedbackService {
     });
   }
 
-  async getFeedbackById(id: string): Promise<MessageFeedback | null> {
-    return this.feedbackRepository.findById(id);
+  async getFeedbackById(id: string, organizationId: string): Promise<MessageFeedback | null> {
+    return this.feedbackRepository.findByIdAndOrganization(id, organizationId);
   }
 
   async getFeedbackByMessage(messageId: string): Promise<MessageFeedback[]> {

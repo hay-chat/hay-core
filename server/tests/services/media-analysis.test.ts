@@ -39,9 +39,8 @@ jest.mock("@server/services/storage.service", () => ({
 }));
 
 const mockPdfParse = jest.fn();
-jest.mock("pdf-parse", () => ({
-  __esModule: true,
-  default: (...args: unknown[]) => mockPdfParse(...args),
+jest.mock("@server/lib/read-pdf-text", () => ({
+  readPdfText: (...args: unknown[]) => mockPdfParse(...args),
 }));
 
 jest.mock("@server/services/redis.service", () => ({

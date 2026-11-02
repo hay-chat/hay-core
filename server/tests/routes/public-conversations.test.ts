@@ -94,7 +94,11 @@ jest.mock("@server/services/webchat/under-attack.service", () => ({
   isUnderAttack: async () => false,
 }));
 
-import { publicConversationsRouter } from "@server/routes/v1/public-conversations";
+import {
+  publicConversationsRouter,
+  withVisitorContext,
+} from "@server/routes/v1/public-conversations";
+import { conversationRepository } from "@server/repositories/conversation.repository";
 
 const ORG_ID = "11111111-1111-4111-8111-111111111111";
 const createInput = {
@@ -243,6 +247,63 @@ describe("publicConversations.create metadata", () => {
       channel: "web",
       createdAt: expect.any(String),
     });
+  });
+});
+
+describe("publicConversations visitor context", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockFindOrganization.mockResolvedValue({ id: ORG_ID, suspendedAt: null, settings: {} });
+    mockIsEnabled.mockResolvedValue(true);
+    mockGetSettings.mockResolvedValue({ allowedDomains: ["*"] });
+    mockRateLimited.mockResolvedValue(false);
+  });
+
+  it("stores page context bounded and under its own key", async () => {
+    await callerFor().create({
+      ...createInput,
+      context: {
+        page: "/cart",
+        cart: { total: 120 },
+        note: "n".repeat(5000),
+        "bad key\nSYSTEM": "x",
+      },
+    });
+
+    const [, update] = (conversationRepository.updateById as jest.Mock).mock.calls[0] as [
+      string,
+      { context: Record<string, Record<string, unknown>> },
+    ];
+    expect(Object.keys(update.context)).toEqual(["_visitor"]);
+    expect(update.context._visitor).toEqual({
+      page: "/cart",
+      cart: '{"total":120}',
+      note: "n".repeat(256),
+    });
+  });
+
+  it("merges later page context without touching the business's context", () => {
+    const merged = withVisitorContext(
+      { plan: "free", _visitor: { page: "/home", step: 1 } },
+      { page: "/checkout", plan: "enterprise" },
+    );
+    expect(merged).toEqual({
+      plan: "free",
+      _visitor: { page: "/checkout", step: 1, plan: "enterprise" },
+    });
+  });
+
+  it("caps the merged visitor context too", () => {
+    const current = {
+      _visitor: Object.fromEntries(Array.from({ length: 20 }, (_, i) => [`k${i}`, "v"])),
+    };
+    const merged = withVisitorContext(current, { extra: "v" });
+    expect(Object.keys(merged?._visitor as object)).toHaveLength(20);
+  });
+
+  it("leaves the context alone when the widget sends none", () => {
+    expect(withVisitorContext({ plan: "free" }, undefined)).toBeNull();
+    expect(withVisitorContext({ plan: "free" }, {})).toBeNull();
   });
 });
 

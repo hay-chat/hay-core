@@ -30,6 +30,12 @@ export class JobRepository {
     });
   }
 
+  async findByIdAndOrganization(id: string, organizationId: string): Promise<Job | null> {
+    return await this.getRepository().findOne({
+      where: { id, organizationId },
+    });
+  }
+
   /**
    * Find an in-flight (not-yet-terminal) sync job for a given document source.
    * Used to keep enqueueSync idempotent so the 60s dispatcher does not pile up

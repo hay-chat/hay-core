@@ -3,6 +3,7 @@ import { AppDataSource } from "@server/database/data-source";
 import { User } from "@server/entities/user.entity";
 import { PrivacyRequest } from "@server/entities/privacy-request.entity";
 import { AuditLog } from "@server/entities/audit-log.entity";
+import { purgeAuditLogs } from "@server/tests/helpers/audit-logs";
 import { Organization } from "@server/entities/organization.entity";
 import { privacyService } from "@server/services/privacy.service";
 import { rateLimitService } from "@server/services/rate-limit.service";
@@ -42,7 +43,6 @@ describe("Privacy DSAR Integration Tests", () => {
   beforeEach(async () => {
     // Clean up test data - order matters due to foreign key constraints
     const privacyRequestRepo = AppDataSource.getRepository(PrivacyRequest);
-    const auditLogRepo = AppDataSource.getRepository(AuditLog);
     const userRepo = AppDataSource.getRepository(User);
     const orgRepo = AppDataSource.getRepository(Organization);
 
@@ -65,18 +65,17 @@ describe("Privacy DSAR Integration Tests", () => {
       // 3. Audit logs (references both users and organization)
       // Delete all audit logs for users in this organization
       if (userIds.length > 0) {
-        await auditLogRepo
-          .createQueryBuilder()
-          .delete()
-          .where("user_id IN (:...userIds)", { userIds })
-          .execute();
+        await purgeAuditLogs("user_id = ANY($1)", [userIds]);
       }
       // Delete audit logs by organization ID
       if (existingOrg.id) {
-        await auditLogRepo.delete({ organizationId: existingOrg.id });
+        await purgeAuditLogs("organization_id = $1", [existingOrg.id]);
       }
-      // Clean up any audit logs with null user IDs (created during deletion tests)
-      await auditLogRepo.delete({ userId: null as any });
+      // Clean up privacy audit logs left without a user or organization (deletion tests).
+      // Kept narrow: other suites running in parallel assert on their own rows.
+      await purgeAuditLogs(
+        "user_id IS NULL AND organization_id IS NULL AND resource = 'privacy_request'",
+      );
 
       // 4. Users (now safe to delete as no audit logs reference them)
       await userRepo.delete({ organizationId: existingOrg.id });
@@ -170,7 +169,7 @@ describe("Privacy DSAR Integration Tests", () => {
     }, 15000);
 
     it("should collect complete user data for export", async () => {
-      const exportData = await (privacyService as any).collectUserData(testUser.id, testEmail);
+      const exportData = await (privacyService as any).collectUserData(testUser.id);
 
       expect(exportData).toBeDefined();
       expect(exportData.exportDate).toBeDefined();
@@ -183,10 +182,7 @@ describe("Privacy DSAR Integration Tests", () => {
       expect(exportData.personalData.profile.firstName).toBe("Privacy");
       expect(exportData.personalData.profile.lastName).toBe("Tester");
 
-      expect(exportData.personalData.organization).toBeDefined();
-      expect(exportData.personalData.organization.name).toBe("Privacy Test Org");
-
-      expect(exportData.personalData.apiKeys).toBeInstanceOf(Array);
+      expect(exportData.personalData.organizations).toEqual([]);
       expect(exportData.personalData.auditLogs).toBeInstanceOf(Array);
       expect(exportData.personalData.documents).toBeInstanceOf(Array);
     }, 10000);
@@ -239,7 +235,7 @@ describe("Privacy DSAR Integration Tests", () => {
       await auditLogRepo.save(testLog);
 
       // Execute deletion
-      await (privacyService as any).executeDataDeletion(testUser.id, testEmail);
+      await (privacyService as any).executeDataDeletion(testUser.id);
 
       // Verify user was soft deleted
       const userRepo = AppDataSource.getRepository(User);
@@ -267,16 +263,18 @@ describe("Privacy DSAR Integration Tests", () => {
       expect(anonymizedLog?.userAgent).toBe("deleted");
     }, 10000);
 
-    it("should fail deletion request for non-existent user", async () => {
+    it("should answer a deletion request for an unknown email like any other", async () => {
       // Reset rate limits for this specific test
       const nonExistentEmail = "nonexistent@example.com";
       await rateLimitService.resetRateLimit(nonExistentEmail, "email");
       await rateLimitService.resetRateLimit(testIp, "ip");
       await rateLimitService.resetRateLimit(`${testIp}:${nonExistentEmail}`, "combined");
 
-      await expect(
-        privacyService.requestDeletion(nonExistentEmail, testIp, testUserAgent),
-      ).rejects.toThrow("No account found with this email address");
+      const result = await privacyService.requestDeletion(nonExistentEmail, testIp, testUserAgent);
+      expect(result.requestId).toBeDefined();
+      const status = await privacyService.getStatus(result.requestId);
+      expect(status.status).toBe("pending_verification");
+      await AppDataSource.getRepository(PrivacyRequest).delete({ id: result.requestId });
     });
   });
 
@@ -475,8 +473,11 @@ describe("Privacy DSAR Integration Tests", () => {
         type: "export",
         status: "completed",
         metadata: {
-          exportUrl: "/tmp/test-export.json",
-          downloadToken: "test-download-token",
+          uploadId: "00000000-0000-4000-8000-000000000000",
+          downloadTokenHash: crypto
+            .createHash("sha256")
+            .update("test-download-token")
+            .digest("hex"),
           exportExpiresAt: new Date(Date.now() - 1000), // Already expired
         },
       });
@@ -499,8 +500,11 @@ describe("Privacy DSAR Integration Tests", () => {
         downloadCount: 1, // Already downloaded once
         maxDownloads: 1,
         metadata: {
-          exportUrl: "/tmp/test-export.json",
-          downloadToken: "test-download-token",
+          uploadId: "00000000-0000-4000-8000-000000000000",
+          downloadTokenHash: crypto
+            .createHash("sha256")
+            .update("test-download-token")
+            .digest("hex"),
           exportExpiresAt: new Date(Date.now() + 86400000), // Not expired
         },
       });
@@ -545,7 +549,7 @@ describe("Privacy DSAR Integration Tests", () => {
         expect(anonymizedLog?.ipAddress).toBe(expected);
 
         // Cleanup for next iteration
-        await auditLogRepo.delete({ id: log.id });
+        await purgeAuditLogs("id = $1", [log.id]);
 
         // Recreate user for next test
         const userRepo = AppDataSource.getRepository(User);
@@ -587,9 +591,10 @@ describe("Privacy DSAR Integration Tests", () => {
 
       // Verify arrays were anonymized
       const anonymizedLog = await auditLogRepo.findOne({ where: { id: log.id } });
-      expect(anonymizedLog?.metadata.users[0].email).toBe("[REDACTED]");
-      expect(anonymizedLog?.metadata.users[1].email).toBe("[REDACTED]");
-      expect(anonymizedLog?.metadata.users[0].name).toBe("[REDACTED]");
+      const users = anonymizedLog?.metadata?.users as Array<{ email: string; name: string }>;
+      expect(users[0].email).toBe("[REDACTED]");
+      expect(users[1].email).toBe("[REDACTED]");
+      expect(users[0].name).toBe("[REDACTED]");
     });
 
     it("should handle deletion of already-deleted users", async () => {
@@ -598,10 +603,12 @@ describe("Privacy DSAR Integration Tests", () => {
       testUser.deletedAt = new Date();
       await userRepo.save(testUser);
 
-      // Try to request deletion again
-      await expect(
-        privacyService.requestDeletion(testEmail, testIp, testUserAgent),
-      ).rejects.toThrow("No account found with this email address");
+      // A second request gets the same answer but is tied to no account
+      const { requestId } = await privacyService.requestDeletion(testEmail, testIp, testUserAgent);
+      const request = await AppDataSource.getRepository(PrivacyRequest).findOneByOrFail({
+        id: requestId,
+      });
+      expect(request.userId).toBeNull();
     });
 
     it("should cancel pending privacy requests", async () => {
@@ -654,8 +661,8 @@ describe("Privacy DSAR Integration Tests", () => {
         type: "export",
         status: "completed",
         metadata: {
-          exportUrl: "/tmp/test-export.json",
-          downloadToken: "correct-token",
+          uploadId: "00000000-0000-4000-8000-000000000000",
+          downloadTokenHash: crypto.createHash("sha256").update("correct-token").digest("hex"),
         },
       });
       await privacyRequestRepo.save(request);

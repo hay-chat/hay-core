@@ -33,8 +33,8 @@ function toTiptapDoc(stored: string): unknown {
  *
  * Down only drops the new columns; agents are not restored.
  */
-export class ReplaceAgentsWithOrgAssistant1793400000000 implements MigrationInterface {
-  name = "ReplaceAgentsWithOrgAssistant1793400000000";
+export class ReplaceAgentsWithOrgAssistant1793700000000 implements MigrationInterface {
+  name = "ReplaceAgentsWithOrgAssistant1793700000000";
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(`

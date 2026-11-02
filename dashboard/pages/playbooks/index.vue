@@ -251,6 +251,7 @@
 </template>
 
 <script setup lang="ts">
+import { logger } from "@/utils/logger";
 import {
   Plus,
   Book,
@@ -410,7 +411,7 @@ const editPlaybook = (id: string) => {
 
 const duplicatePlaybook = (id: string) => {
   // TODO: Implement playbook duplication
-  console.log("Duplicate playbook:", id);
+  logger.debug("Duplicate playbook:", id);
 };
 
 // Delete dialog state
@@ -449,7 +450,7 @@ const confirmDelete = async () => {
 
 const togglePlaybookStatus = (id: string) => {
   // TODO: Toggle playbook active/inactive status
-  console.log("Toggle status for playbook:", id);
+  logger.debug("Toggle status for playbook:", id);
 };
 
 // Fetch playbooks from API

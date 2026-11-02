@@ -588,6 +588,19 @@ describe("Register API", () => {
       ).not.toThrow();
     });
 
+    it("accepts the base64 HMAC format", () => {
+      expect(() =>
+        registerAPI.webhookRouting({
+          signature: {
+            header: "x-shopify-hmac-sha256",
+            format: "sha256-hmac-base64",
+            secretEnv: "ALLOWED_VAR",
+          },
+          routeKeyPath: { itemsPath: ".", keyPath: "shop_domain" },
+        }),
+      ).not.toThrow();
+    });
+
     it("rejects svix with a non-svix header, unknown formats and unknown transforms", () => {
       expect(() =>
         registerAPI.webhookRouting({
@@ -607,6 +620,54 @@ describe("Register API", () => {
           routeKeyPath: { ...routeKeyPath, keyTransform: "upper" as never },
         }),
       ).toThrow(/keyTransform/);
+    });
+  });
+
+  describe("Webhook Routing Dedupe", () => {
+    const base = {
+      signature: { header: "x-sig", format: "sha256-hmac" as const, secretEnv: "ALLOWED_VAR" },
+      routeKeyPath: { itemsPath: "entry", keyPath: "id" },
+    };
+    // The registry accepts one routing strategy, so each declaration gets its own.
+    const freshAPI = () =>
+      createRegisterAPI({
+        registry: new PluginRegistry(),
+        manifest: { env: ["ALLOWED_VAR"] },
+        logger,
+      });
+
+    it("accepts header, body-path and raw-body keys with a window", () => {
+      expect(() =>
+        freshAPI().webhookRouting({ ...base, dedupe: { source: "header", header: "x-id" } }),
+      ).not.toThrow();
+      expect(() =>
+        freshAPI().webhookRouting({
+          ...base,
+          dedupe: { source: "body-path", path: "data.id", windowSeconds: 3600 },
+        }),
+      ).not.toThrow();
+      expect(() =>
+        freshAPI().webhookRouting({
+          ...base,
+          dedupe: { source: "raw-body", windowSeconds: 86400 },
+        }),
+      ).not.toThrow();
+    });
+
+    it("rejects unknown sources, missing keys and out-of-range windows", () => {
+      const attempt = (dedupe: unknown) => () =>
+        freshAPI().webhookRouting({
+          ...base,
+          dedupe: dedupe as never,
+        });
+      expect(attempt({ source: "body-hash" })).toThrow(/dedupe.source/);
+      expect(attempt({ source: "header" })).toThrow(/dedupe.header/);
+      expect(attempt({ source: "body-path", path: "" })).toThrow(/dedupe.path/);
+      expect(attempt({ source: "raw-body", windowSeconds: 0 })).toThrow(/windowSeconds/);
+      expect(attempt({ source: "raw-body", windowSeconds: 8 * 24 * 3600 })).toThrow(
+        /windowSeconds/,
+      );
+      expect(attempt({ source: "raw-body", windowSeconds: 1.5 })).toThrow(/windowSeconds/);
     });
   });
 
@@ -759,9 +820,9 @@ describe("Register API", () => {
           ],
         }),
       ).toThrow(/declared twice/);
-      expect(() =>
-        registerAPI.setup({ steps: [{ id: "a", kind: "wizard" as never }] }),
-      ).toThrow(/unknown kind/);
+      expect(() => registerAPI.setup({ steps: [{ id: "a", kind: "wizard" as never }] })).toThrow(
+        /unknown kind/,
+      );
       expect(() => registerAPI.setup({ steps: [{ id: "1st", kind: "connect" }] })).toThrow(
         /must start with a letter/,
       );

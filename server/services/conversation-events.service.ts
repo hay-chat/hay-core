@@ -53,7 +53,6 @@ class ConversationEventsService {
             attachments: message.attachments ?? [],
             status: message.status,
             deliveryState: message.deliveryState,
-            isPlayground: conversation.metadata?.isPlayground === true,
           },
         });
         logger.debug(`Message ${message.id} published to Redis for broadcast`);
@@ -61,10 +60,9 @@ class ConversationEventsService {
       }
 
       // Same gate websocketService applies on the Redis path: the customer only
-      // ever sees public, released messages (or everything in the playground).
+      // ever sees public, released messages.
       const isPublic = isWidgetVisibleMessage(message.type, message.metadata);
-      const isPlayground = conversation.metadata?.isPlayground === true;
-      if (!isPlayground && !(isPublic && message.deliveryState === "sent")) {
+      if (!(isPublic && message.deliveryState === "sent")) {
         logger.debug({ messageId: message.id }, "Redis unavailable; message kept off webchat");
         return;
       }
@@ -85,9 +83,7 @@ class ConversationEventsService {
       );
       const sent = websocketService.sendToConversation(
         conversation.id,
-        isPlayground
-          ? { type: "message", conversationId: conversation.id, data: { ...data, attachments } }
-          : toPublicMessageEvent(conversation.id, data, attachments),
+        toPublicMessageEvent(conversation.id, data, attachments),
       );
       logger.debug(
         { messageId: message.id, conversationId: conversation.id, clientCount: sent },

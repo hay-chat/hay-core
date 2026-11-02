@@ -17,7 +17,7 @@ import { PromptService } from "@server/services/prompt.service";
 import { createLogger } from "@server/lib/logger";
 import { hasTiptapContent } from "@server/types/tiptap.types";
 import { closureCopy } from "./closure-copy";
-import { availabilityContext, availabilityHandoffLine } from "./handoff-copy";
+import { availabilityContext, availabilityHandoffLine, handoffCopy } from "./handoff-copy";
 import { getAvailability, typicalFirstReplyMinutes } from "@server/services/business-hours.service";
 import {
   handoffTicketsService,
@@ -32,6 +32,7 @@ import { sendSuspendedHoldingReply } from "./suspended-holding-reply";
 import type { ExecutionResult } from "./execution.layer";
 import type { ToolLedgerEntry } from "@server/services/core/action-claim-guardrail.service";
 import { decidedActionsLedger } from "./decided-actions";
+import { isToolEnabled } from "@server/services/core/enabled-tools";
 import type { Message } from "@server/database/entities/message.entity";
 import type pino from "pino";
 
@@ -74,7 +75,7 @@ async function sendBotMessage(
     {
       durationMs: Date.now() - processingStartedAt,
       messageType: payload.type,
-      messagePreview: payload.content.substring(0, 100),
+      messageLength: payload.content.length,
     },
     "Bot message sent",
   );
@@ -1141,7 +1142,7 @@ async function handleExecutionLoop(
         await sendBotMessage(
           conversation,
           {
-            content: "I'm here to help! How can I assist you today?",
+            content: handoffCopy("planningFallback", customerLanguage, conversation.language),
             type: MessageType.BOT_AGENT,
             metadata: {
               isFallbackResponse: true,
@@ -1167,7 +1168,7 @@ async function handleExecutionLoop(
       {
         step: executionResult.step,
         hasUserMessage: !!executionResult.userMessage,
-        userMessagePreview: executionResult.userMessage?.substring(0, 100),
+        userMessageLength: executionResult.userMessage?.length ?? 0,
         hasTool: !!executionResult.tool,
         toolName: executionResult.tool?.name,
         hasHandoff: !!executionResult.handoff,
@@ -1206,44 +1207,31 @@ async function handleExecutionLoop(
       await recordPlaybookFit(conversation, true);
     }
 
-    // Enforce enabled_tools: reject tool calls not in the conversation's allowed list.
-    // Policy: when enabled_tools is null/empty (no playbook), all tools are allowed.
-    // When a playbook defines enabled_tools, only those tools may be called.
-    // EXCEPTION: core tools (e.g. recommend_products) are always allowed —
-    // they're built into core and not part of any playbook's tool list.
-    if (executionResult.step === "CALL_TOOL" && executionResult.tool) {
-      const enabledTools = conversation.enabled_tools;
-      const { coreToolRegistry } = await import("@server/services/core/core-tools");
-      const { isPageTool } = await import("@server/services/webchat/page-tools.service");
-      // Page tools (registered by the host page in the browser) are exempt too:
-      // they exist only while that page is open, never in a playbook's list.
-      const isCoreTool =
-        coreToolRegistry.has(executionResult.tool.name) || isPageTool(executionResult.tool.name);
-      if (!isCoreTool && enabledTools && enabledTools.length > 0) {
-        if (!enabledTools.includes(executionResult.tool.name)) {
-          log.warn(
-            {
-              toolName: executionResult.tool.name,
-              enabledTools,
-            },
-            "Tool execution blocked — not in enabled_tools",
-          );
-          // Don't count blocked tool calls toward the iteration limit —
-          // feed an error back to the LLM so it can adjust instead of silently looping.
-          iterations--;
-          toolsCalledThisTurn.push({ name: executionResult.tool.name, success: false });
-          await conversation.addMessage({
-            content: `Tool "${executionResult.tool.name}" is not available in this conversation. Available tools: ${enabledTools.join(", ")}`,
-            type: MessageType.TOOL,
-            metadata: {
-              toolName: executionResult.tool.name,
-              status: "blocked",
-              reason: "not_in_enabled_tools",
-            },
-          });
-          continue;
-        }
-      }
+    // Enforce enabled_tools (see core/enabled-tools; ToolExecutionService checks
+    // it again for every caller). Caught here first so the AI hears which tools
+    // it has, and a blocked call does not count toward the iteration limit.
+    if (
+      executionResult.step === "CALL_TOOL" &&
+      executionResult.tool &&
+      !(await isToolEnabled(conversation, executionResult.tool.name))
+    ) {
+      const enabledTools = conversation.enabled_tools ?? [];
+      log.warn(
+        { toolName: executionResult.tool.name, enabledTools },
+        "Tool execution blocked — not in enabled_tools",
+      );
+      iterations--;
+      toolsCalledThisTurn.push({ name: executionResult.tool.name, success: false });
+      await conversation.addMessage({
+        content: `Tool "${executionResult.tool.name}" is not available in this conversation. Available tools: ${enabledTools.join(", ")}`,
+        type: MessageType.TOOL,
+        metadata: {
+          toolName: executionResult.tool.name,
+          status: "blocked",
+          reason: "not_in_enabled_tools",
+        },
+      });
+      continue;
     }
 
     // Quick check with the team (D19): one fact goes to the team and the
@@ -1547,7 +1535,7 @@ async function handleExecutionLoop(
           log.error(
             {
               toolName: executionResult.tool.name,
-              messagePreview: executionResult.userMessage.substring(0, 100),
+              messageLength: executionResult.userMessage.length,
             },
             "HALLUCINATION DETECTED: Saved user message with unpopulated tool field",
           );
@@ -1570,7 +1558,7 @@ async function handleExecutionLoop(
         );
         log.debug(
           {
-            messagePreview: executionResult.userMessage.substring(0, 100),
+            messageLength: executionResult.userMessage.length,
             confidenceScore: executionResult.confidence?.score,
             confidenceTier: executionResult.confidence?.tier,
           },
@@ -1603,7 +1591,7 @@ async function handleExecutionLoop(
           await sendBotMessage(
             conversation,
             {
-              content: "I'm here to help! How can I assist you today?",
+              content: handoffCopy("planningFallback", customerLanguage, conversation.language),
               type: MessageType.BOT_AGENT,
               metadata: {
                 isFallbackResponse: true,

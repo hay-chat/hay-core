@@ -207,6 +207,7 @@ export function loadManifest(pluginPath: string): ValidatedManifest {
     "webchat",
     "disputes",
     "tickets",
+    "privacy",
   ];
   for (const cap of manifest.capabilities) {
     if (!validCapabilities.includes(cap)) {

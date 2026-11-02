@@ -171,7 +171,7 @@ describe("pluginApi mcp.registerRemote", () => {
       transport: "http",
       tools: [tool],
       ...input,
-    } as Parameters<ReturnType<typeof callerWith>["mcp.registerRemote"]>[0]);
+    } as unknown as Parameters<ReturnType<typeof callerWith>["mcp.registerRemote"]>[0]);
 
   it.each(["http://127.0.0.1:5432/mcp", "http://10.0.0.5/mcp", "http://169.254.169.254/latest"])(
     "rejects a server URL on a non-public address (%s)",

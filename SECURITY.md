@@ -46,8 +46,18 @@ If you discover a security vulnerability, please report it responsibly by emaili
 
 ## Webhook Replay Protection
 
-Where Hay receives third-party webhooks (e.g. email and billing providers), inbound webhook requests must be protected against replay attacks.
+Inbound webhooks signed with Standard Webhooks / Svix signatures (e.g. Resend email events, see `server/lib/svix-signature.ts`) are checked as follows:
 
-- **Timestamp tolerance**: Requests must include a provider timestamp and it must be within **5 minutes** of server time.
-- **Nonce deduplication**: Requests must include a provider nonce/request id; Hay records that nonce in **Redis** with a 5-minute TTL and rejects any subsequent reuse.
-- **Logging**: Missing headers or rejected requests are logged (for tracking legacy senders and investigating abuse).
+- **Signature**: HMAC-SHA256 over `id.timestamp.body` with the provider secret; requests without a valid signature are rejected.
+- **Timestamp tolerance**: the provider timestamp must be within **5 minutes** of server time.
+- **Message id deduplication**: the provider message id is recorded in **Redis** for the tolerance window and a reused id is rejected. _(Pending: added by the webhook replay change in the current security batch; until it lands only the signature and timestamp are checked.)_
+
+Third-party webhooks received by plugins are verified by each plugin against its provider's own scheme.
+
+## Audit Log
+
+Security-relevant actions (sign-in and sign-out, API keys, members and roles, plugin configuration and credentials, exports, deletions, DSAR requests) are written to the `audit_logs` table.
+
+- Rows are append-only: a database trigger rejects updates and deletes, except clearing a deleted user's or organization's reference, GDPR erasure anonymization, and the retention job.
+- Rows are kept **90 days**, also after the organization is deleted (attributable through `original_organization_id`).
+- Failed sign-ins for unknown emails store a keyed hash of the email, never the address.

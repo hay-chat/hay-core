@@ -268,6 +268,7 @@
 </template>
 
 <script setup lang="ts">
+import { logger } from "@/utils/logger";
 import {
   MessageSquare,
   Activity,
@@ -621,7 +622,7 @@ onMounted(async () => {
   unsubscribeConversationCreated = websocket.on(
     "conversation_created",
     async (payload: unknown) => {
-      console.log("[Conversations List] Received conversation_created event", payload);
+      logger.debug("[Conversations List] Received conversation_created event", payload);
       if (isConversationCreatedPayload(payload)) {
         const newConversation = payload;
 
@@ -643,7 +644,7 @@ onMounted(async () => {
   unsubscribeConversationUpdated = websocket.on(
     "conversation_updated",
     async (payload: unknown) => {
-      console.log("[Conversations List] Received conversation_updated event", payload);
+      logger.debug("[Conversations List] Received conversation_updated event", payload);
       if (isConversationUpdatedPayload(payload)) {
         const updatedData = payload;
         const index = conversations.value.findIndex((c) => c.id === updatedData.id);
@@ -671,7 +672,7 @@ onMounted(async () => {
   unsubscribeConversationDeleted = websocket.on(
     "conversation_deleted",
     async (payload: unknown) => {
-      console.log("[Conversations List] Received conversation_deleted event", payload);
+      logger.debug("[Conversations List] Received conversation_deleted event", payload);
       if (isConversationDeletedPayload(payload)) {
         const deletedId = payload.id;
         const index = conversations.value.findIndex((c) => c.id === deletedId);

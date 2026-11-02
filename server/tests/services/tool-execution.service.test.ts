@@ -15,6 +15,10 @@ const mockHold = jest.fn();
 const mockFindEarlierRequest = jest.fn();
 const mockGetToolsForOrg = jest.fn();
 const mockGetLastMessages = jest.fn();
+const mockResolveIdentity = jest.fn();
+const mockCoreGet = jest.fn();
+const mockCoreExecute = jest.fn();
+const mockGetSecrets = jest.fn();
 
 jest.mock("@server/lib/logger", () => ({
   createLogger: () => ({ info: jest.fn(), debug: jest.fn(), warn: jest.fn(), error: jest.fn() }),
@@ -49,7 +53,7 @@ jest.mock("@server/services/plugin-manager.service", () => ({
   },
 }));
 jest.mock("@server/services/conversation-secret.service", () => ({
-  conversationSecretService: { getSecrets: async () => ({}) },
+  conversationSecretService: { getSecrets: mockGetSecrets },
 }));
 jest.mock("@server/services/mcp-registry.service", () => ({
   mcpRegistryService: { getToolRisk: mockGetToolRisk, getToolsForOrg: mockGetToolsForOrg },
@@ -58,7 +62,15 @@ jest.mock("@server/services/mcp-client-factory.service", () => ({
   MCPClientFactory: { createClient: async () => ({ callTool: mockCallTool }) },
 }));
 jest.mock("@server/services/core/core-tools", () => ({
-  coreToolRegistry: { has: () => false },
+  coreToolRegistry: {
+    has: (name: string) => Boolean(mockCoreGet(name)),
+    get: mockCoreGet,
+    execute: mockCoreExecute,
+  },
+}));
+jest.mock("@server/services/core/customer-identity", () => ({
+  ...jest.requireActual("@server/services/core/customer-identity"),
+  resolveCustomerIdentity: mockResolveIdentity,
 }));
 jest.mock("@server/services/redis.service", () => ({
   redisService: { isConnected: () => false },
@@ -110,6 +122,9 @@ beforeEach(() => {
   mockFindEarlierRequest.mockResolvedValue(null);
   mockGetToolsForOrg.mockResolvedValue([]);
   mockGetLastMessages.mockResolvedValue([]);
+  mockResolveIdentity.mockResolvedValue({ trust: "none" });
+  mockCoreGet.mockReturnValue(undefined);
+  mockGetSecrets.mockResolvedValue({});
   mockHold.mockImplementation(async (input: Record<string, unknown>) => ({
     id: "pa-1",
     idempotency_key: "key-from-pending-action",
@@ -651,5 +666,132 @@ describe("action log helpers", () => {
     expect(toolErrorCode("boom")).toBe("INTERNAL");
     expect(toolErrorCode(undefined)).toBe("INTERNAL");
     expect(toolErrorCode('{"code":"RATE_LIMITED"}')).toBe("RATE_LIMITED");
+  });
+});
+
+describe("ToolExecutionService tool governance", () => {
+  const LOOKUP_RISK = { readOnly: true, category: null, classified: true, customerData: true };
+  const lookup = { name: "shop:find_customer", args: { email: "ana@example.com" } };
+  const ANA = {
+    trust: "verified",
+    source: "webchat_signature",
+    externalId: "ext-1",
+    email: "ana@example.com",
+    phone: null,
+  };
+
+  it("refuses a customer-data read when nobody is verified, without calling the plugin", async () => {
+    mockGetToolRisk.mockResolvedValue(LOOKUP_RISK);
+    const res = await new ToolExecutionService().handleToolExecution(makeConversation(), lookup);
+
+    expect(res).toMatchObject({ success: false, result: { status: "identity_required" } });
+    expect(mockCallTool).not.toHaveBeenCalled();
+    expect(mockRecord.mock.calls[0][0]).toMatchObject({
+      outcome: "error",
+      errorCode: "IDENTITY_REQUIRED",
+    });
+  });
+
+  it("runs it for a verified customer and sends the identity beside the args", async () => {
+    mockGetToolRisk.mockResolvedValue(LOOKUP_RISK);
+    mockResolveIdentity.mockResolvedValue(ANA);
+    mockCallTool.mockResolvedValue({ content: [{ type: "text", text: "[]" }] });
+    const res = await new ToolExecutionService().handleToolExecution(makeConversation(), lookup);
+
+    expect(res.success).toBe(true);
+    const [toolName, args, meta] = mockCallTool.mock.calls[0];
+    expect(toolName).toBe("find_customer");
+    expect(args).toEqual({ email: "ana@example.com" });
+    expect(meta).toEqual({ "chat.hay/customer": ANA });
+  });
+
+  it("refuses a tool the conversation's playbook does not enable", async () => {
+    const conversation = Object.assign(makeConversation(), { enabled_tools: ["shop:get_order"] });
+    const res = await new ToolExecutionService().handleToolExecution(conversation, {
+      name: "shop:create_refund",
+      args: { order_id: "1" },
+    });
+
+    expect(res).toMatchObject({ success: false, result: { status: "not_available" } });
+    expect(mockCallTool).not.toHaveBeenCalled();
+    expect(mockRecord.mock.calls[0][0].errorCode).toBe("TOOL_NOT_ENABLED");
+  });
+
+  it("refuses args that do not match the tool's cached input schema, before any hold", async () => {
+    mockFindOrg.mockResolvedValue(APPROVAL_DEFAULTS);
+    mockGetToolsForOrg.mockResolvedValue([
+      {
+        pluginId: "shop",
+        name: "create_refund",
+        input_schema: {
+          type: "object",
+          required: ["order_id"],
+          properties: { order_id: { type: "string" }, amount: { type: "number" } },
+          additionalProperties: false,
+        },
+      },
+    ]);
+    const res = await new ToolExecutionService().handleToolExecution(makeConversation(), {
+      name: "shop:create_refund",
+      args: { amount: "lots", note: "x" },
+    });
+
+    expect(res).toMatchObject({ success: false, result: { status: "invalid_arguments" } });
+    expect(mockHold).not.toHaveBeenCalled();
+    expect(mockCallTool).not.toHaveBeenCalled();
+  });
+
+  it("simulates a core tool with a side effect in a dry-run conversation", async () => {
+    mockCoreGet.mockImplementation((name: string) =>
+      name === "send_attachment"
+        ? { name, risk: { readOnly: false, category: "note", classified: true } }
+        : undefined,
+    );
+    const res = await new ToolExecutionService().handleToolExecution(
+      makeConversation({ isPlayground: true }),
+      { name: "send_attachment", args: { url: "https://x.test/a.pdf" } },
+    );
+
+    expect(res).toMatchObject({ success: true, simulated: true });
+    expect(mockCoreExecute).not.toHaveBeenCalled();
+  });
+
+  it("runs a core tool with a side effect live without asking the shopper or holding", async () => {
+    mockFindOrg.mockResolvedValue({ settings: { actionApproval: { customerConfirmation: true } } });
+    mockCoreGet.mockImplementation((name: string) =>
+      name === "create_ticket"
+        ? { name, risk: { readOnly: false, category: "note", classified: true } }
+        : undefined,
+    );
+    mockCoreExecute.mockResolvedValue({ created: true });
+    const res = await new ToolExecutionService().handleToolExecution(makeConversation(), {
+      name: "create_ticket",
+      args: { subject: "s", summary: "t" },
+    });
+
+    expect(res).toMatchObject({ success: true, result: { created: true } });
+    expect(mockHold).not.toHaveBeenCalled();
+  });
+
+  it("fills secrets only into properties the schema marks for them", async () => {
+    mockGetToolRisk.mockResolvedValue({ readOnly: true, category: null, classified: true });
+    mockGetSecrets.mockResolvedValue({ token: "s3cret" });
+    mockGetToolsForOrg.mockResolvedValue([
+      {
+        pluginId: "shop",
+        name: "get_order",
+        input_schema: {
+          type: "object",
+          properties: { auth: { type: "string", "x-hay-secret": "token" }, note: {} },
+        },
+      },
+    ]);
+    mockCallTool.mockResolvedValue({ content: [] });
+    await new ToolExecutionService().handleToolExecution(makeConversation(), {
+      name: "shop:get_order",
+      args: { note: "<<secret.token>>" },
+    });
+
+    expect(mockCallTool.mock.calls[0][1]).toEqual({ auth: "s3cret", note: "<<secret.token>>" });
   });
 });

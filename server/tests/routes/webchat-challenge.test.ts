@@ -1,7 +1,10 @@
 import { describe, it, expect, jest, beforeEach } from "@jest/globals";
 
 jest.mock("@server/config/env", () => ({
-  config: { domain: { dashboard: "app.hay.chat", api: "api.hay.chat" } },
+  config: {
+    domain: { dashboard: "app.hay.chat", api: "api.hay.chat" },
+    server: { trustProxy: 1 },
+  },
 }));
 jest.mock("@server/lib/logger", () => ({
   createLogger: () => ({ debug: jest.fn(), info: jest.fn(), warn: jest.fn(), error: jest.fn() }),

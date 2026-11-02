@@ -38,6 +38,9 @@ jest.mock("@server/services/organization.service", () => ({
   organizationService: { findOne: mockFindOne, deleteWithData: mockDeleteWithData },
 }));
 
+// Account provisioning is covered by tests/integration/auth-account-access.test.ts.
+jest.mock("@server/routes/v1/internal/users", () => ({ internalUsersRouter: {} }));
+
 import { internalRouter } from "@server/routes/v1/internal";
 import { INTERNAL_SECRET_HEADER } from "@server/trpc/middleware/internal";
 import type { Context } from "@server/trpc/context";
@@ -228,7 +231,7 @@ describe("internal.organizations", () => {
     await expect(
       internalRouter.createCaller(ctx()).organizations.delete({ organizationId: ORG_ID }),
     ).resolves.toEqual({ success: true });
-    expect(mockDeleteWithData).toHaveBeenCalledWith(organization);
+    expect(mockDeleteWithData).toHaveBeenCalledWith(organization, { source: "operator" });
 
     mockFindOne.mockResolvedValueOnce(null);
     await expect(

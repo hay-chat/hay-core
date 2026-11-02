@@ -218,6 +218,10 @@ export class ConversationService {
       }
     }
 
+    // Media files are not removed by the row's CASCADE either.
+    const { deleteConversationMedia } = await import("./conversation-media.service");
+    await deleteConversationMedia({ organizationId, conversationIds: [conversationId] });
+
     return await this.conversationRepository.delete(conversationId, organizationId);
   }
 

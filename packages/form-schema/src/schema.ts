@@ -68,7 +68,7 @@ export const formStatusSchema = z.enum(["PENDING", "SUBMITTED", "SKIPPED"]);
 
 export const formResponseValueSchema = z.union([z.string(), z.number(), z.boolean(), z.null()]);
 
-export const formResponseSchema = z.record(formResponseValueSchema);
+export const formResponseSchema = z.record(z.string(), formResponseValueSchema);
 
 export const formMessageMetadataSchema = z.object({
   ui: z.object({

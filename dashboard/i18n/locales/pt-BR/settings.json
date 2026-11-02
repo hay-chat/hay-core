@@ -78,7 +78,14 @@
     "similarityThresholdHelper": "Limite mais baixo para busca mais ampla (padrão: 0.3)",
     "fallbackMessage": "Mensagem de Fallback",
     "fallbackMessagePlaceholder": "Digite a mensagem de fallback...",
-    "fallbackMessageHelper": "Mensagem exibida quando a confiança é baixa e o escalonamento está desativado. Será automaticamente traduzida para corresponder ao idioma da conversa."
+    "fallbackMessageHelper": "Mensagem exibida quando a confiança é baixa e o escalonamento está desativado. Será automaticamente traduzida para corresponder ao idioma da conversa.",
+    "escalationOff": {
+      "title": "Desativar o encaminhamento para humanos?",
+      "description": "Respostas em que a IA não tem confiança serão enviadas aos clientes em vez de irem para a sua equipe.",
+      "instruction": "Digite {word} para confirmar.",
+      "word": "DESATIVAR",
+      "confirm": "Desativar encaminhamento"
+    }
   },
   "danger": {
     "title": "Zona de Perigo",

@@ -11,6 +11,7 @@ import {
 } from "@server/types/organization-access.types";
 import { resolutionLedgerService } from "@server/services/resolution-ledger.service";
 import { createLogger } from "@server/lib/logger";
+import { internalUsersRouter } from "./users";
 
 const logger = createLogger("internal");
 
@@ -104,7 +105,7 @@ const internalOrganizationsRouter = router({
       throw new TRPCError({ code: "NOT_FOUND", message: "Organization not found" });
     }
 
-    await organizationService.deleteWithData(organization);
+    await organizationService.deleteWithData(organization, { source: "operator" });
     logger.warn({ orgId: organization.id }, "Organization deleted by operator");
 
     return { success: true };
@@ -141,4 +142,5 @@ const internalResolutionsRouter = router({
 export const internalRouter = router({
   organizations: internalOrganizationsRouter,
   resolutions: internalResolutionsRouter,
+  users: internalUsersRouter,
 });

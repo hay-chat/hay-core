@@ -34,6 +34,7 @@ export function mintPluginApiToken(
     { organizationId, pluginId, scope: PLUGIN_API_TOKEN_SCOPE, capabilities },
     config.jwt.secret,
     {
+      algorithm: "HS256",
       expiresIn: "24h",
       issuer: PLUGIN_API_TOKEN_ISSUER,
       audience: PLUGIN_API_TOKEN_AUDIENCE,
@@ -48,6 +49,7 @@ export function mintPluginApiToken(
  */
 export function verifyPluginApiToken(token: string): PluginApiTokenClaims {
   const decoded = jwt.verify(token, config.jwt.secret, {
+    algorithms: ["HS256"],
     issuer: PLUGIN_API_TOKEN_ISSUER,
     audience: PLUGIN_API_TOKEN_AUDIENCE,
   });

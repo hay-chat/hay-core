@@ -12,6 +12,7 @@
 
 import type { Conversation } from "@server/database/entities/conversation.entity";
 import { createLogger } from "@server/lib/logger";
+import type { ToolRisk } from "../tool-risk";
 import { completeProductCaseTool } from "./complete-product-case";
 import { createTicketTool } from "./create-ticket";
 import { findPageUrlTool } from "./find-page-url";
@@ -27,6 +28,8 @@ export interface CoreToolDefinition {
   description: string;
   /** JSON Schema describing the tool's input args. */
   inputSchema: Record<string, unknown>;
+  /** READ_RISK, or CORE_WRITE_RISK when the tool changes anything (dry-run simulates it). */
+  risk: ToolRisk;
   /**
    * Tool body. Receives the conversation (so the impl can scope to the org)
    * plus the parsed args. Whatever it returns is JSON-serialized into the
@@ -48,6 +51,10 @@ class CoreToolRegistry {
 
   has(name: string): boolean {
     return this.tools.has(name);
+  }
+
+  get(name: string): CoreToolDefinition | undefined {
+    return this.tools.get(name);
   }
 
   list(): CoreToolDefinition[] {

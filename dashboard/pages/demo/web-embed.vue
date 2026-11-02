@@ -180,6 +180,7 @@
 </template>
 
 <script setup lang="ts">
+import { logger } from "@/utils/logger";
 import { ref, onMounted, onBeforeUnmount } from "vue";
 import { Shield, Key, RefreshCw, Trash2, Download, MousePointerClick } from "lucide-vue-next";
 import {
@@ -226,7 +227,7 @@ async function loadSessionInfo() {
 
     // If conversation ID changed from a value to a different value (not from null)
     if (previousId && currentConversationId && previousId !== currentConversationId) {
-      console.log("Conversation changed, reloading widget...");
+      logger.debug("Conversation changed, reloading widget...");
       reloadWidget();
     }
   }

@@ -46,6 +46,7 @@ describe("loadManifest capabilities", () => {
         "webchat",
         "disputes",
         "tickets",
+        "privacy",
       ]),
     );
     expect(manifest.capabilities).toContain("disputes");

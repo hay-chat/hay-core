@@ -50,7 +50,7 @@
     "body": "Recebemos uma solicitação para redefinir a senha da sua conta {{ companyName }} associada a",
     "clickToReset": "Se você fez esta solicitação, clique no botão abaixo para redefinir sua senha:",
     "resetPassword": "Redefinir Senha",
-    "expirationWarning": "Este link de redefinição de senha expirará em {{ expirationHours }} horas por motivos de segurança.",
+    "expirationWarning": "Este link de redefinição de senha expirará em 1 hora por motivos de segurança.",
     "important": "Importante",
     "didntRequest": "Não solicitou isso?",
     "ignoreEmail": "Se você não solicitou uma redefinição de senha, por favor ignore este e-mail. Sua senha permanecerá inalterada.",

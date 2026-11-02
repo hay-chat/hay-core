@@ -3,6 +3,10 @@
  * Used in privacy.service.ts for type-safe export data structures
  */
 
+/** Job `data.type` values of queued privacy requests (job-queue.service BACKGROUND_JOB_TYPES). */
+export const PRIVACY_EXPORT_JOB_TYPE = "privacy_export";
+export const PRIVACY_DELETION_JOB_TYPE = "privacy_deletion";
+
 export interface MessageAttachment {
   id: string;
   name: string;
@@ -174,6 +178,7 @@ export interface ExportPackageStatistics {
   totalDocuments?: number;
   totalUploads?: number;
   totalAuditLogs?: number;
+  totalOrganizations?: number;
 }
 
 export interface ExportPackageData {

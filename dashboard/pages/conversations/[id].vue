@@ -1056,6 +1056,7 @@
 </template>
 
 <script setup lang="ts">
+import { logger } from "@/utils/logger";
 import {
   ArrowLeft,
   Eye,
@@ -1482,19 +1483,19 @@ const toggleLegalHold = async (newValue: boolean) => {
 
 // Message approval handlers
 const handleMessageApproved = async (messageId: string) => {
-  console.log("Message approved:", messageId);
+  logger.debug("Message approved:", messageId);
   // Reload conversation to get updated messages
   await fetchConversation();
 };
 
 const handleMessageBlocked = async (messageId: string) => {
-  console.log("Message blocked:", messageId);
+  logger.debug("Message blocked:", messageId);
   // Reload conversation to get updated messages
   await fetchConversation();
 };
 
 const handleFeedbackSubmitted = () => {
-  console.log("Feedback submitted");
+  logger.debug("Feedback submitted");
   // Optional: Show toast or update UI
 };
 
@@ -1722,7 +1723,7 @@ const formatStatus = (status: string | undefined) => {
 const toggleSupervisionMode = () => {
   supervisionMode.value = !supervisionMode.value;
   // TODO: Enable/disable supervision mode
-  console.log("Supervision mode:", supervisionMode.value);
+  logger.debug("Supervision mode:", supervisionMode.value);
 };
 
 const takeOverConversation = async () => {
@@ -2145,7 +2146,7 @@ onMounted(async () => {
   websocket.connect();
 
   // Subscribe to this specific conversation to receive its messages
-  console.log("[WebSocket] Subscribing to conversation:", conversationId.value);
+  logger.debug("[WebSocket] Subscribing to conversation:", conversationId.value);
   websocket.send({
     type: "subscribe",
     conversationId: conversationId.value,
@@ -2153,7 +2154,7 @@ onMounted(async () => {
 
   // Listen for new messages (full message data)
   unsubscribeMessage = websocket.on("message", async (payload: unknown) => {
-    console.log("[WebSocket] Received message event with full data", payload);
+    logger.debug("[WebSocket] Received message event with full data", payload);
     if (isMessageEventPayload(payload) && payload.data) {
       const messageData = payload.data;
 
@@ -2182,7 +2183,7 @@ onMounted(async () => {
 
         if (optimisticIndex !== -1) {
           // Replace optimistic message with real one
-          console.log(
+          logger.debug(
             "[WebSocket] Replacing optimistic message with real message:",
             messageData.id,
           );
@@ -2203,7 +2204,7 @@ onMounted(async () => {
         // Check if message already exists - if so, update it (for tool call responses)
         const existingMessageIndex = messages.value.findIndex((m) => m.id === messageData.id);
         if (existingMessageIndex !== -1) {
-          console.log("[WebSocket] Updating existing message:", messageData.id);
+          logger.debug("[WebSocket] Updating existing message:", messageData.id);
           messages.value[existingMessageIndex] = {
             id: messageData.id,
             content: messageData.content,
@@ -2248,7 +2249,7 @@ onMounted(async () => {
 
         if (optimisticIndex !== -1) {
           // Replace optimistic message with real one
-          console.log(
+          logger.debug(
             "[WebSocket] Replacing optimistic message with real message:",
             messageData.id,
           );
@@ -2273,7 +2274,7 @@ onMounted(async () => {
           (m) => m.id === messageData.id,
         );
         if (existingMessageIndex !== -1) {
-          console.log("[WebSocket] Updating existing message:", messageData.id);
+          logger.debug("[WebSocket] Updating existing message:", messageData.id);
           conversation.value.messages[existingMessageIndex] = {
             id: messageData.id,
             content: messageData.content,
@@ -2323,7 +2324,7 @@ onMounted(async () => {
   // Debounce timer for conversation refreshes to prevent excessive API calls
   let refreshDebounceTimer: ReturnType<typeof setTimeout> | null = null;
   const debouncedRefreshConversation = async (reason: string) => {
-    console.log(`[WebSocket] Conversation refresh requested (${reason}), debouncing...`);
+    logger.debug(`[WebSocket] Conversation refresh requested (${reason}), debouncing...`);
 
     // Clear any pending refresh
     if (refreshDebounceTimer) {
@@ -2332,7 +2333,7 @@ onMounted(async () => {
 
     // Schedule new refresh after 300ms
     refreshDebounceTimer = setTimeout(async () => {
-      console.log(`[WebSocket] Executing debounced refresh (${reason})`);
+      logger.debug(`[WebSocket] Executing debounced refresh (${reason})`);
       await fetchConversation();
       refreshDebounceTimer = null;
     }, 300);
@@ -2359,7 +2360,7 @@ onMounted(async () => {
     async (payload: unknown) => {
       if (!isConversationEventPayload(payload)) return;
       if (payload.conversationId === conversationId.value) {
-        console.log("[WebSocket] Conversation status changed", payload);
+        logger.debug("[WebSocket] Conversation status changed", payload);
 
         // Handle processing phase for typing indicator
         if (payload.processingPhase) {
@@ -2379,9 +2380,9 @@ onMounted(async () => {
 
   // Listen for message approval events
   unsubscribeMessageApproved = websocket.on("message_approved", async (payload: unknown) => {
-    console.log("[WebSocket] Received message_approved event", payload);
+    logger.debug("[WebSocket] Received message_approved event", payload);
     if (isConversationEventPayload(payload) && payload.conversationId === conversationId.value) {
-      console.log("[WebSocket] Message approved in current conversation");
+      logger.debug("[WebSocket] Message approved in current conversation");
       await debouncedRefreshConversation("message_approved");
       // Scroll will happen after refresh completes
       setTimeout(() => scrollToBottom(), 350);
@@ -2390,9 +2391,9 @@ onMounted(async () => {
 
   // Listen for message block events
   unsubscribeMessageBlocked = websocket.on("message_blocked", async (payload: unknown) => {
-    console.log("[WebSocket] Received message_blocked event", payload);
+    logger.debug("[WebSocket] Received message_blocked event", payload);
     if (isConversationEventPayload(payload) && payload.conversationId === conversationId.value) {
-      console.log("[WebSocket] Message blocked in current conversation");
+      logger.debug("[WebSocket] Message blocked in current conversation");
       await debouncedRefreshConversation("message_blocked");
     }
   });

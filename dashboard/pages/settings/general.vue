@@ -8,7 +8,7 @@
           <RotateCcw class="h-4 w-4 mr-2" />
           {{ $t("general.resetToDefaults") }}
         </Button>
-        <Button :loading="isSaving" :disabled="!hasChanges" @click="saveSettings">
+        <Button :loading="isSaving" :disabled="!hasChanges" @click="saveSettings()">
           <Save class="h-4 w-4 mr-2" />
           {{ $t("general.saveChanges") }}
         </Button>
@@ -21,6 +21,37 @@
       :organization-name="settings.organizationName"
       @deleted="onOrganizationDeleted"
     />
+
+    <!-- Typed confirmation before human escalation is switched off -->
+    <Dialog v-model:open="escalationConfirmOpen">
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>{{ $t("confidence.escalationOff.title") }}</DialogTitle>
+          <DialogDescription>{{ $t("confidence.escalationOff.description") }}</DialogDescription>
+        </DialogHeader>
+        <Input
+          v-model="escalationTypedWord"
+          :label="$t('confidence.escalationOff.instruction', { word: escalationConfirmWord })"
+          autocomplete="off"
+          data-testid="escalation-typed-confirm"
+        />
+        <DialogFooter>
+          <Button variant="outline" :disabled="isSaving" @click="escalationConfirmOpen = false">
+            {{ $t("common.cancel") }}
+          </Button>
+          <Button
+            variant="destructive"
+            :loading="isSaving"
+            :disabled="
+              escalationTypedWord.trim().toUpperCase() !== escalationConfirmWord.toUpperCase()
+            "
+            @click="saveSettings(true)"
+          >
+            {{ $t("confidence.escalationOff.confirm") }}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
 
     <!-- Organization Settings -->
     <Card>
@@ -713,7 +744,23 @@ const handleLogoSelect = async (event: Event) => {
   }
 };
 
-const saveSettings = async () => {
+/** Sent with a save that switches escalation off (server ESCALATION_OFF_CONFIRMATION). */
+const ESCALATION_OFF_CONFIRMATION = "SWITCH OFF ESCALATION";
+const escalationConfirmOpen = ref(false);
+const escalationTypedWord = ref("");
+const escalationConfirmWord = computed(() => t("confidence.escalationOff.word"));
+const escalationSwitchedOff = computed(
+  () =>
+    Boolean(originalSettings.value.confidenceGuardrail?.enableEscalation) &&
+    !settings.value.confidenceGuardrail.enableEscalation,
+);
+
+const saveSettings = async (escalationOffConfirmed = false) => {
+  if (escalationSwitchedOff.value && !escalationOffConfirmed) {
+    escalationTypedWord.value = "";
+    escalationConfirmOpen.value = true;
+    return;
+  }
   try {
     isSaving.value = true;
 
@@ -733,6 +780,8 @@ const saveSettings = async () => {
         // Ensure boolean values are properly typed (Input component may return strings)
         enableRecheck: Boolean(settings.value.confidenceGuardrail.enableRecheck),
         enableEscalation: Boolean(settings.value.confidenceGuardrail.enableEscalation),
+        // The server refuses an escalation switch-off without it (typed confirm above).
+        ...(escalationSwitchedOff.value && { confirmSwitchOff: ESCALATION_OFF_CONFIRMATION }),
         // Ensure number values are properly typed
         highThreshold: Number(settings.value.confidenceGuardrail.highThreshold),
         mediumThreshold: Number(settings.value.confidenceGuardrail.mediumThreshold),
@@ -746,6 +795,7 @@ const saveSettings = async () => {
     });
 
     if (response.success) {
+      escalationConfirmOpen.value = false;
       // The server normalizes the website ("shop.com" → "https://shop.com").
       settings.value.organizationWebsite = response.data.website;
       // Update original settings to new saved state

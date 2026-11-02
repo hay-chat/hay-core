@@ -2,7 +2,8 @@
  * Plugin Registry Composable
  *
  * Provides dynamic loading of plugin UI components from built bundles.
- * Components are loaded through authenticated HTTP endpoints.
+ * Bundles are loaded from short-lived URLs signed for the current organization
+ * (`Hay.plugins.getUiAssetUrls`), since <script>/<link> tags send no auth header.
  *
  * @example
  * ```typescript
@@ -11,8 +12,9 @@
  * ```
  */
 
+import { logger } from "@/utils/logger";
 import { defineAsyncComponent, type Component, type ComponentOptions } from "vue";
-import { useDomain } from "@/composables/useDomain";
+import { Hay } from "@/utils/api";
 
 interface PluginComponentCache {
   [key: string]: Component;
@@ -45,7 +47,6 @@ function convertPluginIdToGlobalVar(pluginId: string): string {
 export const usePluginRegistry = () => {
   const componentCache: PluginComponentCache = {};
   const loadedResources = new Set<string>(); // Track loaded scripts and styles
-  const { getApiUrl } = useDomain();
 
   /**
    * Load a plugin component dynamically from its UI bundle.
@@ -68,7 +69,7 @@ export const usePluginRegistry = () => {
     }
 
     try {
-      console.log(`[PluginRegistry] Loading ${componentName} from ${pluginId}`);
+      logger.debug(`[PluginRegistry] Loading ${componentName} from ${pluginId}`);
 
       const component = defineAsyncComponent({
         loader: async () => {
@@ -78,25 +79,24 @@ export const usePluginRegistry = () => {
             // Import Vue and expose it globally
             const Vue = await import("vue");
             globalWindow.Vue = Vue;
-            console.log("[PluginRegistry] Vue exposed globally for UMD bundles");
+            logger.debug("[PluginRegistry] Vue exposed globally for UMD bundles");
           }
-
-          // Build authenticated URL to plugin UI bundle (UMD format)
-          // URL format: http://localhost:3001/plugins/ui/hay-plugin-zendesk/ui.js
-          const apiBaseUrl = getApiUrl();
-          const bundleUrl = `${apiBaseUrl}/plugins/ui/${encodeURIComponent(pluginId)}/ui.js`;
-          const styleUrl = `${apiBaseUrl}/plugins/ui/${encodeURIComponent(pluginId)}/style.css`;
-
-          console.log(`[PluginRegistry] Loading UMD bundle from ${bundleUrl}`);
 
           // Check if plugin resources are already loaded
           if (loadedResources.has(pluginId)) {
-            console.log(
+            logger.debug(
               `[PluginRegistry] Plugin ${pluginId} resources already loaded, skipping script/style`,
             );
           } else {
-            // Load CSS first (if not already loaded)
             const styleId = `plugin-style-${pluginId}`;
+            const scriptId = `plugin-script-${pluginId}`;
+            // Signed URLs of the UMD bundle and its stylesheet, only fetched when a tag is missing
+            const needsAssets =
+              !document.getElementById(styleId) || !document.getElementById(scriptId);
+            const { script: bundleUrl, style: styleUrl } = needsAssets
+              ? await Hay.plugins.getUiAssetUrls.query({ pluginId })
+              : { script: "", style: "" };
+            // Load CSS first (if not already loaded)
             if (!document.getElementById(styleId)) {
               await new Promise<void>((resolve) => {
                 const link = document.createElement("link");
@@ -104,7 +104,7 @@ export const usePluginRegistry = () => {
                 link.rel = "stylesheet";
                 link.href = styleUrl;
                 link.onload = () => {
-                  console.log(`[PluginRegistry] CSS loaded for ${pluginId}`);
+                  logger.debug(`[PluginRegistry] CSS loaded for ${pluginId}`);
                   resolve();
                 };
                 link.onerror = () => {
@@ -117,7 +117,6 @@ export const usePluginRegistry = () => {
             }
 
             // Load the UMD bundle as a script tag (it will set a global variable)
-            const scriptId = `plugin-script-${pluginId}`;
             if (!document.getElementById(scriptId)) {
               await new Promise<void>((resolve, reject) => {
                 const script = document.createElement("script");
@@ -125,11 +124,11 @@ export const usePluginRegistry = () => {
                 script.src = bundleUrl;
                 script.async = true;
                 script.onload = () => {
-                  console.log(`[PluginRegistry] UMD bundle loaded for ${pluginId}`);
+                  logger.debug(`[PluginRegistry] UMD bundle loaded for ${pluginId}`);
                   resolve();
                 };
                 script.onerror = () => {
-                  reject(new Error(`Failed to load plugin bundle from ${bundleUrl}`));
+                  reject(new Error(`Failed to load plugin bundle for ${pluginId}`));
                 };
                 document.head.appendChild(script);
               });
@@ -143,8 +142,7 @@ export const usePluginRegistry = () => {
           // For Zendesk plugin, it's window.ZendeskPlugin
           const pluginNamePascal = convertPluginIdToGlobalVar(pluginId);
           const pluginGlobal = globalWindow[pluginNamePascal] as
-            | Record<string, unknown>
-            | undefined;
+            Record<string, unknown> | undefined;
 
           if (!pluginGlobal) {
             throw new Error(
@@ -159,7 +157,7 @@ export const usePluginRegistry = () => {
             );
           }
 
-          console.log(`[PluginRegistry] Successfully loaded ${componentName} from ${pluginId}`);
+          logger.debug(`[PluginRegistry] Successfully loaded ${componentName} from ${pluginId}`);
           // PluginPageSlot passes every component the same props (api, locale, ...).
           // A prop the component doesn't declare would fall through to its root
           // element as a DOM attribute, and stringifying the tRPC client (`api`)
@@ -198,14 +196,14 @@ export const usePluginRegistry = () => {
    * @param pluginId - Plugin identifier to unload
    */
   const unloadPlugin = (pluginId: string) => {
-    console.log(`[PluginRegistry] Unloading plugin ${pluginId}`);
+    logger.debug(`[PluginRegistry] Unloading plugin ${pluginId}`);
 
     // Remove script tag
     const scriptId = `plugin-script-${pluginId}`;
     const script = document.getElementById(scriptId);
     if (script) {
       script.remove();
-      console.log(`[PluginRegistry] Removed script for ${pluginId}`);
+      logger.debug(`[PluginRegistry] Removed script for ${pluginId}`);
     }
 
     // Remove style tag
@@ -213,7 +211,7 @@ export const usePluginRegistry = () => {
     const style = document.getElementById(styleId);
     if (style) {
       style.remove();
-      console.log(`[PluginRegistry] Removed styles for ${pluginId}`);
+      logger.debug(`[PluginRegistry] Removed styles for ${pluginId}`);
     }
 
     // Remove from loaded resources set
@@ -224,7 +222,7 @@ export const usePluginRegistry = () => {
       .filter((key) => key.startsWith(`${pluginId}:`))
       .forEach((key) => {
         delete componentCache[key];
-        console.log(`[PluginRegistry] Removed cached component ${key}`);
+        logger.debug(`[PluginRegistry] Removed cached component ${key}`);
       });
 
     // Clear the global variable (if it exists)
@@ -232,7 +230,7 @@ export const usePluginRegistry = () => {
     const globalWindow = window as unknown as WindowWithVue;
     if (globalWindow[pluginNamePascal]) {
       delete globalWindow[pluginNamePascal];
-      console.log(`[PluginRegistry] Removed global variable ${pluginNamePascal}`);
+      logger.debug(`[PluginRegistry] Removed global variable ${pluginNamePascal}`);
     }
   };
 

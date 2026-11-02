@@ -12,7 +12,8 @@
     "capabilities": [
       "mcp",
       "auth",
-      "products"
+      "products",
+      "privacy"
     ],
     "env": [
       "NUVEMSHOP_OAUTH_CLIENT_ID",

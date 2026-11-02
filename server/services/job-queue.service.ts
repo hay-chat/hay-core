@@ -7,11 +7,16 @@ const logger = createLogger("job-queue");
 
 /**
  * Job `data.type` values that are processed by the background queue worker.
- * Other types (web_import, page_discovery, privacy export, ...) are dispatched
- * inline by their initiating route and must NOT be listed here, or the worker
- * would race the inline processor.
+ * Other types (web_import, page_discovery, ...) are dispatched inline by their
+ * initiating route and must NOT be listed here, or the worker would race the
+ * inline processor.
  */
-const BACKGROUND_JOB_TYPES = ["document_source_sync", "organization_export"];
+const BACKGROUND_JOB_TYPES = [
+  "document_source_sync",
+  "organization_export",
+  "privacy_export",
+  "privacy_deletion",
+];
 
 /** Partial job state changes published on the job-updates channel. */
 interface JobUpdate {
@@ -121,7 +126,7 @@ export class JobQueueService {
    */
   async processNextJob(): Promise<void> {
     // Most job types are processed inline by their initiating route (web import,
-    // page discovery, privacy export). Background-dispatched types claim a row
+    // page discovery). Background-dispatched types claim a row
     // here and route to their handler service.
     if (this.isProcessing) {
       return;
@@ -196,6 +201,13 @@ export class JobQueueService {
           await this.completeJob(job.id, job.organizationId, result);
           return;
         }
+        case "privacy_export":
+        case "privacy_deletion": {
+          const { privacyService } = await import("./privacy.service");
+          const result = await privacyService.processJob(job);
+          await this.completeJob(job.id, job.organizationId, result);
+          return;
+        }
         default:
           logger.warn({ jobId: job.id, type }, "No background handler for job type");
           await this.failJob(job.id, job.organizationId, `No handler for job type: ${type}`);
@@ -246,8 +258,8 @@ export class JobQueueService {
     progress: Record<string, unknown>,
   ): Promise<Job | null> {
     // Get current job data
-    const job = await jobRepository.findById(jobId);
-    if (!job || job.organizationId !== organizationId) {
+    const job = await jobRepository.findByIdAndOrganization(jobId, organizationId);
+    if (!job) {
       return null;
     }
 
@@ -294,9 +306,9 @@ export class JobQueueService {
    * Cancel a job
    */
   async cancelJob(jobId: string, organizationId: string): Promise<Job | null> {
-    const job = await jobRepository.findById(jobId);
+    const job = await jobRepository.findByIdAndOrganization(jobId, organizationId);
 
-    if (!job || job.organizationId !== organizationId) {
+    if (!job) {
       logger.error({ jobId }, "Job not found or unauthorized");
       return null;
     }

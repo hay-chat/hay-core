@@ -27,6 +27,8 @@
  *   - `"sha256-hmac"`: HMAC-SHA256 of the body, lowercase hex, compared
  *     timing-safe against the named header (an optional `sha256=` prefix is
  *     stripped first). Used by Meta-style providers.
+ *   - `"sha256-hmac-base64"`: the same HMAC, base64-encoded in `header`
+ *     (Shopify's `x-shopify-hmac-sha256`).
  *   - `"svix"`: the Standard Webhooks / Svix scheme (Resend and others).
  *     `header` must be `svix-signature`; Core also reads `svix-id` and
  *     `svix-timestamp`, signs `${id}.${timestamp}.${body}` with the
@@ -39,7 +41,7 @@ export interface WebhookSignatureDescriptor {
   header: string;
 
   /** Signature format. */
-  format: "sha256-hmac" | "svix";
+  format: "sha256-hmac" | "sha256-hmac-base64" | "svix";
 
   /**
    * Name of the environment variable holding the shared signing secret.
@@ -172,6 +174,34 @@ export interface WebhookDeauthorizationDescriptor {
 }
 
 /**
+ * Replay / re-delivery deduplication descriptor (opt-in).
+ *
+ * Declares where a verified delivery's dedupe key comes from. Core claims
+ * `pluginId + orgId + key` once per routed org for `windowSeconds`; a repeat
+ * inside the window is acknowledged with 200 `{ duplicate: true }` and not
+ * forwarded. If forwarding to an org fails, that org's claim is released so
+ * the provider's retry is accepted.
+ *
+ *   - `"header"`: the value of a request header (e.g. a delivery id).
+ *   - `"body-path"`: a dot-path to a string or number on the parsed body.
+ *   - `"raw-body"`: a digest of the exact signed bytes. Only declare this
+ *     when every legitimate delivery carries a unique id or timestamp, so
+ *     identical bytes can only be a re-delivery.
+ *
+ * A delivery with no key (missing header or path) is processed without
+ * deduplication. Leave `dedupe` out when the provider can legitimately send
+ * the same bytes twice and gives no delivery id.
+ */
+export type WebhookDedupeDescriptor = (
+  | { source: "header"; header: string }
+  | { source: "body-path"; path: string }
+  | { source: "raw-body" }
+) & {
+  /** How long a key is remembered, in seconds (default 600, max 604800). */
+  windowSeconds?: number;
+};
+
+/**
  * Full webhook routing strategy a plugin declares via `register.webhookRouting`.
  */
 export interface WebhookRoutingDescriptor {
@@ -179,4 +209,5 @@ export interface WebhookRoutingDescriptor {
   verificationChallenge?: WebhookVerificationChallengeDescriptor;
   routeKeyPath: WebhookRouteKeyPathDescriptor;
   deauthorization?: WebhookDeauthorizationDescriptor;
+  dedupe?: WebhookDedupeDescriptor;
 }

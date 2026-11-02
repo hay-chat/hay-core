@@ -1,5 +1,6 @@
 import { t, scopedProcedure } from "@server/trpc";
 import { RESOURCES, ACTIONS } from "@server/types/scopes";
+import { auditLogService } from "@server/services/audit-log.service";
 import { conversationSecretService } from "../../../services/conversation-secret.service";
 import { z } from "zod";
 import {
@@ -121,7 +122,7 @@ export function clientConversationMetadata(
 const createConversationSchema = z.object({
   title: z.string().min(1).max(255).optional(),
   language: z.string().max(35).optional(),
-  metadata: z.record(z.unknown()).optional(),
+  metadata: z.record(z.string(), z.unknown()).optional(),
   status: settableStatusSchema.optional(),
   customerId: z.string().uuid().optional(),
   /** D7-5: a test conversation that runs this playbook version (usually the draft). */
@@ -157,7 +158,11 @@ const STAFF_ATTACHMENT_MAX_BASE64_LENGTH =
   Math.ceil(config.storage.limits.conversationMediaMaxFileSize / 3) * 4;
 
 export const conversationsRouter = t.router({
-  list: createListProcedure(conversationListInputSchema, conversationRepository),
+  list: createListProcedure(
+    RESOURCES.CONVERSATIONS,
+    conversationListInputSchema,
+    conversationRepository,
+  ),
 
   /**
    * What the Home screen shows: conversations waiting for a human (longest wait
@@ -638,6 +643,15 @@ export const conversationsRouter = t.router({
           message: "Conversation not found",
         });
       }
+      await auditLogService.record({
+        userId: ctx.user?.id,
+        organizationId: ctx.organizationId,
+        action: "conversation.delete",
+        resource: "conversation",
+        changes: { conversationId: input.id },
+        ipAddress: ctx.ipAddress,
+        userAgent: ctx.userAgent,
+      });
 
       return { success: true };
     }),
@@ -1304,7 +1318,7 @@ export const conversationsRouter = t.router({
   // Attach server-side secrets to a conversation (server-to-server, API key auth)
   // Secrets are stored in Redis, never reach the LLM — injected into MCP tool calls only
   addSecrets: scopedProcedure(RESOURCES.CONVERSATIONS, ACTIONS.UPDATE)
-    .input(z.object({ id: z.string().uuid(), secrets: z.record(z.string()) }))
+    .input(z.object({ id: z.string().uuid(), secrets: z.record(z.string(), z.string()) }))
     .mutation(async ({ ctx, input }) => {
       const conversation = await conversationRepository.findById(input.id);
       if (!conversation || conversation.organization_id !== ctx.organizationId) {
@@ -1317,7 +1331,7 @@ export const conversationsRouter = t.router({
   // Merge public context into a conversation (server-to-server, API key auth)
   // Context is stored in DB conversation.context JSONB and injected into the LLM prompt
   addContext: scopedProcedure(RESOURCES.CONVERSATIONS, ACTIONS.UPDATE)
-    .input(z.object({ id: z.string().uuid(), context: z.record(z.any()) }))
+    .input(z.object({ id: z.string().uuid(), context: z.record(z.string(), z.any()) }))
     .mutation(async ({ ctx, input }) => {
       const conversation = await conversationRepository.findById(input.id);
       if (!conversation || conversation.organization_id !== ctx.organizationId) {
@@ -1362,6 +1376,15 @@ export const conversationsRouter = t.router({
         .replace(/^-|-$/g, "")
         .slice(0, 50);
       const timestamp = new Date().toISOString().slice(0, 10);
+      await auditLogService.record({
+        userId: ctx.user?.id,
+        organizationId,
+        action: "conversation.export",
+        resource: "conversation",
+        changes: { conversationId: conversation.id, format: input.format },
+        ipAddress: ctx.ipAddress,
+        userAgent: ctx.userAgent,
+      });
 
       if (input.format === "pdf") {
         const organization = await organizationRepository.findById(organizationId);
