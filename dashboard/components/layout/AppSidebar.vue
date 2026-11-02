@@ -32,6 +32,11 @@
 
 <script setup lang="ts">
 import { logger } from "@/utils/logger";
+import {
+  SETTINGS_NAV,
+  isSettingsTabActive,
+  visibleSettingsTabs,
+} from "@/composables/useSettingsNav";
 import { computed, onMounted, ref } from "vue";
 import {
   Sparkles,
