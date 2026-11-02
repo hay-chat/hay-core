@@ -14,7 +14,7 @@ for (let i = 1; i <= 4; i++) {
   }
 }
 // Fallback to .env at project root even if not found, for backward compatibility
-dotenv.config({ path: envPath || path.resolve(__dirname, "../../../../.env") });
+dotenv.config({ path: envPath || path.resolve(__dirname, "../../../../.env"), quiet: true });
 
 /**
  * Normalize a configured domain to host[:port] form by stripping any leading

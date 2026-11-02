@@ -104,8 +104,7 @@ export class PluginInstanceRepository extends BaseRepository<PluginInstance> {
       // string[] (see RegistryManifest), which doesn't overlap the structured
       // HayPluginManifest type on the entity — cast through unknown.
       const manifest = instance.plugin?.manifest as unknown as
-        | { capabilities?: string[] }
-        | undefined;
+        { capabilities?: string[] } | undefined;
       return Array.isArray(manifest?.capabilities) && manifest!.capabilities!.includes(capability);
     });
   }

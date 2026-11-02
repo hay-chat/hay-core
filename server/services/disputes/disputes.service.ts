@@ -70,8 +70,7 @@ export type AttachErrorCode =
   | "TOO_LARGE";
 
 export type AttachResult =
-  | { ok: true; providerUrl: string | null }
-  | { ok: false; code: AttachErrorCode; message: string };
+  { ok: true; providerUrl: string | null } | { ok: false; code: AttachErrorCode; message: string };
 
 const workerResponseSchema = z.union([
   z.object({

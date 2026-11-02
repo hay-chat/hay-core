@@ -59,11 +59,7 @@ export function requestKey(args: Record<string, unknown>): string {
 }
 
 export type PendingActionEvent =
-  | "action_requested"
-  | "action_approved"
-  | "action_rejected"
-  | "action_executed"
-  | "action_expired";
+  "action_requested" | "action_approved" | "action_rejected" | "action_executed" | "action_expired";
 
 export interface HoldInput {
   organizationId: string;

@@ -15,7 +15,9 @@ import { isPublicUploadPath, setPublicUploadHeaders } from "@server/services/med
 import { bodyLimitForPath } from "@server/lib/body-limits";
 import { httpIpRateLimit } from "@server/lib/http-rate-limit";
 import "reflect-metadata";
-import "dotenv/config";
+import dotenv from "dotenv";
+
+dotenv.config({ quiet: true });
 
 const logger = createLogger("server");
 const trpcLogger = createLogger("trpc");
