@@ -330,16 +330,7 @@ Test emails with SMTP disabled (logs to console):
 SMTP_ENABLED = false;
 ```
 
-### 2. Test Script
-
-Use the test email script:
-
-```bash
-cd server
-npm run test-email
-```
-
-### 3. Email Clients
+### 2. Email Clients
 
 Test in multiple email clients:
 
