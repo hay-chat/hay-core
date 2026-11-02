@@ -41,13 +41,7 @@ export const REPLAY_BUCKETS = [
 export type ReplayBucket = (typeof REPLAY_BUCKETS)[number];
 
 export type CheckId =
-  | "replied"
-  | "action_claim"
-  | "must_call"
-  | "must_not_call"
-  | "handoff"
-  | "reply_quality"
-  | "safe";
+  "replied" | "action_claim" | "must_call" | "must_not_call" | "handoff" | "reply_quality" | "safe";
 
 export interface VerdictCheck {
   id: CheckId;

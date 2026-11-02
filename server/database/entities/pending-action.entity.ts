@@ -16,12 +16,7 @@ import {
  * - expired: nobody decided in time; the conversation went to a person
  */
 export type PendingActionStatus =
-  | "pending"
-  | "approved"
-  | "executed"
-  | "failed"
-  | "rejected"
-  | "expired";
+  "pending" | "approved" | "executed" | "failed" | "rejected" | "expired";
 
 /**
  * Why the call was held: by the policy gate (money_move, category_policy = a

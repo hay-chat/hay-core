@@ -142,8 +142,7 @@ export const usePluginRegistry = () => {
           // For Zendesk plugin, it's window.ZendeskPlugin
           const pluginNamePascal = convertPluginIdToGlobalVar(pluginId);
           const pluginGlobal = globalWindow[pluginNamePascal] as
-            | Record<string, unknown>
-            | undefined;
+            Record<string, unknown> | undefined;
 
           if (!pluginGlobal) {
             throw new Error(
