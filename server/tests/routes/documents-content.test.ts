@@ -217,8 +217,9 @@ describe("document images", () => {
   });
 
   it("signs image URLs when the document is read", async () => {
+    const DOCUMENT_ID = "11111111-1111-4111-8111-111111111112";
     existing = {
-      id: "doc-1",
+      id: DOCUMENT_ID,
       organizationId: ORG_ID,
       content: `<img src="${mediaUrl(IMAGE_ID)}">`,
       contentJson: {
@@ -227,7 +228,7 @@ describe("document images", () => {
       },
     };
 
-    const document = await caller().getById({ id: "11111111-1111-4111-8111-111111111112" });
+    const document = await caller().getById({ id: DOCUMENT_ID });
 
     expect(document.content).toMatch(signedQuery);
     expect(JSON.stringify(document.contentJson)).toMatch(signedQuery);
