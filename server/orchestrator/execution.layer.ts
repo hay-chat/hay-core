@@ -19,6 +19,11 @@ import {
   type ActionClaimAssessment,
   type ToolLedgerEntry,
 } from "@server/services/core/action-claim-guardrail.service";
+import {
+  LinkGuardrailService,
+  extractUrls,
+  type BadLink,
+} from "@server/services/core/link-guardrail.service";
 import { MessageIntent, Message } from "@server/database/entities/message.entity";
 import { Document } from "@server/entities/document.entity";
 import { describeLocalTime } from "./local-time";
@@ -58,7 +63,11 @@ interface OrchestrationRagStatus {
  */
 export interface ExecuteOptions {
   toolsCalledThisTurn?: ToolLedgerEntry[];
-  turnGuardrailState?: { actionClaimRetries: number; companyInterestRetries: number };
+  turnGuardrailState?: {
+    actionClaimRetries: number;
+    companyInterestRetries: number;
+    linkRetries: number;
+  };
   plannerFeedback?: string;
 }
 
@@ -93,6 +102,8 @@ export interface ExecutionResult {
   // Guardrail fields
   actionClaim?: ActionClaimAssessment; // Stage 0: Action-claim vs tool-call consistency
   actionClaimRetryAttempted?: boolean;
+  badLinks?: BadLink[]; // Link check: links in the reply that are dead or not on the site
+  linkRetryAttempted?: boolean;
   companyInterest?: CompanyInterestAssessment; // Stage 1: Company interest protection
   companyInterestRetryAttempted?: boolean;
   confidence?: ConfidenceAssessment; // Stage 2: Fact grounding
@@ -129,6 +140,7 @@ export class ExecutionLayer {
   private companyInterestService: CompanyInterestGuardrailService;
   private confidenceService: ConfidenceGuardrailService;
   private actionClaimService: ActionClaimGuardrailService;
+  private linkService = new LinkGuardrailService();
   // Per-instance memo for organization settings — both guardrail config
   // helpers read the same row. ExecutionLayer is constructed per turn so this
   // is naturally short-lived.
@@ -595,6 +607,18 @@ export class ExecutionLayer {
       return stageZeroResult;
     }
 
+    // Link check (no LLM). Also before the intent exemption: a made-up link in
+    // a goodbye message is just as broken.
+    const linkResult = await this.applyLinkGuardrail(
+      result,
+      conversation,
+      customerLanguage,
+      options,
+    );
+    if (linkResult) {
+      return linkResult;
+    }
+
     // Check if we should skip guardrail checks based on user intent
     const lastCustomerMessage = await conversation.getLastCustomerMessage();
     if (lastCustomerMessage?.intent) {
@@ -974,6 +998,123 @@ export class ExecutionLayer {
     result.userMessage = fallbackMessage;
     result.actionClaimRetryAttempted = true;
     return result;
+  }
+
+  /**
+   * Link check: every URL in the reply must come from the conversation context
+   * or the site index, or at least answer. A bad link gets one re-plan where
+   * the planner fixes it, drops it, or hands off (a link alone can go, but "go
+   * to our sales page" with no such page cannot be answered without it). A
+   * dead link that survives the re-plan hands off. Returns null to continue.
+   */
+  private async applyLinkGuardrail(
+    result: ExecutionResult,
+    conversation: Conversation,
+    customerLanguage?: string,
+    options: ExecuteOptions = {},
+  ): Promise<ExecutionResult | null> {
+    const response = result.userMessage;
+    if (!response || extractUrls(response).length === 0) {
+      return null;
+    }
+
+    const log = logger.child({
+      organizationId: conversation.organization_id,
+      conversationId: conversation.id,
+    });
+
+    let badLinks: BadLink[];
+    try {
+      const messages = await conversation.getMessages();
+      const { website, siteUrls } = await this.getLinkContext(conversation);
+      badLinks = await this.linkService.assessLinks({
+        response,
+        // Metadata carries tool outputs; the playbook and documents are messages.
+        contextTexts: messages.map(
+          (msg) => `${msg.content ?? ""}\n${JSON.stringify(msg.metadata ?? {})}`,
+        ),
+        siteUrls,
+        website,
+      });
+    } catch (error) {
+      // The check must never break a turn.
+      log.warn({ error }, "Link check failed, sending the reply unchecked");
+      return null;
+    }
+
+    if (badLinks.length === 0) {
+      return null;
+    }
+    result.badLinks = badLinks;
+
+    const retriesUsed = options.turnGuardrailState?.linkRetries ?? 0;
+    if (options.turnGuardrailState && retriesUsed < 1) {
+      options.turnGuardrailState.linkRetries++;
+
+      const list = badLinks
+        .map((link) =>
+          link.reason === "dead"
+            ? `${link.url} (does not exist)`
+            : `${link.url} (not a known page of the website)`,
+        )
+        .join("; ");
+      const plannerFeedback =
+        `Your previous response linked to: ${list}. Do not share a URL you did not find in ` +
+        `this conversation or get from find_page_url. Use find_page_url if it is available to ` +
+        `get the real page, or RESPOND without the link if the answer still helps the customer ` +
+        `without it. If the customer needs that page to continue and you have no real URL for ` +
+        `it, use HANDOFF.`;
+
+      log.warn({ badLinks }, "Link check: re-planning with corrective feedback");
+
+      const retryResult = await this.execute(conversation, customerLanguage, {
+        ...options,
+        plannerFeedback,
+      });
+      if (retryResult) {
+        retryResult.linkRetryAttempted = true;
+        return retryResult;
+      }
+    }
+
+    // After the re-plan only a proven dead link stops the reply: an unlisted
+    // page the planner kept on purpose may simply be missing from the sitemap.
+    const deadLinks = badLinks.filter((link) => link.reason === "dead");
+    if (deadLinks.length === 0) {
+      log.debug({ badLinks }, "Link check: keeping unlisted links after the re-plan");
+      return null;
+    }
+
+    log.warn({ deadLinks }, "Link check: dead link after the re-plan, handing off");
+    const confidenceConfig = await this.getConfidenceConfig(conversation);
+    const fallbackMessage = await this.composeContextualFallbackMessage(
+      conversation,
+      confidenceConfig.fallbackMessage,
+      customerLanguage,
+    );
+    return {
+      step: "HANDOFF",
+      userMessage: fallbackMessage,
+      handoff: {
+        reason: "Reply linked to a page that does not exist",
+        fields: { deadLinks: deadLinks.map((link) => link.url) },
+      },
+      badLinks,
+      linkRetryAttempted: retriesUsed > 0 || undefined,
+      originalMessage: response,
+    };
+  }
+
+  /** The organization's website and known page URLs, for the link check. */
+  private async getLinkContext(
+    conversation: Conversation,
+  ): Promise<{ website: string | null; siteUrls: string[] }> {
+    const { siteIndexService } = await import("@server/services/site-index.service");
+    const [website, siteUrls] = await Promise.all([
+      siteIndexService.resolveWebsite(conversation.organization_id),
+      siteIndexService.listUrls(conversation.organization_id),
+    ]);
+    return { website, siteUrls };
   }
 
   /**

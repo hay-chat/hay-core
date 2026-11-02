@@ -928,7 +928,11 @@ The following tools are available for you to use. You MUST return only valid JSO
       this.document_ids = updatedDocIds;
 
       await this.addMessage({
-        content: `# ${document.title} added to conversation \n ${document.content}`,
+        // The source URL lets the planner link to the real page instead of
+        // guessing one (the link guardrail trusts URLs found in context).
+        content: `# ${document.title} added to conversation \n${
+          document.sourceUrl ? `Source: ${document.sourceUrl}\n` : ""
+        } ${document.content}`,
         type: "Document",
         metadata: {
           documentId: document.id,
