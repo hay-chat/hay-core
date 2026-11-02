@@ -18,6 +18,15 @@ import { createListProcedure } from "@server/trpc/procedures/list";
 import { documentRetryService } from "@server/services/document-retry.service";
 import { storageService } from "@server/services/storage.service";
 import { MediaRejectedError } from "@server/services/media-sanitizer.service";
+import {
+  DOCUMENT_IMAGES_FOLDER,
+  signDocumentImageUrls,
+  signDocumentImageUrlsInJson,
+  signMediaUrl,
+  DOCUMENT_IMAGE_SIGNED_URL_TTL_SECONDS,
+  stripMediaSignatures,
+  stripMediaSignaturesInJson,
+} from "@server/services/media-url.service";
 import { config } from "@server/config/env";
 import { AppDataSource } from "@server/database/data-source";
 import { createLogger } from "@server/lib/logger";
@@ -52,8 +61,13 @@ export const documentsRouter = t.router({
         id: document.id,
         title: document.title,
         description: document.description,
-        content: document.content,
-        contentJson: document.contentJson,
+        content: document.content
+          ? await signDocumentImageUrls(document.content, document.organizationId)
+          : document.content,
+        contentJson: await signDocumentImageUrlsInJson(
+          document.contentJson,
+          document.organizationId,
+        ),
         type: document.type,
         status: document.status,
         visibility: document.visibility,
@@ -208,7 +222,9 @@ export const documentsRouter = t.router({
       // Editor documents are rendered as HTML, so their content is always sanitized
       const isEditorAuthored = !!input.contentJson;
       if (isEditorAuthored) {
-        processedContent = sanitizeEditorHtml(input.contentHtml ?? input.content);
+        processedContent = stripMediaSignatures(
+          sanitizeEditorHtml(input.contentHtml ?? input.content),
+        );
       }
 
       // Process file if provided
@@ -264,7 +280,7 @@ export const documentsRouter = t.router({
       const document = await documentRepository.create({
         title: sanitizeContent(input.title),
         content: sanitizedContent,
-        contentJson: input.contentJson,
+        contentJson: stripMediaSignaturesInJson(input.contentJson),
         type: input.type || DocumentationType.ARTICLE,
         status: input.status || DocumentationStatus.DRAFT,
         visibility: input.visibility || DocumentVisibility.PRIVATE,
@@ -333,13 +349,14 @@ export const documentsRouter = t.router({
       const html =
         input.contentHtml ??
         (document.importMethod === ImportMethod.EDITOR ? input.content : undefined);
-      const nextContent = html !== undefined ? sanitizeEditorHtml(html) : input.content;
+      const nextContent =
+        html !== undefined ? stripMediaSignatures(sanitizeEditorHtml(html)) : input.content;
 
       // Update document
       const updatedDocument = await documentRepository.update(document.id, ctx.organizationId!, {
         ...(input.title && { title: input.title }),
         ...(nextContent !== undefined && { content: nextContent }),
-        ...(input.contentJson && { contentJson: input.contentJson }),
+        ...(input.contentJson && { contentJson: stripMediaSignaturesInJson(input.contentJson) }),
         ...(input.status && { status: input.status }),
       });
 
@@ -494,12 +511,13 @@ export const documentsRouter = t.router({
           buffer,
           originalName: input.fileName,
           mimeType: input.mimeType,
-          folder: "document-images",
+          folder: DOCUMENT_IMAGES_FOLDER,
           organizationId: ctx.organizationId,
           uploadedById: ctx.user.id,
           maxSize,
         });
-        return { url: result.url };
+        // Signed so the editor can show it; stripped back to the stable URL on save.
+        return { url: signMediaUrl(result.upload.id, DOCUMENT_IMAGE_SIGNED_URL_TTL_SECONDS) };
       } catch (error) {
         if (error instanceof MediaRejectedError) {
           throw new TRPCError({ code: "BAD_REQUEST", message: error.message });
