@@ -1,0 +1,139 @@
+# Self-hosted Hay: everything on one machine, one domain, automatic HTTPS.
+#
+#   cd selfhost
+#   cp .env.example .env      # then fill in the REQUIRED values
+#   docker compose up -d --build
+#
+# Full guide: ../SELF_HOSTING.md
+name: hay
+
+x-hay: &hay
+  image: hay:local
+  build:
+    context: ..
+    dockerfile: Dockerfile
+  restart: unless-stopped
+  env_file: .env
+  environment:
+    NODE_ENV: production
+    # The server reads PORT; the dashboard (Nitro) prefers NITRO_PORT.
+    PORT: "3001"
+    NITRO_PORT: "3000"
+    NITRO_HOST: 0.0.0.0
+    DB_HOST: postgres
+    DB_PORT: "5432"
+    DB_USERNAME: ${DB_USERNAME:-hay}
+    DB_NAME: ${DB_NAME:-hay}
+    REDIS_HOST: redis
+    REDIS_PORT: "6379"
+    RABBITMQ_URL: amqp://${RABBITMQ_USER:-hay}:${RABBITMQ_PASSWORD:?set RABBITMQ_PASSWORD in .env}@rabbitmq:5672/
+    LOCAL_UPLOAD_PATH: /data/uploads
+    API_DOMAIN: ${HAY_DOMAIN:?set HAY_DOMAIN in .env}
+    DASHBOARD_DOMAIN: ${HAY_DOMAIN}
+    BASE_DOMAIN: ${HAY_DOMAIN}
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    restart: unless-stopped
+    # pgvector HNSW index builds need more than Docker's 64 MB /dev/shm.
+    shm_size: 2gb
+    environment:
+      POSTGRES_USER: ${DB_USERNAME:-hay}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?set DB_PASSWORD in .env}
+      POSTGRES_DB: ${DB_NAME:-hay}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME:-hay} -d ${DB_NAME:-hay}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  rabbitmq:
+    image: rabbitmq:4-alpine
+    restart: unless-stopped
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-hay}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD}
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+
+  # One-shot: applies pending database migrations, then exits. The server
+  # waits for it, so `docker compose up -d --build` is also the upgrade command.
+  migrate:
+    <<: *hay
+    restart: "no"
+    command: ["npx", "typeorm", "migration:run", "-d", "dist/database/data-source.js"]
+    depends_on:
+      postgres: { condition: service_healthy }
+
+  server:
+    <<: *hay
+    command: ["node", "dist/main.js"]
+    volumes:
+      - uploads:/data/uploads
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+      redis: { condition: service_healthy }
+      rabbitmq: { condition: service_healthy }
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://localhost:3001/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+
+  dashboard:
+    <<: *hay
+    working_dir: /app/dashboard/.output
+    command: ["node", "server/index.mjs"]
+    depends_on:
+      server: { condition: service_started }
+
+  # Reverse proxy with automatic Let's Encrypt certificates. Needs ports 80 and
+  # 443 open and HAY_DOMAIN's DNS pointing at this machine.
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      HAY_DOMAIN: ${HAY_DOMAIN}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on: [server, dashboard]
+
+volumes:
+  postgres_data:
+  redis_data:
+  rabbitmq_data:
+  uploads:
+  caddy_data:
+  caddy_config:
