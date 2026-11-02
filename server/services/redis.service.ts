@@ -4,6 +4,23 @@ import { createLogger } from "@server/lib/logger";
 
 const logger = createLogger("redis");
 
+const MAX_RETRY_DELAY_MS = 30000;
+
+/**
+ * ioredis retry strategy: reconnect forever with a delay growing by one
+ * second per attempt, capped at 30 s. Giving up would leave the process
+ * without pub/sub and rate limiting until it is restarted.
+ */
+export function redisRetryDelay(times: number): number {
+  const delay = Math.min(times * 1000, MAX_RETRY_DELAY_MS);
+  if (times % 10 === 0) {
+    logger.error({ attempt: times }, "Redis still unreachable, retrying");
+  } else {
+    logger.debug({ delay, attempt: times }, "Retrying connection");
+  }
+  return delay;
+}
+
 /**
  * Redis Service
  * Provides pub/sub functionality for broadcasting events across multiple server instances
@@ -37,15 +54,7 @@ export class RedisService {
         password: config.redis.password,
         db: config.redis.db,
         tls: config.redis.tls,
-        retryStrategy: (times) => {
-          if (times > 10) {
-            logger.error("Max retry attempts reached, stopping retries");
-            return null; // Stop retrying
-          }
-          const delay = Math.min(times * 1000, 5000);
-          logger.debug({ delay, attempt: times }, "Retrying connection");
-          return delay;
-        },
+        retryStrategy: redisRetryDelay,
         maxRetriesPerRequest: null, // Allow indefinite retries per request
         enableReadyCheck: true,
         lazyConnect: false,
@@ -60,15 +69,7 @@ export class RedisService {
         password: config.redis.password,
         db: config.redis.db,
         tls: config.redis.tls,
-        retryStrategy: (times) => {
-          if (times > 10) {
-            logger.error("Max retry attempts reached, stopping retries");
-            return null; // Stop retrying
-          }
-          const delay = Math.min(times * 1000, 5000);
-          logger.debug({ delay, attempt: times }, "Retrying connection");
-          return delay;
-        },
+        retryStrategy: redisRetryDelay,
         maxRetriesPerRequest: null, // Allow indefinite retries per request
         enableReadyCheck: true,
         lazyConnect: false,
