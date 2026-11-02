@@ -975,7 +975,7 @@ The following tools are available for you to use. You MUST return only valid JSO
         logger.debug(
           {
             conversationId: this.id,
-            content: messageData.content.substring(0, 100),
+            contentLength: messageData.content.length,
             type: messageData.type,
           },
           "Duplicate message detected, skipping",

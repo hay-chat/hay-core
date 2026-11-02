@@ -2,6 +2,7 @@ import { LLMService } from "./llm.service";
 import { PromptService } from "../prompt.service";
 import { Message } from "@server/database/entities/message.entity";
 import { createLogger } from "@server/lib/logger";
+import { isWriteAdjacentReply } from "./reply-risk";
 
 const logger = createLogger("company-guardrail");
 
@@ -26,6 +27,8 @@ export interface CompanyInterestAssessment {
   reasoning: string; // Explanation of the decision
   shouldBlock: boolean; // Whether response should be blocked
   requiresFactCheck: boolean; // Whether Stage 2 fact grounding is needed
+  /** The check itself failed; the reply was held because it could not be verified. */
+  evaluationFailed?: boolean;
 }
 
 /**
@@ -164,7 +167,19 @@ export class CompanyInterestGuardrailService {
       };
     } catch (error) {
       logger.error({ err: error }, "Error in company interest assessment");
-      // On error, be conservative and allow response but require fact check
+      // A reply that could not be checked is held when it states amounts,
+      // links or actions; anything else still goes through the fact check.
+      if (isWriteAdjacentReply(context.response)) {
+        return {
+          passed: false,
+          violationType: ViolationType.NONE,
+          severity: "none",
+          reasoning: "Company interest check unavailable - reply needs review",
+          shouldBlock: true,
+          requiresFactCheck: false,
+          evaluationFailed: true,
+        };
+      }
       return {
         passed: true,
         violationType: ViolationType.NONE,

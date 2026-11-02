@@ -34,6 +34,11 @@ import {
   storeWidgetAttachment,
 } from "../../../services/webchat/widget-attachments";
 import {
+  VISITOR_CONTEXT_KEY,
+  VISITOR_CONTEXT_LIMITS,
+  boundContext,
+} from "../../../services/core/prompt-data";
+import {
   formSchemaSchema,
   validateResponse,
   renderFormResponseAsText,
@@ -150,6 +155,28 @@ export function publicMetadata(
   return kept;
 }
 
+/**
+ * Context set by the page the widget runs on (window.HayChat.addContext). Any
+ * visitor can change it, so it is bounded and kept under its own key, apart
+ * from the context the business's servers write (server SDK addContext). The
+ * prompt shows it as unverified visitor data.
+ */
+export function withVisitorContext(
+  current: Record<string, unknown> | null | undefined,
+  incoming: Record<string, unknown> | undefined,
+): Record<string, unknown> | null {
+  if (!incoming || Object.keys(incoming).length === 0) return null;
+  const previous = current?.[VISITOR_CONTEXT_KEY];
+  const merged = {
+    ...(previous && typeof previous === "object" ? previous : {}),
+    ...incoming,
+  };
+  return {
+    ...(current ?? {}),
+    [VISITOR_CONTEXT_KEY]: boundContext(merged, VISITOR_CONTEXT_LIMITS),
+  };
+}
+
 export const publicConversationsRouter = t.router({
   // Create a new public conversation with public key registration
   create: publicProcedure.input(createPublicConversationSchema).mutation(async ({ input, ctx }) => {
@@ -263,19 +290,20 @@ export const publicConversationsRouter = t.router({
         preChatValidated = { schema: input.preChatForm.schema, response: result.data };
       }
 
-      // Build the initial context: explicit input.context first, then pre-chat
-      // form fields (form fields win on conflict — they are user-confirmed).
-      const initialContext: Record<string, unknown> = {
+      // The initial visitor context: the page's context, then the pre-chat
+      // form answers (they win on conflict). Both come from the visitor, so
+      // both are bounded and shown to the AI as unverified.
+      const visitorContext = withVisitorContext(null, {
         ...(input.context ?? {}),
         ...(preChatValidated?.response ?? {}),
-      };
+      });
 
       // Update the conversation with web-specific fields
       await conversationRepository.updateById(conversation.id, {
         channel: "web",
         publicJwk: input.publicJwk,
         lastMessageAt: new Date(),
-        ...(Object.keys(initialContext).length > 0 ? { context: initialContext } : {}),
+        ...(visitorContext ? { context: visitorContext } : {}),
       });
 
       // Link or upsert the customer from the pre-chat answers.
@@ -409,18 +437,14 @@ export const publicConversationsRouter = t.router({
           conversation.needs_processing === true
         : false;
 
-      // Get messages — playground conversations receive all types (including Tool, Document, etc.)
-      const isPlayground = conversation?.metadata?.isPlayground === true;
-      const messages = isPlayground
-        ? await conversationRepository.getMessages(input.conversationId)
-        : await conversationRepository.getWidgetMessages(input.conversationId);
+      // The widget only ever sees customer-facing messages, playground or not.
+      const messages = await conversationRepository.getWidgetMessages(input.conversationId);
 
       // Filter to only return customer-facing messages; files get signed links
       const organizationId = conversation?.organization_id;
       const filteredMessages = await Promise.all(
         messages.slice(input.offset, input.offset + input.limit).map(async (msg) =>
           toPublicMessage(msg, {
-            isPlayground,
             attachments: organizationId
               ? await toPublicAttachments(msg.attachments, organizationId)
               : [],
@@ -528,10 +552,8 @@ export const publicConversationsRouter = t.router({
       });
 
       // Merge incoming context into conversation context if provided
-      if (input.context && Object.keys(input.context).length > 0) {
-        const merged = { ...(conversation.context ?? {}), ...input.context };
-        await conversationRepository.updateById(conversation.id, { context: merged });
-      }
+      const context = withVisitorContext(conversation.context, input.context);
+      if (context) await conversationRepository.updateById(conversation.id, { context });
 
       return {
         messageId: message.id,
@@ -648,10 +670,8 @@ export const publicConversationsRouter = t.router({
       },
     });
 
-    if (input.context && Object.keys(input.context).length > 0) {
-      const merged = { ...(conversation.context ?? {}), ...input.context };
-      await conversationRepository.updateById(conversation.id, { context: merged });
-    }
+    const context = withVisitorContext(conversation.context, input.context);
+    if (context) await conversationRepository.updateById(conversation.id, { context });
 
     const [publicAttachment] = await toPublicAttachments([attachment], organizationId);
     return {
