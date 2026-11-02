@@ -21,13 +21,10 @@ export function useTelemetry() {
 
   /**
    * Tie the current session to a user so an error or replay can be traced back
-   * to the customer who hit it. Only stable, low-sensitivity attributes are sent.
+   * to the account that hit it. Only the opaque user id is sent: no email or name.
    */
-  const identify = (user: { id: string; email: string; name?: string | null }) => {
-    resolveClient()?.identify(user.id, {
-      email: user.email,
-      ...(user.name ? { name: user.name } : {}),
-    });
+  const identify = (user: { id: string }) => {
+    resolveClient()?.identify(user.id);
   };
 
   /** Associate subsequent events with an organization for per-customer grouping. */

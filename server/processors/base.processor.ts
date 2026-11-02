@@ -1,3 +1,6 @@
+/** A document refused for its type, size or the resources parsing it needs. */
+export class DocumentRejectedError extends Error {}
+
 export interface ProcessedDocument {
   content: string;
   metadata: {

@@ -161,6 +161,15 @@ export const config = {
     refreshSecret: process.env.JWT_REFRESH_SECRET || "",
   },
 
+  auth: {
+    // Self-hosted installs without email delivery set this to "false" so new
+    // signups are marked verified and can log in. Hosted Hay keeps the default.
+    requireEmailVerification: process.env.REQUIRE_EMAIL_VERIFICATION !== "false",
+    // "false" closes public signup: only the very first account (the instance
+    // owner) and people with a pending invitation can register.
+    allowSignup: process.env.ALLOW_SIGNUP !== "false",
+  },
+
   orchestrator: {
     interval: parseInt(process.env.ORCHESTRATOR_INTERVAL || "5000", 10),
   },
@@ -318,7 +327,8 @@ export const config = {
 
   plugins: {
     maxUploadSizeMB: parseInt(process.env.PLUGIN_MAX_UPLOAD_SIZE_MB || "50", 10),
-    allowCustomPlugins: process.env.ALLOW_CUSTOM_PLUGINS !== "false",
+    // Organization-supplied (custom/git) plugin code; off unless explicitly enabled
+    allowCustomPlugins: process.env.ALLOW_CUSTOM_PLUGINS === "true",
   },
 
   // Telemetry is entirely optional: with no key the client is never constructed

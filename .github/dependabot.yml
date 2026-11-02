@@ -1,0 +1,27 @@
+version: 2
+updates:
+  # Root lockfile: covers every npm workspace (server, dashboard, packages, core plugins).
+  - package-ecosystem: npm
+    directories:
+      - "/"
+      - "/webchat"
+      - "/plugins/core/*/mcp"
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 10
+    groups:
+      security:
+        applies-to: security-updates
+        patterns: ["*"]
+      minor-and-patch:
+        applies-to: version-updates
+        update-types: [minor, patch]
+        patterns: ["*"]
+
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        patterns: ["*"]

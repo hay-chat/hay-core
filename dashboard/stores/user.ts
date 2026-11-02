@@ -311,9 +311,7 @@ export const useUserStore = defineStore("user", {
       }
 
       const { identify, setOrganization } = useTelemetry();
-      const name = [this.user.firstName, this.user.lastName].filter(Boolean).join(" ");
-
-      identify({ id: this.user.id, email: this.user.email, name: name || null });
+      identify({ id: this.user.id });
 
       const organization = this.organizations.find((org) => org.id === this.activeOrganizationId);
       if (organization) {
@@ -394,5 +392,7 @@ export const useUserStore = defineStore("user", {
       useTelemetry().reset();
     },
   },
-  persist: true,
+  persist: {
+    pick: ["user", "activeOrganizationId", "organizations"],
+  },
 });

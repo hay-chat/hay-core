@@ -6,7 +6,7 @@ import * as path from "path";
 import { v4 as uuidv4 } from "uuid";
 import { config } from "../config/env";
 import { Upload } from "../entities/upload.entity";
-import { isPublicFolder, mediaUrl } from "./media-url.service";
+import { DOCUMENT_IMAGES_FOLDER, isPublicFolder, mediaUrl } from "./media-url.service";
 import {
   CONVERSATION_MEDIA_TYPES,
   sanitizeConversationMedia,
@@ -19,7 +19,7 @@ export const CONVERSATION_MEDIA_FOLDER = "conversation-media";
 
 // Allowed types for every other private folder (documents, plugin ZIPs,
 // exports), keyed by the stored type, with the extension each is stored with.
-// Public folders take raster images only (sanitizePublicImage).
+// Public folders and document images take raster images only (sanitizePublicImage).
 const STORED_FILE_TYPES: Record<string, string> = {
   "image/jpeg": ".jpg",
   "image/png": ".png",
@@ -172,7 +172,7 @@ export class StorageService {
       );
       ({ buffer, mimeType } = await sanitizeConversationMedia(buffer, mimeType));
       extension = CONVERSATION_MEDIA_TYPES[mimeType];
-    } else if (isPublicFolder(options.folder)) {
+    } else if (isPublicFolder(options.folder) || options.folder === DOCUMENT_IMAGES_FOLDER) {
       this.validateSize(buffer.length, options.maxSize);
       ({ buffer, mimeType } = await sanitizePublicImage(buffer));
       extension = STORED_FILE_TYPES[mimeType];
@@ -435,6 +435,25 @@ export class StorageService {
     // Convert stream to buffer using the SDK stream mixin helper
     const bytes = await response.Body.transformToByteArray();
     return Buffer.from(bytes);
+  }
+
+  /**
+   * Revoke public read on a stored file. Local files need nothing: /uploads
+   * only serves public folders.
+   */
+  async makePrivate(upload: Upload): Promise<void> {
+    if (upload.storageType !== "s3") return;
+    if (!this.s3Client) {
+      throw new Error("S3 client not initialized");
+    }
+    const { PutObjectAclCommand } = await import("@aws-sdk/client-s3");
+    await this.s3Client.send(
+      new PutObjectAclCommand({
+        Bucket: config.storage.s3.bucket!,
+        Key: upload.path,
+        ACL: "private",
+      }),
+    );
   }
 
   /**

@@ -147,12 +147,37 @@ describe("ActionClaimGuardrailService.assessActionClaim", () => {
     expect(vars.toolLedger).toContain("none");
   });
 
-  it("fails open when the LLM call errors", async () => {
+  it("holds a reply that may claim an action when the LLM call errors", async () => {
     invoke.mockRejectedValue(new Error("provider down"));
 
     const assessment = await service.assessActionClaim(baseContext());
 
+    expect(assessment.passed).toBe(false);
+    expect(assessment.evaluationFailed).toBe(true);
+  });
+
+  it("holds any reply when the LLM call errors after a tool ran this turn", async () => {
+    invoke.mockRejectedValue(new Error("provider down"));
+
+    const assessment = await service.assessActionClaim(
+      baseContext({
+        response: "All good on my side!",
+        toolsCalledThisTurn: [{ name: "shop:get_order", success: true }],
+      }),
+    );
+
+    expect(assessment.passed).toBe(false);
+  });
+
+  it("lets a plain reply through when the LLM call errors and no tool ran", async () => {
+    invoke.mockRejectedValue(new Error("provider down"));
+
+    const assessment = await service.assessActionClaim(
+      baseContext({ response: "Happy to help! What would you like to know?" }),
+    );
+
     expect(assessment.passed).toBe(true);
+    expect(assessment.evaluationFailed).toBeUndefined();
   });
 
   it("short-circuits without an LLM call when disabled", async () => {

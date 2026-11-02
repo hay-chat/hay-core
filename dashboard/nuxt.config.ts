@@ -4,8 +4,20 @@ import { fileURLToPath } from "node:url";
 
 export default defineNuxtConfig({
   compatibilityDate: "2025-09-19",
-  devtools: { enabled: true },
   ssr: false,
+
+  // Dev-only tooling: never part of a production build.
+  $development: {
+    devtools: { enabled: true },
+    vite: {
+      server: {
+        fs: {
+          // Allow serving files from one level up to access plugins directory
+          allow: [".."],
+        },
+      },
+    },
+  },
 
   // Server configuration for local development
   devServer: {
@@ -99,7 +111,6 @@ export default defineNuxtConfig({
           "en/documents.json",
           "en/queue.json",
           "en/privacy-pages.json",
-          "en/organizations.json",
           "en/products.json",
           "en/customers.json",
           "en/access.json",
@@ -126,7 +137,6 @@ export default defineNuxtConfig({
           "pt-BR/documents.json",
           "pt-BR/queue.json",
           "pt-BR/privacy-pages.json",
-          "pt-BR/organizations.json",
           "pt-BR/products.json",
           "pt-BR/customers.json",
           "pt-BR/access.json",
@@ -277,8 +287,6 @@ export default defineNuxtConfig({
     },
     resolve: {
       alias: {
-        // Enable runtime compilation for inline templates
-        vue: "vue/dist/vue.esm-bundler.js",
         // Add alias for plugins directory
         "@plugins": "../plugins",
         // Shared form schema, read from source (the server uses its CommonJS build)
@@ -288,10 +296,6 @@ export default defineNuxtConfig({
       },
     },
     server: {
-      fs: {
-        // Allow serving files from one level up to access plugins directory
-        allow: [".."],
-      },
       hmr: {
         // Suppress connection errors during HMR
         overlay: false,
@@ -303,18 +307,8 @@ export default defineNuxtConfig({
       },
     },
     define: {
-      // Enable Vue runtime compilation
       __VUE_OPTIONS_API__: true,
       __VUE_PROD_DEVTOOLS__: false,
     },
-  },
-
-  // Enable Vue runtime compilation
-  vue: {
-    compilerOptions: {
-      // This allows runtime compilation of templates
-      isCustomElement: (_tag: string) => false,
-    },
-    runtimeCompiler: true,
   },
 });

@@ -21,6 +21,7 @@ import { analyzeTiptapInstructions } from "../../utils/tiptap-formatter";
 import { asTiptapDocument } from "../../services/playbook-instructions-text";
 import type { PlaybookInstructions } from "./playbook.entity";
 import { documentRepository } from "../../repositories/document.repository";
+import { signDocumentImageUrls } from "../../services/media-url.service";
 import { createLogger } from "@server/lib/logger";
 import { SupportedLanguage } from "../../types/language.types";
 
@@ -932,7 +933,7 @@ The following tools are available for you to use. You MUST return only valid JSO
         // guessing one (the link guardrail trusts URLs found in context).
         content: `# ${document.title} added to conversation \n${
           document.sourceUrl ? `Source: ${document.sourceUrl}\n` : ""
-        } ${document.content}`,
+        } ${await signDocumentImageUrls(document.content ?? "", this.organization_id)}`,
         type: "Document",
         metadata: {
           documentId: document.id,
@@ -975,7 +976,7 @@ The following tools are available for you to use. You MUST return only valid JSO
         logger.debug(
           {
             conversationId: this.id,
-            content: messageData.content.substring(0, 100),
+            contentLength: messageData.content.length,
             type: messageData.type,
           },
           "Duplicate message detected, skipping",

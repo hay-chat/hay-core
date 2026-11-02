@@ -1,3 +1,4 @@
+import { logger } from "@/utils/logger";
 import { defineStore } from "pinia";
 import { HayApi, HayAuthApi } from "@/utils/api";
 import {
@@ -26,17 +27,13 @@ function readStoredTokens(): Tokens | null {
 }
 
 export const useAuthStore = defineStore("auth", {
-  state: () => {
-    const initialState = {
-      tokens: null as Tokens | null,
-      isAuthenticated: false,
-      isInitialized: false,
-      lastActivity: Date.now(),
-      isLoading: false,
-    };
-    console.log("[Auth Store] Initial state:", { hasTokens: !!initialState.tokens });
-    return initialState;
-  },
+  state: () => ({
+    tokens: null as Tokens | null,
+    isAuthenticated: false,
+    isInitialized: false,
+    lastActivity: Date.now(),
+    isLoading: false,
+  }),
   actions: {
     /**
      * Load the user for a persisted session. Goes through the main client, so
@@ -55,7 +52,7 @@ export const useAuthStore = defineStore("auth", {
         this.updateActivity();
       } catch (error) {
         if (isDefinitiveAuthFailure(error)) {
-          console.log("[Auth] Session rejected, clearing tokens");
+          logger.debug("[Auth] Session rejected, clearing tokens");
           this.tokens = null;
           this.isAuthenticated = false;
           this.isInitialized = true;
@@ -83,11 +80,6 @@ export const useAuthStore = defineStore("auth", {
           refreshToken: result.refreshToken,
           expiresAt: Date.now() + result.expiresIn * 1000, // Convert seconds to milliseconds
         };
-        console.log("[Auth Store] Tokens set after login:", {
-          hasAccessToken: !!this.tokens.accessToken,
-          hasRefreshToken: !!this.tokens.refreshToken,
-          expiresAt: new Date(this.tokens.expiresAt).toISOString(),
-        });
         const userStore = useUserStore();
         userStore.setUser(result.user as User);
         this.isAuthenticated = true;
@@ -116,7 +108,7 @@ export const useAuthStore = defineStore("auth", {
           });
         } catch (error) {
           // Ignore errors on logout - the session may already be revoked
-          console.log("[Auth] Logout API call failed:", error);
+          logger.debug("[Auth] Logout API call failed:", error);
         }
       }
 
@@ -220,11 +212,6 @@ export const useAuthStore = defineStore("auth", {
           expiresAt: Date.now() + result.expiresIn * 1000, // Convert seconds to milliseconds
         };
 
-        if (process.client) {
-          const token = useCookie("auth-token");
-          token.value = result.accessToken;
-        }
-
         this.updateActivity();
         this.$persist?.(); // Write through now, so other tabs see the new pair.
       });
@@ -261,7 +248,7 @@ export const useAuthStore = defineStore("auth", {
         this.isInitialized = true;
         this.updateActivity();
 
-        console.log("[Auth] Successfully logged in with tokens");
+        logger.debug("[Auth] Successfully logged in with tokens");
       } catch (error) {
         // If validation fails, clear the tokens
         console.error("[Auth] Token validation failed:", error);
@@ -274,5 +261,8 @@ export const useAuthStore = defineStore("auth", {
       }
     },
   },
-  persist: true,
+  persist: {
+    // isLoading is per page load and must not come back stuck.
+    pick: ["tokens", "isAuthenticated", "isInitialized", "lastActivity"],
+  },
 });

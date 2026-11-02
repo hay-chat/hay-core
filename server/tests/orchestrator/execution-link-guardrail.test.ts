@@ -49,7 +49,7 @@ const conversation = {
   id: "conv-1",
   organization_id: "org-1",
   getMessages: async () => [{ content: "Doc text", metadata: {} }],
-  // GREET is exempt from Stages 1/2, so a passing reply returns untouched.
+  // A greeting with a link still goes through Stages 1/2 (stubbed to pass below).
   getLastCustomerMessage: async () => ({ content: "where do I buy?", intent: "greet" }),
 };
 
@@ -78,6 +78,15 @@ describe("ExecutionLayer link check", () => {
     anyLayer.getActionClaimConfig = jest.fn(async () => ({ enabled: false }));
     anyLayer.getLinkContext = jest.fn(async () => ({ website: "shop.com", siteUrls: [] }));
     anyLayer.linkService = { assessLinks };
+    anyLayer.assessCompanyInterest = jest.fn(async () => ({
+      passed: true,
+      violationType: "none",
+      severity: "none",
+      reasoning: "ok",
+      shouldBlock: false,
+      requiresFactCheck: false,
+    }));
+    anyLayer.assessUnflaggedResponseGrounding = jest.fn(async () => null);
     anyLayer.getConfidenceConfig = jest.fn(async () => ({
       fallbackMessage: "Let me connect you with a team member.",
     }));

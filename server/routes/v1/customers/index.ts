@@ -7,6 +7,7 @@ import { CustomerRepository } from "@server/repositories/customer.repository";
 import { RESOURCES, ACTIONS } from "@server/types/scopes";
 import { boundedJsonRecord } from "@server/lib/validation/json-record";
 import { identifierSchema, includeSchema, selectSchema } from "@server/types/list-input";
+import { auditLogService } from "@server/services/audit-log.service";
 
 const customerService = new CustomerService();
 const customerRepository = new CustomerRepository();
@@ -214,6 +215,15 @@ export const customersRouter = t.router({
           message: "Customer not found",
         });
       }
+      await auditLogService.record({
+        userId: ctx.user?.id,
+        organizationId: ctx.organizationId,
+        action: "customer.delete",
+        resource: "customer",
+        changes: { customerId: input.id },
+        ipAddress: ctx.ipAddress,
+        userAgent: ctx.userAgent,
+      });
 
       return { success: true };
     }),
@@ -233,6 +243,18 @@ export const customersRouter = t.router({
           message: "One or both customers not found",
         });
       }
+      await auditLogService.record({
+        userId: ctx.user?.id,
+        organizationId: ctx.organizationId,
+        action: "customer.merge",
+        resource: "customer",
+        changes: {
+          sourceCustomerId: input.sourceCustomerId,
+          targetCustomerId: input.targetCustomerId,
+        },
+        ipAddress: ctx.ipAddress,
+        userAgent: ctx.userAgent,
+      });
 
       return mergedCustomer;
     }),
@@ -283,7 +305,7 @@ export const customersRouter = t.router({
   // Merge persistent public context into a customer by external ID (server-to-server, API key auth)
   // Context is stored in customer.external_metadata and injected into the LLM prompt on every conversation
   addContext: scopedProcedure(RESOURCES.CUSTOMERS, ACTIONS.UPDATE)
-    .input(z.object({ externalId: z.string(), context: z.record(z.any()) }))
+    .input(z.object({ externalId: z.string(), context: z.record(z.string(), z.any()) }))
     .mutation(async ({ ctx, input }) => {
       const customer = await customerRepository.findByExternalId(
         input.externalId,

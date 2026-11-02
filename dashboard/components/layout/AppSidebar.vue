@@ -31,6 +31,12 @@
 </template>
 
 <script setup lang="ts">
+import { logger } from "@/utils/logger";
+import {
+  SETTINGS_NAV,
+  isSettingsTabActive,
+  visibleSettingsTabs,
+} from "@/composables/useSettingsNav";
 import { computed, onMounted, ref } from "vue";
 import {
   Sparkles,
@@ -74,7 +80,7 @@ const pluginMenuItems = ref<PluginMenuItem[]>([]);
 const user = computed(() => {
   // If authenticated but missing user data, trigger logout
   if (authStore.isAuthenticated && authStore.isInitialized && !userStore.user?.id) {
-    console.log("[AppSidebar] Missing user data while authenticated, logging out");
+    logger.debug("[AppSidebar] Missing user data while authenticated, logging out");
     authStore.logout();
     return {
       name: t("user.defaultName"),
