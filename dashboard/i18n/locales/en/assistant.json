@@ -1,0 +1,81 @@
+{
+  "assistant": {
+    "page": {
+      "title": "Assistant",
+      "description": "Who answers your customers: one AI assistant for the whole organization, on every channel.",
+      "loading": "Loading assistant...",
+      "leavePage": "Leave Page",
+      "metaTitle": "Assistant - Hay.chat",
+      "metaDescription": "Configure your AI assistant"
+    },
+    "actions": {
+      "cancel": "Discard changes",
+      "save": "Save Changes"
+    },
+    "toast": {
+      "updatedSuccess": "Assistant saved",
+      "updateFailed": "Failed to save the assistant. Please try again.",
+      "loadFailed": "Failed to load the assistant"
+    },
+    "form": {
+      "cardTitle": "Identity",
+      "cardDescription": "How the assistant introduces itself and how it talks. Playbooks describe what to do in specific situations; all of them apply.",
+      "name": {
+        "label": "Name",
+        "placeholder": "e.g., {organization} Assistant",
+        "helperText": "Shown to customers in the chat widget. Leave empty to show the widget title.",
+        "tooLong": "The name must be less than 255 characters"
+      },
+      "description": {
+        "label": "Description",
+        "helperText": "An internal note; customers and the assistant never see it.",
+        "placeholder": "What this assistant is for..."
+      },
+      "instructions": {
+        "label": "Instructions",
+        "hint": "The assistant's general behavior and standing rules. Put situation-specific steps in Playbooks."
+      },
+      "initialGreeting": {
+        "label": "Initial Greeting Message",
+        "helperText": "The first message customers see when starting a conversation. If left empty, a default greeting is used. It is translated to the conversation's language automatically.",
+        "placeholder": "Hello! How can I help you today?"
+      },
+      "tone": {
+        "label": "Tone",
+        "professional": "Professional",
+        "casual": "Casual",
+        "enthusiastic": "Enthusiastic",
+        "placeholder": "Describe the communication tone (e.g., professional, friendly, casual)...",
+        "presets": {
+          "professional": "Your tone is professional, calm, and concise. You communicate clearly, use complete sentences, and avoid slang or emojis. You sound confident but approachable — like a well-trained support specialist who respects the customer's time. You empathize when appropriate, but always keep focus on solving the issue efficiently.\n\nExample: \"I understand how that could be frustrating. Let's take a look at your order status together. Could you please confirm your order number?\"",
+          "casual": "You sound like a real person chatting over text — relaxed, warm, and approachable. Use contractions, simple phrasing, and occasional emojis when it fits the vibe. Keep answers helpful but conversational, like a teammate helping out a friend.\n\nExample: \"Hey there! Totally get it — that happens sometimes 😅 Let me check your order real quick so we can sort this out.\"",
+          "enthusiastic": "You make every customer interaction feel exciting and positive. You use exclamation marks moderately, express enthusiasm for helping, and celebrate small wins. You make the customer feel heard and valued while keeping replies short and impactful.\n\nExample: \"Great question! Let's get this sorted out right away 🎉 I just need your email to find your order!\""
+        }
+      },
+      "avoid": {
+        "label": "Things to Avoid",
+        "placeholder": "List things the assistant should avoid (e.g., technical jargon, certain topics)..."
+      },
+      "languageNote": "The assistant answers in the customer's language, falling back to the organization's default language in General settings."
+    },
+    "escalation": {
+      "title": "Human escalation",
+      "description": "What the assistant does when a customer needs a person.",
+      "availableLabel": "If any human agent is available",
+      "availableHint": "Instructions for the assistant when a human agent is available. Leave empty to simply move the conversation to the queue.",
+      "unavailableLabel": "If all human agents are unavailable",
+      "unavailableHint": "Instructions for the assistant when no human agent is available (e.g., ask for their email).",
+      "unavailableModeHint": "What the assistant does when a customer needs a person and nobody can take the conversation (outside business hours, or nobody online).",
+      "modeInstructions": "Follow my instructions",
+      "modeTicket": "Create a ticket",
+      "modeTicketIn": "Create a ticket in {name}",
+      "noHelpdesk": "Connect a helpdesk such as Zendesk to raise tickets automatically.",
+      "connectHelpdesk": "Browse integrations",
+      "ticketExplainer": "The assistant makes sure it has the customer's email, raises a ticket with a summary and the full conversation, and tells the customer the team will get back to them. The conversation is then closed instead of waiting in the queue.",
+      "helpdesk": "Helpdesk",
+      "prefillTitle": "Prefill every ticket with",
+      "notSet": "Not set",
+      "formError": "Could not load the ticket fields from your helpdesk: {message}"
+    }
+  }
+}

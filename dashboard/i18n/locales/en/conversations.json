@@ -65,8 +65,7 @@
       "today": "Today",
       "thisWeek": "This Week",
       "thisMonth": "This Month",
-      "allTime": "All Time",
-      "allAgents": "All Agents"
+      "allTime": "All Time"
     },
     "table": {
       "conversation": "Conversation",
@@ -186,8 +185,6 @@
     },
     "conversationDetails": {
       "title": "Conversation Details",
-      "agent": "Agent:",
-      "defaultAgent": "AI Assistant",
       "status": "Status:",
       "messages": "Messages:",
       "created": "Created:",

@@ -15,7 +15,6 @@ jest.mock("@server/repositories/conversation.repository", () => ({
   conversationRepository: { findById: mockFindById, update: mockUpdate },
 }));
 jest.mock("@server/repositories/playbook.repository", () => ({ playbookRepository: {} }));
-jest.mock("@server/repositories/agent.repository", () => ({ agentRepository: {} }));
 jest.mock("@server/repositories/user.repository", () => ({ userRepository: {} }));
 jest.mock("@server/services/conversation-secret.service", () => ({
   conversationSecretService: {},
@@ -53,14 +52,11 @@ import { runConversation } from "../../orchestrator/run";
 
 const ORG_ID = "11111111-1111-4111-8111-111111111111";
 const CONVERSATION_ID = "22222222-2222-4222-8222-222222222222";
-const AGENT_ID = "33333333-3333-4333-8333-333333333333";
 
 const conversation = (overrides: Record<string, unknown>) => ({
   id: CONVERSATION_ID,
   organization_id: ORG_ID,
-  organization: { suspendedAt: null, suspensionReason: null },
-  agent_id: AGENT_ID,
-  agent: { id: AGENT_ID, enabled: false },
+  organization: { suspendedAt: null, suspensionReason: null, aiPausedAt: new Date() },
   title: "Where is my order?",
   status: "open",
   assigned_user_id: null,
@@ -73,7 +69,7 @@ const conversation = (overrides: Record<string, unknown>) => ({
   ...overrides,
 });
 
-describe("runConversation for a paused agent", () => {
+describe("runConversation while the owner paused the AI", () => {
   beforeEach(() => jest.clearAllMocks());
 
   it("parks a conversation with a shopper message as pending-human and never takes the lock", async () => {
@@ -97,7 +93,7 @@ describe("runConversation for a paused agent", () => {
       }),
     );
     expect(mockLogger.info).toHaveBeenCalledWith(
-      { agentId: AGENT_ID, cause: "agent_disabled", reason: null, queued: true },
+      { reason: null, queued: true },
       "Skipping - agent paused",
     );
     // One fixed line tells the shopper the team will reply (D11-9)
@@ -153,11 +149,11 @@ describe("runConversation for a paused agent", () => {
     expect(convo.lock).not.toHaveBeenCalled();
   });
 
-  it("proceeds to the lock for an enabled agent", async () => {
+  it("proceeds to the lock once the AI is resumed", async () => {
     // Returning null from lock() makes runConversation bail right after the
     // gates, which is all we need to prove the paused gate is open.
     const convo = conversation({
-      agent: { id: AGENT_ID, enabled: true },
+      organization: { suspendedAt: null, suspensionReason: null, aiPausedAt: null },
       lock: jest.fn(async () => null),
     });
     mockFindById.mockResolvedValueOnce(convo);
@@ -169,7 +165,7 @@ describe("runConversation for a paused agent", () => {
   });
 });
 
-describe("runConversation for an organization whose agent the operator paused", () => {
+describe("runConversation for an organization the operator paused", () => {
   beforeEach(() => jest.clearAllMocks());
 
   const pausedOrganization = {
@@ -179,10 +175,9 @@ describe("runConversation for an organization whose agent the operator paused", 
     agentPauseReason: "usage_limit",
   };
 
-  it("parks the conversation as pending-human even though the agent itself is enabled", async () => {
+  it("parks the conversation as pending-human", async () => {
     const convo = conversation({
       organization: pausedOrganization,
-      agent: { id: AGENT_ID, enabled: true },
     });
     mockFindById.mockResolvedValueOnce(convo);
 
@@ -194,7 +189,7 @@ describe("runConversation for an organization whose agent the operator paused", 
     });
     expect(convo.lock).not.toHaveBeenCalled();
     expect(mockLogger.info).toHaveBeenCalledWith(
-      { agentId: AGENT_ID, cause: "organization_paused", reason: "usage_limit", queued: true },
+      { reason: "usage_limit", queued: true },
       "Skipping - agent paused",
     );
   });
@@ -202,7 +197,6 @@ describe("runConversation for an organization whose agent the operator paused", 
   it("sends no greeting when the shopper has not written yet", async () => {
     const convo = conversation({
       organization: pausedOrganization,
-      agent: { id: AGENT_ID, enabled: true },
       getLastCustomerMessage: jest.fn(async () => null),
     });
     mockFindById.mockResolvedValueOnce(convo);
@@ -217,7 +211,6 @@ describe("runConversation for an organization whose agent the operator paused", 
   it("resumes normally once agentPausedAt is cleared", async () => {
     const convo = conversation({
       organization: { ...pausedOrganization, agentPausedAt: null, agentPauseReason: null },
-      agent: { id: AGENT_ID, enabled: true },
       lock: jest.fn(async () => null),
     });
     mockFindById.mockResolvedValueOnce(convo);
@@ -232,10 +225,9 @@ describe("runConversation for an organization whose agent the operator paused", 
 describe("runConversation while the owner paused the AI everywhere (D11-9)", () => {
   beforeEach(() => jest.clearAllMocks());
 
-  it("parks the conversation like an operator pause, the agent being enabled", async () => {
+  it("parks the conversation like an operator pause", async () => {
     const convo = conversation({
       organization: { suspendedAt: null, agentPausedAt: null, aiPausedAt: new Date() },
-      agent: { id: AGENT_ID, enabled: true },
     });
     mockFindById.mockResolvedValueOnce(convo);
 

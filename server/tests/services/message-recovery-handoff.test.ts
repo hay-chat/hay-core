@@ -50,7 +50,6 @@ function makeConversation(overrides: Record<string, unknown> = {}) {
     assigned_user_id: null,
     deleted_at: null,
     language: "pt",
-    agent: { enabled: true },
     organization: { suspendedAt: null, agentPausedAt: null, defaultLanguage: "en" },
     // Past the attempt budget, so recovery escalates to a human.
     recovery_attempts: 5,
@@ -111,8 +110,10 @@ describe("MessageRecoveryService escalation", () => {
     expect(conversation.addMessage).not.toHaveBeenCalled();
   });
 
-  it("queues a paused agent's conversation for a human without messaging the shopper", async () => {
-    const conversation = makeConversation({ agent: { enabled: false } });
+  it("queues a conversation for a human without messaging the shopper while the AI is paused", async () => {
+    const conversation = makeConversation({
+      organization: { suspendedAt: null, agentPausedAt: null, aiPausedAt: new Date() },
+    });
     mockFindById.mockResolvedValue(conversation);
 
     const result = await new MessageRecoveryService().recoverStaleConversation(stale);

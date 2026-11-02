@@ -102,7 +102,7 @@ export default defineNuxtConfig({
         files: [
           "en/common.json",
           "en/auth.json",
-          "en/agents.json",
+          "en/assistant.json",
           "en/settings.json",
           "en/dashboard.json",
           "en/playbooks.json",
@@ -128,7 +128,7 @@ export default defineNuxtConfig({
         files: [
           "pt-BR/common.json",
           "pt-BR/auth.json",
-          "pt-BR/agents.json",
+          "pt-BR/assistant.json",
           "pt-BR/settings.json",
           "pt-BR/dashboard.json",
           "pt-BR/playbooks.json",

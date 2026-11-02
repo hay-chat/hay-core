@@ -321,7 +321,6 @@ export class TestCaseService {
     createdById?: string | null;
     playbookId?: string | null;
     playbookVersionOverride?: PlaybookVersionOverride | null;
-    agentId?: string | null;
     label?: string | null;
   }): Promise<SimulationRun> {
     const cases = await this.list(input.organizationId, { playbookId: input.playbookId });
@@ -333,7 +332,6 @@ export class TestCaseService {
       createdById: input.createdById ?? null,
       kind: TEST_CASES_RUN_KIND,
       label: input.label ?? null,
-      agentId: input.agentId ?? null,
       playbookVersionOverride: input.playbookVersionOverride ?? null,
       cases: cases.map((c) => ({
         seed: c.seed,

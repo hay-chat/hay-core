@@ -87,12 +87,11 @@ describe("Scope System", () => {
 
     it("should return contributor scopes", () => {
       const scopes = getDefaultScopesForRole("contributor");
-      // Should have create and update for agents/playbooks
-      expect(scopes).toContain("agents:create");
+      // Should be able to edit the assistant and create playbooks
+      expect(scopes).toContain("assistant:update");
       expect(scopes).toContain("playbooks:create");
       expect(scopes).toContain("conversations:*");
-      // Should NOT have delete for agents/playbooks
-      expect(scopes).not.toContain("agents:delete");
+      // Should NOT delete playbooks
       expect(scopes).not.toContain("playbooks:delete");
     });
 
@@ -105,16 +104,16 @@ describe("Scope System", () => {
       expect(scopes).toContain("documents:create");
       expect(scopes).toContain("documents:update");
       expect(scopes).not.toContain("documents:delete");
-      // Should only have read access to agents
-      expect(scopes).toContain("agents:read");
-      expect(scopes).not.toContain("agents:create");
+      // Should only have read access to the assistant
+      expect(scopes).toContain("assistant:read");
+      expect(scopes).not.toContain("assistant:update");
     });
 
     it("should return viewer scopes (read-only)", () => {
       const scopes = getDefaultScopesForRole("viewer");
       expect(scopes).toContain("conversations:read");
       expect(scopes).toContain("documents:read");
-      expect(scopes).toContain("agents:read");
+      expect(scopes).toContain("assistant:read");
       expect(scopes).not.toContain("conversations:create");
       expect(scopes).not.toContain("documents:create");
     });
@@ -178,8 +177,8 @@ describe("Scope System", () => {
       const contributorScopes = getDefaultScopesForRole("contributor");
       const memberScopes = getDefaultScopesForRole("member");
 
-      expect(hasRequiredScope("agents", "create", contributorScopes)).toBe(true);
-      expect(hasRequiredScope("agents", "create", memberScopes)).toBe(false);
+      expect(hasRequiredScope("assistant", "update", contributorScopes)).toBe(true);
+      expect(hasRequiredScope("assistant", "update", memberScopes)).toBe(false);
     });
 
     it("should ensure member has more permissions than viewer", () => {
@@ -203,13 +202,13 @@ describe("Scope System", () => {
 
     it("should combine role and custom permissions correctly", () => {
       const roleScopes = getDefaultScopesForRole("member");
-      const customScopes = ["agents:create", "playbooks:create"];
+      const customScopes = ["assistant:update", "playbooks:create"];
       const allScopes = [...roleScopes, ...customScopes];
 
       // Member has conversation access from role
       expect(hasRequiredScope("conversations", "create", allScopes)).toBe(true);
-      // Member gets agent creation from custom permission
-      expect(hasRequiredScope("agents", "create", allScopes)).toBe(true);
+      // Member gets assistant editing from custom permission
+      expect(hasRequiredScope("assistant", "update", allScopes)).toBe(true);
     });
   });
 });

@@ -1,7 +1,7 @@
 {
   "page": {
     "title": "Playbooks",
-    "description": "Automated conversation flows and responses for your agents",
+    "description": "Automated conversation flows and responses for your assistant",
     "headTitle": "Playbooks - Hay.chat"
   },
   "actions": {
@@ -42,8 +42,6 @@
   "table": {
     "playbooks": "Playbooks",
     "name": "Name",
-    "agents": "Agents",
-    "agentsCount": "{count} agents",
     "status": "Status",
     "created": "Created",
     "actions": "Actions"
@@ -63,15 +61,11 @@
     "descriptionLabel": "Description",
     "descriptionPlaceholder": "Describe what this playbook does...",
     "instructionsLabel": "Instructions",
-    "instructionsHint": "Create numbered step-by-step instructions that agents will follow when executing this playbook",
+    "instructionsHint": "Create numbered step-by-step instructions that the assistant will follow when executing this playbook",
     "editorHintMention": "for Actions/Documents",
     "editorHintBlocks": "for blocks",
     "editorHintUndo": "to undo",
     "statusLabel": "Status",
-    "assignAgents": "Assign Agents",
-    "assignedAgents": "Assigned Agents",
-    "loadingAgents": "Loading agents...",
-    "noAgentsAvailable": "No agents available. Create agents first.",
     "createdDate": "Created: {date}",
     "lastUpdated": "Last updated: {date}"
   },
@@ -82,7 +76,7 @@
   },
   "create": {
     "title": "Create New",
-    "description": "Define automated conversation flows for your agents",
+    "description": "Define automated conversation flows for your assistant",
     "headTitle": "Create Playbook - Hay.chat",
     "headDescription": "Create a new automated conversation playbook",
     "editHeadDescription": "Edit your automated conversation playbook"
@@ -100,7 +94,6 @@
     "createSuccess": "Playbook created successfully",
     "saveFailed": "Failed to {action} playbook. Please try again.",
     "loadFailed": "Failed to load playbooks",
-    "loadAgentsFailed": "Failed to load agents",
     "playbookNotFound": "Playbook not found",
     "generateFailed": "Failed to generate instructions. Please try again.",
     "createFailed": "Failed to create playbook. Please try again."
@@ -117,7 +110,7 @@
     "retry": "Retry",
     "publish": "Publish",
     "publishTitle": "Publish Playbook",
-    "publishDescription": "This will update the live assistant behavior for all linked agents. The current draft will become the active version.",
+    "publishDescription": "This will update the live assistant behavior. The current draft will become the active version.",
     "publishConfirm": "Publish Now",
     "publishNoteLabel": "What changed? (optional)",
     "publishNotePlaceholder": "e.g., Updated refund policy steps...",
@@ -261,7 +254,6 @@
     "titlePlaceholder": "Untitled playbook",
     "documentLabel": "Playbook body",
     "detailsSection": "Details",
-    "agentsSection": "Agents",
     "actionsSection": "Available Actions",
     "actionsHint": "Type {'@'} in the body to insert an action or document.",
     "actionsLoading": "Loading actions...",

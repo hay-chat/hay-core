@@ -10,6 +10,10 @@
     "displayName": "Messenger",
     "category": "channel",
     "channel": "messenger",
+    "inactivity": {
+      "warningMinutes": 60,
+      "closeMinutes": 120
+    },
     "rendering": {
       "markdown": "plain",
       "productRecommendations": "text"
@@ -41,7 +45,7 @@
   },
   "devDependencies": {
     "@types/node": "^20.10.0",
-    "@vitejs/plugin-vue": "^5.0.0",
+    "@vitejs/plugin-vue": "^6.0.10",
     "typescript": "^5.3.3",
     "vite": "^5.0.0",
     "vitest": "^1.1.0",

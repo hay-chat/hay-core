@@ -9,7 +9,11 @@ import { EventEmitter } from "events";
  */
 
 jest.mock("@server/config/env", () => ({
-  config: { jwt: { secret: "ws-test-secret" }, cors: { origin: ["https://app.example.test"] } },
+  config: {
+    jwt: { secret: "ws-test-secret" },
+    cors: { origin: ["https://app.example.test"] },
+    server: { trustProxy: 1 },
+  },
 }));
 const mockLogger = { debug: jest.fn(), info: jest.fn(), warn: jest.fn(), error: jest.fn() };
 jest.mock("@server/lib/logger", () => ({ createLogger: () => mockLogger }));

@@ -207,9 +207,9 @@ export class HandoffTicketsService {
     }
 
     const config: HandoffTicketConfig | null =
-      fresh.agent?.human_handoff_unavailable_ticket ?? null;
+      fresh.organization?.humanHandoffUnavailableTicket ?? null;
     if (!config || config.pluginId !== state.pluginId) {
-      return { created: false, error: "Ticket creation is no longer set up for this agent" };
+      return { created: false, error: "Ticket creation is no longer set up for this assistant" };
     }
 
     const subject = input.subject?.trim();

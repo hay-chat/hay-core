@@ -478,7 +478,6 @@ export class CloseClassifierService {
             channel: conversation.channel,
             playbookId: conversation.playbook_id,
             playbookVersionId: conversation.playbook_version_id,
-            agentId: conversation.agent_id,
           },
         })
         .orIgnore()
@@ -589,7 +588,6 @@ export class CloseClassifierService {
               channel: conversation.channel,
               playbookId: conversation.playbook_id,
               playbookVersionId: conversation.playbook_version_id,
-              agentId: conversation.agent_id,
             },
           })
           .orIgnore()

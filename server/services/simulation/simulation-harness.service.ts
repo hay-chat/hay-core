@@ -31,7 +31,6 @@ import {
   type SimulationSeedTurn,
 } from "@server/database/entities/simulation-run-item.entity";
 import { Organization } from "@server/entities/organization.entity";
-import { Agent } from "@server/database/entities/agent.entity";
 import { SIMULATION_CAPS } from "@server/config/simulation-caps";
 import { withUsageCollector, type UsageEvent } from "@server/services/llm/usage-sink";
 import type { SimulationVerdict } from "./turn-judge.service";
@@ -57,8 +56,6 @@ export interface StartSimulationRunInput {
   createdById?: string | null;
   kind?: string;
   label?: string | null;
-  /** Default: the organization's default agent (else its first agent). */
-  agentId?: string | null;
   playbookVersionOverride?: PlaybookVersionOverride | null;
   cases: SimulationCase[];
 }
@@ -184,13 +181,6 @@ export class SimulationHarnessService {
   async startRun(input: StartSimulationRunInput): Promise<SimulationRun> {
     validateCases(input.cases);
 
-    if (input.agentId) {
-      const agent = await AppDataSource.getRepository(Agent).findOne({
-        where: { id: input.agentId, organization_id: input.organizationId },
-      });
-      if (!agent) throw new SimulationError("NOT_FOUND", "Agent not found");
-    }
-
     const override = input.playbookVersionOverride ?? null;
     if (override) {
       const { PlaybookService } = await import("@server/services/playbook.service");
@@ -220,7 +210,6 @@ export class SimulationHarnessService {
           kind: input.kind ?? "manual",
           label: input.label ?? null,
           status: "running",
-          agent_id: input.agentId ?? null,
           playbook_id: override?.playbookId ?? null,
           playbook_version_id: override?.versionId ?? null,
           item_count: input.cases.length,
@@ -420,7 +409,6 @@ export class SimulationHarnessService {
 
   /** Write the case into a new simulation conversation and queue it. */
   private async queueItem(run: SimulationRun, item: SimulationRunItem): Promise<void> {
-    const agentId = run.agent_id ?? (await this.defaultAgentId(run.organization_id));
     const metadata: Record<string, unknown> = {
       runKind: SIMULATION_RUN_KIND,
       simulationRunId: run.id,
@@ -441,7 +429,6 @@ export class SimulationHarnessService {
           ? `${run.label} #${item.position + 1}`
           : `Simulation #${item.position + 1}`,
         organization_id: run.organization_id,
-        agent_id: agentId,
         customer_id: null,
         channel: "web",
         status: "open",
@@ -454,7 +441,7 @@ export class SimulationHarnessService {
 
     // Instructions first, then the history, then the AI's turn.
     await conversation.addInitialSystemMessage();
-    await conversation.addInitialAgentInstructions();
+    await conversation.addInitialAssistantInstructions();
     const base = Date.now();
     await AppDataSource.getRepository(Message).insert(
       item.seed.map((turn, index) => ({
@@ -479,18 +466,6 @@ export class SimulationHarnessService {
       "simulation",
     );
     if (!sent) throw new Error("Queue unavailable");
-  }
-
-  private async defaultAgentId(organizationId: string): Promise<string | null> {
-    const organization = await AppDataSource.getRepository(Organization).findOne({
-      where: { id: organizationId },
-    });
-    if (organization?.defaultAgentId) return organization.defaultAgentId;
-    const agent = await AppDataSource.getRepository(Agent).findOne({
-      where: { organization_id: organizationId },
-      order: { created_at: "ASC" },
-    });
-    return agent?.id ?? null;
   }
 
   /** Never throws: a judge failure leaves the item unjudged, not failed. */

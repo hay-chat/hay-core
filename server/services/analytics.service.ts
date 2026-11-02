@@ -33,14 +33,6 @@ export interface ResponseTimeAnalytics {
   sampleSize: number;
 }
 
-export interface AgentPerformance {
-  agentId: string;
-  totalConversations: number;
-  resolvedConversations: number;
-  /** Same definition as the org-level rate: resolved / total, as a percentage. */
-  resolutionRate: number;
-}
-
 /**
  * Appends created_at bounds for `column` to a raw query. Returns the clause
  * and pushes the values onto `params` so placeholders stay in sync.
@@ -233,41 +225,5 @@ export class AnalyticsService {
       p95ResponseTime: row?.p95 ? parseFloat(row.p95) : 0,
       sampleSize: row ? parseInt(row.samples, 10) : 0,
     };
-  }
-
-  /** Conversations and resolution rate per agent, for conversations created in the range. */
-  async getAgentPerformance(filters: AnalyticsFilters): Promise<AgentPerformance[]> {
-    const { startDate, endDate, organizationId } = filters;
-    const params: unknown[] = [organizationId];
-    const range = dateRangeClause("created_at", params, startDate, endDate);
-
-    const rows: Array<{ agent_id: string; total: string; resolved: string }> =
-      await AppDataSource.query(
-        `
-        SELECT
-          agent_id,
-          COUNT(*) AS total,
-          COUNT(*) FILTER (WHERE status = 'resolved') AS resolved
-        FROM conversations
-        WHERE organization_id = $1
-          AND deleted_at IS NULL
-          AND ${notSimulationSql("conversations")}
-          AND agent_id IS NOT NULL${range}
-        GROUP BY agent_id
-        ORDER BY total DESC
-        `,
-        params,
-      );
-
-    return rows.map((row) => {
-      const total = parseInt(row.total, 10);
-      const resolved = parseInt(row.resolved, 10);
-      return {
-        agentId: row.agent_id,
-        totalConversations: total,
-        resolvedConversations: resolved,
-        resolutionRate: total > 0 ? (resolved / total) * 100 : 0,
-      };
-    });
   }
 }

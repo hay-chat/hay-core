@@ -160,10 +160,6 @@
         </CardHeader>
         <CardContent>
           <div class="space-y-3">
-            <div class="flex items-center justify-between text-sm">
-              <span class="text-neutral-muted">{{ t("table.agents") }}:</span>
-              <span class="font-medium">{{ playbook.agents?.length || 0 }}</span>
-            </div>
             <div v-if="playbook.created_at" class="flex items-center justify-between text-sm">
               <span class="text-neutral-muted">{{ t("table.created") }}:</span>
               <span class="font-medium">{{ formatDateTime(new Date(playbook.created_at)) }}</span>
@@ -184,7 +180,6 @@
             <thead>
               <tr class="border-b">
                 <th class="text-left py-3 px-4 font-medium">{{ t("table.name") }}</th>
-                <th class="text-left py-3 px-4 font-medium">{{ t("table.agents") }}</th>
                 <th class="text-left py-3 px-4 font-medium">{{ t("table.status") }}</th>
                 <th class="text-left py-3 px-4 font-medium">{{ t("table.created") }}</th>
                 <th class="text-left py-3 px-4 font-medium">{{ t("table.actions") }}</th>
@@ -206,9 +201,6 @@
                       {{ playbook.description }}
                     </div>
                   </div>
-                </td>
-                <td class="py-3 px-4 text-sm">
-                  {{ t("table.agentsCount", { count: playbook.agents?.length || 0 }) }}
                 </td>
                 <td class="py-3 px-4">
                   <Badge :variant="getStatusVariant(playbook.status || 'draft')">

@@ -2,7 +2,6 @@ import "reflect-metadata";
 import { randomUUID } from "crypto";
 import { AppDataSource } from "../../server/database/data-source";
 import { User } from "../../server/entities/user.entity";
-import { Agent } from "../../server/database/entities/agent.entity";
 import { Customer } from "../../server/database/entities/customer.entity";
 import { Conversation } from "../../server/database/entities/conversation.entity";
 import { Message, MessageType, MessageStatus } from "../../server/database/entities/message.entity";
@@ -19,7 +18,6 @@ import { getTestUserEmail } from "./auth";
 
 export interface QueuedReplySeed {
   userId: string;
-  agentId: string;
   customerId: string;
   conversationId: string;
   messageId: string;
@@ -32,8 +30,8 @@ async function ensureConnection(): Promise<void> {
 }
 
 /**
- * A WhatsApp conversation for the e2e organization whose agent requires
- * approval, with one customer question and one AI reply held in the queue.
+ * A WhatsApp conversation for the e2e organization with one customer question
+ * and one AI reply held in the approval queue.
  */
 export async function seedQueuedReply(originalReply: string): Promise<QueuedReplySeed> {
   await ensureConnection();
@@ -45,13 +43,6 @@ export async function seedQueuedReply(originalReply: string): Promise<QueuedRepl
     throw new Error("E2E user from global setup not found");
   }
   const organizationId = user.organizationId;
-
-  const agent = await AppDataSource.getRepository(Agent).save({
-    name: "E2E approval agent",
-    organization_id: organizationId,
-    testMode: true,
-    channels: ["whatsapp"],
-  });
 
   // (organization_id, external_id) is unique; parallel projects/workers seed concurrently.
   const customer = await AppDataSource.getRepository(Customer).save({
@@ -65,7 +56,6 @@ export async function seedQueuedReply(originalReply: string): Promise<QueuedRepl
     channel: "whatsapp",
     status: "open",
     organization_id: organizationId,
-    agent_id: agent.id,
     customer_id: customer.id,
   });
 
@@ -88,7 +78,6 @@ export async function seedQueuedReply(originalReply: string): Promise<QueuedRepl
 
   return {
     userId: user.id,
-    agentId: agent.id,
     customerId: customer.id,
     conversationId: conversation.id,
     messageId: queued.id,
@@ -104,7 +93,6 @@ export async function cleanupQueuedReply(seed: QueuedReplySeed): Promise<void> {
   await ensureConnection();
   await AppDataSource.getRepository(Conversation).delete(seed.conversationId);
   await AppDataSource.getRepository(Customer).delete(seed.customerId);
-  await AppDataSource.getRepository(Agent).delete(seed.agentId);
   // Release the pool so the worker can exit promptly.
   await AppDataSource.destroy();
 }

@@ -122,7 +122,6 @@ class ConversationEventsService {
           created_at: conversation.created_at,
           updated_at: conversation.updated_at,
           ended_at: conversation.ended_at,
-          agent_id: conversation.agent_id,
           customer_id: conversation.customer_id,
           assigned_user_id: conversation.assigned_user_id,
           assignedUser: conversation.assignedUser
@@ -186,7 +185,6 @@ class ConversationEventsService {
           updated_at: conversation.updated_at,
           ended_at: conversation.ended_at,
           closed_at: conversation.closed_at,
-          agent_id: conversation.agent_id,
           customer_id: conversation.customer_id,
           assigned_user_id: conversation.assigned_user_id,
           assignedUser: conversation.assignedUser

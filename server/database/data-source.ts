@@ -1,3 +1,4 @@
+import fs from "fs";
 import { DataSource } from "typeorm";
 import { User } from "../entities/user.entity";
 import { ApiKey } from "../entities/apikey.entity";
@@ -9,7 +10,6 @@ import { DocumentSource } from "../entities/document-source.entity";
 import { Job } from "../entities/job.entity";
 import { Session } from "../entities/session.entity";
 import { Embedding } from "../entities/embedding.entity";
-import { Agent } from "./entities/agent.entity";
 import { Playbook } from "./entities/playbook.entity";
 import { PlaybookVersion } from "./entities/playbook-version.entity";
 import { Conversation } from "./entities/conversation.entity";
@@ -59,6 +59,25 @@ import "reflect-metadata";
 
 const logger = createLogger("database");
 
+/**
+ * TLS options for the Postgres connection. With DB_SSL_CA (PEM text or a path
+ * to a PEM file) the server certificate is verified; without it the link is
+ * encrypted but unverified, which validateProductionConfig warns about.
+ */
+export function buildSslOptions(
+  ssl: boolean,
+  sslCa: string,
+): false | { rejectUnauthorized: boolean; ca?: string } {
+  if (!ssl) {
+    return false;
+  }
+  if (!sslCa) {
+    return { rejectUnauthorized: false };
+  }
+  const ca = sslCa.includes("-----BEGIN") ? sslCa : fs.readFileSync(sslCa, "utf8");
+  return { rejectUnauthorized: true, ca };
+}
+
 export const AppDataSource = new DataSource({
   type: config.database.type,
   host: config.database.host,
@@ -68,7 +87,9 @@ export const AppDataSource = new DataSource({
   database: config.database.database,
   synchronize: false, // IMPORTANT: Never use synchronize in production, always use migrations
   logging: false, // Disable verbose logging
-  ssl: config.database.ssl ? { rejectUnauthorized: false } : false,
+  ssl: buildSslOptions(config.database.ssl, config.database.sslCa),
+  poolSize: config.database.maxConnections,
+  connectTimeoutMS: config.database.connectionTimeout,
   // hnsw.iterative_scan: keeps probing the HNSW graph until LIMIT is satisfied
   // post-filter (e.g. WHERE organization_id = ...). Required for correct top-K
   // results on small tenants. Available in pgvector ≥ 0.8.
@@ -86,7 +107,6 @@ export const AppDataSource = new DataSource({
     Job,
     Session,
     Embedding,
-    Agent,
     Playbook,
     PlaybookVersion,
     Conversation,

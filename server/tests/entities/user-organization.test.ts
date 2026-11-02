@@ -9,7 +9,7 @@ describe("UserOrganization Entity", () => {
 
       expect(userOrg.hasScope("conversations", "read")).toBe(true);
       expect(userOrg.hasScope("documents", "delete")).toBe(true);
-      expect(userOrg.hasScope("agents", "execute")).toBe(true);
+      expect(userOrg.hasScope("assistant", "update")).toBe(true);
       expect(userOrg.hasScope("*", "*")).toBe(true);
     });
 
@@ -28,13 +28,13 @@ describe("UserOrganization Entity", () => {
       userOrg.role = "contributor";
       userOrg.isActive = true;
 
-      // Contributors can create agents and playbooks
-      expect(userOrg.hasScope("agents", "create")).toBe(true);
+      // Contributors can edit the assistant and create playbooks
+      expect(userOrg.hasScope("assistant", "update")).toBe(true);
       expect(userOrg.hasScope("playbooks", "create")).toBe(true);
       expect(userOrg.hasScope("conversations", "create")).toBe(true);
 
       // But cannot delete them
-      expect(userOrg.hasScope("agents", "delete")).toBe(false);
+      expect(userOrg.hasScope("playbooks", "delete")).toBe(false);
       expect(userOrg.hasScope("playbooks", "delete")).toBe(false);
     });
 
@@ -47,9 +47,9 @@ describe("UserOrganization Entity", () => {
       expect(userOrg.hasScope("conversations", "create")).toBe(true);
       expect(userOrg.hasScope("documents", "create")).toBe(true);
 
-      // But only read access to agents
-      expect(userOrg.hasScope("agents", "read")).toBe(true);
-      expect(userOrg.hasScope("agents", "create")).toBe(false);
+      // But only read access to the assistant
+      expect(userOrg.hasScope("assistant", "read")).toBe(true);
+      expect(userOrg.hasScope("assistant", "update")).toBe(false);
     });
 
     it("should check scopes correctly for viewer role", () => {
@@ -60,12 +60,12 @@ describe("UserOrganization Entity", () => {
       // Viewers only have read access
       expect(userOrg.hasScope("conversations", "read")).toBe(true);
       expect(userOrg.hasScope("documents", "read")).toBe(true);
-      expect(userOrg.hasScope("agents", "read")).toBe(true);
+      expect(userOrg.hasScope("assistant", "read")).toBe(true);
 
       // No create/update/delete
       expect(userOrg.hasScope("conversations", "create")).toBe(false);
       expect(userOrg.hasScope("documents", "update")).toBe(false);
-      expect(userOrg.hasScope("agents", "delete")).toBe(false);
+      expect(userOrg.hasScope("playbooks", "delete")).toBe(false);
     });
 
     it("should return false for inactive users", () => {
@@ -88,20 +88,20 @@ describe("UserOrganization Entity", () => {
       expect(userOrg.hasScope("documents", "create")).toBe(true);
 
       // Still restricted from other create operations
-      expect(userOrg.hasScope("agents", "create")).toBe(false);
+      expect(userOrg.hasScope("assistant", "update")).toBe(false);
     });
 
     it("should combine role defaults with custom permissions", () => {
       const userOrg = new UserOrganization();
       userOrg.role = "member";
       userOrg.isActive = true;
-      userOrg.permissions = ["agents:create", "playbooks:create"];
+      userOrg.permissions = ["assistant:update", "playbooks:create"];
 
       // Has member default scopes
       expect(userOrg.hasScope("conversations", "create")).toBe(true);
 
       // Plus custom scopes
-      expect(userOrg.hasScope("agents", "create")).toBe(true);
+      expect(userOrg.hasScope("assistant", "update")).toBe(true);
       expect(userOrg.hasScope("playbooks", "create")).toBe(true);
     });
   });
@@ -187,9 +187,9 @@ describe("UserOrganization Entity", () => {
       contributor.role = "contributor";
       contributor.isActive = true;
 
-      // Admin can delete agents, contributor cannot
-      expect(admin.hasScope("agents", "delete")).toBe(true);
-      expect(contributor.hasScope("agents", "delete")).toBe(false);
+      // Admin can delete playbooks, contributor cannot
+      expect(admin.hasScope("playbooks", "delete")).toBe(true);
+      expect(contributor.hasScope("playbooks", "delete")).toBe(false);
     });
 
     it("should enforce permission hierarchy: contributor > member", () => {
@@ -201,9 +201,9 @@ describe("UserOrganization Entity", () => {
       member.role = "member";
       member.isActive = true;
 
-      // Contributor can create agents, member cannot
-      expect(contributor.hasScope("agents", "create")).toBe(true);
-      expect(member.hasScope("agents", "create")).toBe(false);
+      // Contributor can edit the assistant, member cannot
+      expect(contributor.hasScope("assistant", "update")).toBe(true);
+      expect(member.hasScope("assistant", "update")).toBe(false);
     });
 
     it("should enforce permission hierarchy: member > viewer", () => {

@@ -465,7 +465,7 @@ const scopeGroups = {
   Content: [
     { label: "Read Documents", value: "documents:read" },
     { label: "Write Documents", value: "documents:write" },
-    { label: "Read Agents", value: "agents:read" },
+    { label: "Read Assistant", value: "assistant:read" },
     { label: "Read Playbooks", value: "playbooks:read" },
   ],
   Analytics: [{ label: "Read Analytics", value: "analytics:read" }],

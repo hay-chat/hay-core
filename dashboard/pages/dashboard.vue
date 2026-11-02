@@ -11,18 +11,7 @@
     </template>
 
     <!-- Key Metrics Cards -->
-    <div class="grid gap-4 mb-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
-      <MetricCard
-        :title="$t('dashboard.metrics.activeAgents')"
-        :icon="Bot"
-        :metric="metrics.activeAgents"
-        :subtitle="`+${metrics.newAgentsThisWeek}`"
-        :subtitle-suffix="$t('dashboard.metrics.newThisWeek')"
-        subtitle-color="green"
-        :show-cache-indicator="false"
-        :cache-age="analyticsStore.formatDataAge(CACHE_KEYS.AGENTS)"
-      />
-
+    <div class="grid gap-4 mb-4 md:grid-cols-2 xl:grid-cols-4">
       <MetricCard
         :title="$t('dashboard.metrics.totalConversations')"
         :icon="MessageSquare"
@@ -144,60 +133,6 @@
           </div>
         </CardContent>
       </Card> -->
-
-      <!-- Top Performing Agents -->
-      <Card>
-        <CardHeader>
-          <div class="flex items-center justify-between">
-            <div>
-              <CardTitle>{{ $t("dashboard.topAgents.title") }}</CardTitle>
-              <CardDescription>{{ $t("dashboard.topAgents.description") }}</CardDescription>
-            </div>
-            <Button variant="ghost" size="sm" @click="viewAllAgents">
-              {{ $t("dashboard.actions.viewAll") }}
-              <ChevronRight class="ml-1 h-4 w-4" />
-            </Button>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <div v-if="topAgents.length > 0" class="space-y-4">
-            <div
-              v-for="agent in topAgents"
-              :key="agent.id"
-              class="flex items-center justify-between p-3 border rounded-lg hover:bg-background-secondary transition-colors"
-            >
-              <div class="flex items-center space-x-3">
-                <div class="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
-                  <Bot class="h-5 w-5 text-primary" />
-                </div>
-                <div>
-                  <p class="font-medium text-foreground">
-                    {{ agent.name }}
-                  </p>
-                  <p class="text-sm text-neutral-muted">
-                    {{ $t("dashboard.topAgents.conversations", { count: agent.conversations }) }}
-                  </p>
-                </div>
-              </div>
-              <div v-if="agent.conversations > 0" class="text-right">
-                <div class="text-sm font-medium text-foreground">
-                  {{ agent.resolutionRate.toFixed(0) }}%
-                </div>
-                <div class="text-xs text-neutral-muted">
-                  {{ $t("dashboard.topAgents.resolutionRate") }}
-                </div>
-              </div>
-            </div>
-          </div>
-          <div v-else class="text-center py-8 text-neutral-muted">
-            <Bot class="h-12 w-12 mx-auto mb-2 opacity-50" />
-            <p>{{ $t("dashboard.topAgents.emptyTitle") }}</p>
-            <Button variant="outline" size="sm" class="mt-4" @click="createAgent">
-              {{ $t("dashboard.actions.createFirstAgent") }}
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
 
       <!-- Recent Conversations -->
       <Card>
@@ -333,7 +268,6 @@
 
 <script setup lang="ts">
 import {
-  Bot,
   MessageSquare,
   CheckCircle,
   User,
@@ -360,23 +294,19 @@ const analyticsStore = useAnalyticsStore();
 
 // Cache keys for different widgets
 const CACHE_KEYS = {
-  AGENTS: "dashboard_agents",
   CONVERSATIONS: "dashboard_conversations",
   ACTIVITY: "dashboard_activity",
   SENTIMENT: "dashboard_sentiment",
   METRICS: "dashboard_metrics",
-  AGENT_PERFORMANCE: "dashboard_agent_performance",
   RESPONSE_TIME: "dashboard_response_time",
 };
 
 // TTL values in milliseconds
 const CACHE_TTL = {
-  AGENTS: 5 * 60 * 1000, // 5 minutes
   CONVERSATIONS: 1 * 60 * 1000, // 1 minute for recent conversations
   ACTIVITY: 3 * 60 * 1000, // 3 minutes for activity chart
   SENTIMENT: 5 * 60 * 1000, // 5 minutes for sentiment data
   METRICS: 2 * 60 * 1000, // 2 minutes for conversation metrics
-  AGENT_PERFORMANCE: 2 * 60 * 1000,
   RESPONSE_TIME: 2 * 60 * 1000,
 };
 
@@ -387,22 +317,10 @@ const dateRange = ref({
 });
 
 // Real data - fetched from API
-interface Agent {
-  id: string;
-  name: string;
-  enabled: boolean;
-  created_at: string;
-  description?: string | null;
-  organization?: unknown;
-  playbooks?: unknown[];
-  updated_at: string;
-}
-
 interface Conversation {
   id: string;
   title?: string;
   status: string;
-  agent_id?: string;
   created_at: string;
   updated_at: string;
   messages?: Array<{ content: string; created_at: string }>;
@@ -417,7 +335,6 @@ interface ConversationStat {
   chartIndex?: number;
 }
 
-const agents = ref<Agent[]>([]);
 const conversations = ref<Conversation[]>([]);
 const conversationStats = ref<ConversationStat[]>([]);
 
@@ -429,43 +346,12 @@ const conversationMetrics = ref({
   resolutionRate: 0,
   avgMessagesPerConversation: 0,
 });
-type AgentPerformance = RouterOutputs["analytics"]["agentPerformance"]["data"][number];
 type ResponseTime = RouterOutputs["analytics"]["responseTime"]["data"];
-const agentPerformance = ref<AgentPerformance[]>([]);
 const responseTime = ref<ResponseTime>({
   averageResponseTime: 0,
   medianResponseTime: 0,
   p95ResponseTime: 0,
   sampleSize: 0,
-});
-
-// Computed properties for dashboard data
-const metrics = computed(() => {
-  const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-  return {
-    activeAgents: agents.value.filter((a) => a.enabled).length,
-    newAgentsThisWeek: agents.value.filter((a) => new Date(a.created_at) > weekAgo).length,
-  };
-});
-
-// Enabled agents ranked by conversations in the selected period, with their real
-// resolution rate (resolved / total, the same definition as the org-level rate).
-const topAgents = computed(() => {
-  const performanceByAgent = new Map(agentPerformance.value.map((p) => [p.agentId, p]));
-
-  return agents.value
-    .filter((agent) => agent.enabled)
-    .map((agent) => {
-      const performance = performanceByAgent.get(agent.id);
-      return {
-        id: agent.id,
-        name: agent.name,
-        conversations: performance?.totalConversations ?? 0,
-        resolutionRate: performance?.resolutionRate ?? 0,
-      };
-    })
-    .sort((a, b) => b.conversations - a.conversations)
-    .slice(0, 4);
 });
 
 // Computed property for sentiment gauge counts
@@ -561,61 +447,42 @@ const fetchDashboardData = async (forceRefresh = false) => {
     const dateFilters = toISODateRange(dateRange.value);
 
     // Fetch all data in parallel using the analytics store for caching
-    const [
-      agentsData,
-      conversationsData,
-      analyticsData,
-      sentimentAnalysis,
-      metricsData,
-      agentPerformanceData,
-      responseTimeData,
-    ] = await Promise.all([
-      // Agents data with caching
-      analyticsStore.fetchData(CACHE_KEYS.AGENTS, () => HayApi.agents.list.query(), {
-        ttl: CACHE_TTL.AGENTS,
-        forceRefresh,
-      }),
-      // Conversations data with shorter cache for recent updates
-      analyticsStore.fetchData(
-        CACHE_KEYS.CONVERSATIONS,
-        () =>
-          HayApi.conversations.list.query({
-            pagination: { page: 1, limit: 10 },
-            include: ["messages"],
-          }),
-        { ttl: CACHE_TTL.CONVERSATIONS, forceRefresh },
-      ),
-      // Activity chart data
-      analyticsStore.fetchData(
-        CACHE_KEYS.ACTIVITY,
-        () => HayApi.analytics.conversationActivity.query(dateFilters),
-        { ttl: CACHE_TTL.ACTIVITY, forceRefresh },
-      ),
-      // Sentiment analysis data
-      analyticsStore.fetchData(
-        CACHE_KEYS.SENTIMENT,
-        () => HayApi.analytics.sentimentAnalysis.query(dateFilters),
-        { ttl: CACHE_TTL.SENTIMENT, forceRefresh },
-      ),
-      // Conversation metrics
-      analyticsStore.fetchData(
-        CACHE_KEYS.METRICS,
-        () => HayApi.analytics.conversationMetrics.query(dateFilters),
-        { ttl: CACHE_TTL.METRICS, forceRefresh },
-      ),
-      analyticsStore.fetchData(
-        CACHE_KEYS.AGENT_PERFORMANCE,
-        () => HayApi.analytics.agentPerformance.query(dateFilters),
-        { ttl: CACHE_TTL.AGENT_PERFORMANCE, forceRefresh },
-      ),
-      analyticsStore.fetchData(
-        CACHE_KEYS.RESPONSE_TIME,
-        () => HayApi.analytics.responseTime.query(dateFilters),
-        { ttl: CACHE_TTL.RESPONSE_TIME, forceRefresh },
-      ),
-    ]);
-
-    agents.value = (agentsData as Agent[]) || [];
+    const [conversationsData, analyticsData, sentimentAnalysis, metricsData, responseTimeData] =
+      await Promise.all([
+        // Conversations data with shorter cache for recent updates
+        analyticsStore.fetchData(
+          CACHE_KEYS.CONVERSATIONS,
+          () =>
+            HayApi.conversations.list.query({
+              pagination: { page: 1, limit: 10 },
+              include: ["messages"],
+            }),
+          { ttl: CACHE_TTL.CONVERSATIONS, forceRefresh },
+        ),
+        // Activity chart data
+        analyticsStore.fetchData(
+          CACHE_KEYS.ACTIVITY,
+          () => HayApi.analytics.conversationActivity.query(dateFilters),
+          { ttl: CACHE_TTL.ACTIVITY, forceRefresh },
+        ),
+        // Sentiment analysis data
+        analyticsStore.fetchData(
+          CACHE_KEYS.SENTIMENT,
+          () => HayApi.analytics.sentimentAnalysis.query(dateFilters),
+          { ttl: CACHE_TTL.SENTIMENT, forceRefresh },
+        ),
+        // Conversation metrics
+        analyticsStore.fetchData(
+          CACHE_KEYS.METRICS,
+          () => HayApi.analytics.conversationMetrics.query(dateFilters),
+          { ttl: CACHE_TTL.METRICS, forceRefresh },
+        ),
+        analyticsStore.fetchData(
+          CACHE_KEYS.RESPONSE_TIME,
+          () => HayApi.analytics.responseTime.query(dateFilters),
+          { ttl: CACHE_TTL.RESPONSE_TIME, forceRefresh },
+        ),
+      ]);
 
     // Handle both paginated and non-paginated responses
     if (
@@ -657,17 +524,13 @@ const fetchDashboardData = async (forceRefresh = false) => {
       avgMessagesPerConversation: metrics.avgMessagesPerConversation || 0,
     };
 
-    agentPerformance.value =
-      (agentPerformanceData as { data?: AgentPerformance[] } | null)?.data || [];
     const responseTimeResult = (responseTimeData as { data?: ResponseTime } | null)?.data;
     if (responseTimeResult) responseTime.value = responseTimeResult;
   } catch (error) {
     console.error("Error fetching dashboard data:", error);
     // Set empty arrays on error to prevent UI issues
-    agents.value = [];
     conversations.value = [];
     conversationStats.value = [];
-    agentPerformance.value = [];
   }
 };
 
@@ -682,14 +545,6 @@ const refreshData = async () => {
   } finally {
     loading.value = false;
   }
-};
-
-const createAgent = () => {
-  router.push("/agents/new");
-};
-
-const viewAllAgents = () => {
-  router.push("/agents");
 };
 
 const viewAllConversations = () => {
@@ -714,7 +569,6 @@ watch(dateRange, async () => {
   analyticsStore.clearData(CACHE_KEYS.ACTIVITY);
   analyticsStore.clearData(CACHE_KEYS.SENTIMENT);
   analyticsStore.clearData(CACHE_KEYS.METRICS);
-  analyticsStore.clearData(CACHE_KEYS.AGENT_PERFORMANCE);
   analyticsStore.clearData(CACHE_KEYS.RESPONSE_TIME);
   await fetchDashboardData(true);
 });

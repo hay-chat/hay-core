@@ -38,6 +38,7 @@ import {
   customAiLabel,
   isEuOrganization,
 } from "@server/services/ai-disclosure";
+import { assistantRouter } from "./assistant";
 import {
   CHAT_MODEL_CATALOG,
   EMBEDDING_MODEL_CATALOG,
@@ -164,7 +165,6 @@ const updateSettingsSchema = z.object({
   dateFormat: z.nativeEnum(DateFormat).optional(),
   timeFormat: z.nativeEnum(TimeFormat).optional(),
   timezone: z.nativeEnum(Timezone).optional(),
-  defaultAgentId: z.string().uuid().nullable().optional(),
   testModeDefault: z.boolean().optional(),
   confidenceGuardrail: confidenceGuardrailSchema.optional(),
   retentionDays: z.number().int().min(1).max(3650).nullable().optional(), // Data retention in days (null = disabled)
@@ -172,6 +172,8 @@ const updateSettingsSchema = z.object({
 });
 
 export const organizationsRouter = t.router({
+  assistant: assistantRouter,
+
   // ============================================================================
   // ORGANIZATION CREATION
   // ============================================================================
@@ -312,7 +314,6 @@ export const organizationsRouter = t.router({
         dateFormat: organization.dateFormat,
         timeFormat: organization.timeFormat,
         timezone: organization.timezone,
-        defaultAgentId: organization.defaultAgentId,
         testModeDefault: organization.settings?.testModeDefault || false,
         logoUrl: organization.logoUrl || null,
         confidenceGuardrail,
@@ -744,7 +745,6 @@ export const organizationsRouter = t.router({
           dateFormat: updatedOrg.dateFormat,
           timeFormat: updatedOrg.timeFormat,
           timezone: updatedOrg.timezone,
-          defaultAgentId: updatedOrg.defaultAgentId,
           testModeDefault: updatedOrg.settings?.testModeDefault || false,
           confidenceGuardrail: updatedOrg.settings?.confidenceGuardrail,
           actionApproval: resolveActionApprovalConfig(updatedOrg.settings),

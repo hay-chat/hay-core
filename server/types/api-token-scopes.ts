@@ -17,7 +17,7 @@ export enum ApiTokenScope {
   // Content
   DOCUMENTS_READ = "documents:read",
   DOCUMENTS_WRITE = "documents:write",
-  AGENTS_READ = "agents:read",
+  ASSISTANT_READ = "assistant:read",
   PLAYBOOKS_READ = "playbooks:read",
 
   // Analytics
@@ -57,7 +57,7 @@ export const API_TOKEN_SCOPE_GROUPS = {
   Content: [
     ApiTokenScope.DOCUMENTS_READ,
     ApiTokenScope.DOCUMENTS_WRITE,
-    ApiTokenScope.AGENTS_READ,
+    ApiTokenScope.ASSISTANT_READ,
     ApiTokenScope.PLAYBOOKS_READ,
   ],
   Analytics: [ApiTokenScope.ANALYTICS_READ],
@@ -89,7 +89,7 @@ export const API_TOKEN_SCOPE_DESCRIPTIONS: Record<ApiTokenScope, string> = {
   [ApiTokenScope.CUSTOMERS_WRITE]: "Create and update customers",
   [ApiTokenScope.DOCUMENTS_READ]: "Read documents",
   [ApiTokenScope.DOCUMENTS_WRITE]: "Upload and modify documents",
-  [ApiTokenScope.AGENTS_READ]: "Read agent configurations",
+  [ApiTokenScope.ASSISTANT_READ]: "Read the assistant's settings",
   [ApiTokenScope.PLAYBOOKS_READ]: "Read playbooks",
   [ApiTokenScope.ANALYTICS_READ]: "Access analytics data",
   [ApiTokenScope.PRIVACY_READ]: "View privacy requests",
