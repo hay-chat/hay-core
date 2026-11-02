@@ -127,8 +127,10 @@ export class CustomerService {
   /**
    * Delete a customer
    */
+  /** Deleting a customer erases them: conversations, messages, media and embeddings included. */
   async deleteCustomer(customerId: string, organizationId: string): Promise<boolean> {
-    return await this.customerRepository.delete(customerId, organizationId);
+    const { privacyService } = await import("./privacy.service");
+    return await privacyService.eraseCustomer(customerId, organizationId);
   }
 
   /**
