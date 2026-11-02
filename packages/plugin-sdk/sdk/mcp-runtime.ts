@@ -12,6 +12,7 @@ import { resolve, join } from "path";
 import type {
   HayMcpRuntimeAPI,
   McpServerInstance,
+  ToolCallMeta,
   McpInitializerContext,
   ExternalMcpOptions,
   LocalMcpOptions,
@@ -298,8 +299,8 @@ export function createMcpRuntimeAPI(options: McpRuntimeAPIOptions): HayMcpRuntim
           listTools: async () => {
             return await client.listTools();
           },
-          callTool: async (name: string, args?: Record<string, any>) => {
-            return await client.callTool(name, args || {});
+          callTool: async (name: string, args?: Record<string, any>, meta?: ToolCallMeta) => {
+            return await client.callTool(name, args || {}, meta);
           },
           stop: async () => {
             logger.debug(`Stopping stdio MCP server: ${id}`);

@@ -282,14 +282,21 @@ export class StdioMcpClient {
   /**
    * Call a tool on the MCP server
    */
-  async callTool(name: string, args: Record<string, any>): Promise<any> {
-    this.logger.debug("[Stdio MCP] Calling tool", { name, args });
+  async callTool(
+    name: string,
+    args: Record<string, any>,
+    meta?: Record<string, unknown>,
+  ): Promise<any> {
+    this.logger.debug("[Stdio MCP] Calling tool", { name });
 
     try {
       await this.ensureInitialized();
+      // `_meta` (the verified customer) rides beside the arguments, where the
+      // server's tool handler reads it from `extra._meta`.
       const result = await this.sendRequest("tools/call", {
         name,
         arguments: args,
+        ...(meta ? { _meta: meta } : {}),
       });
 
       return result;

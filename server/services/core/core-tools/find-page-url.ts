@@ -6,6 +6,7 @@
 
 import { siteIndexService } from "@server/services/site-index.service";
 import type { CoreToolDefinition } from "./index";
+import { READ_RISK } from "../tool-risk";
 
 export const findPageUrlTool: CoreToolDefinition = {
   name: "find_page_url",
@@ -14,6 +15,7 @@ export const findPageUrlTool: CoreToolDefinition = {
     "page, shipping policy, contact page). Returns up to 5 matching pages; link only to one of " +
     "them. An empty list means no such page is known: do not link, and hand off if the customer " +
     "needs that page.",
+  risk: READ_RISK,
   inputSchema: {
     type: "object",
     additionalProperties: false,

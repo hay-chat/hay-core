@@ -8,6 +8,7 @@
 
 const { z } = require("zod");
 const { wcApi, wcList } = require("../lib/client");
+const { callerIdentity, lookupFor, verifiedEmail } = require("@hay/plugin-sdk/identity");
 const { ok, fail, toolError } = require("../lib/format");
 const { summarizeOrder } = require("../lib/orders");
 
@@ -82,8 +83,10 @@ function registerCustomerTools(server) {
       email: z.string().optional().describe("Email address used at checkout."),
       phone: z.string().optional().describe("Billing phone number (any format)."),
     },
-    async ({ email, phone }) => {
+    async (asked, extra) => {
       try {
+        // Customer data: only the verified customer's own (see @hay/plugin-sdk/identity).
+        const { email, phone } = lookupFor(callerIdentity(extra), asked);
         if (!email && !phone)
           throw toolError("BAD_INPUT", "Provide an email and/or a phone number.");
         if (!email && !phoneKey(phone)) {
@@ -144,8 +147,9 @@ function registerCustomerTools(server) {
       limit: z.number().int().optional().describe("Orders per page (default 10, max 100)."),
       page: z.number().int().optional().describe("Page number (default 1)."),
     },
-    async ({ email, limit, page }) => {
+    async ({ email: asked, limit, page }, extra) => {
       try {
+        const email = verifiedEmail(callerIdentity(extra), asked);
         const perPage = Math.min(limit ?? 10, 100);
         const paging = { per_page: perPage, page: page ?? 1, orderby: "date", order: "desc" };
         // Registered customers get exact, countable paging by customer id;

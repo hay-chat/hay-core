@@ -36,4 +36,7 @@ module.exports = {
   },
   // Enforces the merchant's coupon cap itself; above it, core holds the call.
   capped: ["shopify_create_coupon"],
+  // Return a customer's profile or order history: core runs them only for a
+  // verified customer, and they return only that customer's records.
+  customerData: ["shopify_find_customer", "shopify_get_customer", "shopify_list_customer_orders"],
 };
