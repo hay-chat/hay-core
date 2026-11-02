@@ -68,7 +68,7 @@ export function extractUrls(text: string): string[] {
   });
 }
 
-function hostKey(hostname: string): string {
+export function hostKey(hostname: string): string {
   return hostname.toLowerCase().replace(/^www\./, "");
 }
 
@@ -83,7 +83,7 @@ export function normalizeUrl(url: string): string {
   }
 }
 
-function websiteUrl(website?: string | null): URL | null {
+export function websiteUrl(website?: string | null): URL | null {
   if (!website) return null;
   try {
     return new URL(/^https?:\/\//i.test(website) ? website : `https://${website}`);

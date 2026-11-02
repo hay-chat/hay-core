@@ -1105,13 +1105,16 @@ export class ExecutionLayer {
     };
   }
 
-  /** The organization's website and site index, for the link check. */
+  /** The organization's website and known page URLs, for the link check. */
   private async getLinkContext(
     conversation: Conversation,
   ): Promise<{ website: string | null; siteUrls: string[] }> {
-    const { organizationRepository } = await import("@server/repositories/organization.repository");
-    const organization = await organizationRepository.findById(conversation.organization_id);
-    return { website: organization?.website ?? null, siteUrls: [] };
+    const { siteIndexService } = await import("@server/services/site-index.service");
+    const [website, siteUrls] = await Promise.all([
+      siteIndexService.resolveWebsite(conversation.organization_id),
+      siteIndexService.listUrls(conversation.organization_id),
+    ]);
+    return { website, siteUrls };
   }
 
   /**
