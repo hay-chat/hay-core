@@ -118,13 +118,23 @@ async function startServer() {
   // lib/client-ip.ts), not whatever X-Forwarded-For a client sent.
   server.set("trust proxy", config.server.trustProxy);
 
-  // Baseline security headers. CSP and frame options are left to the routes
-  // that serve HTML (webchat challenge, media) since some must be framed;
-  // resources are loaded cross-origin by the dashboard and the widget.
+  // Baseline security headers. The default CSP suits JSON and plain-text
+  // responses (nothing loads, nothing may frame them); routes that serve HTML
+  // or files set their own CSP (webchat challenge, media, plugin assets,
+  // public uploads). Resources are loaded cross-origin by the dashboard and
+  // the widget.
   server.use(
     helmet({
-      contentSecurityPolicy: false,
-      frameguard: false,
+      contentSecurityPolicy: {
+        useDefaults: false,
+        directives: {
+          defaultSrc: ["'none'"],
+          baseUri: ["'none'"],
+          formAction: ["'none'"],
+          frameAncestors: ["'none'"],
+        },
+      },
+      frameguard: { action: "deny" },
       crossOriginOpenerPolicy: false,
       crossOriginResourcePolicy: { policy: "cross-origin" },
       strictTransportSecurity: config.domain.useSSL,
@@ -264,7 +274,11 @@ async function startServer() {
   // Hay.chat-hosted challenge frame for webchat bot checks (D9-8). Mounted before
   // the static files so it is never shadowed by a file of the same name.
   const { webchatChallengeHandler } = await import("@server/routes/webchat-challenge");
-  server.get("/v1/webchat/challenge", (req, res) => void webchatChallengeHandler(req, res));
+  // Framed by customer sites: its CSP frame-ancestors decides who may embed it.
+  server.get("/v1/webchat/challenge", (req, res) => {
+    res.removeHeader("X-Frame-Options");
+    void webchatChallengeHandler(req, res);
+  });
   // widget.js (the loader) gets a short cache; the hashed chunks under assets/
   // are immutable. See lib/webchat-static.ts.
   server.use("/v1/webchat", webchatStatic(webchatDir));
