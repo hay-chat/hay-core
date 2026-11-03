@@ -1,3 +1,7 @@
+# Local development services. The fixed project name lets every worktree share
+# one stack (the container names below are fixed too).
+name: hay-core
+
 services:
   postgres:
     image: pgvector/pgvector:pg16

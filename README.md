@@ -72,48 +72,50 @@ Teams comparing Chatwoot, Zammad or Dify for self-hosted AI support use Hay.chat
 
 ### Prerequisites
 
-- Node.js 20 or newer (22 recommended; the Docker image uses 22)
+- Node.js 22.12 or newer
 - npm >= 9
-- Docker (for PostgreSQL, Redis and RabbitMQ)
+- Docker, running (for PostgreSQL, Redis and RabbitMQ)
+- An OpenAI API key (embeddings always use OpenAI, even with another chat provider)
 
 ### Setup
 
 ```bash
-# Clone the repository
 git clone https://github.com/hay-chat/hay-core.git
 cd hay-core
 
-# Start infrastructure
-docker compose up -d
-
-# Install dependencies
-npm install
-
-# Configure environment
-cp .env.example .env
-# Edit .env with your settings (see Environment Variables below)
-
-# Run database migrations
-cd server && npm run migration:run && cd ..
+# One-time setup (safe to re-run)
+OPENAI_API_KEY=sk-... npm run setup
 
 # Start development
 npm run dev
 ```
 
-The dashboard runs on `http://localhost:3000` and the API on `http://localhost:3001`.
+`npm run setup` (`scripts/setup-dev.sh`):
+
+1. Starts PostgreSQL with pgvector, Redis and RabbitMQ with `docker compose up -d` (the app itself runs on your machine, so you get hot reload).
+2. Runs `npm install`.
+3. Creates `.env` from `.env.example` with generated JWT secrets and `REQUIRE_EMAIL_VERIFICATION=false` (no SMTP locally). It keeps an existing `.env` and only fills in empty JWT secrets. If you don't pass `OPENAI_API_KEY`, set it in `.env` afterwards.
+4. Builds the plugin SDK (plugins are built on demand against it) and the webchat widget (served by the API).
+5. Runs database migrations.
+
+Then open `http://localhost:3000` and sign up; the first account creates your organization. The API runs on `http://localhost:3001` and the RabbitMQ admin UI on `http://localhost:15672` (`hay` / `hay_password`).
+
+Optional: set `CHROME_EXECUTABLE_PATH` to a local Chrome or Chromium to import websites into the knowledge base, and the `SMTP_*` variables to send email.
+
+`selfhost/compose.yml` runs the whole app in Docker, but it is a production build without hot reload; use it to self-host (see [SELF_HOSTING.md](SELF_HOSTING.md)), not for development.
 
 ### Environment Variables
 
-| Variable                                                      | Required   | Description                       |
-| ------------------------------------------------------------- | ---------- | --------------------------------- |
-| `DB_HOST`, `DB_PORT`, `DB_USERNAME`, `DB_PASSWORD`, `DB_NAME` | Yes        | PostgreSQL connection             |
-| `REDIS_HOST`, `REDIS_PORT`                                    | Yes        | Redis connection                  |
-| `RABBITMQ_URL`                                                | Yes        | Message queue (AI replies)        |
-| `JWT_SECRET`, `JWT_REFRESH_SECRET`                            | Yes        | Auth secrets (min 32 chars)       |
-| `OPENAI_API_KEY`                                              | Yes        | OpenAI API key for AI features    |
-| `LLM_BASE_URL`, `LLM_VENDOR`, `LLM_API_KEY`, `LLM_TIER_*`     | No         | Other OpenAI-compatible chat host |
-| `SMTP_ENABLED`, `SMTP_HOST`, `SMTP_PORT`, `SMTP_AUTH_USER`, `SMTP_AUTH_PASS` | No | Email sending              |
-| `BASE_DOMAIN`, `API_DOMAIN`, `DASHBOARD_DOMAIN`               | Production | Domain configuration              |
+| Variable                                                                     | Required   | Description                       |
+| ---------------------------------------------------------------------------- | ---------- | --------------------------------- |
+| `DB_HOST`, `DB_PORT`, `DB_USERNAME`, `DB_PASSWORD`, `DB_NAME`                | Yes        | PostgreSQL connection             |
+| `REDIS_HOST`, `REDIS_PORT`                                                   | Yes        | Redis connection                  |
+| `RABBITMQ_URL`                                                               | Yes        | Message queue (AI replies)        |
+| `JWT_SECRET`, `JWT_REFRESH_SECRET`                                           | Yes        | Auth secrets (min 32 chars)       |
+| `OPENAI_API_KEY`                                                             | Yes        | OpenAI API key for AI features    |
+| `LLM_BASE_URL`, `LLM_VENDOR`, `LLM_API_KEY`, `LLM_TIER_*`                    | No         | Other OpenAI-compatible chat host |
+| `SMTP_ENABLED`, `SMTP_HOST`, `SMTP_PORT`, `SMTP_AUTH_USER`, `SMTP_AUTH_PASS` | No         | Email sending                     |
+| `BASE_DOMAIN`, `API_DOMAIN`, `DASHBOARD_DOMAIN`                              | Production | Domain configuration              |
 
 ## Development
 
