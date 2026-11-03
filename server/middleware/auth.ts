@@ -2,6 +2,15 @@ import { Request, Response, NextFunction } from "express";
 import { requireAuth, requireAdmin } from "@server/lib/auth/middleware";
 import { AuthUser } from "@server/lib/auth/AuthUser";
 
+const ORGANIZATION_ID_PATTERN = /^[A-Za-z0-9_-]+$/;
+
+function parseOrganizationIdHeader(value: unknown): string | undefined {
+  if (typeof value !== "string") return undefined;
+  const trimmed = value.trim();
+  if (!trimmed || !ORGANIZATION_ID_PATTERN.test(trimmed)) return undefined;
+  return trimmed;
+}
+
 // Extend Express Request type
 declare global {
   // eslint-disable-next-line @typescript-eslint/no-namespace
@@ -23,7 +32,7 @@ export const withAuth = async (req: Request, res: Response, next: NextFunction):
     const user = await requireAuth(req);
 
     // Extract organizationId from header
-    const organizationId = req.headers["x-organization-id"] as string | undefined;
+    const organizationId = parseOrganizationIdHeader(req.headers["x-organization-id"]);
 
     if (!organizationId) {
       res.status(400).json({
@@ -54,7 +63,7 @@ export const withAdminAuth = async (
   try {
     // First authenticate
     const user = await requireAuth(req);
-    const organizationId = req.headers["x-organization-id"] as string | undefined;
+    const organizationId = parseOrganizationIdHeader(req.headers["x-organization-id"]);
 
     if (!organizationId) {
       res.status(400).json({ error: "x-organization-id header required" });
@@ -86,7 +95,7 @@ export const withOptionalAuth = async (
 ): Promise<void> => {
   try {
     const user = await requireAuth(req);
-    const organizationId = req.headers["x-organization-id"] as string | undefined;
+    const organizationId = parseOrganizationIdHeader(req.headers["x-organization-id"]);
 
     req.user = user;
     req.organizationId = organizationId;

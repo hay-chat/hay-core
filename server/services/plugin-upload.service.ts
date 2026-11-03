@@ -274,10 +274,19 @@ export class PluginUploadService {
     pluginId: string,
     organizationId: string,
   ): Promise<string> {
-    const extractPath = path.join(this.pluginsDir, "custom", organizationId, pluginId);
+    const customRoot = path.resolve(this.pluginsDir, "custom");
+    const orgDir = path.resolve(customRoot, organizationId);
+    const extractPath = path.resolve(orgDir, pluginId);
+
+    const customRootWithSep = `${customRoot}${path.sep}`;
+    if (!orgDir.startsWith(customRootWithSep)) {
+      throw new Error("Invalid organization path");
+    }
+    if (!extractPath.startsWith(customRootWithSep)) {
+      throw new Error("Invalid plugin path");
+    }
 
     // Create organization directory if needed
-    const orgDir = path.join(this.pluginsDir, "custom", organizationId);
     if (!fs.existsSync(orgDir)) {
       await fs.promises.mkdir(orgDir, { recursive: true });
     }
