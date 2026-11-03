@@ -20,9 +20,15 @@ const stopWorkersForPlugin = jest.fn<(pluginId: string) => Promise<void>>();
 jest.mock("../../services/plugin-runner.service", () => ({
   getPluginRunnerService: () => ({ stopWorkersForPlugin }),
 }));
-const registerRouter = jest.fn();
+const routers = new Map<string, unknown>();
+const registerRouter = jest.fn((id: string, router: unknown) => routers.set(id, router));
 jest.mock("../../services/plugin-router-registry.service", () => ({
-  pluginRouterRegistry: { hasRouter: () => false, registerRouter },
+  pluginRouterRegistry: {
+    hasRouter: (id: string) => routers.has(id),
+    getRouter: (id: string) => routers.get(id),
+    registerRouter,
+    unregisterRouter: (id: string) => routers.delete(id),
+  },
 }));
 
 import { pluginManagerService } from "@server/services/plugin-manager.service";
@@ -59,6 +65,7 @@ const registryEntry = (sourceType: "core" | "custom" | "git", manifest: Record<s
 beforeEach(async () => {
   jest.clearAllMocks();
   pluginManagerService.registry.clear();
+  routers.clear();
   pluginDir = await fs.mkdtemp(path.join(os.tmpdir(), "plugin-trust-"));
 });
 
@@ -213,5 +220,46 @@ describe("registerPlugin checksum", () => {
     );
 
     expect(await registeredChecksum()).toBe(before);
+  });
+});
+
+describe("buildPlugin reloads an in-process plugin router", () => {
+  // Same shape as the esbuild router bundles (export default + named router)
+  const writeRouter = (version: number) =>
+    fs.writeFile(
+      path.join(pluginDir, "router.js"),
+      `Object.defineProperty(exports, "__esModule", { value: true });
+       exports.default = exports.router = { version: ${version} };`,
+    );
+
+  it("swaps the loaded router for the new build", async () => {
+    await writePlugin({});
+    await writeRouter(1);
+    pluginManagerService.registry.set(
+      "tenant-plugin",
+      registryEntry("core", { trpcRouter: "router.js", autoActivate: true }),
+    );
+    await pluginManagerService.ensurePluginRouterRegistered("tenant-plugin");
+    expect(routers.get("tenant-plugin")).toEqual({ version: 1 });
+
+    // Jest keeps its own module registry, so it can't observe the require.cache
+    // swap itself (verified against plain Node in the PR); assert the reload ran.
+    await pluginManagerService.buildPlugin("tenant-plugin");
+
+    expect(registerRouter).toHaveBeenCalledTimes(2);
+    expect(routers.has("tenant-plugin")).toBe(true);
+  });
+
+  it("does not load a router that was never registered", async () => {
+    await writePlugin({});
+    await writeRouter(1);
+    pluginManagerService.registry.set(
+      "tenant-plugin",
+      registryEntry("core", { trpcRouter: "router.js", autoActivate: true }),
+    );
+
+    await pluginManagerService.buildPlugin("tenant-plugin");
+
+    expect(registerRouter).not.toHaveBeenCalled();
   });
 });

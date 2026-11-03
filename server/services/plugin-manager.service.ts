@@ -667,6 +667,27 @@ export class PluginManagerService {
   async buildPlugin(pluginId: string): Promise<void> {
     await this.runBuild(pluginId);
     await this.runnerService.stopWorkersForPlugin(pluginId);
+    await this.reloadPluginRouter(pluginId);
+  }
+
+  /**
+   * Swap an in-process plugin router for the freshly built one. Consumers look
+   * routers up per call (pluginRouterRegistry.getRouter), so no restart is
+   * needed. No-op for plugins whose router was never loaded.
+   */
+  private async reloadPluginRouter(pluginId: string): Promise<void> {
+    const { pluginRouterRegistry } = await import("./plugin-router-registry.service");
+    const plugin = this.registry.get(pluginId);
+    if (!plugin || !pluginRouterRegistry.hasRouter(pluginId)) return;
+
+    // Drop every cached module of the plugin so the next require reads the new
+    // build. require.cache is keyed by real path, so resolve symlinks first.
+    const pluginDir = (await fs.realpath(path.join(this.pluginsDir, plugin.pluginPath))) + path.sep;
+    for (const cached of Object.keys(require.cache)) {
+      if (cached.startsWith(pluginDir)) delete require.cache[cached];
+    }
+    pluginRouterRegistry.unregisterRouter(pluginId);
+    await this.ensurePluginRouterRegistered(pluginId);
   }
 
   private async runBuild(pluginId: string): Promise<void> {
