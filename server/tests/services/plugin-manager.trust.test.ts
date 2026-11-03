@@ -16,8 +16,9 @@ jest.mock("@server/repositories/plugin-registry.repository", () => ({
 jest.mock("@server/repositories/plugin-instance.repository", () => ({
   pluginInstanceRepository: {},
 }));
+const stopWorkersForPlugin = jest.fn<(pluginId: string) => Promise<void>>();
 jest.mock("../../services/plugin-runner.service", () => ({
-  getPluginRunnerService: () => ({}),
+  getPluginRunnerService: () => ({ stopWorkersForPlugin }),
 }));
 const registerRouter = jest.fn();
 jest.mock("../../services/plugin-router-registry.service", () => ({
@@ -140,5 +141,77 @@ describe("ensurePluginRouterRegistered", () => {
       false,
     );
     expect(registerRouter).not.toHaveBeenCalled();
+  });
+});
+
+describe("buildPlugin stops workers running the previous build", () => {
+  it("stops the plugin's workers after a successful build", async () => {
+    await writePlugin({}, { scripts: { build: "tsc" } });
+    await fs.mkdir(path.join(pluginDir, "dist"));
+    await fs.writeFile(path.join(pluginDir, "dist", "index.js"), "");
+    pluginManagerService.registry.set(
+      "tenant-plugin",
+      registryEntry("git", { entry: "dist/index.js" }),
+    );
+
+    await pluginManagerService.buildPlugin("tenant-plugin");
+
+    expect(stopWorkersForPlugin).toHaveBeenCalledWith("tenant-plugin");
+  });
+
+  it("keeps the workers when the build fails", async () => {
+    await writePlugin({});
+    pluginManagerService.registry.set(
+      "tenant-plugin",
+      registryEntry("custom", { entry: "dist/index.js" }),
+    );
+
+    await expect(pluginManagerService.buildPlugin("tenant-plugin")).rejects.toThrow();
+    expect(stopWorkersForPlugin).not.toHaveBeenCalled();
+  });
+});
+
+describe("registerPlugin checksum", () => {
+  const registeredChecksum = async () => {
+    upsertPlugin.mockClear();
+    upsertPlugin.mockImplementation(async (plugin) => plugin);
+    await pluginManagerService.registerPlugin(pluginDir, "git", "org-a");
+    return (upsertPlugin.mock.calls[0][0] as { checksum: string }).checksum;
+  };
+
+  beforeEach(async () => {
+    await fs.writeFile(path.join(pluginDir, "index.ts"), "export const a = 1;");
+  });
+
+  it("changes only the source half when a source file changes", async () => {
+    await writePlugin({}, { dependencies: { zod: "^3.0.0" } });
+    const before = await registeredChecksum();
+    await fs.writeFile(path.join(pluginDir, "index.ts"), "export const a = 2;");
+    const after = await registeredChecksum();
+
+    expect(after).toHaveLength(64);
+    expect(after.slice(0, 32)).not.toBe(before.slice(0, 32));
+    expect(after.slice(32)).toBe(before.slice(32));
+  });
+
+  it("changes only the deps half when a dependency changes", async () => {
+    await writePlugin({}, { dependencies: { zod: "^3.0.0" } });
+    const before = await registeredChecksum();
+    await writePlugin({}, { dependencies: { zod: "^4.0.0" } });
+    const after = await registeredChecksum();
+
+    expect(after.slice(0, 32)).toBe(before.slice(0, 32));
+    expect(after.slice(32)).not.toBe(before.slice(32));
+  });
+
+  it("ignores the plugin-sdk file: path that installPlugin rewrites", async () => {
+    await writePlugin({}, { dependencies: { "@hay/plugin-sdk": "file:../sdk" } });
+    const before = await registeredChecksum();
+    await writePlugin(
+      {},
+      { dependencies: { "@hay/plugin-sdk": "file:../../packages/plugin-sdk" } },
+    );
+
+    expect(await registeredChecksum()).toBe(before);
   });
 });

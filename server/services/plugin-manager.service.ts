@@ -10,6 +10,7 @@ import { getPluginRunnerService } from "./plugin-runner.service";
 import type { WorkerInfo } from "@server/types/plugin-sdk.types";
 import { createLogger } from "@server/lib/logger";
 import { registerServerAliasForPlugins } from "@server/lib/plugin-router-alias";
+import { packPluginChecksum } from "@server/lib/plugin-checksum";
 import {
   INACTIVITY_MINUTES_LIMITS,
   isValidInactivityTiming,
@@ -377,9 +378,49 @@ export class PluginManagerService {
   }
 
   /**
-   * Calculate checksum of plugin files for change detection
+   * Calculate the plugin's checksum (source + dependencies, see lib/plugin-checksum)
    */
   private async calculatePluginChecksum(pluginPath: string): Promise<string> {
+    const [sourceHash, depsHash] = await Promise.all([
+      this.hashPluginSource(pluginPath),
+      this.hashPluginDependencies(pluginPath),
+    ]);
+    return packPluginChecksum(sourceHash, depsHash);
+  }
+
+  /**
+   * Hash the dependency fields of the plugin's package.json and its bundled
+   * mcp/package.json: the inputs of installPlugin.
+   */
+  private async hashPluginDependencies(pluginPath: string): Promise<string> {
+    const hash = crypto.createHash("sha256");
+
+    for (const file of ["package.json", path.join("mcp", "package.json")]) {
+      let packageJson: Record<string, Record<string, string> | undefined>;
+      try {
+        packageJson = JSON.parse(await fs.readFile(path.join(pluginPath, file), "utf-8"));
+      } catch {
+        continue;
+      }
+      for (const field of [
+        "dependencies",
+        "devDependencies",
+        "peerDependencies",
+        "optionalDependencies",
+      ]) {
+        const deps = { ...packageJson[field] };
+        // installPlugin rewrites this file: path for custom plugins; it is not
+        // a dependency change.
+        if (deps["@hay/plugin-sdk"]?.startsWith("file:")) deps["@hay/plugin-sdk"] = "file:";
+        const entries = Object.entries(deps).sort(([a], [b]) => a.localeCompare(b));
+        hash.update(JSON.stringify([file, field, entries]));
+      }
+    }
+
+    return hash.digest("hex");
+  }
+
+  private async hashPluginSource(pluginPath: string): Promise<string> {
     const hash = crypto.createHash("sha256");
 
     async function processDirectory(dir: string) {
@@ -619,9 +660,16 @@ export class PluginManagerService {
   }
 
   /**
-   * Build a plugin (run build command from package.json)
+   * Build a plugin (run build command from package.json), then stop its
+   * running workers so no request is served by the previous build. They
+   * restart on demand.
    */
   async buildPlugin(pluginId: string): Promise<void> {
+    await this.runBuild(pluginId);
+    await this.runnerService.stopWorkersForPlugin(pluginId);
+  }
+
+  private async runBuild(pluginId: string): Promise<void> {
     const plugin = this.registry.get(pluginId);
     if (!plugin) {
       throw new Error(`Plugin ${pluginId} not found`);

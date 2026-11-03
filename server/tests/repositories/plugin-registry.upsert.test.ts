@@ -91,3 +91,44 @@ describe("PluginRegistryRepository.upsertPlugin ownership", () => {
     expect(update).toHaveBeenCalledWith("row-1", expect.objectContaining({ sourceType: "core" }));
   });
 });
+
+describe("PluginRegistryRepository.upsertPlugin change detection", () => {
+  const SOURCE_A = "a".repeat(32);
+  const SOURCE_B = "b".repeat(32);
+  const DEPS_A = "c".repeat(32);
+  const DEPS_B = "d".repeat(32);
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    findOne.mockResolvedValue(
+      row({ sourceType: "core", checksum: SOURCE_A + DEPS_A, installed: true, built: true }),
+    );
+  });
+
+  const upsertWith = (checksum: string) =>
+    repository.upsertPlugin({ pluginId: "hay-plugin-stripe", sourceType: "core", checksum });
+  const updatedFields = () => update.mock.calls[0][1] as Partial<PluginRegistry>;
+
+  it("leaves install and build flags alone when nothing changed", async () => {
+    await upsertWith(SOURCE_A + DEPS_A);
+    expect(updatedFields()).not.toHaveProperty("built");
+    expect(updatedFields()).not.toHaveProperty("installed");
+  });
+
+  it("rebuilds without reinstalling when only the source changed", async () => {
+    await upsertWith(SOURCE_B + DEPS_A);
+    expect(updatedFields()).toMatchObject({ built: false, metadataState: "stale" });
+    expect(updatedFields()).not.toHaveProperty("installed");
+  });
+
+  it("reinstalls and rebuilds when dependencies changed", async () => {
+    await upsertWith(SOURCE_A + DEPS_B);
+    expect(updatedFields()).toMatchObject({ installed: false, built: false });
+  });
+
+  it("reinstalls once when the stored checksum predates the two-part format", async () => {
+    findOne.mockResolvedValue(row({ sourceType: "core", checksum: "f".repeat(64) }));
+    await upsertWith(SOURCE_A + DEPS_A);
+    expect(updatedFields()).toMatchObject({ installed: false, built: false });
+  });
+});
