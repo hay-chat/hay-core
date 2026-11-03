@@ -102,6 +102,8 @@ Then open `http://localhost:3000` and sign up; the first account creates your or
 
 Optional: set `CHROME_EXECUTABLE_PATH` to a local Chrome or Chromium to import websites into the knowledge base, and the `SMTP_*` variables to send email.
 
+The dev server (`npm run dev:server`) skips type-checking on restart for speed. Type errors show in your editor and in `npm run typecheck` (CI runs it too).
+
 `selfhost/compose.yml` runs the whole app in Docker, but it is a production build without hot reload; use it to self-host (see [SELF_HOSTING.md](SELF_HOSTING.md)), not for development.
 
 ### Environment Variables
