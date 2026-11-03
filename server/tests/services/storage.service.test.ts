@@ -278,3 +278,21 @@ describe("StorageService private uploads", () => {
     expect(remove).toHaveBeenCalled();
   });
 });
+
+describe("StorageService local paths", () => {
+  it("resolves stored paths inside the upload directory", () => {
+    const storage = new StorageService();
+    expect(storage["resolveLocalPath"]("org/avatars/a.png")).toBe(
+      "/tmp/hay-test-uploads/org/avatars/a.png",
+    );
+  });
+
+  it.each(["../../etc/passwd", "org/../../outside.txt", "/etc/passwd", ""])(
+    "rejects %p, which resolves outside the upload directory",
+    (filePath) => {
+      expect(() => new StorageService()["resolveLocalPath"](filePath)).toThrow(
+        "Invalid storage path",
+      );
+    },
+  );
+});

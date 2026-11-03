@@ -510,16 +510,13 @@ async function startServer() {
   const mediaRouter = await import("@server/routes/v1/media/index");
   server.use("/v1/media", mediaRouter.default);
 
-  // Create dynamic router with plugin routes (after plugins are loaded)
+  // Core routers merged with plugin routers. The merged router is cached and
+  // replaced whenever a plugin router is registered or reloaded (a plugin
+  // rebuild), so the middleware is rebuilt when its identity changes.
   const { createV1Router } = await import("@server/routes/v1");
-  const dynamicRouter = createV1Router();
-
-  // Add tRPC middleware with context
-  // @ts-ignore - Express type definition mismatch between root and server node_modules
-  server.use(
-    "/v1",
+  const createV1Middleware = (v1Router: ReturnType<typeof createV1Router>) =>
     createExpressMiddleware({
-      router: dynamicRouter,
+      router: v1Router,
       createContext,
       // Without this, every failed procedure (validation, auth, unhandled throw) is
       // returned to the client and never written to the logs, leaving production
@@ -543,8 +540,17 @@ async function startServer() {
           properties: { trpc_path: path, trpc_type: type, trpc_code: error.code },
         });
       },
-    }),
-  );
+    });
+  let v1Router = createV1Router();
+  let v1Middleware = createV1Middleware(v1Router);
+  server.use("/v1", (req, res, next) => {
+    const current = createV1Router();
+    if (current !== v1Router) {
+      v1Router = current;
+      v1Middleware = createV1Middleware(current);
+    }
+    return v1Middleware(req, res, next);
+  });
 
   // Create HTTP server
   const httpServer = createServer(server);

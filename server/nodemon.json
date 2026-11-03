@@ -1,8 +1,8 @@
 {
   "watch": ["**/*.ts"],
   "ext": "ts",
-  "ignore": ["**/*.spec.ts", "node_modules"],
-  "exec": "ts-node -r tsconfig-paths/register",
+  "ignore": ["**/*.spec.ts", "**/*.test.ts", "tests/**", "scripts/**", "node_modules"],
+  "exec": "ts-node --transpile-only -r tsconfig-paths/register",
   "env": {
     "NODE_ENV": "development"
   }

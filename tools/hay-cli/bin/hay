@@ -4,4 +4,9 @@
 set -euo pipefail
 here="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")" && pwd)"
 repo="$(cd "$here/../../.." && pwd)"
-exec "$repo/node_modules/.bin/tsx" "$here/../src/main.ts" "$@"
+# tsx is a server dependency; npm hoists it to the root only sometimes.
+for tsx in "$repo/node_modules/.bin/tsx" "$repo/server/node_modules/.bin/tsx"; do
+  [ -x "$tsx" ] && exec "$tsx" "$here/../src/main.ts" "$@"
+done
+echo "hay: tsx not found; run npm install in $repo" >&2
+exit 1

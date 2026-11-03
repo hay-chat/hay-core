@@ -15,6 +15,7 @@
     "plugins/core/*"
   ],
   "scripts": {
+    "setup": "./scripts/setup-dev.sh",
     "dev": "npm run dev:server & npm run dev:dashboard",
     "dev:dashboard": "cd dashboard && npm run dev",
     "dev:server": "npm run build:form-schema && cd server && npm run dev",

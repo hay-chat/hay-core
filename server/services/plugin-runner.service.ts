@@ -480,6 +480,25 @@ export class PluginRunnerService {
   }
 
   /**
+   * Stop every organization's worker of one plugin (after a rebuild, so no
+   * request runs on the previous build). Workers restart on demand.
+   */
+  async stopWorkersForPlugin(pluginId: string): Promise<void> {
+    const workers = this.getAllWorkers().filter((worker) => worker.pluginId === pluginId);
+    if (workers.length === 0) return;
+
+    logger.info({ pluginId, count: workers.length }, "Stopping workers running a previous build");
+    const results = await Promise.allSettled(
+      workers.map((worker) => this.stopWorker(worker.organizationId, pluginId)),
+    );
+    for (const result of results) {
+      if (result.status === "rejected") {
+        logger.error({ err: result.reason, pluginId }, "Failed to stop worker after rebuild");
+      }
+    }
+  }
+
+  /**
    * Stop all workers (used during shutdown)
    */
   async stopAllWorkers(): Promise<void> {

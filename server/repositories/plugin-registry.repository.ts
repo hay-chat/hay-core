@@ -3,6 +3,7 @@ import { BaseRepository } from "./base.repository";
 import { PluginRegistry, PluginStatus } from "@server/entities/plugin-registry.entity";
 import type { HayPluginManifest } from "@server/types/plugin.types";
 import type { PluginMetadata, PluginMetadataState } from "@server/types/plugin-sdk.types";
+import { pluginChecksumChanges } from "@server/lib/plugin-checksum";
 
 /**
  * The partial-entity shape accepted by TypeORM's `Repository.update`. Derived
@@ -120,16 +121,19 @@ export class PluginRegistryRepository extends BaseRepository<PluginRegistry> {
       // Repair: if the record has git metadata, ensure sourceType is "git"
       const resolvedSourceType = existing.gitConnectionId ? "git" : existing.sourceType;
 
-      // If plugin source changed (checksum differs), reset install/build flags
-      // so dependencies get reinstalled and code gets rebuilt, and mark the
-      // cached worker metadata stale so the next worker start re-fetches it
-      const checksumChanged = updateFields.checksum && updateFields.checksum !== existing.checksum;
+      // A source change needs a rebuild; a dependency change also needs a
+      // reinstall. Either way the cached worker metadata is stale, so the next
+      // worker start re-fetches it.
+      const changes = updateFields.checksum
+        ? pluginChecksumChanges(existing.checksum, updateFields.checksum)
+        : { source: false, deps: false };
 
       const fields: DeepPartial<PluginRegistry> = {
         ...updateFields,
         sourceType: resolvedSourceType,
         status: PluginStatus.AVAILABLE, // Plugin exists on filesystem
-        ...(checksumChanged ? { installed: false, built: false, metadataState: "stale" } : {}),
+        ...(changes.source || changes.deps ? { built: false, metadataState: "stale" } : {}),
+        ...(changes.deps ? { installed: false } : {}),
         updatedAt: new Date(),
       };
       await this.getRepository().update(existing.id, toUpdatePayload(fields));
