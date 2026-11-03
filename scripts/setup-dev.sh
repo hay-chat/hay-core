@@ -74,11 +74,14 @@ npm run build:webchat
 step "Running database migrations"
 npm run migration:run
 
+step "Creating the dev login"
+(cd server && npm run --silent dev:account)
+
 openai_key=$(grep -E '^OPENAI_API_KEY=' .env | cut -d= -f2- || true)
 printf '\n\033[32mSetup complete.\033[0m\n'
 if [ -z "$openai_key" ] || [ "$openai_key" = "your-openai-api-key" ]; then
   printf '\033[33mStill needed: set OPENAI_API_KEY in .env (required for AI replies and embeddings).\033[0m\n'
 fi
 echo "Start the app with: npm run dev"
-echo "  Dashboard: http://localhost:3000  (sign up; the first account creates your organization)"
+echo "  Dashboard: http://localhost:3000  (log in as dev@hay.local / hay-dev-password)"
 echo "  API:       http://localhost:3001"

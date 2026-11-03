@@ -11,7 +11,7 @@ Best for Shopify and WooCommerce stores that want AI to actually issue refunds a
 ![GitHub issues](https://img.shields.io/github/issues/hay-chat/hay-core)
 ![GitHub pull requests](https://img.shields.io/github/issues-pr/hay-chat/hay-core)
 ![GitHub repo size](https://img.shields.io/github/repo-size/hay-chat/hay-core)
-![Node.js version](https://img.shields.io/badge/node-%3E%3D20-brightgreen)
+![Node.js version](https://img.shields.io/badge/node-%3E%3D22.12-brightgreen)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5-blue)
 
 ## What is Hay.chat?
@@ -97,8 +97,16 @@ npm run dev
 3. Creates `.env` from `.env.example` with generated JWT secrets and `REQUIRE_EMAIL_VERIFICATION=false` (no SMTP locally). It keeps an existing `.env` and only fills in empty JWT secrets. If you don't pass `OPENAI_API_KEY`, set it in `.env` afterwards.
 4. Builds the plugin SDK (plugins are built on demand against it) and the webchat widget (served by the API).
 5. Runs database migrations.
+6. Creates a dev login, `dev@hay.local` / `hay-dev-password`, that owns the "Hay Dev" organization (`npm run dev:account` in `server/`). It only runs with `NODE_ENV=development` against a local database.
 
-Then open `http://localhost:3000` and sign up; the first account creates your organization. The API runs on `http://localhost:3001` and the RabbitMQ admin UI on `http://localhost:15672` (`hay` / `hay_password`).
+Then open `http://localhost:3000` and log in with the dev login, or sign up for a new organization. The API runs on `http://localhost:3001` and the RabbitMQ admin UI on `http://localhost:15672` (`hay` / `hay_password`).
+
+To chat with your local assistant from the terminal, use the `hay` CLI (see [tools/hay-cli/README.md](tools/hay-cli/README.md)):
+
+```bash
+HAY_EMAIL=dev@hay.local HAY_PASSWORD=hay-dev-password tools/hay-cli/bin/hay --target local orgs
+tools/hay-cli/bin/hay --target local --org <org-id> chat send "Hi"
+```
 
 Optional: set `CHROME_EXECUTABLE_PATH` to a local Chrome or Chromium to import websites into the knowledge base, and the `SMTP_*` variables to send email.
 

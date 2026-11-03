@@ -28,6 +28,7 @@
     "order-links:backfill": "tsx scripts/backfill-order-links.ts",
     "insights:backfill-feedback": "tsx scripts/backfill-feedback-insights.ts",
     "plugins:enable-defaults": "tsx scripts/enable-default-plugins.ts",
+    "dev:account": "tsx scripts/create-dev-account.ts",
     "documents:privatize-images": "tsx scripts/privatize-document-images.ts"
   },
   "dependencies": {
