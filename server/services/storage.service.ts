@@ -356,10 +356,23 @@ export class StorageService {
   }
 
   /**
+   * Absolute path of a stored file, refusing anything that resolves outside
+   * the upload directory (stored paths embed organization and plugin ids).
+   */
+  private resolveLocalPath(filePath: string): string {
+    const root = path.resolve(config.storage.local.uploadDir);
+    const fullPath = path.resolve(root, filePath);
+    if (!fullPath.startsWith(root + path.sep)) {
+      throw new Error("Invalid storage path");
+    }
+    return fullPath;
+  }
+
+  /**
    * Upload to local storage
    */
   private async uploadLocal(buffer: Buffer, filePath: string): Promise<void> {
-    const fullPath = path.join(config.storage.local.uploadDir, filePath);
+    const fullPath = this.resolveLocalPath(filePath);
     const directory = path.dirname(fullPath);
 
     // Create directory if it doesn't exist
@@ -402,7 +415,7 @@ export class StorageService {
    * Download from local storage
    */
   private async downloadLocal(filePath: string): Promise<Buffer> {
-    const fullPath = path.join(config.storage.local.uploadDir, filePath);
+    const fullPath = this.resolveLocalPath(filePath);
 
     if (!fs.existsSync(fullPath)) {
       throw new Error(`File not found: ${filePath}`);
@@ -460,7 +473,7 @@ export class StorageService {
    * Delete from local storage
    */
   private async deleteLocal(filePath: string): Promise<void> {
-    const fullPath = path.join(config.storage.local.uploadDir, filePath);
+    const fullPath = this.resolveLocalPath(filePath);
 
     if (fs.existsSync(fullPath)) {
       await fs.promises.unlink(fullPath);
