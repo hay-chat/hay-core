@@ -36,8 +36,17 @@ jest.mock("@server/services/business-hours.service", () => ({
 jest.mock("@server/services/conversation-secret.service", () => ({
   conversationSecretService: { deleteSecrets: jest.fn() },
 }));
+const mockHandleTool = jest.fn(
+  async (): Promise<{ success: boolean; result?: unknown; readOnly?: boolean }> => ({
+    success: true,
+    result: { pages: [] },
+    readOnly: true,
+  }),
+);
 jest.mock("@server/services/core/tool-execution.service", () => ({
-  ToolExecutionService: class {},
+  ToolExecutionService: class {
+    handleToolExecution = mockHandleTool;
+  },
 }));
 jest.mock("@server/services/core/llm.service", () => ({ LLMService: class {} }));
 jest.mock("@server/services/prompt.service", () => ({
@@ -62,7 +71,7 @@ jest.mock("../../orchestrator/retrieval.layer", () => ({
     getRelevantDocuments = async () => [];
   },
 }));
-const mockExecute = jest.fn<() => Promise<unknown>>();
+const mockExecute = jest.fn<(...args: unknown[]) => Promise<unknown>>();
 jest.mock("../../orchestrator/execution.layer", () => ({
   ExecutionLayer: class {
     execute = mockExecute;
@@ -363,5 +372,103 @@ describe("conversation waiting for a person (D5-7)", () => {
 
     expect(mockExecute).toHaveBeenCalled();
     expect(botMessages().map((m) => m.content)).toEqual(["Our store opens at 9."]);
+  });
+});
+
+describe("planner that keeps calling tools", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    customerLanguage = "en";
+    mockTypicalReply.mockResolvedValue(null);
+    mockWithinHours.mockResolvedValue(true);
+  });
+
+  it("hands off with the fixed line when it keeps calling tools past the budget, instead of going silent", async () => {
+    let call = 0;
+    mockExecute.mockImplementation(async () => ({
+      step: "CALL_TOOL",
+      tool: { name: "find_page_url", args: { query: `attempt ${++call}` } },
+    }));
+    given({ humanHandoffUnavailableInstructions: INSTRUCTIONS }, 0);
+
+    await runConversation(CONVERSATION_ID);
+
+    // 8 tool calls run; the 9th plan is told to stop and still asks for a tool.
+    expect(mockExecute).toHaveBeenCalledTimes(9);
+    expect(mockHandleTool).toHaveBeenCalledTimes(8);
+    expect(mockExecute.mock.calls[7][2]).not.toHaveProperty("plannerFeedback");
+    expect(mockExecute.mock.calls[8][2]).toEqual(
+      expect.objectContaining({
+        plannerFeedback: expect.stringContaining("Do not call any more tools"),
+      }),
+    );
+    expect(conversation.addHandoffInstructions).not.toHaveBeenCalled();
+    expect(mockUpdate).toHaveBeenCalledWith(CONVERSATION_ID, ORG_ID, { status: "pending-human" });
+    expect(botMessages()).toEqual([
+      expect.objectContaining({
+        content: handoffCopy("handoffNobodyOnline", "en"),
+        metadata: expect.objectContaining({ isHandoffMessage: true, planningExhausted: true }),
+      }),
+    ]);
+  });
+
+  it("runs an identical tool call once per turn and tells the planner it already has the result", async () => {
+    mockExecute
+      .mockResolvedValueOnce({
+        step: "CALL_TOOL",
+        tool: { name: "recommend_products", args: { query: "refund status" } },
+      })
+      .mockResolvedValueOnce({
+        step: "CALL_TOOL",
+        tool: { name: "recommend_products", args: { query: "refund status" } },
+      })
+      .mockResolvedValueOnce({ step: "RESPOND", userMessage: "I can't see orders here." });
+    given({}, 0);
+
+    await runConversation(CONVERSATION_ID);
+
+    expect(mockHandleTool).toHaveBeenCalledTimes(1);
+    expect(conversation.addMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: "Tool",
+        metadata: expect.objectContaining({ status: "blocked", reason: "repeated_call" }),
+      }),
+    );
+    expect(botMessages().map((m) => m.content)).toEqual(["I can't see orders here."]);
+  });
+
+  it("runs a failed call again: the retry may succeed", async () => {
+    const lookup = { step: "CALL_TOOL", tool: { name: "get_order", args: { orderId: "1001" } } };
+    mockExecute
+      .mockResolvedValueOnce(lookup)
+      .mockResolvedValueOnce(lookup)
+      .mockResolvedValueOnce({ step: "RESPOND", userMessage: "Your order shipped." });
+    mockHandleTool.mockResolvedValueOnce({ success: false, readOnly: true });
+    given({}, 0);
+
+    await runConversation(CONVERSATION_ID);
+
+    expect(mockHandleTool).toHaveBeenCalledTimes(2);
+  });
+
+  it("reads again after a write in the same turn", async () => {
+    const lookup = { step: "CALL_TOOL", tool: { name: "get_order", args: { orderId: "1001" } } };
+    mockExecute
+      .mockResolvedValueOnce(lookup)
+      .mockResolvedValueOnce({
+        step: "CALL_TOOL",
+        tool: { name: "create_return", args: { orderId: "1001" } },
+      })
+      .mockResolvedValueOnce(lookup)
+      .mockResolvedValueOnce({ step: "RESPOND", userMessage: "Your return is open." });
+    mockHandleTool
+      .mockResolvedValueOnce({ success: true, readOnly: true })
+      .mockResolvedValueOnce({ success: true, readOnly: false })
+      .mockResolvedValueOnce({ success: true, readOnly: true });
+    given({}, 0);
+
+    await runConversation(CONVERSATION_ID);
+
+    expect(mockHandleTool).toHaveBeenCalledTimes(3);
   });
 });

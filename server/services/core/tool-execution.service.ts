@@ -102,6 +102,8 @@ interface ToolExecutionResult {
   simulated?: boolean;
   /** Held for a person's approval: nothing was sent to the provider yet. */
   pending?: boolean;
+  /** The tool only reads: running it again with the same input changes nothing. */
+  readOnly?: boolean;
 }
 
 interface ToolLogEntry {
@@ -222,7 +224,7 @@ export class ToolExecutionService {
         orchestration_status: currentContext as unknown as Record<string, unknown>,
       });
 
-      return step.result;
+      return { ...step.result, readOnly: target.risk.readOnly };
     } catch (error) {
       logger.error({ err: error }, "Error handling tool execution");
       return {

@@ -99,6 +99,11 @@ export interface ExecutionResult {
    * retry). The turn becomes a hand-off that must not need the LLM again.
    */
   aiUnavailable?: boolean;
+  /**
+   * Set when the planner used up the turn's iterations without a reply (tool
+   * loop). Like aiUnavailable, the hand-off must not re-plan.
+   */
+  planningExhausted?: boolean;
   formJson?: string | null; // JSON string of FormSchema (for ASK_FORM step only)
   rationale?: string;
   /**

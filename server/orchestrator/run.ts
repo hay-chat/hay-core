@@ -1014,6 +1014,27 @@ async function requeueIfStillPending(conversation: Conversation, log: pino.Logge
   }
 }
 
+/** Identifies a tool call by name and input, to spot exact repeats in a turn. */
+function toolCallKey(tool: { name: string; args?: Record<string, unknown> }): string {
+  return `${tool.name}:${JSON.stringify(tool.args ?? {})}`;
+}
+
+/** A hand-off that must go out as fixed copy, without asking the planner again. */
+function needsNoPlanner(result: ExecutionResult): boolean {
+  return result.aiUnavailable === true || result.planningExhausted === true;
+}
+
+function planningExhaustedHandoff(log: pino.Logger): ExecutionResult {
+  log.warn("Planner did not finish the reply (step limit or tool budget), handing off");
+  const reason = "The AI could not finish the reply (too many steps)";
+  return {
+    step: "HANDOFF",
+    handoffReason: reason,
+    handoff: { reason },
+    planningExhausted: true,
+  };
+}
+
 /**
  * Handle iterative execution loop with tool calls
  * This allows the LLM to call tools, analyze results, and continue the conversation
@@ -1098,6 +1119,10 @@ async function handleExecutionLoop(
   const executionLayer = new ExecutionLayer();
   const toolExecutionService = new ToolExecutionService();
   const MAX_ITERATIONS = 15; // Prevent infinite loops
+  // Tool calls the planner may ask for in one turn (repeats and blocked calls
+  // included). Real flows need a handful; a planner past this is searching for
+  // something it doesn't have, so it is told to answer, ask or hand off.
+  const TOOL_CALL_BUDGET = 8;
   const MAX_EMPTY_RETRIES = 3; // Max retries when LLM returns incomplete responses
   let iterations = 0;
   let emptyRetries = 0; // Track consecutive retries without valid response
@@ -1108,6 +1133,17 @@ async function handleExecutionLoop(
   // Ledger of tool calls made during THIS turn (conversation history is not
   // turn-scoped). The action-claim guardrail compares RESPOND claims against it.
   const toolsCalledThisTurn: ToolLedgerEntry[] = [...decidedActions];
+  // name + args of each successful read this turn, to skip exact repeats.
+  // Cleared after a write: reading again after a change is a real re-read.
+  const toolCallKeysThisTurn = new Set<string>();
+  const rememberToolCall = (
+    tool: { name: string; args?: Record<string, unknown> },
+    result: { success: boolean; readOnly?: boolean },
+  ) => {
+    if (!result.readOnly) toolCallKeysThisTurn.clear();
+    else if (result.success) toolCallKeysThisTurn.add(toolCallKey(tool));
+  };
+  let toolCallsRequested = 0;
   // Shared (by reference) with the execution layer so corrective re-plans are
   // budgeted per turn, not per execute() call.
   const turnGuardrailState = { actionClaimRetries: 0, companyInterestRetries: 0, linkRetries: 0 };
@@ -1119,12 +1155,21 @@ async function handleExecutionLoop(
     iterations++;
     log.debug(`Execution iteration ${iterations}`);
 
-    // Get current messages and execute (with confidence guardrails integrated)
-    let executionResult: ExecutionResult | null = await executionLayer.execute(
-      conversation,
-      customerLanguage,
-      { toolsCalledThisTurn, turnGuardrailState },
-    );
+    // The last iteration never re-plans: a planner that is still calling tools
+    // after this many steps is looping, and ending the loop without a message
+    // left the shopper with no reply at all. Hand off with the fixed line.
+    let executionResult: ExecutionResult | null =
+      iterations === MAX_ITERATIONS
+        ? planningExhaustedHandoff(log)
+        : await executionLayer.execute(conversation, customerLanguage, {
+            toolsCalledThisTurn,
+            turnGuardrailState,
+            ...(toolCallsRequested >= TOOL_CALL_BUDGET
+              ? {
+                  plannerFeedback: `You have already made ${toolCallsRequested} tool calls in this turn. Do not call any more tools: answer the customer with what you have, ask them for what you need, or use HANDOFF.`,
+                }
+              : {}),
+          });
 
     if (!executionResult) {
       emptyRetries++;
@@ -1207,6 +1252,15 @@ async function handleExecutionLoop(
       await recordPlaybookFit(conversation, true);
     }
 
+    if (executionResult.step === "CALL_TOOL") {
+      if (toolCallsRequested >= TOOL_CALL_BUDGET) {
+        // Told to stop and still calling tools: hand off rather than loop on.
+        executionResult = planningExhaustedHandoff(log);
+      } else {
+        toolCallsRequested++;
+      }
+    }
+
     // Enforce enabled_tools (see core/enabled-tools; ToolExecutionService checks
     // it again for every caller). Caught here first so the AI hears which tools
     // it has, and a blocked call does not count toward the iteration limit.
@@ -1232,6 +1286,26 @@ async function handleExecutionLoop(
         },
       });
       continue;
+    }
+
+    // The same successful read again in one turn returns the same result:
+    // planners that lack the tool they want repeat a near-miss (one search 20
+    // times). Don't run it; tell the planner, and let the repeat count toward
+    // the limit. Failed calls may be retried, and a write resets the set.
+    if (executionResult.step === "CALL_TOOL" && executionResult.tool) {
+      if (toolCallKeysThisTurn.has(toolCallKey(executionResult.tool))) {
+        log.warn({ toolName: executionResult.tool.name }, "Repeated tool call skipped");
+        await conversation.addMessage({
+          content: `You already called "${executionResult.tool.name}" with the same input in this turn and its result is above. Do not call it again: answer the customer with what you have, ask them for what you need, or hand off.`,
+          type: MessageType.TOOL,
+          metadata: {
+            toolName: executionResult.tool.name,
+            status: "blocked",
+            reason: "repeated_call",
+          },
+        });
+        continue;
+      }
     }
 
     // Quick check with the team (D19): one fact goes to the team and the
@@ -1293,6 +1367,7 @@ async function handleExecutionLoop(
         success: toolExecResult1.success,
         pending: toolExecResult1.pending,
       });
+      rememberToolCall(executionResult.tool, toolExecResult1);
       await maybeEmitProductRecommendation(
         conversation,
         executionResult.tool.name,
@@ -1324,6 +1399,7 @@ async function handleExecutionLoop(
         success: toolExecResult2.success,
         pending: toolExecResult2.pending,
       });
+      rememberToolCall(executionResult.tool, toolExecResult2);
       await maybeEmitProductRecommendation(
         conversation,
         executionResult.tool.name,
@@ -1394,7 +1470,8 @@ async function handleExecutionLoop(
       const plannedHandoff =
         conversation.metadata?.playbookPrescribesHandoff === true &&
         !executionResult.confidence &&
-        !executionResult.aiUnavailable;
+        !executionResult.aiUnavailable &&
+        !executionResult.planningExhausted;
 
       // Every hand-off queues the conversation for the team.
       await conversationRepository.update(conversation.id, conversation.organization_id, {
@@ -1449,6 +1526,7 @@ async function handleExecutionLoop(
           isHandoffMessage: true,
           handoffType,
           ...(executionResult.aiUnavailable ? { aiUnavailable: true } : {}),
+          ...(executionResult.planningExhausted ? { planningExhausted: true } : {}),
           availability: {
             state: availability.state,
             nextOpening: availability.nextOpening?.toISOString() ?? null,
@@ -1468,7 +1546,7 @@ async function handleExecutionLoop(
         handoffType === "unavailable" ? assistant?.humanHandoffUnavailableTicket : null;
       if (
         ticketConfig &&
-        !executionResult.aiUnavailable &&
+        !needsNoPlanner(executionResult) &&
         (await handoffTicketsService.isProvider(
           conversation.organization_id,
           ticketConfig.pluginId,
@@ -1490,7 +1568,7 @@ async function handleExecutionLoop(
 
       // Custom instructions run through the planner again, which is exactly what
       // just failed when the AI is unavailable; use the fixed line instead.
-      if (hasTiptapContent(customInstructions) && !executionResult.aiUnavailable) {
+      if (hasTiptapContent(customInstructions) && !needsNoPlanner(executionResult)) {
         log.debug({ handoffType }, "Executing custom handoff instructions");
         await conversation.addHandoffInstructions(
           customInstructions,
@@ -1606,10 +1684,6 @@ async function handleExecutionLoop(
         continue;
       }
     }
-  }
-
-  if (iterations >= MAX_ITERATIONS) {
-    log.warn("Reached maximum execution iterations, ending loop");
   }
 
   // The hand-off raised its ticket this turn: the team follows up in the
