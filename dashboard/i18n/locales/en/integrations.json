@@ -352,11 +352,11 @@
       "openExternal": "Open in a new tab"
     },
     "connect": {
-      "title": "Connecting {name} to Hay",
+      "title": "Connecting {name} to Hay.chat",
       "saving": "Saving your store details…",
       "redirecting": "Opening your store to approve access. You will come back here, then to your store admin.",
       "failedTitle": "We couldn't start the connection",
-      "networkError": "Hay didn't answer in time. Check your connection and try again.",
+      "networkError": "Hay.chat didn't answer in time. Check your connection and try again.",
       "retry": "Try again"
     }
   }
