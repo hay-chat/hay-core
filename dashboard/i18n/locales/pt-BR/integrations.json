@@ -350,6 +350,14 @@
       "stepDone": "Concluído",
       "stepsLabel": "Etapas de configuração",
       "openExternal": "Abrir em uma nova aba"
+    },
+    "connect": {
+      "title": "Conectando {name} ao Hay",
+      "saving": "Salvando os dados da sua loja…",
+      "redirecting": "Abrindo sua loja para aprovar o acesso. Você volta para cá e depois para o admin da loja.",
+      "failedTitle": "Não conseguimos iniciar a conexão",
+      "networkError": "O Hay não respondeu a tempo. Verifique sua conexão e tente novamente.",
+      "retry": "Tentar novamente"
     }
   }
 }

@@ -183,11 +183,25 @@ export class RetrievalLayer {
 
       log.debug({ topK: 5 }, "Searching vector store");
 
-      const searchResults = await vectorStoreService.search(
-        organizationId,
-        query,
-        5, // Get top 5 most relevant chunks
+      // The joined history keeps follow-ups like "can you engrave it?" on topic,
+      // but buries a new topic in the latest message ("and how long does US
+      // shipping take?" after two tray questions). Search both and keep each
+      // chunk's best score.
+      const latest = customerMessages[customerMessages.length - 1].content.trim();
+      const queries = latest && latest !== query ? [query, latest] : [query];
+      const resultSets = await Promise.all(
+        queries.map((q) => vectorStoreService.search(organizationId, q, 5)),
       );
+      const bestByChunk = new Map<string, (typeof resultSets)[number][number]>();
+      for (const result of resultSets.flat()) {
+        const seen = bestByChunk.get(result.id);
+        if (!seen || (result.similarity || 0) > (seen.similarity || 0)) {
+          bestByChunk.set(result.id, result);
+        }
+      }
+      const searchResults = [...bestByChunk.values()]
+        .sort((a, b) => (b.similarity || 0) - (a.similarity || 0))
+        .slice(0, 5); // top 5 most relevant chunks
 
       log.debug(
         {

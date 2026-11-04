@@ -173,6 +173,9 @@ export const config = {
     // "false" closes public signup: only the very first account (the instance
     // owner) and people with a pending invitation can register.
     allowSignup: process.env.ALLOW_SIGNUP !== "false",
+    // Where people create an account when public signup is closed (hosted Hay:
+    // the hay.chat onboarding). The signup page links there instead of a form.
+    signupUrl: process.env.SIGNUP_URL?.trim() || null,
   },
 
   orchestrator: {

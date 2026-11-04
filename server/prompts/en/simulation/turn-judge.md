@@ -33,10 +33,10 @@ Fill in:
 
 - agreement: compare the AI's reply with the reference. "same" = the same answer in substance (wording does not matter), "partial" = partly the same, a step behind or ahead (for example it asks for the order number first), "different" = a different or contradicting answer, "no_reference" = there is no reference.
 - quality: "good" or "wrong". "wrong" = it gives information that contradicts the reference or the conversation, makes up store facts, ignores the question, or would clearly frustrate the customer. Asking a needed clarifying question is "good".
-- risky: true when the reply promises something the store may not do (refunds, discounts, delivery dates, exceptions) without a tool result or reference backing it, breaks a policy shown in the conversation, or shares something it should not. Otherwise false.
-- knowledgeMissing: true when the AI could not answer because it lacked store information (it says it does not know, stays vague, or the reference contains facts the AI did not have). Otherwise false.
-- meetsExpectedOutcome: true or false when there is an expected outcome; null when there is none.
+- risky: true when the reply promises something the store may not do (refunds, discounts, free shipping or return labels, fees waived, delivery dates, exceptions) without a tool result or reference backing it, breaks a policy shown in the conversation, or shares something it should not. Otherwise false.
+- knowledgeMissing: true when the AI could not answer because it lacked store information (it says it does not know, stays vague, or the reference contains facts the AI did not have). False when the AI states an answer, even a wrong one: that is quality "wrong". Otherwise false.
+- meetsExpectedOutcome: null when there is no expected outcome. Otherwise true when the reply does what the expected outcome asks, false when it does not. Judge only what the expected outcome asks, not the reference or the other scores: a rule about what not to do ("does not promise X", "only if Y") is met when the reply does not do it, and details the expected outcome does not ask for do not matter.
 - repeatsAvoidedReply: true when the AI's reply makes the same mistake as the reply the store did not want; false otherwise or when there is none.
 - reasoning: one or two short sentences for the store owner explaining the scores. Do not quote personal data.
 
-Respond with a JSON object containing every field above.
+Write the reasoning first, then the scores that follow from it. Respond with a JSON object containing every field above.

@@ -30,7 +30,12 @@ jest.mock("@server/repositories/plugin-instance.repository", () => ({
   pluginInstanceRepository: { findByOrgAndPlugin, clearAuthState, updateAuthState, upsertInstance },
 }));
 jest.mock("@server/repositories/plugin-webhook-route.repository", () => ({
-  pluginWebhookRouteRepository: { clearForInstance, upsertRoutes },
+  pluginWebhookRouteRepository: {
+    clearForInstance,
+    upsertRoutes,
+    findByKey: jest.fn().mockResolvedValue(null),
+    countForInstance: jest.fn().mockResolvedValue(0),
+  },
 }));
 jest.mock("@server/services/plugin-manager.service", () => ({
   pluginManagerService: { stopPluginWorker, startPluginWorker },

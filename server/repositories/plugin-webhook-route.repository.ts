@@ -67,6 +67,11 @@ export class PluginWebhookRouteRepository extends BaseRepository<PluginWebhookRo
   /**
    * Remove all routes owned by a plugin instance (e.g. on disconnect).
    */
+  /** How many routing keys a plugin instance still owns. */
+  async countForInstance(pluginInstanceId: string): Promise<number> {
+    return this.getRepository().count({ where: { pluginInstanceId } });
+  }
+
   async clearForInstance(pluginInstanceId: string): Promise<void> {
     await this.getRepository().delete({ pluginInstanceId });
   }

@@ -204,6 +204,52 @@ describe("replay runner", () => {
     expect(run.item_count).toBe(1);
   });
 
+  it("replays resolved and unresolved conversations too, not ones still open", async () => {
+    const repo = AppDataSource.getRepository(Conversation);
+    const save = (title: string, status: Conversation["status"]) =>
+      repo.save({
+        organization_id: orgId,
+        title,
+        channel: "web",
+        status,
+        context: {},
+        metadata: {},
+      });
+    const resolved = await save("Resolved", "resolved");
+    const unresolved = await save("Unresolved", "unresolved");
+    await save("Open", "open");
+    await save("Waiting", "pending-human");
+
+    const ids = await replayService.recentConversationIds(orgId, 10);
+    expect(ids).toEqual(expect.arrayContaining([resolved.id, unresolved.id]));
+    expect(ids).toHaveLength(2);
+  });
+
+  it("finds real conversations behind newer simulation conversations", async () => {
+    const repo = AppDataSource.getRepository(Conversation);
+    const real = await repo.save({
+      organization_id: orgId,
+      title: "Real",
+      channel: "web",
+      status: "resolved",
+      context: {},
+      metadata: {},
+    });
+    // A previous replay's leftovers: closed, and newer than the real chat.
+    for (let i = 0; i < 4; i++) {
+      await repo.save({
+        organization_id: orgId,
+        title: `Simulation #${i + 1}`,
+        channel: "web",
+        status: "closed",
+        context: {},
+        metadata: { runKind: "simulation", dryRun: true },
+      });
+    }
+
+    expect(await replayService.recentConversationIds(orgId, 1)).toEqual([real.id]);
+  });
+
   it("refuses test conversations and other organizations' transcripts", async () => {
     const playground = await AppDataSource.getRepository(Conversation).save({
       organization_id: orgId,

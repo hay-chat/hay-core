@@ -178,7 +178,7 @@ feature's status as the guide states it.
 | F24 | Usage page, resolution ledger, billing outcome, exclusions                                      | guide `usage-and-resolution-ledger`                      | ready                                                | HND-02, HND-05, TRS-04, BIL-01, BIL-02, BIL-03, BIL-04, OWN-03                                                 |
 | F25 | Insights: closed-chat review, nightly patterns, approve opens a draft fix                       | guide `insights`                                         | ready\* (approve flow by automated tests)            | OWN-04                                                                                                         |
 | F26 | Test before go-live: draft test, replay, test cases, readiness, channel modes                   | guide `test-before-go-live`                              | ready (Off channel delivery: ready\*)                | OWN-05                                                                                                         |
-| F27 | Quick check with the team (D19), off by default                                                 | roadmap Wave 4; research D19                             | ready\* (live, mock-LLM tested only)                 | HND-05, TRS-01                                                                                                 |
+| F27 | Quick check with the team (D19), off by default                                                 | roadmap Wave 4; research D19                             | ready\* (live, mock-LLM tested only)                 | HND-05..HND-11, TRS-01                                                                                         |
 | F28 | Fact check on every reply / no invented facts                                                   | roadmap "Still on Roger" (ffd1f715, deployed 28 Oct)     | ready                                                | ORD-01, ORD-02, RET-01, RET-03, RET-06, PAY-02, PAY-04, PRD-01, PRD-02, PRD-03, PRD-04, TRS-01, TRS-07, DSP-01 |
 | F29 | Replies in the shopper's language, mid-conversation switches                                    | research D17 (built); hand-off copy en/pt                | ready (one known bug)                                | ORD-01, ORD-05, PAY-01, CHN-01                                                                                 |
 | F30 | EU-only AI processing, fails closed                                                             | guide `eu-only-processing`                               | blocked (OpenAI EU approval)                         | CHN-06                                                                                                         |
@@ -704,6 +704,97 @@ export, plan control. They have their own guides.
 - **Features:** F27, F24
 - **Verify:** a team question row; T+5 and T+10 messages in variant B; billing outcome `human` (teammate answered through a quick check, Roger's decision) in Settings > Usage, not counted as an AI resolution.
 - **Status:** ready\* (live on prod since 29 Oct, off by default; tested with a mock LLM only, so the real model's choice to ask the team is unproven)
+
+### HND-06 Quick check or hand-off? (where the line is)
+
+- **VOC:** D19 / P1-03 "invent or hand off, no middle path"; the quick check is only for one missing fact.
+- **Store · fixture · customer:** any · none · any
+- **Needs:** kb, dashboard (to see the Questions card)
+- **Setup:** quick check **on**; inside hours. One new conversation per message.
+- **Shopper:**
+  - a. "Is the speckled stoneware planter frost-safe?" (in the knowledge base)
+  - b. "Do you sell replacement wicks for the soy candle?" (not in the knowledge base, one fact)
+  - c. "Can I talk to a real person please?"
+  - d. "This is the third time my order is late, I'm furious, I want my money back."
+  - e. "Can you change the email on my account to new@example.com?"
+- **Expected:** a: answers from the care doc (−5 °C), no team question. b: the planner picks `ASK_TEAM`, the shopper gets the "checking with the team" line, one row on the Inbox Questions card with a short self-contained question. c, d, e: `HANDOFF` (asks for a person / upset / needs an action or account change), no team question.
+- **Must not:** ask the team something the knowledge base answers; use a quick check for a person request, an angry shopper or an action; guess the wick answer.
+- **Features:** F27, F01
+- **Verify:** `conv show`: planner step per conversation (`ASK_TEAM` only in b); team question rows (only b); status `pending-human` for c, d, e.
+- **Status:** ready\* (the real model's choice is unproven, see HND-05)
+
+### HND-07 A second unknown fact while the first is open
+
+- **VOC:** D19 "the AI keeps answering"; one open question per conversation.
+- **Store · fixture · customer:** any · none · any
+- **Needs:** kb, dashboard
+- **Setup:** quick check on; inside hours; nobody answers yet.
+- **Shopper:** "Does the oak serving tray come gift-boxed?" → "Also, can you engrave it?" → "And how long does US shipping take?"
+- **Expected:** the first message opens a question. The engraving fact is **added to the open question** (one row, two facts), not a second question and not a hand-off. The shipping question gets a normal answer from the knowledge base (3–7 business days) while the question is open.
+- **Must not:** open a second question; hand off; go quiet on the shipping question.
+- **Features:** F27
+- **Verify:** one `team_questions` row for the conversation containing both facts; the third reply cites the shipping doc.
+- **Status:** ready\*
+
+### HND-08 Limit: two quick checks per conversation, the third is a hand-off
+
+- **VOC:** D19 limits (2 per conversation, 20 per org per hour).
+- **Store · fixture · customer:** any · none · any
+- **Needs:** kb, dashboard
+- **Setup:** quick check on; inside hours; Marina answers in the Inbox.
+- **Shopper:** "Do you sell replacement wicks?" → (Marina answers "No, sorry") → "Do you have a loyalty program?" → (Marina answers "Not yet") → "Do you have a physical shop in Boston?"
+- **Expected:** questions 1 and 2 go to the team and are relayed. The third unknown fact is a normal hand-off (conversation limit), with the honest hand-off line.
+- **Must not:** open a third question; guess the shop answer.
+- **Features:** F27, F01
+- **Verify:** two answered team question rows; third turn `HANDOFF`; server log shows the `conversation_limit` refusal.
+- **Status:** ready\*
+
+### HND-09 Quick check outside business hours
+
+- **VOC:** D19 "hours-aware"; HND-03 closed line.
+- **Store · fixture · customer:** any · none · any
+- **Needs:** kb, dashboard
+- **Setup:** quick check on; set business hours so the store is closed now.
+- **Shopper:** "Does the oak serving tray come gift-boxed?"
+- **Expected:** the shopper gets the offline line with the next opening time (store time zone), not "checking with the team, back in a few minutes". The question is still queued on the Questions card. No T+5 update, no T+10 wait. When Marina answers the next morning, the answer is relayed into the chat.
+- **Must not:** promise a quick answer; send the T+5 "still looking" update while closed.
+- **Features:** F27, F02
+- **Verify:** team question row created already timed out; reply text has the next opening; later answer appears as a relayed message.
+- **Status:** ready\*
+
+### HND-10 Answer relay: rephrased, as written, late, in Portuguese, saved to knowledge
+
+- **VOC:** D19 relay; "the answer should teach the bot once" (P2-17).
+- **Store · fixture · customer:** any · none · any
+- **Needs:** kb, dashboard
+- **Setup:** quick check on; inside hours. Update after 1 min and give up after 2 min (settings card) to make the late case fast.
+- **Shopper / team:**
+  - a. en: "Do you offer a student discount?" → Marina answers "nope, not right now" (rephrased).
+  - b. pt-BR (`--lang pt-BR`): "Vocês fazem embrulho para presente?" → Marina answers in English "Yes, kraft paper, free" (rephrased).
+  - c. en: "Will the oak serving tray come in a bigger size?" → Marina answers with **send as written** on: "A 60 cm one is coming in December."
+  - d. en: "Do you sell replacement wicks?" → wait past give-up (chat moves to `pending-human`) → Marina answers late.
+  - e. Repeat c with **save to knowledge** on, then a new conversation: "Is there a bigger oak tray coming?"
+- **Expected:** a: polite rewording that keeps her meaning, nothing added. b: relay in Portuguese. c: exact text. d: the late answer is still relayed and the chat goes back to the AI. e: the new conversation answers from the saved document with no team question.
+- **Must not:** add facts Marina didn't give; answer in English to the pt-BR shopper; drop the late answer.
+- **Features:** F27, F29, F28
+- **Verify:** relayed message content vs Marina's answer; new knowledge document after e; e's second conversation has no team question.
+- **Status:** ready\*
+
+### HND-11 Take-over cancels the question; fact check leads to a quick check; no quick checks in tests
+
+- **VOC:** D19 "taking over cancels the question"; the fact check that blocks unsupported claims.
+- **Store · fixture · customer:** any · none · any
+- **Needs:** kb, dashboard
+- **Setup:** quick check on; inside hours.
+- **Shopper / team:**
+  - a. "Is the oak tray food-safe for cutting raw meat?" → while it is open, Marina takes over the conversation in the Inbox.
+  - b. "What's the warranty on the linen tablecloth?" (no warranty in the knowledge base: tempts the model to invent one).
+  - c. Same message as b in the dashboard playground / playbook test.
+- **Expected:** a: the question disappears from the Questions card (cancelled), no T+5/T+10 messages, Marina owns the chat. b: either `ASK_TEAM` directly, or the fact check rejects an invented warranty and turns it into a quick check, never an invented warranty. c: no team question (test conversations can't ask the team); a normal hand-off or "I don't have that" instead.
+- **Must not:** keep timers running after take-over; state a warranty; create a team question from a test chat.
+- **Features:** F27, F28, F03, F26
+- **Verify:** question status `cancelled` in a; confidence / fact-check state in `conv show` for b; no team question row for c.
+- **Status:** ready\*
 
 ---
 

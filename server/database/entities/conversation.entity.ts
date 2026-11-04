@@ -63,6 +63,14 @@ function toTiptapInstructions(value: unknown): TiptapInstructionInput {
   return asTiptapDocument(value as PlaybookInstructions) as unknown as TiptapInstructionInput;
 }
 
+/**
+ * Shown in place of a playbook action whose tool is not installed. The planner
+ * used to improvise with other tools (e.g. searching pages for the tool's name)
+ * until the turn ran out of steps, so tell it plainly what to do instead.
+ */
+const UNAVAILABLE_ACTION_NOTE =
+  "Not available (its integration is not connected). Do not try to call it or look for it with other tools. If you need it to help, tell the customer you can't do that here and hand off.";
+
 @Entity("conversations")
 @Index("idx_conversations_assigned_user_id", ["assigned_user_id"])
 @Index("idx_conversations_status_assigned", ["status", "assigned_user_id"])
@@ -538,7 +546,7 @@ The following tools are available for you to use. You MUST return only valid JSO
             toolSchema.description
           }${requiredFields}\n  Input Schema: ${JSON.stringify(inputSchema, null, 2)}`;
         } else {
-          return `- **${actionName}**: Action not found in available tools`;
+          return `- **${actionName}**: ${UNAVAILABLE_ACTION_NOTE}`;
         }
       });
 
@@ -809,7 +817,7 @@ The following tools are available for you to use. You MUST return only valid JSO
             toolSchema.description
           }${requiredFields}\n  Input Schema: ${JSON.stringify(inputSchema, null, 2)}`;
         } else {
-          return `- **${actionName}**: Action not found in available tools`;
+          return `- **${actionName}**: ${UNAVAILABLE_ACTION_NOTE}`;
         }
       });
 
