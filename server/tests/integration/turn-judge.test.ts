@@ -71,6 +71,10 @@ describe("turn scoring", () => {
     expect(scoreTurn(facts(), {}, { ...goodJudge, knowledgeMissing: true }).bucket).toBe(
       "knowledge_missing",
     );
+    // A made-up answer the judge also tags as missing knowledge is still wrong.
+    expect(
+      scoreTurn(facts(), {}, { ...goodJudge, quality: "wrong", knowledgeMissing: true }).bucket,
+    ).toBe("wrong_or_risky");
     const write = { name: "cancel_order", readOnly: false, outcome: "simulated", args: {} };
     expect(scoreTurn(facts({ tools: [write] }), {}, goodJudge).bucket).toBe("needed_action");
     expect(scoreTurn(facts({ reply: null }), {}, null).bucket).toBe("wrong_or_risky");

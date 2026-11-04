@@ -139,10 +139,16 @@ export function scoreTurn(
   const writes = facts.tools.filter((t) => !t.readOnly);
   let bucket: ReplayBucket;
   if (facts.handedOff) bucket = "handed_off";
-  else if (!facts.reply?.trim() || facts.actionClaimFlagged || judge?.risky) {
+  // A wrong answer outranks missing knowledge: the judge can flag both for a
+  // made-up fact, and that has to land in "fix these first".
+  else if (
+    !facts.reply?.trim() ||
+    facts.actionClaimFlagged ||
+    judge?.risky ||
+    judge?.quality === "wrong"
+  ) {
     bucket = "wrong_or_risky";
   } else if (judge?.knowledgeMissing) bucket = "knowledge_missing";
-  else if (judge?.quality === "wrong") bucket = "wrong_or_risky";
   else if (writes.length > 0) bucket = "needed_action";
   else bucket = "answered";
 
@@ -219,23 +225,24 @@ function formatTools(tools: VerdictTool[]): string {
 
 const JUDGE_SCHEMA = {
   type: "object",
+  // Reasoning first: the model writes its case before it commits to the scores.
   properties: {
+    reasoning: { type: "string" },
     agreement: { type: "string", enum: ["same", "partial", "different", "no_reference"] },
     quality: { type: "string", enum: ["good", "wrong"] },
     risky: { type: "boolean" },
     knowledgeMissing: { type: "boolean" },
     meetsExpectedOutcome: { type: ["boolean", "null"] },
     repeatsAvoidedReply: { type: "boolean" },
-    reasoning: { type: "string" },
   },
   required: [
+    "reasoning",
     "agreement",
     "quality",
     "risky",
     "knowledgeMissing",
     "meetsExpectedOutcome",
     "repeatsAvoidedReply",
-    "reasoning",
   ],
   additionalProperties: false,
 };
