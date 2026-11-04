@@ -27,6 +27,7 @@ import type { SimulationSeedTurn } from "@server/database/entities/simulation-ru
 import { SIMULATION_CAPS } from "@server/config/simulation-caps";
 import { DeliveryState } from "@server/types/message-feedback.types";
 import { isTestConversation } from "@server/services/close-classification/outcome-rules";
+import { notSimulationSql } from "./simulation-kind";
 import {
   normalizeTranscript,
   type TestTranscriptTurn,
@@ -194,16 +195,23 @@ export class ReplayService {
     return sources;
   }
 
-  /** The N most recently closed real conversations (not playground, not simulations). */
+  /**
+   * The N most recently finished real conversations (not playground, not
+   * simulations). Finished means any end state: closed, or resolved/unresolved
+   * when the AI or an agent wrapped it up.
+   */
   async recentConversationIds(organizationId: string, count: number): Promise<string[]> {
     const rows = await AppDataSource.getRepository(Conversation)
       .createQueryBuilder("c")
       .select(["c.id", "c.metadata"])
       .where("c.organization_id = :organizationId", { organizationId })
-      .andWhere("c.status = 'closed'")
+      .andWhere("c.status IN (:...finished)", { finished: ["closed", "resolved", "unresolved"] })
       .andWhere("c.deleted_at IS NULL")
+      // Each replay leaves closed simulation conversations behind, newest of
+      // all: filtered after the LIMIT, they would push the real ones out.
+      .andWhere(notSimulationSql("c"))
       .orderBy("c.updated_at", "DESC")
-      // Test conversations are filtered below; read extra to make up for them.
+      // Playground chats are filtered below; read extra to make up for them.
       .take(Math.min(count * 3, 600))
       .getMany();
     return rows

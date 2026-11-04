@@ -99,6 +99,11 @@ export interface ExecutionResult {
    * retry). The turn becomes a hand-off that must not need the LLM again.
    */
   aiUnavailable?: boolean;
+  /**
+   * Set when the planner used up the turn's iterations without a reply (tool
+   * loop). Like aiUnavailable, the hand-off must not re-plan.
+   */
+  planningExhausted?: boolean;
   formJson?: string | null; // JSON string of FormSchema (for ASK_FORM step only)
   rationale?: string;
   /**
@@ -372,6 +377,18 @@ export class ExecutionLayer {
       const knowledgeBlock = await this.buildKnowledgePrompt(conversation);
       if (knowledgeBlock) {
         finalPrompt = finalPrompt + knowledgeBlock;
+      }
+
+      // A request for a person must beat the active playbook's first steps
+      // ("ask for the order number and email"): the planner otherwise follows
+      // the playbook, which comes later in its context than the general rule.
+      const lastCustomerMessage = await conversation.getLastCustomerMessage();
+      if (lastCustomerMessage?.intent === MessageIntent.HANDOFF) {
+        finalPrompt +=
+          "\n\n---THE CUSTOMER ASKED FOR A PERSON---\n" +
+          "Their latest message asks to talk to a person. Use HANDOFF now, before any playbook step: " +
+          "do not ask for an order number, email or other details first. Put what they said in the handoff reason." +
+          "\n---END---";
       }
 
       // Corrective feedback from a guardrail-triggered retry (e.g. the previous

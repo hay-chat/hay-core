@@ -17,7 +17,7 @@ order with customer emails off. Use **test stores only**, never a real merchant'
 | `orders/customers.json` | 15 fake shoppers, 5 per store.                                                          |
 | `knowledge/`            | Knowledge-base documents, en and pt-BR.                                                 |
 | `playbooks/<platform>/` | Playbooks per store, using that store's plugin actions. Nuvemshop in pt-BR.             |
-| `SCENARIOS.md`          | 57 conversation test scenarios from the VOC research, mapped to the features they test. |
+| `SCENARIOS.md`          | 63 conversation test scenarios from the VOC research, mapped to the features they test. |
 | `scripts/`              | Seed scripts (one per store + Hay.chat), image generator, tests.                        |
 
 The three stores:

@@ -20,5 +20,6 @@ Analiza el siguiente mensaje del usuario y determina:
 - Cuando el usuario responde a una pregunta (como "¿por qué quieres cancelar?"), su respuesta debe clasificarse según el contenido, NO como cierre
 - En caso de duda, prefiere "request", "question" u "other" sobre intenciones de cierre
 - Las intenciones de cierre deben tener confianza > 0.8 para ser válidas
+- Usa "handoff" cuando el usuario pide hablar con un humano, una persona, un agente o el equipo ("quiero hablar con una persona", "¿me pasas con alguien?"), aunque el mensaje también diga de qué se trata. Preguntar si eres un bot no es "handoff"
 
 Mensaje del usuario: "{{message}}"

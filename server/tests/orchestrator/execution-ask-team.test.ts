@@ -52,6 +52,10 @@ const conversation = {
   getMessages: async () => [
     { type: "Customer", content: "Does the 40 cm vase ship in a gift box?" },
   ],
+  getLastCustomerMessage: async () => ({
+    type: "Customer",
+    content: "Does the 40 cm vase ship in a gift box?",
+  }),
 } as unknown as Conversation;
 
 function plan(result: Record<string, unknown>): string {
