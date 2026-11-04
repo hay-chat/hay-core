@@ -58,9 +58,31 @@
         </div>
       </div> -->
 
+      <!-- Public signup closed on this server (no invitation) -->
+      <div v-if="signupClosed" class="space-y-4" role="status">
+        <Alert variant="info">
+          <AlertTitle>{{ $t("signup.closed.title") }}</AlertTitle>
+          <AlertDescription>
+            {{
+              signupUrl ? $t("signup.closed.descriptionWithUrl") : $t("signup.errors.signupClosed")
+            }}
+          </AlertDescription>
+        </Alert>
+        <Button v-if="signupUrl" class="w-full" :href="signupUrl">
+          {{ $t("signup.closed.createAccount") }}
+        </Button>
+        <Button
+          class="w-full"
+          :variant="signupUrl ? 'outline' : 'default'"
+          @click="router.push({ path: '/login', query: loginQuery })"
+        >
+          {{ $t("signup.signIn") }}
+        </Button>
+      </div>
+
       <!-- Account created: the email must be verified before signing in -->
       <div
-        v-if="signupComplete"
+        v-else-if="signupComplete"
         class="p-4 rounded-md bg-green-50 border border-green-200 space-y-3"
         role="status"
       >
@@ -305,12 +327,29 @@ const loadInvitationContext = async () => {
   }
 };
 
+// Public signup closed (ALLOW_SIGNUP=false) and no invitation: say so up front
+// instead of after the form is submitted.
+const signupClosed = ref(false);
+const signupUrl = ref<string | null>(null);
+const loadSignupStatus = async () => {
+  if (invitationContext.value) return;
+  try {
+    const status = await Hay.auth.signupStatus.query();
+    signupClosed.value = !status.open;
+    signupUrl.value = status.signupUrl;
+  } catch (err) {
+    // The register call still enforces it; keep the form.
+    console.error("Failed to load signup status:", err);
+  }
+};
+
 // Redirect to home if already logged in
-onMounted(() => {
+onMounted(async () => {
   if (authStore.isAuthenticated) {
     router.push(redirectUrl.value);
   } else {
-    loadInvitationContext();
+    await loadInvitationContext();
+    await loadSignupStatus();
   }
 });
 

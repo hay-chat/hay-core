@@ -171,6 +171,16 @@ async function assertSignupAllowed(manager: EntityManager, email: string): Promi
 
 export const authRouter = t.router({
   // Public endpoints
+
+  /**
+   * Whether the signup form is open to anyone, so the dashboard can say so
+   * before the form is filled in. Invitations still work when it is closed.
+   */
+  signupStatus: publicProcedure.query(async () => {
+    const open = config.auth.allowSignup || (await AppDataSource.getRepository(User).count()) === 0;
+    return { open, signupUrl: open ? null : config.auth.signupUrl };
+  }),
+
   login: publicProcedure.input(loginSchema).mutation(async ({ input, ctx }) => {
     const { email, password } = input;
 
