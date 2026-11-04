@@ -367,13 +367,23 @@ async function startServer() {
         // allowlisted at initiate time), else the dashboard plugin settings page.
         const dashboardUrl = getDashboardUrl();
         const encodedPluginId = encodeURIComponent(result.pluginId!);
-        const redirectUrl =
-          result.returnTo ??
-          `${dashboardUrl}/integrations/plugins/${encodedPluginId}?oauth=success`;
+        let redirectUrl = `${dashboardUrl}/integrations/plugins/${encodedPluginId}?oauth=success`;
+        if (result.returnTo) {
+          // Tell the external page the outcome so it can confirm it to the user.
+          const back = new URL(result.returnTo);
+          back.searchParams.set("hay_connect", "success");
+          redirectUrl = back.toString();
+        }
         logger.info({ pluginId: result.pluginId }, "OAuth callback successful");
         return res.redirect(redirectUrl);
       } else {
         logger.warn({ error: result.error }, "OAuth callback failed");
+        if (result.returnTo) {
+          const back = new URL(result.returnTo);
+          back.searchParams.set("hay_connect", "error");
+          back.searchParams.set("hay_connect_error", (result.error || "unknown").slice(0, 200));
+          return res.redirect(back.toString());
+        }
         // Show error page
         return res.status(400).send(`
           <html>

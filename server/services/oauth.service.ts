@@ -556,7 +556,12 @@ export class OAuthService {
     if (error) {
       logger.warn({ error }, "OAuth provider returned error");
       logger.error(`OAuth callback error: ${error}`);
-      return { success: false, error };
+      // Consume the state anyway so the page that started the connect (e.g. the
+      // Shopify app) gets the merchant back with the reason.
+      const cancelled = state
+        ? await oauthStateService.retrieveState(state).catch(() => null)
+        : null;
+      return { success: false, error, returnTo: cancelled?.returnTo };
     }
 
     // Retrieve state from Redis (one-time use)
@@ -676,6 +681,17 @@ export class OAuthService {
       await this.storeTokens(organizationId, pluginId, tokens, allScopes);
       logger.info("Tokens stored successfully");
 
+      // A running worker was started without these credentials (its onStart saw
+      // "not connected"), and workers only read config when they start. Stop it
+      // so the next start (onConnected below) runs onStart with the new token:
+      // e.g. the Shopify plugin writes the App Store app's metafields and starts
+      // its MCP server there.
+      try {
+        await pluginManagerService.stopPluginWorker(organizationId, pluginId);
+      } catch (err) {
+        logger.warn({ err, organizationId, pluginId }, "Failed to restart worker after OAuth");
+      }
+
       // Run the plugin's optional onConnected lifecycle hook. The plugin (not
       // core) performs any provider call it needs with the fresh credentials and
       // returns opaque routing keys for core to persist. Failures here must NOT
@@ -706,6 +722,7 @@ export class OAuthService {
       return {
         success: false,
         error: error instanceof Error ? error.message : "Token exchange failed",
+        returnTo: oauthState.returnTo,
       };
     }
   }
@@ -1004,6 +1021,16 @@ export class OAuthService {
         return { ok: true, routingKeyCount: 0 };
       }
 
+      // An account (e.g. a Shopify store) belongs to one Hay organization: the
+      // upsert below moves its routing keys here, so remember who held them.
+      const previousOwners = new Map<string, string>(); // instanceId -> organizationId
+      for (const key of routingKeys) {
+        const owner = await pluginWebhookRouteRepository.findByKey(pluginId, key);
+        if (owner && owner.organizationId !== organizationId) {
+          previousOwners.set(owner.pluginInstanceId, owner.organizationId);
+        }
+      }
+
       // Reconnecting with a different account must drop the previous account's keys.
       await pluginWebhookRouteRepository.clearForInstance(instance.id);
       await pluginWebhookRouteRepository.upsertRoutes(
@@ -1012,6 +1039,28 @@ export class OAuthService {
         instance.id,
         routingKeys,
       );
+
+      // The provider account was just authorized for this organization, so a
+      // previous organization left with none of its accounts is disconnected:
+      // otherwise its worker keeps using its token (for Shopify it rewrites the
+      // store's metafields back to the old organization on every start).
+      for (const [previousInstanceId, previousOrgId] of previousOwners) {
+        const remaining = await pluginWebhookRouteRepository.countForInstance(previousInstanceId);
+        if (remaining > 0) continue;
+        try {
+          await this.revokeOAuth(previousOrgId, pluginId);
+        } catch (err) {
+          logger.warn(
+            { err, pluginId, previousOrgId },
+            "Could not disconnect the account's previous organization",
+          );
+          continue;
+        }
+        logger.warn(
+          { pluginId, organizationId, previousOrgId },
+          "Account moved to another organization; previous connection revoked",
+        );
+      }
 
       logger.info(
         { pluginId, organizationId, routingKeyCount: routingKeys.length },

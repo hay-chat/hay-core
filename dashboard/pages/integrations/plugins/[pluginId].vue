@@ -16,8 +16,28 @@
       @confirm="handleDisablePlugin"
     />
 
+    <!-- External connect hand-off (e.g. from the Shopify app): say what is happening -->
+    <div
+      v-if="connectStep"
+      class="max-w-md mx-auto text-center py-16 space-y-4"
+      role="status"
+      aria-live="polite"
+    >
+      <Loader2 class="h-10 w-10 text-primary mx-auto animate-spin" />
+      <h2 class="text-lg font-medium">
+        {{ $t("pluginSettings.connect.title", { name: displayName || pluginId }) }}
+      </h2>
+      <p class="text-neutral-muted">
+        {{
+          connectStep === "redirecting"
+            ? $t("pluginSettings.connect.redirecting")
+            : $t("pluginSettings.connect.saving")
+        }}
+      </p>
+    </div>
+
     <!-- Loading State -->
-    <div v-if="loading" class="space-y-4" aria-busy="true">
+    <div v-else-if="loading" class="space-y-4" aria-busy="true">
       <div class="flex items-center gap-4">
         <div class="h-12 w-12 rounded-lg bg-muted animate-pulse"></div>
         <div class="flex-1 space-y-2">
@@ -39,6 +59,15 @@
     </div>
 
     <div v-else-if="plugin" class="space-y-6">
+      <Alert v-if="connectError" variant="destructive">
+        <AlertTitle>{{ $t("pluginSettings.connect.failedTitle") }}</AlertTitle>
+        <AlertDescription class="space-y-3">
+          <p>{{ connectError }}</p>
+          <Button size="sm" variant="outline" @click="retryConnect">
+            {{ $t("pluginSettings.connect.retry") }}
+          </Button>
+        </AlertDescription>
+      </Alert>
       <!-- Status header: identity, status, one primary action, ⋯ menu -->
       <header class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div class="flex items-start gap-4 min-w-0">
@@ -569,6 +598,7 @@ import {
   Power,
   ExternalLink,
   Ticket,
+  Loader2,
 } from "lucide-vue-next";
 import { Hay } from "@/utils/api";
 import { useUserStore } from "@/stores/user";
@@ -1233,6 +1263,29 @@ const handleOAuthCallback = () => {
 // /integrations/plugins/<id>?connect=1&config.shopDomain=<shop>[&return_to=<allowlisted url>]
 // Prefill the given (non-secret) config fields, save — which also enables the
 // plugin — and start the OAuth flow, so the merchant never types identifiers.
+// Shown from the first render of a connect link, so the settings page never
+// flashes before the provider's approval screen.
+const connectStep = ref<"saving" | "redirecting" | null>(
+  route.query.connect === "1" ? "saving" : null,
+);
+const connectError = ref<string | null>(null);
+// The original link, to retry after a failure (the query is cleared then).
+const connectQuery = route.query.connect === "1" ? { ...route.query } : null;
+
+/** Turn transport failures (HTML error pages, timeouts) into a sentence a merchant understands. */
+const describeConnectError = (err: any): string => {
+  const raw = String(err?.message || err?.data?.message || "");
+  if (!raw || /JSON|Unexpected token|<html|Failed to fetch|NetworkError|timeout|aborted/i.test(raw)) {
+    return t("pluginSettings.connect.networkError");
+  }
+  return raw;
+};
+
+const retryConnect = () => {
+  if (!connectQuery) return;
+  window.location.href = router.resolve({ path: route.path, query: connectQuery }).href;
+};
+
 const handleConnectIntent = async (): Promise<boolean> => {
   if (route.query.connect !== "1") return false;
 
@@ -1264,16 +1317,16 @@ const handleConnectIntent = async (): Promise<boolean> => {
       pluginId: pluginId.value,
       returnTo,
     });
+    connectStep.value = "redirecting";
     window.location.href = authorizationUrl;
     return true;
   } catch (err: any) {
     console.error("Failed to auto-connect plugin:", err);
-    toast.error(
-      err?.message ||
-        err?.data?.message ||
-        t("pluginSettings.toast.oauthConnectFailed", { name: displayName.value || pluginId.value }),
-    );
+    connectStep.value = null;
+    connectError.value = describeConnectError(err);
+    toast.error(t("pluginSettings.toast.oauthConnectFailed", { name: displayName.value || pluginId.value }));
     router.replace({ path: route.path, query: {} });
+    if (!plugin.value) await fetchPlugin();
     return false;
   }
 };
