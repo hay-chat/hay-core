@@ -379,6 +379,18 @@ export class ExecutionLayer {
         finalPrompt = finalPrompt + knowledgeBlock;
       }
 
+      // A request for a person must beat the active playbook's first steps
+      // ("ask for the order number and email"): the planner otherwise follows
+      // the playbook, which comes later in its context than the general rule.
+      const lastCustomerMessage = await conversation.getLastCustomerMessage();
+      if (lastCustomerMessage?.intent === MessageIntent.HANDOFF) {
+        finalPrompt +=
+          "\n\n---THE CUSTOMER ASKED FOR A PERSON---\n" +
+          "Their latest message asks to talk to a person. Use HANDOFF now, before any playbook step: " +
+          "do not ask for an order number, email or other details first. Put what they said in the handoff reason." +
+          "\n---END---";
+      }
+
       // Corrective feedback from a guardrail-triggered retry (e.g. the previous
       // plan claimed an action without calling a tool). Appended last so it
       // reads as the most recent instruction.

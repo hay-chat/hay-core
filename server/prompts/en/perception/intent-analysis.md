@@ -21,6 +21,7 @@ Analyze the following user message and determine:
 - When the user is responding to a question (like "why do you want to cancel?"), their answer should be classified based on the content, NOT as closure
 - When in doubt, prefer "request", "question", or "other" over closure intents
 - Closure intents should have confidence > 0.8 to be valid
+- Use "handoff" when the user asks to talk to a human, a person, an agent or the team ("I want to speak to a human", "can I talk to someone?", "get me a real person"), even if the message also says what it is about. Asking whether you are a bot is not "handoff"
 
 SPECIAL NOTE: Gratitude messages like "thank you", "thanks", "appreciate it" should typically be classified as "greet" rather than closure. However, be aware that these MAY indicate conversation closure when they come after task completion. The system will evaluate context separately to determine if closure is appropriate.
 
