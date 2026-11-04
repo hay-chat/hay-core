@@ -335,6 +335,17 @@ const loadSignupStatus = async () => {
   if (invitationContext.value) return;
   try {
     const status = await Hay.auth.signupStatus.query();
+    if (!status.open && status.signupUrl) {
+      // Hosted Hay: accounts are created by the hay.chat onboarding. Pass the
+      // page the visitor was heading to, so they come back to it afterwards.
+      const target = new URL(status.signupUrl);
+      const next = redirectUrl.value;
+      if (next && next !== "/" && /^\/(?![/\\])/.test(next)) {
+        target.searchParams.set("return_to", next);
+      }
+      window.location.replace(target.toString());
+      return;
+    }
     signupClosed.value = !status.open;
     signupUrl.value = status.signupUrl;
   } catch (err) {
