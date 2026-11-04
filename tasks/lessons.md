@@ -273,3 +273,32 @@
 - **Failure mode**: the entity declared `type: "jsonb"`, but the column created by the initial schema is `text` (production has jsonb); the copy step `assistant_instructions = c.instructions` failed with `column is of type jsonb but expression is of type text`.
 - **Detection signal**: running the migration against a DB migrated from scratch (`\d agents`).
 - **Prevention**: check the real column type (`\d table`) before writing a data-copy migration, and test both shapes; read such columns as `::text` and convert in code (parse JSON, wrap plain text) rather than trusting the entity decorator.
+
+### A prompt rule loses to the active playbook; small graders misread short non-English claims
+
+- **Failure mode**: (1) adding "a person request comes before the playbook's steps" to `planner.md` changed nothing: the planner still asked for the checkout email, because the playbook message ("From this message forward you should be following this playbook") sits later in its context. (2) The grounding grader (medium tier = gpt-4o-mini) scored "Sim, oferecemos embrulho para presente" 1.0 as "no specific claims", while the same claim in English scored 0.0. Rule wording alone flip-flopped between runs.
+- **Detection signal**: re-running the scenario through `hay chat send` after the prompt edit; replaying the grader with the real conversation context (`buildConfidenceContext` + the prompt) 2× per case over a small mixed set (claims in pt/es/de, greeting, "I don't know").
+- **Prevention**: when the planner must override a playbook, inject the instruction late in the prompt from a signal (perception intent, planner feedback), not as a general rule at the top. For LLM graders, make the model enumerate what it checks in the JSON schema before the score field, and test with negatives (claim-free replies on the same topic) so an example doesn't anchor on the topic.
+
+### Editing server files during a CLI test run restarts the server mid-run
+
+- **Failure mode**: nodemon watches `server/**/*.ts`; a scratch script inside `server/` and a one-line log edit each restarted the dev server and failed the in-flight `hay chat send` runs with `NETWORK fetch failed`.
+- **Detection signal**: `error: publicConversations.create: NETWORK fetch failed` in a transcript; `[nodemon] restarting due to changes` in the server log.
+- **Prevention**: keep scratch scripts in the scratchpad (run with `server/node_modules/.bin/tsx --tsconfig server/tsconfig.json`, cwd `server/`), and batch server edits before starting a run, not during one.
+
+### A grounding grader passed an invented "no" because a playbook was active
+
+- **Failure mode**: "We don't have a physical shop in Boston, we operate online" scored ≥0.5 in the unflagged grounding check. Step 1 of the grader asked whether the active playbook covered the topic and stopped there; negatives ("we don't…") weren't listed as claims.
+- **Detection signal**: HND-08 transcript with an unsupported fact; replaying the grader with the real context. A first replay looked wrong only because the harness used the conversation's *last* customer question instead of the turn's — replays must pin the customer question per turn.
+- **Prevention**: graders decide "are there claims?" first, then check each claim against the literal text of sources; list negative claims explicitly; pick example topics that don't overlap the test cases.
+
+## Replay selection filtered test chats after the LIMIT (2026-11-03)
+- Failure: "replay my last N conversations" returned nothing after one replay; it also never picked AI-resolved chats.
+- Signal: a replay of N conversations reported 1 or 0 items while the inbox had many finished chats.
+- Rule: filter in SQL anything that can outnumber real rows (simulations write a closed conversation per turn); match
+  "finished" to the set the rest of the code uses (closed, resolved, unresolved), not one status.
+
+## Judge field definitions need the same care as the grader (2026-11-03)
+- Failure: the turn judge (medium tier) failed a correct reply against "does not promise X" and filed an invented answer as "knowledge missing".
+- Signal: test case failed on a draft identical to the active version; a scratch re-judge loop (6×) showed 1/6 pass.
+- Rule: define each boolean in one testable sentence, write reasoning before scores, and measure with a fixed-input re-judge loop before and after.
