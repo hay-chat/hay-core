@@ -72,6 +72,7 @@ If an "Active Playbook:" document is present, its instructions ARE company polic
 - Example: Playbook says "if the order is unfulfilled, cancel it instead of refunding" → AI says "since your order is unfulfilled, we can cancel it rather than refund" → ✅ 1.0
 - Proposing or announcing an action the playbook instructs is GROUNDED, not a fabricated claim
 - Only penalize claims that CONTRADICT or go BEYOND what the playbook and other documents state
+- Only what the playbook actually says counts. A fact it doesn't state is NOT grounded just because it fits the playbook or seems likely
 
 ### Rule 2: No Claims = High Score
 
@@ -80,6 +81,15 @@ If response makes NO specific company claims, score **0.9-1.0**
 - "I can help you with that" → ✅ No claims
 - "Let me look that up" → ✅ No claims
 - "I'll check our inventory" → ✅ No claims
+
+### Rule 2b: "Yes, we do / No, we don't / We only" IS a Company Claim — in Any Language
+
+Saying whether the company offers, sells, ships, allows or provides something is a specific company claim, however short or friendly the reply is, and whatever language it is in. Saying it does NOT, or that something is the ONLY option, is a claim too.
+
+- "Yes, we can do that for you!" / "Sim, fazemos isso." / "Sí, lo ofrecemos." → claim (the company does it)
+- "No, that isn't possible." / "We only do X." → claim (the company does not do the other thing)
+- A "no" or an "only" is supported only when a document says so. A document that describes one option (for example a retail price list) does not show that other options don't exist; a topic the documents don't mention is unknown, not a "no"
+- Only a generic offer to help ("How can I help?"), a question, "let me check" or "I'll ask the team" is claim-free. Saying the company does, can do or offers a specific thing is never "just offering help"
 
 ### Rule 3: Only Check Company-Specific Claims
 
@@ -101,17 +111,12 @@ If the Retrieved Documents section says "No documents or tool results were retri
 
 ## EVALUATION STEPS
 
-**Step 1**: Are there "Tool Result:" or "Active Playbook:" documents?
-
-- YES → Does response present that tool data or follow the playbook's instructions? → Score 0.9-1.0 ✅
-- NO → Continue to Step 2
-
-**Step 2**: Does response make specific company claims?
+**Step 1**: Does the response make specific company claims (yes or no, see Rule 2b)?
 
 - NO → Score 0.9-1.0 ✅ (Nothing to verify)
-- YES → Continue to Step 3
+- YES → Continue to Step 2
 
-**Step 3**: Can those claims be verified in Knowledge Base docs?
+**Step 2**: Is every claim stated in a "Tool Result:", the "Active Playbook:" text, or a Knowledge Base doc?
 
 - YES → Score 0.8-1.0 ✅
 - PARTIALLY → Score 0.5-0.7 ⚠️
@@ -158,6 +163,27 @@ If the Retrieved Documents section says "No documents or tool results were retri
 **Response**: "We absolutely do ship to Portugal! Delivery takes 3-5 days."
 **Score**: `{"score": 0.1, "reasoning": "Specific shipping claims with no document or tool result to support them"}`
 
+### Example 4c: Short Yes in Another Language (LOW SCORE)
+
+**Retrieved Documents**: "No documents or tool results were retrieved"
+**Customer Question**: "Vocês vendem refil?"
+**Response**: "Sim, vendemos refil! É só me avisar se precisar de ajuda."
+**Score**: `{"score": 0.0, "reasoning": "Confirms the company sells refills; nothing retrieved supports it"}`
+
+### Example 4c-2: An Unsupported "No" (LOW SCORE)
+
+**Knowledge Base**: Product FAQ (sizes, materials and retail prices; nothing about wholesale)
+**Customer Question**: "Do you sell wholesale?"
+**Response**: "We only sell retail, so wholesale isn't available."
+**Score**: `{"claims": ["The company only sells retail", "The company does not sell wholesale"], "score": 0.1, "reasoning": "The FAQ lists retail prices but never says wholesale is unavailable; a topic the documents don't mention is unknown, not a no"}`
+
+### Example 4d: Not Knowing Is Claim-Free (HIGH SCORE)
+
+**Retrieved Documents**: "No documents or tool results were retrieved"
+**Customer Question**: "Vocês vendem refil?"
+**Response**: "Não tenho essa informação aqui. Quer que eu pergunte à equipe?"
+**Score**: `{"score": 1.0, "reasoning": "Says it doesn't know and offers to ask the team; no company claim"}`
+
 ### Example 5: General Clarification (HIGH SCORE)
 
 **Response**: "Monthly ticket volume refers to the number of support tickets per month."
@@ -172,7 +198,10 @@ Return ONLY a JSON object:
 
 ```json
 {
-  "score": <number between 0 and 1>,
-  "reasoning": "<brief explanation of the score>"
+  "claims": ["<each statement that the company does, offers, has, can do, allows, ships or charges something, OR does not / doesn't have / doesn't offer something, in English; [] if none>"],
+  "reasoning": "<for each claim: supported by which document, or not supported>",
+  "score": <number between 0 and 1>
 }
 ```
+
+Fill `claims` first, then score from it: any claim the documents do not support makes the score low.

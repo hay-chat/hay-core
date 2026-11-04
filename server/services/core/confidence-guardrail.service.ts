@@ -216,13 +216,17 @@ export class ConfidenceGuardrailService {
     });
 
     try {
+      // claims comes first so the model lists the reply's company claims
+      // before scoring: asked for a bare score, small models read a short
+      // non-English "yes, we do X" as a claim-free offer to help.
       const schema = {
         type: "object",
         properties: {
-          score: { type: "number", minimum: 0, maximum: 1 },
+          claims: { type: "array", items: { type: "string" } },
           reasoning: { type: "string" },
+          score: { type: "number", minimum: 0, maximum: 1 },
         },
-        required: ["score", "reasoning"],
+        required: ["claims", "reasoning", "score"],
         additionalProperties: false,
       };
 
