@@ -52,6 +52,8 @@ export function useSetupTestChat() {
 
   const messages = ref<Message[]>([]);
   const sourcesByMessage = ref<Record<string, SetupSource[]>>({});
+  /** What retrieval gave the pipeline. It logs these as `Document` messages, seen only by polling. */
+  const retrieved = ref<Array<SetupSource & { at: number }>>([]);
   const conversationId = ref<string | null>(null);
   const sending = ref(false);
   const awaitingReply = ref(false);
@@ -97,7 +99,7 @@ export function useSetupTestChat() {
     clearTimers();
   };
 
-  /** Add or update one message; a bot reply ends the wait and takes the question's sources. */
+  /** Add or update one message; a new bot reply ends the wait and takes the question's sources. */
   const upsert = (incoming: Message) => {
     if (!VISIBLE_TYPES.includes(incoming.type)) return;
 
@@ -116,10 +118,12 @@ export function useSetupTestChat() {
     if (existing !== -1) messages.value[existing] = incoming;
     else messages.value.push(incoming);
 
-    if (incoming.type !== MessageType.CUSTOMER && awaitingReply.value) {
+    if (existing === -1 && incoming.type !== MessageType.CUSTOMER && awaitingReply.value) {
       if (pendingSources.length) sourcesByMessage.value[incoming.id] = pendingSources;
       pendingSources = [];
       finishWaiting();
+      // A reply from the socket can beat the documents it drew on, so fetch those now.
+      void reconcile();
     }
   };
 
@@ -135,7 +139,18 @@ export function useSetupTestChat() {
   };
 
   // The poll only needs what the chat shows: the text and the documents the reply drew on.
-  const upsertServerMessage = (m: ServerMessage) =>
+  const upsertServerMessage = (m: ServerMessage) => {
+    const documentId = m.metadata?.documentId;
+    if (m.type === MessageType.DOCUMENT && documentId) {
+      if (!retrieved.value.some((doc) => doc.documentId === documentId)) {
+        retrieved.value.push({
+          documentId,
+          title: m.metadata?.documentTitle ?? "",
+          at: new Date(m.created_at).getTime(),
+        });
+      }
+      return;
+    }
     upsert(
       toMessage(
         m.id,
@@ -146,6 +161,7 @@ export function useSetupTestChat() {
         m.status,
       ),
     );
+  };
 
   const schedulePoll = () => {
     if (pollTimer) clearTimeout(pollTimer);
@@ -207,6 +223,9 @@ export function useSetupTestChat() {
       });
       conversationId.value = created.id;
       listen(created.id);
+      // A conversation starts with a greeting. Load it now so it reads first and is never
+      // mistaken for the reply to the question about to be asked.
+      await reconcile();
       return created.id;
     } catch {
       error.value = "start";
@@ -268,13 +287,22 @@ export function useSetupTestChat() {
     await send(text);
   };
 
-  /** Every message the pipeline produced, plus the sources of the question that prompted it. */
-  const entries = computed(() =>
-    messages.value.map((message) => ({
-      message,
-      sources: sourcesByMessage.value[message.id] ?? [],
-    })),
-  );
+  /**
+   * Every message the pipeline produced, with its sources: the asked row's when there are any,
+   * else the documents retrieved since the previous reply.
+   */
+  const entries = computed(() => {
+    let previousReplyAt = 0;
+    return messages.value.map((message) => {
+      if (message.type === MessageType.CUSTOMER) return { message, sources: [] as SetupSource[] };
+      const replyAt = new Date(message.created_at).getTime();
+      const found = retrieved.value
+        .filter((doc) => doc.at > previousReplyAt && doc.at <= replyAt)
+        .map(({ documentId, title }) => ({ documentId, title }));
+      previousReplyAt = replyAt;
+      return { message, sources: sourcesByMessage.value[message.id] ?? found };
+    });
+  });
 
   const dispose = () => {
     stopped = true;

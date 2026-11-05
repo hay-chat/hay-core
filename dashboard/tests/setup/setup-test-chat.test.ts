@@ -114,6 +114,66 @@ describe("useSetupTestChat", () => {
     expect(vi.getTimerCount()).toBe(0);
   });
 
+  it("shows the greeting first and keeps waiting for the real reply", async () => {
+    const greeting = {
+      id: "g1",
+      content: "Hi, how can I help?",
+      type: "BotAgent",
+      created_at: "2026-11-05T12:00:00.000Z",
+    };
+    api.get.mockResolvedValue({ messages: [greeting] });
+    const { chat } = mountChat();
+    const sources = [{ documentId: "d1", title: "Pricing page" }];
+    await chat.send("How much is it?", sources);
+
+    expect(chat.entries.value.map((e) => e.message.id)[0]).toBe("g1");
+    expect(chat.awaitingReply.value).toBe(true);
+
+    // The poll and the socket can both report the greeting again; it is not the answer.
+    await vi.advanceTimersByTimeAsync(4000);
+    socket.handlers.get("message")?.(botReply("g1", "Hi, how can I help?"));
+    expect(chat.awaitingReply.value).toBe(true);
+    expect(chat.entries.value.find((e) => e.message.id === "g1")?.sources).toEqual([]);
+
+    socket.handlers.get("message")?.(botReply("b1", "From 50 a month."));
+    expect(chat.awaitingReply.value).toBe(false);
+    expect(chat.entries.value.find((e) => e.message.id === "b1")?.sources).toEqual(sources);
+  });
+
+  it("shows the documents retrieved for a typed question as the reply's sources", async () => {
+    const message = (id: string, type: string, at: string, metadata?: object) => ({
+      id,
+      content: id,
+      type,
+      created_at: `2026-11-05T12:00:${at}.000Z`,
+      metadata,
+    });
+    const greeting = message("g1", "BotAgent", "00");
+    const trial = { documentId: "d1", documentTitle: "Free trial" };
+    api.get.mockResolvedValueOnce({ messages: [greeting] }).mockResolvedValue({
+      messages: [
+        greeting,
+        message("doc1", "Document", "05", trial),
+        message("r1", "BotAgent", "10"),
+        message("doc2", "Document", "15", { documentId: "d1", documentTitle: "Free trial" }),
+        message("doc3", "Document", "16", { documentId: "d2", documentTitle: "Pricing" }),
+        message("r2", "BotAgent", "20"),
+      ],
+    });
+    const { chat } = mountChat();
+    await chat.send("Can I try it first?");
+
+    // The reply comes over the socket before the documents have been fetched.
+    socket.handlers.get("message")?.(botReply("r1", "Yes."));
+    await flushPromises();
+
+    const sourcesOf = (id: string) =>
+      chat.entries.value.find((e) => e.message.id === id)?.sources.map((s) => s.title);
+    expect(sourcesOf("g1")).toEqual([]);
+    expect(sourcesOf("r1")).toEqual(["Free trial"]);
+    expect(sourcesOf("r2")).toEqual(["Pricing"]);
+  });
+
   it("ignores messages from other conversations", async () => {
     const { chat } = mountChat();
     await chat.send("Hi");
