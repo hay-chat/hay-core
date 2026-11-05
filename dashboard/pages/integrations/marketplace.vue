@@ -141,7 +141,7 @@
                 v-if="!plugin.enabled"
                 size="sm"
                 :loading="enablingPlugin === plugin.id"
-                @click="connectPlugin(plugin.id)"
+                @click="connectPlugin(plugin.id, plugin.name)"
               >
                 <Plug v-if="enablingPlugin !== plugin.id" class="h-3 w-3 mr-1" />
                 {{
@@ -212,6 +212,7 @@ import { useAppStore } from "@/stores/app";
 import { useAuthStore } from "@/stores/auth";
 import { useUserStore } from "@/stores/user";
 import { useToast } from "@/composables/useToast";
+import { usePluginConnect } from "@/composables/usePluginConnect";
 import { useDomain } from "@/composables/useDomain";
 import type { RouterOutputs } from "@/types/trpc";
 
@@ -329,14 +330,16 @@ const refreshPlugins = () => {
   fetchPlugins();
 };
 
+const pluginConnect = usePluginConnect();
+
 // One verb everywhere (D20): Connect adds the plugin and opens its Setup.
-const connectPlugin = async (pluginId: string) => {
+const connectPlugin = async (pluginId: string, pluginName: string) => {
   enablingPlugin.value = pluginId;
   const { toast } = useToast();
 
   try {
-    await appStore.enablePlugin(pluginId);
-    navigateToSettings(pluginId);
+    // Shows step-by-step progress when the first connect has to build the plugin.
+    if (await pluginConnect.connect({ pluginId, pluginName })) navigateToSettings(pluginId);
   } catch (error: unknown) {
     console.error("Failed to connect plugin:", error);
     // TRPCError messages are in error.message for client errors

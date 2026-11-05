@@ -26,6 +26,8 @@
     <ServerStatusBanner />
     <!-- Toast Container for all pages -->
     <ToastContainer />
+    <!-- Step-by-step progress while a plugin connects (usePluginConnect) -->
+    <PluginConnectProgress />
   </SidebarProvider>
 </template>
 
