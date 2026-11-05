@@ -14,6 +14,7 @@ import { invitationsRouter } from "./invitations";
 import { sourcesRouter } from "./sources";
 import { messageFeedbackRouter } from "./message-feedback";
 import { onboardingRouter } from "./onboarding";
+import { setupRouter } from "./setup";
 import { privacyRouter } from "./privacy";
 import { customerPrivacyRouter } from "./customer-privacy";
 import { apiTokensRouter } from "./api-tokens";
@@ -58,6 +59,7 @@ const coreRouters = {
   sources: sourcesRouter,
   messageFeedback: messageFeedbackRouter,
   onboarding: onboardingRouter,
+  setup: setupRouter,
   privacy: privacyRouter,
   customerPrivacy: customerPrivacyRouter,
   apiTokens: apiTokensRouter,
