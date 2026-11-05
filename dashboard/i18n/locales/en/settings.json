@@ -20,7 +20,7 @@
     "aboutHelper": "This information helps AI understand your business context. Max 10,000 characters.",
     "website": "Website",
     "websitePlaceholder": "shop.com",
-    "websiteHelper": "Your store's website. Hay reads its sitemap so the AI links only to pages that exist.",
+    "websiteHelper": "Your store's website. Hay.chat reads its sitemap so the AI links only to pages that exist.",
     "logo": "Logo",
     "logoAlt": "Organization logo",
     "removeLogo": "Remove Logo",

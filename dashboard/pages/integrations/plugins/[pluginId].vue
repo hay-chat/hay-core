@@ -604,6 +604,7 @@ import { Hay } from "@/utils/api";
 import { useUserStore } from "@/stores/user";
 import { useAppStore } from "@/stores/app";
 import { useToast } from "@/composables/useToast";
+import { usePluginConnect } from "@/composables/usePluginConnect";
 import { useDomain } from "@/composables/useDomain";
 import { classifyTool } from "@/utils/toolClassification";
 import PluginOAuthConnection from "@/components/plugins/PluginOAuthConnection.vue";
@@ -636,6 +637,7 @@ const route = useRoute();
 const router = useRouter();
 const userStore = useUserStore();
 const appStore = useAppStore();
+const pluginConnect = usePluginConnect();
 const toast = useToast();
 
 // Plugin ID from route (decode in case it contains special characters like /)
@@ -1200,11 +1202,15 @@ const handleConnect = async () => {
   enabling.value = true;
 
   try {
-    await appStore.enablePlugin(pluginId.value);
+    // Shows step-by-step progress when the first connect has to build the plugin.
+    const proceed = await pluginConnect.connect({
+      pluginId: pluginId.value,
+      pluginName: displayName.value || pluginId.value,
+    });
     // Plugin translations are served for enabled plugins only: load this one's now.
     void loadPluginTranslations();
     await fetchPlugin();
-    await openSetup();
+    if (proceed) await openSetup();
   } catch (err: any) {
     console.error("Failed to connect plugin:", err);
     toast.error(err?.message || err?.data?.message || t("pluginSettings.toast.enableFailed"));
@@ -1302,7 +1308,19 @@ const handleConnectIntent = async (): Promise<boolean> => {
   try {
     // `enable` (not `configure`) so a never-installed or previously disabled
     // instance is created/re-enabled, installed, and its worker started.
-    await Hay.plugins.enable.mutate({ pluginId: pluginId.value, configuration });
+    const proceed = await pluginConnect.connect({
+      pluginId: pluginId.value,
+      pluginName: displayName.value || pluginId.value,
+      configuration,
+      continueLabel: t("pluginConnect.continueGeneric"),
+    });
+    if (!proceed) {
+      // Failed, and the dialog already showed why.
+      connectStep.value = null;
+      router.replace({ path: route.path, query: {} });
+      if (!plugin.value) await fetchPlugin();
+      return false;
+    }
     // OAuth availability is only reported once an enabled instance exists.
     if (!oauthAvailable.value) await fetchPlugin();
     if (!oauthAvailable.value) {

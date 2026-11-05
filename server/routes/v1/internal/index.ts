@@ -12,6 +12,13 @@ import {
 import { resolutionLedgerService } from "@server/services/resolution-ledger.service";
 import { createLogger } from "@server/lib/logger";
 import { internalUsersRouter } from "./users";
+import { AppDataSource } from "@server/database/data-source";
+import { ApiKey } from "@server/entities/apikey.entity";
+import { Organization } from "@server/entities/organization.entity";
+import { UserOrganization } from "@server/entities/user-organization.entity";
+import { generateApiKey, hashApiKey } from "@server/lib/auth/utils/hashing";
+import { ApiTokenScope } from "@server/types/api-token-scopes";
+import { auditLogService } from "@server/services/audit-log.service";
 
 const logger = createLogger("internal");
 
@@ -97,6 +104,65 @@ const internalOrganizationsRouter = router({
         throw new TRPCError({ code: "NOT_FOUND", message: "Organization not found" });
       }
       return limits;
+    }),
+
+  /**
+   * For an operator that meets an organization it did not create (e.g. a Shopify
+   * store connected to a workspace made before signup went through the
+   * operator's onboarding): the organization's name and owner, and a fresh API
+   * key with the given read scopes for the operator's own monitoring.
+   */
+  provisionOperatorAccess: internalProcedure
+    .input(
+      organizationIdInput.extend({
+        keyName: z.string().min(1).max(100),
+        scopes: z.array(z.nativeEnum(ApiTokenScope)).min(1).max(20),
+      }),
+    )
+    .mutation(async ({ input }) => {
+      const organization = await AppDataSource.getRepository(Organization).findOneBy({
+        id: input.organizationId,
+      });
+      if (!organization) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Organization not found" });
+      }
+      const owner = await AppDataSource.getRepository(UserOrganization).findOne({
+        where: { organizationId: input.organizationId, role: "owner" },
+        relations: ["user"],
+        order: { createdAt: "ASC" },
+      });
+
+      const token = generateApiKey();
+      const apiKey = AppDataSource.getRepository(ApiKey).create({
+        organizationId: input.organizationId,
+        keyHash: await hashApiKey(token),
+        name: input.keyName,
+        scopes: input.scopes.map((scope) => {
+          const [resource, action] = scope.split(":");
+          return { resource: resource || "*", actions: action ? [action] : ["*"] };
+        }),
+        isActive: true,
+      });
+      await AppDataSource.getRepository(ApiKey).save(apiKey);
+      await auditLogService.record({
+        organizationId: input.organizationId,
+        action: "apikey.create",
+        resource: "api_key",
+        changes: { apiKeyId: apiKey.id, name: input.keyName, scopes: input.scopes, by: "operator" },
+      });
+      logger.info({ organizationId: input.organizationId }, "Operator access provisioned");
+
+      return {
+        organization: { id: organization.id, name: organization.name },
+        owner: owner?.user
+          ? {
+              email: owner.user.email,
+              firstName: owner.user.firstName ?? null,
+              lastName: owner.user.lastName ?? null,
+            }
+          : null,
+        apiToken: token,
+      };
     }),
 
   delete: internalProcedure.input(organizationIdInput).mutation(async ({ input }) => {

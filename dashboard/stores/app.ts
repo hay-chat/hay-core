@@ -161,9 +161,13 @@ export const useAppStore = defineStore("app", {
       return this.plugins;
     },
 
-    async enablePlugin(pluginId: string, configuration?: Record<string, unknown>) {
+    async enablePlugin(
+      pluginId: string,
+      configuration?: Record<string, unknown>,
+      progressId?: string,
+    ) {
       try {
-        await Hay.plugins.enable.mutate({ pluginId, configuration });
+        await Hay.plugins.enable.mutate({ pluginId, configuration, progressId });
         await this.fetchPlugins(); // Refresh to get updated status
         return { success: true };
       } catch (error) {

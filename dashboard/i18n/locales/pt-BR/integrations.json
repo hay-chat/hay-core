@@ -352,12 +352,49 @@
       "openExternal": "Abrir em uma nova aba"
     },
     "connect": {
-      "title": "Conectando {name} ao Hay",
+      "title": "Conectando {name} ao Hay.chat",
       "saving": "Salvando os dados da sua loja…",
       "redirecting": "Abrindo sua loja para aprovar o acesso. Você volta para cá e depois para o admin da loja.",
       "failedTitle": "Não conseguimos iniciar a conexão",
-      "networkError": "O Hay não respondeu a tempo. Verifique sua conexão e tente novamente.",
+      "networkError": "O Hay.chat não respondeu a tempo. Verifique sua conexão e tente novamente.",
       "retry": "Tentar novamente"
     }
+  },
+  "pluginConnect": {
+    "title": "Conectando {name}",
+    "subtitle": "Preparando pela primeira vez. Isso pode levar até um minuto.",
+    "readySubtitle": "Agora, termine a configuração.",
+    "readyTitle": "{name} está pronto",
+    "failedTitle": "Não foi possível conectar {name}",
+    "failedSubtitle": "Nada foi ativado, então é seguro tentar de novo.",
+    "runningNote": "A primeira conexão compila o plugin. Da próxima vez é mais rápido.",
+    "ready": "Pronto",
+    "continue": "Continuar para a configuração",
+    "close": "Fechar",
+    "tryAgain": "Tentar de novo",
+    "countdown": "Continuando em {seconds} segundos",
+    "seconds": "{value}s",
+    "skipped": "Já feito",
+    "failed": "Falhou",
+    "unknownError": "Algo deu errado ao conectar. Tente de novo em instantes.",
+    "steps": {
+      "install": {
+        "label": "Baixar dependências",
+        "detail": "Instalando pacotes"
+      },
+      "build": {
+        "label": "Compilar o plugin",
+        "detail": "Compilando {name}"
+      },
+      "enable": {
+        "label": "Ativar para sua organização",
+        "detail": "Salvando configurações"
+      },
+      "start": {
+        "label": "Iniciar",
+        "detail": "Iniciando {name} e carregando suas ferramentas"
+      }
+    },
+    "continueGeneric": "Continuar"
   }
 }
