@@ -359,5 +359,42 @@
       "networkError": "Hay didn't answer in time. Check your connection and try again.",
       "retry": "Try again"
     }
+  },
+  "pluginConnect": {
+    "title": "Connecting {name}",
+    "subtitle": "Getting it ready for the first time. This can take up to a minute.",
+    "readyTitle": "{name} is ready",
+    "readySubtitle": "Next, finish setting it up.",
+    "failedTitle": "Couldn't connect {name}",
+    "failedSubtitle": "Nothing was turned on, so it's safe to try again.",
+    "runningNote": "The first connect builds the plugin. Next time it's quicker.",
+    "ready": "Ready",
+    "continue": "Continue to setup",
+    "close": "Close",
+    "tryAgain": "Try again",
+    "countdown": "Continuing in {seconds} seconds",
+    "seconds": "{value}s",
+    "skipped": "Already done",
+    "failed": "Failed",
+    "unknownError": "Something went wrong while connecting. Try again in a moment.",
+    "steps": {
+      "install": {
+        "label": "Download dependencies",
+        "detail": "Installing packages"
+      },
+      "build": {
+        "label": "Build the plugin",
+        "detail": "Compiling {name}"
+      },
+      "enable": {
+        "label": "Turn it on for your organization",
+        "detail": "Saving settings"
+      },
+      "start": {
+        "label": "Start it up",
+        "detail": "Starting {name} and loading its tools"
+      }
+    },
+    "continueGeneric": "Continue"
   }
 }
