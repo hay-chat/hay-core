@@ -119,6 +119,7 @@
       "missing": "Missing answer",
       "needs_connection": "Needs connection",
       "playbook_off": "Playbook off",
+      "playbook_missing": "Needs a playbook",
       "check_failed": "Couldn't check"
     },
     "why": {
@@ -133,6 +134,9 @@
       "connectAny": "Connect your platform to {capability}",
       "playbook": "{playbook} playbook is ready to review",
       "playbookAny": "A playbook is ready to review",
+      "playbookWriting": "Writing a playbook from your {plugin} tools",
+      "playbookNoTool": "{plugin} has no tool for this yet. You can write your own playbook.",
+      "playbookFailed": "We couldn't write a playbook. Try again or write your own.",
       "failed": "Something went wrong while checking. Try again.",
       "missingPartial": "Not found in the pages read so far"
     },
@@ -150,6 +154,7 @@
       "addAnswer": "Add answer",
       "connect": "Connect",
       "choosePlatform": "Choose platform",
+      "writeOwn": "Write your own",
       "review": "Review",
       "retry": "Retry"
     },
@@ -163,25 +168,43 @@
     "playbook": {
       "whatItDoes": "What {playbook} does",
       "open": "Open playbook",
-      "close": "Not now"
+      "close": "Not now",
+      "turnOn": "Turn on",
+      "turnOnError": "We couldn't turn this playbook on. Try again.",
+      "generateError": "We couldn't write the playbook. Try again.",
+      "reviewHint": "Nothing changes for customers until you turn it on.",
+      "stepsLabel": "Steps"
+    },
+    "connectError": {
+      "message": "We couldn't connect {plugin}. Nothing was changed. Try again.",
+      "detail": "{plugin} said: {detail}"
     },
     "upNext": {
       "connect": {
         "title": "Connect {plugin}",
         "whyOne": "So your assistant can do more than answer. This unlocks {count} request on your list.",
         "whyOther": "So your assistant can do more than answer. This unlocks {count} requests on your list.",
+        "whyCapabilityOne": "So your assistant can {capability}. This unlocks {count} request on your list.",
+        "whyCapabilityOther": "So your assistant can {capability}. This unlocks {count} requests on your list.",
         "label": "Connect {plugin}"
       },
       "choosePlatform": {
         "title": "Choose your platform",
         "whyOne": "Tell us what you use so your assistant can act for customers. This unlocks {count} request on your list.",
         "whyOther": "Tell us what you use so your assistant can act for customers. This unlocks {count} requests on your list.",
+        "whyCapabilityOne": "Tell us what you use so your assistant can {capability}. This unlocks {count} request on your list.",
+        "whyCapabilityOther": "Tell us what you use so your assistant can {capability}. This unlocks {count} requests on your list.",
         "label": "Choose platform"
       },
       "playbook": {
         "title": "Turn on {playbook}",
         "why": "We wrote this playbook for your business. Review it and turn it on.",
         "label": "Review playbook"
+      },
+      "writePlaybook": {
+        "title": "Write the playbook for “{question}”",
+        "why": "We couldn't write this one from your tools. Write your own and your assistant will follow it.",
+        "label": "Write playbook"
       },
       "answer": {
         "title": "Answer “{question}”",

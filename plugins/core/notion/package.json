@@ -15,6 +15,14 @@
     "capabilities": [
       "auth"
     ],
+    "setup": {
+      "businessTypes": [
+        "saas",
+        "service",
+        "other"
+      ],
+      "group": "knowledge"
+    },
     "documentImporter": true,
     "config": {
       "apiToken": {

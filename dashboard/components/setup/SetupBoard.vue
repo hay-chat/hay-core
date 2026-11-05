@@ -48,6 +48,7 @@
       :total="board.rows.length"
       :connect-to="connectTo"
       :can-install="canInstall"
+      :write-to="writeTo"
       @open="openRow"
       @choose-platform="emit('choosePlatform')"
       @install="openInstall"
@@ -106,12 +107,18 @@
             :connect-to="rowConnectTo(row)"
             :playbook-to="rowPlaybookTo(row)"
             :site-partial="Boolean(board.site.partial)"
+            :write-to="writeTo"
+            :turning-on="turningOnId === row.id"
+            :turn-on-error="turnOnErrorId === row.id"
+            :connect-failure="rowConnectFailure(row)"
             @try="chat?.ask(row.text, row.sources)"
             @toggle="toggleRow(row.id)"
             @remove="removeRow(row.id)"
             @retry="actions.retryRow(row.id)"
             @choose-platform="emit('choosePlatform')"
             @save="saveAnswer(row.id, $event)"
+            @turn-on="turnOn(row.id)"
+            @regenerate="actions.generatePlaybook(row.id)"
           />
         </ul>
         <EmptyState
@@ -176,19 +183,28 @@ export interface SetupBoardActions {
   /** Resolves true when the answer was saved. */
   saveAnswer: (questionId: string, answer: string) => Promise<boolean>;
   retryRow: (questionId: string) => Promise<void>;
+  /** Resolves true when the playbook is now on. */
+  turnOnPlaybook: (questionId: string) => Promise<boolean>;
+  /** Drafts the playbook again for a request whose first attempt found no tool or failed. */
+  generatePlaybook: (questionId: string) => Promise<void>;
   /** Resolves true when setup was set aside, so the page can leave. */
   finishLater: () => Promise<boolean>;
 }
 
-const props = defineProps<{
-  board: SetupBoard;
-  /** The readiness check is running. Rows show "checking" until the first result. */
-  checking: boolean;
-  checkFailed: boolean;
-  /** Rows with a check or save in flight, shown as checking again. */
-  busyRowIds: string[];
-  actions: SetupBoardActions;
-}>();
+const props = withDefaults(
+  defineProps<{
+    board: SetupBoard;
+    /** The readiness check is running. Rows show "checking" until the first result. */
+    checking: boolean;
+    checkFailed: boolean;
+    /** Rows with a check or save in flight, shown as checking again. */
+    busyRowIds: string[];
+    actions: SetupBoardActions;
+    /** The connect attempt that just failed, shown next to the rows that platform would unlock. */
+    connectError?: { pluginId: string; detail?: string } | null;
+  }>(),
+  { connectError: null },
+);
 
 const emit = defineEmits<{
   changeAnswers: [];
@@ -196,7 +212,7 @@ const emit = defineEmits<{
   recheck: [];
 }>();
 
-const { canOpen, connectPath, playbookPath } = useSetupLinks();
+const { canOpen, connectPath, playbookPath, writePlaybookPath } = useSetupLinks();
 
 const chat = ref<InstanceType<typeof SetupTestChat> | null>(null);
 
@@ -294,6 +310,11 @@ const closeInstall = () => {
 const toggleInstall = () => {
   installOpen.value = !installOpen.value;
 };
+const writeTo = computed(() => (canOpen("/playbooks") ? writePlaybookPath : null));
+const rowConnectFailure = (row: SetupRowData) =>
+  props.connectError && row.plugin?.id === props.connectError.pluginId
+    ? { detail: props.connectError.detail }
+    : null;
 const rowConnectTo = (row: SetupRowData): string | null =>
   row.plugin && canOpen("/integrations/plugins") ? connectPath(row.plugin.id) : null;
 const rowPlaybookTo = (row: SetupRowData): string | null =>
@@ -306,6 +327,7 @@ const errorId = ref<string | null>(null);
 
 const toggleRow = (id: string) => {
   errorId.value = null;
+  turnOnErrorId.value = null;
   openId.value = openId.value === id ? null : id;
 };
 
@@ -313,6 +335,18 @@ const openRow = async (id: string) => {
   openId.value = id;
   await nextTick();
   document.querySelector(`[data-row-id="${id}"]`)?.scrollIntoView?.({ block: "nearest" });
+};
+
+const turningOnId = ref<string | null>(null);
+const turnOnErrorId = ref<string | null>(null);
+
+const turnOn = async (id: string) => {
+  turningOnId.value = id;
+  turnOnErrorId.value = null;
+  const on = await props.actions.turnOnPlaybook(id);
+  turningOnId.value = null;
+  if (on) openId.value = null;
+  else turnOnErrorId.value = id;
 };
 
 const saveAnswer = async (id: string, answer: string) => {

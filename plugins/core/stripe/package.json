@@ -14,7 +14,21 @@
       "auth",
       "cron",
       "disputes"
-    ]
+    ],
+    "setup": {
+      "businessTypes": [
+        "store",
+        "saas",
+        "service",
+        "other"
+      ],
+      "group": "payments",
+      "handles": [
+        "refunds",
+        "billing",
+        "subscriptions"
+      ]
+    }
   },
   "scripts": {
     "build": "tsc",

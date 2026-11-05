@@ -184,6 +184,7 @@ export type { HayOrg } from "./org";
 
 export type {
   HayPluginManifest,
+  HayPluginSetupHints,
   HayPluginPackageJson,
   PluginCategory,
   PluginCapability,

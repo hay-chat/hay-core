@@ -24,6 +24,14 @@
       <NuxtLink v-if="connectTo" :to="connectTo" :class="buttonLinkClass" class="max-md:w-full">
         {{ copy.label }}
       </NuxtLink>
+      <NuxtLink
+        v-else-if="writeTo && upNext.kind === 'write_playbook'"
+        :to="writeTo"
+        :class="buttonLinkClass"
+        class="max-md:w-full"
+      >
+        {{ copy.label }}
+      </NuxtLink>
       <Button
         v-else-if="upNext.kind === 'done' && canInstall"
         class="max-md:w-full"
@@ -55,16 +63,21 @@ import type { SetupUpNext } from "@/stores/setup";
 import { describeUpNext, requestsCount } from "@/composables/useSetupCopy";
 import { buttonLinkClass } from "./styles";
 
-const props = defineProps<{
-  upNext: SetupUpNext | null;
-  /** The first round of checks is still running, so no step can be named yet. */
-  checking: boolean;
-  total: number;
-  /** Where "connect" leads, or null when the role cannot open it. */
-  connectTo: string | null;
-  /** Whether "done" can open the install panel (adding the assistant to the site). */
-  canInstall: boolean;
-}>();
+const props = withDefaults(
+  defineProps<{
+    upNext: SetupUpNext | null;
+    /** The first round of checks is still running, so no step can be named yet. */
+    checking: boolean;
+    total: number;
+    /** Where "connect" leads, or null when the role cannot open it. */
+    connectTo: string | null;
+    /** Whether "done" can open the install panel (adding the assistant to the site). */
+    canInstall: boolean;
+    /** Where "write your own playbook" leads, or null when the role cannot open it. */
+    writeTo?: string | null;
+  }>(),
+  { writeTo: null },
+);
 
 const emit = defineEmits<{
   open: [questionId: string];

@@ -6,6 +6,7 @@
  */
 
 import type {
+  BusinessType,
   SetupBoard,
   SetupChannelRef,
   SetupHandle,
@@ -22,12 +23,17 @@ export interface BoardPlugin {
   id: string;
   name: string;
   handles: SetupHandle[];
+  /** Business types the plugin's manifest suggests it for. */
+  businessTypes: BusinessType[];
+  /** The organization has really connected it. Unknown counts as not connected. */
+  connected: boolean;
 }
 
 export interface BoardPlaybook {
   id: string;
   title: string;
   active: boolean;
+  steps: string[];
 }
 
 export interface BoardFacts {
@@ -40,21 +46,64 @@ export interface BoardFacts {
   channels: SetupChannelRef[];
 }
 
-/** The chosen platform that handles `need`, if any. */
-function pluginFor(
+/**
+ * The platform that should handle `need`: one the customer chose, else one the manifests suggest
+ * for their business type. A connected one wins, so a platform connected after the answers were
+ * saved is still used. Undefined means no known platform handles it.
+ */
+export function pluginFor(
   need: SetupHandle,
-  chosen: string[],
+  setup: SetupSettings,
   plugins: BoardPlugin[],
-): SetupPluginRef | undefined {
-  for (const id of chosen) {
-    const plugin = plugins.find((p) => p.id === id);
-    if (plugin?.handles.includes(need)) return { id: plugin.id, name: plugin.name };
+): BoardPlugin | undefined {
+  const chosen = (p: BoardPlugin) => setup.toolPluginIds.includes(p.id);
+  const suitable = (p: BoardPlugin) =>
+    chosen(p) || (!!setup.businessType && p.businessTypes.includes(setup.businessType));
+  const rank = (p: BoardPlugin) => (p.connected ? 0 : 2) + (chosen(p) ? 0 : 1);
+
+  return plugins
+    .filter((p) => p.handles.includes(need) && suitable(p))
+    .sort((a, b) => rank(a) - rank(b) || a.name.localeCompare(b.name))[0];
+}
+
+function platformRow(
+  question: SetupQuestion,
+  need: SetupHandle,
+  base: Pick<SetupRow, "id" | "text" | "source" | "sources">,
+  facts: BoardFacts,
+): SetupRow {
+  const plugin = pluginFor(need, facts.setup, facts.plugins);
+  const ref = plugin ? { plugin: { id: plugin.id, name: plugin.name } } : {};
+  const playbook = question.playbookId
+    ? facts.playbooks.find((p) => p.id === question.playbookId)
+    : undefined;
+  const withPlaybook = playbook
+    ? { playbook: { id: playbook.id, title: playbook.title, steps: playbook.steps } }
+    : {};
+
+  // Nothing can act for the customer until a platform that handles this is connected.
+  if (!plugin?.connected) return { ...base, needs: need, ...ref, status: "needs_connection" };
+
+  if (playbook) {
+    return {
+      ...base,
+      needs: need,
+      ...ref,
+      ...withPlaybook,
+      status: playbook.active ? "ready" : "playbook_off",
+    };
   }
-  return undefined;
+  return {
+    ...base,
+    needs: need,
+    ...ref,
+    status: "playbook_missing",
+    generation: question.playbookAttempt?.outcome ?? "pending",
+  };
 }
 
 export function buildRow(question: SetupQuestion, facts: BoardFacts): SetupRow {
-  const { setup, site, plugins, playbooks } = facts;
+  const { site } = facts;
   const base = {
     id: question.id,
     text: question.text,
@@ -62,19 +111,7 @@ export function buildRow(question: SetupQuestion, facts: BoardFacts): SetupRow {
     sources: [] as SetupRow["sources"],
   };
 
-  if (question.needs) {
-    const plugin = pluginFor(question.needs, setup.toolPluginIds, plugins);
-    const playbook = question.playbookId
-      ? playbooks.find((p) => p.id === question.playbookId)
-      : undefined;
-    return {
-      ...base,
-      needs: question.needs,
-      ...(plugin ? { plugin } : {}),
-      ...(playbook ? { playbook: { id: playbook.id, title: playbook.title, steps: [] } } : {}),
-      status: !playbook ? "needs_connection" : playbook.active ? "ready" : "playbook_off",
-    };
-  }
+  if (question.needs) return platformRow(question, question.needs, base, facts);
 
   const reading = site.state.state === "reading";
   const check = question.check;
@@ -95,19 +132,33 @@ export function buildRow(question: SetupQuestion, facts: BoardFacts): SetupRow {
   return { ...base, status: checkedBeforeLastRead ? "checking" : "missing" };
 }
 
+/** The need that most of `rows` share, so "so your assistant can ..." names the common one. */
+function commonNeed(rows: SetupRow[]): SetupHandle | undefined {
+  const counts = new Map<SetupHandle, number>();
+  for (const row of rows) if (row.needs) counts.set(row.needs, (counts.get(row.needs) ?? 0) + 1);
+  return [...counts].sort((a, b) => b[1] - a[1])[0]?.[0];
+}
+
 export function pickUpNext(rows: SetupRow[]): SetupUpNext {
   const needing = rows.filter((r) => r.status === "needs_connection");
   if (needing.length > 0) {
-    const byPlugin = new Map<string, { plugin: SetupPluginRef; unlocks: number }>();
+    const byPlugin = new Map<string, { plugin: SetupPluginRef; rows: SetupRow[] }>();
     for (const row of needing) {
       if (!row.plugin) continue;
-      const entry = byPlugin.get(row.plugin.id) ?? { plugin: row.plugin, unlocks: 0 };
-      entry.unlocks += 1;
+      const entry = byPlugin.get(row.plugin.id) ?? { plugin: row.plugin, rows: [] };
+      entry.rows.push(row);
       byPlugin.set(row.plugin.id, entry);
     }
-    const best = [...byPlugin.values()].sort((a, b) => b.unlocks - a.unlocks)[0];
-    if (best) return { kind: "connect", plugin: best.plugin, unlocks: best.unlocks };
-    return { kind: "choose_platform", unlocks: needing.length };
+    const best = [...byPlugin.values()].sort((a, b) => b.rows.length - a.rows.length)[0];
+    if (best) {
+      return {
+        kind: "connect",
+        plugin: best.plugin,
+        unlocks: best.rows.length,
+        capability: commonNeed(best.rows),
+      };
+    }
+    return { kind: "choose_platform", unlocks: needing.length, capability: commonNeed(needing) };
   }
 
   const off = rows.find((r) => r.status === "playbook_off");
@@ -115,10 +166,20 @@ export function pickUpNext(rows: SetupRow[]): SetupUpNext {
     return { kind: "playbook", questionId: off.id, title: off.playbook?.title ?? off.text };
   }
 
+  const unwritten = rows.find(
+    (r) => r.status === "playbook_missing" && r.generation && r.generation !== "pending",
+  );
+  if (unwritten) return { kind: "write_playbook", questionId: unwritten.id, text: unwritten.text };
+
   const missing = rows.find((r) => r.status === "missing");
   if (missing) return { kind: "answer", questionId: missing.id, text: missing.text };
 
   return { kind: "done" };
+}
+
+/** True once every row, including platform rows, is ready. Only then is setup finished. */
+export function isEverythingReady(rows: SetupRow[]): boolean {
+  return rows.length > 0 && rows.every((r) => r.status === "ready");
 }
 
 export function buildBoard(facts: BoardFacts): SetupBoard {

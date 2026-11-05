@@ -13,6 +13,15 @@
       "mcp",
       "tickets"
     ],
+    "setup": {
+      "businessTypes": [
+        "store",
+        "saas",
+        "service",
+        "other"
+      ],
+      "group": "helpdesk"
+    },
     "env": [
       "ZENDESK_SUBDOMAIN",
       "ZENDESK_EMAIL",

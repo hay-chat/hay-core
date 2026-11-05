@@ -12,7 +12,14 @@
     "capabilities": [
       "mcp",
       "auth"
-    ]
+    ],
+    "setup": {
+      "businessTypes": [
+        "saas",
+        "service"
+      ],
+      "group": "crm"
+    }
   },
   "scripts": {
     "build": "tsc",
