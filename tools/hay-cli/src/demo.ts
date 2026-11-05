@@ -11,7 +11,11 @@ import type { CommandResult, Ctx } from "./commands";
 
 const REPO = join(__dirname, "..", "..", "..");
 const DEMO_DIR = join(REPO, "tools", "demo-account");
-const TSX = join(REPO, "node_modules", ".bin", "tsx");
+// tsx is a server dependency; npm hoists it to the root only sometimes (same lookup as bin/hay).
+const TSX = [
+  join(REPO, "node_modules", ".bin", "tsx"),
+  join(REPO, "server", "node_modules", ".bin", "tsx"),
+].find(existsSync);
 
 export const DEMO_PLATFORMS = ["shopify", "woocommerce", "nuvemshop"] as const;
 type DemoPlatform = (typeof DEMO_PLATFORMS)[number];
@@ -122,6 +126,10 @@ export function planSeed(
 }
 
 function runScript(script: string, args: string[]): number {
+  if (!TSX) {
+    console.error(`hay: tsx not found; run npm install in ${REPO}`);
+    return 1;
+  }
   const result = spawnSync(TSX, [join(DEMO_DIR, "scripts", script), ...args], {
     cwd: REPO,
     stdio: "inherit",
