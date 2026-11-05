@@ -137,8 +137,9 @@ How to decide:
 1. State in "request_needs" the action someone would have to take in a system to satisfy the request. Looking up information is not the same as changing it.
 2. A tool performs that action only if its description says it does. A similar name does not count, and a tool that only records a request or leaves a note does not perform the action it mentions.
 3. Copy tool ids exactly from the list. Never invent one. If no listed tool performs the action, leave "matching_tools" empty and set "can_fulfil" to false.
-4. When "can_fulfil" is true, write steps in this order: ask the customer for what the tools need, call a read tool before any write tool, tell the customer what you are about to change and wait for a yes before a write tool, then say what happens next. Add a step that hands the conversation to a person when a tool returns an error.
-5. Write "title", "trigger" and every step's "text" in ${language}.
+4. When "can_fulfil" is true, write steps in this order: ask the customer for what the tools need, call a read tool before any write tool, tell the customer what you are about to change and wait for a yes before a write tool, then say what happens next. Add a step that hands the conversation to a person when a tool returns an error, and after any tool whose description says to hand off.
+5. Never write a tool id or tool name inside a step's "text": put it only in that step's "tool" field. Describe the step in plain words ("look the order up").
+6. Write "title", "trigger" and every step's "text" in ${language}.
 
 Example, unrelated to this request: for "How many loyalty points do I have?" with the tool acme:get_points_balance (read), the steps are: ask for the email on the account; call acme:get_points_balance; tell the customer the number; hand off to a person if the lookup fails.
 ${retry}`;
@@ -216,7 +217,9 @@ const defaultDeps: GenerationDeps = {
     new LLMService().invoke<string>({
       prompt,
       jsonSchema: PLAN_JSON_SCHEMA,
-      tier: "medium",
+      // Hard tier: measured against the medium tier on real tool lists, it picks the right tools
+      // more often and answers faster.
+      tier: "hard",
       temperature: 0,
       max_tokens: 1500,
       organizationId,
