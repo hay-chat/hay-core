@@ -1,3 +1,205 @@
 {
-  "setup": {}
+  "setup": {
+    "nav": {
+      "title": "Configuração",
+      "progress": "{ready} de {total} prontas",
+      "upNext": "Próximo passo: {title}",
+      "continue": "Continuar configuração",
+      "widgetLabel": "Progresso da configuração"
+    },
+    "state": {
+      "loadingLabel": "Carregando sua configuração",
+      "errorTitle": "Não conseguimos carregar sua configuração",
+      "errorDescription": "Verifique sua conexão e tente de novo. Nada foi alterado.",
+      "retry": "Tentar de novo",
+      "forbiddenTitle": "Só proprietários e administradores podem configurar o Hay",
+      "forbiddenDescription": "Peça a um proprietário ou administrador desta organização para concluir a configuração.",
+      "goHome": "Ir para o início"
+    },
+    "questions": {
+      "stepLabel": "Pergunta {current} de {total}",
+      "skip": "Pular perguntas",
+      "backToList": "Voltar para a lista",
+      "back": "Voltar",
+      "continue": "Continuar",
+      "finish": "Ver o que seu assistente já faz",
+      "chooseTypeHint": "Escolha um tipo de negócio para continuar.",
+      "saveError": "Não conseguimos salvar suas respostas. Tente de novo.",
+      "type": {
+        "title": "Que tipo de negócio é este?",
+        "description": "Lemos seu site para ajustar as sugestões. Isso define o que vamos perguntar.",
+        "website": "Seu site",
+        "websitePlaceholder": "sualoja.com.br",
+        "typeLabel": "Tipo de negócio",
+        "inferring": "Lendo seu site para sugerir um tipo",
+        "inferred": "Parece com você, pelo seu site"
+      },
+      "tools": {
+        "title": "O que você já usa?",
+        "description": "Escolha tudo o que se aplica. Isso define o que seu assistente pode fazer pelos clientes.",
+        "channelsTitle": "Onde os clientes falam com você",
+        "loading": "Carregando sugestões",
+        "error": "Não conseguimos carregar as sugestões para este tipo de negócio.",
+        "retry": "Tentar de novo",
+        "none": "Ainda não temos plataformas sugeridas para este tipo de negócio. Você pode conectar uma depois."
+      },
+      "ask": {
+        "title": "O que os clientes mais perguntam?",
+        "description": "Vamos testar seu assistente com estas perguntas. Tire as que não servem e adicione as suas.",
+        "addLabel": "Adicione uma pergunta dos clientes",
+        "addPlaceholder": "Adicionar outra pergunta",
+        "add": "Adicionar"
+      }
+    },
+    "types": {
+      "store": { "name": "Loja virtual", "hint": "Você vende produtos online" },
+      "saas": { "name": "Software ou SaaS", "hint": "Clientes assinam seu produto" },
+      "service": { "name": "Prestador de serviços", "hint": "Clientes agendam ou contratam você" },
+      "other": { "name": "Outro", "hint": "Vamos começar pelo básico" }
+    },
+    "groups": {
+      "commerce": "Onde você vende",
+      "payments": "Pagamentos",
+      "crm": "Clientes e CRM",
+      "helpdesk": "Atendimento",
+      "marketing": "Marketing",
+      "knowledge": "Documentos e conhecimento",
+      "booking": "Agendamentos"
+    },
+    "live": {
+      "title": "O que vamos verificar para você",
+      "label": "Sua lista até agora",
+      "empty": "Escolha algumas perguntas e elas aparecem aqui.",
+      "willRead": "Vamos ler {site} quando você terminar.",
+      "readingOne": "Lendo {site}: {count} página até agora",
+      "readingOther": "Lendo {site}: {count} páginas até agora",
+      "readingOfOne": "Lendo {site}: {processed} de {total} página",
+      "readingOfOther": "Lendo {site}: {processed} de {total} páginas",
+      "doneOne": "Lemos {count} página de {site}",
+      "doneOther": "Lemos {count} páginas de {site}",
+      "failed": "Não conseguimos ler {site}",
+      "yours": "Sua",
+      "site": "Seu site",
+      "platform": "Sua plataforma"
+    },
+    "board": {
+      "title": "O que seu assistente já resolve?",
+      "answers": "Suas respostas",
+      "changeAnswers": "Alterar respostas",
+      "finishLater": "Terminar depois",
+      "finishError": "Não conseguimos guardar onde você parou. Tente de novo.",
+      "addToSite": "Colocar no seu site",
+      "ready": "{ready} de {total} prontas",
+      "testingOne": "Testando seu assistente em {count} pergunta",
+      "testingOther": "Testando seu assistente em {count} perguntas",
+      "testingHint": "Você já pode usar o chat de teste.",
+      "checkErrorTitle": "Não conseguimos rodar as verificações",
+      "checkErrorDescription": "Sua lista não mudou. Verifique de novo para ver como está cada pedido.",
+      "checkAgain": "Verificar de novo",
+      "rowsLabel": "Pedidos dos clientes",
+      "emptyTitle": "Sua lista ainda não tem perguntas",
+      "emptyDescription": "Adicione uma pergunta dos clientes e vamos testar seu assistente com ela.",
+      "addLabel": "Adicione uma pergunta dos clientes",
+      "addPlaceholder": "Adicione uma pergunta dos clientes",
+      "add": "Adicionar",
+      "addError": "Não conseguimos adicionar essa pergunta. Tente de novo.",
+      "remove": "Remover {question}",
+      "removeTitle": "Não se aplica",
+      "removeError": "Não conseguimos remover essa pergunta. Tente de novo."
+    },
+    "status": {
+      "checking": "Verificando…",
+      "reading_site": "Lendo seu site",
+      "ready": "Pronta",
+      "missing": "Falta resposta",
+      "needs_connection": "Precisa conectar",
+      "playbook_off": "Playbook desligado",
+      "check_failed": "Não deu para verificar"
+    },
+    "why": {
+      "checking": "Testando no seu assistente",
+      "readingSite": "Ainda lendo seu site",
+      "readyFound": "Encontrada em {source}",
+      "readyTool": "{plugin} conectado, {playbook} ligado",
+      "readyGeneric": "Seu assistente sabe responder",
+      "missingSite": "Seu site não diz",
+      "missingNoSite": "Seus documentos não dizem",
+      "connect": "Conecte {plugin} para {capability}",
+      "connectAny": "Conecte sua plataforma para {capability}",
+      "playbook": "O playbook {playbook} está pronto para revisar",
+      "playbookAny": "Há um playbook pronto para revisar",
+      "failed": "Algo deu errado na verificação. Tente de novo."
+    },
+    "needs": {
+      "orders": "consultar pedidos",
+      "refunds": "fazer reembolsos",
+      "order_changes": "alterar pedidos",
+      "billing": "buscar faturas",
+      "subscriptions": "gerenciar assinaturas",
+      "bookings": "agendar atendimentos",
+      "generic": "agir pelos clientes"
+    },
+    "action": {
+      "tryIt": "Testar",
+      "addAnswer": "Adicionar resposta",
+      "connect": "Conectar",
+      "choosePlatform": "Escolher plataforma",
+      "review": "Revisar",
+      "retry": "Tentar de novo"
+    },
+    "answer": {
+      "label": "Como seu assistente deve responder?",
+      "placeholder": "Escreva a resposta que os clientes devem receber",
+      "save": "Salvar resposta",
+      "cancel": "Cancelar",
+      "error": "Não conseguimos salvar essa resposta. Tente de novo."
+    },
+    "playbook": {
+      "whatItDoes": "O que o playbook {playbook} faz",
+      "open": "Abrir playbook",
+      "close": "Agora não"
+    },
+    "upNext": {
+      "connect": {
+        "title": "Conectar {plugin}",
+        "whyOne": "Para seu assistente fazer mais do que responder. Isso libera {count} pedido da sua lista.",
+        "whyOther": "Para seu assistente fazer mais do que responder. Isso libera {count} pedidos da sua lista.",
+        "label": "Conectar {plugin}"
+      },
+      "choosePlatform": {
+        "title": "Escolha sua plataforma",
+        "whyOne": "Diga o que você usa para seu assistente agir pelos clientes. Isso libera {count} pedido da sua lista.",
+        "whyOther": "Diga o que você usa para seu assistente agir pelos clientes. Isso libera {count} pedidos da sua lista.",
+        "label": "Escolher plataforma"
+      },
+      "playbook": {
+        "title": "Ligar {playbook}",
+        "why": "Escrevemos este playbook para o seu negócio. Revise e ligue.",
+        "label": "Revisar playbook"
+      },
+      "answer": {
+        "title": "Responder “{question}”",
+        "why": "Seu site não cobre isso, então seu assistente passaria o caso para você.",
+        "label": "Adicionar resposta"
+      },
+      "done": {
+        "title": "Seu assistente resolve tudo o que está nesta lista",
+        "why": "Coloque no seu site quando quiser.",
+        "label": "Colocar no seu site"
+      }
+    },
+    "chat": {
+      "title": "Teste seu assistente",
+      "intro": "Pergunte o que um cliente perguntaria. Nada aqui chega a clientes de verdade.",
+      "messageLabel": "Mensagem",
+      "placeholder": "Pergunte como um cliente",
+      "send": "Enviar",
+      "typing": "Seu assistente está respondendo",
+      "source": "Fonte",
+      "startError": "Não conseguimos iniciar o chat de teste.",
+      "replyError": "Ainda sem resposta. Tente enviar de novo.",
+      "retry": "Tentar de novo",
+      "log": "Conversa de teste"
+    }
+  }
 }
