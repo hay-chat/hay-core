@@ -17,6 +17,7 @@ import {
   type InactivityTiming,
 } from "@server/lib/inactivity-timing";
 import { config } from "@server/config/env";
+import { readSetupHints } from "@server/services/setup/plugin-hints";
 
 const logger = createLogger("plugin-manager");
 
@@ -45,6 +46,8 @@ interface HayPluginBlock {
   documentImporter?: boolean;
   /** Hosts a server-managed OAuth client secret may be sent to (exact or `*.suffix`). */
   oauthHosts?: string[];
+  /** When in-app setup should suggest this plugin, and what it can do for customers. */
+  setup?: unknown;
 }
 
 /**
@@ -288,6 +291,7 @@ export class PluginManagerService {
         defaultEnabled: hayPlugin.defaultEnabled === true, // Enabled for new orgs
         trpcRouter: hayPlugin.trpcRouter || undefined, // Optional plugin-side tRPC router file
         oauthHosts: hayPlugin.oauthHosts || undefined, // Hosts a managed OAuth secret may reach
+        setup: readSetupHints(hayPlugin.setup), // In-app setup suggestions
       };
 
       // Load i18n translations from plugin's i18n/ directory

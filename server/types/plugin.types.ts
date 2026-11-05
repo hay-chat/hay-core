@@ -1,5 +1,6 @@
 import type { ChannelRendering } from "@server/lib/channel-rendering";
 import type { InactivityTiming } from "@server/lib/inactivity-timing";
+import type { PluginSetupHints } from "@server/types/setup.types";
 
 export interface HayPluginManifest {
   id: string;
@@ -22,6 +23,8 @@ export interface HayPluginManifest {
   /** When a silent customer is checked in on and closed: see server/lib/inactivity-timing.ts. */
   inactivity?: InactivityTiming;
   autoActivate?: boolean;
+  /** When in-app setup should suggest this plugin, and what it can do for customers. */
+  setup?: PluginSetupHints;
   /** Enabled automatically for newly created organizations (package.json hay-plugin.defaultEnabled). */
   defaultEnabled?: boolean;
   invisible?: boolean;
