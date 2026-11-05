@@ -14,6 +14,14 @@
       "mcp",
       "auth"
     ],
+    "setup": {
+      "businessTypes": [
+        "saas",
+        "service",
+        "store"
+      ],
+      "group": "crm"
+    },
     "env": [
       "HUBSPOT_CLIENT_ID",
       "HUBSPOT_CLIENT_SECRET"

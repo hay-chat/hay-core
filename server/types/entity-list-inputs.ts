@@ -55,6 +55,8 @@ export const conversationFiltersSchema = z
       .optional(),
     playbookId: z.string().uuid().optional(),
     hasMessages: z.boolean().optional(),
+    /** Leaves out playground chats, for counts of real customer conversations. */
+    excludePlayground: z.boolean().optional(),
   })
   .optional();
 

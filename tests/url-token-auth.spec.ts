@@ -13,8 +13,8 @@ test.describe("URL Token Authentication", () => {
     // Navigate with auth tokens via helper
     await navigateWithAuth(page, "/");
 
-    // Should be authenticated and redirected to getting-started (new users need onboarding)
-    await expect(page).toHaveURL(/\/(getting-started|dashboard)/, { timeout: 10000 });
+    // Should be authenticated and redirected to setup (new organizations) or the dashboard
+    await expect(page).toHaveURL(/\/(setup|dashboard)/, { timeout: 10000 });
 
     // Verify URL is clean (no tokens in URL)
     const url = new URL(page.url());

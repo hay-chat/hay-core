@@ -11,12 +11,15 @@ export const translate = (key: string, params?: unknown) =>
   params !== undefined && typeof params === "object" ? `${key} ${JSON.stringify(params)}` : key;
 
 export const toast = { success: vi.fn(), error: vi.fn() };
-export const router = { push: vi.fn() };
+export const router = { push: vi.fn(), replace: vi.fn() };
+/** The current route; tests set `route.query` before mounting. */
+export const route: { path: string; query: Record<string, unknown> } = { path: "/", query: {} };
 
 export function stubNuxtGlobals() {
   vi.stubGlobal("useI18n", () => ({ t: translate }));
   vi.stubGlobal("useToast", () => toast);
   vi.stubGlobal("useRouter", () => router);
+  vi.stubGlobal("useRoute", () => route);
   vi.stubGlobal("useOrgDateTime", () => ({
     formatDate: (value: unknown) => String(value),
     formatDateTime: (value: unknown) => String(value),
@@ -111,11 +114,57 @@ const Badge = defineComponent({
   },
 });
 
+/** Meter with the ARIA value the real one exposes, so tests can read progress. */
+const Progress = defineComponent({
+  name: "Progress",
+  props: { value: { type: Number, default: 0 } },
+  setup(props) {
+    return () => h("div", { role: "progressbar", "aria-valuenow": props.value });
+  },
+});
+
+const Textarea = defineComponent({
+  name: "Textarea",
+  props: {
+    modelValue: { type: String, default: "" },
+    id: { type: String, default: "" },
+    placeholder: { type: String, default: "" },
+  },
+  emits: ["update:modelValue"],
+  setup(props, { emit }) {
+    return () =>
+      h("textarea", {
+        id: props.id || undefined,
+        value: props.modelValue,
+        placeholder: props.placeholder,
+        onInput: (e: Event) => emit("update:modelValue", (e.target as HTMLTextAreaElement).value),
+      });
+  },
+});
+
+/** A link that renders as <a :href="to"> without needing the router. */
+const NuxtLink = defineComponent({
+  name: "NuxtLink",
+  props: { to: { type: String, default: "" } },
+  setup(props, { slots }) {
+    return () => h("a", { href: props.to }, slots.default?.());
+  },
+});
+
 const EmptyState = defineComponent({
   name: "EmptyState",
-  props: { title: { type: String, default: "" }, description: { type: String, default: "" } },
-  setup(props) {
-    return () => h("div", { "data-stub": "EmptyState" }, `${props.title} ${props.description}`);
+  props: {
+    title: { type: String, default: "" },
+    description: { type: String, default: "" },
+    action: { type: String, default: "" },
+  },
+  emits: ["click"],
+  setup(props, { emit }) {
+    return () =>
+      h("div", { "data-stub": "EmptyState" }, [
+        `${props.title} ${props.description}`,
+        props.action ? h("button", { onClick: () => emit("click") }, props.action) : null,
+      ]);
   },
 });
 
@@ -133,11 +182,20 @@ export const uiStubs: Record<string, Component> = {
   DialogFooter: container("DialogFooter"),
   Label: container("Label"),
   Loading: container("Loading"),
+  Table: container("Table"),
+  TableBody: container("TableBody"),
+  TableCell: container("TableCell"),
+  TableHead: container("TableHead"),
+  TableHeader: container("TableHeader"),
+  TableRow: container("TableRow"),
   Dialog,
   Button,
   Input,
   Switch,
   Badge,
+  Progress,
+  Textarea,
+  NuxtLink,
   EmptyState,
 };
 

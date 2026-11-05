@@ -15,6 +15,16 @@
       "products",
       "privacy"
     ],
+    "setup": {
+      "businessTypes": [
+        "store"
+      ],
+      "group": "commerce",
+      "handles": [
+        "orders",
+        "order_changes"
+      ]
+    },
     "env": [
       "NUVEMSHOP_OAUTH_CLIENT_ID",
       "NUVEMSHOP_OAUTH_CLIENT_SECRET"

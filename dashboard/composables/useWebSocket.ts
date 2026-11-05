@@ -72,7 +72,16 @@ const eventHandlers = new Map<string, Set<WebSocketEventHandler>>();
 
 let reconnectTimeout: ReturnType<typeof setTimeout> | null = null;
 
-export function useWebSocket() {
+interface UseWebSocketOptions {
+  /**
+   * The socket is shared by the whole app (the layout opens it). Closing it when this owner
+   * unmounts is right for the owner that opened it; a page-level user that only listens
+   * passes `false` so leaving the page does not cut the layout's realtime updates.
+   */
+  disconnectOnUnmount?: boolean;
+}
+
+export function useWebSocket(options: UseWebSocketOptions = {}) {
   const notifications = useNotifications();
   const { t } = useI18n();
 
@@ -352,7 +361,7 @@ export function useWebSocket() {
    * Cleanup on unmount
    */
   onUnmounted(() => {
-    disconnect();
+    if (options.disconnectOnUnmount !== false) disconnect();
   });
 
   return {

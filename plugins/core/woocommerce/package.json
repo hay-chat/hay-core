@@ -13,6 +13,17 @@
       "mcp",
       "products"
     ],
+    "setup": {
+      "businessTypes": [
+        "store"
+      ],
+      "group": "commerce",
+      "handles": [
+        "orders",
+        "refunds",
+        "order_changes"
+      ]
+    },
     "env": []
   },
   "scripts": {

@@ -1,6 +1,7 @@
 import type { OrgLlmConfig } from "@server/services/llm/provider.types";
 import type { AiRegion } from "@server/services/llm/ai-region";
 import type { WriteCategory } from "@server/services/core/tool-risk";
+import type { SetupSettings } from "@server/types/setup.types";
 
 export type { OrgLlmConfig };
 
@@ -497,6 +498,7 @@ export interface OrganizationSettings {
   channelAiModes?: Record<string, ChannelAiMode>; // Per-channel AI mode; missing = "on"
   media?: MediaSettings; // Customer photos/PDFs: AI reading, ID documents, case email
   quickCheck?: QuickCheckSettings; // Ask the team one fact instead of handing off (D19)
+  setup?: SetupSettings; // In-app setup answers and readiness checks
   [key: string]: unknown;
 }
 

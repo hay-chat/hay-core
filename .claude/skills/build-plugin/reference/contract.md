@@ -66,6 +66,12 @@ to it over loopback HTTP, authenticated with a per-worker secret: `/health`, `/m
 }
 ```
 
+**`setup`** (optional) — `{ "businessTypes": ["store"], "group": "commerce", "handles": ["orders"] }`.
+Lets in-app setup suggest the plugin. `group`: `commerce | payments | crm | helpdesk | marketing |
+knowledge | booking`. `handles` (what customer requests the tools really fulfil): `orders | refunds |
+order_changes | billing | subscriptions | bookings`. Declare a handle only if a tool does it: a
+refund tool that just records a request and hands off does not handle `refunds`.
+
 **Category** — the SDK and runner validate against exactly four:
 `integration | channel | tool | analytics`.
 (`document_importer` appears on the Atlassian plugin and rides a separate `autoActivate` +

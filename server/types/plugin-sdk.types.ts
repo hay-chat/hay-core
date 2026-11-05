@@ -6,6 +6,7 @@
  */
 
 import type { ChildProcess } from "child_process";
+import type { PluginSetupHints } from "@server/types/setup.types";
 
 // ============================================================================
 // Manifest Types (Minimal - from package.json)
@@ -33,6 +34,9 @@ export interface HayPluginManifest {
 
   /** Allowed environment variables (e.g., ["SHOPIFY_API_KEY"]) */
   env?: string[];
+
+  /** When in-app setup should suggest this plugin, and what it can do for customers */
+  setup?: PluginSetupHints;
 }
 
 // ============================================================================

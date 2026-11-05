@@ -16,7 +16,6 @@ interface AppState {
   pluginsLastUpdated: number | null;
   pluginsLoading: boolean;
   rowsPerPage: number;
-  onboardingCompleted: boolean;
   /** Plugin settings Advanced mode, remembered per user id (D20). */
   pluginAdvancedMode: Record<string, boolean>;
 }
@@ -31,7 +30,6 @@ export const useAppStore = defineStore("app", {
     pluginsLastUpdated: null,
     pluginsLoading: false,
     rowsPerPage: 10,
-    onboardingCompleted: false,
     pluginAdvancedMode: {},
   }),
 
@@ -71,7 +69,7 @@ export const useAppStore = defineStore("app", {
         this.isLoading = true;
 
         const result = await Hay.conversations.list.query({
-          filters: { status: "open" },
+          filters: { status: "open", excludePlayground: true },
           pagination: { page: 1, limit: 1 }, // We only need the count, not the data
         });
 
@@ -201,18 +199,13 @@ export const useAppStore = defineStore("app", {
       this.rowsPerPage = rows;
     },
 
-    // Onboarding management
-    setOnboardingCompleted(completed: boolean) {
-      this.onboardingCompleted = completed;
-    },
-
     setPluginAdvancedMode(userId: string, on: boolean) {
       this.pluginAdvancedMode = { ...this.pluginAdvancedMode, [userId]: on };
     },
   },
   persist: {
     // Preferences only: counts and the plugin list are refetched each load.
-    pick: ["rowsPerPage", "onboardingCompleted", "pluginAdvancedMode"],
+    pick: ["rowsPerPage", "pluginAdvancedMode"],
   },
 });
 

@@ -64,11 +64,6 @@ test.beforeAll(async ({ browser }) => {
   const state = JSON.parse(fs.readFileSync(AUTH_STATE, "utf8"));
   for (const origin of state.origins ?? []) {
     origin.origin = BASE_URL;
-    // Home redirects first-time users to Getting Started; this user has finished it
-    origin.localStorage.push({
-      name: "app",
-      value: JSON.stringify({ onboardingCompleted: true }),
-    });
   }
   fs.writeFileSync(MOBILE_AUTH_STATE, JSON.stringify(state));
 

@@ -12,7 +12,13 @@
     "capabilities": [
       "mcp",
       "auth"
-    ]
+    ],
+    "setup": {
+      "businessTypes": [
+        "store"
+      ],
+      "group": "marketing"
+    }
   },
   "scripts": {
     "build": "tsc",

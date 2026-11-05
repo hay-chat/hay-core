@@ -13,6 +13,17 @@
       "mcp",
       "auth"
     ],
+    "setup": {
+      "businessTypes": [
+        "store",
+        "service",
+        "saas"
+      ],
+      "group": "payments",
+      "handles": [
+        "refunds"
+      ]
+    },
     "env": [
       "MERCADOPAGO_CLIENT_ID",
       "MERCADOPAGO_CLIENT_SECRET"

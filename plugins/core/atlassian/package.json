@@ -16,6 +16,13 @@
       "mcp",
       "auth"
     ],
+    "setup": {
+      "businessTypes": [
+        "saas",
+        "other"
+      ],
+      "group": "knowledge"
+    },
     "documentImporter": true,
     "env": [
       "ATLASSIAN_CLIENT_ID",

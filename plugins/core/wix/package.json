@@ -12,7 +12,18 @@
     "capabilities": [
       "mcp",
       "auth"
-    ]
+    ],
+    "setup": {
+      "businessTypes": [
+        "store"
+      ],
+      "group": "commerce",
+      "handles": [
+        "orders",
+        "refunds",
+        "order_changes"
+      ]
+    }
   },
   "scripts": {
     "build": "tsc",
