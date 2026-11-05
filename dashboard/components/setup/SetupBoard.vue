@@ -24,13 +24,15 @@
         </ul>
       </div>
       <div class="flex flex-wrap items-center gap-2">
-        <NuxtLink
-          v-if="canOpen('/settings/webchat')"
-          to="/settings/webchat"
-          :class="outlineLinkClass"
+        <Button
+          v-if="canInstall"
+          variant="outline"
+          :aria-expanded="installOpen"
+          aria-controls="setup-install-panel"
+          @click="toggleInstall"
         >
           {{ $t("setup.board.addToSite") }}
-        </NuxtLink>
+        </Button>
         <Button variant="outline" :loading="finishing" @click="finishLater">
           {{ $t("setup.board.finishLater") }}
         </Button>
@@ -45,9 +47,18 @@
       :checking="firstCheckPending"
       :total="board.rows.length"
       :connect-to="connectTo"
-      :done-to="doneTo"
+      :can-install="canInstall"
       @open="openRow"
       @choose-platform="emit('choosePlatform')"
+      @install="openInstall"
+    />
+
+    <SetupInstallPanel
+      v-if="installOpen"
+      :not-ready="board.totalCount - board.readyCount"
+      :total="board.totalCount"
+      :settings-to="canOpen('/settings/webchat') ? '/settings/webchat' : null"
+      @close="closeInstall"
     />
 
     <div class="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(300px,360px)]">
@@ -61,6 +72,19 @@
             {{ $t("setup.board.checkAgain") }}
           </Button>
         </div>
+
+        <p
+          v-if="board.site.partial"
+          class="mb-3 text-sm text-neutral-700"
+          role="status"
+          data-testid="setup-partial-notice"
+        >
+          {{
+            $t(`setup.board.partialNotice${board.site.processed === 1 ? "One" : "Other"}`, {
+              count: board.site.processed,
+            })
+          }}
+        </p>
 
         <div class="mb-1 flex items-center gap-3">
           <b class="whitespace-nowrap font-medium text-neutral-900" aria-live="polite">
@@ -81,6 +105,7 @@
             :error="errorId === row.id"
             :connect-to="rowConnectTo(row)"
             :playbook-to="rowPlaybookTo(row)"
+            :site-partial="Boolean(board.site.partial)"
             @try="chat?.ask(row.text, row.sources)"
             @toggle="toggleRow(row.id)"
             @remove="removeRow(row.id)"
@@ -114,6 +139,17 @@
         <p v-if="removeFailed" class="mt-2 text-sm text-destructive" role="alert">
           {{ $t("setup.board.removeError") }}
         </p>
+
+        <SetupChannels
+          v-if="board.channelRefs.length"
+          class="mt-6"
+          :channels="board.channelRefs"
+          :can-install="canInstall"
+          :install-open="installOpen"
+          @install="openInstall"
+        />
+
+        <SetupReplay class="mt-6" />
       </section>
 
       <SetupTestChat ref="chat" />
@@ -122,14 +158,16 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
-import { useAppStore } from "@/stores/app";
+import { computed, nextTick, onBeforeUnmount, ref, watch } from "vue";
 import type { SetupBoard, SetupRow as SetupRowData, SetupRowStatus } from "@/stores/setup";
 import { useSetupLinks } from "@/composables/useSetupLinks";
 import SetupRow from "./SetupRow.vue";
 import SetupUpNext from "./SetupUpNext.vue";
 import SetupTestChat from "./SetupTestChat.vue";
-import { textLinkClass, outlineLinkClass } from "./styles";
+import SetupInstallPanel from "./SetupInstallPanel.vue";
+import SetupChannels from "./SetupChannels.vue";
+import SetupReplay from "./SetupReplay.vue";
+import { textLinkClass } from "./styles";
 
 export interface SetupBoardActions {
   /** Resolves true when the question was added. */
@@ -159,7 +197,6 @@ const emit = defineEmits<{
 }>();
 
 const { canOpen, connectPath, playbookPath } = useSetupLinks();
-const appStore = useAppStore();
 
 const chat = ref<InstanceType<typeof SetupTestChat> | null>(null);
 
@@ -221,10 +258,6 @@ const readyPercent = computed(() =>
 // --- Header tags: business type, a few tools and the website.
 const { t } = useI18n();
 
-onMounted(() => {
-  if (props.board.toolPluginIds.length) void appStore.getPlugins();
-});
-
 const websiteHost = (website: string): string => {
   try {
     return new URL(/^[a-z]+:\/\//i.test(website) ? website : `https://${website}`).host;
@@ -236,10 +269,7 @@ const websiteHost = (website: string): string => {
 const tags = computed(() => {
   const list: string[] = [];
   if (props.board.businessType) list.push(t(`setup.types.${props.board.businessType}.name`));
-  for (const id of props.board.toolPluginIds.slice(0, 3)) {
-    const name = appStore.getPluginById(id)?.name;
-    if (name) list.push(name);
-  }
+  for (const plugin of props.board.toolPlugins.slice(0, 3)) list.push(plugin.name);
   if (props.board.website) list.push(websiteHost(props.board.website));
   return list;
 });
@@ -251,9 +281,19 @@ const connectTo = computed(() => {
     ? connectPath(next.plugin.id)
     : null;
 });
-const doneTo = computed(() =>
-  props.board.upNext.kind === "done" && canOpen("/settings/webchat") ? "/settings/webchat" : null,
-);
+
+// --- Add to your site: an inline panel, available whatever the state of the list.
+const canInstall = computed(() => canOpen("/settings/webchat"));
+const installOpen = ref(false);
+const openInstall = () => {
+  installOpen.value = true;
+};
+const closeInstall = () => {
+  installOpen.value = false;
+};
+const toggleInstall = () => {
+  installOpen.value = !installOpen.value;
+};
 const rowConnectTo = (row: SetupRowData): string | null =>
   row.plugin && canOpen("/integrations/plugins") ? connectPath(row.plugin.id) : null;
 const rowPlaybookTo = (row: SetupRowData): string | null =>

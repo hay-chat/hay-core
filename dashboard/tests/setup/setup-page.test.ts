@@ -38,6 +38,23 @@ vi.mock("@/components/setup/SetupTestChat.vue", async () => {
   };
 });
 
+vi.mock("@/components/setup/SetupReplay.vue", async () => {
+  const { defineComponent, h } = await import("vue");
+  return { default: defineComponent({ name: "SetupReplay", setup: () => () => h("div") }) };
+});
+vi.mock("@/composables/useWebchatSnippet", async () => {
+  const { computed, ref } = await import("vue");
+  return {
+    useWebchatSnippet: () => ({
+      snippet: computed(() => ""),
+      loading: ref(false),
+      failed: ref(false),
+      enabled: ref(true),
+      load: vi.fn(),
+    }),
+  };
+});
+
 import SetupPage from "../../pages/setup/index.vue";
 import { useUserStore } from "@/stores/user";
 

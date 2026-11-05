@@ -23,6 +23,12 @@
       />
       {{ siteLine }}
     </p>
+    <Progress
+      v-if="showBar"
+      :value="barPercent"
+      class="mt-2 h-1"
+      :aria-label="$t('setup.live.progressLabel')"
+    />
 
     <ul v-if="items.length" class="mt-3">
       <li
@@ -70,6 +76,15 @@ const host = computed(() => {
   }
 });
 
+// A bar only when the server knows the total; otherwise the count in the line says it all.
+const showBar = computed(
+  () =>
+    siteState.value === "reading" && Boolean(props.site?.total) && (props.site?.processed ?? 0) > 0,
+);
+const barPercent = computed(() =>
+  props.site?.total ? Math.min(100, ((props.site.processed ?? 0) / props.site.total) * 100) : 0,
+);
+
 const siteLine = computed(() => {
   if (!host.value) return "";
   const site = props.site;
@@ -88,12 +103,18 @@ const siteLine = computed(() => {
       });
     case "done": {
       const count = site?.processed ?? 0;
+      if (site?.partial) {
+        return t(`setup.live.partial${count === 1 ? "One" : "Other"}`, {
+          site: host.value,
+          count,
+        });
+      }
       return t(`setup.live.done${count === 1 ? "One" : "Other"}`, { site: host.value, count });
     }
     case "failed":
       return t("setup.live.failed", { site: host.value });
     default:
-      return t("setup.live.willRead", { site: host.value });
+      return t("setup.live.waiting", { site: host.value });
   }
 });
 </script>

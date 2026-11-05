@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { flushPromises } from "@vue/test-utils";
 import { mountWithStubs, stubNuxtGlobals } from "../component-harness";
 import { board, row } from "./fixtures";
@@ -8,6 +8,7 @@ const api = vi.hoisted(() => ({
   suggestions: vi.fn(),
   infer: vi.fn(),
   saveAnswers: vi.fn(),
+  startReading: vi.fn(),
 }));
 vi.mock("@/utils/api", () => ({
   Hay: {
@@ -15,6 +16,7 @@ vi.mock("@/utils/api", () => ({
       suggestions: { query: api.suggestions },
       inferBusinessType: { mutate: api.infer },
       saveAnswers: { mutate: api.saveAnswers },
+      startReading: { mutate: api.startReading },
     },
   },
 }));
@@ -54,6 +56,9 @@ describe("SetupQuestions", () => {
     stubNuxtGlobals();
     api.suggestions.mockResolvedValue(suggestions);
     api.infer.mockResolvedValue({ businessType: null });
+    api.startReading.mockResolvedValue(
+      board({ answeredAt: undefined, site: { state: "reading", discovered: 0, processed: 0 } }),
+    );
     api.saveAnswers.mockResolvedValue(
       board({ rows: [row({ id: "returns", status: "checking" })] }),
     );
@@ -220,5 +225,100 @@ describe("SetupQuestions", () => {
     expect(wrapper.get('[aria-label="setup.live.label"]').text()).toContain(
       'setup.live.readingOther {"site":"alma.example","count":12}',
     );
+  });
+
+  it("live list says what it is waiting for, shows a bar with a total, and owns up to a partial read", async () => {
+    const live = (site: Record<string, unknown>) =>
+      mountQuestions({ board: { ...fresh, website: "https://alma.example", site } });
+
+    const waiting = live({ state: "none", discovered: 0, processed: 0 });
+    expect(waiting.get('[aria-label="setup.live.label"]').text()).toContain(
+      'setup.live.waiting {"site":"alma.example"}',
+    );
+
+    const reading = live({ state: "reading", discovered: 40, processed: 20, total: 80 });
+    expect(reading.get('[role="progressbar"]').attributes("aria-valuenow")).toBe("25");
+
+    const partial = live({ state: "done", discovered: 140, processed: 140, partial: true });
+    expect(partial.get('[aria-label="setup.live.label"]').text()).toContain(
+      'setup.live.partialOther {"site":"alma.example","count":140}',
+    );
+    expect(partial.find('[role="progressbar"]').exists()).toBe(false);
+  });
+
+  describe("reading the site while the first question is open", () => {
+    beforeEach(() => vi.useFakeTimers());
+    afterEach(() => vi.useRealTimers());
+
+    const typeSite = async (wrapper: ReturnType<typeof mountQuestions>, value: string) => {
+      const input = wrapper.get<HTMLInputElement>(
+        'input[aria-label="setup.questions.type.website"]',
+      );
+      await input.setValue(value);
+      await input.trigger("blur");
+    };
+
+    it("starts after the field is left, once, and passes the board up", async () => {
+      const wrapper = mountQuestions();
+      await typeSite(wrapper, "alma.example");
+      expect(api.startReading).not.toHaveBeenCalled(); // debounced
+      await vi.advanceTimersByTimeAsync(800);
+      expect(api.startReading).toHaveBeenCalledWith({ website: "https://alma.example" });
+      expect(wrapper.emitted("reading")).toHaveLength(1);
+
+      // Blur again, then Continue: the same address is not sent twice.
+      await typeSite(wrapper, "alma.example");
+      await vi.advanceTimersByTimeAsync(800);
+      await wrapper.get('input[value="store"]').setValue(true);
+      await buttonByText(wrapper, "setup.questions.continue").trigger("click");
+      expect(api.startReading).toHaveBeenCalledTimes(1);
+    });
+
+    it("never starts on a partly typed address", async () => {
+      const wrapper = mountQuestions();
+      await typeSite(wrapper, "alma.");
+      await vi.advanceTimersByTimeAsync(2000);
+      expect(api.startReading).not.toHaveBeenCalled();
+    });
+
+    it("Continue starts straight away without waiting for the debounce", async () => {
+      const wrapper = mountQuestions();
+      await wrapper.get('input[value="store"]').setValue(true);
+      await wrapper
+        .get<HTMLInputElement>('input[aria-label="setup.questions.type.website"]')
+        .setValue("alma.example");
+      await buttonByText(wrapper, "setup.questions.continue").trigger("click");
+      expect(api.startReading).toHaveBeenCalledWith({ website: "https://alma.example" });
+    });
+
+    it("clears the wait when it unmounts", async () => {
+      const wrapper = mountQuestions();
+      await typeSite(wrapper, "alma.example");
+      wrapper.unmount();
+      await vi.advanceTimersByTimeAsync(2000);
+      expect(api.startReading).not.toHaveBeenCalled();
+    });
+
+    it("an account that already has a website source starts on arrival, from that address", async () => {
+      mountQuestions({
+        board: {
+          ...fresh,
+          website: undefined,
+          site: { state: "reading", website: "https://alma.example", discovered: 3, processed: 3 },
+        },
+      });
+      await flushPromises();
+      expect(api.startReading).toHaveBeenCalledWith({ website: "https://alma.example" });
+    });
+
+    it("a failed start can be tried again", async () => {
+      api.startReading.mockRejectedValueOnce(new Error("offline"));
+      const wrapper = mountQuestions();
+      await typeSite(wrapper, "alma.example");
+      await vi.advanceTimersByTimeAsync(800);
+      await typeSite(wrapper, "alma.example");
+      await vi.advanceTimersByTimeAsync(800);
+      expect(api.startReading).toHaveBeenCalledTimes(2);
+    });
   });
 });

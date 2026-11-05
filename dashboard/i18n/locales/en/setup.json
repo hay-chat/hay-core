@@ -70,7 +70,6 @@
       "title": "What we'll check for you",
       "label": "Your list so far",
       "empty": "Pick a few questions and they'll appear here.",
-      "willRead": "We'll read {site} when you finish.",
       "readingOne": "Reading {site}: {count} page so far",
       "readingOther": "Reading {site}: {count} pages so far",
       "readingOfOne": "Reading {site}: {processed} of {total} page",
@@ -80,7 +79,11 @@
       "failed": "We couldn't read {site}",
       "yours": "Yours",
       "site": "Your site",
-      "platform": "Your platform"
+      "platform": "Your platform",
+      "waiting": "We'll start reading {site} as soon as you've entered it.",
+      "progressLabel": "Reading progress",
+      "partialOne": "Read {count} page of {site} so far. The rest follows in the next daily update.",
+      "partialOther": "Read {count} pages of {site} so far. The rest follows in the next daily update."
     },
     "board": {
       "title": "What can your assistant handle?",
@@ -105,7 +108,9 @@
       "addError": "We couldn't add that question. Try again.",
       "remove": "Remove {question}",
       "removeTitle": "Not relevant",
-      "removeError": "We couldn't remove that question. Try again."
+      "removeError": "We couldn't remove that question. Try again.",
+      "partialNoticeOne": "We've read {count} page of your site so far, so a request listed as missing may be on a page we haven't reached yet.",
+      "partialNoticeOther": "We've read {count} pages of your site so far, so a request listed as missing may be on a page we haven't reached yet."
     },
     "status": {
       "checking": "Checking…",
@@ -128,7 +133,8 @@
       "connectAny": "Connect your platform to {capability}",
       "playbook": "{playbook} playbook is ready to review",
       "playbookAny": "A playbook is ready to review",
-      "failed": "Something went wrong while checking. Try again."
+      "failed": "Something went wrong while checking. Try again.",
+      "missingPartial": "Not found in the pages read so far"
     },
     "needs": {
       "orders": "look up orders",
@@ -200,6 +206,63 @@
       "replyError": "No reply yet. Try sending it again.",
       "retry": "Try again",
       "log": "Test conversation"
+    },
+    "install": {
+      "title": "Add your assistant to your site",
+      "close": "Close",
+      "instructions": "Paste this into your site's HTML, just before the page ends.",
+      "codeLabel": "Install code",
+      "copy": "Copy code",
+      "copied": "Copied",
+      "copyError": "We couldn't copy it. Select the code and copy it by hand.",
+      "loading": "Loading your install code…",
+      "error": "We couldn't load your install code.",
+      "retry": "Try again",
+      "moreOptions": "Appearance and more options",
+      "notReadyOne": "{count} request on your list isn't ready yet. Your assistant hands those to your team instead of guessing.",
+      "notReadyOther": "{count} requests on your list aren't ready yet. Your assistant hands those to your team instead of guessing.",
+      "allReady": "Everything on your list is ready.",
+      "noRequests": "Your list is empty, so there is nothing to check yet. You can still add the chat to your site."
+    },
+    "channels": {
+      "title": "Where customers reach you",
+      "webchatHint": "A chat window on your website.",
+      "connectedHint": "Customers can reach your assistant here.",
+      "connectHint": "Connect {plugin} so customers can reach your assistant there.",
+      "connected": "Connected",
+      "notConnected": "Not connected",
+      "connect": "Connect {plugin}",
+      "addToSite": "Add to your site"
+    },
+    "replay": {
+      "title": "Test on real conversations",
+      "description": "Import past conversations and see how your assistant would have replied. Optional, and nothing is sent to customers.",
+      "loading": "Looking for past conversations…",
+      "loadError": "We couldn't load your past conversations.",
+      "retry": "Try again",
+      "import": "Import conversations",
+      "importMore": "Import more",
+      "run": "Replay {count} conversations",
+      "again": "Replay again",
+      "cost": "A replay runs your assistant on each conversation, so it takes a few minutes. It isn't billed. It counts toward your monthly allowance of test conversations ({remaining} of {limit} left).",
+      "allowanceUsed": "You've used this month's allowance of test conversations. It resets next month.",
+      "startError": "We couldn't start the replay. Try again.",
+      "running": "Replaying your conversations: {done} of {total} messages done",
+      "sampleOne": "Out of {count} customer message replayed",
+      "sampleOther": "Out of {count} customer messages replayed",
+      "resultsLabel": "Replay results",
+      "buckets": {
+        "answered": "Would answer",
+        "handed_off": "Would hand off",
+        "knowledge_missing": "Missing knowledge",
+        "needed_action": "Needed an action",
+        "wrong_or_risky": "Wrong or risky"
+      },
+      "notJudged": "{count} couldn't be judged and aren't counted.",
+      "nothingJudged": "None of the replayed messages could be judged.",
+      "capped": "This replay stopped early at its AI usage limit. The counts cover what finished.",
+      "cancelled": "This replay was stopped. The counts cover what finished.",
+      "openReport": "Open the full report"
     }
   }
 }

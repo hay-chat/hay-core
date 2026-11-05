@@ -21,6 +21,7 @@ import {
 import {
   type BusinessType,
   type SetupBoard,
+  type SetupChannelRef,
   type SetupCheckResult,
   type SetupQuestion,
   type SetupSettings,
@@ -85,11 +86,47 @@ async function loadPlaybooks(setup: SetupSettings) {
   }));
 }
 
-async function loadFacts(organizationId: string, setup: SetupSettings, site?: SiteReading) {
-  const [siteReading, playbooks, real] = await Promise.all([
-    site ?? readSiteState(organizationId, setup.website),
+const webchatName = (language?: string) =>
+  catalogLocale(language) === "pt-BR" ? "Chat no site" : "Website chat";
+
+/** The channels the customer picked, resolved to names and whether their plugin is enabled. */
+async function loadChannels(
+  organizationId: string,
+  setup: SetupSettings,
+): Promise<SetupChannelRef[]> {
+  if (setup.channels.length === 0) return [];
+  const language = await organizationLanguage(organizationId);
+  const plugins = visiblePlugins(organizationId);
+  const refs: SetupChannelRef[] = [];
+  for (const id of setup.channels) {
+    if (id === "webchat") {
+      refs.push({ id, name: webchatName(language), connected: true });
+      continue;
+    }
+    // A channel whose plugin is gone (or hidden from this org) is dropped, not shown broken.
+    const plugin = plugins.find((p) => p.manifest?.channel === id);
+    if (!plugin) continue;
+    const enabledId = await pluginManagerService.findPluginIdByChannel(organizationId, id);
+    refs.push({
+      id,
+      name: plugin.name,
+      plugin: { id: plugin.pluginId, name: plugin.name },
+      connected: enabledId !== null,
+    });
+  }
+  return refs;
+}
+
+async function loadFacts(
+  organizationId: string,
+  setup: SetupSettings,
+  options: { site?: SiteReading; resume?: boolean } = {},
+) {
+  const [siteReading, playbooks, real, channels] = await Promise.all([
+    options.site ?? readSiteState(organizationId, setup.website, { resume: options.resume }),
     loadPlaybooks(setup),
     hasRealConversations(organizationId),
+    loadChannels(organizationId, setup),
   ]);
   const facts: BoardFacts = {
     setup,
@@ -97,17 +134,27 @@ async function loadFacts(organizationId: string, setup: SetupSettings, site?: Si
     plugins: boardPlugins(organizationId),
     playbooks,
     hasRealConversations: real,
+    channels,
   };
   return facts;
 }
 
-async function boardFor(organizationId: string, setup?: SetupSettings): Promise<SetupBoard> {
+async function boardFor(
+  organizationId: string,
+  setup?: SetupSettings,
+  options: { resume?: boolean } = {},
+): Promise<SetupBoard> {
   const current = setup ?? (await readSetup(organizationId));
-  return buildBoard(await loadFacts(organizationId, current));
+  return buildBoard(await loadFacts(organizationId, current, options));
 }
 
-export function getBoard(organizationId: string): Promise<SetupBoard> {
-  return boardFor(organizationId);
+/**
+ * Reading the board also continues a partial website read that is waiting (see site.ts), but
+ * only while setup is still open, so finished accounts never start background work from here.
+ */
+export async function getBoard(organizationId: string): Promise<SetupBoard> {
+  const current = await readSetup(organizationId);
+  return boardFor(organizationId, current, { resume: !current.finishedAt && !!current.website });
 }
 
 export async function getSuggestions(
@@ -117,9 +164,7 @@ export async function getSuggestions(
   const language = await organizationLanguage(organizationId);
   const plugins = visiblePlugins(organizationId);
 
-  const channels = new Map<string, string>([
-    ["webchat", catalogLocale(language) === "pt-BR" ? "Chat no site" : "Website chat"],
-  ]);
+  const channels = new Map<string, string>([["webchat", webchatName(language)]]);
   for (const p of plugins) {
     const channel = p.manifest?.channel;
     if (channel && !channels.has(channel)) channels.set(channel, p.name);
@@ -189,6 +234,20 @@ export function mergeQuestions(
   return merged;
 }
 
+/**
+ * Starts reading the site while the first question is still open. Saves the address, reuses the
+ * org's source for it or creates one, and returns the board. Safe to call again for the same
+ * address, and a bad address never throws: it shows up as `site.state === "failed"`.
+ */
+export async function startReading(organizationId: string, website: string): Promise<SetupBoard> {
+  const address = addScheme(website.trim());
+  const saved = await updateSetup(organizationId, (current) =>
+    current.website === address ? current : { ...current, website: address },
+  );
+  await startSiteRead(organizationId, address);
+  return boardFor(organizationId, saved, { resume: true });
+}
+
 export interface SaveAnswersInput {
   businessType: BusinessType;
   website?: string;
@@ -216,7 +275,7 @@ export async function saveAnswers(
 
   // A bad address must not fail the save: it shows up as `site.state === "failed"`.
   await startSiteRead(organizationId, website);
-  return boardFor(organizationId, saved);
+  return boardFor(organizationId, saved, { resume: true });
 }
 
 /** Questions that documents should answer and have no usable result yet. */
@@ -280,7 +339,9 @@ export async function checkQuestions(
   const targets = setup.questions.filter((q) =>
     questionIds ? !q.needs && questionIds.includes(q.id) : needsCheck(q, site),
   );
-  if (targets.length === 0) return buildBoard(await loadFacts(organizationId, setup, site));
+  // The board always carries the site as it is when we answer, not as it was before the checks
+  // ran, so the dashboard never sees "reading" again for a read that has finished.
+  if (targets.length === 0) return buildBoard(await loadFacts(organizationId, setup));
 
   const results = await mapWithConcurrency(targets, CHECK_CONCURRENCY, async (q) => ({
     id: q.id,
@@ -288,7 +349,7 @@ export async function checkQuestions(
     result: await checkOnce(organizationId, q),
   }));
   const saved = await saveChecks(organizationId, results);
-  return buildBoard(await loadFacts(organizationId, saved, site));
+  return buildBoard(await loadFacts(organizationId, saved));
 }
 
 function findQuestion(setup: SetupSettings, questionId: string): SetupQuestion {

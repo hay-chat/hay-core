@@ -46,7 +46,9 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
  * slow `conversations.get` poll as the fallback if the socket missed it.
  */
 export function useSetupTestChat() {
-  const websocket = useWebSocket();
+  // Only listens: the layout owns the shared socket, and closing it here would silence the
+  // inbox badge and other pages' realtime updates once the person leaves setup.
+  const websocket = useWebSocket({ disconnectOnUnmount: false });
 
   const messages = ref<Message[]>([]);
   const sourcesByMessage = ref<Record<string, SetupSource[]>>({});

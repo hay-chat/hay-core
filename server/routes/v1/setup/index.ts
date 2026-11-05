@@ -35,6 +35,16 @@ export const setupRouter = t.router({
       businessType: await setup.inferBusinessType(orgId(ctx), input.website),
     })),
 
+  /**
+   * Starts reading the website while the first question is open. Idempotent for one address;
+   * a bad address does not throw, it shows as `site.state === "failed"`.
+   */
+  startReading: update()
+    .input(z.object({ website: z.string().trim().min(1).max(2048) }))
+    .mutation(({ ctx, input }): Promise<SetupBoard> =>
+      setup.startReading(orgId(ctx), input.website),
+    ),
+
   /** Saves answers and starts reading the site. Keeps checks and playbooks of unchanged questions. */
   saveAnswers: update()
     .input(

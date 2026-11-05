@@ -34,6 +34,7 @@
       :board="store.board"
       :editing="Boolean(store.board.answeredAt)"
       :start-step="startStep"
+      @reading="onReading"
       @saved="onSaved"
       @cancel="mode = 'board'"
     />
@@ -99,6 +100,12 @@ const start = async () => {
 const openQuestions = (step: number) => {
   startStep.value = step;
   mode.value = "questions";
+};
+
+// A read started from question 1 can answer after the person has already moved on to the board;
+// the saved board is newer then, so the late one is dropped.
+const onReading = (board: SetupBoardData) => {
+  if (mode.value === "questions") store.apply(board);
 };
 
 const onSaved = (board: SetupBoardData) => {

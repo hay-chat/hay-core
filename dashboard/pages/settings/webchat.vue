@@ -280,6 +280,7 @@ import PreChatFormBuilder from "@/components/settings/PreChatFormBuilder.vue";
 import { useToast } from "@/composables/useToast";
 import { useUserStore } from "@/stores/user";
 import { useDomain } from "@/composables/useDomain";
+import { buildWebchatSnippet } from "@/utils/webchat-snippet";
 
 type UpdateSettingsInput = RouterInputs["webchat"]["updateSettings"];
 
@@ -336,27 +337,19 @@ const hasChanges = computed(() => {
   );
 });
 
-const installationCode = computed(() => {
-  const organizationId = userStore.activeOrganizationId || "YOUR_ORG_ID";
-  // With Web Chat off there is no greeting to show, so the snippet leaves it out.
-  const greetingConfig = settingsForm.value.isEnabled
-    ? `,
-    showGreeting: ${settingsForm.value.showGreeting},
-    greetingMessage: '${settingsForm.value.greetingMessage}'`
-    : "";
-  return `<${"script"}>
-  window.HayChat = window.HayChat || {};
-  window.HayChat.config = {
-    organizationId: '${organizationId}',
-    baseUrl: '${apiBaseUrl}',
-    widgetTitle: '${settingsForm.value.widgetTitle}',
-    widgetSubtitle: '${settingsForm.value.widgetSubtitle}',
-    position: '${settingsForm.value.position}',
-    theme: '${settingsForm.value.theme}'${greetingConfig}
-  };
-</${"script"}>
-<${"script"} src="${apiBaseUrl}/v1/webchat/widget.js" async></${"script"}>`;
-});
+const installationCode = computed(() =>
+  buildWebchatSnippet({
+    organizationId: userStore.activeOrganizationId || "YOUR_ORG_ID",
+    baseUrl: apiBaseUrl,
+    widgetTitle: settingsForm.value.widgetTitle,
+    widgetSubtitle: settingsForm.value.widgetSubtitle,
+    position: settingsForm.value.position,
+    theme: settingsForm.value.theme,
+    isEnabled: settingsForm.value.isEnabled,
+    showGreeting: settingsForm.value.showGreeting,
+    greetingMessage: settingsForm.value.greetingMessage,
+  }),
+);
 
 // Load settings
 async function loadSettings() {
