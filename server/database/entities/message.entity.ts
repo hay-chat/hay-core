@@ -202,6 +202,7 @@ export class Message {
     playbookTitle?: string;
     documentId?: string;
     documentTitle?: string;
+    isGreeting?: boolean;
     // Conversation management metadata
     isInactivityWarning?: boolean;
     /** "Our team will reply here", sent once while the AI is paused (D11-9). */

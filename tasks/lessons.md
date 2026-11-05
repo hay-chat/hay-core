@@ -317,3 +317,18 @@
 - Failure: setup's test chat treated the greeting as the reply and dropped typed questions' sources; mocked component tests all passed.
 - Signal: only running the real flow against a real site showed it.
 - Rule: for a chat surface, test the real flow with real replies before calling it done, and load existing messages before waiting for a new one.
+
+## A readiness check disagreed with the chat it vouched for (2026-11-05)
+- Failure: the board said Ready at similarity 0.25 while the chat kept only chunks above 0.4, and the source line showed the check's page, not the reply's. A customer saw Ready, a handoff and a source together.
+- Signal: Roger's screenshot; only running every Ready row through the real chat measured it (2 real answers of 6).
+- Rule: a status that promises behaviour shares its constants with that behaviour, and is verified by running it. Show only what really happened in the turn on screen.
+
+## Loose selectors in a capture script changed real data (2026-11-05)
+- Failure: `getByRole("button", {name: /question/})` matched "Remove <question>" once aria-labels landed, so a screenshot run deleted three questions from an account Roger uses.
+- Signal: the row count dropped between screenshots (9, 8, 7, 6).
+- Rule: browser scripts that click match the full accessible name, and assert state before and after.
+
+## Symlinked node_modules broke when a plugin install ran (2026-11-05)
+- Failure: a worktree's symlinked `node_modules` was replaced by a partial install when enabling a plugin ran root `npm install`, killing the dev server.
+- Signal: nuxt died and a plugin build failed right after clicking Connect.
+- Rule: a worktree that runs the app gets real `node_modules` (`cp -cR`), not symlinks.

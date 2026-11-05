@@ -64,6 +64,7 @@ export interface Message {
     // Handoff metadata
     isHandoffMessage?: boolean;
     handoffType?: string;
+    isGreeting?: boolean;
     // Takeover / release (System messages)
     isTakeoverMessage?: boolean;
     isReleaseMessage?: boolean;
