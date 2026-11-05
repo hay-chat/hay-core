@@ -332,3 +332,8 @@
 - Failure: a worktree's symlinked `node_modules` was replaced by a partial install when enabling a plugin ran root `npm install`, killing the dev server.
 - Signal: nuxt died and a plugin build failed right after clicking Connect.
 - Rule: a worktree that runs the app gets real `node_modules` (`cp -cR`), not symlinks.
+
+## A passing test turn is not a correct answer (2026-11-05)
+- Failure: the chat told an English customer "$200/month" because an English question retrieved the Portuguese pricing page ("R$ 200"). A check that only asks "did it reply without handing off?" would call that a pass.
+- Signal: tracing a figure from the reply back to the documents; "$540" appeared in none of them as dollars.
+- Rule: when judging chat quality, compare the reply's facts with the source text, not just its outcome.
