@@ -302,3 +302,8 @@
 - Failure: the turn judge (medium tier) failed a correct reply against "does not promise X" and filed an invented answer as "knowledge missing".
 - Signal: test case failed on a draft identical to the active version; a scratch re-judge loop (6×) showed 1/6 pass.
 - Rule: define each boolean in one testable sentence, write reasoning before scores, and measure with a fixed-input re-judge loop before and after.
+
+## Blamed a native module for a segfault that was the wrong Node version (2026-11-05)
+- Failure: the API server exited 139 with no output in a new worktree; I traced it to `argon2` and called the install broken. The shell was on Node 20; the repo's `.nvmrc` pins 22.
+- Signal: the same `argon2` file was loaded fine by the running dev server, whose binary was Node 22.
+- Rule: in a new worktree, compare `node -v` with `.nvmrc` first. Before running migrations or integration tests, read `DB_HOST`: the root `.env` can point at a remote database.
