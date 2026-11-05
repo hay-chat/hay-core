@@ -8,26 +8,32 @@ import {
   type SetupBoard,
   type SetupSuggestions,
 } from "@server/types/setup.types";
-
-const notImplemented = (): never => {
-  throw new TRPCError({ code: "METHOD_NOT_SUPPORTED", message: "Not implemented yet" });
-};
+import * as setup from "@server/services/setup/setup.service";
 
 const read = () => scopedProcedure(RESOURCES.ORGANIZATION_SETTINGS, ACTIONS.READ);
 const update = () => scopedProcedure(RESOURCES.ORGANIZATION_SETTINGS, ACTIONS.UPDATE);
 
+const orgId = (ctx: { organizationId?: string | null }): string => {
+  if (!ctx.organizationId) throw new TRPCError({ code: "BAD_REQUEST", message: "No organization" });
+  return ctx.organizationId;
+};
+
 export const setupRouter = t.router({
   /** Answers plus the live status of every row. Never runs an LLM check. */
-  get: read().query((): Promise<SetupBoard> => notImplemented()),
+  get: read().query(({ ctx }): Promise<SetupBoard> => setup.getBoard(orgId(ctx))),
 
   suggestions: read()
     .input(z.object({ businessType: z.enum(BUSINESS_TYPES) }))
-    .query((): Promise<SetupSuggestions> => notImplemented()),
+    .query(({ ctx, input }): Promise<SetupSuggestions> =>
+      setup.getSuggestions(orgId(ctx), input.businessType),
+    ),
 
   /** Guesses the business type from the website. Null when the site can't be read. */
   inferBusinessType: update()
     .input(z.object({ website: z.string().trim().min(1).max(2048) }))
-    .mutation((): Promise<{ businessType: BusinessType | null }> => notImplemented()),
+    .mutation(async ({ ctx, input }): Promise<{ businessType: BusinessType | null }> => ({
+      businessType: await setup.inferBusinessType(orgId(ctx), input.website),
+    })),
 
   /** Saves answers and starts reading the site. Keeps checks and playbooks of unchanged questions. */
   saveAnswers: update()
@@ -48,12 +54,14 @@ export const setupRouter = t.router({
           .max(30),
       }),
     )
-    .mutation((): Promise<SetupBoard> => notImplemented()),
+    .mutation(({ ctx, input }): Promise<SetupBoard> => setup.saveAnswers(orgId(ctx), input)),
 
   /** Runs the readiness check. Omit `questionIds` to check everything that needs it. */
   checkQuestions: update()
     .input(z.object({ questionIds: z.array(z.string().min(1).max(255)).max(30).optional() }))
-    .mutation((): Promise<SetupBoard> => notImplemented()),
+    .mutation(({ ctx, input }): Promise<SetupBoard> =>
+      setup.checkQuestions(orgId(ctx), input.questionIds),
+    ),
 
   /** Saves the customer's own answer as a document, then rechecks that question. */
   addAnswer: update()
@@ -63,16 +71,20 @@ export const setupRouter = t.router({
         answer: z.string().trim().min(1).max(10000),
       }),
     )
-    .mutation((): Promise<SetupBoard> => notImplemented()),
+    .mutation(({ ctx, input }): Promise<SetupBoard> =>
+      setup.addAnswer(orgId(ctx), input.questionId, input.answer),
+    ),
 
   addQuestion: update()
     .input(z.object({ text: z.string().trim().min(1).max(500) }))
-    .mutation((): Promise<SetupBoard> => notImplemented()),
+    .mutation(({ ctx, input }): Promise<SetupBoard> => setup.addQuestion(orgId(ctx), input.text)),
 
   removeQuestion: update()
     .input(z.object({ questionId: z.string().min(1).max(255) }))
-    .mutation((): Promise<SetupBoard> => notImplemented()),
+    .mutation(({ ctx, input }): Promise<SetupBoard> =>
+      setup.removeQuestion(orgId(ctx), input.questionId),
+    ),
 
   /** "Finish later": stops the redirect from `/`. Setup stays available in the sidebar. */
-  dismiss: update().mutation((): Promise<SetupBoard> => notImplemented()),
+  dismiss: update().mutation(({ ctx }): Promise<SetupBoard> => setup.dismiss(orgId(ctx))),
 });

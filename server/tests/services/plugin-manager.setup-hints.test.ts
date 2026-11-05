@@ -28,7 +28,9 @@ async function register(hayPlugin: Record<string, unknown>) {
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
-  return upsertPlugin.mock.calls[upsertPlugin.mock.calls.length - 1][0] as { manifest: { setup?: unknown } };
+  return upsertPlugin.mock.calls[upsertPlugin.mock.calls.length - 1][0] as {
+    manifest: { setup?: unknown };
+  };
 }
 
 describe("manifest setup hints", () => {
