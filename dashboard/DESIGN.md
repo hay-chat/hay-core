@@ -219,7 +219,7 @@ components:
     padding: "0.5rem 0.75rem"
 ---
 
-<!-- Tokens and component facts are extracted from the shipped code. The North Star and the descriptive color names were proposed by the documenter from that evidence and have not been confirmed by the product owner. -->
+<!-- Tokens and component facts are extracted from the shipped code. The North Star and the descriptive color names are confirmed by the product owner. -->
 
 # Design System: Hay Dashboard
 
