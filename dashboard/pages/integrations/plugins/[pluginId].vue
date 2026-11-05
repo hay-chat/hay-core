@@ -1,9 +1,12 @@
 <template>
   <Page width="max">
-    <div>
+    <div class="flex flex-wrap items-center gap-2">
       <Button variant="ghost" size="sm" @click="router.push('/integrations/marketplace')">
         <ArrowLeft class="h-4 w-4 mr-2" />
         {{ $t("pluginSettings.backToMarketplace") }}
+      </Button>
+      <Button v-if="cameFromSetup" variant="outline" size="sm" @click="router.push('/setup')">
+        {{ $t("pluginSettings.backToSetup") }}
       </Button>
     </div>
 
@@ -1275,6 +1278,15 @@ const connectStep = ref<"saving" | "redirecting" | null>(
   route.query.connect === "1" ? "saving" : null,
 );
 const connectError = ref<string | null>(null);
+// Arrived from the in-app setup (its connect link carries return_to=<this origin>/setup).
+// The query is cleared after the connect starts, so remember it now.
+const cameFromSetup = ref(false);
+try {
+  const back = new URL(String(route.query.return_to ?? ""));
+  cameFromSetup.value = back.origin === window.location.origin && back.pathname === "/setup";
+} catch {
+  // No (or an unparsable) return_to: not from setup.
+}
 // The original link, to retry after a failure (the query is cleared then).
 const connectQuery = route.query.connect === "1" ? { ...route.query } : null;
 

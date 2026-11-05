@@ -114,6 +114,7 @@
       "missing": "Falta resposta",
       "needs_connection": "Precisa conectar",
       "playbook_off": "Playbook desligado",
+      "playbook_missing": "Precisa de playbook",
       "check_failed": "Não deu para verificar"
     },
     "why": {
@@ -128,6 +129,9 @@
       "connectAny": "Conecte sua plataforma para {capability}",
       "playbook": "O playbook {playbook} está pronto para revisar",
       "playbookAny": "Há um playbook pronto para revisar",
+      "playbookWriting": "Escrevendo um playbook com as ferramentas de {plugin}",
+      "playbookNoTool": "{plugin} ainda não tem uma ferramenta para isso. Você pode escrever seu próprio playbook.",
+      "playbookFailed": "Não conseguimos escrever um playbook. Tente de novo ou escreva o seu.",
       "failed": "Algo deu errado na verificação. Tente de novo."
     },
     "needs": {
@@ -144,6 +148,7 @@
       "addAnswer": "Adicionar resposta",
       "connect": "Conectar",
       "choosePlatform": "Escolher plataforma",
+      "writeOwn": "Escrever o meu",
       "review": "Revisar",
       "retry": "Tentar de novo"
     },
@@ -157,25 +162,43 @@
     "playbook": {
       "whatItDoes": "O que o playbook {playbook} faz",
       "open": "Abrir playbook",
-      "close": "Agora não"
+      "close": "Agora não",
+      "turnOn": "Ligar",
+      "turnOnError": "Não conseguimos ligar este playbook. Tente de novo.",
+      "generateError": "Não conseguimos escrever o playbook. Tente de novo.",
+      "reviewHint": "Nada muda para os clientes até você ligar.",
+      "stepsLabel": "Passos"
+    },
+    "connectError": {
+      "message": "Não conseguimos conectar {plugin}. Nada foi alterado. Tente de novo.",
+      "detail": "{plugin} informou: {detail}"
     },
     "upNext": {
       "connect": {
         "title": "Conectar {plugin}",
         "whyOne": "Para seu assistente fazer mais do que responder. Isso libera {count} pedido da sua lista.",
         "whyOther": "Para seu assistente fazer mais do que responder. Isso libera {count} pedidos da sua lista.",
+        "whyCapabilityOne": "Para seu assistente poder {capability}. Isso libera {count} pedido da sua lista.",
+        "whyCapabilityOther": "Para seu assistente poder {capability}. Isso libera {count} pedidos da sua lista.",
         "label": "Conectar {plugin}"
       },
       "choosePlatform": {
         "title": "Escolha sua plataforma",
         "whyOne": "Diga o que você usa para seu assistente agir pelos clientes. Isso libera {count} pedido da sua lista.",
         "whyOther": "Diga o que você usa para seu assistente agir pelos clientes. Isso libera {count} pedidos da sua lista.",
+        "whyCapabilityOne": "Diga o que você usa para seu assistente poder {capability}. Isso libera {count} pedido da sua lista.",
+        "whyCapabilityOther": "Diga o que você usa para seu assistente poder {capability}. Isso libera {count} pedidos da sua lista.",
         "label": "Escolher plataforma"
       },
       "playbook": {
         "title": "Ligar {playbook}",
         "why": "Escrevemos este playbook para o seu negócio. Revise e ligue.",
         "label": "Revisar playbook"
+      },
+      "writePlaybook": {
+        "title": "Escrever o playbook de “{question}”",
+        "why": "Não conseguimos escrever este com as suas ferramentas. Escreva o seu e seu assistente vai segui-lo.",
+        "label": "Escrever playbook"
       },
       "answer": {
         "title": "Responder “{question}”",

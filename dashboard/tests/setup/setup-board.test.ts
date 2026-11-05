@@ -196,6 +196,8 @@ describe("SetupBoard", () => {
     removeQuestion: vi.fn().mockResolvedValue(true),
     saveAnswer: vi.fn().mockResolvedValue(true),
     retryRow: vi.fn().mockResolvedValue(undefined),
+    turnOnPlaybook: vi.fn().mockResolvedValue(true),
+    generatePlaybook: vi.fn().mockResolvedValue(undefined),
     finishLater: vi.fn().mockResolvedValue(true),
   };
 
@@ -283,7 +285,9 @@ describe("SetupBoard", () => {
     expect(connect.length).toBeGreaterThan(0);
     const url = new URL(`http://x${connect[0]}`);
     expect(url.searchParams.get("connect")).toBe("1");
-    expect(url.searchParams.get("return_to")).toBe(`${window.location.origin}/setup`);
+    expect(url.searchParams.get("return_to")).toBe(
+      `${window.location.origin}/setup?plugin=shopify`,
+    );
   });
 
   it("hides links the role cannot open", async () => {

@@ -68,6 +68,18 @@
             {{ $t("setup.action.review") }}
           </Button>
         </template>
+        <template v-else-if="displayStatus === 'playbook_missing'">
+          <NuxtLink
+            v-if="writeTo && row.generation !== 'pending'"
+            :to="writeTo"
+            :class="textLinkClass"
+          >
+            {{ $t("setup.action.writeOwn") }}
+          </NuxtLink>
+          <Button variant="link" size="sm" class="min-h-11 md:min-h-0" @click="emit('regenerate')">
+            {{ $t("setup.action.retry") }}
+          </Button>
+        </template>
         <template v-else-if="displayStatus === 'check_failed'">
           <Button variant="link" size="sm" class="min-h-11 md:min-h-0" @click="emit('retry')">
             {{ $t("setup.action.retry") }}
@@ -75,6 +87,24 @@
         </template>
       </span>
     </div>
+
+    <!-- The platform's connect attempt failed: say so next to the row it would have unlocked -->
+    <p
+      v-if="connectFailure && displayStatus === 'needs_connection'"
+      class="pb-3 text-sm text-destructive"
+      role="alert"
+      data-testid="setup-connect-error"
+    >
+      {{ $t("setup.connectError.message", { plugin: row.plugin?.name ?? "" }) }}
+      <span v-if="connectFailure.detail" class="text-neutral-muted">
+        {{
+          $t("setup.connectError.detail", {
+            plugin: row.plugin?.name ?? "",
+            detail: connectFailure.detail,
+          })
+        }}
+      </span>
+    </p>
 
     <!-- Missing: the customer's own answer, saved as a document -->
     <form
@@ -104,24 +134,36 @@
       </div>
     </form>
 
-    <!-- Playbook off: what it does, before it is turned on (workstream C adds Turn on) -->
+    <!-- Playbook off: what it does, before the customer turns it on -->
     <div
       v-if="expanded && displayStatus === 'playbook_off' && row.playbook"
       class="setup-expand grid gap-2 pb-4"
+      data-testid="setup-playbook-review"
     >
-      <span class="text-sm text-neutral-muted">
+      <span class="text-sm font-medium text-neutral-900">
         {{ $t("setup.playbook.whatItDoes", { playbook: row.playbook.title }) }}
       </span>
-      <ol class="list-decimal space-y-1 pl-5 text-sm text-neutral-900">
-        <li v-for="step in row.playbook.steps" :key="step">{{ step }}</li>
+      <ol
+        v-if="row.playbook.steps.length"
+        class="list-decimal space-y-1 pl-5 text-sm text-neutral-900"
+        :aria-label="$t('setup.playbook.stepsLabel')"
+      >
+        <li v-for="(step, index) in row.playbook.steps" :key="index">{{ step }}</li>
       </ol>
+      <p class="text-sm text-neutral-muted">{{ $t("setup.playbook.reviewHint") }}</p>
+      <p v-if="turnOnError" class="text-sm text-destructive" role="alert">
+        {{ $t("setup.playbook.turnOnError") }}
+      </p>
       <div class="flex flex-wrap items-center gap-2">
-        <NuxtLink v-if="playbookTo" :to="playbookTo" :class="outlineLinkClass">
-          {{ $t("setup.playbook.open") }}
-        </NuxtLink>
+        <Button type="button" :loading="turningOn" @click="emit('turnOn')">
+          {{ $t("setup.playbook.turnOn") }}
+        </Button>
         <Button type="button" variant="outline" @click="emit('toggle')">
           {{ $t("setup.playbook.close") }}
         </Button>
+        <NuxtLink v-if="playbookTo" :to="playbookTo" :class="textLinkClass">
+          {{ $t("setup.playbook.open") }}
+        </NuxtLink>
       </div>
     </div>
   </li>
@@ -132,7 +174,7 @@ import { computed, nextTick, ref, watch } from "vue";
 import { X } from "lucide-vue-next";
 import type { SetupRow, SetupRowStatus } from "@/stores/setup";
 import { needsLabel } from "@/composables/useSetupCopy";
-import { textLinkClass, outlineLinkClass } from "./styles";
+import { textLinkClass } from "./styles";
 
 type BadgeVariant = "secondary" | "success" | "warning" | "tool" | "outline";
 
@@ -143,22 +185,33 @@ const BADGE_VARIANTS: Record<SetupRowStatus, BadgeVariant> = {
   missing: "warning",
   needs_connection: "tool",
   playbook_off: "tool",
+  playbook_missing: "tool",
   check_failed: "outline",
 };
 
-const props = defineProps<{
-  row: SetupRow;
-  /** What to show now: `checking` until the real status has been revealed. */
-  displayStatus: SetupRowStatus;
-  /** Whether the organization has a website, which changes how "missing" reads. */
-  hasSite: boolean;
-  expanded: boolean;
-  saving: boolean;
-  error: boolean;
-  /** Link to connect the row's platform, or null when the role cannot open it. */
-  connectTo: string | null;
-  playbookTo: string | null;
-}>();
+const props = withDefaults(
+  defineProps<{
+    row: SetupRow;
+    /** What to show now: `checking` until the real status has been revealed. */
+    displayStatus: SetupRowStatus;
+    /** Whether the organization has a website, which changes how "missing" reads. */
+    hasSite: boolean;
+    expanded: boolean;
+    saving: boolean;
+    error: boolean;
+    /** Link to connect the row's platform, or null when the role cannot open it. */
+    connectTo: string | null;
+    playbookTo: string | null;
+    /** Where "write your own" leads, or null when the role cannot open it. */
+    writeTo?: string | null;
+    /** Turning the playbook on is in flight. */
+    turningOn?: boolean;
+    turnOnError?: boolean;
+    /** The platform's connect attempt failed; `detail` is what the provider said, if anything. */
+    connectFailure?: { detail?: string } | null;
+  }>(),
+  { writeTo: null, turningOn: false, turnOnError: false, connectFailure: null },
+);
 
 const emit = defineEmits<{
   try: [];
@@ -167,6 +220,8 @@ const emit = defineEmits<{
   retry: [];
   choosePlatform: [];
   save: [answer: string];
+  turnOn: [];
+  regenerate: [];
 }>();
 
 const { t } = useI18n();
@@ -198,6 +253,13 @@ const why = computed(() => {
         ? t("setup.why.connect", { plugin: row.plugin.name, capability })
         : t("setup.why.connectAny", { capability });
     }
+    case "playbook_missing":
+      if (row.generation === "no_tool") {
+        return t("setup.why.playbookNoTool", { plugin: row.plugin?.name ?? "" });
+      }
+      return row.generation === "failed"
+        ? t("setup.why.playbookFailed")
+        : t("setup.why.playbookWriting", { plugin: row.plugin?.name ?? "" });
     case "playbook_off":
       return row.playbook
         ? t("setup.why.playbook", { playbook: row.playbook.title })

@@ -12,11 +12,14 @@ export const translate = (key: string, params?: unknown) =>
 
 export const toast = { success: vi.fn(), error: vi.fn() };
 export const router = { push: vi.fn(), replace: vi.fn() };
+/** The current route; tests set `route.query` before mounting. */
+export const route: { path: string; query: Record<string, unknown> } = { path: "/", query: {} };
 
 export function stubNuxtGlobals() {
   vi.stubGlobal("useI18n", () => ({ t: translate }));
   vi.stubGlobal("useToast", () => toast);
   vi.stubGlobal("useRouter", () => router);
+  vi.stubGlobal("useRoute", () => route);
   vi.stubGlobal("useOrgDateTime", () => ({
     formatDate: (value: unknown) => String(value),
     formatDateTime: (value: unknown) => String(value),
