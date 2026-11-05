@@ -70,7 +70,6 @@
       "title": "O que vamos verificar para você",
       "label": "Sua lista até agora",
       "empty": "Escolha algumas perguntas e elas aparecem aqui.",
-      "willRead": "Vamos ler {site} quando você terminar.",
       "readingOne": "Lendo {site}: {count} página até agora",
       "readingOther": "Lendo {site}: {count} páginas até agora",
       "readingOfOne": "Lendo {site}: {processed} de {total} página",
@@ -80,7 +79,11 @@
       "failed": "Não conseguimos ler {site}",
       "yours": "Sua",
       "site": "Seu site",
-      "platform": "Sua plataforma"
+      "platform": "Sua plataforma",
+      "waiting": "Vamos começar a ler {site} assim que você informar o endereço completo.",
+      "progressLabel": "Progresso da leitura",
+      "partialOne": "Lemos {count} página de {site} até agora. O resto vem na próxima atualização diária.",
+      "partialOther": "Lemos {count} páginas de {site} até agora. O resto vem na próxima atualização diária."
     },
     "board": {
       "title": "O que seu assistente já resolve?",
@@ -105,7 +108,9 @@
       "addError": "Não conseguimos adicionar essa pergunta. Tente de novo.",
       "remove": "Remover {question}",
       "removeTitle": "Não se aplica",
-      "removeError": "Não conseguimos remover essa pergunta. Tente de novo."
+      "removeError": "Não conseguimos remover essa pergunta. Tente de novo.",
+      "partialNoticeOne": "Lemos {count} página do seu site até agora, então um pedido marcado como sem resposta pode estar numa página que ainda não lemos.",
+      "partialNoticeOther": "Lemos {count} páginas do seu site até agora, então um pedido marcado como sem resposta pode estar numa página que ainda não lemos."
     },
     "status": {
       "checking": "Verificando…",
@@ -128,7 +133,8 @@
       "connectAny": "Conecte sua plataforma para {capability}",
       "playbook": "O playbook {playbook} está pronto para revisar",
       "playbookAny": "Há um playbook pronto para revisar",
-      "failed": "Algo deu errado na verificação. Tente de novo."
+      "failed": "Algo deu errado na verificação. Tente de novo.",
+      "missingPartial": "Não encontrado nas páginas lidas até agora"
     },
     "needs": {
       "orders": "consultar pedidos",
@@ -200,6 +206,63 @@
       "replyError": "Ainda sem resposta. Tente enviar de novo.",
       "retry": "Tentar de novo",
       "log": "Conversa de teste"
+    },
+    "install": {
+      "title": "Coloque seu assistente no seu site",
+      "close": "Fechar",
+      "instructions": "Cole isto no HTML do seu site, logo antes do fim da página.",
+      "codeLabel": "Código de instalação",
+      "copy": "Copiar código",
+      "copied": "Copiado",
+      "copyError": "Não conseguimos copiar. Selecione o código e copie manualmente.",
+      "loading": "Carregando o código de instalação…",
+      "error": "Não conseguimos carregar o código de instalação.",
+      "retry": "Tentar de novo",
+      "moreOptions": "Aparência e mais opções",
+      "notReadyOne": "{count} pedido da sua lista ainda não está pronto. Seu assistente passa esses para a sua equipe em vez de chutar.",
+      "notReadyOther": "{count} pedidos da sua lista ainda não estão prontos. Seu assistente passa esses para a sua equipe em vez de chutar.",
+      "allReady": "Tudo o que está na sua lista está pronto.",
+      "noRequests": "Sua lista está vazia, então ainda não há nada para verificar. Você já pode colocar o chat no seu site."
+    },
+    "channels": {
+      "title": "Por onde os clientes falam com você",
+      "webchatHint": "Uma janela de chat no seu site.",
+      "connectedHint": "Os clientes já podem falar com seu assistente aqui.",
+      "connectHint": "Conecte {plugin} para os clientes falarem com seu assistente por lá.",
+      "connected": "Conectado",
+      "notConnected": "Não conectado",
+      "connect": "Conectar {plugin}",
+      "addToSite": "Colocar no site"
+    },
+    "replay": {
+      "title": "Teste com conversas reais",
+      "description": "Importe conversas antigas e veja como seu assistente teria respondido. Opcional, e nada é enviado aos clientes.",
+      "loading": "Procurando conversas antigas…",
+      "loadError": "Não conseguimos carregar suas conversas antigas.",
+      "retry": "Tentar de novo",
+      "import": "Importar conversas",
+      "importMore": "Importar mais",
+      "run": "Reproduzir {count} conversas",
+      "again": "Reproduzir de novo",
+      "cost": "A reprodução roda seu assistente em cada conversa, então leva alguns minutos. Não é cobrada. Conta para sua cota mensal de conversas de teste (restam {remaining} de {limit}).",
+      "allowanceUsed": "Você usou a cota de conversas de teste deste mês. Ela volta no mês que vem.",
+      "startError": "Não conseguimos iniciar a reprodução. Tente de novo.",
+      "running": "Reproduzindo suas conversas: {done} de {total} mensagens concluídas",
+      "sampleOne": "De {count} mensagem de cliente reproduzida",
+      "sampleOther": "De {count} mensagens de clientes reproduzidas",
+      "resultsLabel": "Resultado da reprodução",
+      "buckets": {
+        "answered": "Responderia",
+        "handed_off": "Passaria para a equipe",
+        "knowledge_missing": "Falta conhecimento",
+        "needed_action": "Precisaria de uma ação",
+        "wrong_or_risky": "Errada ou arriscada"
+      },
+      "notJudged": "{count} não puderam ser avaliadas e não entram na conta.",
+      "nothingJudged": "Nenhuma das mensagens reproduzidas pôde ser avaliada.",
+      "capped": "Esta reprodução parou antes, no limite de uso de IA. Os números cobrem o que terminou.",
+      "cancelled": "Esta reprodução foi interrompida. Os números cobrem o que terminou.",
+      "openReport": "Abrir o relatório completo"
     }
   }
 }

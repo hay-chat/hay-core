@@ -23,6 +23,29 @@ vi.mock("@/components/setup/SetupTestChat.vue", async () => {
   };
 });
 
+vi.mock("@/components/setup/SetupReplay.vue", async () => {
+  const { defineComponent: define, h: render } = await import("vue");
+  return {
+    default: define({
+      name: "SetupReplay",
+      setup: () => () => render("div", { "data-stub": "SetupReplay" }),
+    }),
+  };
+});
+const snippetState = vi.hoisted(() => ({ failed: false }));
+vi.mock("@/composables/useWebchatSnippet", async () => {
+  const { computed, ref } = await import("vue");
+  return {
+    useWebchatSnippet: () => ({
+      snippet: computed(() => (snippetState.failed ? "" : "<script>install</script>")),
+      loading: ref(false),
+      failed: ref(snippetState.failed),
+      enabled: ref(true),
+      load: vi.fn(),
+    }),
+  };
+});
+
 import SetupRow from "../../components/setup/SetupRow.vue";
 import SetupUpNext from "../../components/setup/SetupUpNext.vue";
 import SetupBoardView from "../../components/setup/SetupBoard.vue";
@@ -142,7 +165,7 @@ describe("SetupUpNext", () => {
 
   const mountNext = (upNext: unknown, props = {}) =>
     mountWithStubs(SetupUpNext, {
-      props: { upNext, checking: false, total: 4, connectTo: null, doneTo: null, ...props },
+      props: { upNext, checking: false, total: 4, connectTo: null, canInstall: false, ...props },
     });
 
   it("connect names the platform and links to it", () => {
@@ -172,12 +195,14 @@ describe("SetupUpNext", () => {
     expect(wrapper.emitted("choosePlatform")).toHaveLength(1);
   });
 
-  it("done links to the webchat settings when the role may open it", () => {
-    const wrapper = mountNext({ kind: "done" }, { doneTo: "/settings/webchat" });
-    expect(wrapper.get("a").attributes("href")).toBe("/settings/webchat");
+  it("done opens the install panel when the role may use it", async () => {
+    const wrapper = mountNext({ kind: "done" }, { canInstall: true });
+    expect(wrapper.find("a").exists()).toBe(false);
+    await wrapper.get("button").trigger("click");
+    expect(wrapper.emitted("install")).toHaveLength(1);
   });
 
-  it("done offers nothing to a role that cannot open the link", () => {
+  it("done offers nothing to a role that cannot install", () => {
     const wrapper = mountNext({ kind: "done" });
     expect(wrapper.find("a").exists()).toBe(false);
     expect(wrapper.find("button").exists()).toBe(false);
@@ -349,6 +374,154 @@ describe("SetupBoard", () => {
     await action!.trigger("click");
     await flushPromises();
     expect(wrapper.find("textarea").exists()).toBe(true);
+  });
+
+  describe("add to your site", () => {
+    const openPanel = async (wrapper: ReturnType<typeof mountBoard>) => {
+      await wrapper
+        .findAll("button")
+        .find((b) => b.text() === "setup.board.addToSite")!
+        .trigger("click");
+      await flushPromises();
+    };
+
+    it("is available at any time and states how many requests are not ready", async () => {
+      vi.stubGlobal("matchMedia", () => ({ matches: true }));
+      const wrapper = mountBoard({
+        board: board({ rows, readyCount: 1, totalCount: 3 }),
+        checking: false,
+      });
+      expect(wrapper.find("[data-testid=setup-install]").exists()).toBe(false);
+      await openPanel(wrapper);
+      expect(wrapper.get("[data-testid=install-honesty]").text()).toBe(
+        'setup.install.notReadyOther {"count":2}',
+      );
+      expect(wrapper.get("[data-testid=install-code]").text()).toContain("install");
+    });
+
+    it("says everything is ready only when every request is", async () => {
+      vi.stubGlobal("matchMedia", () => ({ matches: true }));
+      const wrapper = mountBoard({
+        board: board({ rows, readyCount: 3, totalCount: 3, upNext: { kind: "done" } }),
+        checking: false,
+      });
+      await openPanel(wrapper);
+      expect(wrapper.get("[data-testid=install-honesty]").text()).toBe("setup.install.allReady");
+    });
+
+    it("copies the code", async () => {
+      vi.stubGlobal("matchMedia", () => ({ matches: true }));
+      const writeText = vi.fn().mockResolvedValue(undefined);
+      vi.stubGlobal("navigator", { clipboard: { writeText } });
+      const wrapper = mountBoard({ checking: false });
+      await openPanel(wrapper);
+      await wrapper
+        .findAll("button")
+        .find((b) => b.text() === "setup.install.copy")!
+        .trigger("click");
+      await flushPromises();
+      expect(writeText).toHaveBeenCalledWith("<script>install</script>");
+      expect(wrapper.text()).toContain("setup.install.copied");
+      wrapper.unmount();
+      expect(vi.getTimerCount()).toBe(0);
+    });
+
+    it("opens from the done state of up next", async () => {
+      vi.stubGlobal("matchMedia", () => ({ matches: true }));
+      const wrapper = mountBoard({
+        board: board({ rows, readyCount: 3, totalCount: 3, upNext: { kind: "done" } }),
+        checking: false,
+      });
+      await wrapper
+        .get("[data-testid=setup-up-next]")
+        .findAll("button")
+        .find((b) => b.text() === "setup.upNext.done.label")!
+        .trigger("click");
+      await flushPromises();
+      expect(wrapper.find("[data-testid=setup-install]").exists()).toBe(true);
+    });
+
+    it("is hidden from roles that cannot open the web chat settings", async () => {
+      useUserStore().$patch({ organizations: [{ id: "o1", role: "contributor" }] as never });
+      vi.stubGlobal("matchMedia", () => ({ matches: true }));
+      const wrapper = mountBoard({ checking: false });
+      expect(wrapper.text()).not.toContain("setup.board.addToSite");
+    });
+  });
+
+  describe("channels", () => {
+    const channelBoard = (channelRefs: unknown[]) =>
+      board({ rows, channelRefs: channelRefs as never });
+
+    it("shows webchat as the install panel and plugin channels by connection state", async () => {
+      vi.stubGlobal("matchMedia", () => ({ matches: true }));
+      const wrapper = mountBoard({
+        board: channelBoard([
+          { id: "webchat", name: "Website chat", connected: true },
+          {
+            id: "wa",
+            name: "WhatsApp",
+            plugin: { id: "whatsapp", name: "WhatsApp" },
+            connected: true,
+          },
+          {
+            id: "ig",
+            name: "Instagram",
+            plugin: { id: "instagram", name: "Instagram" },
+            connected: false,
+          },
+        ]),
+        checking: false,
+      });
+      const section = wrapper.get("[data-testid=setup-channels]");
+      expect(section.text()).toContain("Website chat");
+      expect(section.text()).toContain("setup.channels.connected");
+      const link = section.get("a");
+      const url = new URL(`http://x${link.attributes("href")}`);
+      expect(url.pathname).toBe("/integrations/plugins/instagram");
+      expect(url.searchParams.get("return_to")).toBe(`${window.location.origin}/setup`);
+
+      await section
+        .findAll("button")
+        .find((b) => b.text() === "setup.channels.addToSite")!
+        .trigger("click");
+      expect(wrapper.find("[data-testid=setup-install]").exists()).toBe(true);
+    });
+
+    it("shows nothing when no channel was picked", () => {
+      vi.stubGlobal("matchMedia", () => ({ matches: true }));
+      const wrapper = mountBoard({ board: channelBoard([]), checking: false });
+      expect(wrapper.find("[data-testid=setup-channels]").exists()).toBe(false);
+    });
+  });
+
+  it("says so when only part of the site was read, and rewords missing", async () => {
+    vi.stubGlobal("matchMedia", () => ({ matches: true }));
+    const wrapper = mountBoard({
+      board: board({
+        rows: [row({ id: "b", status: "missing" })],
+        site: { state: "done", discovered: 140, processed: 140, partial: true },
+      }),
+      checking: false,
+    });
+    expect(wrapper.get("[data-testid=setup-partial-notice]").text()).toContain(
+      'setup.board.partialNoticeOther {"count":140}',
+    );
+    expect(wrapper.text()).toContain("setup.why.missingPartial");
+    expect(wrapper.text()).not.toContain("setup.why.missingSite");
+  });
+
+  it("header plugin tags use the names the server sent", () => {
+    vi.stubGlobal("matchMedia", () => ({ matches: true }));
+    const wrapper = mountBoard({
+      board: board({
+        rows,
+        toolPluginIds: ["shopify"],
+        toolPlugins: [{ id: "shopify", name: "Shopify" }],
+      }),
+      checking: false,
+    });
+    expect(wrapper.text()).toContain("Shopify");
   });
 
   it("Finish later calls the action", async () => {

@@ -152,6 +152,8 @@ const props = defineProps<{
   displayStatus: SetupRowStatus;
   /** Whether the organization has a website, which changes how "missing" reads. */
   hasSite: boolean;
+  /** The site was only partly read, so "missing" means "not in the pages read so far". */
+  sitePartial?: boolean;
   expanded: boolean;
   saving: boolean;
   error: boolean;
@@ -191,6 +193,7 @@ const why = computed(() => {
       return t("setup.why.readyGeneric");
     }
     case "missing":
+      if (props.hasSite && props.sitePartial) return t("setup.why.missingPartial");
       return t(props.hasSite ? "setup.why.missingSite" : "setup.why.missingNoSite");
     case "needs_connection": {
       const capability = needsLabel(t, row.needs);

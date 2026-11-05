@@ -24,9 +24,13 @@
       <NuxtLink v-if="connectTo" :to="connectTo" :class="buttonLinkClass" class="max-md:w-full">
         {{ copy.label }}
       </NuxtLink>
-      <NuxtLink v-else-if="doneTo" :to="doneTo" :class="buttonLinkClass" class="max-md:w-full">
+      <Button
+        v-else-if="upNext.kind === 'done' && canInstall"
+        class="max-md:w-full"
+        @click="emit('install')"
+      >
         {{ copy.label }}
-      </NuxtLink>
+      </Button>
       <Button
         v-else-if="upNext.kind === 'choose_platform'"
         class="max-md:w-full"
@@ -58,13 +62,14 @@ const props = defineProps<{
   total: number;
   /** Where "connect" leads, or null when the role cannot open it. */
   connectTo: string | null;
-  /** Where "done" leads (adding the assistant to the site), or null when not allowed. */
-  doneTo: string | null;
+  /** Whether "done" can open the install panel (adding the assistant to the site). */
+  canInstall: boolean;
 }>();
 
 const emit = defineEmits<{
   open: [questionId: string];
   choosePlatform: [];
+  install: [];
 }>();
 
 const { t } = useI18n();

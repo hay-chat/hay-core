@@ -29,8 +29,8 @@
             type="text"
             :label="$t('setup.questions.type.website')"
             :placeholder="$t('setup.questions.type.websitePlaceholder')"
-            @blur="infer"
-            @keydown.enter="infer"
+            @blur="onWebsiteDone"
+            @keydown.enter="onWebsiteDone"
           />
           <p v-if="inferring" class="mt-1.5 text-sm text-neutral-muted" role="status">
             {{ $t("setup.questions.type.inferring") }}
@@ -228,8 +228,9 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onMounted, ref, watch } from "vue";
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { Hay } from "@/utils/api";
+import { readableWebsite } from "@/utils/setup-website";
 import type { RouterInputs } from "@/types/trpc";
 import type { SetupBoard, SetupSuggestions } from "@/stores/setup";
 import SetupLiveList, { type LiveItem } from "./SetupLiveList.vue";
@@ -258,6 +259,8 @@ const props = defineProps<{
 }>();
 
 const emit = defineEmits<{
+  /** Reading the site started (or was already under way); this is the board as it stands. */
+  reading: [board: SetupBoard];
   saved: [board: SetupBoard];
   cancel: [];
 }>();
@@ -268,7 +271,8 @@ const heading = ref<HTMLElement | null>(null);
 
 // --- Draft answers. They live here, so going back keeps them.
 const step = ref(Math.min(Math.max(props.startStep ?? 0, 0), 2));
-const website = ref(props.board?.website ?? "");
+// Sign-up may have created the website source already; its address is the starting point.
+const website = ref(props.board?.website ?? props.board?.site.website ?? "");
 const type = ref<BusinessType | null>(props.board?.businessType ?? null);
 const toolIds = ref<string[]>([...(props.board?.toolPluginIds ?? [])]);
 const channelIds = ref<string[]>([...(props.board?.channels ?? [])]);
@@ -413,10 +417,50 @@ const infer = async () => {
   }
 };
 
+// --- Reading the site while this question is open, so answers can appear within minutes.
+const READ_DEBOUNCE_MS = 700;
+let readTimer: ReturnType<typeof setTimeout> | null = null;
+let readFor = "";
+
+const clearReadTimer = () => {
+  if (readTimer) clearTimeout(readTimer);
+  readTimer = null;
+};
+
+const startReading = async (address: string) => {
+  readFor = address;
+  try {
+    emit("reading", await Hay.setup.startReading.mutate({ website: address }));
+  } catch {
+    // Allow another try on the next blur or Continue; the board still shows no progress.
+    readFor = "";
+  }
+};
+
+/** Starts reading once what is typed is a whole address. `now` skips the short wait. */
+const beginReading = (now = false) => {
+  clearReadTimer();
+  const address = readableWebsite(website.value);
+  if (!address || address === readFor) return;
+  if (now) void startReading(address);
+  else readTimer = setTimeout(() => void startReading(address), READ_DEBOUNCE_MS);
+};
+
+const onWebsiteDone = () => {
+  void infer();
+  beginReading();
+};
+
 onMounted(() => {
-  if (!props.editing) void infer();
+  if (!props.editing) {
+    void infer();
+    // An account that already has a website source starts (or resumes) its read on arrival.
+    if (props.board && props.board.site.state !== "none") beginReading(true);
+  }
   focusHeading();
 });
+
+onBeforeUnmount(clearReadTimer);
 
 // --- Question 3: add your own.
 const addCustom = () => {
@@ -483,6 +527,7 @@ const save = async () => {
 };
 
 const next = () => {
+  if (step.value === 0) beginReading(true);
   if (step.value < 2) step.value += 1;
   else void save();
 };
