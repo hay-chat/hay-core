@@ -69,7 +69,7 @@ export const useAppStore = defineStore("app", {
         this.isLoading = true;
 
         const result = await Hay.conversations.list.query({
-          filters: { status: "open" },
+          filters: { status: "open", excludePlayground: true },
           pagination: { page: 1, limit: 1 }, // We only need the count, not the data
         });
 
