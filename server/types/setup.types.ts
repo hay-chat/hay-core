@@ -92,6 +92,16 @@ export interface SetupPluginRef {
   name: string;
 }
 
+/** A channel the customer picked: "webchat", or a plugin's manifest `channel` value. */
+export interface SetupChannelRef {
+  id: string;
+  name: string;
+  /** The plugin that provides the channel. Absent for webchat, which core provides. */
+  plugin?: SetupPluginRef;
+  /** Whether that plugin is enabled for the organization. Meaningless for webchat. */
+  connected: boolean;
+}
+
 export interface SetupRow {
   id: string;
   text: string;
@@ -112,6 +122,11 @@ export interface SetupSiteState {
   discovered: number;
   processed: number;
   total?: number;
+  /**
+   * True when reading stopped before the whole site was covered (a large site). `processed` is
+   * then the pages read so far, and "not found" only means "not found in those pages".
+   */
+  partial?: boolean;
 }
 
 /** The single most useful thing to do next. */
@@ -126,7 +141,11 @@ export interface SetupBoard {
   businessType?: BusinessType;
   website?: string;
   toolPluginIds: string[];
+  /** Names for `toolPluginIds`, so the header does not need the plugin list loaded. */
+  toolPlugins: SetupPluginRef[];
   channels: string[];
+  /** The channels the customer picked, resolved to names and connection state. */
+  channelRefs: SetupChannelRef[];
   rows: SetupRow[];
   site: SetupSiteState;
   upNext: SetupUpNext;

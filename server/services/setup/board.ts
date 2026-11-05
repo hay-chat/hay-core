@@ -7,6 +7,7 @@
 
 import type {
   SetupBoard,
+  SetupChannelRef,
   SetupHandle,
   SetupPluginRef,
   SetupQuestion,
@@ -35,6 +36,8 @@ export interface BoardFacts {
   plugins: BoardPlugin[];
   playbooks: BoardPlaybook[];
   hasRealConversations: boolean;
+  /** Picked channels, resolved by the service (needs the registry and instances). */
+  channels: SetupChannelRef[];
 }
 
 /** The chosen platform that handles `need`, if any. */
@@ -127,7 +130,12 @@ export function buildBoard(facts: BoardFacts): SetupBoard {
     businessType: setup.businessType,
     website: setup.website,
     toolPluginIds: setup.toolPluginIds,
+    toolPlugins: setup.toolPluginIds.flatMap((id) => {
+      const plugin = facts.plugins.find((p) => p.id === id);
+      return plugin ? [{ id: plugin.id, name: plugin.name }] : [];
+    }),
     channels: setup.channels,
+    channelRefs: facts.channels,
     rows,
     site: site.state,
     upNext: pickUpNext(rows),
