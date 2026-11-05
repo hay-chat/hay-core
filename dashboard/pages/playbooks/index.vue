@@ -153,9 +153,50 @@
                 {{ playbook.description }}
               </p>
             </div>
-            <Button variant="ghost" size="sm" @click.stop="togglePlaybookStatus(playbook.id)">
-              <MoreHorizontal class="h-4 w-4" />
-            </Button>
+            <!-- The menu renders inside the card, so stop its clicks from opening the playbook -->
+            <div class="shrink-0" @click.stop>
+              <DropdownMenu>
+                <DropdownMenuTrigger as-child>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    data-testid="playbook-card-menu"
+                    :aria-label="t('actions.moreActions')"
+                  >
+                    <MoreHorizontal class="h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem @click="editPlaybook(playbook.id)">
+                    <Pencil class="mr-2 h-4 w-4" />
+                    {{ t("actions.edit") }}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem @click="duplicatePlaybook(playbook.id)">
+                    <Copy class="mr-2 h-4 w-4" />
+                    {{ t("actions.duplicate") }}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    v-if="playbook.status === 'active'"
+                    @click="archivePlaybook(playbook.id)"
+                  >
+                    <Archive class="mr-2 h-4 w-4" />
+                    {{ t("actions.archive") }}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    v-else-if="playbook.status === 'archived'"
+                    @click="restorePlaybook(playbook.id)"
+                  >
+                    <ArchiveRestore class="mr-2 h-4 w-4" />
+                    {{ t("actions.restoreAsDraft") }}
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem class="text-destructive" @click="deletePlaybook(playbook.id)">
+                    <Trash2 class="mr-2 h-4 w-4" />
+                    {{ t("actions.deletePlaybook") }}
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
           </div>
         </CardHeader>
         <CardContent>
@@ -251,7 +292,6 @@
 </template>
 
 <script setup lang="ts">
-import { logger } from "@/utils/logger";
 import {
   Plus,
   Book,
@@ -265,6 +305,9 @@ import {
   Trash2,
   Sparkles,
   LayoutTemplate,
+  Pencil,
+  Archive,
+  ArchiveRestore,
 } from "lucide-vue-next";
 
 import { useRouter } from "vue-router";
@@ -409,10 +452,40 @@ const editPlaybook = (id: string) => {
   router.push(`/playbooks/${id}`);
 };
 
-const duplicatePlaybook = (id: string) => {
-  // TODO: Implement playbook duplication
-  logger.debug("Duplicate playbook:", id);
+const duplicatePlaybook = async (id: string) => {
+  const playbook = playbooks.value.find((p) => p.id === id);
+  if (!playbook) return;
+
+  try {
+    const copy = await HayApi.playbooks.duplicate.mutate({
+      id,
+      title: t("actions.copyTitle", { name: playbook.title }).slice(0, 255),
+    });
+    toast.success(t("toast.duplicateSuccess"));
+    router.push(`/playbooks/${copy.id}`);
+  } catch (error) {
+    console.error("Failed to duplicate playbook:", error);
+    toast.error(t("toast.duplicateFailed"));
+  }
 };
+
+const setPlaybookStatus = async (id: string, status: PlaybookStatus, successMessage: string) => {
+  try {
+    await HayApi.playbooks.update.mutate({ id, data: { status } });
+    playbooks.value = playbooks.value.map((p) => (p.id === id ? { ...p, status } : p));
+    toast.success(successMessage);
+  } catch (error) {
+    console.error("Failed to update playbook status:", error);
+    toast.error(t("toast.statusFailed"));
+  }
+};
+
+const archivePlaybook = (id: string) =>
+  setPlaybookStatus(id, PlaybookStatus.ARCHIVED, t("toast.archiveSuccess"));
+
+// Back to draft, not active: going live again stays an explicit publish from the editor.
+const restorePlaybook = (id: string) =>
+  setPlaybookStatus(id, PlaybookStatus.DRAFT, t("toast.restoreSuccess"));
 
 // Delete dialog state
 const showDeleteDialog = ref(false);
@@ -446,11 +519,6 @@ const confirmDelete = async () => {
     playbookToDelete.value = null;
     showDeleteDialog.value = false;
   }
-};
-
-const togglePlaybookStatus = (id: string) => {
-  // TODO: Toggle playbook active/inactive status
-  logger.debug("Toggle status for playbook:", id);
 };
 
 // Fetch playbooks from API

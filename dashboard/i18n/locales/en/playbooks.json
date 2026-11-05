@@ -17,7 +17,13 @@
     "previous": "Previous",
     "continue": "Continue",
     "confirmLeave": "Leave Page",
-    "leave": "Leave"
+    "leave": "Leave",
+    "moreActions": "More actions",
+    "edit": "Edit",
+    "duplicate": "Duplicate",
+    "copyTitle": "{name} (copy)",
+    "archive": "Archive",
+    "restoreAsDraft": "Restore as draft"
   },
   "stats": {
     "totalPlaybooks": "Total Playbooks",
@@ -96,7 +102,12 @@
     "loadFailed": "Failed to load playbooks",
     "playbookNotFound": "Playbook not found",
     "generateFailed": "Failed to generate instructions. Please try again.",
-    "createFailed": "Failed to create playbook. Please try again."
+    "createFailed": "Failed to create playbook. Please try again.",
+    "duplicateSuccess": "Playbook duplicated",
+    "duplicateFailed": "Failed to duplicate playbook",
+    "archiveSuccess": "Playbook archived",
+    "restoreSuccess": "Playbook restored as a draft",
+    "statusFailed": "Failed to update playbook status"
   },
   "delete": {
     "title": "Delete Playbook",

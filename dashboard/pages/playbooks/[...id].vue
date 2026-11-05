@@ -53,48 +53,6 @@
             </template>
           </div>
 
-          <Button
-            v-if="isEditMode && playbook"
-            variant="outline"
-            size="sm"
-            @click="openSuggestDialog"
-          >
-            <Sparkles class="h-4 w-4 mr-2" />
-            {{ t("suggest.improveButton") }}
-          </Button>
-
-          <Button
-            v-if="isEditMode && playbook"
-            variant="outline"
-            size="sm"
-            @click="showVersionHistory = true"
-          >
-            <History class="h-4 w-4 mr-2" />
-            {{ t("versioning.history.button") }}
-          </Button>
-
-          <Button
-            v-if="isEditMode && draftVersion"
-            variant="outline"
-            size="sm"
-            data-testid="test-draft"
-            :loading="isOpeningTest"
-            @click="testDraft"
-          >
-            <FlaskConical class="h-4 w-4 mr-2" />
-            {{ t("versioning.testDraft") }}
-          </Button>
-
-          <Button
-            v-if="isEditMode && draftVersion"
-            variant="outline"
-            size="sm"
-            data-testid="replay-draft"
-            @click="replayDraft"
-          >
-            {{ t("versioning.replayDraft") }}
-          </Button>
-
           <!-- Edit mode: Save (identity) + Publish -->
           <template v-if="isEditMode">
             <Button
@@ -116,6 +74,52 @@
               {{ t("versioning.publish") }}
             </Button>
           </template>
+
+          <!-- Secondary actions, as on the conversation page -->
+          <DropdownMenu v-if="isEditMode && playbook" class="!w-auto">
+            <DropdownMenuTrigger as-child>
+              <Button
+                variant="outline"
+                size="icon"
+                data-testid="playbook-actions-menu"
+                :loading="isOpeningTest"
+                :aria-label="t('actions.moreActions')"
+              >
+                <MoreHorizontal class="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem @click="openSuggestDialog">
+                <Sparkles class="mr-2 h-4 w-4" />
+                {{ t("suggest.improveButton") }}
+              </DropdownMenuItem>
+              <DropdownMenuItem @click="showVersionHistory = true">
+                <History class="mr-2 h-4 w-4" />
+                {{ t("versioning.history.button") }}
+              </DropdownMenuItem>
+              <template v-if="draftVersion">
+                <DropdownMenuSeparator />
+                <DropdownMenuItem data-testid="test-draft" @click="testDraft">
+                  <FlaskConical class="mr-2 h-4 w-4" />
+                  {{ t("versioning.testDraft") }}
+                </DropdownMenuItem>
+                <DropdownMenuItem data-testid="replay-draft" @click="replayDraft">
+                  <Repeat class="mr-2 h-4 w-4" />
+                  {{ t("versioning.replayDraft") }}
+                </DropdownMenuItem>
+              </template>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                class="text-destructive"
+                data-testid="delete-playbook"
+                :disabled="isSubmitting"
+                @click="handleDelete"
+              >
+                <Trash2 class="mr-2 h-4 w-4" />
+                {{ t("actions.deletePlaybook") }}
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
 
           <!-- Create mode: single Create button -->
           <Button
@@ -235,7 +239,7 @@
               @saved="(categories) => playbook && (playbook.approval_categories = categories)"
             />
 
-            <!-- About + danger zone (edit mode only) -->
+            <!-- About (edit mode only) -->
             <Card v-if="isEditMode && playbook">
               <CardHeader>
                 <CardTitle class="text-base">{{ t("editor.metadataSection") }}</CardTitle>
@@ -249,17 +253,6 @@
                     {{ t("form.lastUpdated", { date: formatDateTime(playbook.updated_at) }) }}
                   </div>
                 </div>
-                <Button
-                  type="button"
-                  variant="destructive"
-                  size="sm"
-                  class="w-full"
-                  :loading="isSubmitting"
-                  @click="handleDelete"
-                >
-                  <Trash2 class="h-4 w-4 mr-2" />
-                  {{ t("actions.deletePlaybook") }}
-                </Button>
               </CardContent>
             </Card>
           </div>
@@ -359,6 +352,8 @@ import {
   History,
   Sparkles,
   FlaskConical,
+  MoreHorizontal,
+  Repeat,
 } from "lucide-vue-next";
 import type { JSONContent } from "@tiptap/vue-3";
 import type { MCPTool } from "@/components/tiptap/MentionExtension";

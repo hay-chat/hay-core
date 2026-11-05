@@ -17,7 +17,13 @@
     "previous": "Anterior",
     "continue": "Continuar",
     "confirmLeave": "Sair da Página",
-    "leave": "Sair"
+    "leave": "Sair",
+    "moreActions": "Mais ações",
+    "edit": "Editar",
+    "duplicate": "Duplicar",
+    "copyTitle": "{name} (cópia)",
+    "archive": "Arquivar",
+    "restoreAsDraft": "Restaurar como rascunho"
   },
   "stats": {
     "totalPlaybooks": "Total de Playbooks",
@@ -96,7 +102,12 @@
     "loadFailed": "Falha ao carregar playbooks",
     "playbookNotFound": "Playbook não encontrado",
     "generateFailed": "Falha ao gerar instruções. Tente novamente.",
-    "createFailed": "Falha ao criar playbook. Tente novamente."
+    "createFailed": "Falha ao criar playbook. Tente novamente.",
+    "duplicateSuccess": "Playbook duplicado",
+    "duplicateFailed": "Falha ao duplicar playbook",
+    "archiveSuccess": "Playbook arquivado",
+    "restoreSuccess": "Playbook restaurado como rascunho",
+    "statusFailed": "Falha ao atualizar o status do playbook"
   },
   "delete": {
     "title": "Excluir Playbook",
