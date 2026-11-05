@@ -9,7 +9,7 @@
         <p class="text-lg font-medium text-neutral-900">
           {{ requestsCount($t, "setup.board.testing", total) }}
         </p>
-        <p class="text-sm text-neutral-muted">{{ $t("setup.board.testingHint") }}</p>
+        <p class="text-sm text-neutral-700">{{ $t("setup.board.testingHint") }}</p>
       </template>
       <template v-else-if="copy">
         <p class="flex flex-wrap items-center gap-2 text-lg font-medium text-neutral-900">
