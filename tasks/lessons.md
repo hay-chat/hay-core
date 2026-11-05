@@ -302,3 +302,18 @@
 - Failure: the turn judge (medium tier) failed a correct reply against "does not promise X" and filed an invented answer as "knowledge missing".
 - Signal: test case failed on a draft identical to the active version; a scratch re-judge loop (6×) showed 1/6 pass.
 - Rule: define each boolean in one testable sentence, write reasoning before scores, and measure with a fixed-input re-judge loop before and after.
+
+## Copying .env into a worktree pointed tests at the remote DB (2026-11-05)
+- Failure: agent worktrees got a copy of the main `.env`, which targets the remote DigitalOcean database; `server/config/env.ts` loads only `.env`.
+- Signal: `DB_HOST` in the copied `.env` was not localhost, caught just before booting the server.
+- Rule: before anything DB-touching in a worktree, check `DB_HOST`; copy `.env.local` to the worktree's `.env` instead of the main `.env`.
+
+## "Environment issue" hid a Node version mismatch (2026-11-05)
+- Failure: route suites and the server died silently (exit 139) and were written off as flaky; argon2's native binary segfaults on Node 20.
+- Signal: exit 139 with no JS error, and the repo's `.nvmrc` says 22 while the shell defaults to 20.
+- Rule: check `node -v` against `.nvmrc` first; trace a silent crash to a cause before calling it environmental.
+
+## Unit tests passed while the real test chat was broken (2026-11-05)
+- Failure: setup's test chat treated the greeting as the reply and dropped typed questions' sources; mocked component tests all passed.
+- Signal: only running the real flow against a real site showed it.
+- Rule: for a chat surface, test the real flow with real replies before calling it done, and load existing messages before waiting for a new one.
