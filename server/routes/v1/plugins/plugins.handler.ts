@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { isAllowedConnectReturn } from "@server/lib/connect-return";
 import { TRPCError } from "@trpc/server";
 import { authenticatedProcedure, scopedProcedure } from "@server/trpc";
 import { RESOURCES, ACTIONS } from "@server/types/scopes";
@@ -1445,17 +1446,11 @@ export const initiateOAuth = pluginManageProcedure
     }),
   )
   .mutation(async ({ ctx, input }) => {
-    if (input.returnTo) {
-      const allowed = (process.env.CONNECT_ALLOWED_REDIRECT_ORIGINS || "")
-        .split(",")
-        .map((s) => s.trim())
-        .filter(Boolean);
-      if (!allowed.includes(new URL(input.returnTo).origin)) {
-        throw new TRPCError({
-          code: "FORBIDDEN",
-          message: "returnTo origin is not allowlisted for connect handshakes",
-        });
-      }
+    if (input.returnTo && !isAllowedConnectReturn(input.returnTo)) {
+      throw new TRPCError({
+        code: "FORBIDDEN",
+        message: "returnTo origin is not allowlisted for connect handshakes",
+      });
     }
 
     const { authorizationUrl, state } = await oauthService.initiateOAuth(

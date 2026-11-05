@@ -55,6 +55,26 @@ const repositories = [
   ["documents", () => new DocumentRepository()],
 ] as const;
 
+describe("conversation list excludePlayground filter", () => {
+  beforeEach(() => {
+    sql.length = 0;
+  });
+
+  it("leaves out playground chats only when asked", async () => {
+    const repository = new ConversationRepository();
+
+    await repository.paginateQuery(params({ filters: { status: "open" } }), ORG_ID);
+    expect(sql.join(" ")).not.toContain("playground");
+
+    await repository.paginateQuery(
+      params({ filters: { status: "open", excludePlayground: true } }),
+      ORG_ID,
+    );
+    expect(sql.join(" ")).toContain("entity.metadata->>'sourceId'");
+    expect(sql.join(" ")).toContain("entity.metadata->>'isPlayground'");
+  });
+});
+
 describe("list query identifiers", () => {
   beforeEach(() => {
     sql.length = 0;

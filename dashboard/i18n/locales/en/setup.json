@@ -1,0 +1,300 @@
+{
+  "setup": {
+    "nav": {
+      "title": "Set up",
+      "progress": "{ready} of {total} ready",
+      "upNext": "Up next: {title}",
+      "continue": "Continue setup",
+      "widgetLabel": "Setup progress"
+    },
+    "state": {
+      "loadingLabel": "Loading your setup",
+      "errorTitle": "We couldn't load your setup",
+      "errorDescription": "Check your connection and try again. Nothing was changed.",
+      "retry": "Try again",
+      "forbiddenTitle": "Only owners and admins can set up Hay",
+      "forbiddenDescription": "Ask an owner or admin of this organization to finish setup.",
+      "goHome": "Go to home"
+    },
+    "questions": {
+      "stepLabel": "Question {current} of {total}",
+      "skip": "Skip questions",
+      "backToList": "Back to your list",
+      "back": "Back",
+      "continue": "Continue",
+      "finish": "See what your assistant can do",
+      "chooseTypeHint": "Choose a business type to continue.",
+      "saveError": "We couldn't save your answers. Try again.",
+      "type": {
+        "title": "What kind of business is this?",
+        "description": "We read your website to tailor what we suggest next. This decides what we ask.",
+        "website": "Your website",
+        "websitePlaceholder": "yourstore.com",
+        "typeLabel": "Business type",
+        "inferring": "Reading your website to suggest a type",
+        "inferred": "Looks like you, from your website"
+      },
+      "tools": {
+        "title": "What do you already use?",
+        "description": "Choose everything that applies. This decides what your assistant can do for customers.",
+        "channelsTitle": "Where customers contact you",
+        "loading": "Loading suggestions",
+        "error": "We couldn't load suggestions for this business type.",
+        "retry": "Try again",
+        "none": "We have no platform suggestions for this business type yet. You can connect one later."
+      },
+      "ask": {
+        "title": "What do customers ask most?",
+        "description": "We'll test your assistant on these. Remove the ones that don't fit and add your own.",
+        "addLabel": "Add a question customers ask",
+        "addPlaceholder": "Add another question",
+        "add": "Add"
+      }
+    },
+    "types": {
+      "store": { "name": "Online store", "hint": "You sell products online" },
+      "saas": { "name": "Software or SaaS", "hint": "Customers subscribe to your product" },
+      "service": { "name": "Service provider", "hint": "Customers book or hire you" },
+      "other": { "name": "Something else", "hint": "We'll start with the basics" }
+    },
+    "groups": {
+      "commerce": "Where you sell",
+      "payments": "Payments",
+      "crm": "Customers and CRM",
+      "helpdesk": "Support",
+      "marketing": "Marketing",
+      "knowledge": "Docs and knowledge",
+      "booking": "Bookings"
+    },
+    "live": {
+      "title": "What we'll check for you",
+      "label": "Your list so far",
+      "empty": "Pick a few questions and they'll appear here.",
+      "readingOne": "Reading {site}: {count} page so far",
+      "readingOther": "Reading {site}: {count} pages so far",
+      "readingOfOne": "Reading {site}: {processed} of {total} page",
+      "readingOfOther": "Reading {site}: {processed} of {total} pages",
+      "doneOne": "Read {count} page from {site}",
+      "doneOther": "Read {count} pages from {site}",
+      "failed": "We couldn't read {site}",
+      "yours": "Yours",
+      "site": "Your site",
+      "platform": "Your platform",
+      "waiting": "We'll start reading {site} as soon as you've entered it.",
+      "progressLabel": "Reading progress",
+      "partialOne": "Read {count} page of {site} so far. The rest follows in the next daily update.",
+      "partialOther": "Read {count} pages of {site} so far. The rest follows in the next daily update."
+    },
+    "board": {
+      "title": "What can your assistant handle?",
+      "answers": "Your answers",
+      "changeAnswers": "Change answers",
+      "finishLater": "Finish later",
+      "finishError": "We couldn't save your place. Try again.",
+      "addToSite": "Add to your site",
+      "ready": "{ready} of {total} ready",
+      "testingOne": "Testing your assistant on {count} question",
+      "testingOther": "Testing your assistant on {count} questions",
+      "testingHint": "You can start using the test chat now.",
+      "checkErrorTitle": "We couldn't run the checks",
+      "checkErrorDescription": "Your list is unchanged. Check again to see where each request stands.",
+      "checkAgain": "Check again",
+      "rowsLabel": "Customer requests",
+      "progressLabel": "Requests ready",
+      "emptyTitle": "No questions on your list yet",
+      "emptyDescription": "Add a question customers ask and we'll test your assistant on it.",
+      "addLabel": "Add a question customers ask",
+      "addPlaceholder": "Add a question customers ask",
+      "add": "Add",
+      "addError": "We couldn't add that question. Try again.",
+      "remove": "Remove {question}",
+      "removeTitle": "Not relevant",
+      "removeError": "We couldn't remove that question. Try again.",
+      "partialNoticeOne": "We've read {count} page of your site so far, so a request listed as missing may be on a page we haven't reached yet.",
+      "partialNoticeOther": "We've read {count} pages of your site so far, so a request listed as missing may be on a page we haven't reached yet."
+    },
+    "status": {
+      "checking": "Checking…",
+      "reading_site": "Reading your site",
+      "ready": "Ready",
+      "missing": "Missing answer",
+      "needs_connection": "Needs connection",
+      "playbook_off": "Playbook off",
+      "playbook_missing": "Needs a playbook",
+      "check_failed": "Couldn't check"
+    },
+    "why": {
+      "checking": "Testing on your assistant",
+      "readingSite": "Still reading your website",
+      "readyFound": "Found on {source}",
+      "readyOwn": "Your answer",
+      "readyTool": "{plugin} connected, {playbook} on",
+      "readyGeneric": "Your assistant can answer this",
+      "missingSite": "Your website doesn't say",
+      "missingNoSite": "Your documents don't say",
+      "connect": "Connect {plugin} to {capability}",
+      "connectAny": "Connect your platform to {capability}",
+      "playbook": "{playbook} playbook is ready to review",
+      "playbookAny": "A playbook is ready to review",
+      "playbookWriting": "Writing a playbook from your {plugin} tools",
+      "playbookNoTool": "{plugin} has no tool for this yet. You can write your own playbook.",
+      "playbookFailed": "We couldn't write a playbook. Try again or write your own.",
+      "failed": "Something went wrong while checking. Try again.",
+      "missingHandedOff": "We found something, but not enough to answer with confidence. This would go to your team.",
+      "missingPartial": "Not found in the pages read so far"
+    },
+    "needs": {
+      "orders": "look up orders",
+      "refunds": "issue refunds",
+      "order_changes": "update orders",
+      "billing": "find invoices",
+      "subscriptions": "manage subscriptions",
+      "bookings": "book appointments",
+      "generic": "take action for customers"
+    },
+    "action": {
+      "tryIt": "Try it",
+      "tryItFor": "Try it: {question}",
+      "addAnswer": "Add answer",
+      "addAnswerFor": "Add answer: {question}",
+      "connect": "Connect",
+      "connectFor": "Connect: {question}",
+      "choosePlatform": "Choose platform",
+      "writeOwn": "Write your own",
+      "review": "Review",
+      "retry": "Retry"
+    },
+    "answer": {
+      "label": "How should your assistant answer?",
+      "placeholder": "Write the answer customers should get",
+      "save": "Save answer",
+      "cancel": "Cancel",
+      "error": "We couldn't save that answer. Try again."
+    },
+    "playbook": {
+      "whatItDoes": "What {playbook} does",
+      "open": "Open playbook",
+      "close": "Not now",
+      "turnOn": "Turn on",
+      "turnOnError": "We couldn't turn this playbook on. Try again.",
+      "generateError": "We couldn't write the playbook. Try again.",
+      "reviewHint": "Nothing changes for customers until you turn it on.",
+      "stepsLabel": "Steps"
+    },
+    "connectError": {
+      "message": "We couldn't connect {plugin}. Nothing was changed. Try again.",
+      "detail": "{plugin} said: {detail}"
+    },
+    "upNext": {
+      "connect": {
+        "title": "Connect {plugin}",
+        "whyOne": "So your assistant can do more than answer. This unlocks {count} request on your list.",
+        "whyOther": "So your assistant can do more than answer. This unlocks {count} requests on your list.",
+        "whyCapabilityOne": "So your assistant can {capability}. This unlocks {count} request on your list.",
+        "whyCapabilityOther": "So your assistant can {capability}. This unlocks {count} requests on your list.",
+        "label": "Connect {plugin}"
+      },
+      "choosePlatform": {
+        "title": "Choose your platform",
+        "whyOne": "Tell us what you use so your assistant can act for customers. This unlocks {count} request on your list.",
+        "whyOther": "Tell us what you use so your assistant can act for customers. This unlocks {count} requests on your list.",
+        "whyCapabilityOne": "Tell us what you use so your assistant can {capability}. This unlocks {count} request on your list.",
+        "whyCapabilityOther": "Tell us what you use so your assistant can {capability}. This unlocks {count} requests on your list.",
+        "label": "Choose platform"
+      },
+      "playbook": {
+        "title": "Turn on {playbook}",
+        "why": "We wrote this playbook for your business. Review it and turn it on.",
+        "label": "Review playbook"
+      },
+      "writePlaybook": {
+        "title": "Write the playbook for “{question}”",
+        "why": "We couldn't write this one from your tools. Write your own and your assistant will follow it.",
+        "label": "Write playbook"
+      },
+      "answer": {
+        "title": "Answer “{question}”",
+        "why": "Your website doesn't cover this, so your assistant would hand it to you.",
+        "label": "Add answer"
+      },
+      "done": {
+        "title": "Your assistant can handle everything on this list",
+        "why": "Add it to your site whenever you're ready.",
+        "label": "Add to your site"
+      }
+    },
+    "chat": {
+      "title": "Test your assistant",
+      "intro": "Ask anything a customer would. Nothing here reaches real customers.",
+      "messageLabel": "Message",
+      "placeholder": "Ask what a customer would",
+      "send": "Send",
+      "typing": "Your assistant is replying",
+      "source": "Source",
+      "handedOff": "Your assistant wasn't sure of this answer, so it handed off to your team.",
+      "startError": "We couldn't start the test chat.",
+      "replyError": "No reply yet. Try sending it again.",
+      "retry": "Try again",
+      "log": "Test conversation"
+    },
+    "install": {
+      "title": "Add your assistant to your site",
+      "close": "Close",
+      "instructions": "Paste this into your site's HTML, just before the page ends.",
+      "codeLabel": "Install code",
+      "copy": "Copy code",
+      "copied": "Copied",
+      "copyError": "We couldn't copy it. Select the code and copy it by hand.",
+      "loading": "Loading your install code…",
+      "error": "We couldn't load your install code.",
+      "retry": "Try again",
+      "moreOptions": "Appearance and more options",
+      "notReadyOne": "{count} request on your list isn't ready yet. Your assistant hands those to your team instead of guessing.",
+      "notReadyOther": "{count} requests on your list aren't ready yet. Your assistant hands those to your team instead of guessing.",
+      "allReady": "Everything on your list is ready.",
+      "noRequests": "Your list is empty, so there is nothing to check yet. You can still add the chat to your site."
+    },
+    "channels": {
+      "title": "Where customers reach you",
+      "webchatHint": "A chat window on your website.",
+      "connectedHint": "Customers can reach your assistant here.",
+      "connectHint": "Connect {plugin} so customers can reach your assistant there.",
+      "connected": "Connected",
+      "notConnected": "Not connected",
+      "connect": "Connect {plugin}",
+      "addToSite": "Add to your site"
+    },
+    "replay": {
+      "title": "Test on real conversations",
+      "description": "Import past conversations and see how your assistant would have replied. Optional, and nothing is sent to customers.",
+      "loading": "Looking for past conversations…",
+      "loadError": "We couldn't load your past conversations.",
+      "retry": "Try again",
+      "import": "Import conversations",
+      "importMore": "Import more",
+      "runOne": "Replay {count} conversation",
+      "runOther": "Replay {count} conversations",
+      "again": "Replay again",
+      "cost": "A replay runs your assistant on each conversation, so it takes a few minutes. It isn't billed. It counts toward your monthly allowance of test conversations ({remaining} of {limit} left).",
+      "allowanceUsed": "You've used this month's allowance of test conversations. It resets next month.",
+      "startError": "We couldn't start the replay. Try again.",
+      "running": "Replaying your conversations: {done} of {total} messages done",
+      "sampleOne": "Out of {count} customer message replayed",
+      "sampleOther": "Out of {count} customer messages replayed",
+      "resultsLabel": "Replay results",
+      "buckets": {
+        "answered": "Would answer",
+        "handed_off": "Would hand off",
+        "knowledge_missing": "Missing knowledge",
+        "needed_action": "Needed an action",
+        "wrong_or_risky": "Wrong or risky"
+      },
+      "notJudgedOne": "{count} couldn't be judged and isn't counted.",
+      "notJudgedOther": "{count} couldn't be judged and aren't counted.",
+      "nothingJudged": "None of the replayed messages could be judged.",
+      "capped": "This replay stopped early at its AI usage limit. The counts cover what finished.",
+      "cancelled": "This replay was stopped. The counts cover what finished.",
+      "openReport": "Open the full report"
+    }
+  }
+}

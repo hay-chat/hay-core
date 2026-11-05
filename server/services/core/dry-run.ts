@@ -13,6 +13,11 @@ export function isPlaygroundConversation(metadata: Metadata): boolean {
   return metadata?.sourceId === "playground" || metadata?.isPlayground === true;
 }
 
+/** SQL form of `isPlaygroundConversation`, negated, for a conversations table alias. */
+export function notPlaygroundSql(alias: string): string {
+  return `NOT (COALESCE(${alias}.metadata->>'sourceId', '') = 'playground' OR COALESCE(${alias}.metadata->>'isPlayground', '') = 'true')`;
+}
+
 export function isDryRun(metadata: Metadata): boolean {
   if (metadata?.dryRun === true) return true;
   return isPlaygroundConversation(metadata) && metadata?.dryRun !== false;

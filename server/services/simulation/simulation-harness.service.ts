@@ -17,7 +17,7 @@
  * the replay runner and judge (lane L7b) build on that.
  */
 
-import type { EntityManager } from "typeorm";
+import { Not, type EntityManager } from "typeorm";
 import { AppDataSource } from "@server/database/data-source";
 import { Conversation } from "@server/database/entities/conversation.entity";
 import { Message, MessageDirection, MessageType } from "@server/database/entities/message.entity";
@@ -39,7 +39,7 @@ import {
   type PlaybookVersionOverride,
 } from "@server/services/playbook-version-override";
 import { createLogger } from "@server/lib/logger";
-import { SIMULATION_RUN_KIND } from "./simulation-kind";
+import { SETUP_CHECK_RUN_KIND, SIMULATION_RUN_KIND } from "./simulation-kind";
 
 const logger = createLogger("simulation-harness");
 
@@ -159,7 +159,10 @@ export class SimulationHarnessService {
     return AppDataSource.getRepository(SimulationRunItem);
   }
 
-  /** This month's simulated conversations against the organization's cap. */
+  /**
+   * This month's simulated conversations against the organization's cap. Setup test turns are
+   * Hay's own checks and are never counted.
+   */
   async getAllowance(
     organizationId: string,
     manager: EntityManager = AppDataSource.manager,
@@ -171,7 +174,9 @@ export class SimulationHarnessService {
     const used = await manager
       .getRepository(SimulationRunItem)
       .createQueryBuilder("item")
+      .innerJoin(SimulationRun, "run", "run.id = item.run_id")
       .where("item.organization_id = :organizationId", { organizationId })
+      .andWhere("run.kind <> :setupKind", { setupKind: SETUP_CHECK_RUN_KIND })
       .andWhere("item.created_at >= :since", { since: startOfMonthUtc() })
       .andWhere("item.status <> 'skipped'")
       .getCount();
@@ -197,7 +202,8 @@ export class SimulationHarnessService {
         `simulation-allowance:${input.organizationId}`,
       ]);
       const allowance = await this.getAllowance(input.organizationId, manager);
-      if (input.cases.length > allowance.remaining) {
+      // Setup test turns bypass the cap: they are not the customer's simulations.
+      if (input.kind !== SETUP_CHECK_RUN_KIND && input.cases.length > allowance.remaining) {
         throw new SimulationError(
           "LIMIT_REACHED",
           `This run needs ${input.cases.length} simulated conversations; ${allowance.remaining} of ${allowance.limit} are left this month`,
@@ -240,7 +246,7 @@ export class SimulationHarnessService {
 
   async listRuns(organizationId: string, limit = 50): Promise<SimulationRun[]> {
     return this.runs.find({
-      where: { organization_id: organizationId },
+      where: { organization_id: organizationId, kind: Not(SETUP_CHECK_RUN_KIND) },
       order: { created_at: "DESC" },
       take: limit,
     });
@@ -300,6 +306,14 @@ export class SimulationHarnessService {
     }
 
     await this.finishItem(item, error ? "failed" : "completed", { usage, error, verdict });
+    await this.dispatchNext(item.run_id);
+  }
+
+  /** Fail one running item now (a caller's own, shorter timeout) and let its run move on. */
+  async failRunningItem(itemId: string, error: string): Promise<void> {
+    const item = await this.items.findOne({ where: { id: itemId, status: "running" } });
+    if (!item) return;
+    await this.finishItem(item, "failed", { usage: {}, error });
     await this.dispatchNext(item.run_id);
   }
 

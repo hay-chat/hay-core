@@ -10,6 +10,13 @@ type Metadata = Record<string, unknown> | null | undefined;
 
 export const SIMULATION_RUN_KIND = "simulation";
 
+/**
+ * Run kind of the in-app setup board's test turns. These runs are Hay's own readiness checks,
+ * not something the customer started: they do not count against the monthly simulation
+ * allowance, do not need any left, and are not listed with the customer's runs.
+ */
+export const SETUP_CHECK_RUN_KIND = "setup_check";
+
 export function isSimulationConversation(metadata: Metadata): boolean {
   return metadata?.runKind === SIMULATION_RUN_KIND;
 }

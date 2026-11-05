@@ -49,6 +49,21 @@ describe("RetrievalLayer.getRelevantDocuments", () => {
     ]);
   });
 
+  it("keeps a weak match the reply can still be grounded on, and drops noise", async () => {
+    // A short question like "Is there a free trial?" scores about 0.36 on the page that answers it.
+    search.mockResolvedValue([
+      { id: "c1", documentId: "trial", similarity: 0.36 },
+      { id: "c2", documentId: "noise", similarity: 0.2 },
+    ]);
+
+    const docs = await new RetrievalLayer().getRelevantDocuments(
+      [customer("Is there a free trial?")],
+      "org-1",
+    );
+
+    expect(docs).toEqual([{ id: "trial", similarity: 0.36 }]);
+  });
+
   it("searches once when there is a single customer message", async () => {
     search.mockResolvedValue([{ id: "c1", documentId: "d1", similarity: 0.8 }]);
 

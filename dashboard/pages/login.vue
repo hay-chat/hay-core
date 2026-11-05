@@ -302,6 +302,8 @@ const handleSubmit = async () => {
       error.value = t("login.errors.accountLocked");
     } else if (err.message.includes("suspended")) {
       error.value = t("login.errors.accountSuspended");
+    } else if (err.message.includes("Too many")) {
+      error.value = t("login.errors.tooManyRequests");
     } else {
       error.value = t("login.errors.networkError");
     }

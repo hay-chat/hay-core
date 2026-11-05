@@ -10,6 +10,7 @@ import type { ListParams } from "../trpc/middleware/pagination";
 import { Message, MessageType } from "@server/database/entities/message.entity";
 import { createLogger } from "@server/lib/logger";
 import { AGENT_SYSTEM_EVENTS } from "@server/services/webchat/public-message";
+import { notPlaygroundSql } from "../services/core/dry-run";
 import { notSimulationSql } from "../services/simulation/simulation-kind";
 
 const LOCK_DURATION_MS = 15_000;
@@ -418,6 +419,10 @@ export class ConversationRepository extends BaseRepository<Conversation> {
       queryBuilder.andWhere("entity.playbook_id = :playbookId", {
         playbookId: filters.playbookId,
       });
+    }
+
+    if (filters.excludePlayground) {
+      queryBuilder.andWhere(notPlaygroundSql("entity"));
     }
 
     if (filters.hasMessages !== undefined) {

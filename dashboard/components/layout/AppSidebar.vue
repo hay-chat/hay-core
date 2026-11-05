@@ -7,6 +7,7 @@
     <div class="flex min-h-0 flex-1 flex-col overflow-y-auto">
       <NavMain :items="navMain" />
     </div>
+    <SetupSidebarWidget />
     <div class="pb-[max(0.5rem,env(safe-area-inset-bottom))]">
       <NavUser :user="user" />
     </div>
@@ -24,6 +25,7 @@
       <NavMain :items="navMain" />
     </SidebarContent>
     <SidebarFooter>
+      <SetupSidebarWidget class="group-data-[collapsible=icon]:hidden" />
       <NavUser :user="user" />
     </SidebarFooter>
     <SidebarRail />
@@ -37,7 +39,7 @@ import {
   isSettingsTabActive,
   visibleSettingsTabs,
 } from "@/composables/useSettingsNav";
-import { computed, onMounted, ref } from "vue";
+import { computed, onMounted, ref, watch } from "vue";
 import {
   Sparkles,
   Inbox,
@@ -53,10 +55,12 @@ import {
 import OrgSwitcher from "./OrgSwitcher.vue";
 import NavMain from "./NavMain.vue";
 import NavUser from "./NavUser.vue";
+import SetupSidebarWidget from "@/components/setup/SetupSidebarWidget.vue";
 
 import { useUserStore } from "@/stores/user";
 import { useAuthStore } from "@/stores/auth";
 import { useAppStore } from "@/stores/app";
+import { useSetupStore } from "@/stores/setup";
 import { Hay } from "@/utils/api";
 import { roleProtectedRoutes } from "@/middleware/auth.global";
 import type { RouterOutputs } from "@/types/trpc";
@@ -69,6 +73,7 @@ const { t } = useI18n();
 const userStore = useUserStore();
 const authStore = useAuthStore();
 const appStore = useAppStore();
+const setupStore = useSetupStore();
 
 // Get current route
 const route = useRoute();
@@ -121,13 +126,17 @@ const navMain = computed(() => {
   // Get current user role
   const isAdminOrOwner = userStore.isAdmin;
 
-  // Only show "Getting Started" if onboarding is not completed
-  if (!appStore.onboardingCompleted) {
+  // Setup stays in the nav until it is finished, and only for roles that can open it
+  if (setupStore.showInNav) {
     items.push({
-      title: t("nav.gettingStarted"),
-      url: "/getting-started",
+      title: t("setup.nav.title"),
+      url: "/setup",
       icon: Sparkles,
-      isActive: isPathActive("/getting-started"),
+      badge:
+        setupStore.board?.answeredAt && setupStore.totalCount > 0
+          ? `${setupStore.readyCount}/${setupStore.totalCount}`
+          : undefined,
+      isActive: isPathActive("/setup"),
     });
   }
 
@@ -274,8 +283,21 @@ const navMain = computed(() => {
   return items;
 });
 
+// One shared fetch serves this nav item, the widget and the /setup page. Reload when
+// the role resolves (first paint can precede the organization list) and on navigation.
+watch(
+  () => userStore.isAdmin,
+  () => void setupStore.load({ force: true }),
+);
+watch(
+  () => route.path,
+  () => void setupStore.load({ maxAgeMs: 60_000 }),
+);
+
 // Fetch plugin menu items
 onMounted(async () => {
+  void setupStore.load({ maxAgeMs: 60_000 });
+
   try {
     const response = await Hay.plugins.getMenuItems.query();
     pluginMenuItems.value = response.items || [];

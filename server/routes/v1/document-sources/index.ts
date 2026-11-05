@@ -9,19 +9,12 @@ import { pluginManagerService } from "@server/services/plugin-manager.service";
 import { pluginRouterRegistry } from "@server/services/plugin-router-registry.service";
 import { pluginInstanceRepository } from "@server/repositories/plugin-instance.repository";
 import { vectorStoreService } from "@server/services/vector-store.service";
-import {
-  WEBSITE_PLUGIN_ID,
-  WEBSITE_SOURCE_TYPE,
-} from "@server/services/importers/website-importer";
-import { validateUrlForSSRF } from "@server/utils/ssrf";
+import { createWebsiteSource } from "@server/services/website-source.service";
 import { AppDataSource } from "@server/database/data-source";
 import { Job } from "@server/entities/job.entity";
 import { jobRepository } from "@server/repositories/job.repository";
 import { DocumentSource } from "@server/entities/document-source.entity";
 import { createLogger } from "@server/lib/logger";
-
-/** Default re-sync cadence for website sources: incremental delta once a day. */
-const WEBSITE_DEFAULT_SYNC_INTERVAL_MS = 24 * 60 * 60 * 1000;
 
 const logger = createLogger("document-sources");
 
@@ -221,40 +214,9 @@ export const documentSourcesRouter = t.router({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      // Block SSRF (internal IPs, link-local, etc.) before we ever store or fetch.
-      await validateUrlForSSRF(input.url);
-
-      let normalizedUrl: string;
-      let hostname: string;
-      try {
-        const parsed = new URL(input.url);
-        // Normalize to origin so the same site isn't connected twice under
-        // trivially different paths/queries. externalId per page keeps the
-        // full URL.
-        normalizedUrl = parsed.origin;
-        hostname = parsed.hostname;
-      } catch {
-        throw new TRPCError({ code: "BAD_REQUEST", message: "Invalid website URL" });
-      }
-
-      const created = await documentSourceRepository.create({
-        organizationId: ctx.organizationId!,
-        pluginId: WEBSITE_PLUGIN_ID,
-        displayName: input.displayName?.trim() || hostname,
-        sourceType: WEBSITE_SOURCE_TYPE,
-        externalRootId: normalizedUrl,
-        externalRootLabel: hostname,
-        config: { url: normalizedUrl },
-        syncIntervalMs:
-          input.syncIntervalMs === undefined
-            ? WEBSITE_DEFAULT_SYNC_INTERVAL_MS
-            : (input.syncIntervalMs ?? undefined),
-      });
-
-      // Start an initial sweep right away so the source isn't empty while the
-      // user waits for the scheduler.
-      const { jobId } = await documentSourceSyncService.enqueueSync(created.id, {
-        forceFullSweep: true,
+      const { source: created, jobId } = await createWebsiteSource(ctx.organizationId!, input.url, {
+        displayName: input.displayName,
+        syncIntervalMs: input.syncIntervalMs,
       });
 
       return { ...serialize(created), jobId };
