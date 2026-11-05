@@ -13,15 +13,15 @@ import { In } from "typeorm";
 import { AppDataSource } from "@server/database/data-source";
 import { Document, DocumentationStatus } from "@server/entities/document.entity";
 import { vectorStoreService } from "@server/services/vector-store.service";
+import { MIN_DOCUMENT_SIMILARITY } from "@server/services/document-similarity";
 import { LLMService } from "@server/services/core/llm.service";
 import { createLogger } from "@server/lib/logger";
 import type { SetupCheckResult, SetupSource } from "@server/types/setup.types";
 
 const logger = createLogger("setup-check");
 
-/** Passages shown to the model, and the floor under which a chunk is not worth reading. */
+/** Passages shown to the model: the same top chunks the chat retrieves for one question. */
 export const CHECK_PASSAGE_COUNT = 5;
-export const CHECK_MIN_SIMILARITY = 0.25;
 const PASSAGE_MAX_CHARS = 1200;
 const ANSWER_MAX_CHARS = 1000;
 /** Questions checked at once. Each costs one embedding and one model call. */
@@ -127,14 +127,10 @@ export async function findPassages(
   question: string,
 ): Promise<CheckPassage[]> {
   if (!vectorStoreService.initialized) await vectorStoreService.initialize();
-  const results = await vectorStoreService.search(
-    organizationId,
-    question,
-    CHECK_PASSAGE_COUNT + 3,
-  );
+  const results = await vectorStoreService.search(organizationId, question, CHECK_PASSAGE_COUNT);
   const candidates = results.filter(
     (r): r is typeof r & { documentId: string } =>
-      !!r.documentId && (r.similarity ?? 0) >= CHECK_MIN_SIMILARITY && !!r.content?.trim(),
+      !!r.documentId && (r.similarity ?? 0) >= MIN_DOCUMENT_SIMILARITY && !!r.content?.trim(),
   );
   if (candidates.length === 0) return [];
 
@@ -145,7 +141,6 @@ export async function findPassages(
 
   return candidates
     .filter((c) => usable.has(c.documentId))
-    .slice(0, CHECK_PASSAGE_COUNT)
     .map((c, index) => {
       const doc = usable.get(c.documentId)!;
       return {

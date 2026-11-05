@@ -1,5 +1,6 @@
 import { Message } from "@server/database/entities/message.entity";
 import { Playbook } from "@server/database/entities/playbook.entity";
+import { MIN_DOCUMENT_SIMILARITY } from "@server/services/document-similarity";
 import { LLMService } from "../services/core/llm.service";
 import { vectorStoreService } from "@server/services/vector-store.service";
 import { PromptService } from "../services/prompt.service";
@@ -220,11 +221,11 @@ export class RetrievalLayer {
       }
 
       // Filter out low relevance results
-      const filteredResults = searchResults.filter((result) => (result.similarity || 0) > 0.4);
+      const filteredResults = searchResults.filter((result) => (result.similarity || 0) >= MIN_DOCUMENT_SIMILARITY);
 
       log.debug(
         {
-          threshold: 0.4,
+          threshold: MIN_DOCUMENT_SIMILARITY,
           beforeCount: searchResults.length,
           afterCount: filteredResults.length,
           filtered: filteredResults.map((r) => ({
