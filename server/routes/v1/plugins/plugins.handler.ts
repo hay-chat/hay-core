@@ -18,6 +18,7 @@ import { dropManagedOverrides, resolveConfigWithEnv } from "@server/lib/config-r
 import { configEnvAllowList } from "@server/lib/plugin-env";
 import { oauthService } from "@server/services/oauth.service";
 import { auditLogService } from "@server/services/audit-log.service";
+import { createPluginInstallProgress } from "@server/lib/plugin-install-progress";
 import { v4 as uuidv4 } from "uuid";
 import type { HayPluginManifest } from "@server/types/plugin.types";
 import type { AuthMethodDescriptor, ConfigFieldDescriptor } from "@server/types/plugin-sdk.types";
@@ -359,6 +360,8 @@ export const enablePlugin = pluginManageProcedure
     z.object({
       pluginId: z.string(),
       configuration: z.record(z.string(), z.any()).optional(),
+      /** Client-chosen id; when set, each step is reported over the websocket. */
+      progressId: z.string().uuid().optional(),
     }),
   )
   .mutation(async ({ ctx, input }) => {
@@ -387,21 +390,30 @@ export const enablePlugin = pluginManageProcedure
       }
     }
 
+    const progress = createPluginInstallProgress(
+      ctx.organizationId!,
+      input.pluginId,
+      input.progressId,
+    );
+
     try {
-      // Check if plugin needs installation
       if (pluginManagerService.needsInstallation(input.pluginId)) {
         logger.info({ pluginName: plugin.name }, "Starting installation for plugin");
-        await pluginManagerService.installPlugin(input.pluginId);
+        await progress.run("install", () => pluginManagerService.installPlugin(input.pluginId));
+      } else {
+        progress.mark("install", "skipped");
       }
 
-      // Check if plugin needs building
       if (pluginManagerService.needsBuilding(input.pluginId)) {
         logger.info({ pluginName: plugin.name }, "Starting build for plugin");
-        await pluginManagerService.buildPlugin(input.pluginId);
+        await progress.run("build", () => pluginManagerService.buildPlugin(input.pluginId));
+      } else {
+        progress.mark("build", "skipped");
       }
 
       // Only enable plugin if installation and build succeeded
       logger.info({ pluginName: plugin.name }, "Enabling plugin for organization");
+      progress.mark("enable", "active");
       const instance = await pluginInstanceRepository.enablePlugin(
         ctx.organizationId!,
         input.pluginId,
@@ -434,6 +446,7 @@ export const enablePlugin = pluginManageProcedure
           "Failed to register plugin cron jobs",
         );
       }
+      progress.mark("enable", "done");
 
       // For MCP plugins, start the worker immediately so it can register its MCP servers
       const manifest = plugin.manifest as any;
@@ -441,9 +454,11 @@ export const enablePlugin = pluginManageProcedure
 
       if (capabilities.includes("mcp")) {
         logger.info({ pluginName: plugin.name }, "Starting worker for MCP plugin");
+        progress.mark("start", "active");
         try {
           await pluginManagerService.getOrStartWorker(ctx.organizationId!, input.pluginId);
           logger.info({ pluginName: plugin.name }, "Worker started for plugin");
+          progress.mark("start", "done");
         } catch (workerError) {
           logger.error(
             { err: workerError, pluginName: plugin.name },
@@ -451,7 +466,10 @@ export const enablePlugin = pluginManageProcedure
           );
           // Don't fail the entire enable operation if worker fails to start
           // The worker can be started later on-demand
+          progress.mark("start", "skipped");
         }
+      } else {
+        progress.mark("start", "skipped");
       }
 
       return {
