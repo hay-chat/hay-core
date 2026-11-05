@@ -4,6 +4,18 @@
     :class="done ? 'border border-border bg-background-secondary' : 'bg-primary-50'"
     data-testid="setup-up-next"
   >
+    <div
+      v-if="thumbnailUrl"
+      class="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-border bg-background"
+    >
+      <img
+        :src="thumbnailUrl"
+        alt=""
+        class="h-7 w-7 object-contain"
+        data-testid="setup-up-next-thumbnail"
+        @error="thumbnailFailed = true"
+      />
+    </div>
     <div class="min-w-0 flex-1 basis-64">
       <template v-if="checking">
         <p class="text-lg font-medium text-neutral-900">
@@ -58,8 +70,9 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, ref, watch } from "vue";
 import type { SetupUpNext } from "@/stores/setup";
+import { useDomain } from "@/composables/useDomain";
 import { describeUpNext, requestsCount } from "@/composables/useSetupCopy";
 import { buttonLinkClass } from "./styles";
 
@@ -77,6 +90,18 @@ const props = withDefaults(
     writeTo?: string | null;
   }>(),
   { writeTo: null },
+);
+
+const { getApiUrl } = useDomain();
+const thumbnailFailed = ref(false);
+const connectPluginId = computed(() =>
+  props.upNext?.kind === "connect" ? props.upNext.plugin.id : null,
+);
+watch(connectPluginId, () => (thumbnailFailed.value = false));
+const thumbnailUrl = computed(() =>
+  connectPluginId.value && !props.checking && !thumbnailFailed.value
+    ? getApiUrl(`/plugins/thumbnails/${encodeURIComponent(connectPluginId.value)}`)
+    : null,
 );
 
 const emit = defineEmits<{

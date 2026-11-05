@@ -11,6 +11,9 @@ const api = vi.hoisted(() => ({
   generatePlaybooks: vi.fn(),
   turnOnPlaybook: vi.fn(),
 }));
+vi.mock("@/composables/useDomain", () => ({
+  useDomain: () => ({ getApiUrl: (path: string) => `http://api${path}` }),
+}));
 vi.mock("@/utils/api", () => ({
   Hay: {
     setup: {

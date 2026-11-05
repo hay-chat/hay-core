@@ -5,6 +5,9 @@ import { flushPromises } from "@vue/test-utils";
 import { mountWithStubs, stubNuxtGlobals } from "../component-harness";
 import { board, row } from "./fixtures";
 
+vi.mock("@/composables/useDomain", () => ({
+  useDomain: () => ({ getApiUrl: (path: string) => `http://api${path}` }),
+}));
 vi.mock("@/utils/api", () => ({ Hay: {}, HayApi: {} }));
 vi.mock("@/middleware/auth.global", async () => ({
   hasRouteAccess: (await import("./fixtures")).hasRouteAccess,
@@ -185,6 +188,26 @@ describe("SetupRow", () => {
 });
 
 describe("SetupUpNext", () => {
+  const banner = (upNext: unknown, checking = false) =>
+    mountWithStubs(SetupUpNext, {
+      props: { upNext, checking, total: 3, connectTo: "/connect", canInstall: true },
+    } as never);
+  const connect = { kind: "connect", plugin: { id: "acme/x", name: "Acme" }, unlocks: 2 };
+  const thumbnail = "[data-testid=setup-up-next-thumbnail]";
+
+  it("shows the plugin's thumbnail when the next step is connecting it", async () => {
+    const wrapper = banner(connect);
+    expect(wrapper.get(thumbnail).attributes("src")).toBe("http://api/plugins/thumbnails/acme%2Fx");
+
+    await wrapper.get(thumbnail).trigger("error");
+    expect(wrapper.find(thumbnail).exists()).toBe(false);
+  });
+
+  it("shows no thumbnail while checking or when no plugin is named", () => {
+    expect(banner(connect, true).find(thumbnail).exists()).toBe(false);
+    expect(banner({ kind: "done" }).find(thumbnail).exists()).toBe(false);
+  });
+
   beforeEach(() => stubNuxtGlobals());
 
   const mountNext = (upNext: unknown, props = {}) =>
