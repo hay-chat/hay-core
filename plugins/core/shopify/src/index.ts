@@ -505,6 +505,7 @@ export default defineHayPlugin((globalCtx) => {
           ],
           default: "oauth",
           required: true,
+          advanced: true,
         },
         shopDomain: {
           type: "string",
@@ -537,6 +538,7 @@ export default defineHayPlugin((globalCtx) => {
           label: "Admin API version",
           description: "Shopify Admin API version to use.",
           default: "2026-04",
+          advanced: true,
         },
         couponsEnabled: {
           type: "boolean",
