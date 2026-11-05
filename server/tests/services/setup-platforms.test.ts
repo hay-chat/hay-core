@@ -57,6 +57,33 @@ describe("platform rows follow the platform that really handles the request", ()
     expect(board.upNext).toEqual({ kind: "choose_platform", unlocks: 1, capability: "refunds" });
   });
 
+  it("offers choose_platform instead of guessing when answers were saved with no tools picked", () => {
+    const board = run([need("refund", "refunds")], [shop]);
+    expect(board.rows[0].plugin).toBeDefined(); // not yet answered: manifests still suggest
+
+    const saved = (plugins: BoardPlugin[]) =>
+      buildBoard({
+        setup: {
+          businessType: "store",
+          toolPluginIds: [],
+          channels: [],
+          questions: [need("refund", "refunds")],
+          answeredAt: NOW,
+        },
+        site: { state: { state: "done", discovered: 0, processed: 0 } },
+        plugins,
+        playbooks: [],
+        hasRealConversations: false,
+      });
+    const unchosen = saved([shop]);
+    expect(unchosen.rows[0]).toMatchObject({ status: "needs_connection" });
+    expect(unchosen.rows[0].plugin).toBeUndefined();
+    expect(unchosen.upNext).toEqual({ kind: "choose_platform", unlocks: 1, capability: "refunds" });
+
+    // A platform really connected afterwards is still used.
+    expect(saved([{ ...shop, connected: true }]).rows[0].plugin?.id).toBe("shop");
+  });
+
   it("does not suggest a platform meant for another business type", () => {
     const booking = plugin({ id: "cal", handles: ["bookings"], businessTypes: ["service"] });
     expect(run([need("book", "bookings")], [booking]).rows[0].plugin).toBeUndefined();

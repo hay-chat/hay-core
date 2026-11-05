@@ -41,6 +41,8 @@ export interface SetupSource {
   documentId: string;
   title: string;
   url?: string;
+  /** Set on board rows when this is the customer's own saved answer, not a page of their site. */
+  own?: boolean;
 }
 
 /** Result of asking whether this organization's documents really answer a question. */
@@ -62,6 +64,8 @@ export interface SetupQuestion {
   playbookId?: string;
   /** Set when generating a playbook found no suitable tool or failed, so we never retry silently. */
   playbookAttempt?: { outcome: "no_tool" | "failed"; at: string };
+  /** The document holding the answer the customer wrote for this question. */
+  answerDocumentId?: string;
   check?: SetupCheckResult;
 }
 

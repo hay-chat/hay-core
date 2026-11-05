@@ -98,18 +98,16 @@ describe("useSetupTestChat", () => {
     expect(api.create).toHaveBeenCalledTimes(1);
   });
 
-  it("shows the reply from the socket with the asked row's sources, and stops waiting", async () => {
+  it("shows the reply from the socket and stops waiting", async () => {
     const { chat } = mountChat();
-    const sources = [{ documentId: "d1", title: "Returns page" }];
-    await chat.send("What is your return policy?", sources);
+    await chat.send("What is your return policy?");
     expect(chat.awaitingReply.value).toBe(true);
     expect(chat.typing.value).toBe(true);
 
     socket.handlers.get("message")?.(botReply("b1", "30 days."));
     expect(chat.awaitingReply.value).toBe(false);
     expect(chat.typing.value).toBe(false);
-    const reply = chat.entries.value.find((e) => e.message.id === "b1");
-    expect(reply?.sources).toEqual(sources);
+    expect(chat.entries.value.some((e) => e.message.id === "b1")).toBe(true);
     expect(chat.entries.value[0].message.deliveryState).toBe("sent");
     expect(vi.getTimerCount()).toBe(0);
   });
@@ -123,8 +121,7 @@ describe("useSetupTestChat", () => {
     };
     api.get.mockResolvedValue({ messages: [greeting] });
     const { chat } = mountChat();
-    const sources = [{ documentId: "d1", title: "Pricing page" }];
-    await chat.send("How much is it?", sources);
+    await chat.send("How much is it?");
 
     expect(chat.entries.value.map((e) => e.message.id)[0]).toBe("g1");
     expect(chat.awaitingReply.value).toBe(true);
@@ -137,10 +134,54 @@ describe("useSetupTestChat", () => {
 
     socket.handlers.get("message")?.(botReply("b1", "From 50 a month."));
     expect(chat.awaitingReply.value).toBe(false);
-    expect(chat.entries.value.find((e) => e.message.id === "b1")?.sources).toEqual(sources);
+    expect(chat.entries.value.some((e) => e.message.id === "b1")).toBe(true);
   });
 
-  it("shows the documents retrieved for a typed question as the reply's sources", async () => {
+  it("names no source on a handed-off reply, and asks the next question in a new conversation", async () => {
+    const { chat } = mountChat();
+    await chat.send("Is there a free trial?");
+    api.create.mockResolvedValue({ id: "conv-2" });
+
+    const handoff = botReply("h1", "I've passed this to the team.");
+    handoff.data.metadata = { handoffType: "available" } as never;
+    socket.handlers.get("message")?.(handoff);
+
+    const reply = chat.entries.value.find((e) => e.message.id === "h1");
+    expect(reply?.handedOff).toBe(true);
+    expect(reply?.sources).toEqual([]);
+
+    await chat.send("Do you offer refunds?");
+    expect(api.update).toHaveBeenCalledWith(expect.objectContaining({ data: { status: "closed" } }));
+    expect(api.create).toHaveBeenCalledTimes(2);
+    expect(api.sendMessage.mock.calls.at(-1)?.[0].conversationId).toBe("conv-2");
+  });
+
+  it("does not greet twice when a new conversation starts", async () => {
+    const greeting = (id: string) => ({
+      id,
+      content: "Hi",
+      type: "BotAgent",
+      metadata: { isGreeting: true },
+      created_at: "2026-11-05T12:00:00.000Z",
+    });
+    api.get.mockResolvedValue({ messages: [greeting("g1")] });
+    const { chat } = mountChat();
+    await chat.send("One?");
+
+    const handoff = botReply("h1", "Passed on.");
+    handoff.data.metadata = { handoffType: "available" } as never;
+    socket.handlers.get("message")?.(handoff);
+
+    api.create.mockResolvedValue({ id: "conv-2" });
+    api.get.mockResolvedValue({ messages: [greeting("g2")] });
+    await chat.send("Two?");
+
+    const ids = chat.entries.value.map((e) => e.message.id);
+    expect(ids).toContain("g1");
+    expect(ids).not.toContain("g2");
+  });
+
+  it("shows the closest retrieved document as each reply's source", async () => {
     const message = (id: string, type: string, at: string, metadata?: object) => ({
       id,
       content: id,
@@ -171,7 +212,8 @@ describe("useSetupTestChat", () => {
       chat.entries.value.find((e) => e.message.id === id)?.sources.map((s) => s.title);
     expect(sourcesOf("g1")).toEqual([]);
     expect(sourcesOf("r1")).toEqual(["Free trial"]);
-    expect(sourcesOf("r2")).toEqual(["Pricing"]);
+    // The same page can answer a later question too; it isn't dropped for having appeared before.
+    expect(sourcesOf("r2")).toEqual(["Free trial"]);
   });
 
   it("ignores messages from other conversations", async () => {

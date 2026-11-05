@@ -20,6 +20,9 @@
           :show-timestamp="false"
           @retry="retry"
         />
+        <p v-if="entry.handedOff" class="ml-11 text-xs text-neutral-muted">
+          {{ $t("setup.chat.handedOff") }}
+        </p>
         <p v-if="sourcesFor(entry).length" class="ml-11 text-xs text-neutral-muted">
           {{ $t("setup.chat.source") }}:
           <template v-for="(source, index) in sourcesFor(entry)" :key="source.documentId">
@@ -31,9 +34,9 @@
               rel="noopener noreferrer"
               class="font-medium text-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
-              {{ source.title }}
+              {{ pageTitle(source.title) }}
             </a>
-            <span v-else class="font-medium text-primary">{{ source.title }}</span>
+            <span v-else class="font-medium text-primary">{{ pageTitle(source.title) }}</span>
           </template>
         </p>
       </div>
@@ -79,11 +82,12 @@
 </template>
 
 <script setup lang="ts">
-import { nextTick, ref, watch } from "vue";
+import { computed, nextTick, ref, watch } from "vue";
 import { ArrowUp } from "lucide-vue-next";
 import ChatMessage from "@/components/ChatMessage.vue";
 import { useSetupTestChat } from "@/composables/useSetupTestChat";
 import type { SetupRow } from "@/stores/setup";
+import { pageTitle } from "@/utils/format";
 
 type SetupSource = SetupRow["sources"][number];
 
@@ -98,8 +102,9 @@ const submit = async () => {
   await send(text);
 };
 
-/** Sources the setup check found, else the documents the real reply drew on. */
+/** What this reply really drew on. A handed-off reply didn't answer from anything. */
 const sourcesFor = (entry: (typeof entries.value)[number]): SetupSource[] => {
+  if (entry.handedOff) return [];
   if (entry.sources.length) return entry.sources;
   return (entry.message.metadata?.documentsUsed ?? []).map((doc) => ({
     documentId: doc.id,
@@ -115,8 +120,9 @@ watch(
   },
 );
 
-/** "Try it" on a ready row: ask its question and show the row's sources. */
-const ask = (text: string, sources: SetupSource[] = []) => send(text, sources);
+/** "Try it" on a ready row: asks its question, and the reply shows what it really used. */
+const ask = (text: string) => send(text);
+const busy = computed(() => sending.value || awaitingReply.value);
 
-defineExpose({ ask });
+defineExpose({ ask, busy });
 </script>

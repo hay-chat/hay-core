@@ -93,6 +93,21 @@ describe("row statuses", () => {
     expect(board.rows[0]).toMatchObject({ answer: "30 days", sources });
   });
 
+  it("marks the customer's own saved answer, and it survives a recheck", () => {
+    const sources = [
+      { documentId: "own", title: "a" },
+      { documentId: "page", title: "Returns" },
+    ];
+    const question = {
+      ...doc("a", { outcome: "answered", answer: "30 days", sources, checkedAt: NOW }),
+      answerDocumentId: "own",
+    };
+    const board = buildBoard(
+      facts({ setup: { toolPluginIds: [], channels: [], questions: [question] } }),
+    );
+    expect(board.rows[0].sources.map((s) => s.own)).toEqual([true, undefined]);
+  });
+
   it("platform questions need a connection until a playbook exists; plugin comes from handles", () => {
     const q: SetupQuestion = { id: "o", text: "Where?", source: "catalog", needs: "orders" };
     const plugins = [

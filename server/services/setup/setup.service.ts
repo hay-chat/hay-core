@@ -25,6 +25,7 @@ import {
   type SetupCheckResult,
   type SetupQuestion,
   type SetupSettings,
+  type SetupSource,
   type SetupSuggestions,
 } from "@server/types/setup.types";
 import {
@@ -354,14 +355,19 @@ function checkOnce(organizationId: string, question: SetupQuestion): Promise<Set
 /** Writes results onto the freshly read settings, skipping questions removed or reworded meanwhile. */
 async function saveChecks(
   organizationId: string,
-  results: { id: string; text: string; result: SetupCheckResult }[],
+  results: { id: string; text: string; result: SetupCheckResult; answerDocumentId?: string }[],
 ): Promise<SetupSettings> {
   return updateSetup(organizationId, (current) => {
     return {
       ...current,
       questions: current.questions.map((q) => {
         const hit = results.find((r) => r.id === q.id && r.text === q.text);
-        return hit ? { ...q, check: hit.result } : q;
+        if (!hit) return q;
+        return {
+          ...q,
+          check: hit.result,
+          ...(hit.answerDocumentId ? { answerDocumentId: hit.answerDocumentId } : {}),
+        };
       }),
     };
   });
@@ -416,18 +422,14 @@ export async function addAnswer(
 
   // The customer just wrote the answer to this exact question and it is embedded, so a "not
   // answered" verdict would be wrong: record their own text. A failed check stays failed.
+  const mine: SetupSource = { documentId: document.id, title: document.title };
   const result: SetupCheckResult =
     rechecked.outcome === "not_answered"
-      ? {
-          outcome: "answered",
-          answer,
-          sources: [{ documentId: document.id, title: document.title }],
-          checkedAt: rechecked.checkedAt,
-        }
+      ? { outcome: "answered", answer, sources: [mine], checkedAt: rechecked.checkedAt }
       : rechecked;
 
   const saved = await saveChecks(organizationId, [
-    { id: question.id, text: question.text, result },
+    { id: question.id, text: question.text, result, answerDocumentId: document.id },
   ]);
   return boardFor(organizationId, saved);
 }

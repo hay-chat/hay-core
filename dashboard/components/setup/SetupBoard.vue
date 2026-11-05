@@ -26,6 +26,7 @@
       <div class="flex flex-wrap items-center gap-2">
         <Button
           v-if="canInstall"
+          id="setup-install-trigger"
           variant="outline"
           :aria-expanded="installOpen"
           aria-controls="setup-install-panel"
@@ -91,10 +92,18 @@
           <b class="whitespace-nowrap font-medium text-neutral-900" aria-live="polite">
             {{ $t("setup.board.ready", { ready: readyShown, total: board.rows.length }) }}
           </b>
-          <Progress :value="readyPercent" class="h-1.5 max-w-[220px] flex-1" />
+          <Progress
+            :value="readyPercent"
+            class="h-1.5 max-w-[220px] flex-1"
+            :aria-label="$t('setup.board.progressLabel')"
+          />
         </div>
 
-        <ul v-if="board.rows.length" data-testid="setup-rows">
+        <ul
+          v-if="board.rows.length"
+          class="min-[1360px]:grid min-[1360px]:grid-cols-[minmax(0,1.15fr)_auto_minmax(0,1.3fr)_auto_2rem]"
+          data-testid="setup-rows"
+        >
           <SetupRow
             v-for="(row, index) in board.rows"
             :key="row.id"
@@ -111,7 +120,8 @@
             :turning-on="turningOnId === row.id"
             :turn-on-error="turnOnErrorId === row.id"
             :connect-failure="rowConnectFailure(row)"
-            @try="chat?.ask(row.text, row.sources)"
+            :try-disabled="Boolean(chat?.busy)"
+            @try="tryRow(row.text)"
             @toggle="toggleRow(row.id)"
             @remove="removeRow(row.id)"
             @retry="actions.retryRow(row.id)"
@@ -127,7 +137,7 @@
           :description="$t('setup.board.emptyDescription')"
         />
 
-        <form class="mt-3 flex items-end gap-2" @submit.prevent="addQuestion">
+        <form ref="addForm" class="mt-3 flex items-end gap-2" @submit.prevent="addQuestion">
           <div class="min-w-0 flex-1">
             <Input
               v-model="newQuestion"
@@ -219,6 +229,19 @@ const chat = ref<InstanceType<typeof SetupTestChat> | null>(null);
 // --- The one-time settle: rows read "checking", then reveal their real status.
 const revealed = ref(0);
 const settledOnce = ref(false);
+
+/** "Try it" asks the question. The chat sits below the rows on phones, so bring it into view. */
+const tryRow = (text: string) => {
+  const target = chat.value;
+  if (!target) return;
+  void target.ask(text);
+  if (window.matchMedia?.("(min-width: 1024px)").matches) return;
+  const reduceMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+  (target.$el as HTMLElement | undefined)?.scrollIntoView?.({
+    behavior: reduceMotion ? "auto" : "smooth",
+    block: "start",
+  });
+};
 let revealTimer: ReturnType<typeof setInterval> | null = null;
 
 const clearReveal = () => {
@@ -247,12 +270,14 @@ const settle = () => {
   }, 80);
 };
 
+// Coming back to the board with no check in flight shows the result at once, without the band.
+if (!props.checking) finishSettle();
+
 watch(
   () => props.checking,
   (checking) => {
     if (!checking) settle();
   },
-  { immediate: true },
 );
 
 onBeforeUnmount(clearReveal);
@@ -304,8 +329,11 @@ const installOpen = ref(false);
 const openInstall = () => {
   installOpen.value = true;
 };
-const closeInstall = () => {
+const closeInstall = async () => {
   installOpen.value = false;
+  // The panel held focus; give it back to the button that opened it.
+  await nextTick();
+  document.getElementById("setup-install-trigger")?.focus();
 };
 const toggleInstall = () => {
   installOpen.value = !installOpen.value;
@@ -358,11 +386,23 @@ const saveAnswer = async (id: string, answer: string) => {
   else errorId.value = id;
 };
 
+const addForm = ref<HTMLFormElement | null>(null);
 const removeFailed = ref(false);
 const removeRow = async (id: string) => {
   removeFailed.value = false;
   if (openId.value === id) openId.value = null;
+  // The remove button goes with its row: focus the next row's, else the previous one's.
+  const index = props.board.rows.findIndex((r) => r.id === id);
+  const neighbour = props.board.rows[index + 1] ?? props.board.rows[index - 1];
   removeFailed.value = !(await props.actions.removeQuestion(id));
+  if (removeFailed.value) return;
+  await nextTick();
+  const next = neighbour
+    ? document.querySelector<HTMLElement>(
+        `[data-row-id="${neighbour.id}"] [data-row-action="remove"]`,
+      )
+    : null;
+  (next ?? addForm.value?.querySelector("input"))?.focus();
 };
 
 const newQuestion = ref("");

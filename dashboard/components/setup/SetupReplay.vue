@@ -40,7 +40,11 @@
           </li>
         </ul>
         <p v-if="report.notJudged > 0" class="mt-2 text-sm text-neutral-muted">
-          {{ $t("setup.replay.notJudged", { count: report.notJudged }) }}
+          {{
+            $t(`setup.replay.notJudged${report.notJudged === 1 ? "One" : "Other"}`, {
+              count: report.notJudged,
+            })
+          }}
         </p>
         <p v-if="report.run.status === 'capped'" class="mt-2 text-sm text-neutral-muted">
           {{ $t("setup.replay.capped") }}
@@ -57,7 +61,11 @@
         {{ $t("setup.replay.nothingJudged") }}
       </p>
 
-      <p v-if="!running" class="mt-3 text-sm text-neutral-muted" data-testid="replay-cost">
+      <p
+        v-if="!running && imported > 0"
+        class="mt-3 text-sm text-neutral-muted"
+        data-testid="replay-cost"
+      >
         {{ costLine }}
       </p>
       <p v-if="startError" class="mt-2 text-sm text-destructive" role="alert">
@@ -71,12 +79,18 @@
       <div class="mt-3 flex flex-wrap items-center gap-2">
         <Button
           v-if="canReplay"
-          :variant="report ? 'outline' : 'default'"
+          variant="outline"
           :loading="starting"
           :disabled="outOfAllowance"
           @click="start"
         >
-          {{ report ? $t("setup.replay.again") : $t("setup.replay.run", { count: replayCount }) }}
+          {{
+            report
+              ? $t("setup.replay.again")
+              : $t(`setup.replay.run${replayCount === 1 ? "One" : "Other"}`, {
+                  count: replayCount,
+                })
+          }}
         </Button>
         <Button
           v-if="canImport"

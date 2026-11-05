@@ -51,16 +51,16 @@ export function useSetupTestChat() {
   const websocket = useWebSocket({ disconnectOnUnmount: false });
 
   const messages = ref<Message[]>([]);
-  const sourcesByMessage = ref<Record<string, SetupSource[]>>({});
   /** What retrieval gave the pipeline. It logs these as `Document` messages, seen only by polling. */
-  const retrieved = ref<Array<SetupSource & { at: number }>>([]);
+  const retrieved = ref<Array<SetupSource & { messageId: string; at: number }>>([]);
   const conversationId = ref<string | null>(null);
   const sending = ref(false);
   const awaitingReply = ref(false);
   const typing = ref(false);
   const error = ref<SetupChatError>(null);
 
-  let pendingSources: SetupSource[] = [];
+  /** The AI stops answering a conversation it handed off, so the next question needs a new one. */
+  let handedOff = false;
   let pollTimer: ReturnType<typeof setTimeout> | null = null;
   let replyDeadline: ReturnType<typeof setTimeout> | null = null;
   let lastQuestion = "";
@@ -99,9 +99,17 @@ export function useSetupTestChat() {
     clearTimers();
   };
 
-  /** Add or update one message; a new bot reply ends the wait and takes the question's sources. */
+  /** Add or update one message; a new bot reply ends the wait. */
   const upsert = (incoming: Message) => {
     if (!VISIBLE_TYPES.includes(incoming.type)) return;
+    // A fresh conversation greets again; the chat already said hello.
+    if (
+      incoming.metadata?.isGreeting &&
+      messages.value.some((m) => m.metadata?.isGreeting && m.id !== incoming.id)
+    ) {
+      return;
+    }
+    if (incoming.metadata?.handoffType) handedOff = true;
 
     const optimistic =
       incoming.type === MessageType.CUSTOMER
@@ -119,8 +127,6 @@ export function useSetupTestChat() {
     else messages.value.push(incoming);
 
     if (existing === -1 && incoming.type !== MessageType.CUSTOMER && awaitingReply.value) {
-      if (pendingSources.length) sourcesByMessage.value[incoming.id] = pendingSources;
-      pendingSources = [];
       finishWaiting();
       // A reply from the socket can beat the documents it drew on, so fetch those now.
       void reconcile();
@@ -142,8 +148,9 @@ export function useSetupTestChat() {
   const upsertServerMessage = (m: ServerMessage) => {
     const documentId = m.metadata?.documentId;
     if (m.type === MessageType.DOCUMENT && documentId) {
-      if (!retrieved.value.some((doc) => doc.documentId === documentId)) {
+      if (!retrieved.value.some((doc) => doc.messageId === m.id)) {
         retrieved.value.push({
+          messageId: m.id,
           documentId,
           title: m.metadata?.documentTitle ?? "",
           at: new Date(m.created_at).getTime(),
@@ -157,7 +164,13 @@ export function useSetupTestChat() {
         m.content,
         m.type,
         new Date(m.created_at),
-        m.metadata?.documentsUsed ? { documentsUsed: m.metadata.documentsUsed } : undefined,
+        m.metadata
+          ? {
+              ...(m.metadata.documentsUsed ? { documentsUsed: m.metadata.documentsUsed } : {}),
+              ...(m.metadata.handoffType ? { handoffType: m.metadata.handoffType } : {}),
+              ...(m.metadata.isGreeting ? { isGreeting: true } : {}),
+            }
+          : undefined,
         m.status,
       ),
     );
@@ -214,7 +227,20 @@ export function useSetupTestChat() {
     );
   };
 
+  const closeConversation = () => {
+    if (!conversationId.value) return;
+    void Hay.conversations.update
+      .mutate({ id: conversationId.value, data: { status: "closed" } })
+      .catch(() => {});
+  };
+
   const ensureConversation = async (): Promise<string | null> => {
+    if (handedOff) {
+      unsubscribers.splice(0).forEach((off) => off());
+      closeConversation();
+      conversationId.value = null;
+      handedOff = false;
+    }
     if (conversationId.value) return conversationId.value;
     try {
       const created = await Hay.conversations.create.mutate({
@@ -233,8 +259,8 @@ export function useSetupTestChat() {
     }
   };
 
-  /** Ask one question. `sources` are shown under the reply that answers it. */
-  const send = async (text: string, sources: SetupSource[] = []): Promise<void> => {
+  /** Ask one question. */
+  const send = async (text: string): Promise<void> => {
     const content = text.trim();
     if (!content || sending.value || awaitingReply.value) return;
 
@@ -249,7 +275,6 @@ export function useSetupTestChat() {
       const optimistic = toMessage(tempId, content, MessageType.CUSTOMER, new Date(), undefined);
       optimistic.deliveryState = "pending";
       messages.value.push(optimistic);
-      pendingSources = sources;
 
       try {
         const result = await Hay.conversations.sendMessage.mutate({
@@ -271,7 +296,6 @@ export function useSetupTestChat() {
         if (index !== -1) {
           messages.value[index] = { ...messages.value[index], deliveryState: "failed" };
         }
-        pendingSources = [];
       }
     } finally {
       sending.value = false;
@@ -288,19 +312,23 @@ export function useSetupTestChat() {
   };
 
   /**
-   * Every message the pipeline produced, with its sources: the asked row's when there are any,
-   * else the documents retrieved since the previous reply.
+   * Every message the pipeline produced, with the closest document retrieved since the previous
+   * reply. A handed-off reply lists none: the assistant didn't answer from it.
    */
   const entries = computed(() => {
     let previousReplyAt = 0;
     return messages.value.map((message) => {
-      if (message.type === MessageType.CUSTOMER) return { message, sources: [] as SetupSource[] };
+      if (message.type === MessageType.CUSTOMER) {
+        return { message, sources: [] as SetupSource[], handedOff: false };
+      }
       const replyAt = new Date(message.created_at).getTime();
       const found = retrieved.value
         .filter((doc) => doc.at > previousReplyAt && doc.at <= replyAt)
+        .slice(0, 1)
         .map(({ documentId, title }) => ({ documentId, title }));
       previousReplyAt = replyAt;
-      return { message, sources: sourcesByMessage.value[message.id] ?? found };
+      const isHandoff = Boolean(message.metadata?.handoffType);
+      return { message, sources: isHandoff ? [] : found, handedOff: isHandoff };
     });
   });
 
@@ -309,11 +337,7 @@ export function useSetupTestChat() {
     clearTimers();
     unsubscribers.splice(0).forEach((off) => off());
     // Playground conversations are throwaway: close so they don't linger as open.
-    if (conversationId.value) {
-      void Hay.conversations.update
-        .mutate({ id: conversationId.value, data: { status: "closed" } })
-        .catch(() => {});
-    }
+    closeConversation();
   };
 
   onBeforeUnmount(dispose);

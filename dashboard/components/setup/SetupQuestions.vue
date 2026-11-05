@@ -18,7 +18,12 @@
 
       <!-- 1. Website and business type -->
       <div v-if="step === 0">
-        <h1 :id="headingId" ref="heading" tabindex="-1" class="text-2xl outline-none md:text-3xl">
+        <h1
+          :id="headingId"
+          ref="heading"
+          tabindex="-1"
+          class="text-2xl text-neutral-900 outline-none md:text-3xl"
+        >
           {{ $t("setup.questions.type.title") }}
         </h1>
         <p class="mt-2 text-neutral-muted">{{ $t("setup.questions.type.description") }}</p>
@@ -77,7 +82,12 @@
 
       <!-- 2. Tools and channels -->
       <div v-else-if="step === 1">
-        <h1 :id="headingId" ref="heading" tabindex="-1" class="text-2xl outline-none md:text-3xl">
+        <h1
+          :id="headingId"
+          ref="heading"
+          tabindex="-1"
+          class="text-2xl text-neutral-900 outline-none md:text-3xl"
+        >
           {{ $t("setup.questions.tools.title") }}
         </h1>
         <p class="mt-2 text-neutral-muted">{{ $t("setup.questions.tools.description") }}</p>
@@ -141,7 +151,12 @@
 
       <!-- 3. Questions -->
       <div v-else>
-        <h1 :id="headingId" ref="heading" tabindex="-1" class="text-2xl outline-none md:text-3xl">
+        <h1
+          :id="headingId"
+          ref="heading"
+          tabindex="-1"
+          class="text-2xl text-neutral-900 outline-none md:text-3xl"
+        >
           {{ $t("setup.questions.ask.title") }}
         </h1>
         <p class="mt-2 text-neutral-muted">{{ $t("setup.questions.ask.description") }}</p>

@@ -9,7 +9,7 @@
     <b class="font-medium text-neutral-900">
       {{ $t("setup.nav.progress", { ready: store.readyCount, total: store.totalCount }) }}
     </b>
-    <Progress :value="percent" class="h-1.5" />
+    <Progress :value="percent" class="h-1.5" :aria-label="$t('setup.nav.widgetLabel')" />
     <span v-if="copy" class="text-neutral-muted">
       {{ $t("setup.nav.upNext", { title: copy.title }) }}
     </span>

@@ -76,14 +76,23 @@ describe("SetupReplay", () => {
   });
   afterEach(() => vi.useRealTimers());
 
-  it("starts with an import and says what a replay costs", async () => {
+  it("starts with an import and stays quiet about cost until something is imported", async () => {
     const wrapper = await mountReplay();
     expect(button(wrapper, "setup.replay.import")).toBeDefined();
-    expect(button(wrapper, 'setup.replay.run {"count":0}')).toBeUndefined();
+    expect(button(wrapper, 'setup.replay.runOther {"count":0}')).toBeUndefined();
+    expect(wrapper.find("[data-testid=replay-cost]").exists()).toBe(false);
+    expect(wrapper.find("[data-testid=replay-counts]").exists()).toBe(false);
+  });
+
+  it("says what a replay costs once there is something to replay, on a quiet button", async () => {
+    api.transcripts.mockResolvedValue({ items: [{ id: "t1" }], total: 1 });
+    const wrapper = await mountReplay();
     expect(wrapper.get("[data-testid=replay-cost]").text()).toBe(
       'setup.replay.cost {"remaining":150,"limit":200}',
     );
-    expect(wrapper.find("[data-testid=replay-counts]").exists()).toBe(false);
+    expect(button(wrapper, 'setup.replay.runOne {"count":1}')!.attributes("variant")).toBe(
+      "outline",
+    );
   });
 
   it("opens the existing import dialog", async () => {
@@ -99,7 +108,7 @@ describe("SetupReplay", () => {
       report({ run: { id: "run-9", status: "running" }, inProgress: 4, sampleSize: 2 }),
     );
     const wrapper = await mountReplay();
-    await button(wrapper, 'setup.replay.run {"count":20}')!.trigger("click");
+    await button(wrapper, 'setup.replay.runOther {"count":20}')!.trigger("click");
     await flushPromises();
     expect(api.start).toHaveBeenCalledWith({
       transcriptIds: ["t1", "t2"],
@@ -159,7 +168,9 @@ describe("SetupReplay", () => {
     api.allowance.mockResolvedValue({ limit: 200, used: 200, remaining: 0 });
     const wrapper = await mountReplay();
     expect(wrapper.text()).toContain("setup.replay.allowanceUsed");
-    expect(button(wrapper, 'setup.replay.run {"count":1}')!.attributes("disabled")).toBeDefined();
+    expect(
+      button(wrapper, 'setup.replay.runOne {"count":1}')!.attributes("disabled"),
+    ).toBeDefined();
   });
 
   it("reports a refused start from the server as the allowance", async () => {
@@ -169,7 +180,7 @@ describe("SetupReplay", () => {
       Object.assign(Object.create(TRPCClientError.prototype), { data: { code: "FORBIDDEN" } }),
     );
     const wrapper = await mountReplay();
-    await button(wrapper, 'setup.replay.run {"count":1}')!.trigger("click");
+    await button(wrapper, 'setup.replay.runOne {"count":1}')!.trigger("click");
     await flushPromises();
     expect(wrapper.get("[role=alert]").text()).toBe("setup.replay.allowanceUsed");
   });

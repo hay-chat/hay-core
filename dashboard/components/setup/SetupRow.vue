@@ -1,12 +1,20 @@
 <template>
-  <li class="border-b border-border" :data-status="displayStatus" :data-row-id="row.id">
+  <!-- Below 1360px a row stacks; from there the list is the grid and each row a subgrid of it, so
+       pills and reasons line up between rows. -->
+  <li
+    ref="rowEl"
+    class="border-b border-border min-[1360px]:col-span-full min-[1360px]:grid min-[1360px]:grid-cols-subgrid"
+    :data-status="displayStatus"
+    :data-row-id="row.id"
+  >
     <div
-      class="grid grid-cols-[minmax(0,1fr)_2.75rem] items-center gap-x-2 gap-y-1 py-3 md:grid-cols-[minmax(0,1.15fr)_9rem_minmax(0,1.3fr)_auto_2rem] md:gap-x-3"
+      class="grid grid-cols-[minmax(0,1fr)_2.75rem] items-center gap-x-2 gap-y-1 py-3 min-[1360px]:col-span-full min-[1360px]:grid-cols-subgrid min-[1360px]:gap-x-3"
     >
-      <span class="col-start-1 font-medium text-neutral-900 md:col-start-1">{{ row.text }}</span>
+      <span class="col-start-1 font-medium text-neutral-900">{{ row.text }}</span>
       <button
         type="button"
-        class="col-start-2 row-start-1 grid h-11 w-11 place-items-center justify-self-end rounded-md text-neutral-muted hover:bg-accent hover:text-neutral-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:col-start-5 md:h-8 md:w-8"
+        data-row-action="remove"
+        class="col-start-2 row-start-1 grid h-11 w-11 place-items-center justify-self-end rounded-md text-neutral-muted hover:bg-accent hover:text-neutral-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring min-[1360px]:col-start-5 min-[1360px]:h-8 min-[1360px]:w-8"
         :aria-label="$t('setup.board.remove', { question: row.text })"
         :title="$t('setup.board.removeTitle')"
         @click="emit('remove')"
@@ -14,21 +22,33 @@
         <X class="h-4 w-4" aria-hidden="true" />
       </button>
 
-      <span class="col-span-2 md:col-span-1 md:col-start-2 md:row-start-1">
-        <Badge :key="displayStatus" :variant="badgeVariant" class="setup-settle">
+      <span
+        class="col-span-2 min-[1360px]:col-span-1 min-[1360px]:col-start-2 min-[1360px]:row-start-1"
+      >
+        <Badge :key="displayStatus" :variant="badgeVariant" :class="['setup-settle', badgeClass]">
           {{ $t(`setup.status.${displayStatus}`) }}
         </Badge>
       </span>
 
       <span
-        class="col-span-2 text-sm text-neutral-muted md:col-span-1 md:col-start-3 md:row-start-1"
+        class="col-span-2 text-sm text-neutral-muted min-[1360px]:col-span-1 min-[1360px]:col-start-3 min-[1360px]:row-start-1"
       >
         {{ why }}
       </span>
 
-      <span class="col-span-2 md:col-span-1 md:col-start-4 md:row-start-1 md:text-right">
+      <span
+        class="col-span-2 min-[1360px]:col-span-1 min-[1360px]:col-start-4 min-[1360px]:row-start-1 min-[1360px]:text-right"
+      >
         <template v-if="displayStatus === 'ready'">
-          <Button variant="link" size="sm" class="min-h-11 md:min-h-0" @click="emit('try')">
+          <Button
+            variant="link"
+            size="sm"
+            data-row-action="primary"
+            class="min-h-11 md:min-h-0"
+            :disabled="tryDisabled"
+            :aria-label="$t('setup.action.tryItFor', { question: row.text })"
+            @click="emit('try')"
+          >
             {{ $t("setup.action.tryIt") }}
           </Button>
         </template>
@@ -36,20 +56,29 @@
           <Button
             variant="link"
             size="sm"
+            data-row-action="primary"
             class="min-h-11 md:min-h-0"
             :aria-expanded="expanded"
+            :aria-label="$t('setup.action.addAnswerFor', { question: row.text })"
             @click="emit('toggle')"
           >
             {{ $t("setup.action.addAnswer") }}
           </Button>
         </template>
         <template v-else-if="displayStatus === 'needs_connection'">
-          <NuxtLink v-if="connectTo" :to="connectTo" :class="textLinkClass">
+          <NuxtLink
+            v-if="connectTo"
+            :to="connectTo"
+            data-row-action="primary"
+            :class="textLinkClass"
+            :aria-label="$t('setup.action.connectFor', { question: row.text })"
+          >
             {{ $t("setup.action.connect") }}
           </NuxtLink>
           <Button
             v-else-if="!row.plugin"
             variant="link"
+            data-row-action="primary"
             size="sm"
             class="min-h-11 md:min-h-0"
             @click="emit('choosePlatform')"
@@ -61,6 +90,7 @@
           <Button
             variant="link"
             size="sm"
+            data-row-action="primary"
             class="min-h-11 md:min-h-0"
             :aria-expanded="expanded"
             @click="emit('toggle')"
@@ -91,7 +121,7 @@
     <!-- The platform's connect attempt failed: say so next to the row it would have unlocked -->
     <p
       v-if="connectFailure && displayStatus === 'needs_connection'"
-      class="pb-3 text-sm text-destructive"
+      class="pb-3 text-sm text-destructive min-[1360px]:col-span-full"
       role="alert"
       data-testid="setup-connect-error"
     >
@@ -109,7 +139,7 @@
     <!-- Missing: the customer's own answer, saved as a document -->
     <form
       v-if="expanded && displayStatus === 'missing'"
-      class="setup-expand grid gap-2 pb-4"
+      class="setup-expand grid gap-2 pb-4 min-[1360px]:col-span-full"
       @submit.prevent="save"
     >
       <label class="text-sm text-neutral-muted" :for="answerId">
@@ -137,7 +167,7 @@
     <!-- Playbook off: what it does, before the customer turns it on -->
     <div
       v-if="expanded && displayStatus === 'playbook_off' && row.playbook"
-      class="setup-expand grid gap-2 pb-4"
+      class="setup-expand grid gap-2 pb-4 min-[1360px]:col-span-full"
       data-testid="setup-playbook-review"
     >
       <span class="text-sm font-medium text-neutral-900">
@@ -170,23 +200,34 @@
 </template>
 
 <script setup lang="ts">
+import { pageTitle } from "@/utils/format";
 import { computed, nextTick, ref, watch } from "vue";
 import { X } from "lucide-vue-next";
 import type { SetupRow, SetupRowStatus } from "@/stores/setup";
 import { needsLabel } from "@/composables/useSetupCopy";
 import { textLinkClass } from "./styles";
 
-type BadgeVariant = "secondary" | "success" | "warning" | "tool" | "outline";
+type BadgeVariant = "secondary" | "success" | "warning" | "outline";
 
 const BADGE_VARIANTS: Record<SetupRowStatus, BadgeVariant> = {
   checking: "secondary",
   reading_site: "secondary",
   ready: "success",
   missing: "warning",
-  needs_connection: "tool",
-  playbook_off: "tool",
-  playbook_missing: "tool",
+  needs_connection: "secondary",
+  playbook_off: "secondary",
+  playbook_missing: "secondary",
   check_failed: "outline",
+};
+
+// Setup keeps one saturated colour, the blue: steps that need the customer are a quiet blue tint
+// and in-progress states a quiet grey. `!` beats the Badge variant's own colours.
+const BADGE_CLASSES: Partial<Record<SetupRowStatus, string>> = {
+  checking: "!bg-background-tertiary !text-neutral-muted",
+  reading_site: "!bg-background-tertiary !text-neutral-muted",
+  needs_connection: "!bg-primary-50 !text-primary",
+  playbook_off: "!bg-primary-50 !text-primary",
+  playbook_missing: "!bg-primary-50 !text-primary",
 };
 
 const props = withDefaults(
@@ -211,8 +252,10 @@ const props = withDefaults(
     turnOnError?: boolean;
     /** The platform's connect attempt failed; `detail` is what the provider said, if anything. */
     connectFailure?: { detail?: string } | null;
+    /** The test chat is answering, so a new question would be dropped. */
+    tryDisabled?: boolean;
   }>(),
-  { writeTo: null, turningOn: false, turnOnError: false, connectFailure: null },
+  { writeTo: null, turningOn: false, turnOnError: false, connectFailure: null, tryDisabled: false },
 );
 
 const emit = defineEmits<{
@@ -231,6 +274,7 @@ const { t } = useI18n();
 const draft = ref("");
 const answerId = computed(() => `setup-answer-${props.row.id}`);
 const badgeVariant = computed(() => BADGE_VARIANTS[props.displayStatus]);
+const badgeClass = computed(() => BADGE_CLASSES[props.displayStatus]);
 
 const why = computed(() => {
   const { row } = props;
@@ -241,7 +285,8 @@ const why = computed(() => {
       return t("setup.why.readingSite");
     case "ready": {
       const source = row.sources[0];
-      if (source) return t("setup.why.readyFound", { source: source.title });
+      if (source?.own) return t("setup.why.readyOwn");
+      if (source) return t("setup.why.readyFound", { source: pageTitle(source.title) });
       if (row.plugin && row.playbook) {
         return t("setup.why.readyTool", { plugin: row.plugin.name, playbook: row.playbook.title });
       }
@@ -277,12 +322,20 @@ const save = () => {
   if (answer) emit("save", answer);
 };
 
-// Move focus into the field when the row opens, like a dialog would.
+const rowEl = ref<HTMLElement | null>(null);
+
+// Move focus into the field when the row opens, like a dialog would. When it closes, the
+// focused control (Cancel, Save, Turn on) is gone: hand focus back to the row's action.
 watch(
   () => props.expanded,
   async (open) => {
     if (!open) {
       draft.value = "";
+      await nextTick();
+      const active = document.activeElement;
+      if (!active || active === document.body) {
+        rowEl.value?.querySelector<HTMLElement>('[data-row-action="primary"]')?.focus();
+      }
       return;
     }
     if (props.displayStatus !== "missing") return;

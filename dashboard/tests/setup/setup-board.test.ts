@@ -10,13 +10,15 @@ vi.mock("@/middleware/auth.global", async () => ({
   hasRouteAccess: (await import("./fixtures")).hasRouteAccess,
 }));
 const chatAsk = vi.hoisted(() => vi.fn());
+const chatState = vi.hoisted(() => ({ busy: null as { value: boolean } | null }));
 vi.mock("@/components/setup/SetupTestChat.vue", async () => {
-  const { defineComponent: define, h: render } = await import("vue");
+  const { defineComponent: define, h: render, ref } = await import("vue");
+  chatState.busy = ref(false);
   return {
     default: define({
       name: "SetupTestChat",
       setup(_, { expose }) {
-        expose({ ask: chatAsk });
+        expose({ ask: chatAsk, busy: chatState.busy });
         return () => render("div", { "data-stub": "SetupTestChat" });
       },
     }),
@@ -80,6 +82,28 @@ describe("SetupRow", () => {
     const tryIt = wrapper.findAll("button").find((b) => b.text() === "setup.action.tryIt");
     await tryIt!.trigger("click");
     expect(wrapper.emitted("try")).toHaveLength(1);
+  });
+
+  it("a customer's own saved answer reads Your answer, not Found on its title", () => {
+    const wrapper = mountRow("ready", {
+      sources: [{ documentId: "d1", title: "How do I invite my team?", own: true }],
+    });
+    expect(wrapper.text()).toContain("setup.why.readyOwn");
+    expect(wrapper.text()).not.toContain("setup.why.readyFound");
+  });
+
+  it("drops a trailing site name from the page title it found the answer on", () => {
+    const wrapper = mountRow("ready", {
+      sources: [{ documentId: "d1", title: "Pricing | Hay.chat" }],
+    });
+    expect(wrapper.text()).toContain('setup.why.readyFound {"source":"Pricing"}');
+  });
+
+  it("Try it is disabled while the chat is busy and names its question", () => {
+    const wrapper = mountRow("ready", {}, { tryDisabled: true });
+    const tryIt = wrapper.findAll("button").find((b) => b.text() === "setup.action.tryIt")!;
+    expect(tryIt.attributes("disabled")).toBeDefined();
+    expect(tryIt.attributes("aria-label")).toContain("Question r1");
   });
 
   it("missing expands to a labelled textarea and saves the answer", async () => {
@@ -323,14 +347,59 @@ describe("SetupBoard", () => {
     expect(wrapper.findAll("a").map((a) => a.attributes("href"))).toEqual([]);
   });
 
-  it("Try it on a ready row asks the chat with that row's sources", async () => {
-    vi.stubGlobal("matchMedia", () => ({ matches: true }));
+  describe("Try it", () => {
+    const scrollIntoView = vi.fn();
+    const mobile = (reduceMotion: boolean) =>
+      vi.stubGlobal("matchMedia", (query: string) => ({
+        matches: query.includes("prefers-reduced-motion") ? reduceMotion : false,
+      }));
+    const tryButton = (wrapper: ReturnType<typeof mountBoard>) =>
+      wrapper.findAll("button").find((b) => b.text() === "setup.action.tryIt")!;
+
+    beforeEach(() => {
+      Element.prototype.scrollIntoView = scrollIntoView;
+      if (chatState.busy) chatState.busy.value = false;
+    });
+
+    it("asks the chat with the question text only", async () => {
+      mobile(true);
+      const wrapper = mountBoard({ checking: false });
+      await tryButton(wrapper).trigger("click");
+      expect(chatAsk).toHaveBeenCalledWith("Question a");
+    });
+
+    it("brings the chat into view below the lg breakpoint, smoothly unless motion is reduced", async () => {
+      mobile(false);
+      const wrapper = mountBoard({ checking: false });
+      await tryButton(wrapper).trigger("click");
+      expect(scrollIntoView).toHaveBeenLastCalledWith({ behavior: "smooth", block: "start" });
+
+      mobile(true);
+      await tryButton(wrapper).trigger("click");
+      expect(scrollIntoView).toHaveBeenLastCalledWith({ behavior: "auto", block: "start" });
+    });
+
+    it("does not scroll on desktop, where the chat is already beside the rows", async () => {
+      vi.stubGlobal("matchMedia", () => ({ matches: true }));
+      const wrapper = mountBoard({ checking: false });
+      await tryButton(wrapper).trigger("click");
+      expect(chatAsk).toHaveBeenCalled();
+      expect(scrollIntoView).not.toHaveBeenCalled();
+    });
+
+    it("is disabled while the chat is answering", async () => {
+      vi.stubGlobal("matchMedia", () => ({ matches: true }));
+      const wrapper = mountBoard({ checking: false });
+      chatState.busy!.value = true;
+      await flushPromises();
+      expect(tryButton(wrapper).attributes("disabled")).toBeDefined();
+    });
+  });
+
+  it("shows the result at once when it returns with no check running", () => {
     const wrapper = mountBoard({ checking: false });
-    const tryIt = wrapper.findAll("button").find((b) => b.text() === "setup.action.tryIt");
-    await tryIt!.trigger("click");
-    expect(chatAsk).toHaveBeenCalledWith("Question a", [
-      { documentId: "d", title: "Shipping page" },
-    ]);
+    expect(statuses(wrapper)).toEqual(["ready", "missing", "needs_connection"]);
+    expect(wrapper.text()).not.toContain("setup.board.testing");
   });
 
   it("shows an empty state and a retry when the check failed", async () => {

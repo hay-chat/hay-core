@@ -20,3 +20,9 @@ export const kebabToTitle = (str: string): string => {
     .map((word) => capitalize(word))
     .join(" ");
 };
+
+/** "Pricing | Hay.chat" reads as "Pricing": the site name after the last separator is noise. */
+export function pageTitle(title: string): string {
+  const cut = title.lastIndexOf(" | ");
+  return cut > 0 ? title.slice(0, cut) : title;
+}

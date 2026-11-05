@@ -50,6 +50,9 @@ export interface BoardFacts {
  * The platform that should handle `need`: one the customer chose, else one the manifests suggest
  * for their business type. A connected one wins, so a platform connected after the answers were
  * saved is still used. Undefined means no known platform handles it.
+ *
+ * A customer who saved their answers and picked no tools has not chosen a platform: manifests
+ * must not choose for them, so only a platform they have really connected counts.
  */
 export function pluginFor(
   need: SetupHandle,
@@ -59,10 +62,11 @@ export function pluginFor(
   const chosen = (p: BoardPlugin) => setup.toolPluginIds.includes(p.id);
   const suitable = (p: BoardPlugin) =>
     chosen(p) || (!!setup.businessType && p.businessTypes.includes(setup.businessType));
+  const unchosen = !!setup.answeredAt && setup.toolPluginIds.length === 0;
   const rank = (p: BoardPlugin) => (p.connected ? 0 : 2) + (chosen(p) ? 0 : 1);
 
   return plugins
-    .filter((p) => p.handles.includes(need) && suitable(p))
+    .filter((p) => p.handles.includes(need) && suitable(p) && (!unchosen || p.connected))
     .sort((a, b) => rank(a) - rank(b) || a.name.localeCompare(b.name))[0];
 }
 
@@ -121,7 +125,10 @@ export function buildRow(question: SetupQuestion, facts: BoardFacts): SetupRow {
   if (check.outcome === "failed") return { ...base, status: "check_failed" };
 
   if (check.outcome === "answered") {
-    return { ...base, status: "ready", answer: check.answer, sources: check.sources };
+    const sources = check.sources.map((source) =>
+      source.documentId === question.answerDocumentId ? { ...source, own: true } : source,
+    );
+    return { ...base, status: "ready", answer: check.answer, sources };
   }
 
   // Not answered. While the site is still being read the answer may simply not be in yet, and a
