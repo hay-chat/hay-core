@@ -7,7 +7,7 @@
 
     <div
       ref="scroller"
-      class="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-4"
+      class="setup-chat-log flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-4"
       role="log"
       :aria-label="$t('setup.chat.log')"
     >
@@ -20,10 +20,10 @@
           :show-timestamp="false"
           @retry="retry"
         />
-        <p v-if="entry.handedOff" class="ml-11 text-xs text-neutral-muted">
+        <p v-if="entry.handedOff" class="text-xs text-neutral-muted">
           {{ $t("setup.chat.handedOff") }}
         </p>
-        <p v-if="sourcesFor(entry).length" class="ml-11 text-xs text-neutral-muted">
+        <p v-if="sourcesFor(entry).length" class="text-xs text-neutral-muted">
           {{ $t("setup.chat.source") }}:
           <template v-for="(source, index) in sourcesFor(entry)" :key="source.documentId">
             <span v-if="index > 0">, </span>
@@ -41,7 +41,7 @@
         </p>
       </div>
 
-      <div v-if="typing" class="ml-11 flex items-center gap-1" role="status">
+      <div v-if="typing" class="flex items-center gap-1" role="status">
         <span class="sr-only">{{ $t("setup.chat.typing") }}</span>
         <span
           v-for="n in 3"
@@ -126,3 +126,32 @@ const busy = computed(() => sending.value || awaitingReply.value);
 
 defineExpose({ ask, busy });
 </script>
+
+<style scoped lang="scss">
+/* Reads like the webchat customers will see: replies are plain full-width text, questions a bubble. */
+.setup-chat-log {
+  :deep(.chat-message__avatar) {
+    display: none;
+  }
+
+  :deep(.chat-message--BotAgent),
+  :deep(.chat-message--HumanAgent) {
+    --bubble-bg: transparent;
+    --bubble-fg: var(--color-neutral-800);
+
+    .chat-message__content {
+      width: 100%;
+      max-width: 100%;
+    }
+
+    .chat-message__bubble {
+      padding: 0;
+    }
+  }
+
+  :deep(.chat-message--Customer) {
+    --bubble-bg: var(--color-primary);
+    --bubble-fg: var(--color-white);
+  }
+}
+</style>
