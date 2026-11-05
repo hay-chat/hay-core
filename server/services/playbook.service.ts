@@ -50,7 +50,9 @@ export class PlaybookService {
       description?: string;
       instructions?: PlaybookInstructions;
       status?: PlaybookStatus;
-    },
+    } & Partial<
+      Pick<Playbook, "kind" | "required_fields" | "prompt_template" | "approval_categories">
+    >,
   ): Promise<Playbook> {
     // Store plain-text instructions as a Tiptap document so the editor can show them.
     const playbookData =
@@ -185,6 +187,37 @@ export class PlaybookService {
         approval_categories:
           approvalCategories.length > 0 ? [...new Set(approvalCategories)] : null,
       }),
+    });
+  }
+
+  /**
+   * Copy a playbook as a new draft. Copies the latest edits (the draft when there is one)
+   * and the approval override, so a copy never asks for less approval than its source.
+   */
+  async duplicatePlaybook(
+    organizationId: string,
+    playbookId: string,
+    title: string,
+  ): Promise<Playbook | null> {
+    const source = await this.playbookRepository.findByIdAndOrganization(
+      playbookId,
+      organizationId,
+    );
+    if (!source) return null;
+
+    const draft = await this.playbookVersionRepository.findDraftByPlaybookId(playbookId);
+    const content = draft ?? source;
+
+    return await this.createPlaybook(organizationId, {
+      title,
+      trigger: source.trigger,
+      description: source.description ?? undefined,
+      instructions: content.instructions as PlaybookInstructions,
+      status: PlaybookStatus.DRAFT,
+      kind: source.kind,
+      required_fields: content.required_fields,
+      prompt_template: content.prompt_template,
+      approval_categories: source.approval_categories,
     });
   }
 
