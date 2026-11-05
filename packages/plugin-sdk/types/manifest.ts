@@ -133,6 +133,28 @@ export interface HayPluginManifest {
    * @example ["SHOPIFY_API_KEY", "SHOPIFY_SECRET"]
    */
   env?: string[];
+
+  /**
+   * When in-app setup should suggest this plugin, and what it can do for customers.
+   *
+   * @remarks
+   * Declare `handles` only for things the plugin's tools really do. A plugin
+   * whose refund tool only records a request and hands off does not handle
+   * `refunds`. Unknown values are dropped by core.
+   */
+  setup?: HayPluginSetupHints;
+}
+
+/** Optional `setup` block of the `hay-plugin` manifest. */
+export interface HayPluginSetupHints {
+  /** Business types that should be offered this plugin. */
+  businessTypes: Array<"store" | "saas" | "service" | "other">;
+  /** Where the plugin appears in the "what do you already use" step. */
+  group: "commerce" | "payments" | "crm" | "helpdesk" | "marketing" | "knowledge" | "booking";
+  /** Customer requests the plugin's tools can fulfil. */
+  handles?: Array<
+    "orders" | "refunds" | "order_changes" | "billing" | "subscriptions" | "bookings"
+  >;
 }
 
 /**

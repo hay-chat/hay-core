@@ -12,7 +12,16 @@
     "capabilities": [
       "mcp",
       "auth"
-    ]
+    ],
+    "setup": {
+      "businessTypes": [
+        "service"
+      ],
+      "group": "booking",
+      "handles": [
+        "bookings"
+      ]
+    }
   },
   "scripts": {
     "build": "tsc",
