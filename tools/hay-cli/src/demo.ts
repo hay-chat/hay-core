@@ -11,14 +11,18 @@ import type { CommandResult, Ctx } from "./commands";
 
 const REPO = join(__dirname, "..", "..", "..");
 const DEMO_DIR = join(REPO, "tools", "demo-account");
-const TSX = join(REPO, "node_modules", ".bin", "tsx");
+// tsx is a server dependency; npm hoists it to the root only sometimes (same lookup as bin/hay).
+const TSX = [
+  join(REPO, "node_modules", ".bin", "tsx"),
+  join(REPO, "server", "node_modules", ".bin", "tsx"),
+].find(existsSync);
 
 export const DEMO_PLATFORMS = ["shopify", "woocommerce", "nuvemshop"] as const;
 type DemoPlatform = (typeof DEMO_PLATFORMS)[number];
 
 /** Env vars a store seed needs before it can write; `--dry-run` needs none. */
 export const STORE_ENV: Record<DemoPlatform, string[]> = {
-  shopify: ["SHOPIFY_STORE_DOMAIN", "SHOPIFY_ADMIN_TOKEN"],
+  shopify: ["SHOPIFY_STORE_DOMAIN", "SHOPIFY_CLIENT_ID", "SHOPIFY_CLIENT_SECRET"],
   woocommerce: ["WOO_URL", "WOO_CONSUMER_KEY", "WOO_CONSUMER_SECRET"],
   nuvemshop: ["NUVEMSHOP_STORE_ID", "NUVEMSHOP_ACCESS_TOKEN"],
 };
@@ -56,6 +60,7 @@ export function planSeed(
     dryRun: boolean;
     resetOrders: boolean;
     imageBaseUrl?: string;
+    currency?: string;
     target: string;
     org?: string;
   },
@@ -84,7 +89,14 @@ export function planSeed(
       skipped.push(`${platform} store (no ${STORE_ENV[platform].join(" / ")})`);
       continue;
     }
-    steps.push({ label: `${platform} store`, script: `seed-${platform}.ts`, args: storeArgs });
+    steps.push({
+      label: `${platform} store`,
+      script: `seed-${platform}.ts`,
+      args: [
+        ...storeArgs,
+        ...(platform === "shopify" && options.currency ? ["--currency", options.currency] : []),
+      ],
+    });
   }
 
   const hayArgs = [
@@ -122,6 +134,10 @@ export function planSeed(
 }
 
 function runScript(script: string, args: string[]): number {
+  if (!TSX) {
+    console.error(`hay: tsx not found; run npm install in ${REPO}`);
+    return 1;
+  }
   const result = spawnSync(TSX, [join(DEMO_DIR, "scripts", script), ...args], {
     cwd: REPO,
     stdio: "inherit",
@@ -137,6 +153,7 @@ export async function demoSeed(ctx: Ctx): Promise<CommandResult> {
     dryRun: boolFlag(ctx.args, "dry-run"),
     resetOrders: boolFlag(ctx.args, "reset-orders"),
     imageBaseUrl: stringFlag(ctx.args, "image-base-url"),
+    currency: stringFlag(ctx.args, "currency"),
     target: ctx.target,
     org: stringFlag(ctx.args, "org"),
   });

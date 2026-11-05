@@ -1,9 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { loadCustomers, loadOrders, loadProducts, type Flags } from "../lib/data";
 import type { Customer, OrderFixture, Product } from "../lib/types";
-import { seedShopify, run, type SeedOptions } from "../seed-shopify";
-import { createShopify, operationName } from "../shopify/client";
-import { orderCreateInput, refundInput, type OrderContext } from "../shopify/orders";
+import { resolveCurrency, seedShopify, run, type SeedOptions } from "../seed-shopify";
+import { createShopify, fetchAdminToken, operationName } from "../shopify/client";
+import { orderCreateInput, refundInput, seedOrder, type OrderContext } from "../shopify/orders";
 import { productSetInput } from "../shopify/products";
 
 const NOW = new Date("2026-10-29T12:00:00Z");
@@ -16,11 +16,11 @@ const products: Product[] = [
     description: { en: "A candle.", "pt-BR": "Uma vela." },
     details: { en: ["Soy wax"], "pt-BR": ["Cera de soja"] },
     price: { USD: 32, EUR: 29, BRL: 129 },
-    compareAtPrice: { USD: 40 },
+    compareAtPrice: { USD: 40, EUR: 36 },
     options: [{ en: "Scent", "pt-BR": "Aroma" }],
     variants: [
       { sku: "T-CND-SAN", options: ["Sandalwood"], stock: 10 },
-      { sku: "T-CND-FIG", options: ["Fig"], price: { USD: 34 }, stock: 5 },
+      { sku: "T-CND-FIG", options: ["Fig"], price: { USD: 34, EUR: 31 }, stock: 5 },
     ],
     weightGrams: 480,
     images: ["test-candle-1.png"],
@@ -137,6 +137,7 @@ const fixtures: Record<string, OrderFixture> = {
 };
 
 const ctx: OrderContext = {
+  currency: "EUR",
   products,
   customers: { "us-test": customer },
   customerIds: { "us-test": "gid://shopify/Customer/1" },
@@ -275,6 +276,7 @@ function fakeShopify(existingOrderTags: string[] = []) {
 
 const flags = (dryRun = false): Flags => ({ dryRun, only: new Set(), orderKeys: new Set() });
 const ordersOnly = (keys: string[] = []): SeedOptions => ({
+  currency: "EUR",
   only: new Set(["orders"]),
   orderKeys: new Set(keys),
   resetOrders: false,
@@ -302,8 +304,9 @@ afterEach(() => {
 });
 
 describe("productSetInput", () => {
-  it("maps options, SKUs, USD prices, compareAt, weight, stock and tags", () => {
+  it("maps options, SKUs, EUR prices, compareAt, weight, stock and tags", () => {
     const input = productSetInput(products[0], {
+      currency: "EUR",
       locationId: "gid://shopify/Location/1",
       files: ["https://img/1.png"],
     });
@@ -321,19 +324,20 @@ describe("productSetInput", () => {
     const variants = input.variants as any[];
     expect(variants[0]).toMatchObject({
       sku: "T-CND-SAN",
-      price: "32.00",
-      compareAtPrice: "40.00",
+      price: "29.00",
+      compareAtPrice: "36.00",
       optionValues: [{ optionName: "Scent", name: "Sandalwood" }],
       inventoryItem: { measurement: { weight: { unit: "GRAMS", value: 480 } } },
       inventoryQuantities: [
         { locationId: "gid://shopify/Location/1", name: "available", quantity: 10 },
       ],
     });
-    expect(variants[1].price).toBe("34.00");
+    expect(variants[1].price).toBe("31.00");
   });
 
   it("gives single-variant products Shopify's default option and keeps existing ids by SKU", () => {
     const input = productSetInput(products[1], {
+      currency: "EUR",
       locationId: "L",
       existing: {
         id: "gid://shopify/Product/7",
@@ -358,32 +362,32 @@ describe("orderCreateInput", () => {
     const input = orderCreateInput({ ...fixtures.paid, note: "Leave with the doorman." }, ctx);
     expect(input).toMatchObject({
       test: true,
-      currency: "USD",
+      currency: "EUR",
       financialStatus: "PAID",
       processedAt: "2026-10-09T12:00:00.000Z",
       note: "Leave with the doorman.",
       tags: ["hay-demo", "hay-demo:paid"],
       customer: { toAssociate: { id: "gid://shopify/Customer/1" } },
       shippingAddress: { address1: "1 Main St", countryCode: "US", provinceCode: "TX" },
-      // $82 > $75: free shipping
+      // €74 > €50: free shipping
       shippingLines: [{ priceSet: { shopMoney: { amount: "0.00" } } }],
       transactions: [
         {
           kind: "SALE",
           status: "SUCCESS",
           gateway: "card",
-          amountSet: { shopMoney: { amount: "82.00", currencyCode: "USD" } },
+          amountSet: { shopMoney: { amount: "74.00", currencyCode: "EUR" } },
         },
       ],
     });
   });
 
-  it("creates pending and voided orders without a transaction, and charges shipping under $75", () => {
+  it("creates pending and voided orders without a transaction, and charges shipping under €50", () => {
     const pending = orderCreateInput(fixtures.pending, ctx);
     expect(pending).toMatchObject({
       financialStatus: "PENDING",
       transactions: [],
-      shippingLines: [{ priceSet: { shopMoney: { amount: "6.90" } } }],
+      shippingLines: [{ priceSet: { shopMoney: { amount: "3.90" } } }],
     });
     expect(orderCreateInput(fixtures.voided, ctx)).toMatchObject({
       financialStatus: "VOIDED",
@@ -409,7 +413,7 @@ describe("refundInput", () => {
   };
 
   it("refunds every line and shipping for a full refund", () => {
-    expect(refundInput(fixtures.refunded, "O1", details, products, NOW)).toMatchObject({
+    expect(refundInput(fixtures.refunded, "O1", details, products, NOW, "EUR")).toMatchObject({
       notify: false,
       processedAt: "2026-10-26T12:00:00.000Z",
       refundLineItems: [
@@ -417,16 +421,16 @@ describe("refundInput", () => {
         { lineItemId: "L2", quantity: 1 },
       ],
       shipping: { fullRefund: true },
-      transactions: [{ parentId: "T1", amount: "82.00", kind: "REFUND", gateway: "card" }],
+      transactions: [{ parentId: "T1", amount: "74.00", kind: "REFUND", gateway: "card" }],
     });
   });
 
   it("refunds only refundLines for a partial refund, the day after delivery", () => {
-    const input = refundInput(fixtures.partial, "O1", details, products, NOW);
+    const input = refundInput(fixtures.partial, "O1", details, products, NOW, "EUR");
     expect(input).toMatchObject({
       processedAt: "2026-10-16T12:00:00.000Z",
       refundLineItems: [{ lineItemId: "L2", quantity: 1, restockType: "NO_RESTOCK" }],
-      transactions: [{ amount: "50.00" }],
+      transactions: [{ amount: "45.00" }],
     });
     expect(input).not.toHaveProperty("shipping");
   });
@@ -503,6 +507,51 @@ describe("order mutation sequence per state", () => {
   });
 });
 
+describe("store order limit", () => {
+  const limited = {
+    orderCreate: {
+      order: null,
+      userErrors: [{ message: "Too many attempts. Please try again later." }],
+    },
+  };
+  const created = {
+    orderCreate: { order: { id: "gid://shopify/Order/1", name: "#1001" }, userErrors: [] },
+  };
+  const stubShop = (mutate: ReturnType<typeof vi.fn>) =>
+    ({
+      dryRun: false,
+      mutate,
+      query: vi.fn().mockResolvedValue({
+        orders: { nodes: [], pageInfo: { hasNextPage: false, endCursor: null } },
+        order: {
+          id: "gid://shopify/Order/1",
+          name: "#1001",
+          tags: [],
+          closed: false,
+          cancelledAt: null,
+          displayFinancialStatus: "PAID",
+          displayFulfillmentStatus: "UNFULFILLED",
+          fulfillments: [],
+        },
+      }),
+    }) as unknown as Parameters<typeof seedOrder>[0];
+
+  it("waits and retries orderCreate when the store limit is hit", async () => {
+    const mutate = vi.fn().mockResolvedValueOnce(limited).mockResolvedValueOnce(created);
+    const row = await seedOrder(stubShop(mutate), fixtures.paid, ctx, { rateLimitWaitMs: 0 });
+    expect(mutate).toHaveBeenCalledTimes(2);
+    expect(row).toMatchObject({ status: "created", orderName: "#1001" });
+  });
+
+  it("gives up with the store's error after repeated limits", async () => {
+    const mutate = vi.fn().mockResolvedValue(limited);
+    await expect(
+      seedOrder(stubShop(mutate), fixtures.paid, ctx, { rateLimitWaitMs: 0 }),
+    ).rejects.toThrow("Too many attempts");
+    expect(mutate).toHaveBeenCalledTimes(4);
+  });
+});
+
 describe("idempotency", () => {
   it("skips an order whose fixture tag already exists", async () => {
     const { writes, rows } = await seedOrders(fixtures.delivered, ["hay-demo:delivered"]);
@@ -557,7 +606,7 @@ describe("idempotency", () => {
     await seedShopify(
       shop,
       { products: [products[1]], customers: [], orders: [] },
-      { only: new Set(["products"]), orderKeys: new Set(), resetOrders: false },
+      { currency: "EUR", only: new Set(["products"]), orderKeys: new Set(), resetOrders: false },
     );
     const set = fake.calls.find((c) => c.op === "ProductSet")!.variables.input;
     expect(set.id).toBe("gid://shopify/Product/5");
@@ -578,6 +627,7 @@ describe("dry-run", () => {
         orders: loadOrders("shopify"),
       },
       {
+        currency: "EUR",
         only: new Set(),
         orderKeys: new Set(),
         resetOrders: true,
@@ -592,19 +642,88 @@ describe("dry-run", () => {
   it("run() exits 0 with --dry-run and no env, and 1 without credentials for a real run", async () => {
     const fake = fakeShopify();
     vi.spyOn(console, "error").mockImplementation(() => {});
-    const saved = { d: process.env.SHOPIFY_STORE_DOMAIN, t: process.env.SHOPIFY_ADMIN_TOKEN };
+    const saved = {
+      d: process.env.SHOPIFY_STORE_DOMAIN,
+      i: process.env.SHOPIFY_CLIENT_ID,
+      s: process.env.SHOPIFY_CLIENT_SECRET,
+    };
     delete process.env.SHOPIFY_STORE_DOMAIN;
-    delete process.env.SHOPIFY_ADMIN_TOKEN;
+    delete process.env.SHOPIFY_CLIENT_ID;
+    delete process.env.SHOPIFY_CLIENT_SECRET;
     try {
       expect(await run(["--dry-run", "--only", "orders", "--orders", "delivered,refunded"])).toBe(
         0,
       );
       expect(fake.fetchMock).not.toHaveBeenCalled();
       // Only meaningful when tools/demo-account/.env doesn't set the credentials.
-      if (!process.env.SHOPIFY_ADMIN_TOKEN) expect(await run(["--only", "orders"])).toBe(1);
+      if (!process.env.SHOPIFY_CLIENT_SECRET) expect(await run(["--only", "orders"])).toBe(1);
     } finally {
       if (saved.d !== undefined) process.env.SHOPIFY_STORE_DOMAIN = saved.d;
-      if (saved.t !== undefined) process.env.SHOPIFY_ADMIN_TOKEN = saved.t;
+      if (saved.i !== undefined) process.env.SHOPIFY_CLIENT_ID = saved.i;
+      if (saved.s !== undefined) process.env.SHOPIFY_CLIENT_SECRET = saved.s;
     }
+  });
+
+  describe("resolveCurrency", () => {
+    const shopIn = (currencyCode: string, dryRun = false) =>
+      ({ dryRun, query: async () => ({ shop: { currencyCode } }) }) as never;
+
+    it("uses the store's currency, and accepts a matching --currency in any case", async () => {
+      await expect(resolveCurrency(shopIn("EUR"))).resolves.toBe("EUR");
+      await expect(resolveCurrency(shopIn("USD"), "usd")).resolves.toBe("USD");
+    });
+
+    it("stops on a mismatch, a currency outside the catalogue, or an unknown flag", async () => {
+      await expect(resolveCurrency(shopIn("EUR"), "USD")).rejects.toThrow("doesn't match");
+      await expect(resolveCurrency(shopIn("GBP"))).rejects.toThrow("Store currency is GBP");
+      await expect(resolveCurrency(shopIn("EUR"), "GBP")).rejects.toThrow("must be one of");
+    });
+
+    it("never asks the store in a dry run", async () => {
+      await expect(resolveCurrency(shopIn("EUR", true))).resolves.toBe("USD");
+      await expect(resolveCurrency(shopIn("EUR", true), "BRL")).resolves.toBe("BRL");
+    });
+  });
+
+  it("prices products, orders and shipping in the chosen currency", () => {
+    const input = productSetInput(products[0], { currency: "USD", locationId: "L" });
+    expect((input.variants as any[])[0]).toMatchObject({ price: "32.00", compareAtPrice: "40.00" });
+    const order = orderCreateInput(fixtures.pending, { ...ctx, currency: "USD" });
+    expect(order).toMatchObject({
+      currency: "USD",
+      shippingLines: [{ priceSet: { shopMoney: { amount: "6.90", currencyCode: "USD" } } }],
+    });
+  });
+
+  describe("fetchAdminToken", () => {
+    const flags = { dryRun: true } as Flags;
+    afterEach(() => {
+      vi.unstubAllGlobals();
+    });
+
+    it("posts the client credentials grant to the store, even in dry-run flags", async () => {
+      const fetchMock = vi.fn(
+        async () => new Response(JSON.stringify({ access_token: "tok", expires_in: 86399 })),
+      );
+      vi.stubGlobal("fetch", fetchMock);
+      expect(await fetchAdminToken(flags, "demo.myshopify.com", "id", "secret")).toBe("tok");
+      const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
+      expect(url).toBe("https://demo.myshopify.com/admin/oauth/access_token");
+      expect(JSON.parse(init.body as string)).toEqual({
+        client_id: "id",
+        client_secret: "secret",
+        grant_type: "client_credentials",
+      });
+    });
+
+    it("surfaces Shopify's error when the store is outside the app's organization", async () => {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async () => new Response('{"error":"shop_not_permitted"}', { status: 400 })),
+      );
+      await expect(fetchAdminToken(flags, "demo.myshopify.com", "id", "secret")).rejects.toThrow(
+        "shop_not_permitted",
+      );
+    });
   });
 });

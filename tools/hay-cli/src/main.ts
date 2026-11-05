@@ -48,7 +48,7 @@ Usage: hay <command> [options]   (global: --target prod|local, --org <id>, --jso
   demo seed [all|hay|shopify|woocommerce|nuvemshop]
                                   load the Casa Aurora demo (tools/demo-account) into the stores
                                   and Hay.chat; store keys in tools/demo-account/.env
-        [--dry-run] [--reset-orders] [--image-base-url <url>]
+        [--dry-run] [--reset-orders] [--image-base-url <url>] [--currency USD|EUR|BRL]
   demo images                     regenerate the demo product images
 
 Target: --target, else HAY_TARGET, else config defaultTarget, else prod.

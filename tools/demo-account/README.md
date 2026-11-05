@@ -42,9 +42,13 @@ refunded, cancelled unpaid, high value (over the approval threshold), delivered 
 
    - **Hay.chat:** log in with the hay CLI as usual (`tools/hay-cli/.env` or `hay login`), and set
      `HAY_ORG_SHOPIFY` / `HAY_ORG_WOOCOMMERCE` / `HAY_ORG_NUVEMSHOP` to the org each store is connected to.
-   - **Shopify:** a custom app on the dev store with `write_products`, `write_inventory`,
-     `read_locations`, `write_files`, `write_customers`, `write_orders`, `write_fulfillments`,
-     `write_merchant_managed_fulfillment_orders`. Put its Admin API token in `SHOPIFY_ADMIN_TOKEN`.
+   - **Shopify:** the store is `hay-dev-demo`. In the [Dev Dashboard](https://dev.shopify.com/dashboard),
+     create an app in the same organization as the store. Create a version with the scopes
+     `write_products`, `write_inventory`, `read_locations`, `write_files`, `write_customers`,
+     `write_orders`, `write_fulfillments`, `write_merchant_managed_fulfillment_orders`, then install
+     it on the store. Put the client ID and secret from Settings in `SHOPIFY_CLIENT_ID` and
+     `SHOPIFY_CLIENT_SECRET`; each run exchanges them for a 24-hour token. Shopify answers
+     `shop_not_permitted` when the store and the app are in different organizations.
    - **WooCommerce:** wp-admin → WooCommerce → Settings → Advanced → REST API → Add key (Read/Write).
      Optional `WP_USER` + `WP_APP_PASSWORD` (Users → Profile → Application Passwords) to upload images.
    - **Nuvemshop:** a custom app on the store (Aplicativos a medida) with read/write on products, orders,
@@ -75,16 +79,22 @@ refunded, cancelled unpaid, high value (over the approval threshold), delivered 
    starting states. Products and customers are updated in place on every run.
 
 Flags for `hay demo seed`: `--dry-run`, `--reset-orders`, `--image-base-url <url>` (products take
-images from that URL instead of uploading local files), plus the CLI's `--target` and `--org`.
-The scripts also run on their own: `node_modules/.bin/tsx tools/demo-account/scripts/seed-<x>.ts --help`
+images from that URL instead of uploading local files), `--currency USD|EUR|BRL` (Shopify), plus the CLI's `--target` and `--org`.
+The scripts also run on their own: `server/node_modules/.bin/tsx tools/demo-account/scripts/seed-<x>.ts --help`
 style flags (`--only products|customers|orders`, `--orders key1,key2`; seed-hay: `--platform`,
 `--draft`, `--quick-check on|off`, `--only settings,assistant,docs,playbooks`).
 
+The Shopify seed follows the store's currency: it uses the catalogue's prices and the shipping rule
+for USD, EUR or BRL. `--currency` states which one you expect and stops the run if the store differs,
+because Shopify treats product prices as the store's currency. `hay-dev-demo` is set to EUR, while
+`knowledge/en/*-us.md` and `playbooks/shopify/10-product-and-care.md` quote USD: align them before
+running `hay demo seed hay` for this store.
+
 ## What each platform can't reproduce
 
-None of the store scripts has run against a real store yet; the first run on each confirms the points below.
+The Shopify script has run against a real development store. The WooCommerce and Nuvemshop scripts have not, so their first run confirms the points below.
 
-- **Shopify:** orders are backdated with `processedAt`, but `createdAt` is always the seed time, and
+- **Shopify:** customer phone numbers only go on the address, because Shopify's check on the customer's own phone field can reject the fake 555 numbers. Development stores allow about 5 new orders a minute, so a full run pauses for a minute or two. Orders are backdated with `processedAt`, but `createdAt` is always the seed time, and
   the Hay.chat Shopify plugin reads `createdAt`, so orders look placed today. Tracking events are
   backdated, so delivered and stale tracking work. Card payments are recorded as an external `card` gateway.
 - **WooCommerce:** the REST API can't backdate. After a real run the script saves a `wp eval` command

@@ -26,6 +26,29 @@ export function operationName(document: string): string {
   return /\b(?:query|mutation)\s+(\w+)/.exec(document)?.[1] ?? "anonymous";
 }
 
+/**
+ * Exchanges a Dev Dashboard app's credentials for an Admin API token (client credentials grant).
+ * Tokens last 24 hours, so each seed run gets a new one. Only works when the app and the store are
+ * in the same Shopify organization, otherwise Shopify answers `shop_not_permitted`.
+ */
+export async function fetchAdminToken(
+  flags: Flags,
+  domain: string,
+  clientId: string,
+  clientSecret: string,
+): Promise<string> {
+  const response = await http<{ access_token?: string }>(
+    { ...flags, dryRun: false },
+    "POST",
+    `https://${domain}/admin/oauth/access_token`,
+    {
+      body: { client_id: clientId, client_secret: clientSecret, grant_type: "client_credentials" },
+    },
+  );
+  if (!response.access_token) throw new Error("Shopify token response had no access_token");
+  return response.access_token;
+}
+
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 export function createShopify(
