@@ -1,5 +1,6 @@
 <template>
-  <Page>
+  <!-- relative: keeps screen-reader-only elements inside the scrolling main, or phones get blank scroll -->
+  <Page class="relative">
     <div
       v-if="store.status === 'idle' || store.status === 'loading'"
       class="mx-auto w-full max-w-[1120px] animate-pulse space-y-4 motion-reduce:animate-none"
