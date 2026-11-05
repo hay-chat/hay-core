@@ -26,7 +26,17 @@ import {
   type SetupSettings,
   type SetupSuggestions,
 } from "@server/types/setup.types";
-import { buildBoard, type BoardFacts, type BoardPlugin } from "./board";
+import {
+  buildBoard,
+  isEverythingReady,
+  pluginFor,
+  type BoardFacts,
+  type BoardPlugin,
+} from "./board";
+import { fillAssistantIfEmpty } from "./assistant";
+import { connectedPluginIds } from "./connection";
+import { stepsFromInstructions } from "./playbook-generation";
+import { generatePlaybooksFor, turnOnPlaybook } from "./playbooks";
 import { catalogFor, catalogLocale, findCatalogQuestion } from "./catalog";
 import { CHECK_CONCURRENCY, checkQuestion, mapWithConcurrency } from "./check";
 import { saveAnswerDocument } from "./answer-document";
@@ -47,12 +57,23 @@ function visiblePlugins(organizationId: string) {
     .filter((p) => isPluginVisibleToOrganization(p, organizationId));
 }
 
-function boardPlugins(organizationId: string): BoardPlugin[] {
-  return visiblePlugins(organizationId).map((p) => ({
+/**
+ * Platforms that can handle a customer request, with whether each is really connected. Only
+ * asks about connections when a question needs a platform, and only for plugins that declare
+ * a handle.
+ */
+async function boardPlugins(organizationId: string, setup: SetupSettings): Promise<BoardPlugin[]> {
+  const plugins = visiblePlugins(organizationId).map((p) => ({
     id: p.pluginId,
     name: p.name,
     handles: p.manifest?.setup?.handles ?? [],
+    businessTypes: p.manifest?.setup?.businessTypes ?? [],
   }));
+  const wanted = setup.questions.some((q) => q.needs)
+    ? plugins.filter((p) => p.handles.length > 0).map((p) => p.id)
+    : [];
+  const connected = await connectedPluginIds(organizationId, wanted);
+  return plugins.map((p) => ({ ...p, connected: connected.has(p.id) }));
 }
 
 /** True when the org has a conversation that is not a playground chat or a replay/simulation run. */
@@ -76,34 +97,49 @@ async function loadPlaybooks(setup: SetupSettings) {
   if (ids.length === 0) return [];
   const found = await AppDataSource.getRepository(Playbook).find({
     where: { id: In(ids) },
-    select: { id: true, title: true, status: true },
+    select: { id: true, title: true, status: true, instructions: true },
   });
   return found.map((p) => ({
     id: p.id,
     title: p.title,
     active: p.status === PlaybookStatus.ACTIVE,
+    steps: stepsFromInstructions(p.instructions),
   }));
 }
 
 async function loadFacts(organizationId: string, setup: SetupSettings, site?: SiteReading) {
-  const [siteReading, playbooks, real] = await Promise.all([
+  const [siteReading, playbooks, real, plugins] = await Promise.all([
     site ?? readSiteState(organizationId, setup.website),
     loadPlaybooks(setup),
     hasRealConversations(organizationId),
+    boardPlugins(organizationId, setup),
   ]);
   const facts: BoardFacts = {
     setup,
     site: siteReading,
-    plugins: boardPlugins(organizationId),
+    plugins,
     playbooks,
     hasRealConversations: real,
   };
   return facts;
 }
 
+/**
+ * Stamps `finishedAt` the first time every row, including platform rows, is ready. Rows only
+ * become ready after real documents, connections and active playbooks, so this cannot fire early.
+ */
+async function finishIfReady(organizationId: string, board: SetupBoard): Promise<SetupBoard> {
+  if (board.finishedAt || !isEverythingReady(board.rows)) return board;
+  const saved = await updateSetup(organizationId, (current) => ({
+    ...current,
+    finishedAt: current.finishedAt ?? new Date().toISOString(),
+  }));
+  return { ...board, finishedAt: saved.finishedAt, shouldPrompt: false };
+}
+
 async function boardFor(organizationId: string, setup?: SetupSettings): Promise<SetupBoard> {
   const current = setup ?? (await readSetup(organizationId));
-  return buildBoard(await loadFacts(organizationId, current));
+  return finishIfReady(organizationId, buildBoard(await loadFacts(organizationId, current)));
 }
 
 export function getBoard(organizationId: string): Promise<SetupBoard> {
@@ -216,6 +252,8 @@ export async function saveAnswers(
 
   // A bad address must not fail the save: it shows up as `site.state === "failed"`.
   await startSiteRead(organizationId, website);
+  // Fills the assistant once, in the background; it never delays or fails the save.
+  void fillAssistantIfEmpty(organizationId);
   return boardFor(organizationId, saved);
 }
 
@@ -251,23 +289,14 @@ async function saveChecks(
   results: { id: string; text: string; result: SetupCheckResult }[],
 ): Promise<SetupSettings> {
   return updateSetup(organizationId, (current) => {
-    const next: SetupSettings = {
+    return {
       ...current,
       questions: current.questions.map((q) => {
         const hit = results.find((r) => r.id === q.id && r.text === q.text);
         return hit ? { ...q, check: hit.result } : q;
       }),
     };
-    return withFinish(next);
   });
-}
-
-/** Marks setup finished once every row is ready. */
-function withFinish(setup: SetupSettings): SetupSettings {
-  if (setup.finishedAt || setup.questions.length === 0) return setup;
-  // Questions that need a platform are only ready once a playbook is on, which workstream C owns.
-  const allReady = setup.questions.every((q) => !q.needs && q.check?.outcome === "answered");
-  return allReady ? { ...setup, finishedAt: new Date().toISOString() } : setup;
 }
 
 export async function checkQuestions(
@@ -280,7 +309,9 @@ export async function checkQuestions(
   const targets = setup.questions.filter((q) =>
     questionIds ? !q.needs && questionIds.includes(q.id) : needsCheck(q, site),
   );
-  if (targets.length === 0) return buildBoard(await loadFacts(organizationId, setup, site));
+  if (targets.length === 0) {
+    return finishIfReady(organizationId, buildBoard(await loadFacts(organizationId, setup, site)));
+  }
 
   const results = await mapWithConcurrency(targets, CHECK_CONCURRENCY, async (q) => ({
     id: q.id,
@@ -288,7 +319,7 @@ export async function checkQuestions(
     result: await checkOnce(organizationId, q),
   }));
   const saved = await saveChecks(organizationId, results);
-  return buildBoard(await loadFacts(organizationId, saved, site));
+  return finishIfReady(organizationId, buildBoard(await loadFacts(organizationId, saved, site)));
 }
 
 function findQuestion(setup: SetupSettings, questionId: string): SetupQuestion {
@@ -376,4 +407,32 @@ export async function dismiss(organizationId: string): Promise<SetupBoard> {
     dismissedAt: new Date().toISOString(),
   }));
   return boardFor(organizationId, saved);
+}
+
+/**
+ * Drafts playbooks for connected platform requests that have none. Omit `questionIds` for the
+ * automatic run; naming ids also retries a request whose earlier attempt found no tool or failed.
+ */
+export async function generatePlaybooks(
+  organizationId: string,
+  questionIds?: string[],
+): Promise<SetupBoard> {
+  const setup = await readSetup(organizationId);
+  const plugins = await boardPlugins(organizationId, setup);
+  await generatePlaybooksFor(
+    organizationId,
+    (need) => pluginFor(need, setup, plugins),
+    questionIds,
+  );
+  return boardFor(organizationId);
+}
+
+export async function turnOn(
+  organizationId: string,
+  userId: string,
+  questionId: string,
+): Promise<SetupBoard> {
+  const setup = await readSetup(organizationId);
+  await turnOnPlaybook(organizationId, userId, findQuestion(setup, questionId));
+  return boardFor(organizationId);
 }

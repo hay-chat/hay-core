@@ -60,6 +60,8 @@ export interface SetupQuestion {
   needs?: SetupHandle;
   /** The generated playbook for this request, once one exists. */
   playbookId?: string;
+  /** Set when generating a playbook found no suitable tool or failed, so we never retry silently. */
+  playbookAttempt?: { outcome: "no_tool" | "failed"; at: string };
   check?: SetupCheckResult;
 }
 
@@ -73,6 +75,9 @@ export interface SetupSettings {
   questions: SetupQuestion[];
   answeredAt?: string;
   dismissedAt?: string;
+  /** Set once the assistant's persona was filled in (or found already filled in). */
+  assistantFilledAt?: string;
+  /** Set only when every row, including platform rows, is ready. */
   finishedAt?: string;
 }
 
@@ -83,6 +88,7 @@ export const SETUP_ROW_STATUSES = [
   "missing",
   "needs_connection",
   "playbook_off",
+  "playbook_missing",
   "check_failed",
 ] as const;
 export type SetupRowStatus = (typeof SETUP_ROW_STATUSES)[number];
@@ -103,6 +109,8 @@ export interface SetupRow {
   /** The platform that can do this for the customer, when one was chosen. */
   plugin?: SetupPluginRef;
   playbook?: { id: string; title: string; steps: string[] };
+  /** For `playbook_missing`: still to be generated, no suitable tool, or the attempt failed. */
+  generation?: "pending" | "no_tool" | "failed";
 }
 
 export interface SetupSiteState {
@@ -116,9 +124,10 @@ export interface SetupSiteState {
 
 /** The single most useful thing to do next. */
 export type SetupUpNext =
-  | { kind: "connect"; plugin: SetupPluginRef; unlocks: number }
-  | { kind: "choose_platform"; unlocks: number }
+  | { kind: "connect"; plugin: SetupPluginRef; unlocks: number; capability?: SetupHandle }
+  | { kind: "choose_platform"; unlocks: number; capability?: SetupHandle }
   | { kind: "playbook"; questionId: string; title: string }
+  | { kind: "write_playbook"; questionId: string; text: string }
   | { kind: "answer"; questionId: string; text: string }
   | { kind: "done" };
 

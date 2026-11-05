@@ -85,6 +85,23 @@ export const setupRouter = t.router({
       setup.removeQuestion(orgId(ctx), input.questionId),
     ),
 
+  /**
+   * Drafts a playbook for each connected platform request that has none. Naming `questionIds`
+   * retries a request whose earlier attempt found no suitable tool or failed.
+   */
+  generatePlaybooks: scopedProcedure(RESOURCES.PLAYBOOKS, ACTIONS.CREATE)
+    .input(z.object({ questionIds: z.array(z.string().min(1).max(255)).max(30).optional() }))
+    .mutation(({ ctx, input }): Promise<SetupBoard> =>
+      setup.generatePlaybooks(orgId(ctx), input.questionIds),
+    ),
+
+  /** Turns on a request's draft playbook. Safe to call twice. */
+  turnOnPlaybook: scopedProcedure(RESOURCES.PLAYBOOKS, ACTIONS.UPDATE)
+    .input(z.object({ questionId: z.string().min(1).max(255) }))
+    .mutation(({ ctx, input }): Promise<SetupBoard> =>
+      setup.turnOn(orgId(ctx), ctx.user!.id, input.questionId),
+    ),
+
   /** "Finish later": stops the redirect from `/`. Setup stays available in the sidebar. */
   dismiss: update().mutation(({ ctx }): Promise<SetupBoard> => setup.dismiss(orgId(ctx))),
 });

@@ -95,7 +95,16 @@ describe("row statuses", () => {
 
   it("platform questions need a connection until a playbook exists; plugin comes from handles", () => {
     const q: SetupQuestion = { id: "o", text: "Where?", source: "catalog", needs: "orders" };
-    const plugins = [{ id: "shop", name: "Shop", handles: ["orders" as const] }];
+    const plugins = [
+      {
+        id: "shop",
+        name: "Shop",
+        handles: ["orders" as const],
+        businessTypes: [],
+        connected: false,
+      },
+    ];
+    const connected = plugins.map((p) => ({ ...p, connected: true }));
     const base = { toolPluginIds: ["shop"], channels: [], questions: [q] };
     expect(buildBoard(facts({ setup: base, plugins })).rows[0]).toMatchObject({
       status: "needs_connection",
@@ -106,21 +115,39 @@ describe("row statuses", () => {
     ).toBeUndefined();
 
     const withPlaybook = { ...base, questions: [{ ...q, playbookId: "p1" }] };
+    // Connected, but a playbook has not been drafted yet.
+    expect(buildBoard(facts({ setup: base, plugins: connected })).rows[0]).toMatchObject({
+      status: "playbook_missing",
+      generation: "pending",
+    });
+    // A playbook never makes a row ready while its platform is not connected.
     expect(
       buildBoard(
         facts({
           setup: withPlaybook,
           plugins,
-          playbooks: [{ id: "p1", title: "T", active: false }],
+          playbooks: [{ id: "p1", title: "T", active: true, steps: [] }],
         }),
       ).rows[0].status,
-    ).toBe("playbook_off");
+    ).toBe("needs_connection");
     expect(
       buildBoard(
         facts({
           setup: withPlaybook,
-          plugins,
-          playbooks: [{ id: "p1", title: "T", active: true }],
+          plugins: connected,
+          playbooks: [{ id: "p1", title: "T", active: false, steps: ["Ask", "Look up"] }],
+        }),
+      ).rows[0],
+    ).toMatchObject({
+      status: "playbook_off",
+      playbook: { id: "p1", title: "T", steps: ["Ask", "Look up"] },
+    });
+    expect(
+      buildBoard(
+        facts({
+          setup: withPlaybook,
+          plugins: connected,
+          playbooks: [{ id: "p1", title: "T", active: true, steps: [] }],
         }),
       ).rows[0].status,
     ).toBe("ready");
@@ -130,7 +157,15 @@ describe("row statuses", () => {
 describe("upNext order and counts", () => {
   const answered = { outcome: "answered" as const, answer: "x", sources: [], checkedAt: NOW };
   const missing = { outcome: "not_answered" as const, sources: [], checkedAt: NOW };
-  const plugins = [{ id: "shop", name: "Shop", handles: ["orders" as const, "refunds" as const] }];
+  const plugins = [
+    {
+      id: "shop",
+      name: "Shop",
+      handles: ["orders" as const, "refunds" as const],
+      businessTypes: [],
+      connected: false,
+    },
+  ];
   const need = (id: string, needs: "orders" | "refunds" | "billing"): SetupQuestion => ({
     id,
     text: id,
@@ -153,6 +188,7 @@ describe("upNext order and counts", () => {
       kind: "connect",
       plugin: { id: "shop", name: "Shop" },
       unlocks: 2,
+      capability: "orders",
     });
   });
 
@@ -160,15 +196,15 @@ describe("upNext order and counts", () => {
     const board = buildBoard(
       facts({ setup: { toolPluginIds: [], channels: [], questions: [need("o", "orders")] } }),
     );
-    expect(board.upNext).toEqual({ kind: "choose_platform", unlocks: 1 });
+    expect(board.upNext).toEqual({ kind: "choose_platform", unlocks: 1, capability: "orders" });
   });
 
   it("then playbook, then answer, then done", () => {
     const off = { ...need("o", "orders"), playbookId: "p" };
     const withOff = buildBoard(
       facts({
-        plugins,
-        playbooks: [{ id: "p", title: "Order status", active: false }],
+        plugins: plugins.map((p) => ({ ...p, connected: true })),
+        playbooks: [{ id: "p", title: "Order status", active: false, steps: [] }],
         setup: { toolPluginIds: ["shop"], channels: [], questions: [doc("m", missing), off] },
       }),
     );
