@@ -60,6 +60,7 @@ import { onBeforeUnmount, onMounted, ref } from "vue";
 import { Hay } from "@/utils/api";
 import { useSetupStore, type SetupBoard as SetupBoardData } from "@/stores/setup";
 import { useSetupSitePolling } from "@/composables/useSetupSitePolling";
+import { useSetupTurnPolling } from "@/composables/useSetupTurnPolling";
 import SetupQuestions from "@/components/setup/SetupQuestions.vue";
 import SetupBoard, { type SetupBoardActions } from "@/components/setup/SetupBoard.vue";
 
@@ -193,6 +194,17 @@ const onSaved = (board: SetupBoardData) => {
 useSetupSitePolling(() => {
   if (mode.value === "board") void runCheck();
 });
+
+// Rows the check found answers for stay "checking" while a real test turn runs; poll until the
+// server reports each turn's result.
+useSetupTurnPolling(
+  () =>
+    mode.value === "board" &&
+    !checking.value &&
+    !checkFailed.value &&
+    store.board?.site.state !== "reading" &&
+    Boolean(store.board?.rows.some((r) => r.status === "checking")),
+);
 
 const toast = useToast();
 const { t } = useI18n();

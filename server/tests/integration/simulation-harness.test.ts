@@ -9,6 +9,7 @@ import { SimulationRunItem } from "../../database/entities/simulation-run-item.e
 import { emitUsage } from "../../services/llm/usage-sink";
 import { conversationRepository } from "../../repositories/conversation.repository";
 import { SIMULATION_CAPS } from "../../config/simulation-caps";
+import { SETUP_CHECK_RUN_KIND } from "../../services/simulation/simulation-kind";
 
 const enqueued: Array<{ conversationId: string; trigger: string }> = [];
 
@@ -184,6 +185,29 @@ describe("simulation harness", () => {
     await expect(
       simulationHarnessService.startRun({ organizationId: orgId, cases: twoCases }),
     ).rejects.toMatchObject({ code: "LIMIT_REACHED" });
+  });
+
+  it("setup test turns are not counted, not capped and not listed as runs", async () => {
+    await AppDataSource.getRepository(Organization).update(orgId, {
+      limits: { maxSimulationsPerMonth: 2 },
+    });
+    // The customer's own allowance is used up...
+    await simulationHarnessService.startRun({ organizationId: orgId, cases: twoCases });
+    const before = await simulationHarnessService.getAllowance(orgId);
+    expect(before).toEqual({ limit: 2, used: 2, remaining: 0 });
+
+    // ...and a setup check still starts, without changing it.
+    const run = await simulationHarnessService.startRun({
+      organizationId: orgId,
+      kind: SETUP_CHECK_RUN_KIND,
+      cases: twoCases,
+    });
+    expect(run.status).toBe("running");
+    expect(await simulationHarnessService.getAllowance(orgId)).toEqual(before);
+
+    const listed = await simulationHarnessService.listRuns(orgId);
+    expect(listed.map((r) => r.kind)).not.toContain(SETUP_CHECK_RUN_KIND);
+    expect(listed).toHaveLength(1);
   });
 
   it("holds the monthly cap when runs start at the same time (F1)", async () => {

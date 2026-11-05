@@ -140,6 +140,7 @@
       "playbookNoTool": "{plugin} ainda não tem uma ferramenta para isso. Você pode escrever seu próprio playbook.",
       "playbookFailed": "Não conseguimos escrever um playbook. Tente de novo ou escreva o seu.",
       "failed": "Algo deu errado na verificação. Tente de novo.",
+      "missingHandedOff": "Encontramos algo, mas não o bastante para responder com segurança. Isso iria para a sua equipe.",
       "missingPartial": "Não encontrado nas páginas lidas até agora"
     },
     "needs": {

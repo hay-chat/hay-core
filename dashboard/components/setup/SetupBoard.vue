@@ -44,9 +44,9 @@
     </p>
 
     <SetupUpNext
-      :up-next="firstCheckPending ? null : board.upNext"
-      :checking="firstCheckPending"
-      :total="board.rows.length"
+      :up-next="testing ? null : board.upNext"
+      :checking="testing"
+      :total="testingCount"
       :connect-to="connectTo"
       :can-install="canInstall"
       :write-to="writeTo"
@@ -283,6 +283,14 @@ watch(
 onBeforeUnmount(clearReveal);
 
 const firstCheckPending = computed(() => !settledOnce.value);
+
+// The band stays up while any row is still being tested for real (a test turn takes a while),
+// and then counts only those rows.
+const checkingRows = computed(() => props.board.rows.filter((row) => row.status === "checking"));
+const testing = computed(() => firstCheckPending.value || checkingRows.value.length > 0);
+const testingCount = computed(() =>
+  firstCheckPending.value ? props.board.rows.length : checkingRows.value.length,
+);
 
 const displayStatus = (row: SetupRowData, index: number): SetupRowStatus => {
   if (props.busyRowIds.includes(row.id)) return "checking";

@@ -31,6 +31,7 @@ import { DocumentSourceSyncStatus } from "@server/entities/document-source.entit
 import { JobStatus } from "@server/entities/job.entity";
 
 const NOW = "2026-11-05T10:00:00.000Z";
+const PASSED = { state: "passed" } as const;
 const LATER = "2026-11-05T10:05:00.000Z";
 const siteOf = (state: "none" | "reading" | "done" | "failed", syncedAt?: string) => ({
   state: { state, discovered: 0, processed: 0 },
@@ -83,7 +84,7 @@ describe("row statuses", () => {
           toolPluginIds: [],
           channels: [],
           questions: [
-            doc("a", { outcome: "answered", answer: "30 days", sources, checkedAt: NOW }),
+            doc("a", { outcome: "answered", answer: "30 days", sources, checkedAt: NOW, turn: PASSED }),
             doc("b", { outcome: "failed", sources: [], checkedAt: NOW }),
           ],
         },
@@ -99,7 +100,7 @@ describe("row statuses", () => {
       { documentId: "page", title: "Returns" },
     ];
     const question = {
-      ...doc("a", { outcome: "answered", answer: "30 days", sources, checkedAt: NOW }),
+      ...doc("a", { outcome: "answered", answer: "30 days", sources, checkedAt: NOW, turn: PASSED }),
       answerDocumentId: "own",
     };
     const board = buildBoard(
@@ -170,7 +171,13 @@ describe("row statuses", () => {
 });
 
 describe("upNext order and counts", () => {
-  const answered = { outcome: "answered" as const, answer: "x", sources: [], checkedAt: NOW };
+  const answered = {
+    outcome: "answered" as const,
+    answer: "x",
+    sources: [],
+    checkedAt: NOW,
+    turn: PASSED,
+  };
   const missing = { outcome: "not_answered" as const, sources: [], checkedAt: NOW };
   const plugins = [
     {

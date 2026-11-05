@@ -156,7 +156,13 @@ describe("finished only when platform rows are ready too", () => {
       id: "d",
       text: "d",
       source: "catalog",
-      check: { outcome: "answered", answer: "x", sources: [], checkedAt: NOW },
+      check: {
+        outcome: "answered",
+        answer: "x",
+        sources: [],
+        checkedAt: NOW,
+        turn: { state: "passed" },
+      },
     } as SetupQuestion;
     const shop = plugin({ id: "shop", handles: ["orders"], connected: true });
     expect(isEverythingReady(run([answered, need("o", "orders")], [shop], ["shop"]).rows)).toBe(

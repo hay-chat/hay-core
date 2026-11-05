@@ -125,6 +125,8 @@ export function buildRow(question: SetupQuestion, facts: BoardFacts): SetupRow {
   if (check.outcome === "failed") return { ...base, status: "check_failed" };
 
   if (check.outcome === "answered") {
+    // Ready only after a real test turn passed. Pending, or stored before turns existed: testing.
+    if (check.turn?.state !== "passed") return { ...base, status: "checking" };
     const sources = check.sources.map((source) =>
       source.documentId === question.answerDocumentId ? { ...source, own: true } : source,
     );
@@ -136,7 +138,8 @@ export function buildRow(question: SetupQuestion, facts: BoardFacts): SetupRow {
   if (reading) return { ...base, status: "reading_site" };
   const checkedBeforeLastRead =
     !!site.syncedAt && new Date(check.checkedAt).getTime() < new Date(site.syncedAt).getTime();
-  return { ...base, status: checkedBeforeLastRead ? "checking" : "missing" };
+  if (checkedBeforeLastRead) return { ...base, status: "checking" };
+  return { ...base, status: "missing", ...(check.handedOff ? { handedOff: true } : {}) };
 }
 
 /** The need that most of `rows` share, so "so your assistant can ..." names the common one. */

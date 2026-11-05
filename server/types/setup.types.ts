@@ -52,7 +52,18 @@ export interface SetupCheckResult {
   answer?: string;
   sources: SetupSource[];
   checkedAt: string;
+  /**
+   * For `answered`: the real test turn through the chat pipeline. Only `passed` is Ready. A check
+   * stored without one (made before turns existed) counts as not checked yet.
+   */
+  turn?: SetupTurn;
+  /** Set with `not_answered` when the passages answered it but the real chat handed off. */
+  handedOff?: boolean;
 }
+
+export type SetupTurn =
+  | { state: "pending"; runId: string; ref: string; startedAt: string }
+  | { state: "passed" };
 
 export interface SetupQuestion {
   id: string;
@@ -119,6 +130,8 @@ export interface SetupRow {
   status: SetupRowStatus;
   answer?: string;
   sources: SetupSource[];
+  /** For `missing`: the assistant found something but a real test turn went to the team. */
+  handedOff?: boolean;
   needs?: SetupHandle;
   /** The platform that can do this for the customer, when one was chosen. */
   plugin?: SetupPluginRef;

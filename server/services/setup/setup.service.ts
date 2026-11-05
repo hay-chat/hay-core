@@ -3,7 +3,7 @@
  *
  * Stored answers live in `settings.setup`; row statuses are worked out on every read from the
  * site's sync state, documents and playbooks (see board.ts). Only `checkQuestions`,
- * `addAnswer` and `addQuestion` call a model.
+ * `addAnswer` and `addQuestion` call a model, and run a real test turn for answers the check finds.
  *
  * @module services/setup/setup.service
  */
@@ -42,11 +42,16 @@ import { generatePlaybooksFor, turnOnPlaybook } from "./playbooks";
 import { catalogFor, catalogLocale, findCatalogQuestion } from "./catalog";
 import { CHECK_CONCURRENCY, checkQuestion, mapWithConcurrency } from "./check";
 import { saveAnswerDocument } from "./answer-document";
+import { readTurn, startTurns } from "./turn";
+import type { PendingTurn, TurnOutcome } from "./turn-classify";
+import { createLogger } from "@server/lib/logger";
 import { inferBusinessType as inferFromSite, addScheme } from "./infer";
 import { readSiteState, startSiteRead, type SiteReading } from "./site";
 import { readSetup, updateSetup } from "./store";
 
 export const MAX_QUESTIONS = 30;
+
+const logger = createLogger("setup-service");
 
 async function organizationLanguage(organizationId: string): Promise<string | undefined> {
   const organization = await organizationService.findOne(organizationId);
@@ -199,7 +204,7 @@ async function boardFor(
  * only while setup is still open, so finished accounts never start background work from here.
  */
 export async function getBoard(organizationId: string): Promise<SetupBoard> {
-  const current = await readSetup(organizationId);
+  const current = await settleTurns(organizationId, await readSetup(organizationId));
   return boardFor(organizationId, current, { resume: !current.finishedAt && !!current.website });
 }
 
@@ -331,13 +336,104 @@ export function needsCheck(question: SetupQuestion, site: SiteReading): boolean 
   if (question.needs) return false;
   const check = question.check;
   if (!check || check.outcome === "failed") return true;
-  if (check.outcome === "answered") return false;
+  // A turn that is pending is already being tested. An answer with no turn at all was stored
+  // before turns existed: it never passed a real one, so it is checked again.
+  if (check.outcome === "answered") return check.turn === undefined;
   // Not answered earlier: look again once the site has been re-read since.
   return (
     site.state.state !== "reading" &&
     !!site.syncedAt &&
     new Date(check.checkedAt).getTime() < new Date(site.syncedAt).getTime()
   );
+}
+
+/**
+ * One check at a time per organization: a second call (a poll, an added question) waits, then
+ * reads the questions again and sees the turns the first one started instead of starting its own.
+ */
+const checkLocks = new Map<string, Promise<unknown>>();
+
+function serialized<T>(organizationId: string, work: () => Promise<T>): Promise<T> {
+  const prior = checkLocks.get(organizationId) ?? Promise.resolve();
+  const next = prior.catch(() => undefined).then(work);
+  checkLocks.set(organizationId, next);
+  void next
+    .finally(() => {
+      if (checkLocks.get(organizationId) === next) checkLocks.delete(organizationId);
+    })
+    .catch(() => undefined);
+  return next;
+}
+
+interface CheckedQuestion {
+  id: string;
+  text: string;
+  result: SetupCheckResult;
+  answerDocumentId?: string;
+}
+
+/**
+ * Starts the real test turns for the questions the cheap check called answered, in one run. They
+ * stay `checking` on the board until a turn finishes. If the run cannot start they are `failed`
+ * (never missing), so a row is never stuck.
+ */
+async function withTurns(
+  organizationId: string,
+  checked: CheckedQuestion[],
+): Promise<CheckedQuestion[]> {
+  const answered = checked.filter((c) => c.result.outcome === "answered");
+  if (answered.length === 0) return checked;
+  let started: Map<string, PendingTurn>;
+  try {
+    started = await startTurns(organizationId, answered);
+  } catch (err) {
+    logger.warn({ err, organizationId }, "Could not start the setup test turns");
+    return checked.map((c) =>
+      answered.includes(c)
+        ? { ...c, result: { outcome: "failed", sources: [], checkedAt: c.result.checkedAt } }
+        : c,
+    );
+  }
+  return checked.map((c) => {
+    const turn = started.get(c.id);
+    return turn ? { ...c, result: { ...c.result, turn } } : c;
+  });
+}
+
+function finishTurn(check: SetupCheckResult, outcome: TurnOutcome): SetupCheckResult {
+  if (outcome === "passed") return { ...check, turn: { state: "passed" } };
+  if (outcome === "handed_off") {
+    return { outcome: "not_answered", sources: [], checkedAt: check.checkedAt, handedOff: true };
+  }
+  return { outcome: "failed", sources: [], checkedAt: new Date().toISOString() };
+}
+
+/**
+ * Applies the turns that finished (or were lost) since the last read, so a board read or a
+ * recheck always recovers a row left on `checking`. Costs nothing when no turn is pending.
+ */
+async function settleTurns(organizationId: string, setup: SetupSettings): Promise<SetupSettings> {
+  const pending = setup.questions.flatMap((q) =>
+    q.check?.turn?.state === "pending" ? [{ question: q, turn: q.check.turn }] : [],
+  );
+  if (pending.length === 0) return setup;
+
+  const outcomes = await Promise.all(
+    pending.map(async (p) => ({ ...p, outcome: await readTurn(organizationId, p.turn) })),
+  );
+  const done = outcomes.filter((o) => o.outcome !== "pending");
+  if (done.length === 0) return setup;
+
+  return updateSetup(organizationId, (current) => ({
+    ...current,
+    questions: current.questions.map((q) => {
+      // Same id AND wording AND the same run: a reworded or re-tested question keeps its newer state.
+      const hit = done.find((d) => d.question.id === q.id && d.question.text === q.text);
+      const turn = q.check?.turn;
+      if (!hit || !q.check || turn?.state !== "pending" || turn.runId !== hit.turn.runId) return q;
+      return { ...q, check: finishTurn(q.check, hit.outcome) };
+    }),
+  }));
 }
 
 /** One in-flight check per question, so overlapping polls don't pay for the same answer twice. */
@@ -355,7 +451,7 @@ function checkOnce(organizationId: string, question: SetupQuestion): Promise<Set
 /** Writes results onto the freshly read settings, skipping questions removed or reworded meanwhile. */
 async function saveChecks(
   organizationId: string,
-  results: { id: string; text: string; result: SetupCheckResult; answerDocumentId?: string }[],
+  results: CheckedQuestion[],
 ): Promise<SetupSettings> {
   return updateSetup(organizationId, (current) => {
     return {
@@ -373,29 +469,41 @@ async function saveChecks(
   });
 }
 
-export async function checkQuestions(
+/** Cheap check for each target, then one real test turn for those it calls answered. */
+async function checkAndStart(
   organizationId: string,
-  questionIds?: string[],
-): Promise<SetupBoard> {
-  const setup = await readSetup(organizationId);
-  const site = await readSiteState(organizationId, setup.website);
-
-  const targets = setup.questions.filter((q) =>
-    questionIds ? !q.needs && questionIds.includes(q.id) : needsCheck(q, site),
-  );
-  // The board always carries the site as it is when we answer, not as it was before the checks
-  // ran, so the dashboard never sees "reading" again for a read that has finished.
-  if (targets.length === 0) {
-    return finishIfReady(organizationId, buildBoard(await loadFacts(organizationId, setup)));
-  }
-
-  const results = await mapWithConcurrency(targets, CHECK_CONCURRENCY, async (q) => ({
+  targets: SetupQuestion[],
+): Promise<SetupSettings> {
+  const checked = await mapWithConcurrency(targets, CHECK_CONCURRENCY, async (q) => ({
     id: q.id,
     text: q.text,
     result: await checkOnce(organizationId, q),
   }));
-  const saved = await saveChecks(organizationId, results);
-  return finishIfReady(organizationId, buildBoard(await loadFacts(organizationId, saved)));
+  return saveChecks(organizationId, await withTurns(organizationId, checked));
+}
+
+export function checkQuestions(
+  organizationId: string,
+  questionIds?: string[],
+): Promise<SetupBoard> {
+  return serialized(organizationId, async () => {
+    const setup = await settleTurns(organizationId, await readSetup(organizationId));
+    const site = await readSiteState(organizationId, setup.website);
+
+    const targets = setup.questions.filter((q) =>
+      questionIds ? !q.needs && questionIds.includes(q.id) : needsCheck(q, site),
+    );
+    // A question whose turn is still running is not tested a second time.
+    const fresh = targets.filter((q) => q.check?.turn?.state !== "pending");
+    // The board always carries the site as it is when we answer, not as it was before the checks
+    // ran, so the dashboard never sees "reading" again for a read that has finished.
+    if (fresh.length === 0) {
+      return finishIfReady(organizationId, buildBoard(await loadFacts(organizationId, setup)));
+    }
+
+    const saved = await checkAndStart(organizationId, fresh);
+    return finishIfReady(organizationId, buildBoard(await loadFacts(organizationId, saved)));
+  });
 }
 
 function findQuestion(setup: SetupSettings, questionId: string): SetupQuestion {
@@ -418,20 +526,24 @@ export async function addAnswer(
   }
 
   const document = await saveAnswerDocument(organizationId, question.text, answer);
-  const rechecked = await checkOnce(organizationId, question);
 
-  // The customer just wrote the answer to this exact question and it is embedded, so a "not
-  // answered" verdict would be wrong: record their own text. A failed check stays failed.
-  const mine: SetupSource = { documentId: document.id, title: document.title };
-  const result: SetupCheckResult =
-    rechecked.outcome === "not_answered"
-      ? { outcome: "answered", answer, sources: [mine], checkedAt: rechecked.checkedAt }
-      : rechecked;
+  return serialized(organizationId, async () => {
+    const rechecked = await checkOnce(organizationId, question);
 
-  const saved = await saveChecks(organizationId, [
-    { id: question.id, text: question.text, result, answerDocumentId: document.id },
-  ]);
-  return boardFor(organizationId, saved);
+    // The customer just wrote the answer to this exact question and it is embedded, so a "not
+    // answered" verdict would be wrong: record their own text. A failed check stays failed. Their
+    // answer still has to pass a real test turn before the row is Ready.
+    const mine: SetupSource = { documentId: document.id, title: document.title };
+    const result: SetupCheckResult =
+      rechecked.outcome === "not_answered"
+        ? { outcome: "answered", answer, sources: [mine], checkedAt: rechecked.checkedAt }
+        : rechecked;
+
+    const [tested] = await withTurns(organizationId, [
+      { id: question.id, text: question.text, result, answerDocumentId: document.id },
+    ]);
+    return boardFor(organizationId, await saveChecks(organizationId, [tested]));
+  });
 }
 
 export async function addQuestion(organizationId: string, text: string): Promise<SetupBoard> {
@@ -451,13 +563,12 @@ export async function addQuestion(organizationId: string, text: string): Promise
     return { ...current, questions: [...current.questions, added] };
   });
 
-  // One question is cheap to check now, so the row doesn't sit on "checking".
+  // The filter is quick; the test turn runs behind it and the row reads "checking" until it ends.
   if (added) {
-    const result = await checkOnce(organizationId, added);
-    const withCheck = await saveChecks(organizationId, [
-      { id: added.id, text: added.text, result },
-    ]);
-    return boardFor(organizationId, withCheck);
+    const target = added;
+    return serialized(organizationId, async () =>
+      boardFor(organizationId, await checkAndStart(organizationId, [target])),
+    );
   }
   return boardFor(organizationId, saved);
 }

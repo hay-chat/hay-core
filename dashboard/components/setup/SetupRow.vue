@@ -293,6 +293,7 @@ const why = computed(() => {
       return t("setup.why.readyGeneric");
     }
     case "missing":
+      if (row.handedOff) return t("setup.why.missingHandedOff");
       if (props.hasSite && props.sitePartial) return t("setup.why.missingPartial");
       return t(props.hasSite ? "setup.why.missingSite" : "setup.why.missingNoSite");
     case "needs_connection": {
