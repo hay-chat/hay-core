@@ -13,7 +13,6 @@ jest.mock("@server/services/plugin-manager.service", () => ({
         manifest: { channel: "whatsapp" },
       },
     ]),
-    findPluginIdByChannel: jest.fn().mockResolvedValue(null),
   },
   isPluginVisibleToOrganization: () => true,
 }));

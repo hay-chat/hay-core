@@ -54,8 +54,20 @@ function withTimeout<T>(work: Promise<T>, ms: number): Promise<T> {
   return Promise.race([work, timeout]).finally(() => clearTimeout(timer));
 }
 
+export interface ResolveOptions {
+  /**
+   * Whether being connected means having tools. True for platforms the assistant acts on; false
+   * for channels, which deliver messages and register no tools.
+   */
+  needsTools?: boolean;
+}
+
 /** Decides one plugin. Pure given the deps, so every branch is testable. */
-export async function resolveOne(pluginId: string, deps: ConnectionDeps): Promise<ConnectionState> {
+export async function resolveOne(
+  pluginId: string,
+  deps: ConnectionDeps,
+  { needsTools = true }: ResolveOptions = {},
+): Promise<ConnectionState> {
   const facts = await deps.facts(pluginId);
   if (!facts?.enabled) return "not_connected";
 
@@ -64,11 +76,12 @@ export async function resolveOne(pluginId: string, deps: ConnectionDeps): Promis
     if (status) return status.state === "connected" ? "connected" : "not_connected";
   }
 
+  const hasTools = !needsTools || facts.toolCount > 0;
   if (facts.usesOAuth) {
-    return facts.oauthConnected && facts.toolCount > 0 ? "connected" : "not_connected";
+    return facts.oauthConnected && hasTools ? "connected" : "not_connected";
   }
   // Key-based plugins: tools only exist after the worker started with working settings.
-  return facts.requiredConfigPresent && facts.toolCount > 0 ? "connected" : "not_connected";
+  return facts.requiredConfigPresent && hasTools ? "connected" : "not_connected";
 }
 
 /**
@@ -78,10 +91,11 @@ export async function resolveOne(pluginId: string, deps: ConnectionDeps): Promis
 export async function resolveConnections(
   pluginIds: string[],
   deps: ConnectionDeps,
+  options: ResolveOptions = {},
 ): Promise<Map<string, ConnectionState>> {
   const unique = [...new Set(pluginIds)];
   const settled = await Promise.allSettled(
-    unique.map((id) => withTimeout(resolveOne(id, deps), deps.timeoutMs)),
+    unique.map((id) => withTimeout(resolveOne(id, deps, options), deps.timeoutMs)),
   );
   const result = new Map<string, ConnectionState>();
   settled.forEach((outcome, index) => {
@@ -138,10 +152,11 @@ export async function defaultDeps(organizationId: string): Promise<ConnectionDep
 export async function connectedPluginIds(
   organizationId: string,
   pluginIds: string[],
+  options: ResolveOptions = {},
 ): Promise<Set<string>> {
   if (pluginIds.length === 0) return new Set();
   try {
-    const states = await resolveConnections(pluginIds, await defaultDeps(organizationId));
+    const states = await resolveConnections(pluginIds, await defaultDeps(organizationId), options);
     return new Set([...states].filter(([, state]) => state === "connected").map(([id]) => id));
   } catch (err) {
     logger.warn({ err, organizationId }, "Could not resolve plugin connections");

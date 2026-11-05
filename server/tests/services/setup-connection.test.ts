@@ -34,6 +34,22 @@ const deps = (over: Partial<ConnectionDeps> & { byId?: Record<string, PluginFact
   }) as ConnectionDeps;
 
 describe("resolveOne", () => {
+  it("a channel registers no tools, but still has to finish connecting", async () => {
+    const channel = { needsTools: false };
+    const check = (over: Partial<PluginFacts>) =>
+      resolveOne("p", deps({ byId: { p: facts({ toolCount: 0, ...over }) } }), channel);
+
+    expect(await check({})).toBe("connected");
+    expect(await check({ oauthConnected: false })).toBe("not_connected");
+    expect(await check({ usesOAuth: false, requiredConfigPresent: false })).toBe("not_connected");
+    expect(await check({ usesOAuth: false })).toBe("connected");
+    expect(await check({ enabled: false })).toBe("not_connected");
+    // Without the option, tools still count.
+    expect(await resolveOne("p", deps({ byId: { p: facts({ toolCount: 0 }) } }))).toBe(
+      "not_connected",
+    );
+  });
+
   it("a plugin that is only enabled is not connected", async () => {
     expect(await resolveOne("p", deps({ byId: { p: facts({ oauthConnected: false }) } }))).toBe(
       "not_connected",

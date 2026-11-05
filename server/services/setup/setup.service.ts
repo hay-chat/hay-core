@@ -111,7 +111,7 @@ async function loadPlaybooks(setup: SetupSettings) {
 const webchatName = (language?: string) =>
   catalogLocale(language) === "pt-BR" ? "Chat no site" : "Website chat";
 
-/** The channels the customer picked, resolved to names and whether their plugin is enabled. */
+/** The channels the customer picked, resolved to names and whether they are really connected. */
 async function loadChannels(
   organizationId: string,
   setup: SetupSettings,
@@ -119,6 +119,13 @@ async function loadChannels(
   if (setup.channels.length === 0) return [];
   const language = await organizationLanguage(organizationId);
   const plugins = visiblePlugins(organizationId);
+  const pluginFor = (id: string) => plugins.find((p) => p.manifest?.channel === id);
+  const connected = await connectedPluginIds(
+    organizationId,
+    setup.channels.flatMap((id) => pluginFor(id)?.pluginId ?? []),
+    { needsTools: false },
+  );
+
   const refs: SetupChannelRef[] = [];
   for (const id of setup.channels) {
     if (id === "webchat") {
@@ -126,14 +133,13 @@ async function loadChannels(
       continue;
     }
     // A channel whose plugin is gone (or hidden from this org) is dropped, not shown broken.
-    const plugin = plugins.find((p) => p.manifest?.channel === id);
+    const plugin = pluginFor(id);
     if (!plugin) continue;
-    const enabledId = await pluginManagerService.findPluginIdByChannel(organizationId, id);
     refs.push({
       id,
       name: plugin.name,
       plugin: { id: plugin.pluginId, name: plugin.name },
-      connected: enabledId !== null,
+      connected: connected.has(plugin.pluginId),
     });
   }
   return refs;

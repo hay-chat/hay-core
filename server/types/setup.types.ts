@@ -104,7 +104,7 @@ export interface SetupChannelRef {
   name: string;
   /** The plugin that provides the channel. Absent for webchat, which core provides. */
   plugin?: SetupPluginRef;
-  /** Whether that plugin is enabled for the organization. Meaningless for webchat. */
+  /** Whether that plugin finished connecting for the organization. Always true for webchat. */
   connected: boolean;
 }
 
