@@ -20,6 +20,9 @@ export const roleProtectedRoutes: Record<string, string[]> = {
   "/settings/usage": ["owner", "admin"],
   "/settings/assistant": ["owner", "admin"],
 
+  // In-app setup
+  "/setup": ["owner", "admin"],
+
   // Insights - all except agent
   "/insights": ["owner", "admin", "contributor", "member", "viewer"],
 
@@ -40,7 +43,7 @@ export const roleProtectedRoutes: Record<string, string[]> = {
 /**
  * Check if a user role has access to a specific route
  */
-function hasRouteAccess(path: string, userRole: string | undefined): boolean {
+export function hasRouteAccess(path: string, userRole: string | undefined): boolean {
   if (!userRole) return false;
 
   // Check if this specific route is protected

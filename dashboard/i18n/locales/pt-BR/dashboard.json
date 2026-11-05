@@ -46,66 +46,6 @@
     "minutesAgo": "{count}m atrás",
     "hoursAgo": "{count}h atrás",
     "daysAgo": "{count}d atrás"
-  },
-  "gettingStarted": {
-    "title": "Primeiros Passos",
-    "description": "Você está a poucos passos de ter o Hay.chat cuidando das suas tarefas de suporte repetitivas, para que sua equipe possa focar no que realmente importa — ajudar clientes e fazer seu negócio crescer.",
-    "progress": {
-      "title": "Progresso de Integração",
-      "stepsCompleted": "{completed} de {total} etapas concluídas",
-      "percentComplete": "{percent}% Concluído",
-      "allCompleted": "Parabéns! Você completou todas as etapas de integração."
-    },
-    "integrations": {
-      "title": "Escolha integrações",
-      "subtitle": "Conecte suas ferramentas e plataformas favoritas ao Hay.chat",
-      "description": "O Hay.chat funciona onde sua equipe já trabalha — conecte apps como {zendesk}, {shopify} ou {whatsapp} em poucos cliques para começar a sincronizar conversas automaticamente.",
-      "count": "{count} integrações conectadas",
-      "browseAll": "Ver Todas as Integrações",
-      "suggest": "Sugerir uma Integração"
-    },
-    "assistant": {
-      "title": "Descreva seu assistente",
-      "subtitle": "Seu colega de equipe de IA começa aqui.",
-      "description": "Dê um nome ao seu assistente, escolha o tom e escreva as regras que ele sempre segue. Ele responde em todos os canais onde a IA está ligada.",
-      "describe": "Descrever assistente",
-      "edit": "Editar assistente"
-    },
-    "documents": {
-      "title": "Envie documentos de treinamento",
-      "subtitle": "Ensine o Hay.chat como você treinaria um novo membro da equipe.",
-      "description": "Envie seus playbooks, FAQs ou documentos de processos existentes — o Hay.chat aprende instantaneamente e nunca esquece.",
-      "countOne": "{count} documento enviado",
-      "countOther": "{count} documentos enviados",
-      "uploadDocuments": "Enviar Documentos",
-      "viewDocuments": "Ver Documentos",
-      "locked": "Termine as etapas anteriores antes de fazer isso. O Hay.chat vai funcionar melhor assim."
-    },
-    "playbook": {
-      "title": "Crie um playbook",
-      "subtitle": "Automatize fluxos de trabalho e ações comuns.",
-      "description": "Playbooks permitem definir como o Hay.chat deve responder, escalar ou executar tarefas (como reembolsos ou consultas de pedidos) — tudo sem código.",
-      "countOne": "{count} playbook criado",
-      "countOther": "{count} playbooks criados",
-      "createPlaybook": "Criar Playbook",
-      "viewPlaybooks": "Ver Playbooks",
-      "locked": "Termine as etapas anteriores antes de fazer isso. O Hay.chat vai funcionar melhor assim."
-    },
-    "playground": {
-      "title": "Teste o assistente em um chat playground",
-      "subtitle": "Veja seu assistente em ação antes de ir ao ar.",
-      "description": "Use o playground integrado para testar como o Hay.chat responde, ajustar instruções e aperfeiçoar a experiência antes de conectar com clientes reais.",
-      "countOne": "{count} conversa iniciada",
-      "countOther": "{count} conversas iniciadas",
-      "startChat": "Iniciar Chat Playground",
-      "viewConversations": "Ver Conversas",
-      "locked": "Termine as etapas anteriores antes de fazer isso. O Hay.chat vai funcionar melhor assim."
-    },
-    "goLive": {
-      "title": "Entre no ar por um canal primeiro",
-      "description": "Muitas lojas começam com a IA só no Web Chat e deixam WhatsApp, Instagram e e-mail com a equipe. Quando estiver satisfeito com as respostas, ligue os outros canais um de cada vez.",
-      "button": "Escolher os canais da IA"
-    }
   }
   }
 }
