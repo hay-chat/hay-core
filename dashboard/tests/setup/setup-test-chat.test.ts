@@ -32,8 +32,12 @@ const socket = vi.hoisted(() => {
     }),
   };
 });
+const useWebSocketMock = vi.hoisted(() => vi.fn());
 vi.mock("@/composables/useWebSocket", () => ({
-  useWebSocket: () => ({ connect: socket.connect, send: socket.send, on: socket.on }),
+  useWebSocket: (options?: unknown) => {
+    useWebSocketMock(options);
+    return { connect: socket.connect, send: socket.send, on: socket.on };
+  },
 }));
 
 import { useSetupTestChat } from "../../composables/useSetupTestChat";
@@ -57,6 +61,11 @@ const botReply = (id: string, content: string) => ({
 });
 
 describe("useSetupTestChat", () => {
+  it("only listens on the shared socket, so leaving setup does not close it for other pages", () => {
+    mountChat();
+    expect(useWebSocketMock).toHaveBeenCalledWith({ disconnectOnUnmount: false });
+  });
+
   beforeEach(() => {
     vi.clearAllMocks();
     vi.useFakeTimers();
