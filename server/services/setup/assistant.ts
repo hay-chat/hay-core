@@ -153,7 +153,9 @@ const defaultDeps: AssistantDeps = {
     new LLMService().invoke<string>({
       prompt,
       jsonSchema: ASSISTANT_JSON_SCHEMA,
-      tier: "medium",
+      // Hard tier: on a fake store the medium tier wrote two lines of instructions where five to
+      // eight were asked for; the hard tier followed the schema.
+      tier: "hard",
       temperature: 0.4,
       max_tokens: 1500,
       organizationId,
