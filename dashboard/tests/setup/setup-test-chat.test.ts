@@ -151,7 +151,9 @@ describe("useSetupTestChat", () => {
     expect(reply?.sources).toEqual([]);
 
     await chat.send("Do you offer refunds?");
-    expect(api.update).toHaveBeenCalledWith(expect.objectContaining({ data: { status: "closed" } }));
+    expect(api.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: { status: "closed" } }),
+    );
     expect(api.create).toHaveBeenCalledTimes(2);
     expect(api.sendMessage.mock.calls.at(-1)?.[0].conversationId).toBe("conv-2");
   });

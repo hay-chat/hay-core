@@ -221,7 +221,9 @@ export class RetrievalLayer {
       }
 
       // Filter out low relevance results
-      const filteredResults = searchResults.filter((result) => (result.similarity || 0) >= MIN_DOCUMENT_SIMILARITY);
+      const filteredResults = searchResults.filter(
+        (result) => (result.similarity || 0) >= MIN_DOCUMENT_SIMILARITY,
+      );
 
       log.debug(
         {

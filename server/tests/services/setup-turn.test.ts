@@ -93,8 +93,9 @@ beforeEach(() => {
   });
   readTurn.mockReset().mockResolvedValue("pending");
   saveAnswerDocument.mockReset().mockResolvedValue({ id: "doc1", title: "My answer" });
-  (jest.requireMock("@server/database/data-source") as { AppDataSource: { query: jest.Mock } })
-    .AppDataSource.query.mockResolvedValue([]);
+  (
+    jest.requireMock("@server/database/data-source") as { AppDataSource: { query: jest.Mock } }
+  ).AppDataSource.query.mockResolvedValue([]);
 });
 
 const stored = () => (store.current.questions as SetupQuestion[])[0];
@@ -137,7 +138,9 @@ describe("board rows and the real test turn", () => {
 describe("classifyTurn", () => {
   it("a reply without a hand-off passes, a hand-off does not, no reply fails", () => {
     expect(classifyTurn({ reply: "30 days.", handedOff: false })).toBe("passed");
-    expect(classifyTurn({ reply: "I'll pass you to the team", handedOff: true })).toBe("handed_off");
+    expect(classifyTurn({ reply: "I'll pass you to the team", handedOff: true })).toBe(
+      "handed_off",
+    );
     expect(classifyTurn({ reply: null, handedOff: false })).toBe("failed");
   });
 

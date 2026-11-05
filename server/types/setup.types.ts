@@ -62,8 +62,7 @@ export interface SetupCheckResult {
 }
 
 export type SetupTurn =
-  | { state: "pending"; runId: string; ref: string; startedAt: string }
-  | { state: "passed" };
+  { state: "pending"; runId: string; ref: string; startedAt: string } | { state: "passed" };
 
 export interface SetupQuestion {
   id: string;

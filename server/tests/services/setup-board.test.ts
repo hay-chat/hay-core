@@ -84,7 +84,13 @@ describe("row statuses", () => {
           toolPluginIds: [],
           channels: [],
           questions: [
-            doc("a", { outcome: "answered", answer: "30 days", sources, checkedAt: NOW, turn: PASSED }),
+            doc("a", {
+              outcome: "answered",
+              answer: "30 days",
+              sources,
+              checkedAt: NOW,
+              turn: PASSED,
+            }),
             doc("b", { outcome: "failed", sources: [], checkedAt: NOW }),
           ],
         },
@@ -100,7 +106,13 @@ describe("row statuses", () => {
       { documentId: "page", title: "Returns" },
     ];
     const question = {
-      ...doc("a", { outcome: "answered", answer: "30 days", sources, checkedAt: NOW, turn: PASSED }),
+      ...doc("a", {
+        outcome: "answered",
+        answer: "30 days",
+        sources,
+        checkedAt: NOW,
+        turn: PASSED,
+      }),
       answerDocumentId: "own",
     };
     const board = buildBoard(
