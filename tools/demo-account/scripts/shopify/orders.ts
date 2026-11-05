@@ -34,6 +34,7 @@ const SHIPPING: Record<Currency, { freeOver: number; price: number }> = {
 };
 /** brand.md: 3–7 business days in transit; used for the carrier's estimated delivery. */
 const TRANSIT_DAYS = 5;
+const MAX_ORDER_ATTEMPTS = 4;
 
 export const orderTag = (key: string) => `${DEMO_TAG}:${key}`;
 
@@ -512,12 +513,60 @@ async function readState(
   }
 }
 
+type OrderCreated = {
+  orderCreate: {
+    order: { id: string; name: string } | null;
+    userErrors: { field?: string[] | null; message: string }[];
+  };
+};
+
+/**
+ * Development stores cap order creation at about 5 a minute and report it as a userError, not as
+ * THROTTLED, so the client's retry doesn't see it. Wait out the window and try again.
+ */
+async function createOrder(
+  shop: Shopify,
+  fixture: OrderFixture,
+  ctx: OrderContext,
+  rateLimitWaitMs: number,
+): Promise<OrderCreated> {
+  for (let attempt = 1; ; attempt++) {
+    const created = await shop.mutate<OrderCreated>(
+      ORDER_CREATE,
+      {
+        order: orderCreateInput(fixture, ctx),
+        // No order confirmation or shipping emails; stock levels stay as the product step set them.
+        options: {
+          sendReceipt: false,
+          sendFulfillmentReceipt: false,
+          inventoryBehaviour: "BYPASS",
+        },
+      },
+      {
+        orderCreate: {
+          order: { id: `gid://shopify/Order/dry-run-${fixture.key}`, name: "(dry-run)" },
+          userErrors: [],
+        },
+      },
+    );
+    const limited = created.orderCreate.userErrors.some((e) =>
+      e.message.startsWith("Too many attempts"),
+    );
+    if (!limited || attempt >= MAX_ORDER_ATTEMPTS) {
+      assertNoUserErrors(`orderCreate ${fixture.key}`, created.orderCreate);
+      return created;
+    }
+    log(`  Store order limit reached, waiting ${rateLimitWaitMs / 1000}s`);
+    await sleep(rateLimitWaitMs);
+  }
+}
+
 /** Creates one fixture's order unless an order already carries its tag. */
 export async function seedOrder(
   shop: Shopify,
   fixture: OrderFixture,
   ctx: OrderContext,
-  options: { pollMs?: number } = {},
+  options: { pollMs?: number; rateLimitWaitMs?: number } = {},
 ): Promise<SeededOrder> {
   const [existing] = await findDemoOrders(shop, orderTag(fixture.key));
   if (existing) {
@@ -528,23 +577,7 @@ export async function seedOrder(
   log(
     `Order ${fixture.key}: creating (${fixture.financialStatus}, ${fixture.fulfillmentStatus}${fixture.cancelled ? ", cancelled" : ""})`,
   );
-  const created = await shop.mutate<{
-    orderCreate: { order: { id: string; name: string } | null; userErrors: [] };
-  }>(
-    ORDER_CREATE,
-    {
-      order: orderCreateInput(fixture, ctx),
-      // No order confirmation or shipping emails; stock levels stay as the product step set them.
-      options: { sendReceipt: false, sendFulfillmentReceipt: false, inventoryBehaviour: "BYPASS" },
-    },
-    {
-      orderCreate: {
-        order: { id: `gid://shopify/Order/dry-run-${fixture.key}`, name: "(dry-run)" },
-        userErrors: [],
-      },
-    },
-  );
-  assertNoUserErrors(`orderCreate ${fixture.key}`, created.orderCreate);
+  const created = await createOrder(shop, fixture, ctx, options.rateLimitWaitMs ?? 60_000);
   const orderId = created.orderCreate.order?.id;
   if (!orderId) throw new Error(`orderCreate ${fixture.key}: no order returned`);
 

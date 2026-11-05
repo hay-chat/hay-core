@@ -3,7 +3,7 @@ import { loadCustomers, loadOrders, loadProducts, type Flags } from "../lib/data
 import type { Customer, OrderFixture, Product } from "../lib/types";
 import { resolveCurrency, seedShopify, run, type SeedOptions } from "../seed-shopify";
 import { createShopify, fetchAdminToken, operationName } from "../shopify/client";
-import { orderCreateInput, refundInput, type OrderContext } from "../shopify/orders";
+import { orderCreateInput, refundInput, seedOrder, type OrderContext } from "../shopify/orders";
 import { productSetInput } from "../shopify/products";
 
 const NOW = new Date("2026-10-29T12:00:00Z");
@@ -504,6 +504,51 @@ describe("order mutation sequence per state", () => {
       refundMethod: { originalPaymentMethodsRefund: false },
     });
     expect(calls.find((c) => c.op === "RefundCreate")!.variables.key).toBe("hay-demo-refund-1");
+  });
+});
+
+describe("store order limit", () => {
+  const limited = {
+    orderCreate: {
+      order: null,
+      userErrors: [{ message: "Too many attempts. Please try again later." }],
+    },
+  };
+  const created = {
+    orderCreate: { order: { id: "gid://shopify/Order/1", name: "#1001" }, userErrors: [] },
+  };
+  const stubShop = (mutate: ReturnType<typeof vi.fn>) =>
+    ({
+      dryRun: false,
+      mutate,
+      query: vi.fn().mockResolvedValue({
+        orders: { nodes: [], pageInfo: { hasNextPage: false, endCursor: null } },
+        order: {
+          id: "gid://shopify/Order/1",
+          name: "#1001",
+          tags: [],
+          closed: false,
+          cancelledAt: null,
+          displayFinancialStatus: "PAID",
+          displayFulfillmentStatus: "UNFULFILLED",
+          fulfillments: [],
+        },
+      }),
+    }) as unknown as Parameters<typeof seedOrder>[0];
+
+  it("waits and retries orderCreate when the store limit is hit", async () => {
+    const mutate = vi.fn().mockResolvedValueOnce(limited).mockResolvedValueOnce(created);
+    const row = await seedOrder(stubShop(mutate), fixtures.paid, ctx, { rateLimitWaitMs: 0 });
+    expect(mutate).toHaveBeenCalledTimes(2);
+    expect(row).toMatchObject({ status: "created", orderName: "#1001" });
+  });
+
+  it("gives up with the store's error after repeated limits", async () => {
+    const mutate = vi.fn().mockResolvedValue(limited);
+    await expect(
+      seedOrder(stubShop(mutate), fixtures.paid, ctx, { rateLimitWaitMs: 0 }),
+    ).rejects.toThrow("Too many attempts");
+    expect(mutate).toHaveBeenCalledTimes(4);
   });
 });
 

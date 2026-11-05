@@ -94,7 +94,7 @@ running `hay demo seed hay` for this store.
 
 The Shopify script has run against a real development store. The WooCommerce and Nuvemshop scripts have not, so their first run confirms the points below.
 
-- **Shopify:** customer phone numbers only go on the address, because Shopify's check on the customer's own phone field can reject the fake 555 numbers. Orders are backdated with `processedAt`, but `createdAt` is always the seed time, and
+- **Shopify:** customer phone numbers only go on the address, because Shopify's check on the customer's own phone field can reject the fake 555 numbers. Development stores allow about 5 new orders a minute, so a full run pauses for a minute or two. Orders are backdated with `processedAt`, but `createdAt` is always the seed time, and
   the Hay.chat Shopify plugin reads `createdAt`, so orders look placed today. Tracking events are
   backdated, so delivered and stale tracking work. Card payments are recorded as an external `card` gateway.
 - **WooCommerce:** the REST API can't backdate. After a real run the script saves a `wp eval` command
