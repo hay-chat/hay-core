@@ -14,21 +14,31 @@
  * is skipped on re-runs. `--reset-orders` archives and deletes the tagged orders first.
  */
 import { DEMO_TAG, daysAgo, log, productBySku, trackingNumber } from "../lib/data";
-import type { Customer, FinancialStatus, OrderFixture, OrderLine, Product } from "../lib/types";
+import type {
+  Currency,
+  Customer,
+  FinancialStatus,
+  OrderFixture,
+  OrderLine,
+  Product,
+} from "../lib/types";
 import { assertNoUserErrors, type Shopify } from "./client";
 import { mailingAddress } from "./customers";
 import { money } from "./products";
 
-const CURRENCY = "USD";
-/** brand.md: free US shipping over $75, otherwise $6.90. */
-const FREE_SHIPPING_OVER = 75;
-const SHIPPING_PRICE = 6.9;
+/** brand.md per market; its Brazil section gives no PAC price, so R$24.90 is the Nuvemshop seed's. */
+const SHIPPING: Record<Currency, { freeOver: number; price: number }> = {
+  USD: { freeOver: 75, price: 6.9 },
+  EUR: { freeOver: 50, price: 3.9 },
+  BRL: { freeOver: 299, price: 24.9 },
+};
 /** brand.md: 3–7 business days in transit; used for the carrier's estimated delivery. */
 const TRANSIT_DAYS = 5;
 
 export const orderTag = (key: string) => `${DEMO_TAG}:${key}`;
 
 export interface OrderContext {
+  currency: Currency;
   products: Product[];
   /** Customer key → fixture customer. */
   customers: Record<string, Customer>;
@@ -55,22 +65,24 @@ export interface SeededOrder {
 
 const round = (n: number) => Math.round(n * 100) / 100;
 const iso = (days: number, now: Date) => daysAgo(days, now).toISOString();
-const moneySet = (amount: number) => ({
-  shopMoney: { amount: money(amount), currencyCode: CURRENCY },
+const moneySet = (amount: number, currency: Currency) => ({
+  shopMoney: { amount: money(amount), currencyCode: currency },
 });
 const isShipped = (fixture: OrderFixture) => fixture.fulfillmentStatus !== "unfulfilled";
 
-export function linePrice(products: Product[], sku: string): number {
+export function linePrice(products: Product[], sku: string, currency: Currency): number {
   const { product, variant } = productBySku(products, sku);
-  return variant.price?.USD ?? product.price.USD;
+  return variant.price?.[currency] ?? product.price[currency];
 }
 
-const linesTotal = (products: Product[], lines: OrderLine[]) =>
-  round(lines.reduce((sum, line) => sum + linePrice(products, line.sku) * line.quantity, 0));
+const linesTotal = (products: Product[], lines: OrderLine[], currency: Currency) =>
+  round(
+    lines.reduce((sum, line) => sum + linePrice(products, line.sku, currency) * line.quantity, 0),
+  );
 
-export function orderTotals(fixture: OrderFixture, products: Product[]) {
-  const subtotal = linesTotal(products, fixture.lines);
-  const shipping = subtotal > FREE_SHIPPING_OVER ? 0 : SHIPPING_PRICE;
+export function orderTotals(fixture: OrderFixture, products: Product[], currency: Currency) {
+  const subtotal = linesTotal(products, fixture.lines, currency);
+  const shipping = subtotal > SHIPPING[currency].freeOver ? 0 : SHIPPING[currency].price;
   return { subtotal, shipping, total: round(subtotal + shipping) };
 }
 
@@ -110,13 +122,14 @@ export function orderCreateInput(
   if (!customerKey || !customer) throw new Error(`Order ${fixture.key} has no Shopify customer`);
   const customerId = ctx.customerIds[customerKey];
   if (!customerId) throw new Error(`Customer ${customerKey} was not seeded`);
-  const { shipping, total } = orderTotals(fixture, ctx.products);
+  const { currency } = ctx;
+  const { shipping, total } = orderTotals(fixture, ctx.products, currency);
   const financialStatus = createFinancialStatus(fixture.financialStatus);
   const processedAt = iso(fixture.placedDaysAgo, ctx.now);
   const address = mailingAddress(customer.address);
 
   return {
-    currency: CURRENCY,
+    currency,
     test: true,
     processedAt,
     financialStatus,
@@ -132,10 +145,12 @@ export function orderCreateInput(
       return {
         variantId,
         quantity: line.quantity,
-        priceSet: moneySet(linePrice(ctx.products, line.sku)),
+        priceSet: moneySet(linePrice(ctx.products, line.sku, currency), currency),
       };
     }),
-    shippingLines: [{ title: "Standard shipping", code: "standard", priceSet: moneySet(shipping) }],
+    shippingLines: [
+      { title: "Standard shipping", code: "standard", priceSet: moneySet(shipping, currency) },
+    ],
     // Only a captured payment gets a transaction; it's the parent refunds point at.
     transactions:
       financialStatus === "PAID"
@@ -146,7 +161,7 @@ export function orderCreateInput(
               gateway: gateway(fixture),
               test: true,
               processedAt,
-              amountSet: moneySet(total),
+              amountSet: moneySet(total, currency),
             },
           ]
         : [],
@@ -390,13 +405,16 @@ export function refundInput(
   details: RefundDetails["order"],
   products: Product[],
   now: Date,
+  currency: Currency,
 ): Record<string, unknown> {
   const full = fixture.financialStatus === "refunded";
   const lines = full ? fixture.lines : (fixture.refundLines ?? []);
   if (lines.length === 0) throw new Error(`${fixture.key}: partially_refunded needs refundLines`);
   const sale = details.transactions.find((t) => t.kind === "SALE" && t.status === "SUCCESS");
   if (!sale) throw new Error(`${fixture.key}: no successful sale transaction to refund`);
-  const amount = full ? orderTotals(fixture, products).total : linesTotal(products, lines);
+  const amount = full
+    ? orderTotals(fixture, products, currency).total
+    : linesTotal(products, lines, currency);
 
   return {
     orderId,
@@ -442,7 +460,7 @@ async function refund(
   };
   if (!shop.dryRun)
     details = (await shop.query<RefundDetails>(REFUND_DETAILS, { id: orderId })).order;
-  const input = refundInput(fixture, orderId, details, ctx.products, ctx.now);
+  const input = refundInput(fixture, orderId, details, ctx.products, ctx.now, ctx.currency);
   const data = await shop.mutate<{
     refundCreate: { refund: { id: string } | null; userErrors: [] };
   }>(

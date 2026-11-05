@@ -2,9 +2,10 @@
  * Seeds a Shopify development store with the Casa Aurora catalogue, customers and order states.
  *
  *   tsx tools/demo-account/scripts/seed-shopify.ts [--dry-run] [--only products|customers|orders]
- *     [--orders key1,key2] [--reset-orders] [--image-base-url <url>]
+ *     [--orders key1,key2] [--reset-orders] [--image-base-url <url>] [--currency USD|EUR|BRL]
  *
- * Env (tools/demo-account/.env): SHOPIFY_STORE_DOMAIN, SHOPIFY_ADMIN_TOKEN. Dry-run needs neither.
+ * Env (tools/demo-account/.env): SHOPIFY_STORE_DOMAIN, SHOPIFY_CLIENT_ID, SHOPIFY_CLIENT_SECRET.
+ * Dry-run needs none of them.
  * Idempotent: products match by handle/SKU, customers by email, orders by tag `hay-demo:<key>`.
  * Writes the result to orders/seeded-shopify.json (not in dry-run).
  */
@@ -20,8 +21,8 @@ import {
   parseFlags,
   requireEnv,
 } from "./lib/data";
-import type { Customer, OrderFixture, Product } from "./lib/types";
-import { API_VERSION, createShopify, type Shopify } from "./shopify/client";
+import type { Currency, Customer, OrderFixture, Product } from "./lib/types";
+import { API_VERSION, createShopify, fetchAdminToken, type Shopify } from "./shopify/client";
 import { findCustomerIds, seedCustomers } from "./shopify/customers";
 import { resetOrders, seedOrder, type SeededOrder } from "./shopify/orders";
 import { findVariantIds, seedProducts } from "./shopify/products";
@@ -29,6 +30,7 @@ import { findVariantIds, seedProducts } from "./shopify/products";
 export const SUMMARY_FILE = join(ROOT, "orders", "seeded-shopify.json");
 
 export interface SeedOptions {
+  currency: Currency;
   only: Set<string>;
   orderKeys: Set<string>;
   resetOrders: boolean;
@@ -59,7 +61,10 @@ export async function seedShopify(
   let variantIds: Record<string, string> = {};
   let customerIds: Record<string, string> = {};
   if (wants("products"))
-    variantIds = await seedProducts(shop, data.products, { imageBaseUrl: options.imageBaseUrl });
+    variantIds = await seedProducts(shop, data.products, {
+      currency: options.currency,
+      imageBaseUrl: options.imageBaseUrl,
+    });
   if (wants("customers")) customerIds = await seedCustomers(shop, data.customers);
   if (!wants("orders")) return [];
 
@@ -79,6 +84,7 @@ export async function seedShopify(
   if (options.resetOrders) await resetOrders(shop, options.orderKeys);
 
   const ctx = {
+    currency: options.currency,
     products: data.products,
     customers: Object.fromEntries(data.customers.map((c) => [c.key, c])),
     customerIds,
@@ -89,6 +95,37 @@ export async function seedShopify(
   for (const fixture of orders)
     seeded.push(await seedOrder(shop, fixture, ctx, { pollMs: options.pollMs }));
   return seeded;
+}
+
+const CURRENCIES: readonly string[] = ["USD", "EUR", "BRL"] satisfies Currency[];
+const isCurrency = (code: string): code is Currency => CURRENCIES.includes(code);
+
+/**
+ * Which catalogue prices to use: the store's currency, or `--currency`, which must match it because
+ * Shopify treats product prices as the store's currency. A dry run doesn't ask the store, so it uses
+ * `--currency`, else USD.
+ */
+export async function resolveCurrency(shop: Shopify, requested?: string): Promise<Currency> {
+  const wanted = requested?.toUpperCase();
+  if (wanted !== undefined && !isCurrency(wanted)) {
+    throw new Error(`--currency must be one of ${CURRENCIES.join(", ")}`);
+  }
+  if (shop.dryRun) return wanted ?? "USD";
+  const data = await shop.query<{ shop: { currencyCode: string } }>(
+    "query ShopCurrency { shop { currencyCode } }",
+  );
+  const store = data.shop.currencyCode;
+  if (!isCurrency(store)) {
+    throw new Error(
+      `Store currency is ${store}; the catalogue has ${CURRENCIES.join(", ")} prices`,
+    );
+  }
+  if (wanted && wanted !== store) {
+    throw new Error(
+      `--currency ${wanted} doesn't match the store (${store}). Change the store's currency in Settings → General, or drop the flag.`,
+    );
+  }
+  return store;
 }
 
 export function summaryTable(rows: SeededOrder[]): string {
@@ -123,15 +160,21 @@ export async function run(argv: string[]): Promise<number> {
     const env = flags.dryRun
       ? {
           SHOPIFY_STORE_DOMAIN: process.env.SHOPIFY_STORE_DOMAIN || "dry-run.myshopify.com",
-          SHOPIFY_ADMIN_TOKEN: "",
+          SHOPIFY_CLIENT_ID: "",
+          SHOPIFY_CLIENT_SECRET: "",
         }
-      : requireEnv("SHOPIFY_STORE_DOMAIN", "SHOPIFY_ADMIN_TOKEN");
+      : requireEnv("SHOPIFY_STORE_DOMAIN", "SHOPIFY_CLIENT_ID", "SHOPIFY_CLIENT_SECRET");
     const domain = env.SHOPIFY_STORE_DOMAIN.replace(/^https?:\/\//, "").replace(/\/$/, "");
     log(
       `Shopify ${domain} (Admin API ${API_VERSION})${flags.dryRun ? " — dry run, nothing is sent" : ""}`,
     );
 
-    const shop = createShopify(flags, domain, env.SHOPIFY_ADMIN_TOKEN);
+    const token = flags.dryRun
+      ? ""
+      : await fetchAdminToken(flags, domain, env.SHOPIFY_CLIENT_ID, env.SHOPIFY_CLIENT_SECRET);
+    const shop = createShopify(flags, domain, token);
+    const currency = await resolveCurrency(shop, argValue(argv, "--currency"));
+    log(`Currency: ${currency}`);
     const rows = await seedShopify(
       shop,
       {
@@ -140,6 +183,7 @@ export async function run(argv: string[]): Promise<number> {
         orders: loadOrders("shopify"),
       },
       {
+        currency,
         only: flags.only,
         orderKeys: flags.orderKeys,
         resetOrders: argv.includes("--reset-orders"),

@@ -6,7 +6,7 @@
 import { existsSync, readFileSync, statSync } from "node:fs";
 import { extname, join } from "node:path";
 import { DEMO_TAG, IMAGES_DIR, log } from "../lib/data";
-import type { Product } from "../lib/types";
+import type { Currency, Product } from "../lib/types";
 import { assertNoUserErrors, type Shopify } from "./client";
 
 const VENDOR = "Casa Aurora";
@@ -37,10 +37,10 @@ export function descriptionHtml(product: Product): string {
   return `<p>${escapeHtml(product.description.en)}</p>${items ? `<ul>${items}</ul>` : ""}`;
 }
 
-/** The `ProductSetInput` for a catalogue product (store language: en, currency: USD). */
+/** The `ProductSetInput` for a catalogue product (store language: en). */
 export function productSetInput(
   product: Product,
-  options: { locationId: string; existing?: ExistingProduct; files?: string[] },
+  options: { currency: Currency; locationId: string; existing?: ExistingProduct; files?: string[] },
 ): Record<string, unknown> {
   const optionNames =
     product.options.length > 0 ? product.options.map((o) => o.en) : [DEFAULT_OPTION.name];
@@ -54,7 +54,7 @@ export function productSetInput(
     })),
   }));
 
-  const compareAt = product.compareAtPrice?.USD;
+  const compareAt = product.compareAtPrice?.[options.currency];
   const variants = product.variants.map((variant) => ({
     ...(options.existing?.variantIds[variant.sku]
       ? { id: options.existing.variantIds[variant.sku] }
@@ -64,7 +64,7 @@ export function productSetInput(
       optionName: optionNames[i],
       name,
     })),
-    price: money(variant.price?.USD ?? product.price.USD),
+    price: money(variant.price?.[options.currency] ?? product.price[options.currency]),
     compareAtPrice: compareAt === undefined ? null : money(compareAt),
     taxable: true,
     inventoryPolicy: "DENY",
@@ -248,7 +248,7 @@ const PRODUCT_SET = `
 export async function seedProducts(
   shop: Shopify,
   products: Product[],
-  options: { imageBaseUrl?: string } = {},
+  options: { currency: Currency; imageBaseUrl?: string },
 ): Promise<Record<string, string>> {
   const locationId = await primaryLocationId(shop);
   const variantIds: Record<string, string> = {};
@@ -257,7 +257,12 @@ export async function seedProducts(
     const files = existing?.hasMedia
       ? undefined
       : await imageSources(shop, product, options.imageBaseUrl);
-    const input = productSetInput(product, { locationId, existing, files });
+    const input = productSetInput(product, {
+      currency: options.currency,
+      locationId,
+      existing,
+      files,
+    });
     const data = await shop.mutate<{
       productSet: {
         product: { id: string; variants: { nodes: { id: string; sku: string }[] } };

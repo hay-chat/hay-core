@@ -22,7 +22,7 @@ type DemoPlatform = (typeof DEMO_PLATFORMS)[number];
 
 /** Env vars a store seed needs before it can write; `--dry-run` needs none. */
 export const STORE_ENV: Record<DemoPlatform, string[]> = {
-  shopify: ["SHOPIFY_STORE_DOMAIN", "SHOPIFY_ADMIN_TOKEN"],
+  shopify: ["SHOPIFY_STORE_DOMAIN", "SHOPIFY_CLIENT_ID", "SHOPIFY_CLIENT_SECRET"],
   woocommerce: ["WOO_URL", "WOO_CONSUMER_KEY", "WOO_CONSUMER_SECRET"],
   nuvemshop: ["NUVEMSHOP_STORE_ID", "NUVEMSHOP_ACCESS_TOKEN"],
 };
@@ -60,6 +60,7 @@ export function planSeed(
     dryRun: boolean;
     resetOrders: boolean;
     imageBaseUrl?: string;
+    currency?: string;
     target: string;
     org?: string;
   },
@@ -88,7 +89,14 @@ export function planSeed(
       skipped.push(`${platform} store (no ${STORE_ENV[platform].join(" / ")})`);
       continue;
     }
-    steps.push({ label: `${platform} store`, script: `seed-${platform}.ts`, args: storeArgs });
+    steps.push({
+      label: `${platform} store`,
+      script: `seed-${platform}.ts`,
+      args: [
+        ...storeArgs,
+        ...(platform === "shopify" && options.currency ? ["--currency", options.currency] : []),
+      ],
+    });
   }
 
   const hayArgs = [
@@ -145,6 +153,7 @@ export async function demoSeed(ctx: Ctx): Promise<CommandResult> {
     dryRun: boolFlag(ctx.args, "dry-run"),
     resetOrders: boolFlag(ctx.args, "reset-orders"),
     imageBaseUrl: stringFlag(ctx.args, "image-base-url"),
+    currency: stringFlag(ctx.args, "currency"),
     target: ctx.target,
     org: stringFlag(ctx.args, "org"),
   });
