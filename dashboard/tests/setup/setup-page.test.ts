@@ -2,6 +2,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createPinia, setActivePinia } from "pinia";
 import { flushPromises } from "@vue/test-utils";
+import { nextTick } from "vue";
 import { mountWithStubs, router, stubNuxtGlobals } from "../component-harness";
 import { board, row } from "./fixtures";
 
@@ -59,6 +60,7 @@ vi.mock("@/composables/useWebchatSnippet", async () => {
 });
 
 import SetupPage from "../../pages/setup/index.vue";
+import { useSetupStore } from "@/stores/setup";
 import { useUserStore } from "@/stores/user";
 
 const rows = [row({ id: "a", status: "ready" }), row({ id: "b", status: "missing" })];
@@ -100,6 +102,71 @@ describe("setup page", () => {
     await flushPromises();
     expect(api.checkQuestions).not.toHaveBeenCalled();
     expect(wrapper.text()).toContain("setup.questions.type.title");
+  });
+
+  describe("while the server has not answered yet", () => {
+    let answer: (value: unknown) => void;
+    const QUESTIONS = "setup.questions.type.title";
+    const SKELETON = ".animate-pulse";
+
+    beforeEach(() => {
+      api.get.mockReturnValue(new Promise((resolve) => (answer = resolve)));
+    });
+
+    it("never shows the questions when the sidebar already loaded a started board", async () => {
+      useSetupStore().apply(board({ rows }));
+      const wrapper = mountWithStubs(SetupPage);
+      await nextTick();
+      expect(wrapper.text()).not.toContain(QUESTIONS);
+      // The board opens straight away, with rows checking rather than showing old statuses.
+      expect(wrapper.findAll("[data-row-id]").map((r) => r.attributes("data-status"))).toEqual([
+        "checking",
+        "checking",
+      ]);
+      answer(board({ rows }));
+      await flushPromises();
+      expect(wrapper.text()).not.toContain(QUESTIONS);
+      expect(api.checkQuestions).toHaveBeenCalledTimes(1);
+    });
+
+    it("shows a skeleton, not the questions, when it holds a board without answers", async () => {
+      useSetupStore().apply(board({ rows: [], answeredAt: undefined }));
+      const wrapper = mountWithStubs(SetupPage);
+      await nextTick();
+      expect(wrapper.find(SKELETON).exists()).toBe(true);
+      expect(wrapper.text()).not.toContain(QUESTIONS);
+
+      // Answered on another device: the server's word wins, no flash of the questions.
+      answer(board({ rows }));
+      await flushPromises();
+      expect(wrapper.find(SKELETON).exists()).toBe(false);
+      expect(wrapper.text()).not.toContain(QUESTIONS);
+      expect(wrapper.findAll("[data-row-id]")).toHaveLength(2);
+    });
+
+    it("shows a skeleton on a first visit, then the questions once the server says so", async () => {
+      const wrapper = mountWithStubs(SetupPage);
+      await nextTick();
+      expect(wrapper.find(SKELETON).exists()).toBe(true);
+      expect(wrapper.text()).not.toContain(QUESTIONS);
+
+      answer(board({ rows: [], answeredAt: undefined, businessType: undefined }));
+      await flushPromises();
+      expect(wrapper.find(SKELETON).exists()).toBe(false);
+      expect(wrapper.text()).toContain(QUESTIONS);
+    });
+
+    it("does not open a board held for another organization", async () => {
+      const store = useSetupStore();
+      store.apply(board({ rows }));
+      store.organizationId = "other-org";
+      const wrapper = mountWithStubs(SetupPage);
+      await nextTick();
+      expect(wrapper.findAll("[data-row-id]")).toHaveLength(0);
+      expect(wrapper.find(SKELETON).exists()).toBe(true);
+      answer(board({ rows }));
+      await flushPromises();
+    });
   });
 
   it("polls while the site is being read, checks once when it is done, then stops", async () => {

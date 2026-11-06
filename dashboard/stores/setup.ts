@@ -22,7 +22,8 @@ function isForbidden(error: unknown): boolean {
 
 /**
  * The organization's setup board, fetched once and shared by the `/` redirect,
- * the sidebar and the `/setup` page.
+ * the sidebar and the `/setup` page. Kept in localStorage so a returning person
+ * sees their board immediately; every page load still refreshes it from the server.
  */
 export const useSetupStore = defineStore("setup", {
   state: () => ({
@@ -96,6 +97,14 @@ export const useSetupStore = defineStore("setup", {
       this.status = "idle";
       this.loadedAt = null;
       this.organizationId = null;
+    },
+  },
+
+  persist: {
+    pick: ["board", "organizationId"],
+    // `loadedAt` is not restored, so a restored board always counts as stale.
+    afterHydrate: ({ store }) => {
+      if (store.board) store.status = "ready";
     },
   },
 });

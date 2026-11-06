@@ -6,6 +6,7 @@ import {
   SessionEndedError,
   withCrossTabLock,
 } from "@/utils/session-refresh";
+import { useSetupStore } from "./setup";
 import { useUserStore, type User } from "./user";
 
 interface Tokens {
@@ -119,6 +120,8 @@ export const useAuthStore = defineStore("auth", {
       // Clear user store
       const userStore = useUserStore();
       userStore.clearUser();
+      // The saved setup board must not reach the next person on this browser.
+      useSetupStore().reset();
 
       // Show notification if there's a reason
       if (reason === "token_expired" && process.client) {
