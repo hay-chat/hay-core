@@ -157,8 +157,9 @@ export class DocumentSourceRepository extends BaseRepository<DocumentSource> {
     };
 
     if (result.status === "success") {
-      // Clear cursor on a clean full pass; an explicit cursor override still wins.
-      patch.lastSyncCursor = result.cursor ?? undefined;
+      // Clear cursor on a clean full pass; an explicit cursor override still wins. It must be null:
+      // TypeORM skips undefined, which would leave the next sync resuming from the old offset.
+      patch.lastSyncCursor = result.cursor ?? null;
     } else if (result.cursor !== undefined) {
       patch.lastSyncCursor = result.cursor ?? undefined;
     }

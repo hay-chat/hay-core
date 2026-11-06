@@ -51,7 +51,7 @@ export class DocumentSource extends OrganizationScopedEntity {
   lastSyncedAt?: Date;
 
   @Column({ type: "varchar", length: 1024, nullable: true })
-  lastSyncCursor?: string;
+  lastSyncCursor?: string | null;
 
   @Column({
     type: "enum",
