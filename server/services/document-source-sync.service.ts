@@ -213,11 +213,16 @@ export class DocumentSourceSyncService {
 
       if (initiallyDoingFullSweep) {
         isFullSweep = true;
+        const resumed = !!source.lastSyncCursor;
         const result = await this.fullDiscovery(source, importer, startedAt, report);
         stats = mergeStats(stats, result.stats);
         cursor = result.cursor;
 
-        if (result.complete) {
+        if (result.complete && resumed) {
+          // This run only saw the pages after the cursor, so its "live set" would archive every
+          // page imported by earlier runs. Deletions wait for a sweep that runs in a single job.
+          status = "success";
+        } else if (result.complete) {
           // Only reconcile deletions when the discovery loop ran end-to-end;
           // otherwise the "live set" is partial and would archive valid docs.
           await report(

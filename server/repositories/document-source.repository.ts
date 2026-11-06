@@ -100,8 +100,9 @@ export class DocumentSourceRepository extends BaseRepository<DocumentSource> {
    * A source is due when:
    *   - enabled = true
    *   - it is not currently running
-   *   - it has never synced OR (syncIntervalMs is configured and the
-   *     interval has elapsed since lastSyncedAt)
+   *   - it has never synced, OR its last run hit the time budget with work left
+   *     (partial), OR (syncIntervalMs is configured and the interval has elapsed
+   *     since lastSyncedAt)
    */
   async findDueForSync(): Promise<DocumentSource[]> {
     const rows = await this.getRepository().query(
@@ -110,6 +111,7 @@ export class DocumentSourceRepository extends BaseRepository<DocumentSource> {
          AND (last_sync_status IS NULL OR last_sync_status != 'running')
          AND (
            last_synced_at IS NULL
+           OR last_sync_status = 'partial'
            OR (
              sync_interval_ms IS NOT NULL
              AND now() - last_synced_at > make_interval(secs => sync_interval_ms::float / 1000)

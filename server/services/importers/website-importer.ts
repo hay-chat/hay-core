@@ -48,8 +48,11 @@ export function isWebsiteSource(source: Pick<DocumentSource, "pluginId">): boole
   return source.pluginId === WEBSITE_PLUGIN_ID;
 }
 
-/** How many pages to return per discover()/listChanges() call. */
-const PAGE_SIZE = 50;
+/**
+ * How many pages to return per discover()/listChanges() call. The sync's resume cursor only moves
+ * between batches, so one batch must fit well inside its 50-second budget (pages take about 2s).
+ */
+const PAGE_SIZE = 10;
 
 type EnumeratedPage = { url: string; lastmod?: string; title?: string };
 

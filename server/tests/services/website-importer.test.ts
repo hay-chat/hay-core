@@ -73,7 +73,7 @@ beforeEach(() => {
 
 describe("WebsiteImporter.discover", () => {
   it("paginates sitemap entries with an offset cursor and maps lastmod to externalUpdatedAt", async () => {
-    const entries = Array.from({ length: 60 }, (_, i) => ({
+    const entries = Array.from({ length: 15 }, (_, i) => ({
       url: `https://docs.example.com/page-${i}`,
       lastmod: "2026-01-15T10:00:00.000Z",
     }));
@@ -82,9 +82,9 @@ describe("WebsiteImporter.discover", () => {
     const importer = new WebsiteImporter(makeSource());
 
     const first = await importer.discover({ cursor: undefined });
-    expect(first.pages).toHaveLength(50);
-    expect(first.nextCursor).toBe("50");
-    expect(first.total).toBe(60); // full enumeration count, for "X of Y" progress
+    expect(first.pages).toHaveLength(10);
+    expect(first.nextCursor).toBe("10");
+    expect(first.total).toBe(15); // full enumeration count, for "X of Y" progress
     expect(first.pages[0]).toMatchObject({
       externalId: "https://docs.example.com/page-0",
       externalUrl: "https://docs.example.com/page-0",
@@ -92,7 +92,7 @@ describe("WebsiteImporter.discover", () => {
     });
 
     const second = await importer.discover({ cursor: first.nextCursor });
-    expect(second.pages).toHaveLength(10);
+    expect(second.pages).toHaveLength(5);
     expect(second.nextCursor).toBeUndefined();
 
     // Enumeration is cached for the importer's lifetime: the sitemap is fetched once.
