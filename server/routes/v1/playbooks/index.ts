@@ -171,6 +171,30 @@ export const playbooksRouter = t.router({
       return { warnings };
     }),
 
+  duplicate: scopedProcedure(RESOURCES.PLAYBOOKS, ACTIONS.CREATE)
+    .input(
+      z.object({
+        id: z.string().uuid(),
+        title: z.string().min(1).max(255),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const playbook = await playbookService.duplicatePlaybook(
+        ctx.organizationId!,
+        input.id,
+        input.title,
+      );
+
+      if (!playbook) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Playbook not found",
+        });
+      }
+
+      return playbook;
+    }),
+
   delete: scopedProcedure(RESOURCES.PLAYBOOKS, ACTIONS.DELETE)
     .input(
       z.object({
