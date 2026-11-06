@@ -2,7 +2,7 @@
   <!-- relative: keeps screen-reader-only elements inside the scrolling main, or phones get blank scroll -->
   <Page class="relative">
     <div
-      v-if="store.status === 'idle' || store.status === 'loading'"
+      v-if="deciding"
       class="mx-auto w-full max-w-[1120px] animate-pulse space-y-4 motion-reduce:animate-none"
       role="status"
       :aria-label="$t('setup.state.loadingLabel')"
@@ -56,9 +56,10 @@
 </template>
 
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, ref } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref } from "vue";
 import { Hay } from "@/utils/api";
 import { useSetupStore, type SetupBoard as SetupBoardData } from "@/stores/setup";
+import { useUserStore } from "@/stores/user";
 import { useSetupSitePolling } from "@/composables/useSetupSitePolling";
 import { useSetupTurnPolling } from "@/composables/useSetupTurnPolling";
 import SetupQuestions from "@/components/setup/SetupQuestions.vue";
@@ -68,10 +69,24 @@ const router = useRouter();
 const route = useRoute();
 const store = useSetupStore();
 
-const mode = ref<"questions" | "board">("questions");
+// A board this browser already holds (from the sidebar, `/`, or the last visit) that has answers
+// can open right away: answers are never un-saved. Without answers the server decides, because
+// they may have been saved elsewhere, so the questions never show until it has replied.
+const openBoardNow =
+  Boolean(store.board?.answeredAt) && store.organizationId === useUserStore().activeOrganizationId;
+
+const mode = ref<"questions" | "board" | null>(openBoardNow ? "board" : null);
 const startStep = ref(0);
-const checking = ref(false);
+// Rows read "checking" from the first render, instead of flashing their saved statuses.
+const checking = ref(openBoardNow && Boolean(store.board?.rows.length));
 const checkFailed = ref(false);
+/** Nothing to show yet: a skeleton, never a guess at which screen is right. */
+const deciding = computed(
+  () =>
+    store.status === "idle" ||
+    store.status === "loading" ||
+    (Boolean(store.board) && mode.value === null),
+);
 const busyRowIds = ref<string[]>([]);
 /** The connect attempt that failed on the way back, shown next to the rows it would unlock. */
 const connectError = ref<{ pluginId: string; detail?: string } | null>(null);
@@ -169,8 +184,10 @@ const start = async () => {
   if (returned) await router.replace({ path: "/setup" });
   await store.load({ force: true });
   if (!store.board) return;
-  if (store.board.answeredAt) showBoard();
-  else mode.value = "questions";
+  if (!store.board.answeredAt) mode.value = "questions";
+  // "Change answers" was opened from the held board while this loaded: don't pull them out of it.
+  else if (mode.value === "questions") checking.value = false;
+  else showBoard();
   if (returned?.status === "success") void settleConnectReturn(returned.pluginId);
 };
 

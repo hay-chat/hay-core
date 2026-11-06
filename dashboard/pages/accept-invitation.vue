@@ -134,6 +134,7 @@
 <script setup lang="ts">
 import { Hay } from "@/utils/api";
 import { useAuthStore } from "@/stores/auth";
+import { useSetupStore } from "@/stores/setup";
 import { useUserStore } from "@/stores/user";
 
 definePageMeta({
@@ -301,6 +302,7 @@ const checkEmailMatch = async () => {
     authStore.tokens = null;
     authStore.isAuthenticated = false;
     userStore.clearUser();
+    useSetupStore().reset();
 
     // Redirect based on whether the invitation is for an existing user
     if (invitation.value.isExistingUser) {
