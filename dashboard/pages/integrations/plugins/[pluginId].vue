@@ -5,7 +5,7 @@
         <ArrowLeft class="h-4 w-4 mr-2" />
         {{ $t("pluginSettings.backToMarketplace") }}
       </Button>
-      <Button v-if="cameFromSetup" variant="outline" size="sm" @click="router.push('/setup')">
+      <Button v-if="setupReturn" variant="outline" size="sm" @click="router.push('/setup')">
         {{ $t("pluginSettings.backToSetup") }}
       </Button>
     </div>
@@ -1084,6 +1084,11 @@ const saveConfiguration = async () => {
 
     toast.success(t("pluginSettings.toast.configSaved"));
     await fetchPlugin();
+    // Sent here by setup, with everything it needs: carry on there.
+    if (setupReturn && !error.value && missingRequired.value === 0) {
+      setupReturn.searchParams.set("hay_connect", "success");
+      await router.push(setupReturn.pathname + setupReturn.search);
+    }
   } catch (err: any) {
     console.error("Failed to save configuration:", err);
     toast.error(err?.message || err?.data?.message || t("pluginSettings.toast.configSaveFailed"));
@@ -1279,14 +1284,15 @@ const connectStep = ref<"saving" | "redirecting" | null>(
 );
 const connectError = ref<string | null>(null);
 // Arrived from the in-app setup (its connect link carries return_to=<this origin>/setup).
-// The query is cleared after the connect starts, so remember it now.
-const cameFromSetup = ref(false);
-try {
-  const back = new URL(String(route.query.return_to ?? ""));
-  cameFromSetup.value = back.origin === window.location.origin && back.pathname === "/setup";
-} catch {
-  // No (or an unparsable) return_to: not from setup.
-}
+// Saving the settings goes back there. Failed connects clear the query, so remember it now.
+const setupReturn = (() => {
+  try {
+    const back = new URL(String(route.query.return_to ?? ""));
+    return back.origin === window.location.origin && back.pathname === "/setup" ? back : null;
+  } catch {
+    return null; // No (or an unparsable) return_to: not from setup.
+  }
+})();
 // The original link, to retry after a failure (the query is cleared then).
 const connectQuery = route.query.connect === "1" ? { ...route.query } : null;
 
@@ -1336,10 +1342,16 @@ const handleConnectIntent = async (): Promise<boolean> => {
     // OAuth availability is only reported once an enabled instance exists.
     if (!oauthAvailable.value) await fetchPlugin();
     if (!oauthAvailable.value) {
-      // No OAuth (e.g. a store plugin that connects from its own settings
-      // panel): the link only pre-fills the settings, so stay on the page.
-      toast.success(t("pluginSettings.toast.configSaved"));
-      router.replace({ path: route.path, query: {} });
+      // No OAuth (e.g. API-key plugins, or a store plugin that connects from its
+      // own settings panel): the rest happens here, so open Setup.
+      connectStep.value = null;
+      if (Object.keys(configuration).length > 0) {
+        toast.success(t("pluginSettings.toast.configSaved"));
+      }
+      // return_to stays, so a refresh still goes back to setup after saving.
+      const { return_to: returnTo } = route.query;
+      router.replace({ path: route.path, query: returnTo ? { return_to: returnTo } : {} });
+      await openSetup();
       return false;
     }
     const returnTo = typeof route.query.return_to === "string" ? route.query.return_to : undefined;
