@@ -18,12 +18,13 @@ jest.mock("@server/repositories/message.repository", () => ({
 const publish = jest.fn<(channel: string, event: unknown) => Promise<void>>();
 // In-memory stand-in for the delivery-id store (SET NX / DEL).
 const seenIds = new Set<string>();
+const mockRedis = { connected: true };
 const redisClient = {
   set: async (key: string) => (seenIds.has(key) ? null : (seenIds.add(key), "OK")),
   del: async (key: string) => (seenIds.delete(key) ? 1 : 0),
 };
 jest.mock("@server/services/redis.service", () => ({
-  redisService: { publish, getClient: () => redisClient, isConnected: () => true },
+  redisService: { publish, getClient: () => redisClient, isConnected: () => mockRedis.connected },
 }));
 
 const recordDeliveryFailure = jest.fn<(organizationId: string, channel: string) => Promise<void>>();
@@ -133,6 +134,10 @@ describe("POST /v1/webhooks/email-events", () => {
     const res = {
       statusCode: 200,
       body: undefined as unknown,
+      headers: {} as Record<string, string>,
+      setHeader(name: string, value: string) {
+        this.headers[name] = value;
+      },
       status(code: number) {
         this.statusCode = code;
         return this;
@@ -201,6 +206,18 @@ describe("POST /v1/webhooks/email-events", () => {
     const retry = await call(headers, bounce);
     expect(retry.res.statusCode).toBe(200);
     expect(retry.res.body).toEqual({ ok: true, handled: true });
+  });
+
+  it("answers 503 with Retry-After while the delivery store is down", async () => {
+    mockRedis.connected = false;
+    try {
+      const { res } = await call(signed(bounce, "msg_outage"), bounce);
+      expect(res.statusCode).toBe(503);
+      expect(res.headers["Retry-After"]).toBe("30");
+      expect(findOutbound).not.toHaveBeenCalled();
+    } finally {
+      mockRedis.connected = true;
+    }
   });
 
   it("answers 503 when the secret is not configured", async () => {

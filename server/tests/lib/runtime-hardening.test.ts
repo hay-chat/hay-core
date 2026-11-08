@@ -15,7 +15,7 @@ jest.mock("@server/services/rate-limit.service", () => ({
 }));
 
 import { bodyLimitForPath, DEFAULT_BODY_LIMIT } from "@server/lib/body-limits";
-import { httpIpRateLimit } from "@server/lib/http-rate-limit";
+import { httpIpRateLimit, trpcRetryAfterMeta } from "@server/lib/http-rate-limit";
 import { rateLimitKey } from "@server/services/rate-limit.service";
 import { redisRetryDelay } from "@server/services/redis.service";
 
@@ -39,6 +39,16 @@ describe("bodyLimitForPath", () => {
     expect(bodyLimitForPath("/v1/publicConversations.sendMessage")).toBe("15mb");
     expect(bodyLimitForPath("/v1/plugins/hay-plugin/webhook")).toBe("10mb");
     expect(bodyLimitForPath("/v1/plugins/hay-plugin/action")).toBe("10mb");
+  });
+});
+
+describe("trpcRetryAfterMeta", () => {
+  it("adds Retry-After only when a request was refused as unavailable", () => {
+    expect(trpcRetryAfterMeta({ errors: [{ code: "SERVICE_UNAVAILABLE" }] })).toEqual({
+      headers: { "Retry-After": "30" },
+    });
+    expect(trpcRetryAfterMeta({ errors: [{ code: "UNAUTHORIZED" }] })).toEqual({});
+    expect(trpcRetryAfterMeta({ errors: [] })).toEqual({});
   });
 });
 

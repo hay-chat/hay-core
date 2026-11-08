@@ -50,7 +50,7 @@ Inbound webhooks signed with Standard Webhooks / Svix signatures (e.g. Resend em
 
 - **Signature**: HMAC-SHA256 over `id.timestamp.body` with the provider secret; requests without a valid signature are rejected.
 - **Timestamp tolerance**: the provider timestamp must be within **5 minutes** of server time.
-- **Message id deduplication**: the provider message id is recorded in **Redis** for the tolerance window and a reused id is rejected. _(Pending: added by the webhook replay change in the current security batch; until it lands only the signature and timestamp are checked.)_
+- **Message id deduplication**: the provider message id is recorded in **Redis** for the tolerance window and a reused id is acknowledged without being processed again. While Redis is unavailable, deliveries are refused with `503` and `Retry-After` so the provider retries them.
 
 Third-party webhooks received by plugins are verified by each plugin against its provider's own scheme.
 

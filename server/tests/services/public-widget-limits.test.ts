@@ -1,7 +1,14 @@
 import { describe, it, expect, jest, beforeEach } from "@jest/globals";
 
 const mockCheckKey =
-  jest.fn<(key: string, max: number, windowSeconds: number) => Promise<{ limited: boolean }>>();
+  jest.fn<
+    (
+      key: string,
+      max: number,
+      windowSeconds: number,
+      failClosed: boolean,
+    ) => Promise<{ limited: boolean }>
+  >();
 jest.mock("@server/services/rate-limit.service", () => ({
   rateLimitService: { checkKeyRateLimit: mockCheckKey },
 }));
@@ -27,11 +34,13 @@ describe("isPublicWidgetRateLimited", () => {
       "public-widget:createPerIp:203.0.113.7",
       PUBLIC_WIDGET_LIMITS.createPerIp.max,
       PUBLIC_WIDGET_LIMITS.createPerIp.windowSeconds,
+      false,
     );
     expect(mockCheckKey).toHaveBeenCalledWith(
       "public-widget:createPerOrg:org-1",
       PUBLIC_WIDGET_LIMITS.createPerOrg.max,
       PUBLIC_WIDGET_LIMITS.createPerOrg.windowSeconds,
+      false,
     );
   });
 
@@ -61,7 +70,19 @@ describe("isPublicWidgetRateLimited", () => {
       "public-widget:createPerOrg:org-1",
       expect.anything(),
       expect.anything(),
+      expect.anything(),
     );
+  });
+
+  it("passes the fail-closed choice to every rule and surfaces the refusal", async () => {
+    mockCheckKey.mockResolvedValue({ limited: false });
+    await isPublicWidgetRateLimited([{ rule: "createPerIp", id: "ip" }], { failClosed: true });
+    expect(mockCheckKey.mock.calls[0][3]).toBe(true);
+
+    mockCheckKey.mockRejectedValue(new Error("unavailable"));
+    await expect(
+      isPublicWidgetRateLimited([{ rule: "createPerIp", id: "ip" }], { failClosed: true }),
+    ).rejects.toThrow("unavailable");
   });
 
   it("checks rules in the order given", async () => {

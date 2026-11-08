@@ -15,11 +15,25 @@ function seenKey(namespace: string, deliveryId: string): string {
   return `webhook:seen:${namespace}:${digest}`;
 }
 
+/** How long a provider should wait before retrying a refused delivery. */
+export const WEBHOOK_RETRY_AFTER_SECONDS = 30;
+
+/**
+ * The store of seen delivery ids cannot be reached. The delivery has not been
+ * processed: answer 503 so the provider retries it.
+ */
+export class WebhookReplayUnavailableError extends Error {
+  constructor() {
+    super("Webhook delivery store unavailable");
+    this.name = "WebhookReplayUnavailableError";
+  }
+}
+
 /**
  * Record a verified webhook delivery id for `ttlSeconds`. Returns false when
  * the id was already processed (a replay or a provider re-delivery), true
- * otherwise. Fails open when Redis is unavailable: the signature and timestamp
- * checks still apply.
+ * otherwise. Throws WebhookReplayUnavailableError when Redis is unavailable,
+ * because without the store a repeat cannot be told from a first delivery.
  */
 export async function claimWebhookDelivery(
   namespace: string,
@@ -28,15 +42,15 @@ export async function claimWebhookDelivery(
 ): Promise<boolean> {
   const client = redisService.getClient();
   if (!client || !redisService.isConnected()) {
-    logger.warn({ namespace }, "Redis unavailable, webhook replay check skipped");
-    return true;
+    logger.error({ namespace }, "Redis unavailable, refusing webhook delivery");
+    throw new WebhookReplayUnavailableError();
   }
   try {
     const result = await client.set(seenKey(namespace, deliveryId), "1", "EX", ttlSeconds, "NX");
     return result === "OK";
   } catch (error) {
-    logger.warn({ err: error, namespace }, "Webhook replay check failed, allowing delivery");
-    return true;
+    logger.error({ err: error, namespace }, "Webhook replay check failed, refusing delivery");
+    throw new WebhookReplayUnavailableError();
   }
 }
 
@@ -45,6 +59,11 @@ export async function claimWebhookDelivery(
  * the same delivery is accepted.
  */
 export async function releaseWebhookDelivery(namespace: string, deliveryId: string): Promise<void> {
+  // Commands issued while disconnected would wait in ioredis's offline queue.
+  if (!redisService.isConnected()) {
+    logger.warn({ namespace }, "Redis unavailable, webhook delivery id not released");
+    return;
+  }
   try {
     await redisService.getClient()?.del(seenKey(namespace, deliveryId));
   } catch (error) {

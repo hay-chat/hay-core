@@ -265,15 +265,19 @@ const jobRegistry: CronJobConfig[] = [
       const { rabbitmqService } = await import("./rabbitmq.service");
       const sweepLogger = createLogger("orchestrator-sweep");
 
-      if (!rabbitmqService.isConnected()) {
-        sweepLogger.debug("RabbitMQ not connected, skipping sweep");
-        return;
-      }
-
       const repo = new ConversationRepository();
       const staleConversations = await repo.getStaleUnprocessed(30000); // 30s threshold
 
       if (staleConversations.length === 0) return;
+
+      if (!rabbitmqService.isConnected()) {
+        sweepLogger.error(
+          { count: staleConversations.length },
+          "RabbitMQ not connected, processing pending conversations directly",
+        );
+        await orchestratorWorker.processDirectly(staleConversations.map((conv) => conv.id));
+        return;
+      }
 
       sweepLogger.debug(`Found ${staleConversations.length} stale conversations, re-enqueuing`);
 

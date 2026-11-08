@@ -3,8 +3,9 @@ import { rateLimitService } from "./rate-limit.service";
 /**
  * Abuse limits for the public webchat API (publicConversations.* and the
  * WebSocket). They are sized so a real shopper never meets them, and only
- * stop scripted floods. Counters live in Redis; if Redis is down the limits
- * fail open so the widget keeps working.
+ * stop scripted floods. Counters live in Redis. If Redis is down, requests
+ * that create something lasting (conversations, stored files) are refused and
+ * the rest count per process, so an open chat keeps working.
  *
  * Per-IP limits depend on the edge proxy setting X-Forwarded-For (see
  * lib/client-ip.ts), so each write is also limited per org or conversation.
@@ -44,6 +45,7 @@ type LimitRule = Exclude<keyof typeof PUBLIC_WIDGET_LIMITS, "maxMessageLength">;
  */
 export async function isPublicWidgetRateLimited(
   checks: Array<{ rule: LimitRule; id: string }>,
+  options: { failClosed?: boolean } = {},
 ): Promise<boolean> {
   for (const { rule, id } of checks) {
     const { max, windowSeconds } = PUBLIC_WIDGET_LIMITS[rule];
@@ -51,6 +53,7 @@ export async function isPublicWidgetRateLimited(
       `public-widget:${rule}:${id}`,
       max,
       windowSeconds,
+      options.failClosed ?? false,
     );
     if (result.limited) return true;
   }

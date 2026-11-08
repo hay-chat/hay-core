@@ -25,7 +25,13 @@ jest.mock("@server/lib/hmac-signature", () => ({
 }));
 const claimWebhookDelivery = jest.fn();
 const releaseWebhookDelivery = jest.fn();
-jest.mock("@server/lib/webhook-replay", () => ({ claimWebhookDelivery, releaseWebhookDelivery }));
+class MockReplayUnavailable extends Error {}
+jest.mock("@server/lib/webhook-replay", () => ({
+  claimWebhookDelivery,
+  releaseWebhookDelivery,
+  WEBHOOK_RETRY_AFTER_SECONDS: 30,
+  WebhookReplayUnavailableError: MockReplayUnavailable,
+}));
 import { verifyHmacSha256 } from "@server/lib/hmac-signature";
 
 import {
@@ -355,9 +361,16 @@ describe("webhookRouterService.handle signature formats", () => {
   const rawBody = '{"type":"email.received","data":{"to":["x@y.z"]}}';
 
   function makeRes() {
-    const res: { statusCode?: number; body?: unknown; status: jest.Mock; json: jest.Mock } = {
+    const res: {
+      statusCode?: number;
+      body?: unknown;
+      status: jest.Mock;
+      json: jest.Mock;
+      setHeader: jest.Mock;
+    } = {
       status: jest.fn(),
       json: jest.fn(),
+      setHeader: jest.fn(),
     };
     res.status.mockImplementation((code: number) => {
       res.statusCode = code;
@@ -405,6 +418,19 @@ describe("webhookRouterService.handle signature formats", () => {
     expect(claimWebhookDelivery).toHaveBeenCalledWith("webhook-router:p", "msg_1");
   });
 
+  it("answers 503 with Retry-After while the delivery store is down", async () => {
+    claimWebhookDelivery.mockRejectedValue(new MockReplayUnavailable());
+    const ts = Math.floor(Date.now() / 1000);
+    const req = { method: "POST", headers: svixHeaders(ts, rawBody), rawBody } as never;
+    const res = makeRes();
+
+    await webhookRouterService.handle(req, res as never, "p", svixRouting as never);
+
+    expect(res.statusCode).toBe(503);
+    expect(res.setHeader).toHaveBeenCalledWith("Retry-After", "30");
+    expect(findByKey).not.toHaveBeenCalled();
+  });
+
   it("acknowledges a repeated svix-id without dispatching it again", async () => {
     claimWebhookDelivery.mockResolvedValue(false);
     const ts = Math.floor(Date.now() / 1000);
@@ -437,9 +463,16 @@ describe("webhookRouterService.handle plugin-declared dedupe", () => {
   const verifyHmac = verifyHmacSha256 as jest.Mock;
 
   function makeRes() {
-    const res: { statusCode?: number; body?: unknown; status: jest.Mock; json: jest.Mock } = {
+    const res: {
+      statusCode?: number;
+      body?: unknown;
+      status: jest.Mock;
+      json: jest.Mock;
+      setHeader: jest.Mock;
+    } = {
       status: jest.fn(),
       json: jest.fn(),
+      setHeader: jest.fn(),
     };
     res.status.mockImplementation((code: number) => {
       res.statusCode = code;

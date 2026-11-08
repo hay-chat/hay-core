@@ -69,7 +69,7 @@ export async function setUnderAttack(
 /**
  * Count one conversation-create attempt and switch under-attack mode on when
  * the org passes the threshold. Returns whether the org is under attack.
- * Fails open (Redis down = no auto trigger).
+ * While Redis is down the count is per process.
  */
 export async function recordCreateAttempt(organizationId: string): Promise<boolean> {
   const { createThreshold, windowSeconds } = config.underAttack;
