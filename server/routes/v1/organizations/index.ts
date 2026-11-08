@@ -35,6 +35,7 @@ import { SsrfBlockedError, validateUrlForSSRF } from "@server/utils/ssrf";
 import {
   AI_REGIONS,
   describeAiProvider,
+  describeVisionProvider,
   isEuRegionConfigured,
   regionFromSettings,
 } from "@server/services/llm/ai-region";
@@ -440,6 +441,7 @@ export const organizationsRouter = t.router({
         euAvailable: isEuRegionConfigured(),
         hasCustomProvider: !!organization.settings?.llm,
         provider: describeAiProvider(organization.settings),
+        visionProvider: describeVisionProvider(organization.settings),
       };
     },
   ),
