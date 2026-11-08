@@ -887,7 +887,7 @@ export const configurePlugin = pluginManageProcedure
 /**
  * Get UI template for plugin configuration
  */
-export const getPluginUITemplate = authenticatedProcedure
+export const getPluginUITemplate = pluginManageProcedure
   .input(
     z.object({
       pluginId: z.string(),
@@ -1183,7 +1183,7 @@ export const getMenuItems = authenticatedProcedure.query(async ({ ctx }) => {
 /**
  * Test MCP connection for a plugin
  */
-export const testConnection = authenticatedProcedure
+export const testConnection = pluginManageProcedure
   .input(
     z.object({
       pluginId: z.string(),
@@ -1605,7 +1605,7 @@ export async function forwardPluginUiRoute(
  * caller's organization. A mutation even for GET so it is never cached/batched
  * as a query. The public plugin proxy refuses `/ui/*`.
  */
-export const callPluginUiRoute = authenticatedProcedure
+export const callPluginUiRoute = pluginManageProcedure
   .input(
     z.object({
       pluginId: z.string(),

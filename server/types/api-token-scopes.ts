@@ -7,6 +7,7 @@ export enum ApiTokenScope {
   // Conversations & Messages
   CONVERSATIONS_READ = "conversations:read",
   CONVERSATIONS_WRITE = "conversations:write",
+  CONVERSATIONS_EXPORT = "conversations:export",
   MESSAGES_READ = "messages:read",
   MESSAGES_WRITE = "messages:write",
 
@@ -50,6 +51,7 @@ export const API_TOKEN_SCOPE_GROUPS = {
   "Conversations & Messages": [
     ApiTokenScope.CONVERSATIONS_READ,
     ApiTokenScope.CONVERSATIONS_WRITE,
+    ApiTokenScope.CONVERSATIONS_EXPORT,
     ApiTokenScope.MESSAGES_READ,
     ApiTokenScope.MESSAGES_WRITE,
   ],
@@ -83,6 +85,7 @@ export const API_TOKEN_SCOPE_GROUPS = {
 export const API_TOKEN_SCOPE_DESCRIPTIONS: Record<ApiTokenScope, string> = {
   [ApiTokenScope.CONVERSATIONS_READ]: "Read conversations",
   [ApiTokenScope.CONVERSATIONS_WRITE]: "Create and update conversations",
+  [ApiTokenScope.CONVERSATIONS_EXPORT]: "Export conversations and evidence packs",
   [ApiTokenScope.MESSAGES_READ]: "Read messages",
   [ApiTokenScope.MESSAGES_WRITE]: "Send and update messages",
   [ApiTokenScope.CUSTOMERS_READ]: "Read customer data",

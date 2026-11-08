@@ -1,3 +1,4 @@
+import { rateLimitMiddleware, RateLimits } from "@server/trpc/middleware/rate-limit";
 import { t, authenticatedProcedure, scopedProcedure } from "@server/trpc";
 import { enableDefaultPlugins } from "@server/services/default-plugins.service";
 import { z } from "zod";
@@ -183,6 +184,7 @@ export const organizationsRouter = t.router({
    * Requires: authenticated user
    */
   create: authenticatedProcedure
+    .use(rateLimitMiddleware(RateLimits.STRICT))
     .input(
       z.object({
         name: z.string().min(1).max(100),

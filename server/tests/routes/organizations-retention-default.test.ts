@@ -6,6 +6,14 @@ import { describe, it, expect, jest, beforeEach } from "@jest/globals";
  */
 
 const mockLogger = { debug: jest.fn(), info: jest.fn(), warn: jest.fn(), error: jest.fn() };
+jest.mock("@server/trpc/middleware/rate-limit", () => ({
+  RateLimits: { MODERATE: {}, STRICT: {} },
+  rateLimitMiddleware:
+    () =>
+    ({ next }: { next: () => unknown }) =>
+      next(),
+  rateLimitedProcedure: jest.fn(),
+}));
 jest.mock("@server/lib/logger", () => ({ createLogger: () => mockLogger }));
 
 const mockCreate = jest.fn((data: Record<string, unknown>) => ({ id: "org-new", ...data }));

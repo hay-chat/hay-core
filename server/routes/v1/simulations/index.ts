@@ -1,3 +1,4 @@
+import { rateLimitMiddleware, RateLimits } from "@server/trpc/middleware/rate-limit";
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { t, scopedProcedure } from "@server/trpc";
@@ -55,6 +56,7 @@ export const simulationsRouter = t.router({
   ),
 
   start: scopedProcedure(RESOURCES.PLAYBOOKS, ACTIONS.UPDATE)
+    .use(rateLimitMiddleware(RateLimits.MODERATE))
     .input(startSchema)
     .mutation(async ({ ctx, input }) => {
       try {

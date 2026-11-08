@@ -1,3 +1,4 @@
+import { rateLimitMiddleware, RateLimits } from "@server/trpc/middleware/rate-limit";
 import { t, scopedProcedure } from "@server/trpc";
 import { z } from "zod";
 import { RESOURCES, ACTIONS } from "@server/types/scopes";
@@ -431,6 +432,7 @@ export const documentsRouter = t.router({
    * saves the reviewed diff through update/create.
    */
   suggestEdits: scopedProcedure(RESOURCES.DOCUMENTS, ACTIONS.UPDATE)
+    .use(rateLimitMiddleware(RateLimits.MODERATE))
     .input(
       z
         .object({
@@ -539,12 +541,17 @@ export const documentsRouter = t.router({
     }),
 
   regenerateEmbeddings: scopedProcedure(RESOURCES.DOCUMENTS, ACTIONS.UPDATE)
+    .use(rateLimitMiddleware(RateLimits.MODERATE))
     .input(
-      z.object({
-        documentId: z.string().optional(),
-        chunkSize: z.number().optional().default(1000),
-        chunkOverlap: z.number().optional().default(200),
-      }),
+      z
+        .object({
+          documentId: z.string().optional(),
+          chunkSize: z.number().int().min(100).max(4000).optional().default(1000),
+          chunkOverlap: z.number().int().min(0).max(1000).optional().default(200),
+        })
+        .refine((value) => value.chunkOverlap < value.chunkSize, {
+          message: "chunkOverlap must be smaller than chunkSize",
+        }),
     )
     .mutation(async ({ ctx, input }) => {
       // Ensure vector store is initialized

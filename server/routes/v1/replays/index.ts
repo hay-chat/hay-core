@@ -1,3 +1,4 @@
+import { rateLimitMiddleware, RateLimits } from "@server/trpc/middleware/rate-limit";
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { t, scopedProcedure } from "@server/trpc";
@@ -14,6 +15,7 @@ import { playbookVersionOverrideSchema, toTrpcError } from "../simulations";
  */
 export const replaysRouter = t.router({
   start: scopedProcedure(RESOURCES.PLAYBOOKS, ACTIONS.UPDATE)
+    .use(rateLimitMiddleware(RateLimits.MODERATE))
     .input(
       z
         .object({
@@ -57,6 +59,7 @@ export const replaysRouter = t.router({
    * against the playbook draft that is meant to fix it, before publishing.
    */
   startForInsight: scopedProcedure(RESOURCES.PLAYBOOKS, ACTIONS.UPDATE)
+    .use(rateLimitMiddleware(RateLimits.MODERATE))
     .input(
       z.object({
         insightId: z.string().uuid(),

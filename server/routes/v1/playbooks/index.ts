@@ -1,3 +1,4 @@
+import { rateLimitMiddleware, RateLimits } from "@server/trpc/middleware/rate-limit";
 import { t, scopedProcedure } from "@server/trpc";
 import { z } from "zod";
 import { PlaybookService } from "../../../services/playbook.service";
@@ -418,6 +419,7 @@ export const playbooksRouter = t.router({
   }),
 
   suggestEdits: scopedProcedure(RESOURCES.PLAYBOOKS, ACTIONS.UPDATE)
+    .use(rateLimitMiddleware(RateLimits.MODERATE))
     .input(
       z
         .object({
@@ -463,6 +465,7 @@ export const playbooksRouter = t.router({
     }),
 
   generateInstructions: scopedProcedure(RESOURCES.PLAYBOOKS, ACTIONS.CREATE)
+    .use(rateLimitMiddleware(RateLimits.MODERATE))
     .input(
       z.object({
         purpose: z.string().min(1),

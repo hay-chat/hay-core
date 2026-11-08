@@ -34,6 +34,8 @@ export const RESOURCES = {
   PLUGINS: "plugins",
   ANALYTICS: "analytics",
   AUDIT_LOGS: "audit_logs",
+  // Customer data subject requests; only the admin/owner wildcard holds it
+  PRIVACY: "privacy",
   // Usage and the resolution ledger; only the admin/owner wildcard holds it
   BILLING: "billing",
 
@@ -142,8 +144,6 @@ export const MEMBER_SCOPES = [
   buildScope(RESOURCES.DOCUMENTS, ACTIONS.CREATE),
   buildScope(RESOURCES.DOCUMENTS, ACTIONS.UPDATE),
   buildScope(RESOURCES.SOURCES, ACTIONS.READ),
-  buildScope(RESOURCES.SOURCES, ACTIONS.CREATE),
-  buildScope(RESOURCES.SOURCES, ACTIONS.UPDATE),
   buildScope(RESOURCES.ASSISTANT, ACTIONS.READ),
   buildScope(RESOURCES.PLAYBOOKS, ACTIONS.READ),
   buildScope(RESOURCES.ANALYTICS, ACTIONS.READ),
@@ -166,8 +166,6 @@ export const CONTRIBUTOR_SCOPES = [
   buildScope(RESOURCES.DOCUMENTS, ACTIONS.CREATE),
   buildScope(RESOURCES.DOCUMENTS, ACTIONS.UPDATE),
   buildScope(RESOURCES.SOURCES, ACTIONS.READ),
-  buildScope(RESOURCES.SOURCES, ACTIONS.CREATE),
-  buildScope(RESOURCES.SOURCES, ACTIONS.UPDATE),
   buildScope(RESOURCES.ASSISTANT, ACTIONS.READ),
   buildScope(RESOURCES.ASSISTANT, ACTIONS.UPDATE),
   buildScope(RESOURCES.PLAYBOOKS, ACTIONS.READ),

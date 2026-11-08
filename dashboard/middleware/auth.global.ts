@@ -15,6 +15,7 @@ export const roleProtectedRoutes: Record<string, string[]> = {
   "/settings/general": ["owner", "admin"],
   "/settings/billing": ["owner", "admin"],
   "/settings/privacy": ["owner", "admin"],
+  "/settings/customer-privacy": ["owner", "admin"],
   "/settings/webchat": ["owner", "admin"],
   "/settings/business-hours": ["owner", "admin"],
   "/settings/usage": ["owner", "admin"],
