@@ -7,7 +7,7 @@
  * `pluginRouterRegistry` and invokes the procedures through
  * `router.createCaller(ctx)`, bypassing the HTTP layer. Because of that,
  * this router MUST be built with the same `t` instance as the rest of the
- * server (we import `publicProcedure` / `router` from `@server/trpc`).
+ * server (we import `pluginRouterProcedure` / `router` from `@server/trpc`).
  *
  * Procedure ↔ contract mapping:
  *   - listRoots   → the workspace ("all shared pages") plus one root per shared database
@@ -27,7 +27,7 @@
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 
-import { publicProcedure, router } from "@server/trpc";
+import { pluginRouterProcedure, router } from "@server/trpc";
 import { pluginInstanceRepository } from "@server/repositories/plugin-instance.repository";
 import { decryptConfig } from "@server/lib/auth/utils/encryption";
 import type {
@@ -88,8 +88,11 @@ function clientFromInstance(instance: { config?: Record<string, unknown> | null 
 }
 
 /** Load the Notion plugin instance for an org and build a client. */
-async function loadClient(instanceId: string): Promise<NotionClient> {
-  const instance = await pluginInstanceRepository.findById(instanceId);
+async function loadClient(instanceId: string, organizationId: string): Promise<NotionClient> {
+  const instance = await pluginInstanceRepository.findByIdAndOrganization(
+    instanceId,
+    organizationId,
+  );
   if (!instance) {
     throw new TRPCError({
       code: "NOT_FOUND",
@@ -155,10 +158,10 @@ export const notionRouter = router({
    * root per database the integration can access. A workspace member controls
    * scope by choosing which pages/databases to share with the integration.
    */
-  listRoots: publicProcedure
+  listRoots: pluginRouterProcedure
     .input(z.object({ instanceId: z.string().min(1) }))
-    .query(async ({ input }): Promise<DocumentImporterRoot[]> => {
-      const client = await loadClient(input.instanceId);
+    .query(async ({ ctx, input }): Promise<DocumentImporterRoot[]> => {
+      const client = await loadClient(input.instanceId, ctx.organizationId);
 
       const roots: DocumentImporterRoot[] = [
         {
@@ -200,7 +203,7 @@ export const notionRouter = router({
    * Discover pages within a root — one page of results at a time, returning a
    * cursor the sync engine can pass back to continue.
    */
-  discover: publicProcedure
+  discover: pluginRouterProcedure
     .input(
       z.object({
         instanceId: z.string().min(1),
@@ -210,9 +213,10 @@ export const notionRouter = router({
     )
     .query(
       async ({
+        ctx,
         input,
       }): Promise<{ pages: DocumentImporterExternalPage[]; nextCursor?: string }> => {
-        const client = await loadClient(input.instanceId);
+        const client = await loadClient(input.instanceId, ctx.organizationId);
         try {
           const { results, nextCursor } = await fetchRootPage(client, input.rootId, {
             cursor: input.cursor,
@@ -228,10 +232,10 @@ export const notionRouter = router({
    * Fetch a page's full block tree and convert it to Markdown. An empty page
    * yields an empty body; the sync engine handles that (no chunks to embed).
    */
-  fetchPage: publicProcedure
+  fetchPage: pluginRouterProcedure
     .input(z.object({ instanceId: z.string().min(1), externalId: z.string().min(1) }))
-    .query(async ({ input }): Promise<DocumentImporterFetchedPage> => {
-      const client = await loadClient(input.instanceId);
+    .query(async ({ ctx, input }): Promise<DocumentImporterFetchedPage> => {
+      const client = await loadClient(input.instanceId, ctx.organizationId);
 
       try {
         const page = await client.getPage(input.externalId);
@@ -255,7 +259,7 @@ export const notionRouter = router({
    * Results come back sorted newest-first, so we stop walking (and drop the
    * cursor) once we see a page older than `since`.
    */
-  listChanges: publicProcedure
+  listChanges: pluginRouterProcedure
     .input(
       z.object({
         instanceId: z.string().min(1),
@@ -266,9 +270,10 @@ export const notionRouter = router({
     )
     .query(
       async ({
+        ctx,
         input,
       }): Promise<{ changes: DocumentImporterPageChange[]; nextCursor?: string }> => {
-        const client = await loadClient(input.instanceId);
+        const client = await loadClient(input.instanceId, ctx.organizationId);
 
         const sinceMs = Date.parse(input.since);
         if (isNaN(sinceMs)) {
