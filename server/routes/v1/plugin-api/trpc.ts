@@ -771,8 +771,8 @@ export const pluginApiTrpcRouter = router({
    * OAuth connections get their keys from `onConnected`. Connections configured
    * without OAuth (WhatsApp manual mode with a pasted token) register them here
    * once the plugin has confirmed its credentials can access those provider
-   * accounts. An empty list removes the instance's keys. Last writer wins per
-   * key, exactly like a reconnect.
+   * accounts. An empty list removes the instance's keys. A key another
+   * organization holds while its instance is enabled is refused with CONFLICT.
    */
   "webhooks.setRoutingKeys": pluginProcedure
     .input(z.object({ routingKeys: z.array(z.string().min(1).max(256)).max(20) }))
@@ -786,13 +786,22 @@ export const pluginApiTrpcRouter = router({
       }
 
       const routingKeys = [...new Set(input.routingKeys)];
-      await pluginWebhookRouteRepository.clearForInstance(instance.id);
-      await pluginWebhookRouteRepository.upsertRoutes(
+      const { conflicts } = await pluginWebhookRouteRepository.claimRoutes(
         pluginId,
         organizationId,
         instance.id,
         routingKeys,
       );
+      if (conflicts.length > 0) {
+        logger.error(
+          { organizationId, pluginId, conflicts },
+          "Plugin claimed webhook routing keys held by another organization",
+        );
+        throw new TRPCError({
+          code: "CONFLICT",
+          message: "A routing key is already connected to another organization",
+        });
+      }
 
       logger.info(
         { organizationId, pluginId, routingKeyCount: routingKeys.length },

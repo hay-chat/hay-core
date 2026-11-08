@@ -6,7 +6,7 @@ const clearAuthState = jest.fn();
 const updateAuthState = jest.fn();
 const upsertInstance = jest.fn();
 const clearForInstance = jest.fn();
-const upsertRoutes = jest.fn();
+const claimRoutes = jest.fn();
 const stopPluginWorker = jest.fn();
 const startPluginWorker = jest.fn();
 const retrieveState = jest.fn();
@@ -32,7 +32,7 @@ jest.mock("@server/repositories/plugin-instance.repository", () => ({
 jest.mock("@server/repositories/plugin-webhook-route.repository", () => ({
   pluginWebhookRouteRepository: {
     clearForInstance,
-    upsertRoutes,
+    claimRoutes,
     findByKey: jest.fn().mockResolvedValue(null),
     countForInstance: jest.fn().mockResolvedValue(0),
   },
@@ -117,7 +117,7 @@ beforeEach(() => {
   updateAuthState.mockResolvedValue(undefined);
   upsertInstance.mockResolvedValue(undefined);
   clearForInstance.mockResolvedValue(undefined);
-  upsertRoutes.mockResolvedValue(undefined);
+  claimRoutes.mockResolvedValue({ conflicts: [], previousOwners: [] });
   startPluginWorker.mockResolvedValue({ port: 4321 });
 });
 
@@ -168,8 +168,9 @@ describe("oauthService.completeWithCode", () => {
     expect(body.extras).toEqual({ waba_id: "WABA1", phone_number_id: "PN1" });
     expect(body.authState).toBeDefined();
 
-    expect(clearForInstance).toHaveBeenCalledWith("inst-1");
-    expect(upsertRoutes).toHaveBeenCalledWith("p", "org-1", "inst-1", ["WABA1", "PN1"]);
+    expect(claimRoutes).toHaveBeenCalledWith("p", "org-1", "inst-1", ["WABA1", "PN1"], {
+      allowTransfer: false,
+    });
     expect(result).toEqual({ success: true, onConnected: { ok: true, routingKeyCount: 2 } });
   });
 
@@ -181,7 +182,7 @@ describe("oauthService.completeWithCode", () => {
     const result = await oauthService.completeWithCode("org-1", "p", "the-code");
 
     expect(updateAuthState).toHaveBeenCalled();
-    expect(upsertRoutes).not.toHaveBeenCalled();
+    expect(claimRoutes).not.toHaveBeenCalled();
     expect(result).toEqual({ success: true, onConnected: { ok: false, routingKeyCount: 0 } });
   });
 

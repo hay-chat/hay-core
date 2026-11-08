@@ -3,8 +3,7 @@ const findByOrgAndPlugin = jest.fn();
 const clearAuthState = jest.fn();
 const updateAuthState = jest.fn();
 const clearForInstance = jest.fn();
-const upsertRoutes = jest.fn();
-const findByKey = jest.fn();
+const claimRoutes = jest.fn();
 const countForInstance = jest.fn();
 const stopPluginWorker = jest.fn();
 const startPluginWorker = jest.fn();
@@ -16,7 +15,7 @@ jest.mock("@server/repositories/plugin-instance.repository", () => ({
   pluginInstanceRepository: { findByOrgAndPlugin, clearAuthState, updateAuthState },
 }));
 jest.mock("@server/repositories/plugin-webhook-route.repository", () => ({
-  pluginWebhookRouteRepository: { clearForInstance, upsertRoutes, findByKey, countForInstance },
+  pluginWebhookRouteRepository: { clearForInstance, claimRoutes, countForInstance },
 }));
 jest.mock("@server/services/plugin-manager.service", () => ({
   pluginManagerService: { stopPluginWorker, startPluginWorker },
@@ -75,7 +74,7 @@ describe("oauthService.runOnConnected", () => {
     });
     startPluginWorker.mockResolvedValue({ port: 4321 });
     clearForInstance.mockResolvedValue(undefined);
-    upsertRoutes.mockResolvedValue(undefined);
+    claimRoutes.mockResolvedValue({ conflicts: [], previousOwners: [] });
     global.fetch = jest.fn().mockResolvedValue({
       ok: true,
       json: async () => ({ routingKeys: ["WABA1", "PN1"] }),
@@ -89,11 +88,9 @@ describe("oauthService.runOnConnected", () => {
       }
     ).runOnConnected("org-1", "p");
 
-    expect(clearForInstance).toHaveBeenCalledWith("inst-1");
-    expect(upsertRoutes).toHaveBeenCalledWith("p", "org-1", "inst-1", ["WABA1", "PN1"]);
-    expect(clearForInstance.mock.invocationCallOrder[0]).toBeLessThan(
-      upsertRoutes.mock.invocationCallOrder[0],
-    );
+    expect(claimRoutes).toHaveBeenCalledWith("p", "org-1", "inst-1", ["WABA1", "PN1"], {
+      allowTransfer: false,
+    });
   });
 
   const runOnConnected = (org: string, plugin: string) =>
@@ -103,11 +100,11 @@ describe("oauthService.runOnConnected", () => {
       }
     ).runOnConnected(org, plugin);
 
+  const previousOwner = { organizationId: "org-old", pluginInstanceId: "inst-old" };
+
   it("disconnects the previous organization once the account moved away from it", async () => {
-    findByPluginId.mockResolvedValue({ pluginId: "p" });
-    findByKey.mockImplementation(async (_p: string, key: string) =>
-      key === "WABA1" ? { organizationId: "org-old", pluginInstanceId: "inst-old" } : null,
-    );
+    findByPluginId.mockResolvedValue({ pluginId: "p", sourceType: "core" });
+    claimRoutes.mockResolvedValue({ conflicts: [], previousOwners: [previousOwner] });
     countForInstance.mockResolvedValue(0);
     findByOrgAndPlugin.mockImplementation(async (org: string) =>
       org === "org-old"
@@ -122,6 +119,9 @@ describe("oauthService.runOnConnected", () => {
 
     await runOnConnected("org-1", "p");
 
+    expect(claimRoutes).toHaveBeenCalledWith("p", "org-1", "inst-1", ["WABA1", "PN1"], {
+      allowTransfer: true,
+    });
     expect(countForInstance).toHaveBeenCalledWith("inst-old");
     expect(clearAuthState).toHaveBeenCalledWith("inst-old", "org-old");
     expect(stopPluginWorker).toHaveBeenCalledWith("org-old", "p");
@@ -129,7 +129,7 @@ describe("oauthService.runOnConnected", () => {
   });
 
   it("keeps the previous organization connected while it still owns other accounts", async () => {
-    findByKey.mockResolvedValue({ organizationId: "org-old", pluginInstanceId: "inst-old" });
+    claimRoutes.mockResolvedValue({ conflicts: [], previousOwners: [previousOwner] });
     countForInstance.mockResolvedValue(1);
 
     await runOnConnected("org-1", "p");
@@ -138,11 +138,19 @@ describe("oauthService.runOnConnected", () => {
   });
 
   it("does not treat its own earlier keys as a move", async () => {
-    findByKey.mockResolvedValue({ organizationId: "org-1", pluginInstanceId: "inst-1" });
-
     await runOnConnected("org-1", "p");
 
     expect(countForInstance).not.toHaveBeenCalled();
+    expect(clearAuthState).not.toHaveBeenCalled();
+  });
+
+  it("reports a failed connection when the keys belong to another organization", async () => {
+    claimRoutes.mockResolvedValue({ conflicts: ["WABA1"], previousOwners: [] });
+
+    await expect(runOnConnected("org-1", "p")).resolves.toEqual({
+      ok: false,
+      routingKeyCount: 0,
+    });
     expect(clearAuthState).not.toHaveBeenCalled();
   });
 });
