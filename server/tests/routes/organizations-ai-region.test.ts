@@ -72,6 +72,49 @@ describe("organizations AI region", () => {
       euAvailable: false,
       hasCustomProvider: false,
       provider: expect.objectContaining({ name: expect.any(String), host: expect.any(String) }),
+      visionProvider: expect.objectContaining({
+        name: expect.any(String),
+        host: expect.any(String),
+      }),
+    });
+  });
+
+  describe("custom chat endpoint", () => {
+    const withEndpoint = (chat: Record<string, unknown>) => ({
+      ...llmInput,
+      chat: { ...llmInput.chat, ...chat },
+    });
+
+    it.each([
+      ["a base URL without a key", { baseUrl: "https://8.8.8.8/v1" }],
+      ["anthropic without a key", { provider: "anthropic" as const, vendor: undefined }],
+      ["a non-https base URL", { baseUrl: "http://8.8.8.8/v1", apiKey: "sk" }],
+      ["a private base URL", { baseUrl: "https://10.0.0.5/v1", apiKey: "sk" }],
+      ["a loopback base URL", { baseUrl: "https://127.0.0.1/v1", apiKey: "sk" }],
+    ])("refuses %s and stores nothing", async (_name, chat) => {
+      await expect(caller().updateLlmConfig(withEndpoint(chat))).rejects.toMatchObject({
+        code: "PRECONDITION_FAILED",
+      });
+      expect(mockUpdate).not.toHaveBeenCalled();
+    });
+
+    it("saves a public https base URL with a key", async () => {
+      await expect(
+        caller().updateLlmConfig(withEndpoint({ baseUrl: "https://8.8.8.8/v1", apiKey: "sk" })),
+      ).resolves.toEqual({ success: true });
+    });
+
+    it("needs the key re-entered before a stored key goes to a different host", async () => {
+      mockFindOne.mockResolvedValue({
+        id: ORG_ID,
+        settings: {
+          llm: { chat: { provider: "openai-compatible", apiKeyEncrypted: "enc" }, embedding: {} },
+        },
+      });
+      await expect(
+        caller().updateLlmConfig(withEndpoint({ baseUrl: "https://8.8.8.8/v1" })),
+      ).rejects.toMatchObject({ code: "PRECONDITION_FAILED" });
+      expect(mockUpdate).not.toHaveBeenCalled();
     });
   });
 

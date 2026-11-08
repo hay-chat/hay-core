@@ -422,6 +422,8 @@
       "regionEu": "Somente UE (data centers na UE)",
       "regionDefault": "Qualquer região",
       "providerLabel": "Provedor",
+      "visionLabel": "Fotos e PDFs",
+      "visionOff": "Não analisados (sem endpoint na UE para isso)",
       "change": "Alterar em Modelos de IA",
       "loadFailed": "Falha ao carregar os detalhes do processamento de IA"
     },

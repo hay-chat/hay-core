@@ -1,6 +1,6 @@
 import { describe, it, expect, afterEach } from "@jest/globals";
 import { config as frozenConfig } from "@server/config/env";
-import { describeAiProvider } from "@server/services/llm/ai-region";
+import { describeAiProvider, describeVisionProvider } from "@server/services/llm/ai-region";
 
 // env.ts exports `as const`; the object itself is mutable.
 type Mutable<T> = { -readonly [K in keyof T]: Mutable<T[K]> };
@@ -13,12 +13,14 @@ const config = frozenConfig as Mutable<typeof frozenConfig>;
 
 const original = {
   eu: config.aiRegion.eu.baseUrl,
+  euKey: config.aiRegion.eu.apiKey,
   llm: config.llm.baseUrl,
   openai: config.openai.baseUrl,
 };
 
 afterEach(() => {
   config.aiRegion.eu.baseUrl = original.eu;
+  config.aiRegion.eu.apiKey = original.euKey;
   config.llm.baseUrl = original.llm;
   config.openai.baseUrl = original.openai;
 });
@@ -57,5 +59,20 @@ describe("describeAiProvider", () => {
         },
       }),
     ).toEqual({ name: "llm.acme.test", host: "llm.acme.test" });
+  });
+});
+
+describe("describeVisionProvider", () => {
+  it("shows no provider for an EU-only org when the EU endpoint is not configured", () => {
+    config.aiRegion.eu.baseUrl = "";
+    config.aiRegion.eu.apiKey = "";
+    expect(describeVisionProvider({ aiRegion: "eu" })).toBeNull();
+  });
+
+  it("names managed OpenAI even when the org chats on another provider", () => {
+    config.aiRegion.eu.baseUrl = "";
+    config.aiRegion.eu.apiKey = "";
+    config.openai.baseUrl = "";
+    expect(describeVisionProvider({})).toEqual({ name: "OpenAI", host: "api.openai.com" });
   });
 });

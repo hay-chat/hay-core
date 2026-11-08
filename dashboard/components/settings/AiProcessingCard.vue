@@ -24,6 +24,21 @@
             ({{ info.provider.host }})
           </span>
         </dd>
+        <dt class="text-muted-foreground">
+          {{ $t("customerPrivacy.aiProcessing.visionLabel") }}
+        </dt>
+        <dd class="font-medium" data-testid="ai-processing-vision">
+          <template v-if="info.visionProvider">
+            {{ info.visionProvider.name }}
+            <span
+              v-if="info.visionProvider.name !== info.visionProvider.host"
+              class="text-muted-foreground"
+            >
+              ({{ info.visionProvider.host }})
+            </span>
+          </template>
+          <template v-else>{{ $t("customerPrivacy.aiProcessing.visionOff") }}</template>
+        </dd>
       </dl>
       <Button variant="outline" size="sm" @click="router.push('/settings/llm')">
         {{ $t("customerPrivacy.aiProcessing.change") }}

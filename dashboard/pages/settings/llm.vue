@@ -378,7 +378,8 @@ async function save() {
       chat: {
         provider,
         vendor,
-        baseUrl: form.value.baseUrl || undefined,
+        // A base URL left over from another provider choice must not be sent.
+        baseUrl: (showBaseUrl.value && form.value.baseUrl) || undefined,
         apiKey: form.value.byo && form.value.apiKey ? form.value.apiKey : undefined,
         clearApiKey: !form.value.byo,
         tiers: form.value.tiers,
@@ -391,7 +392,11 @@ async function save() {
     toast.success(t("llmSettings.saveSuccess"));
   } catch (error) {
     console.error("Failed to save LLM config:", error);
-    toast.error(t("llmSettings.saveFailed"));
+    // PRECONDITION_FAILED carries a message written for the person saving the form.
+    const { data, message } = error as { data?: { code?: string }; message?: string };
+    toast.error(
+      data?.code === "PRECONDITION_FAILED" && message ? message : t("llmSettings.saveFailed"),
+    );
   } finally {
     isSaving.value = false;
   }
