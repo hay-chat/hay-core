@@ -520,11 +520,9 @@ async function startServer() {
   const mediaRouter = await import("@server/routes/v1/media/index");
   server.use("/v1/media", mediaRouter.default);
 
-  // Core routers merged with plugin routers. The merged router is cached and
-  // replaced whenever a plugin router is registered or reloaded (a plugin
-  // rebuild), so the middleware is rebuilt when its identity changes.
-  const { createV1Router } = await import("@server/routes/v1");
-  const createV1Middleware = (v1Router: ReturnType<typeof createV1Router>) =>
+  const { v1Router } = await import("@server/routes/v1");
+  server.use(
+    "/v1",
     createExpressMiddleware({
       router: v1Router,
       createContext,
@@ -550,17 +548,8 @@ async function startServer() {
           properties: { trpc_path: path, trpc_type: type, trpc_code: error.code },
         });
       },
-    });
-  let v1Router = createV1Router();
-  let v1Middleware = createV1Middleware(v1Router);
-  server.use("/v1", (req, res, next) => {
-    const current = createV1Router();
-    if (current !== v1Router) {
-      v1Router = current;
-      v1Middleware = createV1Middleware(current);
-    }
-    return v1Middleware(req, res, next);
-  });
+    }),
+  );
 
   // Create HTTP server
   const httpServer = createServer(server);

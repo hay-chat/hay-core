@@ -658,7 +658,7 @@ export class DocumentSourceSyncService {
   ): DocumentImporterContract {
     // createCaller is attached to v11 router instances. We pass a partial
     // Context with only the org context populated — plugin importer
-    // procedures are expected to authorize off `organizationId`.
+    // procedures are resolve records with `organizationId` and refuse any HTTP context.
     const ctx = {
       user: null,
       organizationId: source.organizationId,

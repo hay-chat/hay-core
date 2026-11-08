@@ -154,7 +154,7 @@ export const documentSourcesRouter = t.router({
     .input(
       z.object({
         pluginId: z.string().min(1),
-        pluginInstanceId: z.string().uuid().optional(),
+        pluginInstanceId: z.string().uuid(),
         displayName: z.string().min(1).max(255),
         sourceType: z.string().min(1).max(50),
         externalRootId: z.string().max(255).optional(),
@@ -181,6 +181,17 @@ export const documentSourcesRouter = t.router({
         throw new TRPCError({
           code: "BAD_REQUEST",
           message: `Plugin '${input.pluginId}' is not a document_importer`,
+        });
+      }
+
+      const instance = await pluginInstanceRepository.findByOrgAndPlugin(
+        ctx.organizationId!,
+        input.pluginId,
+      );
+      if (!instance || instance.id !== input.pluginInstanceId) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Plugin instance not found for this organization",
         });
       }
 
