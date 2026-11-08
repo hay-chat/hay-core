@@ -1,9 +1,10 @@
 import { AppDataSource } from "../database/data-source";
-import { AuditLog, type AuditAction } from "../entities/audit-log.entity";
+import { AuditLog, type AuditAction, type AuditActorType } from "../entities/audit-log.entity";
 import { User } from "../entities/user.entity";
 import { createLogger } from "@server/lib/logger";
 import { config } from "@server/config/env";
 import { createHmac } from "crypto";
+import { apiKeyIdFromUserId } from "@server/lib/auth/api-token-actor";
 
 const logger = createLogger("audit-log");
 
@@ -11,9 +12,12 @@ export interface AuditLogOptions {
   /**
    * User performing the action. Optional for system-driven events
    * (e.g. scheduled syncs, plugin workers) — the audit log row stores
-   * a nullable user reference.
+   * a nullable user reference. An API token's synthetic user id is accepted
+   * here and recorded as the key, not as a user.
    */
   userId?: string;
+  /** Set for events a plugin worker triggers; everything else is derived from `userId`. */
+  actorType?: Extract<AuditActorType, "plugin" | "system">;
   organizationId?: string | null;
   action: AuditAction;
   resource?: string;
@@ -38,6 +42,29 @@ export interface GetAuditLogsOptions {
 /** Audit log retention promised in PRIVACY.md. */
 export const AUDIT_LOG_RETENTION_DAYS = 90;
 
+/**
+ * Maps the caller to the row's actor. `users.id` is a uuid, so an API token's
+ * synthetic id must never reach it. The insert trigger copies the two metadata
+ * keys into `actor_type` / `api_key_id`; they are overwritten here so a caller's
+ * own metadata can't claim a different actor.
+ */
+function resolveActor(
+  options: Pick<AuditLogOptions, "userId" | "actorType" | "metadata">,
+): Pick<AuditLogOptions, "userId" | "metadata"> {
+  const apiKeyId = apiKeyIdFromUserId(options.userId);
+  const { actorType: _actorType, apiKeyId: _apiKeyId, ...rest } = options.metadata ?? {};
+  const actor: Record<string, unknown> = apiKeyId
+    ? { actorType: "apikey", apiKeyId }
+    : options.actorType
+      ? { actorType: options.actorType }
+      : {};
+  const metadata = { ...rest, ...actor };
+  return {
+    userId: apiKeyId ? undefined : options.userId,
+    metadata: options.metadata || Object.keys(actor).length > 0 ? metadata : undefined,
+  };
+}
+
 /** Keyed hash so failed logins for the same unknown email can be correlated without storing it. */
 export function hashEmailForAudit(email: string): string {
   return createHmac("sha256", config.jwt.secret || "")
@@ -53,15 +80,20 @@ export class AuditLogService {
    */
   async log(options: AuditLogOptions): Promise<AuditLog> {
     try {
+      const { actorType: _actorType, ...fields } = options;
       const auditLog = AuditLog.createLog({
-        ...options,
+        ...fields,
+        ...resolveActor(options),
         organizationId: options.organizationId ?? undefined,
         status: options.status || "success",
       });
 
       return await this.auditLogRepository.save(auditLog);
     } catch (error) {
-      logger.error({ err: error }, "Failed to create audit log");
+      logger.error(
+        { err: error, action: options.action, organizationId: options.organizationId },
+        "Failed to create audit log",
+      );
       throw error;
     }
   }

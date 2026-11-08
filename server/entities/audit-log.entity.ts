@@ -76,11 +76,14 @@ export type AuditAction =
   | "dispute_evidence.export"
   | "dispute_evidence.push";
 
+export type AuditActorType = "user" | "apikey" | "plugin" | "system";
+
 @Entity("audit_logs")
 @Index("idx_audit_logs_user", ["userId"])
 @Index("idx_audit_logs_organization", ["organizationId"])
 @Index("idx_audit_logs_original_organization", ["originalOrganizationId"])
 @Index("idx_audit_logs_action", ["action"])
+@Index("idx_audit_logs_api_key", ["apiKeyId"])
 @Index("idx_audit_logs_created_at", ["createdAt"])
 export class AuditLog extends TypeOrmBaseEntity {
   @PrimaryGeneratedColumn("uuid")
@@ -106,6 +109,25 @@ export class AuditLog extends TypeOrmBaseEntity {
    */
   @Column({ type: "uuid", nullable: true, select: false, insert: false, update: false })
   originalOrganizationId?: string;
+
+  /**
+   * Who performed the event, and the API key when that was a token. Filled by a
+   * DB trigger on insert from `metadata.actorType` / `metadata.apiKeyId` (or
+   * from `user_id`). Like `originalOrganizationId`, never touched by TypeORM, so
+   * code stays compatible before the migration runs. NULL on older rows.
+   */
+  @Column({
+    type: "varchar",
+    length: 20,
+    nullable: true,
+    select: false,
+    insert: false,
+    update: false,
+  })
+  actorType?: AuditActorType;
+
+  @Column({ type: "uuid", nullable: true, select: false, insert: false, update: false })
+  apiKeyId?: string;
 
   @Column({ type: "varchar", length: 100 })
   action!: AuditAction;

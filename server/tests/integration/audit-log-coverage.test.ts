@@ -4,8 +4,11 @@ import { AppDataSource } from "../../database/data-source";
 import { Organization } from "../../entities/organization.entity";
 import { User } from "../../entities/user.entity";
 import { AuditLog } from "../../entities/audit-log.entity";
+import { Customer } from "../../database/entities/customer.entity";
 import { apiTokensRouter } from "../../routes/v1/api-tokens";
+import { customersRouter } from "../../routes/v1/customers";
 import { ApiTokenScope } from "../../types/api-token-scopes";
+import { auditLogService } from "../../services/audit-log.service";
 import { organizationService } from "../../services/organization.service";
 import type { Context } from "../../trpc/context";
 import { purgeAuditLogs } from "../helpers/audit-logs";
@@ -69,6 +72,45 @@ describe("audit log coverage", () => {
       true,
     );
     expect(JSON.stringify(rows)).not.toContain(created.token);
+  });
+
+  it("attributes an API token's action to the key, not to a user", async () => {
+    const apiKeyId = "a0d17000-0000-4000-8000-0000000000cc";
+    const customers = AppDataSource.getRepository(Customer);
+    const customer = await customers.save(
+      customers.create({ organization_id: orgId, external_id: "audit-coverage-customer" }),
+    );
+    const apiKeyCtx = {
+      ...ctx,
+      user: { ...ctx.user, id: `api-token-${apiKeyId}`, authMethod: "apikey", apiKeyId },
+    } as unknown as Context;
+
+    await customersRouter.createCaller(apiKeyCtx).delete({ id: customer.id });
+
+    const row = await AppDataSource.getRepository(AuditLog)
+      .createQueryBuilder("log")
+      .addSelect(["log.actorType", "log.apiKeyId"])
+      .where("log.original_organization_id = :orgId AND log.action = 'customer.delete'", { orgId })
+      .getOneOrFail();
+    expect(row.userId).toBeNull();
+    expect(row.actorType).toBe("apikey");
+    expect(row.apiKeyId).toBe(apiKeyId);
+  });
+
+  it("does not let caller metadata claim a different actor", async () => {
+    const row = await auditLogService.log({
+      userId,
+      organizationId: orgId,
+      action: "profile.update",
+      metadata: { actorType: "system", apiKeyId: "a0d17000-0000-4000-8000-0000000000dd" },
+    });
+    const stored = await AppDataSource.getRepository(AuditLog)
+      .createQueryBuilder("log")
+      .addSelect(["log.actorType", "log.apiKeyId"])
+      .where("log.id = :id", { id: row.id })
+      .getOneOrFail();
+    expect(stored.actorType).toBe("user");
+    expect(stored.apiKeyId).toBeNull();
   });
 
   it("records the organization's deletion and keeps the trail afterwards", async () => {
