@@ -24,6 +24,7 @@ import { v4 as uuidv4 } from "uuid";
 import type { HayPluginManifest } from "@server/types/plugin.types";
 import type { AuthMethodDescriptor, ConfigFieldDescriptor } from "@server/types/plugin-sdk.types";
 import { MCPClientFactory } from "@server/services/mcp-client-factory.service";
+import { toPluginInstanceDto } from "./plugin-instance.dto";
 import { PluginStatus } from "@server/entities/plugin-registry.entity";
 import {
   mergeWithStoredConfig,
@@ -126,7 +127,7 @@ export const getAllPlugins = authenticatedProcedure.query(async ({ ctx }) => {
 /**
  * Get a specific plugin by ID
  */
-export const getPlugin = authenticatedProcedure
+export const getPlugin = scopedProcedure(RESOURCES.PLUGINS, ACTIONS.READ)
   .input(
     z.object({
       pluginId: z.string(),
@@ -340,7 +341,8 @@ export const getPlugin = authenticatedProcedure
       oauthAvailable,
       oauthConfigured,
       oauthConnected,
-      auth: instance ? instance.authState : undefined,
+      authMethod: instance?.authState?.methodId ?? instance?.authMethod ?? null,
+      authValidatedAt: instance?.authValidatedAt ?? null,
       // Generic "channel failing" signal (D13-11); null when never reported.
       channelHealth: instance?.channelHealth ?? null,
     };
@@ -349,9 +351,12 @@ export const getPlugin = authenticatedProcedure
 /**
  * Get plugin instances for the organization
  */
-export const getPluginInstances = authenticatedProcedure.query(async ({ ctx }) => {
-  return await pluginInstanceRepository.findByOrganization(ctx.organizationId!);
-});
+export const getPluginInstances = scopedProcedure(RESOURCES.PLUGINS, ACTIONS.READ).query(
+  async ({ ctx }) => {
+    const instances = await pluginInstanceRepository.findByOrganization(ctx.organizationId!);
+    return instances.map(toPluginInstanceDto);
+  },
+);
 
 /**
  * Enable a plugin for the organization
@@ -475,7 +480,7 @@ export const enablePlugin = pluginManageProcedure
 
       return {
         success: true,
-        instance,
+        instance: toPluginInstanceDto(instance),
       };
     } catch (error) {
       logger.error({ err: error, pluginName: plugin.name }, "Failed to enable plugin");
@@ -831,7 +836,7 @@ export const configurePlugin = pluginManageProcedure
 
       return {
         success: true,
-        instance: newInstance,
+        instance: toPluginInstanceDto(newInstance),
       };
     }
 
@@ -875,7 +880,7 @@ export const configurePlugin = pluginManageProcedure
 
     return {
       success: true,
-      instance: { ...instance, config, authState },
+      instance: toPluginInstanceDto(instance),
     };
   });
 

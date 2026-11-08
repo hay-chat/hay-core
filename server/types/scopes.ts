@@ -148,6 +148,8 @@ export const MEMBER_SCOPES = [
   buildScope(RESOURCES.PLAYBOOKS, ACTIONS.READ),
   buildScope(RESOURCES.ANALYTICS, ACTIONS.READ),
   buildScope(RESOURCES.ORGANIZATION_MEMBERS, ACTIONS.READ),
+  // Document import reads the plugin's schema; no credentials are returned.
+  buildScope(RESOURCES.PLUGINS, ACTIONS.READ),
   buildScope(RESOURCES.PRODUCTS, ACTIONS.READ),
   buildScope(RESOURCES.PRODUCTS, ACTIONS.CREATE),
   buildScope(RESOURCES.PRODUCTS, ACTIONS.UPDATE),
@@ -173,6 +175,8 @@ export const CONTRIBUTOR_SCOPES = [
   buildScope(RESOURCES.PLAYBOOKS, ACTIONS.UPDATE),
   buildScope(RESOURCES.ANALYTICS, ACTIONS.READ),
   buildScope(RESOURCES.ORGANIZATION_MEMBERS, ACTIONS.READ),
+  // Document import reads the plugin's schema; no credentials are returned.
+  buildScope(RESOURCES.PLUGINS, ACTIONS.READ),
   buildScope(RESOURCES.PRODUCTS, ACTIONS.READ),
   buildScope(RESOURCES.PRODUCTS, ACTIONS.CREATE),
   buildScope(RESOURCES.PRODUCTS, ACTIONS.UPDATE),
