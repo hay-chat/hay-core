@@ -228,7 +228,7 @@ export function useChat(config: HayChatConfig, options: UseChatOptions = {}) {
       // The pre-chat form answers, when the shopper filled one.
       const preChatPayload =
         preChatFormSchema.value && preChatFormResponse.value
-          ? { schema: preChatFormSchema.value, response: preChatFormResponse.value }
+          ? { response: preChatFormResponse.value }
           : undefined;
 
       // Create conversation via HTTP, passing current context and the signed customer id

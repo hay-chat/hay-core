@@ -12,6 +12,7 @@ import {
 import { z } from "zod";
 import { ConversationService } from "../../../services/conversation.service";
 import { MessageType, MessageDirection } from "../../../database/entities/message.entity";
+import type { Conversation } from "../../../database/entities/conversation.entity";
 import { TRPCError } from "@trpc/server";
 import { dpopCacheService } from "../../../services/dpop-cache.service";
 import { conversationRepository } from "../../../repositories/conversation.repository";
@@ -38,6 +39,10 @@ import {
   VISITOR_CONTEXT_LIMITS,
   boundContext,
 } from "../../../services/core/prompt-data";
+import {
+  CUSTOMER_LINK_SOURCE,
+  CUSTOMER_LINK_SOURCE_KEY,
+} from "../../../services/core/customer-identity";
 import {
   formSchemaSchema,
   validateResponse,
@@ -86,7 +91,6 @@ const createPublicConversationSchema = z.object({
   challengeError: z.string().max(64).optional(),
   preChatForm: z
     .object({
-      schema: formSchemaSchema,
       response: z.record(z.string(), z.union([z.string(), z.number(), z.boolean(), z.null()])),
     })
     .optional(),
@@ -258,9 +262,40 @@ export const publicConversationsRouter = t.router({
       if (input.customerExternalId && !customerExternalId) {
         logger.info({ organizationId }, "Ignored an unsigned or invalid customerExternalId");
       }
-      const customer = customerExternalId
+      const signedCustomer = customerExternalId
         ? await customerRepository.findByExternalId(customerExternalId, organizationId)
         : null;
+
+      // The form is the organization's own; a client only sends the answers.
+      // Checked first so a bad response leaves nothing behind.
+      const preChatValidated = input.preChatForm
+        ? await validatePreChatResponse(organizationId, input.preChatForm.response)
+        : null;
+
+      // An email typed in a form is a claim, so it never links an existing
+      // customer: only the store's signature does. The claim gets its own
+      // record, and duplicates surface in the customer merge suggestions.
+      const preChatCustomerFields = preChatValidated
+        ? extractCustomerFields(
+            preChatValidated.schema,
+            preChatValidated.response as Record<string, string | number | boolean | null>,
+          )
+        : null;
+      const claimedCustomer =
+        !signedCustomer && preChatCustomerFields?.email
+          ? await customerRepository.create({
+              organization_id: organizationId,
+              email: preChatCustomerFields.email,
+              name: preChatCustomerFields.name ?? null,
+              phone: preChatCustomerFields.phone ?? null,
+            } as never)
+          : null;
+      const customer = signedCustomer ?? claimedCustomer;
+      const customerLinkSource = signedCustomer
+        ? CUSTOMER_LINK_SOURCE.signature
+        : claimedCustomer
+          ? CUSTOMER_LINK_SOURCE.preChatEmail
+          : null;
 
       // Create the conversation with the public JWK
       const conversation = await conversationService.createConversation(organizationId, {
@@ -273,22 +308,9 @@ export const publicConversationsRouter = t.router({
           createdAt: new Date().toISOString(),
           ...(input.isPlayground ? { isPlayground: true } : {}),
           ...(gate.results.length > 0 ? { botCheck: botCheckRecord(gate) } : {}),
+          ...(customerLinkSource ? { [CUSTOMER_LINK_SOURCE_KEY]: customerLinkSource } : {}),
         },
       });
-
-      // Validate pre-chat form response (if supplied) before any persistence so
-      // we fail fast with a clear error instead of leaving partial state.
-      let preChatValidated: { schema: FormSchema; response: Record<string, unknown> } | null = null;
-      if (input.preChatForm) {
-        const result = validateResponse(input.preChatForm.schema, input.preChatForm.response);
-        if (!result.success) {
-          throw new TRPCError({
-            code: "BAD_REQUEST",
-            message: `Invalid pre-chat form response: ${JSON.stringify(result.errors)}`,
-          });
-        }
-        preChatValidated = { schema: input.preChatForm.schema, response: result.data };
-      }
 
       // The initial visitor context: the page's context, then the pre-chat
       // form answers (they win on conflict). Both come from the visitor, so
@@ -305,57 +327,6 @@ export const publicConversationsRouter = t.router({
         lastMessageAt: new Date(),
         ...(visitorContext ? { context: visitorContext } : {}),
       });
-
-      // Link or upsert the customer from the pre-chat answers.
-      // Priority: the signed customerExternalId above > email lookup > new customer.
-      let linkedCustomerId: string | null = customer?.id ?? null;
-
-      if (preChatValidated) {
-        const customerFields = extractCustomerFields(
-          preChatValidated.schema,
-          preChatValidated.response as Record<string, string | number | boolean | null>,
-        );
-
-        if (linkedCustomerId) {
-          // Update existing customer with any form-supplied fields (only set fields, never clear).
-          const updates: Record<string, string> = {};
-          if (customerFields.name) updates.name = customerFields.name;
-          if (customerFields.email) updates.email = customerFields.email;
-          if (customerFields.phone) updates.phone = customerFields.phone;
-          if (Object.keys(updates).length > 0) {
-            await customerRepository.update(linkedCustomerId, organizationId, updates as never);
-          }
-        } else if (customerFields.email) {
-          // Try to find existing customer by email; otherwise create one.
-          const existing = await customerRepository.findByEmail(
-            customerFields.email,
-            organizationId,
-          );
-          if (existing) {
-            linkedCustomerId = existing.id;
-            const updates: Record<string, string> = {};
-            if (customerFields.name && !existing.name) updates.name = customerFields.name;
-            if (customerFields.phone && !existing.phone) updates.phone = customerFields.phone;
-            if (Object.keys(updates).length > 0) {
-              await customerRepository.update(existing.id, organizationId, updates as never);
-            }
-          } else {
-            const created = await customerRepository.create({
-              organization_id: organizationId,
-              email: customerFields.email,
-              name: customerFields.name ?? null,
-              phone: customerFields.phone ?? null,
-            } as never);
-            linkedCustomerId = created.id;
-          }
-        }
-      }
-
-      if (linkedCustomerId && linkedCustomerId !== customer?.id) {
-        await conversationRepository.updateById(conversation.id, {
-          customer_id: linkedCustomerId,
-        });
-      }
 
       // Persist a FORM message recording what was collected, so the transcript
       // and the LLM history both surface the structured data clearly.
@@ -839,8 +810,8 @@ export const publicConversationsRouter = t.router({
 
   // Submit a response to an in-conversation FORM message (ASK_FORM step).
   // Validates the response against the schema stored on the message, writes
-  // each field into conversation.context, applies mapToCustomer mappings to
-  // the linked Customer, mutates the FORM message to SUBMITTED, then
+  // the fields into the visitor's context, completes a pre-chat claim record
+  // with mapToCustomer fields, mutates the FORM message to SUBMITTED, then
   // re-enqueues the orchestrator so it resumes with the new context.
   submitForm: publicProcedure
     .input(
@@ -907,31 +878,12 @@ export const publicConversationsRouter = t.router({
           });
         }
 
-        // Merge response into conversation.context (form fields win on conflict).
-        const mergedContext: Record<string, unknown> = {
-          ...(conversation.context ?? {}),
-          ...validated.data,
-        };
-        await conversationRepository.updateById(conversation.id, { context: mergedContext });
+        // The answers come from the visitor, so they sit with the other
+        // visitor-supplied context and reach the AI as unverified.
+        const context = withVisitorContext(conversation.context, validated.data);
+        if (context) await conversationRepository.updateById(conversation.id, { context });
 
-        // Apply mapToCustomer updates if a customer is linked.
-        if (conversation.customer_id) {
-          const customerFields = extractCustomerFields(
-            schema,
-            validated.data as Record<string, string | number | boolean | null>,
-          );
-          const updates: Record<string, string> = {};
-          if (customerFields.name) updates.name = customerFields.name;
-          if (customerFields.email) updates.email = customerFields.email;
-          if (customerFields.phone) updates.phone = customerFields.phone;
-          if (Object.keys(updates).length > 0) {
-            await customerRepository.update(
-              conversation.customer_id,
-              conversation.organization_id,
-              updates as never,
-            );
-          }
-        }
+        await fillClaimedCustomer(conversation, schema, validated.data);
 
         // Mutate the FORM message in place.
         const renderedContent = renderFormResponseAsText(
@@ -976,6 +928,57 @@ export const publicConversationsRouter = t.router({
       }
     }),
 });
+
+/** The organization's pre-chat form with the answers checked against it. */
+async function validatePreChatResponse(
+  organizationId: string,
+  response: Record<string, string | number | boolean | null>,
+): Promise<{ schema: FormSchema; response: Record<string, unknown> }> {
+  const { preChatForm: schema } = await webchatSettingsService.getSettings(organizationId);
+  if (!schema) {
+    throw new TRPCError({ code: "BAD_REQUEST", message: "No pre-chat form is configured" });
+  }
+  const result = validateResponse(schema, response);
+  if (!result.success) {
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message: `Invalid pre-chat form response: ${JSON.stringify(result.errors)}`,
+    });
+  }
+  return { schema, response: result.data };
+}
+
+/**
+ * Form answers may complete the record made from a pre-chat claim, and only
+ * its empty fields. A record the visitor did not create is never changed.
+ */
+async function fillClaimedCustomer(
+  conversation: Conversation,
+  schema: FormSchema,
+  response: Record<string, unknown>,
+): Promise<void> {
+  if (
+    !conversation.customer_id ||
+    conversation.metadata?.[CUSTOMER_LINK_SOURCE_KEY] !== CUSTOMER_LINK_SOURCE.preChatEmail
+  ) {
+    return;
+  }
+  const customer = await customerRepository.findByIdAndOrganization(
+    conversation.customer_id,
+    conversation.organization_id,
+  );
+  if (!customer) return;
+  const fields = extractCustomerFields(
+    schema,
+    response as Record<string, string | number | boolean | null>,
+  );
+  const updates: Record<string, string> = {};
+  if (fields.name && !customer.name) updates.name = fields.name;
+  if (fields.phone && !customer.phone) updates.phone = fields.phone;
+  if (Object.keys(updates).length > 0) {
+    await customerRepository.update(customer.id, conversation.organization_id, updates as never);
+  }
+}
 
 function clientIp(ipAddress: string | undefined): string {
   return ipAddress || "Unknown";

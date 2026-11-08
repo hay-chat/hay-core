@@ -18,6 +18,7 @@ jest.mock("@server/database/data-source", () => ({ AppDataSource: { isInitialize
 const mockCreateConversation = jest.fn(async (_orgId: string, _data: unknown) => ({
   id: "conv-1",
   created_at: new Date("2026-10-27T00:00:00Z"),
+  addMessage: jest.fn(async () => undefined),
 }));
 jest.mock("@server/services/conversation.service", () => ({
   ConversationService: jest.fn(() => ({ createConversation: mockCreateConversation })),
@@ -28,11 +29,19 @@ jest.mock("@server/services/dpop-cache.service", () => ({
 jest.mock("@server/repositories/conversation.repository", () => ({
   conversationRepository: { updateById: jest.fn(async () => undefined) },
 }));
+const mockFindByEmail = jest.fn(async () => ({ id: "existing-customer" }));
+const mockCreateCustomer = jest.fn(async (_data: unknown) => ({ id: "claimed-customer" }));
+const mockUpdateCustomer = jest.fn(async () => ({}));
 const mockFindByExternalId = jest.fn<(id: string, orgId: string) => Promise<unknown>>(
   async () => null,
 );
 jest.mock("@server/repositories/customer.repository", () => ({
-  CustomerRepository: jest.fn(() => ({ findByExternalId: mockFindByExternalId })),
+  CustomerRepository: jest.fn(() => ({
+    findByExternalId: mockFindByExternalId,
+    findByEmail: mockFindByEmail,
+    create: mockCreateCustomer,
+    update: mockUpdateCustomer,
+  })),
 }));
 
 const mockVerifiedCustomerExternalId = jest.fn<
@@ -54,7 +63,8 @@ jest.mock("@server/repositories/webchat-settings.repository", () => ({
 jest.mock("@server/services/storage.service", () => ({ storageService: {} }));
 
 const mockIsEnabled = jest.fn<(orgId: string) => Promise<boolean>>();
-const mockGetSettings = jest.fn<(orgId: string) => Promise<{ allowedDomains: string[] }>>();
+const mockGetSettings =
+  jest.fn<(orgId: string) => Promise<{ allowedDomains: string[]; preChatForm?: unknown }>>();
 jest.mock("@server/services/webchat/webchat-settings.service", () => {
   const actual = jest.requireActual<
     typeof import("@server/services/webchat/webchat-settings.service")
@@ -63,6 +73,7 @@ jest.mock("@server/services/webchat/webchat-settings.service", () => {
     matchesAllowedDomains: actual.matchesAllowedDomains,
     webchatSettingsService: {
       isEnabled: mockIsEnabled,
+      getSettings: mockGetSettings,
       isDomainAllowed: async (orgId: string, hostname: string | null) =>
         actual.matchesAllowedDomains((await mockGetSettings(orgId)).allowedDomains, hostname),
     },
@@ -96,6 +107,7 @@ jest.mock("@server/services/webchat/under-attack.service", () => ({
 
 import {
   publicConversationsRouter,
+  publicMetadata,
   withVisitorContext,
 } from "@server/routes/v1/public-conversations";
 import { conversationRepository } from "@server/repositories/conversation.repository";
@@ -564,5 +576,80 @@ describe("publicConversations.create customer link (D1)", () => {
       ORG_ID,
       expect.objectContaining({ customer_id: null }),
     );
+  });
+});
+
+describe("publicConversations.create pre-chat form", () => {
+  const form = {
+    id: "prechat",
+    fields: [
+      { name: "email", label: "Email", type: "email", required: true, mapToCustomer: "email" },
+    ],
+  };
+  const answers = { response: { email: "someone@example.com" } };
+  const origin = { origin: "https://shop.example.com" };
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockFindOrganization.mockResolvedValue({ id: ORG_ID, suspendedAt: null, settings: {} });
+    mockIsEnabled.mockResolvedValue(true);
+    mockGetSettings.mockResolvedValue({ allowedDomains: ["shop.example.com"], preChatForm: form });
+    mockRateLimited.mockResolvedValue(false);
+    mockVerifiedCustomerExternalId.mockResolvedValue(null);
+  });
+
+  it("refuses answers when the organization has no form, whatever schema is sent", async () => {
+    mockGetSettings.mockResolvedValue({ allowedDomains: ["shop.example.com"], preChatForm: null });
+    await expect(
+      callerFor(origin).create({
+        ...createInput,
+        preChatForm: { schema: form, ...answers },
+      } as never),
+    ).rejects.toMatchObject({ code: "BAD_REQUEST" });
+    expect(mockCreateConversation).not.toHaveBeenCalled();
+  });
+
+  it("validates against the organization's form, not one the client sends", async () => {
+    const forged = { id: "forged", fields: [{ name: "other", label: "x", type: "text" }] };
+    await expect(
+      callerFor(origin).create({
+        ...createInput,
+        preChatForm: { schema: forged, response: { other: "x" } },
+      } as never),
+    ).rejects.toMatchObject({ code: "BAD_REQUEST" });
+  });
+
+  it("gives a typed email its own record instead of linking the matching customer", async () => {
+    await callerFor(origin).create({ ...createInput, preChatForm: answers });
+    expect(mockFindByEmail).not.toHaveBeenCalled();
+    expect(mockCreateCustomer).toHaveBeenCalledWith(
+      expect.objectContaining({ email: "someone@example.com" }),
+    );
+    expect(mockCreateConversation).toHaveBeenCalledWith(
+      ORG_ID,
+      expect.objectContaining({
+        customer_id: "claimed-customer",
+        metadata: expect.objectContaining({ customerLinkSource: "prechat_email" }),
+      }),
+    );
+  });
+
+  it("does not change a signed customer from form answers", async () => {
+    mockVerifiedCustomerExternalId.mockResolvedValue("c-1");
+    mockFindByExternalId.mockResolvedValue({ id: "signed-customer" });
+    await callerFor(origin).create({ ...createInput, preChatForm: answers });
+    expect(mockUpdateCustomer).not.toHaveBeenCalled();
+    expect(mockCreateCustomer).not.toHaveBeenCalled();
+    expect(mockCreateConversation).toHaveBeenCalledWith(
+      ORG_ID,
+      expect.objectContaining({
+        customer_id: "signed-customer",
+        metadata: expect.objectContaining({ customerLinkSource: "webchat_signature" }),
+      }),
+    );
+  });
+
+  it("does not let the browser set the link source", () => {
+    expect(publicMetadata({ customerLinkSource: "webchat_signature" })).toEqual({});
   });
 });

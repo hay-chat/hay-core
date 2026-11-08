@@ -400,6 +400,13 @@ export class LLMService {
         case MessageType.TOOL:
           turns.push({ role: "user", content: this.serializeToolMessage(message) });
           continue;
+        case MessageType.FORM:
+          // Once submitted, the content is what the customer typed.
+          turns.push({
+            role: message.metadata?.ui?.status === "SUBMITTED" ? "user" : "assistant",
+            content: message.content,
+          });
+          continue;
         default:
           turns.push({ role: "assistant", content: message.content });
       }
