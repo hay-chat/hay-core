@@ -3,7 +3,7 @@ import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { publicProcedure } from "@server/trpc/middleware/auth";
 import { privacyService } from "@server/services/privacy.service";
-import { rateLimitService } from "@server/services/rate-limit.service";
+import { rateLimitService, RateLimitUnavailableError } from "@server/services/rate-limit.service";
 import { createLogger } from "@server/lib/logger";
 
 const logger = createLogger("privacy-routes");
@@ -64,7 +64,7 @@ async function checkPrivacyRateLimits(email: string, ipAddress: string): Promise
       ipAddress,
       RATE_LIMITS.IP_REQUESTS_PER_HOUR,
       RATE_LIMITS.IP_WINDOW_SECONDS,
-      FAIL_CLOSED,
+      { scope: "privacy-request", failClosed: FAIL_CLOSED },
     );
 
     if (ipLimit.limited) {
@@ -80,7 +80,7 @@ async function checkPrivacyRateLimits(email: string, ipAddress: string): Promise
       email,
       RATE_LIMITS.EMAIL_REQUESTS_PER_DAY,
       RATE_LIMITS.EMAIL_WINDOW_SECONDS,
-      FAIL_CLOSED,
+      { scope: "privacy-request", failClosed: FAIL_CLOSED },
     );
 
     if (emailLimit.limited) {
@@ -109,7 +109,7 @@ async function checkPrivacyRateLimits(email: string, ipAddress: string): Promise
     }
   } catch (error) {
     // If rate limiting service throws an error (Redis unavailable), convert to TRPC error
-    if (error instanceof Error && error.message.includes("Rate limiting service")) {
+    if (error instanceof RateLimitUnavailableError) {
       throw new TRPCError({
         code: "SERVICE_UNAVAILABLE",
         message: "Privacy request system is temporarily unavailable. Please try again later.",
@@ -332,7 +332,7 @@ export const privacyRouter = t.router({
           ipAddress,
           20, // max 20 attempts
           3600, // per hour
-          false, // fail-open (don't block if Redis is down)
+          { scope: "privacy-download" },
         );
 
         if (rateLimitResult.limited) {

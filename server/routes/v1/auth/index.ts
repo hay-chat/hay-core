@@ -186,7 +186,10 @@ export const authRouter = t.router({
 
     // Rate limit by IP: 10 attempts per 15 minutes
     const ipAddress = ctx.ipAddress || "unknown";
-    const ipRateLimit = await rateLimitService.checkIpRateLimit(ipAddress, 10, 15 * 60, true);
+    const ipRateLimit = await rateLimitService.checkIpRateLimit(ipAddress, 10, 15 * 60, {
+      scope: "login",
+      failClosed: true,
+    });
     if (ipRateLimit.limited) {
       throw new TRPCError({
         code: "TOO_MANY_REQUESTS",
@@ -194,8 +197,12 @@ export const authRouter = t.router({
       });
     }
 
-    // Rate limit by email: 5 attempts per 15 minutes
-    const emailRateLimit = await rateLimitService.checkEmailRateLimit(email, 5, 15 * 60, true);
+    // Rate limit by email: 5 failed attempts per 15 minutes. Counted before the
+    // password check so concurrent guesses all count; a correct password clears it.
+    const emailRateLimit = await rateLimitService.checkEmailRateLimit(email, 5, 15 * 60, {
+      scope: "login",
+      failClosed: true,
+    });
     if (emailRateLimit.limited) {
       throw new TRPCError({
         code: "TOO_MANY_REQUESTS",
@@ -232,6 +239,7 @@ export const authRouter = t.router({
         message: "Invalid credentials",
       });
     }
+    await rateLimitService.resetRateLimit(email, "email", "login");
 
     // Check if user is active
     if (!user.isActive) {
@@ -397,12 +405,22 @@ export const authRouter = t.router({
     .mutation(async ({ input, ctx }) => {
       const { email } = input;
 
-      // Rate limiting: 5 requests per day per email
-      const rateLimitResult = await rateLimitService.checkEmailRateLimit(
-        email,
-        5, // max 5 requests
-        24 * 60 * 60, // per 24 hours
+      // Per IP first, so one address cannot spend a victim's per-email allowance.
+      const ipLimit = await rateLimitService.checkIpRateLimit(
+        ctx.ipAddress || "unknown",
+        20,
+        60 * 60,
+        { scope: "password-reset", failClosed: true },
       );
+      // Rate limiting: 5 requests per day per email
+      const rateLimitResult = ipLimit.limited
+        ? ipLimit
+        : await rateLimitService.checkEmailRateLimit(
+            email,
+            5, // max 5 requests
+            24 * 60 * 60, // per 24 hours
+            { scope: "password-reset", failClosed: true },
+          );
 
       if (rateLimitResult.limited) {
         throw new TRPCError({
@@ -1352,11 +1370,22 @@ export const authRouter = t.router({
    */
   resendSignupVerification: publicProcedure
     .input(z.object({ email: z.string().email() }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
       const { email } = input;
 
+      const ipLimit = await rateLimitService.checkIpRateLimit(
+        ctx.ipAddress || "unknown",
+        20,
+        60 * 60,
+        { scope: "resend-verification", failClosed: true },
+      );
       // Rate limit: 3 requests per hour per email
-      const rateLimitResult = await rateLimitService.checkEmailRateLimit(email, 3, 60 * 60);
+      const rateLimitResult = ipLimit.limited
+        ? ipLimit
+        : await rateLimitService.checkEmailRateLimit(email, 3, 60 * 60, {
+            scope: "resend-verification",
+            failClosed: true,
+          });
       if (rateLimitResult.limited) {
         throw new TRPCError({
           code: "TOO_MANY_REQUESTS",

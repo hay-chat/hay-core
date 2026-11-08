@@ -1,6 +1,11 @@
 import { Router, type Request } from "express";
 import { verifySvixSignature } from "@server/lib/svix-signature";
-import { claimWebhookDelivery, releaseWebhookDelivery } from "@server/lib/webhook-replay";
+import {
+  claimWebhookDelivery,
+  releaseWebhookDelivery,
+  WEBHOOK_RETRY_AFTER_SECONDS,
+  WebhookReplayUnavailableError,
+} from "@server/lib/webhook-replay";
 import { applyEmailEvent, type ResendEmailEvent } from "@server/services/email-events.service";
 import { createLogger } from "@server/lib/logger";
 
@@ -49,8 +54,15 @@ router.post("/v1/webhooks/email-events", async (req, res) => {
   }
 
   // Each svix-id is processed once; a repeat is acknowledged without effect.
-  if (!(await claimWebhookDelivery(REPLAY_NAMESPACE, deliveryId))) {
-    res.json({ ok: true, duplicate: true });
+  try {
+    if (!(await claimWebhookDelivery(REPLAY_NAMESPACE, deliveryId))) {
+      res.json({ ok: true, duplicate: true });
+      return;
+    }
+  } catch (error) {
+    if (!(error instanceof WebhookReplayUnavailableError)) throw error;
+    res.setHeader("Retry-After", String(WEBHOOK_RETRY_AFTER_SECONDS));
+    res.status(503).json({ error: "Temporarily unavailable" });
     return;
   }
 

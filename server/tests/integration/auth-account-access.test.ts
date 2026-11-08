@@ -25,6 +25,7 @@ jest.mock("../../services/rate-limit.service", () => ({
     checkKeyRateLimit: async () => ({ limited: mockLimited.value }),
     checkIpRateLimit: async () => ({ limited: false }),
     checkEmailRateLimit: async () => ({ limited: false }),
+    resetRateLimit: async () => undefined,
   },
 }));
 jest.mock("../../services/redis.service", () => ({

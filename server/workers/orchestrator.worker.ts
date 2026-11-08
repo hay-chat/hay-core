@@ -61,6 +61,8 @@ export class OrchestratorWorker {
     }
 
     if (rabbitmqService.isConnected()) {
+      // A broker that came up after boot has not had its queues declared yet.
+      await orchestratorQueueService.declareQueues();
       await this.startConsuming();
     }
 
@@ -193,6 +195,25 @@ export class OrchestratorWorker {
       await this.orchestrator.loop();
     } catch (error) {
       logger.error({ err: error }, "Orchestrator tick error");
+    }
+  }
+
+  /**
+   * Process conversations in this process, for the sweep to use while RabbitMQ
+   * is unavailable. One at a time, so a backlog cannot overload the server.
+   */
+  async processDirectly(conversationIds: string[]): Promise<void> {
+    await this.initialize();
+    if (!this.initialized || !this.orchestrator) return;
+
+    for (const conversationId of conversationIds) {
+      try {
+        await withLogContext({ conversationId }, () =>
+          this.orchestrator!.processConversation(conversationId),
+        );
+      } catch (error) {
+        logger.error({ err: error, conversationId }, "Direct conversation processing failed");
+      }
     }
   }
 

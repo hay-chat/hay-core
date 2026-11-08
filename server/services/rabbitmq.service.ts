@@ -39,12 +39,15 @@ export class RabbitMQService extends EventEmitter {
       "Initializing RabbitMQ service",
     );
 
+    // Set before connecting: a broker that is down at boot must keep being retried.
+    this.isInitialized = true;
+
     try {
       await this.connect();
-      this.isInitialized = true;
       logger.debug("RabbitMQ service fully initialized and ready");
     } catch (error) {
-      logger.error({ err: error }, "Failed to initialize RabbitMQ");
+      logger.error({ err: error }, "Failed to initialize RabbitMQ, will keep retrying");
+      this.scheduleReconnect();
       throw error;
     }
   }

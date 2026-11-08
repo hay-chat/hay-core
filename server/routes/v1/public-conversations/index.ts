@@ -184,10 +184,13 @@ export const publicConversationsRouter = t.router({
       const organizationId = input.organizationId;
 
       if (
-        await isPublicWidgetRateLimited([
-          { rule: "createPerIp", id: clientIp(ctx.ipAddress) },
-          { rule: "createPerOrg", id: organizationId },
-        ])
+        await isPublicWidgetRateLimited(
+          [
+            { rule: "createPerIp", id: clientIp(ctx.ipAddress) },
+            { rule: "createPerOrg", id: organizationId },
+          ],
+          { failClosed: true },
+        )
       ) {
         throw tooManyRequests();
       }
@@ -579,7 +582,9 @@ export const publicConversationsRouter = t.router({
   sendAttachment: publicProcedure.input(sendAttachmentSchema).mutation(async ({ input, ctx }) => {
     // Per IP before DPoP so a flood never reaches signature verification.
     if (
-      await isPublicWidgetRateLimited([{ rule: "attachmentPerIp", id: clientIp(ctx.ipAddress) }])
+      await isPublicWidgetRateLimited([{ rule: "attachmentPerIp", id: clientIp(ctx.ipAddress) }], {
+        failClosed: true,
+      })
     ) {
       throw tooManyRequests();
     }
@@ -610,9 +615,10 @@ export const publicConversationsRouter = t.router({
     }
 
     if (
-      await isPublicWidgetRateLimited([
-        { rule: "attachmentPerConversation", id: input.conversationId },
-      ])
+      await isPublicWidgetRateLimited(
+        [{ rule: "attachmentPerConversation", id: input.conversationId }],
+        { failClosed: true },
+      )
     ) {
       throw tooManyRequests();
     }
@@ -623,7 +629,11 @@ export const publicConversationsRouter = t.router({
     }
     const organizationId = conversation.organization_id;
     // Broadest last, so one conversation's flood only spends its own budget first.
-    if (await isPublicWidgetRateLimited([{ rule: "attachmentPerOrg", id: organizationId }])) {
+    if (
+      await isPublicWidgetRateLimited([{ rule: "attachmentPerOrg", id: organizationId }], {
+        failClosed: true,
+      })
+    ) {
       throw tooManyRequests();
     }
 

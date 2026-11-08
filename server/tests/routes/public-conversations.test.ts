@@ -1,3 +1,4 @@
+import { TRPCError } from "@trpc/server";
 import { describe, it, expect, jest, beforeEach } from "@jest/globals";
 
 /**
@@ -70,7 +71,12 @@ jest.mock("@server/services/webchat/webchat-settings.service", () => {
 });
 
 const mockRateLimited =
-  jest.fn<(checks: Array<{ rule: string; id: string }>) => Promise<boolean>>();
+  jest.fn<
+    (
+      checks: Array<{ rule: string; id: string }>,
+      options?: { failClosed?: boolean },
+    ) => Promise<boolean>
+  >();
 jest.mock("@server/services/public-widget-limits", () => ({
   PUBLIC_WIDGET_LIMITS: { maxMessageLength: 4000 },
   isPublicWidgetRateLimited: mockRateLimited,
@@ -320,10 +326,21 @@ describe("publicConversations rate limits", () => {
     await expect(callerFor({}, "198.51.100.4").create(createInput)).rejects.toMatchObject({
       code: "TOO_MANY_REQUESTS",
     });
-    expect(mockRateLimited).toHaveBeenCalledWith([
-      { rule: "createPerIp", id: "198.51.100.4" },
-      { rule: "createPerOrg", id: ORG_ID },
-    ]);
+    expect(mockRateLimited).toHaveBeenCalledWith(
+      [
+        { rule: "createPerIp", id: "198.51.100.4" },
+        { rule: "createPerOrg", id: ORG_ID },
+      ],
+      { failClosed: true },
+    );
+    expect(mockCreateConversation).not.toHaveBeenCalled();
+  });
+
+  it("create is refused as unavailable when limits cannot be checked", async () => {
+    mockRateLimited.mockRejectedValue(new TRPCError({ code: "SERVICE_UNAVAILABLE" }));
+    await expect(callerFor({}, "198.51.100.4").create(createInput)).rejects.toMatchObject({
+      code: "SERVICE_UNAVAILABLE",
+    });
     expect(mockCreateConversation).not.toHaveBeenCalled();
   });
 
@@ -382,7 +399,10 @@ describe("publicConversations.sendAttachment guards (D8-9)", () => {
       callerFor({}, "198.51.100.4").sendAttachment(attachmentInput),
     ).rejects.toMatchObject({ code: "TOO_MANY_REQUESTS" });
     expect(mockRateLimited).toHaveBeenCalledTimes(1);
-    expect(mockRateLimited).toHaveBeenCalledWith([{ rule: "attachmentPerIp", id: "198.51.100.4" }]);
+    expect(mockRateLimited).toHaveBeenCalledWith(
+      [{ rule: "attachmentPerIp", id: "198.51.100.4" }],
+      { failClosed: true },
+    );
   });
 
   it("requires a valid proof for the conversation (ownership) before anything is stored", async () => {
@@ -390,9 +410,10 @@ describe("publicConversations.sendAttachment guards (D8-9)", () => {
     await expect(callerFor().sendAttachment(attachmentInput)).rejects.toMatchObject({
       code: "UNAUTHORIZED",
     });
-    expect(mockRateLimited).not.toHaveBeenCalledWith([
-      { rule: "attachmentPerConversation", id: attachmentInput.conversationId },
-    ]);
+    expect(mockRateLimited).not.toHaveBeenCalledWith(
+      [{ rule: "attachmentPerConversation", id: attachmentInput.conversationId }],
+      { failClosed: true },
+    );
   });
 
   it("refuses types other than images and PDF", async () => {

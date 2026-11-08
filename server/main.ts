@@ -13,7 +13,7 @@ import { createLogger } from "@server/lib/logger";
 import { initTelemetry, captureException, shutdownTelemetry } from "@server/lib/telemetry";
 import { isPublicUploadPath, setPublicUploadHeaders } from "@server/services/media-url.service";
 import { bodyLimitForPath } from "@server/lib/body-limits";
-import { httpIpRateLimit } from "@server/lib/http-rate-limit";
+import { httpIpRateLimit, trpcRetryAfterMeta } from "@server/lib/http-rate-limit";
 import "reflect-metadata";
 import dotenv from "dotenv";
 
@@ -526,6 +526,7 @@ async function startServer() {
     createExpressMiddleware({
       router: v1Router,
       createContext,
+      responseMeta: trpcRetryAfterMeta,
       // Without this, every failed procedure (validation, auth, unhandled throw) is
       // returned to the client and never written to the logs, leaving production
       // incidents undiagnosable. Input is omitted -- it can carry customer data.
