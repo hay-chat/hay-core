@@ -85,8 +85,8 @@ describe("Privacy DSAR Integration Tests", () => {
     }
 
     // Reset rate limits
-    await rateLimitService.resetRateLimit(testEmail, "email");
-    await rateLimitService.resetRateLimit(testIp, "ip");
+    await rateLimitService.resetRateLimit(testEmail, "email", "privacy-request");
+    await rateLimitService.resetRateLimit(testIp, "ip", "privacy-request");
     await rateLimitService.resetRateLimit(`${testIp}:${testEmail}`, "combined");
 
     // Create test organization
@@ -266,8 +266,8 @@ describe("Privacy DSAR Integration Tests", () => {
     it("should answer a deletion request for an unknown email like any other", async () => {
       // Reset rate limits for this specific test
       const nonExistentEmail = "nonexistent@example.com";
-      await rateLimitService.resetRateLimit(nonExistentEmail, "email");
-      await rateLimitService.resetRateLimit(testIp, "ip");
+      await rateLimitService.resetRateLimit(nonExistentEmail, "email", "privacy-request");
+      await rateLimitService.resetRateLimit(testIp, "ip", "privacy-request");
       await rateLimitService.resetRateLimit(`${testIp}:${nonExistentEmail}`, "combined");
 
       const result = await privacyService.requestDeletion(nonExistentEmail, testIp, testUserAgent);
@@ -338,42 +338,54 @@ describe("Privacy DSAR Integration Tests", () => {
 
   describe("Rate Limiting", () => {
     it("should enforce IP-based rate limiting", async () => {
-      const ipLimit = await rateLimitService.checkIpRateLimit(testIp, 3, 3600);
+      const ipLimit = await rateLimitService.checkIpRateLimit(testIp, 3, 3600, {
+        scope: "privacy-request",
+      });
       expect(ipLimit.limited).toBe(false);
       expect(ipLimit.remaining).toBe(2); // First request consumed one
 
       // Make more requests
-      await rateLimitService.checkIpRateLimit(testIp, 3, 3600);
-      await rateLimitService.checkIpRateLimit(testIp, 3, 3600);
+      await rateLimitService.checkIpRateLimit(testIp, 3, 3600, { scope: "privacy-request" });
+      await rateLimitService.checkIpRateLimit(testIp, 3, 3600, { scope: "privacy-request" });
 
       // Should now be limited
-      const limitedResult = await rateLimitService.checkIpRateLimit(testIp, 3, 3600);
+      const limitedResult = await rateLimitService.checkIpRateLimit(testIp, 3, 3600, {
+        scope: "privacy-request",
+      });
       expect(limitedResult.limited).toBe(true);
       expect(limitedResult.remaining).toBe(0);
     });
 
     it("should enforce email-based rate limiting", async () => {
-      const emailLimit = await rateLimitService.checkEmailRateLimit(testEmail, 2, 86400);
+      const emailLimit = await rateLimitService.checkEmailRateLimit(testEmail, 2, 86400, {
+        scope: "privacy-request",
+      });
       expect(emailLimit.limited).toBe(false);
 
-      await rateLimitService.checkEmailRateLimit(testEmail, 2, 86400);
+      await rateLimitService.checkEmailRateLimit(testEmail, 2, 86400, { scope: "privacy-request" });
 
-      const limitedResult = await rateLimitService.checkEmailRateLimit(testEmail, 2, 86400);
+      const limitedResult = await rateLimitService.checkEmailRateLimit(testEmail, 2, 86400, {
+        scope: "privacy-request",
+      });
       expect(limitedResult.limited).toBe(true);
     });
 
     it("should reset rate limits correctly", async () => {
       // Consume limit
-      await rateLimitService.checkEmailRateLimit(testEmail, 1, 3600);
+      await rateLimitService.checkEmailRateLimit(testEmail, 1, 3600, { scope: "privacy-request" });
 
-      const limitedResult = await rateLimitService.checkEmailRateLimit(testEmail, 1, 3600);
+      const limitedResult = await rateLimitService.checkEmailRateLimit(testEmail, 1, 3600, {
+        scope: "privacy-request",
+      });
       expect(limitedResult.limited).toBe(true);
 
       // Reset
-      await rateLimitService.resetRateLimit(testEmail, "email");
+      await rateLimitService.resetRateLimit(testEmail, "email", "privacy-request");
 
       // Should work again
-      const resetResult = await rateLimitService.checkEmailRateLimit(testEmail, 1, 3600);
+      const resetResult = await rateLimitService.checkEmailRateLimit(testEmail, 1, 3600, {
+        scope: "privacy-request",
+      });
       expect(resetResult.limited).toBe(false);
     });
   });

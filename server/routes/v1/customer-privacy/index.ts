@@ -77,6 +77,7 @@ async function checkCustomerPrivacyRateLimits(
     identifierKey,
     RATE_LIMITS.IDENTIFIER_REQUESTS_PER_DAY,
     RATE_LIMITS.DAY_WINDOW_SECONDS,
+    { scope: "customer-privacy" },
   );
 
   if (identifierLimit.limited) {

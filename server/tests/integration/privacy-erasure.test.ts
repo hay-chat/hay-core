@@ -154,8 +154,8 @@ describe("privacy requests: jobs, exports and erasure", () => {
     sentEmails.length = 0;
     storedFiles.clear();
     const { rateLimitService } = await import("@server/services/rate-limit.service");
-    await rateLimitService.resetRateLimit(STAFF_EMAIL, "email");
-    await rateLimitService.resetRateLimit("10.0.0.9", "ip");
+    await rateLimitService.resetRateLimit(STAFF_EMAIL, "email", "privacy-request");
+    await rateLimitService.resetRateLimit("10.0.0.9", "ip", "privacy-request");
     await rateLimitService.resetRateLimit(`10.0.0.9:${STAFF_EMAIL}`, "combined");
 
     for (const [id, slug] of [
@@ -325,7 +325,7 @@ describe("privacy requests: jobs, exports and erasure", () => {
   it("answers a deletion request for an unknown email without sending anything", async () => {
     const unknown = "nobody-here@example.com";
     const { rateLimitService } = await import("@server/services/rate-limit.service");
-    await rateLimitService.resetRateLimit(unknown, "email");
+    await rateLimitService.resetRateLimit(unknown, "email", "privacy-request");
     await rateLimitService.resetRateLimit(`10.0.0.9:${unknown}`, "combined");
     const { requestId } = await privacyService.requestDeletion(unknown, "10.0.0.9", "UA");
     expect((await privacyService.getStatus(requestId)).status).toBe("pending_verification");

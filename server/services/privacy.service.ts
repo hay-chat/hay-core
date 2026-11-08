@@ -92,8 +92,12 @@ export class PrivacyService {
     // Defense in depth - also checked at router level
     if (!ipAddress) return;
     const { rateLimitService } = await import("./rate-limit.service");
-    const ipLimit = await rateLimitService.checkIpRateLimit(ipAddress, 10, 3600);
-    const emailLimit = await rateLimitService.checkEmailRateLimit(email, 3, 86400);
+    const ipLimit = await rateLimitService.checkIpRateLimit(ipAddress, 10, 3600, {
+      scope: "privacy-request",
+    });
+    const emailLimit = await rateLimitService.checkEmailRateLimit(email, 3, 86400, {
+      scope: "privacy-request",
+    });
     const combinedLimit = await rateLimitService.checkCombinedRateLimit(ipAddress, email, 2, 86400);
     if (ipLimit.limited || emailLimit.limited || combinedLimit.limited) {
       throw new Error("Rate limit exceeded. Please try again later.");
