@@ -1,3 +1,4 @@
+import { rateLimitMiddleware, RateLimits } from "@server/trpc/middleware/rate-limit";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { t, scopedProcedure } from "@server/trpc";
@@ -100,6 +101,7 @@ export const setupRouter = t.router({
    * retries a request whose earlier attempt found no suitable tool or failed.
    */
   generatePlaybooks: scopedProcedure(RESOURCES.PLAYBOOKS, ACTIONS.CREATE)
+    .use(rateLimitMiddleware(RateLimits.MODERATE))
     .input(z.object({ questionIds: z.array(z.string().min(1).max(255)).max(30).optional() }))
     .mutation(({ ctx, input }): Promise<SetupBoard> =>
       setup.generatePlaybooks(orgId(ctx), input.questionIds),

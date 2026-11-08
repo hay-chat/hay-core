@@ -166,6 +166,22 @@ export const scopedProcedure = (resource: string, action: string) => {
 };
 
 /**
+ * For server-to-server endpoints: an API key holding the scope, or a dashboard
+ * user with the organization-wide wildcard (owner/admin).
+ */
+export const serverToServerProcedure = (resource: string, action: string) => {
+  return scopedProcedure(resource, action).use(({ ctx, next }) => {
+    if (ctx.user.authMethod !== "apikey" && !ctx.user.hasScope("*", "*")) {
+      throw new TRPCError({
+        code: "FORBIDDEN",
+        message: "This action requires an API key or an administrator",
+      });
+    }
+    return next();
+  });
+};
+
+/**
  * Public procedure - no authentication required
  */
 export const publicProcedure = t.procedure;

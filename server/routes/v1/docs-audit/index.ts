@@ -1,3 +1,4 @@
+import { rateLimitMiddleware, RateLimits } from "@server/trpc/middleware/rate-limit";
 import { t, scopedProcedure } from "@server/trpc";
 import { z } from "zod";
 import { RESOURCES, ACTIONS } from "@server/types/scopes";
@@ -13,7 +14,9 @@ export const docsAuditRouter = t.router({
    * Start a documentation quality audit for the current organization.
    * Creates a job and runs the analysis in the background.
    */
-  analyze: scopedProcedure(RESOURCES.DOCUMENTS, ACTIONS.READ).mutation(async ({ ctx }) => {
+  analyze: scopedProcedure(RESOURCES.DOCUMENTS, ACTIONS.UPDATE)
+    .use(rateLimitMiddleware(RateLimits.MODERATE))
+    .mutation(async ({ ctx }) => {
     const organizationId = ctx.organizationId!;
 
     // Create a job to track the audit

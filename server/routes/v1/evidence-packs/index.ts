@@ -64,7 +64,7 @@ export const evidencePacksRouter = t.router({
     }),
 
   /** Build the pack for one order, or for one conversation when it names no order. */
-  generate: scopedProcedure(RESOURCES.CONVERSATIONS, ACTIONS.READ)
+  generate: scopedProcedure(RESOURCES.CONVERSATIONS, ACTIONS.EXPORT)
     .input(
       z
         .object({

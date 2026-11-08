@@ -1,3 +1,4 @@
+import { rateLimitMiddleware, RateLimits } from "@server/trpc/middleware/rate-limit";
 import { t, scopedProcedure } from "@server/trpc";
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
@@ -36,6 +37,7 @@ const searchInput = z.object({
 export const embeddingsRouter = t.router({
   // Add document embeddings
   add: scopedProcedure(RESOURCES.DOCUMENTS, ACTIONS.UPDATE)
+    .use(rateLimitMiddleware(RateLimits.MODERATE))
     .input(embedInput)
     .mutation(async ({ ctx, input }) => {
       const organizationId = ctx.organizationId;

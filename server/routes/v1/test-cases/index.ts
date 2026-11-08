@@ -1,3 +1,4 @@
+import { rateLimitMiddleware, RateLimits } from "@server/trpc/middleware/rate-limit";
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { t, scopedProcedure } from "@server/trpc";
@@ -82,6 +83,7 @@ export const testCasesRouter = t.router({
 
   /** Run a playbook's cases against its draft (the publish dialog does this). */
   startRegression: scopedProcedure(RESOURCES.PLAYBOOKS, ACTIONS.UPDATE)
+    .use(rateLimitMiddleware(RateLimits.MODERATE))
     .input(
       z.object({
         playbookId: z.string().uuid().optional(),

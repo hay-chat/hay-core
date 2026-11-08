@@ -455,6 +455,7 @@ const scopeGroups = {
   "Conversations & Messages": [
     { label: "Read Conversations", value: "conversations:read" },
     { label: "Write Conversations", value: "conversations:write" },
+    { label: "Export Conversations", value: "conversations:export" },
     { label: "Read Messages", value: "messages:read" },
     { label: "Write Messages", value: "messages:write" },
   ],

@@ -5,7 +5,12 @@ import { TRPCError } from "@trpc/server";
 import { createListProcedure } from "@server/trpc/procedures/list";
 import { CustomerRepository } from "@server/repositories/customer.repository";
 import { RESOURCES, ACTIONS } from "@server/types/scopes";
-import { boundedJsonRecord } from "@server/lib/validation/json-record";
+import {
+  boundedJsonRecord,
+  fitsInBytes,
+  publicContextRecord,
+} from "@server/lib/validation/json-record";
+import { serverToServerProcedure } from "@server/trpc/middleware/auth";
 import { identifierSchema, includeSchema, selectSchema } from "@server/types/list-input";
 import { createLogger } from "@server/lib/logger";
 import { auditLogService } from "@server/services/audit-log.service";
@@ -308,8 +313,13 @@ export const customersRouter = t.router({
 
   // Merge persistent public context into a customer by external ID (server-to-server, API key auth)
   // Context is stored in customer.external_metadata and injected into the LLM prompt on every conversation
-  addContext: scopedProcedure(RESOURCES.CUSTOMERS, ACTIONS.UPDATE)
-    .input(z.object({ externalId: z.string(), context: z.record(z.string(), z.any()) }))
+  addContext: serverToServerProcedure(RESOURCES.CUSTOMERS, ACTIONS.UPDATE)
+    .input(
+      z.object({
+        externalId: z.string(),
+        context: publicContextRecord(CUSTOMER_EXTERNAL_METADATA_MAX_BYTES),
+      }),
+    )
     .mutation(async ({ ctx, input }) => {
       const customer = await customerRepository.findByExternalId(
         input.externalId,
@@ -321,6 +331,9 @@ export const customersRouter = t.router({
       }
 
       const merged = { ...(customer.external_metadata ?? {}), ...input.context };
+      if (!fitsInBytes(merged, CUSTOMER_EXTERNAL_METADATA_MAX_BYTES)) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Customer context is too large" });
+      }
       await customerRepository.update(customer.id, ctx.organizationId!, {
         external_metadata: merged,
       });

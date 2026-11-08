@@ -4,6 +4,7 @@ import { SourceService } from "../../../services/source.service";
 import { SourceCategory } from "../../../types/source.types";
 import { TRPCError } from "@trpc/server";
 import { RESOURCES, ACTIONS } from "@server/types/scopes";
+import { internalProcedure } from "@server/trpc/middleware/internal";
 
 const sourceService = new SourceService();
 
@@ -45,8 +46,8 @@ export const sourcesRouter = t.router({
       return sources;
     }),
 
-  // Future: for plugin system to register new sources
-  register: scopedProcedure(RESOURCES.SOURCES, ACTIONS.CREATE)
+  // Sources are a global table, so changing them is an operator action.
+  register: internalProcedure
     .input(registerSourceSchema)
     .mutation(async ({ input }) => {
       try {
@@ -60,7 +61,7 @@ export const sourcesRouter = t.router({
       }
     }),
 
-  deactivate: scopedProcedure(RESOURCES.SOURCES, ACTIONS.UPDATE)
+  deactivate: internalProcedure
     .input(z.object({ id: z.string() }))
     .mutation(async ({ input }) => {
       try {
@@ -82,7 +83,7 @@ export const sourcesRouter = t.router({
       }
     }),
 
-  activate: scopedProcedure(RESOURCES.SOURCES, ACTIONS.UPDATE)
+  activate: internalProcedure
     .input(z.object({ id: z.string() }))
     .mutation(async ({ input }) => {
       const success = await sourceService.activateSource(input.id);

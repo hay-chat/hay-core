@@ -22,6 +22,7 @@ export default defineNuxtPlugin(() => {
     "/settings/general": ["owner", "admin"],
     "/settings/billing": ["owner", "admin"],
     "/settings/privacy": ["owner", "admin"],
+    "/settings/customer-privacy": ["owner", "admin"],
     "/settings/webchat": ["owner", "admin"],
     "/settings/business-hours": ["owner", "admin"],
     "/settings/assistant": ["owner", "admin"],
