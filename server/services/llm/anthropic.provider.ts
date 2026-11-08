@@ -111,6 +111,8 @@ export interface AnthropicProviderOptions {
   apiKey: string;
   baseURL?: string;
   id?: string;
+  /** Replaces the SDK's fetch; set when the base URL comes from a tenant. */
+  fetch?: typeof fetch;
 }
 
 export class AnthropicChatProvider implements ChatProvider {
@@ -120,7 +122,7 @@ export class AnthropicChatProvider implements ChatProvider {
 
   constructor(opts: AnthropicProviderOptions) {
     this.id = opts.id ?? "anthropic";
-    this.client = new Anthropic({ apiKey: opts.apiKey, baseURL: opts.baseURL });
+    this.client = new Anthropic({ apiKey: opts.apiKey, baseURL: opts.baseURL, fetch: opts.fetch });
   }
 
   private buildParams(req: ChatRequest): Anthropic.MessageCreateParamsNonStreaming {

@@ -91,6 +91,8 @@ export interface OpenAICompatibleProviderOptions {
   embeddingDimensions?: number;
   /** Stable id echoed onto every result. */
   id?: string;
+  /** Replaces the SDK's fetch; set when the base URL comes from a tenant. */
+  fetch?: typeof fetch;
 }
 
 function mapFinishReason(reason: string | null | undefined): FinishReason {
@@ -123,7 +125,7 @@ export class OpenAICompatibleProvider implements ChatProvider, EmbeddingProvider
     this.id = opts.id ?? "openai-compatible";
     this.capabilities = opts.capabilities ?? OPENAI_CAPABILITIES;
     this.dimensions = opts.embeddingDimensions ?? 1536;
-    this.client = new OpenAI({ apiKey: opts.apiKey, baseURL: opts.baseURL });
+    this.client = new OpenAI({ apiKey: opts.apiKey, baseURL: opts.baseURL, fetch: opts.fetch });
   }
 
   /**

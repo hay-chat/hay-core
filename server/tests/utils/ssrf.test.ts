@@ -13,6 +13,7 @@ import {
   validateUrlForSSRF,
   ssrfSafeLookup,
   safeFetch,
+  ssrfPinnedFetch,
   SsrfBlockedError,
 } from "../../utils/ssrf";
 
@@ -243,5 +244,23 @@ describe("safeFetch", () => {
     expect(init).toMatchObject({ method: "POST", redirect: "manual" });
     expect(init.signal).toBeInstanceOf(AbortSignal);
     expect(init.dispatcher).toBeDefined();
+  });
+});
+
+describe("ssrfPinnedFetch", () => {
+  it("refuses a private address before connecting", async () => {
+    const spy = jest.spyOn(globalThis, "fetch");
+    await expect(ssrfPinnedFetch("https://10.0.0.5/v1/chat")).rejects.toThrow(SsrfBlockedError);
+    expect(spy).not.toHaveBeenCalled();
+    spy.mockRestore();
+  });
+
+  it("pins the connection and does not follow redirects", async () => {
+    const spy = jest.spyOn(globalThis, "fetch").mockResolvedValue(new Response("ok"));
+    await ssrfPinnedFetch(`https://${PUBLIC_V4}/v1/chat`, { method: "POST" });
+    const init = spy.mock.calls[0][1] as RequestInit & { dispatcher?: unknown };
+    expect(init).toMatchObject({ method: "POST", redirect: "manual" });
+    expect(init.dispatcher).toBeDefined();
+    spy.mockRestore();
   });
 });

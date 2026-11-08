@@ -25,6 +25,7 @@ import { config } from "@server/config/env";
 import { createLogger } from "@server/lib/logger";
 import { decryptValue } from "@server/lib/auth/utils/encryption";
 import { organizationRepository } from "@server/repositories/organization.repository";
+import { ssrfPinnedFetch } from "@server/utils/ssrf";
 import {
   OpenAICompatibleProvider,
   OPENAI_COMPATIBLE_CAPABILITIES,
@@ -32,6 +33,7 @@ import {
 import { AnthropicChatProvider } from "./anthropic.provider";
 import { GeminiChatProvider } from "./gemini.provider";
 import { EU_TIERS, PROVIDER_TIER_DEFAULTS } from "./tier-maps";
+import { assertOrgChatEndpoint } from "./org-chat-endpoint";
 import {
   AiRegionUnavailableError,
   isEuRegionConfigured,
@@ -214,7 +216,9 @@ class LLMProviderFactory {
 
   private buildChatProvider(llm: OrgLlmConfig): ChatProvider {
     const { provider, apiKeyEncrypted, baseUrl, vendor } = llm.chat;
-    // BYO key decrypted only here; falls back to the env/Hay key (Auto/OSS).
+    assertOrgChatEndpoint({ provider, baseUrl, hasOwnKey: !!apiKeyEncrypted });
+    const tenantFetch = baseUrl ? ssrfPinnedFetch : undefined;
+    // BYO key decrypted only here; the env/Hay key only reaches the managed endpoint.
     const apiKey = apiKeyEncrypted ? decryptValue(apiKeyEncrypted) : config.openai.apiKey;
 
     switch (provider) {
@@ -226,9 +230,10 @@ class LLMProviderFactory {
           // base URL talks to api.openai.com.
           baseURL: baseUrl || (apiKeyEncrypted ? undefined : config.openai.baseUrl || undefined),
           capabilities: OPENAI_COMPATIBLE_CAPABILITIES[vendor ?? "openai"],
+          fetch: tenantFetch,
         });
       case "anthropic":
-        return new AnthropicChatProvider({ apiKey, baseURL: baseUrl });
+        return new AnthropicChatProvider({ apiKey, baseURL: baseUrl, fetch: tenantFetch });
       case "gemini":
         return new GeminiChatProvider({ apiKey });
       default:

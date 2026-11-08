@@ -33,6 +33,7 @@ jest.mock("@server/lib/logger", () => ({
 }));
 
 import { llmProviderFactory } from "../../services/llm/llm-provider.factory";
+import { ssrfPinnedFetch } from "../../utils/ssrf";
 
 function orgWithLlm(llm: OrgLlmConfig) {
   return { settings: { llm } };
@@ -84,6 +85,60 @@ describe("LLMProviderFactory.forOrganization", () => {
         baseURL: "https://api.mistral.ai/v1",
       }),
     );
+  });
+
+  it("connects to an org's base URL through the address-checking fetch", async () => {
+    findById.mockResolvedValue(
+      orgWithLlm({
+        chat: {
+          provider: "openai-compatible",
+          apiKeyEncrypted: "enc-key",
+          baseUrl: "https://llm.example.com/v1",
+          tiers: { easy: "e", medium: "m", hard: "h" },
+        },
+        embedding: { provider: "openai-compatible", model: "text-embedding-3-small" },
+      }),
+    );
+    await llmProviderFactory.forOrganization("org-pinned");
+    expect(openaiCtor).toHaveBeenCalledWith(
+      expect.objectContaining({
+        baseURL: "https://llm.example.com/v1",
+        fetch: ssrfPinnedFetch,
+      }),
+    );
+  });
+
+  it.each([
+    ["openai-compatible", "https://llm.example.com/v1"],
+    ["anthropic", "https://llm.example.com"],
+    ["anthropic", undefined],
+    ["gemini", undefined],
+  ] as const)("never builds %s (%s) on the managed key", async (provider, baseUrl) => {
+    findById.mockResolvedValue(
+      orgWithLlm({
+        chat: { provider, baseUrl, tiers: { easy: "e", medium: "m", hard: "h" } },
+        embedding: { provider: "openai-compatible", model: "text-embedding-3-small" },
+      }),
+    );
+    await expect(llmProviderFactory.forOrganization(`org-${provider}-nokey`)).rejects.toThrow(
+      /own API key/,
+    );
+    expect(openaiCtor).not.toHaveBeenCalledWith(expect.objectContaining({ baseURL: baseUrl }));
+  });
+
+  it("refuses a stored non-https base URL", async () => {
+    findById.mockResolvedValue(
+      orgWithLlm({
+        chat: {
+          provider: "openai-compatible",
+          apiKeyEncrypted: "enc-key",
+          baseUrl: "http://llm.example.com/v1",
+          tiers: { easy: "e", medium: "m", hard: "h" },
+        },
+        embedding: { provider: "openai-compatible", model: "text-embedding-3-small" },
+      }),
+    );
+    await expect(llmProviderFactory.forOrganization("org-http")).rejects.toThrow(/https/);
   });
 
   it("caches per org and re-reads after invalidate", async () => {

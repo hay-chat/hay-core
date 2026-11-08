@@ -28,6 +28,11 @@ import { llmProviderFactory } from "@server/services/llm/llm-provider.factory";
 import { encryptValue } from "@server/lib/auth/utils/encryption";
 import type { OrgLlmConfig } from "@server/services/llm/provider.types";
 import {
+  assertOrgChatEndpoint,
+  OrgChatEndpointError,
+} from "@server/services/llm/org-chat-endpoint";
+import { SsrfBlockedError, validateUrlForSSRF } from "@server/utils/ssrf";
+import {
   AI_REGIONS,
   describeAiProvider,
   isEuRegionConfigured,
@@ -366,18 +371,48 @@ export const organizationsRouter = t.router({
       }
 
       const existing = organization.settings?.llm;
+      const baseUrl = input.chat.baseUrl || undefined;
+      const newApiKey = input.chat.apiKey?.trim();
       let apiKeyEncrypted = existing?.chat.apiKeyEncrypted;
-      if (input.chat.apiKey && input.chat.apiKey.trim()) {
-        apiKeyEncrypted = encryptValue(input.chat.apiKey.trim());
+      if (newApiKey) {
+        apiKeyEncrypted = encryptValue(newApiKey);
       } else if (input.chat.clearApiKey) {
         apiKeyEncrypted = undefined;
+      }
+
+      // A stored key is only ever sent to the host it was entered for.
+      if (baseUrl && apiKeyEncrypted && !newApiKey && baseUrl !== existing?.chat.baseUrl) {
+        throw new TRPCError({
+          code: "PRECONDITION_FAILED",
+          message: "Enter the API key again to use it with a new base URL",
+        });
+      }
+
+      try {
+        assertOrgChatEndpoint({
+          provider: input.chat.provider,
+          baseUrl,
+          hasOwnKey: !!apiKeyEncrypted,
+        });
+        if (baseUrl) await validateUrlForSSRF(baseUrl);
+      } catch (error) {
+        if (error instanceof OrgChatEndpointError) {
+          throw new TRPCError({ code: "PRECONDITION_FAILED", message: error.message });
+        }
+        if (error instanceof SsrfBlockedError) {
+          throw new TRPCError({
+            code: "PRECONDITION_FAILED",
+            message: "The base URL must be a public internet address",
+          });
+        }
+        throw error;
       }
 
       const llm: OrgLlmConfig = {
         chat: {
           provider: input.chat.provider,
           vendor: input.chat.provider === "openai-compatible" ? input.chat.vendor : undefined,
-          baseUrl: input.chat.baseUrl || undefined,
+          baseUrl,
           apiKeyEncrypted,
           tiers: input.chat.tiers,
         },
