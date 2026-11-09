@@ -320,14 +320,27 @@ export class MfaService {
     }
     await this.assertFactorMayBeRemoved(user.id, webauthn > 0);
     await this.verify(user, code, request);
-    if (webauthn > 0) {
-      await this.repository.update(
-        { userId: user.id },
-        { secret: null, confirmedAt: null, lastUsedStep: null },
-      );
-    } else {
-      await this.repository.delete({ userId: user.id });
-    }
+    await AppDataSource.transaction(async (manager) => {
+      // The lock removing a key also takes, so the two cannot each count on the other factor.
+      const repository = manager.getRepository(UserMfa);
+      await repository.findOne({
+        where: { userId: user.id },
+        lock: { mode: "pessimistic_write" },
+      });
+      const current = await this.factors(user.id);
+      if (!current.totp) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "No authenticator app is set up" });
+      }
+      await this.assertFactorMayBeRemoved(user.id, current.webauthn > 0);
+      if (current.webauthn > 0) {
+        await repository.update(
+          { userId: user.id },
+          { secret: null, confirmedAt: null, lastUsedStep: null },
+        );
+      } else {
+        await repository.delete({ userId: user.id });
+      }
+    });
     await auditLogService.record({
       userId: user.id,
       action: "mfa.disable",
