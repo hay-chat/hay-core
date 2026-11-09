@@ -6,6 +6,7 @@ sources:
   - hay-core dashboard/composables/useSettingsNav.ts, i18n/locales/en (assistant.json escalation, actions.json aiActions, settings.json users/businessHours)
   - hay-website src/refund-policy.md, src/pricing/en.locale.js (billing page, Usage)
   - hay-core CHANGELOG.md 0.1.0 (business hours, handoff)
+  - hay-docs user-guide settings.md (claude/ui-audit): two-factor, Active Sessions
 todo:
   - TODO(Roger) Where exactly an owner changes payment method or sees invoices is only documented as the billing page at hay.chat/billing and the Stripe customer portal ("Manage or cancel plan"). The assistant sends people there and offers the team.
 ---
@@ -21,7 +22,9 @@ todo:
 Settings > Assistant > **Actions**. Choose which actions must wait for a person (refunds, cancellations, discounts and coupons, exchanges, returns, address changes and others). Optionally set an amount under which refunds and discounts run without approval, ask the customer to confirm first, and choose which roles can approve. A person approves or declines from the conversation or the Inbox. The Compliance > Action log lists what ran.
 
 ## Team and roles
-Settings > Workspace > **Users** (Team Members) > **Invite Member**: enter the email and a role (owner, admin, member, viewer and others are offered). The owner can always approve actions. API access: Settings > Developers > API Tokens > Create Token (shown once).
+Settings > Workspace > **Users** (Team Members) > **Invite Member**: enter the email and a role (owner, admin, member, viewer and others are offered). The owner can always approve actions. **Two-factor authentication:** each person sets it up under Settings > My Profile > Two-factor authentication: click **Set up two-factor**, confirm your password, add the setup key to an authenticator app and enter the code. Save the recovery codes (each works once and they are not shown again). Later you can get **New recovery codes** or **Turn off**. An owner can switch on **Require two-factor authentication** for the team on the Users page (Two-factor authentication for your team); members who have not set it up are asked at their next sign-in. **Active Sessions** in My Profile lists signed-in devices (a session ends 30 days after sign-in): **Sign out** one device or **Sign out all other devices**.
+
+API access: Settings > Developers > API Tokens > Create Token (shown once).
 
 ## Usage and billing
 - **See your resolutions:** Settings > Billing & Usage > Usage lists every billable resolution with its transcript, exportable as CSV, and lets you exclude one with a reason.

@@ -8,7 +8,7 @@ sources:
   - hay-website src/how-it-works/en.locale.js (@ key, plain-language playbooks)
   - hay-docs user-guide quick-start and playbooks (claude/ui-audit branch)
 todo:
-  - TODO(Roger) The Playbook editor changed on master (duplicate, archive, publish flow). Only steps present in both versions are described.
+  - TODO(Roger) Duplicate, archive and the Publish flow in the playbook editor are left out until confirmed against production.
 ---
 # Add knowledge and write a playbook
 

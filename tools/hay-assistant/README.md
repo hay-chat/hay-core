@@ -35,7 +35,7 @@ Kept as knowledge only, covered inside playbook 4: connect a store or channel, i
 
 `knowledge/`: why Hay, comparison, how it works, plans and pricing, privacy/GDPR/EU, self-hosting and licence, integrations and channels, three dashboard how-tos (get started, connect and widget; knowledge and playbooks; handoff, approvals, team, billing), building a plugin, company and contact. Titles start with "Hay.chat" so they do not collide with existing documents in the org.
 
-Dashboard how-tos use the menu names of the sidebar (Settings > Assistant, Knowledge > Documents, Integrations > Marketplace, ...), checked against tag v0.1.0 and master. Anything that exists only on master (the Set up board, page tools, two-factor, session list) is left out or described generically, because eu.hay.chat can run older code.
+Dashboard how-tos use the menu names of the sidebar (Settings > Assistant, Knowledge > Documents, Integrations > Marketplace, ...), checked against master and the docs audit (`hay-docs-ui-audit` user-guide). Production already has the Set up board, two-factor and Active Sessions (confirmed by screenshots), so the how-tos use the Set up board as the main path for new customers and cover 2FA. Page tools (Settings > Channels > Webchat) are not confirmed on production, so they are left out.
 
 ## Load it
 
@@ -64,4 +64,5 @@ Tests: `cd tools/hay-assistant && ../../node_modules/.bin/vitest run`.
 3. Settings > Channels > Webchat: Allowed Domains include hay.chat (the dashboard host is exempt); optionally enable page tools so the in-app assistant can open pages.
 4. Dashboard embed: set `SUPPORT_WIDGET_ORG_ID=<org-id>` for the dashboard (build or runtime env; `NUXT_PUBLIC_SUPPORT_WIDGET_ORG_ID` also works at runtime). Unset means no widget.
 5. Resolve or consciously accept the `TODO(Roger)` items.
-6. Test with `hay chat send --org <id> "Why is Hay better than Intercom Fin?" --logs` and the questions in the playbook triggers.
+6. Founder Sprint is deliberately not in the content: its name and link are unconfirmed. To add it back, restore a section to `knowledge/04-plans-and-pricing.md` (terms are on hay.chat/founder-sprint/: 10 stores, 90 days of weekly founder help, 50% off) and a line to the pricing playbook.
+7. Test with `hay chat send --org <id> "Why is Hay better than Intercom Fin?" --logs` and the questions in the playbook triggers.
