@@ -1,7 +1,112 @@
 {
   "name": "Stripe",
   "description": "Conecte sua conta Stripe para gerenciar pagamentos, clientes, assinaturas e mais",
-  "tools": {},
+  "tools": {
+    "get_stripe_account_info": {
+      "label": "Ver informações da conta",
+      "description": "Mostra os dados da conta Stripe conectada"
+    },
+    "retrieve_balance": {
+      "label": "Ver saldo",
+      "description": "Mostra o saldo atual da conta Stripe"
+    },
+    "create_customer": {
+      "label": "Criar cliente",
+      "description": "Cria um cliente no Stripe"
+    },
+    "list_customers": {
+      "label": "Buscar clientes",
+      "description": "Lista clientes, com filtro opcional por e-mail"
+    },
+    "create_product": {
+      "label": "Criar produto",
+      "description": "Cria um produto no Stripe"
+    },
+    "list_products": {
+      "label": "Listar produtos",
+      "description": "Lista os produtos da conta"
+    },
+    "create_price": {
+      "label": "Criar preço",
+      "description": "Cria um preço para um produto"
+    },
+    "list_prices": {
+      "label": "Listar preços",
+      "description": "Lista os preços dos produtos"
+    },
+    "list_payment_intents": {
+      "label": "Buscar pagamentos",
+      "description": "Lista pagamentos, com filtro opcional por cliente"
+    },
+    "create_payment_link": {
+      "label": "Criar link de pagamento",
+      "description": "Cria um link para o cliente pagar"
+    },
+    "create_refund": {
+      "label": "Reembolsar pagamento",
+      "description": "Reembolsa um pagamento, total ou parcialmente"
+    },
+    "create_invoice": {
+      "label": "Criar fatura",
+      "description": "Cria uma fatura em rascunho para um cliente"
+    },
+    "create_invoice_item": {
+      "label": "Adicionar item à fatura",
+      "description": "Adiciona um item a uma fatura em rascunho"
+    },
+    "finalize_invoice": {
+      "label": "Finalizar fatura",
+      "description": "Finaliza uma fatura em rascunho para que possa ser paga"
+    },
+    "list_invoices": {
+      "label": "Buscar faturas",
+      "description": "Lista faturas, com filtro opcional por cliente"
+    },
+    "list_subscriptions": {
+      "label": "Buscar assinaturas",
+      "description": "Lista assinaturas, com filtro opcional por cliente"
+    },
+    "update_subscription": {
+      "label": "Alterar assinatura",
+      "description": "Altera a assinatura de um cliente"
+    },
+    "cancel_subscription": {
+      "label": "Cancelar assinatura",
+      "description": "Cancela a assinatura de um cliente"
+    },
+    "create_coupon": {
+      "label": "Criar cupom",
+      "description": "Cria um cupom de desconto"
+    },
+    "list_coupons": {
+      "label": "Listar cupons",
+      "description": "Lista os cupons da conta"
+    },
+    "list_disputes": {
+      "label": "Buscar disputas",
+      "description": "Lista disputas de pagamento"
+    },
+    "update_dispute": {
+      "label": "Responder disputa",
+      "description": "Envia evidências para uma disputa de pagamento"
+    },
+    "search_stripe_resources": {
+      "label": "Buscar no Stripe",
+      "description": "Busca clientes, pagamentos, faturas e mais"
+    },
+    "fetch_stripe_resources": {
+      "label": "Ver registro do Stripe",
+      "description": "Mostra um registro do Stripe pelo ID"
+    },
+    "search_stripe_documentation": {
+      "label": "Buscar na documentação do Stripe",
+      "description": "Busca na documentação do Stripe"
+    },
+    "stripe_api_read": {
+      "label": "Consultar Stripe",
+      "description": "Lê dados da API do Stripe"
+    }
+  },
   "config": {
     "apiKey": {
       "label": "Chave da API",
