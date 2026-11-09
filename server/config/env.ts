@@ -347,6 +347,15 @@ export const config = {
     host: process.env.POSTHOG_HOST || "https://eu.i.posthog.com",
   },
 
+  // SameSite of the dashboard's refresh-token cookie. Keep "strict" when the
+  // dashboard and API share a site (app.example.com + api.example.com); "none"
+  // is only for a dashboard on a different registrable domain and needs HTTPS.
+  authCookie: {
+    sameSite: (["strict", "lax", "none"].includes(process.env.AUTH_COOKIE_SAME_SITE ?? "")
+      ? process.env.AUTH_COOKIE_SAME_SITE
+      : "strict") as "strict" | "lax" | "none",
+  },
+
   // Server-to-server secret for the `internal.*` tRPC procedures (used by an
   // external operator, e.g. a hosted-plan backoffice, to suspend organizations).
   // Empty disables those procedures entirely — the default for self-hosting.

@@ -171,6 +171,7 @@
 </template>
 
 <script setup lang="ts">
+import { ensureFreshAccessToken } from "@/utils/api";
 import {
   Package,
   CheckCircle,
@@ -279,6 +280,7 @@ const deletePlugin = async (pluginId: string) => {
 
   deletingPlugin.value = pluginId;
   try {
+    await ensureFreshAccessToken();
     const response = await fetch(getApiUrl(`/v1/plugins/${encodeURIComponent(pluginId)}`), {
       method: "DELETE",
       headers: {

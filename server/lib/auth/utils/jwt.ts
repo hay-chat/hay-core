@@ -10,12 +10,16 @@ export const ACCESS_TOKEN_TTL_SECONDS = parseExpiresIn(authConfig.jwt.expiresIn)
  * Sign a short-lived access token. Refresh tokens are opaque and owned by
  * auth-session.service.ts.
  */
-export function generateAccessToken(user: Pick<User, "id" | "email" | "tokenVersion">): string {
+export function generateAccessToken(
+  user: Pick<User, "id" | "email" | "tokenVersion">,
+  sessionId: string,
+): string {
   const payload: JWTPayload = {
     userId: user.id,
     email: user.email,
     type: "access",
     tokenVersion: user.tokenVersion ?? 0,
+    sid: sessionId,
   };
 
   return jwt.sign(payload, authConfig.jwt.secret, {

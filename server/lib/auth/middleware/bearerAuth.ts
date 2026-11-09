@@ -71,7 +71,7 @@ export async function authenticateBearerAuth(authHeader?: string): Promise<AuthU
 
   // Create AuthUser instance with JWT metadata
   const authUser = new AuthUser(user, "jwt", {
-    sessionId: `jwt_${payload.iat}_${payload.userId}`,
+    sessionId: payload.sid,
   });
 
   return authUser;

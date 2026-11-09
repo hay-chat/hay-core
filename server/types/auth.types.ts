@@ -5,6 +5,8 @@ export interface JWTPayload {
   email: string;
   type?: "access" | "refresh";
   tokenVersion?: number;
+  /** The session this access token was issued for. */
+  sid?: string;
   iat?: number;
   exp?: number;
 }

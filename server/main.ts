@@ -520,7 +520,9 @@ async function startServer() {
   const mediaRouter = await import("@server/routes/v1/media/index");
   server.use("/v1/media", mediaRouter.default);
 
+  const { noStoreOnAuthRoutes } = await import("@server/lib/auth/session-cookie");
   const { v1Router } = await import("@server/routes/v1");
+  server.use("/v1", noStoreOnAuthRoutes);
   server.use(
     "/v1",
     createExpressMiddleware({

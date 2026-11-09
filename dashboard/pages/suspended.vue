@@ -56,7 +56,7 @@ import { Lock } from "lucide-vue-next";
 import { useI18n } from "vue-i18n";
 import { useUserStore, type User } from "@/stores/user";
 import { useAuthStore } from "@/stores/auth";
-import { Hay, HayAuthApi } from "@/utils/api";
+import { Hay } from "@/utils/api";
 import { useExternalLink } from "@/composables/useExternalLink";
 
 definePageMeta({
@@ -105,7 +105,7 @@ const checking = ref(false);
 const checkAgain = async () => {
   checking.value = true;
   try {
-    const user = await HayAuthApi.auth.me.query();
+    const user = await Hay.auth.me.query();
     userStore.setUser(user as User);
     if (!userStore.isSuspended) {
       window.location.href = "/";

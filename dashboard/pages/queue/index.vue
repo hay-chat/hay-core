@@ -432,6 +432,7 @@ import {
   X,
   XCircle,
 } from "lucide-vue-next";
+import { ensureFreshAccessToken } from "@/utils/api";
 import { createAuthenticatedWebSocket, parseWebSocketMessage } from "@/utils/websocket";
 import type { Job } from "~/types/job";
 
@@ -557,7 +558,13 @@ const setupWebSocket = () => {
   let reconnectTimeout: ReturnType<typeof setTimeout> | null = null;
   let pollInterval: ReturnType<typeof setInterval> | null = null;
 
-  const connect = () => {
+  let unmounted = false;
+
+  const connect = async () => {
+    // The access token is memory only: none yet right after a page load.
+    await ensureFreshAccessToken().catch(() => undefined);
+    if (unmounted) return;
+
     // Try to establish WebSocket connection
     ws = createAuthenticatedWebSocket();
 
@@ -628,6 +635,7 @@ const setupWebSocket = () => {
 
   // Cleanup on unmount
   onUnmounted(() => {
+    unmounted = true;
     ws?.close();
     if (reconnectTimeout) {
       clearTimeout(reconnectTimeout);

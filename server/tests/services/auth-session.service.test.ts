@@ -1,15 +1,25 @@
 import "reflect-metadata";
-import { describe, it, expect, beforeAll, afterAll, beforeEach, jest } from "@jest/globals";
+import {
+  describe,
+  it,
+  expect,
+  beforeAll,
+  afterAll,
+  beforeEach,
+  afterEach,
+  jest,
+} from "@jest/globals";
 import * as jwt from "jsonwebtoken";
 import { AppDataSource } from "@server/database/data-source";
 import { User } from "@server/entities/user.entity";
 import { Session } from "@server/entities/session.entity";
 import { authConfig } from "@server/config/auth.config";
+import { config } from "@server/config/env";
 import {
   authSessionService,
   RefreshRejectedError,
   REFRESH_REUSE_GRACE_MS,
-  SESSION_IDLE_TIMEOUT_MS,
+  SESSION_ABSOLUTE_LIFETIME_MS,
 } from "@server/services/auth-session.service";
 import { verifyToken } from "@server/lib/auth/utils/jwt";
 import { authRouter } from "@server/routes/v1/auth";
@@ -19,7 +29,7 @@ import type { Context } from "@server/trpc/context";
  * DB-backed: rotation correctness lives in row locking and the
  * generation/rotated_at state, which a mock would only restate.
  */
-describe("auth sessions: rotating, sliding refresh tokens (D11-3)", () => {
+describe("auth sessions: rotating refresh tokens (D11-3)", () => {
   const userId = "d1130000-0000-4000-8000-0000000000aa";
   let user: User;
 
@@ -73,7 +83,7 @@ describe("auth sessions: rotating, sliding refresh tokens (D11-3)", () => {
     }
   });
 
-  it("issues an opaque refresh token backed by a 90-day session", async () => {
+  it("issues an opaque refresh token backed by a 30-day session", async () => {
     const tokens = await authSessionService.createSession(user, {
       ipAddress: "203.0.113.7",
       userAgent: "jest",
@@ -87,7 +97,7 @@ describe("auth sessions: rotating, sliding refresh tokens (D11-3)", () => {
     expect(session.generation).toBe(0);
     expect(session.ipAddress).toBe("203.0.113.7");
     expect(
-      Math.abs(session.expiresAt.getTime() - (Date.now() + SESSION_IDLE_TIMEOUT_MS)),
+      Math.abs(session.expiresAt.getTime() - (Date.now() + SESSION_ABSOLUTE_LIFETIME_MS)),
     ).toBeLessThan(60_000);
   });
 
@@ -102,20 +112,28 @@ describe("auth sessions: rotating, sliding refresh tokens (D11-3)", () => {
     expect((await load(third.refreshToken)).generation).toBe(2);
   });
 
-  it("slides the session: a refresh pushes expiry to now + 90 days", async () => {
+  it("keeps the end of the session fixed when refreshing", async () => {
     const tokens = await authSessionService.createSession(user);
-    const nearlyOver = new Date(Date.now() + 60_000);
-    await sessions().update({ id: sessionIdOf(tokens.refreshToken) }, { expiresAt: nearlyOver });
+    const before = (await load(tokens.refreshToken)).expiresAt.getTime();
 
     await authSessionService.refresh(tokens.refreshToken);
 
-    const session = await load(tokens.refreshToken);
-    expect(session.expiresAt.getTime()).toBeGreaterThan(
-      Date.now() + SESSION_IDLE_TIMEOUT_MS - 60_000,
-    );
+    expect((await load(tokens.refreshToken)).expiresAt.getTime()).toBeLessThanOrEqual(before);
   });
 
-  it("rejects a session idle for more than 90 days", async () => {
+  it("ends a session 30 days after sign-in even with a later stored expiry", async () => {
+    const tokens = await authSessionService.createSession(user);
+    await sessions().update(
+      { id: sessionIdOf(tokens.refreshToken) },
+      {
+        createdAt: new Date(Date.now() - SESSION_ABSOLUTE_LIFETIME_MS - 1000),
+        expiresAt: new Date(Date.now() + 60 * 24 * 60 * 60 * 1000),
+      },
+    );
+    await expectRejected(tokens.refreshToken, "expired");
+  });
+
+  it("rejects a session past its expiry", async () => {
     const tokens = await authSessionService.createSession(user);
     await sessions().update(
       { id: sessionIdOf(tokens.refreshToken) },
@@ -266,6 +284,187 @@ describe("auth sessions: rotating, sliding refresh tokens (D11-3)", () => {
     expect(
       await sessions().findOne({ where: { id: sessionIdOf(live.refreshToken) } }),
     ).not.toBeNull();
+  });
+
+  describe("session management", () => {
+    const callerFor = (sessionId: string | undefined, authMethod = "jwt") =>
+      authRouter.createCaller({
+        user: { id: userId, authMethod, sessionId, isActive: true, hasScope: () => true },
+        organizationId: null,
+        req: { headers: {} },
+        res: {},
+        ipAddress: "203.0.113.9",
+        userAgent: "jest",
+      } as unknown as Context);
+
+    it("lists live sessions and marks the current one", async () => {
+      const current = await authSessionService.createSession(user, { userAgent: "phone" });
+      const other = await authSessionService.createSession(user, { userAgent: "laptop" });
+      const ended = await authSessionService.createSession(user);
+      await authSessionService.revoke(ended.refreshToken);
+
+      const list = await callerFor(sessionIdOf(current.refreshToken)).listSessions();
+
+      expect(list.map((s) => s.id).sort()).toEqual(
+        [sessionIdOf(current.refreshToken), sessionIdOf(other.refreshToken)].sort(),
+      );
+      expect(list.find((s) => s.current)?.userAgent).toBe("phone");
+    });
+
+    it("access tokens name their session", async () => {
+      const tokens = await authSessionService.createSession(user);
+      expect(verifyToken(tokens.accessToken).sid).toBe(sessionIdOf(tokens.refreshToken));
+    });
+
+    it("revoking a session stops its refresh token", async () => {
+      const current = await authSessionService.createSession(user);
+      const other = await authSessionService.createSession(user);
+
+      await callerFor(sessionIdOf(current.refreshToken)).revokeSession({
+        sessionId: sessionIdOf(other.refreshToken),
+      });
+
+      await expectRejected(other.refreshToken, "revoked");
+      await expect(authSessionService.refresh(current.refreshToken)).resolves.toBeTruthy();
+    });
+
+    it("refuses to revoke another user's session", async () => {
+      const otherUserId = "d1130000-0000-4000-8000-0000000000ab";
+      await AppDataSource.getRepository(User).save(
+        AppDataSource.getRepository(User).create({
+          id: otherUserId,
+          email: "other-session-user@example.com",
+          password: "x",
+          isActive: true,
+          emailVerified: true,
+        }),
+      );
+      try {
+        const theirs = await authSessionService.createSession(
+          await AppDataSource.getRepository(User).findOneOrFail({ where: { id: otherUserId } }),
+        );
+        await expect(
+          callerFor(undefined).revokeSession({ sessionId: sessionIdOf(theirs.refreshToken) }),
+        ).rejects.toMatchObject({ code: "NOT_FOUND" });
+        await expect(authSessionService.refresh(theirs.refreshToken)).resolves.toBeTruthy();
+      } finally {
+        await AppDataSource.getRepository(User).delete({ id: otherUserId });
+      }
+    });
+
+    it("revokes every other session and keeps this one", async () => {
+      const current = await authSessionService.createSession(user);
+      const a = await authSessionService.createSession(user);
+      const b = await authSessionService.createSession(user);
+
+      const { revoked } = await callerFor(
+        sessionIdOf(current.refreshToken),
+      ).revokeAllOtherSessions();
+
+      expect(revoked).toBe(2);
+      await expectRejected(a.refreshToken, "revoked");
+      await expectRejected(b.refreshToken, "revoked");
+      await expect(authSessionService.refresh(current.refreshToken)).resolves.toBeTruthy();
+    });
+
+    it("is not available to API tokens", async () => {
+      await expect(callerFor(undefined, "apikey").listSessions()).rejects.toMatchObject({
+        code: "FORBIDDEN",
+      });
+    });
+  });
+
+  describe("refresh cookie", () => {
+    const dashboardOrigin = "https://dashboard.example.test";
+    const setCookie = jest.fn();
+    const clearCookie = jest.fn();
+    const cookieCaller = (cookie?: string, origin: string | undefined = dashboardOrigin) =>
+      authRouter.createCaller({
+        user: null,
+        organizationId: null,
+        req: { headers: { cookie, origin } },
+        res: { cookie: setCookie, clearCookie },
+        ipAddress: "203.0.113.9",
+        userAgent: "jest",
+      } as unknown as Context);
+    const cors = config.cors as { origin: unknown };
+    let originalOrigins: unknown;
+
+    beforeEach(() => {
+      setCookie.mockClear();
+      clearCookie.mockClear();
+      originalOrigins = cors.origin;
+      cors.origin = [dashboardOrigin];
+    });
+    afterEach(() => {
+      cors.origin = originalOrigins;
+    });
+
+    it("refreshes from the cookie, rotates it and keeps the token out of the body", async () => {
+      const tokens = await authSessionService.createSession(user);
+
+      const result = await cookieCaller(`other=1; hay_refresh=${tokens.refreshToken}`).refreshToken(
+        { useCookie: true },
+      );
+
+      expect(result.refreshToken).toBeUndefined();
+      expect(result.accessToken).toBeTruthy();
+      expect(
+        setCookie.mock.calls.map(([, , options]) => (options as { path: string }).path),
+      ).toEqual(["/v1/auth.refreshToken", "/v1/auth.logout"]);
+      const [name, value, options] = setCookie.mock.calls[0] as [
+        string,
+        string,
+        Record<string, unknown>,
+      ];
+      expect(name).toBe("hay_refresh");
+      expect(value).not.toBe(tokens.refreshToken);
+      expect(options).toMatchObject({ httpOnly: true });
+      expect((await load(tokens.refreshToken)).generation).toBe(1);
+    });
+
+    it("ignores the cookie from an unknown origin", async () => {
+      const tokens = await authSessionService.createSession(user);
+      await expect(
+        cookieCaller(
+          `hay_refresh=${tokens.refreshToken}`,
+          "https://elsewhere.example",
+        ).refreshToken({ useCookie: true }),
+      ).rejects.toMatchObject({ code: "UNAUTHORIZED" });
+      expect((await load(tokens.refreshToken)).generation).toBe(0);
+    });
+
+    it("answers UNAUTHORIZED without a cookie", async () => {
+      await expect(cookieCaller().refreshToken({ useCookie: true })).rejects.toMatchObject({
+        code: "UNAUTHORIZED",
+      });
+    });
+
+    it("clears the cookie once the server rejects it", async () => {
+      const tokens = await authSessionService.createSession(user);
+      await authSessionService.revoke(tokens.refreshToken);
+      await expect(
+        cookieCaller(`hay_refresh=${tokens.refreshToken}`).refreshToken({ useCookie: true }),
+      ).rejects.toMatchObject({ code: "UNAUTHORIZED" });
+      expect(clearCookie).toHaveBeenCalledTimes(2);
+    });
+
+    it("moves a body token to the cookie when asked to", async () => {
+      const tokens = await authSessionService.createSession(user);
+      const result = await cookieCaller().refreshToken({
+        refreshToken: tokens.refreshToken,
+        useCookie: true,
+      });
+      expect(result.refreshToken).toBeUndefined();
+      expect(setCookie).toHaveBeenCalledTimes(2);
+    });
+
+    it("logs out from the cookie and clears it", async () => {
+      const tokens = await authSessionService.createSession(user);
+      await cookieCaller(`hay_refresh=${tokens.refreshToken}`).logout({ useCookie: true });
+      expect(clearCookie).toHaveBeenCalledTimes(2);
+      await expectRejected(tokens.refreshToken, "revoked");
+    });
   });
 
   describe("auth.refreshToken procedure", () => {

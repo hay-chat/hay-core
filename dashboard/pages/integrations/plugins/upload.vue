@@ -158,6 +158,7 @@
 </template>
 
 <script setup lang="ts">
+import { ensureFreshAccessToken } from "@/utils/api";
 import { Upload, FileArchive, CheckCircle, X, ArrowLeft, AlertCircle } from "lucide-vue-next";
 import { useAuthStore } from "@/stores/auth";
 import { useUserStore } from "@/stores/user";
@@ -260,6 +261,7 @@ const uploadPlugin = async () => {
       }
     }, 200);
 
+    await ensureFreshAccessToken();
     const response = await fetch(getApiUrl("/v1/plugins/upload"), {
       method: "POST",
       headers: {

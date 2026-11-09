@@ -20,6 +20,8 @@ export type AuditAction =
   | "password.reset"
   | "user.login"
   | "user.logout"
+  | "user.session_revoke"
+  | "user.session_revoke_others"
   | "user.register"
   | "apikey.create"
   | "apikey.revoke"
