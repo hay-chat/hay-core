@@ -6,24 +6,18 @@ import {
   SessionEndedError,
   withCrossTabLock,
 } from "@/utils/session-refresh";
+import {
+  clearLegacyRefreshToken,
+  extractLegacyTokens,
+  getLegacyRefreshToken,
+} from "@/utils/legacy-session";
 import { useSetupStore } from "./setup";
 import { useUserStore, type User } from "./user";
 
+/** Access token, memory only. The refresh token is an HttpOnly cookie. */
 interface Tokens {
   accessToken: string;
-  refreshToken: string;
   expiresAt: number;
-}
-
-/** Tokens as persisted by pinia-plugin-persistedstate (key = store id). */
-function readStoredTokens(): Tokens | null {
-  try {
-    const raw = typeof window !== "undefined" ? window.localStorage.getItem("auth") : null;
-    const tokens = raw ? (JSON.parse(raw) as { tokens?: Tokens | null }).tokens : null;
-    return tokens?.refreshToken && typeof tokens.expiresAt === "number" ? tokens : null;
-  } catch {
-    return null;
-  }
 }
 
 export const useAuthStore = defineStore("auth", {
@@ -74,10 +68,11 @@ export const useAuthStore = defineStore("auth", {
         const result = await HayAuthApi.auth.login.mutate({
           email,
           password,
+          useCookie: true,
         });
+        clearLegacyRefreshToken();
         this.tokens = {
           accessToken: result.accessToken,
-          refreshToken: result.refreshToken,
           expiresAt: Date.now() + result.expiresIn * 1000, // Convert seconds to milliseconds
         };
         const userStore = useUserStore();
@@ -98,12 +93,13 @@ export const useAuthStore = defineStore("auth", {
         pushEndpoint = await usePushNotifications().releaseForLogout();
       }
 
-      // End this device's session server-side; the refresh token is the proof,
+      // End this device's session server-side; the refresh cookie is the proof,
       // so this works after the access token expired.
-      if (this.tokens?.refreshToken) {
+      if (this.isAuthenticated) {
         try {
           await HayAuthApi.auth.logout.mutate({
-            refreshToken: this.tokens.refreshToken,
+            refreshToken: getLegacyRefreshToken(),
+            useCookie: true,
             pushEndpoint,
           });
         } catch (error) {
@@ -113,6 +109,7 @@ export const useAuthStore = defineStore("auth", {
       }
 
       // Clear all auth state but keep isInitialized as true to prevent loading state
+      clearLegacyRefreshToken();
       this.tokens = null;
       this.isAuthenticated = false;
       // Don't set isInitialized = false as it causes infinite loading state
@@ -170,50 +167,46 @@ export const useAuthStore = defineStore("auth", {
 
     /**
      * One refresh attempt (retries and the logout decision live in
-     * utils/session-refresh via utils/api). Serialized across tabs: a tab that
-     * gets the lock after another one rotated adopts the stored tokens instead
-     * of sending a refresh token that was just replaced.
+     * utils/session-refresh via utils/api). Serialized across tabs, so each
+     * refresh sends the cookie the previous one just set.
      */
     async refreshTokens() {
       await withCrossTabLock("hay-auth-refresh", async () => {
-        const stored = readStoredTokens();
-        if (stored && this.tokens && stored.expiresAt > this.tokens.expiresAt) {
-          this.tokens = stored; // Another tab rotated more recently.
-          if (stored.expiresAt - Date.now() > 60_000) return;
-        }
-
-        const currentTokens = this.tokens;
-        if (!currentTokens?.refreshToken) {
+        if (!this.isAuthenticated) {
           throw new SessionEndedError();
         }
 
-        const result = await HayAuthApi.auth.refreshToken.mutate({
-          refreshToken: currentTokens.refreshToken,
-        });
+        let result;
+        try {
+          result = await HayAuthApi.auth.refreshToken.mutate({
+            refreshToken: getLegacyRefreshToken(),
+            useCookie: true,
+          });
+        } catch (error) {
+          if (isDefinitiveAuthFailure(error)) clearLegacyRefreshToken();
+          throw error;
+        }
+        clearLegacyRefreshToken();
 
-        // Refresh tokens rotate: the old one stops working once its successor is used.
         this.tokens = {
           accessToken: result.accessToken,
-          refreshToken: result.refreshToken,
           expiresAt: Date.now() + result.expiresIn * 1000, // Convert seconds to milliseconds
         };
 
         this.updateActivity();
-        this.$persist?.(); // Write through now, so other tabs see the new pair.
       });
     },
 
     /**
-     * Login using tokens directly (useful for automated testing and direct auth links)
-     * This mimics the regular login flow but with pre-existing tokens
+     * Login with an access token already obtained (the refresh token, when
+     * there is one, was set as a cookie by the same response).
      */
-    async loginWithTokens(data: { accessToken: string; refreshToken: string; expiresIn: number }) {
+    async loginWithTokens(data: { accessToken: string; expiresIn: number }) {
       this.isLoading = true;
       try {
         // Set tokens first
         this.tokens = {
           accessToken: data.accessToken,
-          refreshToken: data.refreshToken,
           expiresAt: Date.now() + data.expiresIn * 1000,
         };
 
@@ -248,7 +241,10 @@ export const useAuthStore = defineStore("auth", {
     },
   },
   persist: {
-    // isLoading is per page load and must not come back stuck.
-    pick: ["tokens", "isAuthenticated", "isInitialized", "lastActivity"],
+    // isLoading is per page load and must not come back stuck. Tokens never touch storage.
+    pick: ["isAuthenticated", "isInitialized", "lastActivity"],
+    beforeHydrate: () => {
+      if (typeof window !== "undefined") extractLegacyTokens(window.localStorage);
+    },
   },
 });

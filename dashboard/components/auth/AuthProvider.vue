@@ -55,7 +55,7 @@ const initializeAuth = async () => {
 
   if (!authStore.isInitialized) {
     // Check if we have tokens before trying to initialize
-    if (!authStore.tokens?.accessToken) {
+    if (!authStore.isAuthenticated) {
       // No tokens, mark as initialized but not authenticated
       authStore.isInitialized = true;
       authStore.isAuthenticated = false;

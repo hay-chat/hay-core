@@ -2,6 +2,7 @@ import { Entity, Column, Index, ManyToOne, JoinColumn } from "typeorm";
 import { OrganizationScopedEntity } from "./base.entity";
 import type { ApiKeyScope } from "../types/auth.types";
 import { Organization } from "./organization.entity";
+import { User } from "./user.entity";
 
 @Entity("api_keys")
 @Index("idx_api_keys_organization_id", ["organizationId"])
@@ -31,6 +32,17 @@ export class ApiKey extends OrganizationScopedEntity {
 
   @Column({ type: "boolean", default: true })
   isActive!: boolean;
+
+  /** First characters of the token, for display. Not selected on the authentication path. */
+  @Column({ type: "varchar", length: 16, nullable: true, select: false })
+  keyPrefix?: string | null;
+
+  @Column({ type: "uuid", nullable: true, select: false })
+  createdByUserId?: string | null;
+
+  @ManyToOne(() => User, { onDelete: "SET NULL", nullable: true })
+  @JoinColumn({ foreignKeyConstraintName: "fk_api_keys_created_by_user" })
+  createdByUser?: User | null;
 
   isExpired(): boolean {
     if (!this.expiresAt) return false;

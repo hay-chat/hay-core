@@ -237,6 +237,56 @@
     <!-- Recent Security Activity -->
     <Card>
       <CardHeader>
+        <CardTitle>{{ $t("profile.activeSessions") }}</CardTitle>
+        <CardDescription>{{ $t("profile.activeSessionsDescription") }}</CardDescription>
+      </CardHeader>
+      <CardContent class="space-y-3">
+        <div
+          v-if="!loadingSessions && sessions.length === 0"
+          class="text-center py-8 text-neutral-muted"
+        >
+          {{ $t("profile.noActiveSessions") }}
+        </div>
+        <div
+          v-for="session in sessions"
+          :key="session.id"
+          class="flex items-center justify-between gap-3 p-3 border rounded-lg"
+        >
+          <div class="min-w-0">
+            <div class="font-medium truncate">
+              {{ describeDevice(session.userAgent) }}
+              <Badge v-if="session.current" variant="success" class="ml-2">
+                {{ $t("profile.thisDevice") }}
+              </Badge>
+            </div>
+            <div class="text-sm text-neutral-muted">
+              {{ $t("profile.sessionLastActive", { date: formatDate(session.lastActivity) }) }}
+              <span v-if="session.ipAddress"> • {{ session.ipAddress }}</span>
+            </div>
+          </div>
+          <Button
+            v-if="!session.current"
+            variant="outline"
+            size="sm"
+            :loading="revokingSessionId === session.id"
+            @click="revokeSession(session.id)"
+          >
+            {{ $t("profile.sessionSignOut") }}
+          </Button>
+        </div>
+        <Button
+          v-if="sessions.some((session) => !session.current)"
+          variant="outline"
+          :loading="revokingOthers"
+          @click="revokeAllOtherSessions"
+        >
+          {{ $t("profile.sessionSignOutOthers") }}
+        </Button>
+      </CardContent>
+    </Card>
+
+    <Card>
+      <CardHeader>
         <CardTitle>{{ $t("profile.recentSecurityActivity") }}</CardTitle>
         <CardDescription>{{ $t("profile.recentSecurityActivityDescription") }}</CardDescription>
       </CardHeader>
@@ -492,7 +542,7 @@ onMounted(async () => {
     originalProfile.lastName = currentUser.value.lastName || "";
   }
 
-  await loadSecurityEvents();
+  await Promise.all([loadSecurityEvents(), loadSessions()]);
 });
 
 // Save profile changes
@@ -636,6 +686,77 @@ const changePassword = async () => {
     toast.error(error instanceof Error ? error.message : t("profile.passwordChangeFailed"));
   } finally {
     isChangingPassword.value = false;
+  }
+};
+
+// Active sessions
+type ActiveSession = RouterOutputs["auth"]["listSessions"][number];
+const sessions = ref<ActiveSession[]>([]);
+const loadingSessions = ref(true);
+const revokingSessionId = ref<string | null>(null);
+const revokingOthers = ref(false);
+
+const loadSessions = async () => {
+  loadingSessions.value = true;
+  try {
+    sessions.value = await Hay.auth.listSessions.query();
+  } catch (error) {
+    console.error("Failed to load sessions:", error);
+  } finally {
+    loadingSessions.value = false;
+  }
+};
+
+const describeDevice = (userAgent: string | null): string => {
+  if (!userAgent) return t("profile.unknownDevice");
+  const browser = /Edg\//.test(userAgent)
+    ? "Edge"
+    : /Firefox\//.test(userAgent)
+      ? "Firefox"
+      : /Chrome\//.test(userAgent)
+        ? "Chrome"
+        : /Safari\//.test(userAgent)
+          ? "Safari"
+          : null;
+  const system = /iPhone|iPad/.test(userAgent)
+    ? "iOS"
+    : /Android/.test(userAgent)
+      ? "Android"
+      : /Mac OS X/.test(userAgent)
+        ? "macOS"
+        : /Windows/.test(userAgent)
+          ? "Windows"
+          : /Linux/.test(userAgent)
+            ? "Linux"
+            : null;
+  return [browser, system].filter(Boolean).join(" · ") || userAgent.slice(0, 60);
+};
+
+const revokeSession = async (sessionId: string) => {
+  revokingSessionId.value = sessionId;
+  try {
+    await Hay.auth.revokeSession.mutate({ sessionId });
+    toast.success(t("profile.sessionRevoked"));
+    await loadSessions();
+  } catch (error) {
+    console.error("Failed to revoke session:", error);
+    toast.error(t("profile.sessionRevokeFailed"));
+  } finally {
+    revokingSessionId.value = null;
+  }
+};
+
+const revokeAllOtherSessions = async () => {
+  revokingOthers.value = true;
+  try {
+    await Hay.auth.revokeAllOtherSessions.mutate();
+    toast.success(t("profile.sessionsRevoked"));
+    await loadSessions();
+  } catch (error) {
+    console.error("Failed to revoke sessions:", error);
+    toast.error(t("profile.sessionRevokeFailed"));
+  } finally {
+    revokingOthers.value = false;
   }
 };
 

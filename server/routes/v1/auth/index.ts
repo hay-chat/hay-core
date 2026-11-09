@@ -27,7 +27,15 @@ import * as crypto from "crypto";
 import { config, getDashboardUrl } from "@server/config/env";
 import { StorageService } from "@server/services/storage.service";
 import { handleUpload } from "@server/lib/upload-helper";
-import { rateLimitService } from "@server/services/rate-limit.service";
+import { assertPasswordNotBreached, newPasswordSchema } from "@server/lib/auth/password-policy";
+import {
+  clearRefreshCookies,
+  readRefreshCookie,
+  setRefreshCookies,
+} from "@server/lib/auth/session-cookie";
+import type { Context } from "@server/trpc/context";
+import type { AuthTokens } from "@server/types/auth.types";
+import { rateLimitService, type RateLimitScope } from "@server/services/rate-limit.service";
 import { rateLimitMiddleware } from "@server/trpc/middleware/rate-limit";
 import { toAccessState } from "@server/services/organization-access.service";
 import {
@@ -78,12 +86,13 @@ const passwordSchema = z.string().min(8).max(128);
 const loginSchema = z.object({
   email: z.string().email(),
   password: passwordSchema,
+  useCookie: z.boolean().optional(),
 });
 
 const registerSchema = z
   .object({
     email: z.string().email(),
-    password: passwordSchema,
+    password: newPasswordSchema,
     confirmPassword: z.string().max(128),
     firstName: z.string().max(255).optional(),
     lastName: z.string().max(255).optional(),
@@ -94,9 +103,47 @@ const registerSchema = z
     path: ["confirmPassword"],
   });
 
+/**
+ * `useCookie`: the caller is the dashboard, which keeps the refresh token in
+ * an HttpOnly cookie. Other clients (hay CLI, external apps) get it in the body.
+ */
+const useCookieField = z.boolean().optional();
+
 const refreshTokenSchema = z.object({
-  refreshToken: z.string(),
+  refreshToken: z.string().optional(),
+  useCookie: useCookieField,
 });
+
+/** Hand tokens to the client: the refresh token goes to the cookie in cookie mode. */
+function deliverTokens(
+  ctx: Pick<Context, "res">,
+  tokens: AuthTokens,
+  useCookie: boolean | undefined,
+): Omit<AuthTokens, "refreshToken"> & { refreshToken?: string } {
+  if (!useCookie) return tokens;
+  setRefreshCookies(ctx.res, tokens.refreshToken);
+  const { refreshToken: _inCookie, ...rest } = tokens;
+  return rest;
+}
+
+/** A password being changed must differ from the current one and not be known to be breached. */
+async function assertNewPasswordAllowed(user: User, newPassword: string): Promise<void> {
+  if (await verifyPassword(newPassword, user.password)) {
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message: "Choose a password different from your current one.",
+    });
+  }
+  await assertPasswordNotBreached(newPassword);
+}
+
+/** Managing sessions is for a signed-in person; API tokens have no session. */
+function requireSessionUser(ctx: Pick<Context, "user">) {
+  if (ctx.user?.authMethod !== "jwt") {
+    throw new TRPCError({ code: "FORBIDDEN", message: "Sessions require a signed-in user" });
+  }
+  return ctx.user;
+}
 
 /** Re-authentication checks (password confirm, password/email change): 5 per 15 minutes. */
 const PASSWORD_CHECK_RATE_LIMIT = {
@@ -133,13 +180,40 @@ function allowlistedRedirectUrl(redirectUri: string): URL {
   return redirectUrl;
 }
 
+/** Generous: offices share an address, and each open dashboard refreshes several times an hour. */
+const REFRESH_IP_LIMIT = { scope: "refresh-token", max: 300, windowSeconds: 15 * 60 } as const;
+const EXCHANGE_IP_LIMIT = { scope: "exchange-auth-code", max: 60, windowSeconds: 15 * 60 } as const;
+
+/** Allows the request when the limiter is unavailable, so an outage does not sign people out. */
+async function assertWithinIpLimit(
+  ipAddress: string | undefined,
+  limit: { scope: RateLimitScope; max: number; windowSeconds: number },
+): Promise<void> {
+  const { limited } = await rateLimitService.checkIpRateLimit(
+    ipAddress || "unknown",
+    limit.max,
+    limit.windowSeconds,
+    { scope: limit.scope },
+  );
+  if (limited) {
+    throw new TRPCError({
+      code: "TOO_MANY_REQUESTS",
+      message: "Too many requests. Please try again later.",
+    });
+  }
+}
+
 /** A single-use, 10-minute auth code for the user. */
-async function createAuthCode(userId: string): Promise<{ code: string; expiresAt: Date }> {
+async function createAuthCode(
+  userId: string,
+  redirectOrigin: string,
+): Promise<{ code: string; expiresAt: Date }> {
   const code = generateSecureToken(32);
   const authCodeRepo = AppDataSource.getRepository(AuthCode);
   const authCode = authCodeRepo.create({
     userId,
     codeHash: await hashApiKey(code),
+    redirectOrigin,
     expiresAt: new Date(Date.now() + 10 * 60 * 1000),
     used: false,
   });
@@ -259,6 +333,10 @@ export const authRouter = t.router({
     }
 
     // Update last login time and last seen
+    // Older accounts hold bcrypt hashes; move them to argon2 while the password is at hand.
+    if (user.password.startsWith("$2")) {
+      user.password = await hashPassword(password, "argon2");
+    }
     user.lastLoginAt = new Date();
     user.updateLastSeen();
     await userRepository.save(user);
@@ -296,7 +374,7 @@ export const authRouter = t.router({
         activeOrganizationId,
         onlineStatus: user.getOnlineStatus(),
       },
-      ...tokens,
+      ...deliverTokens(ctx, tokens, input.useCookie),
     };
   }),
 
@@ -325,6 +403,8 @@ export const authRouter = t.router({
         message: "Too many signup attempts. Please try again later.",
       });
     }
+
+    await assertPasswordNotBreached(input.password);
 
     if (!config.auth.allowSignup) {
       await assertSignupAllowed(AppDataSource.manager, input.email);
@@ -377,15 +457,23 @@ export const authRouter = t.router({
   }),
 
   /**
-   * Rotate: returns a new access token AND a new refresh token, and slides the
-   * session's 90-day idle timeout. UNAUTHORIZED means "log out"; any other
+   * Rotate: returns a new access token AND a new refresh token (set as the
+   * cookie when the caller uses one). UNAUTHORIZED means "log out"; any other
    * error (database down, ...) is transient and the client keeps its session.
    */
   refreshToken: publicProcedure.input(refreshTokenSchema).mutation(async ({ input, ctx }) => {
+    await assertWithinIpLimit(ctx.ipAddress, REFRESH_IP_LIMIT);
+    const fromCookie = input.refreshToken ? undefined : readRefreshCookie(ctx.req);
+    const refreshToken = input.refreshToken ?? fromCookie;
+    if (!refreshToken) {
+      throw new TRPCError({ code: "UNAUTHORIZED", message: "Invalid or expired refresh token" });
+    }
     try {
-      return await authSessionService.refresh(input.refreshToken, ctx);
+      const tokens = await authSessionService.refresh(refreshToken, ctx);
+      return deliverTokens(ctx, tokens, input.useCookie || Boolean(fromCookie));
     } catch (error) {
       if (error instanceof RefreshRejectedError) {
+        if (fromCookie) clearRefreshCookies(ctx.res);
         throw new TRPCError({
           code: "UNAUTHORIZED",
           message: "Invalid or expired refresh token",
@@ -560,7 +648,7 @@ export const authRouter = t.router({
     .input(
       z.object({
         token: z.string(),
-        newPassword: passwordSchema,
+        newPassword: newPasswordSchema,
       }),
     )
     .mutation(async ({ input, ctx }) => {
@@ -590,6 +678,8 @@ export const authRouter = t.router({
           message: "Reset token has expired. Please request a new password reset.",
         });
       }
+
+      await assertNewPasswordAllowed(user, input.newPassword);
 
       // Hash new password
       user.password = await hashPassword(input.newPassword, "argon2");
@@ -754,7 +844,9 @@ export const authRouter = t.router({
   logout: publicProcedure
     .input(refreshTokenSchema.extend({ pushEndpoint: z.string().url().max(2048).optional() }))
     .mutation(async ({ input, ctx }) => {
-      const userId = await authSessionService.revoke(input.refreshToken);
+      const refreshToken = input.refreshToken ?? readRefreshCookie(ctx.req);
+      if (input.useCookie) clearRefreshCookies(ctx.res);
+      const userId = refreshToken ? await authSessionService.revoke(refreshToken) : null;
       if (userId)
         await auditLogService.record({
           userId,
@@ -769,12 +861,63 @@ export const authRouter = t.router({
       return { success: true };
     }),
 
+  /** Where this account is signed in, for the profile page. */
+  listSessions: protectedProcedureWithoutOrg.query(async ({ ctx }) => {
+    const user = requireSessionUser(ctx);
+    const sessions = await authSessionService.listActive(user.id);
+    return sessions.map((session) => ({
+      id: session.id,
+      createdAt: session.createdAt,
+      lastActivity: session.lastActivity,
+      expiresAt: session.expiresAt,
+      ipAddress: session.ipAddress ?? null,
+      userAgent: session.userAgent ?? null,
+      current: session.id === user.sessionId,
+    }));
+  }),
+
+  /** Sign out one device. Its access token keeps working until it expires (15 minutes). */
+  revokeSession: protectedProcedureWithoutOrg
+    .input(z.object({ sessionId: z.string().uuid() }))
+    .mutation(async ({ ctx, input }) => {
+      const user = requireSessionUser(ctx);
+      const revoked = await authSessionService.revokeForUser(user.id, input.sessionId);
+      if (!revoked) throw new TRPCError({ code: "NOT_FOUND", message: "Session not found" });
+      await auditLogService.record({
+        userId: user.id,
+        action: "user.session_revoke",
+        resource: "auth",
+        changes: { sessionId: input.sessionId },
+        ipAddress: ctx.ipAddress,
+        userAgent: ctx.userAgent,
+      });
+      return { success: true };
+    }),
+
+  /** Sign out everywhere else, keeping the session this request belongs to. */
+  revokeAllOtherSessions: protectedProcedureWithoutOrg.mutation(async ({ ctx }) => {
+    const user = requireSessionUser(ctx);
+    if (!user.sessionId) {
+      throw new TRPCError({ code: "BAD_REQUEST", message: "Refresh your session and try again" });
+    }
+    const revoked = await authSessionService.revokeOthers(user.id, user.sessionId);
+    await auditLogService.record({
+      userId: user.id,
+      action: "user.session_revoke_others",
+      resource: "auth",
+      changes: { revoked },
+      ipAddress: ctx.ipAddress,
+      userAgent: ctx.userAgent,
+    });
+    return { revoked };
+  }),
+
   changePassword: protectedProcedure
     .use(rateLimitMiddleware(PASSWORD_CHECK_RATE_LIMIT))
     .input(
       z.object({
         currentPassword: z.string().max(128),
-        newPassword: passwordSchema,
+        newPassword: newPasswordSchema,
       }),
     )
     .mutation(async ({ input, ctx }) => {
@@ -798,6 +941,8 @@ export const authRouter = t.router({
           message: "Current password is incorrect",
         });
       }
+
+      await assertNewPasswordAllowed(user, input.newPassword);
 
       // Hash new password and invalidate all existing tokens
       user.password = await hashPassword(input.newPassword, "argon2");
@@ -1504,8 +1649,7 @@ export const authRouter = t.router({
   generateAuthCode: protectedProcedureWithoutOrg
     .input(z.object({ redirectUri: z.string().url() }))
     .mutation(async ({ ctx, input }) => {
-      allowlistedRedirectUrl(input.redirectUri);
-      return createAuthCode(ctx.user!.id);
+      return createAuthCode(ctx.user!.id, allowlistedRedirectUrl(input.redirectUri).origin);
     }),
 
   // Issue a single-use auth code bound to an allowlisted external redirect URI.
@@ -1522,7 +1666,7 @@ export const authRouter = t.router({
     )
     .mutation(async ({ ctx, input }) => {
       const redirectUrl = allowlistedRedirectUrl(input.redirectUri);
-      const { code } = await createAuthCode(ctx.user!.id);
+      const { code } = await createAuthCode(ctx.user!.id, redirectUrl.origin);
 
       redirectUrl.searchParams.set("code", code);
       if (input.state) redirectUrl.searchParams.set("state", input.state);
@@ -1531,15 +1675,34 @@ export const authRouter = t.router({
     }),
 
   exchangeAuthCode: publicProcedure
-    .input(z.object({ code: z.string().min(1) }))
+    .input(
+      z.object({
+        code: z.string().min(1),
+        redirectUri: z.string().url().optional(),
+        useCookie: useCookieField,
+      }),
+    )
     .mutation(async ({ input, ctx }) => {
+      await assertWithinIpLimit(ctx.ipAddress, EXCHANGE_IP_LIMIT);
+
+      if (!input.redirectUri && config.authCodes.requireRedirectUri) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "redirectUri is required" });
+      }
+      const redirectOrigin = input.redirectUri ? new URL(input.redirectUri).origin : null;
       const codeHash = await hashApiKey(input.code);
 
       // Claim the code in one statement so concurrent exchanges can't both succeed.
       const claimed = await AppDataSource.createQueryBuilder()
         .update(AuthCode)
         .set({ used: true })
-        .where("code_hash = :codeHash AND used = false AND expires_at > now()", { codeHash })
+        .where(
+          `code_hash = :codeHash AND used = false AND expires_at > now()${
+            redirectOrigin
+              ? " AND (redirect_origin IS NULL OR redirect_origin = :redirectOrigin)"
+              : ""
+          }`,
+          { codeHash, redirectOrigin },
+        )
         .returning("user_id")
         .execute();
       const userId = (claimed.raw as Array<{ user_id: string }>)[0]?.user_id;
@@ -1599,7 +1762,7 @@ export const authRouter = t.router({
           activeOrganizationId,
           onlineStatus: user.getOnlineStatus(),
         },
-        ...tokens,
+        ...deliverTokens(ctx, tokens, input.useCookie),
       };
     }),
 

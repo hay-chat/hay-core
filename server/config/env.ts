@@ -349,11 +349,39 @@ export const config = {
     host: process.env.POSTHOG_HOST || "https://eu.i.posthog.com",
   },
 
+  // Refuse new passwords found in known breaches (k-anonymity range lookup).
+  passwordBreachCheck:
+    process.env.PASSWORD_BREACH_CHECK !== "false" && process.env.NODE_ENV !== "test",
+
+  // SameSite of the dashboard's refresh-token cookie. Keep "strict" when the
+  // dashboard and API share a site (app.example.com + api.example.com); "none"
+  // is only for a dashboard on a different registrable domain and needs HTTPS.
+  authCookie: {
+    sameSite: (["strict", "lax", "none"].includes(process.env.AUTH_COOKIE_SAME_SITE ?? "")
+      ? process.env.AUTH_COOKIE_SAME_SITE
+      : "strict") as "strict" | "lax" | "none",
+  },
+
   // Server-to-server secret for the `internal.*` tRPC procedures (used by an
   // external operator, e.g. a hosted-plan backoffice, to suspend organizations).
   // Empty disables those procedures entirely — the default for self-hosting.
+  authCodes: {
+    // Refuse exchanges that do not name the destination the code was issued for.
+    // Enable once every app calling exchangeAuthCode sends redirectUri.
+    requireRedirectUri: process.env.AUTH_CODE_REQUIRE_REDIRECT_URI === "true",
+  },
+
   internal: {
     apiSecret: process.env.INTERNAL_API_SECRET || "",
+    // Still accepted during a rotation, then removed.
+    previousApiSecret: process.env.INTERNAL_API_PREVIOUS_SECRET || "",
+    // Refuse calls that only present the shared secret. Enable once the operator signs requests.
+    requireSignature: process.env.INTERNAL_API_REQUIRE_SIGNATURE === "true",
+    // Comma-separated client addresses; empty allows any.
+    allowedIps: (process.env.INTERNAL_API_ALLOWED_IPS || "")
+      .split(",")
+      .map((ip) => ip.trim())
+      .filter(Boolean),
     // Where core POSTs signed events the operator may need to act on (for
     // example organization.deleted, so the operator can stop billing).
     // Empty disables them.
@@ -561,6 +589,14 @@ export function validateProductionConfig(): string[] {
   }
   if (config.internal.apiSecret && config.internal.apiSecret.length < MIN_SECRET_LENGTH) {
     errors.push(`INTERNAL_API_SECRET must be at least ${MIN_SECRET_LENGTH} characters when set.`);
+  }
+  if (
+    config.internal.previousApiSecret &&
+    config.internal.previousApiSecret.length < MIN_SECRET_LENGTH
+  ) {
+    errors.push(
+      `INTERNAL_API_PREVIOUS_SECRET must be at least ${MIN_SECRET_LENGTH} characters when set.`,
+    );
   }
 
   if (missingVars.length > 0) {

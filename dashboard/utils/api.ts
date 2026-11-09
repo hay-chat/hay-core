@@ -52,9 +52,11 @@ const sessionRefresh = createRefreshCoordinator({
  * a still-valid token is used even if the refresh could not reach the server.
  */
 export async function ensureFreshAccessToken(minValidityMs = 60_000): Promise<void> {
-  const tokens = useAuthStore().tokens;
-  if (!tokens?.refreshToken) return;
-  if (tokens.expiresAt - Date.now() > minValidityMs) return;
+  const authStore = useAuthStore();
+  if (!authStore.isAuthenticated) return;
+  // After a reload the access token is gone (memory only); the cookie brings a new one.
+  const tokens = authStore.tokens;
+  if (tokens && tokens.expiresAt - Date.now() > minValidityMs) return;
 
   try {
     await sessionRefresh.refresh();
@@ -142,7 +144,7 @@ export const tokenRefreshLink: TRPCLink<AppRouter> = () => {
             observer.next(value);
           },
           error(err) {
-            if (isRetry || !isUnauthorizedError(err) || !useAuthStore().tokens?.refreshToken) {
+            if (isRetry || !isUnauthorizedError(err) || !useAuthStore().isAuthenticated) {
               observer.error(err);
               return;
             }
@@ -200,6 +202,8 @@ function createHayAuthApi() {
         errorLink, // Handle errors including expired tokens
         httpLink({
           url: getApiBaseUrl(),
+          // The refresh-token cookie is scoped to the refresh and logout endpoints.
+          fetch: (url, options) => fetch(url, { ...options, credentials: "include" }),
           // You can pass any HTTP headers you wish here
           async headers() {
             return {
@@ -244,6 +248,7 @@ function createHayApi() {
  * Resolves null when the server has no such upload for this organization.
  */
 export async function fetchMedia(uploadId: string): Promise<Blob | null> {
+  await ensureFreshAccessToken();
   const response = await fetch(`${getApiBaseUrl()}/media/${encodeURIComponent(uploadId)}`, {
     headers: {
       authorization: getAuthToken(),

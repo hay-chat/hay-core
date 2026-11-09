@@ -1,8 +1,23 @@
 import { User } from "@server/entities/user.entity";
 import { UserOrganization } from "@server/entities/user-organization.entity";
 import type { ApiKeyScope } from "@server/types/auth.types";
+import { ACTIONS, RESOURCES } from "@server/types/scopes";
 
 const WRITE_ACTIONS = ["create", "update"];
+
+/** Who runs the organization is decided by people; no API token reaches these. */
+const RESOURCES_CLOSED_TO_API_TOKENS: readonly string[] = [
+  RESOURCES.ORGANIZATION_MEMBERS,
+  RESOURCES.ORGANIZATION_INVITATIONS,
+  RESOURCES.API_KEYS,
+];
+
+function closedToApiTokens(resource: string, action: string): boolean {
+  return (
+    RESOURCES_CLOSED_TO_API_TOKENS.includes(resource) ||
+    (resource === RESOURCES.ORGANIZATIONS && action === ACTIONS.DELETE)
+  );
+}
 
 /**
  * AuthUser class represents an authenticated user in the tRPC context
@@ -61,6 +76,8 @@ export class AuthUser {
   hasScope(resource: string, action: string): boolean {
     // For API key auth, check the API key scopes
     if (this.authMethod === "apikey") {
+      if (closedToApiTokens(resource, action)) return false;
+
       if (!this.scopes || this.scopes.length === 0) {
         return false; // No scopes means no access (security fix: deny by default)
       }

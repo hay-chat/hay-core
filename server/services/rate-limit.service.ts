@@ -24,7 +24,10 @@ export type RateLimitScope =
   | "resend-verification"
   | "privacy-request"
   | "privacy-download"
-  | "customer-privacy";
+  | "customer-privacy"
+  | "refresh-token"
+  | "exchange-auth-code"
+  | "internal-api";
 
 export interface RateLimitOptions {
   scope: RateLimitScope;

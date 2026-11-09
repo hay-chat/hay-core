@@ -3,12 +3,12 @@ import { observable } from "@trpc/server/observable";
 
 interface FakeTokens {
   accessToken: string;
-  refreshToken: string;
   expiresAt: number;
 }
 
 const authStore = {
   tokens: null as FakeTokens | null,
+  isAuthenticated: true,
   refreshTokens: vi.fn<() => Promise<void>>(),
   logout: vi.fn(),
 };
@@ -33,7 +33,6 @@ const serverError = () => ({
 const MIN = 60_000;
 const tokensExpiringIn = (ms: number): FakeTokens => ({
   accessToken: "access-old",
-  refreshToken: "hrt1.old",
   expiresAt: Date.now() + ms,
 });
 
@@ -41,7 +40,6 @@ const tokensExpiringIn = (ms: number): FakeTokens => ({
 const rotate = async () => {
   authStore.tokens = {
     accessToken: "access-new",
-    refreshToken: "hrt1.new",
     expiresAt: Date.now() + 15 * MIN,
   };
 };
@@ -94,6 +92,7 @@ describe("dashboard session refresh (D11-4)", () => {
   beforeEach(() => {
     vi.resetModules();
     authStore.tokens = null;
+    authStore.isAuthenticated = true;
     authStore.refreshTokens.mockReset();
     authStore.logout.mockReset();
   });
@@ -122,7 +121,7 @@ describe("dashboard session refresh (D11-4)", () => {
       ]);
 
       expect(authStore.refreshTokens).toHaveBeenCalledTimes(1);
-      expect(authStore.tokens?.refreshToken).toBe("hrt1.new");
+      expect(authStore.tokens?.accessToken).toBe("access-new");
     });
 
     it("keeps the session when the refresh keeps failing on the network", async () => {
@@ -139,7 +138,7 @@ describe("dashboard session refresh (D11-4)", () => {
       expect(authStore.refreshTokens).toHaveBeenCalledTimes(5); // 1 + 4 backoff retries
       await vi.runAllTimersAsync();
       expect(authStore.logout).not.toHaveBeenCalled();
-      expect(authStore.tokens?.refreshToken).toBe("hrt1.old");
+      expect(authStore.tokens?.accessToken).toBe("access-old");
     });
 
     it("lets a request through on a still-valid token when the refresh cannot reach the server", async () => {
@@ -242,10 +241,21 @@ describe("dashboard session refresh (D11-4)", () => {
       expect(outcome.ok).toBe(false);
       expect(downstreamCalls).toBe(0); // an expired token is not sent to get a 401
       expect(authStore.logout).not.toHaveBeenCalled();
-      expect(authStore.tokens?.refreshToken).toBe("hrt1.old");
+      expect(authStore.tokens?.accessToken).toBe("access-old");
+    });
+
+    it("gets an access token from the cookie after a page load", async () => {
+      authStore.refreshTokens.mockImplementation(rotate);
+
+      const { outcome, accessTokensSent } = await runThroughLink([{ value: "ok" }]);
+
+      expect(outcome.ok).toBe(true);
+      expect(authStore.refreshTokens).toHaveBeenCalledTimes(1);
+      expect(accessTokensSent).toEqual(["access-new"]);
     });
 
     it("sends unauthenticated requests untouched", async () => {
+      authStore.isAuthenticated = false;
       const { outcome, downstreamCalls } = await runThroughLink([{ value: "public" }]);
       expect(outcome.ok).toBe(true);
       expect(downstreamCalls).toBe(1);

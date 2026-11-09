@@ -59,11 +59,11 @@ onMounted(async () => {
   try {
     const result = await HayAuthApi.auth.exchangeAuthCode.mutate({
       code: code.value,
+      useCookie: true,
     });
 
     await authStore.loginWithTokens({
       accessToken: result.accessToken,
-      refreshToken: result.refreshToken,
       expiresIn: result.expiresIn,
     });
 

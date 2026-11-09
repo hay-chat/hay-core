@@ -23,13 +23,23 @@ jest.mock("@server/services/redis.service", () => ({
 
 const mockUserOrgFindOne = jest.fn<(options: unknown) => Promise<unknown>>();
 const mockUserFindOne = jest.fn<(options: unknown) => Promise<unknown>>();
+const mockUserFind = jest.fn<(options: unknown) => Promise<unknown[]>>();
+const mockUserOrgFind = jest.fn<(options: unknown) => Promise<unknown[]>>();
+const mockSessionFind = jest.fn<(options: unknown) => Promise<unknown[]>>();
 jest.mock("@server/entities/user.entity", () => ({ User: class MockUser {} }));
+jest.mock("@server/entities/session.entity", () => ({ Session: class MockSession {} }));
 jest.mock("@server/entities/user-organization.entity", () => ({ UserOrganization: class {} }));
 jest.mock("@server/database/data-source", () => ({
   AppDataSource: {
     isInitialized: false,
     getRepository: (entity: { name?: string }) => ({
       findOne: entity.name === "MockUser" ? mockUserFindOne : mockUserOrgFindOne,
+      find:
+        entity.name === "MockUser"
+          ? mockUserFind
+          : entity.name === "MockSession"
+            ? mockSessionFind
+            : mockUserOrgFind,
     }),
   },
 }));
@@ -488,6 +498,61 @@ describe("WebSocket dashboard authentication", () => {
 
     expect(orgMembers(service).get(ORG_ID)?.has(clientId)).toBe(true);
     expect(ws.last()).toEqual({ type: "authenticated" });
+  });
+
+  describe("re-validation of open sockets", () => {
+    const revalidate = () =>
+      (
+        service as unknown as { revalidateDashboardClients(): Promise<void> }
+      ).revalidateDashboardClients();
+    const membership = { userId: "user-1", organizationId: ORG_ID };
+
+    beforeEach(() => {
+      mockUserFind.mockResolvedValue([activeUser]);
+      mockUserOrgFind.mockResolvedValue([membership]);
+      mockSessionFind.mockResolvedValue([{ id: "session-1" }]);
+    });
+
+    it("keeps a socket whose user, membership and session are still valid", async () => {
+      const { ws, send, clientId } = connect(service);
+      await send({ type: "auth", token: sign({ sid: "session-1" }) });
+
+      await revalidate();
+
+      expect(ws.closedWith).toBeUndefined();
+      expect(orgMembers(service).get(ORG_ID)?.has(clientId)).toBe(true);
+    });
+
+    it.each([
+      [
+        "the password changed",
+        () => mockUserFind.mockResolvedValue([{ ...activeUser, tokenVersion: 3 }]),
+      ],
+      [
+        "the user was disabled",
+        () => mockUserFind.mockResolvedValue([{ ...activeUser, isActive: false }]),
+      ],
+      ["the membership ended", () => mockUserOrgFind.mockResolvedValue([])],
+      ["the session was revoked", () => mockSessionFind.mockResolvedValue([])],
+    ])("closes the socket once %s", async (_label, change) => {
+      const { ws, send, clientId } = connect(service);
+      await send({ type: "auth", token: sign({ sid: "session-1" }) });
+
+      change();
+      await revalidate();
+
+      expect(ws.closedWith).toBe(1008);
+      expect(orgMembers(service).get(ORG_ID)?.has(clientId) ?? false).toBe(false);
+    });
+
+    it("leaves widget sockets alone", async () => {
+      const { ws } = connect(service);
+
+      await revalidate();
+
+      expect(mockUserFind).not.toHaveBeenCalled();
+      expect(ws.closedWith).toBeUndefined();
+    });
   });
 
   it("ignores a token passed in the query string", async () => {
