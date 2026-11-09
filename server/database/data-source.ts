@@ -38,6 +38,10 @@ import { SitePage } from "./entities/site-page.entity";
 import { UserMfa } from "./entities/user-mfa.entity";
 import { UserWebauthnCredential } from "./entities/user-webauthn-credential.entity";
 import { SsoConnection } from "./entities/sso-connection.entity";
+import { ScimGroup } from "./entities/scim-group.entity";
+import { ScimGroupMember } from "./entities/scim-group-member.entity";
+import { ScimToken } from "./entities/scim-token.entity";
+import { ScimUser } from "./entities/scim-user.entity";
 import { SsoDomain } from "./entities/sso-domain.entity";
 import { SsoIdentity } from "./entities/sso-identity.entity";
 import { InsightIssue } from "./entities/insight-issue.entity";
@@ -178,6 +182,10 @@ export const AppDataSource = new DataSource({
     SsoConnection,
     SsoDomain,
     SsoIdentity,
+    ScimToken,
+    ScimUser,
+    ScimGroup,
+    ScimGroupMember,
   ],
   migrations: __filename.includes("dist")
     ? [__dirname + "/migrations/*.js"] // Production: compiled JS files in same relative location

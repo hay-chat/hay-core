@@ -203,6 +203,8 @@ async function startServer() {
   };
   const bodyParsers = new Map<string, express.RequestHandler[]>();
   server.use((req, res, next) => {
+    // SCIM reads its own bodies (application/scim+json) after checking the token.
+    if (req.path.startsWith("/scim/")) return next();
     void (async () => {
       let limit = bodyLimitForPath(req.path);
       if (limit === UPLOAD_BODY_LIMIT && !(await mayParseLargeBody(req))) {
@@ -466,6 +468,10 @@ async function startServer() {
   // Single sign-on: the browser's trips to and from an organization's identity provider
   const ssoRouter = await import("@server/routes/sso");
   server.use(ssoRouter.default);
+
+  // SCIM provisioning: an identity provider keeps an organization's people and groups in step
+  const scimRouter = await import("@server/routes/scim");
+  server.use(scimRouter.default);
 
   // Well-known endpoints for OAuth Client Metadata Document (CIMD)
   const wellKnownRouter = await import("@server/routes/well-known");

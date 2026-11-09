@@ -5,6 +5,7 @@ import { SSO_ASSIGNABLE_ROLES } from "@server/database/entities/sso-connection.e
 import { requireMfaStepUp } from "@server/trpc/middleware/mfa";
 import { scopedProcedure } from "@server/trpc/middleware/auth";
 import { ACTIONS, RESOURCES } from "@server/types/scopes";
+import { scimBaseUrl, scimService } from "@server/services/scim.service";
 import { ssoService } from "@server/services/sso.service";
 
 /** Setting up single sign-on is for the organization's owners, signed in as people. */
@@ -57,6 +58,10 @@ export const ssoRouter = t.router({
     return {
       connection: await ssoService.getConnection(ctx.organizationId!),
       saml: ssoService.samlServiceProviderDetails(ctx.organizationId!),
+      scim: {
+        baseUrl: scimBaseUrl(),
+        token: await scimService.getTokenStatus(ctx.organizationId!),
+      },
       domains: await ssoService.listDomains(ctx.organizationId!),
       enforced: ctx.user.userOrganization?.organization?.settings?.ssoEnforced === true,
       assignableRoles: SSO_ASSIGNABLE_ROLES,
@@ -108,4 +113,14 @@ export const ssoRouter = t.router({
       });
       return { enforced: input.enforced };
     }),
+
+  /** The token is returned here once; only its hash is kept. Creating another replaces it. */
+  createScimToken: ownerProcedure
+    .use(requireMfaStepUp)
+    .mutation(({ ctx }) => scimService.createToken(ctx.organizationId!, actor(ctx))),
+
+  revokeScimToken: ownerProcedure.use(requireMfaStepUp).mutation(async ({ ctx }) => {
+    await scimService.revokeToken(ctx.organizationId!, actor(ctx));
+    return { success: true };
+  }),
 });

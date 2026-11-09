@@ -511,6 +511,25 @@ export class WebSocketService {
     }
   }
 
+  /**
+   * Close a person's signed-in dashboard sockets right away: those of one
+   * organization, or all of them when `organizationId` is omitted. The periodic
+   * pass would close them too once the database says so; this is for a change
+   * that must not wait for it. Returns how many were closed.
+   */
+  closeDashboardSockets(userId: string, organizationId?: string): number {
+    let closed = 0;
+    for (const [clientId, client] of this.clients.entries()) {
+      if (client.dashboardIdentity?.userId !== userId) continue;
+      if (organizationId && client.organizationId !== organizationId) continue;
+      client.authenticated = false;
+      this.organizationClients.get(client.organizationId)?.delete(clientId);
+      client.ws.close(CLOSE_POLICY_VIOLATION, "Unauthorized");
+      closed += 1;
+    }
+    return closed;
+  }
+
   /** Browsers send an Origin; the dashboard's must be one of the CORS origins. */
   private isAllowedDashboardOrigin(origin: string | undefined): boolean {
     if (!origin) return true; // not a browser, so no cross-site request to guard against

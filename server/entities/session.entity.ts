@@ -3,7 +3,7 @@ import { BaseEntity } from "./base.entity";
 import { User } from "./user.entity";
 
 export type SessionRevokedReason =
-  "logout" | "reuse_detected" | "password_changed" | "user_revoked";
+  "logout" | "reuse_detected" | "password_changed" | "user_revoked" | "deprovisioned";
 
 /**
  * One login on one device: a refresh-token family.

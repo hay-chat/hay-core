@@ -33,6 +33,7 @@ export type RateLimitScope =
   | "sso-callback"
   | "sso-saml-acs"
   | "sso-saml-finish"
+  | "scim-auth"
   | "sso-discover"
   | "internal-api";
 
