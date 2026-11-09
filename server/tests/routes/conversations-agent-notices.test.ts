@@ -22,7 +22,7 @@ type FakeConversation = {
 let conversation: FakeConversation;
 
 jest.mock("@server/repositories/conversation.repository", () => ({
-  ConversationRepository: jest.fn(() => ({ findById: async () => conversation })),
+  ConversationRepository: jest.fn(() => ({ findByIdAndOrganization: async () => conversation })),
 }));
 
 const mockFindUser = jest.fn<(id: string) => Promise<unknown>>();
@@ -143,15 +143,13 @@ describe("agent join/leave notices", () => {
     });
   });
 
-  it("an AI-mode reply from the dashboard carries no name", async () => {
-    await caller().sendMessage({
-      conversationId: CONVERSATION_ID,
-      content: "Hi",
-      role: "assistant",
-    });
-
-    expect(storedMessage()).toMatchObject({ type: "BotAgent" });
-    expect((storedMessage().metadata as Record<string, unknown>).agentFirstName).toBeUndefined();
-    expect(mockFindUser).not.toHaveBeenCalled();
+  it("refuses a reply in the assistant's name from someone who has not taken over", async () => {
+    await expect(
+      caller().sendMessage({
+        conversationId: CONVERSATION_ID,
+        content: "Hi",
+        role: "assistant",
+      }),
+    ).rejects.toMatchObject({ code: "PRECONDITION_FAILED" });
   });
 });

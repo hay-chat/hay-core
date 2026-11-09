@@ -2,12 +2,13 @@ import { t, publicProcedure, scopedProcedure } from "@server/trpc";
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { AppDataSource } from "@server/database/data-source";
-import type { FindOptionsWhere } from "typeorm";
+import { Raw, type FindOptionsWhere } from "typeorm";
 import { OrganizationInvitation } from "@server/entities/organization-invitation.entity";
 import { UserOrganization } from "@server/entities/user-organization.entity";
 import { User } from "@server/entities/user.entity";
 import { Organization } from "@server/entities/organization.entity";
 import { RESOURCES, ACTIONS } from "@server/types/scopes";
+import { AuthUser } from "@server/lib/auth/AuthUser";
 import { assertCanGrantMembership } from "@server/lib/auth/membership-grants";
 import { emailService, getOrganizationLocale } from "@server/services/email.service";
 import { getDashboardUrl } from "@server/config/env";
@@ -28,6 +29,53 @@ function generateInvitationToken(): string {
  */
 function hashToken(token: string): string {
   return crypto.createHash("sha256").update(token).digest("hex");
+}
+
+const INVITATION_LIFETIME_MS = 7 * 24 * 60 * 60 * 1000;
+/** Resending renews an invitation, but never past this long after it was created. */
+const INVITATION_MAX_LIFETIME_MS = 30 * 24 * 60 * 60 * 1000;
+const INVITATION_LIST_LIMIT = 500;
+
+/** New expiry for a resent invitation. */
+export function renewedInvitationExpiry(createdAt: Date, now: Date = new Date()): Date {
+  return new Date(
+    Math.min(now.getTime() + INVITATION_LIFETIME_MS, createdAt.getTime() + INVITATION_MAX_LIFETIME_MS),
+  );
+}
+
+/**
+ * An invitation grants what its sender could grant when it is used, not when
+ * it was sent: the sender must still be an active member who may invite and
+ * may give this role and these permissions.
+ */
+async function assertInviterCanStillGrant(invitation: OrganizationInvitation): Promise<void> {
+  const denied = new TRPCError({
+    code: "FORBIDDEN",
+    message: "This invitation is no longer valid. Ask an admin to send a new one.",
+  });
+  if (!invitation.invitedBy) throw denied;
+
+  const [inviter, membership] = await Promise.all([
+    AppDataSource.getRepository(User).findOne({ where: { id: invitation.invitedBy } }),
+    AppDataSource.getRepository(UserOrganization).findOne({
+      where: { userId: invitation.invitedBy, organizationId: invitation.organizationId },
+    }),
+  ]);
+  if (!inviter?.isActive || !membership?.isActive) throw denied;
+
+  const caller = new AuthUser(inviter, "jwt", {
+    organizationId: invitation.organizationId,
+    userOrganization: membership,
+  });
+  if (!caller.hasScope(RESOURCES.ORGANIZATION_INVITATIONS, ACTIONS.INVITE)) throw denied;
+  try {
+    assertCanGrantMembership(caller, {
+      role: invitation.role,
+      permissions: invitation.permissions ?? undefined,
+    });
+  } catch {
+    throw denied;
+  }
 }
 
 /**
@@ -112,6 +160,8 @@ export const invitationsRouter = t.router({
 
       assertCanGrantMembership(ctx.user, { role: input.role, permissions: input.permissions });
 
+      const email = input.email.trim().toLowerCase();
+
       const invitationRepository = AppDataSource.getRepository(OrganizationInvitation);
       const userRepository = AppDataSource.getRepository(User);
       const orgRepository = AppDataSource.getRepository(Organization);
@@ -131,7 +181,7 @@ export const invitationsRouter = t.router({
 
       // Check if user with this email exists
       const existingUser = await userRepository.findOne({
-        where: { email: input.email },
+        where: { email },
       });
 
       // If user exists, check if they're already a member
@@ -154,7 +204,7 @@ export const invitationsRouter = t.router({
       // Check if there's already a pending invitation for this email
       const existingInvitation = await invitationRepository.findOne({
         where: {
-          email: input.email,
+          email: Raw((column) => `LOWER(${column}) = :email`, { email }),
           organizationId: ctx.organizationId,
           status: "pending",
         },
@@ -174,14 +224,14 @@ export const invitationsRouter = t.router({
       // Create invitation
       const invitation = invitationRepository.create({
         organizationId: ctx.organizationId,
-        email: input.email,
+        email,
         invitedUserId: existingUser?.id,
         invitedBy: ctx.user?.id,
         role: input.role,
         permissions: input.permissions,
         tokenHash,
         status: "pending",
-        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
+        expiresAt: new Date(Date.now() + INVITATION_LIFETIME_MS),
         message: input.message,
       });
 
@@ -193,7 +243,7 @@ export const invitationsRouter = t.router({
       const inviterEmail = inviter?.email || "";
 
       await sendInvitationEmail(
-        input.email,
+        email,
         organization.name,
         inviterName,
         inviterEmail,
@@ -209,7 +259,7 @@ export const invitationsRouter = t.router({
       await auditLogService.logInvitationSend(
         ctx.user!.id,
         ctx.organizationId!,
-        input.email,
+        email,
         input.role,
         {
           invitationId: invitation.id,
@@ -264,6 +314,7 @@ export const invitationsRouter = t.router({
         where,
         relations: ["invitedByUser"],
         order: { createdAt: "DESC" },
+        take: INVITATION_LIST_LIMIT,
       });
 
       // Mark expired invitations
@@ -404,6 +455,13 @@ export const invitationsRouter = t.router({
         });
       }
 
+      if (!invitation.organization.isActive || invitation.organization.suspendedAt) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "This organization cannot accept new members right now",
+        });
+      }
+
       // Check if user is already a member
       const existingMembership = await userOrgRepository.findOne({
         where: {
@@ -418,6 +476,8 @@ export const invitationsRouter = t.router({
           message: "You are already a member of this organization",
         });
       }
+
+      await assertInviterCanStillGrant(invitation);
 
       // Create UserOrganization membership
       const userOrg = userOrgRepository.create({
@@ -476,6 +536,13 @@ export const invitationsRouter = t.router({
         throw new TRPCError({
           code: "NOT_FOUND",
           message: "Invalid invitation token",
+        });
+      }
+
+      if (invitation.status !== "pending") {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: `Invitation cannot be declined (status: ${invitation.status})`,
         });
       }
 
@@ -599,6 +666,11 @@ export const invitationsRouter = t.router({
         });
       }
 
+      assertCanGrantMembership(ctx.user, {
+        role: invitation.role,
+        permissions: invitation.permissions ?? undefined,
+      });
+
       // Check rate limit manually using Redis
       const redisService = require("@server/services/redis.service").redisService;
       const redis = redisService.getClient();
@@ -638,7 +710,7 @@ export const invitationsRouter = t.router({
       const tokenHash = hashToken(token);
 
       invitation.tokenHash = tokenHash;
-      invitation.expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
+      invitation.expiresAt = renewedInvitationExpiry(invitation.createdAt);
       await invitationRepository.save(invitation);
 
       // Get organization details

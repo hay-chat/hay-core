@@ -21,7 +21,7 @@ jest.mock("@server/repositories/conversation.repository", () => ({
   ConversationRepository: jest.fn(() => ({
     create: mockConversationCreate,
     update: mockConversationUpdate,
-    findById: async () => null,
+    findByIdAndOrganization: async () => null,
   })),
 }));
 jest.mock("@server/repositories/message.repository", () => ({
@@ -50,7 +50,11 @@ jest.mock("@server/services/message-approval.service", () => ({
   messageApprovalService: { approve: mockApprove, block: mockApprove },
 }));
 
-import { conversationsRouter, clientConversationMetadata } from "@server/routes/v1/conversations";
+import {
+  conversationsRouter,
+  clientConversationMetadata,
+  staffMessageType,
+} from "@server/routes/v1/conversations";
 import { getDefaultScopesForRole, matchesScope } from "@server/types/scopes";
 import type { Context } from "@server/trpc/context";
 
@@ -195,5 +199,24 @@ describe("clientConversationMetadata", () => {
     expect(
       clientConversationMetadata({ isPlayground: true, runKind: "x", dryRun: "no", sourceId: "x" }),
     ).toEqual({});
+  });
+});
+
+describe("staffMessageType", () => {
+  const me = "user-1";
+  const open = { status: "open", assigned_user_id: null, metadata: null };
+  const mine = { status: "human-took-over", assigned_user_id: me, metadata: null };
+  const theirs = { status: "human-took-over", assigned_user_id: "other", metadata: null };
+  const test = { status: "open", assigned_user_id: null, metadata: { sourceId: "playground" } };
+
+  it("a reply is a person's reply, only after taking over", () => {
+    expect(staffMessageType("assistant", mine as never, me)).toBe("HumanAgent");
+    expect(() => staffMessageType("assistant", open as never, me)).toThrow(/Take over/);
+    expect(() => staffMessageType("assistant", theirs as never, me)).toThrow(/Take over/);
+  });
+
+  it("writing as the customer is only for test conversations", () => {
+    expect(staffMessageType("user", test as never, me)).toBe("Customer");
+    expect(() => staffMessageType("user", open as never, me)).toThrow(/test conversations/);
   });
 });

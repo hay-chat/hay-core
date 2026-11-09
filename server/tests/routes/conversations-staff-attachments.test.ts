@@ -19,7 +19,7 @@ type FakeConversation = {
 let conversation: FakeConversation;
 
 jest.mock("@server/repositories/conversation.repository", () => ({
-  ConversationRepository: jest.fn(() => ({ findById: async () => conversation })),
+  ConversationRepository: jest.fn(() => ({ findByIdAndOrganization: async () => conversation })),
 }));
 jest.mock("@server/repositories/user.repository", () => ({
   userRepository: { findById: async () => ({ firstName: "Marina", getFullName: () => "M" }) },

@@ -1126,11 +1126,16 @@ export const authRouter = t.router({
         where: { email: input.newEmail.toLowerCase() },
       });
 
+      // A taken address gets the same answer as a free one, so this can't be
+      // used to find out who has an account.
       if (existingUser && existingUser.id !== user.id) {
-        throw new TRPCError({
-          code: "CONFLICT",
-          message: "Email address is already in use",
-        });
+        logger.info({ userId: user.id }, "Email change requested to an address already in use");
+        return {
+          success: true,
+          message:
+            "Verification email sent. Please check your new email address to complete the change.",
+          pendingEmail: input.newEmail.toLowerCase(),
+        };
       }
 
       // Generate verification token (high-entropy: 256 bits, SHA-256 for direct lookup)
@@ -1283,6 +1288,20 @@ export const authRouter = t.router({
       // Update email and clear verification fields
       const oldEmail = user.email;
       const newEmail = user.pendingEmail;
+
+      // The address may have been registered since the change was requested.
+      const addressTaken = await userRepository.findOne({ where: { email: newEmail } });
+      if (addressTaken && addressTaken.id !== user.id) {
+        await userRepository.update(user.id, {
+          pendingEmail: () => "NULL",
+          emailVerificationTokenHash: () => "NULL",
+          emailVerificationExpiresAt: () => "NULL",
+        });
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Invalid or expired verification token",
+        });
+      }
 
       await userRepository.update(user.id, {
         email: newEmail,
