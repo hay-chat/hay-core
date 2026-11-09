@@ -59,6 +59,19 @@
 
       <!-- Second step: two-factor code -->
       <form v-if="challengeToken" class="space-y-4" @submit.prevent="handleMfaSubmit">
+        <div v-if="mfaMethods?.webauthn" class="space-y-2">
+          <Button
+            type="button"
+            size="lg"
+            class="w-full"
+            :loading="loading"
+            @click="handleSecurityKeySubmit"
+          >
+            {{ $t("login.mfa.useSecurityKey") }}
+          </Button>
+          <p class="text-center text-xs text-neutral-muted">{{ $t("login.mfa.orCode") }}</p>
+        </div>
+
         <div class="space-y-2">
           <Input
             id="mfa-code"
@@ -140,6 +153,24 @@
         <Button type="submit" size="lg" class="w-full" :loading="loading" :disabled="!isFormValid">
           {{ $t("login.submit") }}
         </Button>
+
+        <!-- Single sign-on, offered when the address belongs to an organization that has it -->
+        <Button
+          v-if="ssoAvailable"
+          type="button"
+          variant="outline"
+          size="lg"
+          class="w-full"
+          @click="startSso"
+        >
+          {{ $t("login.sso.continue") }}
+        </Button>
+
+        <div v-if="ssoError" class="p-3 rounded-md bg-red-50 border border-red-200">
+          <p class="text-sm text-red-800">
+            {{ ssoError }}
+          </p>
+        </div>
 
         <!-- Error Message -->
         <div
@@ -257,6 +288,12 @@ onMounted(() => {
     router.push(redirectUrl.value);
   } else {
     loadInvitationContext();
+    // Back from single sign-on with a second factor still to give.
+    if (authStore.pendingChallenge) {
+      challengeToken.value = authStore.pendingChallenge.challengeToken;
+      mfaMethods.value = authStore.pendingChallenge.methods;
+      authStore.pendingChallenge = null;
+    }
   }
 });
 
@@ -272,11 +309,56 @@ const errors = reactive({
 });
 
 const challengeToken = ref<string | null>(null);
+const mfaMethods = ref<{ totp: boolean; webauthn: boolean } | null>(null);
 const mfaCode = ref("");
 const error = ref("");
 const emailNotVerified = ref(false);
 const resendingVerification = ref(false);
 const verificationResent = ref(false);
+
+// Single sign-on: why a return from the provider was refused, and whether this address has one
+const SSO_ERROR_CODES = [
+  "unavailable",
+  "rate_limited",
+  "state_invalid",
+  "provider_error",
+  "token_invalid",
+  "domain_unverified",
+  "email_unverified",
+  "account_conflict",
+  "not_member",
+  "account_disabled",
+  "sso_required",
+];
+const ssoError = ref(
+  typeof route.query.sso_error === "string" && SSO_ERROR_CODES.includes(route.query.sso_error)
+    ? t(`login.sso.errors.${route.query.sso_error}`)
+    : "",
+);
+const ssoAvailable = ref(false);
+let ssoLookup: ReturnType<typeof setTimeout> | undefined;
+
+watch(
+  () => form.email,
+  (email) => {
+    clearTimeout(ssoLookup);
+    ssoAvailable.value = false;
+    if (!validateEmail(email)) return;
+    ssoLookup = setTimeout(async () => {
+      try {
+        const result = await Hay.auth.sso.discover.query({ email });
+        if (email === form.email) ssoAvailable.value = result.available;
+      } catch {
+        ssoAvailable.value = false;
+      }
+    }, 400);
+  },
+);
+
+const startSso = () => {
+  const { apiBaseUrl } = useRuntimeConfig().public;
+  window.location.assign(`${apiBaseUrl}/sso/start?${new URLSearchParams({ email: form.email })}`);
+};
 
 // Computed
 const loading = computed(() => authStore.isLoading);
@@ -325,9 +407,10 @@ const handleSubmit = async () => {
   verificationResent.value = false;
 
   try {
-    const { challengeToken: challenge } = await authStore.login(form.email, form.password);
+    const { challengeToken: challenge, methods } = await authStore.login(form.email, form.password);
     if (challenge) {
       challengeToken.value = challenge;
+      mfaMethods.value = methods;
       form.password = "";
       return;
     }
@@ -354,15 +437,29 @@ const handleSubmit = async () => {
   }
 };
 
-const handleMfaSubmit = async () => {
+const handleMfaSubmit = () =>
+  completeMfa(() => authStore.verifyMfaLogin(challengeToken.value!, mfaCode.value.trim()));
+
+const handleSecurityKeySubmit = () =>
+  completeMfa(() => authStore.verifyWebauthnLogin(challengeToken.value!));
+
+const completeMfa = async (verify: () => Promise<void>) => {
   error.value = "";
   try {
-    await authStore.verifyMfaLogin(challengeToken.value!, mfaCode.value.trim());
+    await verify();
     await router.push(redirectUrl.value);
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "";
-    if (message.includes("Invalid verification code")) {
+    const name = err instanceof Error ? err.name : "";
+    if (name === "NotAllowedError" || name === "AbortError") {
+      error.value = t("login.mfa.keyCancelled");
+    } else if (message.includes("Invalid verification code")) {
       error.value = t("login.mfa.invalidCode");
+    } else if (
+      message.includes("Security key verification failed") ||
+      message.includes("timed out")
+    ) {
+      error.value = t("login.mfa.keyFailed");
     } else if (message.includes("Too many")) {
       error.value = t("login.errors.tooManyRequests");
     } else if (message.includes("expired")) {
@@ -376,6 +473,7 @@ const handleMfaSubmit = async () => {
 
 const cancelMfa = () => {
   challengeToken.value = null;
+  mfaMethods.value = null;
   mfaCode.value = "";
   error.value = "";
 };

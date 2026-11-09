@@ -46,6 +46,8 @@ describe("bodyLimitForPath", () => {
 describe("isPublicWidgetPath", () => {
   it("opens only paths where every procedure is public", () => {
     expect(isPublicWidgetPath("/v1/publicConversations.sendMessage")).toBe(true);
+    expect(isPublicWidgetPath("/v1/webchat.getAvailability")).toBe(true);
+    expect(isPublicWidgetPath("/v1/webchat.getSettings")).toBe(false);
     expect(isPublicWidgetPath("/v1/publicConversations.create,webchat.getPublicConfig")).toBe(true);
     expect(isPublicWidgetPath("/v1/publicConversations.create,auth.me")).toBe(false);
     expect(isPublicWidgetPath("/v1/webchat.getPublicConfigX")).toBe(false);

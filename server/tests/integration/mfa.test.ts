@@ -195,7 +195,7 @@ describe("two-factor authentication", () => {
       const row = await AppDataSource.getRepository(UserMfa).findOneOrFail({
         where: { userId: owner.id },
       });
-      expect(row.secret.startsWith("enc:v3:")).toBe(true);
+      expect(row.secret!.startsWith("enc:v3:")).toBe(true);
       expect(row.secret).not.toContain(secret);
       expect(row.recoveryCodes).toHaveLength(10);
       expect(row.recoveryCodes).not.toContain(recoveryCodes[0]);
@@ -236,6 +236,7 @@ describe("two-factor authentication", () => {
         mfaRequired: true,
         challengeToken: expect.any(String),
         expiresIn: 300,
+        methods: { totp: true, webauthn: false },
       });
       expect(challenge).not.toHaveProperty("accessToken");
       if (!challenge.mfaRequired) throw new Error("expected a challenge");

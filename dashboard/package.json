@@ -36,6 +36,7 @@
   "dependencies": {
     "@floating-ui/vue": "^1.1.9",
     "@headlessui/vue": "^1.7.16",
+    "@simplewebauthn/browser": "^14.0.0",
     "@tiptap/extension-image": "^3.32.2",
     "@tiptap/extension-link": "^3.32.2",
     "@tiptap/extension-mention": "^3.32.2",

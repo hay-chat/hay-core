@@ -3,6 +3,7 @@ import { AppDataSource } from "@server/database/data-source";
 import { User } from "@server/entities/user.entity";
 import { UserOrganization } from "@server/entities/user-organization.entity";
 import { setRefreshCookies } from "@server/lib/auth/session-cookie";
+import { verifyMfaChallengeToken } from "@server/lib/auth/utils/jwt";
 import { auditLogService } from "@server/services/audit-log.service";
 import { authSessionService } from "@server/services/auth-session.service";
 import { mfaService } from "@server/services/mfa.service";
@@ -68,20 +69,31 @@ export const PASSWORD_CHECK_RATE_LIMIT = {
   failClosed: true,
 };
 
-/** Everything after the user has proven who they are: the session and the login response. */
+/**
+ * Everything after the user has proven who they are: the session and the login response.
+ * `ssoOrganizationId`: they signed in through that organization's identity provider.
+ */
 export async function completeLogin(
   user: User,
   ctx: Pick<Context, "res" | "ipAddress" | "userAgent">,
   useCookie: boolean | undefined,
+  ssoOrganizationId?: string,
 ) {
   user.lastLoginAt = new Date();
   user.updateLastSeen();
   await AppDataSource.getRepository(User).save(user);
 
-  const tokens = await authSessionService.createSession(user, ctx);
+  const tokens = await authSessionService.createSession(
+    user,
+    ctx,
+    AppDataSource.manager,
+    null,
+    ssoOrganizationId,
+  );
   await auditLogService.record({
     userId: user.id,
-    action: "user.login",
+    organizationId: ssoOrganizationId,
+    action: ssoOrganizationId ? "sso.login" : "user.login",
     resource: "auth",
     ipAddress: ctx.ipAddress,
     userAgent: ctx.userAgent,
@@ -103,7 +115,7 @@ export async function completeLogin(
 
   return {
     mfaRequired: false as const,
-    mfaEnrolmentRequired: await mfaService.enrolmentRequired(user.id),
+    mfaEnrolmentRequired: await mfaService.enrolmentRequired(user.id, ssoOrganizationId),
     user: {
       ...user.toJSON(),
       organizations,
@@ -112,4 +124,38 @@ export async function completeLogin(
     },
     ...deliverTokens(ctx, tokens, useCookie),
   };
+}
+
+/** The user a second-login-step challenge from `auth.login` belongs to, while it is still valid. */
+export async function requireChallengeUser(challengeToken: string): Promise<User> {
+  const challenge = verifyMfaChallengeToken(challengeToken);
+  const user = challenge
+    ? await AppDataSource.getRepository(User).findOne({
+        where: { id: challenge.userId },
+        relations: ["organization"],
+      })
+    : null;
+  if (
+    !challenge ||
+    !user ||
+    !user.isActive ||
+    !user.emailVerified ||
+    user.tokenVersion !== challenge.tokenVersion
+  ) {
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message: "Your sign-in has expired. Please sign in again.",
+      cause: { type: "MFA_CHALLENGE_EXPIRED" },
+    });
+  }
+  return user;
+}
+
+/** The organization whose provider started this challenge's first step, if any. */
+export function challengeSsoOrganizationId(challengeToken: string): string | undefined {
+  return verifyMfaChallengeToken(challengeToken)?.sso;
+}
+
+export function requestInfo(ctx: Pick<Context, "ipAddress" | "userAgent">) {
+  return { ipAddress: ctx.ipAddress, userAgent: ctx.userAgent };
 }

@@ -7,6 +7,7 @@ import amqplib, {
 import { config } from "@server/config/env";
 import { createLogger } from "@server/lib/logger";
 import { metrics } from "@server/lib/metrics";
+import { extractTraceContext, injectTraceHeaders, withSpan } from "@server/lib/tracing";
 import { EventEmitter } from "events";
 
 const logger = createLogger("rabbitmq");
@@ -204,19 +205,25 @@ export class RabbitMQService extends EventEmitter {
 
     try {
       const content = Buffer.from(JSON.stringify(message));
-      await new Promise<void>((resolve, reject) => {
-        channel.sendToQueue(
-          queue,
-          content,
-          {
-            persistent: true,
-            contentType: "application/json",
-            messageId: (message.messageId as string) || undefined,
-            timestamp: Date.now(),
-          },
-          (err) => (err ? reject(err) : resolve()),
-        );
-      });
+      await withSpan(
+        "queue publish",
+        { "messaging.system": "rabbitmq", "messaging.destination": queue },
+        () =>
+          new Promise<void>((resolve, reject) => {
+            channel.sendToQueue(
+              queue,
+              content,
+              {
+                persistent: true,
+                contentType: "application/json",
+                messageId: (message.messageId as string) || undefined,
+                timestamp: Date.now(),
+                headers: injectTraceHeaders(),
+              },
+              (err) => (err ? reject(err) : resolve()),
+            );
+          }),
+      );
 
       logger.debug({ messageId: message.messageId }, `Published message to queue: ${queue}`);
       metrics.queuePublished.inc({ queue, outcome: "ok" });
@@ -281,9 +288,23 @@ export class RabbitMQService extends EventEmitter {
         if (!msg) return;
         this.messageChannels.set(msg, channel);
         metrics.queueConsumed.inc({ queue });
+        const publishedAt = msg.properties.timestamp;
+        if (typeof publishedAt === "number") {
+          const waitedMs = Date.now() - publishedAt;
+          if (waitedMs >= 0) metrics.queueWaitSeconds.observe({ queue }, waitedMs / 1000);
+        }
 
         try {
-          await handler(msg);
+          await withSpan(
+            "queue consume",
+            {
+              "messaging.system": "rabbitmq",
+              "messaging.destination": queue,
+              "messaging.operation": "process",
+            },
+            () => handler(msg),
+            { parent: extractTraceContext(msg.properties.headers) },
+          );
         } catch (error) {
           logger.error({ err: error, queue }, "Consumer handler error");
           // Nack without requeue on handler exceptions — let dead-letter handle it

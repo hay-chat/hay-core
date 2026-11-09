@@ -581,6 +581,20 @@ const jobRegistry: CronJobConfig[] = [
   },
 
   {
+    name: "ship-audit-log-outbox",
+    description: "Copy new audit log rows to the external append-only sink",
+    schedule: 30000, // Every 30 seconds
+    handler: async () => {
+      const { auditSinkService } = await import("./audit-sink.service");
+      await auditSinkService.shipPending();
+    },
+    timeout: 1800000,
+    singleton: true,
+    enabled: true,
+    skipDatabaseLogging: true,
+  },
+
+  {
     name: "verify-audit-log-chain",
     description: "Recompute the audit log hash chains and report any mismatch",
     schedule: "30 4 * * 0", // Weekly, Sunday at 4:30 AM

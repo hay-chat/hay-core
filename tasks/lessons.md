@@ -362,3 +362,13 @@
 - Failure: a `psql` password prompt and a jest run that never exited each held the machine-wide test lock for a long time.
 - Signal: other agents stalled with zero CPU on the holder.
 - Rule: run serialized commands with stdin closed and non-interactive auth, and use `--forceExit` for full jest runs.
+
+## Shared test containers can be reset by another session (2026-11-09)
+- Failure: a browser check showed false 401 and 500 responses because another session recreated the shared Postgres and Redis containers mid-run, emptying the throwaway database.
+- Signal: errors appeared partway through a run that had been clean, and the container start time was newer than the run.
+- Rule: run long app-level checks on containers with their own names and ports, and never recreate or remove the shared ones while another session uses them.
+
+## Editing an applied migration leaves the test database stale (2026-11-09)
+- Failure: a full run failed one retention test that passed alone, because the migration had been edited after it was applied to that worktree's database, and a suite that reverts and re-applies migrations swapped the function definition partway through the run.
+- Signal: a test that fails in the full run, passes in isolation, and touches a database function changed by a recent migration edit.
+- Rule: after editing a migration that has already run, drop that worktree's test database or revert and re-run the migration before trusting any result.

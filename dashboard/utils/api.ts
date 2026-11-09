@@ -121,6 +121,17 @@ const errorLink: TRPCLink<AppRouter> = () => {
               }
             }
 
+            // The organization requires single sign-on and this session came from a password.
+            if (
+              data?.code === "FORBIDDEN" &&
+              data?.type === "SSO_REQUIRED" &&
+              typeof window !== "undefined"
+            ) {
+              setTimeout(() => {
+                void useAuthStore().logout("sso_required");
+              }, 0);
+            }
+
             // UNAUTHORIZED is handled by tokenRefreshLink: refresh, then retry.
             // Only a rejected refresh logs the user out (see sessionRefresh).
 

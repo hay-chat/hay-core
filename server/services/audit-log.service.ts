@@ -6,6 +6,7 @@ import { metrics } from "@server/lib/metrics";
 import { withLongStatementTimeout } from "../database/session-limits";
 import { createHmac } from "crypto";
 import { apiKeyIdFromUserId } from "@server/lib/auth/api-token-actor";
+import { auditSinkService } from "./audit-sink.service";
 import { deriveServiceKey } from "@server/lib/auth/utils/service-keys";
 
 const logger = createLogger("audit-log");
@@ -358,11 +359,16 @@ export class AuditLogService {
    */
   async cleanup(): Promise<number> {
     try {
+      // With the sink on, rows that have not been shipped are kept; with it off
+      // nothing would ever ship them, so they must not hold retention back.
+      const requireShipped = auditSinkService.enabled;
       const [{ deleted }] = await withLongStatementTimeout((manager) =>
-        manager.query(`SELECT audit_logs_purge($1, $2) AS deleted`, [
-          daysAgo(AUDIT_LOG_RETENTION_DAYS),
-          daysAgo(AUDIT_LOG_PERSONAL_FIELDS_RETENTION_DAYS),
-        ]),
+        manager.query(
+          requireShipped
+            ? `SELECT audit_logs_purge($1, $2, true) AS deleted`
+            : `SELECT audit_logs_purge($1, $2) AS deleted`,
+          [daysAgo(AUDIT_LOG_RETENTION_DAYS), daysAgo(AUDIT_LOG_PERSONAL_FIELDS_RETENTION_DAYS)],
+        ),
       );
       return Number(deleted);
     } catch (error) {
@@ -377,8 +383,8 @@ export class AuditLogService {
   /**
    * Recomputes every hash chain and returns what doesn't match. Detects rows
    * altered or removed behind the database's guards, within what the chain covers.
-   * TODO: anchor chain heads in external write-once storage, so that rewriting a
-   * whole chain and its head is detectable too.
+   * Rewriting a whole chain and its head is caught by comparing against the
+   * external copy (see AuditSinkService.verify).
    */
   async verifyChain(chainKey?: string): Promise<AuditChainProblem[]> {
     try {

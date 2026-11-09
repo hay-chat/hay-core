@@ -38,6 +38,9 @@ function daysAgo(days: number): string {
   return new Date(Date.now() - days * 86_400_000).toISOString();
 }
 
+/** Erasure renames users, so they are only reachable by id. Test files share one database. */
+const seededUserIds: string[] = [];
+
 async function cleanup(): Promise<void> {
   // The ledger refuses DELETE; organization ids repeat between test runs.
   await AppDataSource.query(`TRUNCATE erasure_ledger`);
@@ -53,7 +56,8 @@ async function cleanup(): Promise<void> {
   await AppDataSource.query(`DELETE FROM uploads WHERE organization_id = ANY($1)`, [ORGS]);
   await purgeAuditLogs(`organization_id = ANY($1) OR original_organization_id = ANY($1)`, [ORGS]);
   await AppDataSource.query(`DELETE FROM users WHERE email LIKE 'erasure-test-%@example.com'`);
-  await AppDataSource.query(`DELETE FROM users WHERE email LIKE 'deleted-%@deleted.local'`);
+  await AppDataSource.query(`DELETE FROM users WHERE id = ANY($1)`, [seededUserIds]);
+  seededUserIds.length = 0;
   await AppDataSource.query(`DELETE FROM organizations WHERE id = ANY($1)`, [ORGS]);
 }
 
@@ -279,6 +283,7 @@ describe("erasure completeness", () => {
         `INSERT INTO users (email, password, first_name, last_name, is_active)
          VALUES ('erasure-test-staff@example.com', 'x', 'Sam', 'Staff', true) RETURNING id`,
       );
+      seededUserIds.push(staff);
 
       for (const [id, question] of [
         [conversationId, "Mine"],
@@ -414,6 +419,7 @@ describe("erasure completeness", () => {
         `INSERT INTO users (email, password, first_name, last_name, is_active)
          VALUES ('erasure-test-user@example.com', 'x', 'Ann', 'Lee', true) RETURNING id`,
       );
+      seededUserIds.push(user.id);
       await AppDataSource.query(
         `INSERT INTO erasure_ledger (subject_type, subject_id) VALUES ('user', $1)`,
         [user.id],

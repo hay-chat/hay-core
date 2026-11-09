@@ -1,3 +1,4 @@
+import { withSpan } from "@server/lib/tracing";
 import { LLMService } from "../services/core/llm.service";
 import { Conversation } from "@server/database/entities/conversation.entity";
 import { PromptService } from "../services/prompt.service";
@@ -285,7 +286,17 @@ export class ExecutionLayer {
     };
   }
 
-  async execute(
+  execute(
+    conversation: Conversation,
+    customerLanguage?: string,
+    options: ExecuteOptions = {},
+  ): Promise<ExecutionResult | null> {
+    return withSpan("orchestrator execution", { "hay.layer": "execution" }, () =>
+      this.executeTurn(conversation, customerLanguage, options),
+    ) as Promise<ExecutionResult | null>;
+  }
+
+  private async executeTurn(
     conversation: Conversation,
     customerLanguage?: string,
     options: ExecuteOptions = {},

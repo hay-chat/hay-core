@@ -236,6 +236,7 @@
 
     <!-- Recent Security Activity -->
     <MfaSettingsCard />
+    <SecurityKeysCard />
 
     <Card>
       <CardHeader>
@@ -356,6 +357,7 @@ import { useFileUpload } from "@/composables/useFileUpload";
 import PasswordStrength from "@/components/auth/PasswordStrength.vue";
 import ReauthModal from "@/components/auth/ReauthModal.vue";
 import MfaSettingsCard from "@/components/auth/MfaSettingsCard.vue";
+import SecurityKeysCard from "@/components/auth/SecurityKeysCard.vue";
 import Avatar from "@/components/ui/Avatar.vue";
 
 const { t } = useI18n();

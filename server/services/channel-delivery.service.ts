@@ -237,6 +237,7 @@ export class ChannelDeliveryService {
 
     if (attempt.kind === "delivered") {
       await messageDeliveryRepository.markDelivered(id);
+      metrics.deliveryAttempts.inc({ outcome: "delivered" });
       return "done";
     }
 
@@ -247,11 +248,13 @@ export class ChannelDeliveryService {
         { id, kind: delivery.kind, error: attempt.error, attempt: delivery.attempts, delayMs },
         "Channel delivery failed transiently — retrying",
       );
+      metrics.deliveryAttempts.inc({ outcome: "retry" });
       await messageDeliveryRepository.scheduleRetry(id, delayMs, attempt.error);
       await this.queue.publishRetry(id, delayMs);
       return "retry";
     }
 
+    metrics.deliveryAttempts.inc({ outcome: "failed" });
     await messageDeliveryRepository.markFailed(id, attempt.error);
     if (delivery.kind === "message") await this.recordMessageFailure(delivery, attempt);
     return attempt.retryable ? "dead" : "done";

@@ -85,6 +85,17 @@ export const config = {
     token: process.env.METRICS_TOKEN || "",
   },
 
+  // Trace export over OTLP/HTTP to a collector. Off unless an endpoint is set.
+  // Request headers for the collector come from OTEL_EXPORTER_OTLP_HEADERS.
+  otel: {
+    endpoint: process.env.OTEL_EXPORTER_OTLP_ENDPOINT || "",
+    sampleRatio: Math.min(
+      1,
+      Math.max(0, Number.parseFloat(process.env.OTEL_TRACES_SAMPLE_RATIO || "0.05") || 0),
+    ),
+    serviceName: process.env.OTEL_SERVICE_NAME || "hay-server",
+  },
+
   cors: {
     origin:
       process.env.CORS_ORIGIN?.split(",") ||
@@ -200,6 +211,12 @@ export const config = {
     // Where people create an account when public signup is closed (hosted Hay:
     // the hay.chat onboarding). The signup page links there instead of a form.
     signupUrl: process.env.SIGNUP_URL?.trim() || null,
+  },
+
+  sso: {
+    // Identity providers must be on public https addresses. Self-hosted installs
+    // whose provider lives on a private network set this to "true".
+    allowPrivateProviderHosts: process.env.SSO_ALLOW_PRIVATE_PROVIDER_HOSTS === "true",
   },
 
   orchestrator: {
@@ -353,6 +370,22 @@ export const config = {
       host: process.env.CLAMAV_HOST || null,
       port: parseInt(process.env.CLAMAV_PORT || "3310", 10),
     },
+  },
+
+  // Append-only copy of the audit trail. Off unless a bucket is set. The bucket must
+  // have Object Lock enabled; endpoint, region and credentials default to the S3_* settings.
+  auditSink: {
+    bucket: process.env.AUDIT_SINK_BUCKET || null,
+    endpoint: process.env.AUDIT_SINK_ENDPOINT || process.env.S3_ENDPOINT || null,
+    region: process.env.AUDIT_SINK_REGION || process.env.S3_REGION || "us-east-1",
+    accessKeyId: process.env.AUDIT_SINK_ACCESS_KEY_ID || process.env.S3_ACCESS_KEY_ID || null,
+    secretAccessKey:
+      process.env.AUDIT_SINK_SECRET_ACCESS_KEY || process.env.S3_SECRET_ACCESS_KEY || null,
+    forcePathStyle: process.env.AUDIT_SINK_FORCE_PATH_STYLE === "true",
+    prefix: process.env.AUDIT_SINK_PREFIX || "audit-log/",
+    // Longer than the 365-day row retention, so the copy outlives the row.
+    retentionDays: parseInt(process.env.AUDIT_SINK_RETENTION_DAYS || "400", 10),
+    lockMode: process.env.AUDIT_SINK_LOCK_MODE === "GOVERNANCE" ? "GOVERNANCE" : "COMPLIANCE",
   },
 
   privacy: {

@@ -12,6 +12,7 @@ import {
   extractLegacyTokens,
   getLegacyRefreshToken,
 } from "@/utils/legacy-session";
+import { askKeyToSign } from "@/utils/webauthn";
 import { useSetupStore } from "./setup";
 import { useUserStore, type User } from "./user";
 
@@ -30,6 +31,11 @@ export const useAuthStore = defineStore("auth", {
     isInitialized: false,
     lastActivity: Date.now(),
     isLoading: false,
+    /** A second step left over from a single sign-on return; the login page picks it up. */
+    pendingChallenge: null as {
+      challengeToken: string;
+      methods: { totp: boolean; webauthn: boolean };
+    } | null,
   }),
   actions: {
     /**
@@ -74,10 +80,29 @@ export const useAuthStore = defineStore("auth", {
           useCookie: true,
         });
         if (result.mfaRequired) {
-          return { challengeToken: result.challengeToken };
+          return { challengeToken: result.challengeToken, methods: result.methods };
         }
         this.applyLogin(result);
-        return { challengeToken: null };
+        return { challengeToken: null, methods: null };
+      } finally {
+        this.isLoading = false;
+      }
+    },
+
+    /** Trade the ticket from the identity provider's return for a session. */
+    async completeSsoLogin(ticket: string) {
+      this.isLoading = true;
+      try {
+        const result = await HayAuthApi.auth.sso.exchange.mutate({ ticket, useCookie: true });
+        if (result.mfaRequired) {
+          this.pendingChallenge = {
+            challengeToken: result.challengeToken,
+            methods: result.methods,
+          };
+          return { challengeToken: result.challengeToken, methods: result.methods };
+        }
+        this.applyLogin(result);
+        return { challengeToken: null, methods: null };
       } finally {
         this.isLoading = false;
       }
@@ -90,6 +115,25 @@ export const useAuthStore = defineStore("auth", {
         const result = await HayAuthApi.auth.mfa.verifyLogin.mutate({
           challengeToken,
           code,
+          useCookie: true,
+        });
+        this.applyLogin(result);
+      } finally {
+        this.isLoading = false;
+      }
+    },
+
+    /** Second login step with a security key or passkey. */
+    async verifyWebauthnLogin(challengeToken: string) {
+      this.isLoading = true;
+      try {
+        const optionsJSON = await HayAuthApi.auth.mfa.webauthn.loginOptions.mutate({
+          challengeToken,
+        });
+        const response = await askKeyToSign(optionsJSON);
+        const result = await HayAuthApi.auth.mfa.webauthn.verifyLogin.mutate({
+          challengeToken,
+          response,
           useCookie: true,
         });
         this.applyLogin(result);
@@ -162,7 +206,11 @@ export const useAuthStore = defineStore("auth", {
         }
       }
 
-      await navigateTo("/login");
+      await navigateTo(
+        reason === "sso_required"
+          ? { path: "/login", query: { sso_error: "sso_required" } }
+          : "/login",
+      );
     },
 
     updateActivity() {

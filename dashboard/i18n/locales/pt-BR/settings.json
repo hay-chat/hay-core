@@ -582,6 +582,23 @@
       "stepUpTitle": "Confirme que é você",
       "stepUpDescription": "Digite um código de dois fatores para continuar com esta ação.",
       "stepUpDone": "Confirmado. Tente novamente.",
+      "keys": {
+        "title": "Chaves de segurança e passkeys",
+        "description": "Use uma chave de segurança física ou uma passkey como segundo fator, no lugar de ou junto com um aplicativo autenticador.",
+        "unsupported": "Este navegador não suporta chaves de segurança.",
+        "empty": "Nenhuma chave de segurança ainda.",
+        "add": "Adicionar chave de segurança",
+        "nameLabel": "Nome",
+        "namePlaceholder": "ex.: YubiKey, passkey do notebook",
+        "lastUsed": "Último uso em {date}",
+        "neverUsed": "Ainda não usada",
+        "rename": "Renomear",
+        "remove": "Remover",
+        "addedToast": "Chave de segurança adicionada",
+        "removedToast": "Chave de segurança removida",
+        "use": "Usar uma chave de segurança ou passkey",
+        "orCode": "Ou digite um código"
+      },
       "orgTitle": "Autenticação em dois fatores para sua equipe",
       "orgDescription": "Proteja todas as contas desta organização com um segundo fator.",
       "orgSwitch": "Exigir autenticação em dois fatores",
@@ -590,6 +607,11 @@
         "invalidCode": "Esse código não é válido. Tente novamente.",
         "wrongPassword": "Essa senha está incorreta.",
         "tooMany": "Muitas tentativas. Tente novamente mais tarde.",
+        "lastFactor": "Sua organização exige autenticação em dois fatores, então seu último método não pode ser removido.",
+        "keyFailed": "Não foi possível verificar essa chave de segurança. Tente novamente.",
+        "keyCancelled": "A solicitação da chave de segurança foi cancelada.",
+        "keyDuplicate": "Essa chave de segurança já está registrada.",
+        "keysUnavailable": "As chaves de segurança não estão disponíveis no momento.",
         "generic": "Algo deu errado. Tente novamente."
       }
     }
@@ -790,5 +812,64 @@
     "expired": "A última exportação expirou. Inicie uma nova.",
     "download": "Baixar ZIP",
     "downloadFailed": "A exportação não está mais disponível. Inicie uma nova."
+  },
+  "sso": {
+    "title": "Login único (SSO)",
+    "description": "Permita que sua equipe entre pelo seu provedor de identidade (OpenID Connect).",
+    "ownersOnly": "Somente o proprietário da organização pode gerenciar o login único.",
+    "provider": {
+      "title": "Provedor de identidade",
+      "description": "Crie um aplicativo web OpenID Connect no seu provedor de identidade com a URL de redirecionamento abaixo e informe os dados aqui.",
+      "redirectUri": "URL de redirecionamento",
+      "issuer": "URL do emissor (issuer)",
+      "issuerHelper": "O endereço que serve /.well-known/openid-configuration, por exemplo https://login.exemplo.com",
+      "clientId": "Client ID",
+      "clientSecret": "Client secret",
+      "clientSecretKept": "Deixe vazio para manter o segredo salvo",
+      "defaultRole": "Função para novos membros",
+      "defaultRoleHelper": "Quem entra pela primeira vez recebe esta função, a menos que um grupo abaixo se aplique. O provedor nunca atribui proprietários.",
+      "roleClaim": "Claim de grupos",
+      "roleClaimHelper": "Nome do claim do token que lista os grupos da pessoa, por exemplo groups. Deixe vazio para dar a todos a função acima.",
+      "roleMapping": "Grupo para função",
+      "groupPlaceholder": "Nome do grupo",
+      "addMapping": "Adicionar grupo",
+      "removeMapping": "Remover",
+      "enabled": "Permitir login com este provedor",
+      "save": "Salvar provedor",
+      "saved": "Provedor salvo",
+      "delete": "Remover provedor",
+      "deleted": "Provedor removido",
+      "lastLogin": "Último login com sucesso: {date}",
+      "neverUsed": "Ninguém entrou por este provedor ainda."
+    },
+    "domains": {
+      "title": "Domínios de e-mail",
+      "description": "Só quem tem e-mail em um domínio comprovado por você pode usar este provedor. Comprove um domínio publicando um registro DNS.",
+      "add": "Adicionar domínio",
+      "placeholder": "exemplo.com",
+      "verified": "Verificado",
+      "pending": "Não verificado",
+      "verify": "Verificar registro",
+      "remove": "Remover",
+      "recordName": "Nome do registro TXT",
+      "recordValue": "Valor do registro TXT",
+      "verifiedToast": "Domínio verificado",
+      "removed": "Domínio removido",
+      "empty": "Nenhum domínio ainda."
+    },
+    "enforcement": {
+      "title": "Exigir login único",
+      "description": "Quando ativo, os membros só acessam esta organização entrando pelo provedor. Os tokens de API continuam funcionando.",
+      "breakGlass": "Você continua podendo entrar com senha e segundo fator se o provedor falhar. Configure antes a sua autenticação em dois fatores.",
+      "prerequisites": "Para ativar, é preciso um login bem-sucedido pelo provedor e pelo menos um domínio verificado.",
+      "enable": "Exigir login único",
+      "disable": "Deixar de exigir login único",
+      "enabledToast": "O login único agora é obrigatório",
+      "disabledToast": "O login único não é mais obrigatório",
+      "liftedNotice": "Alterar as credenciais do provedor ou desativá-lo suspende a exigência até que a nova configuração seja testada."
+    },
+    "errors": {
+      "generic": "Algo deu errado. Tente novamente."
+    }
   }
 }

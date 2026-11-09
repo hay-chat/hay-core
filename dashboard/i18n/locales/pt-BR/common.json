@@ -13,6 +13,7 @@
     "settings": "Configurações",
     "general": "Geral",
     "users": "Usuários",
+    "sso": "Login único (SSO)",
     "apiTokens": "Tokens de API",
     "webchat": "Webchat",
     "customerPrivacy": "Privacidade do Cliente",
