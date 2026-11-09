@@ -158,7 +158,7 @@ definePageMeta({
 });
 
 // Extract token from URL
-const token = ref((route.query.token as string) || "");
+const token = useUrlToken();
 
 // Form state
 const form = reactive({

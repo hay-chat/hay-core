@@ -82,7 +82,7 @@ const toast = useToast();
 const userStore = useUserStore();
 
 // Extract token from URL
-const token = ref((route.query.token as string) || "");
+const token = useUrlToken();
 
 // State
 const isVerifying = ref(false);

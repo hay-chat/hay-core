@@ -57,7 +57,7 @@ const router = useRouter();
 const route = useRoute();
 const authStore = useAuthStore();
 
-const token = computed(() => route.query.token as string);
+const token = useUrlToken();
 const loading = ref(true);
 const success = ref(false);
 const error = ref("");
