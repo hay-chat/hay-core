@@ -1,6 +1,7 @@
 <template>
   <Page :title="$t('customers.title')" :description="$t('customers.description')" width="max">
     <template #header>
+      <RefreshIndicator :active="refreshing" />
       <Button variant="outline" size="sm" :loading="loading" @click="reload">
         <RefreshCcw class="h-4 w-4 mr-2" />
         {{ $t("customers.refresh") }}
@@ -25,7 +26,8 @@
           </Button>
         </div>
         <div class="text-sm text-neutral-muted">
-          {{ $t("customers.summary", { total }) }}
+          <template v-if="customers.data.value">{{ $t("customers.summary", { total }) }}</template>
+          <template v-else>&nbsp;</template>
         </div>
       </CardContent>
     </Card>
@@ -34,7 +36,7 @@
 
     <Card class="mt-4">
       <CardContent class="p-0">
-        <div v-if="loading && rows.length === 0" class="py-12 text-center">
+        <div v-if="loading" class="py-12 text-center">
           <RefreshCcw class="h-6 w-6 animate-spin text-neutral-muted mx-auto" />
         </div>
 
@@ -59,6 +61,7 @@
               v-for="c in rows"
               :key="c.id"
               class="cursor-pointer"
+              :class="{ 'data-settle': isNewRow(c.id) }"
               @click="viewCustomer(c.id)"
             >
               <TableCell>
@@ -130,7 +133,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from "vue";
+import { computed, ref } from "vue";
 import { ChevronLeft, ChevronRight, RefreshCcw, Search, Users } from "lucide-vue-next";
 import { Hay } from "@/utils/api";
 import type { RouterOutputs } from "@/types/trpc";
@@ -147,12 +150,25 @@ const router = useRouter();
 const { formatDateTime } = useOrgDateTime();
 
 const PAGE_SIZE = 20;
-const rows = ref<CustomerRow[]>([]);
-const total = ref(0);
-const totalPages = ref(1);
 const page = ref(1);
 const query = ref("");
-const loading = ref(false);
+// What the query uses: applied on Enter or the search button, not while typing.
+const appliedQuery = ref("");
+
+const customers = useCachedQuery(
+  () => ["customers", "list", { page: page.value, search: appliedQuery.value }] as const,
+  ([, , params]) =>
+    Hay.customers.list.query({
+      pagination: { page: params.page, limit: PAGE_SIZE },
+      search: params.search ? { query: params.search } : undefined,
+      sorting: { orderBy: "created_at", orderDirection: "desc" },
+    }),
+);
+const { loading, refreshing } = customers;
+const rows = computed<CustomerRow[]>(() => customers.data.value?.items ?? []);
+const total = computed(() => customers.data.value?.pagination.total ?? 0);
+const totalPages = computed(() => customers.data.value?.pagination.totalPages ?? 1);
+const isNewRow = useNewRows(() => customers.data.value?.items, customers.keyHash);
 
 // "_"-prefixed keys are Hay.chat bookkeeping (e.g. merged identities), not channels.
 const channelsFor = (c: CustomerRow): string[] =>
@@ -170,31 +186,13 @@ const viewCustomer = (id: string) => {
   router.push(`/customers/${id}`);
 };
 
-const load = async () => {
-  loading.value = true;
-  try {
-    const res = await Hay.customers.list.query({
-      pagination: { page: page.value, limit: PAGE_SIZE },
-      search: query.value ? { query: query.value } : undefined,
-      sorting: { orderBy: "created_at", orderDirection: "desc" },
-    });
-    rows.value = res.items;
-    total.value = res.pagination.total;
-    totalPages.value = res.pagination.totalPages;
-  } finally {
-    loading.value = false;
-  }
-};
-
 const reload = () => {
   page.value = 1;
-  void load();
+  appliedQuery.value = query.value;
+  void customers.refresh();
 };
 
 const goToPage = (p: number) => {
   page.value = p;
-  void load();
 };
-
-onMounted(load);
 </script>
