@@ -4,9 +4,15 @@
       <span data-testid="home-headline">{{ headline }}</span>
     </template>
     <template #header>
+      <RefreshIndicator :active="refreshing" />
       <PushAlertsToggle variant="compact" />
-      <Button variant="outline" size="icon" :aria-label="$t('common.refresh')" @click="load(true)">
-        <RefreshCw class="h-4 w-4" :class="{ 'animate-spin': loading }" />
+      <Button
+        variant="outline"
+        size="icon"
+        :aria-label="$t('common.refresh')"
+        @click="attention.refresh()"
+      >
+        <RefreshCw class="h-4 w-4" />
       </Button>
     </template>
 
@@ -14,7 +20,7 @@
     <div v-if="error" class="rounded-xl border border-destructive-200 bg-destructive-50 p-4">
       <p class="font-medium text-destructive-800">{{ $t("home.error.title") }}</p>
       <p class="mt-1 text-sm text-destructive-700">{{ error }}</p>
-      <Button variant="outline" size="sm" class="mt-3" @click="load(true)">
+      <Button variant="outline" size="sm" class="mt-3" @click="attention.refresh()">
         {{ $t("home.error.retry") }}
       </Button>
     </div>
@@ -23,20 +29,22 @@
     <InstallAppGuide dismissible />
 
     <!-- AI actions waiting for an approver (D4-6); hidden when none or not an approver -->
-    <ApprovalsSection @changed="load()" />
+    <ApprovalsSection @changed="attention.refresh()" />
 
     <!-- Facts the AI is checking with the team (D19); hidden when none -->
-    <QuestionsSection @changed="load()" />
+    <QuestionsSection @changed="attention.refresh()" />
 
     <!-- Waiting for a human: the only thing that must be seen first -->
     <section aria-labelledby="home-waiting-heading">
       <h2 id="home-waiting-heading" class="mb-2 flex items-baseline gap-2 text-sm font-semibold">
         {{ $t("home.sections.waiting") }}
-        <span class="tabular-nums text-neutral-muted">{{ pending.length }}</span>
+        <span v-if="attention.data.value" class="tabular-nums text-neutral-muted">
+          <SettleValue :value="pending.length" />
+        </span>
       </h2>
 
       <ul
-        v-if="loading && pending.length === 0"
+        v-if="loading"
         class="divide-y divide-border rounded-xl border border-border bg-background"
         aria-busy="true"
       >
@@ -58,6 +66,7 @@
           v-for="conversation in pending"
           :key="conversation.id"
           :conversation="conversation"
+          :class="{ 'data-settle': isNewPending(conversation.id) }"
           mode="pending"
           :busy="takingOver === conversation.id"
           @open="open"
@@ -66,7 +75,7 @@
       </ul>
 
       <div
-        v-else
+        v-else-if="attention.data.value"
         class="flex flex-col items-center gap-2 rounded-xl border border-dashed border-border px-6 py-10 text-center"
         data-testid="home-empty"
       >
@@ -80,7 +89,7 @@
     <section v-if="mine.length > 0" aria-labelledby="home-mine-heading">
       <h2 id="home-mine-heading" class="mb-2 flex items-baseline gap-2 text-sm font-semibold">
         {{ $t("home.sections.mine") }}
-        <span class="tabular-nums text-neutral-muted">{{ mine.length }}</span>
+        <span class="tabular-nums text-neutral-muted"><SettleValue :value="mine.length" /></span>
       </h2>
       <ul
         class="divide-y divide-border rounded-xl border border-border bg-background"
@@ -90,6 +99,7 @@
           v-for="conversation in mine"
           :key="conversation.id"
           :conversation="conversation"
+          :class="{ 'data-settle': isNewMine(conversation.id) }"
           mode="mine"
           @open="open"
         />
@@ -100,13 +110,14 @@
     <section v-if="team.length > 0" aria-labelledby="home-team-heading">
       <h2 id="home-team-heading" class="mb-2 flex items-baseline gap-2 text-sm font-semibold">
         {{ $t("home.sections.team") }}
-        <span class="tabular-nums text-neutral-muted">{{ team.length }}</span>
+        <span class="tabular-nums text-neutral-muted"><SettleValue :value="team.length" /></span>
       </h2>
       <ul class="divide-y divide-border rounded-xl border border-border bg-background">
         <ConversationAttentionRow
           v-for="conversation in team"
           :key="conversation.id"
           :conversation="conversation"
+          :class="{ 'data-settle': isNewTeam(conversation.id) }"
           mode="team"
           @open="open"
         />
@@ -145,7 +156,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from "vue";
+import { ref, computed, onMounted, onUnmounted, watch } from "vue";
 import { RefreshCw, CheckCircle2, ChevronRight } from "lucide-vue-next";
 import { Hay } from "@/utils/api";
 import { useAppStore } from "@/stores/app";
@@ -166,30 +177,42 @@ const takeoverApi = useConversationTakeover();
 const toast = useToast();
 const now = useNow();
 
-const loading = ref(true);
-const error = ref<string | null>(null);
 const takingOver = ref<string | null>(null);
-const pending = ref<AttentionConversation[]>([]);
-const handled = ref<AttentionConversation[]>([]);
 
-const load = async (showSpinner = false) => {
-  if (showSpinner) loading.value = true;
-  try {
-    const result = await Hay.conversations.attention.query();
-    pending.value = result.waiting;
-    handled.value = result.handling;
-    appStore.pendingHumanCount = result.waiting.length;
-    error.value = null;
-  } catch (err) {
-    error.value = err instanceof Error ? err.message : t("home.error.title");
-  } finally {
-    loading.value = false;
-  }
-};
+const attention = useCachedQuery(
+  () => ["conversations", "attention"] as const,
+  () => Hay.conversations.attention.query(),
+);
+const { loading, refreshing } = attention;
+const pending = computed<AttentionConversation[]>(() => attention.data.value?.waiting ?? []);
+const handled = computed<AttentionConversation[]>(() => attention.data.value?.handling ?? []);
+const error = computed(() => {
+  const err = attention.error.value;
+  if (!err) return null;
+  return err instanceof Error ? err.message : t("home.error.title");
+});
+
+watch(
+  () => attention.data.value?.waiting.length,
+  (count) => {
+    if (count !== undefined) appStore.pendingHumanCount = count;
+  },
+  { immediate: true },
+);
 
 const myId = computed(() => userStore.user?.id);
 const mine = computed(() => handled.value.filter((c) => c.assignedUserId === myId.value));
 const team = computed(() => handled.value.filter((c) => c.assignedUserId !== myId.value));
+
+const isNewPending = useNewRows(() => attention.data.value?.waiting, attention.keyHash);
+const isNewMine = useNewRows(
+  () => (attention.data.value ? mine.value : undefined),
+  attention.keyHash,
+);
+const isNewTeam = useNewRows(
+  () => (attention.data.value ? team.value : undefined),
+  attention.keyHash,
+);
 
 const longestWaitSeconds = computed(() => {
   const first = pending.value[0];
@@ -201,12 +224,12 @@ const longestWaitSeconds = computed(() => {
 });
 
 const headline = computed(() => {
-  if (loading.value && pending.value.length === 0) return t("home.headline.loading");
+  if (!attention.data.value) return t("home.headline.loading");
   return t("home.headline.waiting", pending.value.length);
 });
 
 const subline = computed(() => {
-  if (loading.value && pending.value.length === 0) return "";
+  if (!attention.data.value) return "";
   if (pending.value.length > 0) {
     return t("home.subline.longestWait", { time: formatWaitTime(longestWaitSeconds.value) });
   }
@@ -231,7 +254,7 @@ const takeOver = async (id: string) => {
       toast.info(t("home.row.handledBy", { name: owner.name }));
       takeoverApi.cancelTakeover();
     }
-    await load();
+    await attention.refresh();
   } finally {
     takingOver.value = null;
   }
@@ -241,12 +264,12 @@ const takeOver = async (id: string) => {
 let refreshTimer: ReturnType<typeof setTimeout> | null = null;
 const scheduleRefresh = () => {
   if (refreshTimer) clearTimeout(refreshTimer);
-  refreshTimer = setTimeout(() => void load(), 300);
+  refreshTimer = setTimeout(() => void attention.refresh(), 300);
 };
 const unsubscribers: Array<() => void> = [];
 
-onMounted(async () => {
-  await Promise.all([load(true), appStore.getOpenConversationsCount()]);
+onMounted(() => {
+  void appStore.getOpenConversationsCount();
   for (const event of [
     "conversation_status_changed",
     "conversation_updated",
