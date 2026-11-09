@@ -393,6 +393,10 @@ export const documentsRouter = t.router({
         ...(nextContent !== undefined && { content: nextContent }),
         ...(input.contentJson && { contentJson: stripMediaSignaturesInJson(input.contentJson) }),
         ...(input.status && { status: input.status }),
+        // Archiving a synced doc is sticky: the sync engine must not bring it back.
+        ...(input.status && {
+          excludedFromSync: input.status === DocumentationStatus.ARCHIVED,
+        }),
       });
       await auditDocument(ctx, "document.update", document.id, {
         fields: ["title", "content", "contentJson", "contentHtml", "status"].filter(

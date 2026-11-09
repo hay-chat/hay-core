@@ -432,6 +432,7 @@
 <script setup lang="ts">
 import { logger } from "@/utils/logger";
 import { HayApi } from "@/utils/api";
+import { setDocumentsArchived } from "@/utils/document-archive";
 import { useToast } from "@/composables/useToast";
 import { useWebSocket } from "@/composables/useWebSocket";
 
@@ -757,18 +758,18 @@ const editDocument = (document: Document) => {
 };
 
 const archiveDocument = async (document: Document) => {
-  try {
-    // TODO: Archive/unarchive via API
-    document.status = document.status === "archived" ? "active" : "archived";
-    toast.success(
-      document.status === "archived"
-        ? t("documents.toast.archiveSuccess")
-        : t("documents.toast.unarchiveSuccess"),
-    );
-  } catch (error) {
-    console.error("Error archiving document:", error);
+  const archive = document.status !== "archived";
+  const { failed } = await setDocumentsArchived([document.id], archive, (input) =>
+    HayApi.documents.update.mutate(input),
+  );
+  if (failed.length > 0) {
     toast.error(t("documents.toast.archiveFailed"));
+    return;
   }
+  toast.success(
+    archive ? t("documents.toast.archiveSuccess") : t("documents.toast.unarchiveSuccess"),
+  );
+  await refreshData();
 };
 
 const deleteDocument = (document: Document) => {
@@ -786,14 +787,16 @@ const deleteDocument = (document: Document) => {
 };
 
 const bulkArchive = async () => {
-  try {
-    // TODO: Bulk archive via API
-    logger.debug("Bulk archive:", selectedDocuments.value);
-    selectedDocuments.value = [];
-    toast.success(t("documents.toast.bulkArchiveSuccess"));
-  } catch (error) {
-    console.error("Error archiving documents:", error);
+  const { succeeded, failed } = await setDocumentsArchived(selectedDocuments.value, true, (input) =>
+    HayApi.documents.update.mutate(input),
+  );
+  selectedDocuments.value = failed;
+  if (failed.length > 0) {
     toast.error(t("documents.toast.bulkArchiveFailed"));
+  }
+  if (succeeded.length > 0) {
+    toast.success(t("documents.toast.bulkArchiveSuccess"));
+    await refreshData();
   }
 };
 
