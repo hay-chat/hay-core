@@ -7,7 +7,7 @@ import { monitorEventLoopDelay } from "node:perf_hooks";
  */
 
 type Labels = Record<string, string>;
-type Sample = { labels?: Labels; value: number };
+type Sample = { labels?: Labels; value: number; name?: string };
 type Collect = () => number | Sample[] | Promise<number | Sample[]>;
 type Metric = { name: string; help: string; type: string; samples: () => Promise<Sample[]> };
 
@@ -36,6 +36,55 @@ class Counter {
 function counter(name: string, help: string): Counter {
   const instance = new Counter();
   registry.push({ name, help, type: "counter", samples: async () => instance.samples() });
+  return instance;
+}
+
+const SECONDS_BUCKETS = [0.1, 0.5, 1, 2.5, 5, 10, 30, 60, 120, 300, 900, 3600];
+
+class Histogram {
+  private readonly series = new Map<
+    string,
+    { labels: Labels; counts: number[]; sum: number; count: number }
+  >();
+
+  constructor(
+    private readonly baseName: string,
+    private readonly buckets: number[],
+  ) {}
+
+  observe(labels: Labels, value: number): void {
+    const key = JSON.stringify(Object.entries(labels).sort(([a], [b]) => a.localeCompare(b)));
+    const entry = this.series.get(key) ?? {
+      labels,
+      counts: this.buckets.map(() => 0),
+      sum: 0,
+      count: 0,
+    };
+    this.buckets.forEach((bound, i) => {
+      if (value <= bound) entry.counts[i]++;
+    });
+    entry.sum += value;
+    entry.count++;
+    this.series.set(key, entry);
+  }
+
+  samples(): Sample[] {
+    return [...this.series.values()].flatMap(({ labels, counts, sum, count }) => [
+      ...this.buckets.map((bound, i) => ({
+        name: `${this.baseName}_bucket`,
+        labels: { ...labels, le: String(bound) },
+        value: counts[i],
+      })),
+      { name: `${this.baseName}_bucket`, labels: { ...labels, le: "+Inf" }, value: count },
+      { name: `${this.baseName}_sum`, labels, value: sum },
+      { name: `${this.baseName}_count`, labels, value: count },
+    ]);
+  }
+}
+
+function histogram(name: string, help: string): Histogram {
+  const instance = new Histogram(name, SECONDS_BUCKETS);
+  registry.push({ name, help, type: "histogram", samples: async () => instance.samples() });
   return instance;
 }
 
@@ -70,6 +119,18 @@ export const metrics = {
     "Checks made without Redis, by surface and action taken.",
   ),
   schedulerRuns: counter("hay_scheduler_runs_total", "Scheduled job runs, by job and status."),
+  deliveryAttempts: counter(
+    "hay_delivery_attempts_total",
+    "Channel delivery attempts, by outcome (delivered, retry, failed).",
+  ),
+  queueWaitSeconds: histogram(
+    "hay_queue_wait_seconds",
+    "Seconds a message waited in a queue before a consumer received it, by queue.",
+  ),
+  replyTurnSeconds: histogram(
+    "hay_reply_turn_seconds",
+    "Seconds an orchestrator turn took once picked up, by outcome.",
+  ),
   auditWriteFailures: counter(
     "hay_audit_write_failures_total",
     "Audit entries that failed to save.",
@@ -124,7 +185,7 @@ export async function renderMetrics(): Promise<string> {
     registry.map(async ({ name, help, type, samples }) => {
       const rows = await samples().catch(() => []);
       return [`# HELP ${name} ${help}`, `# TYPE ${name} ${type}`]
-        .concat(rows.map((row) => formatSample(name, row)))
+        .concat(rows.map((row) => formatSample(row.name ?? name, row)))
         .join("\n");
     }),
   );
