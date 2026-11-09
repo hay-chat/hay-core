@@ -61,6 +61,8 @@ import {
   SWITCH_OFF_CONFIRMATION,
 } from "@server/services/core/action-policy";
 import { auditLogService } from "@server/services/audit-log.service";
+import { organizationRequiresMfa } from "@server/services/mfa.service";
+import { requireMfaStepUp } from "@server/trpc/middleware/mfa";
 import { handleUpload } from "@server/lib/upload-helper";
 import { StorageService } from "@server/services/storage.service";
 import { createLogger } from "@server/lib/logger";
@@ -327,9 +329,51 @@ export const organizationsRouter = t.router({
         confidenceGuardrail,
         retentionDays: organization.settings?.retentionDays ?? null,
         actionApproval: resolveActionApprovalConfig(organization.settings),
+        mfaRequired: organizationRequiresMfa(organization),
       };
     },
   ),
+
+  /**
+   * Require two-factor authentication for every member. Members who have not
+   * enrolled are sent to enrol at their next login. Only the owner may lift it.
+   */
+  setMfaRequired: scopedProcedure(RESOURCES.ORGANIZATION_SETTINGS, ACTIONS.UPDATE)
+    .use(requireMfaStepUp)
+    .input(z.object({ required: z.boolean() }))
+    .mutation(async ({ ctx, input }) => {
+      if (ctx.user.authMethod !== "jwt") {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "This action requires a signed-in user",
+        });
+      }
+      if (!input.required && ctx.user.getRole() !== "owner") {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "Only the organization owner can stop requiring two-factor authentication",
+        });
+      }
+
+      const organization = await organizationService.findOne(ctx.organizationId!);
+      if (!organization) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Organization not found" });
+      }
+
+      await organizationService.update(ctx.organizationId!, {
+        settings: { ...(organization.settings || {}), mfaRequired: input.required },
+      });
+      await auditLogService.record({
+        userId: ctx.user.id,
+        organizationId: ctx.organizationId,
+        action: "security.setting.change",
+        resource: "organization",
+        changes: { mfaRequired: input.required },
+        ipAddress: ctx.ipAddress,
+        userAgent: ctx.userAgent,
+      });
+      return { success: true, mfaRequired: input.required };
+    }),
 
   // Static model presets + default tier maps for the settings UI (single source of
   // truth lives in services/llm/model-catalog.ts).
@@ -357,6 +401,7 @@ export const organizationsRouter = t.router({
   // Write the org's LLM provider config. A new plaintext key is encrypted here;
   // an omitted key preserves the existing one; clearApiKey reverts to the managed key.
   updateLlmConfig: scopedProcedure(RESOURCES.ORGANIZATION_SETTINGS, ACTIONS.UPDATE)
+    .use(requireMfaStepUp)
     .input(updateLlmConfigSchema)
     .mutation(async ({ ctx, input }) => {
       const organization = await organizationService.findOne(ctx.organizationId!);
@@ -939,6 +984,7 @@ export const organizationsRouter = t.router({
    * Requires: organization_members:manage scope (typically owner/admin only)
    */
   updateMemberRole: scopedProcedure(RESOURCES.ORGANIZATION_MEMBERS, ACTIONS.MANAGE)
+    .use(requireMfaStepUp)
     .input(
       z.object({
         userId: z.string().uuid(),

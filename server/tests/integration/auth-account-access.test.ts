@@ -217,7 +217,7 @@ describe("account access", () => {
         .createCaller(publicCtx())
         .verifyEmail({ token: await lastVerificationToken() });
       const login = await authRouter.createCaller(publicCtx()).login({ email, password: PASSWORD });
-      expect(login.accessToken).toEqual(expect.any(String));
+      expect(login).toMatchObject({ mfaRequired: false, accessToken: expect.any(String) });
     });
 
     it("answers an existing email like a new one, without a session or org", async () => {

@@ -60,6 +60,8 @@ export interface User {
   onlineStatus?: "online" | "away" | "offline";
   pendingEmail?: string | null;
   emailVerificationExpiresAt?: Date;
+  /** An organization requires two-factor authentication and this user has not enrolled. */
+  mfaEnrolmentRequired?: boolean;
 }
 
 export const useUserStore = defineStore("user", {
@@ -253,6 +255,7 @@ export const useUserStore = defineStore("user", {
         onlineStatus: userData.onlineStatus,
         pendingEmail: userData.pendingEmail,
         emailVerificationExpiresAt: userData.emailVerificationExpiresAt,
+        mfaEnrolmentRequired: userData.mfaEnrolmentRequired,
       };
 
       // Set organizations if provided

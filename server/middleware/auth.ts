@@ -1,6 +1,8 @@
 import { Request, Response, NextFunction } from "express";
 import { requireAuth, requireAdmin } from "@server/lib/auth/middleware";
 import { AuthUser } from "@server/lib/auth/AuthUser";
+import { TRPCError } from "@trpc/server";
+import { mfaService } from "@server/services/mfa.service";
 
 const ORGANIZATION_ID_PATTERN = /^[A-Za-z0-9_-]+$/;
 
@@ -104,4 +106,28 @@ export const withOptionalAuth = async (
   }
 
   next();
+};
+
+/**
+ * Express counterpart of the `requireMfaStepUp` tRPC middleware. Goes after
+ * `withAuth` or `withAdminAuth`.
+ */
+export const withMfaStepUp = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> => {
+  try {
+    await mfaService.assertStepUp(req.user!);
+    next();
+  } catch (error) {
+    if (error instanceof TRPCError && error.code === "FORBIDDEN") {
+      res.status(403).json({
+        error: error.message,
+        type: (error.cause as { type?: string } | undefined)?.type,
+      });
+      return;
+    }
+    next(error);
+  }
 };

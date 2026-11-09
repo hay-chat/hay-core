@@ -235,6 +235,8 @@
     </Card>
 
     <!-- Recent Security Activity -->
+    <MfaSettingsCard />
+
     <Card>
       <CardHeader>
         <CardTitle>{{ $t("profile.activeSessions") }}</CardTitle>
@@ -353,6 +355,7 @@ import { validateEmail as validateEmailUtil, validatePassword } from "@/lib/util
 import { useFileUpload } from "@/composables/useFileUpload";
 import PasswordStrength from "@/components/auth/PasswordStrength.vue";
 import ReauthModal from "@/components/auth/ReauthModal.vue";
+import MfaSettingsCard from "@/components/auth/MfaSettingsCard.vue";
 import Avatar from "@/components/ui/Avatar.vue";
 
 const { t } = useI18n();

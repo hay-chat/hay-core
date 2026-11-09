@@ -7,6 +7,7 @@ import { generateApiKey, hashApiKey } from "@server/lib/auth/utils/hashing";
 import { ApiTokenScope } from "@server/types/api-token-scopes";
 import { RESOURCES, ACTIONS } from "@server/types/scopes";
 import { auditLogService } from "@server/services/audit-log.service";
+import { requireMfaStepUp } from "@server/trpc/middleware/mfa";
 
 // Schema for creating an API token
 const createApiTokenSchema = z.object({
@@ -46,6 +47,7 @@ export const apiTokensRouter = t.router({
    * Returns the plain token ONLY ONCE
    */
   create: scopedProcedure(RESOURCES.API_KEYS, ACTIONS.CREATE)
+    .use(requireMfaStepUp)
     .input(createApiTokenSchema)
     .mutation(async ({ input, ctx }) => {
       if (!ctx.organizationId) {

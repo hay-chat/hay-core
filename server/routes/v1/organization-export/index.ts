@@ -2,6 +2,7 @@ import { TRPCError } from "@trpc/server";
 import { t, scopedProcedure } from "@server/trpc";
 import { RESOURCES, ACTIONS } from "@server/types/scopes";
 import { organizationExportService } from "@server/services/organization-export.service";
+import { requireMfaStepUp } from "@server/trpc/middleware/mfa";
 
 /**
  * Settings → Privacy → "Download all data" (D15-6). Owner/admin only: the
@@ -14,12 +15,13 @@ export const organizationExportRouter = t.router({
     organizationExportService.getState(ctx.organizationId!),
   ),
 
-  request: scopedProcedure(RESOURCES.ORGANIZATIONS, ACTIONS.EXPORT).mutation(({ ctx }) =>
-    organizationExportService.request(ctx.organizationId!, ctx.user?.id),
-  ),
+  request: scopedProcedure(RESOURCES.ORGANIZATIONS, ACTIONS.EXPORT)
+    .use(requireMfaStepUp)
+    .mutation(({ ctx }) => organizationExportService.request(ctx.organizationId!, ctx.user?.id)),
 
-  downloadLink: scopedProcedure(RESOURCES.ORGANIZATIONS, ACTIONS.EXPORT).mutation(
-    async ({ ctx }) => {
+  downloadLink: scopedProcedure(RESOURCES.ORGANIZATIONS, ACTIONS.EXPORT)
+    .use(requireMfaStepUp)
+    .mutation(async ({ ctx }) => {
       const link = await organizationExportService.downloadLink(ctx.organizationId!, ctx.user?.id);
       if (!link) {
         throw new TRPCError({
@@ -28,6 +30,5 @@ export const organizationExportRouter = t.router({
         });
       }
       return link;
-    },
-  ),
+    }),
 });

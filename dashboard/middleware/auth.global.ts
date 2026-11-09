@@ -5,6 +5,8 @@ import { useUserStore, type User } from "@/stores/user";
 import { redirectForSuspension, SUSPENDED_ROUTE } from "@/composables/useSuspension";
 import { Hay } from "@/utils/api";
 
+const MFA_ENROLMENT_ROUTE = "/settings/profile";
+
 // Define role-protected routes
 // Map route paths to required roles
 // Exported so custom menu items can register dynamic role restrictions
@@ -152,6 +154,10 @@ export default defineNuxtRouteMiddleware(
     }
     if (to.path === SUSPENDED_ROUTE) {
       return navigateTo("/");
+    }
+
+    if (userStore.user?.mfaEnrolmentRequired && to.path !== MFA_ENROLMENT_ROUTE) {
+      return navigateTo(MFA_ENROLMENT_ROUTE);
     }
 
     // Role-based route protection

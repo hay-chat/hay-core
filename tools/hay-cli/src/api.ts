@@ -97,18 +97,22 @@ export class HayApi {
 
   /** `auth.login`; keeps the new tokens and, without an explicit org, adopts the user's active one. */
   async login(email: string, password: string): Promise<LoginResponse> {
-    const response = await this.call<LoginResponse>(
+    const response = await this.call<LoginResponse | { mfaRequired: true }>(
       "POST",
       "auth.login",
       { email, password },
       false,
       true,
     );
-    this.profile.accessToken = response.accessToken;
-    this.profile.refreshToken = response.refreshToken;
-    this.organizationId ??= response.user.activeOrganizationId;
-    this.onLogin?.(email, response, this.organizationId);
-    return response;
+    if ("mfaRequired" in response && response.mfaRequired) {
+      throw new Error("This account uses two-factor authentication; use an API token instead.");
+    }
+    const session = response as LoginResponse;
+    this.profile.accessToken = session.accessToken;
+    this.profile.refreshToken = session.refreshToken;
+    this.organizationId ??= session.user.activeOrganizationId;
+    this.onLogin?.(email, session, this.organizationId);
+    return session;
   }
 
   query<T>(path: string, input?: unknown, opts: { auth?: boolean } = {}): Promise<T> {

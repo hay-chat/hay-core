@@ -28,22 +28,25 @@ import { config, getDashboardUrl } from "@server/config/env";
 import { StorageService } from "@server/services/storage.service";
 import { handleUpload } from "@server/lib/upload-helper";
 import { assertPasswordNotBreached, newPasswordSchema } from "@server/lib/auth/password-policy";
-import {
-  clearRefreshCookies,
-  readRefreshCookie,
-  setRefreshCookies,
-} from "@server/lib/auth/session-cookie";
-import type { Context } from "@server/trpc/context";
-import type { AuthTokens } from "@server/types/auth.types";
+import { clearRefreshCookies, readRefreshCookie } from "@server/lib/auth/session-cookie";
 import { rateLimitService, type RateLimitScope } from "@server/services/rate-limit.service";
 import { rateLimitMiddleware } from "@server/trpc/middleware/rate-limit";
-import { toAccessState } from "@server/services/organization-access.service";
 import {
   AGENT_PAUSE_REASONS,
   SUSPENSION_REASONS,
   accessNoticeSchema,
 } from "@server/types/organization-access.types";
 import { createLogger } from "@server/lib/logger";
+import { MFA_CHALLENGE_TTL_SECONDS, generateMfaChallengeToken } from "@server/lib/auth/utils/jwt";
+import { mfaService } from "@server/services/mfa.service";
+import { mfaRouter } from "./mfa";
+import {
+  PASSWORD_CHECK_RATE_LIMIT,
+  completeLogin,
+  deliverTokens,
+  getUserOrganizations,
+  requireSessionUser,
+} from "./shared";
 import { enableDefaultPlugins } from "@server/services/default-plugins.service";
 import {
   createAccount,
@@ -52,34 +55,6 @@ import {
 } from "@server/services/account-registration.service";
 
 const logger = createLogger("auth");
-
-/**
- * Helper function to get all organizations for a user with their roles
- */
-async function getUserOrganizations(userId: string) {
-  const userOrgRepository = AppDataSource.getRepository(UserOrganization);
-  const userOrganizations = await userOrgRepository.find({
-    where: { userId, isActive: true },
-    relations: ["organization", "organization.logoUpload"],
-    order: { createdAt: "ASC" },
-  });
-
-  const storageService = new StorageService();
-
-  return userOrganizations.map((userOrg) => ({
-    id: userOrg.organization.id,
-    name: userOrg.organization.name,
-    slug: userOrg.organization.slug,
-    logo: userOrg.organization.logoUpload
-      ? storageService.getUrl(userOrg.organization.logoUpload)
-      : null,
-    role: userOrg.role,
-    permissions: userOrg.permissions,
-    joinedAt: userOrg.joinedAt,
-    lastAccessedAt: userOrg.lastAccessedAt,
-    ...toAccessState(userOrg.organization),
-  }));
-}
 
 const passwordSchema = z.string().min(8).max(128);
 
@@ -114,18 +89,6 @@ const refreshTokenSchema = z.object({
   useCookie: useCookieField,
 });
 
-/** Hand tokens to the client: the refresh token goes to the cookie in cookie mode. */
-function deliverTokens(
-  ctx: Pick<Context, "res">,
-  tokens: AuthTokens,
-  useCookie: boolean | undefined,
-): Omit<AuthTokens, "refreshToken"> & { refreshToken?: string } {
-  if (!useCookie) return tokens;
-  setRefreshCookies(ctx.res, tokens.refreshToken);
-  const { refreshToken: _inCookie, ...rest } = tokens;
-  return rest;
-}
-
 /** A password being changed must differ from the current one and not be known to be breached. */
 async function assertNewPasswordAllowed(user: User, newPassword: string): Promise<void> {
   if (await verifyPassword(newPassword, user.password)) {
@@ -136,23 +99,6 @@ async function assertNewPasswordAllowed(user: User, newPassword: string): Promis
   }
   await assertPasswordNotBreached(newPassword);
 }
-
-/** Managing sessions is for a signed-in person; API tokens have no session. */
-function requireSessionUser(ctx: Pick<Context, "user">) {
-  if (ctx.user?.authMethod !== "jwt") {
-    throw new TRPCError({ code: "FORBIDDEN", message: "Sessions require a signed-in user" });
-  }
-  return ctx.user;
-}
-
-/** Re-authentication checks (password confirm, password/email change): 5 per 15 minutes. */
-const PASSWORD_CHECK_RATE_LIMIT = {
-  max: 5,
-  windowMs: 15 * 60 * 1000,
-  keyPrefix: "password_check",
-  useUserId: true,
-  failClosed: true,
-};
 
 /**
  * Auth codes only go to origins in CONNECT_ALLOWED_REDIRECT_ORIGINS
@@ -244,6 +190,8 @@ async function assertSignupAllowed(manager: EntityManager, email: string): Promi
 }
 
 export const authRouter = t.router({
+  mfa: mfaRouter,
+
   // Public endpoints
 
   /**
@@ -332,50 +280,21 @@ export const authRouter = t.router({
       });
     }
 
-    // Update last login time and last seen
     // Older accounts hold bcrypt hashes; move them to argon2 while the password is at hand.
     if (user.password.startsWith("$2")) {
       user.password = await hashPassword(password, "argon2");
-    }
-    user.lastLoginAt = new Date();
-    user.updateLastSeen();
-    await userRepository.save(user);
-
-    const tokens = await authSessionService.createSession(user, ctx);
-    await auditLogService.record({
-      userId: user.id,
-      action: "user.login",
-      resource: "auth",
-      ipAddress: ctx.ipAddress,
-      userAgent: ctx.userAgent,
-    });
-
-    // Load all user organizations (multi-org support)
-    const organizations = await getUserOrganizations(user.id);
-
-    // Determine active organization
-    // If user has UserOrganizations, use the most recently accessed one
-    // Otherwise fall back to legacy organizationId
-    let activeOrganizationId = user.organizationId;
-    if (organizations.length > 0) {
-      // Find most recently accessed, or first one if none have been accessed
-      const mostRecent = organizations.reduce((prev, current) => {
-        if (!prev.lastAccessedAt) return current;
-        if (!current.lastAccessedAt) return prev;
-        return new Date(current.lastAccessedAt) > new Date(prev.lastAccessedAt) ? current : prev;
-      });
-      activeOrganizationId = mostRecent.id;
+      await userRepository.save(user);
     }
 
-    return {
-      user: {
-        ...user.toJSON(),
-        organizations,
-        activeOrganizationId,
-        onlineStatus: user.getOnlineStatus(),
-      },
-      ...deliverTokens(ctx, tokens, input.useCookie),
-    };
+    if (await mfaService.findConfirmed(user.id)) {
+      return {
+        mfaRequired: true as const,
+        challengeToken: generateMfaChallengeToken(user),
+        expiresIn: MFA_CHALLENGE_TTL_SECONDS,
+      };
+    }
+
+    return completeLogin(user, ctx, input.useCookie);
   }),
 
   /**
@@ -773,6 +692,7 @@ export const authRouter = t.router({
         ),
         activeOrganizationId: z.string().optional(),
         role: z.enum(["owner", "admin", "member", "viewer", "contributor", "agent"]),
+        mfaEnrolmentRequired: z.boolean(),
       }),
     )
     .query(async ({ ctx }) => {
@@ -832,6 +752,7 @@ export const authRouter = t.router({
         organizations,
         activeOrganizationId,
         role,
+        mfaEnrolmentRequired: await mfaService.enrolmentRequired(user.id),
       };
     }),
 

@@ -552,6 +552,42 @@
     "notifications": {
       "title": "Alertas neste dispositivo",
       "description": "Notificações push quando uma conversa precisar de um humano. A configuração é por dispositivo: ative em cada celular ou computador que você usa."
+    },
+    "mfa": {
+      "title": "Autenticação em dois fatores",
+      "description": "Adicione um código de um aplicativo autenticador a cada login.",
+      "requiredNotice": "Sua organização exige autenticação em dois fatores. Configure para continuar.",
+      "passwordLabel": "Confirme sua senha",
+      "enable": "Configurar dois fatores",
+      "setupDescription": "Adicione esta chave ao seu aplicativo autenticador e digite o código exibido.",
+      "manualKey": "Chave de configuração",
+      "openInApp": "Abrir no aplicativo autenticador",
+      "codeLabel": "Código de verificação",
+      "codePlaceholder": "Código de 6 dígitos ou código de recuperação",
+      "confirm": "Ativar",
+      "enabled": "Ativada",
+      "codesRemaining": "{count} códigos de recuperação restantes",
+      "regenerate": "Novos códigos de recuperação",
+      "disable": "Desativar",
+      "recoveryTitle": "Guarde seus códigos de recuperação",
+      "recoveryDescription": "Cada código funciona uma vez caso você perca o dispositivo. Eles não serão exibidos novamente.",
+      "copyCodes": "Copiar códigos",
+      "savedCodes": "Já guardei",
+      "copiedToast": "Códigos de recuperação copiados",
+      "disabledToast": "Autenticação em dois fatores desativada",
+      "stepUpTitle": "Confirme que é você",
+      "stepUpDescription": "Digite um código de dois fatores para continuar com esta ação.",
+      "stepUpDone": "Confirmado. Tente novamente.",
+      "orgTitle": "Autenticação em dois fatores para sua equipe",
+      "orgDescription": "Proteja todas as contas desta organização com um segundo fator.",
+      "orgSwitch": "Exigir autenticação em dois fatores",
+      "orgHint": "Os membros que ainda não configuraram serão solicitados no próximo login.",
+      "errors": {
+        "invalidCode": "Esse código não é válido. Tente novamente.",
+        "wrongPassword": "Essa senha está incorreta.",
+        "tooMany": "Muitas tentativas. Tente novamente mais tarde.",
+        "generic": "Algo deu errado. Tente novamente."
+      }
     }
   },
   "gitConnections": {

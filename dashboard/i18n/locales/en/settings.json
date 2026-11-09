@@ -552,6 +552,42 @@
     "notifications": {
       "title": "Alerts on this device",
       "description": "Push notifications when a conversation needs a human. Set per device, so turn them on from each phone or computer you use."
+    },
+    "mfa": {
+      "title": "Two-factor authentication",
+      "description": "Add a code from an authenticator app to every sign-in.",
+      "requiredNotice": "Your organization requires two-factor authentication. Set it up to continue.",
+      "passwordLabel": "Confirm your password",
+      "enable": "Set up two-factor",
+      "setupDescription": "Add this key to your authenticator app, then enter the code it shows.",
+      "manualKey": "Setup key",
+      "openInApp": "Open in authenticator app",
+      "codeLabel": "Verification code",
+      "codePlaceholder": "6-digit code or recovery code",
+      "confirm": "Turn on",
+      "enabled": "On",
+      "codesRemaining": "{count} recovery codes left",
+      "regenerate": "New recovery codes",
+      "disable": "Turn off",
+      "recoveryTitle": "Save your recovery codes",
+      "recoveryDescription": "Each code works once if you lose your device. They won't be shown again.",
+      "copyCodes": "Copy codes",
+      "savedCodes": "I saved them",
+      "copiedToast": "Recovery codes copied",
+      "disabledToast": "Two-factor authentication turned off",
+      "stepUpTitle": "Confirm it's you",
+      "stepUpDescription": "Enter a two-factor code to continue with this action.",
+      "stepUpDone": "Confirmed. Please try that again.",
+      "orgTitle": "Two-factor authentication for your team",
+      "orgDescription": "Protect every account in this organization with a second factor.",
+      "orgSwitch": "Require two-factor authentication",
+      "orgHint": "Members who haven't set it up are asked to at their next sign-in.",
+      "errors": {
+        "invalidCode": "That code is not valid. Try again.",
+        "wrongPassword": "That password is incorrect.",
+        "tooMany": "Too many attempts. Please try again later.",
+        "generic": "Something went wrong. Please try again."
+      }
     }
   },
   "gitConnections": {
