@@ -56,6 +56,14 @@ describe("validatePluginZip", () => {
     );
   });
 
+  it("limits the package name so its storage folder fits", () => {
+    const fits = `@${"a".repeat(40)}/${"b".repeat(46)}`;
+    expect(validatePluginZip(zipOf({ "package.json": packageJson(fits) })).pluginId).toBe(fits);
+    expect(() => validatePluginZip(zipOf({ "package.json": packageJson(`${fits}c`) }))).toThrow(
+      "at most 88",
+    );
+  });
+
   it("rejects core-only manifest fields", () => {
     const pkg = Buffer.from(
       JSON.stringify({ name: "p", "hay-plugin": { entry: "x.js", trpcRouter: "router.cjs" } }),

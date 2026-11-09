@@ -84,6 +84,9 @@ function readPackageJson(entry: AdmZip.IZipEntry): string {
   return data.toString("utf8");
 }
 
+/** Stored ZIPs live in `plugin-zips/<id>`, and uploads.folder holds 100 characters. */
+const PLUGIN_ID_MAX_LENGTH = 88;
+
 /**
  * Validate a plugin ZIP without extracting it: declared size/entry caps, no path
  * traversal, no symlinks, and a valid root `package.json`. A header can
@@ -179,6 +182,10 @@ export function parsePluginPackageJson(content: string): {
     throw new Error(
       "Plugin ID (package name) must be a valid npm package name (lowercase letters, numbers, hyphens, optional scope)",
     );
+  }
+
+  if (pluginId.length > PLUGIN_ID_MAX_LENGTH) {
+    throw new Error(`Plugin ID (package name) must be at most ${PLUGIN_ID_MAX_LENGTH} characters`);
   }
 
   const manifest: UploadedPluginManifest = {
