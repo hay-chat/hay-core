@@ -8,6 +8,7 @@ import { createLogger } from "@server/lib/logger";
 import { WebScraperService } from "@server/services/web-scraper.service";
 import { WEBSITE_PLUGIN_ID } from "@server/services/importers/website-importer";
 import { hostKey, normalizeUrl, websiteUrl } from "@server/services/core/link-guardrail.service";
+import { escapeLike } from "@server/lib/sql-like";
 
 const logger = createLogger("site-index");
 
@@ -166,7 +167,7 @@ export class SiteIndexService {
   async search(organizationId: string, query: string): Promise<FoundPage[]> {
     const terms = searchTerms(query);
     if (terms.length === 0) return [];
-    const patterns = terms.map((term) => `%${term.replace(/[%_\\]/g, "\\$&")}%`);
+    const patterns = terms.map((term) => `%${escapeLike(term)}%`);
 
     const [pages, documents] = await Promise.all([
       this.pages

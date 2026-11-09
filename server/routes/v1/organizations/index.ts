@@ -72,6 +72,7 @@ import {
   ESCALATION_OFF_CONFIRMATION,
   confidenceGuardrailLoosening,
 } from "@server/services/core/confidence-guardrail.service";
+import { escapeLike } from "@server/lib/sql-like";
 
 const logger = createLogger("organizations");
 
@@ -881,7 +882,7 @@ export const organizationsRouter = t.router({
       if (input?.search) {
         queryBuilder.andWhere(
           "(LOWER(user.email) LIKE :search OR LOWER(user.firstName) LIKE :search OR LOWER(user.lastName) LIKE :search)",
-          { search: `%${input.search.toLowerCase()}%` },
+          { search: `%${escapeLike(input.search.toLowerCase())}%` },
         );
       }
 

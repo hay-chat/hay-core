@@ -57,6 +57,13 @@ describe("documentSources.create", () => {
     mockFindByOrgAndPlugin.mockResolvedValue({ id: OWN_INSTANCE });
   });
 
+  it("refuses a sync interval shorter than the dashboard's fastest schedule", async () => {
+    await expect(
+      caller.create({ ...input(OWN_INSTANCE), syncIntervalMs: 1000 }),
+    ).rejects.toMatchObject({ code: "BAD_REQUEST" });
+    expect(mockCreate).not.toHaveBeenCalled();
+  });
+
   it("rejects another organization's plugin instance", async () => {
     await expect(caller.create(input(FOREIGN_INSTANCE))).rejects.toMatchObject({
       code: "NOT_FOUND",

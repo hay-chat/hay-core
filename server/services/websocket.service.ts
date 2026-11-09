@@ -815,7 +815,11 @@ export class WebSocketService {
       // Per conversation only after the proof checks out, so knowing a
       // conversationId is not enough to spend (and mute) a shopper's budget.
       if (
-        await isPublicWidgetRateLimited([{ rule: "messagePerConversation", id: conversationId }])
+        await isPublicWidgetRateLimited([
+          { rule: "messagePerConversation", id: conversationId },
+          { rule: "messagePerOrg", id: conversation.organization_id },
+          { rule: "messagePerOrgHourly", id: conversation.organization_id },
+        ])
       ) {
         this.sendError(client, "RATE_LIMITED");
         return;

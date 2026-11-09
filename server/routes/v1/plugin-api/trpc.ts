@@ -35,6 +35,7 @@ import type {
   RemoteMCPServerConfig,
 } from "@server/types/plugin.types";
 import { createLogger } from "@server/lib/logger";
+import { fitsInBytes } from "@server/lib/validation/json-record";
 import { validateUrlForSSRF } from "@server/utils/ssrf";
 import { emailDomainService } from "@server/services/email-domains.service";
 import { channelHealthService } from "@server/services/channel-health.service";
@@ -50,6 +51,8 @@ const channelNameSchema = z
   .regex(/^[a-z0-9][a-z0-9_-]*$/, "Channel names are lowercase letters, digits, - and _");
 
 const logger = createLogger("plugin-api-trpc");
+
+const CUSTOMER_METADATA_MAX_BYTES = 65_536;
 
 // How a provider names the data subject of a privacy request (privacy.*).
 const privacySubjectSchema = z
@@ -918,12 +921,17 @@ export const pluginApiTrpcRouter = router({
   "customers.upsert": pluginProcedure
     .input(
       z.object({
-        externalId: z.string(),
-        channel: z.string(),
-        email: z.string().email().optional(),
-        phone: z.string().optional(),
-        name: z.string().optional(),
-        metadata: z.record(z.string(), z.any()).optional(),
+        externalId: z.string().min(1).max(255),
+        channel: z.string().min(1).max(64),
+        email: z.string().email().max(320).optional(),
+        phone: z.string().max(64).optional(),
+        name: z.string().max(255).optional(),
+        metadata: z
+          .record(z.string(), z.any())
+          .refine((value) => fitsInBytes(value, CUSTOMER_METADATA_MAX_BYTES), {
+            message: "Metadata is too large",
+          })
+          .optional(),
       }),
     )
     .mutation(async ({ input, ctx }) => {
@@ -944,8 +952,8 @@ export const pluginApiTrpcRouter = router({
           external_metadata: {
             ...existing.external_metadata,
             [channel]: {
-              id: externalId,
               ...metadata,
+              id: externalId,
             },
           },
         });
@@ -962,8 +970,8 @@ export const pluginApiTrpcRouter = router({
         name,
         external_metadata: {
           [channel]: {
-            id: externalId,
             ...metadata,
+            id: externalId,
           },
         },
       });

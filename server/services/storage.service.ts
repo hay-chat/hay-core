@@ -1,8 +1,9 @@
 import { fileTypeFromBuffer } from "file-type";
-import { S3Client, DeleteObjectCommand } from "@aws-sdk/client-s3";
+import { S3Client, DeleteObjectCommand, GetObjectCommand } from "@aws-sdk/client-s3";
 import { Upload as S3Upload } from "@aws-sdk/lib-storage";
 import * as fs from "fs";
 import * as path from "path";
+import type { Readable } from "stream";
 import { v4 as uuidv4 } from "uuid";
 import { config } from "../config/env";
 import { Upload } from "../entities/upload.entity";
@@ -175,7 +176,11 @@ export class StorageService {
         buffer.length,
         options.maxSize ?? config.storage.limits.conversationMediaMaxFileSize,
       );
-      ({ buffer, mimeType } = await sanitizeConversationMedia(buffer, mimeType));
+      ({ buffer, mimeType } = await sanitizeConversationMedia(
+        buffer,
+        mimeType,
+        options.originalName,
+      ));
       extension = CONVERSATION_MEDIA_TYPES[mimeType];
     } else if (isPublicFolder(options.folder) || options.folder === DOCUMENT_IMAGES_FOLDER) {
       this.validateSize(buffer.length, options.maxSize);
@@ -246,6 +251,35 @@ export class StorageService {
     }
 
     return { buffer, upload };
+  }
+
+  /**
+   * Open a stored file for reading without loading it into memory, optionally
+   * only bytes `range[0]..range[1]` (inclusive).
+   */
+  async openReadStream(upload: Upload, range?: [number, number]): Promise<Readable> {
+    if (upload.storageType === "s3") {
+      if (!this.s3Client) {
+        throw new Error("S3 client not initialized");
+      }
+      const response = await this.s3Client.send(
+        new GetObjectCommand({
+          Bucket: config.storage.s3.bucket!,
+          Key: upload.path,
+          Range: range ? `bytes=${range[0]}-${range[1]}` : undefined,
+        }),
+      );
+      if (!response.Body) {
+        throw new Error(`Failed to download file from S3: ${upload.path}`);
+      }
+      return response.Body as Readable;
+    }
+
+    const fullPath = this.resolveLocalPath(upload.path);
+    if (!fs.existsSync(fullPath)) {
+      throw new Error(`File not found: ${upload.path}`);
+    }
+    return fs.createReadStream(fullPath, range ? { start: range[0], end: range[1] } : undefined);
   }
 
   /**
@@ -453,8 +487,6 @@ export class StorageService {
     if (!this.s3Client) {
       throw new Error("S3 client not initialized");
     }
-
-    const { GetObjectCommand } = await import("@aws-sdk/client-s3");
 
     const command = new GetObjectCommand({
       Bucket: config.storage.s3.bucket!,

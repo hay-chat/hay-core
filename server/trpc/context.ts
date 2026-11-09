@@ -1,4 +1,5 @@
 import type { CreateExpressContextOptions } from "@trpc/server/adapters/express";
+import { TRPCError } from "@trpc/server";
 import { AuthUser } from "@server/lib/auth/AuthUser";
 import { authenticate } from "@server/lib/auth/middleware";
 import type { ListParams } from "./middleware/pagination";
@@ -20,6 +21,7 @@ export interface Context {
 
 interface RequestWithAuthError extends Request {
   authError?: string;
+  authDenied?: TRPCError;
 }
 
 export const createContext = async ({
@@ -33,7 +35,10 @@ export const createContext = async ({
     user = await authenticate(req);
   } catch (error) {
     // Log authentication errors but don't fail context creation
-    if (error instanceof Error) {
+    if (error instanceof TRPCError && error.code === "FORBIDDEN") {
+      // Valid credentials, wrong organization: procedures that need a user report this.
+      (req as RequestWithAuthError).authDenied = error;
+    } else if (error instanceof Error) {
       logger.error({ err: error }, "Authentication error");
 
       // Store the error for procedures that require auth

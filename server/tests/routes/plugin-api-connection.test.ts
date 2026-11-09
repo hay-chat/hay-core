@@ -31,8 +31,12 @@ jest.mock("@server/repositories/conversation.repository", () => ({
   ConversationRepository: jest.fn(() => ({})),
   conversationRepository: {},
 }));
+const mockCustomerCreate = jest.fn(async (data: Record<string, unknown>) => data);
 jest.mock("@server/repositories/customer.repository", () => ({
-  CustomerRepository: jest.fn(() => ({})),
+  CustomerRepository: jest.fn(() => ({
+    findByExternalId: jest.fn(async () => null),
+    create: mockCustomerCreate,
+  })),
 }));
 jest.mock("@server/repositories/organization.repository", () => ({
   organizationRepository: {
@@ -102,6 +106,32 @@ const ctx = (capabilities = ["messages", "customers"]) => {
 const caller = (capabilities?: string[]) => pluginApiTrpcRouter.createCaller(ctx(capabilities));
 
 const nextTick = () => new Promise<void>((resolve) => setImmediate(resolve));
+
+describe("pluginApi customers.upsert", () => {
+  it("keeps the external id when metadata carries its own id", async () => {
+    await caller(["customers"])["customers.upsert"]({
+      externalId: "ext-1",
+      channel: "shop",
+      metadata: { id: "other", plan: "pro" },
+    });
+
+    expect(mockCustomerCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        external_metadata: { shop: { id: "ext-1", plan: "pro" } },
+      }),
+    );
+  });
+
+  it("refuses oversized metadata", async () => {
+    await expect(
+      caller(["customers"])["customers.upsert"]({
+        externalId: "ext-1",
+        channel: "shop",
+        metadata: { blob: "x".repeat(70_000) },
+      }),
+    ).rejects.toMatchObject({ code: "BAD_REQUEST" });
+  });
+});
 
 describe("pluginApi.connection.revoke", () => {
   beforeEach(() => {

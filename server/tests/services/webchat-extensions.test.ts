@@ -200,6 +200,16 @@ describe("webchat gates", () => {
     });
   });
 
+  it("denies when a gate cannot run while the org is under attack", async () => {
+    findEnabledByOrganization.mockResolvedValue([instance("a", {}, gates("open"))]);
+    fetchMock.mockResolvedValueOnce(reply({ error: "boom" }, 500));
+    const outcome = await webchatExtensionsService.runGates("org-1", "conversation.create", {
+      ...input,
+      underAttack: true,
+    });
+    expect(outcome.decision).toBe("deny");
+  });
+
   it("fails closed as a deny when the plugin asks for it", async () => {
     findEnabledByOrganization.mockResolvedValue([instance("a", {}, gates("closed"))]);
     getOrStartWorker.mockRejectedValueOnce(new Error("cannot start"));

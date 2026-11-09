@@ -1,10 +1,13 @@
 import { t, scopedProcedure } from "@server/trpc";
 import { z } from "zod";
+import { TRPCError } from "@trpc/server";
 import { auditLogService } from "@server/services/audit-log.service";
 import type { AuditAction, AuditLog } from "@server/entities/audit-log.entity";
 import { toClientError } from "@server/trpc/client-error";
 import { RESOURCES, ACTIONS } from "@server/types/scopes";
-import { csvCell } from "@server/services/organization-export.service";
+import { csvCell } from "@server/lib/csv";
+
+const AUDIT_EXPORT_MAX_ROWS = 50_000;
 
 const exportAuditLogsSchema = z.object({
   format: z.enum(["csv", "json"]).default("csv"),
@@ -131,13 +134,22 @@ export const auditLogsRouter = t.router({
         const { format, filters } = input;
 
         // Get audit logs with filters
-        const { logs } = await auditLogService.getLogs({
+        const { logs, total } = await auditLogService.getLogs({
           organizationId: ctx.organizationId!,
           action: filters?.action,
           startDate: filters?.startDate ? new Date(filters.startDate) : undefined,
           endDate: filters?.endDate ? new Date(filters.endDate) : undefined,
           userId: filters?.userId,
+          limit: AUDIT_EXPORT_MAX_ROWS,
         });
+
+        // A compliance export must be complete, so refuse rather than cut it short.
+        if (total > AUDIT_EXPORT_MAX_ROWS) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: `The export matches ${total} entries, more than the ${AUDIT_EXPORT_MAX_ROWS} allowed. Narrow the date range.`,
+          });
+        }
 
         await auditLogService.record({
           userId: ctx.user?.id,

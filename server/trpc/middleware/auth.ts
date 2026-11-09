@@ -16,26 +16,29 @@ const logger = createLogger("trpc-auth");
  */
 interface RequestWithAuthError extends Request {
   authError?: string;
+  authDenied?: TRPCError;
+}
+
+/** Report what `createContext` caught, so the caller gets the real reason. */
+function throwStoredAuthFailure(ctx: Context): void {
+  // @ts-ignore - Express type definition mismatch between root and server node_modules
+  const { authError, authDenied } = ctx.req as RequestWithAuthError;
+
+  if (authDenied) throw authDenied;
+
+  if (authError?.includes("Token has expired") || authError?.includes("token expired")) {
+    throw new TRPCError({
+      code: "UNAUTHORIZED",
+      message: "Token has expired",
+      cause: {
+        type: "TOKEN_EXPIRED",
+      },
+    });
+  }
 }
 
 export const isAuthed = t.middleware<{ ctx: Context }>(async ({ ctx, path, next }) => {
-  // Check if there was an authentication error stored in the request
-  // @ts-ignore - Express type definition mismatch between root and server node_modules
-  const reqWithAuth = ctx.req as RequestWithAuthError;
-  if (reqWithAuth.authError) {
-    const errorMessage = reqWithAuth.authError;
-
-    // Provide specific error for token expiration
-    if (errorMessage.includes("Token has expired") || errorMessage.includes("token expired")) {
-      throw new TRPCError({
-        code: "UNAUTHORIZED",
-        message: "Token has expired",
-        cause: {
-          type: "TOKEN_EXPIRED",
-        },
-      });
-    }
-  }
+  throwStoredAuthFailure(ctx);
 
   if (!ctx.user) {
     throw new TRPCError({
@@ -116,23 +119,7 @@ const hasScope = (resource: string, action: string) => {
  * Used for endpoints that need to work before organization context is established
  */
 export const isAuthedWithoutOrg = t.middleware<{ ctx: Context }>(({ ctx, next }) => {
-  // Check if there was an authentication error stored in the request
-  // @ts-ignore - Express type definition mismatch between root and server node_modules
-  const reqWithAuth = ctx.req as RequestWithAuthError;
-  if (reqWithAuth.authError) {
-    const errorMessage = reqWithAuth.authError;
-
-    // Provide specific error for token expiration
-    if (errorMessage.includes("Token has expired") || errorMessage.includes("token expired")) {
-      throw new TRPCError({
-        code: "UNAUTHORIZED",
-        message: "Token has expired",
-        cause: {
-          type: "TOKEN_EXPIRED",
-        },
-      });
-    }
-  }
+  throwStoredAuthFailure(ctx);
 
   if (!ctx.user) {
     throw new TRPCError({

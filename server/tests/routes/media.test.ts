@@ -1,6 +1,7 @@
 import { describe, it, expect, jest, beforeAll, afterAll, beforeEach } from "@jest/globals";
 import type { AddressInfo } from "net";
 import type { Server } from "http";
+import { Readable } from "stream";
 import { TRPCError } from "@trpc/server";
 
 /**
@@ -19,9 +20,9 @@ jest.mock("@server/lib/logger", () => ({ createLogger: () => mockLogger }));
 const mockFindOne = jest.fn<(options: unknown) => Promise<unknown>>();
 jest.mock("@server/entities/upload.entity", () => ({ Upload: { findOne: mockFindOne } }));
 
-const mockDownload = jest.fn<(id: string) => Promise<{ buffer: Buffer }>>();
+const mockDownload = jest.fn<(upload: unknown, range?: [number, number]) => Promise<Readable>>();
 jest.mock("@server/services/storage.service", () => ({
-  storageService: { download: mockDownload },
+  storageService: { openReadStream: mockDownload },
 }));
 
 const mockWaitForScans =
@@ -50,6 +51,7 @@ const upload = (overrides: Record<string, unknown> = {}) => ({
   folder: "conversation-media",
   mimeType: "image/jpeg",
   originalName: "foto ação.jpg",
+  size: BYTES.length,
   ...overrides,
 });
 
@@ -74,7 +76,9 @@ afterAll(() => new Promise<void>((resolve) => server.close(() => resolve())));
 beforeEach(() => {
   jest.clearAllMocks();
   mockFindOne.mockResolvedValue(upload());
-  mockDownload.mockResolvedValue({ buffer: BYTES });
+  mockDownload.mockImplementation(async (_upload, range) =>
+    Readable.from([range ? BYTES.subarray(range[0], range[1] + 1) : BYTES]),
+  );
 });
 
 const signedPath = (id = UPLOAD_ID, ttl = 60) => {

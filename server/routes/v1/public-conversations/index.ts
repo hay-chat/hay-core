@@ -138,8 +138,8 @@ const recordConsentSchema = z.object({
 const getMessagesSchema = z.object({
   conversationId: z.string().uuid(),
   proof: z.string(), // DPoP proof
-  limit: z.number().optional().default(50),
-  offset: z.number().optional().default(0),
+  limit: z.number().int().min(1).max(200).optional().default(50),
+  offset: z.number().int().min(0).optional().default(0),
 });
 
 /**
@@ -244,9 +244,9 @@ export const publicConversationsRouter = t.router({
         }
       }
 
-      // Every create attempt counts towards the under-attack trigger (D9-10),
-      // including the ones the gates then refuse.
-      const underAttack = await recordCreateAttempt(organizationId);
+      // Every address trying to create counts towards the under-attack trigger
+      // (D9-10), including the ones the gates then refuse.
+      const underAttack = await recordCreateAttempt(organizationId, clientIp(ctx.ipAddress));
 
       // Plugin gates (e.g. a bot challenge) run before the conversation exists.
       const gate = await webchatExtensionsService.runGates(organizationId, "conversation.create", {
@@ -380,6 +380,10 @@ export const publicConversationsRouter = t.router({
   // Get messages for a conversation (requires DPoP proof)
   getMessages: publicProcedure.input(getMessagesSchema).mutation(async ({ input, ctx }) => {
     try {
+      if (await isPublicWidgetRateLimited([{ rule: "readPerIp", id: clientIp(ctx.ipAddress) }])) {
+        throw tooManyRequests();
+      }
+
       // Verify DPoP proof
       const verified = await verifyDPoPForRequest(
         input.conversationId,
@@ -503,6 +507,15 @@ export const publicConversationsRouter = t.router({
           code: "NOT_FOUND",
           message: "Conversation not found",
         });
+      }
+
+      if (
+        await isPublicWidgetRateLimited([
+          { rule: "messagePerOrg", id: conversation.organization_id },
+          { rule: "messagePerOrgHourly", id: conversation.organization_id },
+        ])
+      ) {
+        throw tooManyRequests();
       }
 
       const gate = await webchatExtensionsService.runGates(
@@ -775,6 +788,14 @@ export const publicConversationsRouter = t.router({
     )
     .mutation(async ({ input, ctx }) => {
       try {
+        if (
+          await isPublicWidgetRateLimited([
+            { rule: "rotateKeysPerIp", id: clientIp(ctx.ipAddress) },
+          ])
+        ) {
+          throw tooManyRequests();
+        }
+
         // Verify DPoP proof with current key
         const verified = await verifyDPoPForRequest(
           input.conversationId,
@@ -837,6 +858,10 @@ export const publicConversationsRouter = t.router({
     )
     .mutation(async ({ input, ctx }) => {
       try {
+        if (await isPublicWidgetRateLimited([{ rule: "formPerIp", id: clientIp(ctx.ipAddress) }])) {
+          throw tooManyRequests();
+        }
+
         const verified = await verifyDPoPForRequest(
           input.conversationId,
           input.proof,

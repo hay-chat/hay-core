@@ -48,40 +48,18 @@ export const sourcesRouter = t.router({
     }),
 
   // Sources are a global table, so changing them is an operator action.
-  register: internalProcedure
-    .input(registerSourceSchema)
-    .mutation(async ({ input }) => {
-      try {
-        const source = await sourceService.registerSource(input);
-        return source;
-      } catch (error) {
-        throw toClientError(error, "BAD_REQUEST", "Failed to register source");
-      }
-    }),
+  register: internalProcedure.input(registerSourceSchema).mutation(async ({ input }) => {
+    try {
+      const source = await sourceService.registerSource(input);
+      return source;
+    } catch (error) {
+      throw toClientError(error, "BAD_REQUEST", "Failed to register source");
+    }
+  }),
 
-  deactivate: internalProcedure
-    .input(z.object({ id: z.string() }))
-    .mutation(async ({ input }) => {
-      try {
-        const success = await sourceService.deactivateSource(input.id);
-
-        if (!success) {
-          throw new TRPCError({
-            code: "NOT_FOUND",
-            message: "Source not found",
-          });
-        }
-
-        return { success: true };
-      } catch (error) {
-        throw toClientError(error, "BAD_REQUEST", "Failed to deactivate source");
-      }
-    }),
-
-  activate: internalProcedure
-    .input(z.object({ id: z.string() }))
-    .mutation(async ({ input }) => {
-      const success = await sourceService.activateSource(input.id);
+  deactivate: internalProcedure.input(z.object({ id: z.string() })).mutation(async ({ input }) => {
+    try {
+      const success = await sourceService.deactivateSource(input.id);
 
       if (!success) {
         throw new TRPCError({
@@ -91,5 +69,21 @@ export const sourcesRouter = t.router({
       }
 
       return { success: true };
-    }),
+    } catch (error) {
+      throw toClientError(error, "BAD_REQUEST", "Failed to deactivate source");
+    }
+  }),
+
+  activate: internalProcedure.input(z.object({ id: z.string() })).mutation(async ({ input }) => {
+    const success = await sourceService.activateSource(input.id);
+
+    if (!success) {
+      throw new TRPCError({
+        code: "NOT_FOUND",
+        message: "Source not found",
+      });
+    }
+
+    return { success: true };
+  }),
 });

@@ -121,6 +121,34 @@ export function clientConversationMetadata(
   return kept;
 }
 
+/**
+ * What a dashboard or API caller's message counts as. Staff write as themselves
+ * after taking over; writing as the customer is only for test conversations,
+ * and nobody writes as the assistant.
+ */
+export function staffMessageType(
+  role: "user" | "assistant",
+  conversation: Pick<Conversation, "status" | "assigned_user_id" | "metadata">,
+  userId: string,
+): MessageType {
+  if (role === "user") {
+    if (!isTestConversation(conversation.metadata)) {
+      throw new TRPCError({
+        code: "FORBIDDEN",
+        message: "Only test conversations accept messages as the customer",
+      });
+    }
+    return MessageType.CUSTOMER;
+  }
+  if (conversation.status !== "human-took-over" || conversation.assigned_user_id !== userId) {
+    throw new TRPCError({
+      code: "PRECONDITION_FAILED",
+      message: "Take over the conversation before replying",
+    });
+  }
+  return MessageType.HUMAN_AGENT;
+}
+
 const createConversationSchema = z.object({
   title: z.string().min(1).max(255).optional(),
   language: z.string().max(35).optional(),
@@ -696,7 +724,10 @@ export const conversationsRouter = t.router({
   sendMessage: scopedProcedure(RESOURCES.MESSAGES, ACTIONS.CREATE)
     .input(sendMessageSchema)
     .mutation(async ({ input, ctx }) => {
-      const conversation = await conversationRepository.findById(input.conversationId);
+      const conversation = await conversationRepository.findByIdAndOrganization(
+        input.conversationId,
+        ctx.organizationId!,
+      );
 
       if (!conversation) {
         throw new TRPCError({
@@ -705,26 +736,7 @@ export const conversationsRouter = t.router({
         });
       }
 
-      // Verify organization access
-      if (conversation.organization_id !== ctx.organizationId) {
-        throw new TRPCError({
-          code: "NOT_FOUND",
-          message: "Conversation not found",
-        });
-      }
-
-      // Determine message type based on role and takeover status
-      let messageType: MessageType;
-      if (input.role === "assistant") {
-        // If conversation is taken over by current user, it's a human agent message
-        const isTakenOverByCurrentUser =
-          conversation.status === "human-took-over" &&
-          conversation.assigned_user_id === ctx.user?.id;
-
-        messageType = isTakenOverByCurrentUser ? MessageType.HUMAN_AGENT : MessageType.BOT_AGENT;
-      } else {
-        messageType = MessageType.CUSTOMER;
-      }
+      const messageType = staffMessageType(input.role, conversation, ctx.user!.id);
 
       // D8-16: only a person who took over sends files (delivered by the channel).
       let attachments: Awaited<ReturnType<typeof staffAttachmentsFromUploads>> = [];
@@ -783,8 +795,11 @@ export const conversationsRouter = t.router({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      const conversation = await conversationRepository.findById(input.conversationId);
-      if (!conversation || conversation.organization_id !== ctx.organizationId) {
+      const conversation = await conversationRepository.findByIdAndOrganization(
+        input.conversationId,
+        ctx.organizationId!,
+      );
+      if (!conversation) {
         throw new TRPCError({ code: "NOT_FOUND", message: "Conversation not found" });
       }
       if (
@@ -822,8 +837,11 @@ export const conversationsRouter = t.router({
   channelTemplates: scopedProcedure(RESOURCES.CONVERSATIONS, ACTIONS.READ)
     .input(z.object({ conversationId: z.string().uuid() }))
     .query(async ({ ctx, input }) => {
-      const conversation = await conversationRepository.findById(input.conversationId);
-      if (!conversation || conversation.organization_id !== ctx.organizationId) {
+      const conversation = await conversationRepository.findByIdAndOrganization(
+        input.conversationId,
+        ctx.organizationId!,
+      );
+      if (!conversation) {
         throw new TRPCError({ code: "NOT_FOUND", message: "Conversation not found" });
       }
       try {
@@ -852,8 +870,11 @@ export const conversationsRouter = t.router({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      const conversation = await conversationRepository.findById(input.conversationId);
-      if (!conversation || conversation.organization_id !== ctx.organizationId) {
+      const conversation = await conversationRepository.findByIdAndOrganization(
+        input.conversationId,
+        ctx.organizationId!,
+      );
+      if (!conversation) {
         throw new TRPCError({ code: "NOT_FOUND", message: "Conversation not found" });
       }
       if (
@@ -914,20 +935,15 @@ export const conversationsRouter = t.router({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      const conversation = await conversationRepository.findById(input.conversationId);
+      const conversation = await conversationRepository.findByIdAndOrganization(
+        input.conversationId,
+        ctx.organizationId!,
+      );
 
       if (!conversation) {
         throw new TRPCError({
           code: "NOT_FOUND",
           message: "Conversation not found",
-        });
-      }
-
-      // Verify organization access
-      if (conversation.organization_id !== ctx.organizationId) {
-        throw new TRPCError({
-          code: "FORBIDDEN",
-          message: "You do not have access to this conversation",
         });
       }
 
@@ -1020,20 +1036,15 @@ export const conversationsRouter = t.router({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      const conversation = await conversationRepository.findById(input.conversationId);
+      const conversation = await conversationRepository.findByIdAndOrganization(
+        input.conversationId,
+        ctx.organizationId!,
+      );
 
       if (!conversation) {
         throw new TRPCError({
           code: "NOT_FOUND",
           message: "Conversation not found",
-        });
-      }
-
-      // Verify organization access
-      if (conversation.organization_id !== ctx.organizationId) {
-        throw new TRPCError({
-          code: "FORBIDDEN",
-          message: "You do not have access to this conversation",
         });
       }
 
@@ -1104,20 +1115,15 @@ export const conversationsRouter = t.router({
   getAssignedUser: scopedProcedure(RESOURCES.CONVERSATIONS, ACTIONS.READ)
     .input(z.object({ conversationId: z.string().uuid() }))
     .query(async ({ ctx, input }) => {
-      const conversation = await conversationRepository.findById(input.conversationId);
+      const conversation = await conversationRepository.findByIdAndOrganization(
+        input.conversationId,
+        ctx.organizationId!,
+      );
 
       if (!conversation) {
         throw new TRPCError({
           code: "NOT_FOUND",
           message: "Conversation not found",
-        });
-      }
-
-      // Verify organization access
-      if (conversation.organization_id !== ctx.organizationId) {
-        throw new TRPCError({
-          code: "FORBIDDEN",
-          message: "You do not have access to this conversation",
         });
       }
 
@@ -1144,20 +1150,15 @@ export const conversationsRouter = t.router({
   close: scopedProcedure(RESOURCES.CONVERSATIONS, ACTIONS.UPDATE)
     .input(z.object({ conversationId: z.string().uuid() }))
     .mutation(async ({ ctx, input }) => {
-      const conversation = await conversationRepository.findById(input.conversationId);
+      const conversation = await conversationRepository.findByIdAndOrganization(
+        input.conversationId,
+        ctx.organizationId!,
+      );
 
       if (!conversation) {
         throw new TRPCError({
           code: "NOT_FOUND",
           message: "Conversation not found",
-        });
-      }
-
-      // Verify organization access
-      if (conversation.organization_id !== ctx.organizationId) {
-        throw new TRPCError({
-          code: "FORBIDDEN",
-          message: "You do not have access to this conversation",
         });
       }
 
@@ -1250,8 +1251,11 @@ export const conversationsRouter = t.router({
   forwardProductCase: scopedProcedure(RESOURCES.CONVERSATIONS, ACTIONS.UPDATE)
     .input(z.object({ conversationId: z.string().uuid() }))
     .mutation(async ({ ctx, input }) => {
-      const conversation = await conversationRepository.findById(input.conversationId);
-      if (!conversation || conversation.organization_id !== ctx.organizationId) {
+      const conversation = await conversationRepository.findByIdAndOrganization(
+        input.conversationId,
+        ctx.organizationId!,
+      );
+      if (!conversation) {
         throw new TRPCError({ code: "NOT_FOUND", message: "Conversation not found" });
       }
       const { forwardProductCase } = await import("../../../services/product-case/forward");
@@ -1268,8 +1272,11 @@ export const conversationsRouter = t.router({
   setDryRun: scopedProcedure(RESOURCES.CONVERSATIONS, ACTIONS.UPDATE)
     .input(z.object({ conversationId: z.string().uuid(), dryRun: z.boolean() }))
     .mutation(async ({ ctx, input }) => {
-      const conversation = await conversationRepository.findById(input.conversationId);
-      if (!conversation || conversation.organization_id !== ctx.organizationId) {
+      const conversation = await conversationRepository.findByIdAndOrganization(
+        input.conversationId,
+        ctx.organizationId!,
+      );
+      if (!conversation) {
         throw new TRPCError({ code: "NOT_FOUND", message: "Conversation not found" });
       }
       if (!isPlaygroundConversation(conversation.metadata)) {
@@ -1335,8 +1342,11 @@ export const conversationsRouter = t.router({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      const conversation = await conversationRepository.findById(input.id);
-      if (!conversation || conversation.organization_id !== ctx.organizationId) {
+      const conversation = await conversationRepository.findByIdAndOrganization(
+        input.id,
+        ctx.organizationId!,
+      );
+      if (!conversation) {
         throw new TRPCError({ code: "NOT_FOUND", message: "Conversation not found" });
       }
       await conversationSecretService.setSecrets(input.id, input.secrets);
@@ -1353,8 +1363,11 @@ export const conversationsRouter = t.router({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      const conversation = await conversationRepository.findById(input.id);
-      if (!conversation || conversation.organization_id !== ctx.organizationId) {
+      const conversation = await conversationRepository.findByIdAndOrganization(
+        input.id,
+        ctx.organizationId!,
+      );
+      if (!conversation) {
         throw new TRPCError({ code: "NOT_FOUND", message: "Conversation not found" });
       }
       const merged = { ...(conversation.context ?? {}), ...input.context };

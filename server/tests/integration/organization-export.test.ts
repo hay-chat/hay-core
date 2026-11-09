@@ -49,11 +49,8 @@ jest.mock("../../services/conversation-events.service", () => ({
   },
 }));
 
-import {
-  csvCell,
-  csvLine,
-  organizationExportService,
-} from "../../services/organization-export.service";
+import { csvCell } from "@server/lib/csv";
+import { csvLine, organizationExportService } from "../../services/organization-export.service";
 
 describe("csv helpers", () => {
   it("quotes, serialises objects and defuses formulas", () => {

@@ -291,7 +291,8 @@ export class WebchatExtensionsService {
         ...(typeof body.reason === "string" ? { reason: body.reason.slice(0, 100) } : {}),
       };
     } catch (error) {
-      const decision = gate.failurePolicy === "closed" ? "deny" : "flag";
+      // A check that can't run is no check at all while the org is under attack.
+      const decision = gate.failurePolicy === "closed" || input.underAttack ? "deny" : "flag";
       logger.warn(
         { err: error, pluginId, event: gate.event, decision },
         "Webchat gate unavailable, applying failure policy",

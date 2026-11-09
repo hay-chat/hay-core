@@ -5,6 +5,7 @@ import type { ListParams } from "../trpc/middleware/pagination";
 import type { PaginatedResponse } from "../types/list-input";
 import { createPaginatedResponse } from "../types/list-input";
 import { createLogger } from "@server/lib/logger";
+import { escapeLike } from "@server/lib/sql-like";
 
 const logger = createLogger("base-repo");
 
@@ -152,11 +153,12 @@ export abstract class BaseRepository<T extends ObjectLiteral> {
       .join(" OR ");
 
     if (searchConditions) {
+      const searchPattern = `%${escapeLike(search.query)}%`;
       queryBuilder.andWhere(
         `(${searchConditions})`,
         search.searchFields.reduce(
           (params, _, index) => {
-            params[`searchQuery${index}`] = `%${search.query}%`;
+            params[`searchQuery${index}`] = searchPattern;
             return params;
           },
           {} as Record<string, unknown>,
