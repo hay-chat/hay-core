@@ -41,5 +41,12 @@
     "usage_cap_reached": "Aumentar limite de gastos",
     "trial_grace": "Escolher um plano",
     "manual_suspension_pending": "Falar com o Hay.chat"
+  },
+  "noAccess": {
+    "title": "Você não tem acesso a esta organização",
+    "description": "Este link pertence a uma organização da qual sua conta não faz parte. Peça a um dos administradores que convide você.",
+    "signedInAs": "Você entrou como {email}.",
+    "goToMyOrganization": "Ir para minha organização",
+    "useAnotherAccount": "Entrar com outra conta"
   }
 }

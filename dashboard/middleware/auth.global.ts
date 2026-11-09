@@ -5,24 +5,59 @@ import { useUserStore, type User } from "@/stores/user";
 import { redirectForSuspension, SUSPENDED_ROUTE } from "@/composables/useSuspension";
 import { Hay } from "@/utils/api";
 import { hasRouteAccess } from "@/utils/route-access";
+import { clearRequestedOrganization, getRequestedOrganization } from "@/utils/org-history";
+import { addOrgToLocation, NO_ACCESS_ROUTE, splitOrgFromLocation } from "@/utils/org-url";
 
 const MFA_ENROLMENT_ROUTE = "/settings/profile";
+
+/**
+ * Open the page in the organization its URL named. The list is refreshed first:
+ * the cached one can miss an organization the user just joined, or still hold
+ * one they were removed from.
+ */
+async function enterRequestedOrganization(to: RouteLocationNormalized) {
+  const organizationId = getRequestedOrganization();
+  if (!organizationId || to.meta.public === true) return;
+
+  const authStore = useAuthStore();
+  const userStore = useUserStore();
+  clearRequestedOrganization();
+  const link = addOrgToLocation(to.fullPath, organizationId);
+
+  if (!authStore.isAuthenticated || !userStore.user?.id) {
+    return navigateTo({ path: "/login", query: { redirect: link } });
+  }
+  if (organizationId === userStore.activeOrganizationId) return;
+
+  try {
+    userStore.setUser((await Hay.auth.me.query()) as User);
+  } catch (error) {
+    console.warn("[Auth Middleware] Could not refresh organizations:", error);
+  }
+
+  if (await userStore.switchOrganization(organizationId)) return;
+  return navigateTo({ path: NO_ACCESS_ROUTE, query: { redirect: link } }, { replace: true });
+}
 
 export default defineNuxtRouteMiddleware(
   async (to: RouteLocationNormalized, from: RouteLocationNormalized) => {
     logger.debug("[Auth Middleware] Checking route:", to.path, "process.client:", process.client);
 
-    // Alert links (push, email) carry ?org=<id>: open them in that organization
-    // for users who belong to several. Before the same-page check, which also
-    // matches the first load.
-    if (process.client && typeof to.query.org === "string") {
-      const userStore = useUserStore();
-      if (
-        to.query.org !== userStore.activeOrganizationId &&
-        userStore.organizations.some((org) => org.id === to.query.org)
-      ) {
-        await userStore.switchOrganization(to.query.org);
+    if (process.client) {
+      // A link to /<orgId>/... followed inside the app (after login, from an alert).
+      const { organizationId, location } = splitOrgFromLocation(to.fullPath);
+      if (organizationId) {
+        if (organizationId === useUserStore().activeOrganizationId) {
+          return navigateTo(location, { replace: true });
+        }
+        // Data for the current organization is already loaded: start clean.
+        window.location.assign(addOrgToLocation(location, organizationId));
+        return abortNavigation();
       }
+
+      // Before the same-page check, which also matches the first load.
+      const redirect = await enterRequestedOrganization(to);
+      if (redirect) return redirect;
     }
 
     // Skip auth check if staying on the same page (e.g., opening modals)
@@ -70,6 +105,10 @@ export default defineNuxtRouteMiddleware(
       }
 
       return navigateTo({ path: "/login", query: { redirect: to.fullPath } });
+    }
+
+    if (to.path === NO_ACCESS_ROUTE) {
+      return;
     }
 
     // Suspended organization: owners/admins may be sent to the operator's page,

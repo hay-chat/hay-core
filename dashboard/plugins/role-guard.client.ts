@@ -6,6 +6,7 @@
 import { useUserStore } from "@/stores/user";
 import { useAuthStore } from "@/stores/auth";
 import { hasRouteAccess } from "@/utils/route-access";
+import { NO_ACCESS_ROUTE } from "@/utils/org-url";
 
 export default defineNuxtPlugin(() => {
   const router = useRouter();
@@ -33,8 +34,8 @@ export default defineNuxtPlugin(() => {
       return;
     }
 
-    // Skip unauthorized page itself
-    if (to.path === "/unauthorized") {
+    // Skip the access-denied pages themselves
+    if (to.path === "/unauthorized" || to.path === NO_ACCESS_ROUTE) {
       return;
     }
 

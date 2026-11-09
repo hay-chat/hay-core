@@ -13,6 +13,7 @@ import {
   isDefinitiveAuthFailure,
   isUnauthorizedError,
 } from "./session-refresh";
+import { splitOrgFromLocation } from "./org-url";
 
 // Helper function to get auth cookie
 function getAuthToken(): string {
@@ -115,7 +116,7 @@ const errorLink: TRPCLink<AppRouter> = () => {
             ) {
               const userStore = useUserStore();
               if (userStore.user) userStore.user.mfaEnrolmentRequired = true;
-              if (window.location.pathname !== "/settings/profile") {
+              if (splitOrgFromLocation(window.location.pathname).location !== "/settings/profile") {
                 setTimeout(() => navigateTo("/settings/profile"), 0);
               }
             }
