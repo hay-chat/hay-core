@@ -25,7 +25,8 @@ describe("registerServerAliasForPlugins (plugin router @server/* resolution)", (
   let serverTrpc: string;
 
   beforeAll(() => {
-    tmp = fs.mkdtempSync(path.join(os.tmpdir(), "plugin-alias-"));
+    // realpath: macOS exposes the temp dir through a symlink, and require.resolve returns the real path.
+    tmp = fs.mkdtempSync(path.join(fs.realpathSync(os.tmpdir()), "plugin-alias-"));
     const dist = path.join(tmp, "server", "dist");
     fs.mkdirSync(path.join(dist, "trpc"), { recursive: true });
     fs.mkdirSync(path.join(dist, "lib"), { recursive: true });
