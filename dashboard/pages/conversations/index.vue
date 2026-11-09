@@ -3,6 +3,7 @@
     <!-- Header -->
     <template #header>
       <div class="flex flex-wrap items-center gap-2">
+        <RefreshIndicator :active="listRefreshing || statsRefreshing" />
         <Button @click="openPlayground">
           <Plus class="h-4 w-4 mr-2" />
           {{ $t("conversations.actions.playground") }}
@@ -20,6 +21,7 @@
         :title="$t('conversations.stats.totalConversations')"
         :icon="MessageSquare"
         :metric="totalConversations"
+        :loading="!listData"
         :subtitle="
           createdToday !== null
             ? $t('conversations.stats.todayIncrease', { count: createdToday })
@@ -31,6 +33,7 @@
         :title="$t('conversations.stats.activeNow')"
         :icon="Activity"
         :metric="appStore.openConversationsCount"
+        :loading="appStore.isLoading && appStore.lastUpdated === null"
         :subtitle="$t('conversations.stats.realTimeConversations')"
       />
 
@@ -43,6 +46,7 @@
             : '—'
         "
         :format-metric="false"
+        :loading="statsLoading"
         :subtitle="
           responseTime && responseTime.sampleSize === 0
             ? $t('conversations.stats.noRepliesLast7Days')
@@ -108,7 +112,7 @@
       <p class="text-neutral-muted mb-4">
         {{ error }}
       </p>
-      <Button variant="outline" @click="fetchConversations">
+      <Button variant="outline" @click="refreshList">
         <RefreshCcw class="h-4 w-4 mr-2" />
         {{ $t("conversations.actions.tryAgain") }}
       </Button>
@@ -169,7 +173,11 @@
               <TableRow
                 v-for="conversation in paginatedConversations"
                 :key="conversation.id"
-                :class="['cursor-pointer', getWaitTimeClass(getWaitTime(conversation))]"
+                :class="[
+                  'cursor-pointer',
+                  getWaitTimeClass(getWaitTime(conversation)),
+                  { 'data-settle': isNewRow(conversation.id) },
+                ]"
                 @click="!bulkMode && viewConversation(conversation.id)"
               >
                 <TableCell v-if="bulkMode" @click.stop>
@@ -213,10 +221,12 @@
                   </div>
                 </TableCell>
                 <TableCell>
-                  <Badge :variant="getStatusVariant(conversation?.status)">
-                    <component :is="getStatusIcon(conversation?.status)" class="h-3 w-3 mr-1" />
-                    {{ formatStatus(conversation?.status) }}
-                  </Badge>
+                  <SettleValue :value="conversation?.status">
+                    <Badge :variant="getStatusVariant(conversation?.status)">
+                      <component :is="getStatusIcon(conversation?.status)" class="h-3 w-3 mr-1" />
+                      {{ formatStatus(conversation?.status) }}
+                    </Badge>
+                  </SettleValue>
                 </TableCell>
                 <TableCell class="hidden md:table-cell text-sm">
                   <div v-if="conversation.assignedUser" class="flex items-center space-x-2">
@@ -288,7 +298,7 @@ import {
 import { HayApi } from "@/utils/api";
 import { useRouter } from "vue-router";
 import { useAppStore } from "@/stores/app";
-import { formatRelativeTime, formatDuration } from "~/utils/date";
+import { formatRelativeTime, formatDuration, toLocalDateString } from "~/utils/date";
 import { getWaitTime, formatWaitTime, getWaitTimeClass } from "@/utils/conversation";
 import {
   statusesForFilter,
@@ -310,12 +320,11 @@ const router = useRouter();
 const appStore = useAppStore();
 
 // Reactive state
-const loading = ref(true);
-const error = ref<string | null>(null);
 const _realTimeEnabled = ref(true);
 const searchQuery = ref("");
 // A deep link with a human status (e.g. from Home) opens on the Escalated filter.
-const initialStatus = String(useRoute().query.status ?? "");
+const route = useRoute();
+const initialStatus = String(route.query.status ?? "");
 const selectedStatus = ref<StatusFilter>(
   initialStatus.includes("pending-human") || initialStatus.includes("human-took-over")
     ? "escalated"
@@ -380,11 +389,77 @@ function isConversationDeletedPayload(value: unknown): value is ConversationDele
   return isRecord(value) && typeof value.id === "string";
 }
 
-const conversations = ref<Conversation[]>([]);
-const totalConversations = ref(0);
-
 // Optional: show only conversations that had a takeover event in the selected period
-const escalationsPeriod = ref<"today" | "week" | null>(null);
+const requestedPeriod = route.query.escalationsPeriod;
+const escalationsPeriod: "today" | "week" | null =
+  requestedPeriod === "today" || requestedPeriod === "week" ? requestedPeriod : null;
+if (escalationsPeriod) currentPage.value = 1;
+
+// Typing in search waits a beat before it becomes part of the query.
+const appliedSearch = ref("");
+
+interface ConversationPage {
+  items: Conversation[];
+  total: number;
+}
+
+const {
+  data: listData,
+  loading,
+  refreshing: listRefreshing,
+  error: listError,
+  keyHash: listKeyHash,
+  refresh: refreshList,
+  setData: setListData,
+} = useCachedQuery(
+  () =>
+    [
+      "conversations",
+      "list",
+      escalationsPeriod
+        ? { escalationsPeriod }
+        : {
+            status: selectedStatus.value,
+            timeframe: selectedTimeframe.value,
+            search: appliedSearch.value,
+            page: currentPage.value,
+            limit: pageSize.value,
+          },
+    ] as const,
+  async ([, , params]): Promise<ConversationPage> => {
+    if (params.escalationsPeriod) {
+      // Conversations by takeover event (no pagination)
+      const response = await HayApi.conversations.escalatedConversations.query({
+        period: params.escalationsPeriod,
+        limit: 200,
+      });
+      const items = response as unknown as Conversation[];
+      return { items, total: items.length };
+    }
+    const statuses = statusesForFilter(params.status);
+    const from = timeframeStart(params.timeframe);
+    const response = await HayApi.conversations.list.query({
+      filters: statuses ? { statuses } : undefined,
+      dateRange: from ? { from: from.toISOString() } : undefined,
+      search: params.search ? { query: params.search } : undefined,
+      pagination: { page: params.page, limit: params.limit },
+      sorting: { orderBy: "created_at", orderDirection: "desc" },
+      include: ["assignedUser", "messages"],
+    });
+    return {
+      items: response.items as unknown as Conversation[],
+      total: response.pagination.total,
+    };
+  },
+);
+
+const conversations = computed(() => listData.value?.items ?? []);
+const totalConversations = computed(() => listData.value?.total ?? 0);
+const isNewRow = useNewRows(() => listData.value?.items, listKeyHash);
+// With rows on screen a failed refresh keeps them; only a first load shows the error.
+const error = computed(() =>
+  listError.value && !listData.value ? t("conversations.error.failedToLoad") : null,
+);
 
 // Computed total pages
 const totalPages = computed(() => Math.ceil(totalConversations.value / pageSize.value));
@@ -398,21 +473,31 @@ const showChannelColumn = computed(() => getEnabledChannelPlugins().length >= 1)
 // Header stats come from the server so they cover the whole organization, not
 // just the page of conversations loaded here. Null = not loaded (or no access).
 type ResponseTime = RouterOutputs["analytics"]["responseTime"]["data"];
-const createdToday = ref<number | null>(null);
-const responseTime = ref<ResponseTime | null>(null);
+const {
+  data: headerStats,
+  loading: statsLoading,
+  refreshing: statsRefreshing,
+  refresh: refreshHeaderStats,
+} = useCachedQuery(
+  // The key rolls over at midnight; the fetcher works out its own window.
+  () => ["analytics", "conversations-header", toLocalDateString(new Date())] as const,
+  async () => {
+    const startOfToday = new Date();
+    startOfToday.setHours(0, 0, 0, 0);
+    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
 
-const fetchHeaderStats = async () => {
-  const startOfToday = new Date();
-  startOfToday.setHours(0, 0, 0, 0);
-  const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-
-  const [today, replies] = await Promise.allSettled([
-    HayApi.analytics.conversationMetrics.query({ startDate: startOfToday.toISOString() }),
-    HayApi.analytics.responseTime.query({ startDate: sevenDaysAgo.toISOString() }),
-  ]);
-  createdToday.value = today.status === "fulfilled" ? today.value.data.totalConversations : null;
-  responseTime.value = replies.status === "fulfilled" ? replies.value.data : null;
-};
+    const [today, replies] = await Promise.allSettled([
+      HayApi.analytics.conversationMetrics.query({ startDate: startOfToday.toISOString() }),
+      HayApi.analytics.responseTime.query({ startDate: sevenDaysAgo.toISOString() }),
+    ]);
+    return {
+      createdToday: today.status === "fulfilled" ? today.value.data.totalConversations : null,
+      responseTime: replies.status === "fulfilled" ? (replies.value.data as ResponseTime) : null,
+    };
+  },
+);
+const createdToday = computed(() => headerStats.value?.createdToday ?? null);
+const responseTime = computed(() => headerStats.value?.responseTime ?? null);
 
 // Select options
 const statusOptions = computed(() => [
@@ -523,73 +608,28 @@ const openPlayground = () => {
   router.push("/conversations/playground");
 };
 
-const fetchConversations = async () => {
-  try {
-    loading.value = true;
-    error.value = null;
-
-    if (escalationsPeriod.value) {
-      // Fetch conversations by takeover-event filter (no pagination)
-      const response = await HayApi.conversations.escalatedConversations.query({
-        period: escalationsPeriod.value,
-        limit: 200,
-      });
-      conversations.value = response as unknown as Conversation[];
-      totalConversations.value = conversations.value.length;
-      currentPage.value = 1;
-    } else {
-      const statuses = statusesForFilter(selectedStatus.value);
-      const from = timeframeStart(selectedTimeframe.value);
-      const query = searchQuery.value.trim();
-      const response = await HayApi.conversations.list.query({
-        filters: statuses ? { statuses } : undefined,
-        dateRange: from ? { from: from.toISOString() } : undefined,
-        search: query ? { query } : undefined,
-        pagination: { page: currentPage.value, limit: pageSize.value },
-        sorting: { orderBy: "created_at", orderDirection: "desc" },
-        include: ["assignedUser", "messages"],
-      });
-
-      conversations.value = response.items as unknown as Conversation[];
-      totalConversations.value = response.pagination.total;
-    }
-  } catch (err) {
-    console.error("Failed to fetch conversations:", err);
-    error.value = t("conversations.error.failedToLoad");
-    conversations.value = [];
-  } finally {
-    loading.value = false;
-  }
-};
-
 const refreshConversations = async () => {
-  await Promise.all([
-    fetchConversations(),
-    appStore.refreshConversationsCount(),
-    fetchHeaderStats(),
-  ]);
+  await Promise.all([refreshList(), appStore.refreshConversationsCount(), refreshHeaderStats()]);
 };
 
-// Any filter change goes back to page 1 and refetches; typing in search waits a beat.
+// Any filter change goes back to page 1. Sync, so the query never sees the new
+// filter with the old page and fetches twice.
 let searchTimer: ReturnType<typeof setTimeout> | undefined;
-const applyFilters = async () => {
-  setPage(1);
-  await fetchConversations();
-};
 watch(searchQuery, () => {
   clearTimeout(searchTimer);
-  searchTimer = setTimeout(applyFilters, 300);
+  searchTimer = setTimeout(() => {
+    setPage(1);
+    appliedSearch.value = searchQuery.value.trim();
+  }, 300);
 });
-watch([selectedStatus, selectedTimeframe], applyFilters);
+watch([selectedStatus, selectedTimeframe], () => setPage(1), { flush: "sync" });
 
-const handlePageChange = async (page: number) => {
+const handlePageChange = (page: number) => {
   setPage(page);
-  await fetchConversations();
 };
 
-const handleItemsPerPageChange = async (itemsPerPage: number) => {
+const handleItemsPerPageChange = (itemsPerPage: number) => {
   setPageSize(itemsPerPage); // Resets to page 1, persists the preference, syncs the URL
-  await fetchConversations();
 };
 
 // WebSocket setup
@@ -601,20 +641,7 @@ let unsubscribeConversationDeleted: (() => void) | null = null;
 
 // Lifecycle
 onMounted(async () => {
-  const route = useRoute();
-  if (route.query.escalationsPeriod) {
-    const period = route.query.escalationsPeriod as string;
-    if (period === "today" || period === "week") {
-      escalationsPeriod.value = period;
-    }
-  }
-
-  await Promise.all([
-    fetchConversations(),
-    appStore.refreshConversationsCount(),
-    appStore.fetchPlugins(),
-    fetchHeaderStats(),
-  ]);
+  await Promise.all([appStore.refreshConversationsCount(), appStore.fetchPlugins()]);
 
   // Setup WebSocket connection for real-time updates
   websocket.connect();
@@ -629,11 +656,13 @@ onMounted(async () => {
 
         // Only add if not already in list (avoid duplicates)
         const exists = conversations.value.some((c) => c.id === newConversation.id);
+        // Add to beginning of list (newest first)
+        setListData((page) =>
+          page.items.some((c) => c.id === newConversation.id)
+            ? page
+            : { items: [newConversation, ...page.items], total: page.total + 1 },
+        );
         if (!exists) {
-          // Add to beginning of list (newest first)
-          conversations.value.unshift(newConversation);
-          totalConversations.value++;
-
           // Update stats
           await appStore.refreshConversationsCount();
         }
@@ -648,14 +677,14 @@ onMounted(async () => {
       logger.debug("[Conversations List] Received conversation_updated event", payload);
       if (isConversationUpdatedPayload(payload)) {
         const updatedData = payload;
-        const index = conversations.value.findIndex((c) => c.id === updatedData.id);
+        const isListed = conversations.value.some((c) => c.id === updatedData.id);
 
-        if (index !== -1) {
+        if (isListed) {
           // Update existing conversation
-          conversations.value[index] = {
-            ...conversations.value[index],
-            ...updatedData,
-          };
+          setListData((page) => ({
+            ...page,
+            items: page.items.map((c) => (c.id === updatedData.id ? { ...c, ...updatedData } : c)),
+          }));
 
           // Update stats if status changed
           if (updatedData.changedFields?.includes("status")) {
@@ -663,7 +692,7 @@ onMounted(async () => {
           }
         } else {
           // Conversation might have been filtered out, but status changed - refetch to be safe
-          await fetchConversations();
+          await refreshList();
         }
       }
     },
@@ -676,12 +705,14 @@ onMounted(async () => {
       logger.debug("[Conversations List] Received conversation_deleted event", payload);
       if (isConversationDeletedPayload(payload)) {
         const deletedId = payload.id;
-        const index = conversations.value.findIndex((c) => c.id === deletedId);
+        const wasListed = conversations.value.some((c) => c.id === deletedId);
 
-        if (index !== -1) {
+        if (wasListed) {
           // Remove from list
-          conversations.value.splice(index, 1);
-          totalConversations.value--;
+          setListData((page) => {
+            const items = page.items.filter((c) => c.id !== deletedId);
+            return { items, total: page.total - (page.items.length - items.length) };
+          });
 
           // Update stats
           await appStore.refreshConversationsCount();
