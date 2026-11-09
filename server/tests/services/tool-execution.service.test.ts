@@ -93,6 +93,7 @@ jest.mock("@server/services/pending-action.service", () => ({
   pendingActionService: { hold: mockHold, findEarlierRequest: mockFindEarlierRequest },
 }));
 
+import { pageToolService } from "@server/services/webchat/page-tools.service";
 import { ToolExecutionService } from "@server/services/core/tool-execution.service";
 import type { Conversation } from "@server/database/entities/conversation.entity";
 
@@ -793,5 +794,58 @@ describe("ToolExecutionService tool governance", () => {
     });
 
     expect(mockCallTool.mock.calls[0][1]).toEqual({ auth: "s3cret", note: "<<secret.token>>" });
+  });
+});
+
+describe("ToolExecutionService page tools", () => {
+  const conversationWith = (annotations?: { readOnlyHint?: boolean }) => {
+    jest.spyOn(pageToolService, "list").mockResolvedValue([
+      {
+        name: "add_to_cart",
+        description: "Add to cart",
+        inputSchema: { type: "object", required: ["sku"] },
+        ...(annotations ? { annotations } : {}),
+      },
+    ]);
+    jest.spyOn(pageToolService, "call").mockResolvedValue("done");
+    return makeConversation();
+  };
+  const call = { name: "page:add_to_cart", args: { sku: "1" } };
+
+  it("runs a read tool the page registered", async () => {
+    const res = await new ToolExecutionService().handleToolExecution(
+      conversationWith({ readOnlyHint: true }),
+      call,
+    );
+    expect(res).toMatchObject({ success: true, result: "done" });
+  });
+
+  it("applies the approval policy to a tool the page declares as a write", async () => {
+    mockFindOrg.mockResolvedValue(APPROVAL_DEFAULTS);
+    const res = await new ToolExecutionService().handleToolExecution(
+      conversationWith({ readOnlyHint: false }),
+      call,
+    );
+    expect(res.pending).toBe(true);
+    expect(pageToolService.call).not.toHaveBeenCalled();
+  });
+
+  it("refuses arguments that do not match the declared schema", async () => {
+    const res = await new ToolExecutionService().handleToolExecution(conversationWith(), {
+      name: call.name,
+      args: {},
+    });
+    expect(res.success).toBe(false);
+    expect(pageToolService.call).not.toHaveBeenCalled();
+  });
+
+  it("refuses a page tool nobody registered", async () => {
+    conversationWith();
+    const res = await new ToolExecutionService().handleToolExecution(makeConversation(), {
+      name: "page:unknown",
+      args: {},
+    });
+    expect(res.success).toBe(false);
+    expect(pageToolService.call).not.toHaveBeenCalled();
   });
 });

@@ -14,6 +14,8 @@ import { User } from "@server/entities/user.entity";
 const logger = createLogger("websocket");
 import { verifyDPoPForRequest } from "../routes/v1/public-conversations";
 import { getClientIp } from "@server/lib/client-ip";
+import { isPageToolsOrigin, requestHostname } from "@server/lib/webchat-origin";
+import { webchatSettingsService } from "./webchat/webchat-settings.service";
 import {
   isWidgetVisibleMessage,
   toPublicAttachments,
@@ -632,6 +634,13 @@ export class WebSocketService {
 
   private async registerPageTools(client: WebSocketClient, tools: unknown): Promise<void> {
     if (!client.conversationId || !pageToolService.isEnabled()) return;
+    const settings = await webchatSettingsService.getSettings(client.organizationId);
+    if (!isPageToolsOrigin(settings, requestHostname({ origin: client.origin }))) {
+      if (Array.isArray(tools) && tools.length > 0) {
+        this.sendError(client, "Page tools are not enabled for this site");
+      }
+      return;
+    }
     try {
       await pageToolService.register(client.conversationId, validatePageTools(tools));
     } catch (error) {
@@ -648,7 +657,7 @@ export class WebSocketService {
   private async handleToolResult(clientId: string, message: ToolResultMessage): Promise<void> {
     const client = this.clients.get(clientId);
     if (!client?.conversationId || typeof message.callId !== "string") return;
-    await pageToolService.resolve(message.callId, {
+    await pageToolService.resolve(message.callId, client.conversationId, {
       result: message.result,
       ...(message.error !== undefined ? { error: String(message.error) } : {}),
     });

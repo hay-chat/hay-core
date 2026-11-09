@@ -58,6 +58,10 @@ jest.mock("@server/routes/v1/public-conversations", () => ({
 
 const mockRateLimited =
   jest.fn<(checks: Array<{ rule: string; id: string }>) => Promise<boolean>>();
+jest.mock("@server/services/webchat/webchat-settings.service", () => ({
+  matchesAllowedDomains: () => false,
+  webchatSettingsService: { getSettings: async () => ({ allowedDomains: [] }) },
+}));
 jest.mock("@server/services/public-widget-limits", () => ({
   PUBLIC_WIDGET_LIMITS: { maxMessageLength: 4000 },
   isPublicWidgetRateLimited: mockRateLimited,

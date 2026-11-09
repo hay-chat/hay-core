@@ -32,6 +32,10 @@ jest.mock("@server/services/redis.service", () => ({
     getClient: () => fakeClient,
   },
 }));
+const mockGetSettings = jest.fn(async () => ({ pageTools: { enabled: true } }));
+jest.mock("@server/services/webchat/webchat-settings.service", () => ({
+  webchatSettingsService: { getSettings: mockGetSettings },
+}));
 jest.mock("@server/services/websocket.service", () => ({
   websocketService: { sendToConversation: mockSendToConversation },
 }));
@@ -41,6 +45,8 @@ import {
   validatePageTools,
   unwrapPageToolResult,
   PageToolValidationError,
+  isPageToolResult,
+  pageToolArgumentErrors,
   PAGE_TOOL_CALL_EVENT,
 } from "@server/services/webchat/page-tools.service";
 
@@ -107,10 +113,10 @@ describe("pageToolService", () => {
     await pageToolService.register("conv-1", [
       { name: "navigate", description: "Go to a page", inputSchema: { type: "object" } },
     ]);
-    expect((await pageToolService.list("conv-1")).map((t) => t.name)).toEqual(["navigate"]);
-    expect(await pageToolService.list("conv-2")).toEqual([]);
+    expect((await pageToolService.list("conv-1", "org-1")).map((t) => t.name)).toEqual(["navigate"]);
+    expect(await pageToolService.list("conv-2", "org-1")).toEqual([]);
     await pageToolService.clear("conv-1");
-    expect(await pageToolService.list("conv-1")).toEqual([]);
+    expect(await pageToolService.list("conv-1", "org-1")).toEqual([]);
   });
 
   it("uses Redis with a TTL when it is connected", async () => {
@@ -124,7 +130,7 @@ describe("pageToolService", () => {
       "EX",
       3600,
     );
-    expect((await pageToolService.list("conv-1")).map((t) => t.name)).toEqual(["navigate"]);
+    expect((await pageToolService.list("conv-1", "org-1")).map((t) => t.name)).toEqual(["navigate"]);
   });
 
   it("sends tool_call to the page and resolves with the page's answer", async () => {
@@ -137,7 +143,7 @@ describe("pageToolService", () => {
       args: { path: "/inbox" },
     });
     const { callId } = (mockSendToConversation.mock.calls[0] as unknown[])[1] as { callId: string };
-    await pageToolService.resolve(callId, { result: { content: [{ type: "text", text: "ok" }] } });
+    await pageToolService.resolve(callId, "conv-1", { result: { content: [{ type: "text", text: "ok" }] } });
     await expect(pending).resolves.toEqual({ content: [{ type: "text", text: "ok" }] });
   });
 
@@ -145,7 +151,7 @@ describe("pageToolService", () => {
     const pending = pageToolService.call("conv-1", "org-1", "navigate", {});
     await new Promise((r) => setImmediate(r));
     const { callId } = (mockSendToConversation.mock.calls[0] as unknown[])[1] as { callId: string };
-    await pageToolService.resolve(callId, { error: "No such route" });
+    await pageToolService.resolve(callId, "conv-1", { error: "No such route" });
     await expect(pending).rejects.toThrow("No such route");
   });
 
@@ -174,16 +180,53 @@ describe("pageToolService", () => {
     expect(mockSendToConversation).not.toHaveBeenCalled();
 
     // The instance holding the socket does not know the call: it publishes the result.
-    await pageToolService.resolve("someone-elses-call", { result: 1 });
+    await pageToolService.resolve("someone-elses-call", "conv-1", { result: 1 });
     expect(mockPublish).toHaveBeenLastCalledWith("webchat:page-tool-results", {
       callId: "someone-elses-call",
+      conversationId: "conv-1",
       result: 1,
     });
 
     // This instance gets its own answer back over the channel.
     const sent = (mockPublish.mock.calls[0] as unknown[])[1] as { payload: { callId: string } };
     const handler = (mockSubscribe.mock.calls[0] as unknown[])[1] as (e: unknown) => void;
-    handler({ callId: sent.payload.callId, result: "done" });
+    handler({ callId: sent.payload.callId, conversationId: "conv-1", result: "done" });
     await expect(pending).resolves.toBe("done");
+  });
+});
+
+describe("page tool boundaries", () => {
+  it("hides a conversation's tools once its organization turns the feature off", async () => {
+    await pageToolService.register("conv-off", [
+      { name: "navigate", description: "Go", inputSchema: { type: "object" } },
+    ]);
+    mockGetSettings.mockResolvedValueOnce({ pageTools: { enabled: false } });
+    expect(await pageToolService.list("conv-off", "org-1")).toEqual([]);
+  });
+
+  it("ignores a result sent from another conversation's socket", async () => {
+    redisConnected = false;
+    const pending = pageToolService.call("conv-1", "org-1", "navigate", {}, 500);
+    await new Promise((resolve) => setImmediate(resolve));
+    const callId = (mockSendToConversation.mock.lastCall?.[1] as { callId: string }).callId;
+    await pageToolService.resolve(callId, "conv-2", { result: "forged" });
+    await pageToolService.resolve(callId, "conv-1", { result: "real" });
+    await expect(pending).resolves.toBe("real");
+  });
+
+  it("checks arguments against the declared schema without running its regexes", () => {
+    const schema = {
+      type: "object",
+      required: ["pattern"],
+      properties: { pattern: { type: "string", pattern: "(a+)+$" } },
+    };
+    expect(pageToolArgumentErrors(schema, { pattern: "x" })).toEqual([]);
+    expect(pageToolArgumentErrors(schema, {})).toHaveLength(1);
+    expect(pageToolArgumentErrors(schema, { pattern: 1 })).toHaveLength(1);
+  });
+
+  it("marks only messages tagged by the server as page results", () => {
+    expect(isPageToolResult({ metadata: { source: "page" } })).toBe(true);
+    expect(isPageToolResult({ metadata: {} })).toBe(false);
   });
 });

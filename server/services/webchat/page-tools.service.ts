@@ -1,3 +1,4 @@
+import Ajv from "ajv";
 import { v4 as uuidv4 } from "uuid";
 import { config } from "@server/config/env";
 import { createLogger } from "@server/lib/logger";
@@ -13,9 +14,11 @@ import { createLogger } from "@server/lib/logger";
  * over Redis so the orchestrator worker and the socket may sit on different
  * server instances; without Redis everything stays in this process.
  *
- * Page tools skip the merchant approval gate on purpose: they run in the
- * visitor's browser, in front of the visitor, touch no provider and carry no
- * secret. The page author decides what the AI may do by registering only that.
+ * An organization opts in (Settings > Webchat); registration also checks the
+ * page's origin. Whatever the page sends is still visitor-controlled: its
+ * descriptors reach the planner as unverified data, its results never count
+ * as grounding or as proof of an action, and a tool that declares
+ * `readOnlyHint: false` goes through the approval policy.
  */
 
 const logger = createLogger("page-tools");
@@ -28,6 +31,8 @@ export const PAGE_TOOL_CALL_EVENT = "page_tool_call";
 /** How long a registration lives without a refresh (sockets re-identify on reconnect). */
 const REGISTRATION_TTL_SECONDS = 60 * 60;
 export const PAGE_TOOL_TIMEOUT_MS = 15_000;
+/** `metadata.source` of a TOOL message whose result the page reported. */
+export const PAGE_TOOL_MESSAGE_SOURCE = "page";
 
 export const PAGE_TOOL_LIMITS = {
   maxTools: 32,
@@ -53,6 +58,7 @@ export interface PageToolOutcome {
 }
 
 interface PendingCall {
+  conversationId: string;
   resolve: (value: unknown) => void;
   reject: (error: Error) => void;
   timer: ReturnType<typeof setTimeout>;
@@ -64,6 +70,48 @@ export function isPageTool(fullToolName: string): boolean {
 
 export function pageToolName(fullToolName: string): string {
   return fullToolName.slice(PAGE_TOOL_PREFIX.length);
+}
+
+/** A TOOL message whose result came from the visitor's page, not a trusted system. */
+export function isPageToolResult(message: { metadata?: { source?: unknown } | null }): boolean {
+  return message.metadata?.source === PAGE_TOOL_MESSAGE_SOURCE;
+}
+
+/** Schema maps whose keys are names the page chose, not JSON Schema keywords. */
+const NAMED_SCHEMA_MAPS = new Set(["properties", "$defs", "definitions", "dependentSchemas"]);
+
+/** Regexes in a page's schema would run on the server, so only the page enforces them. */
+function withoutPatterns(schema: unknown, isNameMap = false): unknown {
+  if (Array.isArray(schema)) return schema.map((item) => withoutPatterns(item));
+  if (!schema || typeof schema !== "object") return schema;
+  const kept: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(schema)) {
+    if (!isNameMap && (key === "pattern" || key === "patternProperties")) continue;
+    kept[key] = withoutPatterns(value, !isNameMap && NAMED_SCHEMA_MAPS.has(key));
+  }
+  return kept;
+}
+
+/**
+ * Error messages when `args` do not match the schema the page declared. Each
+ * check compiles on its own instance: the schema is visitor-controlled, and a
+ * shared Ajv would keep every one of them in its cache.
+ */
+export function pageToolArgumentErrors(
+  schema: Record<string, unknown>,
+  args: Record<string, unknown>,
+): string[] {
+  try {
+    const validate = new Ajv({ allErrors: true, strict: false }).compile(
+      withoutPatterns(schema) as object,
+    );
+    if (validate(args)) return [];
+    return (validate.errors ?? []).map(
+      (error) => `${error.instancePath || "arguments"} ${error.message ?? ""}`,
+    );
+  } catch {
+    return ["the page declared an input schema that cannot be checked"];
+  }
 }
 
 /** Thrown for a registration the server refuses; the message is safe to send back. */
@@ -166,8 +214,18 @@ class PageToolService {
     if (client) await client.del(PAGE_TOOLS_REDIS_PREFIX + conversationId);
   }
 
-  async list(conversationId: string): Promise<PageToolDescriptor[]> {
+  /** The conversation's tools, when its organization still has page tools on. */
+  async list(conversationId: string, organizationId: string): Promise<PageToolDescriptor[]> {
     if (!this.isEnabled()) return [];
+    const tools = await this.registered(conversationId);
+    if (tools.length === 0) return [];
+    const { webchatSettingsService } =
+      await import("@server/services/webchat/webchat-settings.service");
+    const { pageTools } = await webchatSettingsService.getSettings(organizationId);
+    return pageTools?.enabled ? tools : [];
+  }
+
+  private async registered(conversationId: string): Promise<PageToolDescriptor[]> {
     const client = (await this.redis())?.getClient();
     if (client) {
       try {
@@ -201,7 +259,7 @@ class PageToolService {
         this.pending.delete(callId);
         reject(new Error(`Page tool "${name}" did not answer within ${timeoutMs / 1000}s`));
       }, timeoutMs);
-      this.pending.set(callId, { resolve, reject, timer });
+      this.pending.set(callId, { conversationId, resolve, reject, timer });
     });
 
     try {
@@ -213,26 +271,28 @@ class PageToolService {
       });
       if (!delivered) throw new Error(`No page is connected to run "${name}"`);
     } catch (error) {
-      this.settle(callId, { error: (error as Error).message });
+      this.settle(callId, conversationId, { error: (error as Error).message });
     }
     return outcome;
   }
 
   /**
    * The page answered. Called by the socket server that holds the page's
-   * connection; settles locally or forwards to the instance that is waiting.
+   * connection, with the conversation that socket identified into; settles
+   * locally or forwards to the instance that is waiting.
    */
-  async resolve(callId: string, outcome: PageToolOutcome): Promise<void> {
-    if (this.settle(callId, outcome)) return;
+  async resolve(callId: string, conversationId: string, outcome: PageToolOutcome): Promise<void> {
+    if (this.settle(callId, conversationId, outcome)) return;
     const redis = await this.redis();
-    if (redis) await redis.publish(PAGE_TOOL_RESULTS_CHANNEL, { callId, ...outcome });
+    if (redis)
+      await redis.publish(PAGE_TOOL_RESULTS_CHANNEL, { callId, conversationId, ...outcome });
     else logger.debug({ callId }, "Page tool result for an unknown call");
   }
 
-  /** True when this instance was waiting for the call. */
-  private settle(callId: string, outcome: PageToolOutcome): boolean {
+  /** True when this instance was waiting for this call from this conversation. */
+  private settle(callId: string, conversationId: string, outcome: PageToolOutcome): boolean {
     const waiting = this.pending.get(callId);
-    if (!waiting) return false;
+    if (!waiting || waiting.conversationId !== conversationId) return false;
     this.pending.delete(callId);
     clearTimeout(waiting.timer);
     if (outcome.error !== undefined) waiting.reject(new Error(String(outcome.error)));
@@ -270,8 +330,13 @@ class PageToolService {
         return;
       }
       await redis.subscribe(PAGE_TOOL_RESULTS_CHANNEL, (event) => {
-        const { callId, result, error } = (event ?? {}) as { callId?: string } & PageToolOutcome;
-        if (typeof callId === "string") this.settle(callId, { result, error });
+        const { callId, conversationId, result, error } = (event ?? {}) as {
+          callId?: string;
+          conversationId?: string;
+        } & PageToolOutcome;
+        if (typeof callId === "string" && typeof conversationId === "string") {
+          this.settle(callId, conversationId, { result, error });
+        }
       });
     })().catch((error) => {
       this.subscribing = null;
