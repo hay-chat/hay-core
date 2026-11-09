@@ -23,7 +23,9 @@ type OrgLike = Pick<Organization, "timezone"> & { settings?: OrganizationSetting
 /**
  * EU signal for the label rule: the org opted in to EU-only AI processing, or
  * runs on a European time zone (the closest signal of serving EU shoppers until
- * organizations record a country). Errs on the side of disclosure.
+ * organizations record a country). Errs on the side of disclosure, and is only
+ * a heuristic: an org on a non-European time zone serving EU shoppers reads as
+ * non-EU unless its AI region is set to "eu".
  */
 export function isEuOrganization(org: Partial<OrgLike> | null | undefined): boolean {
   if (!org) return false;
