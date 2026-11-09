@@ -14,6 +14,7 @@ import {
   isUnauthorizedError,
 } from "./session-refresh";
 import { splitOrgFromLocation } from "./org-url";
+import { invalidateForMutation } from "./query-cache";
 
 // Helper function to get auth cookie
 function getAuthToken(): string {
@@ -207,6 +208,30 @@ export const tokenRefreshLink: TRPCLink<AppRouter> = () => {
   };
 };
 
+/**
+ * After a mutation succeeds, invalidate the cached lists it can change. Here
+ * rather than at each call site, so no mutation can forget to.
+ */
+export const queryCacheLink: TRPCLink<AppRouter> = () => {
+  return ({ next, op }) => {
+    if (op.type !== "mutation") return next(op);
+    return observable((observer) =>
+      next(op).subscribe({
+        next(value) {
+          invalidateForMutation(op.path);
+          observer.next(value);
+        },
+        error(err) {
+          observer.error(err);
+        },
+        complete() {
+          observer.complete();
+        },
+      }),
+    );
+  };
+};
+
 // Get API base URL from runtime config (lazy getter)
 function getApiBaseUrl(): string {
   if (typeof window !== "undefined") {
@@ -253,6 +278,7 @@ function createHayApi() {
   if (!_hayApi) {
     _hayApi = createTRPCClient<AppRouter>({
       links: [
+        queryCacheLink, // Invalidate cached lists after mutations
         tokenRefreshLink, // Check token before requests
         errorLink, // Handle errors including expired tokens
         httpLink({
