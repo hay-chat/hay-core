@@ -2,6 +2,7 @@ import { LLMService } from "../services/core/llm.service";
 import { Conversation } from "@server/database/entities/conversation.entity";
 import { PromptService } from "../services/prompt.service";
 import { createLogger } from "@server/lib/logger";
+import { isOrgOverBudget } from "@server/services/llm/org-usage-budget";
 import {
   BUSINESS_CONTEXT_LIMITS,
   VISITOR_CONTEXT_KEY,
@@ -50,6 +51,10 @@ import {
 import type { FormSchema } from "@hay/form-schema";
 import { formSchemaSchema } from "@hay/form-schema";
 
+/** Tool loop steps (15) plus one retry per guardrail and a recheck. */
+const MAX_PLANNER_CALLS_PER_TURN = 20;
+const MAX_RECHECK_DEPTH = 1;
+
 const BAD_LINK_NOTE: Record<BadLink["reason"], string> = {
   dead: "does not exist",
   unlisted: "not a known page of the website",
@@ -88,8 +93,12 @@ export interface ExecuteOptions {
     actionClaimRetries: number;
     companyInterestRetries: number;
     linkRetries: number;
+    /** Planner calls so far this turn, across tool steps, retries and rechecks. */
+    plannerCalls?: number;
   };
   plannerFeedback?: string;
+  /** How many confidence rechecks led to this call. */
+  recheckDepth?: number;
 }
 
 export interface ExecutionResult {
@@ -286,6 +295,9 @@ export class ExecutionLayer {
       conversationId: conversation.id,
     });
     try {
+      const limited = await this.turnLimitHandoff(conversation, options, log);
+      if (limited) return limited;
+
       log.debug(
         {
           playbookId: conversation.playbook_id,
@@ -816,7 +828,7 @@ export class ExecutionLayer {
       );
 
       // Handle medium confidence - trigger recheck
-      if (confidenceAssessment.shouldRecheck) {
+      if (confidenceAssessment.shouldRecheck && (options.recheckDepth ?? 0) < MAX_RECHECK_DEPTH) {
         log.debug("Medium confidence detected, triggering recheck");
 
         const recheckResult = await this.performRecheck(
@@ -1417,6 +1429,26 @@ export class ExecutionLayer {
   /**
    * Perform recheck with alternate retrieval strategy
    */
+  /** Ends the turn with a hand-off once it has used its planner calls or the org its tokens. */
+  private async turnLimitHandoff(
+    conversation: Conversation,
+    options: ExecuteOptions,
+    log: Pick<ReturnType<typeof logger.child>, "warn">,
+  ): Promise<ExecutionResult | null> {
+    if (await isOrgOverBudget(conversation.organization_id)) {
+      log.warn("Organization used its daily AI token budget, handing off");
+      const reason = "The AI could not answer (daily usage budget reached)";
+      return { step: "HANDOFF", handoffReason: reason, handoff: { reason }, aiUnavailable: true };
+    }
+    const state = options.turnGuardrailState;
+    if (!state) return null;
+    state.plannerCalls = (state.plannerCalls ?? 0) + 1;
+    if (state.plannerCalls <= MAX_PLANNER_CALLS_PER_TURN) return null;
+    log.warn("Turn used its planner calls, handing off");
+    const reason = "The AI could not finish the reply (too many steps)";
+    return { step: "HANDOFF", handoffReason: reason, handoff: { reason }, planningExhausted: true };
+  }
+
   private async performRecheck(
     originalResult: ExecutionResult,
     conversation: Conversation,
@@ -1457,7 +1489,10 @@ export class ExecutionLayer {
 
       // Re-execute with new documents. Forward options so the recheck's re-plan
       // sees the same turn tool ledger / retry budget as the original plan.
-      const recheckResult = await this.execute(conversation, customerLanguage, options);
+      const recheckResult = await this.execute(conversation, customerLanguage, {
+        ...options,
+        recheckDepth: (options.recheckDepth ?? 0) + 1,
+      });
 
       if (!recheckResult || recheckResult.step !== "RESPOND" || !recheckResult.userMessage) {
         // Recheck failed, restore original documents

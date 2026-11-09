@@ -291,6 +291,8 @@ export const config = {
     baseUrl: process.env.LLM_BASE_URL || "",
     vendor: process.env.LLM_VENDOR || "",
     apiKey: process.env.LLM_API_KEY || "",
+    /** Tokens an organization's AI may use per UTC day before it hands off. 0 turns this off. */
+    orgDailyTokenBudget: Number(process.env.LLM_ORG_DAILY_TOKEN_BUDGET ?? 20_000_000),
   },
 
   /**
