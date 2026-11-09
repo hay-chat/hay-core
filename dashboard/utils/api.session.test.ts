@@ -15,6 +15,8 @@ const authStore = {
 
 vi.mock("@/stores/auth", () => ({ useAuthStore: () => authStore }));
 vi.mock("@/stores/user", () => ({ useUserStore: () => ({}) }));
+const invalidateForMutation = vi.fn();
+vi.mock("./query-cache", () => ({ invalidateForMutation }));
 vi.mock("@/composables/useServerStatus", () => ({ reportServerError: vi.fn() }));
 vi.mock("@/composables/useSuspension", () => ({
   redirectForSuspension: vi.fn(),
@@ -87,6 +89,65 @@ async function runThroughLink(
 
   return { outcome, downstreamCalls, accessTokensSent };
 }
+
+describe("queryCacheLink", () => {
+  type LinkOp = { type: "query" | "mutation"; path: string };
+
+  /** Run one operation through the link against a downstream that answers or fails. */
+  async function run(op: LinkOp, downstream: { value: unknown } | { error: unknown }) {
+    const { queryCacheLink } = await import("./api");
+    const next = () =>
+      observable((observer) => {
+        if ("error" in downstream) observer.error(downstream.error as never);
+        else {
+          observer.next({ result: { type: "data", data: downstream.value } } as never);
+          observer.complete();
+        }
+        return () => {};
+      });
+    const link = (
+      queryCacheLink as unknown as (runtime: object) => (opts: object) => {
+        subscribe: (o: object) => unknown;
+      }
+    )({});
+    const order: string[] = [];
+    invalidateForMutation.mockImplementation(() => order.push("invalidated"));
+    await new Promise<void>((resolve) => {
+      link({ op: { id: 1, input: undefined, context: {}, ...op }, next }).subscribe({
+        next: () => {
+          order.push("delivered");
+          resolve();
+        },
+        error: () => resolve(),
+      });
+    });
+    return order;
+  }
+
+  beforeEach(() => {
+    vi.resetModules();
+    invalidateForMutation.mockReset();
+  });
+
+  it("invalidates before the caller sees a successful mutation", async () => {
+    const order = await run({ type: "mutation", path: "conversations.close" }, { value: {} });
+
+    expect(invalidateForMutation).toHaveBeenCalledWith("conversations.close");
+    expect(order).toEqual(["invalidated", "delivered"]);
+  });
+
+  it("does not invalidate when the mutation fails", async () => {
+    await run({ type: "mutation", path: "conversations.close" }, { error: serverError() });
+
+    expect(invalidateForMutation).not.toHaveBeenCalled();
+  });
+
+  it("ignores queries", async () => {
+    await run({ type: "query", path: "conversations.list" }, { value: {} });
+
+    expect(invalidateForMutation).not.toHaveBeenCalled();
+  });
+});
 
 describe("dashboard session refresh (D11-4)", () => {
   beforeEach(() => {
