@@ -11,6 +11,9 @@ const {
   callerIdentity,
   lookupFor,
   assertOwnsRecord,
+  ownsRecord,
+  matchIdentity,
+  hasIdentity,
   NOT_VERIFIED,
 } = require("@hay/plugin-sdk/identity");
 const { contactsOf } = require("./customers");
@@ -34,6 +37,7 @@ const ORDER_SUPPORT_FIELDS = `
   id
   name
   email
+  phone
   createdAt
   cancelledAt
   closedAt
@@ -57,7 +61,7 @@ const ORDER_SUPPORT_FIELDS = `
     phone
     company
   }
-  customer { id displayName defaultEmailAddress { emailAddress } }
+  customer { id displayName defaultEmailAddress { emailAddress } defaultPhoneNumber { phoneNumber } }
   fulfillments(first: 10) {
     status
     displayStatus
@@ -206,6 +210,45 @@ function orderStaleTracking(order, originCountry, now) {
   );
 }
 
+/**
+ * Gate for reads that return an order with its PII (email, phone, name, address).
+ * Runs in the tool, on the fetched order, before anything is returned: the caller
+ * must be staff, the verified customer core sent (matching the order), or the
+ * shopper must have given an email/phone that matches the order. Otherwise it
+ * throws a PII-free error — never echo anything from `order` here.
+ */
+function assertOrderAccess(order, identity, given) {
+  const onOrder = {
+    emails: [order.email, order.customer?.defaultEmailAddress?.emailAddress],
+    phones: [
+      order.phone,
+      order.shippingAddress?.phone,
+      order.customer?.defaultPhoneNumber?.phoneNumber,
+    ],
+  };
+  if (ownsRecord(identity, onOrder)) return;
+  if (!hasIdentity(given)) {
+    throw toolError(
+      "PRECONDITION",
+      "Ask the customer for the email or phone used on the order first; order details are " +
+        "only returned after it matches.",
+      { details: { reason: "IDENTITY_REQUIRED" } },
+    );
+  }
+  if (!matchIdentity(onOrder, given)) {
+    throw toolError(
+      "PRECONDITION",
+      "The email/phone given does not match this order. No order details can be shared; do " +
+        "not reveal or hint at any email, phone, name or address on the order. Ask the " +
+        "customer to confirm the email used at checkout, or hand off to the team.",
+      { details: { reason: "IDENTITY_MISMATCH" } },
+    );
+  }
+}
+
+const SHOPPER_EMAIL = z.string().optional().describe("Email the customer gave you for this order.");
+const SHOPPER_PHONE = z.string().optional().describe("Phone the customer gave you for this order.");
+
 function enrichOrder(order, originCountry = null, now = Date.now()) {
   if (!order) return null;
   const deliveredAt =
@@ -293,14 +336,18 @@ const OLDER_THAN_60_DAYS =
 function registerOrderTools(server) {
   server.tool(
     "shopify_get_order",
-    "Get an order with line items, totals, shipping address, tracking, payment transactions " +
+    "Requires the email or phone the customer gave for the order (not needed for a verified " +
+      "customer's own order); if it does not match, nothing about the order is returned. " +
+      "Get an order with line items, totals, shipping address, tracking, payment transactions " +
       "(gateway, kind, status, paymentId), refunds with dates, sourceName, tags, custom " +
       "attributes, and a supportSummary (isCancellable, isRefundable, remainingRefundable, " +
       "deliveredAt, addressChangeable, tracking: isStale/daysSinceLastUpdate/staleReason).",
     {
       order_id: z.string().describe("Order GID (gid://shopify/Order/123) or bare numeric id."),
+      email: SHOPPER_EMAIL,
+      phone: SHOPPER_PHONE,
     },
-    async (args) => {
+    async (args, extra) => {
       try {
         const id = toGid("Order", args.order_id);
         const QUERY = `
@@ -311,6 +358,7 @@ function registerOrderTools(server) {
         `;
         const data = await shopifyGql(QUERY, { id });
         if (!data.order) throw await orderNotFound(args.order_id);
+        assertOrderAccess(data.order, callerIdentity(extra), args);
         return ok(enrichOrder(data.order, shopCountry(data)));
       } catch (err) {
         return fail(err);
@@ -321,11 +369,15 @@ function registerOrderTools(server) {
   server.tool(
     "shopify_get_order_by_name",
     'Look up an order by its human-readable name (e.g. "#1001"). Returns the same enriched ' +
-      "shape as shopify_get_order, including the supportSummary.",
+      "shape as shopify_get_order, including the supportSummary. " +
+      "Requires the email or phone the customer gave for the order; if it does not match, " +
+      "nothing about the order is returned.",
     {
       name: z.string().describe('Order name including any prefix, e.g. "#1001".'),
+      email: SHOPPER_EMAIL,
+      phone: SHOPPER_PHONE,
     },
-    async (args) => {
+    async (args, extra) => {
       try {
         // OrderIdentifierInput has no `name` field (only id / customId), so look
         // an order up by its name via the orders search query. Verified 2026-04.
@@ -356,6 +408,7 @@ function registerOrderTools(server) {
               (older ? OLDER_THAN_60_DAYS : ""),
           );
         }
+        assertOrderAccess(first, callerIdentity(extra), args);
         return ok(enrichOrder(first, shopCountry(data)));
       } catch (err) {
         return fail(err);

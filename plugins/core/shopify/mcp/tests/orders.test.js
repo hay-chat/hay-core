@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach } from "vitest";
 import { createRequire } from "node:module";
 
 const require = createRequire(import.meta.url);
-const { createFakeServer, mockShopify, verified } = require("./harness");
+const { createFakeServer, mockShopify, verified, STAFF } = require("./harness");
 const { registerOrderTools, cancelBlocker, enrichOrder } = require("../tools/orders");
 const { registerFulfillmentTools } = require("../tools/fulfillments");
 
@@ -427,7 +427,7 @@ describe("shopify_get_order supportSummary", () => {
         },
       }),
     });
-    const res = await server.call("shopify_get_order", { order_id: "1001" });
+    const res = await server.call("shopify_get_order", { order_id: "1001" }, STAFF);
     expect(res.data.supportSummary).toMatchObject({
       isCancellable: false,
       addressChangeable: false,
@@ -469,7 +469,7 @@ describe("shopify_get_order payment and source fields (D10-1)", () => {
         }),
       }),
     });
-    const res = await server.call("shopify_get_order", { order_id: "1001" });
+    const res = await server.call("shopify_get_order", { order_id: "1001" }, STAFF);
     for (const field of [
       "sourceName",
       "paymentGatewayNames",
@@ -498,7 +498,7 @@ describe("shopify_get_order payment and source fields (D10-1)", () => {
 
   it("defaults missing payment fields to empty values", async () => {
     mockShopify({ GetOrder: () => ({ order: unfulfilledOrder({ lineItems: { edges: [] } }) }) });
-    const res = await server.call("shopify_get_order", { order_id: "1001" });
+    const res = await server.call("shopify_get_order", { order_id: "1001" }, STAFF);
     expect(res.data).toMatchObject({
       sourceName: null,
       tags: [],
@@ -578,7 +578,7 @@ describe("supportSummary.tracking (D6-9)", () => {
         shop: { billingAddress: { countryCodeV2: "BR" } },
       }),
     });
-    await server.call("shopify_get_order", { order_id: "1001" });
+    await server.call("shopify_get_order", { order_id: "1001" }, STAFF);
     expect(calls[0].query).toContain("sortKey: HAPPENED_AT");
     expect(calls[0].query).toContain("countryCodeV2");
   });
@@ -589,7 +589,7 @@ describe("marketplace orders in not-found (D10-6)", () => {
     mockShopify({ GetOrderByName: () => ({ orders: { nodes: [], edges: [] }, shop: null }) });
     const server = createFakeServer();
     registerOrderTools(server);
-    const res = await server.call("shopify_get_order_by_name", { name: "240512AB12CD34" });
+    const res = await server.call("shopify_get_order_by_name", { name: "240512AB12CD34" }, STAFF);
     expect(res.isError).toBe(true);
     expect(res.data.code).toBe("NOT_FOUND");
     expect(res.data.details).toMatchObject({ marketplace: "shopee" });
@@ -609,7 +609,7 @@ describe("order lookups as customers phrase them (haychat-2, 2026-10-29)", () =>
     });
     const server = createFakeServer();
     registerOrderTools(server);
-    const res = await server.call("shopify_get_order_by_name", { name: "1005" });
+    const res = await server.call("shopify_get_order_by_name", { name: "1005" }, STAFF);
     expect(res.isError).toBe(false);
     expect(calls.map((c) => c.variables.query)).toEqual(['name:"#1005"']);
   });
@@ -623,7 +623,7 @@ describe("order lookups as customers phrase them (haychat-2, 2026-10-29)", () =>
     });
     const server = createFakeServer();
     registerOrderTools(server);
-    const res = await server.call("shopify_get_order_by_name", { name: "#1005" });
+    const res = await server.call("shopify_get_order_by_name", { name: "#1005" }, STAFF);
     expect(res.data.code).toBe("NOT_FOUND");
     expect(res.data.message).toMatch(/last 60 days/);
   });
@@ -637,7 +637,7 @@ describe("order lookups as customers phrase them (haychat-2, 2026-10-29)", () =>
     });
     const server = createFakeServer();
     registerOrderTools(server);
-    const res = await server.call("shopify_get_order_by_name", { name: "#1005" });
+    const res = await server.call("shopify_get_order_by_name", { name: "#1005" }, STAFF);
     expect(res.data.message).not.toMatch(/60 days/);
   });
 
