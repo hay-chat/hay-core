@@ -29,7 +29,7 @@
       },
       "list": {
         "title": "Histórico de Avaliações",
-        "count": "{count} avaliações",
+        "count": "{count} avaliação | {count} avaliações",
         "loading": "Carregando avaliações...",
         "empty": "Nenhuma avaliação corresponde a estes filtros",
         "reviewer": "Avaliada por {email}",

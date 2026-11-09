@@ -29,7 +29,7 @@
       },
       "list": {
         "title": "Feedback History",
-        "count": "{count} feedback entries",
+        "count": "{count} feedback entry | {count} feedback entries",
         "loading": "Loading feedback...",
         "empty": "No feedback matches these filters",
         "reviewer": "Rated by {email}",
