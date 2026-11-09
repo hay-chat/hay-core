@@ -1,7 +1,8 @@
-# Single sign-on (OpenID Connect)
+# Single sign-on (OpenID Connect, SAML) and SCIM
 
-Each organization can let its team sign in through its own identity provider.
-Owners set it up under Settings, Single sign-on. SAML and SCIM are not part of this.
+Each organization can let its team sign in through its own identity provider, and can have that provider
+create and remove its people automatically (SCIM). Owners set it up under Settings, Single sign-on.
+A connection is OpenID Connect or SAML, one per organization.
 
 ## How a sign-in works
 
@@ -19,7 +20,7 @@ Owners set it up under Settings, Single sign-on. SAML and SCIM are not part of t
 
 Redis is required: without it sign-in is refused, nothing is issued.
 
-## Setup for an owner
+## Setup for an owner (OpenID Connect)
 
 1. Create an OpenID Connect web application at the provider. Redirect URL: `<API URL>/sso/callback`
    (shown on the settings page). The provider must support the authorization code flow with PKCE (S256), sign ID
@@ -35,6 +36,37 @@ Redis is required: without it sign-in is refused, nothing is issued.
 Self-hosted installs whose provider sits on a private network or plain http set
 `SSO_ALLOW_PRIVATE_PROVIDER_HOSTS=true`. By default provider URLs must be https on public addresses
 (the same outbound rules as other tenant-supplied URLs).
+
+## SAML
+
+Choose "SAML 2.0" on the settings page. Hay shows the values to enter at the provider:
+
+- **ACS URL (Reply URL):** `<API URL>/sso/saml/acs`, the same for every organization.
+- **Entity ID (Audience):** `<API URL>/sso/saml/<organization id>`. Once saved, the same page lists the
+  service provider metadata URL (`<entity id>/metadata`) for providers that import it.
+
+Then enter the provider's entity ID, its single sign-on URL (HTTP-Redirect binding) and the certificate it signs with
+(PEM or plain base64; paste two during a rotation). Sign-in starts at Hay only. Requirements on the provider:
+
+- The **assertion** must be signed with the configured certificate (signing only the outer response is refused).
+  Okta signs the assertion by default. In Entra choose "Sign SAML assertion" or "Sign SAML response and assertion".
+- The assertion must name this audience, be addressed (Recipient) to the ACS URL, answer the request Hay sent
+  (`InResponseTo`) and be within its validity window (60 seconds of clock skew, and no assertion older than 5 minutes).
+- NameID must not be `transient`. The email address comes from the `email`, `mail` or `emailaddress` claim,
+  else from an email NameID. Optional first/last name attributes: `givenName`/`firstName`, `sn`/`surname`.
+- A groups attribute can be named for role mapping, as with the OpenID Connect groups claim.
+
+How the browser comes back: the provider POSTs the response to the ACS URL. That request is cross-site, so the
+sign-in cookie (SameSite=Lax, as for OpenID Connect) is not sent with it. Hay verifies the response there, then
+redirects (303) to `/sso/saml/finish`, a same-site GET where the cookie arrives; only then is the person provisioned
+and the one-minute ticket issued. Provider-initiated sign-in (a response nobody asked for) is refused. A SAML
+assertion has no `email_verified`: the signed assertion plus the DNS-proven domain stand in for it.
+
+Switching an organization between OpenID Connect and SAML, or to another provider, turns the requirement off and forgets
+the old provider's links; people link again by email as active members.
+
+Redis is used for the request id (one use), the assertion id (so a captured response cannot be replayed) and the
+parked response. The ACS endpoint accepts a form post of up to 400 KB and nothing else is widened.
 
 ## Who gets in
 
@@ -91,6 +123,33 @@ Then check `audit_logs` for `sso.enforcement.change`.
 `sso.config.update`, `sso.config.delete`, `sso.domain.add`, `sso.domain.verify`, `sso.domain.remove`,
 `sso.enforcement.change` (all by the acting owner; the client secret is never recorded), `sso.login`, and
 `sso.login_failed` (with a reason such as `state_invalid`, `token_invalid`, `domain_unverified`).
+SCIM adds `scim.token.create`, `scim.token.revoke`, `scim.auth_failed` (first failure per address per 15 minutes),
+`scim.user.create|update|deactivate|reactivate|delete`, `scim.group.create|update|delete` and `scim.role.change`.
+
+## SCIM provisioning
+
+An owner generates a token under "Automatic provisioning (SCIM)". It is shown once; only a hash is kept. Creating another
+replaces the first; revoking stops it at once. Enter `<API URL>/scim/v2` and the token at the provider (Okta: SCIM 2.0 with
+HTTP header authentication; Entra: tenant URL and secret token). Requests are limited to 600 a minute per token, and
+failed attempts are limited per address.
+
+- A token reaches only its own organization. Other organizations' people and groups answer 404.
+- Users: create, get, list (filters `eq ne co sw ew pr gt ge lt le`, `and`, `or`, `not`, on `userName`, `externalId`, `id`,
+  `emails.value`, `active`, `name.*`, `displayName`), PUT, PATCH (Okta's pathless and Entra's path form) and DELETE.
+  Discovery: `/ServiceProviderConfig`, `/ResourceTypes`, `/Schemas`. Errors follow RFC 7644 (`scimType`).
+- Only addresses on the organization's verified domains can be provisioned. An account that already exists outside the
+  organization is never claimed (409); invite that person first. A person this organization removed earlier can be
+  provisioned again.
+- Owners are never changed, deactivated or removed through SCIM (403). Groups never produce an owner.
+- An account used in other organizations is only changed here: its name and address are left alone (an address change
+  is refused with `mutability`), and nothing happens to its other memberships.
+- Deactivating (`active: false`) or deleting removes the person from this organization: the membership, their single
+  sign-on sessions for this organization, their open dashboard sockets here and the API tokens they created here all
+  end. If it was their only organization the account is deactivated and every session ends. Reactivation turns the
+  membership back on, and the account too when this was its only organization.
+- Groups: a pushed group's name is looked up in the role mapping above (the same one sign-in uses). Members get the best
+  mapped role, or the default role when none of their groups is mapped. With no mapping set, groups never change a role.
+  If a groups claim is also configured for sign-in, each sign-in re-applies the claim, so use the same group names in both.
 
 ## Confirm it works
 
@@ -100,4 +159,6 @@ Then check `audit_logs` for `sso.enforcement.change`.
 
 ## Deploy notes
 
-Run migrations after deploying. Until they run, nobody has single sign-on and everything else is unchanged.
+Run migrations after deploying. Until they run, nobody has single sign-on or SCIM and everything else is unchanged
+(SCIM requests answer 401). Two migrations add SAML columns to `sso_connections` and the SCIM tables.
+No new environment variables. `SSO_ALLOW_PRIVATE_PROVIDER_HOSTS=true` also allows a plain-http SAML sign-in URL for self-hosted installs.
