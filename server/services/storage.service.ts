@@ -1,4 +1,4 @@
-import FileType from "file-type";
+import { fileTypeFromBuffer } from "file-type";
 import { S3Client, DeleteObjectCommand } from "@aws-sdk/client-s3";
 import { Upload as S3Upload } from "@aws-sdk/lib-storage";
 import * as fs from "fs";
@@ -82,7 +82,7 @@ export async function detectStoredFileType(
 ): Promise<string> {
   const bare = declaredMimeType.split(";")[0].trim().toLowerCase();
   const declared = DECLARED_ALIASES[bare] ?? bare;
-  const detected = await FileType.fromBuffer(buffer);
+  const detected = await fileTypeFromBuffer(buffer);
 
   if (!detected) {
     if (TEXT_TYPES.has(declared)) return declared;
