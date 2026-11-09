@@ -3,13 +3,14 @@
 For the person on call. Each one starts with how to confirm the problem and ends
 with how to confirm it's over.
 
-| Runbook                                   | Use when                                                                                  |
-| ----------------------------------------- | ----------------------------------------------------------------------------------------- |
-| [redis-down](redis-down.md)               | `hay_dependency_up{dependency="redis"}` is 0, or logins and webhooks return 503           |
-| [rabbitmq-down](rabbitmq-down.md)         | `hay_dependency_up{dependency="rabbitmq"}` is 0, replies are slow, or dead letters appear |
-| [db-restore](db-restore.md)               | Data is lost or the database is unusable                                                  |
-| [key-rotation](key-rotation.md)           | A secret leaked, someone with access left, or a rotation is due                           |
-| [incident-response](incident-response.md) | Anything that may be a security incident                                                  |
+| Runbook                                   | Use when                                                                                       |
+| ----------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| [redis-down](redis-down.md)               | `hay_dependency_up{dependency="redis"}` is 0, or logins and webhooks return 503                |
+| [rabbitmq-down](rabbitmq-down.md)         | `hay_dependency_up{dependency="rabbitmq"}` is 0, replies are slow, or dead letters appear      |
+| [db-restore](db-restore.md)               | Data is lost or the database is unusable                                                       |
+| [key-rotation](key-rotation.md)           | A secret leaked, someone with access left, or a rotation is due                                |
+| [audit-sink](audit-sink.md)               | Audit copy is lagging, entries were set aside, or the trail must be checked against the bucket |
+| [incident-response](incident-response.md) | Anything that may be a security incident                                                       |
 
 **Two deployments.** Commands differ between them, so each runbook says which applies.
 
