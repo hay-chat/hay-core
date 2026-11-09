@@ -489,7 +489,7 @@ export const organizationsRouter = t.router({
         euAvailable: isEuRegionConfigured(),
         hasCustomProvider: !!organization.settings?.llm,
         provider: describeAiProvider(organization.settings),
-        visionProvider: describeVisionProvider(organization.settings),
+        visionProvider: describeVisionProvider(),
       };
     },
   ),

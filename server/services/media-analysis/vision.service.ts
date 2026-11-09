@@ -6,8 +6,8 @@
  *
  * Endpoint:
  * - the EU endpoint whenever it is configured, for every organization;
- * - otherwise the default managed OpenAI endpoint, except for EU-only orgs: their
- *   files never leave the region, so the pass does not run for them.
+ * - otherwise the default managed OpenAI endpoint, for every organization, EU-only
+ *   orgs included: vision is not blocked while no EU inference exists.
  *
  * Usage is reported through the LLM usage seam (services/llm/usage-sink).
  *
@@ -19,12 +19,7 @@ import sharp from "sharp";
 import { config } from "@server/config/env";
 import { createLogger } from "@server/lib/logger";
 import { MEDIA_CLASSES, type MediaClass } from "@server/database/entities/message.entity";
-import { organizationRepository } from "@server/repositories/organization.repository";
-import {
-  isEuRegionConfigured,
-  regionFromSettings,
-  type AiRegion,
-} from "@server/services/llm/ai-region";
+import { isEuRegionConfigured, type AiRegion } from "@server/services/llm/ai-region";
 import { emitUsage } from "@server/services/llm/usage-sink";
 
 const logger = createLogger("vision");
@@ -112,8 +107,8 @@ interface Endpoint {
 class VisionService {
   private readonly clients = new Map<string, OpenAI>();
 
-  /** The vision endpoint for this org, or null when vision can't run for it. */
-  private async endpoint(organizationId: string): Promise<Endpoint | null> {
+  /** The vision endpoint, or null when no OpenAI key is configured. Same for every org. */
+  private endpoint(): Endpoint | null {
     if (isEuRegionConfigured()) {
       return {
         apiKey: config.aiRegion.eu.apiKey,
@@ -122,9 +117,6 @@ class VisionService {
       };
     }
     if (!config.openai.apiKey) return null;
-    // No silent fallback when the settings cannot be read: the org may be EU-only.
-    const organization = await organizationRepository.findById(organizationId);
-    if (regionFromSettings(organization?.settings) === "eu") return null;
     return {
       apiKey: config.openai.apiKey,
       baseURL: config.openai.baseUrl || undefined,
@@ -162,7 +154,7 @@ class VisionService {
     input: VisionInput,
     question?: string,
   ): Promise<VisionResult> {
-    const endpoint = await this.endpoint(organizationId);
+    const endpoint = this.endpoint();
     if (!endpoint)
       throw new VisionUnavailableError("vision is not available for this organization");
 

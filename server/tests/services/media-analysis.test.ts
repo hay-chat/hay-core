@@ -235,17 +235,13 @@ describe("processMessageMedia", () => {
     );
   });
 
-  it("does not read an EU-only org's files when the EU endpoint is not configured", async () => {
+  it("reads an EU-only org's files on the default endpoint when no EU endpoint is configured", async () => {
     mockFindOrganization.mockResolvedValue({ settings: { aiRegion: "eu" } });
     mockFindMessage.mockResolvedValue(message(markAnalysisPending([photo()])!));
 
     await processMessageMedia("msg-1", ORG);
 
-    expect(mockChatCreate).not.toHaveBeenCalled();
-    expect(storedAttachments()[0].analysis).toMatchObject({
-      status: "failed",
-      reason: "unavailable",
-    });
+    expect(mockChatCreate).toHaveBeenCalled();
   });
 
   it("reads files on the EU endpoint whenever it is configured", async () => {

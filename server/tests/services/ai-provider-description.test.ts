@@ -63,16 +63,17 @@ describe("describeAiProvider", () => {
 });
 
 describe("describeVisionProvider", () => {
-  it("shows no provider for an EU-only org when the EU endpoint is not configured", () => {
+  it("names the default endpoint for an EU-only org while no EU endpoint is configured", () => {
     config.aiRegion.eu.baseUrl = "";
     config.aiRegion.eu.apiKey = "";
-    expect(describeVisionProvider({ aiRegion: "eu" })).toBeNull();
+    config.openai.baseUrl = "";
+    expect(describeVisionProvider()).toEqual({ name: "OpenAI", host: "api.openai.com" });
   });
 
   it("names managed OpenAI even when the org chats on another provider", () => {
     config.aiRegion.eu.baseUrl = "";
     config.aiRegion.eu.apiKey = "";
     config.openai.baseUrl = "";
-    expect(describeVisionProvider({})).toEqual({ name: "OpenAI", host: "api.openai.com" });
+    expect(describeVisionProvider()).toEqual({ name: "OpenAI", host: "api.openai.com" });
   });
 });

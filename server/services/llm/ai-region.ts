@@ -70,15 +70,12 @@ function hostOf(url: string, fallback: string): string {
 /**
  * Who reads customer photos and PDFs, for display only. Vision always runs on a
  * managed OpenAI endpoint, whatever chat provider the org chose; mirrors
- * VisionService.endpoint. Null when an EU-only org's files are not analysed at all.
+ * VisionService.endpoint.
  */
-export function describeVisionProvider(
-  settings: { aiRegion?: unknown } | null | undefined,
-): { name: string; host: string } | null {
-  let host: string;
-  if (isEuRegionConfigured()) host = hostOf(config.aiRegion.eu.baseUrl, "eu.api.openai.com");
-  else if (regionFromSettings(settings) === "eu") return null;
-  else host = hostOf(config.openai.baseUrl, "api.openai.com");
+export function describeVisionProvider(): { name: string; host: string } {
+  const host = isEuRegionConfigured()
+    ? hostOf(config.aiRegion.eu.baseUrl, "eu.api.openai.com")
+    : hostOf(config.openai.baseUrl, "api.openai.com");
   return { name: KNOWN_AI_HOSTS[host] ?? host, host };
 }
 
