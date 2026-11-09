@@ -28,8 +28,9 @@ jest.mock("../../services/rate-limit.service", () => ({
     resetRateLimit: async () => undefined,
   },
 }));
+const mockRedisClient: { value: Record<string, () => Promise<number>> | null } = { value: null };
 jest.mock("../../services/redis.service", () => ({
-  redisService: { isConnected: () => false, getClient: () => null },
+  redisService: { isConnected: () => false, getClient: () => mockRedisClient.value },
 }));
 jest.mock("../../config/env", () => {
   const actual = jest.requireActual("../../config/env") as { config: object };
@@ -267,6 +268,60 @@ describe("account access", () => {
         emailVerificationTokenHash: null,
         emailVerificationExpiresAt: null,
       });
+    });
+  });
+
+  describe("passwords", () => {
+    const NEW_PASSWORD = "AnotherHorse7?";
+
+    it("refuses a signup password that misses the composition rules", async () => {
+      await expect(
+        authRouter.createCaller(publicCtx()).register({
+          organizationName: "Weak Org",
+          email: `weak@${DOMAIN}`,
+          password: "alllowercase",
+          confirmPassword: "alllowercase",
+        }),
+      ).rejects.toMatchObject({ code: "BAD_REQUEST" });
+    });
+
+    it("refuses changing to the current password and accepts a new one", async () => {
+      const user = await createMember("pw-change", "member");
+      const caller = authRouter.createCaller(await memberCtx(user.id));
+      const allow = async () => 0;
+      mockRedisClient.value = { zremrangebyscore: allow, zcard: allow, zadd: allow, expire: allow };
+
+      await expect(
+        caller.changePassword({ currentPassword: PASSWORD, newPassword: PASSWORD }),
+      ).rejects.toMatchObject({ code: "BAD_REQUEST" });
+
+      await expect(
+        caller.changePassword({ currentPassword: PASSWORD, newPassword: NEW_PASSWORD }),
+      ).resolves.toBeTruthy();
+      mockRedisClient.value = null;
+    });
+
+    it("moves a bcrypt hash to argon2 on sign-in", async () => {
+      const user = await createMember("pw-bcrypt", "member");
+      const users = AppDataSource.getRepository(User);
+      await users.update({ id: user.id }, { password: await hashPassword(PASSWORD, "bcrypt") });
+
+      await authRouter.createCaller(publicCtx()).login({ email: user.email, password: PASSWORD });
+
+      const stored = await users.findOneOrFail({ where: { id: user.id } });
+      expect(stored.password.startsWith("$argon2")).toBe(true);
+      await expect(
+        authRouter.createCaller(publicCtx()).login({ email: user.email, password: PASSWORD }),
+      ).resolves.toBeTruthy();
+    });
+
+    it("answers invalid credentials for an unreadable stored hash", async () => {
+      const user = await createMember("pw-unknown", "member");
+      await AppDataSource.getRepository(User).update({ id: user.id }, { password: "not-a-hash" });
+
+      await expect(
+        authRouter.createCaller(publicCtx()).login({ email: user.email, password: PASSWORD }),
+      ).rejects.toMatchObject({ code: "UNAUTHORIZED" });
     });
   });
 

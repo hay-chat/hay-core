@@ -27,6 +27,7 @@ import * as crypto from "crypto";
 import { config, getDashboardUrl } from "@server/config/env";
 import { StorageService } from "@server/services/storage.service";
 import { handleUpload } from "@server/lib/upload-helper";
+import { assertPasswordNotBreached, newPasswordSchema } from "@server/lib/auth/password-policy";
 import {
   clearRefreshCookies,
   readRefreshCookie,
@@ -91,7 +92,7 @@ const loginSchema = z.object({
 const registerSchema = z
   .object({
     email: z.string().email(),
-    password: passwordSchema,
+    password: newPasswordSchema,
     confirmPassword: z.string().max(128),
     firstName: z.string().max(255).optional(),
     lastName: z.string().max(255).optional(),
@@ -123,6 +124,17 @@ function deliverTokens(
   setRefreshCookies(ctx.res, tokens.refreshToken);
   const { refreshToken: _inCookie, ...rest } = tokens;
   return rest;
+}
+
+/** A password being changed must differ from the current one and not be known to be breached. */
+async function assertNewPasswordAllowed(user: User, newPassword: string): Promise<void> {
+  if (await verifyPassword(newPassword, user.password)) {
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message: "Choose a password different from your current one.",
+    });
+  }
+  await assertPasswordNotBreached(newPassword);
 }
 
 /** Managing sessions is for a signed-in person; API tokens have no session. */
@@ -294,6 +306,10 @@ export const authRouter = t.router({
     }
 
     // Update last login time and last seen
+    // Older accounts hold bcrypt hashes; move them to argon2 while the password is at hand.
+    if (user.password.startsWith("$2")) {
+      user.password = await hashPassword(password, "argon2");
+    }
     user.lastLoginAt = new Date();
     user.updateLastSeen();
     await userRepository.save(user);
@@ -360,6 +376,8 @@ export const authRouter = t.router({
         message: "Too many signup attempts. Please try again later.",
       });
     }
+
+    await assertPasswordNotBreached(input.password);
 
     if (!config.auth.allowSignup) {
       await assertSignupAllowed(AppDataSource.manager, input.email);
@@ -602,7 +620,7 @@ export const authRouter = t.router({
     .input(
       z.object({
         token: z.string(),
-        newPassword: passwordSchema,
+        newPassword: newPasswordSchema,
       }),
     )
     .mutation(async ({ input, ctx }) => {
@@ -632,6 +650,8 @@ export const authRouter = t.router({
           message: "Reset token has expired. Please request a new password reset.",
         });
       }
+
+      await assertNewPasswordAllowed(user, input.newPassword);
 
       // Hash new password
       user.password = await hashPassword(input.newPassword, "argon2");
@@ -869,7 +889,7 @@ export const authRouter = t.router({
     .input(
       z.object({
         currentPassword: z.string().max(128),
-        newPassword: passwordSchema,
+        newPassword: newPasswordSchema,
       }),
     )
     .mutation(async ({ input, ctx }) => {
@@ -893,6 +913,8 @@ export const authRouter = t.router({
           message: "Current password is incorrect",
         });
       }
+
+      await assertNewPasswordAllowed(user, input.newPassword);
 
       // Hash new password and invalidate all existing tokens
       user.password = await hashPassword(input.newPassword, "argon2");

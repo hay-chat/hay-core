@@ -34,9 +34,8 @@ export async function verifyPassword(password: string, hash: string): Promise<bo
     return bcrypt.compare(password, hash);
   } else if (hash.startsWith("$argon2")) {
     return argon2.verify(hash, password);
-  } else {
-    throw new Error("Unknown hash format");
   }
+  return false; // No password is valid against a value we can't read as a hash.
 }
 
 /**

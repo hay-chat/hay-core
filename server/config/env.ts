@@ -347,6 +347,10 @@ export const config = {
     host: process.env.POSTHOG_HOST || "https://eu.i.posthog.com",
   },
 
+  // Refuse new passwords found in known breaches (k-anonymity range lookup).
+  passwordBreachCheck:
+    process.env.PASSWORD_BREACH_CHECK !== "false" && process.env.NODE_ENV !== "test",
+
   // SameSite of the dashboard's refresh-token cookie. Keep "strict" when the
   // dashboard and API share a site (app.example.com + api.example.com); "none"
   // is only for a dashboard on a different registrable domain and needs HTTPS.
