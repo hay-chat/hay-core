@@ -371,7 +371,7 @@ Store platforms connected through plugins (Nuvemshop LGPD webhooks, Shopify comp
 
 ### Retention for Compliance
 
-- Audit logs (anonymized or not) are deleted after **90 days** by the `cleanup-old-audit-logs` daily job.
+- Audit logs (anonymized or not) are deleted after **365 days** by the `cleanup-old-audit-logs` daily job. IP addresses, user agents and email addresses in the event details are cleared from them after **90 days**.
 - Backups: production databases run on a managed provider (DigitalOcean) with the provider's automated backups. Hay has no backup rotation of its own, so deleted data can remain in provider backups for the provider's backup retention window. _(To confirm: the configured backup retention period.)_
 
 ---
@@ -392,7 +392,7 @@ Store platforms connected through plugins (Nuvemshop LGPD webhooks, Shopify comp
 
 ### 3. Audit Trail
 
-All DSAR actions are recorded in the audit log. Audit rows are append-only at the database level: they cannot be edited or deleted, except for the erasure anonymization above and the 90-day retention cleanup. Deleting an organization keeps its audit rows (the organization reference is cleared; the original organization id is retained).
+All DSAR actions are recorded in the audit log. Audit rows are append-only at the database level: they cannot be edited or deleted, except for the erasure anonymization above and the retention cleanup (personal fields after 90 days, the row after 365). Deleting an organization keeps its audit rows (the organization reference is cleared; the original organization id is retained).
 
 - `privacy.export.request`
 - `privacy.export.confirm`
@@ -584,7 +584,7 @@ Plugins an organization enables (e.g. Shopify, WhatsApp, Zendesk) send data to t
 | **Embeddings**       | Per-org `retentionDays` | Deleted alongside anonymized conversations                                          |
 | **Export Files**     | 7 days                  | Automatically deleted after download link expires                                   |
 | **Privacy Requests** | 365 days                | Anonymized after 365 days (pending PR #133)                                         |
-| **Audit Logs**       | 90 days                 | Deleted daily by the `cleanup-old-audit-logs` job; kept after organization deletion |
+| **Audit Logs**       | 365 days (personal fields 90 days) | Cleared and deleted daily by the `cleanup-old-audit-logs` job; kept after organization deletion |
 | **Database Backups** | Provider's retention    | Managed-database automated backups; no Hay-side rotation (period _to confirm_)      |
 
 ---

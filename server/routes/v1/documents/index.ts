@@ -1,5 +1,8 @@
 import { rateLimitMiddleware, RateLimits } from "@server/trpc/middleware/rate-limit";
 import { t, scopedProcedure } from "@server/trpc";
+import type { Context } from "@server/trpc/context";
+import type { AuditAction } from "@server/entities/audit-log.entity";
+import { auditLogService } from "@server/services/audit-log.service";
 import { z } from "zod";
 import { RESOURCES, ACTIONS } from "@server/types/scopes";
 import { DocumentProcessorFactory, DocumentRejectedError } from "@server/processors";
@@ -42,6 +45,24 @@ import {
 import { TRPCError } from "@trpc/server";
 
 const logger = createLogger("documents");
+
+/** Records a knowledge base change. Never logs the document's content. */
+async function auditDocument(
+  ctx: Context,
+  action: AuditAction,
+  documentId: string,
+  details: Record<string, unknown>,
+): Promise<void> {
+  await auditLogService.record({
+    userId: ctx.user?.id,
+    organizationId: ctx.organizationId,
+    action,
+    resource: "document",
+    changes: { documentId, ...details },
+    ipAddress: ctx.ipAddress,
+    userAgent: ctx.userAgent,
+  });
+}
 
 export const documentsRouter = t.router({
   list: createListProcedure(RESOURCES.DOCUMENTS, documentListInputSchema, documentRepository),
@@ -325,6 +346,8 @@ export const documentsRouter = t.router({
         vectorChunks,
       );
 
+      await auditDocument(ctx, "document.create", document.id, { title: document.title });
+
       return {
         id: document.id,
         title: document.title,
@@ -368,6 +391,11 @@ export const documentsRouter = t.router({
         ...(nextContent !== undefined && { content: nextContent }),
         ...(input.contentJson && { contentJson: stripMediaSignaturesInJson(input.contentJson) }),
         ...(input.status && { status: input.status }),
+      });
+      await auditDocument(ctx, "document.update", document.id, {
+        fields: ["title", "content", "contentJson", "contentHtml", "status"].filter(
+          (field) => input[field as keyof typeof input] !== undefined,
+        ),
       });
 
       if (!updatedDocument) {
@@ -494,6 +522,7 @@ export const documentsRouter = t.router({
 
       // Delete the document itself
       await documentRepository.delete(document.id, ctx.organizationId!);
+      await auditDocument(ctx, "document.delete", document.id, { title: document.title });
 
       return {
         success: true,

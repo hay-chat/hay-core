@@ -4,6 +4,9 @@ import { z } from "zod";
 import { PlaybookService } from "../../../services/playbook.service";
 import { PlaybookStatus } from "../../../database/entities/playbook.entity";
 import { TRPCError } from "@trpc/server";
+import type { AuditAction } from "@server/entities/audit-log.entity";
+import { auditLogService } from "@server/services/audit-log.service";
+import type { Context } from "@server/trpc/context";
 import { RESOURCES, ACTIONS } from "@server/types/scopes";
 import { APPROVAL_CATEGORIES } from "@server/types/organization-settings.types";
 import { LLMService } from "../../../services/core/llm.service";
@@ -79,6 +82,24 @@ const updatePlaybookSchema = z.object({
     .optional(),
 });
 
+/** Records a change to what the assistant is allowed to do. Never logs the instructions. */
+async function auditPlaybook(
+  ctx: Context,
+  action: AuditAction,
+  playbookId: string,
+  details: Record<string, unknown> = {},
+): Promise<void> {
+  await auditLogService.record({
+    userId: ctx.user?.id,
+    organizationId: ctx.organizationId,
+    action,
+    resource: "playbook",
+    changes: { playbookId, ...details },
+    ipAddress: ctx.ipAddress,
+    userAgent: ctx.userAgent,
+  });
+}
+
 export const playbooksRouter = t.router({
   // D8-14: ready-made playbooks; the dashboard creates a draft from one.
   templates: scopedProcedure(RESOURCES.PLAYBOOKS, ACTIONS.READ)
@@ -127,6 +148,7 @@ export const playbooksRouter = t.router({
     .input(createPlaybookSchema)
     .mutation(async ({ ctx, input }) => {
       const playbook = await playbookService.createPlaybook(ctx.organizationId!, input);
+      await auditPlaybook(ctx, "playbook.create", playbook.id, { title: playbook.title });
       const actionWarnings = await playbookService.validateReferencedActions(
         ctx.organizationId!,
         playbook.instructions,
@@ -155,6 +177,9 @@ export const playbooksRouter = t.router({
         });
       }
 
+      await auditPlaybook(ctx, "playbook.update", playbook.id, {
+        fields: Object.keys(input.data),
+      });
       const actionWarnings = await playbookService.validateReferencedActions(
         ctx.organizationId!,
         playbook.instructions,
@@ -193,6 +218,10 @@ export const playbooksRouter = t.router({
         });
       }
 
+      await auditPlaybook(ctx, "playbook.create", playbook.id, {
+        title: playbook.title,
+        duplicatedFrom: input.id,
+      });
       return playbook;
     }),
 
@@ -212,6 +241,7 @@ export const playbooksRouter = t.router({
         });
       }
 
+      await auditPlaybook(ctx, "playbook.delete", input.id);
       return { success: true };
     }),
 
@@ -369,6 +399,7 @@ export const playbooksRouter = t.router({
             ctx.user!.id,
             input.note,
           );
+          await auditPlaybook(ctx, "playbook.publish", input.playbookId, { versionId: version.id });
           const actionWarnings = await playbookService.validateReferencedActions(
             ctx.organizationId!,
             version.instructions,
@@ -397,13 +428,17 @@ export const playbooksRouter = t.router({
       )
       .mutation(async ({ ctx, input }) => {
         try {
-          return await playbookService.rollbackToVersion(
+          const version = await playbookService.rollbackToVersion(
             ctx.organizationId!,
             input.playbookId,
             input.versionId,
             ctx.user!.id,
             input.reason,
           );
+          await auditPlaybook(ctx, "playbook.publish", input.playbookId, {
+            rolledBackToVersionId: input.versionId,
+          });
+          return version;
         } catch (error) {
           if (error instanceof Error) {
             if (error.message === "Playbook not found") {

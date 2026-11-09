@@ -494,12 +494,31 @@ const jobRegistry: CronJobConfig[] = [
 
   {
     name: "cleanup-old-audit-logs",
-    description: "Delete audit logs older than the 90-day retention period",
+    description: "Clear personal fields from audit logs after 90 days and delete them after 365",
     schedule: "45 3 * * *", // Daily at 3:45 AM
     handler: async () => {
       const { auditLogService } = await import("./audit-log.service");
       const deleted = await auditLogService.cleanup();
       logger.info({ deleted }, "Audit log retention cleanup finished");
+    },
+    timeout: 1800000,
+    singleton: true,
+    enabled: true,
+  },
+
+  {
+    name: "verify-audit-log-chain",
+    description: "Recompute the audit log hash chains and report any mismatch",
+    schedule: "30 4 * * 0", // Weekly, Sunday at 4:30 AM
+    handler: async () => {
+      const { auditLogService } = await import("./audit-log.service");
+      const problems = await auditLogService.verifyChain();
+      if (problems.length > 0) {
+        logger.error(
+          { count: problems.length, sample: problems.slice(0, 20) },
+          "Audit log hash chain verification found problems",
+        );
+      }
     },
     timeout: 1800000,
     singleton: true,

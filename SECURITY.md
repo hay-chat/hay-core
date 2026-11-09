@@ -59,5 +59,7 @@ Third-party webhooks received by plugins are verified by each plugin against its
 Security-relevant actions (sign-in and sign-out, API keys, members and roles, plugin configuration and credentials, exports, deletions, DSAR requests) are written to the `audit_logs` table.
 
 - Rows are append-only: a database trigger rejects updates and deletes, except clearing a deleted user's or organization's reference, GDPR erasure anonymization, and the retention job.
-- Rows are kept **90 days**, also after the organization is deleted (attributable through `original_organization_id`).
+- Rows are kept **365 days**, also after the organization is deleted (attributable through `original_organization_id`). IP addresses, user agents and email addresses in the event details are cleared after 90 days.
+- Each organization's rows form a hash chain that a weekly job recomputes, so altered or removed events are reported.
+- Each row records whether a user, an API key, a plugin or the system acted.
 - Failed sign-ins for unknown emails store a keyed hash of the email, never the address.

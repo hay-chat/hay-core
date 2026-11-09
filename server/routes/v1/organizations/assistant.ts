@@ -6,6 +6,7 @@ import { tiptapDocSchema } from "@server/types/tiptap.types";
 import { handoffTicketConfigSchema } from "@server/types/handoff-ticket.types";
 import { organizationService } from "@server/services/organization.service";
 import { storageService } from "@server/services/storage.service";
+import { auditLogService } from "@server/services/audit-log.service";
 import { handoffTicketsService } from "@server/services/handoff-tickets/handoff-tickets.service";
 import { softLaunchReadinessService } from "@server/services/soft-launch-readiness.service";
 import type { Organization } from "@server/entities/organization.entity";
@@ -84,6 +85,15 @@ export const assistantRouter = t.router({
         humanHandoffAvailableInstructions: input.humanHandoffAvailableInstructions,
         humanHandoffUnavailableInstructions: input.humanHandoffUnavailableInstructions,
         humanHandoffUnavailableTicket: input.humanHandoffUnavailableTicket,
+      });
+      await auditLogService.record({
+        userId: ctx.user?.id,
+        organizationId,
+        action: "assistant.update",
+        resource: "assistant",
+        changes: { fields: Object.keys(input) },
+        ipAddress: ctx.ipAddress,
+        userAgent: ctx.userAgent,
       });
       return toAssistant(updated);
     }),

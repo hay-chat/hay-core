@@ -177,6 +177,16 @@ export const apiTokensRouter = t.router({
 
       await apiKeyRepository.save(apiKey);
 
+      await auditLogService.record({
+        userId: ctx.user?.id,
+        organizationId: ctx.organizationId,
+        action: "apikey.update",
+        resource: "apikey",
+        changes: { apiKeyId: apiKey.id, name: input.name, scopes: input.scopes },
+        ipAddress: ctx.ipAddress,
+        userAgent: ctx.userAgent,
+      });
+
       return {
         success: true,
         token: {
