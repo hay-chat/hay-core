@@ -10,7 +10,7 @@
         <NuxtLink to="/documents/sources">
           <Button variant="outline">
             <Plug class="mr-2 h-4 w-4" />
-            Connected sources
+            {{ $t("documents.actions.connectedSources") }}
           </Button>
         </NuxtLink>
         <NuxtLink to="/documents/new">
