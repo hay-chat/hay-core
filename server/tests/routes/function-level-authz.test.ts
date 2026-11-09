@@ -134,7 +134,7 @@ describe("addSecrets and addContext", () => {
   });
 
   it("refuses a conversation context that grows past the limit when merged", async () => {
-    jest.spyOn(ConversationRepository.prototype, "findById").mockResolvedValue({
+    jest.spyOn(ConversationRepository.prototype, "findByIdAndOrganization").mockResolvedValue({
       organization_id: "org-1",
       context: { existing: "x".repeat(60 * 1024) },
     } as never);
