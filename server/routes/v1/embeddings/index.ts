@@ -1,10 +1,11 @@
+import { rateLimitMiddleware, RateLimits } from "@server/trpc/middleware/rate-limit";
 import { t, scopedProcedure } from "@server/trpc";
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { vectorStoreService } from "@server/services/vector-store.service";
 import { documentRepository } from "@server/repositories/document.repository";
 import { createLogger } from "@server/lib/logger";
-import { boundedJsonRecord } from "@server/lib/validation/json-record";
+import { embeddingChunkMetadata } from "@server/lib/validation/json-record";
 import { RESOURCES, ACTIONS } from "@server/types/scopes";
 
 const logger = createLogger("embeddings");
@@ -16,12 +17,12 @@ const CHUNK_METADATA_MAX_BYTES = 4_096;
 const embedInput = z.object({
   documentId: z.string().uuid().nullable().optional(),
   content: z.string().min(1).max(CHUNK_MAX_LENGTH),
-  metadata: boundedJsonRecord(CHUNK_METADATA_MAX_BYTES).optional(),
+  metadata: embeddingChunkMetadata(CHUNK_METADATA_MAX_BYTES).optional(),
   chunks: z
     .array(
       z.object({
         content: z.string().min(1).max(CHUNK_MAX_LENGTH),
-        metadata: boundedJsonRecord(CHUNK_METADATA_MAX_BYTES).optional(),
+        metadata: embeddingChunkMetadata(CHUNK_METADATA_MAX_BYTES).optional(),
       }),
     )
     .max(CHUNKS_MAX_COUNT)
@@ -36,6 +37,7 @@ const searchInput = z.object({
 export const embeddingsRouter = t.router({
   // Add document embeddings
   add: scopedProcedure(RESOURCES.DOCUMENTS, ACTIONS.UPDATE)
+    .use(rateLimitMiddleware(RateLimits.MODERATE))
     .input(embedInput)
     .mutation(async ({ ctx, input }) => {
       const organizationId = ctx.organizationId;

@@ -142,6 +142,7 @@ const internalOrganizationsRouter = router({
           return { resource: resource || "*", actions: action ? [action] : ["*"] };
         }),
         isActive: true,
+        keyPrefix: token.slice(0, 8),
       });
       await AppDataSource.getRepository(ApiKey).save(apiKey);
       await auditLogService.record({

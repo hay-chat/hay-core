@@ -16,7 +16,7 @@ services:
       POSTGRES_PASSWORD: hay_password
       POSTGRES_DB: hay_db
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
       # Auto-create pgvector extension on first run
@@ -32,7 +32,7 @@ services:
     container_name: hay-redis
     restart: unless-stopped
     ports:
-      - "6379:6379"
+      - "127.0.0.1:6379:6379"
     volumes:
       - redis_data:/data
     healthcheck:
@@ -49,8 +49,8 @@ services:
       RABBITMQ_DEFAULT_USER: hay
       RABBITMQ_DEFAULT_PASS: hay_password
     ports:
-      - "5672:5672"
-      - "15672:15672"
+      - "127.0.0.1:5672:5672"
+      - "127.0.0.1:15672:15672"
     volumes:
       - rabbitmq_data:/var/lib/rabbitmq
     healthcheck:

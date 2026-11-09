@@ -5,8 +5,8 @@
  * (contributions are forced to `challenge_all`, and gates are told so a
  * missing token is refused). It turns on two ways:
  *  - the owner switches it on in Settings > Webchat;
- *  - automatically, when more than `config.underAttack.createThreshold` new
- *    conversations are attempted for one org within the window.
+ *  - automatically, when more than `config.underAttack.createThreshold` distinct
+ *    addresses attempt new conversations for one org within the window.
  * Either way it lasts `config.underAttack.hours`, then lapses on its own.
  */
 
@@ -67,32 +67,41 @@ export async function setUnderAttack(
 }
 
 /**
- * Count one conversation-create attempt and switch under-attack mode on when
- * the org passes the threshold. Returns whether the org is under attack.
- * Fails open (Redis down = no auto trigger).
+ * Count one address's conversation-create attempts and switch under-attack
+ * mode on when the org passes the threshold of distinct addresses. One client
+ * repeating itself counts once, so it cannot turn on the challenge for
+ * everyone else (the per-IP limits deal with it). Returns whether the org is
+ * under attack. While Redis is down the counts are per process.
  */
-export async function recordCreateAttempt(organizationId: string): Promise<boolean> {
+export async function recordCreateAttempt(organizationId: string, ip: string): Promise<boolean> {
   const { createThreshold, windowSeconds } = config.underAttack;
   if (createThreshold > 0) {
-    const result = await rateLimitService.checkKeyRateLimit(
-      `under-attack:creates:${organizationId}`,
-      createThreshold,
+    const repeat = await rateLimitService.checkKeyRateLimit(
+      `under-attack:seen:${organizationId}:${ip}`,
+      1,
       windowSeconds,
     );
-    if (result.limited) {
-      // Only an org not already under attack is switched on; an owner's
-      // longer period is never shortened.
-      const update = await repository().update(
-        { organizationId, underAttackUntil: Or(IsNull(), LessThan(new Date())) },
-        { underAttackUntil: endsAt(), underAttackSource: "auto" },
+    if (!repeat.limited) {
+      const result = await rateLimitService.checkKeyRateLimit(
+        `under-attack:creates:${organizationId}`,
+        createThreshold,
+        windowSeconds,
       );
-      if (update.affected) {
-        logger.warn(
-          { organizationId, createThreshold, windowSeconds },
-          "Webchat create rate passed the threshold: under-attack mode on",
+      if (result.limited) {
+        // Only an org not already under attack is switched on; an owner's
+        // longer period is never shortened.
+        const update = await repository().update(
+          { organizationId, underAttackUntil: Or(IsNull(), LessThan(new Date())) },
+          { underAttackUntil: endsAt(), underAttackSource: "auto" },
         );
+        if (update.affected) {
+          logger.warn(
+            { organizationId, createThreshold, windowSeconds },
+            "Webchat create rate passed the threshold: under-attack mode on",
+          );
+        }
+        return true;
       }
-      return true;
     }
   }
   return isUnderAttack(organizationId);

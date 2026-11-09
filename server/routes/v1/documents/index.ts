@@ -1,4 +1,8 @@
+import { rateLimitMiddleware, RateLimits } from "@server/trpc/middleware/rate-limit";
 import { t, scopedProcedure } from "@server/trpc";
+import type { Context } from "@server/trpc/context";
+import type { AuditAction } from "@server/entities/audit-log.entity";
+import { auditLogService } from "@server/services/audit-log.service";
 import { z } from "zod";
 import { RESOURCES, ACTIONS } from "@server/types/scopes";
 import { DocumentProcessorFactory, DocumentRejectedError } from "@server/processors";
@@ -17,6 +21,7 @@ import { documentListInputSchema } from "@server/types/entity-list-inputs";
 import { createListProcedure } from "@server/trpc/procedures/list";
 import { documentRetryService } from "@server/services/document-retry.service";
 import { storageService } from "@server/services/storage.service";
+import { deleteDocumentAttachments } from "@server/services/storage-purge.service";
 import { MediaRejectedError } from "@server/services/media-sanitizer.service";
 import {
   DOCUMENT_IMAGES_FOLDER,
@@ -39,8 +44,27 @@ import {
   KnowledgeSuggestionService,
 } from "@server/services/knowledge-suggestion.service";
 import { TRPCError } from "@trpc/server";
+import { escapeLike } from "@server/lib/sql-like";
 
 const logger = createLogger("documents");
+
+/** Records a knowledge base change. Never logs the document's content. */
+async function auditDocument(
+  ctx: Context,
+  action: AuditAction,
+  documentId: string,
+  details: Record<string, unknown>,
+): Promise<void> {
+  await auditLogService.record({
+    userId: ctx.user?.id,
+    organizationId: ctx.organizationId,
+    action,
+    resource: "document",
+    changes: { documentId, ...details },
+    ipAddress: ctx.ipAddress,
+    userAgent: ctx.userAgent,
+  });
+}
 
 export const documentsRouter = t.router({
   list: createListProcedure(RESOURCES.DOCUMENTS, documentListInputSchema, documentRepository),
@@ -122,7 +146,7 @@ export const documentsRouter = t.router({
               CASE WHEN title ILIKE $3 THEN 0 ELSE 1 END
             LIMIT $4
           `;
-          const escapedQuery = query.replace(/%/g, "\\%").replace(/_/g, "\\_");
+          const escapedQuery = escapeLike(query);
           return AppDataSource.query(keywordQuery, [
             organizationId,
             escapedQuery, // exact title match
@@ -324,6 +348,8 @@ export const documentsRouter = t.router({
         vectorChunks,
       );
 
+      await auditDocument(ctx, "document.create", document.id, { title: document.title });
+
       return {
         id: document.id,
         title: document.title,
@@ -367,6 +393,11 @@ export const documentsRouter = t.router({
         ...(nextContent !== undefined && { content: nextContent }),
         ...(input.contentJson && { contentJson: stripMediaSignaturesInJson(input.contentJson) }),
         ...(input.status && { status: input.status }),
+      });
+      await auditDocument(ctx, "document.update", document.id, {
+        fields: ["title", "content", "contentJson", "contentHtml", "status"].filter(
+          (field) => input[field as keyof typeof input] !== undefined,
+        ),
       });
 
       if (!updatedDocument) {
@@ -431,6 +462,7 @@ export const documentsRouter = t.router({
    * saves the reviewed diff through update/create.
    */
   suggestEdits: scopedProcedure(RESOURCES.DOCUMENTS, ACTIONS.UPDATE)
+    .use(rateLimitMiddleware(RateLimits.MODERATE))
     .input(
       z
         .object({
@@ -492,6 +524,8 @@ export const documentsRouter = t.router({
 
       // Delete the document itself
       await documentRepository.delete(document.id, ctx.organizationId!);
+      await auditDocument(ctx, "document.delete", document.id, { title: document.title });
+      await deleteDocumentAttachments(ctx.organizationId!, document.attachments);
 
       return {
         success: true,
@@ -539,12 +573,17 @@ export const documentsRouter = t.router({
     }),
 
   regenerateEmbeddings: scopedProcedure(RESOURCES.DOCUMENTS, ACTIONS.UPDATE)
+    .use(rateLimitMiddleware(RateLimits.MODERATE))
     .input(
-      z.object({
-        documentId: z.string().optional(),
-        chunkSize: z.number().optional().default(1000),
-        chunkOverlap: z.number().optional().default(200),
-      }),
+      z
+        .object({
+          documentId: z.string().optional(),
+          chunkSize: z.number().int().min(100).max(4000).optional().default(1000),
+          chunkOverlap: z.number().int().min(0).max(1000).optional().default(200),
+        })
+        .refine((value) => value.chunkOverlap < value.chunkSize, {
+          message: "chunkOverlap must be smaller than chunkSize",
+        }),
     )
     .mutation(async ({ ctx, input }) => {
       // Ensure vector store is initialized

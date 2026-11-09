@@ -13,8 +13,7 @@
  * @module services/media-analysis/pipeline
  */
 
-import { readPdfText } from "@server/lib/read-pdf-text";
-import { MAX_PDF_PAGES } from "@server/processors/pdf.processor";
+import { DocumentProcessorFactory } from "@server/processors";
 import { AppDataSource } from "@server/database/data-source";
 import { Conversation } from "@server/database/entities/conversation.entity";
 import type { ScanStatus } from "@server/entities/upload.entity";
@@ -118,9 +117,10 @@ export async function loadFileForVision(
   }
 
   if (upload.mimeType === PDF_TYPE) {
-    const parsed = await readPdfText(buffer, MAX_PDF_PAGES);
+    // Shopper-supplied file: parsed in the worker thread, under its time and memory caps.
+    const parsed = await new DocumentProcessorFactory().processDocument(buffer, PDF_TYPE);
     // Card numbers are removed before the text reaches the vision model (D8-12).
-    const text = redactCardNumbers((parsed.text ?? "").replace(/\s+\n/g, "\n").trim());
+    const text = redactCardNumbers(parsed.content.replace(/\s+\n/g, "\n").trim());
     if (text.length < MIN_PDF_TEXT) {
       // TODO: scanned PDFs (no text layer) need page rendering before vision.
       return { skipped: { status: "skipped", reason: "no_text" } };

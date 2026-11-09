@@ -45,6 +45,7 @@ export interface RegisteredRoute {
   method: HttpMethod;
   path: string;
   handler: RouteHandler;
+  public?: boolean;
 }
 
 /**

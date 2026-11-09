@@ -59,15 +59,16 @@ onMounted(async () => {
   try {
     const result = await HayAuthApi.auth.exchangeAuthCode.mutate({
       code: code.value,
+      redirectUri: `${window.location.origin}/auth/exchange`,
+      useCookie: true,
     });
 
     await authStore.loginWithTokens({
       accessToken: result.accessToken,
-      refreshToken: result.refreshToken,
       expiresIn: result.expiresIn,
     });
 
-    await router.push("/");
+    await router.replace("/");
   } catch (err: unknown) {
     status.value = "error";
     errorMessage.value =

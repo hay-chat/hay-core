@@ -3,64 +3,10 @@ import type { RouteLocationNormalized } from "vue-router";
 import { useAuthStore } from "@/stores/auth";
 import { useUserStore, type User } from "@/stores/user";
 import { redirectForSuspension, SUSPENDED_ROUTE } from "@/composables/useSuspension";
-import { HayAuthApi } from "@/utils/api";
+import { Hay } from "@/utils/api";
+import { hasRouteAccess } from "@/utils/route-access";
 
-// Define role-protected routes
-// Map route paths to required roles
-// Exported so custom menu items can register dynamic role restrictions
-export const roleProtectedRoutes: Record<string, string[]> = {
-  // Admin only (owner, admin)
-  "/settings/users": ["owner", "admin"],
-  "/settings/api-tokens": ["owner", "admin"],
-  "/settings/general": ["owner", "admin"],
-  "/settings/billing": ["owner", "admin"],
-  "/settings/privacy": ["owner", "admin"],
-  "/settings/webchat": ["owner", "admin"],
-  "/settings/business-hours": ["owner", "admin"],
-  "/settings/usage": ["owner", "admin"],
-  "/settings/assistant": ["owner", "admin"],
-
-  // In-app setup
-  "/setup": ["owner", "admin"],
-
-  // Insights - all except agent
-  "/insights": ["owner", "admin", "contributor", "member", "viewer"],
-
-  // Content creation - contributor+
-  "/playbooks/create": ["owner", "admin", "contributor"],
-  "/playbooks/new": ["owner", "admin", "contributor"],
-
-  // Document import - member+
-  "/documents/import": ["owner", "admin", "contributor", "member"],
-
-  // Plugins - admin+
-  "/integrations/marketplace": ["owner", "admin"],
-  "/integrations/plugins": ["owner", "admin"],
-  "/plugins": ["owner", "admin"],
-  "/channels": ["owner", "admin"],
-};
-
-/**
- * Check if a user role has access to a specific route
- */
-export function hasRouteAccess(path: string, userRole: string | undefined): boolean {
-  if (!userRole) return false;
-
-  // Check if this specific route is protected
-  if (roleProtectedRoutes[path]) {
-    return roleProtectedRoutes[path].includes(userRole);
-  }
-
-  // Check if any parent route matches (for dynamic routes)
-  for (const [protectedPath, allowedRoles] of Object.entries(roleProtectedRoutes)) {
-    if (path.startsWith(protectedPath)) {
-      return allowedRoles.includes(userRole);
-    }
-  }
-
-  // If route is not explicitly protected, allow access
-  return true;
-}
+const MFA_ENROLMENT_ROUTE = "/settings/profile";
 
 export default defineNuxtRouteMiddleware(
   async (to: RouteLocationNormalized, from: RouteLocationNormalized) => {
@@ -104,7 +50,7 @@ export default defineNuxtRouteMiddleware(
     if (!authStore.isInitialized) {
       // For client-side navigation, wait for auth initialization
       // but immediately redirect if we know there's no token
-      if (!authStore.tokens?.accessToken) {
+      if (!authStore.isAuthenticated) {
         logger.debug("[Auth Middleware] No token and not initialized, redirecting to login");
         return navigateTo({ path: "/login", query: { redirect: to.fullPath } });
       }
@@ -133,7 +79,7 @@ export default defineNuxtRouteMiddleware(
       // The store is persisted, so confirm with the server before locking anyone
       // out: a suspension lifted since the last visit must not bounce the user.
       try {
-        const user = await HayAuthApi.auth.me.query();
+        const user = await Hay.auth.me.query();
         userStore.setUser(user as User);
         currentOrganization = userStore.currentOrganization;
       } catch (error) {
@@ -151,6 +97,10 @@ export default defineNuxtRouteMiddleware(
     }
     if (to.path === SUSPENDED_ROUTE) {
       return navigateTo("/");
+    }
+
+    if (userStore.user?.mfaEnrolmentRequired && to.path !== MFA_ENROLMENT_ROUTE) {
+      return navigateTo(MFA_ENROLMENT_ROUTE);
     }
 
     // Role-based route protection

@@ -119,7 +119,7 @@ describe("plugins.get / plugins.enable visibility", () => {
 
   it("hides another organization's plugin", async () => {
     getPlugin.mockReturnValue(otherOrgPlugin);
-    await expect(callerFor("viewer").get({ pluginId: "private-plugin" })).rejects.toMatchObject({
+    await expect(callerFor("member").get({ pluginId: "private-plugin" })).rejects.toMatchObject({
       code: "NOT_FOUND",
     });
   });

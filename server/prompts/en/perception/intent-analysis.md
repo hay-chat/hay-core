@@ -25,4 +25,4 @@ Analyze the following user message and determine:
 
 SPECIAL NOTE: Gratitude messages like "thank you", "thanks", "appreciate it" should typically be classified as "greet" rather than closure. However, be aware that these MAY indicate conversation closure when they come after task completion. The system will evaluate context separately to determine if closure is appropriate.
 
-User message: "{{message}}"
+User message: {{message}}

@@ -133,6 +133,7 @@
 
 <script setup lang="ts">
 import { Hay } from "@/utils/api";
+import type { User } from "@/stores/user";
 import { useAuthStore } from "@/stores/auth";
 import { useSetupStore } from "@/stores/setup";
 import { useUserStore } from "@/stores/user";
@@ -143,12 +144,11 @@ definePageMeta({
 });
 
 const router = useRouter();
-const route = useRoute();
 const authStore = useAuthStore();
 const userStore = useUserStore();
 const { formatDateTime } = useOrgDateTime();
 
-const token = computed(() => route.query.token as string);
+const token = useUrlToken();
 const loading = ref(true);
 const accepting = ref(false);
 const declining = ref(false);
@@ -190,7 +190,7 @@ const loadInvitation = async () => {
     loading.value = true;
     error.value = "";
 
-    const result = await Hay.invitations.getInvitationByToken.query({
+    const result = await Hay.invitations.getInvitationByToken.mutate({
       token: token.value,
     });
 
@@ -289,6 +289,15 @@ const handleDecline = async () => {
 
 // Check if logged in user matches invitation email
 const checkEmailMatch = async () => {
+  // A public page, so the session's user has not been loaded yet.
+  if (authStore.isAuthenticated && !userStore.user?.email) {
+    try {
+      userStore.setUser((await Hay.auth.me.query()) as User);
+    } catch (err) {
+      console.warn("Could not load the signed-in user:", err);
+    }
+  }
+
   if (
     authStore.isAuthenticated &&
     userStore.user?.email &&
@@ -316,13 +325,6 @@ const checkEmailMatch = async () => {
 // Load invitation on mount
 onMounted(() => {
   loadInvitation();
-});
-
-// Watch for token changes (e.g., if navigating back from login)
-watch(token, () => {
-  if (token.value) {
-    loadInvitation();
-  }
 });
 
 // Watch for invitation changes to check email match

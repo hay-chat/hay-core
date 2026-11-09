@@ -24,6 +24,18 @@
             ({{ info.provider.host }})
           </span>
         </dd>
+        <dt class="text-muted-foreground">
+          {{ $t("customerPrivacy.aiProcessing.visionLabel") }}
+        </dt>
+        <dd class="font-medium" data-testid="ai-processing-vision">
+          {{ info.visionProvider.name }}
+          <span
+            v-if="info.visionProvider.name !== info.visionProvider.host"
+            class="text-muted-foreground"
+          >
+            ({{ info.visionProvider.host }})
+          </span>
+        </dd>
       </dl>
       <Button variant="outline" size="sm" @click="router.push('/settings/llm')">
         {{ $t("customerPrivacy.aiProcessing.change") }}

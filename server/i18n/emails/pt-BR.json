@@ -192,7 +192,7 @@
     "confirmButton": "Confirmar Exclusão de Dados",
     "whatWillBeDeleted": "O que será excluído:",
     "deleted1": "Sua conta será permanentemente desativada",
-    "deleted2": "Todas as chaves de API serão revogadas",
+    "deleted2": "Todas as sessões ativas serão encerradas",
     "deleted3": "Informações pessoais serão anonimizadas",
     "deleted4": "Registros de auditoria da conta serão mantidos (anonimizados) para conformidade",
     "deleted5": "Este link de verificação expirará em {{ expiresIn }}",
@@ -204,13 +204,13 @@
     "body": "Confirmamos que seus dados pessoais foram excluídos com sucesso da {{ companyName }} conforme solicitado.",
     "whatWeDone": "O que fizemos:",
     "done1": "Sua conta foi permanentemente desativada",
-    "done2": "Todas as chaves de API foram revogadas",
+    "done2": "Todas as sessões ativas foram encerradas",
     "done3": "Informações pessoais foram removidas ou anonimizadas",
     "done4": "Você não pode mais acessar sua conta",
     "importantNotes": "Observações Importantes:",
     "note1": "Alguns registros de auditoria foram mantidos (anonimizados) para requisitos legais e de conformidade",
     "note2": "Se você criar uma nova conta com o mesmo endereço de e-mail, ela será tratada como uma conta completamente nova",
-    "note3": "Cópias de backup em nossos sistemas de recuperação de desastres serão excluídas como parte de nossa rotação regular de backup (dentro de 90 dias)",
+    "note3": "Cópias de backup em nossos sistemas de recuperação de desastres serão removidas à medida que expirarem em nossa rotação regular de backup",
     "thankYou": "Obrigado por usar a {{ companyName }}. Se você tiver alguma dúvida sobre esta exclusão, entre em contato com nossa equipe de suporte."
   }
 }

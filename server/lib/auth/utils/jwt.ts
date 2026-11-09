@@ -1,3 +1,4 @@
+import * as crypto from "crypto";
 import * as jwt from "jsonwebtoken";
 import { authConfig } from "@server/config/auth.config";
 import type { JWTPayload, RefreshTokenPayload } from "@server/types/auth.types";
@@ -10,12 +11,16 @@ export const ACCESS_TOKEN_TTL_SECONDS = parseExpiresIn(authConfig.jwt.expiresIn)
  * Sign a short-lived access token. Refresh tokens are opaque and owned by
  * auth-session.service.ts.
  */
-export function generateAccessToken(user: Pick<User, "id" | "email" | "tokenVersion">): string {
+export function generateAccessToken(
+  user: Pick<User, "id" | "email" | "tokenVersion">,
+  sessionId: string,
+): string {
   const payload: JWTPayload = {
     userId: user.id,
     email: user.email,
     type: "access",
     tokenVersion: user.tokenVersion ?? 0,
+    sid: sessionId,
   };
 
   return jwt.sign(payload, authConfig.jwt.secret, {
@@ -70,6 +75,38 @@ export function verifyRefreshToken(token: string): RefreshTokenPayload {
       throw new Error("Invalid token");
     }
     throw error;
+  }
+}
+
+/** How long the second login step stays open after the password was accepted. */
+export const MFA_CHALLENGE_TTL_SECONDS = 5 * 60;
+
+/** A key of its own, so a challenge can never be accepted as an access token. */
+function mfaChallengeKey(): string {
+  return crypto.createHmac("sha256", authConfig.jwt.secret).update("mfa-challenge").digest("hex");
+}
+
+export function generateMfaChallengeToken(user: Pick<User, "id" | "tokenVersion">): string {
+  return jwt.sign(
+    { userId: user.id, tokenVersion: user.tokenVersion ?? 0, type: "mfa-challenge" },
+    mfaChallengeKey(),
+    { expiresIn: MFA_CHALLENGE_TTL_SECONDS, algorithm: "HS256" },
+  );
+}
+
+/** The challenge's claims, or null when it is invalid or expired. */
+export function verifyMfaChallengeToken(
+  token: string,
+): { userId: string; tokenVersion: number } | null {
+  try {
+    const decoded = jwt.verify(token, mfaChallengeKey(), { algorithms: ["HS256"] }) as {
+      userId: string;
+      tokenVersion: number;
+      type: string;
+    };
+    return decoded.type === "mfa-challenge" ? decoded : null;
+  } catch {
+    return null;
   }
 }
 

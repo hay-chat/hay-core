@@ -14,8 +14,8 @@ jest.mock("@server/services/rate-limit.service", () => ({
   ).rateLimitKey,
 }));
 
-import { bodyLimitForPath, DEFAULT_BODY_LIMIT } from "@server/lib/body-limits";
-import { httpIpRateLimit } from "@server/lib/http-rate-limit";
+import { bodyLimitForPath, DEFAULT_BODY_LIMIT, isPublicWidgetPath } from "@server/lib/body-limits";
+import { httpIpRateLimit, trpcRetryAfterMeta } from "@server/lib/http-rate-limit";
 import { rateLimitKey } from "@server/services/rate-limit.service";
 import { redisRetryDelay } from "@server/services/redis.service";
 
@@ -36,9 +36,30 @@ describe("bodyLimitForPath", () => {
   });
 
   it("gives the public widget and plugin routes intermediate limits", () => {
-    expect(bodyLimitForPath("/v1/publicConversations.sendMessage")).toBe("15mb");
+    expect(bodyLimitForPath("/v1/publicConversations.sendAttachment")).toBe("15mb");
+    expect(bodyLimitForPath("/v1/publicConversations.sendMessage")).toBe(DEFAULT_BODY_LIMIT);
     expect(bodyLimitForPath("/v1/plugins/hay-plugin/webhook")).toBe("10mb");
     expect(bodyLimitForPath("/v1/plugins/hay-plugin/action")).toBe("10mb");
+  });
+});
+
+describe("isPublicWidgetPath", () => {
+  it("opens only paths where every procedure is public", () => {
+    expect(isPublicWidgetPath("/v1/publicConversations.sendMessage")).toBe(true);
+    expect(isPublicWidgetPath("/v1/publicConversations.create,webchat.getPublicConfig")).toBe(true);
+    expect(isPublicWidgetPath("/v1/publicConversations.create,auth.me")).toBe(false);
+    expect(isPublicWidgetPath("/v1/webchat.getPublicConfigX")).toBe(false);
+    expect(isPublicWidgetPath("/v1/publicConversationsX.a")).toBe(false);
+  });
+});
+
+describe("trpcRetryAfterMeta", () => {
+  it("adds Retry-After only when a request was refused as unavailable", () => {
+    expect(trpcRetryAfterMeta({ errors: [{ code: "SERVICE_UNAVAILABLE" }] })).toEqual({
+      headers: { "Retry-After": "30" },
+    });
+    expect(trpcRetryAfterMeta({ errors: [{ code: "UNAUTHORIZED" }] })).toEqual({});
+    expect(trpcRetryAfterMeta({ errors: [] })).toEqual({});
   });
 });
 

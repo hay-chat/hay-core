@@ -195,6 +195,7 @@
 </template>
 
 <script setup lang="ts">
+import { ensureFreshAccessToken } from "@/utils/api";
 import { logger } from "@/utils/logger";
 import {
   Package,
@@ -397,6 +398,7 @@ const deletePlugin = async (pluginId: string) => {
   }
 
   try {
+    await ensureFreshAccessToken();
     const response = await fetch(getApiUrl(`/v1/plugins/${encodeURIComponent(pluginId)}`), {
       method: "DELETE",
       headers: {

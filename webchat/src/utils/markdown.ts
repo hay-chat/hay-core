@@ -22,9 +22,42 @@ export function safeHttpUrl(url: unknown): string | undefined {
   }
 }
 
-export function parseMarkdown(text: string): string {
-  // Escape HTML to prevent XSS
-  let html = escapeHtml(text);
+// Finished tags wait behind these private-use marks until every markdown pass
+// has run, so no later pass can match text inside an attribute.
+const HELD_START = "\uE000";
+const HELD_END = "\uE001";
+
+/** Takes already-escaped text: an absolute http(s) URL, with no whitespace. */
+function isSafeLinkUrl(url: string): boolean {
+  return /^https?:\/\/\S+$/i.test(url);
+}
+
+export function parseMarkdown(text: string, approvedImages?: readonly string[]): string {
+  const held: string[] = [];
+  const hold = (tag: string): string => {
+    held.push(tag);
+    return `${HELD_START}${held.length - 1}${HELD_END}`;
+  };
+
+  // Escape HTML to prevent XSS. URLs stay escaped too: `&amp;` is correct in an attribute.
+  let html = escapeHtml(text.replace(/[\uE000\uE001]/g, ""));
+
+  // Images ![alt](url) — must run BEFORE links (an image contains link syntax).
+  // An image the server did not approve stays a link, so opening the chat doesn't request it.
+  html = html.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, (_, alt, url) => {
+    if (!isSafeLinkUrl(url)) return "";
+    if (approvedImages && !approvedImages.includes(url.replace(/&amp;/g, "&"))) {
+      return `[${alt || url}](${url})`;
+    }
+    return hold(`<img src="${url}" alt="${alt}" loading="lazy" />`);
+  });
+
+  // Links [text](url). The label stays in the text so bold and code still apply to it.
+  html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_, label, url) =>
+    isSafeLinkUrl(url)
+      ? `${hold(`<a href="${url}" target="_blank" rel="noopener noreferrer">`)}${label}</a>`
+      : label,
+  );
 
   // Inline code `code`
   html = html.replace(/`([^`]+)`/g, "<code>$1</code>");
@@ -35,25 +68,10 @@ export function parseMarkdown(text: string): string {
   // Italic *text* (not inside bold markers)
   html = html.replace(/(?<![*\\])\*([^*]+)\*(?!\*)/g, "<em>$1</em>");
 
-  // Images ![alt](url) — must run BEFORE links (an image contains link syntax).
-  // Only allow http/https; drop anything else.
-  html = html.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, (_, alt, url) => {
-    const safeUrl = url.replace(/&amp;/g, "&");
-    if (!/^https?:\/\//i.test(safeUrl)) return "";
-    return `<img src="${safeUrl}" alt="${alt}" loading="lazy" />`;
-  });
-
-  // Links [text](url) — only allow http/https
-  html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_, label, url) => {
-    const safeUrl = url.replace(/&amp;/g, "&");
-    if (!/^https?:\/\//i.test(safeUrl)) return label;
-    return `<a href="${safeUrl}" target="_blank" rel="noopener noreferrer">${label}</a>`;
-  });
-
   // Process block-level elements (lists)
   html = processBlocks(html);
 
-  return html;
+  return html.replace(/\uE000(\d+)\uE001/g, (_, index) => held[Number(index)]);
 }
 
 /**

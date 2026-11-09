@@ -265,15 +265,19 @@ const jobRegistry: CronJobConfig[] = [
       const { rabbitmqService } = await import("./rabbitmq.service");
       const sweepLogger = createLogger("orchestrator-sweep");
 
-      if (!rabbitmqService.isConnected()) {
-        sweepLogger.debug("RabbitMQ not connected, skipping sweep");
-        return;
-      }
-
       const repo = new ConversationRepository();
       const staleConversations = await repo.getStaleUnprocessed(30000); // 30s threshold
 
       if (staleConversations.length === 0) return;
+
+      if (!rabbitmqService.isConnected()) {
+        sweepLogger.error(
+          { count: staleConversations.length },
+          "RabbitMQ not connected, processing pending conversations directly",
+        );
+        await orchestratorWorker.processDirectly(staleConversations.map((conv) => conv.id));
+        return;
+      }
 
       sweepLogger.debug(`Found ${staleConversations.length} stale conversations, re-enqueuing`);
 
@@ -284,6 +288,32 @@ const jobRegistry: CronJobConfig[] = [
     singleton: true,
     enabled: true,
     skipDatabaseLogging: true,
+  },
+
+  {
+    name: "channel-delivery-sweep",
+    description: "Publish outbound deliveries the queue never received and close abandoned ones",
+    schedule: 15000, // Every 15 seconds
+    handler: async (signal) => {
+      const { channelDeliveryService } = await import("./channel-delivery.service");
+      await channelDeliveryService.sweep(signal);
+    },
+    singleton: true,
+    enabled: true,
+    skipDatabaseLogging: true,
+  },
+
+  {
+    name: "cleanup-message-deliveries",
+    description: "Delete settled outbound delivery records older than 30 days",
+    schedule: "45 3 * * *", // Daily at 3:45 AM
+    handler: async () => {
+      const { messageDeliveryRepository } =
+        await import("../repositories/message-delivery.repository");
+      await messageDeliveryRepository.deleteSettledOlderThan(30);
+    },
+    singleton: true,
+    enabled: true,
   },
 
   {
@@ -341,7 +371,7 @@ const jobRegistry: CronJobConfig[] = [
     name: "orchestrator-stale-message-check",
     description: "Detect and recover stale/lost messages",
     schedule: 60000, // Every 60 seconds (1 minute)
-    handler: async () => {
+    handler: async (signal) => {
       const { config } = await import("../config/env");
       if (config.staleMessageDetection?.enabled === false) {
         return; // Skip if disabled
@@ -360,6 +390,7 @@ const jobRegistry: CronJobConfig[] = [
 
       // Recover each conversation
       for (const staleConv of staleConversations) {
+        if (signal.aborted) return; // The rest are picked up by the next run.
         try {
           const result = await messageRecoveryService.recoverStaleConversation(staleConv, false);
           logger.debug({ conversationId: staleConv.conversationId, result }, "Recovery result");
@@ -438,11 +469,25 @@ const jobRegistry: CronJobConfig[] = [
   },
 
   {
-    name: "requeue-stale-privacy-jobs",
-    description: "Queue again DSAR export/deletion jobs whose server stopped mid-run",
-    schedule: "*/10 * * * *", // Every 10 minutes
+    name: "plugin-cron-reconcile",
+    description: "Keep this process's plugin cron jobs in line with enabled plugin instances",
+    schedule: 60000, // Every 60 seconds
+    handler: async () => {
+      const { pluginCronService } = await import("./plugin-cron.service");
+      await pluginCronService.reconcile();
+    },
+    perInstance: true, // Cron registrations live in each process's scheduler.
+    enabled: true,
+    skipDatabaseLogging: true,
+  },
+
+  {
+    name: "requeue-stale-background-jobs",
+    description: "Queue again background jobs whose server stopped mid-run",
+    schedule: "*/5 * * * *", // Every 5 minutes
     handler: async () => {
       await privacyService.requeueStaleJobs();
+      await jobQueueService.requeueStaleJobs();
     },
     singleton: true,
     enabled: true,
@@ -468,6 +513,9 @@ const jobRegistry: CronJobConfig[] = [
     handler: async () => {
       const { dataRetentionService } = await import("./data-retention.service");
       await dataRetentionService.anonymizeExpiredConversations();
+      // Customers left with no live conversation, same retention setting.
+      await dataRetentionService.sweepExpiredCustomers();
+      await dataRetentionService.expireInsightText();
       // Imported test transcripts (D7-8) follow the same retention setting.
       const { testTranscriptService } = await import("./test-transcript.service");
       await testTranscriptService.deleteExpired();
@@ -489,13 +537,62 @@ const jobRegistry: CronJobConfig[] = [
   },
 
   {
+    name: "storage-purge-drain",
+    description: "Delete stored files queued by bulk deletions (organization deletion)",
+    schedule: "20 * * * *", // Hourly
+    handler: async () => {
+      const { drainStoragePurgeQueue } = await import("./storage-purge.service");
+      await drainStoragePurgeQueue();
+    },
+    timeout: 1800000,
+    retryOnFailure: true,
+    maxRetries: 3,
+    singleton: true,
+    enabled: true,
+  },
+
+  {
+    name: "document-files-orphan-sweep",
+    description: "Delete document files and editor images no document names any more",
+    schedule: "0 4 * * *", // Daily at 4 AM
+    handler: async () => {
+      const { sweepOrphanDocumentFiles } = await import("./storage-purge.service");
+      await sweepOrphanDocumentFiles();
+    },
+    timeout: 1800000,
+    retryOnFailure: true,
+    maxRetries: 3,
+    singleton: true,
+    enabled: true,
+  },
+
+  {
     name: "cleanup-old-audit-logs",
-    description: "Delete audit logs older than the 90-day retention period",
+    description: "Clear personal fields from audit logs after 90 days and delete them after 365",
     schedule: "45 3 * * *", // Daily at 3:45 AM
     handler: async () => {
       const { auditLogService } = await import("./audit-log.service");
       const deleted = await auditLogService.cleanup();
       logger.info({ deleted }, "Audit log retention cleanup finished");
+    },
+    timeout: 1800000,
+    singleton: true,
+    enabled: true,
+  },
+
+  {
+    name: "verify-audit-log-chain",
+    description: "Recompute the audit log hash chains and report any mismatch",
+    schedule: "30 4 * * 0", // Weekly, Sunday at 4:30 AM
+    handler: async () => {
+      const { auditLogService } = await import("./audit-log.service");
+      const problems = await auditLogService.verifyChain();
+      if (problems.length > 0) {
+        logger.error(
+          { count: problems.length, sample: problems.slice(0, 20) },
+          "Audit log hash chain verification found problems",
+        );
+      }
     },
     timeout: 1800000,
     singleton: true,

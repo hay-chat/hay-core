@@ -5,7 +5,7 @@ import { llmProviderFactory } from "@server/services/llm/llm-provider.factory";
 import { emitUsage } from "@server/services/llm/usage-sink";
 import { modelFlags } from "@server/services/llm/model-catalog";
 import { describeAttachmentsForAgent } from "@server/services/media-analysis/agent-view";
-import { renderToolResult } from "@server/services/core/prompt-data";
+import { renderToolResult, splitToolReference } from "@server/services/core/prompt-data";
 import {
   buildRepairMessages,
   StructuredOutputError,
@@ -372,7 +372,8 @@ export class LLMService {
    * assistant said. Document messages are skipped: their content (and source
    * URL) reaches the planner once, in the prompt's <knowledge> block. They stay
    * stored in full for the inbox, the link check and the fact check. The active playbook is
-   * the business's own instructions, so it is a system turn.
+   * the business's own instructions, so it is a system turn; the details of its tools come
+   * from their publishers, so those go in a user turn.
    */
   private serializeMessages(messages: Message[]): ChatMessage[] {
     const turns: ChatMessage[] = [];
@@ -394,11 +395,23 @@ export class LLMService {
           continue;
         }
         case MessageType.SYSTEM:
-        case MessageType.PLAYBOOK:
           turns.push({ role: "system", content: message.content });
           continue;
+        case MessageType.PLAYBOOK: {
+          const { instructions, toolReference } = splitToolReference(message.content);
+          turns.push({ role: "system", content: instructions });
+          if (toolReference) turns.push({ role: "user", content: toolReference });
+          continue;
+        }
         case MessageType.TOOL:
           turns.push({ role: "user", content: this.serializeToolMessage(message) });
+          continue;
+        case MessageType.FORM:
+          // Once submitted, the content is what the customer typed.
+          turns.push({
+            role: message.metadata?.ui?.status === "SUBMITTED" ? "user" : "assistant",
+            content: message.content,
+          });
           continue;
         default:
           turns.push({ role: "assistant", content: message.content });

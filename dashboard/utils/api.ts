@@ -7,6 +7,7 @@ import { useAuthStore } from "@/stores/auth";
 import { useUserStore } from "@/stores/user";
 import { reportServerError } from "@/composables/useServerStatus";
 import { redirectForSuspension, SUSPENDED_ROUTE } from "@/composables/useSuspension";
+import { requestMfaStepUp } from "@/composables/useMfaStepUp";
 import {
   createRefreshCoordinator,
   isDefinitiveAuthFailure,
@@ -52,9 +53,11 @@ const sessionRefresh = createRefreshCoordinator({
  * a still-valid token is used even if the refresh could not reach the server.
  */
 export async function ensureFreshAccessToken(minValidityMs = 60_000): Promise<void> {
-  const tokens = useAuthStore().tokens;
-  if (!tokens?.refreshToken) return;
-  if (tokens.expiresAt - Date.now() > minValidityMs) return;
+  const authStore = useAuthStore();
+  if (!authStore.isAuthenticated) return;
+  // After a reload the access token is gone (memory only); the cookie brings a new one.
+  const tokens = authStore.tokens;
+  if (tokens && tokens.expiresAt - Date.now() > minValidityMs) return;
 
   try {
     await sessionRefresh.refresh();
@@ -100,6 +103,23 @@ const errorLink: TRPCLink<AppRouter> = () => {
               return;
             }
 
+            if (data?.code === "FORBIDDEN" && data?.type === "MFA_STEP_UP_REQUIRED") {
+              requestMfaStepUp();
+            }
+
+            // The organization requires two-factor and this user has not enrolled.
+            if (
+              data?.code === "FORBIDDEN" &&
+              data?.type === "MFA_ENROLMENT_REQUIRED" &&
+              typeof window !== "undefined"
+            ) {
+              const userStore = useUserStore();
+              if (userStore.user) userStore.user.mfaEnrolmentRequired = true;
+              if (window.location.pathname !== "/settings/profile") {
+                setTimeout(() => navigateTo("/settings/profile"), 0);
+              }
+            }
+
             // UNAUTHORIZED is handled by tokenRefreshLink: refresh, then retry.
             // Only a rejected refresh logs the user out (see sessionRefresh).
 
@@ -142,7 +162,7 @@ export const tokenRefreshLink: TRPCLink<AppRouter> = () => {
             observer.next(value);
           },
           error(err) {
-            if (isRetry || !isUnauthorizedError(err) || !useAuthStore().tokens?.refreshToken) {
+            if (isRetry || !isUnauthorizedError(err) || !useAuthStore().isAuthenticated) {
               observer.error(err);
               return;
             }
@@ -200,6 +220,8 @@ function createHayAuthApi() {
         errorLink, // Handle errors including expired tokens
         httpLink({
           url: getApiBaseUrl(),
+          // The refresh-token cookie is scoped to the refresh and logout endpoints.
+          fetch: (url, options) => fetch(url, { ...options, credentials: "include" }),
           // You can pass any HTTP headers you wish here
           async headers() {
             return {
@@ -244,6 +266,7 @@ function createHayApi() {
  * Resolves null when the server has no such upload for this organization.
  */
 export async function fetchMedia(uploadId: string): Promise<Blob | null> {
+  await ensureFreshAccessToken();
   const response = await fetch(`${getApiBaseUrl()}/media/${encodeURIComponent(uploadId)}`, {
     headers: {
       authorization: getAuthToken(),

@@ -62,7 +62,7 @@ import { useAuthStore } from "@/stores/auth";
 import { useAppStore } from "@/stores/app";
 import { useSetupStore } from "@/stores/setup";
 import { Hay } from "@/utils/api";
-import { roleProtectedRoutes } from "@/middleware/auth.global";
+import { roleProtectedRoutes } from "@/utils/route-access";
 import type { RouterOutputs } from "@/types/trpc";
 
 type PluginMenuItem = RouterOutputs["plugins"]["getMenuItems"]["items"][number];
@@ -196,7 +196,9 @@ const navMain = computed(() => {
 
   const complianceItems = [
     { title: t("nav.actionLog"), url: "/actions", isActive: isPathActive("/actions") },
-    { title: t("nav.evidencePacks"), url: "/evidence", isActive: isPathActive("/evidence") },
+    ...(userStore.canExportConversations
+      ? [{ title: t("nav.evidencePacks"), url: "/evidence", isActive: isPathActive("/evidence") }]
+      : []),
   ];
 
   items.push(

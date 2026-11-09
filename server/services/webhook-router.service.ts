@@ -4,9 +4,15 @@ import { pluginInstanceManagerService } from "./plugin-instance-manager.service"
 import { pluginRegistryRepository } from "../repositories/plugin-registry.repository";
 import { pluginInstanceRepository } from "../repositories/plugin-instance.repository";
 import { pluginWebhookRouteRepository } from "../repositories/plugin-webhook-route.repository";
-import { verifyHmacSha256 } from "@server/lib/hmac-signature";
+import { timingSafeCompare, verifyHmacSha256 } from "@server/lib/hmac-signature";
+import { configEnvAllowList } from "@server/lib/plugin-env";
 import { normalizeEmailAddressKey, verifySvixSignature } from "@server/lib/svix-signature";
-import { claimWebhookDelivery, releaseWebhookDelivery } from "@server/lib/webhook-replay";
+import {
+  claimWebhookDelivery,
+  releaseWebhookDelivery,
+  WEBHOOK_RETRY_AFTER_SECONDS,
+  WebhookReplayUnavailableError,
+} from "@server/lib/webhook-replay";
 import type {
   WebhookDeauthorizationDescriptor,
   WebhookDedupeDescriptor,
@@ -96,7 +102,7 @@ export class WebhookRouterService {
   ): Promise<void> {
     // GET → verification handshake (no signature; echo the challenge).
     if (req.method === "GET") {
-      await this.handleVerification(req, res, routing);
+      await this.handleVerification(req, res, pluginId, routing);
       return;
     }
 
@@ -113,7 +119,7 @@ export class WebhookRouterService {
       return;
     }
 
-    const secret = process.env[routing.signature.secretEnv];
+    const secret = await this.pluginEnvValue(pluginId, routing.signature.secretEnv);
     if (!secret) {
       logger.error(
         { pluginId, secretEnv: routing.signature.secretEnv },
@@ -146,34 +152,49 @@ export class WebhookRouterService {
     // formats have no delivery id or timestamp, and two legitimate events can
     // have identical bodies, so they are not deduplicated here.)
     const deliveryId = routing.signature.format === "svix" ? req.headers["svix-id"] : undefined;
-    if (
-      typeof deliveryId === "string" &&
-      !(await claimWebhookDelivery(`webhook-router:${pluginId}`, deliveryId))
-    ) {
-      res.status(200).json({ received: true, duplicate: true });
-      return;
-    }
-
-    const byOrg = await this.groupByOrg(pluginId, routing, body);
-
-    // Plugin-declared dedupe: claim the key once per routed org. A delivery
-    // every org has already seen is acknowledged without forwarding.
+    const claims: Array<{ namespace: string; id: string }> = [];
+    let byOrg: Awaited<ReturnType<typeof this.groupByOrg>>;
     const dedupeKey = routing.dedupe ? extractDedupeKey(routing.dedupe, req, rawBody, body) : null;
-    if (dedupeKey !== null && byOrg.size > 0) {
-      for (const organizationId of Array.from(byOrg.keys())) {
-        const fresh = await claimWebhookDelivery(
-          dedupeNamespace(pluginId, organizationId),
-          dedupeKey,
-          routing.dedupe?.windowSeconds,
-        );
-        if (!fresh) {
-          byOrg.delete(organizationId);
+    try {
+      if (typeof deliveryId === "string") {
+        const namespace = `webhook-router:${pluginId}`;
+        if (!(await claimWebhookDelivery(namespace, deliveryId))) {
+          res.status(200).json({ received: true, duplicate: true });
+          return;
+        }
+        claims.push({ namespace, id: deliveryId });
+      }
+
+      byOrg = await this.groupByOrg(pluginId, routing, body);
+
+      // Plugin-declared dedupe: claim the key once per routed org. A delivery
+      // every org has already seen is acknowledged without forwarding.
+      if (dedupeKey !== null && byOrg.size > 0) {
+        for (const organizationId of Array.from(byOrg.keys())) {
+          const namespace = dedupeNamespace(pluginId, organizationId);
+          const fresh = await claimWebhookDelivery(
+            namespace,
+            dedupeKey,
+            routing.dedupe?.windowSeconds,
+          );
+          if (fresh) {
+            claims.push({ namespace, id: dedupeKey });
+          } else {
+            byOrg.delete(organizationId);
+          }
+        }
+        if (byOrg.size === 0) {
+          res.status(200).json({ received: true, duplicate: true });
+          return;
         }
       }
-      if (byOrg.size === 0) {
-        res.status(200).json({ received: true, duplicate: true });
-        return;
-      }
+    } catch (error) {
+      if (!(error instanceof WebhookReplayUnavailableError)) throw error;
+      // The provider will retry; ids claimed so far must not make that retry a duplicate.
+      await Promise.all(claims.map(({ namespace, id }) => releaseWebhookDelivery(namespace, id)));
+      res.setHeader("Retry-After", String(WEBHOOK_RETRY_AFTER_SECONDS));
+      res.status(503).json({ error: "Temporarily unavailable" });
+      return;
     }
 
     // Respond 200 promptly; forwarding happens asynchronously so a slow or
@@ -245,7 +266,7 @@ export class WebhookRouterService {
       return;
     }
 
-    const secret = process.env[descriptor.secretEnv];
+    const secret = await this.pluginEnvValue(pluginId, descriptor.secretEnv);
     if (!secret) {
       logger.error(
         { pluginId, secretEnv: descriptor.secretEnv },
@@ -344,6 +365,7 @@ export class WebhookRouterService {
   private async handleVerification(
     req: Request,
     res: Response,
+    pluginId: string,
     routing: WebhookRoutingDescriptor,
   ): Promise<void> {
     const challenge = routing.verificationChallenge;
@@ -361,8 +383,12 @@ export class WebhookRouterService {
       return;
     }
 
-    const expectedToken = await this.resolveVerifyToken(challenge);
-    if (expectedToken && token === expectedToken && typeof challengeValue === "string") {
+    const expectedToken = await this.pluginEnvValue(pluginId, challenge.verifyTokenEnv);
+    if (
+      expectedToken &&
+      timingSafeCompare(token, expectedToken) &&
+      typeof challengeValue === "string"
+    ) {
       res.status(200).send(challengeValue);
       return;
     }
@@ -371,20 +397,17 @@ export class WebhookRouterService {
   }
 
   /**
-   * Resolve the expected verify token. The shared-app model uses a single env
-   * token; `verifyTokenConfigField` exists for per-instance tokens but is not
-   * resolvable on a no-org shared URL, so env takes precedence.
+   * The value of a host env var named by a plugin's webhook declaration. The
+   * declaration comes from the running worker, so the name only resolves when
+   * the plugin's static manifest may read it (see `configEnvAllowList`).
    */
-  private async resolveVerifyToken(
-    challenge: NonNullable<WebhookRoutingDescriptor["verificationChallenge"]>,
+  private async pluginEnvValue(
+    pluginId: string,
+    envName: string | undefined,
   ): Promise<string | undefined> {
-    if (challenge.verifyTokenEnv) {
-      const value = process.env[challenge.verifyTokenEnv];
-      if (value) {
-        return value;
-      }
-    }
-    return undefined;
+    if (!envName) return undefined;
+    const plugin = await pluginRegistryRepository.findByPluginId(pluginId);
+    return configEnvAllowList(plugin).has(envName) ? process.env[envName] : undefined;
   }
 
   /**

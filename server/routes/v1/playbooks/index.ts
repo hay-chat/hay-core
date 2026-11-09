@@ -1,8 +1,12 @@
+import { rateLimitMiddleware, RateLimits } from "@server/trpc/middleware/rate-limit";
 import { t, scopedProcedure } from "@server/trpc";
 import { z } from "zod";
 import { PlaybookService } from "../../../services/playbook.service";
 import { PlaybookStatus } from "../../../database/entities/playbook.entity";
 import { TRPCError } from "@trpc/server";
+import type { AuditAction } from "@server/entities/audit-log.entity";
+import { auditLogService } from "@server/services/audit-log.service";
+import type { Context } from "@server/trpc/context";
 import { RESOURCES, ACTIONS } from "@server/types/scopes";
 import { APPROVAL_CATEGORIES } from "@server/types/organization-settings.types";
 import { LLMService } from "../../../services/core/llm.service";
@@ -10,6 +14,7 @@ import { PromptService } from "../../../services/prompt.service";
 import { PlaybookSuggestionService } from "../../../services/playbook-suggestion.service";
 import { documentRepository } from "../../../repositories/document.repository";
 import { In } from "typeorm";
+import { fitsInBytes } from "@server/lib/validation/json-record";
 import { listPlaybookTemplates } from "../../../services/product-case/templates";
 
 const playbookService = new PlaybookService();
@@ -50,12 +55,12 @@ const tiptapContentSchema = z.object({ type: z.string().optional() }).passthroug
 
 // Instructions may be a Tiptap document, a legacy structured list, a raw
 // string, or null.
-const instructionsSchema = z.union([
-  tiptapContentSchema,
-  z.array(instructionItemSchema),
-  z.string(),
-  z.null(),
-]);
+const INSTRUCTIONS_MAX_BYTES = 200_000;
+const instructionsSchema = z
+  .union([tiptapContentSchema, z.array(instructionItemSchema), z.string(), z.null()])
+  .refine((value) => fitsInBytes(value, INSTRUCTIONS_MAX_BYTES), {
+    message: "Instructions are too long",
+  });
 
 const createPlaybookSchema = z.object({
   title: z.string().min(1).max(255),
@@ -77,6 +82,24 @@ const updatePlaybookSchema = z.object({
     .max(APPROVAL_CATEGORIES.length)
     .optional(),
 });
+
+/** Records a change to what the assistant is allowed to do. Never logs the instructions. */
+async function auditPlaybook(
+  ctx: Context,
+  action: AuditAction,
+  playbookId: string,
+  details: Record<string, unknown> = {},
+): Promise<void> {
+  await auditLogService.record({
+    userId: ctx.user?.id,
+    organizationId: ctx.organizationId,
+    action,
+    resource: "playbook",
+    changes: { playbookId, ...details },
+    ipAddress: ctx.ipAddress,
+    userAgent: ctx.userAgent,
+  });
+}
 
 export const playbooksRouter = t.router({
   // D8-14: ready-made playbooks; the dashboard creates a draft from one.
@@ -126,6 +149,7 @@ export const playbooksRouter = t.router({
     .input(createPlaybookSchema)
     .mutation(async ({ ctx, input }) => {
       const playbook = await playbookService.createPlaybook(ctx.organizationId!, input);
+      await auditPlaybook(ctx, "playbook.create", playbook.id, { title: playbook.title });
       const actionWarnings = await playbookService.validateReferencedActions(
         ctx.organizationId!,
         playbook.instructions,
@@ -154,6 +178,9 @@ export const playbooksRouter = t.router({
         });
       }
 
+      await auditPlaybook(ctx, "playbook.update", playbook.id, {
+        fields: Object.keys(input.data),
+      });
       const actionWarnings = await playbookService.validateReferencedActions(
         ctx.organizationId!,
         playbook.instructions,
@@ -192,6 +219,10 @@ export const playbooksRouter = t.router({
         });
       }
 
+      await auditPlaybook(ctx, "playbook.create", playbook.id, {
+        title: playbook.title,
+        duplicatedFrom: input.id,
+      });
       return playbook;
     }),
 
@@ -211,6 +242,7 @@ export const playbooksRouter = t.router({
         });
       }
 
+      await auditPlaybook(ctx, "playbook.delete", input.id);
       return { success: true };
     }),
 
@@ -368,6 +400,7 @@ export const playbooksRouter = t.router({
             ctx.user!.id,
             input.note,
           );
+          await auditPlaybook(ctx, "playbook.publish", input.playbookId, { versionId: version.id });
           const actionWarnings = await playbookService.validateReferencedActions(
             ctx.organizationId!,
             version.instructions,
@@ -396,13 +429,17 @@ export const playbooksRouter = t.router({
       )
       .mutation(async ({ ctx, input }) => {
         try {
-          return await playbookService.rollbackToVersion(
+          const version = await playbookService.rollbackToVersion(
             ctx.organizationId!,
             input.playbookId,
             input.versionId,
             ctx.user!.id,
             input.reason,
           );
+          await auditPlaybook(ctx, "playbook.publish", input.playbookId, {
+            rolledBackToVersionId: input.versionId,
+          });
+          return version;
         } catch (error) {
           if (error instanceof Error) {
             if (error.message === "Playbook not found") {
@@ -418,6 +455,7 @@ export const playbooksRouter = t.router({
   }),
 
   suggestEdits: scopedProcedure(RESOURCES.PLAYBOOKS, ACTIONS.UPDATE)
+    .use(rateLimitMiddleware(RateLimits.MODERATE))
     .input(
       z
         .object({
@@ -463,6 +501,7 @@ export const playbooksRouter = t.router({
     }),
 
   generateInstructions: scopedProcedure(RESOURCES.PLAYBOOKS, ACTIONS.CREATE)
+    .use(rateLimitMiddleware(RateLimits.MODERATE))
     .input(
       z.object({
         purpose: z.string().min(1),

@@ -155,6 +155,20 @@ export const ssrfSafeHttpsAgent = new https.Agent({ lookup: ssrfSafeLookup });
 
 const ssrfSafeDispatcher = new Agent({ connect: { lookup: ssrfSafeLookup } });
 
+/**
+ * `fetch` drop-in for SDK clients whose base URL comes from a tenant. Same
+ * guarantees as `safeFetch` (checked on every request, pinned connection, no
+ * redirects); the SDK owns the timeout.
+ */
+export const ssrfPinnedFetch: typeof fetch = async (input, init) => {
+  await validateUrlForSSRF(input instanceof Request ? input.url : input);
+  return fetch(input, {
+    ...init,
+    redirect: "manual",
+    ...({ dispatcher: ssrfSafeDispatcher } as RequestInit),
+  });
+};
+
 export type SafeFetchInit = RequestInit & { timeoutMs: number };
 
 /**

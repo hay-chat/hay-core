@@ -1,8 +1,9 @@
-import FileType from "file-type";
-import { S3Client, DeleteObjectCommand } from "@aws-sdk/client-s3";
+import { fileTypeFromBuffer } from "file-type";
+import { S3Client, DeleteObjectCommand, GetObjectCommand } from "@aws-sdk/client-s3";
 import { Upload as S3Upload } from "@aws-sdk/lib-storage";
 import * as fs from "fs";
 import * as path from "path";
+import type { Readable } from "stream";
 import { v4 as uuidv4 } from "uuid";
 import { config } from "../config/env";
 import { Upload } from "../entities/upload.entity";
@@ -72,6 +73,9 @@ const DECLARED_ALIASES: Record<string, string> = {
   "application/x-zip-compressed": "application/zip",
 };
 
+/** A file refused for its content or size; the message is safe to show the uploader. */
+export class UploadRejectedError extends Error {}
+
 /**
  * Type of a file for a private non-conversation folder, from its magic bytes.
  * The declared type only decides between types the content can't distinguish.
@@ -82,17 +86,19 @@ export async function detectStoredFileType(
 ): Promise<string> {
   const bare = declaredMimeType.split(";")[0].trim().toLowerCase();
   const declared = DECLARED_ALIASES[bare] ?? bare;
-  const detected = await FileType.fromBuffer(buffer);
+  const detected = await fileTypeFromBuffer(buffer);
 
   if (!detected) {
     if (TEXT_TYPES.has(declared)) return declared;
-    throw new Error(`File content is not a supported type (declared ${declared || "unknown"})`);
+    throw new UploadRejectedError(
+      `File content is not a supported type (declared ${declared || "unknown"})`,
+    );
   }
   const zipBased = CONTAINER_TYPES["application/zip"].has(detected.mime);
   const container = zipBased ? "application/zip" : detected.mime;
   if (CONTAINER_TYPES[container]?.has(declared)) return declared;
   if (!STORED_FILE_TYPES[detected.mime]) {
-    throw new Error(`File type not allowed: ${detected.mime}`);
+    throw new UploadRejectedError(`File type not allowed: ${detected.mime}`);
   }
   return detected.mime;
 }
@@ -170,7 +176,11 @@ export class StorageService {
         buffer.length,
         options.maxSize ?? config.storage.limits.conversationMediaMaxFileSize,
       );
-      ({ buffer, mimeType } = await sanitizeConversationMedia(buffer, mimeType));
+      ({ buffer, mimeType } = await sanitizeConversationMedia(
+        buffer,
+        mimeType,
+        options.originalName,
+      ));
       extension = CONVERSATION_MEDIA_TYPES[mimeType];
     } else if (isPublicFolder(options.folder) || options.folder === DOCUMENT_IMAGES_FOLDER) {
       this.validateSize(buffer.length, options.maxSize);
@@ -244,6 +254,35 @@ export class StorageService {
   }
 
   /**
+   * Open a stored file for reading without loading it into memory, optionally
+   * only bytes `range[0]..range[1]` (inclusive).
+   */
+  async openReadStream(upload: Upload, range?: [number, number]): Promise<Readable> {
+    if (upload.storageType === "s3") {
+      if (!this.s3Client) {
+        throw new Error("S3 client not initialized");
+      }
+      const response = await this.s3Client.send(
+        new GetObjectCommand({
+          Bucket: config.storage.s3.bucket!,
+          Key: upload.path,
+          Range: range ? `bytes=${range[0]}-${range[1]}` : undefined,
+        }),
+      );
+      if (!response.Body) {
+        throw new Error(`Failed to download file from S3: ${upload.path}`);
+      }
+      return response.Body as Readable;
+    }
+
+    const fullPath = this.resolveLocalPath(upload.path);
+    if (!fs.existsSync(fullPath)) {
+      throw new Error(`File not found: ${upload.path}`);
+    }
+    return fs.createReadStream(fullPath, range ? { start: range[0], end: range[1] } : undefined);
+  }
+
+  /**
    * Delete file from storage and database
    */
   async delete(uploadId: string): Promise<void> {
@@ -260,6 +299,18 @@ export class StorageService {
 
     // 3. Delete database record
     await upload.remove();
+  }
+
+  /**
+   * Delete a stored object whose upload row is already gone (or about to be);
+   * see storage-purge.service.
+   */
+  async deleteObject(storageType: string, path: string): Promise<void> {
+    if (storageType === "s3") {
+      await this.deleteS3(path);
+    } else {
+      await this.deleteLocal(path);
+    }
   }
 
   /**
@@ -351,7 +402,9 @@ export class StorageService {
     if (size > sizeLimit) {
       const maxSizeMB = (sizeLimit / (1024 * 1024)).toFixed(2);
       const fileSizeMB = (size / (1024 * 1024)).toFixed(2);
-      throw new Error(`File too large: ${fileSizeMB}MB. Maximum allowed: ${maxSizeMB}MB`);
+      throw new UploadRejectedError(
+        `File too large: ${fileSizeMB}MB. Maximum allowed: ${maxSizeMB}MB`,
+      );
     }
   }
 
@@ -404,7 +457,10 @@ export class StorageService {
         Key: filePath,
         Body: buffer,
         ContentType: mimeType,
-        ACL: isPublic ? "public-read" : "private",
+        ...(config.storage.s3.useAcls ? { ACL: isPublic ? "public-read" : "private" } : {}),
+        ...(config.storage.s3.serverSideEncryption
+          ? { ServerSideEncryption: config.storage.s3.serverSideEncryption }
+          : {}),
       },
     });
 
@@ -432,8 +488,6 @@ export class StorageService {
       throw new Error("S3 client not initialized");
     }
 
-    const { GetObjectCommand } = await import("@aws-sdk/client-s3");
-
     const command = new GetObjectCommand({
       Bucket: config.storage.s3.bucket!,
       Key: filePath,
@@ -452,10 +506,10 @@ export class StorageService {
 
   /**
    * Revoke public read on a stored file. Local files need nothing: /uploads
-   * only serves public folders.
+   * only serves public folders. Without ACLs the bucket policy decides.
    */
   async makePrivate(upload: Upload): Promise<void> {
-    if (upload.storageType !== "s3") return;
+    if (upload.storageType !== "s3" || !config.storage.s3.useAcls) return;
     if (!this.s3Client) {
       throw new Error("S3 client not initialized");
     }

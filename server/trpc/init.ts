@@ -1,4 +1,5 @@
 import { initTRPC } from "@trpc/server";
+import { currentRequestId } from "@server/lib/logger";
 import { createContext } from "./context";
 
 /**
@@ -16,6 +17,7 @@ export const t = initTRPC.context<typeof createContext>().create({
         ...shape.data,
         type: cause?.type,
         reason: cause?.reason,
+        requestId: currentRequestId(),
       },
     };
   },

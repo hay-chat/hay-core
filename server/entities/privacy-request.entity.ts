@@ -73,6 +73,10 @@ export class PrivacyRequest extends TypeOrmBaseEntity {
   @Column({ type: "uuid", nullable: true })
   organizationId?: string;
 
+  /** Set when the organization is deleted, in raw SQL; the request row outlives it. */
+  @Column({ type: "uuid", nullable: true, select: false, insert: false, update: false })
+  originalOrganizationId?: string;
+
   @Column({
     type: "enum",
     enum: ["email", "phone", "externalId"],
@@ -150,7 +154,7 @@ export class PrivacyRequest extends TypeOrmBaseEntity {
   @JoinColumn()
   customer?: Customer;
 
-  @ManyToOne(() => Organization, { nullable: true, onDelete: "CASCADE" })
+  @ManyToOne(() => Organization, { nullable: true, onDelete: "SET NULL" })
   @JoinColumn()
   organization?: Organization;
 

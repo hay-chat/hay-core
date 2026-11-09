@@ -36,6 +36,8 @@ Edit `selfhost/.env` and fill in the **REQUIRED** block:
 | ----------------------- | ------------------------------------------------------------ |
 | `HAY_DOMAIN`            | The domain Hay will be served on, e.g. `support.example.com` |
 | `DB_PASSWORD`           | Any strong password (`openssl rand -hex 32`)                 |
+| `DB_APP_PASSWORD`       | Another strong password, for the app's limited database role |
+| `REDIS_PASSWORD`        | Any strong password                                          |
 | `RABBITMQ_PASSWORD`     | Any strong password                                          |
 | `JWT_SECRET`            | 32+ random characters                                        |
 | `JWT_REFRESH_SECRET`    | 32+ random characters, different from `JWT_SECRET`           |
@@ -140,21 +142,80 @@ restarts. **Back up first** (below): some migrations can't be reverted. Read the
 [release notes](https://github.com/hay-chat/hay-core/releases) before upgrading;
 Hay is pre-1.0 and releases may include breaking changes.
 
+Upgrading from a version that ran as root or without a Redis password: add
+`REDIS_PASSWORD` to `selfhost/.env`. The containers now run as an unprivileged
+user (uid 10001); the one-shot `uploads-perms` container hands the uploads volume
+to it. If you bind-mounted uploads from the host, `chown -R 10001:10001` that
+directory yourself.
+
 ## Backups
 
-Three things hold state:
+The `backup` container takes a database dump and an uploads archive once a day
+into the `hay_backups` volume, keeping 7 daily, 4 weekly and 6 monthly copies
+(`BACKUP_*` in `.env`). It shows as unhealthy in `docker compose ps` when the last
+good backup is more than two intervals old.
 
-1. **The database.**
-   ```bash
-   docker compose exec -T postgres pg_dump -U hay -Fc hay > hay-$(date +%F).dump
-   ```
-   Restore into an empty database with `pg_restore -U hay -d hay --clean`.
-2. **Uploaded files**, in the `hay_uploads` volume (or your S3 bucket).
-3. **`selfhost/.env`.** Without `PLUGIN_ENCRYPTION_KEY` the stored integration
-   credentials can't be decrypted, and without the JWT secrets everyone is
-   logged out.
+**Backups on the same disk don't survive losing the disk.** Set `RESTIC_REPOSITORY`
+and `RESTIC_PASSWORD` in `.env` to also keep an encrypted copy elsewhere (any
+[restic S3 or REST repository](https://restic.readthedocs.io/en/stable/030_preparing_a_new_repo.html)).
+That copy holds the dump, the uploads, and `selfhost/.env`. Store `RESTIC_PASSWORD`
+outside this machine as well: without it the copy can't be read.
 
-Redis and RabbitMQ hold only transient data.
+Without restic, save `selfhost/.env` yourself. Without its
+`PLUGIN_ENCRYPTION_KEY` the stored integration credentials can't be decrypted,
+and without the JWT secrets everyone is logged out. Redis and RabbitMQ hold only
+transient data. If uploads are on S3, use that bucket's versioning.
+
+Take one now, and rehearse a restore every quarter. The drill restores the newest
+dump into a scratch database, checks it, and drops it:
+
+```bash
+docker compose exec backup backup.sh --once
+docker compose exec backup restore-drill.sh
+```
+
+To restore for real, see [`runbooks/db-restore.md`](runbooks/db-restore.md). Other
+runbooks for outages, key rotation and incidents are in [`runbooks/`](runbooks/).
+
+## Monitoring
+
+The server exposes Prometheus metrics at `/metrics` on port 9464, separately from
+the application port and never through the reverse proxy. By default it listens
+on loopback inside the server container, so you can read it with:
+
+```bash
+docker compose exec server node -e "fetch('http://127.0.0.1:9464/metrics').then(r=>r.text()).then(console.log)"
+```
+
+To scrape from a Prometheus container, set `METRICS_HOST=0.0.0.0` and a long
+random `METRICS_TOKEN` in `selfhost/.env`, attach Prometheus to the `hay_default`
+network, and configure `authorization: { credentials: <token> }` on the scrape
+job with target `server:9464`. Without a token the server won't listen on anything
+but loopback. Set `METRICS_PORT=0` to turn the endpoint off.
+
+Alert on at least these:
+
+```yaml
+- alert: HayDependencyDown
+  expr: hay_dependency_up == 0
+  for: 2m
+- alert: HayRedisDegraded # rate limits are per process, or requests are refused
+  expr: increase(hay_redis_unavailable_total[5m]) > 0
+- alert: HayDeadLetters # messages or conversations that used up their retries
+  expr: increase(hay_dead_letters_total[15m]) > 0 or hay_dead_letter_queue_depth > 0
+- alert: HaySchedulerFailures
+  expr: increase(hay_scheduler_runs_total{status!="success"}[1h]) > 3
+- alert: HayAuditWriteFailures
+  expr: increase(hay_audit_write_failures_total[5m]) > 0
+- alert: HayServerErrors
+  expr: rate(hay_http_requests_total{status_class="5xx"}[5m]) > 0.5
+```
+
+Also probe `/ready` from inside the Docker network (it answers 503 while the
+database, Redis or RabbitMQ is down). It isn't proxied. Every response carries an
+`X-Request-Id` header, every log line written for that request has the same
+`requestId`, and tRPC errors return it in `error.data.requestId`, so a reported
+failure can be found with `docker compose logs server | grep <id>`.
 
 ## Using your own proxy or managed services
 
@@ -169,6 +230,17 @@ Redis and RabbitMQ hold only transient data.
   `REDIS_PASSWORD`, `REDIS_TLS` or `RABBITMQ_URL` in the `environment` block of
   the `x-hay` anchor. PostgreSQL needs pgvector 0.8+, and the database user must
   be allowed to `CREATE EXTENSION vector` and `pgcrypto`.
+- **Proxy hops (`TRUST_PROXY`):** the number of reverse proxies between the
+  internet and the server. The default of 1 is right for the bundled Caddy. Add
+  one for each extra layer (for example 2 with Cloudflare in front of Caddy). Too
+  low and every visitor appears to come from your proxy's IP, so rate limits are
+  shared between them. Too high and visitors can spoof their IP with an
+  `X-Forwarded-For` header. The server logs a warning at startup when it is unset.
+- **Website imports:** pages are rendered in the separate `browser` container,
+  which has no secrets and can't reach the databases. Without it, set
+  `CHROME_REMOTE_URL` to your own Chromium's DevTools URL, or unset it to run
+  Chromium inside the server container. Imports report an error while a configured
+  remote browser is unreachable; Hay doesn't fall back to a local one.
 
 ## Troubleshooting
 

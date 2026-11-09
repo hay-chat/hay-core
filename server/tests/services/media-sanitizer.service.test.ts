@@ -5,6 +5,7 @@ import {
   MAX_IMAGE_INPUT_PIXELS,
   MediaRejectedError,
   sanitizeConversationMedia,
+  neutraliseCsvFormulas,
 } from "@server/services/media-sanitizer.service";
 
 /**
@@ -163,5 +164,29 @@ describe("sanitizeConversationMedia", () => {
     const gif = await animatedGif(MAX_ANIMATION_FRAMES + 1, 2);
 
     await expect(sanitizeConversationMedia(gif, "image/gif")).rejects.toThrow(/too many frames/);
+  });
+});
+
+describe("neutraliseCsvFormulas", () => {
+  const run = (input: string) => neutraliseCsvFormulas(Buffer.from(input)).toString();
+
+  it("defuses formulas at the start of a cell, quoted or not", () => {
+    expect(run('a,=1+1\n"@SUM(A1)",b\n')).toBe("a,'=1+1\n\"'@SUM(A1)\",b\n");
+    expect(run('+cmd|x,"-2+3"')).toBe("'+cmd|x,\"'-2+3\"");
+  });
+
+  it("leaves numbers, inner characters and non-ASCII text alone", () => {
+    expect(run('-12.5,+15551234567,a=b,"x,=y"\nação,-5%')).toBe(
+      '-12.5,+15551234567,a=b,"x,=y"\nação,-5%',
+    );
+  });
+
+  it("keeps a byte order mark and defuses the first cell after it", () => {
+    expect(run("\ufeff=1,b")).toBe("\ufeff'=1,b");
+  });
+
+  it("applies to a .csv declared as plain text", async () => {
+    const result = await sanitizeConversationMedia(Buffer.from("=1,b"), "text/plain", "x.CSV");
+    expect(result.buffer.toString()).toBe("'=1,b");
   });
 });

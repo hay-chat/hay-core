@@ -5,6 +5,7 @@
 
 import { useUserStore } from "@/stores/user";
 import { useAuthStore } from "@/stores/auth";
+import { hasRouteAccess } from "@/utils/route-access";
 
 export default defineNuxtPlugin(() => {
   const router = useRouter();
@@ -13,56 +14,6 @@ export default defineNuxtPlugin(() => {
   // This ensures persisted state is loaded
   let userStore: ReturnType<typeof useUserStore> | null = null;
   let authStore: ReturnType<typeof useAuthStore> | null = null;
-
-  // Define role-protected routes (same as middleware)
-  const roleProtectedRoutes: Record<string, string[]> = {
-    // Admin only (owner, admin)
-    "/settings/users": ["owner", "admin"],
-    "/settings/api-tokens": ["owner", "admin"],
-    "/settings/general": ["owner", "admin"],
-    "/settings/billing": ["owner", "admin"],
-    "/settings/privacy": ["owner", "admin"],
-    "/settings/webchat": ["owner", "admin"],
-    "/settings/business-hours": ["owner", "admin"],
-    "/settings/assistant": ["owner", "admin"],
-
-    // Insights - all except agent
-    "/insights": ["owner", "admin", "contributor", "member", "viewer"],
-
-    // Content creation - contributor+
-    "/playbooks/create": ["owner", "admin", "contributor"],
-    "/playbooks/new": ["owner", "admin", "contributor"],
-
-    // Document import - member+
-    "/documents/import": ["owner", "admin", "contributor", "member"],
-
-    // Plugins - admin+
-    "/integrations/marketplace": ["owner", "admin"],
-    "/integrations/plugins": ["owner", "admin"],
-    "/plugins": ["owner", "admin"],
-  };
-
-  /**
-   * Check if a user role has access to a specific route
-   */
-  function hasRouteAccess(path: string, userRole: string | undefined): boolean {
-    if (!userRole) return false;
-
-    // Check if this specific route is protected
-    if (roleProtectedRoutes[path]) {
-      return roleProtectedRoutes[path].includes(userRole);
-    }
-
-    // Check if any parent route matches (for dynamic routes)
-    for (const [protectedPath, allowedRoles] of Object.entries(roleProtectedRoutes)) {
-      if (path.startsWith(protectedPath)) {
-        return allowedRoles.includes(userRole);
-      }
-    }
-
-    // If route is not explicitly protected, allow access
-    return true;
-  }
 
   // Add router guard that runs after each navigation
   router.afterEach((to, from) => {

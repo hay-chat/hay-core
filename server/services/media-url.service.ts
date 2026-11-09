@@ -1,8 +1,9 @@
 import { createHmac, timingSafeEqual } from "crypto";
 import path from "path";
 import { In } from "typeorm";
-import { config, getApiUrl } from "../config/env";
+import { getApiUrl } from "../config/env";
 import { Upload } from "../entities/upload.entity";
+import { deriveServiceKey } from "@server/lib/auth/utils/service-keys";
 
 /**
  * Media URLs for private uploads.
@@ -102,15 +103,9 @@ export function mediaUrl(uploadId: string): string {
   return `${getApiUrl()}/v1/media/${uploadId}`;
 }
 
-/**
- * Dedicated key for media signatures, derived from JWT_SECRET so that a media
- * signature can never be replayed as (or forged from) a session token.
- */
+/** A media signature can never be replayed as (or forged from) a session token. */
 function signingKey(): Buffer {
-  if (!config.jwt.secret) {
-    throw new Error("JWT_SECRET is required to sign media URLs");
-  }
-  return createHmac("sha256", config.jwt.secret).update("hay:media-url:v1").digest();
+  return deriveServiceKey("hay:media-url:v1");
 }
 
 function signature(uploadId: string, expires: number): string {
@@ -175,6 +170,11 @@ export async function signAttachmentUrls<T extends { id?: string; url: string }>
  * `{api}/v1/media/{id}`, optionally followed by a signature (`&` may be
  * HTML-escaped). Group 1 is the upload id.
  */
+/** The upload id of a /v1/media/:id URL, signed or not; null for any other URL. */
+export function parseMediaUploadId(url: string): string | null {
+  return mediaUrlPattern().exec(url)?.[1] ?? null;
+}
+
 function mediaUrlPattern(): RegExp {
   const base = mediaUrl("").replace(/[.*+?^${}()|[\]\\/]/g, "\\$&");
   return new RegExp(

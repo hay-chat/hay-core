@@ -28,10 +28,12 @@
     <ToastContainer />
     <!-- Step-by-step progress while a plugin connects (usePluginConnect) -->
     <PluginConnectProgress />
+    <MfaStepUpDialog />
   </SidebarProvider>
 </template>
 
 <script setup lang="ts">
+import MfaStepUpDialog from "@/components/auth/MfaStepUpDialog.vue";
 import { useWebSocket } from "@/composables/useWebSocket";
 import { useNotifications } from "@/composables/useNotifications";
 import { usePushNotifications } from "@/composables/usePushNotifications";

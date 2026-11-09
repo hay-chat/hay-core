@@ -101,7 +101,7 @@ export type { PluginPage } from "./ui";
 // Register API (Phase 2.2) ✅
 // ============================================================================
 
-export type { HayRegisterAPI, UIRegistrationAPI } from "./register";
+export type { HayRegisterAPI, RouteOptions, UIRegistrationAPI } from "./register";
 
 // ============================================================================
 // Plugin state (persisted per org + plugin)

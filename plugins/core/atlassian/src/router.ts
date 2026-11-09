@@ -7,7 +7,7 @@
  * `pluginRouterRegistry` and invokes the procedures through
  * `router.createCaller(ctx)`, bypassing the HTTP layer. Because of that,
  * this router MUST be built with the same `t` instance as the rest of the
- * server (we import `publicProcedure` / `router` from `@server/trpc`).
+ * server (we import `pluginRouterProcedure` / `router` from `@server/trpc`).
  *
  * Procedure ↔ contract mapping:
  *   - listRoots   → list Confluence spaces
@@ -23,7 +23,7 @@
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 
-import { publicProcedure, router } from "@server/trpc";
+import { pluginRouterProcedure, router } from "@server/trpc";
 import { pluginInstanceRepository } from "@server/repositories/plugin-instance.repository";
 import { decryptConfig } from "@server/lib/auth/utils/encryption";
 import type {
@@ -107,15 +107,12 @@ function getAuthConfigFromInstance(instance: {
 
 /**
  * Load the Confluence plugin instance for an org and build a client.
- *
- * The instance is looked up by `instanceId` only (it's an opaque UUID owned
- * by the org that called us; `document-source-sync` always passes the
- * matching org's instance id). We do not cross-check organizationId here —
- * the caller context (createCaller) and the row's own organizationId would
- * always agree, so adding a redundant check would only complicate signatures.
  */
-async function loadClient(instanceId: string): Promise<ConfluenceClient> {
-  const instance = await pluginInstanceRepository.findById(instanceId);
+async function loadClient(instanceId: string, organizationId: string): Promise<ConfluenceClient> {
+  const instance = await pluginInstanceRepository.findByIdAndOrganization(
+    instanceId,
+    organizationId,
+  );
   if (!instance) {
     throw new TRPCError({
       code: "NOT_FOUND",
@@ -152,8 +149,11 @@ function buildExternalUrl(
 }
 
 /** Read siteUrl from instance config (decrypted) — used only to construct externalUrl. */
-async function getSiteUrl(instanceId: string): Promise<string | undefined> {
-  const instance = await pluginInstanceRepository.findById(instanceId);
+async function getSiteUrl(instanceId: string, organizationId: string): Promise<string | undefined> {
+  const instance = await pluginInstanceRepository.findByIdAndOrganization(
+    instanceId,
+    organizationId,
+  );
   if (!instance?.config) return undefined;
   const config = decryptConfig(instance.config);
   const siteUrl = config.siteUrl as string | undefined;
@@ -173,10 +173,10 @@ export const confluenceRouter = router({
    * List Confluence spaces accessible with the configured auth.
    * Paginates through all pages of /spaces (limit=250 each).
    */
-  listRoots: publicProcedure
+  listRoots: pluginRouterProcedure
     .input(z.object({ instanceId: z.string().min(1) }))
-    .query(async ({ input }): Promise<DocumentImporterRoot[]> => {
-      const client = await loadClient(input.instanceId);
+    .query(async ({ ctx, input }): Promise<DocumentImporterRoot[]> => {
+      const client = await loadClient(input.instanceId, ctx.organizationId);
 
       const spaces: Array<{ id: string; key: string; name: string; type?: string }> = [];
       let cursor: string | undefined = undefined;
@@ -214,7 +214,7 @@ export const confluenceRouter = router({
    * Discover pages within a space — one page of results at a time.
    * Returns a cursor that the sync engine can pass back to continue.
    */
-  discover: publicProcedure
+  discover: pluginRouterProcedure
     .input(
       z.object({
         instanceId: z.string().min(1),
@@ -224,10 +224,11 @@ export const confluenceRouter = router({
     )
     .query(
       async ({
+        ctx,
         input,
       }): Promise<{ pages: DocumentImporterExternalPage[]; nextCursor?: string }> => {
-        const client = await loadClient(input.instanceId);
-        const siteUrl = await getSiteUrl(input.instanceId);
+        const client = await loadClient(input.instanceId, ctx.organizationId);
+        const siteUrl = await getSiteUrl(input.instanceId, ctx.organizationId);
 
         try {
           const { results, nextCursor } = await client.listPagesInSpace({
@@ -259,11 +260,11 @@ export const confluenceRouter = router({
    * If the body is missing or malformed we still return a placeholder
    * document so the sync engine can record metadata + a visible gap marker.
    */
-  fetchPage: publicProcedure
+  fetchPage: pluginRouterProcedure
     .input(z.object({ instanceId: z.string().min(1), externalId: z.string().min(1) }))
-    .query(async ({ input }): Promise<DocumentImporterFetchedPage> => {
-      const client = await loadClient(input.instanceId);
-      const siteUrl = await getSiteUrl(input.instanceId);
+    .query(async ({ ctx, input }): Promise<DocumentImporterFetchedPage> => {
+      const client = await loadClient(input.instanceId, ctx.organizationId);
+      const siteUrl = await getSiteUrl(input.instanceId, ctx.organizationId);
 
       let page: ConfluencePage & { body: { atlas_doc_format?: { value: string } } };
       try {
@@ -303,7 +304,7 @@ export const confluenceRouter = router({
    * Deletions are NOT detected here; the sync engine's reconcile pass
    * handles tombstoning by diffing against a full sweep.
    */
-  listChanges: publicProcedure
+  listChanges: pluginRouterProcedure
     .input(
       z.object({
         instanceId: z.string().min(1),
@@ -314,9 +315,10 @@ export const confluenceRouter = router({
     )
     .query(
       async ({
+        ctx,
         input,
       }): Promise<{ changes: DocumentImporterPageChange[]; nextCursor?: string }> => {
-        const client = await loadClient(input.instanceId);
+        const client = await loadClient(input.instanceId, ctx.organizationId);
 
         try {
           const { results, nextCursor } = await client.listPagesModifiedSince({

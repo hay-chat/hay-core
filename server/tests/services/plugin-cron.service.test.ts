@@ -5,7 +5,7 @@
 jest.mock("../../services/plugin-runner.service", () => ({ getPluginRunnerService: jest.fn() }));
 jest.mock("../../lib/config-resolver", () => ({ resolveConfigForWorker: jest.fn() }));
 jest.mock("../../repositories/plugin-instance.repository", () => ({
-  pluginInstanceRepository: { findByOrgAndPlugin: jest.fn() },
+  pluginInstanceRepository: { findByOrgAndPlugin: jest.fn(), findAll: jest.fn() },
 }));
 jest.mock("../../services/scheduler.service", () => ({
   schedulerService: { registerJob: jest.fn(), unregisterJob: jest.fn() },
@@ -35,5 +35,55 @@ describe("PluginCronService.registerForInstance", () => {
     expect(calls[0]).not.toHaveProperty("maxRetries");
     expect(calls[0].retryOnFailure).toBe(false);
     expect(calls[1]).toMatchObject({ maxRetries: 3, retryOnFailure: true });
+  });
+});
+
+describe("PluginCronService.reconcile", () => {
+  const registerJob = schedulerService.registerJob as jest.Mock;
+  const unregisterJob = schedulerService.unregisterJob as jest.Mock;
+  const instance = (schedule: string) => ({
+    organizationId: "org-1",
+    plugin: { pluginId: "shopify", metadata: { crons: [{ name: "refresh", schedule }] } },
+  });
+  const serve = (instances: unknown[]) => {
+    (pluginInstanceRepository.findAll as jest.Mock).mockResolvedValue(instances);
+    (pluginInstanceRepository.findByOrgAndPlugin as jest.Mock).mockResolvedValue(instances[0]);
+  };
+
+  beforeEach(() => jest.clearAllMocks());
+
+  it("picks up an instance enabled elsewhere, once", async () => {
+    const service = new PluginCronService();
+    serve([instance("0 * * * *")]);
+
+    await service.reconcile();
+    await service.reconcile();
+
+    expect(registerJob).toHaveBeenCalledTimes(1);
+    expect(unregisterJob).not.toHaveBeenCalled();
+  });
+
+  it("re-registers when the declared schedule changes", async () => {
+    const service = new PluginCronService();
+    serve([instance("0 * * * *")]);
+    await service.reconcile();
+
+    serve([instance("*/5 * * * *")]);
+    await service.reconcile();
+
+    expect(registerJob).toHaveBeenCalledTimes(2);
+    expect(registerJob.mock.calls[1][0]).toMatchObject({ schedule: "*/5 * * * *" });
+    expect(unregisterJob).toHaveBeenCalledTimes(1);
+  });
+
+  it("removes the job of an instance disabled elsewhere", async () => {
+    const service = new PluginCronService();
+    serve([instance("0 * * * *")]);
+    await service.reconcile();
+
+    serve([]);
+    await service.reconcile();
+
+    expect(unregisterJob).toHaveBeenCalledWith("plugin-cron:shopify:org-1:refresh");
   });
 });

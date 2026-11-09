@@ -89,7 +89,6 @@ describe("useWebSocket", () => {
       type: "identify",
       conversationId: "conv-1",
       proof: "proof-for:wss://api.example.test/ws",
-      url: "wss://api.example.test/ws",
     });
     app.unmount();
   });

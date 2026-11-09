@@ -590,7 +590,7 @@ export default defineHayPlugin((globalCtx) => {
         // same bytes as a replay and be dropped.
       });
 
-      ctx.register.route("POST", "/webhook", (req, res) =>
+      ctx.register.route("POST", "/webhook", { public: true }, (req, res) =>
         handleLgpdWebhook(req, res, {
           storeId: () => connectedStoreId,
           revokeConnection: async (reason) => {

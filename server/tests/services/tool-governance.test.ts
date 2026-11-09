@@ -30,7 +30,11 @@ describe("identityFromCustomer", () => {
       trust: "none",
     });
     expect(
-      identityFromCustomer(customer({ external_id: "c-1", email: "ana@example.com" }), "web"),
+      identityFromCustomer(
+        customer({ external_id: "c-1", email: "ana@example.com" }),
+        "web",
+        "webchat_signature",
+      ),
     ).toEqual({
       trust: "verified",
       source: "webchat_signature",
@@ -46,7 +50,16 @@ describe("identityFromCustomer", () => {
       email: "someone@else.com",
       external_metadata: { web: { emailConsentSource: "handoff" } },
     });
-    expect(identityFromCustomer(typed, "web")).toMatchObject({ trust: "verified", email: null });
+    expect(identityFromCustomer(typed, "web", "webchat_signature")).toMatchObject({
+      trust: "verified",
+      email: null,
+    });
+  });
+
+  it("does not verify a store customer the signature did not link", () => {
+    const store = customer({ external_id: "c-1", email: "ana@example.com" });
+    expect(identityFromCustomer(store, "web", "prechat_email")).toEqual({ trust: "none" });
+    expect(identityFromCustomer(store, "web")).toEqual({ trust: "none" });
   });
 
   it("takes a channel conversation's identity from what the channel stored, not the record", () => {
@@ -86,8 +99,11 @@ describe("requestKey", () => {
 });
 
 describe("isToolEnabled", () => {
-  it("allows every tool without a playbook list", async () => {
-    expect(await isToolEnabled({ enabled_tools: null }, "shop:create_refund")).toBe(true);
+  it("allows only core and page tools without a playbook list", async () => {
+    for (const enabled_tools of [null, []]) {
+      expect(await isToolEnabled({ enabled_tools }, "shop:create_refund")).toBe(false);
+      expect(await isToolEnabled({ enabled_tools }, "create_ticket")).toBe(true);
+    }
   });
 
   it("allows only listed tools, plus core and page tools", async () => {

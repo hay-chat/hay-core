@@ -19,7 +19,6 @@ import { customerPrivacyRouter } from "./customer-privacy";
 import { apiTokensRouter } from "./api-tokens";
 import { auditLogsRouter } from "./audit-logs";
 import { webchatRouter } from "./webchat";
-import { pluginRouterRegistry } from "@server/services/plugin-router-registry.service";
 import { pluginApiTrpcRouter } from "./plugin-api/trpc";
 import { gitConnectionsRouter } from "./git-connections";
 import { docsAuditRouter } from "./docs-audit";
@@ -83,13 +82,6 @@ const coreRouters = {
   teamQuestions: teamQuestionsRouter,
 };
 
-// Create v1Router with core + plugin routers
-// Plugins will register their routers dynamically
-export const createV1Router = () => {
-  return pluginRouterRegistry.createMergedRouter(coreRouters);
-};
-
-// Export initial router (will be updated when plugins register)
 export const v1Router = router(coreRouters);
 
 export type V1Router = typeof v1Router;

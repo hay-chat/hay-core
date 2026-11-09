@@ -1,3 +1,4 @@
+import { TRPCError } from "@trpc/server";
 import { describe, it, expect, jest, beforeEach } from "@jest/globals";
 
 /**
@@ -18,21 +19,55 @@ jest.mock("@server/database/data-source", () => ({ AppDataSource: { isInitialize
 const mockCreateConversation = jest.fn(async (_orgId: string, _data: unknown) => ({
   id: "conv-1",
   created_at: new Date("2026-10-27T00:00:00Z"),
+  addMessage: jest.fn(async () => undefined),
 }));
 jest.mock("@server/services/conversation.service", () => ({
   ConversationService: jest.fn(() => ({ createConversation: mockCreateConversation })),
+}));
+const mockConversation = jest.fn<() => unknown>(() => null);
+type ProofResult = { success: boolean; newNonce?: string; error?: string };
+const mockVerifyProof = jest.fn<(...args: unknown[]) => Promise<ProofResult>>(async () => ({
+  success: false,
+  error: "Invalid proof",
+}));
+jest.mock("@server/services/webchat/dpop-proof.service", () => ({
+  ...jest.requireActual<typeof import("@server/services/webchat/dpop-proof.service")>(
+    "@server/services/webchat/dpop-proof.service",
+  ),
+  verifyDPoPForRequest: (...args: unknown[]) => mockVerifyProof(...args),
+}));
+const mockFindMessage = jest.fn<() => Promise<unknown>>(async () => null);
+const mockUpdateMessage = jest.fn(async () => undefined);
+jest.mock("@server/repositories/message.repository", () => ({
+  MessageRepository: jest.fn(() => ({ findById: mockFindMessage, update: mockUpdateMessage })),
+}));
+jest.mock("@server/services/orchestrator-queue.service", () => ({
+  orchestratorQueueService: { enqueue: jest.fn(async () => undefined) },
 }));
 jest.mock("@server/services/dpop-cache.service", () => ({
   dpopCacheService: { generateNonce: jest.fn(async () => "nonce-1") },
 }));
 jest.mock("@server/repositories/conversation.repository", () => ({
-  conversationRepository: { updateById: jest.fn(async () => undefined) },
+  conversationRepository: {
+    updateById: jest.fn(async () => undefined),
+    findById: jest.fn(async () => mockConversation()),
+  },
 }));
+const mockFindCustomerById = jest.fn<() => Promise<unknown>>(async () => null);
+const mockFindByEmail = jest.fn(async () => ({ id: "existing-customer" }));
+const mockCreateCustomer = jest.fn(async (_data: unknown) => ({ id: "claimed-customer" }));
+const mockUpdateCustomer = jest.fn(async (..._args: unknown[]) => ({}));
 const mockFindByExternalId = jest.fn<(id: string, orgId: string) => Promise<unknown>>(
   async () => null,
 );
 jest.mock("@server/repositories/customer.repository", () => ({
-  CustomerRepository: jest.fn(() => ({ findByExternalId: mockFindByExternalId })),
+  CustomerRepository: jest.fn(() => ({
+    findByExternalId: mockFindByExternalId,
+    findByEmail: mockFindByEmail,
+    findByIdAndOrganization: mockFindCustomerById,
+    create: mockCreateCustomer,
+    update: mockUpdateCustomer,
+  })),
 }));
 
 const mockVerifiedCustomerExternalId = jest.fn<
@@ -54,7 +89,8 @@ jest.mock("@server/repositories/webchat-settings.repository", () => ({
 jest.mock("@server/services/storage.service", () => ({ storageService: {} }));
 
 const mockIsEnabled = jest.fn<(orgId: string) => Promise<boolean>>();
-const mockGetSettings = jest.fn<(orgId: string) => Promise<{ allowedDomains: string[] }>>();
+const mockGetSettings =
+  jest.fn<(orgId: string) => Promise<{ allowedDomains: string[]; preChatForm?: unknown }>>();
 jest.mock("@server/services/webchat/webchat-settings.service", () => {
   const actual = jest.requireActual<
     typeof import("@server/services/webchat/webchat-settings.service")
@@ -63,6 +99,7 @@ jest.mock("@server/services/webchat/webchat-settings.service", () => {
     matchesAllowedDomains: actual.matchesAllowedDomains,
     webchatSettingsService: {
       isEnabled: mockIsEnabled,
+      getSettings: mockGetSettings,
       isDomainAllowed: async (orgId: string, hostname: string | null) =>
         actual.matchesAllowedDomains((await mockGetSettings(orgId)).allowedDomains, hostname),
     },
@@ -70,7 +107,12 @@ jest.mock("@server/services/webchat/webchat-settings.service", () => {
 });
 
 const mockRateLimited =
-  jest.fn<(checks: Array<{ rule: string; id: string }>) => Promise<boolean>>();
+  jest.fn<
+    (
+      checks: Array<{ rule: string; id: string }>,
+      options?: { failClosed?: boolean },
+    ) => Promise<boolean>
+  >();
 jest.mock("@server/services/public-widget-limits", () => ({
   PUBLIC_WIDGET_LIMITS: { maxMessageLength: 4000 },
   isPublicWidgetRateLimited: mockRateLimited,
@@ -88,7 +130,9 @@ jest.mock("@server/services/webchat/webchat-extensions.service", () => ({
   webchatExtensionsService: { runGates: mockRunGates },
 }));
 
-const mockRecordCreateAttempt = jest.fn<(orgId: string) => Promise<boolean>>(async () => false);
+const mockRecordCreateAttempt = jest.fn<(orgId: string, ip: string) => Promise<boolean>>(
+  async () => false,
+);
 jest.mock("@server/services/webchat/under-attack.service", () => ({
   recordCreateAttempt: mockRecordCreateAttempt,
   isUnderAttack: async () => false,
@@ -96,8 +140,10 @@ jest.mock("@server/services/webchat/under-attack.service", () => ({
 
 import {
   publicConversationsRouter,
+  publicMetadata,
   withVisitorContext,
 } from "@server/routes/v1/public-conversations";
+import { MessageType } from "@server/database/entities/message.entity";
 import { conversationRepository } from "@server/repositories/conversation.repository";
 
 const ORG_ID = "11111111-1111-4111-8111-111111111111";
@@ -320,10 +366,21 @@ describe("publicConversations rate limits", () => {
     await expect(callerFor({}, "198.51.100.4").create(createInput)).rejects.toMatchObject({
       code: "TOO_MANY_REQUESTS",
     });
-    expect(mockRateLimited).toHaveBeenCalledWith([
-      { rule: "createPerIp", id: "198.51.100.4" },
-      { rule: "createPerOrg", id: ORG_ID },
-    ]);
+    expect(mockRateLimited).toHaveBeenCalledWith(
+      [
+        { rule: "createPerIp", id: "198.51.100.4" },
+        { rule: "createPerOrg", id: ORG_ID },
+      ],
+      { failClosed: true },
+    );
+    expect(mockCreateConversation).not.toHaveBeenCalled();
+  });
+
+  it("create is refused as unavailable when limits cannot be checked", async () => {
+    mockRateLimited.mockRejectedValue(new TRPCError({ code: "SERVICE_UNAVAILABLE" }));
+    await expect(callerFor({}, "198.51.100.4").create(createInput)).rejects.toMatchObject({
+      code: "SERVICE_UNAVAILABLE",
+    });
     expect(mockCreateConversation).not.toHaveBeenCalled();
   });
 
@@ -331,8 +388,6 @@ describe("publicConversations rate limits", () => {
     conversationId: "22222222-2222-4222-8222-222222222222",
     content: "hello",
     proof: "proof",
-    method: "POST",
-    url: "http://localhost:3001/v1/publicConversations.sendMessage",
   };
 
   it("sendMessage is limited per IP before the proof is checked", async () => {
@@ -372,8 +427,6 @@ describe("publicConversations.sendAttachment guards (D8-9)", () => {
     mimeType: "image/jpeg" as const,
     filename: "photo.jpg",
     proof: "proof",
-    method: "POST",
-    url: "http://localhost:3001/v1/publicConversations.sendAttachment",
   };
 
   it("is limited per IP before the proof is checked", async () => {
@@ -382,7 +435,10 @@ describe("publicConversations.sendAttachment guards (D8-9)", () => {
       callerFor({}, "198.51.100.4").sendAttachment(attachmentInput),
     ).rejects.toMatchObject({ code: "TOO_MANY_REQUESTS" });
     expect(mockRateLimited).toHaveBeenCalledTimes(1);
-    expect(mockRateLimited).toHaveBeenCalledWith([{ rule: "attachmentPerIp", id: "198.51.100.4" }]);
+    expect(mockRateLimited).toHaveBeenCalledWith(
+      [{ rule: "attachmentPerIp", id: "198.51.100.4" }],
+      { failClosed: true },
+    );
   });
 
   it("requires a valid proof for the conversation (ownership) before anything is stored", async () => {
@@ -390,9 +446,10 @@ describe("publicConversations.sendAttachment guards (D8-9)", () => {
     await expect(callerFor().sendAttachment(attachmentInput)).rejects.toMatchObject({
       code: "UNAUTHORIZED",
     });
-    expect(mockRateLimited).not.toHaveBeenCalledWith([
-      { rule: "attachmentPerConversation", id: attachmentInput.conversationId },
-    ]);
+    expect(mockRateLimited).not.toHaveBeenCalledWith(
+      [{ rule: "attachmentPerConversation", id: attachmentInput.conversationId }],
+      { failClosed: true },
+    );
   });
 
   it("refuses types other than images and PDF", async () => {
@@ -411,8 +468,6 @@ describe("publicConversations.submitCsat guards", () => {
     conversationId: "22222222-2222-4222-8222-222222222222",
     rating: 4,
     proof: "proof",
-    method: "POST",
-    url: "http://localhost:3001/v1/publicConversations.submitCsat",
   };
 
   it("is limited per IP before the proof is checked", async () => {
@@ -471,7 +526,7 @@ describe("publicConversations.create plugin gates", () => {
   it("counts the attempt and tells the gates when the org is under attack", async () => {
     mockRecordCreateAttempt.mockResolvedValueOnce(true);
     await callerFor().create(createInput);
-    expect(mockRecordCreateAttempt).toHaveBeenCalledWith(ORG_ID);
+    expect(mockRecordCreateAttempt).toHaveBeenCalledWith(ORG_ID, expect.any(String));
     expect(mockRunGates).toHaveBeenCalledWith(
       ORG_ID,
       "conversation.create",
@@ -564,5 +619,165 @@ describe("publicConversations.create customer link (D1)", () => {
       ORG_ID,
       expect.objectContaining({ customer_id: null }),
     );
+  });
+});
+
+describe("publicConversations.create pre-chat form", () => {
+  const form = {
+    id: "prechat",
+    fields: [
+      { name: "email", label: "Email", type: "email", required: true, mapToCustomer: "email" },
+    ],
+  };
+  const answers = { response: { email: "someone@example.com" } };
+  const origin = { origin: "https://shop.example.com" };
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockFindOrganization.mockResolvedValue({ id: ORG_ID, suspendedAt: null, settings: {} });
+    mockIsEnabled.mockResolvedValue(true);
+    mockGetSettings.mockResolvedValue({ allowedDomains: ["shop.example.com"], preChatForm: form });
+    mockRateLimited.mockResolvedValue(false);
+    mockVerifiedCustomerExternalId.mockResolvedValue(null);
+  });
+
+  it("refuses answers when the organization has no form, whatever schema is sent", async () => {
+    mockGetSettings.mockResolvedValue({ allowedDomains: ["shop.example.com"], preChatForm: null });
+    await expect(
+      callerFor(origin).create({
+        ...createInput,
+        preChatForm: { schema: form, ...answers },
+      } as never),
+    ).rejects.toMatchObject({ code: "BAD_REQUEST" });
+    expect(mockCreateConversation).not.toHaveBeenCalled();
+  });
+
+  it("validates against the organization's form, not one the client sends", async () => {
+    const forged = { id: "forged", fields: [{ name: "other", label: "x", type: "text" }] };
+    await expect(
+      callerFor(origin).create({
+        ...createInput,
+        preChatForm: { schema: forged, response: { other: "x" } },
+      } as never),
+    ).rejects.toMatchObject({ code: "BAD_REQUEST" });
+  });
+
+  it("gives a typed email its own record instead of linking the matching customer", async () => {
+    await callerFor(origin).create({ ...createInput, preChatForm: answers });
+    expect(mockFindByEmail).not.toHaveBeenCalled();
+    expect(mockCreateCustomer).toHaveBeenCalledWith(
+      expect.objectContaining({ email: "someone@example.com" }),
+    );
+    expect(mockCreateConversation).toHaveBeenCalledWith(
+      ORG_ID,
+      expect.objectContaining({
+        customer_id: "claimed-customer",
+        metadata: expect.objectContaining({ customerLinkSource: "prechat_email" }),
+      }),
+    );
+  });
+
+  it("does not change a signed customer from form answers", async () => {
+    mockVerifiedCustomerExternalId.mockResolvedValue("c-1");
+    mockFindByExternalId.mockResolvedValue({ id: "signed-customer" });
+    await callerFor(origin).create({ ...createInput, preChatForm: answers });
+    expect(mockUpdateCustomer).not.toHaveBeenCalled();
+    expect(mockCreateCustomer).not.toHaveBeenCalled();
+    expect(mockCreateConversation).toHaveBeenCalledWith(
+      ORG_ID,
+      expect.objectContaining({
+        customer_id: "signed-customer",
+        metadata: expect.objectContaining({ customerLinkSource: "webchat_signature" }),
+      }),
+    );
+  });
+
+  it("does not let the browser set the link source", () => {
+    expect(publicMetadata({ customerLinkSource: "webchat_signature" })).toEqual({});
+  });
+});
+
+describe("publicConversations DPoP proofs", () => {
+  const conversationId = "22222222-2222-4222-8222-222222222222";
+
+  beforeEach(() => jest.clearAllMocks());
+
+  it("checks a proof against the procedure called, not what the body names", async () => {
+    await callerFor({ host: "chat.selfhosted.test" })
+      .getMessages({
+        conversationId,
+        proof: "proof",
+        method: "GET",
+        url: "https://elsewhere.test/anything",
+      } as never)
+      .catch(() => undefined);
+
+    expect(mockVerifyProof).toHaveBeenCalledWith(conversationId, "proof", {
+      method: "POST",
+      path: "/v1/publicConversations.getMessages",
+      schemes: ["http:", "https:"],
+      hosts: ["api.hay.chat:443", "chat.selfhosted.test"],
+    });
+  });
+});
+
+describe("publicConversations.submitForm", () => {
+  const conversationId = "22222222-2222-4222-8222-222222222222";
+  const messageId = "33333333-3333-4333-8333-333333333333";
+  const schema = {
+    id: "details",
+    fields: [
+      { name: "name", label: "Name", type: "text", mapToCustomer: "name" },
+      { name: "phone", label: "Phone", type: "text", mapToCustomer: "phone" },
+    ],
+  };
+  const input = {
+    conversationId,
+    messageId,
+    response: { name: "Sam Typed", phone: "+15550100" },
+    proof: "proof",
+  };
+  const conversation = (metadata: Record<string, unknown>) => ({
+    id: conversationId,
+    organization_id: ORG_ID,
+    customer_id: "customer-1",
+    context: {},
+    metadata,
+  });
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockVerifyProof.mockResolvedValueOnce({ success: true, newNonce: "nonce-2" });
+    mockFindMessage.mockResolvedValue({
+      id: messageId,
+      conversation_id: conversationId,
+      type: MessageType.FORM,
+      metadata: { ui: { kind: "form", schema, status: "PENDING" } },
+    });
+  });
+
+  it("keeps answers as visitor context and leaves a signed customer untouched", async () => {
+    mockConversation.mockReturnValueOnce(conversation({ customerLinkSource: "webchat_signature" }));
+    const { conversationRepository } = jest.requireMock<{
+      conversationRepository: { updateById: jest.Mock };
+    }>("@server/repositories/conversation.repository");
+
+    await callerFor().submitForm(input);
+
+    expect(conversationRepository.updateById).toHaveBeenCalledWith(conversationId, {
+      context: expect.objectContaining({
+        _visitor: expect.objectContaining({ name: "Sam Typed" }),
+      }),
+    });
+    expect(mockUpdateCustomer).not.toHaveBeenCalled();
+  });
+
+  it("only fills empty fields of a customer created from a typed email", async () => {
+    mockConversation.mockReturnValueOnce(conversation({ customerLinkSource: "prechat_email" }));
+    mockFindCustomerById.mockResolvedValueOnce({ id: "customer-1", name: null, phone: "+1999" });
+
+    await callerFor().submitForm(input);
+
+    expect(mockUpdateCustomer).toHaveBeenCalledWith("customer-1", ORG_ID, { name: "Sam Typed" });
   });
 });

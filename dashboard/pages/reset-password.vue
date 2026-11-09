@@ -148,7 +148,6 @@ import { validatePassword } from "@/lib/utils";
 import PasswordStrength from "@/components/auth/PasswordStrength.vue";
 
 const { t } = useI18n();
-const route = useRoute();
 const router = useRouter();
 const toast = useToast();
 
@@ -158,7 +157,7 @@ definePageMeta({
 });
 
 // Extract token from URL
-const token = ref((route.query.token as string) || "");
+const token = useUrlToken();
 
 // Form state
 const form = reactive({
@@ -225,7 +224,7 @@ const verifyToken = async () => {
   }
 
   try {
-    const response = await Hay.auth.verifyResetToken.query({ token: token.value });
+    const response = await Hay.auth.verifyResetToken.mutate({ token: token.value });
 
     if (response.valid) {
       userEmail.value = ("email" in response ? response.email : "") || "";

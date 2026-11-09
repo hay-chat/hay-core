@@ -1,4 +1,5 @@
 import { Message } from "@server/database/entities/message.entity";
+import { fenceData } from "@server/services/core/prompt-data";
 import { Playbook } from "@server/database/entities/playbook.entity";
 import { MIN_DOCUMENT_SIMILARITY } from "@server/services/document-similarity";
 import { LLMService } from "../services/core/llm.service";
@@ -48,7 +49,7 @@ export class RetrievalLayer {
     const candidatePrompt = await this.promptService.getPrompt(
       "retrieval/playbook-selection",
       {
-        conversationContext,
+        conversationContext: fenceData(conversationContext),
         playbooks: playbooks.map((p) => ({
           id: p.id,
           title: p.title,

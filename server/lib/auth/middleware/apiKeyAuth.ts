@@ -4,6 +4,7 @@ import { Organization } from "@server/entities/organization.entity";
 import { AuthUser } from "@server/lib/auth/AuthUser";
 import { extractApiKeyFromHeader, hashApiKey } from "@server/lib/auth/utils/hashing";
 import { AppDataSource } from "@server/database/data-source";
+import { apiTokenUserId } from "@server/lib/auth/api-token-actor";
 
 /**
  * Authenticate using Organization API Token
@@ -63,14 +64,16 @@ export async function authenticateApiKeyAuth(authHeader?: string): Promise<AuthU
     throw new Error("Associated organization is suspended");
   }
 
-  // Update last used timestamp
-  matchedApiKey.lastUsedAt = new Date();
-  await apiKeyRepository.save(matchedApiKey);
+  // Record use, at most once a minute so API traffic doesn't turn into row writes.
+  const now = new Date();
+  if (!matchedApiKey.lastUsedAt || now.getTime() - matchedApiKey.lastUsedAt.getTime() > 60_000) {
+    await apiKeyRepository.update({ id: matchedApiKey.id }, { lastUsedAt: now });
+  }
 
   // Create a synthetic user representing the organization's API access
   // This user won't have a real user ID but will have organization context
   const syntheticUser = new User();
-  syntheticUser.id = `api-token-${matchedApiKey.id}`; // Synthetic ID for API token
+  syntheticUser.id = apiTokenUserId(matchedApiKey.id);
   syntheticUser.email = `api-token@${matchedApiKey.organization.slug}.internal`;
   syntheticUser.isActive = true;
   syntheticUser.organizationId = matchedApiKey.organizationId;

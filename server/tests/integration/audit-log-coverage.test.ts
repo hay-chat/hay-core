@@ -4,8 +4,14 @@ import { AppDataSource } from "../../database/data-source";
 import { Organization } from "../../entities/organization.entity";
 import { User } from "../../entities/user.entity";
 import { AuditLog } from "../../entities/audit-log.entity";
+import { Customer } from "../../database/entities/customer.entity";
 import { apiTokensRouter } from "../../routes/v1/api-tokens";
+import { customersRouter } from "../../routes/v1/customers";
+import { playbooksRouter } from "../../routes/v1/playbooks";
+import { assistantRouter } from "../../routes/v1/organizations/assistant";
+import { auditLogsRouter } from "../../routes/v1/audit-logs";
 import { ApiTokenScope } from "../../types/api-token-scopes";
+import { auditLogService } from "../../services/audit-log.service";
 import { organizationService } from "../../services/organization.service";
 import type { Context } from "../../trpc/context";
 import { purgeAuditLogs } from "../helpers/audit-logs";
@@ -69,6 +75,78 @@ describe("audit log coverage", () => {
       true,
     );
     expect(JSON.stringify(rows)).not.toContain(created.token);
+  });
+
+  it("attributes an API token's action to the key, not to a user", async () => {
+    const apiKeyId = "a0d17000-0000-4000-8000-0000000000cc";
+    const customers = AppDataSource.getRepository(Customer);
+    const customer = await customers.save(
+      customers.create({ organization_id: orgId, external_id: "audit-coverage-customer" }),
+    );
+    const apiKeyCtx = {
+      ...ctx,
+      user: { ...ctx.user, id: `api-token-${apiKeyId}`, authMethod: "apikey", apiKeyId },
+    } as unknown as Context;
+
+    await customersRouter.createCaller(apiKeyCtx).delete({ id: customer.id });
+
+    const row = await AppDataSource.getRepository(AuditLog)
+      .createQueryBuilder("log")
+      .addSelect(["log.actorType", "log.apiKeyId"])
+      .where("log.original_organization_id = :orgId AND log.action = 'customer.delete'", { orgId })
+      .getOneOrFail();
+    expect(row.userId).toBeNull();
+    expect(row.actorType).toBe("apikey");
+    expect(row.apiKeyId).toBe(apiKeyId);
+  });
+
+  it("does not let caller metadata claim a different actor", async () => {
+    const row = await auditLogService.log({
+      userId,
+      organizationId: orgId,
+      action: "profile.update",
+      metadata: { actorType: "system", apiKeyId: "a0d17000-0000-4000-8000-0000000000dd" },
+    });
+    const stored = await AppDataSource.getRepository(AuditLog)
+      .createQueryBuilder("log")
+      .addSelect(["log.actorType", "log.apiKeyId"])
+      .where("log.id = :id", { id: row.id })
+      .getOneOrFail();
+    expect(stored.actorType).toBe("user");
+    expect(stored.apiKeyId).toBeNull();
+  });
+
+  it("records playbook, assistant, API key and export changes without their content", async () => {
+    const authedCaller = <R>(router: { createCaller: (c: Context) => R }) =>
+      router.createCaller(ctx);
+    const playbooks = authedCaller(playbooksRouter);
+    const playbook = await playbooks.create({ title: "Refunds", trigger: "refund" });
+    await playbooks.update({ id: playbook.id, data: { title: "Refunds v2" } });
+    await playbooks.delete({ id: playbook.id });
+
+    await authedCaller(assistantRouter).update({ tone: "A very private tone" });
+
+    const tokens = authedCaller(apiTokensRouter);
+    const token = await tokens.create({ name: "CI", scopes: [ApiTokenScope.CONVERSATIONS_READ] });
+    await tokens.update({ id: token.id, name: "CI renamed" });
+
+    await authedCaller(auditLogsRouter).export({ format: "json" });
+
+    const trail = await actions();
+    expect(trail).toEqual(
+      expect.arrayContaining([
+        "playbook.create",
+        "playbook.update",
+        "playbook.delete",
+        "assistant.update",
+        "apikey.update",
+        "audit_log.export",
+      ]),
+    );
+    const rows = await AppDataSource.getRepository(AuditLog).find({
+      where: { originalOrganizationId: orgId },
+    });
+    expect(JSON.stringify(rows)).not.toContain("A very private tone");
   });
 
   it("records the organization's deletion and keeps the trail afterwards", async () => {

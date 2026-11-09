@@ -2,14 +2,15 @@ import { Entity, Column, Index, ManyToOne, JoinColumn } from "typeorm";
 import { BaseEntity } from "./base.entity";
 import { User } from "./user.entity";
 
-export type SessionRevokedReason = "logout" | "reuse_detected" | "password_changed";
+export type SessionRevokedReason =
+  "logout" | "reuse_detected" | "password_changed" | "user_revoked";
 
 /**
  * One login on one device: a refresh-token family.
  *
  * The refresh token is derived from (id, generation) and is never stored.
- * Each refresh bumps `generation` (rotation) and pushes `expiresAt` to
- * now + the idle timeout (sliding session). See auth-session.service.ts.
+ * Each refresh bumps `generation` (rotation). `expiresAt` is fixed at sign-in
+ * plus the absolute lifetime. See auth-session.service.ts.
  */
 @Entity("sessions")
 @Index("idx_sessions_user_id", ["userId"])

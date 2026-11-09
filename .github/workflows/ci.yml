@@ -141,8 +141,9 @@ jobs:
       - name: Run hay CLI tests
         run: npm run test:hay-cli
 
-  # High-severity advisories in production dependencies block both the webchat
-  # widget and the monorepo.
+  # Moderate and worse advisories in production dependencies block both the
+  # webchat widget and the monorepo, except those listed with a reason and an
+  # expiry in .github/audit-allowlist.json.
   dependency-audit:
     name: Dependency Audit
     runs-on: ubuntu-latest
@@ -153,10 +154,32 @@ jobs:
         with:
           node-version: "22"
       - name: Audit webchat
-        working-directory: webchat
-        run: npm audit --omit=dev --audit-level=high
+        run: node scripts/audit-check.mjs webchat
       - name: Audit monorepo
-        run: npm audit --omit=dev --audit-level=high
+        run: node scripts/audit-check.mjs .
+
+  # Builds the production image (which compiles every workspace) and fails on a
+  # critical vulnerability that has a fix available.
+  docker-image:
+    name: Docker Image
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Build image
+        run: docker build -t hay:ci .
+      - name: Scan image
+        uses: anchore/scan-action@27805bf3b4e84b4a5c980df22ed233c00390a439 # v7.4.2
+        with:
+          image: hay:ci
+          fail-build: true
+          severity-cutoff: critical
+          only-fixed: true
+          output-format: table
 
   # Webchat widget: unit tests, then the performance budget on a fresh build
   # (D12-9). The budget fails the job when widget.js grows past 10 KB brotli or

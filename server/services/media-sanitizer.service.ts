@@ -1,4 +1,4 @@
-import FileType from "file-type";
+import { fileTypeFromBuffer } from "file-type";
 import sharp from "sharp";
 
 /**
@@ -39,7 +39,6 @@ const TEXT_TYPES = new Set(["text/plain", "text/csv"]);
 
 /** file-type names that we store under a canonical allow-list name. */
 const DETECTED_ALIASES: Record<string, string> = {
-  "audio/opus": "audio/ogg", // WhatsApp voice notes: Opus in an Ogg container
   "audio/x-m4a": "audio/mp4",
   "video/x-m4v": "video/mp4",
 };
@@ -66,7 +65,7 @@ function bareMime(mimeType: string): string {
 
 /** Real type of the file from its content, checked against the allow-list. */
 async function detectType(buffer: Buffer, declaredMime: string): Promise<string> {
-  const detected = await FileType.fromBuffer(buffer);
+  const detected = await fileTypeFromBuffer(buffer);
 
   if (!detected) {
     if (TEXT_TYPES.has(declaredMime)) return declaredMime;
@@ -79,7 +78,9 @@ async function detectType(buffer: Buffer, declaredMime: string): Promise<string>
     throw new MediaRejectedError("HEIC/HEIF images are not supported");
   }
 
-  const mimeType = DETECTED_ALIASES[detected.mime] ?? detected.mime;
+  // Bare type: Opus in an Ogg container (WhatsApp voice notes) reports "audio/ogg; codecs=opus".
+  const detectedMime = bareMime(detected.mime);
+  const mimeType = DETECTED_ALIASES[detectedMime] ?? detectedMime;
   if (!CONVERSATION_MEDIA_TYPES[mimeType]) {
     throw new MediaRejectedError(`File type not allowed: ${detected.mime}`);
   }
@@ -141,11 +142,74 @@ async function reencodeOrReject(buffer: Buffer, mimeType: string): Promise<Sanit
   }
 }
 
+const CSV_DELIMITERS = new Set([",", ";", "\t", "\r", "\n"]);
+const CSV_NUMBER = /^[+-]?(\d[\d.]*|\.\d+)%?$/;
+
+/**
+ * Spreadsheets run cells that start with `=`, `+`, `-` or `@` as formulas, so
+ * prefix those with an apostrophe. Plain numbers stay as they are. Works on a
+ * latin1 view of the bytes: every character it looks at is ASCII, and other
+ * encodings of the same bytes pass through unchanged.
+ */
+export function neutraliseCsvFormulas(buffer: Buffer): Buffer {
+  const text = buffer.toString("latin1");
+  const utf8Bom = text.startsWith("\xef\xbb\xbf");
+  let out = utf8Bom ? text.slice(0, 3) : "";
+  let inQuotes = false;
+  let atCellStart = true;
+
+  const isFormula = (from: number, quoted: boolean): boolean => {
+    if (!/[=+\-@]/.test(text[from] ?? "") && !(quoted && /[\t\r]/.test(text[from] ?? ""))) {
+      return false;
+    }
+    let end = from;
+    while (end < text.length && text[end] !== '"' && !CSV_DELIMITERS.has(text[end])) end++;
+    return !CSV_NUMBER.test(text.slice(from, end));
+  };
+
+  for (let i = utf8Bom ? 3 : 0; i < text.length; i++) {
+    const char = text[i];
+    if (inQuotes) {
+      out += char;
+      if (char === '"') {
+        if (text[i + 1] === '"') out += text[++i];
+        else inQuotes = false;
+      }
+      continue;
+    }
+    if (CSV_DELIMITERS.has(char)) {
+      out += char;
+      atCellStart = true;
+      continue;
+    }
+    if (atCellStart) {
+      atCellStart = false;
+      if (char === '"') {
+        inQuotes = true;
+        out += char;
+        if (isFormula(i + 1, true)) out += "'";
+        continue;
+      }
+      if (isFormula(i, false)) out += "'";
+    }
+    out += char;
+  }
+  return Buffer.from(out, "latin1");
+}
+
 export async function sanitizeConversationMedia(
   buffer: Buffer,
   declaredMimeType: string,
+  originalName?: string,
 ): Promise<SanitizedMedia> {
   const mimeType = await detectType(buffer, bareMime(declaredMimeType));
+
+  if (
+    mimeType === "text/csv" ||
+    (TEXT_TYPES.has(mimeType) && /\.[ct]sv$/i.test(originalName ?? ""))
+  ) {
+    return { buffer: neutraliseCsvFormulas(buffer), mimeType };
+  }
 
   if (!REENCODED_IMAGE_TYPES.has(mimeType)) {
     return { buffer, mimeType };
@@ -160,7 +224,7 @@ export async function sanitizeConversationMedia(
  * these files are served from a public URL under our origin.
  */
 export async function sanitizePublicImage(buffer: Buffer): Promise<SanitizedMedia> {
-  const detected = await FileType.fromBuffer(buffer);
+  const detected = await fileTypeFromBuffer(buffer);
   if (!detected || !REENCODED_IMAGE_TYPES.has(detected.mime)) {
     throw new MediaRejectedError("Only JPEG, PNG, GIF or WebP images are allowed");
   }

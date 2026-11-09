@@ -1,4 +1,5 @@
 import { Router, type Request, type Response } from "express";
+import { pipeline } from "stream/promises";
 import { TRPCError } from "@trpc/server";
 import { requireAuth } from "@server/lib/auth/middleware";
 import { createLogger } from "@server/lib/logger";
@@ -48,12 +49,20 @@ export function contentDisposition(mimeType: string, originalName: string): stri
   return `${type}; filename="${asciiName}"; filename*=UTF-8''${encodeURIComponent(originalName)}`;
 }
 
-/** Resource/action a staff member needs to read files in this folder. */
-function requiredScope(folder: string): [string, string] {
+/**
+ * Resource/action a staff member needs to read files in this folder, or null
+ * for folders staff never read directly: those are delivered only through a
+ * signed link or their own download flow.
+ */
+function requiredScope(folder: string): [string, string] | null {
   if (folder === "conversation-media") return [RESOURCES.CONVERSATIONS, ACTIONS.READ];
-  if (folder.startsWith("documents") || folder === DOCUMENT_IMAGES_FOLDER)
+  if (
+    folder === "documents" ||
+    folder.startsWith("documents/") ||
+    folder === DOCUMENT_IMAGES_FOLDER
+  )
     return [RESOURCES.DOCUMENTS, ACTIONS.READ];
-  return [RESOURCES.ALL, RESOURCES.ALL];
+  return null;
 }
 
 type AccessResult = "granted" | "unauthenticated" | "denied";
@@ -78,8 +87,9 @@ async function checkAccess(req: Request, upload: Upload): Promise<AccessResult> 
   if (headerOrganizationId !== upload.organizationId) return "denied";
   if (user.organizationId !== upload.organizationId) return "denied";
 
-  const [resource, action] = requiredScope(upload.folder);
-  return user.hasScope(resource, action) ? "granted" : "denied";
+  const scope = requiredScope(upload.folder);
+  if (!scope) return "denied";
+  return user.hasScope(scope[0], scope[1]) ? "granted" : "denied";
 }
 
 /** Parse a single `bytes=start-end` range. Returns null when absent or unsatisfiable. */
@@ -136,7 +146,12 @@ router.get("/:id", async (req: Request, res: Response) => {
       return;
     }
 
-    const { buffer } = await storageService.download(upload.id);
+    const size = Number(upload.size);
+    const range = parseRange(req.headers.range, size);
+    const unsatisfiable = !!req.headers.range && !range;
+    const body = unsatisfiable
+      ? null
+      : await storageService.openReadStream(upload, range ?? undefined);
 
     res.set({
       "Content-Type": upload.mimeType,
@@ -150,22 +165,24 @@ router.get("/:id", async (req: Request, res: Response) => {
       "Accept-Ranges": "bytes",
     });
 
-    const range = parseRange(req.headers.range, buffer.length);
-    if (req.headers.range && !range) {
-      res.status(416).set("Content-Range", `bytes */${buffer.length}`).end();
+    if (!body) {
+      res.status(416).set("Content-Range", `bytes */${size}`).end();
       return;
     }
     if (range) {
       const [start, end] = range;
       res
         .status(206)
-        .set("Content-Range", `bytes ${start}-${end}/${buffer.length}`)
-        .send(buffer.subarray(start, end + 1));
-      return;
+        .set("Content-Range", `bytes ${start}-${end}/${size}`)
+        .set("Content-Length", String(end - start + 1));
+    } else {
+      res.status(200).set("Content-Length", String(size));
     }
 
-    res.status(200).send(buffer);
+    await pipeline(body, res);
   } catch (error) {
+    // Players cancel a request on every seek.
+    if ((error as NodeJS.ErrnoException).code === "ERR_STREAM_PREMATURE_CLOSE") return;
     logger.error({ err: error, uploadId: id }, "Failed to serve media");
     if (!res.headersSent) {
       res.status(500).json({ error: "Failed to load media" });

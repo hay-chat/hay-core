@@ -8,7 +8,8 @@
  *  - a category the active playbook lists always waits (a playbook can only
  *    tighten, so this applies even when the org's approval is off);
  *  - with the org's approval off (`moneyMovesNeedApproval` false), every other
- *    call runs;
+ *    call runs, so nobody reviews the AI's decision first (see "Automated
+ *    Decisions" in SECURITY.md);
  *  - tools that do not declare a risk class are held (they may move money);
  *  - destructive writes (deletes, account configuration) are always held;
  *  - a category the org does not require approval for runs (by default only

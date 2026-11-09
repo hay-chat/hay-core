@@ -1,0 +1,8 @@
+# Changes here need a review from the code owner once the branch ruleset
+# requires code owner review.
+/.github/                   @rgrjnr
+/server/lib/auth/           @rgrjnr
+/server/database/migrations/ @rgrjnr
+/plugins/core/              @rgrjnr
+/Dockerfile                 @rgrjnr
+/selfhost/                  @rgrjnr

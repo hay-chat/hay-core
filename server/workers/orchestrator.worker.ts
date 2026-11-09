@@ -1,12 +1,15 @@
 import { Orchestrator } from "../orchestrator";
 import { AppDataSource } from "../database/data-source";
 import { createLogger, withLogContext } from "@server/lib/logger";
+import { metrics } from "@server/lib/metrics";
 import { rabbitmqService } from "@server/services/rabbitmq.service";
+import { ConversationRepository } from "@server/repositories/conversation.repository";
 import { simulationHarnessService } from "@server/services/simulation/simulation-harness.service";
 import {
   orchestratorQueueService,
   ORCHESTRATOR_QUEUES,
   MAX_RETRY_ATTEMPTS,
+  type OrchestratorDeadLetterMessage,
   type OrchestratorMessage,
 } from "@server/services/orchestrator-queue.service";
 
@@ -61,6 +64,8 @@ export class OrchestratorWorker {
     }
 
     if (rabbitmqService.isConnected()) {
+      // A broker that came up after boot has not had its queues declared yet.
+      await orchestratorQueueService.declareQueues();
       await this.startConsuming();
     }
 
@@ -179,7 +184,35 @@ export class OrchestratorWorker {
       { prefetch: 2 },
     );
 
-    logger.info("RabbitMQ consumer started for orchestrator.process");
+    await rabbitmqService.consume(
+      ORCHESTRATOR_QUEUES.DEAD,
+      async (msg) => {
+        await this.handleDeadLetter(
+          rabbitmqService.parseMessage<OrchestratorDeadLetterMessage>(msg),
+        );
+        rabbitmqService.ack(msg);
+      },
+      { prefetch: 1 },
+    );
+
+    logger.info("RabbitMQ consumers started for orchestrator.process");
+  }
+
+  /**
+   * A conversation that used up its queue retries is flagged as stuck, so the
+   * stale-message check recovers it or hands it to a person.
+   */
+  private async handleDeadLetter(data: OrchestratorDeadLetterMessage): Promise<void> {
+    metrics.deadLetters.inc({ queue: ORCHESTRATOR_QUEUES.DEAD });
+    logger.error(
+      { conversationId: data.conversationId, trigger: data.trigger, error: data.error },
+      "Conversation dead-lettered",
+    );
+    await new ConversationRepository().updateById(data.conversationId, {
+      is_stuck: true,
+      stuck_detected_at: new Date(),
+      stuck_reason: "orchestrator_dead_letter",
+    });
   }
 
   /**
@@ -193,6 +226,25 @@ export class OrchestratorWorker {
       await this.orchestrator.loop();
     } catch (error) {
       logger.error({ err: error }, "Orchestrator tick error");
+    }
+  }
+
+  /**
+   * Process conversations in this process, for the sweep to use while RabbitMQ
+   * is unavailable. One at a time, so a backlog cannot overload the server.
+   */
+  async processDirectly(conversationIds: string[]): Promise<void> {
+    await this.initialize();
+    if (!this.initialized || !this.orchestrator) return;
+
+    for (const conversationId of conversationIds) {
+      try {
+        await withLogContext({ conversationId }, () =>
+          this.orchestrator!.processConversation(conversationId),
+        );
+      } catch (error) {
+        logger.error({ err: error, conversationId }, "Direct conversation processing failed");
+      }
     }
   }
 

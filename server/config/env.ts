@@ -1,5 +1,6 @@
 import dotenv from "dotenv";
 import path from "path";
+import { configuredEncryptionKeys } from "../lib/auth/utils/encryption-keys";
 
 // Load environment variables
 // In production, the compiled code is in server/dist/config, so we need to go up 3 levels to project root
@@ -24,6 +25,18 @@ dotenv.config({ path: envPath || path.resolve(__dirname, "../../../../.env"), qu
  */
 function stripScheme(value: string): string {
   return value.replace(/^[a-z][a-z0-9+.-]*:\/\//i, "");
+}
+
+/**
+ * S3_SERVER_SIDE_ENCRYPTION: AES256, aws:kms or none. Defaults to AES256 on AWS
+ * only: other S3-compatible stores may reject the header.
+ */
+function s3ServerSideEncryption(): "AES256" | "aws:kms" | undefined {
+  const setting = process.env.S3_SERVER_SIDE_ENCRYPTION;
+  if (setting === "AES256" || setting === "aws:kms") return setting;
+  if (setting === "none") return undefined;
+  if (setting) throw new Error("S3_SERVER_SIDE_ENCRYPTION must be AES256, aws:kms or none");
+  return process.env.S3_ENDPOINT?.includes("amazonaws.com") ? "AES256" : undefined;
 }
 
 export const config = {
@@ -62,6 +75,14 @@ export const config = {
     ),
     cdn: stripScheme(process.env.CDN_DOMAIN || ""),
     useSSL: process.env.USE_SSL === "true" || process.env.NODE_ENV === "production",
+  },
+
+  // Prometheus endpoint, on its own port so no reverse proxy can reach it. A
+  // host other than loopback also requires METRICS_TOKEN. Port 0 turns it off.
+  metrics: {
+    port: parseInt(process.env.METRICS_PORT || "9464", 10),
+    host: process.env.METRICS_HOST || "127.0.0.1",
+    token: process.env.METRICS_TOKEN || "",
   },
 
   cors: {
@@ -123,13 +144,6 @@ export const config = {
     debug: process.env.DEBUG === "true",
   },
 
-  organization: {
-    extractionMethods: (process.env.ORGANIZATION_EXTRACTION_METHOD || "subdomain,header,jwt").split(
-      ",",
-    ),
-    defaultOrganization: process.env.DEFAULT_ORGANIZATION || "default",
-  },
-
   database: {
     type: "postgres" as const,
     host: process.env.DB_HOST || "localhost",
@@ -142,6 +156,14 @@ export const config = {
     // database server when DB_SSL=true. Without it the connection is encrypted
     // but the server certificate is not verified.
     sslCa: process.env.DB_SSL_CA || "",
+    // Owner role for migrations. Unset: migrations run as DB_USERNAME (one role for everything).
+    migratorUsername: process.env.DB_MIGRATOR_USERNAME || "",
+    migratorPassword: process.env.DB_MIGRATOR_PASSWORD || "",
+    statementTimeoutMs: parseInt(process.env.DB_STATEMENT_TIMEOUT_MS || "30000", 10),
+    idleInTransactionTimeoutMs: parseInt(
+      process.env.DB_IDLE_IN_TRANSACTION_TIMEOUT_MS || "60000",
+      10,
+    ),
     synchronize: false, // Never use synchronize in production
     logging: process.env.DB_LOGGING === "true",
     maxConnections: parseInt(process.env.DB_MAX_CONNECTIONS || "10", 10),
@@ -160,9 +182,11 @@ export const config = {
     url: process.env.RABBITMQ_URL || "amqp://hay:hay_password@localhost:5672/",
   },
 
+  // Root of the purpose-specific signing keys (lib/auth/utils/service-keys).
+  serviceKey: process.env.HAY_SERVICE_KEY || "",
+
   jwt: {
     secret: process.env.JWT_SECRET || "",
-    expiresIn: process.env.JWT_EXPIRES_IN || "7d",
     refreshSecret: process.env.JWT_REFRESH_SECRET || "",
   },
 
@@ -259,6 +283,8 @@ export const config = {
     baseUrl: process.env.LLM_BASE_URL || "",
     vendor: process.env.LLM_VENDOR || "",
     apiKey: process.env.LLM_API_KEY || "",
+    /** Tokens an organization's AI may use per UTC day before it hands off. 0 turns this off. */
+    orgDailyTokenBudget: Number(process.env.LLM_ORG_DAILY_TOKEN_BUDGET ?? 20_000_000),
   },
 
   /**
@@ -310,6 +336,9 @@ export const config = {
       bucket: process.env.S3_BUCKET || null,
       accessKeyId: process.env.S3_ACCESS_KEY_ID || null,
       secretAccessKey: process.env.S3_SECRET_ACCESS_KEY || null,
+      // false for buckets with ACLs disabled; public folders then need a bucket policy.
+      useAcls: process.env.S3_USE_ACLS !== "false",
+      serverSideEncryption: s3ServerSideEncryption(),
     },
     limits: {
       maxFileSize: parseInt(process.env.UPLOAD_MAX_SIZE_MB || "10", 10) * 1024 * 1024,
@@ -337,6 +366,10 @@ export const config = {
     maxUploadSizeMB: parseInt(process.env.PLUGIN_MAX_UPLOAD_SIZE_MB || "50", 10),
     // Organization-supplied (custom/git) plugin code; off unless explicitly enabled
     allowCustomPlugins: process.env.ALLOW_CUSTOM_PLUGINS === "true",
+    // Organization-supplied UI bundles run in the dashboard's own page; off unless explicitly enabled
+    allowCustomPluginUi: process.env.ALLOW_CUSTOM_PLUGIN_UI === "true",
+    // Core plugins were compiled into the image: nothing to install or build at runtime
+    prebuilt: process.env.PLUGINS_PREBUILT === "true",
   },
 
   // Telemetry is entirely optional: with no key the client is never constructed
@@ -347,11 +380,39 @@ export const config = {
     host: process.env.POSTHOG_HOST || "https://eu.i.posthog.com",
   },
 
+  // Refuse new passwords found in known breaches (k-anonymity range lookup).
+  passwordBreachCheck:
+    process.env.PASSWORD_BREACH_CHECK !== "false" && process.env.NODE_ENV !== "test",
+
+  // SameSite of the dashboard's refresh-token cookie. Keep "strict" when the
+  // dashboard and API share a site (app.example.com + api.example.com); "none"
+  // is only for a dashboard on a different registrable domain and needs HTTPS.
+  authCookie: {
+    sameSite: (["strict", "lax", "none"].includes(process.env.AUTH_COOKIE_SAME_SITE ?? "")
+      ? process.env.AUTH_COOKIE_SAME_SITE
+      : "strict") as "strict" | "lax" | "none",
+  },
+
   // Server-to-server secret for the `internal.*` tRPC procedures (used by an
   // external operator, e.g. a hosted-plan backoffice, to suspend organizations).
   // Empty disables those procedures entirely — the default for self-hosting.
+  authCodes: {
+    // Refuse exchanges that do not name the destination the code was issued for.
+    // Enable once every app calling exchangeAuthCode sends redirectUri.
+    requireRedirectUri: process.env.AUTH_CODE_REQUIRE_REDIRECT_URI === "true",
+  },
+
   internal: {
     apiSecret: process.env.INTERNAL_API_SECRET || "",
+    // Still accepted during a rotation, then removed.
+    previousApiSecret: process.env.INTERNAL_API_PREVIOUS_SECRET || "",
+    // Refuse calls that only present the shared secret. Enable once the operator signs requests.
+    requireSignature: process.env.INTERNAL_API_REQUIRE_SIGNATURE === "true",
+    // Comma-separated client addresses; empty allows any.
+    allowedIps: (process.env.INTERNAL_API_ALLOWED_IPS || "")
+      .split(",")
+      .map((ip) => ip.trim())
+      .filter(Boolean),
     // Where core POSTs signed events the operator may need to act on (for
     // example organization.deleted, so the operator can stop billing).
     // Empty disables them.
@@ -367,6 +428,10 @@ export const config = {
 
   scraper: {
     chromeExecutablePath: process.env.CHROME_EXECUTABLE_PATH || "",
+    // DevTools URL of a separate browser (http://host:port). Set = never launch locally.
+    chromeRemoteUrl: process.env.CHROME_REMOTE_URL || "",
+    // Containers can't use Chromium's sandbox; everywhere else it stays on.
+    chromeDisableSandbox: process.env.CHROME_DISABLE_SANDBOX === "true",
     puppeteerMaxConcurrent: parseInt(process.env.PUPPETEER_MAX_CONCURRENT || "3", 10),
     puppeteerTimeout: parseInt(process.env.PUPPETEER_TIMEOUT || "30000", 10),
   },
@@ -508,6 +573,23 @@ export function validateJwtSecrets(): void {
 const MIN_SECRET_LENGTH = 32;
 const DEFAULT_DB_PASSWORD = "hay_password";
 const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1", "::1"]);
+const PRIVATE_IPV4 = /^(10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)/;
+
+/** A host reached over a network we don't control: not loopback, a private IP or a bare container name. */
+export function isRemoteHost(host: string): boolean {
+  return !LOCAL_HOSTS.has(host) && !PRIVATE_IPV4.test(host) && host.includes(".");
+}
+
+/** What is wrong with the database TLS settings for this environment, or null. */
+export function databaseTlsError(): string | null {
+  if (config.env === "development" || config.env === "test") return null;
+  if (!isRemoteHost(config.database.host)) return null;
+  if (!config.database.ssl) return "DB_SSL must be true for a remote database host.";
+  if (!config.database.sslCa) {
+    return "DB_SSL_CA (PEM text or a path to a PEM file) is required for a remote database host.";
+  }
+  return null;
+}
 
 /**
  * Validates the configuration a production server needs. Throws on settings
@@ -516,6 +598,12 @@ const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1", "::1"]);
  * Should be called at application startup.
  */
 export function validateProductionConfig(): string[] {
+  if (!process.env.NODE_ENV) {
+    throw new Error(
+      "NODE_ENV must be set (production, development or test): production checks depend on it.",
+    );
+  }
+
   // JWT secrets are validated in all environments (except test)
   validateJwtSecrets();
 
@@ -540,11 +628,18 @@ export function validateProductionConfig(): string[] {
     missingVars.push("RABBITMQ_URL");
   }
 
-  const encryptionKey = process.env.PLUGIN_ENCRYPTION_KEY || "";
-  if (!encryptionKey) {
-    missingVars.push("PLUGIN_ENCRYPTION_KEY");
-  } else if (encryptionKey.length < MIN_SECRET_LENGTH) {
-    errors.push(`PLUGIN_ENCRYPTION_KEY must be at least ${MIN_SECRET_LENGTH} characters.`);
+  try {
+    const encryptionKeys = configuredEncryptionKeys();
+    if (encryptionKeys.length === 0) {
+      missingVars.push("PLUGIN_ENCRYPTION_KEY");
+    } else if (encryptionKeys.some((key) => key.secret.length < MIN_SECRET_LENGTH)) {
+      errors.push(`PLUGIN_ENCRYPTION_KEY must be at least ${MIN_SECRET_LENGTH} characters.`);
+    }
+  } catch (error) {
+    errors.push((error as Error).message);
+  }
+  if (config.serviceKey && config.serviceKey.length < MIN_SECRET_LENGTH) {
+    errors.push(`HAY_SERVICE_KEY must be at least ${MIN_SECRET_LENGTH} characters when set.`);
   }
 
   if (!process.env.DB_PASSWORD || process.env.DB_PASSWORD === DEFAULT_DB_PASSWORD) {
@@ -555,6 +650,22 @@ export function validateProductionConfig(): string[] {
   }
   if (config.internal.apiSecret && config.internal.apiSecret.length < MIN_SECRET_LENGTH) {
     errors.push(`INTERNAL_API_SECRET must be at least ${MIN_SECRET_LENGTH} characters when set.`);
+  }
+  if (
+    config.internal.previousApiSecret &&
+    config.internal.previousApiSecret.length < MIN_SECRET_LENGTH
+  ) {
+    errors.push(
+      `INTERNAL_API_PREVIOUS_SECRET must be at least ${MIN_SECRET_LENGTH} characters when set.`,
+    );
+  }
+
+  const tlsError = databaseTlsError();
+  if (tlsError) {
+    errors.push(tlsError);
+  }
+  if (!config.redis.password && isRemoteHost(config.redis.host)) {
+    errors.push("REDIS_PASSWORD is required for a remote Redis host.");
   }
 
   if (missingVars.length > 0) {
@@ -571,14 +682,13 @@ export function validateProductionConfig(): string[] {
   if (config.logging.level === "debug" || config.logging.level === "trace") {
     warnings.push(`LOG_LEVEL=${config.logging.level} is verbose and may log customer data.`);
   }
-  if (!config.database.ssl && !LOCAL_HOSTS.has(config.database.host)) {
-    warnings.push("DB_SSL is off for a remote database host; database traffic is unencrypted.");
-  }
   if (config.database.ssl && !config.database.sslCa) {
     warnings.push("DB_SSL is on without DB_SSL_CA; the database certificate is not verified.");
   }
-  if (!config.redis.password && !LOCAL_HOSTS.has(config.redis.host)) {
-    warnings.push("REDIS_PASSWORD is not set for a remote Redis host.");
+  if (process.env.TRUST_PROXY === undefined) {
+    warnings.push(
+      `TRUST_PROXY is not set; assuming ${config.server.trustProxy} reverse proxy hop(s). Set it to the real number so client IPs are correct.`,
+    );
   }
 
   return warnings;

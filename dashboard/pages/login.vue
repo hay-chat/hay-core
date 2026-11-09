@@ -57,8 +57,43 @@
         </div>
       </div> -->
 
+      <!-- Second step: two-factor code -->
+      <form v-if="challengeToken" class="space-y-4" @submit.prevent="handleMfaSubmit">
+        <div class="space-y-2">
+          <Input
+            id="mfa-code"
+            v-model="mfaCode"
+            :label="$t('login.mfa.codeLabel')"
+            :placeholder="$t('login.mfa.codePlaceholder')"
+            autocomplete="one-time-code"
+            autofocus
+            required
+          />
+          <p class="text-sm text-neutral-muted">{{ $t("login.mfa.hint") }}</p>
+        </div>
+
+        <Button
+          type="submit"
+          size="lg"
+          class="w-full"
+          :loading="loading"
+          :disabled="!mfaCode.trim()"
+        >
+          {{ $t("login.mfa.submit") }}
+        </Button>
+        <Button type="button" variant="ghost" class="w-full" @click="cancelMfa">
+          {{ $t("login.mfa.back") }}
+        </Button>
+
+        <div v-if="error" class="p-3 rounded-md bg-red-50 border border-red-200">
+          <p class="text-sm text-red-800">
+            {{ error }}
+          </p>
+        </div>
+      </form>
+
       <!-- Login Form -->
-      <form class="space-y-4" @submit.prevent="handleSubmit">
+      <form v-else class="space-y-4" @submit.prevent="handleSubmit">
         <div class="space-y-2">
           <Input
             id="email"
@@ -144,6 +179,7 @@
 </template>
 
 <script setup lang="ts">
+import { safeInternalPath } from "@/utils/safe-internal-path";
 import { validateEmail } from "@/lib/utils";
 import { useAuthStore } from "@/stores/auth";
 import { Hay } from "@/utils/api";
@@ -163,7 +199,7 @@ const route = useRoute();
 const authStore = useAuthStore();
 
 // Get redirect URL from query params
-const redirectUrl = computed(() => (route.query.redirect as string) || "/");
+const redirectUrl = computed(() => safeInternalPath(route.query.redirect));
 
 // Invitation context
 interface InvitationContext {
@@ -197,7 +233,7 @@ const loadInvitationContext = async () => {
   if (!token) return;
 
   try {
-    const invitation = await Hay.invitations.getInvitationByToken.query({ token });
+    const invitation = await Hay.invitations.getInvitationByToken.mutate({ token });
     invitationContext.value = {
       email: invitation.email,
       role: invitation.role,
@@ -235,6 +271,8 @@ const errors = reactive({
   password: "",
 });
 
+const challengeToken = ref<string | null>(null);
+const mfaCode = ref("");
 const error = ref("");
 const emailNotVerified = ref(false);
 const resendingVerification = ref(false);
@@ -287,7 +325,12 @@ const handleSubmit = async () => {
   verificationResent.value = false;
 
   try {
-    await authStore.login(form.email, form.password);
+    const { challengeToken: challenge } = await authStore.login(form.email, form.password);
+    if (challenge) {
+      challengeToken.value = challenge;
+      form.password = "";
+      return;
+    }
 
     // Successful login - redirect to the intended page or dashboard
     await router.push(redirectUrl.value);
@@ -309,6 +352,32 @@ const handleSubmit = async () => {
     }
     console.error("Login error:", err);
   }
+};
+
+const handleMfaSubmit = async () => {
+  error.value = "";
+  try {
+    await authStore.verifyMfaLogin(challengeToken.value!, mfaCode.value.trim());
+    await router.push(redirectUrl.value);
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "";
+    if (message.includes("Invalid verification code")) {
+      error.value = t("login.mfa.invalidCode");
+    } else if (message.includes("Too many")) {
+      error.value = t("login.errors.tooManyRequests");
+    } else if (message.includes("expired")) {
+      cancelMfa();
+      error.value = t("login.mfa.expired");
+    } else {
+      error.value = t("login.errors.networkError");
+    }
+  }
+};
+
+const cancelMfa = () => {
+  challengeToken.value = null;
+  mfaCode.value = "";
+  error.value = "";
 };
 
 const handleResendVerification = async () => {

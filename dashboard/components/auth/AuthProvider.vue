@@ -8,9 +8,8 @@
       <Loading />
       <div v-if="showRefreshMessage" class="text-sm text-gray-500">
         {{ $t("common.takingLonger") }}
-        <a href="javascript:void(0)" class="text-blue-500 underline" @click="refresh">{{
-          $t("common.refreshPage")
-        }}</a
+        <button type="button" class="text-blue-500 underline" @click="refresh">
+          {{ $t("common.refreshPage") }}</button
         >.
       </div>
     </div>
@@ -55,7 +54,7 @@ const initializeAuth = async () => {
 
   if (!authStore.isInitialized) {
     // Check if we have tokens before trying to initialize
-    if (!authStore.tokens?.accessToken) {
+    if (!authStore.isAuthenticated) {
       // No tokens, mark as initialized but not authenticated
       authStore.isInitialized = true;
       authStore.isAuthenticated = false;

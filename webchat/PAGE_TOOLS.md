@@ -64,8 +64,8 @@ closes. The AI gets 15 seconds for an answer; after that it is told the tool did
 
 ## What the AI sees
 
-The planner prompt lists page tools in their own section ("Page tools (this visitor's browser)")
-next to the playbook's tools and Hay's built-in tools. A page tool is never gated by a playbook's
+The planner gets the tool names next to the playbook's tools and Hay's built-in tools, and the
+descriptions and schemas as unverified data in a `<page_tools>` block in the conversation. A page tool is never gated by a playbook's
 `enabled_tools`; the page decides what is available by registering it. Every call lands in the
 conversation's TOOL message, the action log and the tool ledger like an MCP call.
 
@@ -73,10 +73,16 @@ conversation's TOOL message, the action log and the tool ledger like an MCP call
 
 - **Only the page's own code can register tools.** Hay never lets the AI run anything the page did not
   offer, and never injects secrets or approval ids into page tool calls.
-- Page tools skip the merchant approval gate (refund caps, customer confirmation): they run in the
-  visitor's own browser, in front of the visitor, and touch no provider. Register only what you would
-  let the visitor click themselves: cart, navigation, form prefill, "show me where". **Never** payment
-  or account mutations.
+- **Off by default.** An organization turns page tools on in Settings > Webchat, and only pages on the
+  list there (or on the allowed domains, where `*` does not count) can register tools.
+- A tool with `readOnlyHint: true` or no hint runs in the visitor's browser straight away. A tool with
+  `readOnlyHint: false` follows the merchant's approval policy, so it can wait for a person. Register
+  only what you would let the visitor click themselves: cart, navigation, form prefill, "show me
+  where". **Never** payment or account mutations.
+- Arguments are checked against `inputSchema` before the page is called (`pattern` keywords are left
+  to the page).
+- The page reports its own results, so they never count as grounding for an answer or as proof that
+  an order, payment or account changed.
 - Validate arguments in `execute`: the AI fills them from the conversation, so treat them as user input.
 - The whole feature can be turned off on the server with `WEBCHAT_PAGE_TOOLS=false`.
 

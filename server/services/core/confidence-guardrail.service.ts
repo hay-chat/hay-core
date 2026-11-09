@@ -1,4 +1,5 @@
 import { LLMService } from "./llm.service";
+import { fenceData } from "@server/services/core/prompt-data";
 import { PromptService } from "../prompt.service";
 import { Document } from "@server/entities/document.entity";
 import { Message } from "@server/database/entities/message.entity";
@@ -210,9 +211,9 @@ export class ConfidenceGuardrailService {
 
     // Get prompt from PromptService
     const evaluationPrompt = await this.promptService.getPrompt("execution/confidence-grounding", {
-      retrievedDocuments: documentContext,
-      response: context.response,
-      customerQuery: context.customerQuery,
+      retrievedDocuments: fenceData(documentContext),
+      response: fenceData(context.response),
+      customerQuery: fenceData(context.customerQuery),
     });
 
     try {
@@ -274,8 +275,8 @@ export class ConfidenceGuardrailService {
   private async calculateCertaintyScore(context: ConfidenceContext): Promise<number> {
     // Get prompt from PromptService
     const certaintyPrompt = await this.promptService.getPrompt("execution/confidence-certainty", {
-      response: context.response,
-      customerQuery: context.customerQuery,
+      response: fenceData(context.response),
+      customerQuery: fenceData(context.customerQuery),
     });
 
     try {

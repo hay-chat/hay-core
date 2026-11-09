@@ -274,19 +274,21 @@
                   <BookOpen class="mr-2 h-4 w-4" />
                   {{ $t("knowledgeSuggest.improveFromConversation") }}
                 </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem :disabled="isExporting" @click="exportConversation('pdf')">
-                  <FileText class="mr-2 h-4 w-4" />
-                  {{ $t("conversations.detail.exportPdf") }}
-                </DropdownMenuItem>
-                <DropdownMenuItem :disabled="isExporting" @click="exportConversation('csv')">
-                  <FileSpreadsheet class="mr-2 h-4 w-4" />
-                  {{ $t("conversations.detail.exportCsv") }}
-                </DropdownMenuItem>
-                <DropdownMenuItem data-testid="open-evidence-pack" @click="openEvidencePack">
-                  <FileCheck class="mr-2 h-4 w-4" />
-                  {{ $t("conversations.detail.evidencePack") }}
-                </DropdownMenuItem>
+                <template v-if="userStore.canExportConversations">
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem :disabled="isExporting" @click="exportConversation('pdf')">
+                    <FileText class="mr-2 h-4 w-4" />
+                    {{ $t("conversations.detail.exportPdf") }}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem :disabled="isExporting" @click="exportConversation('csv')">
+                    <FileSpreadsheet class="mr-2 h-4 w-4" />
+                    {{ $t("conversations.detail.exportCsv") }}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem data-testid="open-evidence-pack" @click="openEvidencePack">
+                    <FileCheck class="mr-2 h-4 w-4" />
+                    {{ $t("conversations.detail.evidencePack") }}
+                  </DropdownMenuItem>
+                </template>
                 <DropdownMenuItem v-if="isLocalhost" @click="copyConversationJson">
                   <Braces class="mr-2 h-4 w-4" />
                   Copy JSON

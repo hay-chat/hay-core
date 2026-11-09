@@ -7,6 +7,7 @@ import { generateApiKey, hashApiKey } from "@server/lib/auth/utils/hashing";
 import { ApiTokenScope } from "@server/types/api-token-scopes";
 import { RESOURCES, ACTIONS } from "@server/types/scopes";
 import { auditLogService } from "@server/services/audit-log.service";
+import { requireMfaStepUp } from "@server/trpc/middleware/mfa";
 
 // Schema for creating an API token
 const createApiTokenSchema = z.object({
@@ -27,12 +28,26 @@ const tokenIdSchema = z.object({
   id: z.string().uuid(),
 });
 
+const DEFAULT_TOKEN_LIFETIME_MS = 365 * 24 * 60 * 60 * 1000;
+const TOKEN_PREFIX_LENGTH = 8;
+
+/** The token's real first characters; tokens from before prefixes were kept show none. */
+function maskedKey(key: Pick<ApiKey, "keyPrefix">): string {
+  return `${key.keyPrefix ?? "hay_"}****`;
+}
+
+/** Token rows with the display columns the authentication path doesn't load. */
+function selectTokens() {
+  return AppDataSource.getRepository(ApiKey).createQueryBuilder("key").addSelect("key.keyPrefix");
+}
+
 export const apiTokensRouter = t.router({
   /**
    * Create a new API token
    * Returns the plain token ONLY ONCE
    */
   create: scopedProcedure(RESOURCES.API_KEYS, ACTIONS.CREATE)
+    .use(requireMfaStepUp)
     .input(createApiTokenSchema)
     .mutation(async ({ input, ctx }) => {
       if (!ctx.organizationId) {
@@ -62,8 +77,10 @@ export const apiTokensRouter = t.router({
         keyHash: tokenHash,
         name: input.name,
         scopes: scopesFormatted,
-        expiresAt: input.expiresAt,
+        expiresAt: input.expiresAt ?? new Date(Date.now() + DEFAULT_TOKEN_LIFETIME_MS),
         isActive: true,
+        keyPrefix: token.slice(0, TOKEN_PREFIX_LENGTH),
+        createdByUserId: ctx.user?.id,
       });
 
       await apiKeyRepository.save(apiKeyEntity);
@@ -99,17 +116,13 @@ export const apiTokensRouter = t.router({
       });
     }
 
-    const apiKeyRepository = AppDataSource.getRepository(ApiKey);
-    const apiKeys = await apiKeyRepository.find({
-      where: { organizationId: ctx.organizationId },
-      order: { createdAt: "DESC" },
-    });
+    const apiKeys = await selectTokens()
+      .where("key.organizationId = :organizationId", { organizationId: ctx.organizationId })
+      .orderBy("key.createdAt", "DESC")
+      .getMany();
 
     // Return tokens with masked keys
     return apiKeys.map((key) => {
-      // Extract last 4 characters of the hash for display
-      const last4 = key.keyHash.slice(-4);
-
       // Flatten scopes back to string array
       const scopeStrings = key.scopes.map((scope) => {
         if (scope.actions.includes("*")) {
@@ -121,7 +134,7 @@ export const apiTokensRouter = t.router({
       return {
         id: key.id,
         name: key.name,
-        maskedKey: `hay_****${last4}`,
+        maskedKey: maskedKey(key),
         scopes: scopeStrings,
         createdAt: key.createdAt,
         lastUsedAt: key.lastUsedAt,
@@ -176,6 +189,16 @@ export const apiTokensRouter = t.router({
       }
 
       await apiKeyRepository.save(apiKey);
+
+      await auditLogService.record({
+        userId: ctx.user?.id,
+        organizationId: ctx.organizationId,
+        action: "apikey.update",
+        resource: "apikey",
+        changes: { apiKeyId: apiKey.id, name: input.name, scopes: input.scopes },
+        ipAddress: ctx.ipAddress,
+        userAgent: ctx.userAgent,
+      });
 
       return {
         success: true,
@@ -291,13 +314,12 @@ export const apiTokensRouter = t.router({
         });
       }
 
-      const apiKeyRepository = AppDataSource.getRepository(ApiKey);
-      const apiKey = await apiKeyRepository.findOne({
-        where: {
+      const apiKey = await selectTokens()
+        .where("key.id = :id AND key.organizationId = :organizationId", {
           id: input.id,
           organizationId: ctx.organizationId,
-        },
-      });
+        })
+        .getOne();
 
       if (!apiKey) {
         throw new TRPCError({
@@ -305,9 +327,6 @@ export const apiTokensRouter = t.router({
           message: "API token not found",
         });
       }
-
-      // Extract last 4 characters for masking
-      const last4 = apiKey.keyHash.slice(-4);
 
       // Flatten scopes to string array
       const scopeStrings = apiKey.scopes.map((scope) => {
@@ -320,7 +339,7 @@ export const apiTokensRouter = t.router({
       return {
         id: apiKey.id,
         name: apiKey.name,
-        maskedKey: `hay_****${last4}`,
+        maskedKey: maskedKey(apiKey),
         scopes: scopeStrings,
         createdAt: apiKey.createdAt,
         lastUsedAt: apiKey.lastUsedAt,

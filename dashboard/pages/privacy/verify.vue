@@ -132,7 +132,7 @@ const successMessage = ref("");
 const errorMessage = ref("");
 const requestType = ref<"export" | "deletion" | null>(null);
 
-const token = computed(() => route.query.token as string);
+const token = useUrlToken();
 const type = computed(() => route.query.type as string);
 
 const title = computed(() => {

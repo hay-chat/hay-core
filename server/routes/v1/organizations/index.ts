@@ -1,3 +1,4 @@
+import { rateLimitMiddleware, RateLimits } from "@server/trpc/middleware/rate-limit";
 import { t, authenticatedProcedure, scopedProcedure } from "@server/trpc";
 import { enableDefaultPlugins } from "@server/services/default-plugins.service";
 import { z } from "zod";
@@ -28,8 +29,14 @@ import { llmProviderFactory } from "@server/services/llm/llm-provider.factory";
 import { encryptValue } from "@server/lib/auth/utils/encryption";
 import type { OrgLlmConfig } from "@server/services/llm/provider.types";
 import {
+  assertOrgChatEndpoint,
+  OrgChatEndpointError,
+} from "@server/services/llm/org-chat-endpoint";
+import { SsrfBlockedError, validateUrlForSSRF } from "@server/utils/ssrf";
+import {
   AI_REGIONS,
   describeAiProvider,
+  describeVisionProvider,
   isEuRegionConfigured,
   regionFromSettings,
 } from "@server/services/llm/ai-region";
@@ -54,6 +61,8 @@ import {
   SWITCH_OFF_CONFIRMATION,
 } from "@server/services/core/action-policy";
 import { auditLogService } from "@server/services/audit-log.service";
+import { organizationRequiresMfa } from "@server/services/mfa.service";
+import { requireMfaStepUp } from "@server/trpc/middleware/mfa";
 import { handleUpload } from "@server/lib/upload-helper";
 import { StorageService } from "@server/services/storage.service";
 import { createLogger } from "@server/lib/logger";
@@ -63,6 +72,7 @@ import {
   ESCALATION_OFF_CONFIRMATION,
   confidenceGuardrailLoosening,
 } from "@server/services/core/confidence-guardrail.service";
+import { escapeLike } from "@server/lib/sql-like";
 
 const logger = createLogger("organizations");
 
@@ -183,6 +193,7 @@ export const organizationsRouter = t.router({
    * Requires: authenticated user
    */
   create: authenticatedProcedure
+    .use(rateLimitMiddleware(RateLimits.STRICT))
     .input(
       z.object({
         name: z.string().min(1).max(100),
@@ -319,9 +330,51 @@ export const organizationsRouter = t.router({
         confidenceGuardrail,
         retentionDays: organization.settings?.retentionDays ?? null,
         actionApproval: resolveActionApprovalConfig(organization.settings),
+        mfaRequired: organizationRequiresMfa(organization),
       };
     },
   ),
+
+  /**
+   * Require two-factor authentication for every member. Members who have not
+   * enrolled are sent to enrol at their next login. Only the owner may lift it.
+   */
+  setMfaRequired: scopedProcedure(RESOURCES.ORGANIZATION_SETTINGS, ACTIONS.UPDATE)
+    .use(requireMfaStepUp)
+    .input(z.object({ required: z.boolean() }))
+    .mutation(async ({ ctx, input }) => {
+      if (ctx.user.authMethod !== "jwt") {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "This action requires a signed-in user",
+        });
+      }
+      if (!input.required && ctx.user.getRole() !== "owner") {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "Only the organization owner can stop requiring two-factor authentication",
+        });
+      }
+
+      const organization = await organizationService.findOne(ctx.organizationId!);
+      if (!organization) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Organization not found" });
+      }
+
+      await organizationService.update(ctx.organizationId!, {
+        settings: { ...(organization.settings || {}), mfaRequired: input.required },
+      });
+      await auditLogService.record({
+        userId: ctx.user.id,
+        organizationId: ctx.organizationId,
+        action: "security.setting.change",
+        resource: "organization",
+        changes: { mfaRequired: input.required },
+        ipAddress: ctx.ipAddress,
+        userAgent: ctx.userAgent,
+      });
+      return { success: true, mfaRequired: input.required };
+    }),
 
   // Static model presets + default tier maps for the settings UI (single source of
   // truth lives in services/llm/model-catalog.ts).
@@ -349,6 +402,7 @@ export const organizationsRouter = t.router({
   // Write the org's LLM provider config. A new plaintext key is encrypted here;
   // an omitted key preserves the existing one; clearApiKey reverts to the managed key.
   updateLlmConfig: scopedProcedure(RESOURCES.ORGANIZATION_SETTINGS, ACTIONS.UPDATE)
+    .use(requireMfaStepUp)
     .input(updateLlmConfigSchema)
     .mutation(async ({ ctx, input }) => {
       const organization = await organizationService.findOne(ctx.organizationId!);
@@ -366,18 +420,48 @@ export const organizationsRouter = t.router({
       }
 
       const existing = organization.settings?.llm;
+      const baseUrl = input.chat.baseUrl || undefined;
+      const newApiKey = input.chat.apiKey?.trim();
       let apiKeyEncrypted = existing?.chat.apiKeyEncrypted;
-      if (input.chat.apiKey && input.chat.apiKey.trim()) {
-        apiKeyEncrypted = encryptValue(input.chat.apiKey.trim());
+      if (newApiKey) {
+        apiKeyEncrypted = encryptValue(newApiKey);
       } else if (input.chat.clearApiKey) {
         apiKeyEncrypted = undefined;
+      }
+
+      // A stored key is only ever sent to the host it was entered for.
+      if (baseUrl && apiKeyEncrypted && !newApiKey && baseUrl !== existing?.chat.baseUrl) {
+        throw new TRPCError({
+          code: "PRECONDITION_FAILED",
+          message: "Enter the API key again to use it with a new base URL",
+        });
+      }
+
+      try {
+        assertOrgChatEndpoint({
+          provider: input.chat.provider,
+          baseUrl,
+          hasOwnKey: !!apiKeyEncrypted,
+        });
+        if (baseUrl) await validateUrlForSSRF(baseUrl);
+      } catch (error) {
+        if (error instanceof OrgChatEndpointError) {
+          throw new TRPCError({ code: "PRECONDITION_FAILED", message: error.message });
+        }
+        if (error instanceof SsrfBlockedError) {
+          throw new TRPCError({
+            code: "PRECONDITION_FAILED",
+            message: "The base URL must be a public internet address",
+          });
+        }
+        throw error;
       }
 
       const llm: OrgLlmConfig = {
         chat: {
           provider: input.chat.provider,
           vendor: input.chat.provider === "openai-compatible" ? input.chat.vendor : undefined,
-          baseUrl: input.chat.baseUrl || undefined,
+          baseUrl,
           apiKeyEncrypted,
           tiers: input.chat.tiers,
         },
@@ -405,6 +489,7 @@ export const organizationsRouter = t.router({
         euAvailable: isEuRegionConfigured(),
         hasCustomProvider: !!organization.settings?.llm,
         provider: describeAiProvider(organization.settings),
+        visionProvider: describeVisionProvider(),
       };
     },
   ),
@@ -797,7 +882,7 @@ export const organizationsRouter = t.router({
       if (input?.search) {
         queryBuilder.andWhere(
           "(LOWER(user.email) LIKE :search OR LOWER(user.firstName) LIKE :search OR LOWER(user.lastName) LIKE :search)",
-          { search: `%${input.search.toLowerCase()}%` },
+          { search: `%${escapeLike(input.search.toLowerCase())}%` },
         );
       }
 
@@ -900,6 +985,7 @@ export const organizationsRouter = t.router({
    * Requires: organization_members:manage scope (typically owner/admin only)
    */
   updateMemberRole: scopedProcedure(RESOURCES.ORGANIZATION_MEMBERS, ACTIONS.MANAGE)
+    .use(requireMfaStepUp)
     .input(
       z.object({
         userId: z.string().uuid(),

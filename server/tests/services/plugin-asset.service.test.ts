@@ -24,6 +24,7 @@ jest.mock("../../config/env", () => {
   };
 });
 
+import { config } from "../../config/env";
 import {
   PluginAssetService,
   canOrganizationLoadPluginUI,
@@ -78,6 +79,8 @@ function signedQuery(pluginId: string, organizationId: string, ttlSeconds?: numb
 
 const ORG_A = "11111111-1111-1111-1111-111111111111";
 const ORG_B = "22222222-2222-2222-2222-222222222222";
+
+const pluginsConfig = config.plugins as { allowCustomPluginUi: boolean };
 
 describe("plugin asset serving", () => {
   let root: string;
@@ -185,6 +188,25 @@ describe("plugin asset serving", () => {
     expect(traversal.captured.statusCode).toBe(404);
   });
 
+  it("does not expose public files or SVG thumbnails of uploaded plugins", async () => {
+    findByPluginId.mockResolvedValue({
+      pluginId: "demo",
+      pluginPath: "demo",
+      sourceType: "custom",
+    });
+
+    const file = mockResponse();
+    await service.servePublicFile(
+      mockRequest({ pluginName: "demo", filePath: "logo.txt" }),
+      file.res,
+    );
+    expect(file.captured.statusCode).toBe(404);
+
+    const thumbnail = mockResponse();
+    await service.serveThumbnail(mockRequest({ pluginName: "demo" }), thumbnail.res);
+    expect(thumbnail.captured.statusCode).toBe(404);
+  });
+
   it("serves HTML from a plugin directory as a sandboxed download", async () => {
     for (let i = 0; i < 2; i++) {
       // Second pass exercises the cached branch.
@@ -257,6 +279,7 @@ describe("plugin asset serving", () => {
   });
 
   it("refuses a custom plugin's UI bundle to organizations that may not load it", async () => {
+    pluginsConfig.allowCustomPluginUi = true;
     findByPluginId.mockResolvedValue({
       pluginId: "demo",
       pluginPath: "demo",
@@ -278,6 +301,7 @@ describe("plugin asset serving", () => {
       owner.res,
     );
     expect(owner.captured.statusCode).toBe(200);
+    pluginsConfig.allowCustomPluginUi = false;
   });
 });
 
@@ -300,7 +324,24 @@ describe("canOrganizationLoadPluginUI", () => {
   const registry = (fields: Partial<PluginRegistry>) =>
     ({ pluginId: "demo", ...fields }) as PluginRegistry;
 
-  beforeEach(() => findByOrgAndPlugin.mockReset());
+  beforeEach(() => {
+    findByOrgAndPlugin.mockReset();
+    pluginsConfig.allowCustomPluginUi = false;
+  });
+
+  afterAll(() => {
+    pluginsConfig.allowCustomPluginUi = false;
+  });
+
+  it.each(["custom", "git"] as const)(
+    "refuses a %s plugin while custom plugin UI is off",
+    async (sourceType) => {
+      findByOrgAndPlugin.mockResolvedValue({ enabled: true });
+      await expect(
+        canOrganizationLoadPluginUI(registry({ sourceType, organizationId: ORG_A }), ORG_A),
+      ).resolves.toBe(false);
+    },
+  );
 
   it("allows core plugins before they are enabled", async () => {
     findByOrgAndPlugin.mockResolvedValue(null);
@@ -312,6 +353,7 @@ describe("canOrganizationLoadPluginUI", () => {
   it.each(["custom", "git"] as const)(
     "allows a %s plugin only for its organization once enabled",
     async (sourceType) => {
+      pluginsConfig.allowCustomPluginUi = true;
       const plugin = registry({ sourceType, organizationId: ORG_A });
 
       findByOrgAndPlugin.mockResolvedValue({ enabled: true });

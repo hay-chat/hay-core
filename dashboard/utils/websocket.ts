@@ -34,7 +34,7 @@ export function createAuthenticatedWebSocket(): WebSocket | null {
   const authStore = useAuthStore();
   const userStore = useUserStore();
 
-  const token = authStore.tokens?.accessToken;
+  const token = authStore.tokens?.accessToken; // Callers refresh it first.
   if (!authStore.isAuthenticated || !token) {
     return null;
   }

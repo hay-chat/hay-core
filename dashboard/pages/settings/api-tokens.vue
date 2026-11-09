@@ -356,6 +356,7 @@
 import { Plus, Key, Edit, Trash2, Ban, Copy, AlertTriangle, Link2 } from "lucide-vue-next";
 import type { RouterInputs, RouterOutputs } from "@/types/trpc";
 import { Hay } from "@/utils/api";
+import { parseConnectReturnUrl } from "@/utils/connect-request";
 import { useUserStore } from "@/stores/user";
 
 type ApiToken = RouterOutputs["apiTokens"]["list"][number];
@@ -396,13 +397,8 @@ const connectRequest = computed(() => {
   const label = CONNECT_PLATFORMS[platform];
   if (!label || !returnUrl) return null;
 
-  let parsed: URL;
-  try {
-    parsed = new URL(returnUrl);
-  } catch {
-    return null;
-  }
-  if (!["http:", "https:"].includes(parsed.protocol)) return null;
+  const parsed = parseConnectReturnUrl(returnUrl, String(route.query.site_url ?? ""));
+  if (!parsed) return null;
 
   return {
     platform,
@@ -455,6 +451,7 @@ const scopeGroups = {
   "Conversations & Messages": [
     { label: "Read Conversations", value: "conversations:read" },
     { label: "Write Conversations", value: "conversations:write" },
+    { label: "Export Conversations", value: "conversations:export" },
     { label: "Read Messages", value: "messages:read" },
     { label: "Write Messages", value: "messages:write" },
   ],

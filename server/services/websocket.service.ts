@@ -10,10 +10,18 @@ import { createLogger } from "@server/lib/logger";
 import { AppDataSource } from "@server/database/data-source";
 import { UserOrganization } from "@server/entities/user-organization.entity";
 import { User } from "@server/entities/user.entity";
+import { Session } from "@server/entities/session.entity";
+import { In, IsNull, MoreThan } from "typeorm";
 
 const logger = createLogger("websocket");
-import { verifyDPoPForRequest } from "../routes/v1/public-conversations";
+import {
+  publicConversationProofTarget,
+  socketIdentifyProofTarget,
+  verifyDPoPForRequest,
+} from "@server/services/webchat/dpop-proof.service";
 import { getClientIp } from "@server/lib/client-ip";
+import { isPageToolsOrigin, requestHostname } from "@server/lib/webchat-origin";
+import { webchatSettingsService } from "./webchat/webchat-settings.service";
 import {
   isWidgetVisibleMessage,
   toPublicAttachments,
@@ -36,23 +44,47 @@ const MAX_FRAME_BYTES = 64 * 1024;
 const ATTACH_TIMEOUT_MS = 10_000;
 /** Pings go out this often; a socket that missed the previous pong is terminated. */
 const HEARTBEAT_INTERVAL_MS = 30_000;
+/** How often a signed-in dashboard socket's user, session and membership are re-checked. */
+const DASHBOARD_REVALIDATE_INTERVAL_MS = 60_000;
 /** Open sockets allowed per client IP (shared NATs keep this generous). */
 const MAX_CONNECTIONS_PER_IP = 100;
-/** DPoP proofs on identify are made for this method and the `/ws` endpoint. */
-const IDENTIFY_PROOF_METHOD = "GET";
-const IDENTIFY_PROOF_PATH = "/ws";
 /** WebSocket close code for a policy violation (RFC 6455). */
 const CLOSE_POLICY_VIOLATION = 1008;
+
+interface DashboardIdentity {
+  userId: string;
+  email: string;
+  tokenVersion?: number;
+  sessionId?: string;
+}
+
+/** Whether the user behind a dashboard token may still receive that account's events. */
+function isDashboardUserAllowed(
+  user: Pick<User, "isActive" | "emailVerified" | "email" | "tokenVersion"> | null | undefined,
+  identity: Pick<DashboardIdentity, "email" | "tokenVersion">,
+): boolean {
+  return (
+    !!user &&
+    user.isActive &&
+    user.emailVerified &&
+    user.email === identity.email &&
+    (identity.tokenVersion === undefined || identity.tokenVersion === (user.tokenVersion ?? 0))
+  );
+}
 
 interface WebSocketClient {
   ws: WebSocket;
   organizationId: string;
   conversationId?: string;
   authenticated: boolean;
+  /** Who a signed-in dashboard socket belongs to; absent for widget sockets. */
+  dashboardIdentity?: DashboardIdentity;
   /** Client IP from the proxy headers. */
   ip: string;
   /** The Origin header of the upgrade request; browsers always send it. */
   origin?: string;
+  /** The Host header of the upgrade request. */
+  host?: string;
   /** Resolves once token authentication (if any) has finished. */
   ready: Promise<void>;
   /** Whether an `auth` frame was already received; only the first one counts. */
@@ -75,7 +107,6 @@ interface IdentifyMessage extends WebSocketMessage {
   conversationId?: string;
   /** DPoP proof (method GET, url `<api>/ws`) signed with the conversation's key. */
   proof?: unknown;
-  url?: unknown;
   /** Page tools (WebMCP) the host page registered; see page-tools.service. */
   tools?: unknown;
 }
@@ -94,8 +125,6 @@ interface ChatMessage extends WebSocketMessage {
   content: string;
   timestamp?: number;
   proof?: string; // DPoP proof JWT
-  method?: string; // HTTP method for DPoP validation
-  url?: string; // Request URL for DPoP validation
   conversationId?: string; // Conversation ID for DPoP validation
 }
 
@@ -147,6 +176,7 @@ export class WebSocketService {
   private organizationClients = new Map<string, Set<string>>();
   private connectionsPerIp = new Map<string, number>();
   private heartbeatTimer?: ReturnType<typeof setInterval>;
+  private revalidateTimer?: ReturnType<typeof setInterval>;
   private redisInitialized = false;
 
   /**
@@ -179,6 +209,12 @@ export class WebSocketService {
     });
 
     this.heartbeatTimer = setInterval(() => this.checkHeartbeats(), HEARTBEAT_INTERVAL_MS);
+    this.revalidateTimer = setInterval(() => {
+      this.revalidateDashboardClients().catch((err) =>
+        logger.warn({ err }, "Dashboard socket re-validation failed"),
+      );
+    }, DASHBOARD_REVALIDATE_INTERVAL_MS);
+    this.revalidateTimer.unref();
     this.heartbeatTimer.unref();
 
     // Initialize Redis for cross-server event broadcasting
@@ -351,6 +387,7 @@ export class WebSocketService {
       authenticated: false,
       ip,
       origin: req.headers.origin,
+      host: req.headers.host,
       ready: Promise.resolve(),
       authAttempted: false,
       isAlive: true,
@@ -403,6 +440,50 @@ export class WebSocketService {
     }
   }
 
+  /**
+   * Close signed-in dashboard sockets whose user was disabled, changed password,
+   * lost the organization or had the session revoked. A failed lookup keeps the
+   * sockets open until the next pass.
+   */
+  private async revalidateDashboardClients(): Promise<void> {
+    const watched = [...this.clients.entries()].filter(([, c]) => c.dashboardIdentity);
+    if (watched.length === 0) return;
+
+    const identities = watched.map(([, c]) => c.dashboardIdentity!);
+    const userIds = [...new Set(identities.map((i) => i.userId))];
+    const sessionIds = [...new Set(identities.flatMap((i) => i.sessionId ?? []))];
+
+    const [users, memberships, liveSessions] = await Promise.all([
+      AppDataSource.getRepository(User).find({ where: { id: In(userIds) } }),
+      AppDataSource.getRepository(UserOrganization).find({
+        where: { userId: In(userIds), isActive: true },
+      }),
+      sessionIds.length === 0
+        ? Promise.resolve([] as Session[])
+        : AppDataSource.getRepository(Session).find({
+            where: { id: In(sessionIds), revokedAt: IsNull(), expiresAt: MoreThan(new Date()) },
+          }),
+    ]);
+
+    const usersById = new Map(users.map((u) => [u.id, u]));
+    const memberKeys = new Set(memberships.map((m) => `${m.userId}:${m.organizationId}`));
+    const liveSessionIds = new Set(liveSessions.map((s) => s.id));
+
+    for (const [clientId, client] of watched) {
+      const identity = client.dashboardIdentity!;
+      const allowed =
+        isDashboardUserAllowed(usersById.get(identity.userId), identity) &&
+        memberKeys.has(`${identity.userId}:${client.organizationId}`) &&
+        (!identity.sessionId || liveSessionIds.has(identity.sessionId));
+      if (allowed) continue;
+
+      logger.info({ clientId }, "Closing dashboard socket that is no longer authorized");
+      client.authenticated = false;
+      this.organizationClients.get(client.organizationId)?.delete(clientId);
+      client.ws.close(CLOSE_POLICY_VIOLATION, "Unauthorized");
+    }
+  }
+
   /** Browsers send an Origin; the dashboard's must be one of the CORS origins. */
   private isAllowedDashboardOrigin(origin: string | undefined): boolean {
     if (!origin) return true; // not a browser, so no cross-site request to guard against
@@ -439,13 +520,7 @@ export class WebSocketService {
     const user = await AppDataSource.getRepository(User).findOne({
       where: { id: decoded.userId },
     });
-    if (
-      !user ||
-      !user.isActive ||
-      !user.emailVerified ||
-      user.email !== decoded.email ||
-      (decoded.tokenVersion !== undefined && decoded.tokenVersion !== (user.tokenVersion ?? 0))
-    ) {
+    if (!isDashboardUserAllowed(user, decoded)) {
       logger.warn({ clientId }, "WebSocket token rejected");
       return;
     }
@@ -464,6 +539,12 @@ export class WebSocketService {
     if (!this.clients.has(clientId)) return;
 
     client.authenticated = true;
+    client.dashboardIdentity = {
+      userId: decoded.userId,
+      email: decoded.email,
+      tokenVersion: decoded.tokenVersion,
+      sessionId: decoded.sid,
+    };
     if (!this.organizationClients.has(client.organizationId)) {
       this.organizationClients.set(client.organizationId, new Set());
     }
@@ -559,15 +640,15 @@ export class WebSocketService {
     const client = this.clients.get(clientId);
     if (!client) return;
 
-    const { conversationId, proof, url } = message;
+    const { conversationId, proof } = message;
 
     if (typeof conversationId !== "string" || !conversationId) {
       this.sendError(client, "conversationId is required");
       return;
     }
 
-    if (typeof proof !== "string" || typeof url !== "string" || !isIdentifyProofUrl(url)) {
-      this.sendError(client, "DPoP authentication required: proof and url must be provided");
+    if (typeof proof !== "string") {
+      this.sendError(client, "DPoP authentication required: proof must be provided");
       return;
     }
 
@@ -587,8 +668,7 @@ export class WebSocketService {
     const verification = await verifyDPoPForRequest(
       conversation.id,
       proof,
-      IDENTIFY_PROOF_METHOD,
-      url,
+      socketIdentifyProofTarget(client.host),
       { checkNonce: false },
     );
     if (!verification.success) {
@@ -632,6 +712,13 @@ export class WebSocketService {
 
   private async registerPageTools(client: WebSocketClient, tools: unknown): Promise<void> {
     if (!client.conversationId || !pageToolService.isEnabled()) return;
+    const settings = await webchatSettingsService.getSettings(client.organizationId);
+    if (!isPageToolsOrigin(settings, requestHostname({ origin: client.origin }))) {
+      if (Array.isArray(tools) && tools.length > 0) {
+        this.sendError(client, "Page tools are not enabled for this site");
+      }
+      return;
+    }
     try {
       await pageToolService.register(client.conversationId, validatePageTools(tools));
     } catch (error) {
@@ -648,7 +735,7 @@ export class WebSocketService {
   private async handleToolResult(clientId: string, message: ToolResultMessage): Promise<void> {
     const client = this.clients.get(clientId);
     if (!client?.conversationId || typeof message.callId !== "string") return;
-    await pageToolService.resolve(message.callId, {
+    await pageToolService.resolve(message.callId, client.conversationId, {
       result: message.result,
       ...(message.error !== undefined ? { error: String(message.error) } : {}),
     });
@@ -670,11 +757,8 @@ export class WebSocketService {
       return;
     }
 
-    if (!message.proof || !message.method || !message.url) {
-      this.sendError(
-        client,
-        "DPoP authentication required: proof, method and url must be provided",
-      );
+    if (!message.proof) {
+      this.sendError(client, "DPoP authentication required: proof must be provided");
       return;
     }
 
@@ -710,8 +794,7 @@ export class WebSocketService {
       const dpopVerification = await verifyDPoPForRequest(
         conversationId,
         message.proof,
-        message.method,
-        message.url,
+        publicConversationProofTarget("sendMessage", client.host),
       );
 
       if (!dpopVerification.success) {
@@ -732,7 +815,11 @@ export class WebSocketService {
       // Per conversation only after the proof checks out, so knowing a
       // conversationId is not enough to spend (and mute) a shopper's budget.
       if (
-        await isPublicWidgetRateLimited([{ rule: "messagePerConversation", id: conversationId }])
+        await isPublicWidgetRateLimited([
+          { rule: "messagePerConversation", id: conversationId },
+          { rule: "messagePerOrg", id: conversation.organization_id },
+          { rule: "messagePerOrgHourly", id: conversation.organization_id },
+        ])
       ) {
         this.sendError(client, "RATE_LIMITED");
         return;
@@ -969,6 +1056,7 @@ export class WebSocketService {
    */
   shutdown(): void {
     clearInterval(this.heartbeatTimer);
+    clearInterval(this.revalidateTimer);
 
     // Close all client connections
     for (const [_clientId, client] of this.clients) {
@@ -989,16 +1077,3 @@ export class WebSocketService {
 }
 
 export const websocketService = new WebSocketService();
-
-/** An identify proof is made for the `/ws` endpoint, not reused from an HTTP call. */
-function isIdentifyProofUrl(url: string): boolean {
-  try {
-    const parsed = new URL(url);
-    return (
-      (parsed.protocol === "ws:" || parsed.protocol === "wss:") &&
-      parsed.pathname === IDENTIFY_PROOF_PATH
-    );
-  } catch {
-    return false;
-  }
-}

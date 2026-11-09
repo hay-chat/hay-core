@@ -3,7 +3,9 @@ import { z } from "zod";
 import { SourceService } from "../../../services/source.service";
 import { SourceCategory } from "../../../types/source.types";
 import { TRPCError } from "@trpc/server";
+import { toClientError } from "@server/trpc/client-error";
 import { RESOURCES, ACTIONS } from "@server/types/scopes";
+import { internalProcedure } from "@server/trpc/middleware/internal";
 
 const sourceService = new SourceService();
 
@@ -45,47 +47,19 @@ export const sourcesRouter = t.router({
       return sources;
     }),
 
-  // Future: for plugin system to register new sources
-  register: scopedProcedure(RESOURCES.SOURCES, ACTIONS.CREATE)
-    .input(registerSourceSchema)
-    .mutation(async ({ input }) => {
-      try {
-        const source = await sourceService.registerSource(input);
-        return source;
-      } catch (error) {
-        throw new TRPCError({
-          code: "BAD_REQUEST",
-          message: error instanceof Error ? error.message : "Failed to register source",
-        });
-      }
-    }),
+  // Sources are a global table, so changing them is an operator action.
+  register: internalProcedure.input(registerSourceSchema).mutation(async ({ input }) => {
+    try {
+      const source = await sourceService.registerSource(input);
+      return source;
+    } catch (error) {
+      throw toClientError(error, "BAD_REQUEST", "Failed to register source");
+    }
+  }),
 
-  deactivate: scopedProcedure(RESOURCES.SOURCES, ACTIONS.UPDATE)
-    .input(z.object({ id: z.string() }))
-    .mutation(async ({ input }) => {
-      try {
-        const success = await sourceService.deactivateSource(input.id);
-
-        if (!success) {
-          throw new TRPCError({
-            code: "NOT_FOUND",
-            message: "Source not found",
-          });
-        }
-
-        return { success: true };
-      } catch (error) {
-        throw new TRPCError({
-          code: "BAD_REQUEST",
-          message: error instanceof Error ? error.message : "Failed to deactivate source",
-        });
-      }
-    }),
-
-  activate: scopedProcedure(RESOURCES.SOURCES, ACTIONS.UPDATE)
-    .input(z.object({ id: z.string() }))
-    .mutation(async ({ input }) => {
-      const success = await sourceService.activateSource(input.id);
+  deactivate: internalProcedure.input(z.object({ id: z.string() })).mutation(async ({ input }) => {
+    try {
+      const success = await sourceService.deactivateSource(input.id);
 
       if (!success) {
         throw new TRPCError({
@@ -95,5 +69,21 @@ export const sourcesRouter = t.router({
       }
 
       return { success: true };
-    }),
+    } catch (error) {
+      throw toClientError(error, "BAD_REQUEST", "Failed to deactivate source");
+    }
+  }),
+
+  activate: internalProcedure.input(z.object({ id: z.string() })).mutation(async ({ input }) => {
+    const success = await sourceService.activateSource(input.id);
+
+    if (!success) {
+      throw new TRPCError({
+        code: "NOT_FOUND",
+        message: "Source not found",
+      });
+    }
+
+    return { success: true };
+  }),
 });

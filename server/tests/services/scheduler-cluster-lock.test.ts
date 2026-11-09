@@ -67,6 +67,27 @@ describe("SchedulerService cluster lock", () => {
     expect(query.mock.calls[0][1]).toEqual(["scheduler:locked-job"]);
   });
 
+  it("aborts the handler's signal when the job times out", async () => {
+    query.mockImplementation(lockResponse(true));
+    let received: AbortSignal | undefined;
+    scheduler.registerJob({
+      name: "slow-job",
+      description: "slow-job",
+      schedule: 60000,
+      enabled: false,
+      skipDatabaseLogging: true,
+      timeout: 1000,
+      handler: (signal) => {
+        received = signal;
+        return new Promise((resolve) => signal.addEventListener("abort", () => resolve()));
+      },
+    });
+
+    await scheduler.runJob("slow-job");
+
+    expect(received?.aborted).toBe(true);
+  });
+
   it("skips the run while another instance holds the lock", async () => {
     query.mockImplementation(lockResponse(false));
     const handler = jest.fn(async () => undefined);

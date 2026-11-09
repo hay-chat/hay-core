@@ -68,6 +68,18 @@ function hostOf(url: string, fallback: string): string {
 }
 
 /**
+ * Who reads customer photos and PDFs, for display only. Vision always runs on a
+ * managed OpenAI endpoint, whatever chat provider the org chose; mirrors
+ * VisionService.endpoint.
+ */
+export function describeVisionProvider(): { name: string; host: string } {
+  const host = isEuRegionConfigured()
+    ? hostOf(config.aiRegion.eu.baseUrl, "eu.api.openai.com")
+    : hostOf(config.openai.baseUrl, "api.openai.com");
+  return { name: KNOWN_AI_HOSTS[host] ?? host, host };
+}
+
+/**
  * Who serves an org's AI chat calls, for display only (Settings -> Customer Privacy,
  * D14-5). Mirrors the endpoint the LLM provider factory picks; it never routes calls.
  */

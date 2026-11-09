@@ -192,7 +192,7 @@
     "confirmButton": "Confirm Data Deletion",
     "whatWillBeDeleted": "What will be deleted:",
     "deleted1": "Your account will be permanently deactivated",
-    "deleted2": "All API keys will be revoked",
+    "deleted2": "All active sessions will be ended",
     "deleted3": "Personal information will be anonymized",
     "deleted4": "Account audit logs will be retained (anonymized) for compliance",
     "deleted5": "This verification link will expire in {{ expiresIn }}",
@@ -204,13 +204,13 @@
     "body": "This confirms that your personal data has been successfully deleted from {{ companyName }} as requested.",
     "whatWeDone": "What we've done:",
     "done1": "Your account has been permanently deactivated",
-    "done2": "All API keys have been revoked",
+    "done2": "All active sessions have been ended",
     "done3": "Personal information has been removed or anonymized",
     "done4": "You can no longer access your account",
     "importantNotes": "Important Notes:",
     "note1": "Some audit logs have been retained (anonymized) for legal and compliance requirements",
     "note2": "If you create a new account with the same email address, it will be treated as a completely new account",
-    "note3": "Backup copies in our disaster recovery systems will be deleted as part of our regular backup rotation (within 90 days)",
+    "note3": "Backup copies in our disaster recovery systems will be removed as they expire under our regular backup rotation",
     "thankYou": "Thank you for using {{ companyName }}. If you have any questions about this deletion, please contact our support team."
   }
 }

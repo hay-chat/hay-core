@@ -562,14 +562,13 @@
             :disabled="isProcessing"
             @click="
               () => {
-                const redirectPath = route.query.redirect as string;
                 router.push(redirectPath || '/documents');
               }
             "
           >
             <CheckCircle class="mr-2 h-4 w-4" />
             {{
-              route.query.redirect
+              redirectPath
                 ? $t("documents.import.processing.continue")
                 : $t("documents.import.processing.viewDocuments")
             }}
@@ -581,6 +580,7 @@
 </template>
 
 <script setup lang="ts">
+import { safeInternalPath } from "@/utils/safe-internal-path";
 import { logger } from "@/utils/logger";
 import {
   Upload,
@@ -604,6 +604,7 @@ import { useToast } from "@/composables/useToast";
 
 const router = useRouter();
 const route = useRoute();
+const redirectPath = computed(() => safeInternalPath(route.query.redirect, ""));
 const toast = useToast();
 const { t } = useI18n();
 const { startTour, shouldShowTour } = useDocumentImportTour();
@@ -705,9 +706,8 @@ const handlePluginConnected = (payload: { instanceId: string }) => {
 };
 
 const handlePluginSourceCreated = (payload: { sourceId: string }) => {
-  const redirectPath = route.query.redirect as string;
-  if (redirectPath) {
-    router.push(redirectPath);
+  if (redirectPath.value) {
+    router.push(redirectPath.value);
     return;
   }
   // Land on the source detail page, which polls sync status live and shows
@@ -820,8 +820,7 @@ const connectWebsite = async () => {
       url: websiteUrl.value,
     });
 
-    const redirectPath = route.query.redirect as string;
-    router.push(redirectPath || `/documents/sources/${source.id}`);
+    router.push(redirectPath.value || `/documents/sources/${source.id}`);
   } catch (error) {
     console.error("Failed to connect website:", error);
     toast.error(

@@ -31,8 +31,12 @@ jest.mock("@server/repositories/conversation.repository", () => ({
   ConversationRepository: jest.fn(() => ({})),
   conversationRepository: {},
 }));
+const mockCustomerCreate = jest.fn(async (data: Record<string, unknown>) => data);
 jest.mock("@server/repositories/customer.repository", () => ({
-  CustomerRepository: jest.fn(() => ({})),
+  CustomerRepository: jest.fn(() => ({
+    findByExternalId: jest.fn(async () => null),
+    create: mockCustomerCreate,
+  })),
 }));
 jest.mock("@server/repositories/organization.repository", () => ({
   organizationRepository: {
@@ -44,13 +48,18 @@ const mockFindByOrgAndPlugin =
 jest.mock("@server/repositories/plugin-instance.repository", () => ({
   pluginInstanceRepository: { findByOrgAndPlugin: mockFindByOrgAndPlugin },
 }));
-const mockClearForInstance = jest.fn<(instanceId: string) => Promise<void>>();
-const mockUpsertRoutes =
-  jest.fn<(pluginId: string, orgId: string, instanceId: string, keys: string[]) => Promise<void>>();
+const mockClaimRoutes =
+  jest.fn<
+    (
+      pluginId: string,
+      orgId: string,
+      instanceId: string,
+      keys: string[],
+    ) => Promise<{ conflicts: string[]; previousOwners: [] }>
+  >();
 jest.mock("@server/repositories/plugin-webhook-route.repository", () => ({
   pluginWebhookRouteRepository: {
-    clearForInstance: mockClearForInstance,
-    upsertRoutes: mockUpsertRoutes,
+    claimRoutes: mockClaimRoutes,
   },
 }));
 jest.mock("@server/repositories/document.repository", () => ({ documentRepository: {} }));
@@ -97,6 +106,32 @@ const ctx = (capabilities = ["messages", "customers"]) => {
 const caller = (capabilities?: string[]) => pluginApiTrpcRouter.createCaller(ctx(capabilities));
 
 const nextTick = () => new Promise<void>((resolve) => setImmediate(resolve));
+
+describe("pluginApi customers.upsert", () => {
+  it("keeps the external id when metadata carries its own id", async () => {
+    await caller(["customers"])["customers.upsert"]({
+      externalId: "ext-1",
+      channel: "shop",
+      metadata: { id: "other", plan: "pro" },
+    });
+
+    expect(mockCustomerCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        external_metadata: { shop: { id: "ext-1", plan: "pro" } },
+      }),
+    );
+  });
+
+  it("refuses oversized metadata", async () => {
+    await expect(
+      caller(["customers"])["customers.upsert"]({
+        externalId: "ext-1",
+        channel: "shop",
+        metadata: { blob: "x".repeat(70_000) },
+      }),
+    ).rejects.toMatchObject({ code: "BAD_REQUEST" });
+  });
+});
 
 describe("pluginApi.connection.revoke", () => {
   beforeEach(() => {
@@ -178,7 +213,10 @@ describe("pluginApi.connection.revoke", () => {
 });
 
 describe("pluginApi.webhooks.setRoutingKeys", () => {
-  beforeEach(() => jest.clearAllMocks());
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockClaimRoutes.mockResolvedValue({ conflicts: [], previousOwners: [] });
+  });
 
   it("replaces the calling instance's keys, de-duplicated", async () => {
     mockFindByOrgAndPlugin.mockResolvedValue({ id: "instance-1" });
@@ -189,8 +227,7 @@ describe("pluginApi.webhooks.setRoutingKeys", () => {
 
     expect(result).toEqual({ routingKeyCount: 2 });
     expect(mockFindByOrgAndPlugin).toHaveBeenCalledWith(ORG_ID, PLUGIN_ID);
-    expect(mockClearForInstance).toHaveBeenCalledWith("instance-1");
-    expect(mockUpsertRoutes).toHaveBeenCalledWith(PLUGIN_ID, ORG_ID, "instance-1", [
+    expect(mockClaimRoutes).toHaveBeenCalledWith(PLUGIN_ID, ORG_ID, "instance-1", [
       "976350592236691",
       "42",
     ]);
@@ -201,8 +238,16 @@ describe("pluginApi.webhooks.setRoutingKeys", () => {
 
     await caller()["webhooks.setRoutingKeys"]({ routingKeys: [] });
 
-    expect(mockClearForInstance).toHaveBeenCalledWith("instance-1");
-    expect(mockUpsertRoutes).toHaveBeenCalledWith(PLUGIN_ID, ORG_ID, "instance-1", []);
+    expect(mockClaimRoutes).toHaveBeenCalledWith(PLUGIN_ID, ORG_ID, "instance-1", []);
+  });
+
+  it("refuses a key another organization holds", async () => {
+    mockFindByOrgAndPlugin.mockResolvedValue({ id: "instance-1" });
+    mockClaimRoutes.mockResolvedValue({ conflicts: ["42"], previousOwners: [] });
+
+    await expect(
+      caller()["webhooks.setRoutingKeys"]({ routingKeys: ["42"] }),
+    ).rejects.toMatchObject({ code: "CONFLICT" });
   });
 
   it("fails without an instance and requires the messages capability", async () => {
@@ -213,6 +258,6 @@ describe("pluginApi.webhooks.setRoutingKeys", () => {
     await expect(
       caller(["customers"])["webhooks.setRoutingKeys"]({ routingKeys: ["1"] }),
     ).rejects.toMatchObject({ code: "FORBIDDEN" });
-    expect(mockUpsertRoutes).not.toHaveBeenCalled();
+    expect(mockClaimRoutes).not.toHaveBeenCalled();
   });
 });

@@ -245,6 +245,25 @@ export class RedisService {
   }
 
   /**
+   * Wait for the first connection, up to `timeoutMs`. Resolves either way;
+   * check isConnected() afterwards.
+   */
+  async waitUntilReady(timeoutMs: number): Promise<void> {
+    const publisher = this.publisher;
+    if (!publisher || publisher.status === "ready") return;
+
+    await new Promise<void>((resolve) => {
+      const done = () => {
+        clearTimeout(timer);
+        publisher.off("ready", done);
+        resolve();
+      };
+      const timer = setTimeout(done, timeoutMs);
+      publisher.once("ready", done);
+    });
+  }
+
+  /**
    * Check if Redis is connected
    */
   isConnected(): boolean {

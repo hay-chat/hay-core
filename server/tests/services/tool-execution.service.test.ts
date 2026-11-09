@@ -3,6 +3,7 @@
  * approval gate (D4-4) and webchat isolation of tool output when Redis is down.
  */
 const mockCallTool = jest.fn();
+const mockIsRemote = jest.fn(async () => false);
 const mockRecord = jest.fn();
 const mockGetToolRisk = jest.fn();
 const mockMessageUpdate = jest.fn();
@@ -59,7 +60,10 @@ jest.mock("@server/services/mcp-registry.service", () => ({
   mcpRegistryService: { getToolRisk: mockGetToolRisk, getToolsForOrg: mockGetToolsForOrg },
 }));
 jest.mock("@server/services/mcp-client-factory.service", () => ({
-  MCPClientFactory: { createClient: async () => ({ callTool: mockCallTool }) },
+  MCPClientFactory: {
+    createClient: async () => ({ callTool: mockCallTool }),
+    isRemote: mockIsRemote,
+  },
 }));
 jest.mock("@server/services/core/core-tools", () => ({
   coreToolRegistry: {
@@ -93,16 +97,27 @@ jest.mock("@server/services/pending-action.service", () => ({
   pendingActionService: { hold: mockHold, findEarlierRequest: mockFindEarlierRequest },
 }));
 
+import { pageToolService } from "@server/services/webchat/page-tools.service";
 import { ToolExecutionService } from "@server/services/core/tool-execution.service";
 import type { Conversation } from "@server/database/entities/conversation.entity";
 
 const REFUND_RISK = { readOnly: false, category: "refund", classified: true };
+
+const PLAYBOOK_TOOLS = [
+  "shop:cancel_order",
+  "shop:create_coupon",
+  "shop:create_refund",
+  "shop:find_customer",
+  "shop:get_order",
+  "shop:mystery",
+];
 
 function makeConversation(metadata: Record<string, unknown> = {}): Conversation {
   return {
     id: "conv-1",
     organization_id: "org-1",
     metadata,
+    enabled_tools: PLAYBOOK_TOOLS,
     orchestration_status: { lastTurn: 0, toolLog: [] },
   } as unknown as Conversation;
 }
@@ -705,6 +720,16 @@ describe("ToolExecutionService tool governance", () => {
     expect(meta).toEqual({ "chat.hay/customer": ANA });
   });
 
+  it("refuses a customer-data read on a remote server, which can't scope it", async () => {
+    mockGetToolRisk.mockResolvedValue(LOOKUP_RISK);
+    mockResolveIdentity.mockResolvedValue(ANA);
+    mockIsRemote.mockResolvedValueOnce(true);
+    const res = await new ToolExecutionService().handleToolExecution(makeConversation(), lookup);
+
+    expect(res).toMatchObject({ success: false, result: { status: "identity_required" } });
+    expect(mockCallTool).not.toHaveBeenCalled();
+  });
+
   it("refuses a tool the conversation's playbook does not enable", async () => {
     const conversation = Object.assign(makeConversation(), { enabled_tools: ["shop:get_order"] });
     const res = await new ToolExecutionService().handleToolExecution(conversation, {
@@ -793,5 +818,58 @@ describe("ToolExecutionService tool governance", () => {
     });
 
     expect(mockCallTool.mock.calls[0][1]).toEqual({ auth: "s3cret", note: "<<secret.token>>" });
+  });
+});
+
+describe("ToolExecutionService page tools", () => {
+  const conversationWith = (annotations?: { readOnlyHint?: boolean }) => {
+    jest.spyOn(pageToolService, "list").mockResolvedValue([
+      {
+        name: "add_to_cart",
+        description: "Add to cart",
+        inputSchema: { type: "object", required: ["sku"] },
+        ...(annotations ? { annotations } : {}),
+      },
+    ]);
+    jest.spyOn(pageToolService, "call").mockResolvedValue("done");
+    return makeConversation();
+  };
+  const call = { name: "page:add_to_cart", args: { sku: "1" } };
+
+  it("runs a read tool the page registered", async () => {
+    const res = await new ToolExecutionService().handleToolExecution(
+      conversationWith({ readOnlyHint: true }),
+      call,
+    );
+    expect(res).toMatchObject({ success: true, result: "done" });
+  });
+
+  it("applies the approval policy to a tool the page declares as a write", async () => {
+    mockFindOrg.mockResolvedValue(APPROVAL_DEFAULTS);
+    const res = await new ToolExecutionService().handleToolExecution(
+      conversationWith({ readOnlyHint: false }),
+      call,
+    );
+    expect(res.pending).toBe(true);
+    expect(pageToolService.call).not.toHaveBeenCalled();
+  });
+
+  it("refuses arguments that do not match the declared schema", async () => {
+    const res = await new ToolExecutionService().handleToolExecution(conversationWith(), {
+      name: call.name,
+      args: {},
+    });
+    expect(res.success).toBe(false);
+    expect(pageToolService.call).not.toHaveBeenCalled();
+  });
+
+  it("refuses a page tool nobody registered", async () => {
+    conversationWith();
+    const res = await new ToolExecutionService().handleToolExecution(makeConversation(), {
+      name: "page:unknown",
+      args: {},
+    });
+    expect(res.success).toBe(false);
+    expect(pageToolService.call).not.toHaveBeenCalled();
   });
 });

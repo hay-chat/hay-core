@@ -1,6 +1,7 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import {
   initConsent,
+  configureConsentRecording,
   markInteraction,
   grantConsent,
   revokeConsent,
@@ -287,5 +288,57 @@ describe("useConsent — ePrivacy storage gate", () => {
       grantConsent();
       expect(sessionStorage.length).toBe(0);
     });
+  });
+});
+
+describe("useConsent — server record of decisions", () => {
+  const fetchMock = vi.fn(() => Promise.resolve(new Response("{}")));
+
+  function recordedBodies(): Array<Record<string, unknown>> {
+    return fetchMock.mock.calls.map((call) => {
+      const init = (call as unknown as [string, RequestInit])[1];
+      return JSON.parse(init.body as string);
+    });
+  }
+
+  beforeEach(() => {
+    fetchMock.mockClear();
+    vi.stubGlobal("fetch", fetchMock);
+    initConsent("strict");
+    configureConsentRecording("https://api.example", "org-1");
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("posts a grant and a revoke with the mode", () => {
+    grantConsent();
+    revokeConsent();
+
+    expect(fetchMock.mock.calls[0]).toEqual([
+      "https://api.example/v1/publicConversations.recordConsent",
+      expect.objectContaining({ method: "POST", keepalive: true }),
+    ]);
+    expect(recordedBodies()).toEqual([
+      { organizationId: "org-1", action: "grant", mode: "strict" },
+      { organizationId: "org-1", action: "revoke", mode: "strict" },
+    ]);
+  });
+
+  it("does not repeat a decision that did not change", () => {
+    grantConsent();
+    grantConsent();
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps working when the request fails", async () => {
+    fetchMock.mockImplementationOnce(() => Promise.reject(new Error("offline")));
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
+
+    expect(() => grantConsent()).not.toThrow();
+    await vi.waitFor(() => expect(consoleError).toHaveBeenCalled());
+    consoleError.mockRestore();
   });
 });

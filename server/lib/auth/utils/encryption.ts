@@ -1,101 +1,150 @@
 import crypto from "crypto";
 
 import { createLogger } from "@server/lib/logger";
+import {
+  configuredEncryptionKeys,
+  SINGLE_KEY_ID,
+  type EncryptionKey,
+} from "@server/lib/auth/utils/encryption-keys";
 
 const logger = createLogger("encryption");
 
 const ALGORITHM = "aes-256-gcm";
+
+// enc:v2 and unprefixed values: PBKDF2 per value, salt + iv + tag + ciphertext.
 const IV_LENGTH = 16;
 const SALT_LENGTH = 64;
 const TAG_LENGTH = 16;
 const TAG_POSITION = SALT_LENGTH + IV_LENGTH;
 const ENCRYPTED_POSITION = TAG_POSITION + TAG_LENGTH;
+export const LEGACY_CIPHERTEXT_PREFIX = "enc:v2:";
 
-/**
- * Marks ciphertext written by encryptValue. Values without it are either
- * ciphertext from before the prefix existed (same layout, decrypted the same
- * way) or legacy plaintext credentials stored before encryption was added.
- */
-export const CIPHERTEXT_PREFIX = "enc:v2:";
+// enc:v3:<key id>: values: one HKDF key per key id, iv + tag + ciphertext.
+const V3_IV_LENGTH = 12;
+const V3_ENCRYPTED_POSITION = V3_IV_LENGTH + TAG_LENGTH;
+export const CIPHERTEXT_PREFIX = "enc:v3:";
 
 let warnedJwtFallback = false;
 
 /**
- * The key stored secrets are encrypted and decrypted with. Production
- * requires a dedicated PLUGIN_ENCRYPTION_KEY (enforced at startup by
- * validateProductionConfig); other environments fall back to JWT_SECRET.
+ * The keys stored secrets are read and written with, current key first.
+ * Deployed servers need PLUGIN_ENCRYPTION_KEY or PLUGIN_ENCRYPTION_KEYS
+ * (enforced at startup by validateProductionConfig); development and tests fall
+ * back to JWT_SECRET.
  */
-function getEncryptionKey(): string {
-  if (process.env.PLUGIN_ENCRYPTION_KEY) {
-    return process.env.PLUGIN_ENCRYPTION_KEY;
+function getEncryptionKeys(): EncryptionKey[] {
+  const keys = configuredEncryptionKeys();
+  if (keys.length > 0) {
+    return keys;
   }
-  if (process.env.NODE_ENV !== "production" && process.env.JWT_SECRET) {
+  const env = process.env.NODE_ENV;
+  if ((env === "development" || env === "test") && process.env.JWT_SECRET) {
     if (!warnedJwtFallback) {
       warnedJwtFallback = true;
       logger.warn("PLUGIN_ENCRYPTION_KEY not set — falling back to JWT_SECRET for encryption");
     }
-    return process.env.JWT_SECRET;
+    return [{ id: SINGLE_KEY_ID, secret: process.env.JWT_SECRET }];
   }
   throw new Error("PLUGIN_ENCRYPTION_KEY must be set for encryption");
 }
 
-/**
- * Derives a key from a password using PBKDF2
- */
-function deriveKey(password: string, salt: Buffer): Buffer {
-  return crypto.pbkdf2Sync(password, salt, 100000, 32, "sha256");
+const subkeys = new Map<string, Buffer>();
+
+/** The AES key for a key id, derived once per process. */
+function subkey({ id, secret }: EncryptionKey): Buffer {
+  const cacheKey = `${id}\0${secret}`;
+  let key = subkeys.get(cacheKey);
+  if (!key) {
+    key = Buffer.from(crypto.hkdfSync("sha256", secret, "hay:stored-secrets:v3", id, 32));
+    subkeys.set(cacheKey, key);
+  }
+  return key;
 }
 
 /**
- * Encrypt a string value using AES-256-GCM
+ * Encrypt a string value using AES-256-GCM under the current key.
  */
 export function encryptValue(text: string): string {
-  const password = getEncryptionKey();
-
-  // Generate random salt and IV
-  const salt = crypto.randomBytes(SALT_LENGTH);
-  const iv = crypto.randomBytes(IV_LENGTH);
-
-  // Derive key from password and salt
-  const key = deriveKey(password, salt);
-
-  // Create cipher
-  const cipher = crypto.createCipheriv(ALGORITHM, key, iv);
-
-  // Encrypt the text
+  const [key] = getEncryptionKeys();
+  const prefix = `${CIPHERTEXT_PREFIX}${key.id}:`;
+  const iv = crypto.randomBytes(V3_IV_LENGTH);
+  const cipher = crypto.createCipheriv(ALGORITHM, subkey(key), iv);
+  cipher.setAAD(Buffer.from(prefix, "utf8"));
   const encrypted = Buffer.concat([cipher.update(text, "utf8"), cipher.final()]);
-
-  // Get the auth tag
-  const tag = cipher.getAuthTag();
-
-  // Combine salt + iv + tag + encrypted
-  const combined = Buffer.concat([salt, iv, tag, encrypted]);
-
-  return CIPHERTEXT_PREFIX + combined.toString("base64");
+  return prefix + Buffer.concat([iv, cipher.getAuthTag(), encrypted]).toString("base64");
 }
 
-function decryptWithKey(combined: Buffer, password: string): string {
-  // Extract components
+function decryptV3(value: string, keys: EncryptionKey[]): string {
+  const separator = value.indexOf(":", CIPHERTEXT_PREFIX.length);
+  const keyId = value.slice(CIPHERTEXT_PREFIX.length, separator);
+  const key = keys.find((candidate) => candidate.id === keyId);
+  if (separator < 0 || !key) {
+    throw new Error(`No encryption key configured with id "${keyId}"`);
+  }
+  const combined = Buffer.from(value.slice(separator + 1), "base64");
+  const decipher = crypto.createDecipheriv(
+    ALGORITHM,
+    subkey(key),
+    combined.subarray(0, V3_IV_LENGTH),
+  );
+  decipher.setAAD(Buffer.from(value.slice(0, separator + 1), "utf8"));
+  decipher.setAuthTag(combined.subarray(V3_IV_LENGTH, V3_ENCRYPTED_POSITION));
+  return Buffer.concat([
+    decipher.update(combined.subarray(V3_ENCRYPTED_POSITION)),
+    decipher.final(),
+  ]).toString("utf8");
+}
+
+function decryptLegacy(combined: Buffer, password: string): string {
   const salt = combined.subarray(0, SALT_LENGTH);
-  const iv = combined.subarray(SALT_LENGTH, TAG_POSITION);
-  const tag = combined.subarray(TAG_POSITION, ENCRYPTED_POSITION);
-  const encrypted = combined.subarray(ENCRYPTED_POSITION);
-
-  const decipher = crypto.createDecipheriv(ALGORITHM, deriveKey(password, salt), iv);
-  decipher.setAuthTag(tag);
-
-  return Buffer.concat([decipher.update(encrypted), decipher.final()]).toString("utf8");
+  const key = crypto.pbkdf2Sync(password, salt, 100000, 32, "sha256");
+  const decipher = crypto.createDecipheriv(
+    ALGORITHM,
+    key,
+    combined.subarray(SALT_LENGTH, TAG_POSITION),
+  );
+  decipher.setAuthTag(combined.subarray(TAG_POSITION, ENCRYPTED_POSITION));
+  return Buffer.concat([
+    decipher.update(combined.subarray(ENCRYPTED_POSITION)),
+    decipher.final(),
+  ]).toString("utf8");
 }
 
 /**
- * Decrypt a string value encrypted with encryptValue. Throws when the
- * current key cannot decrypt it.
+ * Decrypt a string value encrypted with encryptValue, current or older
+ * format. Throws when no configured key can decrypt it.
  */
 export function decryptValue(encryptedText: string): string {
-  const body = encryptedText.startsWith(CIPHERTEXT_PREFIX)
-    ? encryptedText.slice(CIPHERTEXT_PREFIX.length)
+  const keys = getEncryptionKeys();
+  if (encryptedText.startsWith(CIPHERTEXT_PREFIX)) {
+    return decryptV3(encryptedText, keys);
+  }
+  const body = encryptedText.startsWith(LEGACY_CIPHERTEXT_PREFIX)
+    ? encryptedText.slice(LEGACY_CIPHERTEXT_PREFIX.length)
     : encryptedText;
-  return decryptWithKey(Buffer.from(body, "base64"), getEncryptionKey());
+  const combined = Buffer.from(body, "base64");
+  let lastError: unknown;
+  for (const key of keys) {
+    try {
+      return decryptLegacy(combined, key.secret);
+    } catch (error) {
+      lastError = error;
+    }
+  }
+  throw lastError;
+}
+
+/** Whether a stored value is already in the current format under the current key. */
+export function isCurrentCiphertext(value: string): boolean {
+  return value.startsWith(`${CIPHERTEXT_PREFIX}${getEncryptionKeys()[0].id}:`);
+}
+
+/**
+ * Off by default because deployments may hold credentials saved before they
+ * were encrypted. Run the key rotation script, which encrypts them, then enable.
+ */
+function plaintextCredentialsRefused(): boolean {
+  return process.env.PLUGIN_ENCRYPTION_REQUIRE_CIPHERTEXT === "true";
 }
 
 /**
@@ -104,7 +153,7 @@ export function decryptValue(encryptedText: string): string {
  * plaintext written before encryption was introduced.
  */
 export function looksLikeCiphertext(value: string): boolean {
-  if (value.startsWith(CIPHERTEXT_PREFIX)) {
+  if (value.startsWith(CIPHERTEXT_PREFIX) || value.startsWith(LEGACY_CIPHERTEXT_PREFIX)) {
     return true;
   }
   return (
@@ -267,9 +316,12 @@ export class AuthStateEncryptedTransformer {
             }
           } catch (error) {
             if (looksLikeCiphertext(val)) {
-              // Ciphertext the current key cannot open (wrong or changed key):
+              // Ciphertext no configured key can open (wrong or changed key):
               // never hand it on as if it were the credential.
               logger.error({ err: error, key }, "Failed to decrypt credential");
+              decryptedCredentials[key] = null;
+            } else if (plaintextCredentialsRefused()) {
+              logger.error({ key }, "Refusing unencrypted credential");
               decryptedCredentials[key] = null;
             } else {
               // Plaintext stored before credentials were encrypted; it is

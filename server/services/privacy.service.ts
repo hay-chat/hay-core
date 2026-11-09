@@ -29,14 +29,17 @@ import * as os from "os";
 import * as path from "path";
 import * as archiver from "archiver";
 import { config, getDashboardUrl } from "@server/config/env";
-import { IsNull, In } from "typeorm";
+import { IsNull } from "typeorm";
 import type { ExportPackageData } from "@server/types/privacy.types";
 import { PRIVACY_DELETION_JOB_TYPE, PRIVACY_EXPORT_JOB_TYPE } from "@server/types/privacy.types";
 import { NO_RECIPIENT_ERROR, organizationAdminEmails } from "./provider-privacy.service";
 import { storageService } from "@server/services/storage.service";
 import { deleteConversationMedia } from "@server/services/conversation-media.service";
+import { anonymizeConversations } from "@server/services/conversation-anonymizer";
+import { recordErasure } from "@server/services/erasure-ledger";
 import { isUuid } from "@server/services/media-url.service";
 import { fetchPublicFile } from "@server/utils/fetch-public-file";
+import { deriveServiceKey } from "@server/lib/auth/utils/service-keys";
 
 /** Job `data.type` values run by the background job queue (job-queue.service). */
 const PRIVACY_JOB_TYPES = [PRIVACY_EXPORT_JOB_TYPE, PRIVACY_DELETION_JOB_TYPE];
@@ -56,6 +59,17 @@ const MAX_EXPORT_BYTES = 1024 * 1024 * 1024;
 const MAX_ATTACHMENT_BYTES = 512 * 1024 * 1024;
 const REMOTE_ATTACHMENT_FETCH = { maxBytes: 25 * 1024 * 1024, timeoutMs: 15_000 };
 const DAY_MS = 24 * 60 * 60 * 1000;
+
+/** An email or phone shorter than this would match unrelated text. */
+const MIN_IDENTITY_NEEDLE_LENGTH = 7;
+
+/** $2 holds lowercase needles; `text` is SQL built from fixed column names only. */
+const TEXT_MATCHES = (text: string): string =>
+  `EXISTS (SELECT 1 FROM unnest($2::text[]) AS needle WHERE position(needle IN lower(${text})) > 0)`;
+
+/** $3 holds conversation and message ids; a replay ref is `conversation:<id>:<turn>`. */
+const SOURCE_REF_MATCHES = `(source_ref = ANY($3::text[])
+  OR substring(source_ref from '^conversation:([0-9a-f-]{36}):') = ANY($3::text[]))`;
 
 const CANCELLABLE_STATUSES = ["pending_verification", "verified", "processing"];
 
@@ -80,6 +94,9 @@ export function erasedEmail(email: string): string {
  * Privacy Service
  * Handles GDPR Data Subject Access Requests (DSAR)
  */
+/** A refusal whose message is written for the person making the request. */
+export class PrivacyRequestError extends Error {}
+
 export class PrivacyService {
   private readonly VERIFICATION_EXPIRY_HOURS = 24;
 
@@ -92,11 +109,15 @@ export class PrivacyService {
     // Defense in depth - also checked at router level
     if (!ipAddress) return;
     const { rateLimitService } = await import("./rate-limit.service");
-    const ipLimit = await rateLimitService.checkIpRateLimit(ipAddress, 10, 3600);
-    const emailLimit = await rateLimitService.checkEmailRateLimit(email, 3, 86400);
+    const ipLimit = await rateLimitService.checkIpRateLimit(ipAddress, 10, 3600, {
+      scope: "privacy-request",
+    });
+    const emailLimit = await rateLimitService.checkEmailRateLimit(email, 3, 86400, {
+      scope: "privacy-request",
+    });
     const combinedLimit = await rateLimitService.checkCombinedRateLimit(ipAddress, email, 2, 86400);
     if (ipLimit.limited || emailLimit.limited || combinedLimit.limited) {
-      throw new Error("Rate limit exceeded. Please try again later.");
+      throw new PrivacyRequestError("Rate limit exceeded. Please try again later.");
     }
   }
 
@@ -172,7 +193,7 @@ export class PrivacyService {
         request.status = "failed";
         request.errorMessage = "Failed to send verification email. Please try again.";
         await requestRepository.save(request);
-        throw new Error("Failed to send verification email. Please try again later.");
+        throw new PrivacyRequestError("Failed to send verification email. Please try again later.");
       }
     }
 
@@ -248,7 +269,7 @@ export class PrivacyService {
       return { request, jobId: job.id };
     });
 
-    if ("error" in outcome) throw new Error(outcome.error);
+    if ("error" in outcome) throw new PrivacyRequestError(outcome.error);
     const { request, jobId } = outcome;
 
     await this.logPrivacyAction(this.actionName(request, "confirm"), request.userId, {
@@ -422,7 +443,6 @@ export class PrivacyService {
     jobId?: string;
     jobStatus?: string;
     downloadAvailable: boolean;
-    errorMessage?: string;
   }> {
     const requestRepository = AppDataSource.getRepository(PrivacyRequest);
     const request = await requestRepository.findOne({
@@ -431,7 +451,7 @@ export class PrivacyService {
     });
 
     if (!request) {
-      throw new Error("Privacy request not found");
+      throw new PrivacyRequestError("Privacy request not found");
     }
 
     return {
@@ -443,7 +463,6 @@ export class PrivacyService {
       jobId: request.jobId,
       jobStatus: request.job?.status,
       downloadAvailable: this.isDownloadAvailable(request),
-      errorMessage: request.errorMessage,
     };
   }
 
@@ -469,18 +488,18 @@ export class PrivacyService {
 
     const request = await requestRepository.findOne({ where: { id: requestId } });
     if (!request) {
-      throw new Error("Privacy request not found");
+      throw new PrivacyRequestError("Privacy request not found");
     }
 
     if (!request.verificationTokenHash) {
-      throw new Error("This request cannot be cancelled (no verification token)");
+      throw new PrivacyRequestError("This request cannot be cancelled (no verification token)");
     }
     if (!tokenMatches(token, request.verificationTokenHash)) {
-      throw new Error("Invalid verification token");
+      throw new PrivacyRequestError("Invalid verification token");
     }
 
     if (!CANCELLABLE_STATUSES.includes(request.status)) {
-      throw new Error(
+      throw new PrivacyRequestError(
         `Cannot cancel request with status '${request.status}'. ` +
           `Only pending, verified, or processing requests can be cancelled.`,
       );
@@ -521,17 +540,17 @@ export class PrivacyService {
     });
 
     if (!request) {
-      throw new Error("Export request not found or not ready");
+      throw new PrivacyRequestError("Export request not found or not ready");
     }
 
     if (!tokenMatches(downloadToken, request.getDownloadTokenHash())) {
-      throw new Error("Invalid download token");
+      throw new PrivacyRequestError("Invalid download token");
     }
 
     const expiresAt = request.getExportExpiresAt();
     const uploadId = request.getExportUploadId();
     if (!uploadId || !expiresAt || expiresAt <= new Date()) {
-      throw new Error("Export has expired");
+      throw new PrivacyRequestError("Export has expired");
     }
 
     // Check IP restriction (optional - can be disabled for mobile users)
@@ -547,7 +566,7 @@ export class PrivacyService {
         attemptedIp: ipAddress,
       });
 
-      throw new Error(
+      throw new PrivacyRequestError(
         "Security validation failed. Please download from the same device/network " +
           "used to request the export.",
       );
@@ -565,7 +584,7 @@ export class PrivacyService {
       [request.id, ipAddress ?? null],
     );
     if (!claimed?.length) {
-      throw new Error(
+      throw new PrivacyRequestError(
         "Download limit exceeded. This link has already been used. " +
           "Please request a new export if needed.",
       );
@@ -709,7 +728,9 @@ export class PrivacyService {
    * rows such as takeover events still point at it).
    */
   private async executeDataDeletion(userId: string): Promise<void> {
-    return AppDataSource.transaction(async (manager) => {
+    let avatarUrl: string | undefined;
+
+    await AppDataSource.transaction(async (manager) => {
       const userRepository = manager.getRepository(User);
       const auditLogRepository = manager.getRepository(AuditLog);
 
@@ -718,6 +739,7 @@ export class PrivacyService {
         throw new Error("User not found");
       }
       const email = user.email.toLowerCase();
+      avatarUrl = user.avatarUrl ?? undefined;
 
       // Anonymize audit logs (keep for compliance but remove PII)
       const auditLogs = await auditLogRepository.find({ where: { userId } });
@@ -798,9 +820,19 @@ export class PrivacyService {
       // Access tokens already issued stop working.
       user.tokenVersion = (user.tokenVersion ?? 0) + 1;
       await userRepository.save(user);
+      await recordErasure(manager, { subjectType: "user", subjectId: userId });
 
       logger.debug({ userId }, "User data deleted");
     });
+
+    // A deleted file can't be rolled back, so it goes once the erasure committed.
+    if (avatarUrl) {
+      try {
+        await storageService.deleteByPublicUrl(avatarUrl, "avatars", userId);
+      } catch (error) {
+        logger.warn({ err: error, userId }, "Failed to delete an erased user's avatar");
+      }
+    }
   }
 
   /**
@@ -1099,6 +1131,14 @@ export class PrivacyService {
     return { requestId: request.id, expiresAt };
   }
 
+  /** Erase a staff user outside a request, when an erasure is replayed after a restore. */
+  async eraseUser(userId: string): Promise<void> {
+    const user = await AppDataSource.getRepository(User).findOneOrFail({ where: { id: userId } });
+    const email = user.email;
+    await this.executeDataDeletion(userId);
+    await this.anonymizeRequests(AppDataSource.manager, { userId, email });
+  }
+
   /**
    * Erase a customer from the dashboard (Customers → Delete): the same erasure
    * a verified customer deletion request runs. Returns false when the customer
@@ -1273,6 +1313,12 @@ export class PrivacyService {
       // Continue without embeddings - they might not exist
     }
 
+    const linkedRecords = await this.collectLinkedCustomerRecords(
+      organizationId,
+      conversationIds,
+      customer,
+    );
+
     return {
       exportDate: new Date().toISOString(),
       exportVersion: "2.0",
@@ -1292,6 +1338,7 @@ export class PrivacyService {
           updatedAt: customer.updated_at,
         },
         conversations: conversationsWithMessages,
+        ...linkedRecords,
         embeddings: embeddings.map((e) => ({
           id: e.id,
           content: e.content,
@@ -1641,14 +1688,9 @@ please contact ${supportContact}.
 
   /**
    * Sign export data using HMAC-SHA256
-   * Uses a deterministic key derived from the organization's data
    */
   private signExportData(data: string): string {
-    // Use a signing key from environment or generate a deterministic one
-    const { config } = require("@server/config/env");
-    const signingKey = config.jwt.secret;
-
-    const hmac = crypto.createHmac("sha256", signingKey);
+    const hmac = crypto.createHmac("sha256", deriveServiceKey("hay:privacy-export:v1"));
     hmac.update(data);
     return hmac.digest("hex");
   }
@@ -1687,57 +1729,179 @@ please contact ${supportContact}.
         throw new Error("Customer not found");
       }
 
-      if (conversationIds.length > 0) {
-        const messages = await manager.getRepository(Message).find({
-          where: { conversation_id: In(conversationIds) },
-          select: ["id"],
-        });
-        const messageIds = messages.map((m) => m.id);
-
-        // Embeddings are linked by metadata, not foreign keys.
-        await vectorStoreService.deleteByConversationIds(organizationId, conversationIds, manager);
-        if (messageIds.length > 0) {
-          await vectorStoreService.deleteByMessageIds(organizationId, messageIds, manager);
-        }
-
-        const ids = [conversationIds];
-        await manager.query(`DELETE FROM messages WHERE conversation_id = ANY($1)`, ids);
-        for (const table of [
-          "action_log",
-          "pending_actions",
-          "order_conversation_links",
-          "team_questions",
-          "notification_deliveries",
-          "insight_issues",
-        ]) {
-          await manager.query(`DELETE FROM "${table}" WHERE conversation_id = ANY($1)`, ids);
-        }
-        await manager.query(
-          `UPDATE conversation_outcomes
-           SET classification_reason = NULL, exclusion_reason = NULL, exclusion_review_note = NULL
-           WHERE conversation_id = ANY($1)`,
-          ids,
-        );
-        await manager.query(
-          `UPDATE conversations
-           SET customer_id = NULL, title = '[deleted]', context = NULL, metadata = NULL,
-               summary = NULL, resolution_metadata = NULL, orchestration_status = NULL,
-               document_ids = NULL, public_jwk = NULL, spam_reason = NULL, stuck_reason = NULL,
-               last_processing_error = NULL, needs_processing = false,
-               deleted_at = COALESCE(deleted_at, now())
-           WHERE id = ANY($1)`,
-          ids,
-        );
-      }
+      await this.eraseTestData(manager, organizationId, conversationIds, customer);
+      await anonymizeConversations(manager, organizationId, conversationIds, {
+        title: "[deleted]",
+        deleteInsightIssues: true,
+      });
 
       // Merge dismissals cascade with the customer row.
       await customerRepository.delete({ id: customerId, organization_id: organizationId });
+      await recordErasure(manager, {
+        subjectType: "customer",
+        subjectId: customerId,
+        organizationId,
+      });
 
       logger.debug(
         { customerId, organizationId, conversationsAffected: conversationIds.length },
         "Customer data deleted",
       );
     });
+  }
+
+  /**
+   * Simulation data has no customer link: transcripts, test cases and run seeds
+   * are found by the conversations and messages they came from, and by the
+   * customer's email or phone appearing in their text.
+   */
+  private async eraseTestData(
+    manager: EntityManager,
+    organizationId: string,
+    conversationIds: string[],
+    customer: Customer,
+  ): Promise<void> {
+    const { sourceRefs, needles } = await this.testDataMatchers(manager, conversationIds, customer);
+    const params = [organizationId, needles];
+
+    await manager.query(
+      `DELETE FROM test_transcripts
+       WHERE organization_id = $1 AND ${TEXT_MATCHES("turns::text || COALESCE(title, '')")}`,
+      params,
+    );
+    await manager.query(
+      `DELETE FROM test_cases
+       WHERE organization_id = $1
+         AND (${SOURCE_REF_MATCHES} OR ${TEXT_MATCHES("seed::text || title || expectations::text")})`,
+      [...params, sourceRefs],
+    );
+    // Run items stay for the run's totals; one not finished yet can't run without its seed.
+    await manager.query(
+      `UPDATE simulation_run_items
+       SET seed = '[]'::jsonb, expectations = NULL, verdict = NULL, source_ref = NULL, error = NULL,
+           status = CASE WHEN status IN ('pending', 'running') THEN 'failed' ELSE status END,
+           updated_at = now()
+       WHERE organization_id = $1
+         AND (conversation_id = ANY($4::uuid[]) OR ${SOURCE_REF_MATCHES} OR ${TEXT_MATCHES("seed::text")})`,
+      [...params, sourceRefs, conversationIds],
+    );
+  }
+
+  private async testDataMatchers(
+    manager: EntityManager,
+    conversationIds: string[],
+    customer: Customer,
+  ): Promise<{ sourceRefs: string[]; needles: string[] }> {
+    const messages: Array<{ id: string }> = await manager.query(
+      `SELECT id FROM messages WHERE conversation_id = ANY($1::uuid[])`,
+      [conversationIds],
+    );
+    return {
+      sourceRefs: [...conversationIds, ...messages.map((message) => message.id)],
+      needles: [customer.email, customer.phone]
+        .filter((value): value is string => !!value && value.length >= MIN_IDENTITY_NEEDLE_LENGTH)
+        .map((value) => value.toLowerCase()),
+    };
+  }
+
+  /** Records outside the conversation itself that quote or concern the customer. */
+  private async collectLinkedCustomerRecords(
+    organizationId: string,
+    conversationIds: string[],
+    customer: Customer,
+  ): Promise<Record<string, unknown[]>> {
+    const { sourceRefs, needles } = await this.testDataMatchers(
+      AppDataSource.manager,
+      conversationIds,
+      customer,
+    );
+    const query = (sql: string, params: unknown[]): Promise<unknown[]> =>
+      AppDataSource.query(sql, params);
+    const inConversations = [organizationId, conversationIds];
+    const matchers = [organizationId, needles, sourceRefs];
+
+    // Who at the organization decided or answered is staff data and stays out.
+    const [
+      teamQuestions,
+      pendingActions,
+      actionLog,
+      disputes,
+      uploads,
+      consentRecords,
+      testTranscripts,
+      testCases,
+      simulationItems,
+    ] = await Promise.all([
+      query(
+        `SELECT question, customer_message AS "customerMessage", answer, status,
+                asked_at AS "askedAt", answered_at AS "answeredAt"
+         FROM team_questions WHERE organization_id = $1 AND conversation_id = ANY($2::uuid[])`,
+        inConversations,
+      ),
+      query(
+        `SELECT tool_name AS "toolName", category, args, status, created_at AS "createdAt"
+         FROM pending_actions WHERE organization_id = $1 AND conversation_id = ANY($2::uuid[])`,
+        inConversations,
+      ),
+      query(
+        `SELECT tool_name AS "toolName", category, args, outcome, created_at AS "createdAt"
+         FROM action_log WHERE organization_id = $1 AND conversation_id = ANY($2::uuid[])`,
+        inConversations,
+      ),
+      query(
+        `SELECT d.status, d.amount, d.currency, d.reason, d.order_label AS "orderLabel",
+                d.initiated_at AS "initiatedAt"
+         FROM disputes d
+         WHERE d.organization_id = $1 AND d.order_key IN (
+           SELECT l.order_key FROM order_conversation_links l
+           WHERE l.organization_id = $1 AND l.conversation_id = ANY($2::uuid[]))`,
+        inConversations,
+      ),
+      query(
+        `SELECT id, original_name AS "originalName", mime_type AS "mimeType", size,
+                created_at AS "createdAt"
+         FROM uploads WHERE organization_id = $1 AND customer_id = $2`,
+        [organizationId, customer.id],
+      ),
+      query(
+        `SELECT conversation_id AS "conversationId", action, mode, created_at AS "createdAt"
+         FROM webchat_consent_events
+         WHERE organization_id = $1 AND conversation_id = ANY($2::uuid[])`,
+        inConversations,
+      ),
+      query(
+        `SELECT source, title, turns, started_at AS "startedAt"
+         FROM test_transcripts
+         WHERE organization_id = $1 AND ${TEXT_MATCHES("turns::text || COALESCE(title, '')")}`,
+        [organizationId, needles],
+      ),
+      query(
+        `SELECT title, seed, created_at AS "createdAt"
+         FROM test_cases
+         WHERE organization_id = $1
+           AND (${SOURCE_REF_MATCHES} OR ${TEXT_MATCHES("seed::text || title || expectations::text")})`,
+        matchers,
+      ),
+      query(
+        `SELECT seed, created_at AS "createdAt"
+         FROM simulation_run_items
+         WHERE organization_id = $1
+           AND (conversation_id = ANY($4::uuid[]) OR ${SOURCE_REF_MATCHES} OR ${TEXT_MATCHES("seed::text")})`,
+        [...matchers, conversationIds],
+      ),
+    ]);
+
+    return {
+      teamQuestions,
+      pendingActions,
+      actionLog,
+      disputes,
+      uploads,
+      consentRecords,
+      testTranscripts,
+      testCases,
+      simulationItems,
+    };
   }
 
   /**

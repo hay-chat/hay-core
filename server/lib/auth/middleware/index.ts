@@ -93,7 +93,10 @@ async function enhanceWithOrgContext(baseAuthUser: AuthUser, req: Request): Prom
  * Main authentication middleware that tries all authentication methods
  * Returns AuthUser if authenticated, null otherwise
  */
-export async function authenticate(req: Request): Promise<AuthUser | null> {
+export async function authenticate(
+  req: Request,
+  options: { ignoreOrganization?: boolean } = {},
+): Promise<AuthUser | null> {
   const authHeader = req.headers.authorization;
 
   if (!authHeader) {
@@ -128,6 +131,8 @@ export async function authenticate(req: Request): Promise<AuthUser | null> {
       return null;
     }
 
+    if (options.ignoreOrganization) return baseAuthUser;
+
     // Enhance with organization context if organizationId header is present
     return await enhanceWithOrgContext(baseAuthUser, req);
   } catch (error) {
@@ -153,22 +158,6 @@ export async function requireAuth(req: Request): Promise<AuthUser> {
 }
 
 /**
- * Optional authentication - returns null if not authenticated
- */
-export async function optionalAuth(req: Request): Promise<AuthUser | null> {
-  try {
-    return await authenticate(req);
-  } catch (error) {
-    // Re-throw authorization errors (e.g., user doesn't belong to organization)
-    // Only suppress authentication failures (missing/invalid credentials)
-    if (error instanceof TRPCError && error.code === "FORBIDDEN") {
-      throw error;
-    }
-    return null;
-  }
-}
-
-/**
  * Check if the user has required scopes
  */
 export function requireScopes(authUser: AuthUser, resource: string, action: string): void {
@@ -178,11 +167,12 @@ export function requireScopes(authUser: AuthUser, resource: string, action: stri
 }
 
 /**
- * Check if the user has admin access (full permissions)
- * Checks for *:* scope (full access to all resources)
+ * Check that a signed-in owner or admin of the current organization is calling.
+ * API tokens are never admins, whatever their scopes.
  */
 export function requireAdmin(authUser: AuthUser): void {
-  if (!authUser.hasScope("*", "*")) {
+  const role = authUser.getRole();
+  if (authUser.authMethod !== "jwt" || (role !== "owner" && role !== "admin")) {
     throw new Error("Admin access required");
   }
 }

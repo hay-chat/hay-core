@@ -31,8 +31,10 @@ import { sendPausedNotice } from "./paused-notice";
 import { sendSuspendedHoldingReply } from "./suspended-holding-reply";
 import type { ExecutionResult } from "./execution.layer";
 import type { ToolLedgerEntry } from "@server/services/core/action-claim-guardrail.service";
+import { checkReplyMedia } from "./reply-media";
 import { decidedActionsLedger } from "./decided-actions";
 import { isToolEnabled } from "@server/services/core/enabled-tools";
+import { isPageTool, PAGE_TOOL_MESSAGE_SOURCE } from "@server/services/webchat/page-tools.service";
 import type { Message } from "@server/database/entities/message.entity";
 import type pino from "pino";
 
@@ -70,7 +72,7 @@ async function sendBotMessage(
   processingStartedAt: number,
 ): Promise<Message> {
   await assertAiMayReply(conversation);
-  const message = await conversation.addMessage(payload);
+  const message = await conversation.addMessage(await checkReplyMedia(conversation, payload, log));
   log.info(
     {
       durationMs: Date.now() - processingStartedAt,
@@ -1015,6 +1017,16 @@ async function requeueIfStillPending(conversation: Conversation, log: pino.Logge
 }
 
 /** Identifies a tool call by name and input, to spot exact repeats in a turn. */
+/** A TOOL message's metadata while its call runs; page tools are tagged for the guardrails. */
+function runningToolMetadata(tool: { name: string; args?: Record<string, unknown> }) {
+  return {
+    toolName: tool.name,
+    toolInput: tool.args,
+    toolStatus: "RUNNING",
+    ...(isPageTool(tool.name) ? { source: PAGE_TOOL_MESSAGE_SOURCE } : {}),
+  };
+}
+
 function toolCallKey(tool: { name: string; args?: Record<string, unknown> }): string {
   return `${tool.name}:${JSON.stringify(tool.args ?? {})}`;
 }
@@ -1349,11 +1361,7 @@ async function handleExecutionLoop(
       const toolMessageId = await conversation.addMessage({
         content: `Running action: ${executionResult.tool.name}`,
         type: MessageType.TOOL,
-        metadata: {
-          toolName: executionResult.tool.name,
-          toolInput: executionResult.tool.args,
-          toolStatus: "RUNNING",
-        },
+        metadata: runningToolMetadata(executionResult.tool),
       });
 
       // Execute the tool
@@ -1366,6 +1374,7 @@ async function handleExecutionLoop(
         name: executionResult.tool.name,
         success: toolExecResult1.success,
         pending: toolExecResult1.pending,
+        pageTool: isPageTool(executionResult.tool.name),
       });
       rememberToolCall(executionResult.tool, toolExecResult1);
       await maybeEmitProductRecommendation(
@@ -1381,11 +1390,7 @@ async function handleExecutionLoop(
       const toolMessageId = await conversation.addMessage({
         content: `Running action: ${executionResult.tool.name}`,
         type: MessageType.TOOL,
-        metadata: {
-          toolName: executionResult.tool.name,
-          toolInput: executionResult.tool.args,
-          toolStatus: "RUNNING",
-        },
+        metadata: runningToolMetadata(executionResult.tool),
       });
 
       // Execute the tool with the message ID for updating
@@ -1398,6 +1403,7 @@ async function handleExecutionLoop(
         name: executionResult.tool.name,
         success: toolExecResult2.success,
         pending: toolExecResult2.pending,
+        pageTool: isPageTool(executionResult.tool.name),
       });
       rememberToolCall(executionResult.tool, toolExecResult2);
       await maybeEmitProductRecommendation(

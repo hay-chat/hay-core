@@ -195,7 +195,6 @@ Retrieves the current status of a privacy request.
   jobId?: string
   jobStatus?: "pending" | "queued" | "processing" | "completed" | "failed" | "cancelled" | "retrying"
   downloadAvailable: boolean  // True if export is ready
-  errorMessage?: string
 }
 ```
 
@@ -332,6 +331,14 @@ Exports are provided in JSON format and include:
 }
 ```
 
+A **customer** export has `profile`, `conversations` and `embeddings`, plus the records linked to them:
+
+- `teamQuestions`, `pendingActions`, `actionLog`: from the customer's conversations. Who at the organization answered or decided, and any staff note, are left out.
+- `disputes`: chargebacks on orders linked to the customer's conversations (status, amount, currency, reason, order label, date). Provider links and evidence are left out.
+- `uploads`: file details for what the customer uploaded.
+- `consentRecords`: widget consent decisions tied to the customer's conversations.
+- `testTranscripts`, `testCases`, `simulationItems`: simulation data that came from the customer's conversations or contains their email or phone.
+
 ---
 
 ## Data Deletion Strategy
@@ -357,7 +364,9 @@ When a deletion request is confirmed, the following actions are taken:
 
 ### Known Limits
 
-- **Customer erasure** deletes the customer's messages, action logs, pending actions, order links and team questions; conversations remain as anonymous soft-deleted rows _(pending PR #133)_.
+- **Customer erasure** deletes the customer's messages, action logs, pending actions, order links and team questions; conversations remain as anonymous soft-deleted rows.
+- **Simulation data** has no customer link, so erasure finds it by the customer's conversations and messages and by their email or phone appearing in the text (case-insensitive, seven characters or more). Matching transcripts and test cases are deleted; matching run items lose their seed, expectations and verdict and stay as counts. A name alone is not matched, since names produce false positives, so an imported transcript that only names the customer stays.
+- **Disputes** are kept on erasure: they carry no customer identifier, and the organization needs them to answer chargebacks.
 - Audit rows written by _other_ users (e.g. an invitation sent to the erased person) may still contain the erased person's email address.
 - Operator event payloads are not erased yet.
 - Erasure does not reach sub-processors' copies (e.g. AI providers, email provider) or commerce platforms connected through plugins.
@@ -369,9 +378,27 @@ Store platforms connected through plugins (Nuvemshop LGPD webhooks, Shopify comp
 - **Redact** (`customers/redact`): the matching customers are erased as above. The shopper gets no email from Hay; the platform answers them.
 - **Data request** (`customers/data_request`): the store is the controller and Hay the processor, so the export goes to the organization's active owners and admins (template `privacy-export-ready-merchant`), naming the customer and the platform's request id and asking them to forward it. The shopper is never emailed. A request with no matching customer is recorded as answered (`metadata.outcome = "no_match"`); one whose organization has no owner or admin with an email is recorded as failed (`metadata.outcome = "no_recipient"`) and no export is made.
 
+### Re-applying erasures after a restore
+
+Every completed erasure of a customer, staff user or organization adds a row to `erasure_ledger`, in the same transaction as the erasure. The table holds ids only, and a database trigger refuses updates and deletes.
+
+A restored backup can bring erased people back, so after any restore run this before reopening traffic:
+
+```bash
+cd server
+npm run privacy:replay-erasures            # lists what would be erased
+npm run privacy:replay-erasures -- --apply
+```
+
+It is safe to run again: a subject stops being listed once erased. Erasures made before the ledger existed are not recorded and can't be replayed.
+
+### Webchat consent record
+
+When a host page calls the widget's consent grant or revoke, the widget reports the decision to `publicConversations.recordConsent`, stored in `webchat_consent_events` with the organization, the consent mode, the time and the conversation if one is open. No IP address or browser data is stored. The row is deleted with the organization; deleting a conversation row clears its link. The first-interaction gate in implicit mode is not a consent decision and isn't recorded.
+
 ### Retention for Compliance
 
-- Audit logs (anonymized or not) are deleted after **90 days** by the `cleanup-old-audit-logs` daily job.
+- Audit logs (anonymized or not) are deleted after **365 days** by the `cleanup-old-audit-logs` daily job. IP addresses, user agents and email addresses in the event details are cleared from them after **90 days**.
 - Backups: production databases run on a managed provider (DigitalOcean) with the provider's automated backups. Hay has no backup rotation of its own, so deleted data can remain in provider backups for the provider's backup retention window. _(To confirm: the configured backup retention period.)_
 
 ---
@@ -392,7 +419,7 @@ Store platforms connected through plugins (Nuvemshop LGPD webhooks, Shopify comp
 
 ### 3. Audit Trail
 
-All DSAR actions are recorded in the audit log. Audit rows are append-only at the database level: they cannot be edited or deleted, except for the erasure anonymization above and the 90-day retention cleanup. Deleting an organization keeps its audit rows (the organization reference is cleared; the original organization id is retained).
+All DSAR actions are recorded in the audit log. Audit rows are append-only at the database level: they cannot be edited or deleted, except for the erasure anonymization above and the retention cleanup (personal fields after 90 days, the row after 365). Deleting an organization keeps its audit rows (the organization reference is cleared; the original organization id is retained).
 
 - `privacy.export.request`
 - `privacy.export.confirm`
@@ -582,9 +609,11 @@ Plugins an organization enables (e.g. Shopify, WhatsApp, Zendesk) send data to t
 | -------------------- | ----------------------- | ----------------------------------------------------------------------------------- |
 | **Conversations**    | Per-org `retentionDays` | Automatically anonymized by daily cleanup worker (see [RETENTION.md](RETENTION.md)) |
 | **Embeddings**       | Per-org `retentionDays` | Deleted alongside anonymized conversations                                          |
+| **Customers**        | Per-org `retentionDays` | Deleted once unchanged past the window with no live or held conversation; never when `retentionDays` is unset |
+| **Stored files of a deleted organization** | Hours | Queued in the deletion's transaction and deleted by the hourly `storage-purge-drain` job |
 | **Export Files**     | 7 days                  | Automatically deleted after download link expires                                   |
-| **Privacy Requests** | 365 days                | Anonymized after 365 days (pending PR #133)                                         |
-| **Audit Logs**       | 90 days                 | Deleted daily by the `cleanup-old-audit-logs` job; kept after organization deletion |
+| **Privacy Requests** | 365 days                | Anonymized after 365 days; kept after organization deletion, with `original_organization_id` |
+| **Audit Logs**       | 365 days (personal fields 90 days) | Cleared and deleted daily by the `cleanup-old-audit-logs` job; kept after organization deletion |
 | **Database Backups** | Provider's retention    | Managed-database automated backups; no Hay-side rotation (period _to confirm_)      |
 
 ---
@@ -634,7 +663,8 @@ This implementation complies with:
 
 - [ ] Data rectification endpoint (GDPR Article 16)
 - [ ] Data portability in multiple formats (CSV, XML)
-- [ ] Documented backup retention period and restore-time re-erasure procedure
+- [x] Restore-time re-erasure procedure (see "Re-applying erasures after a restore")
+- [ ] Documented backup retention period
 - [ ] Self-service request cancellation
 - [ ] Admin dashboard for DSAR monitoring
 - [ ] Multi-language email templates

@@ -11,9 +11,17 @@ import { createContext } from "@server/trpc/context";
 import { AppDataSource, initializeDatabase } from "@server/database/data-source";
 import { createLogger } from "@server/lib/logger";
 import { initTelemetry, captureException, shutdownTelemetry } from "@server/lib/telemetry";
+import { requestContext } from "@server/lib/request-context";
+import { startMetricsServer } from "@server/lib/metrics-server";
 import { isPublicUploadPath, setPublicUploadHeaders } from "@server/services/media-url.service";
-import { bodyLimitForPath } from "@server/lib/body-limits";
-import { httpIpRateLimit } from "@server/lib/http-rate-limit";
+import {
+  bodyLimitForPath,
+  DEFAULT_BODY_LIMIT,
+  isPublicWidgetPath,
+  UPLOAD_BODY_LIMIT,
+} from "@server/lib/body-limits";
+import { mayParseLargeBody } from "@server/lib/large-body-auth";
+import { httpIpRateLimit, trpcRetryAfterMeta } from "@server/lib/http-rate-limit";
 import "reflect-metadata";
 import dotenv from "dotenv";
 
@@ -64,8 +72,8 @@ async function startServer() {
     logger.warn("Starting server without Redis connection");
   }
 
-  // Initialize Channel Delivery service (depends on Redis)
-  // Listens for outbound bot/agent messages and delivers them to external channels (WhatsApp, etc.)
+  // Initialize Channel Delivery service: consumes the durable delivery queue and
+  // sends outbound bot/agent messages to external channels (WhatsApp, etc.)
   const { channelDeliveryService } = await import("@server/services/channel-delivery.service");
   try {
     await channelDeliveryService.initialize();
@@ -81,8 +89,7 @@ async function startServer() {
       await import("@server/services/orchestrator-queue.service");
     await orchestratorQueueService.declareQueues();
   } catch (error) {
-    // eslint-disable-next-line no-console
-    console.warn("⚠️  Starting server without RabbitMQ connection");
+    logger.warn("Starting server without RabbitMQ connection");
   }
 
   // Initialize Job Queue service (depends on Redis)
@@ -120,6 +127,8 @@ async function startServer() {
   // lib/client-ip.ts), not whatever X-Forwarded-For a client sent.
   server.set("trust proxy", config.server.trustProxy);
 
+  server.use(requestContext);
+
   // Baseline security headers. The default CSP suits JSON and plain-text
   // responses (nothing loads, nothing may frame them); routes that serve HTML
   // or files set their own CSP (webchat challenge, media, plugin assets,
@@ -146,10 +155,7 @@ async function startServer() {
   // Add permissive CORS middleware for public widget endpoints
   // This allows the widget to be embedded on any domain
   server.use((req, res, next) => {
-    if (
-      req.path.startsWith("/v1/publicConversations") ||
-      req.path.startsWith("/v1/webchat.getPublicConfig")
-    ) {
+    if (isPublicWidgetPath(req.path)) {
       return cors({
         origin: true, // Allow all origins
         credentials: false,
@@ -193,17 +199,24 @@ async function startServer() {
   };
   const bodyParsers = new Map<string, express.RequestHandler[]>();
   server.use((req, res, next) => {
-    const limit = bodyLimitForPath(req.path);
-    let parsers = bodyParsers.get(limit);
-    if (!parsers) {
-      parsers = [
-        express.json({ limit, verify: captureRawBody }),
-        express.urlencoded({ extended: true, limit, verify: captureRawBody }),
-      ];
-      bodyParsers.set(limit, parsers);
-    }
-    const [json, urlencoded] = parsers;
-    json(req, res, (err?: unknown) => (err ? next(err) : urlencoded(req, res, next)));
+    void (async () => {
+      let limit = bodyLimitForPath(req.path);
+      if (limit === UPLOAD_BODY_LIMIT && !(await mayParseLargeBody(req))) {
+        limit = DEFAULT_BODY_LIMIT;
+      }
+      let parsers = bodyParsers.get(limit);
+      if (!parsers) {
+        // File uploads are never signature-checked, so no second copy of them.
+        const verify = limit === UPLOAD_BODY_LIMIT ? undefined : captureRawBody;
+        parsers = [
+          express.json({ limit, verify }),
+          express.urlencoded({ extended: true, limit, verify }),
+        ];
+        bodyParsers.set(limit, parsers);
+      }
+      const [json, urlencoded] = parsers;
+      json(req, res, (err?: unknown) => (err ? next(err) : urlencoded(req, res, next)));
+    })().catch(next);
   });
 
   server.get("/", (req, res) => {
@@ -465,7 +478,7 @@ async function startServer() {
 
   // Plugin upload endpoints
   const multer = await import("multer");
-  const { withAdminAuth } = await import("@server/middleware/auth");
+  const { withAdminAuth, withMfaStepUp } = await import("@server/middleware/auth");
   const { pluginUploadService, requireCustomPluginsAllowed, handlePluginUploadError } =
     await import("@server/services/plugin-upload.service");
 
@@ -489,6 +502,7 @@ async function startServer() {
   server.post(
     "/v1/plugins/upload",
     withAdminAuth,
+    withMfaStepUp,
     requireCustomPluginsAllowed,
     pluginUpload.single("plugin"),
     async (req: express.Request, res: express.Response) => {
@@ -500,6 +514,7 @@ async function startServer() {
   server.put(
     "/v1/plugins/:pluginId",
     withAdminAuth,
+    withMfaStepUp,
     requireCustomPluginsAllowed,
     pluginUpload.single("plugin"),
     async (req: express.Request, res: express.Response) => {
@@ -520,14 +535,15 @@ async function startServer() {
   const mediaRouter = await import("@server/routes/v1/media/index");
   server.use("/v1/media", mediaRouter.default);
 
-  // Core routers merged with plugin routers. The merged router is cached and
-  // replaced whenever a plugin router is registered or reloaded (a plugin
-  // rebuild), so the middleware is rebuilt when its identity changes.
-  const { createV1Router } = await import("@server/routes/v1");
-  const createV1Middleware = (v1Router: ReturnType<typeof createV1Router>) =>
+  const { noStoreOnAuthRoutes } = await import("@server/lib/auth/session-cookie");
+  const { v1Router } = await import("@server/routes/v1");
+  server.use("/v1", noStoreOnAuthRoutes);
+  server.use(
+    "/v1",
     createExpressMiddleware({
       router: v1Router,
       createContext,
+      responseMeta: trpcRetryAfterMeta,
       // Without this, every failed procedure (validation, auth, unhandled throw) is
       // returned to the client and never written to the logs, leaving production
       // incidents undiagnosable. Input is omitted -- it can carry customer data.
@@ -550,17 +566,8 @@ async function startServer() {
           properties: { trpc_path: path, trpc_type: type, trpc_code: error.code },
         });
       },
-    });
-  let v1Router = createV1Router();
-  let v1Middleware = createV1Middleware(v1Router);
-  server.use("/v1", (req, res, next) => {
-    const current = createV1Router();
-    if (current !== v1Router) {
-      v1Router = current;
-      v1Middleware = createV1Middleware(current);
-    }
-    return v1Middleware(req, res, next);
-  });
+    }),
+  );
 
   // Create HTTP server
   const httpServer = createServer(server);
@@ -581,8 +588,16 @@ async function startServer() {
     process.exit(1);
   });
 
+  const { registerRuntimeMetrics } = await import("@server/services/runtime-metrics");
+  registerRuntimeMetrics();
+  const metricsServer = startMetricsServer();
+
   httpServer.listen(config.server.port, async () => {
     logger.info({ port: config.server.port }, "Server is running");
+
+    const { setUsageSink } = await import("@server/services/llm/usage-sink");
+    const { recordOrgUsage } = await import("@server/services/llm/org-usage-budget");
+    setUsageSink(recordOrgUsage);
 
     // Start the orchestrator worker (subscribes to RabbitMQ queue)
     await orchestratorWorker.start();
@@ -629,11 +644,18 @@ async function startServer() {
       }
     };
 
+    metricsServer?.close();
     const httpClosed = new Promise<void>((resolve) => httpServer.close(() => resolve()));
     await step("orchestrator", () => orchestratorWorker.stop());
     await step("plugin-cleanup", () => pluginInstanceManagerService.stopCleanup());
     await step("websocket", () => websocketService.shutdown());
-    await step("scheduler", () => schedulerService.shutdown({ gracefulTimeout: 15000 }));
+    await step("background-work", () =>
+      Promise.all([
+        jobQueueService.shutdown(15000),
+        schedulerService.shutdown({ gracefulTimeout: 15000 }),
+        channelDeliveryService.stop(15000),
+      ]),
+    );
     await step("http", () => {
       httpServer.closeIdleConnections();
       return httpClosed;

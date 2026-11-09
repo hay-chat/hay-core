@@ -7,6 +7,7 @@ import {
 } from "../../../services/message-feedback.service";
 import { FeedbackRating } from "../../../types/message-feedback.types";
 import { TRPCError } from "@trpc/server";
+import { auditLogService } from "@server/services/audit-log.service";
 
 const feedbackService = new MessageFeedbackService();
 
@@ -94,6 +95,15 @@ export const messageFeedbackRouter = t.router({
       };
 
       const csv = await feedbackService.exportFeedbackToCSV(ctx.organizationId!, filter);
+      await auditLogService.record({
+        userId: ctx.user?.id,
+        organizationId: ctx.organizationId,
+        action: "message_feedback.export",
+        resource: "message_feedback",
+        changes: { filter: input },
+        ipAddress: ctx.ipAddress,
+        userAgent: ctx.userAgent,
+      });
       return { csv };
     }),
 

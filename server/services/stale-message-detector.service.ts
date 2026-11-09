@@ -133,6 +133,7 @@ export class StaleMessageDetectorService {
         FROM last_messages
         WHERE last_message_type = 'Customer'
           AND last_customer_message_at < $1
+          AND (cooldown_until IS NULL OR cooldown_until <= NOW())
           AND (
             -- Already marked as stuck
             is_stuck = TRUE

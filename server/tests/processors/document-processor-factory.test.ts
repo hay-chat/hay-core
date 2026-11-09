@@ -17,7 +17,10 @@ const PPTX = "application/vnd.openxmlformats-officedocument.presentationml.prese
 
 async function pptx(extra: Record<string, string | Buffer> = {}): Promise<Buffer> {
   const zip = new JSZip();
-  zip.file("[Content_Types].xml", "<Types/>");
+  zip.file(
+    "[Content_Types].xml",
+    '<Types><Override PartName="/ppt/presentation.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.presentation.main+xml"/></Types>',
+  );
   zip.file(
     "ppt/slides/slide1.xml",
     '<p:sld xmlns:a="a" xmlns:p="p"><a:t>Hello slide</a:t></p:sld>',

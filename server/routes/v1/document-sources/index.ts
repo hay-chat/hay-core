@@ -1,4 +1,5 @@
 import { TRPCError } from "@trpc/server";
+import { toClientError } from "@server/trpc/client-error";
 import { z } from "zod";
 import { t, scopedProcedure } from "@server/trpc";
 import { RESOURCES, ACTIONS } from "@server/types/scopes";
@@ -15,8 +16,21 @@ import { Job } from "@server/entities/job.entity";
 import { jobRepository } from "@server/repositories/job.repository";
 import { DocumentSource } from "@server/entities/document-source.entity";
 import { createLogger } from "@server/lib/logger";
+import { fitsInBytes } from "@server/lib/validation/json-record";
 
 const logger = createLogger("document-sources");
+
+/** The most frequent schedule the dashboard offers. */
+const syncIntervalMsSchema = z
+  .number()
+  .int()
+  .min(15 * 60 * 1000);
+const SOURCE_CONFIG_MAX_BYTES = 65_536;
+const sourceConfigSchema = z
+  .record(z.string(), z.unknown())
+  .refine((value) => fitsInBytes(value, SOURCE_CONFIG_MAX_BYTES), {
+    message: "Configuration is too large",
+  });
 
 /**
  * Serialize a DocumentSource for API consumers. Keeps shape stable across
@@ -138,10 +152,7 @@ export const documentSourcesRouter = t.router({
       } catch (err) {
         if (err instanceof TRPCError) throw err;
         logger.error({ err, pluginId: input.pluginId }, "listRoots passthrough failed");
-        throw new TRPCError({
-          code: "INTERNAL_SERVER_ERROR",
-          message: err instanceof Error ? err.message : "listRoots failed",
-        });
+        throw toClientError(err, "INTERNAL_SERVER_ERROR", "listRoots failed");
       }
     }),
 
@@ -154,13 +165,13 @@ export const documentSourcesRouter = t.router({
     .input(
       z.object({
         pluginId: z.string().min(1),
-        pluginInstanceId: z.string().uuid().optional(),
+        pluginInstanceId: z.string().uuid(),
         displayName: z.string().min(1).max(255),
         sourceType: z.string().min(1).max(50),
         externalRootId: z.string().max(255).optional(),
         externalRootLabel: z.string().max(255).optional(),
-        config: z.record(z.string(), z.unknown()).optional(),
-        syncIntervalMs: z.number().int().positive().optional(),
+        config: sourceConfigSchema.optional(),
+        syncIntervalMs: syncIntervalMsSchema.optional(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
@@ -181,6 +192,17 @@ export const documentSourcesRouter = t.router({
         throw new TRPCError({
           code: "BAD_REQUEST",
           message: `Plugin '${input.pluginId}' is not a document_importer`,
+        });
+      }
+
+      const instance = await pluginInstanceRepository.findByOrgAndPlugin(
+        ctx.organizationId!,
+        input.pluginId,
+      );
+      if (!instance || instance.id !== input.pluginInstanceId) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Plugin instance not found for this organization",
         });
       }
 
@@ -210,7 +232,7 @@ export const documentSourcesRouter = t.router({
       z.object({
         url: z.string().url(),
         displayName: z.string().min(1).max(255).optional(),
-        syncIntervalMs: z.number().int().positive().nullable().optional(),
+        syncIntervalMs: syncIntervalMsSchema.nullable().optional(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
@@ -235,8 +257,8 @@ export const documentSourcesRouter = t.router({
           .object({
             displayName: z.string().min(1).max(255).optional(),
             enabled: z.boolean().optional(),
-            syncIntervalMs: z.number().int().positive().nullable().optional(),
-            config: z.record(z.string(), z.unknown()).optional(),
+            syncIntervalMs: syncIntervalMsSchema.nullable().optional(),
+            config: sourceConfigSchema.optional(),
           })
           .refine((p) => Object.keys(p).length > 0, {
             message: "patch must include at least one field",

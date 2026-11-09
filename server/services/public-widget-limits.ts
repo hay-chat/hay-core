@@ -3,8 +3,9 @@ import { rateLimitService } from "./rate-limit.service";
 /**
  * Abuse limits for the public webchat API (publicConversations.* and the
  * WebSocket). They are sized so a real shopper never meets them, and only
- * stop scripted floods. Counters live in Redis; if Redis is down the limits
- * fail open so the widget keeps working.
+ * stop scripted floods. Counters live in Redis. If Redis is down, requests
+ * that create something lasting (conversations, stored files) are refused and
+ * the rest count per process, so an open chat keeps working.
  *
  * Per-IP limits depend on the edge proxy setting X-Forwarded-For (see
  * lib/client-ip.ts), so each write is also limited per org or conversation.
@@ -20,6 +21,16 @@ export const PUBLIC_WIDGET_LIMITS = {
   messagePerConversation: { max: 20, windowSeconds: 60 },
   /** Messages per IP, across conversations. */
   messagePerIp: { max: 60, windowSeconds: 60 },
+  /** Messages per organization, as a burst cap on AI runs across all visitors. */
+  messagePerOrg: { max: 1200, windowSeconds: 60 },
+  /** Messages per organization per hour: the ceiling on AI spend one site's traffic can cause. */
+  messagePerOrgHourly: { max: 20000, windowSeconds: 60 * 60 },
+  /** Message history reads per IP. */
+  readPerIp: { max: 300, windowSeconds: 60 },
+  /** Form submissions per IP. */
+  formPerIp: { max: 30, windowSeconds: 60 },
+  /** Key rotations per IP. A widget rotates rarely. */
+  rotateKeysPerIp: { max: 30, windowSeconds: 10 * 60 },
   /** Files (photos, PDFs) per conversation. Each is up to 10 MB of storage. */
   attachmentPerConversation: { max: 10, windowSeconds: 10 * 60 },
   /** Challenge page loads per IP (one per first message; retries included). */
@@ -44,6 +55,7 @@ type LimitRule = Exclude<keyof typeof PUBLIC_WIDGET_LIMITS, "maxMessageLength">;
  */
 export async function isPublicWidgetRateLimited(
   checks: Array<{ rule: LimitRule; id: string }>,
+  options: { failClosed?: boolean } = {},
 ): Promise<boolean> {
   for (const { rule, id } of checks) {
     const { max, windowSeconds } = PUBLIC_WIDGET_LIMITS[rule];
@@ -51,6 +63,7 @@ export async function isPublicWidgetRateLimited(
       `public-widget:${rule}:${id}`,
       max,
       windowSeconds,
+      options.failClosed ?? false,
     );
     if (result.limited) return true;
   }

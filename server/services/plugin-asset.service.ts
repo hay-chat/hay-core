@@ -7,6 +7,7 @@ import type { PluginRegistry } from "../entities/plugin-registry.entity";
 import { pluginRegistryRepository } from "../repositories/plugin-registry.repository";
 import { pluginInstanceRepository } from "../repositories/plugin-instance.repository";
 import { createLogger } from "@server/lib/logger";
+import { deriveServiceKey } from "@server/lib/auth/utils/service-keys";
 
 const logger = createLogger("plugin-asset");
 
@@ -69,12 +70,9 @@ export async function resolveWithin(baseDir: string, relativePath: string): Prom
  */
 export const PLUGIN_UI_URL_TTL_SECONDS = 10 * 60;
 
-/** Dedicated key, derived from JWT_SECRET, so it never doubles as a session or media signature. */
+/** Dedicated key, so it never doubles as a session or media signature. */
 function uiSigningKey(): Buffer {
-  if (!config.jwt.secret) {
-    throw new Error("JWT_SECRET is required to sign plugin UI URLs");
-  }
-  return createHmac("sha256", config.jwt.secret).update("hay:plugin-ui-url:v1").digest();
+  return deriveServiceKey("hay:plugin-ui-url:v1");
 }
 
 function uiSignature(pluginId: string, organizationId: string, expires: number): string {
@@ -135,6 +133,7 @@ export async function canOrganizationLoadPluginUI(
   organizationId: string,
 ): Promise<boolean> {
   if (plugin.sourceType === "core") return true;
+  if (!config.plugins.allowCustomPluginUi) return false;
   if (plugin.organizationId !== organizationId) return false;
   const instance = await pluginInstanceRepository.findByOrgAndPlugin(
     organizationId,
@@ -186,12 +185,15 @@ export class PluginAssetService {
 
   /**
    * Read the first thumbnail that exists in the plugin directory, honouring the
-   * svg > png > jpg priority order. Returns null if none exist.
+   * svg > png > jpg priority order. Returns null if none exist. Only core
+   * plugins may use SVG, which is a document rather than an image.
    */
   private async readThumbnail(
     pluginDir: string,
+    sourceType: PluginRegistry["sourceType"],
   ): Promise<{ content: Buffer; contentType: string } | null> {
     for (const candidate of PluginAssetService.thumbnailCandidates) {
+      if (candidate.contentType === "image/svg+xml" && sourceType !== "core") continue;
       try {
         const content = await fs.readFile(path.join(pluginDir, candidate.file));
         return { content, contentType: candidate.contentType };
@@ -244,7 +246,7 @@ export class PluginAssetService {
     const pluginDir = pluginDirFor(plugin.pluginPath);
 
     try {
-      const thumbnail = await this.readThumbnail(pluginDir);
+      const thumbnail = await this.readThumbnail(pluginDir, plugin.sourceType);
       if (!thumbnail) {
         res.status(404).json({ error: "Thumbnail not found" });
         return;
@@ -341,10 +343,10 @@ export class PluginAssetService {
       return;
     }
 
-    // Find the plugin
+    // The route is unauthenticated, so it only exposes first-party files.
     const plugin = await pluginRegistryRepository.findByPluginId(pluginName);
 
-    if (!plugin) {
+    if (plugin?.sourceType !== "core") {
       res.status(404).json({ error: "Plugin not found" });
       return;
     }

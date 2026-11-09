@@ -7,7 +7,7 @@ import { board, row } from "./fixtures";
 
 const api = vi.hoisted(() => ({ get: vi.fn() }));
 vi.mock("@/utils/api", () => ({ Hay: { setup: { get: { query: api.get } } }, HayApi: {} }));
-vi.mock("@/middleware/auth.global", async () => ({
+vi.mock("@/utils/route-access", async () => ({
   hasRouteAccess: (await import("./fixtures")).hasRouteAccess,
 }));
 

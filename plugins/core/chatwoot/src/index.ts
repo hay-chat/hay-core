@@ -94,7 +94,7 @@ export default defineHayPlugin((globalCtx) => {
       });
 
       // Inbound: Chatwoot POSTs here when a message_created event fires.
-      register.route("POST", "/messages", async (req, res) => {
+      register.route("POST", "/messages", { public: true }, async (req, res) => {
         await webhookHandler(req, res, {
           getWebhookSecret: () => webhookSecret,
           logger,

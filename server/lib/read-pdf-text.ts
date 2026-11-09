@@ -5,7 +5,7 @@ export async function readPdfText(
   buffer: Buffer,
   maxPages: number,
 ): Promise<{ text: string; pageCount: number }> {
-  const parser = new PDFParse({ data: buffer });
+  const parser = new PDFParse({ data: buffer, isEvalSupported: false });
   try {
     // No "-- 1 of N --" markers: the text goes into documents and embeddings as is.
     const result = await parser.getText({ first: maxPages, pageJoiner: "" });

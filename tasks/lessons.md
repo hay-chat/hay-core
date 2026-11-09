@@ -342,3 +342,23 @@
 - Failure: the chat told an English customer "$200/month" because an English question retrieved the Portuguese pricing page ("R$ 200"). A check that only asks "did it reply without handing off?" would call that a pass.
 - Signal: tracing a figure from the reply back to the documents; "$540" appeared in none of them as dollars.
 - Rule: when judging chat quality, compare the reply's facts with the source text, not just its outcome.
+
+## A merge failure must stop the cleanup (2026-11-09)
+- Failure: a `;` after `git merge` ran worktree removal even though the merge conflicted.
+- Signal: conflict output followed by a clean-up message, and a missing worktree.
+- Rule: chain merge, cleanup and next-step commands with `&&` only.
+
+## Typecheck can't see a dynamic import (2026-11-09)
+- Failure: a dependency-cleanup branch removed `jose` as unused, but the proof verifier loads it through a Function-constructor import. Types and tests all passed.
+- Signal: the package name still appeared in a plain-text search of the server.
+- Rule: before removing a dependency, search for its bare name, not only import statements, and guard indirect loads with a `require.resolve` test.
+
+## Parallel branches need a full-suite pass after merging (2026-11-09)
+- Failure: eight server suites failed only on the merged branch, though each branch's targeted tests passed; merges also dropped a needed import and field.
+- Signal: first full run after integration.
+- Rule: typecheck after every merge and run the full suite plus an independent cross-branch review before calling integrated work done.
+
+## Shared serializers must never wait on stdin or hanging handles (2026-11-09)
+- Failure: a `psql` password prompt and a jest run that never exited each held the machine-wide test lock for a long time.
+- Signal: other agents stalled with zero CPU on the holder.
+- Rule: run serialized commands with stdin closed and non-interactive auth, and use `--forceExit` for full jest runs.

@@ -64,14 +64,48 @@ function ensureStdioDependencies(serverCwd: string, id: string, logger: HayLogge
     return;
   }
 
+  // Production installs happen ahead of time: core plugins at the image build,
+  // others when they are installed. A worker never runs npm there.
+  if (process.env.NODE_ENV === "production") {
+    throw new Error(`Dependencies of stdio MCP server "${id}" are not installed`);
+  }
+
   logger.info(`Installing stdio MCP server dependencies: ${id}`, { cwd: serverCwd });
   // --ignore-scripts: never run a dependency's lifecycle scripts during a
   // server spawn. --omit=dev: stdio servers only need runtime deps.
   execSync("npm install --omit=dev --ignore-scripts", {
     cwd: serverCwd,
     stdio: "inherit",
+    env: stdioServerEnv(),
   });
   ensuredStdioDependencyDirs.add(serverCwd);
+}
+
+/** The worker's environment variables a stdio MCP server may inherit. */
+const STDIO_INHERITED_ENV = [
+  "PATH",
+  "HOME",
+  "NODE_ENV",
+  "TMPDIR",
+  "TEMP",
+  "TMP",
+  "LANG",
+  "LC_ALL",
+  "TZ",
+];
+
+/**
+ * Environment for a stdio MCP server: the basics a process needs plus what the
+ * plugin passes explicitly. The worker's own credentials stay in the worker.
+ *
+ * @internal
+ */
+export function stdioServerEnv(env: Record<string, string> = {}): NodeJS.ProcessEnv {
+  const inherited: NodeJS.ProcessEnv = {};
+  for (const name of STDIO_INHERITED_ENV) {
+    if (process.env[name] !== undefined) inherited[name] = process.env[name];
+  }
+  return { ...inherited, ...env };
 }
 
 /**
@@ -257,11 +291,7 @@ export function createMcpRuntimeAPI(options: McpRuntimeAPIOptions): HayMcpRuntim
         // may be absent even when platform bookkeeping marks the plugin installed.
         ensureStdioDependencies(absoluteCwd, id, logger);
 
-        // Merge environment variables
-        const processEnv = {
-          ...process.env,
-          ...env,
-        };
+        const processEnv = stdioServerEnv(env);
 
         // Use process.execPath for 'node' command to ensure same Node.js binary
         // This prevents PATH issues when plugin workers are spawned in isolated environments

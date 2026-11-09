@@ -1,4 +1,5 @@
 import { LLMService } from "./llm.service";
+import { fenceData } from "@server/services/core/prompt-data";
 import { PromptService } from "../prompt.service";
 import { Message, MessageType } from "@server/database/entities/message.entity";
 import { createLogger } from "@server/lib/logger";
@@ -19,6 +20,8 @@ export interface ToolLedgerEntry {
   success: boolean;
   /** Held for a person's approval (D4-4): requested, not done. */
   pending?: boolean;
+  /** Ran in the visitor's browser: only the page says what happened. */
+  pageTool?: boolean;
   /** A team member decided an earlier held call; this turn answers that decision. */
   decision?: "approved" | "declined";
 }
@@ -82,9 +85,9 @@ export class ActionClaimGuardrailService {
     }
 
     const evaluationPrompt = await this.promptService.getPrompt("execution/action-claim-check", {
-      response: context.response,
-      customerQuery: context.customerQuery,
-      conversationHistory: this.formatConversationHistory(context.conversationHistory),
+      response: fenceData(context.response),
+      customerQuery: fenceData(context.customerQuery),
+      conversationHistory: fenceData(this.formatConversationHistory(context.conversationHistory)),
       toolLedger: this.formatToolLedger(context.toolsCalledThisTurn),
     });
 
@@ -202,6 +205,7 @@ export class ActionClaimGuardrailService {
   private ledgerStatus(entry: ToolLedgerEntry): string {
     if (entry.decision === "declined") return "DECLINED_BY_TEAM";
     if (entry.pending) return "PENDING_APPROVAL";
+    if (entry.pageTool && entry.success) return "UNVERIFIED_PAGE_TOOL";
     const status = entry.success ? "SUCCESS" : "FAILED";
     return entry.decision === "approved" ? `${status} (approved by the team)` : status;
   }

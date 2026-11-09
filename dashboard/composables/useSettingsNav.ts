@@ -44,7 +44,7 @@ export const SETTINGS_NAV: SettingsSection[] = [
     labelKey: "nav.privacy",
     tabs: [
       { labelKey: "nav.workspaceData", path: "/settings/privacy", adminOnly: true },
-      { labelKey: "nav.customerPrivacy", path: "/settings/customer-privacy" },
+      { labelKey: "nav.customerPrivacy", path: "/settings/customer-privacy", adminOnly: true },
     ],
   },
   {

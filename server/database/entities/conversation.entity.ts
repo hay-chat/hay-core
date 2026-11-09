@@ -9,6 +9,7 @@ import {
   JoinColumn,
   Index,
 } from "typeorm";
+import { renderToolDetail, renderToolReference } from "@server/services/core/prompt-data";
 import { Organization } from "../../entities/organization.entity";
 import { User } from "../../entities/user.entity";
 import { Message } from "./message.entity";
@@ -542,15 +543,13 @@ The following tools are available for you to use. You MUST return only valid JSO
               ? ` (Required: ${(required as string[]).join(", ")})`
               : "";
 
-          return `- **${actionName}**: ${
-            toolSchema.description
-          }${requiredFields}\n  Input Schema: ${JSON.stringify(inputSchema, null, 2)}`;
+          return renderToolDetail(actionName, toolSchema.description, requiredFields, inputSchema);
         } else {
           return `- **${actionName}**: ${UNAVAILABLE_ACTION_NOTE}`;
         }
       });
 
-      content += `\n${actionDetails.join("\n\n")}`;
+      content += `\n${renderToolReference(actionDetails.join("\n\n"))}`;
     } else if (referencedActions.length > 0) {
       // Fallback to simple list if no tool schemas provided
       content += `\n\n**Referenced Actions:**\n`;
@@ -813,15 +812,13 @@ The following tools are available for you to use. You MUST return only valid JSO
               ? ` (Required: ${(required as string[]).join(", ")})`
               : "";
 
-          return `- **${actionName}**: ${
-            toolSchema.description
-          }${requiredFields}\n  Input Schema: ${JSON.stringify(inputSchema, null, 2)}`;
+          return renderToolDetail(actionName, toolSchema.description, requiredFields, inputSchema);
         } else {
           return `- **${actionName}**: ${UNAVAILABLE_ACTION_NOTE}`;
         }
       });
 
-      content += `\n${actionDetails.join("\n\n")}`;
+      content += `\n${renderToolReference(actionDetails.join("\n\n"))}`;
     } else if (referencedActions.length > 0) {
       content += `\n\n**Referenced Actions:**\n`;
       content += referencedActions.map((action) => `- ${action}`).join("\n");

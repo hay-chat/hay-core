@@ -50,7 +50,7 @@ Inbound webhooks signed with Standard Webhooks / Svix signatures (e.g. Resend em
 
 - **Signature**: HMAC-SHA256 over `id.timestamp.body` with the provider secret; requests without a valid signature are rejected.
 - **Timestamp tolerance**: the provider timestamp must be within **5 minutes** of server time.
-- **Message id deduplication**: the provider message id is recorded in **Redis** for the tolerance window and a reused id is rejected. _(Pending: added by the webhook replay change in the current security batch; until it lands only the signature and timestamp are checked.)_
+- **Message id deduplication**: the provider message id is recorded in **Redis** for the tolerance window and a reused id is acknowledged without being processed again. While Redis is unavailable, deliveries are refused with `503` and `Retry-After` so the provider retries them.
 
 Third-party webhooks received by plugins are verified by each plugin against its provider's own scheme.
 
@@ -59,5 +59,11 @@ Third-party webhooks received by plugins are verified by each plugin against its
 Security-relevant actions (sign-in and sign-out, API keys, members and roles, plugin configuration and credentials, exports, deletions, DSAR requests) are written to the `audit_logs` table.
 
 - Rows are append-only: a database trigger rejects updates and deletes, except clearing a deleted user's or organization's reference, GDPR erasure anonymization, and the retention job.
-- Rows are kept **90 days**, also after the organization is deleted (attributable through `original_organization_id`).
+- Rows are kept **365 days**, also after the organization is deleted (attributable through `original_organization_id`). IP addresses, user agents and email addresses in the event details are cleared after 90 days.
+- Each organization's rows form a hash chain that a weekly job recomputes, so altered or removed events are reported.
+- Each row records whether a user, an API key, a plugin or the system acted.
 - Failed sign-ins for unknown emails store a keyed hash of the email, never the address.
+
+## Automated Decisions
+
+Refunds, cancellations, discounts and exchanges wait for a person's approval by default. An organization that switches this off lets its AI carry them out with no human review. Where such a decision has a legal or similarly significant effect on a customer, GDPR Article 22 applies, and the organization, as controller, must have a lawful basis and offer a way to reach a person and contest the decision. Handing the conversation to the team is that route in Hay.

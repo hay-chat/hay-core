@@ -1,0 +1,13 @@
+{
+  "_comment": "Moderate advisories accepted for now. High and critical ones can never be listed. Each entry stops working on its expiry date.",
+  "advisories": [
+    { "id": "GHSA-5v7r-6r5c-r473", "package": "file-type", "reason": "Fix needs a major upgrade.", "expires": "2027-02-01" },
+    { "id": "GHSA-3g3m-2fjr-6pw4", "package": "glob", "reason": "Comes through typeorm; the fix needs typeorm 1.x.", "expires": "2027-02-01" },
+    { "id": "GHSA-g3hv-75wg-m249", "package": "minimatch", "reason": "Comes through typeorm; the fix needs typeorm 1.x.", "expires": "2027-02-01" },
+    { "id": "GHSA-45h5-66jx-r2wf", "package": "mjml", "reason": "Templates are ours, not user input; the fix needs mjml 5.x.", "expires": "2027-02-01" },
+    { "id": "GHSA-q8mj-m7cp-5q26", "package": "qs", "reason": "Pending a dependency refresh.", "expires": "2027-02-01" },
+    { "id": "GHSA-x5fp-wj9c-mxmx", "package": "qs", "reason": "Pending a dependency refresh.", "expires": "2027-02-01" },
+    { "id": "GHSA-4mjr-xmp4-gh2g", "package": "qs", "reason": "Pending a dependency refresh.", "expires": "2027-02-01" },
+    { "id": "GHSA-6pq8-jhm2-2vcw", "package": "qs", "reason": "Pending a dependency refresh.", "expires": "2027-02-01" }
+  ]
+}

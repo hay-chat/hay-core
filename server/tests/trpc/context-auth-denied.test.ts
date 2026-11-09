@@ -1,0 +1,84 @@
+import { describe, it, expect, jest } from "@jest/globals";
+import { TRPCError } from "@trpc/server";
+
+jest.mock("@server/lib/logger", () => ({
+  createLogger: () => ({ debug: jest.fn(), info: jest.fn(), warn: jest.fn(), error: jest.fn() }),
+}));
+
+const mockAuthenticate = jest.fn<() => Promise<unknown>>();
+jest.mock("@server/lib/auth/middleware", () => ({ authenticate: mockAuthenticate }));
+
+import { t } from "@server/trpc/init";
+import { createContext } from "@server/trpc/context";
+import { isAuthed, isAuthedWithoutOrg } from "@server/trpc/middleware/auth";
+
+const router = t.router({
+  ping: t.procedure.use(isAuthed).query(() => "pong"),
+  me: t.procedure.use(isAuthedWithoutOrg).query(({ ctx }) => ({
+    userId: ctx.user?.id,
+    organizationId: ctx.organizationId,
+  })),
+});
+
+const contextFor = () =>
+  createContext({
+    req: { headers: {}, socket: {} },
+    res: {},
+  } as never);
+
+describe("createContext", () => {
+  it("reports a wrong-organization denial as FORBIDDEN, not as signed out", async () => {
+    mockAuthenticate.mockRejectedValue(
+      new TRPCError({
+        code: "FORBIDDEN",
+        message: "User does not belong to the specified organization",
+      }),
+    );
+    const ctx = await contextFor();
+
+    expect(ctx.user).toBeNull();
+    await expect(router.createCaller(ctx).ping()).rejects.toMatchObject({ code: "FORBIDDEN" });
+  });
+
+  const wrongOrganization = new TRPCError({ code: "FORBIDDEN", message: "Wrong organization" });
+
+  it("lets a stale organization header through to procedures that need no organization", async () => {
+    mockAuthenticate
+      .mockReset()
+      .mockRejectedValueOnce(wrongOrganization)
+      .mockResolvedValueOnce({ id: "user-1", authMethod: "jwt" });
+    const ctx = await contextFor();
+
+    await expect(router.createCaller(ctx).me()).resolves.toEqual({
+      userId: "user-1",
+      organizationId: null,
+    });
+  });
+
+  it("still refuses a stale organization header on procedures that need one", async () => {
+    mockAuthenticate
+      .mockReset()
+      .mockRejectedValueOnce(wrongOrganization)
+      .mockResolvedValueOnce({ id: "user-1", authMethod: "jwt" });
+    const ctx = await contextFor();
+
+    await expect(router.createCaller(ctx).ping()).rejects.toMatchObject({ code: "FORBIDDEN" });
+  });
+
+  it("does not recover an API key sent with another organization", async () => {
+    mockAuthenticate
+      .mockReset()
+      .mockRejectedValueOnce(wrongOrganization)
+      .mockResolvedValueOnce({ id: "key-user", authMethod: "apikey" });
+    const ctx = await contextFor();
+
+    await expect(router.createCaller(ctx).me()).rejects.toMatchObject({ code: "FORBIDDEN" });
+  });
+
+  it("keeps other authentication failures as UNAUTHORIZED", async () => {
+    mockAuthenticate.mockRejectedValue(new Error("Invalid API key"));
+    const ctx = await contextFor();
+
+    await expect(router.createCaller(ctx).ping()).rejects.toMatchObject({ code: "UNAUTHORIZED" });
+  });
+});

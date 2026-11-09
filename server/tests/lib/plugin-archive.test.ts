@@ -1,6 +1,9 @@
 import { describe, it, expect } from "@jest/globals";
 import AdmZip from "adm-zip";
-import { validatePluginZip } from "@server/lib/plugin-archive";
+import { existsSync, mkdtempSync, readFileSync, rmSync } from "fs";
+import { tmpdir } from "os";
+import path from "path";
+import { extractPluginZip, validatePluginZip } from "@server/lib/plugin-archive";
 
 const packageJson = (name = "my-plugin") =>
   Buffer.from(JSON.stringify({ name, version: "1.2.3", "hay-plugin": { entry: "dist/index.js" } }));
@@ -53,6 +56,14 @@ describe("validatePluginZip", () => {
     );
   });
 
+  it("limits the package name so its storage folder fits", () => {
+    const fits = `@${"a".repeat(40)}/${"b".repeat(46)}`;
+    expect(validatePluginZip(zipOf({ "package.json": packageJson(fits) })).pluginId).toBe(fits);
+    expect(() => validatePluginZip(zipOf({ "package.json": packageJson(`${fits}c`) }))).toThrow(
+      "at most 88",
+    );
+  });
+
   it("rejects core-only manifest fields", () => {
     const pkg = Buffer.from(
       JSON.stringify({ name: "p", "hay-plugin": { entry: "x.js", trpcRouter: "router.cjs" } }),
@@ -64,5 +75,46 @@ describe("validatePluginZip", () => {
 
   it("rejects data that is not a ZIP", () => {
     expect(() => validatePluginZip(Buffer.from("not a zip"))).toThrow();
+  });
+});
+
+describe("extractPluginZip", () => {
+  const withDestination = async (run: (dest: string) => Promise<void>) => {
+    const parent = mkdtempSync(path.join(tmpdir(), "plugin-archive-"));
+    try {
+      await run(path.join(parent, "plugin"));
+    } finally {
+      rmSync(parent, { recursive: true, force: true });
+    }
+  };
+
+  it("writes every file, stored or deflated, including empty ones", async () => {
+    await withDestination(async (dest) => {
+      await extractPluginZip(
+        zipOf({
+          "package.json": packageJson(),
+          "dist/index.js": Buffer.from("x".repeat(5000)),
+          "dist/empty.js": Buffer.from(""),
+        }),
+        dest,
+      );
+
+      expect(readFileSync(path.join(dest, "dist/index.js"), "utf8")).toBe("x".repeat(5000));
+      expect(readFileSync(path.join(dest, "dist/empty.js"), "utf8")).toBe("");
+    });
+  });
+
+  it("stops at the byte cap and removes the partial extraction", async () => {
+    const archive = zipOf({
+      "package.json": packageJson(),
+      "big.bin": Buffer.alloc(64 * 1024),
+    });
+
+    await withDestination(async (dest) => {
+      await expect(extractPluginZip(archive, dest, 1024)).rejects.toThrow(
+        /maximum uncompressed size/,
+      );
+      expect(existsSync(dest)).toBe(false);
+    });
   });
 });

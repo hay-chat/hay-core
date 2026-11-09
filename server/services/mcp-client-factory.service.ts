@@ -17,6 +17,13 @@ export class MCPClientFactory {
   /**
    * Create an MCP client for a plugin instance
    */
+  /** Remote servers are third parties: they never receive the verified customer. */
+  static async isRemote(pluginId: string): Promise<boolean> {
+    const plugin = await pluginRegistryRepository.findByPluginId(pluginId);
+    const manifest = plugin?.manifest as HayPluginManifest | undefined;
+    return manifest?.capabilities?.mcp?.connection?.type === "remote";
+  }
+
   static async createClient(organizationId: string, pluginId: string): Promise<MCPClient> {
     const plugin = await pluginRegistryRepository.findByPluginId(pluginId);
     if (!plugin) {

@@ -138,6 +138,18 @@ describe("ActionClaimGuardrailService.assessActionClaim", () => {
     expect(vars.toolLedger).toContain("create_discount — DECLINED_BY_TEAM");
   });
 
+  it("never lists a successful page tool as SUCCESS", async () => {
+    llmVerdict({ claimsAction: false, backedByTools: true });
+
+    await service.assessActionClaim(
+      baseContext({
+        toolsCalledThisTurn: [{ name: "page:refund", success: true, pageTool: true }],
+      }),
+    );
+
+    expect(getPrompt.mock.calls[0][1].toolLedger).toBe("- page:refund — UNVERIFIED_PAGE_TOOL");
+  });
+
   it("reports an empty ledger explicitly in the prompt", async () => {
     llmVerdict({ claimsAction: false, backedByTools: true });
 

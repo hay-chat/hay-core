@@ -4,8 +4,16 @@ import { describe, it, expect, jest, beforeEach } from "@jest/globals";
  * internal.organizations.* — operator-only procedures behind the shared secret.
  */
 
-const mockConfig = { internal: { apiSecret: "s3cret" } };
+const mockConfig = {
+  internal: { apiSecret: "s3cret", previousApiSecret: "", requireSignature: false, allowedIps: [] },
+};
 jest.mock("@server/config/env", () => ({ config: mockConfig }));
+jest.mock("@server/services/audit-log.service", () => ({
+  auditLogService: { record: async () => undefined },
+}));
+jest.mock("@server/services/rate-limit.service", () => ({
+  rateLimitService: { checkIpRateLimit: async () => ({ limited: false }) },
+}));
 
 const mockLogger = { debug: jest.fn(), info: jest.fn(), warn: jest.fn(), error: jest.fn() };
 jest.mock("@server/lib/logger", () => ({ createLogger: () => mockLogger }));
@@ -36,6 +44,12 @@ const mockFindOne = jest.fn();
 const mockDeleteWithData = jest.fn();
 jest.mock("@server/services/organization.service", () => ({
   organizationService: { findOne: mockFindOne, deleteWithData: mockDeleteWithData },
+}));
+
+jest.mock("@server/database/data-source", () => ({ AppDataSource: {} }));
+jest.mock("@server/lib/auth/utils/hashing", () => ({
+  generateApiKey: () => "key",
+  hashApiKey: async () => "hash",
 }));
 
 // Account provisioning is covered by tests/integration/auth-account-access.test.ts.

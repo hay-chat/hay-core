@@ -13,7 +13,9 @@
  *   4. if the handler staged a credential update, persists it and restarts the
  *      worker so the running MCP server picks up the fresh credentials.
  *
- * Jobs are registered on plugin enable and unregistered on disable.
+ * Jobs are registered on plugin enable and unregistered on disable. The
+ * scheduler's registry is per process, so {@link PluginCronService.reconcile}
+ * also runs on an interval and brings this process in line with the database.
  */
 
 import { schedulerService } from "./scheduler.service";
@@ -36,32 +38,53 @@ function jobName(pluginId: string, orgId: string, cronName: string): string {
   return `plugin-cron:${pluginId}:${orgId}:${cronName}`;
 }
 
-export class PluginCronService {
-  /** Track registered job names per `${orgId}:${pluginId}` so we can unregister. */
-  private registered = new Map<string, string[]>();
+/** Changes when a plugin's declared schedules do, so jobs get re-registered. */
+function cronSignature(crons: CronJobDescriptor[]): string {
+  return JSON.stringify(
+    crons.map(({ name, schedule, retryPolicy }) => [name, schedule, retryPolicy?.maxRetries ?? 0]),
+  );
+}
 
-  /**
-   * Register cron jobs for every currently-enabled plugin instance that declares
-   * crons. Called once at boot, after the plugin manager has populated metadata.
-   */
+export class PluginCronService {
+  /** What is registered per `${orgId}:${pluginId}`, to unregister or spot a change. */
+  private registered = new Map<
+    string,
+    { orgId: string; pluginId: string; names: string[]; signature: string }
+  >();
+
+  /** Register cron jobs at boot, after the plugin manager has populated metadata. */
   async initialize(): Promise<void> {
     try {
-      const enabled = await pluginInstanceRepository.findAll({
-        where: { enabled: true },
-        relations: ["plugin"],
-      });
-
-      let registered = 0;
-      for (const instance of enabled) {
-        const crons = (instance.plugin?.metadata?.crons ?? []) as CronJobDescriptor[];
-        if (!crons.length) continue;
-        await this.registerForInstance(instance.organizationId, instance.plugin.pluginId);
-        registered += crons.length;
-      }
-
-      logger.info({ registered }, "Plugin cron jobs initialized");
+      await this.reconcile();
+      logger.info({ registered: this.registered.size }, "Plugin cron jobs initialized");
     } catch (error) {
       logger.error({ err: error }, "Failed to initialize plugin cron jobs");
+    }
+  }
+
+  /**
+   * Make this process's cron jobs match the enabled plugin instances: register
+   * what is new or changed, unregister what is no longer enabled.
+   */
+  async reconcile(): Promise<void> {
+    const enabled = await pluginInstanceRepository.findAll({
+      where: { enabled: true },
+      relations: ["plugin"],
+    });
+
+    const wanted = new Set<string>();
+    for (const instance of enabled) {
+      const crons = (instance.plugin?.metadata?.crons ?? []) as CronJobDescriptor[];
+      if (!crons.length) continue;
+      const key = `${instance.organizationId}:${instance.plugin.pluginId}`;
+      wanted.add(key);
+      if (this.registered.get(key)?.signature !== cronSignature(crons)) {
+        await this.registerForInstance(instance.organizationId, instance.plugin.pluginId);
+      }
+    }
+
+    for (const [key, { orgId, pluginId }] of [...this.registered]) {
+      if (!wanted.has(key)) this.unregisterForInstance(orgId, pluginId);
     }
   }
 
@@ -88,7 +111,7 @@ export class PluginCronService {
           name,
           description: `Plugin cron "${cron.name}" for ${pluginId} (org ${orgId})`,
           schedule: cron.schedule,
-          handler: () => this.runCron(orgId, pluginId, cron.name),
+          handler: (signal) => this.runCron(orgId, pluginId, cron.name, signal),
           singleton: true,
           retryOnFailure: maxRetries > 0,
           // The scheduler rejects maxRetries < 1, so a cron without a retryPolicy
@@ -104,17 +127,22 @@ export class PluginCronService {
     }
 
     if (names.length) {
-      this.registered.set(`${orgId}:${pluginId}`, names);
+      this.registered.set(`${orgId}:${pluginId}`, {
+        orgId,
+        pluginId,
+        names,
+        signature: cronSignature(crons),
+      });
     }
   }
 
   /** Unregister all cron jobs previously registered for an org+plugin. */
   unregisterForInstance(orgId: string, pluginId: string): void {
     const key = `${orgId}:${pluginId}`;
-    const names = this.registered.get(key);
-    if (!names) return;
+    const entry = this.registered.get(key);
+    if (!entry) return;
 
-    for (const name of names) {
+    for (const name of entry.names) {
       try {
         schedulerService.unregisterJob(name);
       } catch (error) {
@@ -128,7 +156,12 @@ export class PluginCronService {
    * Execute a single plugin cron job: wake the worker, POST the handler, and
    * persist + propagate any credential update it staged.
    */
-  private async runCron(orgId: string, pluginId: string, cronName: string): Promise<void> {
+  private async runCron(
+    orgId: string,
+    pluginId: string,
+    cronName: string,
+    signal: AbortSignal,
+  ): Promise<void> {
     const instance = await pluginInstanceRepository.findByOrgAndPlugin(orgId, pluginId);
     if (!instance || !instance.enabled) {
       // Plugin was disabled between scheduling and firing — clean up.
@@ -160,7 +193,7 @@ export class PluginCronService {
         config: resolvedConfig,
         authState: instance.authState ?? null,
       }),
-      signal: AbortSignal.timeout(60_000),
+      signal: AbortSignal.any([signal, AbortSignal.timeout(60_000)]),
     });
 
     if (!response.ok) {

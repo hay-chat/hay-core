@@ -1,9 +1,19 @@
 import AdmZip from "adm-zip";
+import { createWriteStream, promises as fs } from "fs";
 import path from "path";
+import { PassThrough, Readable, Transform } from "stream";
+import { pipeline } from "stream/promises";
+import { createInflateRaw, inflateRawSync } from "zlib";
 
-/** Caps for an uploaded plugin ZIP, checked before anything is extracted. */
+/** Caps for an uploaded plugin ZIP. */
 const MAX_UNCOMPRESSED_BYTES = 500 * 1024 * 1024;
 const MAX_ENTRIES = 10_000;
+const MAX_PACKAGE_JSON_BYTES = 1024 * 1024;
+const TOO_LARGE_MESSAGE = "ZIP file exceeds maximum uncompressed size (500MB)";
+
+/** ZIP compression methods a plugin archive may use. */
+const METHOD_STORED = 0;
+const METHOD_DEFLATED = 8;
 
 /** Unix file-type bits stored in the high 16 bits of a ZIP entry's external attributes. */
 const S_IFMT = 0o170000;
@@ -58,9 +68,29 @@ function isUnsafeEntryName(name: string): boolean {
   return normalized === ".." || normalized.startsWith("../");
 }
 
+/** Decode the root package.json, trusting the bytes it inflates to rather than its header. */
+function readPackageJson(entry: AdmZip.IZipEntry): string {
+  const data = entry.getCompressedData();
+  try {
+    if (entry.header.method === METHOD_DEFLATED) {
+      return inflateRawSync(data, { maxOutputLength: MAX_PACKAGE_JSON_BYTES }).toString("utf8");
+    }
+  } catch {
+    throw new Error("package.json could not be read from the ZIP or is too large");
+  }
+  if (data.length > MAX_PACKAGE_JSON_BYTES) {
+    throw new Error("package.json could not be read from the ZIP or is too large");
+  }
+  return data.toString("utf8");
+}
+
+/** Stored ZIPs live in `plugin-zips/<id>`, and uploads.folder holds 100 characters. */
+const PLUGIN_ID_MAX_LENGTH = 88;
+
 /**
- * Validate a plugin ZIP without extracting it: size/entry caps, no path
- * traversal, no symlinks, and a valid root `package.json`.
+ * Validate a plugin ZIP without extracting it: declared size/entry caps, no path
+ * traversal, no symlinks, and a valid root `package.json`. A header can
+ * understate an entry's size, so `extractPluginZip` also counts what it writes.
  */
 export function validatePluginZip(zipBuffer: Buffer): {
   manifest: UploadedPluginManifest;
@@ -82,7 +112,13 @@ export function validatePluginZip(zipBuffer: Buffer): {
   for (const entry of zipEntries) {
     totalUncompressedSize += entry.header.size;
     if (totalUncompressedSize > MAX_UNCOMPRESSED_BYTES) {
-      throw new Error("ZIP file exceeds maximum uncompressed size (500MB)");
+      throw new Error(TOO_LARGE_MESSAGE);
+    }
+    if (entry.header.encrypted) {
+      throw new Error(`Encrypted entries are not allowed in ZIP: ${entry.entryName}`);
+    }
+    if (entry.header.method !== METHOD_STORED && entry.header.method !== METHOD_DEFLATED) {
+      throw new Error(`Unsupported compression in ZIP: ${entry.entryName}`);
     }
     if (isUnsafeEntryName(entry.entryName)) {
       throw new Error(`Invalid file path in ZIP: ${entry.entryName}`);
@@ -97,7 +133,7 @@ export function validatePluginZip(zipBuffer: Buffer): {
     throw new Error("package.json not found in ZIP root");
   }
 
-  return parsePluginPackageJson(zip.readAsText(packageEntry));
+  return parsePluginPackageJson(readPackageJson(packageEntry));
 }
 
 /**
@@ -148,6 +184,10 @@ export function parsePluginPackageJson(content: string): {
     );
   }
 
+  if (pluginId.length > PLUGIN_ID_MAX_LENGTH) {
+    throw new Error(`Plugin ID (package name) must be at most ${PLUGIN_ID_MAX_LENGTH} characters`);
+  }
+
   const manifest: UploadedPluginManifest = {
     id: pluginId,
     name: hayPlugin.displayName || pluginId,
@@ -162,8 +202,45 @@ export function parsePluginPackageJson(content: string): {
   return { manifest, pluginId };
 }
 
-/** Validate a plugin ZIP, then extract it into `destDir` (overwriting files). */
-export function extractPluginZip(zipBuffer: Buffer, destDir: string): void {
+/**
+ * Validate a plugin ZIP, then stream it into `destDir`, a directory that does
+ * not exist yet. Stops at the first byte over the size cap and removes the
+ * partial extraction, whatever the entry headers declared.
+ */
+export async function extractPluginZip(
+  zipBuffer: Buffer,
+  destDir: string,
+  maxBytes = MAX_UNCOMPRESSED_BYTES,
+): Promise<void> {
   validatePluginZip(zipBuffer);
-  new AdmZip(zipBuffer).extractAllTo(destDir, true);
+
+  let remaining = maxBytes;
+  const countBytes = () =>
+    new Transform({
+      transform(chunk: Buffer, _encoding, callback) {
+        remaining -= chunk.length;
+        callback(remaining < 0 ? new Error(TOO_LARGE_MESSAGE) : null, chunk);
+      },
+    });
+
+  try {
+    await fs.mkdir(destDir, { recursive: true });
+    for (const entry of new AdmZip(zipBuffer).getEntries()) {
+      const target = path.join(destDir, entry.entryName);
+      if (entry.isDirectory) {
+        await fs.mkdir(target, { recursive: true });
+        continue;
+      }
+      await fs.mkdir(path.dirname(target), { recursive: true });
+      await pipeline(
+        Readable.from([entry.getCompressedData()], { objectMode: false }),
+        entry.header.method === METHOD_DEFLATED ? createInflateRaw() : new PassThrough(),
+        countBytes(),
+        createWriteStream(target),
+      );
+    }
+  } catch (error) {
+    await fs.rm(destDir, { recursive: true, force: true });
+    throw error;
+  }
 }

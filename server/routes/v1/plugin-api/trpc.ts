@@ -2,6 +2,7 @@ import { router } from "@server/trpc";
 import { pluginProcedure, requireCapability } from "@server/trpc/middleware/plugin-auth";
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
+import { toClientError } from "@server/trpc/client-error";
 import { CustomerRepository } from "@server/repositories/customer.repository";
 import { ConversationRepository } from "@server/repositories/conversation.repository";
 import { MessageRepository } from "@server/repositories/message.repository";
@@ -15,7 +16,11 @@ import {
 } from "@server/database/entities/message.entity";
 import { mcpRegistryService } from "@server/services/mcp-registry.service";
 import { redisService } from "@server/services/redis.service";
-import { CONVERSATION_MEDIA_FOLDER, storageService } from "@server/services/storage.service";
+import {
+  CONVERSATION_MEDIA_FOLDER,
+  storageService,
+  UploadRejectedError,
+} from "@server/services/storage.service";
 import { transcriptionService } from "@server/services/transcription.service";
 import { oauthService } from "@server/services/oauth.service";
 import { randomUUID } from "crypto";
@@ -30,6 +35,7 @@ import type {
   RemoteMCPServerConfig,
 } from "@server/types/plugin.types";
 import { createLogger } from "@server/lib/logger";
+import { fitsInBytes } from "@server/lib/validation/json-record";
 import { validateUrlForSSRF } from "@server/utils/ssrf";
 import { emailDomainService } from "@server/services/email-domains.service";
 import { channelHealthService } from "@server/services/channel-health.service";
@@ -45,6 +51,8 @@ const channelNameSchema = z
   .regex(/^[a-z0-9][a-z0-9_-]*$/, "Channel names are lowercase letters, digits, - and _");
 
 const logger = createLogger("plugin-api-trpc");
+
+const CUSTOMER_METADATA_MAX_BYTES = 65_536;
 
 // How a provider names the data subject of a privacy request (privacy.*).
 const privacySubjectSchema = z
@@ -432,10 +440,7 @@ export const pluginApiTrpcRouter = router({
         };
       } catch (error) {
         logger.error({ err: error }, "messages.receive error");
-        throw new TRPCError({
-          code: "INTERNAL_SERVER_ERROR",
-          message: error instanceof Error ? error.message : "Failed to process message",
-        });
+        throw toClientError(error, "INTERNAL_SERVER_ERROR", "Failed to process message");
       }
     }),
 
@@ -532,10 +537,7 @@ export const pluginApiTrpcRouter = router({
         };
       } catch (error) {
         logger.error({ err: error }, "messages.send error");
-        throw new TRPCError({
-          code: "INTERNAL_SERVER_ERROR",
-          message: error instanceof Error ? error.message : "Failed to send message",
-        });
+        throw toClientError(error, "INTERNAL_SERVER_ERROR", "Failed to send message");
       }
     }),
 
@@ -664,12 +666,11 @@ export const pluginApiTrpcRouter = router({
           organizationId,
         });
       } catch (error) {
-        // Storage rejects disallowed or mislabelled content and oversized files
-        // with plain errors — those are caller mistakes, not server faults.
-        throw new TRPCError({
-          code: "BAD_REQUEST",
-          message: error instanceof Error ? error.message : "Upload failed",
-        });
+        // Disallowed, mislabelled or oversized content is the caller's mistake.
+        if (error instanceof UploadRejectedError) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: error.message });
+        }
+        throw toClientError(error, "INTERNAL_SERVER_ERROR", "Upload failed");
       }
 
       // Type and size of what was stored: the type comes from the file's content
@@ -771,8 +772,8 @@ export const pluginApiTrpcRouter = router({
    * OAuth connections get their keys from `onConnected`. Connections configured
    * without OAuth (WhatsApp manual mode with a pasted token) register them here
    * once the plugin has confirmed its credentials can access those provider
-   * accounts. An empty list removes the instance's keys. Last writer wins per
-   * key, exactly like a reconnect.
+   * accounts. An empty list removes the instance's keys. A key another
+   * organization holds while its instance is enabled is refused with CONFLICT.
    */
   "webhooks.setRoutingKeys": pluginProcedure
     .input(z.object({ routingKeys: z.array(z.string().min(1).max(256)).max(20) }))
@@ -786,13 +787,22 @@ export const pluginApiTrpcRouter = router({
       }
 
       const routingKeys = [...new Set(input.routingKeys)];
-      await pluginWebhookRouteRepository.clearForInstance(instance.id);
-      await pluginWebhookRouteRepository.upsertRoutes(
+      const { conflicts } = await pluginWebhookRouteRepository.claimRoutes(
         pluginId,
         organizationId,
         instance.id,
         routingKeys,
       );
+      if (conflicts.length > 0) {
+        logger.error(
+          { organizationId, pluginId, conflicts },
+          "Plugin claimed webhook routing keys held by another organization",
+        );
+        throw new TRPCError({
+          code: "CONFLICT",
+          message: "A routing key is already connected to another organization",
+        });
+      }
 
       logger.info(
         { organizationId, pluginId, routingKeyCount: routingKeys.length },
@@ -911,12 +921,17 @@ export const pluginApiTrpcRouter = router({
   "customers.upsert": pluginProcedure
     .input(
       z.object({
-        externalId: z.string(),
-        channel: z.string(),
-        email: z.string().email().optional(),
-        phone: z.string().optional(),
-        name: z.string().optional(),
-        metadata: z.record(z.string(), z.any()).optional(),
+        externalId: z.string().min(1).max(255),
+        channel: z.string().min(1).max(64),
+        email: z.string().email().max(320).optional(),
+        phone: z.string().max(64).optional(),
+        name: z.string().max(255).optional(),
+        metadata: z
+          .record(z.string(), z.any())
+          .refine((value) => fitsInBytes(value, CUSTOMER_METADATA_MAX_BYTES), {
+            message: "Metadata is too large",
+          })
+          .optional(),
       }),
     )
     .mutation(async ({ input, ctx }) => {
@@ -937,8 +952,8 @@ export const pluginApiTrpcRouter = router({
           external_metadata: {
             ...existing.external_metadata,
             [channel]: {
-              id: externalId,
               ...metadata,
+              id: externalId,
             },
           },
         });
@@ -955,8 +970,8 @@ export const pluginApiTrpcRouter = router({
         name,
         external_metadata: {
           [channel]: {
-            id: externalId,
             ...metadata,
+            id: externalId,
           },
         },
       });

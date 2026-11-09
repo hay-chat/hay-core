@@ -10,6 +10,7 @@
  * would be lost); for those the AI proposes a Q&A instead.
  */
 import { In, Not } from "typeorm";
+import { fenceData } from "@server/services/core/prompt-data";
 import { AppDataSource } from "@server/database/data-source";
 import { Document, DocumentationStatus, ImportMethod } from "@server/entities/document.entity";
 import { conversationRepository } from "@server/repositories/conversation.repository";
@@ -140,7 +141,7 @@ export class KnowledgeSuggestionService {
     const prompt = await PromptService.getInstance().getPrompt(
       "knowledge/suggest-edits",
       {
-        transcript,
+        transcript: transcript ? fenceData(transcript) : "",
         feedback: feedback || "",
         documentOnly: input.documentId ? "yes" : "",
         documents: candidates.map((c) => ({

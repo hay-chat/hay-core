@@ -28,6 +28,7 @@ import { auditLogService } from "./audit-log.service";
 import { CONVERSATION_MEDIA_FOLDER, storageService } from "./storage.service";
 import { signMediaUrl } from "./media-url.service";
 import { createLogger } from "@server/lib/logger";
+import { csvCell } from "@server/lib/csv";
 
 const logger = createLogger("organization-export");
 
@@ -140,20 +141,6 @@ const EXPORT_TABLES: ExportTable[] = [
 ];
 
 /* ================== CSV ================== */
-
-/** One CSV cell: objects as JSON, quotes doubled, formula-looking values defused. */
-export function csvCell(value: unknown): string {
-  if (value === null || value === undefined) return "";
-  let text =
-    value instanceof Date
-      ? value.toISOString()
-      : typeof value === "object"
-        ? JSON.stringify(value)
-        : String(value);
-  // A spreadsheet runs cells that start with these as formulas (CSV injection).
-  if (/^[=+\-@\t\r]/.test(text)) text = `'${text}`;
-  return /[",\r\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
-}
 
 export function csvLine(row: Row, columns: string[]): string {
   return columns.map((column) => csvCell(row[column])).join(",") + "\r\n";

@@ -7,9 +7,12 @@
  *
  * Where an identity is verified:
  *  - webchat: the store's server signed the customer's external id
- *    (webchat-identity.service), so the conversation links that customer. An
- *    email the shopper typed at hand-off is their claim, not verified, and is
- *    left out (web-follow-up.service marks it with emailConsentSource).
+ *    (webchat-identity.service), and the conversation records that this
+ *    signature is what linked the customer (CUSTOMER_LINK_SOURCE_KEY). An
+ *    email the shopper typed, in a form or at hand-off, is their claim, not
+ *    verified: it never produces an identity, and hand-off addresses are left
+ *    out of verified ones (web-follow-up.service marks them with
+ *    emailConsentSource).
  *  - other channels: the channel plugin resolved the sender from the
  *    provider (a WhatsApp number, an email sender) and stored it under the
  *    customer's `external_metadata[channel]`.
@@ -24,6 +27,13 @@ import { AppDataSource } from "@server/database/data-source";
 import { Customer } from "@server/database/entities/customer.entity";
 
 export const CUSTOMER_IDENTITY_META_KEY = "chat.hay/customer";
+
+/** Conversation metadata key: how a web conversation got its customer. Set only by the server. */
+export const CUSTOMER_LINK_SOURCE_KEY = "customerLinkSource";
+export const CUSTOMER_LINK_SOURCE = {
+  signature: "webchat_signature",
+  preChatEmail: "prechat_email",
+} as const;
 
 export type CustomerIdentity =
   | {
@@ -47,11 +57,14 @@ function isStaffConversation(metadata: Record<string, unknown> | null | undefine
 }
 
 /** The identity a customer record proves for a conversation on `channel`. */
-export function identityFromCustomer(customer: Customer, channel: string): CustomerIdentity {
+export function identityFromCustomer(
+  customer: Customer,
+  channel: string,
+  linkSource?: unknown,
+): CustomerIdentity {
   const external = customer.external_metadata ?? {};
   if (channel === "web") {
-    // Only a signed external id links a store customer to a web conversation.
-    if (!customer.external_id) return NONE;
+    if (linkSource !== CUSTOMER_LINK_SOURCE.signature || !customer.external_id) return NONE;
     const web = (external.web ?? {}) as Record<string, unknown>;
     return {
       trust: "verified",
@@ -82,5 +95,10 @@ export async function resolveCustomerIdentity(
     where: { id: conversation.customer_id, organization_id: conversation.organization_id },
     select: { id: true, external_id: true, email: true, phone: true, external_metadata: true },
   });
-  return customer ? identityFromCustomer(customer, conversation.channel ?? "web") : NONE;
+  if (!customer) return NONE;
+  return identityFromCustomer(
+    customer,
+    conversation.channel ?? "web",
+    conversation.metadata?.[CUSTOMER_LINK_SOURCE_KEY],
+  );
 }

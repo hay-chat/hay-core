@@ -1,6 +1,8 @@
 import crypto from "crypto";
+import { TRPCError } from "@trpc/server";
 import { redisService } from "./redis.service";
 import { createLogger } from "@server/lib/logger";
+import { metrics } from "@server/lib/metrics";
 
 const logger = createLogger("rate-limit");
 
@@ -14,26 +16,96 @@ export function rateLimitKey(type: string, identifier: string): string {
 }
 
 /**
+ * Each flow that counts per IP or per email has its own bucket, so one flow's
+ * traffic can never use up another flow's allowance for the same address.
+ */
+export type RateLimitScope =
+  | "login"
+  | "password-reset"
+  | "resend-verification"
+  | "privacy-request"
+  | "privacy-download"
+  | "customer-privacy"
+  | "refresh-token"
+  | "exchange-auth-code"
+  | "mfa-verify"
+  | "internal-api";
+
+export interface RateLimitOptions {
+  scope: RateLimitScope;
+  /** Reject with SERVICE_UNAVAILABLE when Redis cannot be reached. */
+  failClosed?: boolean;
+}
+
+export interface RateLimitResult {
+  limited: boolean;
+  remaining: number;
+  resetAt: Date;
+}
+
+/** Raised for fail-closed limits while Redis is unavailable. */
+export class RateLimitUnavailableError extends TRPCError {
+  constructor() {
+    super({
+      code: "SERVICE_UNAVAILABLE",
+      message: "Rate limiting service unavailable. Please try again later.",
+    });
+    this.name = "RateLimitUnavailableError";
+  }
+}
+
+/**
+ * Increment and read in one step, so concurrent requests cannot all pass on
+ * the same count and a key can never be left without an expiry. A refused
+ * request does not increment.
+ * Returns [limited (0|1), count, ttl seconds].
+ */
+const CHECK_AND_INCREMENT_SCRIPT = `
+local current = tonumber(redis.call('GET', KEYS[1]) or '0')
+local limited = 0
+local count = current
+if current >= tonumber(ARGV[1]) then
+  limited = 1
+else
+  count = redis.call('INCR', KEYS[1])
+end
+local ttl = redis.call('TTL', KEYS[1])
+if ttl < 0 then
+  redis.call('EXPIRE', KEYS[1], ARGV[2])
+  ttl = tonumber(ARGV[2])
+end
+return {limited, count, ttl}
+`;
+
+/** Upper bound on the in-process fallback's memory while Redis is down. */
+const MAX_FALLBACK_KEYS = 50_000;
+const UNAVAILABLE_LOG_INTERVAL_MS = 60_000;
+
+/**
  * Rate Limiting Service
- * Provides IP and email-based rate limiting using Redis
+ * Provides IP and email-based rate limiting using Redis. While Redis is down,
+ * fail-closed limits refuse and the others count per process instead.
  */
 export class RateLimitService {
+  private fallbackCounters = new Map<string, { count: number; expiresAt: number }>();
+  private redisStarted = false;
+  private lastUnavailableLogAt = 0;
+  private fallbackChecksSinceLog = 0;
+
   /**
    * Check if an IP address has exceeded the rate limit
    * @param ipAddress - Client IP address
    * @param maxRequests - Maximum requests allowed
    * @param windowSeconds - Time window in seconds
-   * @param failClosed - If true, reject requests when Redis is unavailable (for critical endpoints)
-   * @returns true if rate limit exceeded, false otherwise
    */
   async checkIpRateLimit(
     ipAddress: string,
     maxRequests: number,
     windowSeconds: number,
-    failClosed: boolean = false,
-  ): Promise<{ limited: boolean; remaining: number; resetAt: Date }> {
-    const key = rateLimitKey("ip", ipAddress);
-    return this.checkRateLimit(key, maxRequests, windowSeconds, failClosed);
+    options: RateLimitOptions,
+  ): Promise<RateLimitResult> {
+    const key = rateLimitKey(`ip:${options.scope}`, ipAddress);
+    return this.checkRateLimit(key, maxRequests, windowSeconds, options.failClosed);
   }
 
   /**
@@ -41,17 +113,15 @@ export class RateLimitService {
    * @param email - Email address
    * @param maxRequests - Maximum requests allowed
    * @param windowSeconds - Time window in seconds
-   * @param failClosed - If true, reject requests when Redis is unavailable (for critical endpoints)
-   * @returns true if rate limit exceeded, false otherwise
    */
   async checkEmailRateLimit(
     email: string,
     maxRequests: number,
     windowSeconds: number,
-    failClosed: boolean = false,
-  ): Promise<{ limited: boolean; remaining: number; resetAt: Date }> {
-    const key = rateLimitKey("email", email);
-    return this.checkRateLimit(key, maxRequests, windowSeconds, failClosed);
+    options: RateLimitOptions,
+  ): Promise<RateLimitResult> {
+    const key = rateLimitKey(`email:${options.scope}`, email);
+    return this.checkRateLimit(key, maxRequests, windowSeconds, options.failClosed);
   }
 
   /**
@@ -68,7 +138,7 @@ export class RateLimitService {
     maxRequests: number,
     windowSeconds: number,
     failClosed: boolean = false,
-  ): Promise<{ limited: boolean; remaining: number; resetAt: Date }> {
+  ): Promise<RateLimitResult> {
     const key = rateLimitKey("combined", `${ipAddress}:${email}`);
     return this.checkRateLimit(key, maxRequests, windowSeconds, failClosed);
   }
@@ -85,7 +155,7 @@ export class RateLimitService {
     operation: string,
     maxRequests: number,
     windowSeconds: number,
-  ): Promise<{ limited: boolean; remaining: number; resetAt: Date }> {
+  ): Promise<RateLimitResult> {
     const key = `rate_limit:org:${organizationId}:${operation}`;
     return this.checkRateLimit(key, maxRequests, windowSeconds);
   }
@@ -100,142 +170,122 @@ export class RateLimitService {
     maxRequests: number,
     windowSeconds: number,
     failClosed: boolean = false,
-  ): Promise<{ limited: boolean; remaining: number; resetAt: Date }> {
+  ): Promise<RateLimitResult> {
     return this.checkRateLimit(rateLimitKey("key", key), maxRequests, windowSeconds, failClosed);
   }
 
-  /**
-   * Generic rate limit check using Redis
-   * Uses sliding window counter algorithm
-   * @param failClosed - If true, will reject requests when Redis is unavailable (for critical endpoints like privacy)
-   */
+  /** The Redis client, or null when commands could not be served right now. */
+  private async availableClient() {
+    if (!this.redisStarted) {
+      this.redisStarted = true;
+      await redisService.initialize();
+      await redisService.waitUntilReady(2000);
+    }
+    // ioredis queues commands while reconnecting, so using the client in that
+    // state would hang the request until Redis comes back.
+    return redisService.isConnected() ? redisService.getClient() : null;
+  }
+
   private async checkRateLimit(
     key: string,
     maxRequests: number,
     windowSeconds: number,
     failClosed: boolean = false,
-  ): Promise<{ limited: boolean; remaining: number; resetAt: Date }> {
-    // Ensure Redis is connected
-    if (!redisService.isConnected()) {
-      await redisService.initialize();
-    }
-
-    const client = redisService.getClient();
-    if (!client) {
-      if (failClosed) {
-        // For critical endpoints (privacy, security), fail closed to prevent abuse
-        logger.error("Redis unavailable, rejecting request (fail-closed policy)");
-        throw new Error("Rate limiting service unavailable. Please try again later.");
-      }
-
-      // For non-critical endpoints, fail open
-      logger.debug("Redis unavailable, allowing request (fail-open policy)");
-      return {
-        limited: false,
-        remaining: maxRequests,
-        resetAt: new Date(Date.now() + windowSeconds * 1000),
-      };
-    }
-
+  ): Promise<RateLimitResult> {
+    let client: Awaited<ReturnType<RateLimitService["availableClient"]>> = null;
     try {
-      // Get current count
-      const currentCount = await client.get(key);
-      const count = currentCount ? parseInt(currentCount, 10) : 0;
+      client = await this.availableClient();
+    } catch (error) {
+      logger.error({ err: error }, "Could not start Redis for rate limiting");
+    }
 
-      // Check if limit exceeded
-      if (count >= maxRequests) {
-        const ttl = await client.ttl(key);
-        const resetAt = new Date(Date.now() + ttl * 1000);
-
-        logger.debug({ key, count, maxRequests, resetAt }, "Rate limit exceeded");
+    if (client) {
+      try {
+        const [limited, count, ttl] = (await client.eval(
+          CHECK_AND_INCREMENT_SCRIPT,
+          1,
+          key,
+          maxRequests,
+          windowSeconds,
+        )) as [number, number, number];
 
         return {
-          limited: true,
-          remaining: 0,
-          resetAt,
+          limited: limited === 1,
+          remaining: Math.max(0, maxRequests - count),
+          resetAt: new Date(Date.now() + ttl * 1000),
         };
+      } catch (error) {
+        logger.error({ err: error }, "Error checking rate limit");
       }
+    }
 
-      // Increment counter
-      const newCount = await client.incr(key);
+    if (failClosed) {
+      logger.error("Redis unavailable, rejecting rate-limited request");
+      metrics.redisUnavailable.inc({ surface: "rate_limit", action: "rejected" });
+      throw new RateLimitUnavailableError();
+    }
+    return this.checkFallback(key, maxRequests, windowSeconds);
+  }
 
-      // Set expiry on first request
-      if (newCount === 1) {
-        await client.expire(key, windowSeconds);
-      }
+  /** Fixed-window count held in this process, used while Redis is down. */
+  private checkFallback(key: string, maxRequests: number, windowSeconds: number): RateLimitResult {
+    this.fallbackChecksSinceLog++;
+    metrics.redisUnavailable.inc({ surface: "rate_limit", action: "per_process" });
+    const now = Date.now();
+    if (now - this.lastUnavailableLogAt >= UNAVAILABLE_LOG_INTERVAL_MS) {
+      logger.error(
+        { checks: this.fallbackChecksSinceLog },
+        "Redis unavailable, rate limits are counted per process",
+      );
+      this.lastUnavailableLogAt = now;
+      this.fallbackChecksSinceLog = 0;
+    }
 
-      const remaining = Math.max(0, maxRequests - newCount);
-      const resetAt = new Date(Date.now() + windowSeconds * 1000);
+    let entry = this.fallbackCounters.get(key);
+    if (!entry || entry.expiresAt <= now) {
+      this.pruneFallback(now);
+      entry = { count: 0, expiresAt: now + windowSeconds * 1000 };
+      this.fallbackCounters.set(key, entry);
+    }
 
-      logger.debug({ key, newCount, remaining, maxRequests }, "Rate limit check passed");
+    const resetAt = new Date(entry.expiresAt);
+    if (entry.count >= maxRequests) {
+      return { limited: true, remaining: 0, resetAt };
+    }
+    entry.count++;
+    return { limited: false, remaining: maxRequests - entry.count, resetAt };
+  }
 
-      return {
-        limited: false,
-        remaining,
-        resetAt,
-      };
-    } catch (error) {
-      logger.error({ err: error }, "Error checking rate limit");
-
-      if (failClosed) {
-        // For critical endpoints, fail closed on errors
-        throw new Error("Rate limiting service error. Please try again later.");
-      }
-
-      // For non-critical endpoints, fail open if Redis errors
-      return {
-        limited: false,
-        remaining: maxRequests,
-        resetAt: new Date(Date.now() + windowSeconds * 1000),
-      };
+  private pruneFallback(now: number): void {
+    if (this.fallbackCounters.size < MAX_FALLBACK_KEYS) return;
+    for (const [key, entry] of this.fallbackCounters) {
+      if (entry.expiresAt <= now) this.fallbackCounters.delete(key);
+    }
+    // Still full of live windows: drop the oldest entries.
+    for (const key of this.fallbackCounters.keys()) {
+      if (this.fallbackCounters.size < MAX_FALLBACK_KEYS) break;
+      this.fallbackCounters.delete(key);
     }
   }
 
   /**
-   * Reset rate limit for a specific key (admin/testing purposes)
+   * Clear a counter. Best effort: a failure here must not fail the caller.
    */
-  async resetRateLimit(identifier: string, type: "ip" | "email" | "combined"): Promise<void> {
-    const client = redisService.getClient();
-    if (!client) {
-      return;
-    }
-
-    const key = rateLimitKey(type, identifier);
-    await client.del(key);
-    logger.debug({ key }, "Rate limit reset");
-  }
-
-  /**
-   * Get current rate limit status without incrementing
-   */
-  async getRateLimitStatus(
+  async resetRateLimit(
     identifier: string,
     type: "ip" | "email" | "combined",
-    maxRequests: number,
-  ): Promise<{ count: number; remaining: number; resetAt: Date | null }> {
-    const client = redisService.getClient();
-    if (!client) {
-      return {
-        count: 0,
-        remaining: maxRequests,
-        resetAt: null,
-      };
+    scope?: RateLimitScope,
+  ): Promise<void> {
+    const key = rateLimitKey(scope ? `${type}:${scope}` : type, identifier);
+    this.fallbackCounters.delete(key);
+
+    try {
+      const client = await this.availableClient();
+      await client?.del(key);
+      logger.debug({ key }, "Rate limit reset");
+    } catch (error) {
+      logger.warn({ err: error }, "Could not reset rate limit");
     }
-
-    const key = rateLimitKey(type, identifier);
-    const currentCount = await client.get(key);
-    const count = currentCount ? parseInt(currentCount, 10) : 0;
-    const remaining = Math.max(0, maxRequests - count);
-
-    let resetAt: Date | null = null;
-    if (count > 0) {
-      const ttl = await client.ttl(key);
-      if (ttl > 0) {
-        resetAt = new Date(Date.now() + ttl * 1000);
-      }
-    }
-
-    return { count, remaining, resetAt };
   }
 }
 

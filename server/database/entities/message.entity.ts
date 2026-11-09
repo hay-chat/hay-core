@@ -227,6 +227,8 @@ export class Message {
     /** The relayed answer of a teammate (rephrased or as written). */
     isTeamAnswer?: boolean;
     teamQuestionId?: string;
+    /** TOOL messages: "page" when the visitor's page reported the result. */
+    source?: string;
     // Form metadata (FORM message type — schema is the FormSchema from @hay/form-schema)
     ui?: {
       kind: "form" | "custom";

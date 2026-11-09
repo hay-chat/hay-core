@@ -120,8 +120,11 @@ export class ConversationService {
     conversationId: string,
     organizationId: string,
   ): Promise<Conversation | null> {
-    const conversation = await this.conversationRepository.findById(conversationId);
-    if (!conversation || conversation.organization_id !== organizationId) {
+    const conversation = await this.conversationRepository.findByIdAndOrganization(
+      conversationId,
+      organizationId,
+    );
+    if (!conversation) {
       return null;
     }
     // Surface a usable URL for the assistant's avatar (the entity only carries
@@ -188,8 +191,11 @@ export class ConversationService {
 
   async deleteConversation(organizationId: string, conversationId: string): Promise<boolean> {
     // Get the conversation first to access message IDs for embedding cleanup
-    const conversation = await this.conversationRepository.findById(conversationId);
-    if (!conversation || conversation.organization_id !== organizationId) {
+    const conversation = await this.conversationRepository.findByIdAndOrganization(
+      conversationId,
+      organizationId,
+    );
+    if (!conversation) {
       return false;
     }
 

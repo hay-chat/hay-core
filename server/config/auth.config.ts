@@ -7,9 +7,6 @@ export const authConfig = {
     expiresIn: "15m",
     algorithm: "HS256" as const,
   },
-  bcrypt: {
-    saltRounds: 12,
-  },
   argon2: {
     type: 2,
     memoryCost: 65536,
@@ -21,9 +18,11 @@ export const authConfig = {
     prefix: "hay_",
   },
   session: {
-    maxAge: 1000 * 60 * 60 * 24 * 7,
-    secure: process.env.NODE_ENV === "production",
+    /** Counted from sign-in; refreshing never extends it. */
+    absoluteLifetimeMs: 1000 * 60 * 60 * 24 * 30,
+    cookieName: "hay_refresh",
+    secure: config.domain.useSSL,
     httpOnly: true,
-    sameSite: "strict" as const,
+    sameSite: config.authCookie.sameSite,
   },
 };

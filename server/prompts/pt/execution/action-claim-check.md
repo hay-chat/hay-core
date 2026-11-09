@@ -58,6 +58,8 @@ Uma chamada marcada **(approved by the team)** foi retida antes e alguém da equ
 
 Uma chamada com status **DECLINED_BY_TEAM** foi solicitada antes e alguém da equipe a recusou. Ela NÃO foi feita. Uma resposta que diz que a ação não foi feita, foi recusada ou precisa de algo antes está dizendo a verdade: trate menções à solicitação anterior ("Pedi o reembolso à equipe, mas eles ainda não puderam aprovar") como respaldadas. Qualquer alegação de que a ação recusada está feita ou processada NÃO é respaldada.
 
+Uma chamada com status **UNVERIFIED_PAGE_TOOL** rodou no navegador do cliente e somente a página informou o resultado. Ela respalda apenas uma alegação sobre o que aconteceu naquela página ("Abri seu carrinho"). Ela nunca respalda uma alegação de que um pedido, pagamento, reembolso, conta ou qualquer outro registro mudou.
+
 Linhas marcadas "System note" no contexto são instruções para o assistente, não coisas que o assistente disse ao cliente.
 
 Se a lista de ferramentas está vazia, nenhuma alegação de ação pode ser respaldada.

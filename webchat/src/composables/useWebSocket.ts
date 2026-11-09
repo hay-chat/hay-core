@@ -190,7 +190,6 @@ export function useWebSocket(baseUrl: string, organizationId: string) {
         type: "identify",
         conversationId: convId,
         proof,
-        url: socketUrl,
         // Page tools (WebMCP) the host page registered, if any.
         ...(tools && tools.length > 0 ? { tools } : {}),
       }),

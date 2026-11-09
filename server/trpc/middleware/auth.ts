@@ -6,6 +6,8 @@ import type { Request } from "express";
 import { auditLogService } from "@server/services/audit-log.service";
 import { createLogger } from "@server/lib/logger";
 import { assertOrganizationNotSuspended } from "./suspension";
+import { isMfaEnrolmentExempt } from "./mfa";
+import { mfaService } from "@server/services/mfa.service";
 
 const logger = createLogger("trpc-auth");
 
@@ -14,26 +16,30 @@ const logger = createLogger("trpc-auth");
  */
 interface RequestWithAuthError extends Request {
   authError?: string;
+  authDenied?: TRPCError;
+  userWithoutOrganization?: AuthUser | null;
 }
 
-export const isAuthed = t.middleware<{ ctx: Context }>(({ ctx, path, next }) => {
-  // Check if there was an authentication error stored in the request
+/** Report what `createContext` caught, so the caller gets the real reason. */
+function throwStoredAuthFailure(ctx: Context): void {
   // @ts-ignore - Express type definition mismatch between root and server node_modules
-  const reqWithAuth = ctx.req as RequestWithAuthError;
-  if (reqWithAuth.authError) {
-    const errorMessage = reqWithAuth.authError;
+  const { authError, authDenied } = ctx.req as RequestWithAuthError;
 
-    // Provide specific error for token expiration
-    if (errorMessage.includes("Token has expired") || errorMessage.includes("token expired")) {
-      throw new TRPCError({
-        code: "UNAUTHORIZED",
-        message: "Token has expired",
-        cause: {
-          type: "TOKEN_EXPIRED",
-        },
-      });
-    }
+  if (authDenied) throw authDenied;
+
+  if (authError?.includes("Token has expired") || authError?.includes("token expired")) {
+    throw new TRPCError({
+      code: "UNAUTHORIZED",
+      message: "Token has expired",
+      cause: {
+        type: "TOKEN_EXPIRED",
+      },
+    });
   }
+}
+
+export const isAuthed = t.middleware<{ ctx: Context }>(async ({ ctx, path, next }) => {
+  throwStoredAuthFailure(ctx);
 
   if (!ctx.user) {
     throw new TRPCError({
@@ -51,6 +57,10 @@ export const isAuthed = t.middleware<{ ctx: Context }>(({ ctx, path, next }) => 
 
   // The organization is already loaded with the membership (no extra query).
   assertOrganizationNotSuspended(ctx.user.userOrganization?.organization, path);
+
+  if (!isMfaEnrolmentExempt(path)) {
+    await mfaService.assertEnrolledIfRequired(ctx.user);
+  }
 
   return next({
     ctx: {
@@ -110,23 +120,15 @@ const hasScope = (resource: string, action: string) => {
  * Used for endpoints that need to work before organization context is established
  */
 export const isAuthedWithoutOrg = t.middleware<{ ctx: Context }>(({ ctx, next }) => {
-  // Check if there was an authentication error stored in the request
+  // A stale organization header must not lock someone out of what needs no
+  // organization: auth.me is how the dashboard learns which ones they still have.
   // @ts-ignore - Express type definition mismatch between root and server node_modules
-  const reqWithAuth = ctx.req as RequestWithAuthError;
-  if (reqWithAuth.authError) {
-    const errorMessage = reqWithAuth.authError;
-
-    // Provide specific error for token expiration
-    if (errorMessage.includes("Token has expired") || errorMessage.includes("token expired")) {
-      throw new TRPCError({
-        code: "UNAUTHORIZED",
-        message: "Token has expired",
-        cause: {
-          type: "TOKEN_EXPIRED",
-        },
-      });
-    }
+  const { userWithoutOrganization } = ctx.req as RequestWithAuthError;
+  if (userWithoutOrganization) {
+    return next({ ctx: { ...ctx, user: userWithoutOrganization, organizationId: null } });
   }
+
+  throwStoredAuthFailure(ctx);
 
   if (!ctx.user) {
     throw new TRPCError({
@@ -163,6 +165,22 @@ export const protectedProcedureWithoutOrg = t.procedure.use(isAuthedWithoutOrg);
  */
 export const scopedProcedure = (resource: string, action: string) => {
   return t.procedure.use(isAuthed).use(hasScope(resource, action));
+};
+
+/**
+ * For server-to-server endpoints: an API key holding the scope, or a dashboard
+ * user with the organization-wide wildcard (owner/admin).
+ */
+export const serverToServerProcedure = (resource: string, action: string) => {
+  return scopedProcedure(resource, action).use(({ ctx, next }) => {
+    if (ctx.user.authMethod !== "apikey" && !ctx.user.hasScope("*", "*")) {
+      throw new TRPCError({
+        code: "FORBIDDEN",
+        message: "This action requires an API key or an administrator",
+      });
+    }
+    return next();
+  });
 };
 
 /**

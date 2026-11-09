@@ -28,6 +28,8 @@ export interface PublicMessageMetadata {
   agentFirstName?: string;
   /** The content is only a "[Customer sent …]" line: the widget shows the files instead. */
   mediaPlaceholder?: true;
+  /** Image URLs the server checked in this reply; any other image renders as a link. */
+  approvedImages?: string[];
 }
 
 /**
@@ -109,6 +111,13 @@ export function toPublicMessageMetadata(metadata: unknown): PublicMessageMetadat
 
   if (source.mediaPlaceholder === true) {
     result.mediaPlaceholder = true;
+  }
+
+  if (Array.isArray(source.approvedImages)) {
+    const approved = source.approvedImages.filter(
+      (url): url is string => typeof url === "string" && /^https?:\/\//i.test(url),
+    );
+    if (approved.length > 0) result.approvedImages = approved;
   }
 
   const firstName = agentFirstName({

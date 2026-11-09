@@ -1,5 +1,6 @@
 import { ref, onUnmounted } from "vue";
 import { useI18n } from "vue-i18n";
+import { ensureFreshAccessToken } from "@/utils/api";
 import {
   createAuthenticatedWebSocket,
   parseWebSocketMessage,
@@ -88,13 +89,16 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
   /**
    * Connect to WebSocket server
    */
-  const connect = () => {
+  const connect = async () => {
     // Don't reconnect if already connected
     if (ws.value?.readyState === WebSocket.OPEN) {
       return;
     }
 
     try {
+      // The access token is memory only: none yet right after a page load.
+      await ensureFreshAccessToken();
+      if (ws.value?.readyState === WebSocket.OPEN) return;
       ws.value = createAuthenticatedWebSocket();
 
       if (!ws.value) {

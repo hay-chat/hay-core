@@ -10,6 +10,7 @@ import { pluginRegistryRepository } from "@server/repositories/plugin-registry.r
 import { RESOURCES, ACTIONS } from "@server/types/scopes";
 import { createLogger } from "@server/lib/logger";
 import type { CanonicalProduct } from "@server/types/canonical-product";
+import { escapeLike } from "@server/lib/sql-like";
 
 const logger = createLogger("products-router");
 
@@ -178,7 +179,7 @@ export const productsRouter = t.router({
       }
       if (input.query) {
         qb.andWhere("(p.title ILIKE :q OR p.handle ILIKE :q)", {
-          q: `%${input.query}%`,
+          q: `%${escapeLike(input.query)}%`,
         });
       }
 

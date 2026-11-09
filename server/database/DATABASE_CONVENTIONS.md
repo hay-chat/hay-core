@@ -59,6 +59,12 @@ Every index created in a migration is mirrored on the entity with `@Index`, usin
   path that would fail without it, and drop or rename old columns only in a later release once nothing
   reads them. If a change can't meet this, say so in the PR's deploy notes.
 - Never rename or edit a migration that has been applied.
+- Backfills on large tables run in batches, each in its own transaction, so one `UPDATE` doesn't
+  hold row locks and WAL for the whole table. `HardenAuditLogs` (1793292146423) predates this and
+  backfills `audit_logs` in one statement: on a large table, run it in a quiet window.
+- A migration whose `down` can't restore data says so in the PR's deploy notes.
+  `ReplaceAgentsWithOrgAssistant` (1793700000000) drops `agents` and `playbook_agents`; its `down`
+  brings back schema only, so take a backup before applying it and restore from that to roll back.
 - Known duplicate timestamps (already applied; leave them as they are, TypeORM tracks them by class
   name): `1761000000000` (AddMultiOrganizationSupport, CreatePrivacyRequestsAndUserDeletion),
   `1781100000000` (AddEditorDocuments, ConvertConversationChannelToVarchar), `1784500000000`

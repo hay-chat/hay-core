@@ -33,6 +33,7 @@ import {
 } from "@server/services/webchat/under-attack.service";
 
 const ORG = "org-1";
+const IP = "203.0.113.7";
 const HOUR = 60 * 60 * 1000;
 
 describe("under-attack mode", () => {
@@ -77,16 +78,26 @@ describe("under-attack mode", () => {
     });
   });
 
+  it("one address repeating itself counts once", async () => {
+    mockCheck.mockResolvedValueOnce({ limited: true }); // already seen
+    expect(await recordCreateAttempt(ORG, IP)).toBe(false);
+    expect(mockCheck).toHaveBeenCalledTimes(1);
+    expect(mockUpdate).not.toHaveBeenCalled();
+  });
+
   it("below the threshold it only counts the attempt", async () => {
     mockCheck.mockResolvedValueOnce({ limited: false });
-    expect(await recordCreateAttempt(ORG)).toBe(false);
+    mockCheck.mockResolvedValueOnce({ limited: false });
+    expect(await recordCreateAttempt(ORG, IP)).toBe(false);
+    expect(mockCheck).toHaveBeenCalledWith(`under-attack:seen:${ORG}:${IP}`, 1, 300);
     expect(mockCheck).toHaveBeenCalledWith(`under-attack:creates:${ORG}`, 30, 300);
     expect(mockUpdate).not.toHaveBeenCalled();
   });
 
   it("past the threshold it switches on automatically", async () => {
+    mockCheck.mockResolvedValueOnce({ limited: false });
     mockCheck.mockResolvedValueOnce({ limited: true });
-    expect(await recordCreateAttempt(ORG)).toBe(true);
+    expect(await recordCreateAttempt(ORG, IP)).toBe(true);
     expect(mockUpdate).toHaveBeenCalledTimes(1);
     const [where, data] = mockUpdate.mock.calls[0] as [
       Record<string, unknown>,
@@ -98,11 +109,11 @@ describe("under-attack mode", () => {
   });
 
   it("reports an owner-started period even below the threshold", async () => {
-    mockCheck.mockResolvedValueOnce({ limited: false });
+    mockCheck.mockResolvedValue({ limited: false });
     mockFindOne.mockResolvedValueOnce({
       underAttackUntil: new Date(Date.now() + HOUR),
       underAttackSource: "owner",
     });
-    expect(await recordCreateAttempt(ORG)).toBe(true);
+    expect(await recordCreateAttempt(ORG, IP)).toBe(true);
   });
 });

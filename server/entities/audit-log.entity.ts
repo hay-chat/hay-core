@@ -16,13 +16,25 @@ export type AuditAction =
   | "profile.update"
   | "email.change"
   | "password.change"
+  | "internal.call"
   | "password.reset.request"
   | "password.reset"
   | "user.login"
   | "user.logout"
+  | "user.session_revoke"
+  | "user.session_revoke_others"
   | "user.register"
+  | "mfa.enable"
+  | "mfa.disable"
+  | "mfa.verify"
+  | "mfa.recovery_code_used"
+  | "mfa.recovery_codes_regenerate"
   | "apikey.create"
   | "apikey.revoke"
+  | "apikey.update"
+  | "assistant.update"
+  | "audit_log.export"
+  | "message_feedback.export"
   | "security.setting.change"
   | "privacy.export.request"
   | "privacy.export.confirm"
@@ -59,6 +71,7 @@ export type AuditAction =
   | "product.prune"
   | "permission.denied"
   | "retention.cleanup"
+  | "retention.customers"
   | "billing.resolution.exclude"
   | "billing.resolution.exclusion_review_requested"
   | "billing.resolution.exclusion_approved"
@@ -76,11 +89,15 @@ export type AuditAction =
   | "dispute_evidence.export"
   | "dispute_evidence.push";
 
+export type AuditActorType = "user" | "apikey" | "plugin" | "system";
+
 @Entity("audit_logs")
 @Index("idx_audit_logs_user", ["userId"])
 @Index("idx_audit_logs_organization", ["organizationId"])
 @Index("idx_audit_logs_original_organization", ["originalOrganizationId"])
 @Index("idx_audit_logs_action", ["action"])
+@Index("idx_audit_logs_api_key", ["apiKeyId"])
+@Index("uq_audit_logs_chain", ["chainKey", "chainSeq"], { unique: true })
 @Index("idx_audit_logs_created_at", ["createdAt"])
 export class AuditLog extends TypeOrmBaseEntity {
   @PrimaryGeneratedColumn("uuid")
@@ -106,6 +123,52 @@ export class AuditLog extends TypeOrmBaseEntity {
    */
   @Column({ type: "uuid", nullable: true, select: false, insert: false, update: false })
   originalOrganizationId?: string;
+
+  /**
+   * Who performed the event, and the API key when that was a token. Filled by a
+   * DB trigger on insert from `metadata.actorType` / `metadata.apiKeyId` (or
+   * from `user_id`). Like `originalOrganizationId`, never touched by TypeORM, so
+   * code stays compatible before the migration runs. NULL on older rows.
+   */
+  @Column({
+    type: "varchar",
+    length: 20,
+    nullable: true,
+    select: false,
+    insert: false,
+    update: false,
+  })
+  actorType?: AuditActorType;
+
+  @Column({ type: "uuid", nullable: true, select: false, insert: false, update: false })
+  apiKeyId?: string;
+
+  /** Hash chain position, assigned by a DB trigger on insert. NULL on older rows. */
+  @Column({ type: "uuid", nullable: true, select: false, insert: false, update: false })
+  chainKey?: string;
+
+  @Column({ type: "bigint", nullable: true, select: false, insert: false, update: false })
+  chainSeq?: string;
+
+  @Column({
+    type: "varchar",
+    length: 64,
+    nullable: true,
+    select: false,
+    insert: false,
+    update: false,
+  })
+  prevHash?: string;
+
+  @Column({
+    type: "varchar",
+    length: 64,
+    nullable: true,
+    select: false,
+    insert: false,
+    update: false,
+  })
+  hash?: string;
 
   @Column({ type: "varchar", length: 100 })
   action!: AuditAction;

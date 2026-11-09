@@ -34,6 +34,8 @@ export const RESOURCES = {
   PLUGINS: "plugins",
   ANALYTICS: "analytics",
   AUDIT_LOGS: "audit_logs",
+  // Customer data subject requests; only the admin/owner wildcard holds it
+  PRIVACY: "privacy",
   // Usage and the resolution ledger; only the admin/owner wildcard holds it
   BILLING: "billing",
 
@@ -142,12 +144,12 @@ export const MEMBER_SCOPES = [
   buildScope(RESOURCES.DOCUMENTS, ACTIONS.CREATE),
   buildScope(RESOURCES.DOCUMENTS, ACTIONS.UPDATE),
   buildScope(RESOURCES.SOURCES, ACTIONS.READ),
-  buildScope(RESOURCES.SOURCES, ACTIONS.CREATE),
-  buildScope(RESOURCES.SOURCES, ACTIONS.UPDATE),
   buildScope(RESOURCES.ASSISTANT, ACTIONS.READ),
   buildScope(RESOURCES.PLAYBOOKS, ACTIONS.READ),
   buildScope(RESOURCES.ANALYTICS, ACTIONS.READ),
   buildScope(RESOURCES.ORGANIZATION_MEMBERS, ACTIONS.READ),
+  // Document import reads the plugin's schema; no credentials are returned.
+  buildScope(RESOURCES.PLUGINS, ACTIONS.READ),
   buildScope(RESOURCES.PRODUCTS, ACTIONS.READ),
   buildScope(RESOURCES.PRODUCTS, ACTIONS.CREATE),
   buildScope(RESOURCES.PRODUCTS, ACTIONS.UPDATE),
@@ -164,8 +166,6 @@ export const CONTRIBUTOR_SCOPES = [
   buildScope(RESOURCES.DOCUMENTS, ACTIONS.CREATE),
   buildScope(RESOURCES.DOCUMENTS, ACTIONS.UPDATE),
   buildScope(RESOURCES.SOURCES, ACTIONS.READ),
-  buildScope(RESOURCES.SOURCES, ACTIONS.CREATE),
-  buildScope(RESOURCES.SOURCES, ACTIONS.UPDATE),
   buildScope(RESOURCES.ASSISTANT, ACTIONS.READ),
   buildScope(RESOURCES.ASSISTANT, ACTIONS.UPDATE),
   buildScope(RESOURCES.PLAYBOOKS, ACTIONS.READ),
@@ -173,6 +173,8 @@ export const CONTRIBUTOR_SCOPES = [
   buildScope(RESOURCES.PLAYBOOKS, ACTIONS.UPDATE),
   buildScope(RESOURCES.ANALYTICS, ACTIONS.READ),
   buildScope(RESOURCES.ORGANIZATION_MEMBERS, ACTIONS.READ),
+  // Document import reads the plugin's schema; no credentials are returned.
+  buildScope(RESOURCES.PLUGINS, ACTIONS.READ),
   buildScope(RESOURCES.PRODUCTS, ACTIONS.READ),
   buildScope(RESOURCES.PRODUCTS, ACTIONS.CREATE),
   buildScope(RESOURCES.PRODUCTS, ACTIONS.UPDATE),

@@ -1,6 +1,7 @@
 import { describe, it, expect, jest, beforeAll, afterAll, beforeEach } from "@jest/globals";
 import type { AddressInfo } from "net";
 import type { Server } from "http";
+import { Readable } from "stream";
 import { TRPCError } from "@trpc/server";
 
 /**
@@ -19,9 +20,9 @@ jest.mock("@server/lib/logger", () => ({ createLogger: () => mockLogger }));
 const mockFindOne = jest.fn<(options: unknown) => Promise<unknown>>();
 jest.mock("@server/entities/upload.entity", () => ({ Upload: { findOne: mockFindOne } }));
 
-const mockDownload = jest.fn<(id: string) => Promise<{ buffer: Buffer }>>();
+const mockDownload = jest.fn<(upload: unknown, range?: [number, number]) => Promise<Readable>>();
 jest.mock("@server/services/storage.service", () => ({
-  storageService: { download: mockDownload },
+  storageService: { openReadStream: mockDownload },
 }));
 
 const mockWaitForScans =
@@ -50,6 +51,7 @@ const upload = (overrides: Record<string, unknown> = {}) => ({
   folder: "conversation-media",
   mimeType: "image/jpeg",
   originalName: "foto ação.jpg",
+  size: BYTES.length,
   ...overrides,
 });
 
@@ -74,7 +76,9 @@ afterAll(() => new Promise<void>((resolve) => server.close(() => resolve())));
 beforeEach(() => {
   jest.clearAllMocks();
   mockFindOne.mockResolvedValue(upload());
-  mockDownload.mockResolvedValue({ buffer: BYTES });
+  mockDownload.mockImplementation(async (_upload, range) =>
+    Readable.from([range ? BYTES.subarray(range[0], range[1] + 1) : BYTES]),
+  );
 });
 
 const signedPath = (id = UPLOAD_ID, ttl = 60) => {
@@ -185,6 +189,27 @@ describe("GET /v1/media/:id", () => {
     response = await fetch(`${baseUrl}/v1/media/${UPLOAD_ID}`, { headers: staffHeaders() });
     expect(response.status).toBe(404);
     expect(mockDownload).not.toHaveBeenCalled();
+  });
+
+  it.each(["privacy-exports", "plugin-zips", "organization-exports", "documents-private"])(
+    "keeps %s out of direct staff access, even with full scope",
+    async (folder) => {
+      mockFindOne.mockResolvedValue(upload({ folder }));
+      mockRequireAuth.mockResolvedValue(staff());
+
+      const response = await fetch(`${baseUrl}/v1/media/${UPLOAD_ID}`, { headers: staffHeaders() });
+
+      expect(response.status).toBe(404);
+      expect(mockDownload).not.toHaveBeenCalled();
+    },
+  );
+
+  it("still serves those folders through a signed link", async () => {
+    mockFindOne.mockResolvedValue(upload({ folder: "organization-exports" }));
+
+    const response = await fetch(`${baseUrl}${signedPath()}`);
+
+    expect(response.status).toBe(200);
   });
 
   it("answers 401 for an invalid session token", async () => {

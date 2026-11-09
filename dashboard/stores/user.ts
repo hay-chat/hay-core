@@ -1,4 +1,5 @@
 import { defineStore } from "pinia";
+import { hasRouteAccess } from "@/utils/route-access";
 
 const SUSPENSION_REASONS = ["trial_expired", "payment_failed", "cancelled", "manual"] as const;
 export type SuspensionReason = (typeof SUSPENSION_REASONS)[number];
@@ -60,6 +61,8 @@ export interface User {
   onlineStatus?: "online" | "away" | "offline";
   pendingEmail?: string | null;
   emailVerificationExpiresAt?: Date;
+  /** An organization requires two-factor authentication and this user has not enrolled. */
+  mfaEnrolmentRequired?: boolean;
 }
 
 export const useUserStore = defineStore("user", {
@@ -227,6 +230,12 @@ export const useUserStore = defineStore("user", {
       );
     },
 
+    /** Conversation exports and evidence packs; viewers and agents don't have the scope. */
+    canExportConversations: (state) => {
+      const activeOrg = state.organizations.find((org) => org.id === state.activeOrganizationId);
+      return hasRouteAccess("/evidence", activeOrg?.role || state.user?.role || "member");
+    },
+
     canExportData: (state) => {
       const activeOrg = state.organizations.find((org) => org.id === state.activeOrganizationId);
       // Only owners can export audit logs
@@ -253,6 +262,7 @@ export const useUserStore = defineStore("user", {
         onlineStatus: userData.onlineStatus,
         pendingEmail: userData.pendingEmail,
         emailVerificationExpiresAt: userData.emailVerificationExpiresAt,
+        mfaEnrolmentRequired: userData.mfaEnrolmentRequired,
       };
 
       // Set organizations if provided
@@ -367,5 +377,7 @@ export const useUserStore = defineStore("user", {
   },
   persist: {
     pick: ["user", "activeOrganizationId", "organizations"],
+    // Fetched again on load; contact details don't need to sit in localStorage.
+    omit: ["user.email", "user.pendingEmail"],
   },
 });

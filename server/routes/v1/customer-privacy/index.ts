@@ -1,4 +1,5 @@
-import { t, authenticatedProcedure } from "@server/trpc";
+import { t, scopedProcedure } from "@server/trpc";
+import { RESOURCES, ACTIONS } from "@server/types/scopes";
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { privacyService } from "@server/services/privacy.service";
@@ -77,6 +78,7 @@ async function checkCustomerPrivacyRateLimits(
     identifierKey,
     RATE_LIMITS.IDENTIFIER_REQUESTS_PER_DAY,
     RATE_LIMITS.DAY_WINDOW_SECONDS,
+    { scope: "customer-privacy" },
   );
 
   if (identifierLimit.limited) {
@@ -93,7 +95,7 @@ export const customerPrivacyRouter = t.router({
    * Request a customer data export
    * Organization initiates export for their customer
    */
-  requestExport: authenticatedProcedure
+  requestExport: scopedProcedure(RESOURCES.PRIVACY, ACTIONS.EXPORT)
     .input(
       z.object({
         identifier: z.object({
@@ -141,7 +143,7 @@ export const customerPrivacyRouter = t.router({
    * Request customer data deletion
    * Organization initiates deletion for their customer
    */
-  requestDeletion: authenticatedProcedure
+  requestDeletion: scopedProcedure(RESOURCES.PRIVACY, ACTIONS.DELETE)
     .input(
       z.object({
         identifier: z.object({
@@ -189,7 +191,7 @@ export const customerPrivacyRouter = t.router({
    * Get status of a customer privacy request
    * Organization can check status of their customer's requests
    */
-  getStatus: authenticatedProcedure
+  getStatus: scopedProcedure(RESOURCES.PRIVACY, ACTIONS.READ)
     .input(
       z.object({
         requestId: z.string().uuid("Invalid request ID"),
@@ -251,7 +253,7 @@ export const customerPrivacyRouter = t.router({
    * List all customer privacy requests for organization
    * Shows history of all requests made for customers
    */
-  listRequests: authenticatedProcedure
+  listRequests: scopedProcedure(RESOURCES.PRIVACY, ACTIONS.READ)
     .input(
       z.object({
         status: z

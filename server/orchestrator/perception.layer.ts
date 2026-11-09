@@ -1,4 +1,5 @@
 import { Message, MessageIntent, MessageSentiment } from "@server/database/entities/message.entity";
+import { fenceData } from "@server/services/core/prompt-data";
 import { LLMService } from "../services/core/llm.service";
 import { PromptService } from "../services/prompt.service";
 import { createLogger } from "@server/lib/logger";
@@ -38,7 +39,7 @@ export class PerceptionLayer {
     // Get prompt from PromptService with conversation's language
     const perceptionPrompt = await this.promptService.getPrompt(
       "perception/intent-analysis",
-      { message: message.content },
+      { message: fenceData(message.content) },
       { conversationId, organizationId },
     );
 

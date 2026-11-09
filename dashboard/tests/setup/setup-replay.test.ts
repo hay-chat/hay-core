@@ -18,7 +18,7 @@ vi.mock("@/utils/api", () => ({
     replays: { report: { query: api.report }, start: { mutate: api.start } },
   },
 }));
-vi.mock("@/middleware/auth.global", async () => ({
+vi.mock("@/utils/route-access", async () => ({
   hasRouteAccess: (await import("./fixtures")).hasRouteAccess,
 }));
 vi.mock("@/components/tests/TranscriptImportDialog.vue", async () => {

@@ -129,3 +129,41 @@ describe("MessageRecoveryService escalation", () => {
     expect(types).toEqual(["System"]);
   });
 });
+
+describe("MessageRecoveryService backoff", () => {
+  const failing = (overrides: Record<string, unknown> = {}) =>
+    makeConversation({ recovery_attempts: 0, processing_error_count: 3, ...overrides });
+
+  beforeEach(() => jest.clearAllMocks());
+
+  it("stores a cooldown instead of waiting, and queues nothing yet", async () => {
+    mockFindById.mockResolvedValue(failing());
+    const before = Date.now();
+
+    const result = await new MessageRecoveryService().recoverStaleConversation(stale);
+
+    expect(result).toMatchObject({ action: "backoff_started", backoffMs: 8000 });
+    expect(Date.now() - before).toBeLessThan(1000);
+    expect(mockEnqueue).not.toHaveBeenCalled();
+    expect(mockUpdateById).toHaveBeenCalledTimes(1);
+    const [, update] = mockUpdateById.mock.calls[0] as [string, { cooldown_until: Date }];
+    expect(update.cooldown_until.getTime()).toBeGreaterThanOrEqual(before + 8000);
+  });
+
+  it("retries once the cooldown has passed and counts that attempt", async () => {
+    mockFindById.mockResolvedValue(failing({ cooldown_until: new Date(Date.now() - 1000) }));
+
+    const result = await new MessageRecoveryService().recoverStaleConversation(stale);
+
+    expect(result).toMatchObject({ success: true, action: "retry_with_backoff" });
+    expect(mockEnqueue).toHaveBeenCalledWith(CONVERSATION_ID, "org-1", "recovery");
+    expect(mockUpdateById).toHaveBeenCalledWith(
+      CONVERSATION_ID,
+      expect.objectContaining({ recovery_attempts: 1 }),
+    );
+    expect(mockUpdateById).toHaveBeenCalledWith(
+      CONVERSATION_ID,
+      expect.objectContaining({ needs_processing: true, cooldown_until: null }),
+    );
+  });
+});

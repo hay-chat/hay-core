@@ -2,11 +2,9 @@ import { t } from "@server/trpc";
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { publicProcedure } from "@server/trpc/middleware/auth";
-import { privacyService } from "@server/services/privacy.service";
-import { rateLimitService } from "@server/services/rate-limit.service";
-import { createLogger } from "@server/lib/logger";
-
-const logger = createLogger("privacy-routes");
+import { privacyService, PrivacyRequestError } from "@server/services/privacy.service";
+import { rateLimitService, RateLimitUnavailableError } from "@server/services/rate-limit.service";
+import { toClientError } from "@server/trpc/client-error";
 
 /**
  * Privacy Router
@@ -24,6 +22,18 @@ const RATE_LIMITS = {
   EMAIL_WINDOW_SECONDS: 86400, // 24 hours
   COMBINED_WINDOW_SECONDS: 86400, // 24 hours
 };
+
+/** Refusals keep their wording; anything unexpected is logged and replaced by `fallback`. */
+function privacyClientError(
+  error: unknown,
+  refusalCode: "BAD_REQUEST" | "NOT_FOUND",
+  fallback: string,
+): TRPCError {
+  if (error instanceof PrivacyRequestError) {
+    return new TRPCError({ code: refusalCode, message: error.message });
+  }
+  return toClientError(error, "INTERNAL_SERVER_ERROR", fallback);
+}
 
 /**
  * Format time remaining in a user-friendly way
@@ -64,7 +74,7 @@ async function checkPrivacyRateLimits(email: string, ipAddress: string): Promise
       ipAddress,
       RATE_LIMITS.IP_REQUESTS_PER_HOUR,
       RATE_LIMITS.IP_WINDOW_SECONDS,
-      FAIL_CLOSED,
+      { scope: "privacy-request", failClosed: FAIL_CLOSED },
     );
 
     if (ipLimit.limited) {
@@ -80,7 +90,7 @@ async function checkPrivacyRateLimits(email: string, ipAddress: string): Promise
       email,
       RATE_LIMITS.EMAIL_REQUESTS_PER_DAY,
       RATE_LIMITS.EMAIL_WINDOW_SECONDS,
-      FAIL_CLOSED,
+      { scope: "privacy-request", failClosed: FAIL_CLOSED },
     );
 
     if (emailLimit.limited) {
@@ -109,7 +119,7 @@ async function checkPrivacyRateLimits(email: string, ipAddress: string): Promise
     }
   } catch (error) {
     // If rate limiting service throws an error (Redis unavailable), convert to TRPC error
-    if (error instanceof Error && error.message.includes("Rate limiting service")) {
+    if (error instanceof RateLimitUnavailableError) {
       throw new TRPCError({
         code: "SERVICE_UNAVAILABLE",
         message: "Privacy request system is temporarily unavailable. Please try again later.",
@@ -147,15 +157,11 @@ export const privacyRouter = t.router({
           expiresAt: result.expiresAt,
         };
       } catch (error) {
-        logger.error({ err: error }, "Export request failed");
-        const message =
-          error instanceof Error
-            ? error.message
-            : "Failed to process export request. Please try again later.";
-        throw new TRPCError({
-          code: "INTERNAL_SERVER_ERROR",
-          message,
-        });
+        throw privacyClientError(
+          error,
+          "BAD_REQUEST",
+          "Failed to process export request. Please try again later.",
+        );
       }
     }),
 
@@ -181,11 +187,7 @@ export const privacyRouter = t.router({
             "Your data export request has been confirmed. We are processing your data and will send you an email when it's ready to download.",
         };
       } catch (error) {
-        const message = error instanceof Error ? error.message : "Unknown error";
-        throw new TRPCError({
-          code: "BAD_REQUEST",
-          message,
-        });
+        throw privacyClientError(error, "BAD_REQUEST", "Failed to confirm the export request");
       }
     }),
 
@@ -216,11 +218,7 @@ export const privacyRouter = t.router({
           expiresAt: result.expiresAt,
         };
       } catch (error) {
-        const message = error instanceof Error ? error.message : "Unknown error";
-        throw new TRPCError({
-          code: "BAD_REQUEST",
-          message,
-        });
+        throw privacyClientError(error, "BAD_REQUEST", "Failed to create the deletion request");
       }
     }),
 
@@ -246,11 +244,7 @@ export const privacyRouter = t.router({
             "Your data deletion request has been confirmed. We are processing your request and will send you a confirmation email when complete.",
         };
       } catch (error) {
-        const message = error instanceof Error ? error.message : "Unknown error";
-        throw new TRPCError({
-          code: "BAD_REQUEST",
-          message,
-        });
+        throw privacyClientError(error, "BAD_REQUEST", "Failed to confirm the deletion request");
       }
     }),
 
@@ -273,11 +267,7 @@ export const privacyRouter = t.router({
           ...status,
         };
       } catch (error) {
-        const message = error instanceof Error ? error.message : "Unknown error";
-        throw new TRPCError({
-          code: "NOT_FOUND",
-          message,
-        });
+        throw privacyClientError(error, "NOT_FOUND", "Failed to load the request status");
       }
     }),
 
@@ -303,11 +293,7 @@ export const privacyRouter = t.router({
           message: "Privacy request has been cancelled successfully.",
         };
       } catch (error) {
-        const message = error instanceof Error ? error.message : "Unknown error";
-        throw new TRPCError({
-          code: "BAD_REQUEST",
-          message,
-        });
+        throw privacyClientError(error, "BAD_REQUEST", "Failed to cancel the request");
       }
     }),
 
@@ -323,7 +309,7 @@ export const privacyRouter = t.router({
         downloadToken: z.string().min(1, "Download token is required"),
       }),
     )
-    .query(async ({ input, ctx }) => {
+    .mutation(async ({ input, ctx }) => {
       const ipAddress = ctx.ipAddress || "unknown";
 
       try {
@@ -332,7 +318,7 @@ export const privacyRouter = t.router({
           ipAddress,
           20, // max 20 attempts
           3600, // per hour
-          false, // fail-open (don't block if Redis is down)
+          { scope: "privacy-download" },
         );
 
         if (rateLimitResult.limited) {
@@ -355,11 +341,7 @@ export const privacyRouter = t.router({
           base64Data: result.buffer.toString("base64"),
         };
       } catch (error) {
-        const message = error instanceof Error ? error.message : "Unknown error";
-        throw new TRPCError({
-          code: error instanceof TRPCError ? error.code : "INTERNAL_SERVER_ERROR",
-          message: `Failed to download export: ${message}`,
-        });
+        throw privacyClientError(error, "BAD_REQUEST", "Failed to download export");
       }
     }),
 });

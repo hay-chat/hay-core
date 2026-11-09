@@ -2,6 +2,7 @@ import { AppDataSource } from "@server/database/data-source";
 import { ScheduledJob } from "@server/entities/scheduled-job.entity";
 import { ScheduledJobHistory } from "@server/entities/scheduled-job-history.entity";
 import { createLogger } from "@server/lib/logger";
+import { metrics } from "@server/lib/metrics";
 import * as cron from "node-cron";
 import type { QueryRunner } from "typeorm";
 
@@ -20,7 +21,7 @@ export type CronJobConfig = {
   name: string; // Unique job identifier
   description: string; // Human-readable description
   schedule: string | number; // Cron expression or interval in ms
-  handler: () => Promise<void>; // Job handler function
+  handler: (signal: AbortSignal) => Promise<void>; // Aborted when the run times out or shutdown gives up on it
   enabled?: boolean; // Enable/disable job (default: true)
   timeout?: number; // Max execution time in ms
   retryOnFailure?: boolean; // Retry failed jobs
@@ -38,6 +39,7 @@ type RegisteredJob = {
   timer?: NodeJS.Timeout; // For interval-based jobs
   cronTask?: cron.ScheduledTask; // For cron-based jobs
   isRunning: boolean;
+  runController?: AbortController; // Cancels the handler of the current run
   lastRun?: Date;
   lastStatus?: "success" | "failed" | "timeout";
   lastError?: string;
@@ -268,6 +270,7 @@ export class SchedulerService {
       while (runningJobs.some((name) => this.jobs.get(name)?.isRunning)) {
         if (Date.now() - waitStart > gracefulTimeout) {
           logger.warn("Graceful timeout exceeded, forcing shutdown");
+          for (const job of this.jobs.values()) job.runController?.abort();
           break;
         }
         await new Promise((resolve) => setTimeout(resolve, 100));
@@ -405,16 +408,18 @@ export class SchedulerService {
 
   /**
    * Run the handler once and record the outcome on the job. When the timeout
-   * fires the run is reported as timed out, but this still waits for the
-   * handler to settle so the job is never marked idle (or unlocked) while
-   * its handler is still running.
+   * fires the run is reported as timed out and its signal is aborted, but this
+   * still waits for the handler to settle so the job is never marked idle (or
+   * unlocked) while its handler is still running.
    */
   private async runOnce(
     job: RegisteredJob,
     name: string,
   ): Promise<{ status: "success" | "failed" | "timeout"; duration: number; error?: string }> {
     const startTime = Date.now();
-    const run = Promise.resolve().then(() => job.config.handler());
+    const controller = new AbortController();
+    job.runController = controller;
+    const run = Promise.resolve().then(() => job.config.handler(controller.signal));
 
     let status: "success" | "failed" | "timeout" = "success";
     let errorMessage: string | undefined;
@@ -435,6 +440,7 @@ export class SchedulerService {
     job.lastStatus = status;
     job.lastError = errorMessage;
     job.lastDuration = duration;
+    metrics.schedulerRuns.inc({ job: name, status });
     job.totalRuns++;
     job.totalDuration += duration;
     if (status !== "success") {
@@ -442,6 +448,7 @@ export class SchedulerService {
     }
 
     if (status === "timeout") {
+      controller.abort();
       await run.catch(() => undefined);
       logger.warn(
         { jobName: name, durationMs: Date.now() - startTime },
@@ -453,8 +460,7 @@ export class SchedulerService {
   }
 
   /**
-   * Wait for a run, rejecting with JobTimeoutError after `timeout` ms. The
-   * run itself is not cancelled.
+   * Wait for a run, rejecting with JobTimeoutError after `timeout` ms.
    */
   private async waitWithTimeout(run: Promise<void>, timeout: number): Promise<void> {
     let timer: NodeJS.Timeout | undefined;

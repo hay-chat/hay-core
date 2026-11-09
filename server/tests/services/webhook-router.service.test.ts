@@ -21,11 +21,18 @@ jest.mock("@server/services/plugin-instance-manager.service", () => ({
   pluginInstanceManagerService: { updateActivityTimestamp },
 }));
 jest.mock("@server/lib/hmac-signature", () => ({
+  ...jest.requireActual<typeof import("@server/lib/hmac-signature")>("@server/lib/hmac-signature"),
   verifyHmacSha256: jest.fn(),
 }));
 const claimWebhookDelivery = jest.fn();
 const releaseWebhookDelivery = jest.fn();
-jest.mock("@server/lib/webhook-replay", () => ({ claimWebhookDelivery, releaseWebhookDelivery }));
+class MockReplayUnavailable extends Error {}
+jest.mock("@server/lib/webhook-replay", () => ({
+  claimWebhookDelivery,
+  releaseWebhookDelivery,
+  WEBHOOK_RETRY_AFTER_SECONDS: 30,
+  WebhookReplayUnavailableError: MockReplayUnavailable,
+}));
 import { verifyHmacSha256 } from "@server/lib/hmac-signature";
 
 import {
@@ -34,6 +41,13 @@ import {
 } from "../../services/webhook-router.service";
 
 const routing = { strategy: "shared" };
+
+/** A core plugin whose manifest declares `names`. */
+const declareEnv = (...names: string[]) =>
+  findByPluginId.mockResolvedValue({
+    sourceType: "core",
+    manifest: { permissions: { env: names } },
+  });
 
 describe("webhookRouterService.getRoutingDescriptor", () => {
   beforeEach(() => jest.resetAllMocks());
@@ -355,9 +369,16 @@ describe("webhookRouterService.handle signature formats", () => {
   const rawBody = '{"type":"email.received","data":{"to":["x@y.z"]}}';
 
   function makeRes() {
-    const res: { statusCode?: number; body?: unknown; status: jest.Mock; json: jest.Mock } = {
+    const res: {
+      statusCode?: number;
+      body?: unknown;
+      status: jest.Mock;
+      json: jest.Mock;
+      setHeader: jest.Mock;
+    } = {
       status: jest.fn(),
       json: jest.fn(),
+      setHeader: jest.fn(),
     };
     res.status.mockImplementation((code: number) => {
       res.statusCode = code;
@@ -373,6 +394,7 @@ describe("webhookRouterService.handle signature formats", () => {
   beforeEach(() => {
     jest.resetAllMocks();
     process.env.TEST_SVIX_SECRET = svixSecret;
+    declareEnv("TEST_SVIX_SECRET");
     findByKey.mockResolvedValue(null);
     claimWebhookDelivery.mockResolvedValue(true);
   });
@@ -403,6 +425,19 @@ describe("webhookRouterService.handle signature formats", () => {
 
     expect(res.statusCode).toBe(200);
     expect(claimWebhookDelivery).toHaveBeenCalledWith("webhook-router:p", "msg_1");
+  });
+
+  it("answers 503 with Retry-After while the delivery store is down", async () => {
+    claimWebhookDelivery.mockRejectedValue(new MockReplayUnavailable());
+    const ts = Math.floor(Date.now() / 1000);
+    const req = { method: "POST", headers: svixHeaders(ts, rawBody), rawBody } as never;
+    const res = makeRes();
+
+    await webhookRouterService.handle(req, res as never, "p", svixRouting as never);
+
+    expect(res.statusCode).toBe(503);
+    expect(res.setHeader).toHaveBeenCalledWith("Retry-After", "30");
+    expect(findByKey).not.toHaveBeenCalled();
   });
 
   it("acknowledges a repeated svix-id without dispatching it again", async () => {
@@ -437,9 +472,16 @@ describe("webhookRouterService.handle plugin-declared dedupe", () => {
   const verifyHmac = verifyHmacSha256 as jest.Mock;
 
   function makeRes() {
-    const res: { statusCode?: number; body?: unknown; status: jest.Mock; json: jest.Mock } = {
+    const res: {
+      statusCode?: number;
+      body?: unknown;
+      status: jest.Mock;
+      json: jest.Mock;
+      setHeader: jest.Mock;
+    } = {
       status: jest.fn(),
       json: jest.fn(),
+      setHeader: jest.fn(),
     };
     res.status.mockImplementation((code: number) => {
       res.statusCode = code;
@@ -482,6 +524,7 @@ describe("webhookRouterService.handle plugin-declared dedupe", () => {
   beforeEach(() => {
     jest.resetAllMocks();
     process.env.TEST_HMAC = "secret";
+    declareEnv("TEST_HMAC");
     verifyHmac.mockReturnValue(true);
     setOwners({ PAGE_A: "org-a", PAGE_B: "org-b", STORE_1: "org-a" });
     startPluginWorker.mockResolvedValue({ port: 1234, instanceId: "inst" });
@@ -587,6 +630,7 @@ describe("webhookRouterService.handle base64 HMAC", () => {
   it("verifies a sha256-hmac-base64 signature as base64", async () => {
     jest.resetAllMocks();
     process.env.TEST_B64_SECRET = "s";
+    declareEnv("TEST_B64_SECRET");
     const { verifyHmacSha256 } = jest.requireMock("@server/lib/hmac-signature") as {
       verifyHmacSha256: jest.Mock;
     };
@@ -611,6 +655,70 @@ describe("webhookRouterService.handle base64 HMAC", () => {
     expect(verifyHmacSha256).toHaveBeenCalledWith(expect.any(Buffer), "abc=", "s", "base64");
     expect(res.status).toHaveBeenCalledWith(401);
     delete process.env.TEST_B64_SECRET;
+  });
+});
+
+describe("webhookRouterService env resolution", () => {
+  const mockRes = () => {
+    const res = { status: jest.fn(), json: jest.fn(), send: jest.fn() };
+    res.status.mockReturnValue(res);
+    return res;
+  };
+  const challenge = {
+    signature: { header: "x", format: "sha256-hmac" as const, secretEnv: "TEST_ROUTER_SECRET" },
+    routeKeyPath: { itemsPath: ".", keyPath: "id" },
+    verificationChallenge: {
+      modeParam: "mode",
+      verifyTokenParam: "token",
+      challengeParam: "challenge",
+      verifyTokenEnv: "TEST_ROUTER_VERIFY",
+    },
+  };
+  const verification = (token: string) =>
+    ({ method: "GET", query: { mode: "subscribe", token, challenge: "c1" }, headers: {} }) as never;
+
+  beforeEach(() => {
+    jest.resetAllMocks();
+    process.env.TEST_ROUTER_SECRET = "s3cret";
+    process.env.TEST_ROUTER_VERIFY = "expected";
+  });
+
+  afterEach(() => {
+    delete process.env.TEST_ROUTER_SECRET;
+    delete process.env.TEST_ROUTER_VERIFY;
+  });
+
+  it("answers the challenge when the token matches a declared variable", async () => {
+    declareEnv("TEST_ROUTER_VERIFY");
+    const res = mockRes();
+
+    await webhookRouterService.handle(verification("expected"), res as never, "p", challenge);
+
+    expect(res.status).toHaveBeenCalledWith(200);
+    expect(res.send).toHaveBeenCalledWith("c1");
+  });
+
+  it("does not compare against a variable the manifest does not declare", async () => {
+    declareEnv();
+    const res = mockRes();
+
+    await webhookRouterService.handle(verification("expected"), res as never, "p", challenge);
+
+    expect(res.status).toHaveBeenCalledWith(403);
+  });
+
+  it("does not let an uploaded plugin read a secret even when declared", async () => {
+    findByPluginId.mockResolvedValue({
+      sourceType: "custom",
+      manifest: { permissions: { env: ["TEST_ROUTER_SECRET"] } },
+    });
+    const res = mockRes();
+    const post = { method: "POST", headers: {}, rawBody: "{}" } as never;
+
+    await webhookRouterService.handle(post, res as never, "p", challenge);
+
+    expect(res.status).toHaveBeenCalledWith(500);
+    expect(verifyHmacSha256).not.toHaveBeenCalled();
   });
 });
 

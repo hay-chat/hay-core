@@ -4,11 +4,10 @@
  * short description. It never depends on the org's chat provider, so it works
  * when the org chats on a text-only model.
  *
- * Endpoint (Roger's D8 answer 2, "OpenAI via the EU endpoint"):
+ * Endpoint:
  * - the EU endpoint whenever it is configured, for every organization;
- * - otherwise the default managed OpenAI endpoint, for every organization,
- *   EU-only orgs included. Roger (2026-10-28): don't block vision just because
- *   an org is EU while no EU inference exists; EU inference is decided later.
+ * - otherwise the default managed OpenAI endpoint, for every organization, EU-only
+ *   orgs included: vision is not blocked while no EU inference exists.
  *
  * Usage is reported through the LLM usage seam (services/llm/usage-sink).
  *

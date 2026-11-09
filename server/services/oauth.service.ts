@@ -1021,30 +1021,32 @@ export class OAuthService {
         return { ok: true, routingKeyCount: 0 };
       }
 
-      // An account (e.g. a Shopify store) belongs to one Hay organization: the
-      // upsert below moves its routing keys here, so remember who held them.
-      const previousOwners = new Map<string, string>(); // instanceId -> organizationId
-      for (const key of routingKeys) {
-        const owner = await pluginWebhookRouteRepository.findByKey(pluginId, key);
-        if (owner && owner.organizationId !== organizationId) {
-          previousOwners.set(owner.pluginInstanceId, owner.organizationId);
-        }
-      }
-
-      // Reconnecting with a different account must drop the previous account's keys.
-      await pluginWebhookRouteRepository.clearForInstance(instance.id);
-      await pluginWebhookRouteRepository.upsertRoutes(
+      // An account (e.g. a Shopify store) belongs to one Hay organization, so a
+      // core plugin's fresh authorization moves its keys here. Other plugins
+      // assert their own keys and cannot take one another organization holds.
+      const claim = await pluginWebhookRouteRepository.claimRoutes(
         pluginId,
         organizationId,
         instance.id,
         routingKeys,
+        { allowTransfer: plugin?.sourceType === "core" },
       );
+      if (claim.conflicts.length > 0) {
+        logger.error(
+          { pluginId, organizationId, conflicts: claim.conflicts },
+          "onConnected returned routing keys held by another organization",
+        );
+        return { ok: false, routingKeyCount: 0 };
+      }
 
       // The provider account was just authorized for this organization, so a
       // previous organization left with none of its accounts is disconnected:
       // otherwise its worker keeps using its token (for Shopify it rewrites the
       // store's metafields back to the old organization on every start).
-      for (const [previousInstanceId, previousOrgId] of previousOwners) {
+      for (const {
+        pluginInstanceId: previousInstanceId,
+        organizationId: previousOrgId,
+      } of claim.previousOwners) {
         const remaining = await pluginWebhookRouteRepository.countForInstance(previousInstanceId);
         if (remaining > 0) continue;
         try {

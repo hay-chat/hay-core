@@ -3,7 +3,7 @@ import { describe, it, expect, jest, beforeEach } from "@jest/globals";
 /**
  * Link check inside ExecutionLayer: a reply with a bad link gets one re-plan
  * (the planner fixes the link, drops it, or hands off). A dead link that
- * survives the re-plan hands off; an unlisted one is kept.
+ * survives the re-plan hands off; any other bad link is removed from the reply.
  */
 
 jest.mock("@server/services/core/llm.service", () => ({ LLMService: class {} }));
@@ -145,7 +145,7 @@ describe("ExecutionLayer link check", () => {
     expect(outcome.originalMessage).toBe("Go to https://shop.com/sales");
   });
 
-  it("keeps an unlisted link the planner kept after the re-plan", async () => {
+  it("removes an unverified link the planner kept after the re-plan", async () => {
     assessLinks.mockResolvedValue([{ url: "https://shop.com/cart", reason: "unlisted" }]);
     const state = { ...freshState(), linkRetries: 1 };
 
@@ -154,7 +154,15 @@ describe("ExecutionLayer link check", () => {
     });
 
     expect(outcome.step).toBe("RESPOND");
-    expect(outcome.userMessage).toBe("Check out at https://shop.com/cart");
+    expect(outcome.userMessage).toBe("Check out at");
+  });
+
+  it("hands off when removing the link would leave nothing to send", async () => {
+    assessLinks.mockResolvedValue([{ url: "https://other.test/a", reason: "unverified" }]);
+    const outcome = await invoke(respond("https://other.test/a"), {
+      turnGuardrailState: { ...freshState(), linkRetries: 1 },
+    });
+    expect(outcome.step).toBe("HANDOFF");
   });
 
   it("sends the reply unchecked when the check itself fails", async () => {

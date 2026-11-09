@@ -10,12 +10,20 @@ import {
 } from "@server/lib/auth/utils/jwt";
 import type { AuthTokens } from "@server/types/auth.types";
 import { createLogger } from "@server/lib/logger";
-import { LessThan, QueryFailedError, type EntityManager, type Repository } from "typeorm";
+import {
+  IsNull,
+  LessThan,
+  MoreThan,
+  Not,
+  QueryFailedError,
+  type EntityManager,
+  type Repository,
+} from "typeorm";
 
 const logger = createLogger("auth-session");
 
-/** A session that sees no refresh for this long ends. Every refresh slides it. */
-export const SESSION_IDLE_TIMEOUT_MS = 90 * 24 * 60 * 60 * 1000;
+/** A session ends this long after sign-in, however active it is. */
+export const SESSION_ABSOLUTE_LIFETIME_MS = authConfig.session.absoluteLifetimeMs;
 
 /**
  * After a rotation the previous refresh token keeps working for this long and
@@ -77,7 +85,7 @@ function decodeRefreshToken(token: string): { sessionId: string; generation: num
 
 function tokensFor(user: User, session: Session): AuthTokens {
   return {
-    accessToken: generateAccessToken(user),
+    accessToken: generateAccessToken(user, session.id),
     refreshToken: encodeRefreshToken(session.id, session.generation),
     expiresIn: ACCESS_TOKEN_TTL_SECONDS,
   };
@@ -113,7 +121,7 @@ export class AuthSessionService {
         generation: 0,
         tokenVersion: user.tokenVersion ?? 0,
         lastActivity: now,
-        expiresAt: new Date(now.getTime() + SESSION_IDLE_TIMEOUT_MS),
+        expiresAt: new Date(now.getTime() + SESSION_ABSOLUTE_LIFETIME_MS),
         ipAddress: truncate(client.ipAddress, 255),
         userAgent: truncate(client.userAgent, 1000),
         legacyTokenHash,
@@ -123,8 +131,8 @@ export class AuthSessionService {
   }
 
   /**
-   * Exchange a refresh token for a new access token and a new refresh token,
-   * sliding the session by the idle timeout.
+   * Exchange a refresh token for a new access token and a new refresh token.
+   * The session's end stays fixed at sign-in plus the absolute lifetime.
    *
    * Throws RefreshRejectedError for a definitive rejection; any other error
    * (e.g. the database is unreachable) must not log the user out.
@@ -147,7 +155,12 @@ export class AuthSessionService {
       if (session.revokedAt) return { rejected: "revoked" };
 
       const now = new Date();
-      if (session.expiresAt.getTime() <= now.getTime()) return { rejected: "expired" };
+      // Sessions started before the absolute lifetime existed can carry a later expiresAt.
+      const endsAt = Math.min(
+        session.expiresAt.getTime(),
+        session.createdAt.getTime() + SESSION_ABSOLUTE_LIFETIME_MS,
+      );
+      if (endsAt <= now.getTime()) return { rejected: "expired" };
 
       const user = await manager.getRepository(User).findOne({ where: { id: session.userId } });
       if (!user || !user.isActive || !user.emailVerified) {
@@ -162,7 +175,7 @@ export class AuthSessionService {
         session.generation += 1;
         session.rotatedAt = now;
         session.lastActivity = now;
-        session.expiresAt = new Date(now.getTime() + SESSION_IDLE_TIMEOUT_MS);
+        session.expiresAt = new Date(endsAt);
         session.ipAddress = truncate(client.ipAddress, 255) ?? session.ipAddress;
         session.userAgent = truncate(client.userAgent, 1000) ?? session.userAgent;
         await repo.save(session);
@@ -249,6 +262,34 @@ export class AuthSessionService {
     if (!session) return null;
     if (!session.revokedAt) await this.markRevoked(repo, session, "logout", new Date());
     return session.userId;
+  }
+
+  /** The user's sessions still able to refresh, most recently used first. */
+  async listActive(userId: string): Promise<Session[]> {
+    const now = Date.now();
+    const sessions = await AppDataSource.getRepository(Session).find({
+      where: { userId, revokedAt: IsNull(), expiresAt: MoreThan(new Date(now)) },
+      order: { lastActivity: "DESC" },
+    });
+    return sessions.filter((s) => s.createdAt.getTime() + SESSION_ABSOLUTE_LIFETIME_MS > now);
+  }
+
+  /** End one of the user's sessions. Returns false when the user has no such session. */
+  async revokeForUser(userId: string, sessionId: string): Promise<boolean> {
+    const repo = AppDataSource.getRepository(Session);
+    const session = await repo.findOne({ where: { id: sessionId, userId } });
+    if (!session) return false;
+    if (!session.revokedAt) await this.markRevoked(repo, session, "user_revoked", new Date());
+    return true;
+  }
+
+  /** End every session of the user except `keepSessionId`. Returns how many ended. */
+  async revokeOthers(userId: string, keepSessionId: string): Promise<number> {
+    const result = await AppDataSource.getRepository(Session).update(
+      { userId, revokedAt: IsNull(), id: Not(keepSessionId) },
+      { revokedAt: new Date(), revokedReason: "user_revoked" },
+    );
+    return result.affected ?? 0;
   }
 
   /** Delete sessions that ended (expired or revoked) more than 30 days ago. */
