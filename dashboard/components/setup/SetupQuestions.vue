@@ -356,7 +356,8 @@ watch(
 
 const questionOptions = computed<QuestionOption[]>(() => {
   // A catalog question the person renamed keeps their wording, not the catalog's.
-  const saved = new Map(extras.value.filter((e) => e.id).map((e) => [e.id, e.text]));
+  const saved = new Map<string, string>();
+  for (const extra of extras.value) if (extra.id) saved.set(extra.id, extra.text);
   const suggested: QuestionOption[] = (current.value?.questions ?? []).map((q) => ({
     key: q.id,
     id: q.id,
