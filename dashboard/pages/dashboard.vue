@@ -2,9 +2,10 @@
   <Page :title="$t('dashboard.page.title')" :description="$t('dashboard.page.description')">
     <template #header>
       <div class="flex gap-4">
-        <DateRangeSelector v-model="dateRange" @change="refreshData" />
-        <Button variant="outline" :disabled="loading" @click="refreshData">
-          <RefreshCw class="mr-2 h-4 w-4" :class="{ 'animate-spin': loading }" />
+        <RefreshIndicator :active="refreshing" class="self-center" />
+        <DateRangeSelector v-model="dateRange" />
+        <Button variant="outline" :disabled="refreshing" @click="refreshData">
+          <RefreshCw class="mr-2 h-4 w-4" />
           {{ $t("dashboard.actions.refresh") }}
         </Button>
       </div>
@@ -19,8 +20,7 @@
         :subtitle="`${conversationMetrics.resolvedConversations}`"
         :subtitle-suffix="$t('dashboard.metrics.resolved')"
         subtitle-color="green"
-        :show-cache-indicator="false"
-        :cache-age="analyticsStore.formatDataAge(CACHE_KEYS.METRICS)"
+        :loading="!metricsQuery.data.value"
       />
 
       <MetricCard
@@ -31,8 +31,7 @@
         :subtitle-suffix="$t('dashboard.metrics.resolved')"
         subtitle-color="green"
         :format-metric="false"
-        :show-cache-indicator="false"
-        :cache-age="analyticsStore.formatDataAge(CACHE_KEYS.METRICS)"
+        :loading="!metricsQuery.data.value"
       />
 
       <MetricCard
@@ -42,8 +41,7 @@
         :subtitle="$t('dashboard.metrics.messagesPer')"
         :subtitle-suffix="$t('dashboard.metrics.conversation')"
         :format-metric="false"
-        :show-cache-indicator="false"
-        :cache-age="analyticsStore.formatDataAge(CACHE_KEYS.METRICS)"
+        :loading="!metricsQuery.data.value"
       />
 
       <MetricCard
@@ -60,8 +58,7 @@
             : $t('dashboard.metrics.noRepliesYet')
         "
         :format-metric="false"
-        :show-cache-indicator="false"
-        :cache-age="analyticsStore.formatDataAge(CACHE_KEYS.RESPONSE_TIME)"
+        :loading="!responseTimeQuery.data.value"
       />
     </div>
 
@@ -81,10 +78,13 @@
               </div>
             </template>
             <div
-              v-else
+              v-else-if="!activityQuery.data.value"
               class="h-full flex items-center justify-center bg-background-secondary rounded-lg"
             >
               <Loading />
+            </div>
+            <div v-else class="text-center py-8 text-neutral-muted">
+              <p>{{ $t("dashboard.activity.empty") }}</p>
             </div>
           </div>
         </CardContent>
@@ -151,11 +151,19 @@
           </div>
         </CardHeader>
         <CardContent>
-          <div v-if="recentConversations.length > 0" class="space-y-4">
+          <div v-if="!recentQuery.data.value" class="space-y-4">
+            <div
+              v-for="i in 4"
+              :key="i"
+              class="h-[66px] animate-pulse rounded-lg bg-background-tertiary motion-reduce:animate-none"
+            />
+          </div>
+          <div v-else-if="recentConversations.length > 0" class="space-y-4">
             <div
               v-for="conversation in recentConversations"
               :key="conversation.id"
               class="flex items-center justify-between p-3 border rounded-lg hover:bg-background-secondary transition-colors cursor-pointer gap-2"
+              :class="{ 'data-settle': isNewRecent(conversation.id) }"
               @click="viewConversation(conversation.id)"
             >
               <div
@@ -213,7 +221,12 @@
           <CardDescription>{{ $t("dashboard.sentiment.scorePeriod") }}</CardDescription>
         </CardHeader>
         <CardContent class="flex align-center justify-center">
+          <div
+            v-if="!sentimentQuery.data.value"
+            class="h-48 w-full animate-pulse rounded-lg bg-background-tertiary motion-reduce:animate-none"
+          />
           <SimpleGauge
+            v-else
             :title="$t('dashboard.sentiment.scoreTitle')"
             :subtitle="$t('dashboard.sentiment.scorePeriod')"
             :counts="sentimentCounts"
@@ -229,7 +242,14 @@
           <CardDescription>{{ $t("dashboard.sentiment.breakdownDescription") }}</CardDescription>
         </CardHeader>
         <CardContent>
-          <div v-if="sentimentBreakdown.length > 0" class="space-y-4">
+          <div v-if="!sentimentQuery.data.value" class="space-y-4">
+            <div
+              v-for="i in 3"
+              :key="i"
+              class="h-[74px] animate-pulse rounded-lg bg-background-tertiary motion-reduce:animate-none"
+            />
+          </div>
+          <div v-else-if="sentimentBreakdown.length > 0" class="space-y-4">
             <div
               v-for="sentiment in sentimentBreakdown"
               :key="sentiment.type"
@@ -247,7 +267,7 @@
               </div>
               <div class="text-right">
                 <div class="text-2xl font-bold text-foreground">
-                  {{ sentiment.percentage.toFixed(1) }}%
+                  <SettleValue :value="`${sentiment.percentage.toFixed(1)}%`" />
                 </div>
               </div>
             </div>
@@ -280,43 +300,30 @@ import {
   Clock,
 } from "lucide-vue-next";
 import { HayApi } from "@/utils/api";
-import { useAnalyticsStore } from "@/stores/analytics";
 import { formatWaitTime } from "@/utils/conversation";
 import { toISODateRange } from "@/utils/date";
 import type { RouterOutputs } from "@/types/trpc";
 
 // State
 const { t } = useI18n();
-const loading = ref(false);
 const router = useRouter();
 const documentStatsWidget = ref<{ refresh: () => void } | null>(null);
-const analyticsStore = useAnalyticsStore();
 
-// Cache keys for different widgets
-const CACHE_KEYS = {
-  CONVERSATIONS: "dashboard_conversations",
-  ACTIVITY: "dashboard_activity",
-  SENTIMENT: "dashboard_sentiment",
-  METRICS: "dashboard_metrics",
-  RESPONSE_TIME: "dashboard_response_time",
-};
-
-// TTL values in milliseconds
-const CACHE_TTL = {
-  CONVERSATIONS: 1 * 60 * 1000, // 1 minute for recent conversations
-  ACTIVITY: 3 * 60 * 1000, // 3 minutes for activity chart
-  SENTIMENT: 5 * 60 * 1000, // 5 minutes for sentiment data
-  METRICS: 2 * 60 * 1000, // 2 minutes for conversation metrics
-  RESPONSE_TIME: 2 * 60 * 1000,
-};
-
-// Date range for analytics
+// The selector fills this in on mount; queries wait for it.
 const dateRange = ref({
   startDate: "",
   endDate: "",
 });
 
-// Real data - fetched from API
+interface DateKey {
+  startDate: string;
+  endDate: string;
+}
+const analyticsKey = <N extends string>(name: N) => {
+  const { startDate, endDate } = dateRange.value;
+  return startDate ? (["analytics", name, { startDate, endDate } as DateKey] as const) : null;
+};
+
 interface Conversation {
   id: string;
   title?: string;
@@ -335,24 +342,72 @@ interface ConversationStat {
   chartIndex?: number;
 }
 
-const conversations = ref<Conversation[]>([]);
-const conversationStats = ref<ConversationStat[]>([]);
+const recentQuery = useCachedQuery(
+  () => ["conversations", "list", "dashboard-recent"] as const,
+  async () => {
+    const response = await HayApi.conversations.list.query({
+      pagination: { page: 1, limit: 10 },
+      include: ["messages"],
+    });
+    return response.items as unknown as Conversation[];
+  },
+);
+const conversations = computed(() => recentQuery.data.value ?? []);
 
-// Analytics data
-const sentimentData = ref<Array<{ sentiment: string; count: number; percentage: number }>>([]);
-const conversationMetrics = ref({
-  totalConversations: 0,
-  resolvedConversations: 0,
-  resolutionRate: 0,
-  avgMessagesPerConversation: 0,
+const activityQuery = useCachedQuery(
+  () => analyticsKey("conversationActivity"),
+  ([, , range]) => HayApi.analytics.conversationActivity.query(toISODateRange(range)),
+);
+const sentimentQuery = useCachedQuery(
+  () => analyticsKey("sentimentAnalysis"),
+  ([, , range]) => HayApi.analytics.sentimentAnalysis.query(toISODateRange(range)),
+);
+const metricsQuery = useCachedQuery(
+  () => analyticsKey("conversationMetrics"),
+  ([, , range]) => HayApi.analytics.conversationMetrics.query(toISODateRange(range)),
+);
+const responseTimeQuery = useCachedQuery(
+  () => analyticsKey("responseTime"),
+  ([, , range]) => HayApi.analytics.responseTime.query(toISODateRange(range)),
+);
+const queries = [recentQuery, activityQuery, sentimentQuery, metricsQuery, responseTimeQuery];
+
+const refreshing = computed(() => queries.some((query) => query.refreshing.value));
+
+// The chart needs numeric counts and a numeric x-axis index.
+const conversationStats = computed<ConversationStat[]>(() =>
+  ((activityQuery.data.value?.data ?? []) as ConversationStat[]).map((item, index) => ({
+    ...item,
+    chartIndex: index,
+    count: Number(item.count) || 0,
+  })),
+);
+
+type SentimentRow = { sentiment: string; count: number; percentage: number };
+const sentimentData = computed(() => (sentimentQuery.data.value?.data ?? []) as SentimentRow[]);
+
+const conversationMetrics = computed(() => {
+  const metrics = (metricsQuery.data.value?.data ?? {}) as Partial<Record<string, number>>;
+  return {
+    totalConversations: metrics.totalConversations ?? 0,
+    resolvedConversations: metrics.resolvedConversations ?? 0,
+    resolutionRate: metrics.resolutionRate ?? 0,
+    avgMessagesPerConversation: metrics.avgMessagesPerConversation ?? 0,
+  };
 });
+
 type ResponseTime = RouterOutputs["analytics"]["responseTime"]["data"];
-const responseTime = ref<ResponseTime>({
-  averageResponseTime: 0,
-  medianResponseTime: 0,
-  p95ResponseTime: 0,
-  sampleSize: 0,
-});
+const responseTime = computed<ResponseTime>(
+  () =>
+    responseTimeQuery.data.value?.data ?? {
+      averageResponseTime: 0,
+      medianResponseTime: 0,
+      p95ResponseTime: 0,
+      sampleSize: 0,
+    },
+);
+
+const isNewRecent = useNewRows(() => recentQuery.data.value, recentQuery.keyHash);
 
 // Computed property for sentiment gauge counts
 const sentimentCounts = computed(() => {
@@ -442,109 +497,9 @@ const formatTimeAgo = (date: Date) => {
   }
 };
 
-const fetchDashboardData = async (forceRefresh = false) => {
-  try {
-    const dateFilters = toISODateRange(dateRange.value);
-
-    // Fetch all data in parallel using the analytics store for caching
-    const [conversationsData, analyticsData, sentimentAnalysis, metricsData, responseTimeData] =
-      await Promise.all([
-        // Conversations data with shorter cache for recent updates
-        analyticsStore.fetchData(
-          CACHE_KEYS.CONVERSATIONS,
-          () =>
-            HayApi.conversations.list.query({
-              pagination: { page: 1, limit: 10 },
-              include: ["messages"],
-            }),
-          { ttl: CACHE_TTL.CONVERSATIONS, forceRefresh },
-        ),
-        // Activity chart data
-        analyticsStore.fetchData(
-          CACHE_KEYS.ACTIVITY,
-          () => HayApi.analytics.conversationActivity.query(dateFilters),
-          { ttl: CACHE_TTL.ACTIVITY, forceRefresh },
-        ),
-        // Sentiment analysis data
-        analyticsStore.fetchData(
-          CACHE_KEYS.SENTIMENT,
-          () => HayApi.analytics.sentimentAnalysis.query(dateFilters),
-          { ttl: CACHE_TTL.SENTIMENT, forceRefresh },
-        ),
-        // Conversation metrics
-        analyticsStore.fetchData(
-          CACHE_KEYS.METRICS,
-          () => HayApi.analytics.conversationMetrics.query(dateFilters),
-          { ttl: CACHE_TTL.METRICS, forceRefresh },
-        ),
-        analyticsStore.fetchData(
-          CACHE_KEYS.RESPONSE_TIME,
-          () => HayApi.analytics.responseTime.query(dateFilters),
-          { ttl: CACHE_TTL.RESPONSE_TIME, forceRefresh },
-        ),
-      ]);
-
-    // Handle both paginated and non-paginated responses
-    if (
-      conversationsData &&
-      typeof conversationsData === "object" &&
-      "items" in conversationsData
-    ) {
-      conversations.value = (conversationsData as { items: Conversation[] }).items || [];
-    } else {
-      conversations.value = (conversationsData as Conversation[]) || [];
-    }
-
-    // Handle the analytics data from the new endpoint
-    const statsData = (analyticsData as { data?: ConversationStat[] })?.data || [];
-
-    // Process the data to add numeric indices for proper chart rendering
-    conversationStats.value = Array.isArray(statsData)
-      ? statsData.map((item: ConversationStat, index: number) => ({
-          ...item,
-          chartIndex: index, // Add numeric index for x-axis
-          count: Number(item.count) || 0, // Ensure count is numeric
-        }))
-      : [];
-
-    // Update sentiment data
-    sentimentData.value =
-      (
-        sentimentAnalysis as {
-          data?: Array<{ sentiment: string; count: number; percentage: number }>;
-        }
-      )?.data || [];
-
-    // Update conversation metrics
-    const metrics = (metricsData as { data?: Record<string, number> })?.data || {};
-    conversationMetrics.value = {
-      totalConversations: metrics.totalConversations || 0,
-      resolvedConversations: metrics.resolvedConversations || 0,
-      resolutionRate: metrics.resolutionRate || 0,
-      avgMessagesPerConversation: metrics.avgMessagesPerConversation || 0,
-    };
-
-    const responseTimeResult = (responseTimeData as { data?: ResponseTime } | null)?.data;
-    if (responseTimeResult) responseTime.value = responseTimeResult;
-  } catch (error) {
-    console.error("Error fetching dashboard data:", error);
-    // Set empty arrays on error to prevent UI issues
-    conversations.value = [];
-    conversationStats.value = [];
-  }
-};
-
-const refreshData = async () => {
-  loading.value = true;
-  try {
-    // Force refresh to bypass cache
-    await fetchDashboardData(true);
-    documentStatsWidget.value?.refresh();
-  } catch (error) {
-    console.error("Error refreshing data:", error);
-  } finally {
-    loading.value = false;
-  }
+const refreshData = () => {
+  queries.forEach((query) => void query.refresh());
+  documentStatsWidget.value?.refresh();
 };
 
 const viewAllConversations = () => {
@@ -555,28 +510,9 @@ const viewConversation = (id: string) => {
   router.push(`/conversations/${id}`);
 };
 
-// Lifecycle
-onMounted(async () => {
-  loading.value = true;
-  // Don't force refresh on mount - use cached data if available
-  await fetchDashboardData(false);
-  loading.value = false;
-});
-
-// Watch for date range changes
-watch(dateRange, async () => {
-  // Clear cache for date-sensitive data and refetch
-  analyticsStore.clearData(CACHE_KEYS.ACTIVITY);
-  analyticsStore.clearData(CACHE_KEYS.SENTIMENT);
-  analyticsStore.clearData(CACHE_KEYS.METRICS);
-  analyticsStore.clearData(CACHE_KEYS.RESPONSE_TIME);
-  await fetchDashboardData(true);
-});
-
 // TODO: Set up WebSocket listeners for real-time updates
 // TODO: Implement data refresh intervals
 // TODO: Add error handling and retry logic
-// TODO: Implement proper loading states
 // TODO: Add accessibility improvements
 // TODO: Implement keyboard navigation
 

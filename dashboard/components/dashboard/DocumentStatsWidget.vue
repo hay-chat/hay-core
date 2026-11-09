@@ -6,18 +6,18 @@
           <CardTitle>Knowledge Base</CardTitle>
           <CardDescription>Documents by status</CardDescription>
         </div>
-        <Button variant="ghost" size="sm" @click="goToDocuments">
-          View All
-          <ChevronRight class="ml-1 h-4 w-4" />
-        </Button>
+        <div class="flex items-center gap-1">
+          <RefreshIndicator :active="query.refreshing.value" />
+          <Button variant="ghost" size="sm" @click="goToDocuments">
+            View All
+            <ChevronRight class="ml-1 h-4 w-4" />
+          </Button>
+        </div>
       </div>
     </CardHeader>
     <CardContent>
       <!-- Loading State -->
-      <div
-        v-if="isLoading && documentStats.length === 0"
-        class="h-[300px] flex items-center justify-center"
-      >
+      <div v-if="isLoading" class="h-[300px] flex items-center justify-center">
         <Loading />
       </div>
 
@@ -40,7 +40,9 @@
       <!-- Chart -->
       <template v-else>
         <div class="text-center mb-4">
-          <span class="text-3xl font-bold text-foreground">{{ totalDocuments }}</span>
+          <span class="text-3xl font-bold text-foreground">
+            <SettleValue :value="totalDocuments" />
+          </span>
           <span class="text-sm text-neutral-muted ml-1">total documents</span>
         </div>
         <DoughnutChart :data="chartData" :height="250" :colors="statusColors" :show-legend="true" />
@@ -52,15 +54,9 @@
 <script setup lang="ts">
 import { FileText, ChevronRight, AlertCircle } from "lucide-vue-next";
 import { HayApi } from "@/utils/api";
-import { useAnalyticsStore } from "@/stores/analytics";
 import { CHART_COLORS } from "@/utils/chart-config";
 
 const router = useRouter();
-const analyticsStore = useAnalyticsStore();
-
-const CACHE_KEY = "dashboard_document_stats";
-const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
-
 const STATUS_CONFIG: Record<string, { label: string; color: string }> = {
   published: { label: "Published", color: CHART_COLORS.success[1] },
   draft: { label: "Draft", color: CHART_COLORS.warning[1] },
@@ -75,10 +71,14 @@ interface StatusCount {
   count: number;
 }
 
-const documentStats = ref<StatusCount[]>([]);
-const error = ref(false);
+const query = useCachedQuery(
+  () => ["analytics", "documentStatusCounts"] as const,
+  () => HayApi.analytics.documentStatusCounts.query(),
+);
 
-const isLoading = computed(() => analyticsStore.isWidgetLoading(CACHE_KEY));
+const documentStats = computed(() => (query.data.value?.data ?? []) as StatusCount[]);
+const error = computed(() => !!query.error.value && query.data.value === undefined);
+const isLoading = query.loading;
 
 const totalDocuments = computed(() =>
   documentStats.value.reduce((sum, item) => sum + item.count, 0),
@@ -98,35 +98,11 @@ const statusColors = computed(() =>
   activeStats.value.map((item) => STATUS_CONFIG[item.status]?.color || CHART_COLORS.neutral[3]),
 );
 
-const fetchDocumentStats = async (forceRefresh = false) => {
-  try {
-    error.value = false;
-    const result = await analyticsStore.fetchData(
-      CACHE_KEY,
-      () => HayApi.analytics.documentStatusCounts.query(),
-      { ttl: CACHE_TTL, forceRefresh },
-    );
-
-    documentStats.value = (result as { data: StatusCount[] })?.data || [];
-  } catch (err) {
-    console.error("Failed to fetch document stats:", err);
-    error.value = true;
-    documentStats.value = [];
-  }
-};
-
-const retry = () => {
-  analyticsStore.clearData(CACHE_KEY);
-  fetchDocumentStats(true);
-};
+const retry = () => void query.refresh();
 
 const goToDocuments = () => {
   router.push("/documents");
 };
 
-defineExpose({ refresh: () => fetchDocumentStats(true) });
-
-onMounted(() => {
-  fetchDocumentStats();
-});
+defineExpose({ refresh: () => void query.refresh() });
 </script>

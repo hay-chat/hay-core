@@ -6,15 +6,18 @@
           <CardTitle>Attention Needed</CardTitle>
           <CardDescription>Conversations awaiting human response</CardDescription>
         </div>
-        <Button variant="ghost" size="sm" @click="viewAllAttention">
-          View All
-          <ChevronRight class="ml-1 h-4 w-4" />
-        </Button>
+        <div class="flex items-center gap-1">
+          <RefreshIndicator :active="isRefreshing" />
+          <Button variant="ghost" size="sm" @click="viewAllAttention">
+            View All
+            <ChevronRight class="ml-1 h-4 w-4" />
+          </Button>
+        </div>
       </div>
     </CardHeader>
     <CardContent>
       <!-- Loading State -->
-      <div v-if="isLoading && attentionConversations.length === 0" class="space-y-3">
+      <div v-if="isLoading" class="space-y-3">
         <div v-for="i in 3" :key="i" class="animate-pulse">
           <div class="flex items-center justify-between p-3 border rounded-lg">
             <div class="flex items-center space-x-3 flex-1">
@@ -42,6 +45,7 @@
           v-for="conversation in attentionConversations"
           :key="conversation.id"
           class="flex items-center justify-between p-3 border rounded-lg hover:bg-background-secondary transition-colors cursor-pointer"
+          :class="{ 'data-settle': isNewRow(conversation.id) }"
           @click="viewConversation(conversation.id)"
         >
           <!-- Left: Customer info -->
@@ -77,20 +81,14 @@
           </div>
         </div>
       </div>
-
-      <!-- Refreshing indicator -->
-      <div v-if="isRefreshing && attentionConversations.length > 0" class="mt-2 text-center">
-        <RefreshCw class="h-4 w-4 inline animate-spin text-neutral-muted" />
-      </div>
     </CardContent>
   </Card>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, computed } from "vue";
+import { onMounted, onUnmounted, computed } from "vue";
 import { useRouter } from "vue-router";
 import { HayApi } from "@/utils/api";
-import { useAnalyticsStore } from "@/stores/analytics";
 import { useWebSocket } from "@/composables/useWebSocket";
 import {
   getWaitTime,
@@ -98,17 +96,13 @@ import {
   getWaitTimeBadgeVariant,
   getFullName,
 } from "@/utils/conversation";
-import { CheckCircle, ChevronRight, RefreshCw } from "lucide-vue-next";
+import { CheckCircle, ChevronRight } from "lucide-vue-next";
 // getChannelIcon is auto-imported from @/utils/channel (plugin-driven, no
 // hardcoded channel list). UI components are auto-imported by Nuxt.
 
 // State
 const router = useRouter();
-const analyticsStore = useAnalyticsStore();
 const websocket = useWebSocket();
-
-const CACHE_KEY = "dashboard_attention_needed";
-const CACHE_TTL = 30 * 1000; // 30 seconds (shorter due to urgency)
 
 interface AttentionConversation {
   id: string;
@@ -129,60 +123,42 @@ interface AttentionConversation {
   waitTime: number;
 }
 
-const attentionConversations = ref<AttentionConversation[]>([]);
-const error = ref<string | null>(null);
+const query = useCachedQuery(
+  () => ["conversations", "attention-needed"] as const,
+  async (): Promise<AttentionConversation[]> => {
+    // Fetch both statuses in parallel
+    const [pendingHumanResponse, takenOverResponse] = await Promise.all([
+      HayApi.conversations.list.query({
+        pagination: { page: 1, limit: 20 }, // Fetch more than 10 to account for filtering
+        filters: { status: "pending-human" },
+      }),
+      HayApi.conversations.list.query({
+        pagination: { page: 1, limit: 20 },
+        filters: { status: "human-took-over" },
+      }),
+    ]);
 
-// Computed loading states
-const isLoading = computed(() => analyticsStore.isWidgetLoading(CACHE_KEY));
-const isRefreshing = computed(() => analyticsStore.isWidgetRefreshing(CACHE_KEY));
+    // Calculate wait times and drop those without a valid one
+    const withWaitTimes = [
+      ...(pendingHumanResponse?.items || []),
+      ...(takenOverResponse?.items || []),
+    ]
+      .map((conv): AttentionConversation | null => {
+        const source = conv as Omit<AttentionConversation, "waitTime">;
+        const waitTime = getWaitTime(source);
+        return waitTime !== null ? { ...source, waitTime } : null;
+      })
+      .filter((conv): conv is AttentionConversation => conv !== null);
 
-// Fetch conversations needing attention
-const fetchAttentionConversations = async (forceRefresh = false) => {
-  try {
-    error.value = null;
+    // Longest wait first, top 10
+    return withWaitTimes.sort((a, b) => b.waitTime - a.waitTime).slice(0, 10);
+  },
+);
 
-    const data = await analyticsStore.fetchData(
-      CACHE_KEY,
-      async () => {
-        // Fetch both statuses in parallel
-        const [pendingHumanResponse, takenOverResponse] = await Promise.all([
-          HayApi.conversations.list.query({
-            pagination: { page: 1, limit: 20 }, // Fetch more than 10 to account for filtering
-            filters: { status: "pending-human" },
-          }),
-          HayApi.conversations.list.query({
-            pagination: { page: 1, limit: 20 },
-            filters: { status: "human-took-over" },
-          }),
-        ]);
-
-        // Merge results from both queries
-        const pendingHuman = pendingHumanResponse?.items || [];
-        const takenOver = takenOverResponse?.items || [];
-        const merged = [...pendingHuman, ...takenOver];
-
-        // Calculate wait times and filter out those without valid wait times
-        const withWaitTimes = merged
-          .map((conv): AttentionConversation | null => {
-            const source = conv as Omit<AttentionConversation, "waitTime">;
-            const waitTime = getWaitTime(source);
-            return waitTime !== null ? { ...source, waitTime } : null;
-          })
-          .filter((conv): conv is AttentionConversation => conv !== null);
-
-        // Sort by longest wait time first and take top 10
-        return withWaitTimes.sort((a, b) => b.waitTime - a.waitTime).slice(0, 10);
-      },
-      { ttl: CACHE_TTL, forceRefresh },
-    );
-
-    attentionConversations.value = data || [];
-  } catch (err) {
-    console.error("Failed to fetch attention conversations:", err);
-    error.value = "Failed to load conversations";
-    attentionConversations.value = [];
-  }
-};
+const attentionConversations = computed(() => query.data.value ?? []);
+const isNewRow = useNewRows(query.data, query.keyHash);
+const isLoading = query.loading;
+const isRefreshing = query.refreshing;
 
 // Navigation handlers
 const viewAllAttention = () => {
@@ -216,7 +192,7 @@ const handleConversationUpdated = async (payload: unknown) => {
   if (needsAttention || isInList) {
     // Refresh the list after a small delay to avoid race conditions
     setTimeout(() => {
-      fetchAttentionConversations(true);
+      void query.refresh();
     }, 200);
   }
 };
@@ -231,15 +207,13 @@ const handleMessageReceived = async (payload: unknown) => {
   if (isInList) {
     // Refresh to update wait times
     setTimeout(() => {
-      fetchAttentionConversations(true);
+      void query.refresh();
     }, 200);
   }
 };
 
 // Lifecycle
-onMounted(async () => {
-  await fetchAttentionConversations();
-
+onMounted(() => {
   // Setup WebSocket listeners
   websocket.connect();
 
