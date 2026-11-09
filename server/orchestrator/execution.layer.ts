@@ -2,6 +2,7 @@ import { LLMService } from "../services/core/llm.service";
 import { Conversation } from "@server/database/entities/conversation.entity";
 import { PromptService } from "../services/prompt.service";
 import { createLogger } from "@server/lib/logger";
+import { isOrgOverBudget } from "@server/services/llm/org-usage-budget";
 import {
   BUSINESS_CONTEXT_LIMITS,
   VISITOR_CONTEXT_KEY,
@@ -12,6 +13,7 @@ import {
   renderDocument,
   truncate,
   renderPageTools,
+  fenceData,
 } from "../services/core/prompt-data";
 
 const logger = createLogger("execution");
@@ -32,8 +34,10 @@ import {
 import {
   LinkGuardrailService,
   extractUrls,
+  removeLinks,
   type BadLink,
 } from "@server/services/core/link-guardrail.service";
+import { messageLinkText } from "./reply-media";
 import { MessageIntent, MessageType, Message } from "@server/database/entities/message.entity";
 import { isPageToolResult } from "@server/services/webchat/page-tools.service";
 import { Document } from "@server/entities/document.entity";
@@ -46,6 +50,16 @@ import {
 } from "@server/types/organization-settings.types";
 import type { FormSchema } from "@hay/form-schema";
 import { formSchemaSchema } from "@hay/form-schema";
+
+/** Tool loop steps (15) plus one retry per guardrail and a recheck. */
+const MAX_PLANNER_CALLS_PER_TURN = 20;
+const MAX_RECHECK_DEPTH = 1;
+
+const BAD_LINK_NOTE: Record<BadLink["reason"], string> = {
+  dead: "does not exist",
+  unlisted: "not a known page of the website",
+  unverified: "not a link from this conversation or the website",
+};
 
 /**
  * Minimal shape of a retrieved document needed for confidence assessment.
@@ -79,8 +93,12 @@ export interface ExecuteOptions {
     actionClaimRetries: number;
     companyInterestRetries: number;
     linkRetries: number;
+    /** Planner calls so far this turn, across tool steps, retries and rechecks. */
+    plannerCalls?: number;
   };
   plannerFeedback?: string;
+  /** How many confidence rechecks led to this call. */
+  recheckDepth?: number;
 }
 
 export interface ExecutionResult {
@@ -277,6 +295,9 @@ export class ExecutionLayer {
       conversationId: conversation.id,
     });
     try {
+      const limited = await this.turnLimitHandoff(conversation, options, log);
+      if (limited) return limited;
+
       log.debug(
         {
           playbookId: conversation.playbook_id,
@@ -376,18 +397,16 @@ export class ExecutionLayer {
         }
       }
 
-      // Inject conversation context into the prompt
-      const contextBlock = await this.buildContextPrompt(conversation);
-      if (contextBlock) {
-        finalPrompt = finalPrompt + contextBlock;
-      }
-
-      // Inject retrieved knowledge-base content so the model can ground its answer
-      // in the same source material the confidence guardrail later evaluates against.
-      const knowledgeBlock = await this.buildKnowledgePrompt(conversation);
-      if (knowledgeBlock) {
-        finalPrompt = finalPrompt + knowledgeBlock;
-      }
+      // Conversation context and the retrieved knowledge the confidence guardrail
+      // later evaluates against. Written by people outside the business's prompt
+      // authors, so a user turn at the head of the history, not the system prompt:
+      // the system prompt also stays stable for prompt caching.
+      const referenceBlocks =
+        (await this.buildContextPrompt(conversation)) +
+        (await this.buildKnowledgePrompt(conversation));
+      const referenceTurn = referenceBlocks
+        ? ({ type: MessageType.CUSTOMER, content: referenceBlocks.trim() } as Message)
+        : null;
 
       // A request for a person must beat the active playbook's first steps
       // ("ask for the order number and email"): the planner otherwise follows
@@ -423,7 +442,11 @@ export class ExecutionLayer {
       log.debug("Invoking LLM for execution planning");
 
       const response = await this.llmService.invoke({
-        history: pageToolsTurn ? [pageToolsTurn, ...messages] : messages,
+        history: [
+          ...(pageToolsTurn ? [pageToolsTurn] : []),
+          ...(referenceTurn ? [referenceTurn] : []),
+          ...messages,
+        ],
         prompt: finalPrompt,
         jsonSchema: this.buildPlannerSchema(allToolNames, quickCheck),
         organizationId: conversation.organization_id,
@@ -805,7 +828,7 @@ export class ExecutionLayer {
       );
 
       // Handle medium confidence - trigger recheck
-      if (confidenceAssessment.shouldRecheck) {
+      if (confidenceAssessment.shouldRecheck && (options.recheckDepth ?? 0) < MAX_RECHECK_DEPTH) {
         log.debug("Medium confidence detected, triggering recheck");
 
         const recheckResult = await this.performRecheck(
@@ -1072,10 +1095,7 @@ export class ExecutionLayer {
       const { website, siteUrls } = await this.getLinkContext(conversation);
       badLinks = await this.linkService.assessLinks({
         response,
-        // Metadata carries tool outputs; the playbook and documents are messages.
-        contextTexts: messages.map(
-          (msg) => `${msg.content ?? ""}\n${JSON.stringify(msg.metadata ?? {})}`,
-        ),
+        contextTexts: messages.map(messageLinkText),
         siteUrls,
         website,
       });
@@ -1094,13 +1114,7 @@ export class ExecutionLayer {
     if (options.turnGuardrailState && retriesUsed < 1) {
       options.turnGuardrailState.linkRetries++;
 
-      const list = badLinks
-        .map((link) =>
-          link.reason === "dead"
-            ? `${link.url} (does not exist)`
-            : `${link.url} (not a known page of the website)`,
-        )
-        .join("; ");
+      const list = badLinks.map((link) => `${link.url} (${BAD_LINK_NOTE[link.reason]})`).join("; ");
       const plannerFeedback =
         `Your previous response linked to: ${list}. Do not share a URL you did not find in ` +
         `this conversation or get from find_page_url. Use find_page_url if it is available to ` +
@@ -1120,15 +1134,22 @@ export class ExecutionLayer {
       }
     }
 
-    // After the re-plan only a proven dead link stops the reply: an unlisted
-    // page the planner kept on purpose may simply be missing from the sitemap.
+    // After the re-plan a proven dead link stops the reply. Any other link
+    // nothing vouches for is taken out, and the rest of the answer still goes.
     const deadLinks = badLinks.filter((link) => link.reason === "dead");
     if (deadLinks.length === 0) {
-      log.debug({ badLinks }, "Link check: keeping unlisted links after the re-plan");
-      return null;
+      const withoutLinks = removeLinks(
+        response,
+        badLinks.map((link) => link.url),
+      );
+      if (withoutLinks) {
+        log.debug({ badLinks }, "Link check: removed unverified links after the re-plan");
+        result.userMessage = withoutLinks;
+        return null;
+      }
     }
 
-    log.warn({ deadLinks }, "Link check: dead link after the re-plan, handing off");
+    log.warn({ badLinks }, "Link check: bad link after the re-plan, handing off");
     const confidenceConfig = await this.getConfidenceConfig(conversation);
     const fallbackMessage = await this.composeContextualFallbackMessage(
       conversation,
@@ -1140,7 +1161,7 @@ export class ExecutionLayer {
       userMessage: fallbackMessage,
       handoff: {
         reason: "Reply linked to a page that does not exist",
-        fields: { deadLinks: deadLinks.map((link) => link.url) },
+        fields: { deadLinks: badLinks.map((link) => link.url) },
       },
       badLinks,
       linkRetryAttempted: retriesUsed > 0 || undefined,
@@ -1408,6 +1429,26 @@ export class ExecutionLayer {
   /**
    * Perform recheck with alternate retrieval strategy
    */
+  /** Ends the turn with a hand-off once it has used its planner calls or the org its tokens. */
+  private async turnLimitHandoff(
+    conversation: Conversation,
+    options: ExecuteOptions,
+    log: Pick<ReturnType<typeof logger.child>, "warn">,
+  ): Promise<ExecutionResult | null> {
+    if (await isOrgOverBudget(conversation.organization_id)) {
+      log.warn("Organization used its daily AI token budget, handing off");
+      const reason = "The AI could not answer (daily usage budget reached)";
+      return { step: "HANDOFF", handoffReason: reason, handoff: { reason }, aiUnavailable: true };
+    }
+    const state = options.turnGuardrailState;
+    if (!state) return null;
+    state.plannerCalls = (state.plannerCalls ?? 0) + 1;
+    if (state.plannerCalls <= MAX_PLANNER_CALLS_PER_TURN) return null;
+    log.warn("Turn used its planner calls, handing off");
+    const reason = "The AI could not finish the reply (too many steps)";
+    return { step: "HANDOFF", handoffReason: reason, handoff: { reason }, planningExhausted: true };
+  }
+
   private async performRecheck(
     originalResult: ExecutionResult,
     conversation: Conversation,
@@ -1448,7 +1489,10 @@ export class ExecutionLayer {
 
       // Re-execute with new documents. Forward options so the recheck's re-plan
       // sees the same turn tool ledger / retry budget as the original plan.
-      const recheckResult = await this.execute(conversation, customerLanguage, options);
+      const recheckResult = await this.execute(conversation, customerLanguage, {
+        ...options,
+        recheckDepth: (options.recheckDepth ?? 0) + 1,
+      });
 
       if (!recheckResult || recheckResult.step !== "RESPOND" || !recheckResult.userMessage) {
         // Recheck failed, restore original documents
@@ -1752,7 +1796,7 @@ export class ExecutionLayer {
         .join("\n");
 
       const prompt = await this.promptService.getPrompt("execution/contextual-fallback", {
-        conversationHistory,
+        conversationHistory: fenceData(conversationHistory),
         targetLanguage,
       });
 

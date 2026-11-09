@@ -595,6 +595,10 @@ async function startServer() {
   httpServer.listen(config.server.port, async () => {
     logger.info({ port: config.server.port }, "Server is running");
 
+    const { setUsageSink } = await import("@server/services/llm/usage-sink");
+    const { recordOrgUsage } = await import("@server/services/llm/org-usage-budget");
+    setUsageSink(recordOrgUsage);
+
     // Start the orchestrator worker (subscribes to RabbitMQ queue)
     await orchestratorWorker.start();
     logger.info("Orchestrator worker started");

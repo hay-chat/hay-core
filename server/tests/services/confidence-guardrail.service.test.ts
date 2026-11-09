@@ -63,7 +63,9 @@ describe("ConfidenceGuardrailService grounding", () => {
     expect(score).toBe(1);
     expect(getPrompt).toHaveBeenCalledWith(
       "execution/confidence-grounding",
-      expect.objectContaining({ retrievedDocuments: NO_DOCUMENTS_PLACEHOLDER }),
+      expect.objectContaining({
+        retrievedDocuments: expect.stringContaining(NO_DOCUMENTS_PLACEHOLDER),
+      }),
     );
     expect(invoke).toHaveBeenCalledTimes(1);
   });

@@ -8,7 +8,7 @@ version: 1.0.0
 Given the conversation context below, score how relevant each playbook is (0-1 scale).
 Consider the trigger phrases, descriptions, and overall context match.
 
-Conversation context: "{{conversationContext}}"
+Conversation context: {{conversationContext}}
 
 Available playbooks:
 {{#each playbooks}}

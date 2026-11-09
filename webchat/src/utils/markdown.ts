@@ -32,7 +32,7 @@ function isSafeLinkUrl(url: string): boolean {
   return /^https?:\/\/\S+$/i.test(url);
 }
 
-export function parseMarkdown(text: string): string {
+export function parseMarkdown(text: string, approvedImages?: readonly string[]): string {
   const held: string[] = [];
   const hold = (tag: string): string => {
     held.push(tag);
@@ -43,9 +43,14 @@ export function parseMarkdown(text: string): string {
   let html = escapeHtml(text.replace(/[\uE000\uE001]/g, ""));
 
   // Images ![alt](url) — must run BEFORE links (an image contains link syntax).
-  html = html.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, (_, alt, url) =>
-    isSafeLinkUrl(url) ? hold(`<img src="${url}" alt="${alt}" loading="lazy" />`) : "",
-  );
+  // An image the server did not approve stays a link, so opening the chat doesn't request it.
+  html = html.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, (_, alt, url) => {
+    if (!isSafeLinkUrl(url)) return "";
+    if (approvedImages && !approvedImages.includes(url.replace(/&amp;/g, "&"))) {
+      return `[${alt || url}](${url})`;
+    }
+    return hold(`<img src="${url}" alt="${alt}" loading="lazy" />`);
+  });
 
   // Links [text](url). The label stays in the text so bold and code still apply to it.
   html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_, label, url) =>

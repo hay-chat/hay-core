@@ -1,4 +1,5 @@
 import { PlaybookService } from "./playbook.service";
+import { fenceData } from "@server/services/core/prompt-data";
 import { PromptService } from "./prompt.service";
 import { LLMService } from "./core/llm.service";
 import { conversationRepository } from "../repositories/conversation.repository";
@@ -271,7 +272,7 @@ export class PlaybookSuggestionService {
         playbookTitle: playbook.title,
         playbookTrigger: playbook.trigger,
         currentInstructions: currentMarkdown,
-        transcript,
+        transcript: transcript ? fenceData(transcript) : "",
         feedback: feedback || "",
         selection: selection || "",
         actions: references.actions,

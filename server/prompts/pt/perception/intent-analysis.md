@@ -23,4 +23,4 @@ Analise a seguinte mensagem do usuário e determine:
 - Intenções de encerramento devem ter confiança > 0.8 para serem válidas
 - Use "handoff" quando o usuário pede para falar com um humano, uma pessoa, um atendente ou a equipe ("quero falar com uma pessoa", "tem alguém aí?", "me passa para um atendente"), mesmo que a mensagem também diga o assunto. Perguntar se você é um robô não é "handoff"
 
-Mensagem do usuário: "{{message}}"
+Mensagem do usuário: {{message}}

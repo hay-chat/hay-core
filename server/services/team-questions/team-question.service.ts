@@ -379,6 +379,9 @@ class TeamQuestionService {
    * the answer. Null on any failure or an implausible result: the caller
    * sends the answer as written.
    */
+  // The rephrase is sent without the reply guardrails: the team member's answer
+  // is the source of truth, and only the prompt's rules keep the model to it.
+  // Organizations that want the exact words use the "as written" relay mode.
   private async rephrase(
     conversation: Conversation,
     question: TeamQuestion,

@@ -8,7 +8,7 @@ version: 1.0.0
 Dado o contexto da conversa abaixo, pontue quão relevante cada playbook é (escala de 0-1).
 Considere as frases de gatilho, descrições e a correspondência geral do contexto.
 
-Contexto da conversa: "{{conversationContext}}"
+Contexto da conversa: {{conversationContext}}
 
 Playbooks disponíveis:
 {{#each playbooks}}

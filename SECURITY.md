@@ -63,3 +63,7 @@ Security-relevant actions (sign-in and sign-out, API keys, members and roles, pl
 - Each organization's rows form a hash chain that a weekly job recomputes, so altered or removed events are reported.
 - Each row records whether a user, an API key, a plugin or the system acted.
 - Failed sign-ins for unknown emails store a keyed hash of the email, never the address.
+
+## Automated Decisions
+
+Refunds, cancellations, discounts and exchanges wait for a person's approval by default. An organization that switches this off lets its AI carry them out with no human review. Where such a decision has a legal or similarly significant effect on a customer, GDPR Article 22 applies, and the organization, as controller, must have a lawful basis and offer a way to reach a person and contest the decision. Handing the conversation to the team is that route in Hay.

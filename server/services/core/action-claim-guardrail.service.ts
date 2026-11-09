@@ -1,4 +1,5 @@
 import { LLMService } from "./llm.service";
+import { fenceData } from "@server/services/core/prompt-data";
 import { PromptService } from "../prompt.service";
 import { Message, MessageType } from "@server/database/entities/message.entity";
 import { createLogger } from "@server/lib/logger";
@@ -84,9 +85,9 @@ export class ActionClaimGuardrailService {
     }
 
     const evaluationPrompt = await this.promptService.getPrompt("execution/action-claim-check", {
-      response: context.response,
-      customerQuery: context.customerQuery,
-      conversationHistory: this.formatConversationHistory(context.conversationHistory),
+      response: fenceData(context.response),
+      customerQuery: fenceData(context.customerQuery),
+      conversationHistory: fenceData(this.formatConversationHistory(context.conversationHistory)),
       toolLedger: this.formatToolLedger(context.toolsCalledThisTurn),
     });
 

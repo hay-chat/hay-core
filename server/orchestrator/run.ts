@@ -31,12 +31,10 @@ import { sendPausedNotice } from "./paused-notice";
 import { sendSuspendedHoldingReply } from "./suspended-holding-reply";
 import type { ExecutionResult } from "./execution.layer";
 import type { ToolLedgerEntry } from "@server/services/core/action-claim-guardrail.service";
+import { checkReplyMedia } from "./reply-media";
 import { decidedActionsLedger } from "./decided-actions";
 import { isToolEnabled } from "@server/services/core/enabled-tools";
-import {
-  isPageTool,
-  PAGE_TOOL_MESSAGE_SOURCE,
-} from "@server/services/webchat/page-tools.service";
+import { isPageTool, PAGE_TOOL_MESSAGE_SOURCE } from "@server/services/webchat/page-tools.service";
 import type { Message } from "@server/database/entities/message.entity";
 import type pino from "pino";
 
@@ -74,7 +72,7 @@ async function sendBotMessage(
   processingStartedAt: number,
 ): Promise<Message> {
   await assertAiMayReply(conversation);
-  const message = await conversation.addMessage(payload);
+  const message = await conversation.addMessage(await checkReplyMedia(conversation, payload, log));
   log.info(
     {
       durationMs: Date.now() - processingStartedAt,

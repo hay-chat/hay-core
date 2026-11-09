@@ -1,4 +1,5 @@
 import { LLMService } from "./llm.service";
+import { fenceData } from "@server/services/core/prompt-data";
 import { isPageToolResult } from "@server/services/webchat/page-tools.service";
 import { PromptService } from "../prompt.service";
 import { Message } from "@server/database/entities/message.entity";
@@ -105,9 +106,9 @@ export class CompanyInterestGuardrailService {
     const evaluationPrompt = await this.promptService.getPrompt(
       "execution/company-interest-check",
       {
-        response: context.response,
-        customerQuery: context.customerQuery,
-        conversationHistory: this.formatConversationHistory(context.conversationHistory),
+        response: fenceData(context.response),
+        customerQuery: fenceData(context.customerQuery),
+        conversationHistory: fenceData(this.formatConversationHistory(context.conversationHistory)),
         companyDomain: context.companyDomain || "not specified",
         hasRetrievedDocuments: context.hasRetrievedDocuments,
         hasToolResults: context.hasToolResults,
