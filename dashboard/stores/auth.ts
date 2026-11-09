@@ -12,6 +12,7 @@ import {
   extractLegacyTokens,
   getLegacyRefreshToken,
 } from "@/utils/legacy-session";
+import { askKeyToSign } from "@/utils/webauthn";
 import { useSetupStore } from "./setup";
 import { useUserStore, type User } from "./user";
 
@@ -74,10 +75,10 @@ export const useAuthStore = defineStore("auth", {
           useCookie: true,
         });
         if (result.mfaRequired) {
-          return { challengeToken: result.challengeToken };
+          return { challengeToken: result.challengeToken, methods: result.methods };
         }
         this.applyLogin(result);
-        return { challengeToken: null };
+        return { challengeToken: null, methods: null };
       } finally {
         this.isLoading = false;
       }
@@ -90,6 +91,25 @@ export const useAuthStore = defineStore("auth", {
         const result = await HayAuthApi.auth.mfa.verifyLogin.mutate({
           challengeToken,
           code,
+          useCookie: true,
+        });
+        this.applyLogin(result);
+      } finally {
+        this.isLoading = false;
+      }
+    },
+
+    /** Second login step with a security key or passkey. */
+    async verifyWebauthnLogin(challengeToken: string) {
+      this.isLoading = true;
+      try {
+        const optionsJSON = await HayAuthApi.auth.mfa.webauthn.loginOptions.mutate({
+          challengeToken,
+        });
+        const response = await askKeyToSign(optionsJSON);
+        const result = await HayAuthApi.auth.mfa.webauthn.verifyLogin.mutate({
+          challengeToken,
+          response,
           useCookie: true,
         });
         this.applyLogin(result);

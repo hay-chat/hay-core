@@ -582,6 +582,23 @@
       "stepUpTitle": "Confirm it's you",
       "stepUpDescription": "Enter a two-factor code to continue with this action.",
       "stepUpDone": "Confirmed. Please try that again.",
+      "keys": {
+        "title": "Security keys and passkeys",
+        "description": "Use a hardware security key or a passkey as a second factor, instead of or beside an authenticator app.",
+        "unsupported": "This browser does not support security keys.",
+        "empty": "No security keys yet.",
+        "add": "Add a security key",
+        "nameLabel": "Name",
+        "namePlaceholder": "e.g. YubiKey, laptop passkey",
+        "lastUsed": "Last used {date}",
+        "neverUsed": "Not used yet",
+        "rename": "Rename",
+        "remove": "Remove",
+        "addedToast": "Security key added",
+        "removedToast": "Security key removed",
+        "use": "Use a security key or passkey",
+        "orCode": "Or enter a code"
+      },
       "orgTitle": "Two-factor authentication for your team",
       "orgDescription": "Protect every account in this organization with a second factor.",
       "orgSwitch": "Require two-factor authentication",
@@ -590,6 +607,11 @@
         "invalidCode": "That code is not valid. Try again.",
         "wrongPassword": "That password is incorrect.",
         "tooMany": "Too many attempts. Please try again later.",
+        "lastFactor": "Your organization requires two-factor authentication, so your last method can't be removed.",
+        "keyFailed": "That security key could not be verified. Try again.",
+        "keyCancelled": "The security key request was cancelled.",
+        "keyDuplicate": "This security key is already registered.",
+        "keysUnavailable": "Security keys are not available right now.",
         "generic": "Something went wrong. Please try again."
       }
     }

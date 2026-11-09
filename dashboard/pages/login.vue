@@ -59,6 +59,19 @@
 
       <!-- Second step: two-factor code -->
       <form v-if="challengeToken" class="space-y-4" @submit.prevent="handleMfaSubmit">
+        <div v-if="mfaMethods?.webauthn" class="space-y-2">
+          <Button
+            type="button"
+            size="lg"
+            class="w-full"
+            :loading="loading"
+            @click="handleSecurityKeySubmit"
+          >
+            {{ $t("login.mfa.useSecurityKey") }}
+          </Button>
+          <p class="text-center text-xs text-neutral-muted">{{ $t("login.mfa.orCode") }}</p>
+        </div>
+
         <div class="space-y-2">
           <Input
             id="mfa-code"
@@ -272,6 +285,7 @@ const errors = reactive({
 });
 
 const challengeToken = ref<string | null>(null);
+const mfaMethods = ref<{ totp: boolean; webauthn: boolean } | null>(null);
 const mfaCode = ref("");
 const error = ref("");
 const emailNotVerified = ref(false);
@@ -325,9 +339,10 @@ const handleSubmit = async () => {
   verificationResent.value = false;
 
   try {
-    const { challengeToken: challenge } = await authStore.login(form.email, form.password);
+    const { challengeToken: challenge, methods } = await authStore.login(form.email, form.password);
     if (challenge) {
       challengeToken.value = challenge;
+      mfaMethods.value = methods;
       form.password = "";
       return;
     }
@@ -354,15 +369,29 @@ const handleSubmit = async () => {
   }
 };
 
-const handleMfaSubmit = async () => {
+const handleMfaSubmit = () =>
+  completeMfa(() => authStore.verifyMfaLogin(challengeToken.value!, mfaCode.value.trim()));
+
+const handleSecurityKeySubmit = () =>
+  completeMfa(() => authStore.verifyWebauthnLogin(challengeToken.value!));
+
+const completeMfa = async (verify: () => Promise<void>) => {
   error.value = "";
   try {
-    await authStore.verifyMfaLogin(challengeToken.value!, mfaCode.value.trim());
+    await verify();
     await router.push(redirectUrl.value);
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "";
-    if (message.includes("Invalid verification code")) {
+    const name = err instanceof Error ? err.name : "";
+    if (name === "NotAllowedError" || name === "AbortError") {
+      error.value = t("login.mfa.keyCancelled");
+    } else if (message.includes("Invalid verification code")) {
       error.value = t("login.mfa.invalidCode");
+    } else if (
+      message.includes("Security key verification failed") ||
+      message.includes("timed out")
+    ) {
+      error.value = t("login.mfa.keyFailed");
     } else if (message.includes("Too many")) {
       error.value = t("login.errors.tooManyRequests");
     } else if (message.includes("expired")) {
@@ -376,6 +405,7 @@ const handleMfaSubmit = async () => {
 
 const cancelMfa = () => {
   challengeToken.value = null;
+  mfaMethods.value = null;
   mfaCode.value = "";
   error.value = "";
 };
