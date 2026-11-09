@@ -17,28 +17,28 @@ export const docsAuditRouter = t.router({
   analyze: scopedProcedure(RESOURCES.DOCUMENTS, ACTIONS.UPDATE)
     .use(rateLimitMiddleware(RateLimits.MODERATE))
     .mutation(async ({ ctx }) => {
-    const organizationId = ctx.organizationId!;
+      const organizationId = ctx.organizationId!;
 
-    // Create a job to track the audit
-    const job = await jobRepository.create({
-      title: "Documentation Quality Audit",
-      description: "Analyzing documentation across multiple quality dimensions",
-      status: JobStatus.PROCESSING,
-      priority: JobPriority.NORMAL,
-      organizationId,
-      data: { type: "docs_audit", stage: "starting" },
-    });
+      // Create a job to track the audit
+      const job = await jobRepository.create({
+        title: "Documentation Quality Audit",
+        description: "Analyzing documentation across multiple quality dimensions",
+        status: JobStatus.PROCESSING,
+        priority: JobPriority.NORMAL,
+        organizationId,
+        data: { type: "docs_audit", stage: "starting" },
+      });
 
-    // Run audit in background
-    docsAuditService.runAudit(organizationId, job.id).catch((error) => {
-      logger.error({ jobId: job.id, organizationId, error }, "Background audit failed");
-    });
+      // Run audit in background
+      docsAuditService.runAudit(organizationId, job.id).catch((error) => {
+        logger.error({ jobId: job.id, organizationId, error }, "Background audit failed");
+      });
 
-    return {
-      jobId: job.id,
-      message: "Documentation audit started. Poll getResult for progress.",
-    };
-  }),
+      return {
+        jobId: job.id,
+        message: "Documentation audit started. Poll getResult for progress.",
+      };
+    }),
 
   /**
    * Get the status/results of a documentation audit job.

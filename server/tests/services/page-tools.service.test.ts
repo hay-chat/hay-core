@@ -113,7 +113,9 @@ describe("pageToolService", () => {
     await pageToolService.register("conv-1", [
       { name: "navigate", description: "Go to a page", inputSchema: { type: "object" } },
     ]);
-    expect((await pageToolService.list("conv-1", "org-1")).map((t) => t.name)).toEqual(["navigate"]);
+    expect((await pageToolService.list("conv-1", "org-1")).map((t) => t.name)).toEqual([
+      "navigate",
+    ]);
     expect(await pageToolService.list("conv-2", "org-1")).toEqual([]);
     await pageToolService.clear("conv-1");
     expect(await pageToolService.list("conv-1", "org-1")).toEqual([]);
@@ -130,7 +132,9 @@ describe("pageToolService", () => {
       "EX",
       3600,
     );
-    expect((await pageToolService.list("conv-1", "org-1")).map((t) => t.name)).toEqual(["navigate"]);
+    expect((await pageToolService.list("conv-1", "org-1")).map((t) => t.name)).toEqual([
+      "navigate",
+    ]);
   });
 
   it("sends tool_call to the page and resolves with the page's answer", async () => {
@@ -143,7 +147,9 @@ describe("pageToolService", () => {
       args: { path: "/inbox" },
     });
     const { callId } = (mockSendToConversation.mock.calls[0] as unknown[])[1] as { callId: string };
-    await pageToolService.resolve(callId, "conv-1", { result: { content: [{ type: "text", text: "ok" }] } });
+    await pageToolService.resolve(callId, "conv-1", {
+      result: { content: [{ type: "text", text: "ok" }] },
+    });
     await expect(pending).resolves.toEqual({ content: [{ type: "text", text: "ok" }] });
   });
 
