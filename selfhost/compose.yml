@@ -26,8 +26,12 @@ x-hay: &hay
     DB_NAME: ${DB_NAME:-hay}
     REDIS_HOST: redis
     REDIS_PORT: "6379"
+    REDIS_PASSWORD: ${REDIS_PASSWORD:?set REDIS_PASSWORD in .env}
     RABBITMQ_URL: amqp://${RABBITMQ_USER:-hay}:${RABBITMQ_PASSWORD:?set RABBITMQ_PASSWORD in .env}@rabbitmq:5672/
     LOCAL_UPLOAD_PATH: /data/uploads
+    # Caddy is the one proxy in front of the server.
+    TRUST_PROXY: ${TRUST_PROXY:-1}
+    CHROME_REMOTE_URL: http://browser:9223
     API_DOMAIN: ${HAY_DOMAIN:?set HAY_DOMAIN in .env}
     DASHBOARD_DOMAIN: ${HAY_DOMAIN}
     BASE_DOMAIN: ${HAY_DOMAIN}
@@ -53,11 +57,13 @@ services:
   redis:
     image: redis:7-alpine
     restart: unless-stopped
-    command: ["redis-server", "--appendonly", "yes"]
+    command: ["redis-server", "--appendonly", "yes", "--requirepass", "${REDIS_PASSWORD}"]
+    environment:
+      REDISCLI_AUTH: ${REDIS_PASSWORD}
     volumes:
       - redis_data:/data
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD-SHELL", "redis-cli ping | grep -q PONG"]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -85,12 +91,42 @@ services:
     depends_on:
       postgres: { condition: service_healthy }
 
+  # One-shot: the app runs unprivileged, so it has to own its uploads volume.
+  uploads-perms:
+    <<: *hay
+    restart: "no"
+    user: root
+    command: ["chown", "-R", "hay:hay", "/data/uploads"]
+    healthcheck:
+      disable: true
+    volumes:
+      - uploads:/data/uploads
+
+  # Renders websites for knowledge-base imports, away from the app and its
+  # secrets. On its own network, so it can't reach postgres, redis or rabbitmq.
+  browser:
+    image: hay-browser:local
+    build:
+      context: ..
+      dockerfile: Dockerfile
+      target: browser
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    networks:
+      - browser
+
   server:
     <<: *hay
     command: ["node", "dist/main.js"]
     volumes:
       - uploads:/data/uploads
+    networks:
+      - default
+      - browser
     depends_on:
+      uploads-perms: { condition: service_completed_successfully }
+      browser: { condition: service_started }
       migrate: { condition: service_completed_successfully }
       redis: { condition: service_healthy }
       rabbitmq: { condition: service_healthy }
@@ -100,7 +136,7 @@ services:
           "CMD",
           "node",
           "-e",
-          "fetch('http://localhost:3001/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+          "fetch('http://localhost:3001/ready').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
         ]
       interval: 15s
       timeout: 5s
@@ -113,6 +149,18 @@ services:
     command: ["node", "server/index.mjs"]
     depends_on:
       server: { condition: service_started }
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://localhost:3000/').then(r=>process.exit(r.status<500?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
 
   # Reverse proxy with automatic Let's Encrypt certificates. Needs ports 80 and
   # 443 open and HAY_DOMAIN's DNS pointing at this machine.
@@ -137,3 +185,6 @@ volumes:
   uploads:
   caddy_data:
   caddy_config:
+
+networks:
+  browser:

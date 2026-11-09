@@ -337,6 +337,8 @@ export const config = {
     maxUploadSizeMB: parseInt(process.env.PLUGIN_MAX_UPLOAD_SIZE_MB || "50", 10),
     // Organization-supplied (custom/git) plugin code; off unless explicitly enabled
     allowCustomPlugins: process.env.ALLOW_CUSTOM_PLUGINS === "true",
+    // Core plugins were compiled into the image: nothing to install or build at runtime
+    prebuilt: process.env.PLUGINS_PREBUILT === "true",
   },
 
   // Telemetry is entirely optional: with no key the client is never constructed
@@ -367,6 +369,10 @@ export const config = {
 
   scraper: {
     chromeExecutablePath: process.env.CHROME_EXECUTABLE_PATH || "",
+    // DevTools URL of a separate browser (http://host:port). Set = never launch locally.
+    chromeRemoteUrl: process.env.CHROME_REMOTE_URL || "",
+    // Containers can't use Chromium's sandbox; everywhere else it stays on.
+    chromeDisableSandbox: process.env.CHROME_DISABLE_SANDBOX === "true",
     puppeteerMaxConcurrent: parseInt(process.env.PUPPETEER_MAX_CONCURRENT || "3", 10),
     puppeteerTimeout: parseInt(process.env.PUPPETEER_TIMEOUT || "30000", 10),
   },
@@ -579,6 +585,11 @@ export function validateProductionConfig(): string[] {
   }
   if (!config.redis.password && !LOCAL_HOSTS.has(config.redis.host)) {
     warnings.push("REDIS_PASSWORD is not set for a remote Redis host.");
+  }
+  if (process.env.TRUST_PROXY === undefined) {
+    warnings.push(
+      `TRUST_PROXY is not set; assuming ${config.server.trustProxy} reverse proxy hop(s). Set it to the real number so client IPs are correct.`,
+    );
   }
 
   return warnings;

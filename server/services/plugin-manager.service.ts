@@ -591,6 +591,12 @@ export class PluginManagerService {
       throw new Error(`Plugin ${pluginId} not found`);
     }
 
+    if (this.isPrebuiltCorePlugin(plugin)) {
+      await pluginRegistryRepository.updateInstallStatus(plugin.id, true);
+      plugin.installed = true;
+      return;
+    }
+
     const pluginPath = path.join(this.pluginsDir, plugin.pluginPath);
     const isWorkspacePlugin = plugin.pluginPath.startsWith("core/");
 
@@ -737,6 +743,12 @@ export class PluginManagerService {
       if (error) {
         throw new Error(error);
       }
+      return;
+    }
+
+    if (this.isPrebuiltCorePlugin(plugin)) {
+      await pluginRegistryRepository.updateBuildStatus(plugin.id, true);
+      plugin.built = true;
       return;
     }
 
@@ -1221,6 +1233,10 @@ export class PluginManagerService {
   /**
    * Build minimal environment for build/install operations
    */
+  private isPrebuiltCorePlugin(plugin: PluginRegistry): boolean {
+    return config.plugins.prebuilt && plugin.sourceType === "core";
+  }
+
   private buildMinimalEnv(): Record<string, string> {
     return {
       NODE_ENV: process.env.NODE_ENV || "production",

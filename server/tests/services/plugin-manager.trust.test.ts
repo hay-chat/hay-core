@@ -10,8 +10,9 @@ jest.mock("@server/lib/logger", () => ({
 }));
 const upsertPlugin = jest.fn<(plugin: unknown) => Promise<unknown>>();
 const updateBuildStatus = jest.fn<(...args: unknown[]) => Promise<void>>();
+const updateInstallStatus = jest.fn<(...args: unknown[]) => Promise<void>>();
 jest.mock("@server/repositories/plugin-registry.repository", () => ({
-  pluginRegistryRepository: { upsertPlugin, updateBuildStatus },
+  pluginRegistryRepository: { upsertPlugin, updateBuildStatus, updateInstallStatus },
 }));
 jest.mock("@server/repositories/plugin-instance.repository", () => ({
   pluginInstanceRepository: {},
@@ -33,6 +34,7 @@ jest.mock("../../services/plugin-router-registry.service", () => ({
 
 import { pluginManagerService } from "@server/services/plugin-manager.service";
 import type { PluginRegistry } from "@server/entities/plugin-registry.entity";
+import { config } from "@server/config/env";
 
 const pluginsDir = path.join(process.cwd(), "..", "plugins");
 let pluginDir: string;
@@ -261,5 +263,21 @@ describe("buildPlugin reloads an in-process plugin router", () => {
     await pluginManagerService.buildPlugin("tenant-plugin");
 
     expect(registerRouter).not.toHaveBeenCalled();
+  });
+});
+
+describe("core plugins compiled into the image", () => {
+  it("are marked ready without running npm", async () => {
+    const prebuilt = jest.replaceProperty(config.plugins, "prebuilt", true);
+    await writePlugin({}, { scripts: { build: "tsc" }, dependencies: { zod: "*" } });
+    pluginManagerService.registry.set("tenant-plugin", registryEntry("core", {}));
+
+    await pluginManagerService.installPlugin("tenant-plugin");
+    await pluginManagerService.buildPlugin("tenant-plugin");
+
+    expect(execSync).not.toHaveBeenCalled();
+    expect(updateInstallStatus).toHaveBeenCalledWith("row-1", true);
+    expect(updateBuildStatus).toHaveBeenCalledWith("row-1", true);
+    prebuilt.restore();
   });
 });

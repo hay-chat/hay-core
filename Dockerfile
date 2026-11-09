@@ -46,24 +46,79 @@ RUN for dir in plugins/core/*/mcp; do \
       if [ -f "$dir/package-lock.json" ]; then install=ci; else install=install; fi; \
       (cd "$dir" && npm "$install" --omit=dev --ignore-scripts --no-audit --no-fund) || exit 1; \
     done
+# Only what runs: manifests, installed dependencies, prompts and plugin assets.
+# TypeScript sources and build configs stay behind; compiled output comes from
+# the build stage. --anchored and --no-wildcards-match-slash keep these patterns
+# from reaching into node_modules. npm keeps typescript and ts-node as peers of
+# other packages, but nothing loads them when running compiled code.
+RUN mkdir -p /runtime server/node_modules \
+    && tar -cf - --anchored --no-wildcards-match-slash \
+         --exclude='node_modules/typescript' \
+         --exclude='node_modules/ts-node' \
+         --exclude='node_modules/.bin/ts*' \
+         --exclude='node_modules/.bin/typeorm-ts-node-*' \
+         --exclude='plugins/core/*/src' \
+         --exclude='plugins/core/*/tests' \
+         --exclude='plugins/core/*/tsconfig*.json' \
+         --exclude='plugins/core/*/vitest.config.ts' \
+         --exclude='plugins/core/*/vite.config.ui.ts' \
+         --exclude='packages/*/src' \
+         --exclude='packages/*/tsconfig.json' \
+         --exclude='packages/*/vitest.config.ts' \
+         --exclude='packages/plugin-sdk/examples' \
+         --exclude='packages/plugin-sdk/runner' \
+         --exclude='packages/plugin-sdk/sdk' \
+         --exclude='packages/plugin-sdk/types' \
+         package.json node_modules packages plugins/core \
+         server/package.json server/node_modules server/prompts \
+       | tar -xf - -C /runtime
 
-# ---- runtime ----------------------------------------------------------------
-FROM node:22-bookworm-slim
-WORKDIR /app
-# Chromium for website scraping (knowledge-base imports). CHROME_EXECUTABLE_PATH
-# points the scraper at it instead of downloading a browser at runtime.
+# ---- chromium: shared by the app image and the browser sidecar --------------
+FROM node:22-bookworm-slim AS chromium
 RUN apt-get update && apt-get install -y --no-install-recommends \
       ca-certificates chromium \
     && rm -rf /var/lib/apt/lists/*
-ENV CHROME_EXECUTABLE_PATH=/usr/bin/chromium
 
-COPY --from=deps /app /app
+# ---- browser: isolated Chromium for website imports (docker build --target) -
+# Holds no application code or secrets. Chromium only listens on loopback in new
+# headless mode, so socat exposes it on the sidecar's private network. Docker's
+# default seccomp profile blocks the namespaces Chromium's sandbox needs, so the
+# container boundary and the unprivileged user are the isolation here.
+FROM chromium AS browser
+RUN apt-get update && apt-get install -y --no-install-recommends socat \
+    && rm -rf /var/lib/apt/lists/* \
+    && useradd --uid 10001 --create-home --shell /usr/sbin/nologin chrome
+USER chrome
+EXPOSE 9223
+HEALTHCHECK --interval=15s --timeout=5s --start-period=15s --retries=5 \
+  CMD ["node", "-e", "fetch('http://127.0.0.1:9222/json/version').then(r=>process.exit(r.ok?0:1),()=>process.exit(1))"]
+ENTRYPOINT ["sh", "-c", "socat TCP-LISTEN:9223,fork,reuseaddr TCP:127.0.0.1:9222 & exec chromium --headless --no-sandbox --disable-dev-shm-usage --disable-gpu --disable-extensions --disable-background-networking --disable-default-apps --disable-sync --no-first-run --force-webrtc-ip-handling-policy=disable_non_proxied_udp --remote-debugging-port=9222 --user-data-dir=/tmp/chrome about:blank"]
+
+# ---- runtime ----------------------------------------------------------------
+FROM chromium
+WORKDIR /app
+# Website imports use this local Chromium unless CHROME_REMOTE_URL points at the
+# browser sidecar. A container can't use Chromium's sandbox (see above).
+ENV CHROME_EXECUTABLE_PATH=/usr/bin/chromium
+ENV CHROME_DISABLE_SANDBOX=true
+
+RUN useradd --uid 10001 --create-home --shell /usr/sbin/nologin hay
+COPY --from=deps /runtime /app
 COPY --from=build /out /app
+# The only paths the app writes to: organization plugins, uploads (LOCAL_UPLOAD_PATH
+# or its cwd-relative default) and plugin pages. Everything else stays root-owned.
+RUN mkdir -p /app/plugins/custom /app/server/server/uploads /data/uploads /app/dashboard/pages/plugins \
+    && chown -R hay:hay /app/plugins/custom /app/server/server/uploads /data/uploads /app/dashboard/pages
 
 ENV NODE_ENV=production
+# Core plugins are compiled above and the image has no build tools.
+ENV PLUGINS_PREBUILT=true
 EXPOSE 3000 3001
+USER hay
 
 # The server MUST run with cwd=/app/server: plugins are resolved from
 # <cwd>/../plugins.
 WORKDIR /app/server
+HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3 \
+  CMD ["node", "-e", "fetch('http://localhost:'+(process.env.PORT||3001)+'/health').then(r=>process.exit(r.ok?0:1),()=>process.exit(1))"]
 CMD ["node", "dist/main.js"]
