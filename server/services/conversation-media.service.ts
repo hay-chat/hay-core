@@ -68,7 +68,7 @@ export async function linkUploadsToMessage(
 }
 
 /** Delete uploads one by one; a failure is logged and counted, never thrown. */
-async function deleteUploads(uploadIds: string[]): Promise<MediaDeletionResult> {
+export async function deleteUploads(uploadIds: string[]): Promise<MediaDeletionResult> {
   let deleted = 0;
   let failed = 0;
   for (const uploadId of uploadIds) {
@@ -138,7 +138,7 @@ export async function sweepConversationMedia(): Promise<{
   expired: MediaDeletionResult;
   orphans: MediaDeletionResult;
 }> {
-  const expired = await sweep(
+  const expired = await sweepUploads(
     `SELECT u.id FROM uploads u
      JOIN organizations o ON o.id = u.organization_id
      LEFT JOIN conversations c ON c.id = u.conversation_id
@@ -157,7 +157,7 @@ export async function sweepConversationMedia(): Promise<{
   // Orphans: never linked to a message, or their message was deleted. A
   // message of the same organization still naming the upload keeps it (a
   // safety net should linking ever have failed).
-  const orphans = await sweep(
+  const orphans = await sweepUploads(
     `SELECT u.id FROM uploads u
      LEFT JOIN conversations lc ON lc.id = u.conversation_id
      WHERE u.folder = $1
@@ -181,7 +181,7 @@ export async function sweepConversationMedia(): Promise<{
   return { expired, orphans };
 }
 
-async function sweep(sql: string, parameters: unknown[]): Promise<MediaDeletionResult> {
+export async function sweepUploads(sql: string, parameters: unknown[]): Promise<MediaDeletionResult> {
   const total: MediaDeletionResult = { deleted: 0, failed: 0 };
   for (let batch = 0; batch < SWEEP_MAX_BATCHES; batch++) {
     const rows: Array<{ id: string }> = await AppDataSource.query(sql, parameters);

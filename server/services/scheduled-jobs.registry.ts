@@ -472,6 +472,8 @@ const jobRegistry: CronJobConfig[] = [
     handler: async () => {
       const { dataRetentionService } = await import("./data-retention.service");
       await dataRetentionService.anonymizeExpiredConversations();
+      // Customers left with no live conversation, same retention setting.
+      await dataRetentionService.sweepExpiredCustomers();
       // Imported test transcripts (D7-8) follow the same retention setting.
       const { testTranscriptService } = await import("./test-transcript.service");
       await testTranscriptService.deleteExpired();
@@ -486,6 +488,36 @@ const jobRegistry: CronJobConfig[] = [
     // Preserves conversation metadata for analytics while removing PII
     // Conversations with legal_hold = true are exempt from anonymization
     timeout: 1800000, // 30 minutes max for large cleanups
+    retryOnFailure: true,
+    maxRetries: 3,
+    singleton: true,
+    enabled: true,
+  },
+
+  {
+    name: "storage-purge-drain",
+    description: "Delete stored files queued by bulk deletions (organization deletion)",
+    schedule: "20 * * * *", // Hourly
+    handler: async () => {
+      const { drainStoragePurgeQueue } = await import("./storage-purge.service");
+      await drainStoragePurgeQueue();
+    },
+    timeout: 1800000,
+    retryOnFailure: true,
+    maxRetries: 3,
+    singleton: true,
+    enabled: true,
+  },
+
+  {
+    name: "document-files-orphan-sweep",
+    description: "Delete document files and editor images no document names any more",
+    schedule: "0 4 * * *", // Daily at 4 AM
+    handler: async () => {
+      const { sweepOrphanDocumentFiles } = await import("./storage-purge.service");
+      await sweepOrphanDocumentFiles();
+    },
+    timeout: 1800000,
     retryOnFailure: true,
     maxRetries: 3,
     singleton: true,

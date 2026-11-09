@@ -175,6 +175,11 @@ export async function signAttachmentUrls<T extends { id?: string; url: string }>
  * `{api}/v1/media/{id}`, optionally followed by a signature (`&` may be
  * HTML-escaped). Group 1 is the upload id.
  */
+/** The upload id of a /v1/media/:id URL, signed or not; null for any other URL. */
+export function parseMediaUploadId(url: string): string | null {
+  return mediaUrlPattern().exec(url)?.[1] ?? null;
+}
+
 function mediaUrlPattern(): RegExp {
   const base = mediaUrl("").replace(/[.*+?^${}()|[\]\\/]/g, "\\$&");
   return new RegExp(

@@ -29,12 +29,13 @@ import * as os from "os";
 import * as path from "path";
 import * as archiver from "archiver";
 import { config, getDashboardUrl } from "@server/config/env";
-import { IsNull, In } from "typeorm";
+import { IsNull } from "typeorm";
 import type { ExportPackageData } from "@server/types/privacy.types";
 import { PRIVACY_DELETION_JOB_TYPE, PRIVACY_EXPORT_JOB_TYPE } from "@server/types/privacy.types";
 import { NO_RECIPIENT_ERROR, organizationAdminEmails } from "./provider-privacy.service";
 import { storageService } from "@server/services/storage.service";
 import { deleteConversationMedia } from "@server/services/conversation-media.service";
+import { anonymizeConversations } from "@server/services/conversation-anonymizer";
 import { isUuid } from "@server/services/media-url.service";
 import { fetchPublicFile } from "@server/utils/fetch-public-file";
 
@@ -716,7 +717,9 @@ export class PrivacyService {
    * rows such as takeover events still point at it).
    */
   private async executeDataDeletion(userId: string): Promise<void> {
-    return AppDataSource.transaction(async (manager) => {
+    let avatarUrl: string | undefined;
+
+    await AppDataSource.transaction(async (manager) => {
       const userRepository = manager.getRepository(User);
       const auditLogRepository = manager.getRepository(AuditLog);
 
@@ -725,6 +728,7 @@ export class PrivacyService {
         throw new Error("User not found");
       }
       const email = user.email.toLowerCase();
+      avatarUrl = user.avatarUrl ?? undefined;
 
       // Anonymize audit logs (keep for compliance but remove PII)
       const auditLogs = await auditLogRepository.find({ where: { userId } });
@@ -808,6 +812,15 @@ export class PrivacyService {
 
       logger.debug({ userId }, "User data deleted");
     });
+
+    // A deleted file can't be rolled back, so it goes once the erasure committed.
+    if (avatarUrl) {
+      try {
+        await storageService.deleteByPublicUrl(avatarUrl, "avatars", userId);
+      } catch (error) {
+        logger.warn({ err: error, userId }, "Failed to delete an erased user's avatar");
+      }
+    }
   }
 
   /**
@@ -1694,48 +1707,10 @@ please contact ${supportContact}.
         throw new Error("Customer not found");
       }
 
-      if (conversationIds.length > 0) {
-        const messages = await manager.getRepository(Message).find({
-          where: { conversation_id: In(conversationIds) },
-          select: ["id"],
-        });
-        const messageIds = messages.map((m) => m.id);
-
-        // Embeddings are linked by metadata, not foreign keys.
-        await vectorStoreService.deleteByConversationIds(organizationId, conversationIds, manager);
-        if (messageIds.length > 0) {
-          await vectorStoreService.deleteByMessageIds(organizationId, messageIds, manager);
-        }
-
-        const ids = [conversationIds];
-        await manager.query(`DELETE FROM messages WHERE conversation_id = ANY($1)`, ids);
-        for (const table of [
-          "action_log",
-          "pending_actions",
-          "order_conversation_links",
-          "team_questions",
-          "notification_deliveries",
-          "insight_issues",
-        ]) {
-          await manager.query(`DELETE FROM "${table}" WHERE conversation_id = ANY($1)`, ids);
-        }
-        await manager.query(
-          `UPDATE conversation_outcomes
-           SET classification_reason = NULL, exclusion_reason = NULL, exclusion_review_note = NULL
-           WHERE conversation_id = ANY($1)`,
-          ids,
-        );
-        await manager.query(
-          `UPDATE conversations
-           SET customer_id = NULL, title = '[deleted]', context = NULL, metadata = NULL,
-               summary = NULL, resolution_metadata = NULL, orchestration_status = NULL,
-               document_ids = NULL, public_jwk = NULL, spam_reason = NULL, stuck_reason = NULL,
-               last_processing_error = NULL, needs_processing = false,
-               deleted_at = COALESCE(deleted_at, now())
-           WHERE id = ANY($1)`,
-          ids,
-        );
-      }
+      await anonymizeConversations(manager, organizationId, conversationIds, {
+        title: "[deleted]",
+        deleteInsightIssues: true,
+      });
 
       // Merge dismissals cascade with the customer row.
       await customerRepository.delete({ id: customerId, organization_id: organizationId });

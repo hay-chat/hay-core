@@ -268,6 +268,18 @@ export class StorageService {
   }
 
   /**
+   * Delete a stored object whose upload row is already gone (or about to be);
+   * see storage-purge.service.
+   */
+  async deleteObject(storageType: string, path: string): Promise<void> {
+    if (storageType === "s3") {
+      await this.deleteS3(path);
+    } else {
+      await this.deleteLocal(path);
+    }
+  }
+
+  /**
    * Delete the upload a public URL points to (stored file names are unique),
    * provided it is in `folder` and was uploaded by `uploadedById`.
    */

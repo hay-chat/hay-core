@@ -357,7 +357,7 @@ When a deletion request is confirmed, the following actions are taken:
 
 ### Known Limits
 
-- **Customer erasure** deletes the customer's messages, action logs, pending actions, order links and team questions; conversations remain as anonymous soft-deleted rows _(pending PR #133)_.
+- **Customer erasure** deletes the customer's messages, action logs, pending actions, order links and team questions; conversations remain as anonymous soft-deleted rows.
 - Audit rows written by _other_ users (e.g. an invitation sent to the erased person) may still contain the erased person's email address.
 - Operator event payloads are not erased yet.
 - Erasure does not reach sub-processors' copies (e.g. AI providers, email provider) or commerce platforms connected through plugins.
@@ -582,8 +582,10 @@ Plugins an organization enables (e.g. Shopify, WhatsApp, Zendesk) send data to t
 | -------------------- | ----------------------- | ----------------------------------------------------------------------------------- |
 | **Conversations**    | Per-org `retentionDays` | Automatically anonymized by daily cleanup worker (see [RETENTION.md](RETENTION.md)) |
 | **Embeddings**       | Per-org `retentionDays` | Deleted alongside anonymized conversations                                          |
+| **Customers**        | Per-org `retentionDays` | Deleted once unchanged past the window with no live or held conversation; never when `retentionDays` is unset |
+| **Stored files of a deleted organization** | Hours | Queued in the deletion's transaction and deleted by the hourly `storage-purge-drain` job |
 | **Export Files**     | 7 days                  | Automatically deleted after download link expires                                   |
-| **Privacy Requests** | 365 days                | Anonymized after 365 days (pending PR #133)                                         |
+| **Privacy Requests** | 365 days                | Anonymized after 365 days; kept after organization deletion, with `original_organization_id` |
 | **Audit Logs**       | 365 days (personal fields 90 days) | Cleared and deleted daily by the `cleanup-old-audit-logs` job; kept after organization deletion |
 | **Database Backups** | Provider's retention    | Managed-database automated backups; no Hay-side rotation (period _to confirm_)      |
 
