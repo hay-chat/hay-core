@@ -55,7 +55,7 @@
       <CardContent class="space-y-4">
         <div class="space-y-2">
           <Label for="retentionDays">{{ $t("customerPrivacy.retentionPeriod") }}</Label>
-          <Select id="retentionDays" v-model="retentionDays">
+          <Select id="retentionDays" v-model="retentionDays" :disabled="isLoadingRetention">
             <SelectTrigger>
               <SelectValue :placeholder="$t('customerPrivacy.selectRetentionPeriod')" />
             </SelectTrigger>
@@ -100,7 +100,7 @@
           </div>
         </div>
 
-        <Button :disabled="isSavingRetention" @click="saveRetentionPolicy">
+        <Button :disabled="isSavingRetention || isLoadingRetention" @click="saveRetentionPolicy">
           <Save class="h-4 w-4 mr-2" />
           {{
             isSavingRetention
@@ -243,6 +243,7 @@ import MediaSettingsCard from "@/components/settings/MediaSettingsCard.vue";
 // Retention policy state
 const retentionDays = ref<number | null>(null);
 const isSavingRetention = ref(false);
+const isLoadingRetention = ref(true);
 
 // Form state
 const identifierType = ref<"email" | "phone" | "externalId">("email");
@@ -436,6 +437,8 @@ const fetchRetentionPolicy = async () => {
     retentionDays.value = result.retentionDays ?? null;
   } catch (error) {
     console.error("Failed to fetch retention policy:", error);
+  } finally {
+    isLoadingRetention.value = false;
   }
 };
 

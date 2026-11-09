@@ -10,7 +10,7 @@
         type="switch"
         :label="$t('profile.mfa.orgSwitch')"
         :hint="$t('profile.mfa.orgHint')"
-        :disabled="saving"
+        :disabled="saving || loading"
         @update:model-value="save(Boolean($event))"
       />
     </CardContent>
@@ -26,6 +26,7 @@ const toast = useToast();
 
 const required = ref(false);
 const saving = ref(false);
+const loading = ref(true);
 
 const save = async (next: boolean) => {
   saving.value = true;
@@ -41,7 +42,11 @@ const save = async (next: boolean) => {
 };
 
 onMounted(async () => {
-  const settings = await Hay.organizations.getSettings.query();
-  required.value = settings.mfaRequired;
+  try {
+    const settings = await Hay.organizations.getSettings.query();
+    required.value = settings.mfaRequired;
+  } finally {
+    loading.value = false;
+  }
 });
 </script>
