@@ -80,6 +80,9 @@ export function erasedEmail(email: string): string {
  * Privacy Service
  * Handles GDPR Data Subject Access Requests (DSAR)
  */
+/** A refusal whose message is written for the person making the request. */
+export class PrivacyRequestError extends Error {}
+
 export class PrivacyService {
   private readonly VERIFICATION_EXPIRY_HOURS = 24;
 
@@ -100,7 +103,7 @@ export class PrivacyService {
     });
     const combinedLimit = await rateLimitService.checkCombinedRateLimit(ipAddress, email, 2, 86400);
     if (ipLimit.limited || emailLimit.limited || combinedLimit.limited) {
-      throw new Error("Rate limit exceeded. Please try again later.");
+      throw new PrivacyRequestError("Rate limit exceeded. Please try again later.");
     }
   }
 
@@ -176,7 +179,7 @@ export class PrivacyService {
         request.status = "failed";
         request.errorMessage = "Failed to send verification email. Please try again.";
         await requestRepository.save(request);
-        throw new Error("Failed to send verification email. Please try again later.");
+        throw new PrivacyRequestError("Failed to send verification email. Please try again later.");
       }
     }
 
@@ -252,7 +255,7 @@ export class PrivacyService {
       return { request, jobId: job.id };
     });
 
-    if ("error" in outcome) throw new Error(outcome.error);
+    if ("error" in outcome) throw new PrivacyRequestError(outcome.error);
     const { request, jobId } = outcome;
 
     await this.logPrivacyAction(this.actionName(request, "confirm"), request.userId, {
@@ -435,7 +438,7 @@ export class PrivacyService {
     });
 
     if (!request) {
-      throw new Error("Privacy request not found");
+      throw new PrivacyRequestError("Privacy request not found");
     }
 
     return {
@@ -473,18 +476,18 @@ export class PrivacyService {
 
     const request = await requestRepository.findOne({ where: { id: requestId } });
     if (!request) {
-      throw new Error("Privacy request not found");
+      throw new PrivacyRequestError("Privacy request not found");
     }
 
     if (!request.verificationTokenHash) {
-      throw new Error("This request cannot be cancelled (no verification token)");
+      throw new PrivacyRequestError("This request cannot be cancelled (no verification token)");
     }
     if (!tokenMatches(token, request.verificationTokenHash)) {
-      throw new Error("Invalid verification token");
+      throw new PrivacyRequestError("Invalid verification token");
     }
 
     if (!CANCELLABLE_STATUSES.includes(request.status)) {
-      throw new Error(
+      throw new PrivacyRequestError(
         `Cannot cancel request with status '${request.status}'. ` +
           `Only pending, verified, or processing requests can be cancelled.`,
       );
@@ -525,17 +528,17 @@ export class PrivacyService {
     });
 
     if (!request) {
-      throw new Error("Export request not found or not ready");
+      throw new PrivacyRequestError("Export request not found or not ready");
     }
 
     if (!tokenMatches(downloadToken, request.getDownloadTokenHash())) {
-      throw new Error("Invalid download token");
+      throw new PrivacyRequestError("Invalid download token");
     }
 
     const expiresAt = request.getExportExpiresAt();
     const uploadId = request.getExportUploadId();
     if (!uploadId || !expiresAt || expiresAt <= new Date()) {
-      throw new Error("Export has expired");
+      throw new PrivacyRequestError("Export has expired");
     }
 
     // Check IP restriction (optional - can be disabled for mobile users)
@@ -551,7 +554,7 @@ export class PrivacyService {
         attemptedIp: ipAddress,
       });
 
-      throw new Error(
+      throw new PrivacyRequestError(
         "Security validation failed. Please download from the same device/network " +
           "used to request the export.",
       );
@@ -569,7 +572,7 @@ export class PrivacyService {
       [request.id, ipAddress ?? null],
     );
     if (!claimed?.length) {
-      throw new Error(
+      throw new PrivacyRequestError(
         "Download limit exceeded. This link has already been used. " +
           "Please request a new export if needed.",
       );

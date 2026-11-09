@@ -243,7 +243,7 @@ const startDownload = async () => {
   try {
     downloading.value = true;
 
-    const result = await Hay.privacy.downloadExport.query({
+    const result = await Hay.privacy.downloadExport.mutate({
       requestId: requestId.value,
       downloadToken: downloadToken.value,
     });

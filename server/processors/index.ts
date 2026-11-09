@@ -1,4 +1,4 @@
-import FileType from "file-type";
+import { fileTypeFromBuffer } from "file-type";
 import JSZip from "jszip";
 import path from "path";
 import { DocumentRejectedError, type ProcessedDocument } from "./base.processor";
@@ -28,7 +28,7 @@ export async function detectDocumentType(
   declaredMimeType: string,
 ): Promise<string> {
   const declared = declaredMimeType.split(";")[0].trim().toLowerCase();
-  const detected = await FileType.fromBuffer(buffer);
+  const detected = await fileTypeFromBuffer(buffer);
 
   if (!detected) return TEXT_TYPES.has(declared) ? declared : "text/plain";
   if (detected.mime === "application/pdf" || OOXML_TYPES.has(detected.mime)) return detected.mime;

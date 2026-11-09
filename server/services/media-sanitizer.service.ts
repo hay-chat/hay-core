@@ -1,4 +1,4 @@
-import FileType from "file-type";
+import { fileTypeFromBuffer } from "file-type";
 import sharp from "sharp";
 
 /**
@@ -39,7 +39,6 @@ const TEXT_TYPES = new Set(["text/plain", "text/csv"]);
 
 /** file-type names that we store under a canonical allow-list name. */
 const DETECTED_ALIASES: Record<string, string> = {
-  "audio/opus": "audio/ogg", // WhatsApp voice notes: Opus in an Ogg container
   "audio/x-m4a": "audio/mp4",
   "video/x-m4v": "video/mp4",
 };
@@ -66,7 +65,7 @@ function bareMime(mimeType: string): string {
 
 /** Real type of the file from its content, checked against the allow-list. */
 async function detectType(buffer: Buffer, declaredMime: string): Promise<string> {
-  const detected = await FileType.fromBuffer(buffer);
+  const detected = await fileTypeFromBuffer(buffer);
 
   if (!detected) {
     if (TEXT_TYPES.has(declaredMime)) return declaredMime;
@@ -79,7 +78,9 @@ async function detectType(buffer: Buffer, declaredMime: string): Promise<string>
     throw new MediaRejectedError("HEIC/HEIF images are not supported");
   }
 
-  const mimeType = DETECTED_ALIASES[detected.mime] ?? detected.mime;
+  // Bare type: Opus in an Ogg container (WhatsApp voice notes) reports "audio/ogg; codecs=opus".
+  const detectedMime = bareMime(detected.mime);
+  const mimeType = DETECTED_ALIASES[detectedMime] ?? detectedMime;
   if (!CONVERSATION_MEDIA_TYPES[mimeType]) {
     throw new MediaRejectedError(`File type not allowed: ${detected.mime}`);
   }
@@ -160,7 +161,7 @@ export async function sanitizeConversationMedia(
  * these files are served from a public URL under our origin.
  */
 export async function sanitizePublicImage(buffer: Buffer): Promise<SanitizedMedia> {
-  const detected = await FileType.fromBuffer(buffer);
+  const detected = await fileTypeFromBuffer(buffer);
   if (!detected || !REENCODED_IMAGE_TYPES.has(detected.mime)) {
     throw new MediaRejectedError("Only JPEG, PNG, GIF or WebP images are allowed");
   }

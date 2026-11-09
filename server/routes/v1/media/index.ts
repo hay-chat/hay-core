@@ -48,12 +48,20 @@ export function contentDisposition(mimeType: string, originalName: string): stri
   return `${type}; filename="${asciiName}"; filename*=UTF-8''${encodeURIComponent(originalName)}`;
 }
 
-/** Resource/action a staff member needs to read files in this folder. */
-function requiredScope(folder: string): [string, string] {
+/**
+ * Resource/action a staff member needs to read files in this folder, or null
+ * for folders staff never read directly: those are delivered only through a
+ * signed link or their own download flow.
+ */
+function requiredScope(folder: string): [string, string] | null {
   if (folder === "conversation-media") return [RESOURCES.CONVERSATIONS, ACTIONS.READ];
-  if (folder.startsWith("documents") || folder === DOCUMENT_IMAGES_FOLDER)
+  if (
+    folder === "documents" ||
+    folder.startsWith("documents/") ||
+    folder === DOCUMENT_IMAGES_FOLDER
+  )
     return [RESOURCES.DOCUMENTS, ACTIONS.READ];
-  return [RESOURCES.ALL, RESOURCES.ALL];
+  return null;
 }
 
 type AccessResult = "granted" | "unauthenticated" | "denied";
@@ -78,8 +86,9 @@ async function checkAccess(req: Request, upload: Upload): Promise<AccessResult> 
   if (headerOrganizationId !== upload.organizationId) return "denied";
   if (user.organizationId !== upload.organizationId) return "denied";
 
-  const [resource, action] = requiredScope(upload.folder);
-  return user.hasScope(resource, action) ? "granted" : "denied";
+  const scope = requiredScope(upload.folder);
+  if (!scope) return "denied";
+  return user.hasScope(scope[0], scope[1]) ? "granted" : "denied";
 }
 
 /** Parse a single `bytes=start-end` range. Returns null when absent or unsatisfiable. */

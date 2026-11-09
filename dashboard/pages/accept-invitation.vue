@@ -190,7 +190,7 @@ const loadInvitation = async () => {
     loading.value = true;
     error.value = "";
 
-    const result = await Hay.invitations.getInvitationByToken.query({
+    const result = await Hay.invitations.getInvitationByToken.mutate({
       token: token.value,
     });
 

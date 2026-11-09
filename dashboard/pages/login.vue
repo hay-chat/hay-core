@@ -144,6 +144,7 @@
 </template>
 
 <script setup lang="ts">
+import { safeInternalPath } from "@/utils/safe-internal-path";
 import { validateEmail } from "@/lib/utils";
 import { useAuthStore } from "@/stores/auth";
 import { Hay } from "@/utils/api";
@@ -163,7 +164,7 @@ const route = useRoute();
 const authStore = useAuthStore();
 
 // Get redirect URL from query params
-const redirectUrl = computed(() => (route.query.redirect as string) || "/");
+const redirectUrl = computed(() => safeInternalPath(route.query.redirect));
 
 // Invitation context
 interface InvitationContext {
@@ -197,7 +198,7 @@ const loadInvitationContext = async () => {
   if (!token) return;
 
   try {
-    const invitation = await Hay.invitations.getInvitationByToken.query({ token });
+    const invitation = await Hay.invitations.getInvitationByToken.mutate({ token });
     invitationContext.value = {
       email: invitation.email,
       role: invitation.role,

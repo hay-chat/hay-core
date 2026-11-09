@@ -2,6 +2,7 @@ import { router } from "@server/trpc";
 import { pluginProcedure, requireCapability } from "@server/trpc/middleware/plugin-auth";
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
+import { toClientError } from "@server/trpc/client-error";
 import { CustomerRepository } from "@server/repositories/customer.repository";
 import { ConversationRepository } from "@server/repositories/conversation.repository";
 import { MessageRepository } from "@server/repositories/message.repository";
@@ -15,7 +16,11 @@ import {
 } from "@server/database/entities/message.entity";
 import { mcpRegistryService } from "@server/services/mcp-registry.service";
 import { redisService } from "@server/services/redis.service";
-import { CONVERSATION_MEDIA_FOLDER, storageService } from "@server/services/storage.service";
+import {
+  CONVERSATION_MEDIA_FOLDER,
+  storageService,
+  UploadRejectedError,
+} from "@server/services/storage.service";
 import { transcriptionService } from "@server/services/transcription.service";
 import { oauthService } from "@server/services/oauth.service";
 import { randomUUID } from "crypto";
@@ -432,10 +437,7 @@ export const pluginApiTrpcRouter = router({
         };
       } catch (error) {
         logger.error({ err: error }, "messages.receive error");
-        throw new TRPCError({
-          code: "INTERNAL_SERVER_ERROR",
-          message: error instanceof Error ? error.message : "Failed to process message",
-        });
+        throw toClientError(error, "INTERNAL_SERVER_ERROR", "Failed to process message");
       }
     }),
 
@@ -532,10 +534,7 @@ export const pluginApiTrpcRouter = router({
         };
       } catch (error) {
         logger.error({ err: error }, "messages.send error");
-        throw new TRPCError({
-          code: "INTERNAL_SERVER_ERROR",
-          message: error instanceof Error ? error.message : "Failed to send message",
-        });
+        throw toClientError(error, "INTERNAL_SERVER_ERROR", "Failed to send message");
       }
     }),
 
@@ -664,12 +663,11 @@ export const pluginApiTrpcRouter = router({
           organizationId,
         });
       } catch (error) {
-        // Storage rejects disallowed or mislabelled content and oversized files
-        // with plain errors — those are caller mistakes, not server faults.
-        throw new TRPCError({
-          code: "BAD_REQUEST",
-          message: error instanceof Error ? error.message : "Upload failed",
-        });
+        // Disallowed, mislabelled or oversized content is the caller's mistake.
+        if (error instanceof UploadRejectedError) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: error.message });
+        }
+        throw toClientError(error, "INTERNAL_SERVER_ERROR", "Upload failed");
       }
 
       // Type and size of what was stored: the type comes from the file's content

@@ -522,7 +522,7 @@ export const authRouter = t.router({
 
   verifyResetToken: publicProcedure
     .input(z.object({ token: z.string() }))
-    .query(async ({ input }) => {
+    .mutation(async ({ input }) => {
       const userRepository = AppDataSource.getRepository(User);
 
       // Direct lookup by SHA-256 hash (O(1) instead of O(n) argon2 scans)
@@ -1087,10 +1087,7 @@ export const authRouter = t.router({
         const baseUrl = process.env.FRONTEND_URL || getDashboardUrl();
         const verificationUrl = `${baseUrl}/verify-email?token=${verificationToken}`;
 
-        logger.debug(
-          { verificationUrl, newEmail: input.newEmail.toLowerCase(), oldEmail },
-          "Sending email change verification emails",
-        );
+        logger.debug("Sending email change verification emails");
 
         const commonVariables = {
           userName: user.getFullName(),
@@ -1164,7 +1161,7 @@ export const authRouter = t.router({
   getRecentSecurityEvents: protectedProcedure
     .input(
       z.object({
-        limit: z.number().optional().default(10),
+        limit: z.number().int().min(1).max(100).optional().default(10),
       }),
     )
     .query(async ({ input, ctx }) => {

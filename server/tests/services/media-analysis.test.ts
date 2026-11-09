@@ -39,8 +39,10 @@ jest.mock("@server/services/storage.service", () => ({
 }));
 
 const mockPdfParse = jest.fn();
-jest.mock("@server/lib/read-pdf-text", () => ({
-  readPdfText: (...args: unknown[]) => mockPdfParse(...args),
+jest.mock("@server/processors", () => ({
+  DocumentProcessorFactory: class {
+    processDocument = (...args: unknown[]) => mockPdfParse(...args);
+  },
 }));
 
 jest.mock("@server/services/redis.service", () => ({
@@ -268,7 +270,7 @@ describe("processMessageMedia", () => {
   it("reads PDF text first and keeps it for the AI", async () => {
     mockFindMessage.mockResolvedValue(message(markAnalysisPending([pdf()])!));
     mockPdfParse.mockResolvedValue({
-      text: "NOTA FISCAL 123\nTotal R$ 59,90\nPedido 4471",
+      content: "NOTA FISCAL 123\nTotal R$ 59,90\nPedido 4471",
     } as never);
     mockChatCreate.mockResolvedValue(
       visionReply({ ...DAMAGE, class: "receipt", description: "A nota fiscal." }) as never,
@@ -286,7 +288,7 @@ describe("processMessageMedia", () => {
   it("removes card numbers from PDF text before the model sees it", async () => {
     mockFindMessage.mockResolvedValue(message(markAnalysisPending([pdf()])!));
     mockPdfParse.mockResolvedValue({
-      text: "Comprovante\nCartão 4111 1111 1111 1111\nPedido 4471",
+      content: "Comprovante\nCartão 4111 1111 1111 1111\nPedido 4471",
     } as never);
     mockChatCreate.mockResolvedValue(visionReply({ ...DAMAGE, class: "receipt" }) as never);
 
@@ -301,11 +303,21 @@ describe("processMessageMedia", () => {
 
   it("skips scanned PDFs without calling the model", async () => {
     mockFindMessage.mockResolvedValue(message(markAnalysisPending([pdf()])!));
-    mockPdfParse.mockResolvedValue({ text: "  " } as never);
+    mockPdfParse.mockResolvedValue({ content: "  " } as never);
 
     await processMessageMedia("msg-1", ORG);
 
     expect(storedAttachments()[0].analysis).toEqual({ status: "skipped", reason: "no_text" });
+    expect(mockChatCreate).not.toHaveBeenCalled();
+  });
+
+  it("marks a PDF failed when its parse worker gives up, without calling the model", async () => {
+    mockFindMessage.mockResolvedValue(message(markAnalysisPending([pdf()])!));
+    mockPdfParse.mockRejectedValue(new Error("Document took too long to process") as never);
+
+    await expect(processMessageMedia("msg-1", ORG)).resolves.toBeUndefined();
+
+    expect(storedAttachments()[0].analysis).toEqual({ status: "failed", reason: "error" });
     expect(mockChatCreate).not.toHaveBeenCalled();
   });
 
@@ -472,7 +484,7 @@ describe("virus scan (D8-4)", () => {
         scanStatus: "clean",
       },
     } as never);
-    mockPdfParse.mockResolvedValue({ text: "NOTA FISCAL 123 Total R$ 59,90" } as never);
+    mockPdfParse.mockResolvedValue({ content: "NOTA FISCAL 123 Total R$ 59,90" } as never);
     mockChatCreate.mockResolvedValue(visionReply({ ...DAMAGE, class: "receipt" }) as never);
 
     await processMessageMedia("msg-1", ORG);

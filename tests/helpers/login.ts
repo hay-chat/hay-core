@@ -2,57 +2,54 @@ import type { Page } from "@playwright/test";
 
 // Test credentials - match what global-setup creates
 const TEST_PASSWORD = "E2eTest@123456";
+const DASHBOARD_URL = process.env.PLAYWRIGHT_DASHBOARD_URL ?? "http://localhost:3000";
+const SERVER_URL = process.env.PLAYWRIGHT_SERVER_URL ?? "http://localhost:3001";
 
 function getTestUserEmail(): string {
   const date = new Date().toISOString().slice(0, 10).replace(/-/g, "");
   return `hay-e2e-${date}@test.com`;
 }
 
-/**
- * Login via API and navigate to page with auth token
- * Calls the login API to get a fresh token, then uses URL token auth
- */
-export async function navigateWithAuth(page: Page, path: string = "/"): Promise<void> {
-  const email = getTestUserEmail();
-  const password = TEST_PASSWORD;
-
-  console.log(`[Login Helper] Logging in as ${email}...`);
-
-  // Call login API to get access token
-  const response = await fetch("http://localhost:3001/v1/auth.login", {
+/** POST to a tRPC procedure on the test server and unwrap its result. */
+async function callProcedure<T>(
+  procedure: string,
+  body: unknown,
+  headers: Record<string, string> = {},
+): Promise<T> {
+  const response = await fetch(`${SERVER_URL}/v1/${procedure}`, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      email,
-      password,
-    }),
+    headers: { "Content-Type": "application/json", ...headers },
+    body: JSON.stringify(body),
   });
 
   if (!response.ok) {
-    const error = await response.json();
-    throw new Error(`Login failed: ${JSON.stringify(error)}`);
+    throw new Error(`${procedure} failed: ${await response.text()}`);
   }
 
   const data = await response.json();
+  return data.result.data as T;
+}
 
-  // tRPC response wraps in { result: { data: ... } }
-  // The actual login result has: { accessToken, refreshToken, expiresIn, user }
-  const result = data.result.data;
-  const { accessToken, refreshToken, expiresIn } = result;
-
-  console.log(`[Login Helper] Login successful, navigating to ${path} with full token set`);
-
-  // Navigate with full token set - middleware uses loginWithTokens for complete auth
-  const params = new URLSearchParams({
-    accessToken,
-    refreshToken,
-    expiresIn: expiresIn.toString(),
+/**
+ * Log in through the API, hand the browser a single-use code on /auth/exchange,
+ * then open `path`. The test server needs the dashboard origin in
+ * CONNECT_ALLOWED_REDIRECT_ORIGINS for the code to be issued.
+ */
+export async function navigateWithAuth(page: Page, path: string = "/"): Promise<void> {
+  const { accessToken } = await callProcedure<{ accessToken: string }>("auth.login", {
+    email: getTestUserEmail(),
+    password: TEST_PASSWORD,
   });
 
-  await page.goto(`${path}?${params.toString()}`);
-  await page.waitForLoadState("networkidle");
+  const { code } = await callProcedure<{ code: string }>(
+    "auth.generateAuthCode",
+    { redirectUri: DASHBOARD_URL },
+    { Authorization: `Bearer ${accessToken}` },
+  );
 
-  console.log(`[Login Helper] ✅ Authenticated and navigated to ${path}`);
+  await page.goto(`${DASHBOARD_URL}/auth/exchange?code=${encodeURIComponent(code)}`);
+  await page.waitForURL((url) => url.pathname !== "/auth/exchange");
+
+  await page.goto(`${DASHBOARD_URL}${path}`);
+  await page.waitForLoadState("networkidle");
 }

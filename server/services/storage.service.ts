@@ -1,4 +1,4 @@
-import FileType from "file-type";
+import { fileTypeFromBuffer } from "file-type";
 import { S3Client, DeleteObjectCommand } from "@aws-sdk/client-s3";
 import { Upload as S3Upload } from "@aws-sdk/lib-storage";
 import * as fs from "fs";
@@ -72,6 +72,9 @@ const DECLARED_ALIASES: Record<string, string> = {
   "application/x-zip-compressed": "application/zip",
 };
 
+/** A file refused for its content or size; the message is safe to show the uploader. */
+export class UploadRejectedError extends Error {}
+
 /**
  * Type of a file for a private non-conversation folder, from its magic bytes.
  * The declared type only decides between types the content can't distinguish.
@@ -82,17 +85,19 @@ export async function detectStoredFileType(
 ): Promise<string> {
   const bare = declaredMimeType.split(";")[0].trim().toLowerCase();
   const declared = DECLARED_ALIASES[bare] ?? bare;
-  const detected = await FileType.fromBuffer(buffer);
+  const detected = await fileTypeFromBuffer(buffer);
 
   if (!detected) {
     if (TEXT_TYPES.has(declared)) return declared;
-    throw new Error(`File content is not a supported type (declared ${declared || "unknown"})`);
+    throw new UploadRejectedError(
+      `File content is not a supported type (declared ${declared || "unknown"})`,
+    );
   }
   const zipBased = CONTAINER_TYPES["application/zip"].has(detected.mime);
   const container = zipBased ? "application/zip" : detected.mime;
   if (CONTAINER_TYPES[container]?.has(declared)) return declared;
   if (!STORED_FILE_TYPES[detected.mime]) {
-    throw new Error(`File type not allowed: ${detected.mime}`);
+    throw new UploadRejectedError(`File type not allowed: ${detected.mime}`);
   }
   return detected.mime;
 }
@@ -351,7 +356,9 @@ export class StorageService {
     if (size > sizeLimit) {
       const maxSizeMB = (sizeLimit / (1024 * 1024)).toFixed(2);
       const fileSizeMB = (size / (1024 * 1024)).toFixed(2);
-      throw new Error(`File too large: ${fileSizeMB}MB. Maximum allowed: ${maxSizeMB}MB`);
+      throw new UploadRejectedError(
+        `File too large: ${fileSizeMB}MB. Maximum allowed: ${maxSizeMB}MB`,
+      );
     }
   }
 
