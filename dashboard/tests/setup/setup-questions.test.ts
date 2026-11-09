@@ -213,6 +213,32 @@ describe("SetupQuestions", () => {
     expect(api.saveAnswers).not.toHaveBeenCalled();
   });
 
+  it("sends the stored wording of a renamed catalog question, not the catalog's", async () => {
+    const saved = board({
+      rows: [
+        row({ id: "returns", status: "ready", text: "How do returns work?" }),
+        row({ id: "order", status: "missing", text: "Where is my order?" }),
+      ],
+      channels: ["webchat"],
+    });
+    const wrapper = mountQuestions({ board: saved, editing: true, startStep: 2 });
+    await flushPromises();
+    expect(wrapper.findAll("fieldset label").map((l) => l.text())).toContain(
+      "How do returns work?",
+    );
+
+    await buttonByText(wrapper, "setup.questions.finish").trigger("click");
+    await flushPromises();
+    expect(api.saveAnswers).toHaveBeenCalledWith(
+      expect.objectContaining({
+        questions: [
+          { id: "returns", text: "How do returns work?" },
+          { id: "order", text: "Where is my order?" },
+        ],
+      }),
+    );
+  });
+
   it("shows reading progress from the board's site state in the live list", async () => {
     const wrapper = mountQuestions({
       board: {
