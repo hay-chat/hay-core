@@ -29,7 +29,8 @@
     "insights:backfill-feedback": "tsx scripts/backfill-feedback-insights.ts",
     "plugins:enable-defaults": "tsx scripts/enable-default-plugins.ts",
     "dev:account": "tsx scripts/create-dev-account.ts",
-    "documents:privatize-images": "tsx scripts/privatize-document-images.ts"
+    "documents:privatize-images": "tsx scripts/privatize-document-images.ts",
+    "privacy:replay-erasures": "tsx scripts/replay-erasures.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.100.1",

@@ -65,6 +65,8 @@ function writeSession(key: string, value: string | null): void {
   }
 }
 
+let consentRecording: { baseUrl: string; organizationId: string } | null = null;
+
 const canUseSession = computed(() => hasInteracted.value || explicitGrant.value === true);
 
 const canUseLocal = computed(() => {
@@ -102,7 +104,9 @@ export function markInteraction(): void {
  * regardless of whether they have interacted with the widget yet.
  */
 export function grantConsent(): void {
+  const changed = explicitGrant.value !== true;
   explicitGrant.value = true;
+  if (changed) recordConsent("grant");
   if (hasInteracted.value) writeSession(SESSION_REVOKED_KEY, null);
 }
 
@@ -112,9 +116,34 @@ export function grantConsent(): void {
  * sessionStorage stays as-is so the current in-tab chat keeps working.
  */
 export function revokeConsent(): void {
+  const changed = explicitGrant.value !== false;
   explicitGrant.value = false;
+  if (changed) recordConsent("revoke");
   if (hasInteracted.value) writeSession(SESSION_REVOKED_KEY, "1");
   wipePersistentStorage();
+}
+
+/**
+ * Tell the server about the visitor's decisions from now on, so the
+ * organization can show consent was given. Carries no visitor identifiers.
+ */
+export function configureConsentRecording(baseUrl: string, organizationId: string): void {
+  consentRecording = { baseUrl, organizationId };
+}
+
+function recordConsent(action: "grant" | "revoke"): void {
+  if (!consentRecording) return;
+  const { baseUrl, organizationId } = consentRecording;
+  const conversationId = safeStorage.session.getItem("hay-conversation-id") ?? undefined;
+  // Fire-and-forget, and keepalive so a banner click that navigates still lands.
+  fetch(`${baseUrl}/v1/publicConversations.recordConsent`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ organizationId, action, mode: mode.value, conversationId }),
+    keepalive: true,
+  }).catch((error) => {
+    console.error("[Webchat] Failed to record the consent decision:", error);
+  });
 }
 
 function wipePersistentStorage(): void {

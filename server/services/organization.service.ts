@@ -5,6 +5,8 @@ import { StorageService } from "./storage.service";
 import { vectorStoreService } from "./vector-store.service";
 import { createLogger } from "@server/lib/logger";
 import { AuditLog } from "@server/entities/audit-log.entity";
+import { queueOrganizationUploadsForPurge } from "./storage-purge.service";
+import { recordErasure } from "./erasure-ledger";
 
 const logger = createLogger("organization-service");
 
@@ -119,6 +121,21 @@ class OrganizationService {
         }),
       );
 
+      // Every stored file goes in the same transaction as the rows that name it.
+      await queueOrganizationUploadsForPurge(manager, orgId);
+      // Requests survive as the record that they were answered.
+      await manager.query(
+        `UPDATE privacy_requests SET original_organization_id = organization_id
+         WHERE organization_id = $1`,
+        [orgId],
+      );
+
+      await recordErasure(manager, {
+        subjectType: "organization",
+        subjectId: orgId,
+        organizationId: orgId,
+      });
+
       // Delete organization logo from storage if exists
       if (organization.logoUploadId) {
         try {
@@ -155,7 +172,7 @@ class OrganizationService {
       // - PluginInstances (onDelete: CASCADE)
       // - ScheduledJobs (onDelete: CASCADE)
       // - AuditLogs (onDelete: SET NULL, kept)
-      // - PrivacyRequests (onDelete: CASCADE)
+      // - PrivacyRequests (onDelete: SET NULL, kept)
       // - Products / ProductVariants (onDelete: CASCADE; product_embeddings
       //   handled above because it's a raw-SQL table without an entity FK)
       await manager.getRepository(Organization).delete({ id: orgId });

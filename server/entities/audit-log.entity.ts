@@ -66,6 +66,7 @@ export type AuditAction =
   | "product.prune"
   | "permission.denied"
   | "retention.cleanup"
+  | "retention.customers"
   | "billing.resolution.exclude"
   | "billing.resolution.exclusion_review_requested"
   | "billing.resolution.exclusion_approved"

@@ -4,7 +4,7 @@ This document describes the automatic data retention system in Hay.
 
 ## Overview
 
-Hay enforces per-organization data retention policies through a daily cleanup worker. When an organization configures a `retentionDays` value, closed conversations older than that window are automatically anonymized and their linked data (messages, embeddings) is removed.
+Hay enforces per-organization data retention policies through a daily cleanup worker. When an organization configures a `retentionDays` value, closed conversations older than that window are automatically anonymized, their linked data is removed, and customers left without a live conversation are deleted.
 
 ## Configuration
 
@@ -28,7 +28,7 @@ Retention is configured per-organization via the `settings.retentionDays` field:
 
 ### What It Does
 
-For each organization with `retentionDays > 0`:
+For each organization with `retentionDays > 0`, in batches of 200 per transaction (up to 100 batches per run; a larger backlog continues the next day):
 
 1. **Identifies eligible conversations** matching all criteria:
    - `deleted_at IS NULL` (not already anonymized)
@@ -36,19 +36,20 @@ For each organization with `retentionDays > 0`:
    - Status is `closed`, `resolved` or `unresolved`
    - `closed_at` (or `created_at` if never closed) is before the cutoff date
 
-2. **Deletes linked embeddings** via `vectorStoreService.deleteByConversationIds()`
-   - Removes embeddings that reference the conversation in their metadata
+2. **Deletes their media files** from storage
 
-3. **Deletes all messages** belonging to the conversations
+3. **Calls `anonymizeConversations`**, the same implementation customer erasure uses:
+   - Deletes embeddings linked by conversation or message id
+   - Deletes all messages
+   - Deletes `action_log`, `pending_actions`, `order_conversation_links`, `team_questions` and `notification_deliveries` rows of the conversation (the conversation is only soft-deleted, so its foreign key cascades never fire)
+   - Clears `classification_reason`, `exclusion_reason` and `exclusion_review_note` on the billing outcome
+   - Anonymizes the conversation record (soft-delete): `deleted_at` set, `title` set to `"[Anonymized]"`, and `customer_id`, `context`, `metadata`, `summary`, `resolution_metadata`, `orchestration_status`, `document_ids`, `public_jwk`, `spam_reason`, `stuck_reason`, `last_processing_error` set to NULL
 
-4. **Anonymizes the conversation record** (soft-delete):
-   - `deleted_at` set to current timestamp
-   - `customer_id` set to NULL
-   - `title` set to `"[Anonymized]"`
-   - `context`, `metadata`, `document_ids` set to NULL
-   - Analytics fields preserved: `status`, `channel`, `agent_id`, `created_at`, `closed_at`
+4. **Logs the batch** to `audit_logs` with action `retention.cleanup`, in the same transaction
 
-5. **Logs the action** to `audit_logs` with action `retention.cleanup`
+### Customers
+
+The same job then deletes, for organizations with `retentionDays > 0` only, customers whose record has not changed since the cutoff and who have no live conversation, no conversation on legal hold and no open privacy request. This includes customers that never had a conversation (for example ones synced from a connected platform). Each batch logs a `retention.customers` audit row. Organizations with no `retentionDays` never lose a customer this way.
 
 ### What Is Preserved
 
@@ -63,12 +64,14 @@ Anonymized conversations keep their structural fields for analytics:
 
 Two tables written at close outlive the conversation's messages on purpose:
 
-- `conversation_outcomes`: one billing outcome per close (outcome, billable, reversed, timestamps). It holds no message text; `classification_reason` is a short model explanation, instructed to contain no personal data and passed through the log redaction regexes. It is the billing record, so it is kept.
-- `insight_issues`: one QA event per classified close for the Insights engine. `summary`, `snippet`, `paraphrase`, `root_cause` and `area` are PII-redacted (the model is told to replace personal data with `[redacted]`, then the email/phone/card/IP regexes run). Per Roger's D3 decision, redacted snippets may outlive conversation retention.
+- `conversation_outcomes`: one billing outcome per close (outcome, billable, reversed, timestamps). It holds no message text and is the billing record, so it is kept; its free-text reasons are cleared when the conversation is anonymized.
+- `insight_issues`: one QA event per classified close for the Insights engine. `summary`, `snippet`, `paraphrase`, `root_cause` and `area` are PII-redacted (the model is told to replace personal data with `[redacted]`, then the email/phone/card/IP regexes run). Issues may outlive conversation retention, up to the cap below.
   - `source = user_feedback` issues (one per staff rating of an AI reply) also keep a redacted `detail` written by the enrichment call; the staff comment is redacted before it is stored, and the reviewer is not recorded. They link to the message and the feedback row with `ON DELETE SET NULL`, so retention deleting the message (which cascades to `message_feedback`) leaves the issue in place. Deleting a feedback row by hand in the dashboard deletes its issue too (the rating was withdrawn).
 - `insight_issue_embeddings`: one vector per issue, built only from the redacted issue text (stored in `content`). It cascades with the issue and with the organization.
-- `insight_clusters` (+ `insight_cluster_members`, `insight_state_audit`, `insight_org_state`): patterns across insight issues for the Insights page. Title, summary, hypothesis, snippets and paraphrases are copied from (or written by the model over) already-redacted issues, under the same `[redacted]` rule, so they may outlive conversation retention too. Snippets keep a `conversationId` link that simply stops resolving once the conversation is deleted. The audit trail keeps the acting user id (`ON DELETE SET NULL`). All cascade with the organization.
+- `insight_clusters` (+ `insight_cluster_members`, `insight_state_audit`, `insight_org_state`): patterns across insight issues for the Insights page. Title, summary, hypothesis, snippets and paraphrases are copied from (or written by the model over) already-redacted issues, under the same `[redacted]` rule, so they may outlive conversation retention too, up to the cap below for snippets and paraphrases. Snippets keep a `conversationId` link that simply stops resolving once the conversation is deleted. The audit trail keeps the acting user id (`ON DELETE SET NULL`). All cascade with the organization.
 - `insight_runs`: one cost and timing row per Insights LLM run (model, token counts, estimated USD, duration, success). No conversation, customer or text content; it cascades with the organization and is kept indefinitely for cost tracking.
+
+**Insight text cap.** Redaction is an instruction to the model plus regexes, so it can miss something, and insight text can quote a customer. For organizations with a `retentionDays`, the daily job deletes insight issues older than twice that period (conversations on legal hold keep theirs) and empties `snippets` and `paraphrases` on clusters not seen for that long; the cluster's counts and generated title stay. Basis: legitimate interest in improving support quality (GDPR Art. 6(1)(f)), which needs a longer comparison window than the conversations themselves, limited by redaction and this cap. Organizations with no `retentionDays` configured keep insight text until they delete it or the organization, as with conversations.
 
 `conversation_outcomes` and `insight_issues` reference the conversation with `ON DELETE SET NULL` and the organization with `ON DELETE CASCADE`. DSAR: a customer erasure deletes their conversations, which nulls the link; the issues hold no identifiers of the customer, so they are not part of the export.
 
@@ -97,9 +100,16 @@ Anonymized conversations (`deleted_at IS NOT NULL`) are excluded from:
 
 Direct lookups by ID (`findById`, `findByIdAndOrganization`) still return anonymized conversations for administrative access.
 
+## Stored Files
+
+- **Conversation media** follows `retentionDays` (180 days when unset), see `conversation-media-sweep`.
+- **Organization deletion** queues every stored object of the organization in `storage_purge_queue`, in the same transaction as the deletion. The hourly `storage-purge-drain` job deletes them; a failure is recorded and retried, up to 20 attempts.
+- **Document deletion** deletes the document's attachments. The daily `document-files-orphan-sweep` deletes attachments and editor images that no document of their organization has named for 30 days.
+- **Export files** expire through their own cleanup jobs. Avatars, logos and plugin ZIPs have no orphan sweep; they are deleted when their owner replaces or deletes them.
+
 ## Audit Trail
 
-Every retention cleanup run produces an audit log entry:
+Every batch produces an audit log entry:
 
 ```json
 {
@@ -117,7 +127,7 @@ Every retention cleanup run produces an audit log entry:
 }
 ```
 
-Failed cleanup attempts are also logged with `status: "failure"` and an `errorMessage`.
+Failed attempts are logged with `status: "failure"` and an `errorMessage`.
 
 ## Database Fields
 
@@ -139,21 +149,16 @@ Failed cleanup attempts are also logged with `status: "failure"` and an `errorMe
 ```bash
 cd server
 npx jest tests/services/data-retention.service.test.ts
+npx jest tests/integration/data-lifecycle.test.ts --runInBand
 ```
 
-Test coverage includes:
-
-- 7-day retention window anonymization
-- Legal hold preservation (conversations with `legal_hold = true` are never anonymized)
-- Embedding deletion alongside conversation anonymization
-- PII field clearing (`customer_id`, `title`, `context`, `metadata`, `document_ids`)
-- Multi-organization independent processing
-- Error isolation (one org failure does not affect others)
-- Audit log creation for success and failure cases
+`tests/integration/data-lifecycle.test.ts` runs the sweeps against a real database and checks that other organizations, live conversations, legal holds and organizations without retention are untouched.
 
 ## Source Files
 
 - **Service:** `server/services/data-retention.service.ts`
+- **Shared anonymizer:** `server/services/conversation-anonymizer.ts`
+- **Stored files:** `server/services/storage-purge.service.ts`
 - **Scheduler registration:** `server/services/scheduled-jobs.registry.ts`
 - **Conversation entity:** `server/database/entities/conversation.entity.ts`
 - **Migration:** `server/database/migrations/1768400000000-AddDataRetentionFields.ts`

@@ -21,6 +21,7 @@ import { documentListInputSchema } from "@server/types/entity-list-inputs";
 import { createListProcedure } from "@server/trpc/procedures/list";
 import { documentRetryService } from "@server/services/document-retry.service";
 import { storageService } from "@server/services/storage.service";
+import { deleteDocumentAttachments } from "@server/services/storage-purge.service";
 import { MediaRejectedError } from "@server/services/media-sanitizer.service";
 import {
   DOCUMENT_IMAGES_FOLDER,
@@ -523,6 +524,7 @@ export const documentsRouter = t.router({
       // Delete the document itself
       await documentRepository.delete(document.id, ctx.organizationId!);
       await auditDocument(ctx, "document.delete", document.id, { title: document.title });
+      await deleteDocumentAttachments(ctx.organizationId!, document.attachments);
 
       return {
         success: true,
