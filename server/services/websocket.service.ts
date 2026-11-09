@@ -3,6 +3,7 @@ import { Server } from "http";
 import { IncomingMessage } from "http";
 import { conversationRepository } from "../repositories/conversation.repository";
 import jwt from "jsonwebtoken";
+import { TRPCError } from "@trpc/server";
 import { config } from "../config/env";
 import type { JWTPayload } from "../types/auth.types";
 import { MessageType } from "../database/entities/message.entity";
@@ -12,6 +13,7 @@ import { UserOrganization } from "@server/entities/user-organization.entity";
 import { User } from "@server/entities/user.entity";
 import { Session } from "@server/entities/session.entity";
 import { In, IsNull, MoreThan } from "typeorm";
+import { assertSsoPolicy } from "@server/lib/auth/sso/policy";
 
 const logger = createLogger("websocket");
 import {
@@ -56,6 +58,26 @@ interface DashboardIdentity {
   email: string;
   tokenVersion?: number;
   sessionId?: string;
+  /** Set when the token came from single sign-on: the one organization it may stream. */
+  ssoOrganizationId?: string;
+}
+
+/** Whether a session may stream this membership's organization under the SSO rules. */
+async function passesSsoPolicy(
+  identity: Pick<DashboardIdentity, "userId" | "ssoOrganizationId">,
+  membership: UserOrganization,
+): Promise<boolean> {
+  try {
+    await assertSsoPolicy(
+      { id: identity.userId, ssoOrganizationId: identity.ssoOrganizationId },
+      membership,
+    );
+    return true;
+  } catch (error) {
+    // Only a refusal is an answer; a failed lookup must not close sockets.
+    if (error instanceof TRPCError) return false;
+    throw error;
+  }
 }
 
 /** Whether the user behind a dashboard token may still receive that account's events. */
@@ -457,6 +479,7 @@ export class WebSocketService {
       AppDataSource.getRepository(User).find({ where: { id: In(userIds) } }),
       AppDataSource.getRepository(UserOrganization).find({
         where: { userId: In(userIds), isActive: true },
+        relations: ["organization"],
       }),
       sessionIds.length === 0
         ? Promise.resolve([] as Session[])
@@ -466,15 +489,19 @@ export class WebSocketService {
     ]);
 
     const usersById = new Map(users.map((u) => [u.id, u]));
-    const memberKeys = new Set(memberships.map((m) => `${m.userId}:${m.organizationId}`));
+    const membershipsByKey = new Map(
+      memberships.map((m) => [`${m.userId}:${m.organizationId}`, m]),
+    );
     const liveSessionIds = new Set(liveSessions.map((s) => s.id));
 
     for (const [clientId, client] of watched) {
       const identity = client.dashboardIdentity!;
+      const membership = membershipsByKey.get(`${identity.userId}:${client.organizationId}`);
       const allowed =
         isDashboardUserAllowed(usersById.get(identity.userId), identity) &&
-        memberKeys.has(`${identity.userId}:${client.organizationId}`) &&
-        (!identity.sessionId || liveSessionIds.has(identity.sessionId));
+        !!membership &&
+        (!identity.sessionId || liveSessionIds.has(identity.sessionId)) &&
+        (await passesSsoPolicy(identity, membership));
       if (allowed) continue;
 
       logger.info({ clientId }, "Closing dashboard socket that is no longer authorized");
@@ -529,9 +556,15 @@ export class WebSocketService {
     // active member before streaming that organization's events.
     const membership = await AppDataSource.getRepository(UserOrganization).findOne({
       where: { userId: decoded.userId, organizationId: client.organizationId, isActive: true },
+      relations: ["organization"],
     });
     if (!membership) {
       logger.warn({ clientId }, "WebSocket client is not a member of the requested organization");
+      return;
+    }
+    const ssoOrganizationId = decoded.sso;
+    if (!(await passesSsoPolicy({ userId: decoded.userId, ssoOrganizationId }, membership))) {
+      logger.warn({ clientId }, "WebSocket session is not allowed in the requested organization");
       return;
     }
 
@@ -544,6 +577,7 @@ export class WebSocketService {
       email: decoded.email,
       tokenVersion: decoded.tokenVersion,
       sessionId: decoded.sid,
+      ssoOrganizationId,
     };
     if (!this.organizationClients.has(client.organizationId)) {
       this.organizationClients.set(client.organizationId, new Set());

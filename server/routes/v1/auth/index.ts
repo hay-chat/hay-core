@@ -25,6 +25,7 @@ import { auditLogService } from "@server/services/audit-log.service";
 import { emailService, getOrganizationLocale } from "@server/services/email.service";
 import { DEFAULT_LANGUAGE } from "@server/types/language.types";
 import * as crypto from "crypto";
+import { redisService } from "@server/services/redis.service";
 import { config, getDashboardUrl } from "@server/config/env";
 import { StorageService } from "@server/services/storage.service";
 import { handleUpload } from "@server/lib/upload-helper";
@@ -151,18 +152,53 @@ async function assertWithinIpLimit(
   }
 }
 
-/** A single-use, 10-minute auth code for the user. */
+const AUTH_CODE_TTL_SECONDS = 10 * 60;
+const SCOPED_AUTH_CODE_PREFIX = "auth-code:sso:";
+
+function scopedAuthCodeKey(code: string): string {
+  return `${SCOPED_AUTH_CODE_PREFIX}${crypto.createHash("sha256").update(code).digest("hex")}`;
+}
+
+function scopedCodeStore() {
+  return redisService.isConnected() ? redisService.getClient() : null;
+}
+
+interface ScopedAuthCode {
+  userId: string;
+  organizationId: string;
+  redirectOrigin: string | null;
+}
+
+/**
+ * A single-use, 10-minute auth code for the user. A session from single sign-on
+ * is limited to one organization, and so must the session the code becomes: its
+ * codes live in Redis (no table change) and carry that organization. Without
+ * Redis such a code cannot be issued.
+ */
 async function createAuthCode(
   userId: string,
   redirectOrigin: string,
+  ssoOrganizationId?: string,
 ): Promise<{ code: string; expiresAt: Date }> {
   const code = generateSecureToken(32);
+  if (ssoOrganizationId) {
+    const store = scopedCodeStore();
+    if (!store) {
+      throw new TRPCError({
+        code: "SERVICE_UNAVAILABLE",
+        message: "Single sign-on is unavailable right now",
+      });
+    }
+    const value: ScopedAuthCode = { userId, organizationId: ssoOrganizationId, redirectOrigin };
+    await store.set(scopedAuthCodeKey(code), JSON.stringify(value), "EX", AUTH_CODE_TTL_SECONDS);
+    return { code, expiresAt: new Date(Date.now() + AUTH_CODE_TTL_SECONDS * 1000) };
+  }
   const authCodeRepo = AppDataSource.getRepository(AuthCode);
   const authCode = authCodeRepo.create({
     userId,
     codeHash: await hashApiKey(code),
     redirectOrigin,
-    expiresAt: new Date(Date.now() + 10 * 60 * 1000),
+    expiresAt: new Date(Date.now() + AUTH_CODE_TTL_SECONDS * 1000),
     used: false,
   });
   await authCodeRepo.save(authCode);
@@ -1605,7 +1641,11 @@ export const authRouter = t.router({
   generateAuthCode: protectedProcedureWithoutOrg
     .input(z.object({ redirectUri: z.string().url() }))
     .mutation(async ({ ctx, input }) => {
-      return createAuthCode(ctx.user!.id, allowlistedRedirectUrl(input.redirectUri).origin);
+      return createAuthCode(
+        ctx.user!.id,
+        allowlistedRedirectUrl(input.redirectUri).origin,
+        ctx.user!.ssoOrganizationId,
+      );
     }),
 
   // Issue a single-use auth code bound to an allowlisted external redirect URI.
@@ -1622,7 +1662,11 @@ export const authRouter = t.router({
     )
     .mutation(async ({ ctx, input }) => {
       const redirectUrl = allowlistedRedirectUrl(input.redirectUri);
-      const { code } = await createAuthCode(ctx.user!.id, redirectUrl.origin);
+      const { code } = await createAuthCode(
+        ctx.user!.id,
+        redirectUrl.origin,
+        ctx.user!.ssoOrganizationId,
+      );
 
       redirectUrl.searchParams.set("code", code);
       if (input.state) redirectUrl.searchParams.set("state", input.state);
@@ -1661,7 +1705,29 @@ export const authRouter = t.router({
         )
         .returning("user_id")
         .execute();
-      const userId = (claimed.raw as Array<{ user_id: string }>)[0]?.user_id;
+      let userId = (claimed.raw as Array<{ user_id: string }>)[0]?.user_id;
+
+      // Not in the table: it may be a code from a single-sign-on session, which keeps its
+      // organization. Without Redis such a code is simply invalid.
+      let ssoOrganizationId: string | undefined;
+      if (!userId) {
+        const raw = await scopedCodeStore()
+          ?.getdel(scopedAuthCodeKey(input.code))
+          .catch(() => null);
+        const scoped = raw ? (JSON.parse(raw) as ScopedAuthCode) : null;
+        if (
+          scoped &&
+          (!redirectOrigin || !scoped.redirectOrigin || scoped.redirectOrigin === redirectOrigin)
+        ) {
+          const member = await AppDataSource.getRepository(UserOrganization).findOne({
+            where: { userId: scoped.userId, organizationId: scoped.organizationId, isActive: true },
+          });
+          if (member) {
+            userId = scoped.userId;
+            ssoOrganizationId = scoped.organizationId;
+          }
+        }
+      }
       const user = userId
         ? await AppDataSource.getRepository(User).findOne({ where: { id: userId } })
         : null;
@@ -1695,7 +1761,13 @@ export const authRouter = t.router({
       user.updateLastSeen();
       await userRepository.save(user);
 
-      const tokens = await authSessionService.createSession(user, ctx);
+      const tokens = await authSessionService.createSession(
+        user,
+        ctx,
+        AppDataSource.manager,
+        null,
+        ssoOrganizationId,
+      );
 
       // Load all user organizations
       const organizations = await getUserOrganizations(user.id);
