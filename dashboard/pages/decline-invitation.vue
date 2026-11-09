@@ -54,7 +54,6 @@ definePageMeta({
 
 const { t } = useI18n();
 const router = useRouter();
-const route = useRoute();
 const authStore = useAuthStore();
 
 const token = useUrlToken();

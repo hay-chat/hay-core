@@ -214,6 +214,7 @@ module.exports = {
         // Project composables (auto-imported by Nuxt from dashboard/composables)
         useOrgDateTime: "readonly",
         useToast: "readonly",
+        useUrlToken: "readonly",
         useDomain: "readonly",
         usePagination: "readonly",
         useExternalLink: "readonly",

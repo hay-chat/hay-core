@@ -144,7 +144,6 @@ definePageMeta({
 });
 
 const router = useRouter();
-const route = useRoute();
 const authStore = useAuthStore();
 const userStore = useUserStore();
 const { formatDateTime } = useOrgDateTime();

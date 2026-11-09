@@ -148,7 +148,6 @@ import { validatePassword } from "@/lib/utils";
 import PasswordStrength from "@/components/auth/PasswordStrength.vue";
 
 const { t } = useI18n();
-const route = useRoute();
 const router = useRouter();
 const toast = useToast();
 
