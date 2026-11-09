@@ -10,6 +10,11 @@ import {
 import { Organization } from "../../entities/organization.entity";
 import type { FormSchema } from "@hay/form-schema";
 
+export interface WebchatPageToolsSettings {
+  enabled: boolean;
+  allowedOrigins?: string[];
+}
+
 export enum WebchatPosition {
   LEFT = "left",
   RIGHT = "right",
@@ -110,6 +115,11 @@ export class WebchatSettings {
   // Pre-chat form the widget asks before the first message (null = none)
   @Column({ type: "jsonb", name: "pre_chat_form", nullable: true })
   preChatForm!: FormSchema | null;
+
+  // Page tools (WebMCP): off until the organization turns them on. With no
+  // allowedOrigins, the allowed domains apply (except `*`).
+  @Column({ type: "jsonb", default: () => `'{"enabled":false}'` })
+  pageTools!: WebchatPageToolsSettings;
 
   // Timestamps
   @CreateDateColumn({ name: "created_at" })

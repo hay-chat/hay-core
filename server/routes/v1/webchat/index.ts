@@ -100,6 +100,12 @@ export const webchatRouter = router({
         spamClassifierEnabled: z.boolean().optional(),
         spamGuidance: z.string().max(2000).nullable().optional(),
         preChatForm: formSchemaSchema.nullable().optional(),
+        pageTools: z
+          .object({
+            enabled: z.boolean(),
+            allowedOrigins: z.array(z.string().trim().min(1).max(255)).max(100).optional(),
+          })
+          .optional(),
       }),
     )
     .mutation(async ({ ctx, input }) => {

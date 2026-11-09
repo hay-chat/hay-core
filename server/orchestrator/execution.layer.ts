@@ -11,6 +11,7 @@ import {
   formatContextLines,
   renderDocument,
   truncate,
+  renderPageTools,
 } from "../services/core/prompt-data";
 
 const logger = createLogger("execution");
@@ -33,7 +34,8 @@ import {
   extractUrls,
   type BadLink,
 } from "@server/services/core/link-guardrail.service";
-import { MessageIntent, Message } from "@server/database/entities/message.entity";
+import { MessageIntent, MessageType, Message } from "@server/database/entities/message.entity";
+import { isPageToolResult } from "@server/services/webchat/page-tools.service";
 import { Document } from "@server/entities/document.entity";
 import { describeLocalTime } from "./local-time";
 import { handoffCopy } from "./handoff-copy";
@@ -302,7 +304,9 @@ export class ExecutionLayer {
       const { pageToolService, PAGE_TOOL_PREFIX } =
         await import("@server/services/webchat/page-tools.service");
       const pageTools =
-        conversation.channel === "web" ? await pageToolService.list(conversation.id) : [];
+        conversation.channel === "web"
+          ? await pageToolService.list(conversation.id, conversation.organization_id)
+          : [];
       const describeTool = (t: { name: string; description: string; inputSchema: unknown }) =>
         `- ${t.name}: ${t.description}\n  input schema: ${JSON.stringify(t.inputSchema)}`;
       const allToolNames = [
@@ -312,9 +316,15 @@ export class ExecutionLayer {
       ];
       const hasTools = allToolNames.length > 0;
       const toolsDetail = coreTools.length ? coreTools.map(describeTool).join("\n") : "";
-      const pageToolsDetail = pageTools.length
-        ? pageTools.map((t) => describeTool({ ...t, name: PAGE_TOOL_PREFIX + t.name })).join("\n")
-        : "";
+      // Visitor-controlled, so a user turn rather than the system prompt.
+      const pageToolsTurn = pageTools.length
+        ? ({
+            type: MessageType.CUSTOMER,
+            content: renderPageTools(
+              pageTools.map((t) => ({ ...t, name: PAGE_TOOL_PREFIX + t.name })),
+            ),
+          } as Message)
+        : null;
 
       // The business's local date and hour, so "today", "tomorrow" and greetings
       // match where the shop is (organization timezone, UTC by default).
@@ -328,7 +338,7 @@ export class ExecutionLayer {
           hasTools,
           tools: allToolNames.join(", "),
           toolsDetail,
-          pageToolsDetail,
+          hasPageTools: pageTools.length > 0,
           timezone,
           localTime,
           quickCheck,
@@ -413,7 +423,7 @@ export class ExecutionLayer {
       log.debug("Invoking LLM for execution planning");
 
       const response = await this.llmService.invoke({
-        history: messages, // Pass Message[] directly instead of converting to string
+        history: pageToolsTurn ? [pageToolsTurn, ...messages] : messages,
         prompt: finalPrompt,
         jsonSchema: this.buildPlannerSchema(allToolNames, quickCheck),
         organizationId: conversation.organization_id,
@@ -1169,7 +1179,10 @@ export class ExecutionLayer {
       conversation.document_ids && conversation.document_ids.length > 0
     );
     const recentToolMessages = conversationHistory
-      .filter((msg) => msg.type === "Tool" && msg.metadata?.toolStatus !== "ERROR")
+      .filter(
+        (msg) =>
+          msg.type === "Tool" && msg.metadata?.toolStatus !== "ERROR" && !isPageToolResult(msg),
+      )
       .slice(-3);
     const hasToolResults = recentToolMessages.length > 0;
 
@@ -1257,7 +1270,10 @@ export class ExecutionLayer {
     // their error payloads aren't grounding evidence and would crowd out real
     // results from the 3-message window.
     const recentToolMessages = conversationHistory
-      .filter((msg) => msg.type === "Tool" && msg.metadata?.toolStatus !== "ERROR")
+      .filter(
+        (msg) =>
+          msg.type === "Tool" && msg.metadata?.toolStatus !== "ERROR" && !isPageToolResult(msg),
+      )
       .slice(-3);
 
     // Get retrieved documents with full content

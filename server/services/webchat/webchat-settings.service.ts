@@ -3,6 +3,7 @@ import {
   WebchatSettings,
   WebchatPosition,
   WebchatTheme,
+  type WebchatPageToolsSettings,
 } from "@server/database/entities/webchat-settings.entity";
 import { organizationRepository } from "@server/repositories/organization.repository";
 import { storageService } from "@server/services/storage.service";
@@ -24,6 +25,7 @@ export interface WebchatSettingsUpdateDTO {
   spamClassifierEnabled?: boolean;
   spamGuidance?: string | null;
   preChatForm?: FormSchema | null;
+  pageTools?: WebchatPageToolsSettings;
 }
 
 export class WebchatSettingsService {

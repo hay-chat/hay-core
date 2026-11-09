@@ -19,6 +19,8 @@ export interface ToolLedgerEntry {
   success: boolean;
   /** Held for a person's approval (D4-4): requested, not done. */
   pending?: boolean;
+  /** Ran in the visitor's browser: only the page says what happened. */
+  pageTool?: boolean;
   /** A team member decided an earlier held call; this turn answers that decision. */
   decision?: "approved" | "declined";
 }
@@ -202,6 +204,7 @@ export class ActionClaimGuardrailService {
   private ledgerStatus(entry: ToolLedgerEntry): string {
     if (entry.decision === "declined") return "DECLINED_BY_TEAM";
     if (entry.pending) return "PENDING_APPROVAL";
+    if (entry.pageTool && entry.success) return "UNVERIFIED_PAGE_TOOL";
     const status = entry.success ? "SUCCESS" : "FAILED";
     return entry.decision === "approved" ? `${status} (approved by the team)` : status;
   }

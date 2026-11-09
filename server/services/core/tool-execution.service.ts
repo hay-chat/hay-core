@@ -39,6 +39,7 @@ import {
 } from "./customer-confirmation";
 import {
   isPageTool,
+  pageToolArgumentErrors,
   pageToolName,
   pageToolService,
   unwrapPageToolResult,
@@ -194,7 +195,7 @@ export class ToolExecutionService {
       // Only core may say a call was approved; drop whatever the model sent.
       delete toolCall.args[TOOL_APPROVAL_ARG];
 
-      const target = await this.resolveTarget(conversation.organization_id, toolCall.name);
+      const target = await this.resolveTarget(conversation, toolCall.name);
       const call: PreparedCall = {
         conversation,
         toolCall,
@@ -245,7 +246,7 @@ export class ToolExecutionService {
     conversation: Conversation,
     action: Pick<PendingAction, "id" | "tool_name" | "args" | "message_id" | "idempotency_key">,
   ): Promise<ToolExecutionResult & { errorCode: string | null }> {
-    const target = await this.resolveTarget(conversation.organization_id, action.tool_name);
+    const target = await this.resolveTarget(conversation, action.tool_name);
     const call: PreparedCall = {
       approvedActionId: action.id,
       conversation,
@@ -318,9 +319,12 @@ export class ToolExecutionService {
         message: `Tool "${call.toolCall.name}" is not available in this conversation.`,
       });
     }
-    const errors = call.target.inputSchema
-      ? schemaErrors(call.target.inputSchema, call.toolCall.args)
-      : [];
+    const { inputSchema } = call.target;
+    const errors = !inputSchema
+      ? []
+      : isPageTool(call.toolCall.name)
+        ? pageToolArgumentErrors(inputSchema, call.toolCall.args)
+        : schemaErrors(inputSchema, call.toolCall.args);
     if (errors.length > 0) {
       return this.refuse(call, "BAD_INPUT", {
         status: "invalid_arguments",
@@ -611,7 +615,11 @@ export class ToolExecutionService {
    * and cached input schema. An unparseable or uncached tool resolves to an
    * unclassified write.
    */
-  private async resolveTarget(organizationId: string, fullToolName: string): Promise<ToolTarget> {
+  private async resolveTarget(
+    conversation: Pick<Conversation, "id" | "organization_id">,
+    fullToolName: string,
+  ): Promise<ToolTarget> {
+    const organizationId = conversation.organization_id;
     const { coreToolRegistry } = await import("./core-tools");
     const coreTool = coreToolRegistry.get(fullToolName);
     if (coreTool) {
@@ -623,15 +631,19 @@ export class ToolExecutionService {
         inputSchema: null,
       };
     }
-    // Page tools run in the visitor's own browser, in front of the visitor,
-    // with no provider and no secret involved: no approval gate.
+    // Page tools run in the visitor's own browser, with no provider and no
+    // secret involved. One the page declares as a write still follows the
+    // approval policy. Only what the page registered can run.
     if (isPageTool(fullToolName)) {
+      const tool = (await pageToolService.list(conversation.id, organizationId)).find(
+        (t) => t.name === pageToolName(fullToolName),
+      );
       return {
         pluginId: null,
         toolName: fullToolName,
-        risk: READ_RISK,
+        risk: tool?.annotations?.readOnlyHint === false ? classifyTool(null) : READ_RISK,
         isCore: false,
-        inputSchema: null,
+        inputSchema: tool?.inputSchema ?? null,
       };
     }
     const colonIndex = fullToolName.lastIndexOf(":");
@@ -702,6 +714,7 @@ export class ToolExecutionService {
     // Page tools (`page:name`) — run by the host page over the conversation's
     // socket. Nothing is injected: the page gets exactly what the model sent.
     if (isPageTool(fullToolName)) {
+      if (!target.inputSchema) throw new Error(`Page tool "${fullToolName}" is not registered`);
       logger.debug({ fullToolName }, "Dispatching to page tool");
       const result = await pageToolService.call(
         conversation.id,

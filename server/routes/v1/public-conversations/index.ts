@@ -12,8 +12,13 @@ import {
 import { z } from "zod";
 import { ConversationService } from "../../../services/conversation.service";
 import { MessageType, MessageDirection } from "../../../database/entities/message.entity";
+import type { Conversation } from "../../../database/entities/conversation.entity";
 import { TRPCError } from "@trpc/server";
 import { dpopCacheService } from "../../../services/dpop-cache.service";
+import {
+  publicConversationProofTarget,
+  verifyDPoPForRequest,
+} from "../../../services/webchat/dpop-proof.service";
 import { conversationRepository } from "../../../repositories/conversation.repository";
 import { CustomerRepository } from "../../../repositories/customer.repository";
 import { OrganizationRepository } from "../../../repositories/organization.repository";
@@ -39,6 +44,10 @@ import {
   VISITOR_CONTEXT_LIMITS,
   boundContext,
 } from "../../../services/core/prompt-data";
+import {
+  CUSTOMER_LINK_SOURCE,
+  CUSTOMER_LINK_SOURCE_KEY,
+} from "../../../services/core/customer-identity";
 import {
   formSchemaSchema,
   validateResponse,
@@ -87,7 +96,6 @@ const createPublicConversationSchema = z.object({
   challengeError: z.string().max(64).optional(),
   preChatForm: z
     .object({
-      schema: formSchemaSchema,
       response: z.record(z.string(), z.union([z.string(), z.number(), z.boolean(), z.null()])),
     })
     .optional(),
@@ -98,8 +106,6 @@ const sendMessageSchema = z.object({
   conversationId: z.string().uuid(),
   content: z.string().min(1).max(PUBLIC_WIDGET_LIMITS.maxMessageLength),
   proof: z.string(), // DPoP proof
-  method: z.string(),
-  url: z.string(),
   context: z.record(z.string(), z.any()).optional(),
 });
 
@@ -111,8 +117,6 @@ const sendAttachmentSchema = z.object({
   filename: z.string().min(1).max(255),
   caption: z.string().max(PUBLIC_WIDGET_LIMITS.maxMessageLength).optional(),
   proof: z.string(), // DPoP proof
-  method: z.string(),
-  url: z.string(),
   context: z.record(z.string(), z.any()).optional(),
 });
 
@@ -121,8 +125,6 @@ const submitCsatSchema = z.object({
   conversationId: z.string().uuid(),
   rating: z.number().int().min(1).max(5),
   proof: z.string(), // DPoP proof
-  method: z.string(),
-  url: z.string(),
 });
 
 const recordConsentSchema = z.object({
@@ -136,8 +138,6 @@ const recordConsentSchema = z.object({
 const getMessagesSchema = z.object({
   conversationId: z.string().uuid(),
   proof: z.string(), // DPoP proof
-  method: z.string(),
-  url: z.string(),
   limit: z.number().optional().default(50),
   offset: z.number().optional().default(0),
 });
@@ -269,9 +269,40 @@ export const publicConversationsRouter = t.router({
       if (input.customerExternalId && !customerExternalId) {
         logger.info({ organizationId }, "Ignored an unsigned or invalid customerExternalId");
       }
-      const customer = customerExternalId
+      const signedCustomer = customerExternalId
         ? await customerRepository.findByExternalId(customerExternalId, organizationId)
         : null;
+
+      // The form is the organization's own; a client only sends the answers.
+      // Checked first so a bad response leaves nothing behind.
+      const preChatValidated = input.preChatForm
+        ? await validatePreChatResponse(organizationId, input.preChatForm.response)
+        : null;
+
+      // An email typed in a form is a claim, so it never links an existing
+      // customer: only the store's signature does. The claim gets its own
+      // record, and duplicates surface in the customer merge suggestions.
+      const preChatCustomerFields = preChatValidated
+        ? extractCustomerFields(
+            preChatValidated.schema,
+            preChatValidated.response as Record<string, string | number | boolean | null>,
+          )
+        : null;
+      const claimedCustomer =
+        !signedCustomer && preChatCustomerFields?.email
+          ? await customerRepository.create({
+              organization_id: organizationId,
+              email: preChatCustomerFields.email,
+              name: preChatCustomerFields.name ?? null,
+              phone: preChatCustomerFields.phone ?? null,
+            } as never)
+          : null;
+      const customer = signedCustomer ?? claimedCustomer;
+      const customerLinkSource = signedCustomer
+        ? CUSTOMER_LINK_SOURCE.signature
+        : claimedCustomer
+          ? CUSTOMER_LINK_SOURCE.preChatEmail
+          : null;
 
       // Create the conversation with the public JWK
       const conversation = await conversationService.createConversation(organizationId, {
@@ -284,22 +315,9 @@ export const publicConversationsRouter = t.router({
           createdAt: new Date().toISOString(),
           ...(input.isPlayground ? { isPlayground: true } : {}),
           ...(gate.results.length > 0 ? { botCheck: botCheckRecord(gate) } : {}),
+          ...(customerLinkSource ? { [CUSTOMER_LINK_SOURCE_KEY]: customerLinkSource } : {}),
         },
       });
-
-      // Validate pre-chat form response (if supplied) before any persistence so
-      // we fail fast with a clear error instead of leaving partial state.
-      let preChatValidated: { schema: FormSchema; response: Record<string, unknown> } | null = null;
-      if (input.preChatForm) {
-        const result = validateResponse(input.preChatForm.schema, input.preChatForm.response);
-        if (!result.success) {
-          throw new TRPCError({
-            code: "BAD_REQUEST",
-            message: `Invalid pre-chat form response: ${JSON.stringify(result.errors)}`,
-          });
-        }
-        preChatValidated = { schema: input.preChatForm.schema, response: result.data };
-      }
 
       // The initial visitor context: the page's context, then the pre-chat
       // form answers (they win on conflict). Both come from the visitor, so
@@ -316,57 +334,6 @@ export const publicConversationsRouter = t.router({
         lastMessageAt: new Date(),
         ...(visitorContext ? { context: visitorContext } : {}),
       });
-
-      // Link or upsert the customer from the pre-chat answers.
-      // Priority: the signed customerExternalId above > email lookup > new customer.
-      let linkedCustomerId: string | null = customer?.id ?? null;
-
-      if (preChatValidated) {
-        const customerFields = extractCustomerFields(
-          preChatValidated.schema,
-          preChatValidated.response as Record<string, string | number | boolean | null>,
-        );
-
-        if (linkedCustomerId) {
-          // Update existing customer with any form-supplied fields (only set fields, never clear).
-          const updates: Record<string, string> = {};
-          if (customerFields.name) updates.name = customerFields.name;
-          if (customerFields.email) updates.email = customerFields.email;
-          if (customerFields.phone) updates.phone = customerFields.phone;
-          if (Object.keys(updates).length > 0) {
-            await customerRepository.update(linkedCustomerId, organizationId, updates as never);
-          }
-        } else if (customerFields.email) {
-          // Try to find existing customer by email; otherwise create one.
-          const existing = await customerRepository.findByEmail(
-            customerFields.email,
-            organizationId,
-          );
-          if (existing) {
-            linkedCustomerId = existing.id;
-            const updates: Record<string, string> = {};
-            if (customerFields.name && !existing.name) updates.name = customerFields.name;
-            if (customerFields.phone && !existing.phone) updates.phone = customerFields.phone;
-            if (Object.keys(updates).length > 0) {
-              await customerRepository.update(existing.id, organizationId, updates as never);
-            }
-          } else {
-            const created = await customerRepository.create({
-              organization_id: organizationId,
-              email: customerFields.email,
-              name: customerFields.name ?? null,
-              phone: customerFields.phone ?? null,
-            } as never);
-            linkedCustomerId = created.id;
-          }
-        }
-      }
-
-      if (linkedCustomerId && linkedCustomerId !== customer?.id) {
-        await conversationRepository.updateById(conversation.id, {
-          customer_id: linkedCustomerId,
-        });
-      }
 
       // Persist a FORM message recording what was collected, so the transcript
       // and the LLM history both surface the structured data clearly.
@@ -411,14 +378,13 @@ export const publicConversationsRouter = t.router({
   }),
 
   // Get messages for a conversation (requires DPoP proof)
-  getMessages: publicProcedure.input(getMessagesSchema).mutation(async ({ input }) => {
+  getMessages: publicProcedure.input(getMessagesSchema).mutation(async ({ input, ctx }) => {
     try {
       // Verify DPoP proof
       const verified = await verifyDPoPForRequest(
         input.conversationId,
         input.proof,
-        input.method,
-        input.url,
+        publicConversationProofTarget("getMessages", ctx.req.headers.host),
       );
 
       if (!verified.success) {
@@ -500,8 +466,7 @@ export const publicConversationsRouter = t.router({
       const verified = await verifyDPoPForRequest(
         input.conversationId,
         input.proof,
-        input.method,
-        input.url,
+        publicConversationProofTarget("sendMessage", ctx.req.headers.host),
       );
 
       if (!verified.success) {
@@ -602,8 +567,7 @@ export const publicConversationsRouter = t.router({
     const verified = await verifyDPoPForRequest(
       input.conversationId,
       input.proof,
-      input.method,
-      input.url,
+      publicConversationProofTarget("sendAttachment", ctx.req.headers.host),
     );
     if (!verified.success) {
       if (verified.newNonce && verified.error === "Invalid or expired nonce") {
@@ -710,8 +674,6 @@ export const publicConversationsRouter = t.router({
         conversationId: z.string().uuid(),
         email: z.string().trim().toLowerCase().email().max(255),
         proof: z.string(),
-        method: z.string(),
-        url: z.string(),
       }),
     )
     .mutation(async ({ input, ctx }) => {
@@ -724,8 +686,7 @@ export const publicConversationsRouter = t.router({
       const verified = await verifyDPoPForRequest(
         input.conversationId,
         input.proof,
-        input.method,
-        input.url,
+        publicConversationProofTarget("setContactEmail", ctx.req.headers.host),
       );
       if (!verified.success) {
         if (verified.newNonce && verified.error === "Invalid or expired nonce") {
@@ -767,8 +728,7 @@ export const publicConversationsRouter = t.router({
     const verified = await verifyDPoPForRequest(
       input.conversationId,
       input.proof,
-      input.method,
-      input.url,
+      publicConversationProofTarget("submitCsat", ctx.req.headers.host),
     );
     if (!verified.success) {
       if (verified.newNonce && verified.error === "Invalid or expired nonce") {
@@ -811,18 +771,15 @@ export const publicConversationsRouter = t.router({
           y: z.string().optional(),
         }),
         proof: z.string(), // DPoP proof with old key
-        method: z.string(),
-        url: z.string(),
       }),
     )
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
       try {
         // Verify DPoP proof with current key
         const verified = await verifyDPoPForRequest(
           input.conversationId,
           input.proof,
-          input.method,
-          input.url,
+          publicConversationProofTarget("rotateKeys", ctx.req.headers.host),
         );
 
         if (!verified.success) {
@@ -866,8 +823,8 @@ export const publicConversationsRouter = t.router({
 
   // Submit a response to an in-conversation FORM message (ASK_FORM step).
   // Validates the response against the schema stored on the message, writes
-  // each field into conversation.context, applies mapToCustomer mappings to
-  // the linked Customer, mutates the FORM message to SUBMITTED, then
+  // the fields into the visitor's context, completes a pre-chat claim record
+  // with mapToCustomer fields, mutates the FORM message to SUBMITTED, then
   // re-enqueues the orchestrator so it resumes with the new context.
   submitForm: publicProcedure
     .input(
@@ -876,17 +833,14 @@ export const publicConversationsRouter = t.router({
         messageId: z.string().uuid(),
         response: z.record(z.string(), z.union([z.string(), z.number(), z.boolean(), z.null()])),
         proof: z.string(),
-        method: z.string(),
-        url: z.string(),
       }),
     )
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
       try {
         const verified = await verifyDPoPForRequest(
           input.conversationId,
           input.proof,
-          input.method,
-          input.url,
+          publicConversationProofTarget("submitForm", ctx.req.headers.host),
         );
         if (!verified.success) {
           throw new TRPCError({
@@ -934,31 +888,12 @@ export const publicConversationsRouter = t.router({
           });
         }
 
-        // Merge response into conversation.context (form fields win on conflict).
-        const mergedContext: Record<string, unknown> = {
-          ...(conversation.context ?? {}),
-          ...validated.data,
-        };
-        await conversationRepository.updateById(conversation.id, { context: mergedContext });
+        // The answers come from the visitor, so they sit with the other
+        // visitor-supplied context and reach the AI as unverified.
+        const context = withVisitorContext(conversation.context, validated.data);
+        if (context) await conversationRepository.updateById(conversation.id, { context });
 
-        // Apply mapToCustomer updates if a customer is linked.
-        if (conversation.customer_id) {
-          const customerFields = extractCustomerFields(
-            schema,
-            validated.data as Record<string, string | number | boolean | null>,
-          );
-          const updates: Record<string, string> = {};
-          if (customerFields.name) updates.name = customerFields.name;
-          if (customerFields.email) updates.email = customerFields.email;
-          if (customerFields.phone) updates.phone = customerFields.phone;
-          if (Object.keys(updates).length > 0) {
-            await customerRepository.update(
-              conversation.customer_id,
-              conversation.organization_id,
-              updates as never,
-            );
-          }
-        }
+        await fillClaimedCustomer(conversation, schema, validated.data);
 
         // Mutate the FORM message in place.
         const renderedContent = renderFormResponseAsText(
@@ -1004,6 +939,57 @@ export const publicConversationsRouter = t.router({
     }),
 });
 
+/** The organization's pre-chat form with the answers checked against it. */
+async function validatePreChatResponse(
+  organizationId: string,
+  response: Record<string, string | number | boolean | null>,
+): Promise<{ schema: FormSchema; response: Record<string, unknown> }> {
+  const { preChatForm: schema } = await webchatSettingsService.getSettings(organizationId);
+  if (!schema) {
+    throw new TRPCError({ code: "BAD_REQUEST", message: "No pre-chat form is configured" });
+  }
+  const result = validateResponse(schema, response);
+  if (!result.success) {
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message: `Invalid pre-chat form response: ${JSON.stringify(result.errors)}`,
+    });
+  }
+  return { schema, response: result.data };
+}
+
+/**
+ * Form answers may complete the record made from a pre-chat claim, and only
+ * its empty fields. A record the visitor did not create is never changed.
+ */
+async function fillClaimedCustomer(
+  conversation: Conversation,
+  schema: FormSchema,
+  response: Record<string, unknown>,
+): Promise<void> {
+  if (
+    !conversation.customer_id ||
+    conversation.metadata?.[CUSTOMER_LINK_SOURCE_KEY] !== CUSTOMER_LINK_SOURCE.preChatEmail
+  ) {
+    return;
+  }
+  const customer = await customerRepository.findByIdAndOrganization(
+    conversation.customer_id,
+    conversation.organization_id,
+  );
+  if (!customer) return;
+  const fields = extractCustomerFields(
+    schema,
+    response as Record<string, string | number | boolean | null>,
+  );
+  const updates: Record<string, string> = {};
+  if (fields.name && !customer.name) updates.name = fields.name;
+  if (fields.phone && !customer.phone) updates.phone = fields.phone;
+  if (Object.keys(updates).length > 0) {
+    await customerRepository.update(customer.id, conversation.organization_id, updates as never);
+  }
+}
+
 function clientIp(ipAddress: string | undefined): string {
   return ipAddress || "Unknown";
 }
@@ -1032,130 +1018,3 @@ function botCheckRecord(gate: GateOutcome) {
 }
 
 // Public components of an EC JWK used for DPoP proof verification.
-interface EcPublicJwk {
-  kty?: string;
-  crv?: string;
-  x?: string;
-  y?: string;
-}
-
-// Helper function to verify DPoP proof for a request. `checkNonce: false` is
-// for read-only attaches (the WebSocket identify) that must not race the
-// widget's HTTP calls for the single rotating nonce; jti and iat still apply.
-export async function verifyDPoPForRequest(
-  conversationId: string,
-  proof: string,
-  method: string,
-  url: string,
-  options: { checkNonce?: boolean } = {},
-): Promise<{ success: boolean; newNonce?: string; error?: string }> {
-  try {
-    // Dynamically import jose using Function constructor to avoid static analysis
-    const importDynamic = new Function("specifier", "return import(specifier)");
-    const jose = await importDynamic("jose");
-
-    // Get the conversation to verify the public key
-    const conversation = await conversationRepository.findById(conversationId);
-    if (!conversation) {
-      return { success: false, error: "Conversation not found" };
-    }
-
-    // Verify this is a web channel conversation
-    if (conversation.channel !== "web") {
-      return { success: false, error: "Not a web conversation" };
-    }
-
-    // Check if conversation has a registered public key
-    if (!conversation.publicJwk) {
-      return { success: false, error: "No public key registered" };
-    }
-
-    // Parse the JWT to get header and payload
-    const payload = jose.decodeJwt(proof);
-    const protectedHeader = jose.decodeProtectedHeader(proof);
-
-    // Verify header requirements
-    if (protectedHeader.typ !== "dpop+jwt") {
-      return { success: false, error: "Invalid token type" };
-    }
-
-    if (protectedHeader.alg !== "ES256") {
-      return { success: false, error: "Invalid algorithm" };
-    }
-
-    if (!protectedHeader.jwk) {
-      return { success: false, error: "Missing JWK in header" };
-    }
-
-    // Verify the JWK matches the registered one
-    const registeredJwk = conversation.publicJwk as EcPublicJwk | null;
-
-    // Compare the essential public key components (x and y for EC keys)
-    const receivedJwk = protectedHeader.jwk as EcPublicJwk | undefined;
-    if (!receivedJwk || !registeredJwk) {
-      return { success: false, error: "Missing JWK" };
-    }
-
-    if (
-      receivedJwk.kty !== registeredJwk.kty ||
-      receivedJwk.crv !== registeredJwk.crv ||
-      receivedJwk.x !== registeredJwk.x ||
-      receivedJwk.y !== registeredJwk.y
-    ) {
-      return { success: false, error: "Public key mismatch" };
-    }
-
-    // Import the public key for verification
-    const publicKey = await jose.importJWK(protectedHeader.jwk, "ES256");
-
-    // Verify the JWT signature
-    await jose.jwtVerify(proof, publicKey, {
-      typ: "dpop+jwt",
-      algorithms: ["ES256"],
-    });
-
-    // Verify the claims
-    if (payload.htm !== method.toUpperCase()) {
-      return { success: false, error: "HTTP method mismatch" };
-    }
-
-    if (payload.htu !== url) {
-      return { success: false, error: "URL mismatch" };
-    }
-
-    // Check time window (±120 seconds)
-    const now = Math.floor(Date.now() / 1000);
-    if (Math.abs(now - payload.iat) > 120) {
-      return { success: false, error: "Token outside time window" };
-    }
-
-    // Check JTI for replay protection
-    const isNewJti = await dpopCacheService.checkAndStoreJTI(payload.jti);
-    if (!isNewJti) {
-      return { success: false, error: "JTI already used" };
-    }
-
-    if (options.checkNonce === false) {
-      return { success: true };
-    }
-
-    // Verify and rotate nonce
-    const newNonce = await dpopCacheService.verifyAndRotateNonce(conversationId, payload.nonce);
-
-    if (!newNonce) {
-      // Generate a new nonce for retry
-      const freshNonce = await dpopCacheService.generateNonce(conversationId);
-      return { success: false, error: "Invalid or expired nonce", newNonce: freshNonce };
-    }
-
-    // Update last message timestamp
-    await conversationRepository.updateById(conversationId, {
-      lastMessageAt: new Date(),
-    });
-
-    return { success: true, newNonce };
-  } catch (error) {
-    logger.error({ err: error }, "DPoP verification error");
-    return { success: false, error: "Verification failed" };
-  }
-} // restart

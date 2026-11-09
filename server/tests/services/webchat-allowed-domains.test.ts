@@ -1,5 +1,8 @@
 import { describe, it, expect, jest } from "@jest/globals";
 
+jest.mock("@server/config/env", () => ({
+  config: { domain: { dashboard: "app.hay.chat", api: "api.hay.chat" } },
+}));
 jest.mock("@server/repositories/webchat-settings.repository", () => ({
   webchatSettingsRepository: {},
 }));
@@ -8,6 +11,7 @@ jest.mock("@server/services/storage.service", () => ({ storageService: {} }));
 jest.mock("@server/database/data-source", () => ({ AppDataSource: { isInitialized: false } }));
 
 import { matchesAllowedDomains } from "@server/services/webchat/webchat-settings.service";
+import { isPageToolsOrigin } from "@server/lib/webchat-origin";
 
 describe("matchesAllowedDomains", () => {
   it("* allows every host, and requests with no host", () => {
@@ -37,5 +41,35 @@ describe("matchesAllowedDomains", () => {
   it("a restricted list rejects requests with no host", () => {
     expect(matchesAllowedDomains(["shop.com"], null)).toBe(false);
     expect(matchesAllowedDomains([], "shop.com")).toBe(false);
+  });
+});
+
+describe("isPageToolsOrigin", () => {
+  const on = { enabled: true };
+
+  it("refuses every site until the organization turns page tools on", () => {
+    const settings = { pageTools: { enabled: false }, allowedDomains: ["shop.com"] };
+    expect(isPageToolsOrigin(settings, "shop.com")).toBe(false);
+    expect(isPageToolsOrigin(settings, "app.hay.chat")).toBe(false);
+  });
+
+  it("uses the feature's own list when there is one", () => {
+    const settings = {
+      pageTools: { enabled: true, allowedOrigins: ["tools.shop.com"] },
+      allowedDomains: ["shop.com"],
+    };
+    expect(isPageToolsOrigin(settings, "tools.shop.com")).toBe(true);
+    expect(isPageToolsOrigin(settings, "shop.com")).toBe(false);
+  });
+
+  it("falls back to the allowed domains, where * does not count", () => {
+    expect(isPageToolsOrigin({ pageTools: on, allowedDomains: ["shop.com"] }, "shop.com")).toBe(
+      true,
+    );
+    expect(isPageToolsOrigin({ pageTools: on, allowedDomains: ["*"] }, "any.com")).toBe(false);
+  });
+
+  it("refuses a socket with no Origin", () => {
+    expect(isPageToolsOrigin({ pageTools: on, allowedDomains: ["shop.com"] }, null)).toBe(false);
   });
 });

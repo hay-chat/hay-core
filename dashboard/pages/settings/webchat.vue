@@ -128,6 +128,30 @@
       </CardContent>
     </Card>
 
+    <!-- Page tools: off until the organization opts in -->
+    <Card>
+      <CardHeader>
+        <CardTitle>{{ $t("webchat.pageTools") }}</CardTitle>
+        <CardDescription>{{ $t("webchat.pageToolsDescription") }}</CardDescription>
+      </CardHeader>
+      <CardContent class="space-y-4">
+        <div class="flex items-center space-x-2">
+          <Switch id="pageToolsEnabled" v-model="settingsForm.pageToolsEnabled" />
+          <Label for="pageToolsEnabled">{{ $t("webchat.pageToolsEnable") }}</Label>
+        </div>
+        <div v-if="settingsForm.pageToolsEnabled" class="space-y-2">
+          <Label for="pageToolsOrigins">{{ $t("webchat.pageToolsOrigins") }}</Label>
+          <Textarea
+            id="pageToolsOrigins"
+            v-model="settingsForm.pageToolsOrigins"
+            :placeholder="$t('webchat.allowedDomainsPlaceholder')"
+            :rows="3"
+          />
+          <p class="text-sm text-neutral-muted">{{ $t("webchat.pageToolsOriginsDescription") }}</p>
+        </div>
+      </CardContent>
+    </Card>
+
     <!-- Spam protection (D9-6 / D9-7) -->
     <Card>
       <CardHeader>
@@ -304,6 +328,8 @@ const settingsForm = ref({
   spamClassifierEnabled: false,
   spamGuidance: "",
   preChatForm: null as FormSchema | null,
+  pageToolsEnabled: false,
+  pageToolsOrigins: "",
 });
 
 const allowedDomainsText = ref("*");
@@ -369,6 +395,8 @@ async function loadSettings() {
       spamClassifierEnabled: settings.spamClassifierEnabled,
       spamGuidance: settings.spamGuidance || "",
       preChatForm: (settings.preChatForm as FormSchema | null) ?? null,
+      pageToolsEnabled: settings.pageTools?.enabled ?? false,
+      pageToolsOrigins: settings.pageTools?.allowedOrigins?.join("\n") ?? "",
     };
 
     underAttack.value = settings.underAttack;
@@ -399,6 +427,13 @@ async function saveSettings() {
       spamClassifierEnabled: settingsForm.value.spamClassifierEnabled,
       spamGuidance: settingsForm.value.spamGuidance.trim() || null,
       preChatForm: settingsForm.value.preChatForm,
+      pageTools: {
+        enabled: settingsForm.value.pageToolsEnabled,
+        allowedOrigins: settingsForm.value.pageToolsOrigins
+          .split("\n")
+          .map((origin) => origin.trim())
+          .filter(Boolean),
+      },
     });
 
     originalSettings.value = { ...settingsForm.value, allowedDomains: allowedDomainsArray.value };
