@@ -59,6 +59,7 @@ onMounted(async () => {
   try {
     const result = await HayAuthApi.auth.exchangeAuthCode.mutate({
       code: code.value,
+      redirectUri: `${window.location.origin}/auth/exchange`,
       useCookie: true,
     });
 
