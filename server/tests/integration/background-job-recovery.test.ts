@@ -90,6 +90,15 @@ describe("background job recovery", () => {
     }
   });
 
+  it("does not requeue a long job whose server is still working on it", async () => {
+    const running = await insertJob("document_source_sync", 20);
+
+    await jobQueueService.touchRunningJob(running);
+    await jobQueueService.requeueStaleJobs();
+
+    expect((await jobOf(running)).status).toBe("processing");
+  });
+
   it("leaves a conversation alone until its cooldown ends", async () => {
     const customerId = uuidv4();
     await AppDataSource.query(

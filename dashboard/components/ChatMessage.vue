@@ -714,7 +714,7 @@ const renderMarkdown = (markdown: string): string =>
     allowImages: props.message.type !== "Customer",
     allowedImageUrls:
       props.message.type === "BotAgent"
-        ? ((props.message.metadata?.approvedImages as string[] | undefined) ?? [])
+        ? (props.message.metadata?.approvedImages ?? [])
         : undefined,
   });
 

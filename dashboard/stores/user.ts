@@ -1,4 +1,5 @@
 import { defineStore } from "pinia";
+import { hasRouteAccess } from "@/utils/route-access";
 
 const SUSPENSION_REASONS = ["trial_expired", "payment_failed", "cancelled", "manual"] as const;
 export type SuspensionReason = (typeof SUSPENSION_REASONS)[number];
@@ -227,6 +228,12 @@ export const useUserStore = defineStore("user", {
           p === "*:*" ||
           p === "*:update",
       );
+    },
+
+    /** Conversation exports and evidence packs; viewers and agents don't have the scope. */
+    canExportConversations: (state) => {
+      const activeOrg = state.organizations.find((org) => org.id === state.activeOrganizationId);
+      return hasRouteAccess("/evidence", activeOrg?.role || state.user?.role || "member");
     },
 
     canExportData: (state) => {

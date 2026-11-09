@@ -28,6 +28,9 @@ const STALE_PROCESSING_MS: Record<string, number> = {
   organization_export: 2 * 60 * 60 * 1000,
 };
 
+/** How often a running job shows it is alive; well inside the shortest window above. */
+const JOB_HEARTBEAT_MS = 5 * 60 * 1000;
+
 /** A job that keeps losing its server this many times is failed instead of requeued. */
 const MAX_JOB_ATTEMPTS = 3;
 
@@ -226,6 +229,15 @@ export class JobQueueService {
    */
   private async dispatchBackgroundJob(job: Job): Promise<void> {
     const type = (job.data?.type as string | undefined) ?? "";
+    const heartbeat =
+      type in STALE_PROCESSING_MS
+        ? setInterval(() => {
+            this.touchRunningJob(job.id).catch((err) =>
+              logger.warn({ err, jobId: job.id }, "Job heartbeat failed"),
+            );
+          }, JOB_HEARTBEAT_MS)
+        : undefined;
+    heartbeat?.unref();
     try {
       switch (type) {
         case "document_source_sync": {
@@ -258,7 +270,18 @@ export class JobQueueService {
       const message = err instanceof Error ? err.message : String(err);
       logger.error({ err, jobId: job.id, type }, "Background job handler failed");
       await this.failJob(job.id, job.organizationId, message);
+    } finally {
+      clearInterval(heartbeat);
     }
+  }
+
+  /** Keeps a job this server is still working on out of `requeueStaleJobs`. */
+  async touchRunningJob(jobId: string): Promise<void> {
+    const { AppDataSource } = await import("../database/data-source");
+    await AppDataSource.query(
+      `UPDATE jobs SET updated_at = now() WHERE id = $1 AND status = 'processing'`,
+      [jobId],
+    );
   }
 
   /**

@@ -6,7 +6,7 @@
         {{ $t("customers.profile.back") }}
       </Button>
       <Button
-        v-if="customer"
+        v-if="customer && userStore.canExportConversations"
         variant="outline"
         size="sm"
         data-testid="customer-evidence-pack"
@@ -131,6 +131,7 @@
 import { ref, computed, onMounted } from "vue";
 import { ArrowLeft, FileCheck, RefreshCcw } from "lucide-vue-next";
 import { Hay } from "@/utils/api";
+import { useUserStore } from "@/stores/user";
 import type { RouterOutputs } from "@/types/trpc";
 import {
   getCustomerDisplayName,
@@ -177,6 +178,7 @@ const avatarUrl = computed(() => {
   return null;
 });
 
+const userStore = useUserStore();
 const goBack = () => router.push("/customers");
 const viewConversation = (id: string) => router.push(`/conversations/${id}`);
 /** D2-5: evidence packs for this customer's orders. */

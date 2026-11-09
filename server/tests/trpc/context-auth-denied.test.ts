@@ -10,10 +10,14 @@ jest.mock("@server/lib/auth/middleware", () => ({ authenticate: mockAuthenticate
 
 import { t } from "@server/trpc/init";
 import { createContext } from "@server/trpc/context";
-import { isAuthed } from "@server/trpc/middleware/auth";
+import { isAuthed, isAuthedWithoutOrg } from "@server/trpc/middleware/auth";
 
 const router = t.router({
   ping: t.procedure.use(isAuthed).query(() => "pong"),
+  me: t.procedure.use(isAuthedWithoutOrg).query(({ ctx }) => ({
+    userId: ctx.user?.id,
+    organizationId: ctx.organizationId,
+  })),
 });
 
 const contextFor = () =>
@@ -34,6 +38,41 @@ describe("createContext", () => {
 
     expect(ctx.user).toBeNull();
     await expect(router.createCaller(ctx).ping()).rejects.toMatchObject({ code: "FORBIDDEN" });
+  });
+
+  const wrongOrganization = new TRPCError({ code: "FORBIDDEN", message: "Wrong organization" });
+
+  it("lets a stale organization header through to procedures that need no organization", async () => {
+    mockAuthenticate
+      .mockReset()
+      .mockRejectedValueOnce(wrongOrganization)
+      .mockResolvedValueOnce({ id: "user-1", authMethod: "jwt" });
+    const ctx = await contextFor();
+
+    await expect(router.createCaller(ctx).me()).resolves.toEqual({
+      userId: "user-1",
+      organizationId: null,
+    });
+  });
+
+  it("still refuses a stale organization header on procedures that need one", async () => {
+    mockAuthenticate
+      .mockReset()
+      .mockRejectedValueOnce(wrongOrganization)
+      .mockResolvedValueOnce({ id: "user-1", authMethod: "jwt" });
+    const ctx = await contextFor();
+
+    await expect(router.createCaller(ctx).ping()).rejects.toMatchObject({ code: "FORBIDDEN" });
+  });
+
+  it("does not recover an API key sent with another organization", async () => {
+    mockAuthenticate
+      .mockReset()
+      .mockRejectedValueOnce(wrongOrganization)
+      .mockResolvedValueOnce({ id: "key-user", authMethod: "apikey" });
+    const ctx = await contextFor();
+
+    await expect(router.createCaller(ctx).me()).rejects.toMatchObject({ code: "FORBIDDEN" });
   });
 
   it("keeps other authentication failures as UNAUTHORIZED", async () => {

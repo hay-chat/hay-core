@@ -196,7 +196,9 @@ const navMain = computed(() => {
 
   const complianceItems = [
     { title: t("nav.actionLog"), url: "/actions", isActive: isPathActive("/actions") },
-    { title: t("nav.evidencePacks"), url: "/evidence", isActive: isPathActive("/evidence") },
+    ...(userStore.canExportConversations
+      ? [{ title: t("nav.evidencePacks"), url: "/evidence", isActive: isPathActive("/evidence") }]
+      : []),
   ];
 
   items.push(

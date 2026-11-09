@@ -25,6 +25,14 @@ const internalMetadata = {
 };
 
 describe("toPublicMessageMetadata", () => {
+  it("passes on approved image URLs, http(s) only", () => {
+    expect(
+      toPublicMessageMetadata({
+        approvedImages: ["https://shop.test/a.png", "javascript:alert(1)", 7],
+      }),
+    ).toEqual({ approvedImages: ["https://shop.test/a.png"] });
+  });
+
   it("keeps only the fields the widget renders", () => {
     expect(toPublicMessageMetadata(internalMetadata)).toEqual({
       isClosureMessage: true,
