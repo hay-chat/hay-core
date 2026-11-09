@@ -102,13 +102,25 @@ WORKDIR /app
 ENV CHROME_EXECUTABLE_PATH=/usr/bin/chromium
 ENV CHROME_DISABLE_SANDBOX=true
 
-RUN useradd --uid 10001 --create-home --shell /usr/sbin/nologin hay
+# bubblewrap sandboxes plugin workers in the plugin-host container (see
+# server/plugin-host/); util-linux (setpriv) is already part of the base image.
+RUN apt-get update && apt-get install -y --no-install-recommends bubblewrap \
+    && rm -rf /var/lib/apt/lists/* \
+    && useradd --uid 10001 --create-home --shell /usr/sbin/nologin hay
 COPY --from=deps /runtime /app
 COPY --from=build /out /app
 # The only paths the app writes to: organization plugins, uploads (LOCAL_UPLOAD_PATH
 # or its cwd-relative default) and plugin pages. Everything else stays root-owned.
+# /run/hay is how the server and the plugin-host container reach each other
+# (named volumes copy these owners and modes on first use): 0711 so plugin
+# workers can pass through to the API socket, but not list it.
 RUN mkdir -p /app/plugins/custom /app/server/server/uploads /data/uploads /app/dashboard/pages/plugins \
-    && chown -R hay:hay /app/plugins/custom /app/server/server/uploads /data/uploads /app/dashboard/pages
+      /run/hay/api /run/hay/ctl /run/hay/w /run/hay-egress/pub /run/hay-egress/ctl \
+    && chown -R hay:hay /app/plugins/custom /app/server/server/uploads /data/uploads /app/dashboard/pages \
+      /run/hay /run/hay-egress \
+    && chmod 0711 /run/hay /run/hay/w /run/hay-egress \
+    && chmod 0755 /run/hay/api /run/hay-egress/pub \
+    && chmod 0750 /run/hay/ctl /run/hay-egress/ctl
 
 ENV NODE_ENV=production
 # Core plugins are compiled above and the image has no build tools.

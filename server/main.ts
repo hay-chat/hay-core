@@ -249,7 +249,12 @@ async function startServer() {
       rabbitmq: rabbitmqService.isConnected(),
     };
     const ready = Object.values(checks).every(Boolean);
-    res.status(ready ? 200 : 503).json({ status: ready ? "ready" : "unavailable", checks });
+    const { getPluginIsolationHealth } = await import("@server/services/plugin-isolation.service");
+    res.status(ready ? 200 : 503).json({
+      status: ready ? "ready" : "unavailable",
+      checks,
+      pluginIsolation: getPluginIsolationHealth(),
+    });
   });
 
   // Serve uploaded files from local storage
@@ -625,6 +630,9 @@ async function startServer() {
       // Start plugin instance lifecycle management
       pluginInstanceManagerService.startCleanup();
       logger.info("Plugin instance lifecycle manager started");
+
+      const { initPluginIsolation } = await import("@server/services/plugin-isolation.service");
+      await initPluginIsolation();
 
       // Note: Plugins will now be started on-demand when needed
       // This improves scalability and resource usage

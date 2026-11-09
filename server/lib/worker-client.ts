@@ -32,6 +32,23 @@ export function unregisterWorkerSocket(port: number): void {
   }
 }
 
+/**
+ * `fetch` over a unix socket. Uses undici's own fetch: its dispatchers are not
+ * guaranteed to work with the one built into Node. The Response is the same
+ * shape callers already use.
+ */
+export function socketFetch(
+  socketPath: string,
+  url: string,
+  init: RequestInit = {},
+): Promise<Response> {
+  return undiciFetch(url, {
+    ...(init as Parameters<typeof undiciFetch>[1]),
+    headers: Object.fromEntries(new Headers(init.headers).entries()),
+    dispatcher: agentFor(socketPath),
+  }) as unknown as Promise<Response>;
+}
+
 function agentFor(socketPath: string): Agent {
   let agent = agentsBySocket.get(socketPath);
   if (!agent) {
@@ -80,11 +97,5 @@ export function workerFetch(port: number, path: string, init: RequestInit = {}):
   const url = `${workerBaseUrl(port)}${path}`;
   const socketPath = socketsByPort.get(port);
   if (!socketPath) return fetch(url, { ...init, headers });
-  // undici's own fetch: its dispatchers are not guaranteed to work with the
-  // one built into Node. Its Response is the same shape callers already use.
-  return undiciFetch(url, {
-    ...(init as Parameters<typeof undiciFetch>[1]),
-    headers: Object.fromEntries(headers.entries()),
-    dispatcher: agentFor(socketPath),
-  }) as unknown as Promise<Response>;
+  return socketFetch(socketPath, url, { ...init, headers });
 }
