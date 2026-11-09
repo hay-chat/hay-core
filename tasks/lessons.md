@@ -384,3 +384,28 @@
 - **Failure:** told Roger that setup answers were editable in Knowledge, when the Edit action only appears for documents with `importMethod === "editor"` and those answers were not.
 - **Signal:** the Edit gate in `dashboard/pages/documents/[id].vue` did not match what had been claimed.
 - **Rule:** before saying a user can do something in the product, read the condition that shows the control and check the real data meets it.
+## Test a replacement LLM with the app's real request shape
+- Failure: recommended deepseek-v4.1-flash from a latency test using a non-empty prompt. Hay's prompt-only calls send an empty user message, which that model rejects with a 400, so replies failed in production.
+- Signal: `message content cannot be empty` in orchestrator-run errors within seconds of the env change.
+- Rule: before changing a model tier, test the candidate with the exact payload from `LLMService` (system prompt, empty user turn, strict JSON schema) and check that the returned content is non-empty. Replay every step the tier serves, including playbook selection with real ids, because a model can pass intent checks and still corrupt UUIDs.
+
+## Gate a commit on the check's result, not on the check having run
+- Failure: a shell line ran a new test and then committed unconditionally, so a test file that did not compile was committed. `tsc --noEmit` passed because the server config excludes tests.
+- Signal: `Test suite failed to run` above a commit hash in the same output.
+- Rule: chain the commit on an explicit pass of the test and lint, and treat ts-jest as the only typecheck of server test files.
+
+## Cost database changes in round trips, at production latency
+- Failure: a spike reported +0.7 ms per statement for a design adding two round trips, because it was measured against a local database. Production's round trip is about 47 ms.
+- Signal: a design that adds statements per query, timed only on localhost.
+- Rule: count round trips for anything on the database path and multiply by the measured production round trip before calling it cheap.
+
+## Timers keep the async context that created them
+- Failure: scheduled job handlers were wrapped in a system context and the lock bookkeeping was left outside, on the assumption that outside meant no context. setInterval and cron callbacks inherit AsyncLocalStorage from whoever registered them, so a shared connection saw several contexts.
+- Signal: a long-lived resource used from timer callbacks while context is carried by AsyncLocalStorage.
+- Rule: give timer-driven code an explicit context at the callback's entry; never rely on "outside the wrap" being empty.
+
+## Check what the assistant actually received after republishing a playbook
+
+- Failure mode: `playbooks.update` changed the title and description but not the active version the assistant reads, so re-seeding looked successful ("8 updated") while chats ran the old instructions. Correct prices in those chats came from a retrieved document and were credited to the edit.
+- Detection signal: the Playbook message in the conversation (`hay chat send --json`, `turn`) still showed the old text.
+- Prevention rule: after changing a playbook, assert on the instructions in the conversation's Playbook message, not on the seed output or the reply alone. When a publish step fails, treat the next test run as invalid.
