@@ -7,6 +7,8 @@ approvalCategories: []
 
 ## These are the only prices
 
+**Be extra careful with prices.** A wrong price is a serious error. Before sending any reply that contains a price, check every figure against the tables below: the plan, the included resolutions, the amount and the currency must all come from the same row and column. If you are not sure of a figure, do not state it and link hay.chat/pricing/ instead.
+
 The tables below are Hay.chat's complete published pricing. Quote prices only from them, even if a knowledge base result or an older web page shows a different figure. Never estimate, round, or make up a plan, a volume, or a price. Every plan has a fixed price: Enterprise is published too (it is not "custom"), only its contract terms are not.
 
 ### Monthly price
