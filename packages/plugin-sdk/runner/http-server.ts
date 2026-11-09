@@ -277,6 +277,7 @@ export class PluginHttpServer {
           routes: routes.map((route) => ({
             method: route.method,
             path: route.path,
+            public: route.public === true,
           })),
           mcp: {
             local: [], // Populated dynamically when MCPs start

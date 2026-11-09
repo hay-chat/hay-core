@@ -364,7 +364,11 @@ export class WebhookRouterService {
     }
 
     const expectedToken = await this.pluginEnvValue(pluginId, challenge.verifyTokenEnv);
-    if (expectedToken && timingSafeCompare(token, expectedToken) && typeof challengeValue === "string") {
+    if (
+      expectedToken &&
+      timingSafeCompare(token, expectedToken) &&
+      typeof challengeValue === "string"
+    ) {
       res.status(200).send(challengeValue);
       return;
     }

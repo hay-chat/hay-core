@@ -186,7 +186,11 @@ describe("plugin asset serving", () => {
   });
 
   it("does not expose public files or SVG thumbnails of uploaded plugins", async () => {
-    findByPluginId.mockResolvedValue({ pluginId: "demo", pluginPath: "demo", sourceType: "custom" });
+    findByPluginId.mockResolvedValue({
+      pluginId: "demo",
+      pluginPath: "demo",
+      sourceType: "custom",
+    });
 
     const file = mockResponse();
     await service.servePublicFile(

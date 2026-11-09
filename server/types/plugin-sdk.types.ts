@@ -380,6 +380,8 @@ export interface RouteDescriptor {
   path: string;
   method: "GET" | "POST" | "PUT" | "DELETE" | "PATCH";
   description?: string;
+  /** Reachable through the public plugin proxy. */
+  public?: boolean;
 }
 
 /**

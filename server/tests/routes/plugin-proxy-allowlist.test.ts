@@ -40,6 +40,7 @@ import proxyRouter, { isDeclaredRoute, takeColdStartSlot } from "../../routes/v1
 
 const ORG_ID = "11111111-1111-4111-8111-111111111111";
 const PLUGIN = "hay-plugin-acme";
+const pluginWith = (routes: unknown[]) => ({ metadataState: "fresh", metadata: { routes } });
 
 describe("plugin proxy allow-list", () => {
   let server: Server;
@@ -63,9 +64,7 @@ describe("plugin proxy allow-list", () => {
     jest.clearAllMocks();
     mockFindOrgById.mockResolvedValue({ id: ORG_ID });
     mockFindByOrgAndPlugin.mockResolvedValue({ enabled: true });
-    mockGetPlugin.mockReturnValue({
-      metadata: { routes: [{ method: "POST", path: "/webhook" }] },
-    });
+    mockGetPlugin.mockReturnValue(pluginWith([{ method: "POST", path: "/webhook", public: true }]));
     mockIsRunning.mockReturnValue(true);
     mockStartPluginWorker.mockResolvedValue({ port: 40123 });
     mockWorkerFetch.mockResolvedValue(new Response('{"ok":true}', { status: 200 }));
@@ -94,6 +93,55 @@ describe("plugin proxy allow-list", () => {
     expect(response.status).toBe(404);
     expect(mockStartPluginWorker).not.toHaveBeenCalled();
     expect(mockWorkerFetch).not.toHaveBeenCalled();
+  });
+
+  it("returns 404 for a declared route that is not public", async () => {
+    mockGetPlugin.mockReturnValue(pluginWith([{ method: "POST", path: "/internal-action" }]));
+
+    const response = await fetch(`${baseUrl}/internal-action?organizationId=${ORG_ID}`, {
+      method: "POST",
+    });
+
+    expect(response.status).toBe(404);
+    expect(mockWorkerFetch).not.toHaveBeenCalled();
+  });
+
+  it("wakes the worker when cached metadata is stale, then applies the refreshed routes", async () => {
+    mockGetPlugin
+      .mockReturnValueOnce({ metadataState: "stale", metadata: { routes: [] } })
+      .mockReturnValue(pluginWith([{ method: "POST", path: "/webhook", public: true }]));
+
+    const response = await fetch(`${baseUrl}/webhook?organizationId=${ORG_ID}`, {
+      method: "POST",
+    });
+
+    expect(response.status).toBe(200);
+    expect(mockWorkerFetch).toHaveBeenCalled();
+  });
+
+  it("drops worker headers that could act on the API origin", async () => {
+    mockWorkerFetch.mockResolvedValue(
+      new Response("<script>1</script>", {
+        status: 200,
+        headers: {
+          "content-type": "text/html",
+          "set-cookie": "session=x",
+          "content-security-policy": "default-src *",
+          "access-control-allow-origin": "*",
+          etag: '"abc"',
+        },
+      }),
+    );
+
+    const response = await fetch(`${baseUrl}/webhook?organizationId=${ORG_ID}`, {
+      method: "POST",
+    });
+
+    expect(response.headers.get("set-cookie")).toBeNull();
+    expect(response.headers.get("access-control-allow-origin")).toBeNull();
+    expect(response.headers.get("content-security-policy")).toBe("sandbox");
+    expect(response.headers.get("x-content-type-options")).toBe("nosniff");
+    expect(response.headers.get("etag")).toBe('"abc"');
   });
 
   it("returns 404 for a declared path with an undeclared method", async () => {
@@ -162,14 +210,36 @@ describe("isDeclaredRoute", () => {
 });
 
 describe("takeColdStartSlot", () => {
-  it("allows a bounded number of cold starts per plugin per minute", () => {
-    const start = 1_000_000;
+  const start = 1_000_000;
+
+  it("allows a bounded number of cold starts per plugin and organization", () => {
     let allowed = 0;
     for (let i = 0; i < 40; i++) {
-      if (takeColdStartSlot("cold-start-test", start + i)) allowed++;
+      if (takeColdStartSlot("budget-plugin", "org-a", `10.0.0.${i}`, start + i)) allowed++;
     }
     expect(allowed).toBe(30);
-    expect(takeColdStartSlot("another-plugin", start)).toBe(true);
-    expect(takeColdStartSlot("cold-start-test", start + 60_000)).toBe(true);
+    expect(takeColdStartSlot("budget-plugin", "org-b", "10.0.1.1", start)).toBe(true);
+    expect(takeColdStartSlot("other-plugin", "org-a", "10.0.1.2", start)).toBe(true);
+    expect(takeColdStartSlot("budget-plugin", "org-a", "10.0.1.3", start + 60_000)).toBe(true);
+  });
+
+  it("stops one client spreading cold starts across organizations", () => {
+    let allowed = 0;
+    for (let i = 0; i < 150; i++) {
+      if (takeColdStartSlot("ip-plugin", `org-${i}`, "10.9.9.9", start + i)) allowed++;
+    }
+    expect(allowed).toBe(120);
+    expect(takeColdStartSlot("ip-plugin", "org-0", "10.9.9.10", start)).toBe(true);
+  });
+
+  it("does not spend the organization's budget on a refused client", () => {
+    for (let i = 0; i < 120; i++) takeColdStartSlot("spend-plugin", `o-${i}`, "10.8.8.8", start);
+    for (let i = 0; i < 5; i++) takeColdStartSlot("spend-plugin", "victim", "10.8.8.8", start);
+
+    let allowed = 0;
+    for (let i = 0; i < 30; i++) {
+      if (takeColdStartSlot("spend-plugin", "victim", `10.8.7.${i}`, start)) allowed++;
+    }
+    expect(allowed).toBe(30);
   });
 });

@@ -3,8 +3,7 @@ import { assertRegistryDependencies } from "@server/lib/plugin-dependencies";
 
 const SDK = "/repo/packages/plugin-sdk";
 const DIR = "/repo/plugins/org/my-plugin";
-const check = (manifest: Record<string, unknown>) =>
-  assertRegistryDependencies(manifest, DIR, SDK);
+const check = (manifest: Record<string, unknown>) => assertRegistryDependencies(manifest, DIR, SDK);
 
 describe("assertRegistryDependencies", () => {
   it("accepts versions, ranges and tags", () => {

@@ -142,7 +142,7 @@ export default defineHayPlugin((globalCtx) => {
         icon: "book",
       });
 
-      register.route("POST", "/webhook", async (req, res) => {
+      register.route("POST", "/webhook", { public: true }, async (req, res) => {
         await webhookHandler(req, res, {
           getGraphClient: () => graphClient,
           pages,

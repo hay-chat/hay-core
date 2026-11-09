@@ -100,6 +100,12 @@ export interface UIRegistrationAPI {
  *
  * @see PLUGIN.md Section 5.2.1 (lines 360-383)
  */
+/** Options for `register.route`. */
+export interface RouteOptions {
+  /** Expose the route on Hay's unauthenticated public plugin URL. */
+  public?: boolean;
+}
+
 export interface HayRegisterAPI {
   /**
    * Register an HTTP route.
@@ -127,6 +133,13 @@ export interface HayRegisterAPI {
    * ```
    */
   route(method: HttpMethod, path: string, handler: RouteHandler): void;
+
+  /**
+   * Register an HTTP route with options. Only routes with `public: true` are
+   * reachable through Hay's public plugin URL; use it for provider callbacks,
+   * and authenticate the caller in the handler (e.g. verify a signature).
+   */
+  route(method: HttpMethod, path: string, options: RouteOptions, handler: RouteHandler): void;
 
   /**
    * Register config schema.

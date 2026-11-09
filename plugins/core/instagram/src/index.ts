@@ -151,7 +151,7 @@ export default defineHayPlugin((globalCtx) => {
 
       // Inbound: Core forwards verified, per-org Meta payloads here. No GET
       // route — Core answers the verification challenge itself.
-      register.route("POST", "/webhook", async (req, res) => {
+      register.route("POST", "/webhook", { public: true }, async (req, res) => {
         await webhookHandler(req, res, {
           getGraphClient: () => graphClient,
           getAccessToken: () => accessToken,

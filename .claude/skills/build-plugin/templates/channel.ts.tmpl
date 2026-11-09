@@ -36,7 +36,7 @@ export default defineHayPlugin((globalCtx) => {
       });
 
       // Inbound + outbound routes. Keep handlers in separate files for testability.
-      ctx.register.route("POST", "/webhook", (req, res) => handleWebhook(req, res, { getSecret: () => webhookSecret, getClient: () => client, api: createPluginApiClient(), logger: ctx.logger }));
+      ctx.register.route("POST", "/webhook", { public: true }, (req, res) => handleWebhook(req, res, { getSecret: () => webhookSecret, getClient: () => client, api: createPluginApiClient(), logger: ctx.logger }));
       ctx.register.route("POST", "/deliver", (req, res) => handleDeliver(req, res, { getClient: () => client, logger: ctx.logger }));
     },
 

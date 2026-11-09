@@ -207,7 +207,10 @@ export default defineHayPlugin((globalCtx) => ({
         );
         const nonce = await requireSessions().start(siteUrl);
         const returnUrl = safeReturnUrl(req.body?.returnUrl, siteUrl);
-        res.json({ nonce, authorizeUrl: buildAuthorizeUrl({ siteUrl, nonce, callbackUrl, returnUrl }) });
+        res.json({
+          nonce,
+          authorizeUrl: buildAuthorizeUrl({ siteUrl, nonce, callbackUrl, returnUrl }),
+        });
       } catch (error) {
         sendWcAuthError(res, error);
       }
@@ -222,7 +225,7 @@ export default defineHayPlugin((globalCtx) => ({
     });
 
     // Public: WooCommerce posts the generated keys here through the core proxy.
-    ctx.register.route("POST", "/wc-auth/callback", async (req, res) => {
+    ctx.register.route("POST", "/wc-auth/callback", { public: true }, async (req, res) => {
       try {
         await requireSessions().receive(req.body);
         res.status(200).json({ ok: true });

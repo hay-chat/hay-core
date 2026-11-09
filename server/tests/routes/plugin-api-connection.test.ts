@@ -215,9 +215,9 @@ describe("pluginApi.webhooks.setRoutingKeys", () => {
     mockFindByOrgAndPlugin.mockResolvedValue({ id: "instance-1" });
     mockClaimRoutes.mockResolvedValue({ conflicts: ["42"], previousOwners: [] });
 
-    await expect(caller()["webhooks.setRoutingKeys"]({ routingKeys: ["42"] })).rejects.toMatchObject(
-      { code: "CONFLICT" },
-    );
+    await expect(
+      caller()["webhooks.setRoutingKeys"]({ routingKeys: ["42"] }),
+    ).rejects.toMatchObject({ code: "CONFLICT" });
   });
 
   it("fails without an instance and requires the messages capability", async () => {

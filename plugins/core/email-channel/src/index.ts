@@ -205,7 +205,7 @@ export default defineHayPlugin((globalCtx) => {
       });
 
       // Core verified the shared svix signature and routed this org's slice.
-      register.route("POST", "/webhook", async (req, res) => {
+      register.route("POST", "/webhook", { public: true }, async (req, res) => {
         if (req.headers["x-hay-webhook-verified"] !== "true") {
           logger.warn("Email webhook rejected — not verified by core");
           res.status(403).json({ error: "unverified" });

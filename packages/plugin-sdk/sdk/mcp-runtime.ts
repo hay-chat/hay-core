@@ -82,7 +82,17 @@ function ensureStdioDependencies(serverCwd: string, id: string, logger: HayLogge
 }
 
 /** The worker's environment variables a stdio MCP server may inherit. */
-const STDIO_INHERITED_ENV = ["PATH", "HOME", "NODE_ENV", "TMPDIR", "TEMP", "TMP", "LANG", "LC_ALL", "TZ"];
+const STDIO_INHERITED_ENV = [
+  "PATH",
+  "HOME",
+  "NODE_ENV",
+  "TMPDIR",
+  "TEMP",
+  "TMP",
+  "LANG",
+  "LC_ALL",
+  "TZ",
+];
 
 /**
  * Environment for a stdio MCP server: the basics a process needs plus what the

@@ -264,7 +264,7 @@ export default defineHayPlugin((globalCtx) => {
 
       // Manual mode: Meta's GET handshake on the per-org URL. (The shared URL's
       // handshake is answered by core with META_VERIFY_TOKEN.)
-      register.route("GET", "/webhook", async (req, res) => {
+      register.route("GET", "/webhook", { public: true }, async (req, res) => {
         const challenge = verificationChallenge(req.query ?? {}, connection);
         if (challenge === null) {
           res.status(403).send("Forbidden");
@@ -273,7 +273,7 @@ export default defineHayPlugin((globalCtx) => {
         res.status(200).type("text/plain").send(challenge);
       });
 
-      register.route("POST", "/webhook", async (req, res) => {
+      register.route("POST", "/webhook", { public: true }, async (req, res) => {
         if (!isTrustedWebhook(req, connection)) {
           logger.warn("WhatsApp webhook rejected — not verified by core and no valid signature");
           res.status(403).json({ error: "unverified" });

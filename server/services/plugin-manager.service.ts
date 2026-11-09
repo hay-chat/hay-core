@@ -661,11 +661,14 @@ export class PluginManagerService {
       const mcpPackageJson = path.join(pluginPath, "mcp", "package.json");
       if (existsSync(mcpPackageJson)) {
         logger.info({ pluginName: plugin.name }, "Installing MCP server dependencies");
-        execSync(isWorkspacePlugin ? "npm install --ignore-scripts" : CUSTOM_PLUGIN_INSTALL_COMMAND, {
-          cwd: path.join(pluginPath, "mcp"),
-          stdio: "inherit",
-          env: this.buildMinimalEnv(),
-        });
+        execSync(
+          isWorkspacePlugin ? "npm install --ignore-scripts" : CUSTOM_PLUGIN_INSTALL_COMMAND,
+          {
+            cwd: path.join(pluginPath, "mcp"),
+            stdio: "inherit",
+            env: this.buildMinimalEnv(),
+          },
+        );
       }
 
       await pluginRegistryRepository.updateInstallStatus(plugin.id, true);
