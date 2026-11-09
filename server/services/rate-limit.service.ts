@@ -28,6 +28,7 @@ export type RateLimitScope =
   | "customer-privacy"
   | "refresh-token"
   | "exchange-auth-code"
+  | "mfa-verify"
   | "internal-api";
 
 export interface RateLimitOptions {

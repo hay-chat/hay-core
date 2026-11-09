@@ -7,6 +7,7 @@ import { useAuthStore } from "@/stores/auth";
 import { useUserStore } from "@/stores/user";
 import { reportServerError } from "@/composables/useServerStatus";
 import { redirectForSuspension, SUSPENDED_ROUTE } from "@/composables/useSuspension";
+import { requestMfaStepUp } from "@/composables/useMfaStepUp";
 import {
   createRefreshCoordinator,
   isDefinitiveAuthFailure,
@@ -100,6 +101,23 @@ const errorLink: TRPCLink<AppRouter> = () => {
 
               observer.error(err);
               return;
+            }
+
+            if (data?.code === "FORBIDDEN" && data?.type === "MFA_STEP_UP_REQUIRED") {
+              requestMfaStepUp();
+            }
+
+            // The organization requires two-factor and this user has not enrolled.
+            if (
+              data?.code === "FORBIDDEN" &&
+              data?.type === "MFA_ENROLMENT_REQUIRED" &&
+              typeof window !== "undefined"
+            ) {
+              const userStore = useUserStore();
+              if (userStore.user) userStore.user.mfaEnrolmentRequired = true;
+              if (window.location.pathname !== "/settings/profile") {
+                setTimeout(() => navigateTo("/settings/profile"), 0);
+              }
             }
 
             // UNAUTHORIZED is handled by tokenRefreshLink: refresh, then retry.

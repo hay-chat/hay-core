@@ -158,6 +158,7 @@
 </template>
 
 <script setup lang="ts">
+import { requestMfaStepUp } from "@/composables/useMfaStepUp";
 import { ensureFreshAccessToken } from "@/utils/api";
 import { Upload, FileArchive, CheckCircle, X, ArrowLeft, AlertCircle } from "lucide-vue-next";
 import { useAuthStore } from "@/stores/auth";
@@ -276,6 +277,7 @@ const uploadPlugin = async () => {
 
     if (!response.ok) {
       const error = await response.json();
+      if (error.type === "MFA_STEP_UP_REQUIRED") requestMfaStepUp();
       throw new Error(error.error || t("upload.errors.uploadFailed"));
     }
 

@@ -1,6 +1,7 @@
 import { logger } from "@/utils/logger";
 import { defineStore } from "pinia";
 import { HayApi, HayAuthApi } from "@/utils/api";
+import type { RouterOutputs } from "@/types/trpc";
 import {
   isDefinitiveAuthFailure,
   SessionEndedError,
@@ -13,6 +14,8 @@ import {
 } from "@/utils/legacy-session";
 import { useSetupStore } from "./setup";
 import { useUserStore, type User } from "./user";
+
+type LoginSession = Extract<RouterOutputs["auth"]["login"], { mfaRequired: false }>;
 
 /** Access token, memory only. The refresh token is an HttpOnly cookie. */
 interface Tokens {
@@ -70,18 +73,43 @@ export const useAuthStore = defineStore("auth", {
           password,
           useCookie: true,
         });
-        clearLegacyRefreshToken();
-        this.tokens = {
-          accessToken: result.accessToken,
-          expiresAt: Date.now() + result.expiresIn * 1000, // Convert seconds to milliseconds
-        };
-        const userStore = useUserStore();
-        userStore.setUser(result.user as User);
-        this.isAuthenticated = true;
-        this.updateActivity();
+        if (result.mfaRequired) {
+          return { challengeToken: result.challengeToken };
+        }
+        this.applyLogin(result);
+        return { challengeToken: null };
       } finally {
         this.isLoading = false;
       }
+    },
+
+    /** Second login step, for accounts with two-factor authentication. */
+    async verifyMfaLogin(challengeToken: string, code: string) {
+      this.isLoading = true;
+      try {
+        const result = await HayAuthApi.auth.mfa.verifyLogin.mutate({
+          challengeToken,
+          code,
+          useCookie: true,
+        });
+        this.applyLogin(result);
+      } finally {
+        this.isLoading = false;
+      }
+    },
+
+    applyLogin(result: LoginSession) {
+      clearLegacyRefreshToken();
+      this.tokens = {
+        accessToken: result.accessToken,
+        expiresAt: Date.now() + result.expiresIn * 1000, // Convert seconds to milliseconds
+      };
+      useUserStore().setUser({
+        ...(result.user as User),
+        mfaEnrolmentRequired: result.mfaEnrolmentRequired,
+      });
+      this.isAuthenticated = true;
+      this.updateActivity();
     },
 
     async logout(reason?: string) {

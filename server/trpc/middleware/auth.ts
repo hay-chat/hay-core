@@ -6,6 +6,8 @@ import type { Request } from "express";
 import { auditLogService } from "@server/services/audit-log.service";
 import { createLogger } from "@server/lib/logger";
 import { assertOrganizationNotSuspended } from "./suspension";
+import { isMfaEnrolmentExempt } from "./mfa";
+import { mfaService } from "@server/services/mfa.service";
 
 const logger = createLogger("trpc-auth");
 
@@ -16,7 +18,7 @@ interface RequestWithAuthError extends Request {
   authError?: string;
 }
 
-export const isAuthed = t.middleware<{ ctx: Context }>(({ ctx, path, next }) => {
+export const isAuthed = t.middleware<{ ctx: Context }>(async ({ ctx, path, next }) => {
   // Check if there was an authentication error stored in the request
   // @ts-ignore - Express type definition mismatch between root and server node_modules
   const reqWithAuth = ctx.req as RequestWithAuthError;
@@ -51,6 +53,10 @@ export const isAuthed = t.middleware<{ ctx: Context }>(({ ctx, path, next }) => 
 
   // The organization is already loaded with the membership (no extra query).
   assertOrganizationNotSuspended(ctx.user.userOrganization?.organization, path);
+
+  if (!isMfaEnrolmentExempt(path)) {
+    await mfaService.assertEnrolledIfRequired(ctx.user);
+  }
 
   return next({
     ctx: {

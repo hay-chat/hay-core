@@ -499,6 +499,7 @@ export interface OrganizationSettings {
   media?: MediaSettings; // Customer photos/PDFs: AI reading, ID documents, case email
   quickCheck?: QuickCheckSettings; // Ask the team one fact instead of handing off (D19)
   setup?: SetupSettings; // In-app setup answers and readiness checks
+  mfaRequired?: boolean; // Every member must use two-factor authentication
   [key: string]: unknown;
 }
 

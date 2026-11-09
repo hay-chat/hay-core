@@ -475,6 +475,8 @@
         <CardTitle class="text-destructive">{{ $t("danger.title") }}</CardTitle>
         <CardDescription>{{ $t("danger.description") }}</CardDescription>
       </CardHeader>
+      <OrganizationMfaCard />
+
       <CardContent>
         <div class="flex items-center justify-between border p-4 rounded-lg">
           <div>
@@ -494,6 +496,7 @@
 
 <script setup lang="ts">
 import { Save, RotateCcw, Trash2 } from "lucide-vue-next";
+import OrganizationMfaCard from "@/components/auth/OrganizationMfaCard.vue";
 import { Hay } from "@/utils/api";
 import { useToast } from "@/composables/useToast";
 import { useFileUpload } from "@/composables/useFileUpload";

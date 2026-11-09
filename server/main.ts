@@ -468,7 +468,7 @@ async function startServer() {
 
   // Plugin upload endpoints
   const multer = await import("multer");
-  const { withAdminAuth } = await import("@server/middleware/auth");
+  const { withAdminAuth, withMfaStepUp } = await import("@server/middleware/auth");
   const { pluginUploadService, requireCustomPluginsAllowed, handlePluginUploadError } =
     await import("@server/services/plugin-upload.service");
 
@@ -492,6 +492,7 @@ async function startServer() {
   server.post(
     "/v1/plugins/upload",
     withAdminAuth,
+    withMfaStepUp,
     requireCustomPluginsAllowed,
     pluginUpload.single("plugin"),
     async (req: express.Request, res: express.Response) => {
@@ -503,6 +504,7 @@ async function startServer() {
   server.put(
     "/v1/plugins/:pluginId",
     withAdminAuth,
+    withMfaStepUp,
     requireCustomPluginsAllowed,
     pluginUpload.single("plugin"),
     async (req: express.Request, res: express.Response) => {
