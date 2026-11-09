@@ -10,6 +10,8 @@ import { createLogger } from "@server/lib/logger";
 import { AppDataSource } from "@server/database/data-source";
 import { UserOrganization } from "@server/entities/user-organization.entity";
 import { User } from "@server/entities/user.entity";
+import { Session } from "@server/entities/session.entity";
+import { In, IsNull, MoreThan } from "typeorm";
 
 const logger = createLogger("websocket");
 import { verifyDPoPForRequest } from "../routes/v1/public-conversations";
@@ -36,6 +38,8 @@ const MAX_FRAME_BYTES = 64 * 1024;
 const ATTACH_TIMEOUT_MS = 10_000;
 /** Pings go out this often; a socket that missed the previous pong is terminated. */
 const HEARTBEAT_INTERVAL_MS = 30_000;
+/** How often a signed-in dashboard socket's user, session and membership are re-checked. */
+const DASHBOARD_REVALIDATE_INTERVAL_MS = 60_000;
 /** Open sockets allowed per client IP (shared NATs keep this generous). */
 const MAX_CONNECTIONS_PER_IP = 100;
 /** DPoP proofs on identify are made for this method and the `/ws` endpoint. */
@@ -44,11 +48,34 @@ const IDENTIFY_PROOF_PATH = "/ws";
 /** WebSocket close code for a policy violation (RFC 6455). */
 const CLOSE_POLICY_VIOLATION = 1008;
 
+interface DashboardIdentity {
+  userId: string;
+  email: string;
+  tokenVersion?: number;
+  sessionId?: string;
+}
+
+/** Whether the user behind a dashboard token may still receive that account's events. */
+function isDashboardUserAllowed(
+  user: Pick<User, "isActive" | "emailVerified" | "email" | "tokenVersion"> | null | undefined,
+  identity: Pick<DashboardIdentity, "email" | "tokenVersion">,
+): boolean {
+  return (
+    !!user &&
+    user.isActive &&
+    user.emailVerified &&
+    user.email === identity.email &&
+    (identity.tokenVersion === undefined || identity.tokenVersion === (user.tokenVersion ?? 0))
+  );
+}
+
 interface WebSocketClient {
   ws: WebSocket;
   organizationId: string;
   conversationId?: string;
   authenticated: boolean;
+  /** Who a signed-in dashboard socket belongs to; absent for widget sockets. */
+  dashboardIdentity?: DashboardIdentity;
   /** Client IP from the proxy headers. */
   ip: string;
   /** The Origin header of the upgrade request; browsers always send it. */
@@ -147,6 +174,7 @@ export class WebSocketService {
   private organizationClients = new Map<string, Set<string>>();
   private connectionsPerIp = new Map<string, number>();
   private heartbeatTimer?: ReturnType<typeof setInterval>;
+  private revalidateTimer?: ReturnType<typeof setInterval>;
   private redisInitialized = false;
 
   /**
@@ -179,6 +207,12 @@ export class WebSocketService {
     });
 
     this.heartbeatTimer = setInterval(() => this.checkHeartbeats(), HEARTBEAT_INTERVAL_MS);
+    this.revalidateTimer = setInterval(() => {
+      this.revalidateDashboardClients().catch((err) =>
+        logger.warn({ err }, "Dashboard socket re-validation failed"),
+      );
+    }, DASHBOARD_REVALIDATE_INTERVAL_MS);
+    this.revalidateTimer.unref();
     this.heartbeatTimer.unref();
 
     // Initialize Redis for cross-server event broadcasting
@@ -403,6 +437,50 @@ export class WebSocketService {
     }
   }
 
+  /**
+   * Close signed-in dashboard sockets whose user was disabled, changed password,
+   * lost the organization or had the session revoked. A failed lookup keeps the
+   * sockets open until the next pass.
+   */
+  private async revalidateDashboardClients(): Promise<void> {
+    const watched = [...this.clients.entries()].filter(([, c]) => c.dashboardIdentity);
+    if (watched.length === 0) return;
+
+    const identities = watched.map(([, c]) => c.dashboardIdentity!);
+    const userIds = [...new Set(identities.map((i) => i.userId))];
+    const sessionIds = [...new Set(identities.flatMap((i) => i.sessionId ?? []))];
+
+    const [users, memberships, liveSessions] = await Promise.all([
+      AppDataSource.getRepository(User).find({ where: { id: In(userIds) } }),
+      AppDataSource.getRepository(UserOrganization).find({
+        where: { userId: In(userIds), isActive: true },
+      }),
+      sessionIds.length === 0
+        ? Promise.resolve([] as Session[])
+        : AppDataSource.getRepository(Session).find({
+            where: { id: In(sessionIds), revokedAt: IsNull(), expiresAt: MoreThan(new Date()) },
+          }),
+    ]);
+
+    const usersById = new Map(users.map((u) => [u.id, u]));
+    const memberKeys = new Set(memberships.map((m) => `${m.userId}:${m.organizationId}`));
+    const liveSessionIds = new Set(liveSessions.map((s) => s.id));
+
+    for (const [clientId, client] of watched) {
+      const identity = client.dashboardIdentity!;
+      const allowed =
+        isDashboardUserAllowed(usersById.get(identity.userId), identity) &&
+        memberKeys.has(`${identity.userId}:${client.organizationId}`) &&
+        (!identity.sessionId || liveSessionIds.has(identity.sessionId));
+      if (allowed) continue;
+
+      logger.info({ clientId }, "Closing dashboard socket that is no longer authorized");
+      client.authenticated = false;
+      this.organizationClients.get(client.organizationId)?.delete(clientId);
+      client.ws.close(CLOSE_POLICY_VIOLATION, "Unauthorized");
+    }
+  }
+
   /** Browsers send an Origin; the dashboard's must be one of the CORS origins. */
   private isAllowedDashboardOrigin(origin: string | undefined): boolean {
     if (!origin) return true; // not a browser, so no cross-site request to guard against
@@ -439,13 +517,7 @@ export class WebSocketService {
     const user = await AppDataSource.getRepository(User).findOne({
       where: { id: decoded.userId },
     });
-    if (
-      !user ||
-      !user.isActive ||
-      !user.emailVerified ||
-      user.email !== decoded.email ||
-      (decoded.tokenVersion !== undefined && decoded.tokenVersion !== (user.tokenVersion ?? 0))
-    ) {
+    if (!isDashboardUserAllowed(user, decoded)) {
       logger.warn({ clientId }, "WebSocket token rejected");
       return;
     }
@@ -464,6 +536,12 @@ export class WebSocketService {
     if (!this.clients.has(clientId)) return;
 
     client.authenticated = true;
+    client.dashboardIdentity = {
+      userId: decoded.userId,
+      email: decoded.email,
+      tokenVersion: decoded.tokenVersion,
+      sessionId: decoded.sid,
+    };
     if (!this.organizationClients.has(client.organizationId)) {
       this.organizationClients.set(client.organizationId, new Set());
     }
@@ -969,6 +1047,7 @@ export class WebSocketService {
    */
   shutdown(): void {
     clearInterval(this.heartbeatTimer);
+    clearInterval(this.revalidateTimer);
 
     // Close all client connections
     for (const [_clientId, client] of this.clients) {
