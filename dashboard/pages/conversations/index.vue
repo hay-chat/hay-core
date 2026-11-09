@@ -116,7 +116,7 @@
 
     <!-- Empty State -->
     <EmptyState
-      v-else-if="filteredConversations.length === 0"
+      v-else-if="paginatedConversations.length === 0"
       :title="
         searchQuery
           ? $t('conversations.empty.noConversationsFound')
@@ -290,6 +290,12 @@ import { useRouter } from "vue-router";
 import { useAppStore } from "@/stores/app";
 import { formatRelativeTime, formatDuration } from "~/utils/date";
 import { getWaitTime, formatWaitTime, getWaitTimeClass } from "@/utils/conversation";
+import {
+  statusesForFilter,
+  timeframeStart,
+  type StatusFilter,
+  type TimeframeFilter,
+} from "@/utils/conversation-filters";
 import { getEnabledChannelPlugins } from "@/utils/channel";
 import Avatar from "@/components/ui/Avatar.vue";
 import type { RouterOutputs } from "@/types/trpc";
@@ -308,8 +314,14 @@ const loading = ref(true);
 const error = ref<string | null>(null);
 const _realTimeEnabled = ref(true);
 const searchQuery = ref("");
-const selectedStatus = ref("");
-const selectedTimeframe = ref("week");
+// A deep link with a human status (e.g. from Home) opens on the Escalated filter.
+const initialStatus = String(useRoute().query.status ?? "");
+const selectedStatus = ref<StatusFilter>(
+  initialStatus.includes("pending-human") || initialStatus.includes("human-took-over")
+    ? "escalated"
+    : "",
+);
+const selectedTimeframe = ref<TimeframeFilter>("all");
 const bulkMode = ref(false);
 const selectedConversations = ref<string[]>([]);
 const { page: currentPage, pageSize, setPage, setPageSize } = usePagination();
@@ -419,28 +431,9 @@ const timeframeOptions = computed(() => [
   { label: t("conversations.filters.allTime"), value: "all" },
 ]);
 
-// For now, we'll use the conversations directly from API (already paginated)
-// In the future, we should pass filters to the API
-const filteredConversations = computed(() => {
-  return conversations.value.filter((conversation) => {
-    const matchesSearch =
-      !searchQuery.value ||
-      conversation.title?.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
-      conversation.id.toLowerCase().includes(searchQuery.value.toLowerCase());
-
-    const matchesStatus = !selectedStatus.value || conversation.status === selectedStatus.value;
-
-    // TODO: Implement timeframe filtering
-    const matchesTimeframe = true;
-
-    return matchesSearch && matchesStatus && matchesTimeframe;
-  });
-});
-
-// Use filtered conversations directly since API already handles pagination
-const paginatedConversations = computed(() => {
-  return filteredConversations.value;
-});
+// Search, status and timeframe are applied by the server (see fetchConversations),
+// so the loaded page and its total always agree.
+const paginatedConversations = computed(() => conversations.value);
 
 // Methods
 const getStatusVariant = (status: string): "default" | "secondary" | "destructive" | "outline" => {
@@ -545,7 +538,13 @@ const fetchConversations = async () => {
       totalConversations.value = conversations.value.length;
       currentPage.value = 1;
     } else {
+      const statuses = statusesForFilter(selectedStatus.value);
+      const from = timeframeStart(selectedTimeframe.value);
+      const query = searchQuery.value.trim();
       const response = await HayApi.conversations.list.query({
+        filters: statuses ? { statuses } : undefined,
+        dateRange: from ? { from: from.toISOString() } : undefined,
+        search: query ? { query } : undefined,
         pagination: { page: currentPage.value, limit: pageSize.value },
         sorting: { orderBy: "created_at", orderDirection: "desc" },
         include: ["assignedUser", "messages"],
@@ -571,6 +570,18 @@ const refreshConversations = async () => {
   ]);
 };
 
+// Any filter change goes back to page 1 and refetches; typing in search waits a beat.
+let searchTimer: ReturnType<typeof setTimeout> | undefined;
+const applyFilters = async () => {
+  setPage(1);
+  await fetchConversations();
+};
+watch(searchQuery, () => {
+  clearTimeout(searchTimer);
+  searchTimer = setTimeout(applyFilters, 300);
+});
+watch([selectedStatus, selectedTimeframe], applyFilters);
+
 const handlePageChange = async (page: number) => {
   setPage(page);
   await fetchConversations();
@@ -590,17 +601,7 @@ let unsubscribeConversationDeleted: (() => void) | null = null;
 
 // Lifecycle
 onMounted(async () => {
-  // Check for query params to pre-filter
   const route = useRoute();
-  if (route.query.status) {
-    const statusParam = route.query.status as string;
-    // Support single status or comma-separated statuses
-    if (statusParam.includes("pending-human")) {
-      selectedStatus.value = "pending-human";
-    } else if (statusParam.includes("human-took-over")) {
-      selectedStatus.value = "human-took-over";
-    }
-  }
   if (route.query.escalationsPeriod) {
     const period = route.query.escalationsPeriod as string;
     if (period === "today" || period === "week") {
@@ -693,6 +694,7 @@ onMounted(async () => {
 });
 
 onUnmounted(() => {
+  clearTimeout(searchTimer);
   // Cleanup WebSocket event handlers
   if (unsubscribeConversationCreated) unsubscribeConversationCreated();
   if (unsubscribeConversationUpdated) unsubscribeConversationUpdated();

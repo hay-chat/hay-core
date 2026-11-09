@@ -75,6 +75,27 @@ describe("conversation list excludePlayground filter", () => {
   });
 });
 
+describe("conversation list statuses filter", () => {
+  beforeEach(() => {
+    sql.length = 0;
+  });
+
+  it("matches any of the given statuses, scoped to the organisation", async () => {
+    await new ConversationRepository().paginateQuery(
+      params({ filters: { statuses: ["pending-human", "human-took-over"] } }),
+      ORG_ID,
+    );
+    expect(sql).toContain("entity.status IN (:...statuses)");
+    expect(sql.join(" ")).toContain("entity.organization_id = :organizationId");
+  });
+
+  it("rejects an unknown status", () => {
+    expect(
+      conversationListInputSchema.safeParse({ filters: { statuses: ["escalated"] } }).success,
+    ).toBe(false);
+  });
+});
+
 describe("list query identifiers", () => {
   beforeEach(() => {
     sql.length = 0;

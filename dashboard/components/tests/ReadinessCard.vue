@@ -58,8 +58,9 @@ import type { RouterOutputs } from "@/types/trpc";
 
 /**
  * Soft-launch readiness (D7-13): weekly approve / edit / block counts for the
- * assistant's replies under Require Approval, and a hint on when Auto-Send may
- * be safe. Require Approval holds replies only, never actions. No percentages.
+ * assistant's replies under "Require approval for AI messages by default"
+ * (Settings > General, organization settings.testModeDefault), and a hint on
+ * when turning it off may be safe. It holds replies only, never actions. No percentages.
  */
 type Readiness = RouterOutputs["organizations"]["assistant"]["readiness"];
 
