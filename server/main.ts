@@ -22,6 +22,7 @@ import {
   UPLOAD_BODY_LIMIT,
 } from "@server/lib/body-limits";
 import { mayParseLargeBody } from "@server/lib/large-body-auth";
+import { pluginApiSocketPath } from "@server/lib/plugin-isolation";
 import { httpIpRateLimit, trpcRetryAfterMeta } from "@server/lib/http-rate-limit";
 import "reflect-metadata";
 import dotenv from "dotenv";
@@ -595,6 +596,13 @@ async function startServer() {
   const { registerRuntimeMetrics } = await import("@server/services/runtime-metrics");
   registerRuntimeMetrics();
   const metricsServer = startMetricsServer();
+
+  const pluginApiSocket = pluginApiSocketPath();
+  if (pluginApiSocket) {
+    const { listenPluginApiSocket } = await import("@server/lib/plugin-api-socket");
+    await listenPluginApiSocket(server, pluginApiSocket);
+    logger.info({ socket: pluginApiSocket }, "Plugin API socket listening");
+  }
 
   httpServer.listen(config.server.port, async () => {
     logger.info({ port: config.server.port }, "Server is running");

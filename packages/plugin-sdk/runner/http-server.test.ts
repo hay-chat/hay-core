@@ -359,3 +359,37 @@ describe("PluginHttpServer worker secret", () => {
     expect(seenSecretHeader).toBeUndefined();
   });
 });
+
+describe("PluginHttpServer on a unix socket", () => {
+  it("serves requests that carry the worker secret over the socket", async () => {
+    const { mkdtempSync, rmSync, statSync } = await import("fs");
+    const { tmpdir } = await import("os");
+    const { join } = await import("path");
+    const { request } = await import("http");
+    const dir = mkdtempSync(join(tmpdir(), "worker-sock-"));
+    const socketPath = join(dir, "worker.sock");
+    const server = new PluginHttpServer(1, new PluginRegistry(), silentLogger, {
+      secret: "s3cret",
+      socketPath,
+    });
+    try {
+      await server.start();
+      expect(statSync(socketPath).mode & 0o777).toBe(0o660);
+
+      const call = (headers: Record<string, string>) =>
+        new Promise<number>((resolve, reject) => {
+          const req = request({ socketPath, path: "/health", headers }, (res) => {
+            res.resume();
+            resolve(res.statusCode ?? 0);
+          });
+          req.on("error", reject);
+          req.end();
+        });
+      expect(await call({})).toBe(401);
+      expect(await call({ "x-hay-worker-secret": "s3cret" })).toBe(200);
+    } finally {
+      await server.stop();
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+});

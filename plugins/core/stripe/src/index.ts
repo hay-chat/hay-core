@@ -300,7 +300,7 @@ async function startDisputeIntake(
   orgId: string,
   logger: { info: (m: string, c?: any) => void; warn: (m: string, c?: any) => void },
 ): Promise<void> {
-  const url = webhookUrl(process.env.HAY_API_URL, process.env.HAY_PLUGIN_ID ?? "", orgId);
+  const url = webhookUrl(process.env.HAY_PUBLIC_URL, process.env.HAY_PLUGIN_ID ?? "", orgId);
   if (url) {
     try {
       const result = await ensureWebhookEndpoint(client, url, orgId);

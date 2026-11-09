@@ -551,6 +551,9 @@ export class PluginRunnerService {
 
     // Add API access so the plugin worker can call the main server's plugin-api
     env.HAY_API_URL = process.env.HAY_API_URL || getApiUrl();
+    // Where the outside world reaches core (webhook and OAuth callback URLs). Not
+    // the same as HAY_API_URL once the worker talks to core through a socket.
+    env.HAY_PUBLIC_URL = getApiUrl();
     env.HAY_API_TOKEN = this.generatePluginJWT(orgId, pluginId, capabilities);
 
     // Add allowed environment variables from host

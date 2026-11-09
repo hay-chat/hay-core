@@ -9,6 +9,7 @@
 
 import express, { type Express, type NextFunction, type Request, type Response } from "express";
 import type { Server } from "http";
+import { chmodSync, rmSync } from "fs";
 import { createHash, timingSafeEqual } from "crypto";
 import type {
   HayLogger,
@@ -71,6 +72,7 @@ export class PluginHttpServer {
   private app: Express;
   private server: Server | null = null;
   private port: number;
+  private socketPath: string | undefined;
   private logger: HayLogger;
   private registry: PluginRegistry;
   private plugin: HayPluginDefinition | null = null;
@@ -84,14 +86,17 @@ export class PluginHttpServer {
   /**
    * @param options.secret - When set, every request must carry it in
    *   {@link WORKER_SECRET_HEADER}. The runner always sets it in production.
+   * @param options.socketPath - Listen on this unix socket instead of loopback
+   *   TCP. Isolated workers have no network, so core reaches them this way.
    */
   constructor(
     port: number,
     registry: PluginRegistry,
     logger: HayLogger,
-    options: { secret?: string } = {},
+    options: { secret?: string; socketPath?: string } = {},
   ) {
     this.port = port;
+    this.socketPath = options.socketPath;
     this.logger = logger;
     this.registry = registry;
     this.app = express();
@@ -1128,10 +1133,25 @@ export class PluginHttpServer {
   async start(): Promise<void> {
     return new Promise((resolve, reject) => {
       try {
-        this.server = this.app.listen(this.port, WORKER_LISTEN_HOST, () => {
-          this.logger.info(`HTTP server listening on ${WORKER_LISTEN_HOST}:${this.port}`);
+        const onListening = (): void => {
           resolve();
-        });
+        };
+        if (this.socketPath) {
+          const socketPath = this.socketPath;
+          // A previous worker for the same org may have left its socket behind.
+          rmSync(socketPath, { force: true });
+          this.server = this.app.listen(socketPath, () => {
+            // Core connects as the directory's group, so the socket must be group-writable.
+            chmodSync(socketPath, 0o660);
+            this.logger.info(`HTTP server listening on unix socket ${socketPath}`);
+            onListening();
+          });
+        } else {
+          this.server = this.app.listen(this.port, WORKER_LISTEN_HOST, () => {
+            this.logger.info(`HTTP server listening on ${WORKER_LISTEN_HOST}:${this.port}`);
+            onListening();
+          });
+        }
 
         this.server.on("error", (err) => {
           this.logger.error("HTTP server error", { error: err.message });
