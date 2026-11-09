@@ -64,9 +64,11 @@ export async function authenticateApiKeyAuth(authHeader?: string): Promise<AuthU
     throw new Error("Associated organization is suspended");
   }
 
-  // Update last used timestamp
-  matchedApiKey.lastUsedAt = new Date();
-  await apiKeyRepository.save(matchedApiKey);
+  // Record use, at most once a minute so API traffic doesn't turn into row writes.
+  const now = new Date();
+  if (!matchedApiKey.lastUsedAt || now.getTime() - matchedApiKey.lastUsedAt.getTime() > 60_000) {
+    await apiKeyRepository.update({ id: matchedApiKey.id }, { lastUsedAt: now });
+  }
 
   // Create a synthetic user representing the organization's API access
   // This user won't have a real user ID but will have organization context

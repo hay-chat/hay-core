@@ -178,11 +178,12 @@ export function requireScopes(authUser: AuthUser, resource: string, action: stri
 }
 
 /**
- * Check if the user has admin access (full permissions)
- * Checks for *:* scope (full access to all resources)
+ * Check that a signed-in owner or admin of the current organization is calling.
+ * API tokens are never admins, whatever their scopes.
  */
 export function requireAdmin(authUser: AuthUser): void {
-  if (!authUser.hasScope("*", "*")) {
+  const role = authUser.getRole();
+  if (authUser.authMethod !== "jwt" || (role !== "owner" && role !== "admin")) {
     throw new Error("Admin access required");
   }
 }
