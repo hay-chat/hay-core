@@ -1,3 +1,4 @@
+import type { NuxtApp } from "nuxt/app";
 import { mountSupportWidget } from "@/utils/support-widget";
 import { useDomain } from "@/composables/useDomain";
 import { usePageTools } from "@/composables/usePageTools";
@@ -7,7 +8,7 @@ import { usePageTools } from "@/composables/usePageTools";
  * Once the widget loads it receives the dashboard's page tools, so the assistant can point at
  * and open pages ("where do I connect Shopify?"). The demo page loads its own widget.
  */
-export default defineNuxtPlugin((nuxtApp) => {
+export default defineNuxtPlugin((nuxtApp: NuxtApp) => {
   const organizationId = useRuntimeConfig().public.supportWidgetOrgId;
   if (!organizationId) return;
 
