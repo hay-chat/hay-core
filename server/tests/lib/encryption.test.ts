@@ -101,6 +101,24 @@ describe("stored secret encryption", () => {
     expect(decryptValue(encryptValue("x"))).toBe("x");
   });
 
+  it("derives a legacy value's key once, even when decryption fails", () => {
+    const readable = legacyCiphertext("reused", KEY);
+    const unreadable = legacyCiphertext("other-key", "a-different-key");
+    const derive = jest.spyOn(crypto, "pbkdf2Sync");
+    try {
+      expect(decryptValue(readable)).toBe("reused");
+      expect(decryptValue(readable)).toBe("reused");
+      expect(derive).toHaveBeenCalledTimes(1);
+
+      derive.mockClear();
+      expect(() => decryptValue(unreadable)).toThrow();
+      expect(() => decryptValue(unreadable)).toThrow();
+      expect(derive).toHaveBeenCalledTimes(1);
+    } finally {
+      derive.mockRestore();
+    }
+  });
+
   it("tells ciphertext apart from legacy plaintext", () => {
     expect(looksLikeCiphertext(encryptValue("a"))).toBe(true);
     expect(looksLikeCiphertext(legacyCiphertext("a", KEY))).toBe(true);

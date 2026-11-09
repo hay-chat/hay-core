@@ -95,9 +95,31 @@ function decryptV3(value: string, keys: EncryptionKey[]): string {
   ]).toString("utf8");
 }
 
-function decryptLegacy(combined: Buffer, password: string): string {
-  const salt = combined.subarray(0, SALT_LENGTH);
+// PBKDF2 blocks the event loop for about 50 ms per call, and credentials are
+// decrypted every time a plugin instance row loads. Each legacy value has its
+// own salt, so its derived key can be reused for as long as the value exists.
+const LEGACY_KEY_CACHE_LIMIT = 5000;
+const legacyKeys = new Map<string, Buffer>();
+
+function legacyKey(password: string, salt: Buffer): Buffer {
+  const cacheKey = `${password}\0${salt.toString("base64")}`;
+  const cached = legacyKeys.get(cacheKey);
+  if (cached) {
+    return cached;
+  }
   const key = crypto.pbkdf2Sync(password, salt, 100000, 32, "sha256");
+  if (legacyKeys.size >= LEGACY_KEY_CACHE_LIMIT) {
+    const oldest = legacyKeys.keys().next().value;
+    if (oldest !== undefined) {
+      legacyKeys.delete(oldest);
+    }
+  }
+  legacyKeys.set(cacheKey, key);
+  return key;
+}
+
+function decryptLegacy(combined: Buffer, password: string): string {
+  const key = legacyKey(password, combined.subarray(0, SALT_LENGTH));
   const decipher = crypto.createDecipheriv(
     ALGORITHM,
     key,
