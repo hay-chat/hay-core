@@ -3,6 +3,7 @@ import { AuditLog, type AuditAction, type AuditActorType } from "../entities/aud
 import { User } from "../entities/user.entity";
 import { createLogger } from "@server/lib/logger";
 import { metrics } from "@server/lib/metrics";
+import { withLongStatementTimeout } from "../database/session-limits";
 import { createHmac } from "crypto";
 import { apiKeyIdFromUserId } from "@server/lib/auth/api-token-actor";
 import { deriveServiceKey } from "@server/lib/auth/utils/service-keys";
@@ -357,9 +358,11 @@ export class AuditLogService {
    */
   async cleanup(): Promise<number> {
     try {
-      const [{ deleted }] = await AppDataSource.query(
-        `SELECT audit_logs_purge($1, $2) AS deleted`,
-        [daysAgo(AUDIT_LOG_RETENTION_DAYS), daysAgo(AUDIT_LOG_PERSONAL_FIELDS_RETENTION_DAYS)],
+      const [{ deleted }] = await withLongStatementTimeout((manager) =>
+        manager.query(`SELECT audit_logs_purge($1, $2) AS deleted`, [
+          daysAgo(AUDIT_LOG_RETENTION_DAYS),
+          daysAgo(AUDIT_LOG_PERSONAL_FIELDS_RETENTION_DAYS),
+        ]),
       );
       return Number(deleted);
     } catch (error) {
@@ -380,7 +383,9 @@ export class AuditLogService {
   async verifyChain(chainKey?: string): Promise<AuditChainProblem[]> {
     try {
       const rows: Array<{ chain_key: string; chain_seq: string; problem: string }> =
-        await AppDataSource.query(`SELECT * FROM audit_logs_verify_chain($1)`, [chainKey ?? null]);
+        await withLongStatementTimeout((manager) =>
+          manager.query(`SELECT * FROM audit_logs_verify_chain($1)`, [chainKey ?? null]),
+        );
       return rows.map((row) => ({
         chainKey: row.chain_key,
         chainSeq: row.chain_seq,

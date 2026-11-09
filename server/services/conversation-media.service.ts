@@ -1,3 +1,4 @@
+import { withLongStatementTimeout } from "@server/database/session-limits";
 import { AppDataSource } from "@server/database/data-source";
 import { Upload } from "@server/entities/upload.entity";
 import { createLogger } from "@server/lib/logger";
@@ -181,10 +182,15 @@ export async function sweepConversationMedia(): Promise<{
   return { expired, orphans };
 }
 
-export async function sweepUploads(sql: string, parameters: unknown[]): Promise<MediaDeletionResult> {
+export async function sweepUploads(
+  sql: string,
+  parameters: unknown[],
+): Promise<MediaDeletionResult> {
   const total: MediaDeletionResult = { deleted: 0, failed: 0 };
   for (let batch = 0; batch < SWEEP_MAX_BATCHES; batch++) {
-    const rows: Array<{ id: string }> = await AppDataSource.query(sql, parameters);
+    const rows: Array<{ id: string }> = await withLongStatementTimeout((manager) =>
+      manager.query(sql, parameters),
+    );
     if (!rows.length) break;
     const result = await deleteUploads(rows.map((row) => row.id));
     total.deleted += result.deleted;
