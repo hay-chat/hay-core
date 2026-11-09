@@ -213,6 +213,12 @@ export const config = {
     signupUrl: process.env.SIGNUP_URL?.trim() || null,
   },
 
+  sso: {
+    // Identity providers must be on public https addresses. Self-hosted installs
+    // whose provider lives on a private network set this to "true".
+    allowPrivateProviderHosts: process.env.SSO_ALLOW_PRIVATE_PROVIDER_HOSTS === "true",
+  },
+
   orchestrator: {
     interval: parseInt(process.env.ORCHESTRATOR_INTERVAL || "5000", 10),
   },

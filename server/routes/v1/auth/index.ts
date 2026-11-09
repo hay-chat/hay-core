@@ -40,6 +40,7 @@ import {
 import { createLogger } from "@server/lib/logger";
 import { MFA_CHALLENGE_TTL_SECONDS, generateMfaChallengeToken } from "@server/lib/auth/utils/jwt";
 import { mfaService } from "@server/services/mfa.service";
+import { ssoLoginRouter } from "./sso";
 import { mfaRouter } from "./mfa";
 import {
   PASSWORD_CHECK_RATE_LIMIT,
@@ -192,6 +193,7 @@ async function assertSignupAllowed(manager: EntityManager, email: string): Promi
 
 export const authRouter = t.router({
   mfa: mfaRouter,
+  sso: ssoLoginRouter,
 
   // Public endpoints
 
@@ -755,7 +757,10 @@ export const authRouter = t.router({
         organizations,
         activeOrganizationId,
         role,
-        mfaEnrolmentRequired: await mfaService.enrolmentRequired(user.id),
+        mfaEnrolmentRequired: await mfaService.enrolmentRequired(
+          user.id,
+          ctx.user!.ssoOrganizationId,
+        ),
       };
     }),
 
