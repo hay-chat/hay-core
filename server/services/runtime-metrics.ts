@@ -1,6 +1,7 @@
 import { registerCollector } from "@server/lib/metrics";
 import { CHANNEL_DELIVERY_QUEUES } from "./channel-delivery-queue.service";
 import { ORCHESTRATOR_QUEUES } from "./orchestrator-queue.service";
+import { registerAuditSinkMetrics } from "./audit-sink.service";
 import { rabbitmqService } from "./rabbitmq.service";
 import { redisService } from "./redis.service";
 import { websocketService } from "./websocket.service";
@@ -9,6 +10,7 @@ const DEAD_LETTER_QUEUES = [ORCHESTRATOR_QUEUES.DEAD, CHANNEL_DELIVERY_QUEUES.DE
 
 /** Metrics read from live services each time they are scraped. */
 export function registerRuntimeMetrics(): void {
+  registerAuditSinkMetrics();
   registerCollector("hay_websocket_connections", "Open WebSocket connections.", () =>
     websocketService.getConnectionCount(),
   );

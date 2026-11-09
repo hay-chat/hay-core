@@ -355,6 +355,22 @@ export const config = {
     },
   },
 
+  // Append-only copy of the audit trail. Off unless a bucket is set. The bucket must
+  // have Object Lock enabled; endpoint, region and credentials default to the S3_* settings.
+  auditSink: {
+    bucket: process.env.AUDIT_SINK_BUCKET || null,
+    endpoint: process.env.AUDIT_SINK_ENDPOINT || process.env.S3_ENDPOINT || null,
+    region: process.env.AUDIT_SINK_REGION || process.env.S3_REGION || "us-east-1",
+    accessKeyId: process.env.AUDIT_SINK_ACCESS_KEY_ID || process.env.S3_ACCESS_KEY_ID || null,
+    secretAccessKey:
+      process.env.AUDIT_SINK_SECRET_ACCESS_KEY || process.env.S3_SECRET_ACCESS_KEY || null,
+    forcePathStyle: process.env.AUDIT_SINK_FORCE_PATH_STYLE === "true",
+    prefix: process.env.AUDIT_SINK_PREFIX || "audit-log/",
+    // Longer than the 365-day row retention, so the copy outlives the row.
+    retentionDays: parseInt(process.env.AUDIT_SINK_RETENTION_DAYS || "400", 10),
+    lockMode: process.env.AUDIT_SINK_LOCK_MODE === "GOVERNANCE" ? "GOVERNANCE" : "COMPLIANCE",
+  },
+
   privacy: {
     downloadIpRestriction: process.env.PRIVACY_DOWNLOAD_IP_RESTRICTION === "true",
     maxDownloadCount: parseInt(process.env.PRIVACY_MAX_DOWNLOAD_COUNT || "1", 10),

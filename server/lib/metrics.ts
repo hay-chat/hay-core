@@ -70,6 +70,10 @@ export const metrics = {
     "Checks made without Redis, by surface and action taken.",
   ),
   schedulerRuns: counter("hay_scheduler_runs_total", "Scheduled job runs, by job and status."),
+  auditSinkDeliveries: counter(
+    "hay_audit_sink_deliveries_total",
+    "Audit entries sent to the external sink, by outcome.",
+  ),
   auditWriteFailures: counter(
     "hay_audit_write_failures_total",
     "Audit entries that failed to save.",
