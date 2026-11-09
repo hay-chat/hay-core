@@ -25,5 +25,5 @@ export function pluginApiSocketPath(env: NodeJS.ProcessEnv = process.env): strin
 
 /** Unix socket of the plugin-host supervisor's control API. */
 export function pluginHostSocketPath(env: NodeJS.ProcessEnv = process.env): string {
-  return env.PLUGIN_HOST_SOCKET?.trim() || "/run/hay/control.sock";
+  return env.PLUGIN_HOST_SOCKET?.trim() || "/run/hay/ctl/control.sock";
 }

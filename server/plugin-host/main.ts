@@ -29,7 +29,7 @@ async function main(): Promise<void> {
     // Every start, with the exact reason, so a degraded host can't go unnoticed.
     log.error(
       launcher.tier === 2
-        ? "Plugin workers are separated by user id only: the sandbox could not start"
+        ? "Plugin workers are separated by user id only: no sandbox is used between them"
         : "Plugin workers are NOT isolated from each other: neither the sandbox nor separate users are available",
       { tier: launcher.tier, tierName: TIER_NAMES[launcher.tier], mode, reason },
     );

@@ -110,6 +110,18 @@ services:
     cpus: 1
     environment:
       NODE_ENV: production
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "require('http').get({socketPath:'/run/hay-egress/ctl/control.sock',path:'/status'},r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))",
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
     volumes:
       - plugin_egress_run:/run/hay-egress
     networks:
