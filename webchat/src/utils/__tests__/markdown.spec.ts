@@ -36,7 +36,7 @@ describe("parseMarkdown output safety", () => {
     "![x](javascript:alert(1))",
     '[x](https://a.example" onmouseover="alert(1))',
     '![x](https://a.example" onerror="alert(1))',
-    "![x\" onerror=\"alert(1)](https://a.example/i.png)",
+    '![x" onerror="alert(1)](https://a.example/i.png)',
     "![a](http://x.example/[b](http://y onerror=alert&#40;1&#41; x) z)",
     "![x[y](http://u.example/i.png) tail](http://z.example onerror=a)",
     "[a](http://x.example/**b** onerror=c **d**)",
@@ -67,7 +67,9 @@ describe("parseMarkdown output safety", () => {
   });
 
   it("still renders formatted labels and images inside links", () => {
-    const root = render("[**bold**](https://a.example) [![i](https://a.example/i.png)](https://b.example)");
+    const root = render(
+      "[**bold**](https://a.example) [![i](https://a.example/i.png)](https://b.example)",
+    );
     expect(root.querySelector("a strong")?.textContent).toBe("bold");
     expect(root.querySelector("a img")?.getAttribute("src")).toBe("https://a.example/i.png");
   });
