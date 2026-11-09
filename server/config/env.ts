@@ -371,6 +371,15 @@ export const config = {
 
   internal: {
     apiSecret: process.env.INTERNAL_API_SECRET || "",
+    // Still accepted during a rotation, then removed.
+    previousApiSecret: process.env.INTERNAL_API_PREVIOUS_SECRET || "",
+    // Refuse calls that only present the shared secret. Enable once the operator signs requests.
+    requireSignature: process.env.INTERNAL_API_REQUIRE_SIGNATURE === "true",
+    // Comma-separated client addresses; empty allows any.
+    allowedIps: (process.env.INTERNAL_API_ALLOWED_IPS || "")
+      .split(",")
+      .map((ip) => ip.trim())
+      .filter(Boolean),
     // Where core POSTs signed events the operator may need to act on (for
     // example organization.deleted, so the operator can stop billing).
     // Empty disables them.
@@ -574,6 +583,14 @@ export function validateProductionConfig(): string[] {
   }
   if (config.internal.apiSecret && config.internal.apiSecret.length < MIN_SECRET_LENGTH) {
     errors.push(`INTERNAL_API_SECRET must be at least ${MIN_SECRET_LENGTH} characters when set.`);
+  }
+  if (
+    config.internal.previousApiSecret &&
+    config.internal.previousApiSecret.length < MIN_SECRET_LENGTH
+  ) {
+    errors.push(
+      `INTERNAL_API_PREVIOUS_SECRET must be at least ${MIN_SECRET_LENGTH} characters when set.`,
+    );
   }
 
   if (missingVars.length > 0) {

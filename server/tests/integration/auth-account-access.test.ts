@@ -45,8 +45,11 @@ jest.mock("../../services/redis.service", () => ({
   redisService: { isConnected: () => false, getClient: () => mockRedisClient.value },
 }));
 jest.mock("../../config/env", () => {
-  const actual = jest.requireActual("../../config/env") as { config: object };
-  return { ...actual, config: { ...actual.config, internal: { apiSecret: "s3cret" } } };
+  const actual = jest.requireActual("../../config/env") as { config: { internal: object } };
+  return {
+    ...actual,
+    config: { ...actual.config, internal: { ...actual.config.internal, apiSecret: "s3cret" } },
+  };
 });
 
 import { AppDataSource } from "../../database/data-source";
