@@ -42,6 +42,7 @@
     "@hay/form-schema": "*",
     "@mozilla/readability": "^0.6.0",
     "@puppeteer/browsers": "^3.2.6",
+    "@simplewebauthn/server": "^14.1.0",
     "@trpc/server": "^11.22.1",
     "adm-zip": "^0.6.1",
     "ajv": "^8.20.0",
