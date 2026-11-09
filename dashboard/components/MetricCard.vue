@@ -7,16 +7,22 @@
           {{ title }}
         </div>
       </div>
-      <div v-if="showCacheIndicator && cacheAge" class="text-xs text-neutral-muted">
-        <Clock class="h-3 w-3 inline mr-1" />
-        {{ cacheAge }}
-      </div>
     </CardHeader>
     <CardContent class="!pt-0">
-      <div class="text-2xl font-bold">
-        {{ formattedMetric }}
+      <!-- Sized to the value, so the card keeps its height when data arrives. -->
+      <div
+        v-if="loading"
+        class="my-1 h-6 w-20 animate-pulse rounded bg-background-tertiary motion-reduce:animate-none"
+        data-testid="metric-skeleton"
+      />
+      <div v-else class="text-2xl font-bold">
+        <SettleValue :value="formattedMetric" />
       </div>
-      <p v-if="subtitle" class="text-xs text-neutral-muted flex gap-1">
+      <div
+        v-if="loading"
+        class="mt-1 h-3 w-24 animate-pulse rounded bg-background-tertiary motion-reduce:animate-none"
+      />
+      <p v-else-if="subtitle" class="text-xs text-neutral-muted flex gap-1">
         <span :class="subtitleClass">{{ subtitle }}</span>
         <span v-if="subtitleSuffix"> {{ subtitleSuffix }}</span>
       </p>
@@ -26,7 +32,6 @@
 
 <script setup lang="ts">
 import { computed, type Component } from "vue";
-import { Clock } from "lucide-vue-next";
 
 interface Props {
   title: string;
@@ -36,14 +41,13 @@ interface Props {
   subtitleSuffix?: string;
   subtitleColor?: "green" | "red" | "default";
   formatMetric?: boolean;
-  showCacheIndicator?: boolean;
-  cacheAge?: string;
+  /** No value yet: show a placeholder rather than a misleading zero. */
+  loading?: boolean;
 }
 
 const props = withDefaults(defineProps<Props>(), {
   subtitleColor: "default",
   formatMetric: true,
-  showCacheIndicator: false,
 });
 
 const formattedMetric = computed(() => {

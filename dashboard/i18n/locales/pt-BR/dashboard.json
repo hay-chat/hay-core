@@ -24,7 +24,8 @@
   },
   "activity": {
     "title": "Atividade de Conversas",
-    "description": "Volume diário de conversas"
+    "description": "Volume diário de conversas",
+    "empty": "Nenhuma atividade de conversa neste período"
   },
   "recentConversations": {
     "title": "Conversas Recentes",

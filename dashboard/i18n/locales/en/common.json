@@ -64,6 +64,7 @@
     "create": "Create",
     "back": "Back",
     "loading": "Loading...",
+    "updating": "Updating…",
     "error": "Error",
     "success": "Success",
     "noResults": "No results",

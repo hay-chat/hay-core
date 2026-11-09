@@ -24,7 +24,8 @@
   },
   "activity": {
     "title": "Conversation Activity",
-    "description": "Daily conversation volume"
+    "description": "Daily conversation volume",
+    "empty": "No conversation activity in this period"
   },
   "recentConversations": {
     "title": "Recent Conversations",
