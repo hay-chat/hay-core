@@ -88,3 +88,13 @@ export async function saveAnswerDocument(
     })) ?? document
   );
 }
+
+/** Renames an answer document and re-embeds it, so the new question wording finds it. */
+export async function retitleAnswerDocument(
+  organizationId: string,
+  document: Document,
+  title: string,
+): Promise<void> {
+  await documentRepository.update(document.id, organizationId, { title });
+  await embedAnswer(organizationId, document.id, title, plainTextOf(document.content));
+}

@@ -49,7 +49,7 @@ import {
   preferOwnAnswer,
 } from "./check";
 import { answerTextOf } from "./answer-text";
-import { saveAnswerDocument } from "./answer-document";
+import { retitleAnswerDocument, saveAnswerDocument } from "./answer-document";
 import { documentRepository } from "@server/repositories/document.repository";
 import { readTurn, startTurns } from "./turn";
 import type { PendingTurn, TurnOutcome } from "./turn-classify";
@@ -547,22 +547,58 @@ export async function addQuestion(organizationId: string, text: string): Promise
   return boardFor(organizationId, saved);
 }
 
+const MAX_REMOVED = 5;
+
+const sameText = (a: string, b: string) => a.toLowerCase() === b.toLowerCase();
+
 export async function removeQuestion(
   organizationId: string,
   questionId: string,
 ): Promise<SetupBoard> {
-  const saved = await updateSetup(organizationId, (current) => ({
-    ...current,
-    questions: current.questions.filter((q) => q.id !== questionId),
-  }));
+  const saved = await updateSetup(organizationId, (current) => {
+    const index = current.questions.findIndex((q) => q.id === questionId);
+    if (index === -1) return current;
+    return {
+      ...current,
+      questions: current.questions.filter((q) => q.id !== questionId),
+      recentlyRemoved: [
+        { question: current.questions[index], index },
+        ...(current.recentlyRemoved ?? []),
+      ].slice(0, MAX_REMOVED),
+    };
+  });
   return boardFor(organizationId, saved);
 }
 
+/** Undoes a removal: same position, status, answer and playbook, with no recheck. */
 export async function restoreQuestion(
-  _organizationId: string,
-  _questionId: string,
+  organizationId: string,
+  questionId: string,
 ): Promise<SetupBoard> {
-  throw new TRPCError({ code: "NOT_IMPLEMENTED" });
+  const saved = await updateSetup(organizationId, (current) => {
+    const removed = (current.recentlyRemoved ?? []).find((r) => r.question.id === questionId);
+    if (!removed) throw new TRPCError({ code: "NOT_FOUND", message: "Nothing to restore" });
+    if (current.questions.length >= MAX_QUESTIONS) {
+      throw new TRPCError({
+        code: "BAD_REQUEST",
+        message: `You can have up to ${MAX_QUESTIONS} questions`,
+      });
+    }
+    if (current.questions.some((q) => sameText(q.text, removed.question.text))) {
+      throw new TRPCError({
+        code: "BAD_REQUEST",
+        message: "A question with this text already exists",
+      });
+    }
+    const questions = [...current.questions];
+    questions.splice(Math.min(removed.index, questions.length), 0, removed.question);
+    return {
+      ...current,
+      questions,
+      recentlyRemoved: (current.recentlyRemoved ?? []).filter((r) => r.question.id !== questionId),
+    };
+  });
+  return boardFor(organizationId, saved);
 }
 
 export interface UpdateQuestionInput {
@@ -596,6 +632,13 @@ export async function updateQuestion(
   if (!renamed && answer === undefined && linkedDocumentId === undefined) {
     return boardFor(organizationId, setup);
   }
+  if (renamed && setup.questions.some((q) => q.id !== question.id && sameText(q.text, text))) {
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message: "A question with this text already exists",
+    });
+  }
+
   let linked: SetupQuestion["linkedDocument"];
   if (typeof linkedDocumentId === "string") {
     if (linkedDocumentId === question.answerDocumentId) {
@@ -621,6 +664,8 @@ export async function updateQuestion(
     answerDocumentId = (
       await saveAnswerDocument(organizationId, { existing: own, title, text: answer })
     ).id;
+  } else if (own && renamed && followsQuestion) {
+    await retitleAnswerDocument(organizationId, own, text);
   }
 
   const saved = await updateSetup(organizationId, (current) => ({

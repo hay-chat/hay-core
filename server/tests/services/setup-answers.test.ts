@@ -54,11 +54,14 @@ jest.mock("@server/services/setup/site", () => ({
   readSiteState: (...args: unknown[]) => readSiteState(...args),
 }));
 const saveAnswerDocument = jest.fn();
+const retitleAnswerDocument = jest.fn();
 const answerDocument = jest.requireActual("@server/services/setup/answer-document") as {
   saveAnswerDocument: (...args: unknown[]) => Promise<unknown>;
+  retitleAnswerDocument: (...args: unknown[]) => Promise<unknown>;
 };
 jest.mock("@server/services/setup/answer-document", () => ({
   saveAnswerDocument: (...args: unknown[]) => saveAnswerDocument(...args),
+  retitleAnswerDocument: (...args: unknown[]) => retitleAnswerDocument(...args),
 }));
 const startTurns = jest.fn();
 jest.mock("@server/services/setup/turn", () => ({
@@ -70,6 +73,9 @@ import {
   checkQuestions,
   draftAnswer,
   getAnswer,
+  MAX_QUESTIONS,
+  removeQuestion,
+  restoreQuestion,
   updateQuestion,
 } from "../../services/setup/setup.service";
 import {
@@ -132,6 +138,7 @@ beforeEach(() => {
     events.push("document");
     return own;
   });
+  retitleAnswerDocument.mockReset();
   findDocuments.mockReset().mockResolvedValue([own]);
   documents.findByIdAndOrganization.mockReset().mockResolvedValue(null);
   documents.create.mockReset().mockImplementation(async (d: object) => ({ id: "new1", ...d }));
@@ -228,6 +235,14 @@ describe("saveAnswerDocument", () => {
     expect(documents.update).toHaveBeenCalledWith("new1", "org", {
       status: DocumentationStatus.ERROR,
     });
+  });
+
+  it("retitling re-embeds under the new title", async () => {
+    await answerDocument.retitleAnswerDocument("org", own, "Returns?");
+    expect(documents.update).toHaveBeenCalledWith("own1", "org", { title: "Returns?" });
+    const chunks = vectorStore.addChunks.mock.calls[0][2] as { content: string }[];
+    expect(chunks[0].content).toContain("Returns?");
+    expect(chunks[0].content).toContain("Yes, 30 days.");
   });
 });
 
@@ -359,6 +374,14 @@ describe("updateQuestion", () => {
     expect(events).toEqual([]);
   });
 
+  it("rejects a duplicate of another question, case-insensitively", async () => {
+    seed([question(), question({ id: "q2", text: "Where is my order?" })]);
+    await expect(
+      updateQuestion("org", { questionId: "q1", text: "where is my ORDER?" }),
+    ).rejects.toMatchObject({ code: "BAD_REQUEST" });
+    expect(stored()[0].text).toBe("Do you offer refunds?");
+  });
+
   it("links a document of this organization, storing its id and title; null clears it", async () => {
     documents.findByIdAndOrganization.mockResolvedValue(other("d9", "Returns page"));
     await updateQuestion("org", { questionId: "q1", linkedDocumentId: "d9" });
@@ -389,6 +412,27 @@ describe("updateQuestion", () => {
       text: "What is your refund policy?",
     });
     expect(stored()[0].check?.outcome).toBe("not_answered");
+  });
+
+  it("rename retitles an untouched answer document, and leaves a changed title alone", async () => {
+    seed([question({ answerDocumentId: "own1" })]);
+    documents.findByIdAndOrganization.mockResolvedValue(own);
+    await updateQuestion("org", { questionId: "q1", text: "Returns?" });
+    expect(retitleAnswerDocument).toHaveBeenCalledWith("org", own, "Returns?");
+
+    retitleAnswerDocument.mockClear();
+    seed([question({ answerDocumentId: "own1" })]);
+    documents.findByIdAndOrganization.mockResolvedValue({ ...own, title: "My own title" });
+    await updateQuestion("org", { questionId: "q1", text: "Returns?" });
+    expect(retitleAnswerDocument).not.toHaveBeenCalled();
+  });
+
+  it("rename of a platform row keeps its playbook and skips the recheck", async () => {
+    seed([question({ needs: "orders", playbookId: "p1" })]);
+    await updateQuestion("org", { questionId: "q1", text: "Where is my parcel?" });
+    expect(stored()[0]).toMatchObject({ text: "Where is my parcel?", playbookId: "p1" });
+    expect(cheap).not.toHaveBeenCalled();
+    expect(startTurns).not.toHaveBeenCalled();
   });
 });
 
@@ -496,5 +540,66 @@ describe("getAnswer", () => {
     expect(await getAnswer("org", "q1")).toEqual({ text: "Yes, 30 days.", editable: true });
     documents.findByIdAndOrganization.mockResolvedValue(other("own1", "T", "<ul><li>a</li></ul>"));
     expect(await getAnswer("org", "q1")).toEqual({ text: "a", editable: false });
+  });
+});
+
+describe("remove and undo", () => {
+  const three = () => [
+    question({ id: "a", text: "A?" }),
+    question({ id: "b", text: "B?", playbookId: "p1", check: wrong }),
+    question({ id: "c", text: "C?" }),
+  ];
+
+  it("records the question and its position, newest first, keeping five", async () => {
+    seed(Array.from({ length: 7 }, (_, i) => question({ id: `q${i}`, text: `Q${i}?` })));
+    for (let i = 0; i < 7; i++) await removeQuestion("org", `q${i}`);
+    const removed = store.current.recentlyRemoved as { question: SetupQuestion; index: number }[];
+    expect(removed.map((r) => r.question.id)).toEqual(["q6", "q5", "q4", "q3", "q2"]);
+    expect(removed[0].index).toBe(0);
+  });
+
+  it("removing a question that is not there records nothing", async () => {
+    seed(three());
+    await removeQuestion("org", "zzz");
+    expect(store.current.recentlyRemoved).toBeUndefined();
+  });
+
+  it("restores at the old position with its check and playbook, no recheck, and drops the entry", async () => {
+    seed(three());
+    await removeQuestion("org", "b");
+    await restoreQuestion("org", "b");
+    expect(stored().map((q) => q.id)).toEqual(["a", "b", "c"]);
+    expect(stored()[1]).toMatchObject({ playbookId: "p1", check: wrong });
+    expect(store.current.recentlyRemoved).toEqual([]);
+    expect(cheap).not.toHaveBeenCalled();
+    expect(startTurns).not.toHaveBeenCalled();
+  });
+
+  it("restores at the end when the list got shorter", async () => {
+    seed(three());
+    await removeQuestion("org", "c");
+    await removeQuestion("org", "b");
+    await restoreQuestion("org", "c");
+    expect(stored().map((q) => q.id)).toEqual(["a", "c"]);
+  });
+
+  it("fails when it was never removed, the limit is reached, or the text was added again", async () => {
+    seed(three());
+    await expect(restoreQuestion("org", "b")).rejects.toMatchObject({ code: "NOT_FOUND" });
+
+    await removeQuestion("org", "b");
+    store.current.questions = [
+      ...stored(),
+      ...Array.from({ length: MAX_QUESTIONS - 2 }, (_, i) =>
+        question({ id: `x${i}`, text: `X${i}` }),
+      ),
+    ];
+    await expect(restoreQuestion("org", "b")).rejects.toMatchObject({ code: "BAD_REQUEST" });
+
+    seed(three());
+    await removeQuestion("org", "b");
+    store.current.questions = [...stored(), question({ id: "n", text: "b?" })];
+    await expect(restoreQuestion("org", "b")).rejects.toMatchObject({ code: "BAD_REQUEST" });
+    expect((store.current.recentlyRemoved as unknown[]).length).toBe(1);
   });
 });
