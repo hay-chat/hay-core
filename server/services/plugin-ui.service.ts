@@ -414,60 +414,6 @@ const saveConfiguration = async () => {
       }
     }
   }
-
-  /**
-   * Get Vue component file content for plugin settings extensions
-   */
-  async getPluginComponent(pluginId: string, componentPath: string): Promise<string | null> {
-    const plugin = await pluginRegistryRepository.findByPluginId(pluginId);
-    if (!plugin) {
-      throw new Error(`Plugin ${pluginId} not found`);
-    }
-
-    // Sanitize the component path to prevent directory traversal
-    const sanitizedPath = componentPath.replace(/\.\./g, "");
-
-    // The plugins directory is at ../plugins from the server directory
-    const pluginDir = path.join(
-      __dirname, // Start from current file location
-      "..", // Go to server root
-      "..", // Go to project root
-      "plugins",
-      plugin.pluginPath, // Use the stored plugin directory name
-    );
-
-    // First try to load from public directory
-    const publicPath = path.join(pluginDir, "public", sanitizedPath);
-
-    // Ensure the path is within the plugin directory
-    if (!publicPath.startsWith(pluginDir)) {
-      throw new Error("Invalid component path");
-    }
-
-    try {
-      // Try public directory first
-      const content = await fs.readFile(publicPath, "utf-8");
-      return content;
-    } catch (error) {
-      // If not found in public, try root plugin directory (for backward compatibility)
-      const fullPath = path.join(pluginDir, sanitizedPath);
-
-      if (!fullPath.startsWith(pluginDir)) {
-        throw new Error("Invalid component path");
-      }
-
-      try {
-        const content = await fs.readFile(fullPath, "utf-8");
-        return content;
-      } catch (fallbackError) {
-        logger.error(
-          { err: fallbackError, componentPath, pluginName: plugin.name },
-          "Failed to load component",
-        );
-        return null;
-      }
-    }
-  }
 }
 
 export const pluginUIService = new PluginUIService();
