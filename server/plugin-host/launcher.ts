@@ -132,10 +132,11 @@ export function removeWorkerDir(dir: string): void {
 /**
  * Run inside the probe sandbox: exit 0 only if the sandbox has its own mount
  * namespace (the binds above succeeded to get this far) and the seccomp filter
- * refuses a nested user namespace.
+ * refuses a nested user namespace. `unshare` exits 1 when refused; anything else,
+ * including the tool being absent, proves nothing and fails the probe.
  */
 const PROBE_SCRIPT =
-  "const r=require('child_process').spawnSync('unshare',['-U','true']);process.exit(r.status===0?3:0)";
+  "const r=require('child_process').spawnSync('unshare',['-U','true']);process.exit(r.status===1?0:3)";
 
 /** Library directories that exist on this machine (arm64 has no /lib64). */
 function existing(paths: string[]): string[] {

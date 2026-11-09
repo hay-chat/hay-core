@@ -15,8 +15,12 @@ const AUDIT_ARCH_AARCH64 = 0xc00000b7;
 
 const BPF_LD_W_ABS = 0x20;
 const BPF_JEQ_K = 0x15;
+const BPF_JGE_K = 0x35;
 const BPF_JSET_K = 0x45;
 const BPF_RET_K = 0x06;
+
+/** x32 calls share the x86-64 architecture value and are told apart by this bit in the number. */
+const X32_SYSCALL_BIT = 0x40000000;
 
 const SECCOMP_RET_ALLOW = 0x7fff0000;
 const SECCOMP_RET_KILL_PROCESS = 0x80000000;
@@ -191,6 +195,8 @@ export function buildSeccompFilter(arch: string = process.arch): Buffer {
     { code: BPF_RET_K, k: SECCOMP_RET_KILL_PROCESS },
     { label: "arch-ok" },
     ld(0), // seccomp_data.nr
+    // The numbers below are x86-64's; an x32 number would match none of them.
+    ...(arch === "x64" ? [{ code: BPF_JGE_K, k: X32_SYSCALL_BIT, jt: "enosys" }] : []),
     // clone3 passes its flags in memory the filter can't read: report it as
     // missing, and libc falls back to clone, whose flags are checked below.
     { code: BPF_JEQ_K, k: table.clone3, jt: "enosys" },
