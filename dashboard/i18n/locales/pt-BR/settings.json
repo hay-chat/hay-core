@@ -840,7 +840,25 @@
       "delete": "Remover provedor",
       "deleted": "Provedor removido",
       "lastLogin": "Último login com sucesso: {date}",
-      "neverUsed": "Ninguém entrou por este provedor ainda."
+      "neverUsed": "Ninguém entrou por este provedor ainda.",
+      "protocol": "Protocolo",
+      "protocolOidc": "OpenID Connect",
+      "protocolSaml": "SAML 2.0",
+      "protocolHelper": "Qual padrão o seu provedor de identidade usa. Trocar pede os dados do novo provedor e desliga o login obrigatório até você testar.",
+      "descriptionSaml": "Crie um aplicativo SAML 2.0 no seu provedor de identidade com os valores abaixo e informe os dados aqui. As respostas precisam ter a assertion assinada; o login deve começar pelo Hay.",
+      "saml": {
+        "acsUrl": "URL do ACS (URL de resposta)",
+        "entityId": "Entity ID (Audience)",
+        "metadataUrl": "URL de metadados (disponível depois de salvar)",
+        "idpEntityId": "Entity ID do provedor de identidade",
+        "idpEntityIdHelper": "O emissor das assertions do provedor, por exemplo https://idp.exemplo.com/metadata",
+        "ssoUrl": "URL de login único",
+        "ssoUrlHelper": "Para onde o Hay envia o pedido de login (binding HTTP-Redirect)",
+        "certificate": "Certificado de assinatura",
+        "certificateHelper": "Certificado PEM ou base64 com o qual o provedor assina as assertions. Na rotação, adicione o próximo ao lado."
+      },
+      "roleClaimSaml": "Atributo de grupos",
+      "roleClaimSamlHelper": "Nome do atributo da assertion que lista os grupos da pessoa, por exemplo groups. Deixe vazio para dar a todos a função acima."
     },
     "domains": {
       "title": "Domínios de e-mail",

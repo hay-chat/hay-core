@@ -7,41 +7,64 @@
       <Card>
         <CardHeader>
           <CardTitle>{{ $t("sso.provider.title") }}</CardTitle>
-          <CardDescription>{{ $t("sso.provider.description") }}</CardDescription>
+          <CardDescription>
+            {{ isSaml ? $t("sso.provider.descriptionSaml") : $t("sso.provider.description") }}
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <form class="space-y-4" @submit.prevent="saveConnection">
-            <div class="space-y-1">
-              <p class="text-sm font-medium">{{ $t("sso.provider.redirectUri") }}</p>
-              <p class="p-2 border rounded-md font-mono text-sm break-all">{{ redirectUri }}</p>
-            </div>
-
             <Input
-              id="sso-issuer"
-              v-model="form.issuer"
-              :label="$t('sso.provider.issuer')"
-              :helper-text="$t('sso.provider.issuerHelper')"
-              placeholder="https://login.example.com"
-              required
+              v-model="form.protocol"
+              type="select"
+              :label="$t('sso.provider.protocol')"
+              :helper-text="$t('sso.provider.protocolHelper')"
+              :options="protocolOptions"
             />
-            <div class="grid gap-4 md:grid-cols-2">
+
+            <template v-if="!isSaml">
+              <div class="space-y-1">
+                <p class="text-sm font-medium">{{ $t("sso.provider.redirectUri") }}</p>
+                <p class="p-2 border rounded-md font-mono text-sm break-all">{{ redirectUri }}</p>
+              </div>
+
               <Input
-                id="sso-client-id"
-                v-model="form.clientId"
-                :label="$t('sso.provider.clientId')"
-                autocomplete="off"
+                id="sso-issuer"
+                v-model="form.issuer"
+                :label="$t('sso.provider.issuer')"
+                :helper-text="$t('sso.provider.issuerHelper')"
+                placeholder="https://login.example.com"
                 required
               />
-              <Input
-                id="sso-client-secret"
-                v-model="form.clientSecret"
-                type="password"
-                :label="$t('sso.provider.clientSecret')"
-                :placeholder="connection ? $t('sso.provider.clientSecretKept') : ''"
-                autocomplete="new-password"
-                :required="!connection"
-              />
-            </div>
+              <div class="grid gap-4 md:grid-cols-2">
+                <Input
+                  id="sso-client-id"
+                  v-model="form.clientId"
+                  :label="$t('sso.provider.clientId')"
+                  autocomplete="off"
+                  required
+                />
+                <Input
+                  id="sso-client-secret"
+                  v-model="form.clientSecret"
+                  type="password"
+                  :label="$t('sso.provider.clientSecret')"
+                  :placeholder="
+                    connection?.hasClientSecret ? $t('sso.provider.clientSecretKept') : ''
+                  "
+                  autocomplete="new-password"
+                  :required="!connection?.hasClientSecret"
+                />
+              </div>
+            </template>
+
+            <SsoSamlFields
+              v-if="isSaml"
+              v-model:idp-entity-id="form.idpEntityId"
+              v-model:sso-url="form.ssoUrl"
+              v-model:certificate="form.certificate"
+              :details="samlDetails"
+              :saved="connection?.protocol === 'saml'"
+            />
 
             <Input
               v-model="form.defaultRole"
@@ -53,8 +76,10 @@
             <Input
               id="sso-role-claim"
               v-model="form.roleClaim"
-              :label="$t('sso.provider.roleClaim')"
-              :helper-text="$t('sso.provider.roleClaimHelper')"
+              :label="isSaml ? $t('sso.provider.roleClaimSaml') : $t('sso.provider.roleClaim')"
+              :helper-text="
+                isSaml ? $t('sso.provider.roleClaimSamlHelper') : $t('sso.provider.roleClaimHelper')
+              "
               placeholder="groups"
             />
 
@@ -219,10 +244,17 @@ const enforced = ref(false);
 const roles = ref<readonly Role[]>([]);
 const newDomain = ref("");
 
+type Protocol = "oidc" | "saml";
+const saml = ref<Settings["saml"]>({ acsUrl: "", entityId: "", metadataUrl: "" });
+
 const form = reactive({
+  protocol: "oidc" as Protocol,
   issuer: "",
   clientId: "",
   clientSecret: "",
+  idpEntityId: "",
+  ssoUrl: "",
+  certificate: "",
   defaultRole: "member" as Role,
   roleClaim: "",
   mappings: [] as Array<{ group: string; role: Role }>,
@@ -232,6 +264,12 @@ const form = reactive({
 const redirectUri = computed(
   () => connection.value?.redirectUri ?? `${useRuntimeConfig().public.apiBaseUrl}/sso/callback`,
 );
+const isSaml = computed(() => form.protocol === "saml");
+const samlDetails = computed(() => saml.value);
+const protocolOptions = computed(() => [
+  { label: t("sso.provider.protocolOidc"), value: "oidc" },
+  { label: t("sso.provider.protocolSaml"), value: "saml" },
+]);
 const roleOptions = computed(() =>
   roles.value.map((role) => ({ label: role.charAt(0).toUpperCase() + role.slice(1), value: role })),
 );
@@ -244,9 +282,17 @@ const apply = (settings: Settings) => {
   domains.value = settings.domains;
   enforced.value = settings.enforced;
   roles.value = settings.assignableRoles;
+  saml.value = settings.saml;
   if (settings.connection) {
-    form.issuer = settings.connection.issuer;
-    form.clientId = settings.connection.clientId;
+    form.protocol = settings.connection.protocol;
+    if (settings.connection.protocol === "saml") {
+      form.idpEntityId = settings.connection.issuer;
+      form.ssoUrl = settings.connection.samlEntryPoint ?? "";
+      form.certificate = settings.connection.samlCertificate ?? "";
+    } else {
+      form.issuer = settings.connection.issuer;
+      form.clientId = settings.connection.clientId ?? "";
+    }
     form.defaultRole = settings.connection.defaultRole;
     form.roleClaim = settings.connection.roleClaim ?? "";
     form.mappings = Object.entries(settings.connection.roleMapping).map(([group, role]) => ({
@@ -275,15 +321,29 @@ const saveConnection = async () => {
         if (group.trim()) roleMapping[group.trim()] = role;
       }
     }
-    await Hay.sso.saveConnection.mutate({
-      issuer: form.issuer.trim(),
-      clientId: form.clientId.trim(),
-      clientSecret: form.clientSecret || undefined,
+    const common = {
       defaultRole: form.defaultRole,
       roleClaim: form.roleClaim.trim() || null,
       roleMapping,
       enabled: form.enabled,
-    });
+    };
+    await Hay.sso.saveConnection.mutate(
+      form.protocol === "saml"
+        ? {
+            protocol: "saml",
+            idpEntityId: form.idpEntityId.trim(),
+            ssoUrl: form.ssoUrl.trim(),
+            certificate: form.certificate.trim(),
+            ...common,
+          }
+        : {
+            protocol: "oidc",
+            issuer: form.issuer.trim(),
+            clientId: form.clientId.trim(),
+            clientSecret: form.clientSecret || undefined,
+            ...common,
+          },
+    );
     form.clientSecret = "";
     await load();
     toast.success(t("sso.provider.saved"));
@@ -303,6 +363,9 @@ const deleteConnection = async () => {
       issuer: "",
       clientId: "",
       clientSecret: "",
+      idpEntityId: "",
+      ssoUrl: "",
+      certificate: "",
       roleClaim: "",
       mappings: [],
     });

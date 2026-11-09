@@ -840,7 +840,25 @@
       "delete": "Remove provider",
       "deleted": "Provider removed",
       "lastLogin": "Last successful sign-in: {date}",
-      "neverUsed": "Nobody has signed in through this provider yet."
+      "neverUsed": "Nobody has signed in through this provider yet.",
+      "protocol": "Protocol",
+      "protocolOidc": "OpenID Connect",
+      "protocolSaml": "SAML 2.0",
+      "protocolHelper": "Which standard your identity provider uses. Switching asks you to enter the new provider's details and turns off required sign-in until you test it.",
+      "descriptionSaml": "Create a SAML 2.0 application in your identity provider with the values below, then enter its details here. Responses must be signed on the assertion; sign-in must start from Hay.",
+      "saml": {
+        "acsUrl": "ACS URL (Reply URL)",
+        "entityId": "Entity ID (Audience)",
+        "metadataUrl": "Metadata URL (available once saved)",
+        "idpEntityId": "Identity provider entity ID",
+        "idpEntityIdHelper": "The issuer of the provider's assertions, for example https://idp.example.com/metadata",
+        "ssoUrl": "Single sign-on URL",
+        "ssoUrlHelper": "Where Hay sends the sign-in request (HTTP-Redirect binding)",
+        "certificate": "Signing certificate",
+        "certificateHelper": "PEM or base64 certificate the provider signs assertions with. Add the next one beside it during a rotation."
+      },
+      "roleClaimSaml": "Groups attribute",
+      "roleClaimSamlHelper": "Name of the assertion attribute that lists a person's groups, for example groups. Leave empty to give everyone the role above."
     },
     "domains": {
       "title": "Email domains",
