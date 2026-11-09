@@ -372,3 +372,9 @@
 - Failure: a full run failed one retention test that passed alone, because the migration had been edited after it was applied to that worktree's database, and a suite that reverts and re-applies migrations swapped the function definition partway through the run.
 - Signal: a test that fails in the full run, passes in isolation, and touches a database function changed by a recent migration edit.
 - Rule: after editing a migration that has already run, drop that worktree's test database or revert and re-run the migration before trusting any result.
+
+## A streaming response inherits the HTTP client's body timeout
+
+- **Failure:** the stream of worker events used undici's default 5-minute body timeout, so core treated an idle worker as exited.
+- **Signal:** a healthy process reported as stopped after exactly the client's default timeout, with no output before it.
+- **Rule:** when a request stays open for a process lifetime, set its body and headers timeouts explicitly and test it idle past the default.
