@@ -281,6 +281,14 @@ ctx.register.route("/webhook", "POST", async (req, res) => {
 });
 ```
 
+Only routes registered with `{ public: true }` are reachable through Hay's public plugin URL. Use it for provider callbacks, and authenticate the caller in the handler:
+
+```typescript
+ctx.register.route("POST", "/webhook", { public: true }, async (req, res) => {
+  // Verify the provider's signature, then handle the event
+});
+```
+
 #### register.ui.page(page)
 
 Register a UI page (a Vue component built into the plugin's UI bundle):

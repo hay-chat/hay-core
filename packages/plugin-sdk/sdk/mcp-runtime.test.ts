@@ -1,8 +1,29 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { createMcpRuntimeAPI, stopAllMcpServers } from './mcp-runtime.js';
-import type { HayLogger, HayConfigRuntimeAPI, HayAuthRuntimeAPI, McpServerInstance } from '../types/index.js';
+import { describe, it, expect, beforeEach, vi } from "vitest";
+import { createMcpRuntimeAPI, stdioServerEnv, stopAllMcpServers } from "./mcp-runtime.js";
+import type {
+  HayLogger,
+  HayConfigRuntimeAPI,
+  HayAuthRuntimeAPI,
+  McpServerInstance,
+} from "../types/index.js";
 
-describe('MCP Runtime API', () => {
+describe("stdioServerEnv", () => {
+  it("passes the basics and explicit values, not the worker credentials", () => {
+    vi.stubEnv("PATH", "/usr/bin");
+    vi.stubEnv("HAY_ORG_AUTH", "worker-credentials");
+    vi.stubEnv("META_APP_SECRET", "host-secret");
+
+    const env = stdioServerEnv({ API_KEY: "k" });
+
+    expect(env.PATH).toBe("/usr/bin");
+    expect(env.API_KEY).toBe("k");
+    expect(env.HAY_ORG_AUTH).toBeUndefined();
+    expect(env.META_APP_SECRET).toBeUndefined();
+    vi.unstubAllEnvs();
+  });
+});
+
+describe("MCP Runtime API", () => {
   let logger: HayLogger;
   let config: HayConfigRuntimeAPI;
   let auth: HayAuthRuntimeAPI;
@@ -29,19 +50,19 @@ describe('MCP Runtime API', () => {
     onMcpServerStarted = vi.fn();
   });
 
-  describe('Local MCP Server', () => {
-    it('should start a local MCP server', async () => {
+  describe("Local MCP Server", () => {
+    it("should start a local MCP server", async () => {
       const api = createMcpRuntimeAPI({ config, auth, logger, onMcpServerStarted });
 
       const mockInstance: McpServerInstance = {
-        name: 'test-server',
-        version: '1.0.0',
+        name: "test-server",
+        version: "1.0.0",
         stop: vi.fn(),
       };
 
       const initializer = vi.fn(async () => mockInstance);
 
-      await api.startLocal('test-server', initializer);
+      await api.startLocal("test-server", initializer);
 
       expect(initializer).toHaveBeenCalledWith({
         config,
@@ -49,102 +70,102 @@ describe('MCP Runtime API', () => {
         logger,
       });
 
-      expect(logger.info).toHaveBeenCalledWith('Starting local MCP server: test-server');
-      expect(logger.info).toHaveBeenCalledWith('Local MCP server started: test-server');
+      expect(logger.info).toHaveBeenCalledWith("Starting local MCP server: test-server");
+      expect(logger.info).toHaveBeenCalledWith("Local MCP server started: test-server");
 
       expect(onMcpServerStarted).toHaveBeenCalledWith({
-        id: 'test-server',
-        type: 'local',
+        id: "test-server",
+        type: "local",
         instance: mockInstance,
       });
     });
 
-    it('should validate server id is present', async () => {
+    it("should validate server id is present", async () => {
       const api = createMcpRuntimeAPI({ config, auth, logger });
 
       await expect(
-        api.startLocal('', async () => ({ name: 'test', version: '1.0.0' })),
-      ).rejects.toThrow('MCP server id must be a non-empty string');
+        api.startLocal("", async () => ({ name: "test", version: "1.0.0" })),
+      ).rejects.toThrow("MCP server id must be a non-empty string");
     });
 
-    it('should validate initializer is a function', async () => {
+    it("should validate initializer is a function", async () => {
       const api = createMcpRuntimeAPI({ config, auth, logger });
 
-      await expect(
-        api.startLocal('test', 'not-a-function' as any),
-      ).rejects.toThrow('MCP server initializer must be a function');
+      await expect(api.startLocal("test", "not-a-function" as any)).rejects.toThrow(
+        "MCP server initializer must be a function",
+      );
     });
 
-    it('should prevent duplicate server IDs', async () => {
+    it("should prevent duplicate server IDs", async () => {
       const api = createMcpRuntimeAPI({ config, auth, logger });
 
       const initializer = async () => ({
-        name: 'test',
-        version: '1.0.0',
+        name: "test",
+        version: "1.0.0",
       });
 
-      await api.startLocal('duplicate-id', initializer);
+      await api.startLocal("duplicate-id", initializer);
 
-      await expect(
-        api.startLocal('duplicate-id', initializer),
-      ).rejects.toThrow('MCP server with id "duplicate-id" is already running');
+      await expect(api.startLocal("duplicate-id", initializer)).rejects.toThrow(
+        'MCP server with id "duplicate-id" is already running',
+      );
     });
 
-    it('should validate initializer returns an object', async () => {
+    it("should validate initializer returns an object", async () => {
       const api = createMcpRuntimeAPI({ config, auth, logger });
 
       const badInitializer = async () => null as any;
 
-      await expect(
-        api.startLocal('test', badInitializer),
-      ).rejects.toThrow('must return an object (McpServerInstance)');
+      await expect(api.startLocal("test", badInitializer)).rejects.toThrow(
+        "must return an object (McpServerInstance)",
+      );
     });
 
-    it('should support sync initializers', async () => {
+    it("should support sync initializers", async () => {
       const api = createMcpRuntimeAPI({ config, auth, logger, onMcpServerStarted });
 
       const mockInstance: McpServerInstance = {
-        name: 'sync-server',
-        version: '1.0.0',
+        name: "sync-server",
+        version: "1.0.0",
       };
 
       const syncInitializer = () => mockInstance;
 
-      await api.startLocal('sync-server', syncInitializer);
+      await api.startLocal("sync-server", syncInitializer);
 
       expect(onMcpServerStarted).toHaveBeenCalledWith({
-        id: 'sync-server',
-        type: 'local',
+        id: "sync-server",
+        type: "local",
         instance: mockInstance,
       });
     });
 
-    it('should handle initializer errors gracefully', async () => {
+    it("should handle initializer errors gracefully", async () => {
       const api = createMcpRuntimeAPI({ config, auth, logger });
 
       const errorInitializer = async () => {
-        throw new Error('Initialization failed');
+        throw new Error("Initialization failed");
       };
 
-      await expect(
-        api.startLocal('error-server', errorInitializer),
-      ).rejects.toThrow('Initialization failed');
+      await expect(api.startLocal("error-server", errorInitializer)).rejects.toThrow(
+        "Initialization failed",
+      );
 
       expect(logger.error).toHaveBeenCalledWith(
-        'Failed to start local MCP server: error-server',
+        "Failed to start local MCP server: error-server",
         expect.any(Error),
       );
     });
 
-    it('should pass context to initializer', async () => {
+    it("should pass context to initializer", async () => {
       const api = createMcpRuntimeAPI({ config, auth, logger });
 
       const initializer = vi.fn(async (ctx) => ({
-        name: 'context-test',
-        version: '1.0.0',
+        name: "context-test",
+        version: "1.0.0",
       }));
 
-      await api.startLocal('context-test', initializer);
+      await api.startLocal("context-test", initializer);
 
       expect(initializer).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -155,229 +176,252 @@ describe('MCP Runtime API', () => {
       );
     });
 
-    it('should log debug info about server instance', async () => {
+    it("should log debug info about server instance", async () => {
       const api = createMcpRuntimeAPI({ config, auth, logger });
 
       const instanceWithStop: McpServerInstance = {
-        name: 'test',
-        version: '1.0.0',
+        name: "test",
+        version: "1.0.0",
         stop: vi.fn(),
       };
 
-      await api.startLocal('test', async () => instanceWithStop);
+      await api.startLocal("test", async () => instanceWithStop);
 
-      expect(logger.debug).toHaveBeenCalledWith('MCP server instance', {
-        id: 'test',
+      expect(logger.debug).toHaveBeenCalledWith("MCP server instance", {
+        id: "test",
         hasStop: true,
       });
     });
   });
 
-  describe('Tool risk declarations', () => {
-    const toolRisk = { read: ['list_things'], write: { create_thing: 'note' as const } };
+  describe("Tool risk declarations", () => {
+    const toolRisk = { read: ["list_things"], write: { create_thing: "note" as const } };
 
-    it('carries toolRisk from startLocal and startExternal registrations', async () => {
-      const api = createMcpRuntimeAPI({ config, auth, logger, pluginDir: '/tmp', onMcpServerStarted });
+    it("carries toolRisk from startLocal and startExternal registrations", async () => {
+      const api = createMcpRuntimeAPI({
+        config,
+        auth,
+        logger,
+        pluginDir: "/tmp",
+        onMcpServerStarted,
+      });
       const instance: McpServerInstance = { listTools: async () => [] };
 
-      await api.startLocal('local-risk', () => instance, { toolRisk });
-      await api.startExternal({ id: 'remote-risk', url: 'https://mcp.example.com', toolRisk });
+      await api.startLocal("local-risk", () => instance, { toolRisk });
+      await api.startExternal({ id: "remote-risk", url: "https://mcp.example.com", toolRisk });
 
-      expect(onMcpServerStarted).toHaveBeenCalledWith({ id: 'local-risk', type: 'local', instance, toolRisk });
+      expect(onMcpServerStarted).toHaveBeenCalledWith({
+        id: "local-risk",
+        type: "local",
+        instance,
+        toolRisk,
+      });
       expect(onMcpServerStarted).toHaveBeenCalledWith(
-        expect.objectContaining({ id: 'remote-risk', type: 'external', toolRisk }),
+        expect.objectContaining({ id: "remote-risk", type: "external", toolRisk }),
       );
     });
 
-    it('rejects an unknown category at registration', async () => {
-      const api = createMcpRuntimeAPI({ config, auth, logger, pluginDir: '/tmp', onMcpServerStarted });
-      const bad = { write: { pay: 'payment' } } as any;
+    it("rejects an unknown category at registration", async () => {
+      const api = createMcpRuntimeAPI({
+        config,
+        auth,
+        logger,
+        pluginDir: "/tmp",
+        onMcpServerStarted,
+      });
+      const bad = { write: { pay: "payment" } } as any;
 
-      await expect(api.startLocal('bad-local', () => ({}), { toolRisk: bad })).rejects.toThrow(
+      await expect(api.startLocal("bad-local", () => ({}), { toolRisk: bad })).rejects.toThrow(
         /Unknown tool category/,
       );
       await expect(
-        api.startExternal({ id: 'bad-remote', url: 'https://mcp.example.com', toolRisk: bad }),
+        api.startExternal({ id: "bad-remote", url: "https://mcp.example.com", toolRisk: bad }),
       ).rejects.toThrow(/Unknown tool category/);
       await expect(
-        api.startLocalStdio({ id: 'bad-stdio', command: 'node', args: [], cwd: '.', toolRisk: bad }),
+        api.startLocalStdio({
+          id: "bad-stdio",
+          command: "node",
+          args: [],
+          cwd: ".",
+          toolRisk: bad,
+        }),
       ).rejects.toThrow(/Unknown tool category/);
       expect(onMcpServerStarted).not.toHaveBeenCalled();
     });
   });
 
-  describe('External MCP Server', () => {
-    it('should start an external MCP server', async () => {
+  describe("External MCP Server", () => {
+    it("should start an external MCP server", async () => {
       const api = createMcpRuntimeAPI({ config, auth, logger, onMcpServerStarted });
 
       await api.startExternal({
-        id: 'external-server',
-        url: 'http://localhost:3000',
+        id: "external-server",
+        url: "http://localhost:3000",
       });
 
-      expect(logger.info).toHaveBeenCalledWith('Starting external MCP server: external-server', {
-        url: 'http://localhost:3000',
+      expect(logger.info).toHaveBeenCalledWith("Starting external MCP server: external-server", {
+        url: "http://localhost:3000",
       });
 
-      expect(logger.info).toHaveBeenCalledWith('External MCP server started: external-server', {
-        url: 'http://localhost:3000',
+      expect(logger.info).toHaveBeenCalledWith("External MCP server started: external-server", {
+        url: "http://localhost:3000",
       });
 
       expect(onMcpServerStarted).toHaveBeenCalledWith({
-        id: 'external-server',
-        type: 'external',
+        id: "external-server",
+        type: "external",
         options: {
-          id: 'external-server',
-          url: 'http://localhost:3000',
+          id: "external-server",
+          url: "http://localhost:3000",
         },
       });
     });
 
-    it('should validate options is an object', async () => {
+    it("should validate options is an object", async () => {
       const api = createMcpRuntimeAPI({ config, auth, logger });
 
-      await expect(
-        api.startExternal(null as any),
-      ).rejects.toThrow('External MCP options must be an object');
+      await expect(api.startExternal(null as any)).rejects.toThrow(
+        "External MCP options must be an object",
+      );
     });
 
-    it('should validate server id is present', async () => {
+    it("should validate server id is present", async () => {
       const api = createMcpRuntimeAPI({ config, auth, logger });
 
-      await expect(
-        api.startExternal({ id: '', url: 'http://localhost:3000' }),
-      ).rejects.toThrow('External MCP server id must be a non-empty string');
+      await expect(api.startExternal({ id: "", url: "http://localhost:3000" })).rejects.toThrow(
+        "External MCP server id must be a non-empty string",
+      );
     });
 
-    it('should validate url is present', async () => {
+    it("should validate url is present", async () => {
       const api = createMcpRuntimeAPI({ config, auth, logger });
 
-      await expect(
-        api.startExternal({ id: 'test', url: '' }),
-      ).rejects.toThrow('External MCP server url must be a non-empty string');
+      await expect(api.startExternal({ id: "test", url: "" })).rejects.toThrow(
+        "External MCP server url must be a non-empty string",
+      );
     });
 
-    it('should prevent duplicate server IDs', async () => {
+    it("should prevent duplicate server IDs", async () => {
       const api = createMcpRuntimeAPI({ config, auth, logger });
 
-      await api.startExternal({ id: 'duplicate', url: 'http://localhost:3000' });
+      await api.startExternal({ id: "duplicate", url: "http://localhost:3000" });
 
       await expect(
-        api.startExternal({ id: 'duplicate', url: 'http://localhost:3001' }),
+        api.startExternal({ id: "duplicate", url: "http://localhost:3001" }),
       ).rejects.toThrow('MCP server with id "duplicate" is already running');
     });
 
-    it('should support auth headers', async () => {
+    it("should support auth headers", async () => {
       const api = createMcpRuntimeAPI({ config, auth, logger, onMcpServerStarted });
 
       await api.startExternal({
-        id: 'auth-server',
-        url: 'http://localhost:3000',
+        id: "auth-server",
+        url: "http://localhost:3000",
         authHeaders: {
-          Authorization: 'Bearer token123',
+          Authorization: "Bearer token123",
         },
       });
 
       expect(onMcpServerStarted).toHaveBeenCalledWith({
-        id: 'auth-server',
-        type: 'external',
+        id: "auth-server",
+        type: "external",
         options: {
-          id: 'auth-server',
-          url: 'http://localhost:3000',
+          id: "auth-server",
+          url: "http://localhost:3000",
           authHeaders: {
-            Authorization: 'Bearer token123',
+            Authorization: "Bearer token123",
           },
         },
       });
     });
 
-    it('should validate authHeaders is an object', async () => {
+    it("should validate authHeaders is an object", async () => {
       const api = createMcpRuntimeAPI({ config, auth, logger });
 
       await expect(
         api.startExternal({
-          id: 'test',
-          url: 'http://localhost:3000',
-          authHeaders: 'not-an-object' as any,
+          id: "test",
+          url: "http://localhost:3000",
+          authHeaders: "not-an-object" as any,
         }),
-      ).rejects.toThrow('External MCP server authHeaders must be an object');
+      ).rejects.toThrow("External MCP server authHeaders must be an object");
     });
 
-    it('should handle server start errors', async () => {
+    it("should handle server start errors", async () => {
       const api = createMcpRuntimeAPI({
         config,
         auth,
         logger,
         onMcpServerStarted: async () => {
-          throw new Error('Platform error');
+          throw new Error("Platform error");
         },
       });
 
       await expect(
-        api.startExternal({ id: 'error-server', url: 'http://localhost:3000' }),
-      ).rejects.toThrow('Platform error');
+        api.startExternal({ id: "error-server", url: "http://localhost:3000" }),
+      ).rejects.toThrow("Platform error");
 
       expect(logger.error).toHaveBeenCalledWith(
-        'Failed to start external MCP server: error-server',
+        "Failed to start external MCP server: error-server",
         expect.any(Error),
       );
     });
   });
 
-  describe('Mixed Server Types', () => {
-    it('should allow both local and external servers with different IDs', async () => {
+  describe("Mixed Server Types", () => {
+    it("should allow both local and external servers with different IDs", async () => {
       const api = createMcpRuntimeAPI({ config, auth, logger, onMcpServerStarted });
 
-      await api.startLocal('local-server', async () => ({
-        name: 'local',
-        version: '1.0.0',
+      await api.startLocal("local-server", async () => ({
+        name: "local",
+        version: "1.0.0",
       }));
 
       await api.startExternal({
-        id: 'external-server',
-        url: 'http://localhost:3000',
+        id: "external-server",
+        url: "http://localhost:3000",
       });
 
       expect(onMcpServerStarted).toHaveBeenCalledTimes(2);
     });
 
-    it('should prevent duplicate IDs across server types', async () => {
+    it("should prevent duplicate IDs across server types", async () => {
       const api = createMcpRuntimeAPI({ config, auth, logger });
 
-      await api.startLocal('duplicate-id', async () => ({
-        name: 'local',
-        version: '1.0.0',
+      await api.startLocal("duplicate-id", async () => ({
+        name: "local",
+        version: "1.0.0",
       }));
 
       await expect(
-        api.startExternal({ id: 'duplicate-id', url: 'http://localhost:3000' }),
+        api.startExternal({ id: "duplicate-id", url: "http://localhost:3000" }),
       ).rejects.toThrow('MCP server with id "duplicate-id" is already running');
     });
   });
 
-  describe('stopAllMcpServers', () => {
-    it('should stop all local MCP servers', async () => {
+  describe("stopAllMcpServers", () => {
+    it("should stop all local MCP servers", async () => {
       const servers = new Map();
 
       const stopFn1 = vi.fn(async () => {});
       const stopFn2 = vi.fn(async () => {});
 
-      servers.set('server1', {
-        id: 'server1',
-        type: 'local',
+      servers.set("server1", {
+        id: "server1",
+        type: "local",
         instance: {
-          name: 'server1',
-          version: '1.0.0',
+          name: "server1",
+          version: "1.0.0",
           stop: stopFn1,
         },
       });
 
-      servers.set('server2', {
-        id: 'server2',
-        type: 'local',
+      servers.set("server2", {
+        id: "server2",
+        type: "local",
         instance: {
-          name: 'server2',
-          version: '1.0.0',
+          name: "server2",
+          version: "1.0.0",
           stop: stopFn2,
         },
       });
@@ -387,18 +431,18 @@ describe('MCP Runtime API', () => {
       expect(stopFn1).toHaveBeenCalled();
       expect(stopFn2).toHaveBeenCalled();
       expect(servers.size).toBe(0);
-      expect(logger.debug).toHaveBeenCalledWith('All MCP servers stopped');
+      expect(logger.debug).toHaveBeenCalledWith("All MCP servers stopped");
     });
 
-    it('should skip servers without stop method', async () => {
+    it("should skip servers without stop method", async () => {
       const servers = new Map();
 
-      servers.set('server1', {
-        id: 'server1',
-        type: 'local',
+      servers.set("server1", {
+        id: "server1",
+        type: "local",
         instance: {
-          name: 'server1',
-          version: '1.0.0',
+          name: "server1",
+          version: "1.0.0",
           // No stop method
         },
       });
@@ -406,18 +450,18 @@ describe('MCP Runtime API', () => {
       await stopAllMcpServers(servers, logger);
 
       expect(servers.size).toBe(0);
-      expect(logger.debug).toHaveBeenCalledWith('All MCP servers stopped');
+      expect(logger.debug).toHaveBeenCalledWith("All MCP servers stopped");
     });
 
-    it('should skip external servers', async () => {
+    it("should skip external servers", async () => {
       const servers = new Map();
 
-      servers.set('external', {
-        id: 'external',
-        type: 'external',
+      servers.set("external", {
+        id: "external",
+        type: "external",
         options: {
-          id: 'external',
-          url: 'http://localhost:3000',
+          id: "external",
+          url: "http://localhost:3000",
         },
       });
 
@@ -426,19 +470,19 @@ describe('MCP Runtime API', () => {
       expect(servers.size).toBe(0);
     });
 
-    it('should handle stop errors gracefully', async () => {
+    it("should handle stop errors gracefully", async () => {
       const servers = new Map();
 
       const errorStopFn = vi.fn(async () => {
-        throw new Error('Stop failed');
+        throw new Error("Stop failed");
       });
 
-      servers.set('error-server', {
-        id: 'error-server',
-        type: 'local',
+      servers.set("error-server", {
+        id: "error-server",
+        type: "local",
         instance: {
-          name: 'error-server',
-          version: '1.0.0',
+          name: "error-server",
+          version: "1.0.0",
           stop: errorStopFn,
         },
       });
@@ -447,36 +491,36 @@ describe('MCP Runtime API', () => {
 
       expect(errorStopFn).toHaveBeenCalled();
       expect(logger.error).toHaveBeenCalledWith(
-        'Error stopping MCP server: error-server',
+        "Error stopping MCP server: error-server",
         expect.any(Error),
       );
       expect(servers.size).toBe(0);
     });
 
-    it('should clear all servers even if some fail to stop', async () => {
+    it("should clear all servers even if some fail to stop", async () => {
       const servers = new Map();
 
       const successStopFn = vi.fn(async () => {});
       const errorStopFn = vi.fn(async () => {
-        throw new Error('Stop failed');
+        throw new Error("Stop failed");
       });
 
-      servers.set('success-server', {
-        id: 'success-server',
-        type: 'local',
+      servers.set("success-server", {
+        id: "success-server",
+        type: "local",
         instance: {
-          name: 'success-server',
-          version: '1.0.0',
+          name: "success-server",
+          version: "1.0.0",
           stop: successStopFn,
         },
       });
 
-      servers.set('error-server', {
-        id: 'error-server',
-        type: 'local',
+      servers.set("error-server", {
+        id: "error-server",
+        type: "local",
         instance: {
-          name: 'error-server',
-          version: '1.0.0',
+          name: "error-server",
+          version: "1.0.0",
           stop: errorStopFn,
         },
       });

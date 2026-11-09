@@ -15,6 +15,7 @@ import type {
   OAuth2AuthOptions,
   HttpMethod,
   RouteHandler,
+  RouteOptions,
   PluginPage,
   CronJobOptions,
   WebhookDedupeDescriptor,
@@ -141,14 +142,24 @@ export function createRegisterAPI(options: RegisterAPIOptions): HayRegisterAPI {
 
   // Create main register API
   const registerAPI: HayRegisterAPI = {
-    route(method: HttpMethod, path: string, handler: RouteHandler): void {
+    route(
+      method: HttpMethod,
+      path: string,
+      optionsOrHandler: RouteOptions | RouteHandler,
+      maybeHandler?: RouteHandler,
+    ): void {
+      const [options, handler] =
+        typeof optionsOrHandler === "function"
+          ? [{}, optionsOrHandler]
+          : [optionsOrHandler, maybeHandler as RouteHandler];
+
       // Validate inputs
       validateHttpMethod(method);
       validateRoutePath(path);
       validateRouteHandler(handler);
 
       // Register the route
-      registry.registerRoute({ method, path, handler });
+      registry.registerRoute({ method, path, handler, public: options.public === true });
 
       logger.debug("Registered route", { method, path });
     },

@@ -666,7 +666,7 @@ export default defineHayPlugin((globalCtx) => {
 
       // Disputes (D2-8). A webhook body is a hint only: the dispute is re-read with
       // the shop's own token before anything is reported.
-      ctx.register.route("POST", "/webhook", async (req, res) => {
+      ctx.register.route("POST", "/webhook", { public: true }, async (req, res) => {
         const topic = complianceTopic(req.headers);
         if (topic) {
           await handleComplianceWebhook(topic, req, res, {

@@ -186,12 +186,15 @@ export class PluginAssetService {
 
   /**
    * Read the first thumbnail that exists in the plugin directory, honouring the
-   * svg > png > jpg priority order. Returns null if none exist.
+   * svg > png > jpg priority order. Returns null if none exist. Only core
+   * plugins may use SVG, which is a document rather than an image.
    */
   private async readThumbnail(
     pluginDir: string,
+    sourceType: PluginRegistry["sourceType"],
   ): Promise<{ content: Buffer; contentType: string } | null> {
     for (const candidate of PluginAssetService.thumbnailCandidates) {
+      if (candidate.contentType === "image/svg+xml" && sourceType !== "core") continue;
       try {
         const content = await fs.readFile(path.join(pluginDir, candidate.file));
         return { content, contentType: candidate.contentType };
@@ -244,7 +247,7 @@ export class PluginAssetService {
     const pluginDir = pluginDirFor(plugin.pluginPath);
 
     try {
-      const thumbnail = await this.readThumbnail(pluginDir);
+      const thumbnail = await this.readThumbnail(pluginDir, plugin.sourceType);
       if (!thumbnail) {
         res.status(404).json({ error: "Thumbnail not found" });
         return;
@@ -341,10 +344,10 @@ export class PluginAssetService {
       return;
     }
 
-    // Find the plugin
+    // The route is unauthenticated, so it only exposes first-party files.
     const plugin = await pluginRegistryRepository.findByPluginId(pluginName);
 
-    if (!plugin) {
+    if (plugin?.sourceType !== "core") {
       res.status(404).json({ error: "Plugin not found" });
       return;
     }

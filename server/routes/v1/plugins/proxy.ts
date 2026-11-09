@@ -89,16 +89,20 @@ router.all(/^\/([^/]+)\/(.*)?$/, async (req: Request, res: Response): Promise<vo
       return;
     }
 
-    // Only routes the plugin declared with register.route() are reachable. When
-    // metadata is cached, check before waking a worker; otherwise after start.
-    const cachedRoutes = pluginManagerService.getPlugin(pluginId)?.metadata?.routes;
-    if (cachedRoutes && !isDeclaredRoute(cachedRoutes, req.method, path)) {
+    // Only routes the plugin declared public with register.route() are
+    // reachable. Check up front when the cached metadata is current, so a bad
+    // path wakes nothing; otherwise the check after start decides.
+    const cachedPlugin = pluginManagerService.getPlugin(pluginId);
+    if (
+      cachedPlugin?.metadataState === "fresh" &&
+      !isPublicRoute(cachedPlugin.metadata?.routes ?? [], req.method, path)
+    ) {
       res.status(404).json({ error: "Not found" });
       return;
     }
 
     if (!getPluginRunnerService().isRunning(organizationId, pluginId)) {
-      if (!takeColdStartSlot(pluginId)) {
+      if (!takeColdStartSlot(pluginId, organizationId, req.ip ?? "unknown")) {
         res.setHeader("Retry-After", String(Math.ceil(COLD_START_WINDOW_MS / 1000)));
         res.status(429).json({ error: "Too many requests" });
         return;
@@ -123,7 +127,7 @@ router.all(/^\/([^/]+)\/(.*)?$/, async (req: Request, res: Response): Promise<vo
     }
 
     const declaredRoutes = pluginManagerService.getPlugin(pluginId)?.metadata?.routes ?? [];
-    if (!isDeclaredRoute(declaredRoutes, req.method, path)) {
+    if (!isPublicRoute(declaredRoutes, req.method, path)) {
       res.status(404).json({ error: "Not found" });
       return;
     }
@@ -146,10 +150,13 @@ router.all(/^\/([^/]+)\/(.*)?$/, async (req: Request, res: Response): Promise<vo
       // Copy status
       res.status(response.status);
 
-      // Copy headers
+      // A worker's response is served from the API origin, so only inert
+      // headers carry over and it can never render as an active document.
       response.headers.forEach((value, key) => {
-        res.setHeader(key, value);
+        if (FORWARDED_RESPONSE_HEADERS.has(key.toLowerCase())) res.setHeader(key, value);
       });
+      res.setHeader("X-Content-Type-Options", "nosniff");
+      res.setHeader("Content-Security-Policy", "sandbox");
 
       // Stream body
       const data = await response.text();
@@ -199,6 +206,15 @@ export function isDeclaredRoute(
   });
 }
 
+/** Whether `method path` matches a route the plugin explicitly exposed. */
+function isPublicRoute(routes: RouteDescriptor[], method: string, path: string): boolean {
+  return isDeclaredRoute(
+    routes.filter((route) => route.public === true),
+    method,
+    path,
+  );
+}
+
 /** Path segments without the leading/trailing slash; null for empty segments. */
 function pathSegments(path: string): string[] | null {
   const trimmed = path.replace(/^\//, "").replace(/\/$/, "");
@@ -210,21 +226,71 @@ function pathSegments(path: string): string[] | null {
 // Upper bound for a plugin route to answer a forwarded request.
 const WORKER_FORWARD_TIMEOUT_MS = 30_000;
 
-// Cold starts (waking a worker that isn't running) per plugin, per window. The
-// proxy is unauthenticated, so this bounds how fast it can spin up workers.
-const COLD_START_WINDOW_MS = 60_000;
-const MAX_COLD_STARTS_PER_WINDOW = 30;
-const coldStarts = new Map<string, { windowStart: number; count: number }>();
+/** Worker response headers the public proxy passes on. */
+const FORWARDED_RESPONSE_HEADERS = new Set([
+  "content-type",
+  "content-language",
+  "cache-control",
+  "etag",
+  "last-modified",
+  "retry-after",
+]);
 
-/** Whether the proxy may cold-start another worker for `pluginId` right now. */
-export function takeColdStartSlot(pluginId: string, now = Date.now()): boolean {
-  const entry = coldStarts.get(pluginId);
+// Cold starts (waking a worker that isn't running) per window. The proxy is
+// unauthenticated, so budgets bound how fast it can spin up workers. One per
+// plugin + organization, so traffic for one org can't starve another's, and one
+// per client IP. The IP budget is higher because a provider delivers webhooks
+// for many organizations from few addresses.
+const COLD_START_WINDOW_MS = 60_000;
+const MAX_COLD_STARTS_PER_INSTANCE = 30;
+const MAX_COLD_STARTS_PER_IP = 120;
+const MAX_TRACKED_COLD_START_KEYS = 10_000;
+
+interface ColdStartWindow {
+  windowStart: number;
+  count: number;
+}
+const coldStarts = new Map<string, ColdStartWindow>();
+
+/** The current window of `key`, unless its budget is already spent. */
+function openColdStartWindow(key: string, limit: number, now: number): ColdStartWindow | null {
+  const entry = coldStarts.get(key);
   if (!entry || now - entry.windowStart >= COLD_START_WINDOW_MS) {
-    coldStarts.set(pluginId, { windowStart: now, count: 1 });
-    return true;
+    return { windowStart: now, count: 0 };
   }
-  if (entry.count >= MAX_COLD_STARTS_PER_WINDOW) return false;
-  entry.count += 1;
+  return entry.count < limit ? entry : null;
+}
+
+/** Keep the budget map bounded: drop expired windows, then the oldest ones. */
+function pruneColdStarts(now: number): void {
+  if (coldStarts.size < MAX_TRACKED_COLD_START_KEYS) return;
+  for (const [key, entry] of coldStarts) {
+    if (now - entry.windowStart >= COLD_START_WINDOW_MS) coldStarts.delete(key);
+  }
+  for (const key of coldStarts.keys()) {
+    if (coldStarts.size < MAX_TRACKED_COLD_START_KEYS) break;
+    coldStarts.delete(key);
+  }
+}
+
+/** Whether the proxy may cold-start this organization's worker for this client right now. */
+export function takeColdStartSlot(
+  pluginId: string,
+  organizationId: string,
+  ip: string,
+  now = Date.now(),
+): boolean {
+  const instanceKey = `instance:${pluginId}:${organizationId}`;
+  const ipKey = `ip:${ip}`;
+  const instance = openColdStartWindow(instanceKey, MAX_COLD_STARTS_PER_INSTANCE, now);
+  const client = openColdStartWindow(ipKey, MAX_COLD_STARTS_PER_IP, now);
+  if (!instance || !client) return false;
+
+  pruneColdStarts(now);
+  instance.count += 1;
+  client.count += 1;
+  coldStarts.set(instanceKey, instance);
+  coldStarts.set(ipKey, client);
   return true;
 }
 

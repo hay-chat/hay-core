@@ -26,7 +26,8 @@
     "env": [
       "RESEND_API_KEY",
       "EMAIL_INBOUND_DOMAIN",
-      "SMTP_FROM_EMAIL"
+      "SMTP_FROM_EMAIL",
+      "RESEND_WEBHOOK_SECRET"
     ]
   },
   "scripts": {

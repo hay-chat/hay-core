@@ -102,7 +102,7 @@ export default defineHayPlugin((globalCtx) => {
 
       // Disputes (D2-7). A webhook body is a hint only: the dispute is re-read
       // from Stripe with the merchant's key before anything is reported.
-      ctx.register.route("POST", "/webhook", async (req, res) => {
+      ctx.register.route("POST", "/webhook", { public: true }, async (req, res) => {
         const id = disputeIdFromEvent(req.body);
         if (!id || !disputes) {
           res.status(200).json({ received: true, handled: false });

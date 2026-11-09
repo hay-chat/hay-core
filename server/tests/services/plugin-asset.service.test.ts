@@ -185,6 +185,25 @@ describe("plugin asset serving", () => {
     expect(traversal.captured.statusCode).toBe(404);
   });
 
+  it("does not expose public files or SVG thumbnails of uploaded plugins", async () => {
+    findByPluginId.mockResolvedValue({
+      pluginId: "demo",
+      pluginPath: "demo",
+      sourceType: "custom",
+    });
+
+    const file = mockResponse();
+    await service.servePublicFile(
+      mockRequest({ pluginName: "demo", filePath: "logo.txt" }),
+      file.res,
+    );
+    expect(file.captured.statusCode).toBe(404);
+
+    const thumbnail = mockResponse();
+    await service.serveThumbnail(mockRequest({ pluginName: "demo" }), thumbnail.res);
+    expect(thumbnail.captured.statusCode).toBe(404);
+  });
+
   it("serves HTML from a plugin directory as a sandboxed download", async () => {
     for (let i = 0; i < 2; i++) {
       // Second pass exercises the cached branch.
