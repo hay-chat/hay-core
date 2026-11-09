@@ -10,7 +10,7 @@ const api = vi.hoisted(() => ({
   get: vi.fn(),
   checkQuestions: vi.fn(),
   dismiss: vi.fn(),
-  addAnswer: vi.fn(),
+  updateQuestion: vi.fn(),
 }));
 vi.mock("@/composables/useDomain", () => ({
   useDomain: () => ({ getApiUrl: (path: string) => `http://api${path}` }),
@@ -21,7 +21,7 @@ vi.mock("@/utils/api", () => ({
       get: { query: api.get },
       checkQuestions: { mutate: api.checkQuestions },
       dismiss: { mutate: api.dismiss },
-      addAnswer: { mutate: api.addAnswer },
+      updateQuestion: { mutate: api.updateQuestion },
     },
   },
   HayApi: {},
@@ -263,7 +263,7 @@ describe("setup page", () => {
   });
 
   it("saves an answer for a missing row through the server and shows the rechecked board", async () => {
-    api.addAnswer.mockResolvedValue(
+    api.updateQuestion.mockResolvedValue(
       board({ rows: [row({ id: "a", status: "ready" }), row({ id: "b", status: "ready" })] }),
     );
     const wrapper = mountWithStubs(SetupPage);
@@ -273,12 +273,13 @@ describe("setup page", () => {
       .find((b) => b.text() === "setup.action.addAnswer")!
       .trigger("click");
     await wrapper.get("textarea").setValue("Yes, we ship to Canada.");
-    await wrapper.get("form").trigger("submit");
+    await wrapper.get("[data-testid=setup-panel]").trigger("submit");
     await flushPromises();
-    expect(api.addAnswer).toHaveBeenCalledWith({
+    expect(api.updateQuestion).toHaveBeenCalledWith({
       questionId: "b",
       answer: "Yes, we ship to Canada.",
     });
+    expect(wrapper.find("[data-testid=setup-panel]").exists()).toBe(false);
     expect(wrapper.findAll("[data-row-id]").map((r) => r.attributes("data-status"))).toEqual([
       "ready",
       "ready",

@@ -8,7 +8,18 @@ import { board, row } from "./fixtures";
 vi.mock("@/composables/useDomain", () => ({
   useDomain: () => ({ getApiUrl: (path: string) => `http://api${path}` }),
 }));
-vi.mock("@/utils/api", () => ({ Hay: {}, HayApi: {} }));
+const api = vi.hoisted(() => ({
+  getAnswer: vi.fn(),
+  draftAnswer: vi.fn(),
+  search: vi.fn(),
+}));
+vi.mock("@/utils/api", () => ({
+  Hay: {
+    setup: { getAnswer: { query: api.getAnswer }, draftAnswer: { mutate: api.draftAnswer } },
+    documents: { search: { query: api.search } },
+  },
+  HayApi: {},
+}));
 vi.mock("@/utils/route-access", async () => ({
   hasRouteAccess: (await import("./fixtures")).hasRouteAccess,
 }));
@@ -109,15 +120,15 @@ describe("SetupRow", () => {
     expect(tryIt.attributes("aria-label")).toContain("Question r1");
   });
 
-  it("missing expands to a labelled textarea and saves the answer", async () => {
+  it("missing expands to a labelled textarea and saves only the answer", async () => {
     const wrapper = mountRow("missing", {}, { expanded: true });
     expect(wrapper.text()).toContain("setup.status.missing");
     expect(wrapper.text()).toContain("setup.why.missingSite");
     const field = wrapper.get("textarea");
-    expect(wrapper.get("label").attributes("for")).toBe(field.attributes("id"));
+    expect(wrapper.get(`label[for="${field.attributes("id")}"]`).exists()).toBe(true);
     await field.setValue("  Yes, we ship to Canada.  ");
     await wrapper.get("form").trigger("submit");
-    expect(wrapper.emitted("save")).toEqual([["Yes, we ship to Canada."]]);
+    expect(wrapper.emitted("save")).toEqual([[{ answer: "Yes, we ship to Canada." }]]);
   });
 
   it("missing says documents, not website, when there is no site", () => {
@@ -174,16 +185,19 @@ describe("SetupRow", () => {
     for (const status of ["checking", "reading_site"] as const) {
       const wrapper = mountRow(status);
       expect(wrapper.text()).toContain(`setup.status.${status}`);
-      expect(wrapper.findAll("button")).toHaveLength(1); // only remove
+      expect(wrapper.findAll("button")).toHaveLength(1); // only the chevron
     }
   });
 
-  it("remove is labelled with the question", async () => {
+  it("the chevron is labelled with the question, toggles the panel and reflects it", async () => {
     const wrapper = mountRow("ready");
-    const remove = wrapper.get('button[aria-label^="setup.board.remove"]');
-    expect(remove.attributes("aria-label")).toContain("Question r1");
-    await remove.trigger("click");
-    expect(wrapper.emitted("remove")).toHaveLength(1);
+    const chevron = wrapper.get('button[data-row-action="edit"]');
+    expect(chevron.attributes("aria-label")).toContain("Question r1");
+    expect(chevron.attributes("aria-expanded")).toBe("false");
+    await chevron.trigger("click");
+    expect(wrapper.emitted("toggle")).toHaveLength(1);
+    await wrapper.setProps({ expanded: true });
+    expect(wrapper.get('button[data-row-action="edit"]').attributes("aria-expanded")).toBe("true");
   });
 });
 
@@ -266,7 +280,8 @@ describe("SetupBoard", () => {
   const actions = {
     addQuestion: vi.fn().mockResolvedValue(true),
     removeQuestion: vi.fn().mockResolvedValue(true),
-    saveAnswer: vi.fn().mockResolvedValue(true),
+    restoreQuestion: vi.fn().mockResolvedValue(true),
+    saveRow: vi.fn().mockResolvedValue(true),
     retryRow: vi.fn().mockResolvedValue(undefined),
     turnOnPlaybook: vi.fn().mockResolvedValue(true),
     generatePlaybook: vi.fn().mockResolvedValue(undefined),

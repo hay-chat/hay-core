@@ -205,7 +205,8 @@ describe("board turn on", () => {
   const actions = {
     addQuestion: vi.fn().mockResolvedValue(true),
     removeQuestion: vi.fn().mockResolvedValue(true),
-    saveAnswer: vi.fn().mockResolvedValue(true),
+    restoreQuestion: vi.fn().mockResolvedValue(true),
+    saveRow: vi.fn().mockResolvedValue(true),
     retryRow: vi.fn().mockResolvedValue(undefined),
     turnOnPlaybook: vi.fn(),
     generatePlaybook: vi.fn().mockResolvedValue(undefined),

@@ -117,6 +117,7 @@
             :playbook-to="rowPlaybookTo(row)"
             :site-partial="Boolean(board.site.partial)"
             :write-to="writeTo"
+            :can-open-documents="canOpen('/documents')"
             :turning-on="turningOnId === row.id"
             :turn-on-error="turnOnErrorId === row.id"
             :connect-failure="rowConnectFailure(row)"
@@ -126,7 +127,7 @@
             @remove="removeRow(row.id)"
             @retry="actions.retryRow(row.id)"
             @choose-platform="emit('choosePlatform')"
-            @save="saveAnswer(row.id, $event)"
+            @save="saveRow(row.id, $event)"
             @turn-on="turnOn(row.id)"
             @regenerate="actions.generatePlaybook(row.id)"
           />
@@ -176,7 +177,12 @@
 
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, ref, watch } from "vue";
-import type { SetupBoard, SetupRow as SetupRowData, SetupRowStatus } from "@/stores/setup";
+import type {
+  SetupBoard,
+  SetupRow as SetupRowData,
+  SetupRowChanges,
+  SetupRowStatus,
+} from "@/stores/setup";
 import { useSetupLinks } from "@/composables/useSetupLinks";
 import SetupRow from "./SetupRow.vue";
 import SetupUpNext from "./SetupUpNext.vue";
@@ -190,8 +196,10 @@ export interface SetupBoardActions {
   /** Resolves true when the question was added. */
   addQuestion: (text: string) => Promise<boolean>;
   removeQuestion: (questionId: string) => Promise<boolean>;
-  /** Resolves true when the answer was saved. */
-  saveAnswer: (questionId: string, answer: string) => Promise<boolean>;
+  /** Puts a removed question back where it was. Resolves true when it is back. */
+  restoreQuestion: (questionId: string) => Promise<boolean>;
+  /** Resolves true when the row's changes were saved. */
+  saveRow: (questionId: string, changes: SetupRowChanges) => Promise<boolean>;
   retryRow: (questionId: string) => Promise<void>;
   /** Resolves true when the playbook is now on. */
   turnOnPlaybook: (questionId: string) => Promise<boolean>;
@@ -293,7 +301,7 @@ const testingCount = computed(() =>
 );
 
 const displayStatus = (row: SetupRowData, index: number): SetupRowStatus => {
-  if (props.busyRowIds.includes(row.id)) return "checking";
+  if (props.busyRowIds.includes(row.id) || savingId.value === row.id) return "checking";
   return settledOnce.value || index < revealed.value ? row.status : "checking";
 };
 
@@ -385,10 +393,10 @@ const turnOn = async (id: string) => {
   else turnOnErrorId.value = id;
 };
 
-const saveAnswer = async (id: string, answer: string) => {
+const saveRow = async (id: string, changes: SetupRowChanges) => {
   savingId.value = id;
   errorId.value = null;
-  const saved = await props.actions.saveAnswer(id, answer);
+  const saved = await props.actions.saveRow(id, changes);
   savingId.value = null;
   if (saved) openId.value = null;
   else errorId.value = id;
@@ -396,21 +404,45 @@ const saveAnswer = async (id: string, answer: string) => {
 
 const addForm = ref<HTMLFormElement | null>(null);
 const removeFailed = ref(false);
+
+const focusChevron = (id: string): boolean => {
+  const chevron = document.querySelector<HTMLElement>(
+    `[data-row-id="${id}"] [data-row-action="edit"]`,
+  );
+  chevron?.focus();
+  return Boolean(chevron);
+};
+
+const UNDO_MS = 8000;
+const toast = useToast();
+
+const undoRemove = async (id: string) => {
+  const restored = await props.actions.restoreQuestion(id);
+  if (!restored) {
+    toast.error(t("setup.board.undoError"));
+    return;
+  }
+  await nextTick();
+  focusChevron(id);
+};
+
 const removeRow = async (id: string) => {
   removeFailed.value = false;
   if (openId.value === id) openId.value = null;
-  // The remove button goes with its row: focus the next row's, else the previous one's.
+  // The chevron goes with its row: focus the next row's, else the previous one's.
   const index = props.board.rows.findIndex((r) => r.id === id);
   const neighbour = props.board.rows[index + 1] ?? props.board.rows[index - 1];
   removeFailed.value = !(await props.actions.removeQuestion(id));
   if (removeFailed.value) return;
+  toast.show({
+    type: "info",
+    title: t("setup.board.removed"),
+    duration: UNDO_MS,
+    action: { label: t("setup.board.undo"), onClick: () => void undoRemove(id) },
+  });
   await nextTick();
-  const next = neighbour
-    ? document.querySelector<HTMLElement>(
-        `[data-row-id="${neighbour.id}"] [data-row-action="remove"]`,
-      )
-    : null;
-  (next ?? addForm.value?.querySelector("input"))?.focus();
+  if (neighbour && focusChevron(neighbour.id)) return;
+  addForm.value?.querySelector("input")?.focus();
 };
 
 const newQuestion = ref("");

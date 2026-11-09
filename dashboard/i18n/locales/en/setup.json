@@ -107,8 +107,9 @@
       "addPlaceholder": "Add a question customers ask",
       "add": "Add",
       "addError": "We couldn't add that question. Try again.",
-      "remove": "Remove {question}",
-      "removeTitle": "Not relevant",
+      "removed": "Question removed",
+      "undo": "Undo",
+      "undoError": "We couldn't undo that. Add the question again.",
       "removeError": "We couldn't remove that question. Try again.",
       "partialNoticeOne": "We've read {count} page of your site so far, so a request listed as missing may be on a page we haven't reached yet.",
       "partialNoticeOther": "We've read {count} pages of your site so far, so a request listed as missing may be on a page we haven't reached yet."
@@ -128,6 +129,7 @@
       "readingSite": "Still reading your website",
       "readyFound": "Found on {source}",
       "readyOwn": "Your answer",
+      "readyLinked": "Your answer, based on {document}",
       "readyTool": "{plugin} connected, {playbook} on",
       "readyGeneric": "Your assistant can answer this",
       "missingSite": "Your website doesn't say",
@@ -155,6 +157,7 @@
     "action": {
       "tryIt": "Try it",
       "tryItFor": "Try it: {question}",
+      "edit": "Edit “{question}”",
       "addAnswer": "Add answer",
       "addAnswerFor": "Add answer: {question}",
       "connect": "Connect",
@@ -167,9 +170,32 @@
     "answer": {
       "label": "How should your assistant answer?",
       "placeholder": "Write the answer customers should get",
-      "save": "Save answer",
+      "save": "Save",
       "cancel": "Cancel",
-      "error": "We couldn't save that answer. Try again."
+      "error": "We couldn't save your changes. Try again."
+    },
+    "panel": {
+      "questionLabel": "Question",
+      "useDocument": "Use a document",
+      "searchLabel": "Search your documents",
+      "searchHint": "Type at least 2 characters.",
+      "searching": "Searching…",
+      "searchError": "We couldn't search your documents. Try again.",
+      "noResults": "No documents match “{query}”.",
+      "resultsLabel": "Matching documents",
+      "basedOn": "Based on {document}",
+      "changeDocument": "Change document",
+      "writeMyOwn": "Write my own",
+      "drafting": "Drafting from {document}…",
+      "draftReady": "We drafted an answer from this document. Your text stays until you replace it.",
+      "replaceDraft": "Replace with draft",
+      "noAnswer": "{document} doesn't answer this. Write the answer or pick another.",
+      "draftError": "We couldn't draft an answer from {document}. Write it yourself or pick it again.",
+      "loadingAnswer": "Loading your answer",
+      "answerLoadError": "We couldn't load your answer.",
+      "formatted": "This answer has formatting that would be lost here.",
+      "editInKnowledge": "Edit it in Knowledge",
+      "removeQuestion": "Remove question"
     },
     "playbook": {
       "whatItDoes": "What {playbook} does",

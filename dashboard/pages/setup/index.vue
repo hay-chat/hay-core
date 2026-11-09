@@ -242,8 +242,9 @@ const actions: SetupBoardActions = {
     return added;
   },
   removeQuestion: (questionId) => applyBoard(Hay.setup.removeQuestion.mutate({ questionId })),
-  saveAnswer: (questionId, answer) =>
-    applyBoard(Hay.setup.addAnswer.mutate({ questionId, answer })),
+  restoreQuestion: (questionId) => applyBoard(Hay.setup.restoreQuestion.mutate({ questionId })),
+  saveRow: (questionId, changes) =>
+    applyBoard(Hay.setup.updateQuestion.mutate({ questionId, ...changes })),
   retryRow: async (questionId) => {
     busyRowIds.value = [...busyRowIds.value, questionId];
     const checked = await applyBoard(

@@ -2,7 +2,7 @@ import { defineStore } from "pinia";
 import { TRPCClientError } from "@trpc/client";
 import { Hay } from "@/utils/api";
 import { useUserStore } from "@/stores/user";
-import type { RouterOutputs } from "@/types/trpc";
+import type { RouterInputs, RouterOutputs } from "@/types/trpc";
 
 export type SetupBoard = RouterOutputs["setup"]["get"];
 export type SetupRow = SetupBoard["rows"][number];
@@ -10,6 +10,9 @@ export type SetupRowStatus = SetupRow["status"];
 export type SetupUpNext = SetupBoard["upNext"];
 export type SetupSiteState = SetupBoard["site"];
 export type SetupSuggestions = RouterOutputs["setup"]["suggestions"];
+/** What a row's edit panel sends: only the fields the person changed. */
+export type SetupRowChanges = Omit<RouterInputs["setup"]["updateQuestion"], "questionId">;
+export type SetupDocumentRef = NonNullable<SetupRow["linkedDocument"]>;
 
 /** `forbidden` covers roles without access, so callers can hide setup instead of erroring. */
 type LoadStatus = "idle" | "loading" | "ready" | "error" | "forbidden";

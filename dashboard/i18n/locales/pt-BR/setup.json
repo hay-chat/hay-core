@@ -107,8 +107,9 @@
       "addPlaceholder": "Adicione uma pergunta dos clientes",
       "add": "Adicionar",
       "addError": "Não conseguimos adicionar essa pergunta. Tente de novo.",
-      "remove": "Remover {question}",
-      "removeTitle": "Não se aplica",
+      "removed": "Pergunta removida",
+      "undo": "Desfazer",
+      "undoError": "Não conseguimos desfazer. Adicione a pergunta de novo.",
       "removeError": "Não conseguimos remover essa pergunta. Tente de novo.",
       "partialNoticeOne": "Lemos {count} página do seu site até agora, então um pedido marcado como sem resposta pode estar numa página que ainda não lemos.",
       "partialNoticeOther": "Lemos {count} páginas do seu site até agora, então um pedido marcado como sem resposta pode estar numa página que ainda não lemos."
@@ -128,6 +129,7 @@
       "readingSite": "Ainda lendo seu site",
       "readyFound": "Encontrada em {source}",
       "readyOwn": "Sua resposta",
+      "readyLinked": "Sua resposta, com base em {document}",
       "readyTool": "{plugin} conectado, {playbook} ligado",
       "readyGeneric": "Seu assistente sabe responder",
       "missingSite": "Seu site não diz",
@@ -155,6 +157,7 @@
     "action": {
       "tryIt": "Testar",
       "tryItFor": "Testar: {question}",
+      "edit": "Editar “{question}”",
       "addAnswer": "Adicionar resposta",
       "addAnswerFor": "Adicionar resposta: {question}",
       "connect": "Conectar",
@@ -167,9 +170,32 @@
     "answer": {
       "label": "Como seu assistente deve responder?",
       "placeholder": "Escreva a resposta que os clientes devem receber",
-      "save": "Salvar resposta",
+      "save": "Salvar",
       "cancel": "Cancelar",
-      "error": "Não conseguimos salvar essa resposta. Tente de novo."
+      "error": "Não conseguimos salvar as alterações. Tente de novo."
+    },
+    "panel": {
+      "questionLabel": "Pergunta",
+      "useDocument": "Usar um documento",
+      "searchLabel": "Buscar nos seus documentos",
+      "searchHint": "Digite pelo menos 2 caracteres.",
+      "searching": "Buscando…",
+      "searchError": "Não conseguimos buscar nos seus documentos. Tente de novo.",
+      "noResults": "Nenhum documento corresponde a “{query}”.",
+      "resultsLabel": "Documentos encontrados",
+      "basedOn": "Com base em {document}",
+      "changeDocument": "Trocar documento",
+      "writeMyOwn": "Escrever minha resposta",
+      "drafting": "Redigindo um rascunho a partir de {document}…",
+      "draftReady": "Redigimos um rascunho a partir deste documento. Seu texto continua até você substituí-lo.",
+      "replaceDraft": "Substituir pelo rascunho",
+      "noAnswer": "{document} não responde a isso. Escreva a resposta ou escolha outro documento.",
+      "draftError": "Não conseguimos redigir um rascunho a partir de {document}. Escreva a resposta ou escolha o documento de novo.",
+      "loadingAnswer": "Carregando sua resposta",
+      "answerLoadError": "Não conseguimos carregar sua resposta.",
+      "formatted": "Esta resposta tem formatação que seria perdida aqui.",
+      "editInKnowledge": "Editar em Conhecimento",
+      "removeQuestion": "Remover pergunta"
     },
     "playbook": {
       "whatItDoes": "O que o playbook {playbook} faz",
