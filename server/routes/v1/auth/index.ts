@@ -1,5 +1,6 @@
 import { t } from "@server/trpc";
 import { z } from "zod";
+import { isValidUuid } from "@server/lib/validation/uuid";
 import { IsNull, type EntityManager } from "typeorm";
 import { TRPCError } from "@trpc/server";
 import { AppDataSource } from "@server/database/data-source";
@@ -1012,6 +1013,14 @@ export const authRouter = t.router({
         });
       }
 
+      const organizationId = ctx.user!.organizationId;
+      if (!organizationId || !isValidUuid(organizationId)) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Select an organization before uploading an avatar",
+        });
+      }
+
       try {
         const storageService = new StorageService();
 
@@ -1019,7 +1028,7 @@ export const authRouter = t.router({
         const result = await handleUpload(
           input.avatar,
           "avatars",
-          ctx.user!.organizationId || "",
+          organizationId,
           ctx.user!.id,
           { maxSize: 2 * 1024 * 1024 }, // 2MB for avatars
         );

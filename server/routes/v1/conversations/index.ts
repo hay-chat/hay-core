@@ -736,7 +736,6 @@ export const conversationsRouter = t.router({
         });
       }
 
-
       const messageType = staffMessageType(input.role, conversation, ctx.user!.id);
 
       // D8-16: only a person who took over sends files (delivered by the channel).
@@ -948,7 +947,6 @@ export const conversationsRouter = t.router({
         });
       }
 
-
       // Check if conversation is already closed or resolved
       if (["closed", "resolved", "unresolved"].includes(conversation.status)) {
         throw new TRPCError({
@@ -1050,7 +1048,6 @@ export const conversationsRouter = t.router({
         });
       }
 
-
       // Verify user is the one who took over
       if (conversation.assigned_user_id !== ctx.user!.id) {
         throw new TRPCError({
@@ -1130,7 +1127,6 @@ export const conversationsRouter = t.router({
         });
       }
 
-
       if (!conversation.assigned_user_id) {
         return null;
       }
@@ -1165,7 +1161,6 @@ export const conversationsRouter = t.router({
           message: "Conversation not found",
         });
       }
-
 
       // Verify user is the one who took over (if conversation is taken over)
       if (

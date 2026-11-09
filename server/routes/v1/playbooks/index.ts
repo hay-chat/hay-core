@@ -14,6 +14,7 @@ import { PromptService } from "../../../services/prompt.service";
 import { PlaybookSuggestionService } from "../../../services/playbook-suggestion.service";
 import { documentRepository } from "../../../repositories/document.repository";
 import { In } from "typeorm";
+import { fitsInBytes } from "@server/lib/validation/json-record";
 import { listPlaybookTemplates } from "../../../services/product-case/templates";
 
 const playbookService = new PlaybookService();
@@ -54,12 +55,12 @@ const tiptapContentSchema = z.object({ type: z.string().optional() }).passthroug
 
 // Instructions may be a Tiptap document, a legacy structured list, a raw
 // string, or null.
-const instructionsSchema = z.union([
-  tiptapContentSchema,
-  z.array(instructionItemSchema),
-  z.string(),
-  z.null(),
-]);
+const INSTRUCTIONS_MAX_BYTES = 200_000;
+const instructionsSchema = z
+  .union([tiptapContentSchema, z.array(instructionItemSchema), z.string(), z.null()])
+  .refine((value) => fitsInBytes(value, INSTRUCTIONS_MAX_BYTES), {
+    message: "Instructions are too long",
+  });
 
 const createPlaybookSchema = z.object({
   title: z.string().min(1).max(255),

@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, jest } from "@jest/globals";
 import { TRPCError } from "@trpc/server";
 import { authRouter } from "@server/routes/v1/auth";
+import { AppDataSource } from "@server/database/data-source";
 import { invitationsRouter } from "@server/routes/v1/invitations";
 import { privacyRouter } from "@server/routes/v1/privacy";
 import { privacyService, PrivacyRequestError } from "@server/services/privacy.service";
@@ -43,6 +44,21 @@ describe("auth.getRecentSecurityEvents", () => {
 
     expect(input.safeParse({ limit: 100 }).success).toBe(true);
     expect(input.safeParse({ limit: 101 }).success).toBe(false);
+  });
+});
+
+describe("auth.uploadAvatar", () => {
+  it("refuses an account with no organization before storing anything", async () => {
+    jest
+      .spyOn(AppDataSource, "getRepository")
+      .mockReturnValue({ findOne: async () => ({ id: "user-1" }) } as never);
+    const user = { id: "user-1", organizationId: undefined };
+
+    await expect(
+      authRouter.createCaller({ user, organizationId: "org-1" } as never).uploadAvatar({
+        avatar: "data:image/png;base64,AAAA",
+      }),
+    ).rejects.toMatchObject({ code: "BAD_REQUEST" });
   });
 });
 

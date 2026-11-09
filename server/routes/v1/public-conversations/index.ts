@@ -138,8 +138,8 @@ const getMessagesSchema = z.object({
   proof: z.string(), // DPoP proof
   method: z.string(),
   url: z.string(),
-  limit: z.number().optional().default(50),
-  offset: z.number().optional().default(0),
+  limit: z.number().int().min(1).max(200).optional().default(50),
+  offset: z.number().int().min(0).optional().default(0),
 });
 
 /**

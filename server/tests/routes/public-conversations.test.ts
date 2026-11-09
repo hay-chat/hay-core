@@ -94,7 +94,9 @@ jest.mock("@server/services/webchat/webchat-extensions.service", () => ({
   webchatExtensionsService: { runGates: mockRunGates },
 }));
 
-const mockRecordCreateAttempt = jest.fn<(orgId: string, ip: string) => Promise<boolean>>(async () => false);
+const mockRecordCreateAttempt = jest.fn<(orgId: string, ip: string) => Promise<boolean>>(
+  async () => false,
+);
 jest.mock("@server/services/webchat/under-attack.service", () => ({
   recordCreateAttempt: mockRecordCreateAttempt,
   isUnderAttack: async () => false,

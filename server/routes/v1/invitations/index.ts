@@ -39,7 +39,10 @@ const INVITATION_LIST_LIMIT = 500;
 /** New expiry for a resent invitation. */
 export function renewedInvitationExpiry(createdAt: Date, now: Date = new Date()): Date {
   return new Date(
-    Math.min(now.getTime() + INVITATION_LIFETIME_MS, createdAt.getTime() + INVITATION_MAX_LIFETIME_MS),
+    Math.min(
+      now.getTime() + INVITATION_LIFETIME_MS,
+      createdAt.getTime() + INVITATION_MAX_LIFETIME_MS,
+    ),
   );
 }
 

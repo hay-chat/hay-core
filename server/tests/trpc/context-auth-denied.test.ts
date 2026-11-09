@@ -25,7 +25,10 @@ const contextFor = () =>
 describe("createContext", () => {
   it("reports a wrong-organization denial as FORBIDDEN, not as signed out", async () => {
     mockAuthenticate.mockRejectedValue(
-      new TRPCError({ code: "FORBIDDEN", message: "User does not belong to the specified organization" }),
+      new TRPCError({
+        code: "FORBIDDEN",
+        message: "User does not belong to the specified organization",
+      }),
     );
     const ctx = await contextFor();
 
