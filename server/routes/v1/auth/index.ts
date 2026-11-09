@@ -287,11 +287,13 @@ export const authRouter = t.router({
       await userRepository.save(user);
     }
 
-    if (await mfaService.findConfirmed(user.id)) {
+    const factors = await mfaService.factors(user.id);
+    if (factors.totp || factors.webauthn > 0) {
       return {
         mfaRequired: true as const,
         challengeToken: generateMfaChallengeToken(user),
         expiresIn: MFA_CHALLENGE_TTL_SECONDS,
+        methods: { totp: factors.totp, webauthn: factors.webauthn > 0 },
       };
     }
 

@@ -3,6 +3,7 @@ import { AppDataSource } from "@server/database/data-source";
 import { User } from "@server/entities/user.entity";
 import { UserOrganization } from "@server/entities/user-organization.entity";
 import { setRefreshCookies } from "@server/lib/auth/session-cookie";
+import { verifyMfaChallengeToken } from "@server/lib/auth/utils/jwt";
 import { auditLogService } from "@server/services/audit-log.service";
 import { authSessionService } from "@server/services/auth-session.service";
 import { mfaService } from "@server/services/mfa.service";
@@ -112,4 +113,33 @@ export async function completeLogin(
     },
     ...deliverTokens(ctx, tokens, useCookie),
   };
+}
+
+/** The user a second-login-step challenge from `auth.login` belongs to, while it is still valid. */
+export async function requireChallengeUser(challengeToken: string): Promise<User> {
+  const challenge = verifyMfaChallengeToken(challengeToken);
+  const user = challenge
+    ? await AppDataSource.getRepository(User).findOne({
+        where: { id: challenge.userId },
+        relations: ["organization"],
+      })
+    : null;
+  if (
+    !challenge ||
+    !user ||
+    !user.isActive ||
+    !user.emailVerified ||
+    user.tokenVersion !== challenge.tokenVersion
+  ) {
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message: "Your sign-in has expired. Please sign in again.",
+      cause: { type: "MFA_CHALLENGE_EXPIRED" },
+    });
+  }
+  return user;
+}
+
+export function requestInfo(ctx: Pick<Context, "ipAddress" | "userAgent">) {
+  return { ipAddress: ctx.ipAddress, userAgent: ctx.userAgent };
 }

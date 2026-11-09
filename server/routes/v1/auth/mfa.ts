@@ -4,22 +4,25 @@ import { t } from "@server/trpc";
 import { AppDataSource } from "@server/database/data-source";
 import { User } from "@server/entities/user.entity";
 import { verifyPassword } from "@server/lib/auth/utils/hashing";
-import { verifyMfaChallengeToken } from "@server/lib/auth/utils/jwt";
 import { authSessionService } from "@server/services/auth-session.service";
 import { mfaService } from "@server/services/mfa.service";
 import { protectedProcedureWithoutOrg, publicProcedure } from "@server/trpc/middleware/auth";
 import { rateLimitMiddleware } from "@server/trpc/middleware/rate-limit";
-import type { Context } from "@server/trpc/context";
-import { PASSWORD_CHECK_RATE_LIMIT, completeLogin, requireSessionUser } from "./shared";
+import {
+  PASSWORD_CHECK_RATE_LIMIT,
+  completeLogin,
+  requestInfo,
+  requireChallengeUser,
+  requireSessionUser,
+} from "./shared";
+import { webauthnRouter } from "./webauthn";
 
 /** A 6-digit authenticator code or a recovery code. */
 const codeSchema = z.string().trim().min(6).max(32);
 
-function requestInfo(ctx: Pick<Context, "ipAddress" | "userAgent">) {
-  return { ipAddress: ctx.ipAddress, userAgent: ctx.userAgent };
-}
-
 export const mfaRouter = t.router({
+  webauthn: webauthnRouter,
+
   status: protectedProcedureWithoutOrg.query(({ ctx }) => {
     return mfaService.status(requireSessionUser(ctx).id);
   }),
@@ -58,8 +61,9 @@ export const mfaRouter = t.router({
       return { success: true };
     }),
 
+  /** With a code, or, without one, after a recent step-up (security keys have no code to type). */
   regenerateRecoveryCodes: protectedProcedureWithoutOrg
-    .input(z.object({ code: codeSchema }))
+    .input(z.object({ code: codeSchema.optional() }))
     .mutation(async ({ ctx, input }) => {
       const recoveryCodes = await mfaService.regenerateRecoveryCodes(
         requireSessionUser(ctx),
@@ -79,26 +83,7 @@ export const mfaRouter = t.router({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      const challenge = verifyMfaChallengeToken(input.challengeToken);
-      const user = challenge
-        ? await AppDataSource.getRepository(User).findOne({
-            where: { id: challenge.userId },
-            relations: ["organization"],
-          })
-        : null;
-      if (
-        !challenge ||
-        !user ||
-        !user.isActive ||
-        !user.emailVerified ||
-        user.tokenVersion !== challenge.tokenVersion
-      ) {
-        throw new TRPCError({
-          code: "BAD_REQUEST",
-          message: "Your sign-in has expired. Please sign in again.",
-          cause: { type: "MFA_CHALLENGE_EXPIRED" },
-        });
-      }
+      const user = await requireChallengeUser(input.challengeToken);
 
       await mfaService.verify(user, input.code, requestInfo(ctx));
       return completeLogin(user, ctx, input.useCookie);
