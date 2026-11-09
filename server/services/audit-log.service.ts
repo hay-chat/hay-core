@@ -2,6 +2,7 @@ import { AppDataSource } from "../database/data-source";
 import { AuditLog, type AuditAction, type AuditActorType } from "../entities/audit-log.entity";
 import { User } from "../entities/user.entity";
 import { createLogger } from "@server/lib/logger";
+import { metrics } from "@server/lib/metrics";
 import { config } from "@server/config/env";
 import { createHmac } from "crypto";
 import { apiKeyIdFromUserId } from "@server/lib/auth/api-token-actor";
@@ -114,6 +115,7 @@ export class AuditLogService {
         { err: error, action: options.action, organizationId: options.organizationId },
         "Failed to create audit log",
       );
+      metrics.auditWriteFailures.inc();
       throw error;
     }
   }

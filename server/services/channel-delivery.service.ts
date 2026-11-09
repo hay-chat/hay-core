@@ -16,6 +16,7 @@
  */
 
 import { createLogger } from "@server/lib/logger";
+import { metrics } from "@server/lib/metrics";
 import { pluginManagerService } from "./plugin-manager.service";
 import { MessageRepository } from "@server/repositories/message.repository";
 import { ConversationRepository } from "@server/repositories/conversation.repository";
@@ -289,6 +290,7 @@ export class ChannelDeliveryService {
   async handleDeadLetter(id: string): Promise<void> {
     const delivery = await messageDeliveryRepository.markDead(id);
     if (!delivery) return;
+    metrics.deadLetters.inc({ queue: CHANNEL_DELIVERY_QUEUES.DEAD });
     const { conversationId, organizationId, kind, lastError } = delivery;
     logger.error({ id, kind, conversationId, error: lastError }, "Channel delivery dead-lettered");
 

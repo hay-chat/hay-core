@@ -23,26 +23,40 @@ import { config } from "@server/config/env";
 import { REDACT_PATHS, REDACT_CENSOR, redactString } from "./redaction";
 
 interface LogContext {
-  conversationId: string;
+  conversationId?: string;
+  requestId?: string;
 }
 
 const logContext = new AsyncLocalStorage<LogContext>();
 
 /**
- * Run `fn` with a conversation id that every log line inside it carries (unless
- * the line or its logger already sets one), so one orchestrator run can be
- * filtered out of interleaved logs (`hay logs <conversationId>`).
+ * Run `fn` with ids that every log line inside it carries, so one request or
+ * orchestrator run can be filtered out of interleaved logs (`hay logs
+ * <conversationId>`). A line or logger that sets its own conversationId keeps it.
  */
 export function withLogContext<T>(context: LogContext, fn: () => T): T {
-  return logContext.run(context, fn);
+  return logContext.run({ ...logContext.getStore(), ...context }, fn);
 }
 
-/** pino mixin: adds the context's conversationId. Exported for tests. */
+/** The id of the HTTP request being handled, if any. */
+export function currentRequestId(): string | undefined {
+  return logContext.getStore()?.requestId;
+}
+
+/** pino mixin: adds the context's ids. Exported for tests. */
 export function logContextMixin(mergeObject: object, _level: number, log: pino.Logger): object {
   const context = logContext.getStore();
-  if (!context || "conversationId" in mergeObject) return {};
-  if ("conversationId" in log.bindings()) return {};
-  return { conversationId: context.conversationId };
+  if (!context) return {};
+  const fields: LogContext = {};
+  if (context.requestId) fields.requestId = context.requestId;
+  if (
+    context.conversationId &&
+    !("conversationId" in mergeObject) &&
+    !("conversationId" in log.bindings())
+  ) {
+    fields.conversationId = context.conversationId;
+  }
+  return fields;
 }
 
 const level = config.logging.level || (config.isProduction ? "info" : "debug");

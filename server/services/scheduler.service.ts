@@ -2,6 +2,7 @@ import { AppDataSource } from "@server/database/data-source";
 import { ScheduledJob } from "@server/entities/scheduled-job.entity";
 import { ScheduledJobHistory } from "@server/entities/scheduled-job-history.entity";
 import { createLogger } from "@server/lib/logger";
+import { metrics } from "@server/lib/metrics";
 import * as cron from "node-cron";
 import type { QueryRunner } from "typeorm";
 
@@ -439,6 +440,7 @@ export class SchedulerService {
     job.lastStatus = status;
     job.lastError = errorMessage;
     job.lastDuration = duration;
+    metrics.schedulerRuns.inc({ job: name, status });
     job.totalRuns++;
     job.totalDuration += duration;
     if (status !== "success") {

@@ -64,6 +64,14 @@ export const config = {
     useSSL: process.env.USE_SSL === "true" || process.env.NODE_ENV === "production",
   },
 
+  // Prometheus endpoint, on its own port so no reverse proxy can reach it. A
+  // host other than loopback also requires METRICS_TOKEN. Port 0 turns it off.
+  metrics: {
+    port: parseInt(process.env.METRICS_PORT || "9464", 10),
+    host: process.env.METRICS_HOST || "127.0.0.1",
+    token: process.env.METRICS_TOKEN || "",
+  },
+
   cors: {
     origin:
       process.env.CORS_ORIGIN?.split(",") ||

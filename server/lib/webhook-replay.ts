@@ -1,6 +1,7 @@
 import crypto from "crypto";
 import { redisService } from "@server/services/redis.service";
 import { createLogger } from "@server/lib/logger";
+import { metrics } from "@server/lib/metrics";
 
 const logger = createLogger("webhook-replay");
 
@@ -43,6 +44,7 @@ export async function claimWebhookDelivery(
   const client = redisService.getClient();
   if (!client || !redisService.isConnected()) {
     logger.error({ namespace }, "Redis unavailable, refusing webhook delivery");
+    metrics.redisUnavailable.inc({ surface: "webhook_replay", action: "rejected" });
     throw new WebhookReplayUnavailableError();
   }
   try {
@@ -50,6 +52,7 @@ export async function claimWebhookDelivery(
     return result === "OK";
   } catch (error) {
     logger.error({ err: error, namespace }, "Webhook replay check failed, refusing delivery");
+    metrics.redisUnavailable.inc({ surface: "webhook_replay", action: "rejected" });
     throw new WebhookReplayUnavailableError();
   }
 }
