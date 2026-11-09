@@ -321,7 +321,7 @@ const selectedStatus = ref<StatusFilter>(
     ? "escalated"
     : "",
 );
-const selectedTimeframe = ref<TimeframeFilter>("week");
+const selectedTimeframe = ref<TimeframeFilter>("all");
 const bulkMode = ref(false);
 const selectedConversations = ref<string[]>([]);
 const { page: currentPage, pageSize, setPage, setPageSize } = usePagination();
