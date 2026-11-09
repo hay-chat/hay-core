@@ -6,6 +6,7 @@ import amqplib, {
 } from "amqplib";
 import { config } from "@server/config/env";
 import { createLogger } from "@server/lib/logger";
+import { metrics } from "@server/lib/metrics";
 import { EventEmitter } from "events";
 
 const logger = createLogger("rabbitmq");
@@ -197,6 +198,7 @@ export class RabbitMQService extends EventEmitter {
     const channel = this.publishChannel;
     if (!channel) {
       logger.warn({ queue }, "Channel not available, message not published");
+      metrics.queuePublished.inc({ queue, outcome: "failed" });
       return false;
     }
 
@@ -217,9 +219,11 @@ export class RabbitMQService extends EventEmitter {
       });
 
       logger.debug({ messageId: message.messageId }, `Published message to queue: ${queue}`);
+      metrics.queuePublished.inc({ queue, outcome: "ok" });
       return true;
     } catch (error) {
       logger.error({ err: error, queue }, "Failed to publish to queue");
+      metrics.queuePublished.inc({ queue, outcome: "failed" });
       return false;
     }
   }
@@ -276,6 +280,7 @@ export class RabbitMQService extends EventEmitter {
       const { consumerTag } = await channel.consume(queue, async (msg: ConsumeMessage | null) => {
         if (!msg) return;
         this.messageChannels.set(msg, channel);
+        metrics.queueConsumed.inc({ queue });
 
         try {
           await handler(msg);
@@ -320,6 +325,7 @@ export class RabbitMQService extends EventEmitter {
    * otherwise it goes to the dead-letter exchange (if configured).
    */
   nack(msg: ConsumeMessage, requeue = false): void {
+    metrics.queueNacked.inc({ queue: msg.fields.routingKey, requeue: String(requeue) });
     this.settle(msg, (channel) => channel.nack(msg, false, requeue));
   }
 
@@ -339,6 +345,22 @@ export class RabbitMQService extends EventEmitter {
    */
   parseMessage<T = Record<string, unknown>>(msg: ConsumeMessage): T {
     return JSON.parse(msg.content.toString()) as T;
+  }
+
+  /** Messages ready in a queue, or null when it cannot be read. */
+  async queueDepth(queue: string): Promise<number | null> {
+    if (!this.connection) return null;
+    try {
+      // A failed check closes the channel it ran on, so it gets its own.
+      const channel = await this.connection.createChannel();
+      channel.on("error", () => undefined);
+      const { messageCount } = await channel.checkQueue(queue);
+      await channel.close();
+      return messageCount;
+    } catch (error) {
+      logger.debug({ err: error, queue }, "Could not read queue depth");
+      return null;
+    }
   }
 
   isConnected(): boolean {

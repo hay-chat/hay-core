@@ -163,6 +163,46 @@ Three things hold state:
 
 Redis and RabbitMQ hold only transient data.
 
+## Monitoring
+
+The server exposes Prometheus metrics at `/metrics` on port 9464, separately from
+the application port and never through the reverse proxy. By default it listens
+on loopback inside the server container, so you can read it with:
+
+```bash
+docker compose exec server node -e "fetch('http://127.0.0.1:9464/metrics').then(r=>r.text()).then(console.log)"
+```
+
+To scrape from a Prometheus container, set `METRICS_HOST=0.0.0.0` and a long
+random `METRICS_TOKEN` in `selfhost/.env`, attach Prometheus to the `hay_default`
+network, and configure `authorization: { credentials: <token> }` on the scrape
+job with target `server:9464`. Without a token the server won't listen on anything
+but loopback. Set `METRICS_PORT=0` to turn the endpoint off.
+
+Alert on at least these:
+
+```yaml
+- alert: HayDependencyDown
+  expr: hay_dependency_up == 0
+  for: 2m
+- alert: HayRedisDegraded # rate limits are per process, or requests are refused
+  expr: increase(hay_redis_unavailable_total[5m]) > 0
+- alert: HayDeadLetters # messages or conversations that used up their retries
+  expr: increase(hay_dead_letters_total[15m]) > 0 or hay_dead_letter_queue_depth > 0
+- alert: HaySchedulerFailures
+  expr: increase(hay_scheduler_runs_total{status!="success"}[1h]) > 3
+- alert: HayAuditWriteFailures
+  expr: increase(hay_audit_write_failures_total[5m]) > 0
+- alert: HayServerErrors
+  expr: rate(hay_http_requests_total{status_class="5xx"}[5m]) > 0.5
+```
+
+Also probe `/ready` from inside the Docker network (it answers 503 while the
+database, Redis or RabbitMQ is down). It isn't proxied. Every response carries an
+`X-Request-Id` header, every log line written for that request has the same
+`requestId`, and tRPC errors return it in `error.data.requestId`, so a reported
+failure can be found with `docker compose logs server | grep <id>`.
+
 ## Using your own proxy or managed services
 
 - **Your own reverse proxy:** remove the `caddy` service, publish the `server`

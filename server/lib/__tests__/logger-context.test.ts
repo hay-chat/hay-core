@@ -17,6 +17,15 @@ function capture() {
 const occurrences = (text: string, needle: string) => text.split(needle).length - 1;
 
 describe("logger conversation context", () => {
+  it("carries the request id alongside a nested conversation id", () => {
+    const { log, lines } = capture();
+    withLogContext({ requestId: "req-1" }, () => {
+      withLogContext({ conversationId: "conv-1" }, () => log.info("inside"));
+    });
+
+    expect(JSON.parse(lines[0])).toMatchObject({ requestId: "req-1", conversationId: "conv-1" });
+  });
+
   it("adds the conversation id to lines logged inside withLogContext", async () => {
     const { log, lines } = capture();
     await withLogContext({ conversationId: "conv-1" }, async () => {

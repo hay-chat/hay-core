@@ -2,6 +2,7 @@ import crypto from "crypto";
 import { TRPCError } from "@trpc/server";
 import { redisService } from "./redis.service";
 import { createLogger } from "@server/lib/logger";
+import { metrics } from "@server/lib/metrics";
 
 const logger = createLogger("rate-limit");
 
@@ -216,6 +217,7 @@ export class RateLimitService {
 
     if (failClosed) {
       logger.error("Redis unavailable, rejecting rate-limited request");
+      metrics.redisUnavailable.inc({ surface: "rate_limit", action: "rejected" });
       throw new RateLimitUnavailableError();
     }
     return this.checkFallback(key, maxRequests, windowSeconds);
@@ -224,6 +226,7 @@ export class RateLimitService {
   /** Fixed-window count held in this process, used while Redis is down. */
   private checkFallback(key: string, maxRequests: number, windowSeconds: number): RateLimitResult {
     this.fallbackChecksSinceLog++;
+    metrics.redisUnavailable.inc({ surface: "rate_limit", action: "per_process" });
     const now = Date.now();
     if (now - this.lastUnavailableLogAt >= UNAVAILABLE_LOG_INTERVAL_MS) {
       logger.error(

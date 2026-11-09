@@ -1,6 +1,7 @@
 import { Orchestrator } from "../orchestrator";
 import { AppDataSource } from "../database/data-source";
 import { createLogger, withLogContext } from "@server/lib/logger";
+import { metrics } from "@server/lib/metrics";
 import { rabbitmqService } from "@server/services/rabbitmq.service";
 import { ConversationRepository } from "@server/repositories/conversation.repository";
 import { simulationHarnessService } from "@server/services/simulation/simulation-harness.service";
@@ -202,6 +203,7 @@ export class OrchestratorWorker {
    * stale-message check recovers it or hands it to a person.
    */
   private async handleDeadLetter(data: OrchestratorDeadLetterMessage): Promise<void> {
+    metrics.deadLetters.inc({ queue: ORCHESTRATOR_QUEUES.DEAD });
     logger.error(
       { conversationId: data.conversationId, trigger: data.trigger, error: data.error },
       "Conversation dead-lettered",

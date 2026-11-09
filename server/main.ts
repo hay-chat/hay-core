@@ -11,6 +11,8 @@ import { createContext } from "@server/trpc/context";
 import { AppDataSource, initializeDatabase } from "@server/database/data-source";
 import { createLogger } from "@server/lib/logger";
 import { initTelemetry, captureException, shutdownTelemetry } from "@server/lib/telemetry";
+import { requestContext } from "@server/lib/request-context";
+import { startMetricsServer } from "@server/lib/metrics-server";
 import { isPublicUploadPath, setPublicUploadHeaders } from "@server/services/media-url.service";
 import { bodyLimitForPath } from "@server/lib/body-limits";
 import { httpIpRateLimit, trpcRetryAfterMeta } from "@server/lib/http-rate-limit";
@@ -81,8 +83,7 @@ async function startServer() {
       await import("@server/services/orchestrator-queue.service");
     await orchestratorQueueService.declareQueues();
   } catch (error) {
-    // eslint-disable-next-line no-console
-    console.warn("⚠️  Starting server without RabbitMQ connection");
+    logger.warn("Starting server without RabbitMQ connection");
   }
 
   // Initialize Job Queue service (depends on Redis)
@@ -119,6 +120,8 @@ async function startServer() {
   // Behind the reverse proxy, req.ip is the address the proxy saw (see
   // lib/client-ip.ts), not whatever X-Forwarded-For a client sent.
   server.set("trust proxy", config.server.trustProxy);
+
+  server.use(requestContext);
 
   // Baseline security headers. The default CSP suits JSON and plain-text
   // responses (nothing loads, nothing may frame them); routes that serve HTML
@@ -571,6 +574,10 @@ async function startServer() {
     process.exit(1);
   });
 
+  const { registerRuntimeMetrics } = await import("@server/services/runtime-metrics");
+  registerRuntimeMetrics();
+  const metricsServer = startMetricsServer();
+
   httpServer.listen(config.server.port, async () => {
     logger.info({ port: config.server.port }, "Server is running");
 
@@ -619,6 +626,7 @@ async function startServer() {
       }
     };
 
+    metricsServer?.close();
     const httpClosed = new Promise<void>((resolve) => httpServer.close(() => resolve()));
     await step("orchestrator", () => orchestratorWorker.stop());
     await step("plugin-cleanup", () => pluginInstanceManagerService.stopCleanup());
