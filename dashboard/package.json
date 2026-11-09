@@ -30,7 +30,7 @@
     "nuxt": "^3.8.2",
     "sass": "^1.107.0",
     "tailwindcss-animate": "^1.0.7",
-    "vitest": "^1.6.1",
+    "vitest": "^3.2.7",
     "vue-tsc": "^3.3.14"
   },
   "dependencies": {
