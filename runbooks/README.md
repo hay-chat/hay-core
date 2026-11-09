@@ -11,6 +11,7 @@ with how to confirm it's over.
 | [db-restore](db-restore.md)               | Data is lost or the database is unusable                                                       |
 | [key-rotation](key-rotation.md)           | A secret leaked, someone with access left, or a rotation is due                                |
 | [audit-sink](audit-sink.md)               | Audit copy is lagging, entries were set aside, or the trail must be checked against the bucket |
+| [single-sign-on](single-sign-on.md)       | Setting up OpenID Connect sign-in for an organization, or an organization is locked out of it  |
 | [incident-response](incident-response.md) | Anything that may be a security incident                                                       |
 
 **Two deployments.** Commands differ between them, so each runbook says which applies.
