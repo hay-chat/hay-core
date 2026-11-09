@@ -127,7 +127,7 @@ describe("HandoffTicketsService", () => {
     expect(body.requester).toEqual({ name: "Ana", email: "ana@example.com" });
     expect(body.fields).toEqual({ priority: "high" });
     expect(body.transcript).toBe("Ana: My mug arrived broken\nAI agent: Sorry to hear that");
-    expect(body.conversation.url).toContain("/conversations/conv-1?org=org-1");
+    expect(body.conversation.url).toContain("/org-1/conversations/conv-1");
     expect(update).toHaveBeenCalledWith(
       "conv-1",
       ORG,

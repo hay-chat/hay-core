@@ -27,6 +27,7 @@ import {
   type ProductCase,
   type ProductCaseForward,
 } from "./product-case";
+import { orgDashboardPath } from "@server/lib/dashboard-links";
 
 const logger = createLogger("product-case-forward");
 
@@ -188,7 +189,7 @@ async function sendCaseEmail(
         details,
         relatedItems,
         actionButton: {
-          url: `${getDashboardUrl()}/conversations/${conversationId}?org=${organizationId}`,
+          url: `${getDashboardUrl()}${orgDashboardPath(organizationId, `/conversations/${conversationId}`)}`,
           text: copy.button,
         },
         additionalInfo: copy.footer,
