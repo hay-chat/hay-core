@@ -135,6 +135,7 @@ export async function canOrganizationLoadPluginUI(
   organizationId: string,
 ): Promise<boolean> {
   if (plugin.sourceType === "core") return true;
+  if (!config.plugins.allowCustomPluginUi) return false;
   if (plugin.organizationId !== organizationId) return false;
   const instance = await pluginInstanceRepository.findByOrgAndPlugin(
     organizationId,

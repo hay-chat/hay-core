@@ -71,4 +71,33 @@ describe("PluginPageSlot", () => {
     expect(wrapper.find(".guide").attributes("api")).toBeUndefined();
     expect(wrapper.text()).not.toContain("Loading plugin component");
   });
+
+  it("gives plugin components the narrow client, not the dashboard's", async () => {
+    let received: Record<string, unknown> | undefined;
+    installBundle(
+      defineComponent({
+        props: { api: { type: Object, default: undefined } },
+        setup(props) {
+          received = props.api;
+          return () => h("p", { class: "guide" }, "Setup guide");
+        },
+      }),
+    );
+
+    mount(PluginPageSlot, {
+      props: { pluginId: PLUGIN_ID, componentName: "AfterSettings" },
+      global: {
+        stubs: {
+          Alert: stub("Alert"),
+          AlertTitle: stub("AlertTitle"),
+          AlertDescription: stub("AlertDescription"),
+          Button: stub("Button"),
+        },
+      },
+    });
+    await flushPromises();
+
+    expect(received?.plugins).toBeDefined();
+    expect(received?.organizations).toBeUndefined();
+  });
 });

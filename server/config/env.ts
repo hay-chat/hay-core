@@ -345,6 +345,8 @@ export const config = {
     maxUploadSizeMB: parseInt(process.env.PLUGIN_MAX_UPLOAD_SIZE_MB || "50", 10),
     // Organization-supplied (custom/git) plugin code; off unless explicitly enabled
     allowCustomPlugins: process.env.ALLOW_CUSTOM_PLUGINS === "true",
+    // Organization-supplied UI bundles run in the dashboard's own page; off unless explicitly enabled
+    allowCustomPluginUi: process.env.ALLOW_CUSTOM_PLUGIN_UI === "true",
     // Core plugins were compiled into the image: nothing to install or build at runtime
     prebuilt: process.env.PLUGINS_PREBUILT === "true",
   },

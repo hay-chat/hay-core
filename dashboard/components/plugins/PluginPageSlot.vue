@@ -9,10 +9,11 @@
  * - `plugin`: plugin metadata object
  * - `config`: current plugin configuration (form data)
  * - `apiBaseUrl`: API base URL for plain HTTP calls
- * - `api`: the dashboard tRPC client (`Hay`), authenticated and scoped to the
- *   logged-in user's organization, e.g. `api.plugins.oauth.status.query(...)` or
+ * - `api`: the small client from `createPluginUiApi`, authenticated as the
+ *   logged-in user, e.g.
  *   `api.plugins.callUiRoute.mutate({ pluginId, method: "GET", path: "/ui/status" })`
- *   to reach the plugin worker's own `/ui/*` routes (a mutation for GET and POST)
+ *   to reach the plugin worker's own `/ui/*` routes (a mutation for GET and POST).
+ *   Only the procedures listed there exist on it.
  * - `locale`: current dashboard locale (e.g. "en", "pt-BR")
  *
  * Plugin components may emit `update:config` with a partial config object.
@@ -33,7 +34,7 @@ import { ref, onErrorCaptured, Suspense } from "vue";
 import { usePluginRegistry } from "@/composables/usePluginRegistry";
 import { Loader2, AlertCircle } from "lucide-vue-next";
 import { useI18n } from "vue-i18n";
-import { Hay } from "@/utils/api";
+import { createPluginUiApi } from "@/utils/plugin-ui-api";
 
 interface Props {
   /** Plugin identifier (e.g., 'zendesk', 'shopify') */
@@ -65,6 +66,7 @@ const emit = defineEmits<{
 
 const pluginRegistry = usePluginRegistry();
 const { locale } = useI18n({ useScope: "global" });
+const pluginUiApi = createPluginUiApi(props.pluginId);
 
 // Error state
 const hasError = ref(false);
@@ -121,7 +123,7 @@ const refreshPage = () => {
           :plugin="plugin"
           :config="config"
           :api-base-url="apiBaseUrl"
-          :api="Hay"
+          :api="pluginUiApi"
           :locale="locale"
           @update:config="emit('update:config', $event)"
         />
