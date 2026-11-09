@@ -111,6 +111,9 @@ function tokenFrom(url: string): string {
   return new URL(url).searchParams.get("token")!;
 }
 
+/** Erasure renames users, so they are only reachable by id. Test files share one database. */
+const seededUserIds: string[] = [];
+
 async function cleanup(): Promise<void> {
   const ids = [ORG_A, ORG_B];
   await AppDataSource.query(`DELETE FROM privacy_requests WHERE organization_id = ANY($1)`, [ids]);
@@ -128,10 +131,10 @@ async function cleanup(): Promise<void> {
        SELECT user_id FROM user_organizations WHERE organization_id = ANY($2))`,
     [STAFF_EMAIL, ids],
   );
-  const userIds = users.map((u) => u.id);
+  const userIds = [...new Set([...users.map((u) => u.id), ...seededUserIds])];
   await purgeAuditLogs(`user_id = ANY($1)`, [userIds]);
   await AppDataSource.query(`DELETE FROM users WHERE id = ANY($1)`, [userIds]);
-  await AppDataSource.query(`DELETE FROM users WHERE email LIKE 'deleted-%@deleted.local'`);
+  seededUserIds.length = 0;
   await AppDataSource.query(`DELETE FROM organizations WHERE id = ANY($1)`, [ids]);
 }
 
@@ -173,6 +176,7 @@ describe("privacy requests: jobs, exports and erasure", () => {
       [STAFF_EMAIL, STAFF_FIRST, STAFF_LAST, ORG_A],
     );
     userId = user.id;
+    seededUserIds.push(userId);
     for (const org of [ORG_A, ORG_B]) {
       await AppDataSource.query(
         `INSERT INTO user_organizations (user_id, organization_id, role) VALUES ($1, $2, 'member')`,
