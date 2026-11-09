@@ -3,6 +3,7 @@ import { TRPCError } from "@trpc/server";
 import { QueryFailedError } from "typeorm";
 import { AppDataSource } from "@server/database/data-source";
 import { UserMfa } from "@server/database/entities/user-mfa.entity";
+import { UserWebauthnCredential } from "@server/database/entities/user-webauthn-credential.entity";
 import type { Organization } from "@server/entities/organization.entity";
 import { UserOrganization } from "@server/entities/user-organization.entity";
 import type { AuthUser } from "@server/lib/auth/AuthUser";
@@ -19,6 +20,7 @@ import { rateLimitService } from "@server/services/rate-limit.service";
 export const MFA_STEP_UP_REQUIRED_ERROR_TYPE = "MFA_STEP_UP_REQUIRED";
 export const MFA_ENROLMENT_REQUIRED_ERROR_TYPE = "MFA_ENROLMENT_REQUIRED";
 export const MFA_INVALID_CODE_ERROR_TYPE = "MFA_INVALID_CODE";
+export const MFA_FACTOR_REQUIRED_ERROR_TYPE = "MFA_FACTOR_REQUIRED";
 
 const MFA_ISSUER = "Hay";
 const STEP_UP_TTL_MS = 5 * 60 * 1000;
@@ -32,7 +34,7 @@ const VERIFY_MAX_PER_IP = 30;
 
 const POSTGRES_UNDEFINED_TABLE = "42P01";
 
-export type MfaMethod = "totp" | "recovery";
+export type MfaMethod = "totp" | "recovery" | "webauthn";
 
 export interface MfaRequestInfo {
   ipAddress?: string;
@@ -63,7 +65,7 @@ function generateRecoveryCode(): string {
   return raw.match(/.{1,4}/g)!.join("-");
 }
 
-function generateRecoveryCodes(): { plain: string[]; hashes: string[] } {
+export function generateRecoveryCodes(): { plain: string[]; hashes: string[] } {
   const plain = Array.from({ length: RECOVERY_CODE_COUNT }, generateRecoveryCode);
   return { plain, hashes: plain.map(hashRecoveryCode) };
 }
@@ -74,41 +76,80 @@ export class MfaService {
   }
 
   /**
-   * The active enrolment, or null. Migrations run after deploy: until the
-   * table exists nobody can have enrolled, and login has to keep working.
+   * What the person has enrolled. Migrations run after deploy: until a table
+   * exists nobody can have enrolled in it, and login has to keep working. Each
+   * table is read on its own, so a missing one never hides the other's factor.
    */
-  async findConfirmed(userId: string): Promise<UserMfa | null> {
+  async factors(userId: string): Promise<{ row: UserMfa | null; totp: boolean; webauthn: number }> {
+    const row = await this.unlessTableMissing(
+      () => this.repository.findOne({ where: { userId } }),
+      null,
+    );
+    const webauthn = await this.unlessTableMissing(
+      () => AppDataSource.getRepository(UserWebauthnCredential).count({ where: { userId } }),
+      0,
+    );
+    return { row, totp: !!row?.confirmedAt && !!row.secret, webauthn };
+  }
+
+  private async unlessTableMissing<T>(query: () => Promise<T>, fallback: T): Promise<T> {
     try {
-      const enrolment = await this.repository.findOne({ where: { userId } });
-      return enrolment?.confirmedAt ? enrolment : null;
+      return await query();
     } catch (error) {
       const driverCode =
         error instanceof QueryFailedError
           ? (error.driverError as { code?: string } | undefined)?.code
           : undefined;
-      if (driverCode === POSTGRES_UNDEFINED_TABLE) return null;
+      if (driverCode === POSTGRES_UNDEFINED_TABLE) return fallback;
       throw error;
     }
   }
 
-  async status(userId: string): Promise<{ enabled: boolean; recoveryCodesRemaining: number }> {
-    const enrolment = await this.findConfirmed(userId);
+  /** Whether any second factor is active: an authenticator app or a security key. */
+  async hasSecondFactor(userId: string): Promise<boolean> {
+    const { totp, webauthn } = await this.factors(userId);
+    return totp || webauthn > 0;
+  }
+
+  async status(userId: string): Promise<{
+    enabled: boolean;
+    totpEnabled: boolean;
+    webauthnCount: number;
+    recoveryCodesRemaining: number;
+  }> {
+    const { row, totp, webauthn } = await this.factors(userId);
+    const enabled = totp || webauthn > 0;
     return {
-      enabled: !!enrolment,
-      recoveryCodesRemaining: enrolment?.recoveryCodes.length ?? 0,
+      enabled,
+      totpEnabled: totp,
+      webauthnCount: webauthn,
+      recoveryCodesRemaining: enabled ? (row?.recoveryCodes.length ?? 0) : 0,
     };
   }
 
   /** Whether one of the user's organizations requires MFA and the user has not enrolled. */
   async enrolmentRequired(userId: string): Promise<boolean> {
+    return (await this.requiredByOrganization(userId)) && !(await this.hasSecondFactor(userId));
+  }
+
+  private async requiredByOrganization(userId: string): Promise<boolean> {
     const memberships = await AppDataSource.getRepository(UserOrganization).find({
       where: { userId, isActive: true },
       relations: ["organization"],
     });
-    if (!memberships.some((membership) => organizationRequiresMfa(membership.organization))) {
-      return false;
+    return memberships.some((membership) => organizationRequiresMfa(membership.organization));
+  }
+
+  /** Refuses to take away the last factor of someone whose organization requires one. */
+  async assertFactorMayBeRemoved(userId: string, otherFactorRemains: boolean): Promise<void> {
+    if (otherFactorRemains) return;
+    if (await this.requiredByOrganization(userId)) {
+      throw mfaError(
+        "FORBIDDEN",
+        "Your organization requires two-factor authentication, so your last method cannot be removed",
+        MFA_FACTOR_REQUIRED_ERROR_TYPE,
+      );
     }
-    return !(await this.findConfirmed(userId));
   }
 
   /** Start (or restart) enrolment. A confirmed enrolment is never overwritten. */
@@ -148,7 +189,7 @@ export class MfaService {
         where: { userId: user.id },
         lock: { mode: "pessimistic_write" },
       });
-      if (!enrolment || enrolment.confirmedAt) return null;
+      if (!enrolment || enrolment.confirmedAt || !enrolment.secret) return null;
 
       const step = findTotpStep(decryptValue(enrolment.secret), code, Date.now());
       if (step === null) return null;
@@ -217,9 +258,10 @@ export class MfaService {
         where: { userId },
         lock: { mode: "pessimistic_write" },
       });
-      if (!enrolment?.confirmedAt) return null;
+      if (!enrolment) return null;
 
       if (/^\d{6}$/.test(code)) {
+        if (!enrolment.confirmedAt || !enrolment.secret) return null;
         const step = findTotpStep(
           decryptValue(enrolment.secret),
           code,
@@ -232,6 +274,7 @@ export class MfaService {
         return "totp";
       }
 
+      // Recovery codes exist only while a factor is active.
       const hash = hashRecoveryCode(code);
       if (!enrolment.recoveryCodes.includes(hash)) return null;
       enrolment.recoveryCodes = enrolment.recoveryCodes.filter((stored) => stored !== hash);
@@ -240,7 +283,8 @@ export class MfaService {
     });
   }
 
-  private async consumeAttempt(email: string, ipAddress: string | undefined): Promise<void> {
+  /** Counts one attempt against the per-user and per-IP limits; refuses while the limiter is down. */
+  async consumeAttempt(email: string, ipAddress: string | undefined): Promise<void> {
     const options = { scope: "mfa-verify", failClosed: true } as const;
     const [byIp, byUser] = [
       await rateLimitService.checkIpRateLimit(
@@ -264,13 +308,26 @@ export class MfaService {
     }
   }
 
+  /** Turns the authenticator app off. Security keys, if any, stay. */
   async disable(
     user: { id: string; email: string },
     code: string,
     request: MfaRequestInfo,
   ): Promise<void> {
+    const { totp, webauthn } = await this.factors(user.id);
+    if (!totp) {
+      throw new TRPCError({ code: "BAD_REQUEST", message: "No authenticator app is set up" });
+    }
+    await this.assertFactorMayBeRemoved(user.id, webauthn > 0);
     await this.verify(user, code, request);
-    await this.repository.delete({ userId: user.id });
+    if (webauthn > 0) {
+      await this.repository.update(
+        { userId: user.id },
+        { secret: null, confirmedAt: null, lastUsedStep: null },
+      );
+    } else {
+      await this.repository.delete({ userId: user.id });
+    }
     await auditLogService.record({
       userId: user.id,
       action: "mfa.disable",
@@ -279,12 +336,26 @@ export class MfaService {
     });
   }
 
+  /**
+   * New recovery codes. Confirmed with a code, or, for people without an
+   * authenticator app, with a recent step-up.
+   */
   async regenerateRecoveryCodes(
-    user: { id: string; email: string },
-    code: string,
+    user: AuthUser,
+    code: string | undefined,
     request: MfaRequestInfo,
   ): Promise<string[]> {
-    await this.verify(user, code, request);
+    if (!(await this.hasSecondFactor(user.id))) {
+      throw new TRPCError({
+        code: "BAD_REQUEST",
+        message: "Two-factor authentication is not enabled",
+      });
+    }
+    if (code) {
+      await this.verify(user, code, request);
+    } else {
+      await this.assertStepUp(user);
+    }
     const codes = generateRecoveryCodes();
     await this.repository.update({ userId: user.id }, { recoveryCodes: codes.hashes });
     await auditLogService.record({
@@ -312,8 +383,8 @@ export class MfaService {
   async assertStepUp(user: AuthUser): Promise<void> {
     if (user.authMethod !== "jwt") return;
 
-    const enrolment = await this.findConfirmed(user.id);
-    if (!enrolment) {
+    const { row, totp, webauthn } = await this.factors(user.id);
+    if (!totp && webauthn === 0) {
       if (organizationRequiresMfa(user.userOrganization?.organization)) {
         throw mfaError(
           "FORBIDDEN",
@@ -326,9 +397,9 @@ export class MfaService {
 
     const stillValid =
       !!user.sessionId &&
-      enrolment.stepUpSessionId === user.sessionId &&
-      !!enrolment.stepUpExpiresAt &&
-      enrolment.stepUpExpiresAt > new Date();
+      row?.stepUpSessionId === user.sessionId &&
+      !!row.stepUpExpiresAt &&
+      row.stepUpExpiresAt > new Date();
     if (!stillValid) {
       throw mfaError(
         "FORBIDDEN",
@@ -342,7 +413,7 @@ export class MfaService {
   async assertEnrolledIfRequired(user: AuthUser): Promise<void> {
     if (user.authMethod !== "jwt") return;
     if (!organizationRequiresMfa(user.userOrganization?.organization)) return;
-    if (await this.findConfirmed(user.id)) return;
+    if (await this.hasSecondFactor(user.id)) return;
     throw mfaError(
       "FORBIDDEN",
       "This organization requires two-factor authentication",

@@ -1,5 +1,5 @@
 <template>
-  <div class="input-wrapper">
+  <div class="input-wrapper" v-bind="wrapperAttrs()">
     <div v-if="label && type !== 'switch' && type !== 'checkbox'" class="label-container">
       <Label :for="inputId">{{ label }}</Label>
       <span
@@ -152,13 +152,16 @@ const props = withDefaults(defineProps<InputProps>(), {
   options: () => [],
 });
 
+defineOptions({ inheritAttrs: false });
+
 const emit = defineEmits<{
   "update:modelValue": [value: string | number | boolean];
 }>();
 
 // Refs
 const textareaRef = ref<HTMLTextAreaElement | null>(null);
-const inputId = Math.random().toString(36).substring(7);
+const attrs = useAttrs();
+const inputId = (attrs.id as string | undefined) ?? Math.random().toString(36).substring(7);
 const showPassword = ref(false);
 
 // Password toggle
@@ -233,8 +236,13 @@ const handleCheckboxChange = (event: Event) => {
   emit("update:modelValue", target.checked);
 };
 
-// Get attrs
-const attrs = useAttrs();
+// Attrs go on the control itself. Select, switch and checkbox don't spread them,
+// so the wrapper keeps those; a switch or checkbox already took the id above.
+function wrapperAttrs() {
+  if (props.type === "select") return attrs;
+  if (props.type !== "switch" && props.type !== "checkbox") return {};
+  return Object.fromEntries(Object.entries(attrs).filter(([name]) => name !== "id"));
+}
 
 // Computed properties for attrs
 const disabledAttr = computed(() => attrs.disabled as boolean | undefined);

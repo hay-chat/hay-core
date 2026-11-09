@@ -1,3 +1,4 @@
+import { withSpan } from "@server/lib/tracing";
 import { conversationRepository } from "@server/repositories/conversation.repository";
 import { playbookRepository } from "@server/repositories/playbook.repository";
 import { conversationSecretService } from "@server/services/conversation-secret.service";
@@ -595,10 +596,15 @@ export const runConversation = async (conversationId: string) => {
     const perceptionLayer = new PerceptionLayer();
 
     // 01.1. Get Intent, Sentiment, and Language
-    const { intent, sentiment, language } = await perceptionLayer.perceive(
-      lastCustomerMessage,
-      conversation.id,
-      conversation.organization_id,
+    const { intent, sentiment, language } = await withSpan(
+      "orchestrator perception",
+      { "hay.layer": "perception" },
+      () =>
+        perceptionLayer.perceive(
+          lastCustomerMessage,
+          conversation.id,
+          conversation.organization_id,
+        ),
     );
     await lastCustomerMessage.savePerception({
       intent: intent.label,
@@ -752,7 +758,9 @@ export const runConversation = async (conversationId: string) => {
     // playbook DB fetch.
     const [livePlaybooks, retrievedDocuments] = await Promise.all([
       playbookRepository.findByStatus(conversation.organization_id, PlaybookStatus.ACTIVE),
-      retrievalLayer.getRelevantDocuments(publicMessages, conversation.organization_id),
+      withSpan("orchestrator retrieval", { "hay.layer": "retrieval" }, () =>
+        retrievalLayer.getRelevantDocuments(publicMessages, conversation.organization_id),
+      ),
     ]);
     const activePlaybooks = await selectablePlaybooks(conversation, livePlaybooks);
 

@@ -393,6 +393,10 @@ export const documentsRouter = t.router({
         ...(nextContent !== undefined && { content: nextContent }),
         ...(input.contentJson && { contentJson: stripMediaSignaturesInJson(input.contentJson) }),
         ...(input.status && { status: input.status }),
+        // Archiving a synced doc is sticky: the sync engine must not bring it back.
+        ...(input.status && {
+          excludedFromSync: input.status === DocumentationStatus.ARCHIVED,
+        }),
       });
       await auditDocument(ctx, "document.update", document.id, {
         fields: ["title", "content", "contentJson", "contentHtml", "status"].filter(
@@ -404,10 +408,24 @@ export const documentsRouter = t.router({
         throw new Error("Failed to update document");
       }
 
-      // Regenerate embeddings if content changed or explicitly requested
+      // Archived documents must not feed the assistant: drop their embeddings on archive and
+      // rebuild them on restore. Only real status transitions act.
+      const wasArchived = document.status === DocumentationStatus.ARCHIVED;
+      const isArchived = (input.status ?? document.status) === DocumentationStatus.ARCHIVED;
+      if (isArchived && !wasArchived) {
+        if (!vectorStoreService.initialized) {
+          await vectorStoreService.initialize();
+        }
+        await vectorStoreService.deleteByDocumentId(ctx.organizationId!, document.id);
+      }
+      const restored = wasArchived && !isArchived;
+
+      // Regenerate embeddings if content changed, the document was restored, or explicitly requested
       if (
-        (nextContent !== undefined && nextContent !== document.content) ||
-        input.regenerateEmbeddings
+        !isArchived &&
+        ((nextContent !== undefined && nextContent !== document.content) ||
+          restored ||
+          input.regenerateEmbeddings)
       ) {
         // Ensure vector store is initialized
         if (!vectorStoreService.initialized) {

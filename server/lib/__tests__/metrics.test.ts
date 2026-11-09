@@ -24,6 +24,20 @@ describe("metrics rendering", () => {
     expect(text).toContain('hay_queue_published_total{queue="render.test",outcome="ok"} 3');
   });
 
+  it("renders histograms with cumulative buckets, sum and count", async () => {
+    metrics.queueWaitSeconds.observe({ queue: "hist.test" }, 0.3);
+    metrics.queueWaitSeconds.observe({ queue: "hist.test" }, 3);
+
+    const text = await renderMetrics();
+
+    expect(text).toContain("# TYPE hay_queue_wait_seconds histogram");
+    expect(text).toContain('hay_queue_wait_seconds_bucket{queue="hist.test",le="0.5"} 1');
+    expect(text).toContain('hay_queue_wait_seconds_bucket{queue="hist.test",le="5"} 2');
+    expect(text).toContain('hay_queue_wait_seconds_bucket{queue="hist.test",le="+Inf"} 2');
+    expect(text).toContain('hay_queue_wait_seconds_count{queue="hist.test"} 2');
+    expect(text).toContain('hay_queue_wait_seconds_sum{queue="hist.test"} 3.3');
+  });
+
   it("escapes label values", async () => {
     registerCollector("hay_test_escape", "Escaping.", () => [
       { labels: { value: 'a"b\\c\nd' }, value: 1 },

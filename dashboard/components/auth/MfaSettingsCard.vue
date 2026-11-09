@@ -56,7 +56,7 @@
       </form>
 
       <!-- Enabled -->
-      <form v-else-if="status?.enabled" class="space-y-4" @submit.prevent>
+      <form v-else-if="status?.totpEnabled" class="space-y-4" @submit.prevent>
         <div class="flex items-center gap-2">
           <Badge variant="success">{{ $t("profile.mfa.enabled") }}</Badge>
           <span class="text-sm text-neutral-muted">
@@ -111,6 +111,7 @@
 
 <script setup lang="ts">
 import type { RouterOutputs } from "@/types/trpc";
+import { useMfaStatus } from "@/composables/useMfaStatus";
 import { Hay } from "@/utils/api";
 import { useToast } from "@/composables/useToast";
 import { useUserStore, type User } from "@/stores/user";
@@ -120,7 +121,7 @@ const { t } = useI18n();
 const toast = useToast();
 const userStore = useUserStore();
 
-const status = ref<RouterOutputs["auth"]["mfa"]["status"] | null>(null);
+const { status, loadStatus } = useMfaStatus();
 const enrolment = ref<RouterOutputs["auth"]["mfa"]["beginEnrolment"] | null>(null);
 const recoveryCodes = ref<string[]>([]);
 const password = ref("");
@@ -129,10 +130,6 @@ const error = ref("");
 const loading = ref(false);
 
 const enrolmentRequired = computed(() => !!userStore.user?.mfaEnrolmentRequired);
-
-const loadStatus = async () => {
-  status.value = await Hay.auth.mfa.status.query();
-};
 
 /** Runs a request with the shared loading and error state. */
 const run = async (action: () => Promise<void>) => {

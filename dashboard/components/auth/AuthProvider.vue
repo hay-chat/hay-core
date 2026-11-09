@@ -2,7 +2,7 @@
   <div>
     <!-- Show loading state while initializing auth -->
     <div
-      v-if="!authStore.isInitialized"
+      v-if="!authStore.isInitialized || awaitingLogin"
       class="flex items-center justify-center h-screen gap-2 flex-col"
     >
       <Loading />
@@ -29,6 +29,7 @@ import { isDefinitiveAuthFailure } from "@/utils/session-refresh";
 
 const authStore = useAuthStore();
 const route = useRoute();
+const router = useRouter();
 const { setLocaleFromBackend } = useLocale();
 const showRefreshMessage = ref(false);
 const refreshTimer = ref<number | null>(null);
@@ -43,6 +44,9 @@ const refresh = (e: Event) => {
 
 // Helper function to check if current route is public
 const isPublicPath = computed(() => route.meta.public === true);
+
+// Signed out on a protected page: never render the app around it.
+const awaitingLogin = computed(() => !authStore.isAuthenticated && !isPublicPath.value);
 
 // Helper function to initialize auth
 const initializeAuth = async () => {
@@ -113,6 +117,10 @@ const initializeAuth = async () => {
   } else if (authStore.isAuthenticated) {
     // Auth already initialized and authenticated, start heartbeat
     startHeartbeat();
+  } else {
+    // The route middleware skips the first load of a page, and "initialized"
+    // survives logout in storage, so a reload after signing out lands here.
+    await router.push({ path: "/login", query: { redirect: route.fullPath } });
   }
 };
 

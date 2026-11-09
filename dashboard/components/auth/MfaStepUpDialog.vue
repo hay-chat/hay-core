@@ -6,7 +6,20 @@
         <DialogDescription>{{ $t("profile.mfa.stepUpDescription") }}</DialogDescription>
       </DialogHeader>
 
-      <form class="space-y-4" @submit.prevent="handleSubmit">
+      <div v-if="status?.webauthnCount" class="space-y-2">
+        <Button type="button" class="w-full" :loading="loading" @click="handleSecurityKey">
+          {{ $t("profile.mfa.keys.use") }}
+        </Button>
+        <p v-if="status.totpEnabled" class="text-center text-xs text-neutral-muted">
+          {{ $t("profile.mfa.keys.orCode") }}
+        </p>
+      </div>
+
+      <form
+        v-if="!status || status.totpEnabled || !status.webauthnCount"
+        class="space-y-4"
+        @submit.prevent="handleSubmit"
+      >
         <Input
           id="mfa-step-up-code"
           v-model="code"
@@ -31,13 +44,15 @@
 
 <script setup lang="ts">
 import { Hay } from "@/utils/api";
+import { useMfaStatus } from "@/composables/useMfaStatus";
 import { useMfaStepUp } from "@/composables/useMfaStepUp";
 import { useToast } from "@/composables/useToast";
-import { mfaErrorKey } from "@/utils/mfa-errors";
+import { askKeyToSign, webauthnErrorKey } from "@/utils/webauthn";
 
 const { t } = useI18n();
 const toast = useToast();
 const { open } = useMfaStepUp();
+const { status, loadStatus } = useMfaStatus();
 
 const code = ref("");
 const error = ref("");
@@ -47,20 +62,31 @@ watch(open, (isOpen) => {
   if (isOpen) {
     code.value = "";
     error.value = "";
+    loadStatus().catch(() => undefined);
   }
 });
 
-const handleSubmit = async () => {
+/** Runs a confirmation with the shared loading and error state. */
+const confirm = async (action: () => Promise<unknown>) => {
   loading.value = true;
   error.value = "";
   try {
-    await Hay.auth.mfa.stepUp.mutate({ code: code.value.trim() });
+    await action();
     open.value = false;
     toast.success(t("profile.mfa.stepUpDone"));
   } catch (err: unknown) {
-    error.value = t(mfaErrorKey(err));
+    error.value = t(webauthnErrorKey(err));
   } finally {
     loading.value = false;
   }
 };
+
+const handleSubmit = () => confirm(() => Hay.auth.mfa.stepUp.mutate({ code: code.value.trim() }));
+
+const handleSecurityKey = () =>
+  confirm(async () => {
+    const optionsJSON = await Hay.auth.mfa.webauthn.stepUpOptions.mutate();
+    const response = await askKeyToSign(optionsJSON);
+    await Hay.auth.mfa.webauthn.stepUp.mutate({ response });
+  });
 </script>

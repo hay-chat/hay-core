@@ -111,7 +111,7 @@ describe("RabbitMQService connection recovery", () => {
     expect(a.prefetch).toHaveBeenCalledWith(2);
     expect(b.prefetch).toHaveBeenCalledWith(10);
 
-    const msg = { fields: {}, content: Buffer.from("{}") } as never;
+    const msg = { fields: {}, properties: {}, content: Buffer.from("{}") } as never;
     const deliver = b.consume.mock.calls[0][1] as (m: unknown) => Promise<void>;
     await deliver(msg);
     service.ack(msg);

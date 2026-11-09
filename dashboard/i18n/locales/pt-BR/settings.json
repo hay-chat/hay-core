@@ -582,6 +582,23 @@
       "stepUpTitle": "Confirme que é você",
       "stepUpDescription": "Digite um código de dois fatores para continuar com esta ação.",
       "stepUpDone": "Confirmado. Tente novamente.",
+      "keys": {
+        "title": "Chaves de segurança e passkeys",
+        "description": "Use uma chave de segurança física ou uma passkey como segundo fator, no lugar de ou junto com um aplicativo autenticador.",
+        "unsupported": "Este navegador não suporta chaves de segurança.",
+        "empty": "Nenhuma chave de segurança ainda.",
+        "add": "Adicionar chave de segurança",
+        "nameLabel": "Nome",
+        "namePlaceholder": "ex.: YubiKey, passkey do notebook",
+        "lastUsed": "Último uso em {date}",
+        "neverUsed": "Ainda não usada",
+        "rename": "Renomear",
+        "remove": "Remover",
+        "addedToast": "Chave de segurança adicionada",
+        "removedToast": "Chave de segurança removida",
+        "use": "Usar uma chave de segurança ou passkey",
+        "orCode": "Ou digite um código"
+      },
       "orgTitle": "Autenticação em dois fatores para sua equipe",
       "orgDescription": "Proteja todas as contas desta organização com um segundo fator.",
       "orgSwitch": "Exigir autenticação em dois fatores",
@@ -590,6 +607,11 @@
         "invalidCode": "Esse código não é válido. Tente novamente.",
         "wrongPassword": "Essa senha está incorreta.",
         "tooMany": "Muitas tentativas. Tente novamente mais tarde.",
+        "lastFactor": "Sua organização exige autenticação em dois fatores, então seu último método não pode ser removido.",
+        "keyFailed": "Não foi possível verificar essa chave de segurança. Tente novamente.",
+        "keyCancelled": "A solicitação da chave de segurança foi cancelada.",
+        "keyDuplicate": "Essa chave de segurança já está registrada.",
+        "keysUnavailable": "As chaves de segurança não estão disponíveis no momento.",
         "generic": "Algo deu errado. Tente novamente."
       }
     }

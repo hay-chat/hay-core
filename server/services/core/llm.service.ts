@@ -1,3 +1,4 @@
+import { withSpan } from "@server/lib/tracing";
 import { Message, MessageType } from "@server/database/entities/message.entity";
 import { config } from "@server/config/env";
 import { createLogger } from "@server/lib/logger";
@@ -297,7 +298,11 @@ export class LLMService {
   private async chatWithRetry(provider: ChatProvider, request: ChatRequest): Promise<ChatResult> {
     for (let attempt = 1; ; attempt++) {
       try {
-        return await this.runWithTimeout(30000, request, (req) => provider.chat(req));
+        return await withSpan(
+          "llm chat",
+          { "llm.provider": provider.id, "llm.model": request.model, "llm.operation": "chat" },
+          () => this.runWithTimeout(30000, request, (req) => provider.chat(req)),
+        );
       } catch (error) {
         const retry =
           attempt < CHAT_ATTEMPTS && !request.signal?.aborted && isTransientLlmError(error);

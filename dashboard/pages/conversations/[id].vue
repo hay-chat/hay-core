@@ -210,21 +210,6 @@
               }}
             </Badge>
             <Button
-              v-if="conversation?.status === 'open'"
-              variant="outline"
-              size="sm"
-              class="max-md:!hidden"
-              :class="supervisionMode ? 'bg-orange-50 border-orange-200' : ''"
-              @click="toggleSupervisionMode"
-            >
-              <Eye class="h-4 w-4 mr-2" />
-              {{
-                supervisionMode
-                  ? $t("conversations.detail.exitSupervision")
-                  : $t("conversations.detail.supervise")
-              }}
-            </Button>
-            <Button
               v-if="conversation?.status === 'open' || conversation?.status === 'pending-human'"
               size="sm"
               data-testid="take-over-button"
@@ -247,18 +232,6 @@
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                <DropdownMenuItem
-                  v-if="conversation?.status === 'open'"
-                  class="md:hidden"
-                  @click="toggleSupervisionMode"
-                >
-                  <Eye class="mr-2 h-4 w-4" />
-                  {{
-                    supervisionMode
-                      ? $t("conversations.detail.exitSupervision")
-                      : $t("conversations.detail.supervise")
-                  }}
-                </DropdownMenuItem>
                 <DropdownMenuItem
                   v-if="conversation?.playbook_id"
                   @click="showSuggestDialog = true"
@@ -1061,7 +1034,6 @@
 import { logger } from "@/utils/logger";
 import {
   ArrowLeft,
-  Eye,
   UserCheck,
   MessageSquare,
   Clock,
@@ -1260,7 +1232,6 @@ const conversationId = ref<string>(routeId);
 
 // Reactive state
 const loading = ref(true);
-const supervisionMode = ref(false);
 const humanTakeover = ref(false);
 const isTyping = ref(false);
 const newMessage = ref("");
@@ -1722,12 +1693,6 @@ const formatStatus = (status: string | undefined) => {
   return keys[status] ? t(keys[status]) : status;
 };
 
-const toggleSupervisionMode = () => {
-  supervisionMode.value = !supervisionMode.value;
-  // TODO: Enable/disable supervision mode
-  logger.debug("Supervision mode:", supervisionMode.value);
-};
-
 const takeOverConversation = async () => {
   const { useToast } = await import("@/composables/useToast");
   const toast = useToast();
@@ -1737,7 +1702,6 @@ const takeOverConversation = async () => {
       conversationId: conversationId.value,
     });
     humanTakeover.value = true;
-    supervisionMode.value = false;
     toast.success(t("conversations.toast.takenOver"), t("conversations.toast.takenOverMessage"));
     // Refresh conversation and assigned user
     await fetchConversation();
