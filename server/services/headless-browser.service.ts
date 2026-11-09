@@ -9,6 +9,7 @@ import { createLogger } from "@server/lib/logger";
 import { validateUrlForSSRF } from "@server/utils/ssrf";
 import { stripHiddenHtml } from "@server/utils/strip-hidden-html";
 import { config } from "@server/config/env";
+import { lookup } from "dns/promises";
 import fs from "fs";
 import path from "path";
 
@@ -29,7 +30,6 @@ const SYSTEM_CHROME_PATHS = [
 ];
 
 const BROWSER_LAUNCH_ARGS = [
-  "--no-sandbox",
   "--disable-dev-shm-usage",
   "--disable-gpu",
   "--disable-extensions",
@@ -143,12 +143,9 @@ export class HeadlessBrowserService {
       return this.browser;
     }
 
-    const executablePath = await this.resolveExecutablePath();
-    this.browser = await puppeteer.launch({
-      executablePath,
-      headless: true,
-      args: BROWSER_LAUNCH_ARGS,
-    });
+    this.browser = config.scraper.chromeRemoteUrl
+      ? await this.connectRemoteBrowser(config.scraper.chromeRemoteUrl)
+      : await this.launchLocalBrowser();
 
     // Clean up on unexpected disconnect
     this.browser.on("disconnected", () => {
@@ -156,8 +153,38 @@ export class HeadlessBrowserService {
       this.browser = null;
     });
 
-    logger.info("Headless browser launched");
+    logger.info("Headless browser ready");
     return this.browser;
+  }
+
+  private async launchLocalBrowser(): Promise<Browser> {
+    const disableSandbox = config.scraper.chromeDisableSandbox;
+    if (disableSandbox) {
+      logger.warn("Launching Chromium without its sandbox; set CHROME_REMOTE_URL to isolate it");
+    }
+    return puppeteer.launch({
+      executablePath: await this.resolveExecutablePath(),
+      headless: true,
+      args: disableSandbox ? ["--no-sandbox", ...BROWSER_LAUNCH_ARGS] : BROWSER_LAUNCH_ARGS,
+    });
+  }
+
+  /**
+   * Attach to the configured browser. Never falls back to a local launch: that
+   * would quietly put page rendering back inside the app container.
+   */
+  private async connectRemoteBrowser(remoteUrl: string): Promise<Browser> {
+    try {
+      const url = new URL(remoteUrl);
+      // Chromium's DevTools endpoint rejects a Host header that isn't an IP or localhost.
+      const { address } = await lookup(url.hostname, { family: 4 });
+      return await puppeteer.connect({ browserURL: `${url.protocol}//${address}:${url.port}` });
+    } catch (err) {
+      logger.error({ err }, "Remote browser is unreachable");
+      throw new Error(
+        "The browser service configured in CHROME_REMOTE_URL is unreachable, so this page could not be rendered.",
+      );
+    }
   }
 
   /**
@@ -238,7 +265,11 @@ export class HeadlessBrowserService {
    */
   async shutdown(): Promise<void> {
     if (this.browser) {
-      await this.browser.close().catch((err) => {
+      // A remote browser outlives this process; only drop the connection to it.
+      const release = config.scraper.chromeRemoteUrl
+        ? this.browser.disconnect()
+        : this.browser.close();
+      await release.catch((err) => {
         logger.warn({ err }, "Failed to close browser gracefully");
       });
       this.browser = null;

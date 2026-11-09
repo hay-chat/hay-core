@@ -36,6 +36,7 @@ Edit `selfhost/.env` and fill in the **REQUIRED** block:
 | ----------------------- | ------------------------------------------------------------ |
 | `HAY_DOMAIN`            | The domain Hay will be served on, e.g. `support.example.com` |
 | `DB_PASSWORD`           | Any strong password (`openssl rand -hex 32`)                 |
+| `REDIS_PASSWORD`        | Any strong password                                          |
 | `RABBITMQ_PASSWORD`     | Any strong password                                          |
 | `JWT_SECRET`            | 32+ random characters                                        |
 | `JWT_REFRESH_SECRET`    | 32+ random characters, different from `JWT_SECRET`           |
@@ -140,6 +141,12 @@ restarts. **Back up first** (below): some migrations can't be reverted. Read the
 [release notes](https://github.com/hay-chat/hay-core/releases) before upgrading;
 Hay is pre-1.0 and releases may include breaking changes.
 
+Upgrading from a version that ran as root or without a Redis password: add
+`REDIS_PASSWORD` to `selfhost/.env`. The containers now run as an unprivileged
+user (uid 10001); the one-shot `uploads-perms` container hands the uploads volume
+to it. If you bind-mounted uploads from the host, `chown -R 10001:10001` that
+directory yourself.
+
 ## Backups
 
 Three things hold state:
@@ -169,6 +176,17 @@ Redis and RabbitMQ hold only transient data.
   `REDIS_PASSWORD`, `REDIS_TLS` or `RABBITMQ_URL` in the `environment` block of
   the `x-hay` anchor. PostgreSQL needs pgvector 0.8+, and the database user must
   be allowed to `CREATE EXTENSION vector` and `pgcrypto`.
+- **Proxy hops (`TRUST_PROXY`):** the number of reverse proxies between the
+  internet and the server. The default of 1 is right for the bundled Caddy. Add
+  one for each extra layer (for example 2 with Cloudflare in front of Caddy). Too
+  low and every visitor appears to come from your proxy's IP, so rate limits are
+  shared between them. Too high and visitors can spoof their IP with an
+  `X-Forwarded-For` header. The server logs a warning at startup when it is unset.
+- **Website imports:** pages are rendered in the separate `browser` container,
+  which has no secrets and can't reach the databases. Without it, set
+  `CHROME_REMOTE_URL` to your own Chromium's DevTools URL, or unset it to run
+  Chromium inside the server container. Imports report an error while a configured
+  remote browser is unreachable; Hay doesn't fall back to a local one.
 
 ## Troubleshooting
 

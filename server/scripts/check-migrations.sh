@@ -11,14 +11,6 @@ if ! npx typeorm-ts-node-commonjs migration:show -d ./database/data-source.ts > 
   echo "❌ Failed to check migration status. Database connection or permissions issue:"
   cat /tmp/migration_check.txt | grep -E "(error|ERROR|Error)" | head -5
 
-  # If it's a connection timeout during build, exit gracefully
-  if grep -q "ETIMEDOUT\|ECONNREFUSED\|ENOTFOUND" /tmp/migration_check.txt; then
-    echo "⚠️  Database not accessible (likely during build phase). Skipping migration check."
-    echo "   Migrations will be run during the release phase."
-    rm -f /tmp/migration_check.txt
-    exit 0
-  fi
-
   exit 1
 fi
 

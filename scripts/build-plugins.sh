@@ -2,6 +2,8 @@
 
 echo "Building plugins..."
 
+failed=()
+
 # Build plugins that have hay-plugin section in package.json
 for plugin_dir in plugins/core/*/; do
   plugin_name=$(basename "$plugin_dir")
@@ -41,8 +43,9 @@ for plugin_dir in plugins/core/*/; do
 
   # Install dependencies if node_modules doesn't exist
   if [ ! -d "${plugin_dir}node_modules" ]; then
-    if ! (cd "$plugin_dir" && npm install 2>&1); then
-      echo "  Install failed for $plugin_name, skipping"
+    if ! (cd "$plugin_dir" && npm install --ignore-scripts 2>&1); then
+      echo "  Install failed for $plugin_name"
+      failed+=("$plugin_name (install)")
       continue
     fi
   fi
@@ -53,15 +56,17 @@ for plugin_dir in plugins/core/*/; do
   # the moment a dep (e.g. magento's date-fns) isn't present at the repo root.
   if [ -f "${plugin_dir}mcp/package.json" ] && [ ! -d "${plugin_dir}mcp/node_modules" ]; then
     echo "  Installing MCP server deps for $plugin_name..."
-    if ! (cd "${plugin_dir}mcp" && npm install 2>&1); then
-      echo "  MCP install failed for $plugin_name, skipping"
+    if ! (cd "${plugin_dir}mcp" && npm install --ignore-scripts 2>&1); then
+      echo "  MCP install failed for $plugin_name"
+      failed+=("$plugin_name (MCP install)")
       continue
     fi
   fi
 
   # Run build
   if ! (cd "$plugin_dir" && npm run build 2>&1); then
-    echo "  Build failed for $plugin_name, skipping"
+    echo "  Build failed for $plugin_name"
+    failed+=("$plugin_name (build)")
     continue
   fi
 
@@ -69,6 +74,12 @@ for plugin_dir in plugins/core/*/; do
 done
 
 echo ""
+if [ "${#failed[@]}" -gt 0 ]; then
+  echo "Plugin builds failed:"
+  printf '  %s\n' "${failed[@]}"
+  exit 1
+fi
+
 echo "All plugins built successfully"
 echo ""
 echo "Plugin UI assets are served directly from plugins/ directory"

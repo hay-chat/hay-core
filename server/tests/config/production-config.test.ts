@@ -18,6 +18,7 @@ const VALID_ENV = {
   LOG_LEVEL: "info",
   DB_HOST: "localhost",
   REDIS_HOST: "localhost",
+  TRUST_PROXY: "1",
 };
 
 const originalEnv = { ...process.env };
@@ -56,6 +57,12 @@ describe("validateProductionConfig", () => {
     ["a short INTERNAL_API_SECRET", { INTERNAL_API_SECRET: "short" }, "INTERNAL_API_SECRET"],
   ])("refuses to start with %s", (_label, overrides, variable) => {
     expect(() => load(overrides).validateProductionConfig()).toThrow(variable);
+  });
+
+  it("warns when the proxy hop count is left to its default", () => {
+    expect(load({ TRUST_PROXY: undefined }).validateProductionConfig().join("\n")).toMatch(
+      /TRUST_PROXY/,
+    );
   });
 
   it("warns about debug logging and unverified or missing transport security", () => {
