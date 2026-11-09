@@ -77,7 +77,8 @@ export class WebchatSettings {
   csatQuestion!: string | null;
 
   // Security
-  @Column({ type: "text", array: true, name: "allowed_domains", default: () => "ARRAY['*']" })
+  // Empty = only the organization's own website (see isDomainAllowed).
+  @Column({ type: "text", array: true, name: "allowed_domains", default: () => "'{}'" })
   allowedDomains!: string[];
 
   @Column({ type: "boolean", name: "is_enabled", default: true })

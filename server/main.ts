@@ -14,7 +14,13 @@ import { initTelemetry, captureException, shutdownTelemetry } from "@server/lib/
 import { requestContext } from "@server/lib/request-context";
 import { startMetricsServer } from "@server/lib/metrics-server";
 import { isPublicUploadPath, setPublicUploadHeaders } from "@server/services/media-url.service";
-import { bodyLimitForPath } from "@server/lib/body-limits";
+import {
+  bodyLimitForPath,
+  DEFAULT_BODY_LIMIT,
+  isPublicWidgetPath,
+  UPLOAD_BODY_LIMIT,
+} from "@server/lib/body-limits";
+import { mayParseLargeBody } from "@server/lib/large-body-auth";
 import { httpIpRateLimit, trpcRetryAfterMeta } from "@server/lib/http-rate-limit";
 import "reflect-metadata";
 import dotenv from "dotenv";
@@ -149,10 +155,7 @@ async function startServer() {
   // Add permissive CORS middleware for public widget endpoints
   // This allows the widget to be embedded on any domain
   server.use((req, res, next) => {
-    if (
-      req.path.startsWith("/v1/publicConversations") ||
-      req.path.startsWith("/v1/webchat.getPublicConfig")
-    ) {
+    if (isPublicWidgetPath(req.path)) {
       return cors({
         origin: true, // Allow all origins
         credentials: false,
@@ -196,17 +199,24 @@ async function startServer() {
   };
   const bodyParsers = new Map<string, express.RequestHandler[]>();
   server.use((req, res, next) => {
-    const limit = bodyLimitForPath(req.path);
-    let parsers = bodyParsers.get(limit);
-    if (!parsers) {
-      parsers = [
-        express.json({ limit, verify: captureRawBody }),
-        express.urlencoded({ extended: true, limit, verify: captureRawBody }),
-      ];
-      bodyParsers.set(limit, parsers);
-    }
-    const [json, urlencoded] = parsers;
-    json(req, res, (err?: unknown) => (err ? next(err) : urlencoded(req, res, next)));
+    void (async () => {
+      let limit = bodyLimitForPath(req.path);
+      if (limit === UPLOAD_BODY_LIMIT && !(await mayParseLargeBody(req))) {
+        limit = DEFAULT_BODY_LIMIT;
+      }
+      let parsers = bodyParsers.get(limit);
+      if (!parsers) {
+        // File uploads are never signature-checked, so no second copy of them.
+        const verify = limit === UPLOAD_BODY_LIMIT ? undefined : captureRawBody;
+        parsers = [
+          express.json({ limit, verify }),
+          express.urlencoded({ extended: true, limit, verify }),
+        ];
+        bodyParsers.set(limit, parsers);
+      }
+      const [json, urlencoded] = parsers;
+      json(req, res, (err?: unknown) => (err ? next(err) : urlencoded(req, res, next)));
+    })().catch(next);
   });
 
   server.get("/", (req, res) => {

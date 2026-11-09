@@ -319,6 +319,8 @@ describe("WebSocket public writes require DPoP", () => {
     expect(mockVerifyDPoP).toHaveBeenCalled();
     expect(mockRateLimited).toHaveBeenLastCalledWith([
       { rule: "messagePerConversation", id: CONV_ID },
+      { rule: "messagePerOrg", id: conversation.organization_id },
+      { rule: "messagePerOrgHourly", id: conversation.organization_id },
     ]);
     expect(conversation.addMessage).not.toHaveBeenCalled();
     expect(ws.last()).toEqual({ type: "error", error: "RATE_LIMITED" });

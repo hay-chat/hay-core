@@ -9,9 +9,11 @@
  */
 
 export const DEFAULT_BODY_LIMIT = "1mb";
-const UPLOAD_BODY_LIMIT = "50mb";
+export const UPLOAD_BODY_LIMIT = "50mb";
 const WIDGET_BODY_LIMIT = "15mb"; // one 10 MB attachment as base64 + message
 const PLUGIN_BODY_LIMIT = "10mb";
+/** Bodies up to this size never need the upload check. */
+export const DEFAULT_BODY_LIMIT_BYTES = 1024 * 1024;
 
 /** tRPC procedures (or whole routers, ending in ".") that accept base64 files. */
 const UPLOAD_PROCEDURES = [
@@ -44,9 +46,24 @@ export function bodyLimitForPath(path: string): string {
     if (procedures.some((procedure) => procedureMatches(procedure, UPLOAD_PROCEDURES))) {
       return UPLOAD_BODY_LIMIT;
     }
-    if (procedures.some((procedure) => procedure.startsWith("publicConversations."))) {
+    if (procedures.includes("publicConversations.sendAttachment")) {
       return WIDGET_BODY_LIMIT;
     }
   }
   return DEFAULT_BODY_LIMIT;
+}
+
+/**
+ * Whether every procedure in a tRPC path is callable from any website. Batches
+ * join procedures in one path, so one public name must not open up the rest.
+ */
+export function isPublicWidgetPath(path: string): boolean {
+  if (!path.startsWith("/v1/")) return false;
+  return path
+    .slice("/v1/".length)
+    .split(",")
+    .every(
+      (procedure) =>
+        procedure.startsWith("publicConversations.") || procedure === "webchat.getPublicConfig",
+    );
 }

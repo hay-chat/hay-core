@@ -9,6 +9,8 @@ import { rateLimitService } from "@server/services/rate-limit.service";
  */
 const HTTP_IP_LIMITS: Array<{ prefix: string; bucket: string; max: number }> = [
   { prefix: "/v1/publicConversations", bucket: "public-conversations", max: 600 },
+  { prefix: "/v1/webchat.getPublicConfig", bucket: "webchat-config", max: 600 },
+  { prefix: "/v1/media", bucket: "media", max: 600 },
   // Includes provider webhooks (/v1/plugins/<id>/webhook), which arrive from a
   // few addresses in bursts; keep this high.
   { prefix: "/v1/plugins", bucket: "plugins", max: 3000 },

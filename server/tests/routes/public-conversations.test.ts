@@ -94,7 +94,7 @@ jest.mock("@server/services/webchat/webchat-extensions.service", () => ({
   webchatExtensionsService: { runGates: mockRunGates },
 }));
 
-const mockRecordCreateAttempt = jest.fn<(orgId: string) => Promise<boolean>>(async () => false);
+const mockRecordCreateAttempt = jest.fn<(orgId: string, ip: string) => Promise<boolean>>(async () => false);
 jest.mock("@server/services/webchat/under-attack.service", () => ({
   recordCreateAttempt: mockRecordCreateAttempt,
   isUnderAttack: async () => false,
@@ -492,7 +492,7 @@ describe("publicConversations.create plugin gates", () => {
   it("counts the attempt and tells the gates when the org is under attack", async () => {
     mockRecordCreateAttempt.mockResolvedValueOnce(true);
     await callerFor().create(createInput);
-    expect(mockRecordCreateAttempt).toHaveBeenCalledWith(ORG_ID);
+    expect(mockRecordCreateAttempt).toHaveBeenCalledWith(ORG_ID, expect.any(String));
     expect(mockRunGates).toHaveBeenCalledWith(
       ORG_ID,
       "conversation.create",

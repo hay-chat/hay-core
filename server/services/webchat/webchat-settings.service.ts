@@ -108,7 +108,12 @@ export class WebchatSettingsService {
    */
   async isDomainAllowed(organizationId: string, hostname: string | null): Promise<boolean> {
     const settings = await this.getSettings(organizationId);
-    return matchesAllowedDomains(settings.allowedDomains, hostname);
+    const allowed = settings.allowedDomains.filter((entry) => entry.trim());
+    if (allowed.length > 0) return matchesAllowedDomains(allowed, hostname);
+
+    const { siteIndexService } = await import("@server/services/site-index.service");
+    const website = await siteIndexService.resolveWebsite(organizationId);
+    return matchesAllowedDomains(domainsForWebsite(website), hostname);
   }
 }
 
@@ -124,6 +129,18 @@ function normalizeDomainEntry(entry: string): string {
     .replace(/[/?#].*$/, "")
     .replace(/:\d+$/, "")
     .replace(/\.$/, "");
+}
+
+/** Allowed-domain entries for an organization's own website and its subdomains. */
+export function domainsForWebsite(website: string | null | undefined): string[] {
+  if (!website) return [];
+  try {
+    const url = new URL(/^https?:\/\//i.test(website) ? website : `https://${website}`);
+    const host = url.hostname.toLowerCase().replace(/^www\./, "");
+    return host ? [host, `*.${host}`] : [];
+  } catch {
+    return [];
+  }
 }
 
 /**

@@ -21,6 +21,16 @@ export const PUBLIC_WIDGET_LIMITS = {
   messagePerConversation: { max: 20, windowSeconds: 60 },
   /** Messages per IP, across conversations. */
   messagePerIp: { max: 60, windowSeconds: 60 },
+  /** Messages per organization, as a burst cap on AI runs across all visitors. */
+  messagePerOrg: { max: 1200, windowSeconds: 60 },
+  /** Messages per organization per hour: the ceiling on AI spend one site's traffic can cause. */
+  messagePerOrgHourly: { max: 20000, windowSeconds: 60 * 60 },
+  /** Message history reads per IP. */
+  readPerIp: { max: 300, windowSeconds: 60 },
+  /** Form submissions per IP. */
+  formPerIp: { max: 30, windowSeconds: 60 },
+  /** Key rotations per IP. A widget rotates rarely. */
+  rotateKeysPerIp: { max: 30, windowSeconds: 10 * 60 },
   /** Files (photos, PDFs) per conversation. Each is up to 10 MB of storage. */
   attachmentPerConversation: { max: 10, windowSeconds: 10 * 60 },
   /** Challenge page loads per IP (one per first message; retries included). */
