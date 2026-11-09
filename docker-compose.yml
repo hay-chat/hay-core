@@ -59,7 +59,69 @@ services:
       timeout: 5s
       retries: 5
 
+  # Plugin isolation (off by default). These two run plugin workers away from the
+  # server: start them with `docker compose --profile plugin-isolation up -d`
+  # and run the server from the hay:local image on the same volumes
+  # (plugin-run at /run/hay) with PLUGIN_ISOLATION=strict and
+  # PLUGIN_API_SOCKET=/run/hay/api/core.sock. A server started on the host with
+  # `npm run dev` can't share unix sockets with Docker Desktop's VM, so local
+  # development keeps spawning workers itself. See selfhost/compose.yml.
+  plugin-host:
+    profiles: [plugin-isolation]
+    image: hay:local
+    container_name: hay-plugin-host
+    command: ["node", "dist/plugin-host/main.js"]
+    network_mode: none
+    read_only: true
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+      # Seccomp for bubblewrap's clone/unshare/mount; AppArmor relaxed for this
+      # container only, because docker-default denies mount (see selfhost/compose.yml).
+      - seccomp=./selfhost/plugin-host-seccomp.json
+      - apparmor=unconfined
+    mem_limit: 2g
+    pids_limit: 512
+    cpus: 2
+    tmpfs:
+      - /tmp:size=64m,mode=1777
+    environment:
+      NODE_ENV: production
+      PLUGIN_ISOLATION: ${PLUGIN_ISOLATION:-strict}
+      PLUGIN_API_SOCKET: /run/hay/api/core.sock
+      PLUGIN_EGRESS_SOCKET: /run/hay-egress/pub/proxy.sock
+      PLUGIN_EGRESS_CONTROL_SOCKET: /run/hay-egress/ctl/control.sock
+    volumes:
+      - plugin_run:/run/hay
+      - plugin_egress_run:/run/hay-egress
+      - custom_plugins:/app/plugins/custom:ro
+
+  plugin-egress:
+    profiles: [plugin-isolation]
+    image: hay:local
+    container_name: hay-plugin-egress
+    command: ["node", "dist/plugin-host/egress-main.js"]
+    read_only: true
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    mem_limit: 256m
+    pids_limit: 256
+    cpus: 1
+    environment:
+      NODE_ENV: production
+    volumes:
+      - plugin_egress_run:/run/hay-egress
+    networks:
+      - plugin_egress
+
 volumes:
+  plugin_run:
+  plugin_egress_run:
+  custom_plugins:
   postgres_data:
   redis_data:
   rabbitmq_data:
+
+networks:
+  plugin_egress:

@@ -40,7 +40,13 @@ async function refresh(mode: PluginIsolationMode, first: boolean): Promise<void>
   try {
     status = await getPluginHostStatus();
   } catch (error) {
-    health = { mode, tier: 0, tierName: "unreachable", reason: String(error), egress: "unavailable" };
+    health = {
+      mode,
+      tier: 0,
+      tierName: "unreachable",
+      reason: String(error),
+      egress: "unavailable",
+    };
     logger.error({ err: error }, "Plugin host is unreachable: plugin workers cannot start");
     return;
   }

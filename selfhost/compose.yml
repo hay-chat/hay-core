@@ -169,6 +169,8 @@ services:
   # environment, no database, Redis or RabbitMQ route, read-only filesystem.
   # Inside, each worker is sandboxed from the others (bubblewrap, else one user
   # per worker); see SELF_HOSTING.md. Start with COMPOSE_PROFILES=plugin-isolation.
+  # Keep it on no network (network_mode: none). Never attach it to the reverse
+  # proxy's network or to any network other applications or datastores share.
   plugin-host:
     profiles: [plugin-isolation]
     image: hay:local
@@ -179,9 +181,15 @@ services:
     cap_drop: [ALL]
     security_opt:
       - no-new-privileges:true
-      # Docker's default profile plus clone/unshare/mount for bubblewrap's
-      # sandbox. The path is relative to this file.
+      # Bubblewrap needs both of these. Docker's default seccomp profile refuses
+      # clone/unshare/mount; this one is the default plus those calls. On hosts
+      # that enforce AppArmor (Debian, Ubuntu), the docker-default profile also
+      # denies mount, so the sandbox can't be built without relaxing it for this
+      # container only. If the sandbox still can't start, the plugin host says
+      # why in its log and falls back to the next tier (see SELF_HOSTING.md).
+      # The seccomp path is relative to this file.
       - seccomp=./plugin-host-seccomp.json
+      - apparmor=unconfined
     mem_limit: 2g
     pids_limit: 512
     cpus: 2

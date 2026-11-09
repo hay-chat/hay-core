@@ -118,9 +118,10 @@ RUN mkdir -p /app/plugins/custom /app/server/server/uploads /data/uploads /app/d
       /run/hay/api /run/hay/ctl /run/hay/w /run/hay-egress/pub /run/hay-egress/ctl \
     && chown -R hay:hay /app/plugins/custom /app/server/server/uploads /data/uploads /app/dashboard/pages \
       /run/hay /run/hay-egress \
-    && chmod 0711 /run/hay /run/hay/w /run/hay-egress \
+    && chmod 0711 /run/hay /run/hay-egress \
+    && chmod 0771 /run/hay/w \
     && chmod 0755 /run/hay/api /run/hay-egress/pub \
-    && chmod 0750 /run/hay/ctl /run/hay-egress/ctl
+    && chmod 0770 /run/hay/ctl /run/hay-egress/ctl
 
 ENV NODE_ENV=production
 # Core plugins are compiled above and the image has no build tools.

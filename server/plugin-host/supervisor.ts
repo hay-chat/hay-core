@@ -7,12 +7,12 @@
  * no plugin code itself.
  */
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "http";
-import { chmodSync, mkdirSync, realpathSync, rmSync } from "fs";
+import { chmodSync, chownSync, mkdirSync, realpathSync, rmSync } from "fs";
 import path from "path";
 import { randomBytes, randomInt } from "crypto";
 import type { ChildProcess } from "child_process";
 import { log } from "./log";
-import type { Launcher, LaunchSpec } from "./launcher";
+import { removeWorkerDir, type Launcher, type LaunchSpec } from "./launcher";
 import {
   WORKER_ID_PATTERN,
   TIER_NAMES,
@@ -41,6 +41,8 @@ export interface SupervisorOptions {
   /** Egress hooks; null when the proxy is not configured. */
   egress: EgressRegistrar | null;
   controlSocket: string;
+  /** Group core runs in; owns the control socket when the supervisor runs as root. */
+  coreGid: number;
 }
 
 /** What the supervisor needs from the egress proxy. */
@@ -93,6 +95,9 @@ export class Supervisor {
     });
     // Only core (same group) may drive the supervisor.
     chmodSync(this.options.controlSocket, 0o660);
+    if (process.getuid?.() === 0) {
+      chownSync(this.options.controlSocket, process.getuid(), this.options.coreGid);
+    }
   }
 
   async close(): Promise<void> {
@@ -198,7 +203,7 @@ export class Supervisor {
     } catch (error) {
       this.releasePorts(bridgePorts);
       if (egressToken) await this.options.egress?.revoke(egressToken).catch(() => undefined);
-      rmSync(workerDir, { recursive: true, force: true });
+      removeWorkerDir(workerDir);
       log.error("Failed to start worker", { id: request.id, err: String(error) });
       return { status: 500, body: { error: `Failed to start worker: ${String(error)}` } };
     }
@@ -328,15 +333,18 @@ export class Supervisor {
     } catch (error) {
       log.warn("Worker cleanup failed", { id: worker.id, err: String(error) });
     }
-    rmSync(worker.spec.workerDir, { recursive: true, force: true });
+    removeWorkerDir(worker.spec.workerDir);
   }
 
   private async stopWorker(id: string): Promise<void> {
     const worker = this.workers.get(id);
     if (!worker) return;
     const exited = new Promise<void>((resolve) => worker.child.once("exit", () => resolve()));
-    signalGroup(worker.child, "SIGTERM");
-    const timer = setTimeout(() => signalGroup(worker.child, "SIGKILL"), STOP_GRACE_MS);
+    this.options.launcher.signal(worker.child, worker.spec, "SIGTERM");
+    const timer = setTimeout(
+      () => this.options.launcher.signal(worker.child, worker.spec, "SIGKILL"),
+      STOP_GRACE_MS,
+    );
     await exited;
     clearTimeout(timer);
   }
@@ -367,15 +375,6 @@ export class Supervisor {
 
   private releasePorts(ports: number[]): void {
     for (const port of ports) this.usedPorts.delete(port);
-  }
-}
-
-function signalGroup(child: ChildProcess, signal: NodeJS.Signals): void {
-  if (child.pid === undefined) return;
-  try {
-    process.kill(-child.pid, signal);
-  } catch {
-    child.kill(signal);
   }
 }
 

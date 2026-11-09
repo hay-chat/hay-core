@@ -28,6 +28,7 @@ import {
 } from "@server/lib/worker-client";
 import { pluginIsolationMode } from "@server/lib/plugin-isolation";
 import { launchInPluginHost } from "./plugin-host.client";
+import { resolveEgressAllow } from "../plugin-host/egress-policy";
 import type { HayPluginManifest } from "../types/plugin.types";
 
 const logger = createLogger("plugin-runner");
@@ -298,6 +299,7 @@ export class PluginRunnerService {
               pluginId,
               port,
               custom: plugin.sourceType !== "core",
+              egressAllow: resolveEgressAllow(manifest.network?.egress, resolvedConfig),
             });
 
       // Track if spawn error occurred to prevent further processing
@@ -437,8 +439,9 @@ export class PluginRunnerService {
     pluginId: string;
     port: number;
     custom: boolean;
+    egressAllow: string[];
   }): Promise<WorkerProcess> {
-    const { env, pluginPath, orgId, pluginId, port, custom } = params;
+    const { env, pluginPath, orgId, pluginId, port, custom, egressAllow } = params;
     const launch = await launchInPluginHost({
       id: `w${port}`,
       pluginId,
@@ -446,7 +449,7 @@ export class PluginRunnerService {
       pluginPath,
       custom,
       env,
-      egressAllow: [],
+      egressAllow,
     });
     registerWorkerSocket(port, launch.socketPath);
     return launch.process;
