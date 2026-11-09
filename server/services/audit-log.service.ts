@@ -40,7 +40,27 @@ export interface GetAuditLogsOptions {
 }
 
 /** Audit log retention promised in PRIVACY.md. */
-export const AUDIT_LOG_RETENTION_DAYS = 90;
+export const AUDIT_LOG_RETENTION_DAYS = 365;
+/** Network identifiers and email addresses are cleared from a row earlier than the row itself. */
+export const AUDIT_LOG_PERSONAL_FIELDS_RETENTION_DAYS = 90;
+
+const POSTGRES_UNDEFINED_FUNCTION = "42883";
+
+function isPendingMigrationError(error: unknown): boolean {
+  return (error as { code?: string }).code === POSTGRES_UNDEFINED_FUNCTION;
+}
+
+function daysAgo(days: number): Date {
+  const date = new Date();
+  date.setDate(date.getDate() - days);
+  return date;
+}
+
+export interface AuditChainProblem {
+  chainKey: string;
+  chainSeq: string;
+  problem: string;
+}
 
 /**
  * Maps the caller to the row's actor. `users.id` is a uuid, so an API token's
@@ -333,20 +353,41 @@ export class AuditLogService {
    * at the database level; the purge flag set here (transaction-scoped) is
    * the only way the guard trigger allows a DELETE.
    */
-  async cleanup(retentionDays: number = AUDIT_LOG_RETENTION_DAYS): Promise<number> {
-    const cutoffDate = new Date();
-    cutoffDate.setDate(cutoffDate.getDate() - retentionDays);
+  async cleanup(): Promise<number> {
+    try {
+      const [{ deleted }] = await AppDataSource.query(
+        `SELECT audit_logs_purge($1, $2) AS deleted`,
+        [daysAgo(AUDIT_LOG_RETENTION_DAYS), daysAgo(AUDIT_LOG_PERSONAL_FIELDS_RETENTION_DAYS)],
+      );
+      return Number(deleted);
+    } catch (error) {
+      if (isPendingMigrationError(error)) {
+        logger.warn("Audit log retention skipped until the migrations have run");
+        return 0;
+      }
+      throw error;
+    }
+  }
 
-    return AppDataSource.transaction(async (manager) => {
-      await manager.query(`SELECT set_config('hay.audit_logs_purge', 'on', true)`);
-      const result = await manager
-        .createQueryBuilder()
-        .delete()
-        .from(AuditLog)
-        .where("created_at < :cutoffDate", { cutoffDate })
-        .execute();
-      return result.affected || 0;
-    });
+  /**
+   * Recomputes every hash chain and returns what doesn't match. Detects rows
+   * altered or removed behind the database's guards, within what the chain covers.
+   * TODO: anchor chain heads in external write-once storage, so that rewriting a
+   * whole chain and its head is detectable too.
+   */
+  async verifyChain(chainKey?: string): Promise<AuditChainProblem[]> {
+    try {
+      const rows: Array<{ chain_key: string; chain_seq: string; problem: string }> =
+        await AppDataSource.query(`SELECT * FROM audit_logs_verify_chain($1)`, [chainKey ?? null]);
+      return rows.map((row) => ({
+        chainKey: row.chain_key,
+        chainSeq: row.chain_seq,
+        problem: row.problem,
+      }));
+    } catch (error) {
+      if (isPendingMigrationError(error)) return [];
+      throw error;
+    }
   }
 
   /**
@@ -542,169 +583,6 @@ export class AuditLogService {
       resource: "organization",
       changes: {
         created: true,
-      },
-      metadata,
-      status: "success",
-    });
-  }
-
-  /**
-   * Log playbook creation
-   */
-  async logPlaybookCreate(
-    userId: string,
-    organizationId: string,
-    playbookId: string,
-    data: Record<string, unknown>,
-    metadata?: Record<string, unknown>,
-  ): Promise<AuditLog> {
-    return this.log({
-      userId,
-      organizationId,
-      action: "playbook.create",
-      resource: "playbook",
-      changes: {
-        playbookId,
-        ...data,
-      },
-      metadata,
-      status: "success",
-    });
-  }
-
-  /**
-   * Log playbook update
-   */
-  async logPlaybookUpdate(
-    userId: string,
-    organizationId: string,
-    playbookId: string,
-    changes: Record<string, unknown>,
-    metadata?: Record<string, unknown>,
-  ): Promise<AuditLog> {
-    return this.log({
-      userId,
-      organizationId,
-      action: "playbook.update",
-      resource: "playbook",
-      changes: {
-        playbookId,
-        ...changes,
-      },
-      metadata,
-      status: "success",
-    });
-  }
-
-  /**
-   * Log playbook deletion
-   */
-  async logPlaybookDelete(
-    userId: string,
-    organizationId: string,
-    playbookId: string,
-    metadata?: Record<string, unknown>,
-  ): Promise<AuditLog> {
-    return this.log({
-      userId,
-      organizationId,
-      action: "playbook.delete",
-      resource: "playbook",
-      changes: {
-        playbookId,
-      },
-      metadata,
-      status: "success",
-    });
-  }
-
-  /**
-   * Log playbook publish
-   */
-  async logPlaybookPublish(
-    userId: string,
-    organizationId: string,
-    playbookId: string,
-    metadata?: Record<string, unknown>,
-  ): Promise<AuditLog> {
-    return this.log({
-      userId,
-      organizationId,
-      action: "playbook.publish",
-      resource: "playbook",
-      changes: {
-        playbookId,
-        status: "published",
-      },
-      metadata,
-      status: "success",
-    });
-  }
-
-  /**
-   * Log document creation
-   */
-  async logDocumentCreate(
-    userId: string,
-    organizationId: string,
-    documentId: string,
-    data: Record<string, unknown>,
-    metadata?: Record<string, unknown>,
-  ): Promise<AuditLog> {
-    return this.log({
-      userId,
-      organizationId,
-      action: "document.create",
-      resource: "document",
-      changes: {
-        documentId,
-        ...data,
-      },
-      metadata,
-      status: "success",
-    });
-  }
-
-  /**
-   * Log document update
-   */
-  async logDocumentUpdate(
-    userId: string,
-    organizationId: string,
-    documentId: string,
-    changes: Record<string, unknown>,
-    metadata?: Record<string, unknown>,
-  ): Promise<AuditLog> {
-    return this.log({
-      userId,
-      organizationId,
-      action: "document.update",
-      resource: "document",
-      changes: {
-        documentId,
-        ...changes,
-      },
-      metadata,
-      status: "success",
-    });
-  }
-
-  /**
-   * Log document deletion
-   */
-  async logDocumentDelete(
-    userId: string,
-    organizationId: string,
-    documentId: string,
-    metadata?: Record<string, unknown>,
-  ): Promise<AuditLog> {
-    return this.log({
-      userId,
-      organizationId,
-      action: "document.delete",
-      resource: "document",
-      changes: {
-        documentId,
       },
       metadata,
       status: "success",

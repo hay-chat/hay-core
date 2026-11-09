@@ -139,6 +139,16 @@ export const auditLogsRouter = t.router({
           userId: filters?.userId,
         });
 
+        await auditLogService.record({
+          userId: ctx.user?.id,
+          organizationId: ctx.organizationId,
+          action: "audit_log.export",
+          resource: "audit_log",
+          changes: { format, filters, rowCount: logs.length },
+          ipAddress: ctx.ipAddress,
+          userAgent: ctx.userAgent,
+        });
+
         if (format === "csv") {
           const csv = convertToCSV(logs);
           return {

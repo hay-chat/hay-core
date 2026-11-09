@@ -23,6 +23,10 @@ export type AuditAction =
   | "user.register"
   | "apikey.create"
   | "apikey.revoke"
+  | "apikey.update"
+  | "assistant.update"
+  | "audit_log.export"
+  | "message_feedback.export"
   | "security.setting.change"
   | "privacy.export.request"
   | "privacy.export.confirm"
@@ -84,6 +88,7 @@ export type AuditActorType = "user" | "apikey" | "plugin" | "system";
 @Index("idx_audit_logs_original_organization", ["originalOrganizationId"])
 @Index("idx_audit_logs_action", ["action"])
 @Index("idx_audit_logs_api_key", ["apiKeyId"])
+@Index("uq_audit_logs_chain", ["chainKey", "chainSeq"], { unique: true })
 @Index("idx_audit_logs_created_at", ["createdAt"])
 export class AuditLog extends TypeOrmBaseEntity {
   @PrimaryGeneratedColumn("uuid")
@@ -128,6 +133,33 @@ export class AuditLog extends TypeOrmBaseEntity {
 
   @Column({ type: "uuid", nullable: true, select: false, insert: false, update: false })
   apiKeyId?: string;
+
+  /** Hash chain position, assigned by a DB trigger on insert. NULL on older rows. */
+  @Column({ type: "uuid", nullable: true, select: false, insert: false, update: false })
+  chainKey?: string;
+
+  @Column({ type: "bigint", nullable: true, select: false, insert: false, update: false })
+  chainSeq?: string;
+
+  @Column({
+    type: "varchar",
+    length: 64,
+    nullable: true,
+    select: false,
+    insert: false,
+    update: false,
+  })
+  prevHash?: string;
+
+  @Column({
+    type: "varchar",
+    length: 64,
+    nullable: true,
+    select: false,
+    insert: false,
+    update: false,
+  })
+  hash?: string;
 
   @Column({ type: "varchar", length: 100 })
   action!: AuditAction;

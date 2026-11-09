@@ -1,4 +1,5 @@
 import "reflect-metadata";
+import { randomUUID } from "crypto";
 import { describe, it, expect, beforeAll, afterAll } from "@jest/globals";
 import { AppDataSource } from "../../database/data-source";
 import { Organization } from "../../entities/organization.entity";
@@ -113,22 +114,144 @@ describe("audit log integrity", () => {
   });
 
   it("purges only rows past retention through the retention job", async () => {
-    await freshOrg();
+    const chainKey = randomUUID();
     // Inserts are allowed, so the expired row is written already backdated.
     const [{ id: oldId }] = await AppDataSource.query(
-      `INSERT INTO audit_logs (user_id, organization_id, action, created_at)
-       VALUES ($1, $2, 'agent.update', now() - interval '91 days') RETURNING id`,
-      [userId, orgId],
+      `INSERT INTO audit_logs (original_organization_id, action, created_at)
+       VALUES ($1, 'agent.update', now() - interval '366 days') RETURNING id`,
+      [chainKey],
     );
-    const recent = await auditLogService.log({
-      userId,
-      organizationId: orgId,
-      action: "agent.update",
-    });
+    const [{ id: recentId }] = await AppDataSource.query(
+      `INSERT INTO audit_logs (original_organization_id, action) VALUES ($1, 'agent.update') RETURNING id`,
+      [chainKey],
+    );
 
     expect(await auditLogService.cleanup()).toBeGreaterThanOrEqual(1);
     expect(await audits().findOneBy({ id: oldId })).toBeNull();
-    expect(await audits().findOneBy({ id: recent.id })).not.toBeNull();
+    expect(await audits().findOneBy({ id: recentId })).not.toBeNull();
+  });
+
+  describe("hash chain", () => {
+    const insert = async (
+      chainKey: string,
+      ageDays: number,
+    ): Promise<{ id: string; seq: string }> => {
+      const [row] = await AppDataSource.query(
+        `INSERT INTO audit_logs (original_organization_id, action, created_at)
+         VALUES ($1, 'agent.update', now() - make_interval(days => $2))
+         RETURNING id, chain_seq AS seq`,
+        [chainKey, ageDays],
+      );
+      return row;
+    };
+    const asReplica = (sql: string, params: unknown[]) =>
+      AppDataSource.transaction(async (manager) => {
+        await manager.query(`SET LOCAL session_replication_role = replica`);
+        await manager.query(sql, params);
+      });
+
+    it("links each row to the one before and verifies clean", async () => {
+      const chainKey = randomUUID();
+      const first = await insert(chainKey, 0);
+      const second = await insert(chainKey, 0);
+
+      expect([first.seq, second.seq]).toEqual(["1", "2"]);
+      expect(await auditLogService.verifyChain(chainKey)).toEqual([]);
+    });
+
+    it("detects a rewritten event and a removed row behind the guard", async () => {
+      const chainKey = randomUUID();
+      const first = await insert(chainKey, 0);
+      await insert(chainKey, 0);
+      const third = await insert(chainKey, 0);
+      const fourth = await insert(chainKey, 0);
+
+      await asReplica(`UPDATE audit_logs SET action = 'user.login' WHERE id = $1`, [first.id]);
+      await asReplica(`DELETE FROM audit_logs WHERE id = $1`, [third.id]);
+      await asReplica(`DELETE FROM audit_logs WHERE id = $1`, [fourth.id]);
+
+      const problems = (await auditLogService.verifyChain(chainKey)).map((p) => p.problem);
+      expect(problems).toContain("hash_mismatch");
+      expect(problems).toContain("missing_newest_rows");
+    });
+
+    it("detects a sequence gap in the middle of a chain", async () => {
+      const chainKey = randomUUID();
+      await insert(chainKey, 0);
+      const middle = await insert(chainKey, 0);
+      await insert(chainKey, 0);
+
+      await asReplica(`DELETE FROM audit_logs WHERE id = $1`, [middle.id]);
+
+      const problems = (await auditLogService.verifyChain(chainKey)).map((p) => p.problem);
+      expect(problems).toContain("sequence_gap");
+    });
+
+    it("purges only a chain's oldest rows, and stays verifiable", async () => {
+      const chainKey = randomUUID();
+      const oldest = await insert(chainKey, 400);
+      const inside = await insert(chainKey, 10);
+      const expiredButLater = await insert(chainKey, 400);
+
+      await auditLogService.cleanup();
+
+      expect(await audits().findOneBy({ id: oldest.id })).toBeNull();
+      expect(await audits().findOneBy({ id: inside.id })).not.toBeNull();
+      expect(await audits().findOneBy({ id: expiredButLater.id })).not.toBeNull();
+      expect(await auditLogService.verifyChain(chainKey)).toEqual([]);
+    });
+
+    it("clears personal fields after 90 days and keeps the chain valid", async () => {
+      const chainKey = randomUUID();
+      const [{ id }] = await AppDataSource.query(
+        `INSERT INTO audit_logs (original_organization_id, action, ip_address, user_agent, changes, created_at)
+         VALUES ($1, 'email.change', '198.51.100.9', 'jest', '{"newEmail":"a@example.com"}', now() - interval '91 days')
+         RETURNING id`,
+        [chainKey],
+      );
+
+      await auditLogService.cleanup();
+
+      const [row] = await AppDataSource.query(
+        `SELECT ip_address, user_agent, changes FROM audit_logs WHERE id = $1`,
+        [id],
+      );
+      expect(row).toEqual({ ip_address: null, user_agent: null, changes: null });
+      expect(await auditLogService.verifyChain(chainKey)).toEqual([]);
+    });
+
+    it("ignores chain values supplied by the writer", async () => {
+      const chainKey = randomUUID();
+      const [row] = await AppDataSource.query(
+        `INSERT INTO audit_logs (original_organization_id, action, chain_seq, hash)
+         VALUES ($1, 'agent.update', 999, 'forged') RETURNING chain_seq, hash`,
+        [chainKey],
+      );
+      expect(row.chain_seq).toBe("1");
+      expect(row.hash).toMatch(/^[0-9a-f]{64}$/);
+    });
+
+    it("does not honour the purge flag for a role that doesn't own the table", async () => {
+      const role = "audit_log_guard_test_role";
+      const chainKey = randomUUID();
+      const row = await insert(chainKey, 0);
+      await AppDataSource.query(`DROP ROLE IF EXISTS ${role}`).catch(() => undefined);
+      await AppDataSource.query(`CREATE ROLE ${role}`);
+      await AppDataSource.query(`GRANT SELECT, UPDATE, DELETE ON audit_logs TO ${role}`);
+      try {
+        await expect(
+          AppDataSource.transaction(async (manager) => {
+            await manager.query(`SET LOCAL ROLE ${role}`);
+            await manager.query(`SELECT set_config('hay.audit_logs_purge', 'on', true)`);
+            await manager.query(`DELETE FROM audit_logs WHERE id = $1`, [row.id]);
+          }),
+        ).rejects.toThrow(/cannot be deleted/);
+      } finally {
+        await AppDataSource.query(`REVOKE ALL ON audit_logs FROM ${role}`);
+        await AppDataSource.query(`DROP ROLE ${role}`);
+      }
+      expect(await audits().findOneBy({ id: row.id })).not.toBeNull();
+    });
   });
 
   it("records failed logins for unknown emails without storing the address", async () => {

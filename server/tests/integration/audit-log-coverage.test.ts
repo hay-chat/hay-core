@@ -7,6 +7,9 @@ import { AuditLog } from "../../entities/audit-log.entity";
 import { Customer } from "../../database/entities/customer.entity";
 import { apiTokensRouter } from "../../routes/v1/api-tokens";
 import { customersRouter } from "../../routes/v1/customers";
+import { playbooksRouter } from "../../routes/v1/playbooks";
+import { assistantRouter } from "../../routes/v1/organizations/assistant";
+import { auditLogsRouter } from "../../routes/v1/audit-logs";
 import { ApiTokenScope } from "../../types/api-token-scopes";
 import { auditLogService } from "../../services/audit-log.service";
 import { organizationService } from "../../services/organization.service";
@@ -111,6 +114,39 @@ describe("audit log coverage", () => {
       .getOneOrFail();
     expect(stored.actorType).toBe("user");
     expect(stored.apiKeyId).toBeNull();
+  });
+
+  it("records playbook, assistant, API key and export changes without their content", async () => {
+    const authedCaller = <R>(router: { createCaller: (c: Context) => R }) =>
+      router.createCaller(ctx);
+    const playbooks = authedCaller(playbooksRouter);
+    const playbook = await playbooks.create({ title: "Refunds", trigger: "refund" });
+    await playbooks.update({ id: playbook.id, data: { title: "Refunds v2" } });
+    await playbooks.delete({ id: playbook.id });
+
+    await authedCaller(assistantRouter).update({ tone: "A very private tone" });
+
+    const tokens = authedCaller(apiTokensRouter);
+    const token = await tokens.create({ name: "CI", scopes: [ApiTokenScope.CONVERSATIONS_READ] });
+    await tokens.update({ id: token.id, name: "CI renamed" });
+
+    await authedCaller(auditLogsRouter).export({ format: "json" });
+
+    const trail = await actions();
+    expect(trail).toEqual(
+      expect.arrayContaining([
+        "playbook.create",
+        "playbook.update",
+        "playbook.delete",
+        "assistant.update",
+        "apikey.update",
+        "audit_log.export",
+      ]),
+    );
+    const rows = await AppDataSource.getRepository(AuditLog).find({
+      where: { originalOrganizationId: orgId },
+    });
+    expect(JSON.stringify(rows)).not.toContain("A very private tone");
   });
 
   it("records the organization's deletion and keeps the trail afterwards", async () => {
