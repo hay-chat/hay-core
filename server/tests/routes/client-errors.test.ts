@@ -55,9 +55,11 @@ describe("auth.uploadAvatar", () => {
     const user = { id: "user-1", organizationId: undefined };
 
     await expect(
-      authRouter.createCaller({ user, organizationId: "org-1" } as never).uploadAvatar({
-        avatar: "data:image/png;base64,AAAA",
-      }),
+      authRouter
+        .createCaller({ user, organizationId: "org-1", req: { headers: {} }, res: {} } as never)
+        .uploadAvatar({
+          avatar: "data:image/png;base64,AAAA",
+        }),
     ).rejects.toMatchObject({ code: "BAD_REQUEST" });
   });
 });
