@@ -10,7 +10,7 @@ import { vi } from "vitest";
 export const translate = (key: string, params?: unknown) =>
   params !== undefined && typeof params === "object" ? `${key} ${JSON.stringify(params)}` : key;
 
-export const toast = { success: vi.fn(), error: vi.fn() };
+export const toast = { success: vi.fn(), error: vi.fn(), show: vi.fn() };
 export const router = { push: vi.fn(), replace: vi.fn() };
 /** The current route; tests set `route.query` before mounting. */
 export const route: { path: string; query: Record<string, unknown> } = { path: "/", query: {} };
@@ -201,10 +201,16 @@ export const uiStubs: Record<string, Component> = {
 
 export function mountWithStubs(
   component: Component,
-  options: { props?: Record<string, unknown>; stubs?: Record<string, Component | boolean> } = {},
+  options: {
+    props?: Record<string, unknown>;
+    stubs?: Record<string, Component | boolean>;
+    /** Mount into the document, for tests that check focus. */
+    attachTo?: HTMLElement;
+  } = {},
 ) {
   return mount(component, {
     props: options.props,
+    attachTo: options.attachTo,
     global: {
       components: uiStubs,
       stubs: options.stubs,

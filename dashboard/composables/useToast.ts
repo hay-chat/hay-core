@@ -6,14 +6,17 @@ export interface Toast {
   title: string;
   message?: string;
   duration?: number;
+  /** A button on the toast, e.g. Undo. Clicking it runs `onClick` and closes the toast. */
+  action?: { label: string; onClick: () => void };
 }
 
 const toasts = ref<Toast[]>([]);
 const toastTimeouts = new Map<string, NodeJS.Timeout>();
+let toastCount = 0;
 
 export function useToast() {
   const show = (toast: Omit<Toast, "id">): string => {
-    const id = Date.now().toString();
+    const id = `${Date.now()}-${++toastCount}`;
     const newToast = { ...toast, id };
     toasts.value.push(newToast);
 

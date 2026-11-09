@@ -1,5 +1,5 @@
 <template>
-  <div class="fixed bottom-4 right-4 z-50 max-w-sm">
+  <div class="fixed bottom-4 right-4 z-50 max-w-sm" aria-live="polite">
     <TransitionGroup name="toast" tag="div" class="flex flex-col gap-2">
       <div
         v-for="toast in toasts"
@@ -11,9 +11,23 @@
       >
         <div class="flex items-center justify-between">
           <span>{{ toast.title }}</span>
-          <button class="ml-4 text-white/80 hover:text-white" @click="remove(toast.id)">
-            <X class="h-4 w-4" />
-          </button>
+          <div class="ml-4 flex items-center gap-3">
+            <button
+              v-if="toast.action"
+              type="button"
+              class="rounded px-1 underline underline-offset-4 hover:no-underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
+              @click="runAction(toast)"
+            >
+              {{ toast.action.label }}
+            </button>
+            <button
+              class="text-white/80 hover:text-white"
+              :aria-label="$t('common.close')"
+              @click="remove(toast.id)"
+            >
+              <X class="h-4 w-4" />
+            </button>
+          </div>
         </div>
       </div>
     </TransitionGroup>
@@ -31,6 +45,11 @@ const toastClasses: Record<Toast["type"], string> = {
   error: "bg-red-600 text-white",
   warning: "bg-yellow-600 text-white",
   info: "bg-blue-600 text-white",
+};
+
+const runAction = (toast: Toast) => {
+  toast.action?.onClick();
+  remove(toast.id);
 };
 
 const toastClass = (type: Toast["type"]): string => toastClasses[type];
