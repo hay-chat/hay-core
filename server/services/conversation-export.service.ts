@@ -1,4 +1,5 @@
 import PDFDocument from "pdfkit";
+import { csvCell } from "@server/lib/csv";
 import { Conversation } from "@server/database/entities/conversation.entity";
 import { Message, MessageType } from "@server/database/entities/message.entity";
 import { formatZonedDateTime, safeTimeZone } from "@server/utils/zoned-datetime";
@@ -175,24 +176,12 @@ export class ConversationExportService {
         msg.metadata?.confidence?.toString() || "",
         msg.metadata?.toolName || "",
         (msg.attachments?.length || 0).toString(),
-      ].map((v) => this.escapeCsvValue(v)),
+      ].map((v) => csvCell(v)),
     );
 
     // UTF-8 BOM for Excel compatibility
     const bom = "\uFEFF";
     return bom + [headers.join(","), ...rows.map((r) => r.join(","))].join("\n");
-  }
-
-  private escapeCsvValue(value: string): string {
-    if (
-      value.includes(",") ||
-      value.includes('"') ||
-      value.includes("\n") ||
-      value.includes("\r")
-    ) {
-      return `"${value.replace(/"/g, '""')}"`;
-    }
-    return value;
   }
 
   private getMessageLabel(message: Message): string {

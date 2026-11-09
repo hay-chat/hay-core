@@ -81,6 +81,8 @@ describe("media scan", () => {
     expect(initialScanStatus("application/pdf")).toBe("pending");
     expect(initialScanStatus("text/csv")).toBe("pending");
     expect(initialScanStatus("image/jpeg")).toBe("skipped");
+    expect(initialScanStatus("video/mp4")).toBe("pending");
+    expect(initialScanStatus("audio/ogg")).toBe("pending");
   });
 
   it("gets clean and infected verdicts from clamd", async () => {

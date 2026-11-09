@@ -142,11 +142,74 @@ async function reencodeOrReject(buffer: Buffer, mimeType: string): Promise<Sanit
   }
 }
 
+const CSV_DELIMITERS = new Set([",", ";", "\t", "\r", "\n"]);
+const CSV_NUMBER = /^[+-]?(\d[\d.]*|\.\d+)%?$/;
+
+/**
+ * Spreadsheets run cells that start with `=`, `+`, `-` or `@` as formulas, so
+ * prefix those with an apostrophe. Plain numbers stay as they are. Works on a
+ * latin1 view of the bytes: every character it looks at is ASCII, and other
+ * encodings of the same bytes pass through unchanged.
+ */
+export function neutraliseCsvFormulas(buffer: Buffer): Buffer {
+  const text = buffer.toString("latin1");
+  const utf8Bom = text.startsWith("\xef\xbb\xbf");
+  let out = utf8Bom ? text.slice(0, 3) : "";
+  let inQuotes = false;
+  let atCellStart = true;
+
+  const isFormula = (from: number, quoted: boolean): boolean => {
+    if (!/[=+\-@]/.test(text[from] ?? "") && !(quoted && /[\t\r]/.test(text[from] ?? ""))) {
+      return false;
+    }
+    let end = from;
+    while (end < text.length && text[end] !== '"' && !CSV_DELIMITERS.has(text[end])) end++;
+    return !CSV_NUMBER.test(text.slice(from, end));
+  };
+
+  for (let i = utf8Bom ? 3 : 0; i < text.length; i++) {
+    const char = text[i];
+    if (inQuotes) {
+      out += char;
+      if (char === '"') {
+        if (text[i + 1] === '"') out += text[++i];
+        else inQuotes = false;
+      }
+      continue;
+    }
+    if (CSV_DELIMITERS.has(char)) {
+      out += char;
+      atCellStart = true;
+      continue;
+    }
+    if (atCellStart) {
+      atCellStart = false;
+      if (char === '"') {
+        inQuotes = true;
+        out += char;
+        if (isFormula(i + 1, true)) out += "'";
+        continue;
+      }
+      if (isFormula(i, false)) out += "'";
+    }
+    out += char;
+  }
+  return Buffer.from(out, "latin1");
+}
+
 export async function sanitizeConversationMedia(
   buffer: Buffer,
   declaredMimeType: string,
+  originalName?: string,
 ): Promise<SanitizedMedia> {
   const mimeType = await detectType(buffer, bareMime(declaredMimeType));
+
+  if (
+    mimeType === "text/csv" ||
+    (TEXT_TYPES.has(mimeType) && /\.[ct]sv$/i.test(originalName ?? ""))
+  ) {
+    return { buffer: neutraliseCsvFormulas(buffer), mimeType };
+  }
 
   if (!REENCODED_IMAGE_TYPES.has(mimeType)) {
     return { buffer, mimeType };

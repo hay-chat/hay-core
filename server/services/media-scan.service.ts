@@ -3,7 +3,7 @@
  * command. A seam, not a service of our own: without CLAMAV_HOST nothing is
  * scanned and files behave as before ("skipped").
  *
- * With CLAMAV_HOST, a new PDF/TXT/CSV upload is stored as "pending" and
+ * With CLAMAV_HOST, a new document, audio or video upload is stored as "pending" and
  * scanned in the background. Until clamd says "clean" the file is held: the
  * media route answers 423, the vision pass does not read it, and the Inbox
  * shows "Scanning…". Infected files and failed scans stay blocked (fail closed).
@@ -19,8 +19,20 @@ import { createLogger } from "@server/lib/logger";
 
 const logger = createLogger("media-scan");
 
-/** Types clamd checks. Photos, audio and video are re-encoded on ingest instead. */
-export const SCANNED_TYPES = new Set(["application/pdf", "text/plain", "text/csv"]);
+/** Types clamd checks: everything stored as received. Photos are re-encoded on ingest instead. */
+export const SCANNED_TYPES = new Set([
+  "application/pdf",
+  "text/plain",
+  "text/csv",
+  "audio/ogg",
+  "audio/mpeg",
+  "audio/aac",
+  "audio/amr",
+  "audio/mp4",
+  "video/mp4",
+  "video/3gpp",
+  "video/quicktime",
+]);
 
 const SCAN_TIMEOUT_MS = 30_000;
 const CHUNK_SIZE = 64 * 1024;
