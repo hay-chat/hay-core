@@ -217,6 +217,8 @@ module.exports = {
         useUrlToken: "readonly",
         useDomain: "readonly",
         usePagination: "readonly",
+        useCachedQuery: "readonly",
+        useNewRows: "readonly",
         useExternalLink: "readonly",
         SETTINGS_NAV: "readonly",
         isSettingsTabActive: "readonly",
