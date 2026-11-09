@@ -812,5 +812,64 @@
     "expired": "The last export has expired. Start a new one.",
     "download": "Download ZIP",
     "downloadFailed": "The export is no longer available. Start a new one."
+  },
+  "sso": {
+    "title": "Single sign-on",
+    "description": "Let your team sign in through your identity provider (OpenID Connect).",
+    "ownersOnly": "Only the organization owner can manage single sign-on.",
+    "provider": {
+      "title": "Identity provider",
+      "description": "Create an OpenID Connect web application in your identity provider with the redirect URL below, then enter its details here.",
+      "redirectUri": "Redirect URL",
+      "issuer": "Issuer URL",
+      "issuerHelper": "The address that serves /.well-known/openid-configuration, for example https://login.example.com",
+      "clientId": "Client ID",
+      "clientSecret": "Client secret",
+      "clientSecretKept": "Leave empty to keep the saved secret",
+      "defaultRole": "Role for new members",
+      "defaultRoleHelper": "Everyone who first signs in gets this role unless a group below applies. Owners are never assigned by the provider.",
+      "roleClaim": "Groups claim",
+      "roleClaimHelper": "Name of the token claim that lists a person's groups, for example groups. Leave empty to give everyone the role above.",
+      "roleMapping": "Group to role",
+      "groupPlaceholder": "Group name",
+      "addMapping": "Add group",
+      "removeMapping": "Remove",
+      "enabled": "Allow sign-in with this provider",
+      "save": "Save provider",
+      "saved": "Provider saved",
+      "delete": "Remove provider",
+      "deleted": "Provider removed",
+      "lastLogin": "Last successful sign-in: {date}",
+      "neverUsed": "Nobody has signed in through this provider yet."
+    },
+    "domains": {
+      "title": "Email domains",
+      "description": "Only people whose email is on a domain you have proven can use this provider. Prove a domain by publishing a DNS record.",
+      "add": "Add domain",
+      "placeholder": "example.com",
+      "verified": "Verified",
+      "pending": "Not verified",
+      "verify": "Check record",
+      "remove": "Remove",
+      "recordName": "TXT record name",
+      "recordValue": "TXT record value",
+      "verifiedToast": "Domain verified",
+      "removed": "Domain removed",
+      "empty": "No domains yet."
+    },
+    "enforcement": {
+      "title": "Require single sign-on",
+      "description": "When on, members can only reach this organization by signing in through the provider. API tokens keep working.",
+      "breakGlass": "You stay able to sign in with your password and a second factor if the provider fails. Make sure your own two-factor authentication is set up first.",
+      "prerequisites": "To turn this on, a successful sign-in through the provider and at least one verified domain are needed.",
+      "enable": "Require single sign-on",
+      "disable": "Stop requiring single sign-on",
+      "enabledToast": "Single sign-on is now required",
+      "disabledToast": "Single sign-on is no longer required",
+      "liftedNotice": "Changing the provider's credentials or turning it off stops the requirement until the new setup has been tested."
+    },
+    "errors": {
+      "generic": "Something went wrong. Please try again."
+    }
   }
 }

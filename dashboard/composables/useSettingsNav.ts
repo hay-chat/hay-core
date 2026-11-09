@@ -2,6 +2,7 @@ export interface SettingsTab {
   labelKey: string;
   path: string;
   adminOnly?: boolean;
+  ownerOnly?: boolean;
 }
 
 export interface SettingsSection {
@@ -37,6 +38,7 @@ export const SETTINGS_NAV: SettingsSection[] = [
     tabs: [
       { labelKey: "nav.general", path: "/settings/general", adminOnly: true },
       { labelKey: "nav.users", path: "/settings/users", adminOnly: true },
+      { labelKey: "nav.sso", path: "/settings/sso", adminOnly: true, ownerOnly: true },
     ],
   },
   {
@@ -70,5 +72,9 @@ export const SETTINGS_NAV: SettingsSection[] = [
 export const isSettingsTabActive = (tab: SettingsTab, currentPath: string): boolean =>
   currentPath === tab.path || currentPath.startsWith(`${tab.path}/`);
 
-export const visibleSettingsTabs = (section: SettingsSection, isAdmin: boolean): SettingsTab[] =>
-  section.tabs.filter((tab) => isAdmin || !tab.adminOnly);
+export const visibleSettingsTabs = (
+  section: SettingsSection,
+  isAdmin: boolean,
+  isOwner = false,
+): SettingsTab[] =>
+  section.tabs.filter((tab) => (isAdmin || !tab.adminOnly) && (isOwner || !tab.ownerOnly));

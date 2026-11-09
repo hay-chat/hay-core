@@ -154,6 +154,24 @@
           {{ $t("login.submit") }}
         </Button>
 
+        <!-- Single sign-on, offered when the address belongs to an organization that has it -->
+        <Button
+          v-if="ssoAvailable"
+          type="button"
+          variant="outline"
+          size="lg"
+          class="w-full"
+          @click="startSso"
+        >
+          {{ $t("login.sso.continue") }}
+        </Button>
+
+        <div v-if="ssoError" class="p-3 rounded-md bg-red-50 border border-red-200">
+          <p class="text-sm text-red-800">
+            {{ ssoError }}
+          </p>
+        </div>
+
         <!-- Error Message -->
         <div
           v-if="error && !emailNotVerified"
@@ -270,6 +288,12 @@ onMounted(() => {
     router.push(redirectUrl.value);
   } else {
     loadInvitationContext();
+    // Back from single sign-on with a second factor still to give.
+    if (authStore.pendingChallenge) {
+      challengeToken.value = authStore.pendingChallenge.challengeToken;
+      mfaMethods.value = authStore.pendingChallenge.methods;
+      authStore.pendingChallenge = null;
+    }
   }
 });
 
@@ -291,6 +315,50 @@ const error = ref("");
 const emailNotVerified = ref(false);
 const resendingVerification = ref(false);
 const verificationResent = ref(false);
+
+// Single sign-on: why a return from the provider was refused, and whether this address has one
+const SSO_ERROR_CODES = [
+  "unavailable",
+  "rate_limited",
+  "state_invalid",
+  "provider_error",
+  "token_invalid",
+  "domain_unverified",
+  "email_unverified",
+  "account_conflict",
+  "not_member",
+  "account_disabled",
+  "sso_required",
+];
+const ssoError = ref(
+  typeof route.query.sso_error === "string" && SSO_ERROR_CODES.includes(route.query.sso_error)
+    ? t(`login.sso.errors.${route.query.sso_error}`)
+    : "",
+);
+const ssoAvailable = ref(false);
+let ssoLookup: ReturnType<typeof setTimeout> | undefined;
+
+watch(
+  () => form.email,
+  (email) => {
+    clearTimeout(ssoLookup);
+    ssoAvailable.value = false;
+    if (!validateEmail(email)) return;
+    ssoLookup = setTimeout(async () => {
+      try {
+        const result = await Hay.auth.sso.discover.query({ email });
+        if (email === form.email) ssoAvailable.value = result.available;
+      } catch {
+        ssoAvailable.value = false;
+      }
+    }, 400);
+  },
+);
+
+const startSso = () => {
+  const { apiBaseUrl } = useRuntimeConfig().public;
+  window.location.assign(`${apiBaseUrl}/sso/start?${new URLSearchParams({ email: form.email })}`);
+};
 
 // Computed
 const loading = computed(() => authStore.isLoading);

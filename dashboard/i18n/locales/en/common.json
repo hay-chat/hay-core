@@ -13,6 +13,7 @@
     "settings": "Settings",
     "general": "General",
     "users": "Users",
+    "sso": "Single sign-on",
     "apiTokens": "API Tokens",
     "webchat": "Webchat",
     "gitConnections": "Git Connections",

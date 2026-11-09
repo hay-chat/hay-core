@@ -250,7 +250,7 @@ const navMain = computed(() => {
 
   // Settings submenu: one entry per section, linking to its first visible tab
   const settingsItems = SETTINGS_NAV.flatMap((section) => {
-    const tabs = visibleSettingsTabs(section, !!isAdminOrOwner);
+    const tabs = visibleSettingsTabs(section, !!isAdminOrOwner, !!userStore.isOwner);
     if (!tabs.length) return [];
     return [
       {
