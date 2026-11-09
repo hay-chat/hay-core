@@ -1,5 +1,6 @@
 import { defineStore } from "pinia";
 import { hasRouteAccess } from "@/utils/route-access";
+import { clearQueryCache } from "@/utils/query-cache";
 
 const SUSPENSION_REASONS = ["trial_expired", "payment_failed", "cancelled", "manual"] as const;
 export type SuspensionReason = (typeof SUSPENSION_REASONS)[number];
@@ -343,6 +344,7 @@ export const useUserStore = defineStore("user", {
     setActiveOrganization(organizationId: string) {
       const organization = this.organizations.find((org) => org.id === organizationId);
       if (organization) {
+        if (organizationId !== this.activeOrganizationId) clearQueryCache();
         this.activeOrganizationId = organizationId;
         useTelemetry().setOrganization({ id: organization.id, name: organization.name });
       }
@@ -360,6 +362,7 @@ export const useUserStore = defineStore("user", {
 
       // Update the active organization ID
       // This will cause the tRPC client to use the new org ID in the x-organization-id header
+      if (organizationId !== this.activeOrganizationId) clearQueryCache();
       this.activeOrganizationId = organizationId;
       useTelemetry().setOrganization({ id: targetOrg.id, name: targetOrg.name });
 
@@ -367,6 +370,7 @@ export const useUserStore = defineStore("user", {
     },
 
     clearUser() {
+      clearQueryCache();
       this.user = null;
       this.activeOrganizationId = null;
       this.organizations = [];
