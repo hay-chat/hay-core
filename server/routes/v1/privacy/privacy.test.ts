@@ -23,6 +23,7 @@ describe("Privacy DSAR Integration Tests", () => {
     if (!AppDataSource.isInitialized) {
       await AppDataSource.initialize();
     }
+    await AppDataSource.runMigrations();
 
     // Initialize Redis
     if (!redisService.isConnected()) {
