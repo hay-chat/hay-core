@@ -1,3 +1,4 @@
+import { allowStorageWaitInTransaction } from "@server/database/session-limits";
 import { AppDataSource } from "@server/database/data-source";
 import { Conversation } from "@server/database/entities/conversation.entity";
 import { AuditLog } from "@server/entities/audit-log.entity";
@@ -96,6 +97,7 @@ export class DataRetentionService {
     const cutoff = cutoffFor(organization.retentionDays);
 
     return AppDataSource.transaction(async (manager) => {
+      await allowStorageWaitInTransaction(manager);
       // Locked so a conversation reopened right now is either waited for or skipped.
       const rows: Array<{ id: string }> = await manager.query(
         `SELECT id FROM conversations
@@ -178,6 +180,7 @@ export class DataRetentionService {
     const cutoff = cutoffFor(organization.retentionDays);
 
     return AppDataSource.transaction(async (manager) => {
+      await allowStorageWaitInTransaction(manager);
       const rows: Array<{ id: string }> = await manager.query(
         `SELECT c.id FROM customers c
          WHERE c.organization_id = $1
