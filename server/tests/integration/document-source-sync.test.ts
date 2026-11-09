@@ -588,12 +588,7 @@ describe("DocumentSourceSyncService", () => {
 
   // -------------------------------------------------------------------------
 
-  // TODO: Never-executed test (see note above) that now fails deterministically:
-  // after pre-marking the source as running, the sync job is NOT short-circuited
-  // (discover/fetchPage still run once). Either the markRunning CAS guard isn't
-  // consulted on this path or the test's claim doesn't persist where the service
-  // reads it. Needs investigation before re-enabling.
-  it.skip("blocks concurrent runs via markRunning CAS", async () => {
+  it("blocks concurrent runs via markRunning CAS", async () => {
     // First, mark the source as already running.
     const claimed = await documentSourceRepository.markRunning(source.id);
     expect(claimed).toBe(true);

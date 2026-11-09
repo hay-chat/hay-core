@@ -18,6 +18,19 @@ const BACKGROUND_JOB_TYPES = [
   "privacy_deletion",
 ];
 
+/**
+ * How long a job may sit in `processing` without an update before its server is
+ * presumed dead. Privacy types are recovered by PrivacyService, because their
+ * request row has to fail with the job.
+ */
+const STALE_PROCESSING_MS: Record<string, number> = {
+  document_source_sync: 15 * 60 * 1000,
+  organization_export: 2 * 60 * 60 * 1000,
+};
+
+/** A job that keeps losing its server this many times is failed instead of requeued. */
+const MAX_JOB_ATTEMPTS = 3;
+
 /** Partial job state changes published on the job-updates channel. */
 interface JobUpdate {
   status?: JobStatus;
@@ -49,6 +62,8 @@ export class JobQueueService {
   private readonly JOB_CHANNEL = "job:updates";
   private readonly JOB_QUEUE_KEY = "jobs:queue";
   private isProcessing = false;
+  private stopping = false;
+  private inFlight: Promise<void> | null = null;
 
   /**
    * Initialize the job queue service
@@ -112,15 +127,6 @@ export class JobQueueService {
   }
 
   /**
-   * Stop the job processing loop
-   * NOTE: Job processing is now handled by the scheduler service
-   */
-  private stopProcessing(): void {
-    // No-op: Processing is now handled by scheduler
-    logger.debug("Job processing handled by scheduler service");
-  }
-
-  /**
    * Process the next available job
    * Called by the scheduler service for background job processing
    */
@@ -128,10 +134,18 @@ export class JobQueueService {
     // Most job types are processed inline by their initiating route (web import,
     // page discovery). Background-dispatched types claim a row
     // here and route to their handler service.
-    if (this.isProcessing) {
+    if (this.isProcessing || this.stopping) {
       return;
     }
     this.isProcessing = true;
+    this.inFlight = this.runNextJob().finally(() => {
+      this.isProcessing = false;
+      this.inFlight = null;
+    });
+    await this.inFlight;
+  }
+
+  private async runNextJob(): Promise<void> {
     try {
       const claimed = await this.claimNextBackgroundJob();
       if (!claimed) {
@@ -140,9 +154,37 @@ export class JobQueueService {
       await this.dispatchBackgroundJob(claimed);
     } catch (err) {
       logger.error({ err }, "Background job processing error");
-    } finally {
-      this.isProcessing = false;
     }
+  }
+
+  /**
+   * Requeue background jobs whose server died mid-run; a job that has done so
+   * MAX_JOB_ATTEMPTS times is failed instead.
+   */
+  async requeueStaleJobs(now = new Date()): Promise<{ requeued: number; failed: number }> {
+    const { AppDataSource } = await import("../database/data-source");
+    const result = { requeued: 0, failed: 0 };
+
+    for (const [type, staleAfterMs] of Object.entries(STALE_PROCESSING_MS)) {
+      const [rows]: [Array<{ status: string }>, number] = await AppDataSource.query(
+        `UPDATE jobs
+         SET status = CASE WHEN COALESCE((data->>'attempts')::int, 0) + 1 >= $3
+                           THEN 'failed'::jobs_status_enum ELSE 'queued'::jobs_status_enum END,
+             data = jsonb_set(data, '{attempts}', to_jsonb(COALESCE((data->>'attempts')::int, 0) + 1)),
+             updated_at = now()
+         WHERE status = 'processing' AND data->>'type' = $1 AND updated_at < $2
+         RETURNING status`,
+        [type, new Date(now.getTime() - staleAfterMs), MAX_JOB_ATTEMPTS],
+      );
+      const failed = rows.filter((row) => row.status === "failed").length;
+      result.failed += failed;
+      result.requeued += rows.length - failed;
+    }
+
+    if (result.requeued + result.failed > 0) {
+      logger.warn(result, "Stale background jobs handled");
+    }
+    return result;
   }
 
   /**
@@ -331,10 +373,23 @@ export class JobQueueService {
   }
 
   /**
-   * Gracefully shutdown the job queue service
+   * Stop claiming jobs and wait, up to timeoutMs, for the one in progress.
    */
-  async shutdown(): Promise<void> {
-    this.stopProcessing();
+  async shutdown(timeoutMs = 15000): Promise<void> {
+    this.stopping = true;
+    if (this.inFlight) {
+      let timer: NodeJS.Timeout | undefined;
+      const finished = await Promise.race([
+        this.inFlight.then(() => true),
+        new Promise<boolean>((resolve) => {
+          timer = setTimeout(() => resolve(false), timeoutMs);
+        }),
+      ]);
+      clearTimeout(timer);
+      if (!finished) {
+        logger.warn({ timeoutMs }, "Background job still running at shutdown");
+      }
+    }
     logger.info("Job queue service shut down");
   }
 }

@@ -625,6 +625,7 @@ async function startServer() {
     await step("websocket", () => websocketService.shutdown());
     await step("background-work", () =>
       Promise.all([
+        jobQueueService.shutdown(15000),
         schedulerService.shutdown({ gracefulTimeout: 15000 }),
         channelDeliveryService.stop(15000),
       ]),

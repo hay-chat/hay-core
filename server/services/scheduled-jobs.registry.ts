@@ -371,7 +371,7 @@ const jobRegistry: CronJobConfig[] = [
     name: "orchestrator-stale-message-check",
     description: "Detect and recover stale/lost messages",
     schedule: 60000, // Every 60 seconds (1 minute)
-    handler: async () => {
+    handler: async (signal) => {
       const { config } = await import("../config/env");
       if (config.staleMessageDetection?.enabled === false) {
         return; // Skip if disabled
@@ -390,6 +390,7 @@ const jobRegistry: CronJobConfig[] = [
 
       // Recover each conversation
       for (const staleConv of staleConversations) {
+        if (signal.aborted) return; // The rest are picked up by the next run.
         try {
           const result = await messageRecoveryService.recoverStaleConversation(staleConv, false);
           logger.debug({ conversationId: staleConv.conversationId, result }, "Recovery result");
@@ -468,11 +469,25 @@ const jobRegistry: CronJobConfig[] = [
   },
 
   {
-    name: "requeue-stale-privacy-jobs",
-    description: "Queue again DSAR export/deletion jobs whose server stopped mid-run",
-    schedule: "*/10 * * * *", // Every 10 minutes
+    name: "plugin-cron-reconcile",
+    description: "Keep this process's plugin cron jobs in line with enabled plugin instances",
+    schedule: 60000, // Every 60 seconds
+    handler: async () => {
+      const { pluginCronService } = await import("./plugin-cron.service");
+      await pluginCronService.reconcile();
+    },
+    perInstance: true, // Cron registrations live in each process's scheduler.
+    enabled: true,
+    skipDatabaseLogging: true,
+  },
+
+  {
+    name: "requeue-stale-background-jobs",
+    description: "Queue again background jobs whose server stopped mid-run",
+    schedule: "*/5 * * * *", // Every 5 minutes
     handler: async () => {
       await privacyService.requeueStaleJobs();
+      await jobQueueService.requeueStaleJobs();
     },
     singleton: true,
     enabled: true,

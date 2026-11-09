@@ -50,6 +50,9 @@ export class DocumentSource extends OrganizationScopedEntity {
   @Column({ type: "timestamptz", nullable: true })
   lastSyncedAt?: Date;
 
+  @Column({ type: "timestamptz", nullable: true })
+  lastSyncStartedAt?: Date | null;
+
   @Column({ type: "varchar", length: 1024, nullable: true })
   lastSyncCursor?: string | null;
 
