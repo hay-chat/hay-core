@@ -22,6 +22,7 @@ import {
   UPLOAD_BODY_LIMIT,
 } from "@server/lib/body-limits";
 import { mayParseLargeBody } from "@server/lib/large-body-auth";
+import { pluginApiSocketPath } from "@server/lib/plugin-isolation";
 import { httpIpRateLimit, trpcRetryAfterMeta } from "@server/lib/http-rate-limit";
 import "reflect-metadata";
 import dotenv from "dotenv";
@@ -250,7 +251,12 @@ async function startServer() {
       rabbitmq: rabbitmqService.isConnected(),
     };
     const ready = Object.values(checks).every(Boolean);
-    res.status(ready ? 200 : 503).json({ status: ready ? "ready" : "unavailable", checks });
+    const { getPluginIsolationHealth } = await import("@server/services/plugin-isolation.service");
+    res.status(ready ? 200 : 503).json({
+      status: ready ? "ready" : "unavailable",
+      checks,
+      pluginIsolation: getPluginIsolationHealth(),
+    });
   });
 
   // Serve uploaded files from local storage
@@ -606,6 +612,13 @@ async function startServer() {
   registerRuntimeMetrics();
   const metricsServer = startMetricsServer();
 
+  const pluginApiSocket = pluginApiSocketPath();
+  if (pluginApiSocket) {
+    const { listenPluginApiSocket } = await import("@server/lib/plugin-api-socket");
+    await listenPluginApiSocket(server, pluginApiSocket);
+    logger.info({ socket: pluginApiSocket }, "Plugin API socket listening");
+  }
+
   httpServer.listen(config.server.port, async () => {
     logger.info({ port: config.server.port }, "Server is running");
 
@@ -627,6 +640,9 @@ async function startServer() {
       // Start plugin instance lifecycle management
       pluginInstanceManagerService.startCleanup();
       logger.info("Plugin instance lifecycle manager started");
+
+      const { initPluginIsolation } = await import("@server/services/plugin-isolation.service");
+      await initPluginIsolation();
 
       // Note: Plugins will now be started on-demand when needed
       // This improves scalability and resource usage

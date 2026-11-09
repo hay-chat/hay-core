@@ -28,6 +28,12 @@
       "META_VERIFY_TOKEN",
       "META_WHATSAPP_ES_CONFIG_ID"
     ],
+    "network": {
+      "egress": [
+        "graph.facebook.com",
+        "lookaside.fbsbx.com"
+      ]
+    },
     "oauthHosts": [
       "www.facebook.com",
       "graph.facebook.com"

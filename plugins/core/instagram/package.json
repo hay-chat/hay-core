@@ -27,6 +27,14 @@
       "META_APP_SECRET",
       "META_VERIFY_TOKEN"
     ],
+    "network": {
+      "egress": [
+        "graph.instagram.com",
+        "*.fbcdn.net",
+        "*.cdninstagram.com",
+        "lookaside.fbsbx.com"
+      ]
+    },
     "oauthHosts": [
       "www.instagram.com",
       "api.instagram.com",

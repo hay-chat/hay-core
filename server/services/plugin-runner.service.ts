@@ -1,7 +1,12 @@
 import { spawn } from "child_process";
 import path from "path";
 import { getPortAllocator } from "./port-allocator.service";
-import type { WorkerInfo, AuthState, ConfigFieldDescriptor } from "../types/plugin-sdk.types";
+import type {
+  WorkerInfo,
+  WorkerProcess,
+  AuthState,
+  ConfigFieldDescriptor,
+} from "../types/plugin-sdk.types";
 import { AppDataSource } from "../database/data-source";
 import { PluginRegistry } from "../entities/plugin-registry.entity";
 import { PluginInstance } from "../entities/plugin-instance.entity";
@@ -14,7 +19,16 @@ import { getApiUrl } from "../config/env";
 import { oauthService } from "./oauth.service";
 import { createLogger } from "@server/lib/logger";
 import { redactEmbeddedJsonFields } from "@server/lib/logger/redaction";
-import { issueWorkerSecret, revokeWorkerSecret, workerFetch } from "@server/lib/worker-client";
+import {
+  issueWorkerSecret,
+  registerWorkerSocket,
+  revokeWorkerSecret,
+  unregisterWorkerSocket,
+  workerFetch,
+} from "@server/lib/worker-client";
+import { pluginIsolationMode } from "@server/lib/plugin-isolation";
+import { launchInPluginHost } from "./plugin-host.client";
+import { resolveEgressAllow } from "../plugin-host/egress-policy";
 import type { HayPluginManifest } from "../types/plugin.types";
 
 const logger = createLogger("plugin-runner");
@@ -230,6 +244,7 @@ export class PluginRunnerService {
       const port = await this.portAllocator.allocate();
       const workerSecret = issueWorkerSecret(port);
       const releasePort = () => {
+        unregisterWorkerSocket(port);
         revokeWorkerSecret(port, workerSecret);
         this.portAllocator.release(port);
       };
@@ -272,31 +287,20 @@ export class PluginRunnerService {
         ? plugin.pluginPath
         : path.join(this.pluginsDir, plugin.pluginPath);
 
-      // Spawn SDK runner
-      const useNode = this.runnerPath.endsWith(".ts");
-      const command = useNode ? "npx" : "node";
-      const args = useNode
-        ? [
-            "tsx",
-            this.runnerPath,
-            `--plugin-path=${pluginPath}`,
-            `--org-id=${orgId}`,
-            `--port=${port}`,
-            `--mode=production`,
-          ]
-        : [
-            this.runnerPath,
-            `--plugin-path=${pluginPath}`,
-            `--org-id=${orgId}`,
-            `--port=${port}`,
-            `--mode=production`,
-          ];
-
-      const workerProcess = spawn(command, args, {
-        env,
-        stdio: ["ignore", "pipe", "pipe"],
-        cwd: path.dirname(this.runnerPath),
-      });
+      // Plugin workers run in the plugin-host container when isolation is on,
+      // otherwise as children of this process.
+      const workerProcess =
+        pluginIsolationMode() === "off"
+          ? this.spawnLocal({ env, pluginPath, orgId, port })
+          : await this.spawnInPluginHost({
+              env,
+              pluginPath,
+              orgId,
+              pluginId,
+              port,
+              custom: plugin.sourceType !== "core",
+              egressAllow: resolveEgressAllow(manifest.network?.egress, resolvedConfig),
+            });
 
       // Track if spawn error occurred to prevent further processing
       let spawnError: Error | null = null;
@@ -391,6 +395,64 @@ export class PluginRunnerService {
 
       throw error;
     }
+  }
+
+  /** Start the SDK runner as a child process of this server. */
+  private spawnLocal(params: {
+    env: Record<string, string>;
+    pluginPath: string;
+    orgId: string;
+    port: number;
+  }): WorkerProcess {
+    const { env, pluginPath, orgId, port } = params;
+    const useNode = this.runnerPath.endsWith(".ts");
+    const command = useNode ? "npx" : "node";
+    const args = useNode
+      ? [
+          "tsx",
+          this.runnerPath,
+          `--plugin-path=${pluginPath}`,
+          `--org-id=${orgId}`,
+          `--port=${port}`,
+          `--mode=production`,
+        ]
+      : [
+          this.runnerPath,
+          `--plugin-path=${pluginPath}`,
+          `--org-id=${orgId}`,
+          `--port=${port}`,
+          `--mode=production`,
+        ];
+
+    return spawn(command, args, {
+      env,
+      stdio: ["ignore", "pipe", "pipe"],
+      cwd: path.dirname(this.runnerPath),
+    });
+  }
+
+  /** Ask the plugin-host supervisor to start the worker, and route core's calls to its socket. */
+  private async spawnInPluginHost(params: {
+    env: Record<string, string>;
+    pluginPath: string;
+    orgId: string;
+    pluginId: string;
+    port: number;
+    custom: boolean;
+    egressAllow: string[];
+  }): Promise<WorkerProcess> {
+    const { env, pluginPath, orgId, pluginId, port, custom, egressAllow } = params;
+    const launch = await launchInPluginHost({
+      id: `w${port}`,
+      pluginId,
+      orgId,
+      pluginPath,
+      custom,
+      env,
+      egressAllow,
+    });
+    registerWorkerSocket(port, launch.socketPath);
+    return launch.process;
   }
 
   /**
@@ -551,6 +613,9 @@ export class PluginRunnerService {
 
     // Add API access so the plugin worker can call the main server's plugin-api
     env.HAY_API_URL = process.env.HAY_API_URL || getApiUrl();
+    // Where the outside world reaches core (webhook and OAuth callback URLs). Not
+    // the same as HAY_API_URL once the worker talks to core through a socket.
+    env.HAY_PUBLIC_URL = getApiUrl();
     env.HAY_API_TOKEN = this.generatePluginJWT(orgId, pluginId, capabilities);
 
     // Add allowed environment variables from host

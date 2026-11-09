@@ -15,6 +15,11 @@
     "capabilities": [
       "auth"
     ],
+    "network": {
+      "egress": [
+        "api.notion.com"
+      ]
+    },
     "setup": {
       "businessTypes": [
         "saas",

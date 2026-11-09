@@ -18,6 +18,7 @@ import { loadPlugin } from "./plugin-loader.js";
 import { createGlobalContext } from "./global-context.js";
 import { executeOnInitialize, executeOnStart, executeOnDisable } from "./hook-executor.js";
 import { PluginHttpServer } from "./http-server.js";
+import { startSandboxBridges } from "./loopback-bridge.js";
 import {
   loadOrgDataFromEnv,
   createMockOrgData,
@@ -98,6 +99,17 @@ async function main(): Promise<void> {
     process.exit(1);
   }
 
+  // An isolated worker reaches core and the outbound proxy only through unix
+  // sockets; bridge them to loopback before any plugin code runs.
+  try {
+    await startSandboxBridges(logger);
+  } catch (err) {
+    logger.error("Failed to start sandbox bridges", {
+      error: err instanceof Error ? err.message : String(err),
+    });
+    process.exit(1);
+  }
+
   let manifest;
   let registry: PluginRegistry;
 
@@ -143,7 +155,10 @@ async function main(): Promise<void> {
   // ============================================================================
 
   try {
-    state.httpServer = new PluginHttpServer(port, registry, logger, { secret: workerSecret });
+    state.httpServer = new PluginHttpServer(port, registry, logger, {
+      secret: workerSecret,
+      socketPath: process.env.HAY_WORKER_SOCKET || undefined,
+    });
 
     // Set plugin on HTTP server (for lifecycle hooks)
     state.httpServer.setPlugin(state.plugin);

@@ -201,7 +201,7 @@ export default defineHayPlugin((globalCtx) => ({
       try {
         const siteUrl = normalizeSiteUrl(connectSiteUrl);
         const callbackUrl = buildCallbackUrl(
-          process.env.HAY_API_URL,
+          process.env.HAY_PUBLIC_URL,
           process.env.HAY_PLUGIN_ID || "hay-plugin-woocommerce",
           process.env.HAY_ORG_ID || "",
         );

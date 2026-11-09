@@ -132,8 +132,16 @@ services:
   server:
     <<: *hay
     command: ["node", "dist/main.js"]
+    environment:
+      <<: *hay-env
+      # Plugin isolation is off unless PLUGIN_ISOLATION is set in .env (strict or
+      # degraded) together with COMPOSE_PROFILES=plugin-isolation.
+      PLUGIN_ISOLATION: ${PLUGIN_ISOLATION:-}
+      PLUGIN_API_SOCKET: ${PLUGIN_ISOLATION:+/run/hay/api/core.sock}
     volumes:
       - uploads:/data/uploads
+      - plugin-run:/run/hay
+      - custom-plugins:/app/plugins/custom
     networks:
       - default
       - browser
@@ -155,6 +163,94 @@ services:
       timeout: 5s
       retries: 10
       start_period: 60s
+
+  # Runs plugin workers away from the server: no network at all (it talks to
+  # core and the egress proxy over unix sockets), none of the server's
+  # environment, no database, Redis or RabbitMQ route, read-only filesystem.
+  # Inside, each worker is sandboxed from the others (bubblewrap, else one user
+  # per worker); see SELF_HOSTING.md. Start with COMPOSE_PROFILES=plugin-isolation.
+  # Keep it on no network (network_mode: none). Never attach it to the reverse
+  # proxy's network or to any network other applications or datastores share.
+  plugin-host:
+    profiles: [plugin-isolation]
+    image: hay:local
+    restart: unless-stopped
+    command: ["node", "dist/plugin-host/main.js"]
+    network_mode: none
+    read_only: true
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+      # Bubblewrap needs both of these. Docker's default seccomp profile refuses
+      # clone/unshare/mount; this one is the default plus those calls. On hosts
+      # that enforce AppArmor (Debian, Ubuntu), the docker-default profile also
+      # denies mount, so the sandbox can't be built without relaxing it for this
+      # container only. If the sandbox still can't start, the plugin host says
+      # why in its log and falls back to the next tier (see SELF_HOSTING.md).
+      # The seccomp path is relative to this file.
+      - seccomp=./plugin-host-seccomp.json
+      - apparmor=unconfined
+    mem_limit: 2g
+    pids_limit: 512
+    cpus: 2
+    tmpfs:
+      - /tmp:size=64m,mode=1777
+    environment:
+      NODE_ENV: production
+      PLUGIN_ISOLATION: ${PLUGIN_ISOLATION:-strict}
+      PLUGIN_API_SOCKET: /run/hay/api/core.sock
+      PLUGIN_EGRESS_SOCKET: /run/hay-egress/pub/proxy.sock
+      PLUGIN_EGRESS_CONTROL_SOCKET: /run/hay-egress/ctl/control.sock
+    volumes:
+      - plugin-run:/run/hay
+      - plugin-egress-run:/run/hay-egress
+      - custom-plugins:/app/plugins/custom:ro
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "require('http').get({socketPath:'/run/hay/ctl/control.sock',path:'/status'},r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))",
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  # The only way out for plugin workers. Allows each worker only the hosts its
+  # plugin declares and refuses internal addresses. On a network of its own, so
+  # it has no route to the database, Redis or RabbitMQ.
+  plugin-egress:
+    profiles: [plugin-isolation]
+    image: hay:local
+    restart: unless-stopped
+    command: ["node", "dist/plugin-host/egress-main.js"]
+    read_only: true
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    mem_limit: 256m
+    pids_limit: 256
+    cpus: 1
+    environment:
+      NODE_ENV: production
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "require('http').get({socketPath:'/run/hay-egress/ctl/control.sock',path:'/status'},r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))",
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    volumes:
+      - plugin-egress-run:/run/hay-egress
+    networks:
+      - egress
 
   dashboard:
     <<: *hay
@@ -234,6 +330,10 @@ volumes:
   backups:
   caddy_data:
   caddy_config:
+  plugin-run:
+  plugin-egress-run:
+  custom-plugins:
 
 networks:
   browser:
+  egress:

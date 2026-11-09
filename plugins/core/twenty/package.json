@@ -13,6 +13,13 @@
       "mcp",
       "auth"
     ],
+    "network": {
+      "egress": [
+        {
+          "fromConfig": "baseUrl"
+        }
+      ]
+    },
     "setup": {
       "businessTypes": [
         "saas",

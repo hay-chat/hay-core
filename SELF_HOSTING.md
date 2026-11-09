@@ -128,6 +128,47 @@ All are configured in `selfhost/.env`; the example lists each one.
 
 After changing `.env`, apply it with `docker compose up -d`.
 
+## Plugin isolation
+
+Plugins run as small worker processes. By default they are children of the server: they share its user, its files and its network, so a faulty or hostile plugin can reach whatever the server can. The server logs one warning at start-up while this is the case.
+
+To run workers in their own container, with their own sandbox and a controlled way out, add to `.env`:
+
+```
+PLUGIN_ISOLATION=strict
+COMPOSE_PROFILES=plugin-isolation
+```
+
+and run `docker compose up -d`. This starts two more containers:
+
+- `plugin-host` runs the workers. It has no network at all, none of the server's environment, no route to the database, Redis or RabbitMQ, a read-only filesystem, no capabilities, and memory, process and CPU limits. It talks to the server and the proxy over unix sockets on shared volumes. It never gets the Docker socket.
+- `plugin-egress` is the only way out. Each worker may reach only the hosts its plugin declares in `hay-plugin.network.egress` (plus hosts taken from the organization's own settings, such as a store URL). It resolves names itself and refuses internal addresses (loopback, private ranges, link-local, shared address space, IPv6 unique-local, multicast, IPv4-mapped) and IP literals.
+
+Inside `plugin-host`, workers are separated from each other in the strongest way the host allows. The tier is chosen at start-up and shown in the `plugin-host` log, in the `/ready` response (`pluginIsolation`) and in the `hay_plugin_isolation_tier` metric:
+
+| Tier | Mechanism                                                                                                                                                              | What the host must allow                                                                                                                                                                                                                           |
+| ---- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1    | A bubblewrap sandbox per worker: its own mount, process, network, IPC and user namespaces, a filesystem containing only the SDK and that plugin, and a seccomp filter. | Unprivileged user namespaces. `compose.yml` already applies a seccomp profile that permits them. `compose.yml` also sets `apparmor=unconfined` on `plugin-host` only, because `docker-default` AppArmor denies the `mount` calls the sandbox needs. Hosts that restrict unprivileged user namespaces by sysctl (Ubuntu 24.04 and later) need that relaxed too, or tier 2. |
+| 2    | One user id per worker.                                                                                                                                                | Start `plugin-host` as root with four capabilities: `docker compose -f compose.yml -f plugin-host-uid.yml up -d`.                                                                                                                                  |
+| 3    | Nothing between plugins: only the container around them.                                                                                                               | Nothing. This is the last resort and is logged as an error at every start.                                                                                                                                                                         |
+
+`PLUGIN_ISOLATION=strict` refuses to start custom (uploaded) plugins at tier 3; bundled plugins still run, with the error logged. `PLUGIN_ISOLATION=degraded` runs custom plugins at tier 3 too. Leave `PLUGIN_ISOLATION` unset to keep today's behaviour.
+
+To see what your host allows before enabling it, start the isolated containers and read the tier: `docker compose logs plugin-host | head`. If it reports tier 3, the log line carries the exact error from the kernel or from bubblewrap.
+
+Start-up verifies a real sandbox: bubblewrap must start a worker with its own mount namespace and the seccomp filter must refuse a nested user namespace. If either fails, the plugin host does not claim tier 1; it logs the exact error at ERROR level and uses the next tier. Workers run without `/proc`, so a fresh `/proc` mount is not required of the host.
+
+Network attachment: `plugin-host` has no network (`network_mode: none`) and must never be attached to your reverse proxy's network or to any network shared with other applications or datastores. Only `plugin-egress` has an outbound route, on a network of its own that no other service joins. If you run Hay behind a shared proxy network, attach only the server to it.
+
+A possible later tier: Landlock (file and TCP-port restrictions without a namespace) where the kernel offers it. It is not built.
+
+Limits to know about:
+
+- At tier 3 the egress rules still apply to honest plugins but are advisory against a hostile one, which can reach the proxy's control socket.
+- Workers on the same tier share the container's memory and CPU limits; there is no per-plugin cap.
+- Private-network targets (a self-hosted service on your LAN) are refused by the proxy. Reach them through a public host name.
+- Plugins that open raw TCP connections (not HTTP) have no route. None of the bundled plugins do.
+
 ## Upgrading
 
 ```bash

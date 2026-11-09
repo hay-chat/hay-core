@@ -1,0 +1,11 @@
+# Fallback for hosts that refuse unprivileged user namespaces (so bubblewrap
+# can't start): the plugin host starts as root with four capabilities, then
+# runs every worker as its own user. Use together with compose.yml:
+#
+#   docker compose -f compose.yml -f plugin-host-uid.yml up -d
+#
+# Full guide: ../SELF_HOSTING.md ("Plugin isolation").
+services:
+  plugin-host:
+    user: "0:0"
+    cap_add: [SETUID, SETGID, CHOWN, SETPCAP]

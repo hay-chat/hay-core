@@ -49,3 +49,33 @@ describe("worker client", () => {
     expect(workerAuthHeaders(41004)).toEqual({});
   });
 });
+
+describe("worker client over a unix socket", () => {
+  it("reaches a worker listening on its registered socket, with the secret", async () => {
+    const { createServer } = await import("http");
+    const { mkdtempSync, rmSync } = await import("fs");
+    const { tmpdir } = await import("os");
+    const { join } = await import("path");
+    const { registerWorkerSocket, unregisterWorkerSocket } =
+      await import("@server/lib/worker-client");
+
+    const dir = mkdtempSync(join(tmpdir(), "wc-sock-"));
+    const socketPath = join(dir, "w.sock");
+    const worker = createServer((req, res) => {
+      res.setHeader("content-type", "application/json");
+      res.end(JSON.stringify({ url: req.url, secret: req.headers[WORKER_SECRET_HEADER] }));
+    });
+    await new Promise<void>((resolve) => worker.listen(socketPath, resolve));
+    const secret = issueWorkerSecret(41010);
+    registerWorkerSocket(41010, socketPath);
+    try {
+      const response = await workerFetch(41010, "/metadata?x=1");
+      expect(await response.json()).toEqual({ url: "/metadata?x=1", secret });
+    } finally {
+      unregisterWorkerSocket(41010);
+      revokeWorkerSecret(41010, secret);
+      await new Promise((resolve) => worker.close(resolve));
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+});

@@ -5,7 +5,7 @@
  * The SDK uses a minimal manifest approach where metadata is fetched at runtime.
  */
 
-import type { ChildProcess } from "child_process";
+import type { EventEmitter } from "events";
 import type { PluginSetupHints } from "@server/types/setup.types";
 
 // ============================================================================
@@ -496,8 +496,25 @@ export interface MCPTool {
 /**
  * Worker process information
  */
+/**
+ * The part of a child process the runner uses. A worker started in the plugin
+ * host is a stand-in with the same surface.
+ */
+export interface WorkerProcess {
+  pid?: number;
+  stdout: Pick<EventEmitter, "on"> | null;
+  stderr: Pick<EventEmitter, "on"> | null;
+  kill(signal?: NodeJS.Signals): boolean;
+  on(event: "error", listener: (error: Error) => void): unknown;
+  on(
+    event: "exit",
+    listener: (code: number | null, signal: NodeJS.Signals | null) => void,
+  ): unknown;
+  once(event: "exit", listener: () => void): unknown;
+}
+
 export interface WorkerInfo {
-  process: ChildProcess;
+  process: WorkerProcess;
   port: number;
   startedAt: Date;
   lastActivity: Date;
