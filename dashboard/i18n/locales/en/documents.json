@@ -10,6 +10,7 @@
       "refresh": "Refresh",
       "importDocument": "Import Document",
       "writeDocument": "Write Document",
+      "connectedSources": "Connected sources",
       "search": "Search",
       "searching": "Searching...",
       "archive": "Archive",
