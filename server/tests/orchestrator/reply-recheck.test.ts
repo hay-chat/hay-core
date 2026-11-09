@@ -101,7 +101,7 @@ function makeConversation() {
     processing_attempts: 0,
     orchestration_status: { version: "v1", lastTurn: 0, toolLog: [] },
     playbook_id: null,
-    enabled_tools: null,
+    enabled_tools: ["get_order"],
     document_ids: [],
     metadata: {},
     lock: jest.fn(async () => "locker"),

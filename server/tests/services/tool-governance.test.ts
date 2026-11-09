@@ -99,8 +99,11 @@ describe("requestKey", () => {
 });
 
 describe("isToolEnabled", () => {
-  it("allows every tool without a playbook list", async () => {
-    expect(await isToolEnabled({ enabled_tools: null }, "shop:create_refund")).toBe(true);
+  it("allows only core and page tools without a playbook list", async () => {
+    for (const enabled_tools of [null, []]) {
+      expect(await isToolEnabled({ enabled_tools }, "shop:create_refund")).toBe(false);
+      expect(await isToolEnabled({ enabled_tools }, "create_ticket")).toBe(true);
+    }
   });
 
   it("allows only listed tools, plus core and page tools", async () => {

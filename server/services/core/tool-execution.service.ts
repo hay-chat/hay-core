@@ -303,10 +303,17 @@ export class ToolExecutionService {
     return resolveCustomerIdentity(conversation);
   }
 
+  private async isRemotePluginTool(target: ToolTarget): Promise<boolean> {
+    if (!target.pluginId) return false;
+    const { MCPClientFactory } = await import("@server/services/mcp-client-factory.service");
+    return MCPClientFactory.isRemote(target.pluginId);
+  }
+
   /**
    * A tool the conversation's playbook does not enable, or args that do not
    * match the tool's schema, are refused before anything else. Reads run,
-   * except a customer-data read in a conversation with no verified customer.
+   * except a customer-data read with no verified customer, or on a remote
+   * server, which is never told who the customer is and so can't scope records.
    * Core writes act only inside Hay.chat: simulated in a dry-run, else run. A
    * plugin write first needs the shopper's go-ahead (D4-10); then it is
    * simulated in a dry-run conversation, held when the org's approval policy
@@ -341,6 +348,15 @@ export class ToolExecutionService {
             "email, phone or name typed in the chat. Tell the customer you cannot open account " +
             "details here: they can sign in to their account on the store and open the chat " +
             "again, or you can hand the conversation to the team.",
+        });
+      }
+      if (call.target.risk.customerData && (await this.isRemotePluginTool(call.target))) {
+        return this.refuse(call, "IDENTITY_REQUIRED", {
+          status: "identity_required",
+          message:
+            "NOT DONE. This lookup returns a customer's personal details, and this connection " +
+            "cannot match them to the verified customer, so it cannot run. Tell the customer " +
+            "you cannot open account details here, or hand the conversation to the team.",
         });
       }
       return this.runLive(call);

@@ -3,6 +3,7 @@
  * approval gate (D4-4) and webchat isolation of tool output when Redis is down.
  */
 const mockCallTool = jest.fn();
+const mockIsRemote = jest.fn(async () => false);
 const mockRecord = jest.fn();
 const mockGetToolRisk = jest.fn();
 const mockMessageUpdate = jest.fn();
@@ -59,7 +60,10 @@ jest.mock("@server/services/mcp-registry.service", () => ({
   mcpRegistryService: { getToolRisk: mockGetToolRisk, getToolsForOrg: mockGetToolsForOrg },
 }));
 jest.mock("@server/services/mcp-client-factory.service", () => ({
-  MCPClientFactory: { createClient: async () => ({ callTool: mockCallTool }) },
+  MCPClientFactory: {
+    createClient: async () => ({ callTool: mockCallTool }),
+    isRemote: mockIsRemote,
+  },
 }));
 jest.mock("@server/services/core/core-tools", () => ({
   coreToolRegistry: {
@@ -99,11 +103,21 @@ import type { Conversation } from "@server/database/entities/conversation.entity
 
 const REFUND_RISK = { readOnly: false, category: "refund", classified: true };
 
+const PLAYBOOK_TOOLS = [
+  "shop:cancel_order",
+  "shop:create_coupon",
+  "shop:create_refund",
+  "shop:find_customer",
+  "shop:get_order",
+  "shop:mystery",
+];
+
 function makeConversation(metadata: Record<string, unknown> = {}): Conversation {
   return {
     id: "conv-1",
     organization_id: "org-1",
     metadata,
+    enabled_tools: PLAYBOOK_TOOLS,
     orchestration_status: { lastTurn: 0, toolLog: [] },
   } as unknown as Conversation;
 }
@@ -704,6 +718,16 @@ describe("ToolExecutionService tool governance", () => {
     expect(toolName).toBe("find_customer");
     expect(args).toEqual({ email: "ana@example.com" });
     expect(meta).toEqual({ "chat.hay/customer": ANA });
+  });
+
+  it("refuses a customer-data read on a remote server, which can't scope it", async () => {
+    mockGetToolRisk.mockResolvedValue(LOOKUP_RISK);
+    mockResolveIdentity.mockResolvedValue(ANA);
+    mockIsRemote.mockResolvedValueOnce(true);
+    const res = await new ToolExecutionService().handleToolExecution(makeConversation(), lookup);
+
+    expect(res).toMatchObject({ success: false, result: { status: "identity_required" } });
+    expect(mockCallTool).not.toHaveBeenCalled();
   });
 
   it("refuses a tool the conversation's playbook does not enable", async () => {
