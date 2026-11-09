@@ -18,6 +18,7 @@ const UNSCOPED_PATHS = [
   "/decline-invitation",
   "/answer-question",
   "/auth",
+  "/sso",
   "/connect",
   "/demo",
   "/privacy",

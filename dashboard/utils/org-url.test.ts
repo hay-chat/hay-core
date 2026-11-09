@@ -39,6 +39,7 @@ describe("addOrgToLocation", () => {
   it("leaves pages outside any organization alone", () => {
     expect(addOrgToLocation("/login?redirect=/inbox", ORG)).toBe("/login?redirect=/inbox");
     expect(addOrgToLocation("/auth/exchange", ORG)).toBe("/auth/exchange");
+    expect(addOrgToLocation("/sso/callback", ORG)).toBe("/sso/callback");
     expect(addOrgToLocation("/no-access", ORG)).toBe("/no-access");
   });
 
