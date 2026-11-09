@@ -423,7 +423,10 @@ export class StorageService {
         Key: filePath,
         Body: buffer,
         ContentType: mimeType,
-        ACL: isPublic ? "public-read" : "private",
+        ...(config.storage.s3.useAcls ? { ACL: isPublic ? "public-read" : "private" } : {}),
+        ...(config.storage.s3.serverSideEncryption
+          ? { ServerSideEncryption: config.storage.s3.serverSideEncryption }
+          : {}),
       },
     });
 
@@ -471,10 +474,10 @@ export class StorageService {
 
   /**
    * Revoke public read on a stored file. Local files need nothing: /uploads
-   * only serves public folders.
+   * only serves public folders. Without ACLs the bucket policy decides.
    */
   async makePrivate(upload: Upload): Promise<void> {
-    if (upload.storageType !== "s3") return;
+    if (upload.storageType !== "s3" || !config.storage.s3.useAcls) return;
     if (!this.s3Client) {
       throw new Error("S3 client not initialized");
     }

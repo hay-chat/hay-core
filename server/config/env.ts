@@ -27,6 +27,18 @@ function stripScheme(value: string): string {
   return value.replace(/^[a-z][a-z0-9+.-]*:\/\//i, "");
 }
 
+/**
+ * S3_SERVER_SIDE_ENCRYPTION: AES256, aws:kms or none. Defaults to AES256 on AWS
+ * only: other S3-compatible stores may reject the header.
+ */
+function s3ServerSideEncryption(): "AES256" | "aws:kms" | undefined {
+  const setting = process.env.S3_SERVER_SIDE_ENCRYPTION;
+  if (setting === "AES256" || setting === "aws:kms") return setting;
+  if (setting === "none") return undefined;
+  if (setting) throw new Error("S3_SERVER_SIDE_ENCRYPTION must be AES256, aws:kms or none");
+  return process.env.S3_ENDPOINT?.includes("amazonaws.com") ? "AES256" : undefined;
+}
+
 export const config = {
   env: process.env.NODE_ENV || "development",
   isDevelopment: process.env.NODE_ENV === "development",
@@ -322,6 +334,9 @@ export const config = {
       bucket: process.env.S3_BUCKET || null,
       accessKeyId: process.env.S3_ACCESS_KEY_ID || null,
       secretAccessKey: process.env.S3_SECRET_ACCESS_KEY || null,
+      // false for buckets with ACLs disabled; public folders then need a bucket policy.
+      useAcls: process.env.S3_USE_ACLS !== "false",
+      serverSideEncryption: s3ServerSideEncryption(),
     },
     limits: {
       maxFileSize: parseInt(process.env.UPLOAD_MAX_SIZE_MB || "10", 10) * 1024 * 1024,
