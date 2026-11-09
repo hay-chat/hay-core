@@ -40,6 +40,12 @@ FROM toolchain AS deps
 RUN npm pkg delete scripts.postinstall \
     && npm pkg delete scripts.prepare -w packages/form-schema \
     && npm ci --omit=dev --include-workspace-root -w server -w packages -w plugins/core
+# Each bundled mcp/ server sits outside the workspace with dependencies of its
+# own. They are installed here because production never runs npm for core plugins.
+RUN for dir in plugins/core/*/mcp; do \
+      if [ -f "$dir/package-lock.json" ]; then install=ci; else install=install; fi; \
+      (cd "$dir" && npm "$install" --omit=dev --ignore-scripts --no-audit --no-fund) || exit 1; \
+    done
 
 # ---- runtime ----------------------------------------------------------------
 FROM node:22-bookworm-slim

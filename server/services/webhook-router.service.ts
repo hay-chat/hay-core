@@ -4,7 +4,8 @@ import { pluginInstanceManagerService } from "./plugin-instance-manager.service"
 import { pluginRegistryRepository } from "../repositories/plugin-registry.repository";
 import { pluginInstanceRepository } from "../repositories/plugin-instance.repository";
 import { pluginWebhookRouteRepository } from "../repositories/plugin-webhook-route.repository";
-import { verifyHmacSha256 } from "@server/lib/hmac-signature";
+import { timingSafeCompare, verifyHmacSha256 } from "@server/lib/hmac-signature";
+import { configEnvAllowList } from "@server/lib/plugin-env";
 import { normalizeEmailAddressKey, verifySvixSignature } from "@server/lib/svix-signature";
 import { claimWebhookDelivery, releaseWebhookDelivery } from "@server/lib/webhook-replay";
 import type {
@@ -96,7 +97,7 @@ export class WebhookRouterService {
   ): Promise<void> {
     // GET → verification handshake (no signature; echo the challenge).
     if (req.method === "GET") {
-      await this.handleVerification(req, res, routing);
+      await this.handleVerification(req, res, pluginId, routing);
       return;
     }
 
@@ -113,7 +114,7 @@ export class WebhookRouterService {
       return;
     }
 
-    const secret = process.env[routing.signature.secretEnv];
+    const secret = await this.pluginEnvValue(pluginId, routing.signature.secretEnv);
     if (!secret) {
       logger.error(
         { pluginId, secretEnv: routing.signature.secretEnv },
@@ -245,7 +246,7 @@ export class WebhookRouterService {
       return;
     }
 
-    const secret = process.env[descriptor.secretEnv];
+    const secret = await this.pluginEnvValue(pluginId, descriptor.secretEnv);
     if (!secret) {
       logger.error(
         { pluginId, secretEnv: descriptor.secretEnv },
@@ -344,6 +345,7 @@ export class WebhookRouterService {
   private async handleVerification(
     req: Request,
     res: Response,
+    pluginId: string,
     routing: WebhookRoutingDescriptor,
   ): Promise<void> {
     const challenge = routing.verificationChallenge;
@@ -361,8 +363,8 @@ export class WebhookRouterService {
       return;
     }
 
-    const expectedToken = await this.resolveVerifyToken(challenge);
-    if (expectedToken && token === expectedToken && typeof challengeValue === "string") {
+    const expectedToken = await this.pluginEnvValue(pluginId, challenge.verifyTokenEnv);
+    if (expectedToken && timingSafeCompare(token, expectedToken) && typeof challengeValue === "string") {
       res.status(200).send(challengeValue);
       return;
     }
@@ -371,20 +373,17 @@ export class WebhookRouterService {
   }
 
   /**
-   * Resolve the expected verify token. The shared-app model uses a single env
-   * token; `verifyTokenConfigField` exists for per-instance tokens but is not
-   * resolvable on a no-org shared URL, so env takes precedence.
+   * The value of a host env var named by a plugin's webhook declaration. The
+   * declaration comes from the running worker, so the name only resolves when
+   * the plugin's static manifest may read it (see `configEnvAllowList`).
    */
-  private async resolveVerifyToken(
-    challenge: NonNullable<WebhookRoutingDescriptor["verificationChallenge"]>,
+  private async pluginEnvValue(
+    pluginId: string,
+    envName: string | undefined,
   ): Promise<string | undefined> {
-    if (challenge.verifyTokenEnv) {
-      const value = process.env[challenge.verifyTokenEnv];
-      if (value) {
-        return value;
-      }
-    }
-    return undefined;
+    if (!envName) return undefined;
+    const plugin = await pluginRegistryRepository.findByPluginId(pluginId);
+    return configEnvAllowList(plugin).has(envName) ? process.env[envName] : undefined;
   }
 
   /**

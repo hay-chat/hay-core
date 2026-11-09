@@ -41,7 +41,7 @@ for plugin_dir in plugins/core/*/; do
 
   # Install dependencies if node_modules doesn't exist
   if [ ! -d "${plugin_dir}node_modules" ]; then
-    if ! (cd "$plugin_dir" && npm install 2>&1); then
+    if ! (cd "$plugin_dir" && npm install --ignore-scripts 2>&1); then
       echo "  Install failed for $plugin_name, skipping"
       continue
     fi
@@ -53,7 +53,7 @@ for plugin_dir in plugins/core/*/; do
   # the moment a dep (e.g. magento's date-fns) isn't present at the repo root.
   if [ -f "${plugin_dir}mcp/package.json" ] && [ ! -d "${plugin_dir}mcp/node_modules" ]; then
     echo "  Installing MCP server deps for $plugin_name..."
-    if ! (cd "${plugin_dir}mcp" && npm install 2>&1); then
+    if ! (cd "${plugin_dir}mcp" && npm install --ignore-scripts 2>&1); then
       echo "  MCP install failed for $plugin_name, skipping"
       continue
     fi

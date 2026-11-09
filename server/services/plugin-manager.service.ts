@@ -2,6 +2,10 @@ import { promises as fs, readFileSync, writeFileSync, existsSync } from "fs";
 import path from "path";
 import crypto from "crypto";
 import { execSync } from "child_process";
+import {
+  CUSTOM_PLUGIN_INSTALL_COMMAND,
+  prepareCustomPluginInstall,
+} from "@server/lib/plugin-dependencies";
 import { pluginRegistryRepository } from "@server/repositories/plugin-registry.repository";
 import { pluginInstanceRepository } from "@server/repositories/plugin-instance.repository";
 import { PluginRegistry, PluginStatus } from "@server/entities/plugin-registry.entity";
@@ -553,7 +557,7 @@ export class PluginManagerService {
               await extractTarball(buffer, pluginPath);
             } else {
               // Custom plugins are stored as ZIP files
-              extractPluginZip(buffer, pluginPath);
+              await extractPluginZip(buffer, pluginPath);
             }
 
             // Re-register the plugin so it's discovered and status is reset to AVAILABLE
@@ -590,6 +594,13 @@ export class PluginManagerService {
     const pluginPath = path.join(this.pluginsDir, plugin.pluginPath);
     const isWorkspacePlugin = plugin.pluginPath.startsWith("core/");
 
+    // Production images carry core plugins' dependencies from the image build.
+    if (isWorkspacePlugin && config.isProduction) {
+      await pluginRegistryRepository.updateInstallStatus(plugin.id, true);
+      plugin.installed = true;
+      return;
+    }
+
     // Check for npm install in package.json
     let installCommand: string | undefined;
     try {
@@ -610,7 +621,7 @@ export class PluginManagerService {
           // The plugin is part of plugins/core/* workspace, so we need workspace-aware install
           installCommand = `npm install --ignore-scripts --workspace=plugins/${plugin.pluginPath}`;
         } else {
-          installCommand = "npm install --ignore-scripts";
+          installCommand = CUSTOM_PLUGIN_INSTALL_COMMAND;
         }
       }
     } catch (error) {
@@ -618,6 +629,12 @@ export class PluginManagerService {
     }
 
     try {
+      if (!isWorkspacePlugin) {
+        const sdkPath = path.join(this.pluginsDir, "..", "packages", "plugin-sdk");
+        await prepareCustomPluginInstall(pluginPath, sdkPath);
+        await prepareCustomPluginInstall(path.join(pluginPath, "mcp"), sdkPath);
+      }
+
       // Install the plugin's own (root) dependencies, if it declares any. A
       // plugin may have none at the root and still ship a bundled mcp/ server
       // with its own deps, so this must NOT short-circuit the MCP install below.
@@ -644,7 +661,7 @@ export class PluginManagerService {
       const mcpPackageJson = path.join(pluginPath, "mcp", "package.json");
       if (existsSync(mcpPackageJson)) {
         logger.info({ pluginName: plugin.name }, "Installing MCP server dependencies");
-        execSync("npm install --ignore-scripts", {
+        execSync(isWorkspacePlugin ? "npm install --ignore-scripts" : CUSTOM_PLUGIN_INSTALL_COMMAND, {
           cwd: path.join(pluginPath, "mcp"),
           stdio: "inherit",
           env: this.buildMinimalEnv(),

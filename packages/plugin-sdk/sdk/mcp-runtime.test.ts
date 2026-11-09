@@ -1,6 +1,22 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { createMcpRuntimeAPI, stopAllMcpServers } from './mcp-runtime.js';
+import { createMcpRuntimeAPI, stdioServerEnv, stopAllMcpServers } from './mcp-runtime.js';
 import type { HayLogger, HayConfigRuntimeAPI, HayAuthRuntimeAPI, McpServerInstance } from '../types/index.js';
+
+describe('stdioServerEnv', () => {
+  it('passes the basics and explicit values, not the worker credentials', () => {
+    vi.stubEnv('PATH', '/usr/bin');
+    vi.stubEnv('HAY_ORG_AUTH', 'worker-credentials');
+    vi.stubEnv('META_APP_SECRET', 'host-secret');
+
+    const env = stdioServerEnv({ API_KEY: 'k' });
+
+    expect(env.PATH).toBe('/usr/bin');
+    expect(env.API_KEY).toBe('k');
+    expect(env.HAY_ORG_AUTH).toBeUndefined();
+    expect(env.META_APP_SECRET).toBeUndefined();
+    vi.unstubAllEnvs();
+  });
+});
 
 describe('MCP Runtime API', () => {
   let logger: HayLogger;

@@ -296,7 +296,7 @@ export class PluginUploadService {
       await fs.promises.rm(extractPath, { recursive: true, force: true });
     }
 
-    extractPluginZip(zipBuffer, extractPath);
+    await extractPluginZip(zipBuffer, extractPath);
 
     return extractPath;
   }

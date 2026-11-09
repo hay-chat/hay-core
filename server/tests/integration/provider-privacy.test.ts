@@ -403,9 +403,9 @@ describe("provider-initiated privacy requests", () => {
 
     async function installPlugin(organizationId: string): Promise<void> {
       await AppDataSource.query(
-        `INSERT INTO plugin_registry (id, plugin_id, name, version, plugin_path, manifest)
-         VALUES ($1, $2, 'Test', '0.0.0', 'test', '{}'::jsonb) ON CONFLICT (id) DO NOTHING`,
-        [REGISTRY_ID, PLUGIN_ID],
+        `INSERT INTO plugin_registry (id, plugin_id, name, version, plugin_path, manifest, source_type)
+         VALUES ($1, $2, 'Test', '0.0.0', 'test', $3::jsonb, 'core') ON CONFLICT (id) DO NOTHING`,
+        [REGISTRY_ID, PLUGIN_ID, JSON.stringify({ permissions: { env: [SECRET_ENV] } })],
       );
       await AppDataSource.query(
         `INSERT INTO plugin_instances (organization_id, plugin_id, enabled) VALUES ($1, $2, true)`,
@@ -470,6 +470,7 @@ describe("provider-initiated privacy requests", () => {
     });
 
     it("answers 404 for a code it never issued and rejects a bad signature", async () => {
+      await installPlugin(ORG_A);
       expect((await status(crypto.randomUUID())).statusCode).toBe(404);
 
       const res = fakeResponse();
