@@ -20,6 +20,7 @@ import {
 } from "@server/services/plugin-manager.service";
 import {
   type BusinessType,
+  type SetupAnswerText,
   type SetupBoard,
   type SetupChannelRef,
   type SetupCheckResult,
@@ -582,6 +583,42 @@ export async function removeQuestion(
     questions: current.questions.filter((q) => q.id !== questionId),
   }));
   return boardFor(organizationId, saved);
+}
+
+export interface UpdateQuestionInput {
+  questionId: string;
+  text?: string;
+  answer?: string;
+  linkedDocumentId?: string | null;
+}
+
+export async function updateQuestion(
+  _organizationId: string,
+  _input: UpdateQuestionInput,
+): Promise<SetupBoard> {
+  throw new TRPCError({ code: "NOT_IMPLEMENTED" });
+}
+
+export async function draftAnswer(
+  _organizationId: string,
+  _questionId: string,
+  _documentId: string,
+): Promise<{ answer: string | null }> {
+  throw new TRPCError({ code: "NOT_IMPLEMENTED" });
+}
+
+export async function getAnswer(
+  _organizationId: string,
+  _questionId: string,
+): Promise<SetupAnswerText | null> {
+  throw new TRPCError({ code: "NOT_IMPLEMENTED" });
+}
+
+export async function restoreQuestion(
+  _organizationId: string,
+  _questionId: string,
+): Promise<SetupBoard> {
+  throw new TRPCError({ code: "NOT_IMPLEMENTED" });
 }
 
 export async function dismiss(organizationId: string): Promise<SetupBoard> {

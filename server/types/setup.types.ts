@@ -76,7 +76,27 @@ export interface SetupQuestion {
   playbookAttempt?: { outcome: "no_tool" | "failed"; at: string };
   /** The document holding the answer the customer wrote for this question. */
   answerDocumentId?: string;
+  /** The existing document the customer based that answer on. */
+  linkedDocument?: SetupDocumentRef;
   check?: SetupCheckResult;
+}
+
+export interface SetupDocumentRef {
+  id: string;
+  title: string;
+}
+
+/** The text of a row's own answer, for its edit panel. */
+export interface SetupAnswerText {
+  text: string;
+  /** False when it gained formatting in Knowledge that a plain text field would lose. */
+  editable: boolean;
+}
+
+/** A removed question, kept so the removal can be undone. */
+export interface SetupRemovedQuestion {
+  question: SetupQuestion;
+  index: number;
 }
 
 export interface SetupSettings {
@@ -87,6 +107,8 @@ export interface SetupSettings {
   /** "webchat" or a plugin's manifest `channel` value. */
   channels: string[];
   questions: SetupQuestion[];
+  /** Newest first, at most five. */
+  recentlyRemoved?: SetupRemovedQuestion[];
   answeredAt?: string;
   dismissedAt?: string;
   /** Set once the assistant's persona was filled in (or found already filled in). */
@@ -129,6 +151,9 @@ export interface SetupRow {
   status: SetupRowStatus;
   answer?: string;
   sources: SetupSource[];
+  /** Present when the row has its own answer, in any status. */
+  answerDocumentId?: string;
+  linkedDocument?: SetupDocumentRef;
   /** For `missing`: the assistant found something but a real test turn went to the team. */
   handedOff?: boolean;
   needs?: SetupHandle;

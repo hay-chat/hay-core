@@ -6,6 +6,7 @@ import { RESOURCES, ACTIONS } from "@server/types/scopes";
 import {
   BUSINESS_TYPES,
   type BusinessType,
+  type SetupAnswerText,
   type SetupBoard,
   type SetupSuggestions,
 } from "@server/types/setup.types";
@@ -74,16 +75,34 @@ export const setupRouter = t.router({
       setup.checkQuestions(orgId(ctx), input.questionIds),
     ),
 
-  /** Saves the customer's own answer as a document, then rechecks that question. */
-  addAnswer: update()
+  /**
+   * Saves a row's edit panel: its wording, its own answer and the document that answer is based
+   * on. Omitted fields stay as they are; `linkedDocumentId: null` drops the link. Rechecks once.
+   */
+  updateQuestion: update()
     .input(
       z.object({
         questionId: z.string().min(1).max(255),
-        answer: z.string().trim().min(1).max(10000),
+        text: z.string().trim().min(1).max(500).optional(),
+        answer: z.string().trim().min(1).max(10000).optional(),
+        linkedDocumentId: z.string().uuid().nullable().optional(),
       }),
     )
-    .mutation(({ ctx, input }): Promise<SetupBoard> =>
-      setup.addAnswer(orgId(ctx), input.questionId, input.answer),
+    .mutation(({ ctx, input }): Promise<SetupBoard> => setup.updateQuestion(orgId(ctx), input)),
+
+  /** Drafts an answer from one document. `answer` is null when it does not state the fact. */
+  draftAnswer: update()
+    .use(rateLimitMiddleware(RateLimits.MODERATE))
+    .input(z.object({ questionId: z.string().min(1).max(255), documentId: z.string().uuid() }))
+    .mutation(({ ctx, input }): Promise<{ answer: string | null }> =>
+      setup.draftAnswer(orgId(ctx), input.questionId, input.documentId),
+    ),
+
+  /** The current text of a row's own answer, or null when it has none or it was deleted. */
+  getAnswer: read()
+    .input(z.object({ questionId: z.string().min(1).max(255) }))
+    .query(({ ctx, input }): Promise<SetupAnswerText | null> =>
+      setup.getAnswer(orgId(ctx), input.questionId),
     ),
 
   addQuestion: update()
@@ -94,6 +113,13 @@ export const setupRouter = t.router({
     .input(z.object({ questionId: z.string().min(1).max(255) }))
     .mutation(({ ctx, input }): Promise<SetupBoard> =>
       setup.removeQuestion(orgId(ctx), input.questionId),
+    ),
+
+  /** Undoes a removal: same position, status, answer and playbook, with no recheck. */
+  restoreQuestion: update()
+    .input(z.object({ questionId: z.string().min(1).max(255) }))
+    .mutation(({ ctx, input }): Promise<SetupBoard> =>
+      setup.restoreQuestion(orgId(ctx), input.questionId),
     ),
 
   /**
