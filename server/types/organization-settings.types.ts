@@ -500,6 +500,7 @@ export interface OrganizationSettings {
   quickCheck?: QuickCheckSettings; // Ask the team one fact instead of handing off (D19)
   setup?: SetupSettings; // In-app setup answers and readiness checks
   mfaRequired?: boolean; // Every member must use two-factor authentication
+  ssoEnforced?: boolean; // Members must sign in through the organization's identity provider
   [key: string]: unknown;
 }
 

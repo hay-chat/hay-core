@@ -38,10 +38,12 @@ import { testTranscriptsRouter } from "./test-transcripts";
 import { replaysRouter } from "./replays";
 import { testCasesRouter } from "./test-cases";
 import { teamQuestionsRouter } from "./team-questions";
+import { ssoRouter } from "./sso";
 
 // Core routers - always available
 const coreRouters = {
   auth: authRouter,
+  sso: ssoRouter,
   internal: internalRouter,
   documents: documentsRouter,
   documentSources: documentSourcesRouter,

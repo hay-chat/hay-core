@@ -7,6 +7,7 @@ import { AppDataSource } from "@server/database/data-source";
 import { UserOrganization } from "@server/entities/user-organization.entity";
 import { User } from "@server/entities/user.entity";
 import { createLogger } from "@server/lib/logger";
+import { assertSsoPolicy } from "@server/lib/auth/sso/policy";
 
 const logger = createLogger("auth-middleware");
 
@@ -66,6 +67,11 @@ async function enhanceWithOrgContext(baseAuthUser: AuthUser, req: Request): Prom
     });
   }
 
+  await assertSsoPolicy(
+    { id: baseAuthUser.id, ssoOrganizationId: baseAuthUser.ssoOrganizationId },
+    userOrg,
+  );
+
   // Get the full user with relations
   const userRepository = AppDataSource.getRepository(User);
   const user = await userRepository.findOne({
@@ -84,6 +90,7 @@ async function enhanceWithOrgContext(baseAuthUser: AuthUser, req: Request): Prom
     sessionId: baseAuthUser.sessionId,
     apiKeyId: baseAuthUser.apiKeyId,
     scopes: baseAuthUser.scopes,
+    ssoOrganizationId: baseAuthUser.ssoOrganizationId,
     organizationId,
     userOrganization: userOrg,
   });

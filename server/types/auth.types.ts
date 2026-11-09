@@ -7,6 +7,8 @@ export interface JWTPayload {
   tokenVersion?: number;
   /** The session this access token was issued for. */
   sid?: string;
+  /** Set when the session came from single sign-on: the only organization it can reach. */
+  sso?: string;
   iat?: number;
   exp?: number;
 }

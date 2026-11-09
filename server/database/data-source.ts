@@ -37,6 +37,9 @@ import { OperatorEventRecord } from "./entities/operator-event.entity";
 import { SitePage } from "./entities/site-page.entity";
 import { UserMfa } from "./entities/user-mfa.entity";
 import { UserWebauthnCredential } from "./entities/user-webauthn-credential.entity";
+import { SsoConnection } from "./entities/sso-connection.entity";
+import { SsoDomain } from "./entities/sso-domain.entity";
+import { SsoIdentity } from "./entities/sso-identity.entity";
 import { InsightIssue } from "./entities/insight-issue.entity";
 import { PushSubscription } from "./entities/push-subscription.entity";
 import { NotificationDelivery } from "./entities/notification-delivery.entity";
@@ -172,6 +175,9 @@ export const AppDataSource = new DataSource({
     SitePage,
     UserMfa,
     UserWebauthnCredential,
+    SsoConnection,
+    SsoDomain,
+    SsoIdentity,
   ],
   migrations: __filename.includes("dist")
     ? [__dirname + "/migrations/*.js"] // Production: compiled JS files in same relative location

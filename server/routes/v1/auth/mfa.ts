@@ -10,6 +10,7 @@ import { protectedProcedureWithoutOrg, publicProcedure } from "@server/trpc/midd
 import { rateLimitMiddleware } from "@server/trpc/middleware/rate-limit";
 import {
   PASSWORD_CHECK_RATE_LIMIT,
+  challengeSsoOrganizationId,
   completeLogin,
   requestInfo,
   requireChallengeUser,
@@ -89,7 +90,12 @@ export const mfaRouter = t.router({
       const user = await requireChallengeUser(input.challengeToken);
 
       await mfaService.verify(user, input.code, requestInfo(ctx));
-      return completeLogin(user, ctx, input.useCookie);
+      return completeLogin(
+        user,
+        ctx,
+        input.useCookie,
+        challengeSsoOrganizationId(input.challengeToken),
+      );
     }),
 
   /** Confirm a code to perform sensitive actions from this session for a few minutes. */

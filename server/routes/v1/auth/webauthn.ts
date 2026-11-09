@@ -9,6 +9,7 @@ import { rateLimitMiddleware } from "@server/trpc/middleware/rate-limit";
 import { TRPCError } from "@trpc/server";
 import {
   PASSWORD_CHECK_RATE_LIMIT,
+  challengeSsoOrganizationId,
   completeLogin,
   requestInfo,
   requireChallengeUser,
@@ -138,7 +139,12 @@ export const webauthnRouter = t.router({
         input.response,
         requestInfo(ctx),
       );
-      return completeLogin(user, ctx, input.useCookie);
+      return completeLogin(
+        user,
+        ctx,
+        input.useCookie,
+        challengeSsoOrganizationId(input.challengeToken),
+      );
     }),
 
   stepUpOptions: protectedProcedureWithoutOrg.mutation(({ ctx }) => {

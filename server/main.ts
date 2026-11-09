@@ -469,6 +469,10 @@ async function startServer() {
   const emailEventsRouter = await import("@server/routes/email-events");
   server.use(emailEventsRouter.default);
 
+  // Single sign-on: the browser's trips to and from an organization's identity provider
+  const ssoRouter = await import("@server/routes/sso");
+  server.use(ssoRouter.default);
+
   // Well-known endpoints for OAuth Client Metadata Document (CIMD)
   const wellKnownRouter = await import("@server/routes/well-known");
   server.use(wellKnownRouter.default);

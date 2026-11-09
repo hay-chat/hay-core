@@ -29,6 +29,9 @@ export type RateLimitScope =
   | "refresh-token"
   | "exchange-auth-code"
   | "mfa-verify"
+  | "sso-start"
+  | "sso-callback"
+  | "sso-discover"
   | "internal-api";
 
 export interface RateLimitOptions {

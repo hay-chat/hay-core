@@ -39,6 +39,6 @@ const tabs = computed(() => {
   const section = SETTINGS_NAV.find((s) =>
     s.tabs.some((tab) => isSettingsTabActive(tab, route.path)),
   );
-  return section ? visibleSettingsTabs(section, !!userStore.isAdmin) : [];
+  return section ? visibleSettingsTabs(section, !!userStore.isAdmin, !!userStore.isOwner) : [];
 });
 </script>

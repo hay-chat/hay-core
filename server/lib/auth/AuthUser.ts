@@ -35,6 +35,8 @@ export class AuthUser {
   public readonly sessionId?: string;
   public readonly apiKeyId?: string;
   public readonly scopes?: ApiKeyScope[];
+  /** Set for sessions started by single sign-on: the one organization they may reach. */
+  public readonly ssoOrganizationId?: string;
 
   // Organization context
   public readonly organizationId?: string;
@@ -49,6 +51,7 @@ export class AuthUser {
       sessionId?: string;
       apiKeyId?: string;
       scopes?: ApiKeyScope[];
+      ssoOrganizationId?: string;
       organizationId?: string;
       userOrganization?: UserOrganization;
     },
@@ -63,6 +66,7 @@ export class AuthUser {
     this.sessionId = metadata?.sessionId;
     this.apiKeyId = metadata?.apiKeyId;
     this.scopes = metadata?.scopes;
+    this.ssoOrganizationId = metadata?.ssoOrganizationId;
     this.organizationId = metadata?.organizationId;
     this.userOrganization = metadata?.userOrganization;
   }

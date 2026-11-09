@@ -5,6 +5,7 @@
 export const roleProtectedRoutes: Record<string, string[]> = {
   // Admin only (owner, admin)
   "/settings/users": ["owner", "admin"],
+  "/settings/sso": ["owner"],
   "/settings/api-tokens": ["owner", "admin"],
   "/settings/general": ["owner", "admin"],
   "/settings/billing": ["owner", "admin"],

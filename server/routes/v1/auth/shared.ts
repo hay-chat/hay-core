@@ -69,20 +69,31 @@ export const PASSWORD_CHECK_RATE_LIMIT = {
   failClosed: true,
 };
 
-/** Everything after the user has proven who they are: the session and the login response. */
+/**
+ * Everything after the user has proven who they are: the session and the login response.
+ * `ssoOrganizationId`: they signed in through that organization's identity provider.
+ */
 export async function completeLogin(
   user: User,
   ctx: Pick<Context, "res" | "ipAddress" | "userAgent">,
   useCookie: boolean | undefined,
+  ssoOrganizationId?: string,
 ) {
   user.lastLoginAt = new Date();
   user.updateLastSeen();
   await AppDataSource.getRepository(User).save(user);
 
-  const tokens = await authSessionService.createSession(user, ctx);
+  const tokens = await authSessionService.createSession(
+    user,
+    ctx,
+    AppDataSource.manager,
+    null,
+    ssoOrganizationId,
+  );
   await auditLogService.record({
     userId: user.id,
-    action: "user.login",
+    organizationId: ssoOrganizationId,
+    action: ssoOrganizationId ? "sso.login" : "user.login",
     resource: "auth",
     ipAddress: ctx.ipAddress,
     userAgent: ctx.userAgent,
@@ -104,7 +115,7 @@ export async function completeLogin(
 
   return {
     mfaRequired: false as const,
-    mfaEnrolmentRequired: await mfaService.enrolmentRequired(user.id),
+    mfaEnrolmentRequired: await mfaService.enrolmentRequired(user.id, ssoOrganizationId),
     user: {
       ...user.toJSON(),
       organizations,
@@ -138,6 +149,11 @@ export async function requireChallengeUser(challengeToken: string): Promise<User
     });
   }
   return user;
+}
+
+/** The organization whose provider started this challenge's first step, if any. */
+export function challengeSsoOrganizationId(challengeToken: string): string | undefined {
+  return verifyMfaChallengeToken(challengeToken)?.sso;
 }
 
 export function requestInfo(ctx: Pick<Context, "ipAddress" | "userAgent">) {

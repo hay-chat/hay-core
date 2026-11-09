@@ -83,9 +83,15 @@ function decodeRefreshToken(token: string): { sessionId: string; generation: num
   return { sessionId, generation };
 }
 
+/** The organization a single-sign-on session is limited to, kept on the session row. */
+function ssoOrganizationOf(session: Session): string | undefined {
+  const value = session.metadata?.ssoOrganizationId;
+  return typeof value === "string" ? value : undefined;
+}
+
 function tokensFor(user: User, session: Session): AuthTokens {
   return {
-    accessToken: generateAccessToken(user, session.id),
+    accessToken: generateAccessToken(user, session.id, ssoOrganizationOf(session)),
     refreshToken: encodeRefreshToken(session.id, session.generation),
     expiresIn: ACCESS_TOKEN_TTL_SECONDS,
   };
@@ -106,12 +112,14 @@ export class AuthSessionService {
   /**
    * Start a new session (one login on one device) and issue its first tokens.
    * Pass `manager` when the user row is written in the same transaction.
+   * A session from single sign-on is limited to `ssoOrganizationId`.
    */
   async createSession(
     user: User,
     client: SessionClientInfo = {},
     manager: EntityManager = AppDataSource.manager,
     legacyTokenHash: string | null = null,
+    ssoOrganizationId?: string,
   ): Promise<AuthTokens> {
     const now = new Date();
     const repo = manager.getRepository(Session);
@@ -125,6 +133,7 @@ export class AuthSessionService {
         ipAddress: truncate(client.ipAddress, 255),
         userAgent: truncate(client.userAgent, 1000),
         legacyTokenHash,
+        ...(ssoOrganizationId ? { metadata: { ssoOrganizationId } } : {}),
       }),
     );
     return tokensFor(user, session);
