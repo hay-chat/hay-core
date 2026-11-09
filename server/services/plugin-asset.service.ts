@@ -2,11 +2,12 @@ import type { Request, Response } from "express";
 import { createHmac, timingSafeEqual } from "crypto";
 import path from "path";
 import fs from "fs/promises";
-import { config, getApiUrl } from "../config/env";
+import { getApiUrl } from "../config/env";
 import type { PluginRegistry } from "../entities/plugin-registry.entity";
 import { pluginRegistryRepository } from "../repositories/plugin-registry.repository";
 import { pluginInstanceRepository } from "../repositories/plugin-instance.repository";
 import { createLogger } from "@server/lib/logger";
+import { deriveServiceKey } from "@server/lib/auth/utils/service-keys";
 
 const logger = createLogger("plugin-asset");
 
@@ -69,12 +70,9 @@ export async function resolveWithin(baseDir: string, relativePath: string): Prom
  */
 export const PLUGIN_UI_URL_TTL_SECONDS = 10 * 60;
 
-/** Dedicated key, derived from JWT_SECRET, so it never doubles as a session or media signature. */
+/** Dedicated key, so it never doubles as a session or media signature. */
 function uiSigningKey(): Buffer {
-  if (!config.jwt.secret) {
-    throw new Error("JWT_SECRET is required to sign plugin UI URLs");
-  }
-  return createHmac("sha256", config.jwt.secret).update("hay:plugin-ui-url:v1").digest();
+  return deriveServiceKey("hay:plugin-ui-url:v1");
 }
 
 function uiSignature(pluginId: string, organizationId: string, expires: number): string {

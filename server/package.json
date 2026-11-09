@@ -31,7 +31,8 @@
     "dev:account": "tsx scripts/create-dev-account.ts",
     "documents:privatize-images": "tsx scripts/privatize-document-images.ts",
     "privacy:replay-erasures": "tsx scripts/replay-erasures.ts",
-    "db:provision-app-role": "tsx scripts/provision-app-role.ts"
+    "db:provision-app-role": "tsx scripts/provision-app-role.ts",
+    "secrets:rotate-encryption-key": "tsx scripts/rotate-plugin-encryption-key.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.100.1",

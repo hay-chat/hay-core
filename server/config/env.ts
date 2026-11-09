@@ -1,5 +1,6 @@
 import dotenv from "dotenv";
 import path from "path";
+import { configuredEncryptionKeys } from "../lib/auth/utils/encryption-keys";
 
 // Load environment variables
 // In production, the compiled code is in server/dist/config, so we need to go up 3 levels to project root
@@ -167,6 +168,9 @@ export const config = {
   rabbitmq: {
     url: process.env.RABBITMQ_URL || "amqp://hay:hay_password@localhost:5672/",
   },
+
+  // Root of the purpose-specific signing keys (lib/auth/utils/service-keys).
+  serviceKey: process.env.HAY_SERVICE_KEY || "",
 
   jwt: {
     secret: process.env.JWT_SECRET || "",
@@ -605,11 +609,18 @@ export function validateProductionConfig(): string[] {
     missingVars.push("RABBITMQ_URL");
   }
 
-  const encryptionKey = process.env.PLUGIN_ENCRYPTION_KEY || "";
-  if (!encryptionKey) {
-    missingVars.push("PLUGIN_ENCRYPTION_KEY");
-  } else if (encryptionKey.length < MIN_SECRET_LENGTH) {
-    errors.push(`PLUGIN_ENCRYPTION_KEY must be at least ${MIN_SECRET_LENGTH} characters.`);
+  try {
+    const encryptionKeys = configuredEncryptionKeys();
+    if (encryptionKeys.length === 0) {
+      missingVars.push("PLUGIN_ENCRYPTION_KEY");
+    } else if (encryptionKeys.some((key) => key.secret.length < MIN_SECRET_LENGTH)) {
+      errors.push(`PLUGIN_ENCRYPTION_KEY must be at least ${MIN_SECRET_LENGTH} characters.`);
+    }
+  } catch (error) {
+    errors.push((error as Error).message);
+  }
+  if (config.serviceKey && config.serviceKey.length < MIN_SECRET_LENGTH) {
+    errors.push(`HAY_SERVICE_KEY must be at least ${MIN_SECRET_LENGTH} characters when set.`);
   }
 
   if (!process.env.DB_PASSWORD || process.env.DB_PASSWORD === DEFAULT_DB_PASSWORD) {

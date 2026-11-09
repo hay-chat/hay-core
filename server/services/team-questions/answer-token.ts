@@ -1,5 +1,6 @@
 import { createHmac, timingSafeEqual } from "crypto";
-import { config, getDashboardUrl } from "@server/config/env";
+import { getDashboardUrl } from "@server/config/env";
+import { deriveServiceKey } from "@server/lib/auth/utils/service-keys";
 
 /**
  * Signed link for answering a quick check from the team email (D19-5): no
@@ -9,12 +10,9 @@ import { config, getDashboardUrl } from "@server/config/env";
 
 export const ANSWER_LINK_TTL_SECONDS = 24 * 60 * 60;
 
-/** Dedicated key derived from JWT_SECRET, so the token can't be replayed as anything else. */
+/** Dedicated key, so the token can't be replayed as anything else. */
 function signingKey(): Buffer {
-  if (!config.jwt.secret) {
-    throw new Error("JWT_SECRET is required to sign answer links");
-  }
-  return createHmac("sha256", config.jwt.secret).update("hay:team-question-answer:v1").digest();
+  return deriveServiceKey("hay:team-question-answer:v1");
 }
 
 function sign(body: string): string {

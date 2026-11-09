@@ -6,6 +6,7 @@
  */
 import * as jwt from "jsonwebtoken";
 import { config } from "@server/config/env";
+import { deriveServiceKey } from "@server/lib/auth/utils/service-keys";
 import {
   isOrganizationOpenToPlugins,
   mintPluginApiToken,
@@ -18,9 +19,10 @@ import {
 
 describe("mintPluginApiToken", () => {
   const token = mintPluginApiToken("org-1", "hay-channel-email", ["messages", "email"]);
+  const key = deriveServiceKey("hay:plugin-api-token:v1");
 
   it("passes the REST relay's issuer and audience check", () => {
-    const decoded = jwt.verify(token, config.jwt.secret, {
+    const decoded = jwt.verify(token, key, {
       issuer: PLUGIN_API_TOKEN_ISSUER,
       audience: PLUGIN_API_TOKEN_AUDIENCE,
     }) as jwt.JwtPayload;
@@ -30,7 +32,7 @@ describe("mintPluginApiToken", () => {
   });
 
   it("carries the scope and fields the tRPC middleware requires", () => {
-    const decoded = jwt.verify(token, config.jwt.secret) as jwt.JwtPayload;
+    const decoded = jwt.verify(token, key) as jwt.JwtPayload;
     expect(decoded.scope).toBe(PLUGIN_API_TOKEN_SCOPE);
     expect(decoded.exp).toBeGreaterThan(decoded.iat as number);
   });
