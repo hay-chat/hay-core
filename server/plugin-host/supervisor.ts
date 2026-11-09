@@ -23,6 +23,8 @@ import {
 } from "./protocol";
 
 const LOG_BACKLOG_LINES = 200;
+/** A worker that never prints a newline must not grow the supervisor's memory. */
+const MAX_LOG_LINE_CHARS = 64 * 1024;
 const MAX_BODY_BYTES = 2 * 1024 * 1024;
 const STOP_GRACE_MS = 5000;
 /** Loopback ports the workers' bridges use. Chosen per worker; only meaningful inside its sandbox. */
@@ -301,6 +303,10 @@ export class Supervisor {
         const lines = pending.split("\n");
         pending = lines.pop() ?? "";
         for (const line of lines) if (line) push({ type: "log", stream, line });
+        if (pending.length > MAX_LOG_LINE_CHARS) {
+          push({ type: "log", stream, line: pending.slice(0, MAX_LOG_LINE_CHARS) });
+          pending = "";
+        }
       });
       worker.child[stream]?.on("end", () => {
         if (pending) push({ type: "log", stream, line: pending });
@@ -319,7 +325,6 @@ export class Supervisor {
       this.releasePorts(worker.bridgePorts);
       void this.finish(worker).finally(() => {
         push(event);
-        for (const subscriber of worker.subscribers) subscriber(event);
         worker.subscribers.clear();
       });
     });
