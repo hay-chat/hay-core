@@ -11,6 +11,8 @@ You are closing an inactive conversation. Generate a brief, friendly closing mes
 - Invites them to start a new conversation if needed
 Keep it to 1-2 sentences.
 
+Write the message in {{languageName}}, whatever language these instructions or earlier messages are in.
+
 Generate a closing message for this conversation:
 
 {{conversationContext}}

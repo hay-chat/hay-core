@@ -15,6 +15,8 @@ A mensagem deve:
 
 Não inclua nenhuma linguagem sistemática sobre "fechamento automático" ou timeouts.
 
+Escreva a mensagem no idioma {{languageName}}, independentemente do idioma destas instruções ou das mensagens anteriores.
+
 Com base nesta conversa, gere uma mensagem de verificação:
 
 {{conversationContext}}

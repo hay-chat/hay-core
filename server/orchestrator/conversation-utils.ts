@@ -8,6 +8,8 @@ import { PromptService } from "@server/services/prompt.service";
 import { createLogger } from "@server/lib/logger";
 import { getAiReplyBlocker, recheckAiReply } from "./reply-guard";
 import { closureCopy } from "./closure-copy";
+import type { Conversation } from "@server/database/entities/conversation.entity";
+import { languageName } from "@server/services/setup/playbook-generation";
 
 const logger = createLogger("conversation-utils");
 
@@ -171,6 +173,16 @@ export async function generateHandoffSummary(
   }
 }
 
+/** The language the customer last wrote in, then the conversation's, then the organization's. */
+function customerLanguage(messages: Message[], conversation: Conversation): string | undefined {
+  const detected = messages.filter((m) => m.type === MessageType.CUSTOMER && m.detectedLanguage);
+  return (
+    detected[detected.length - 1]?.detectedLanguage ||
+    conversation.language ||
+    conversation.organization?.defaultLanguage
+  );
+}
+
 /**
  * Send a contextual inactivity warning message to the user.
  * Returns whether a warning was sent: never while a human holds the
@@ -209,7 +221,10 @@ export async function sendInactivityWarning(
 
     const prompt = await promptService.getPrompt(
       "conversation/inactivity-check",
-      { conversationContext },
+      {
+        conversationContext,
+        languageName: languageName(customerLanguage(messages, conversation)),
+      },
       { conversationId: conversation.id, organizationId },
     );
 
@@ -287,6 +302,7 @@ export async function closeInactiveConversation(
         // User didn't respond to warning
         closureMessage = closureCopy(
           "inactivityClose",
+          customerLanguage(messages, conversation),
           conversation.language,
           conversation.organization?.defaultLanguage,
         );
@@ -302,7 +318,10 @@ export async function closeInactiveConversation(
 
         const prompt = await promptService.getPrompt(
           "conversation/closure-message",
-          { conversationContext },
+          {
+            conversationContext,
+            languageName: languageName(customerLanguage(messages, conversation)),
+          },
           { conversationId: conversation.id, organizationId },
         );
 

@@ -15,6 +15,8 @@ The message should:
 
 Do not include any system-like language about "automatic closure" or timeouts.
 
+Write the message in {{languageName}}, whatever language these instructions or earlier messages are in.
+
 Based on this conversation, generate a check-in message:
 
 {{conversationContext}}

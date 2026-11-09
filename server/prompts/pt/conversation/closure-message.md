@@ -11,6 +11,8 @@ Você está encerrando uma conversa inativa. Gere uma mensagem breve e amigável
 - Convide para iniciar uma nova conversa se necessário
 Mantenha em 1-2 frases.
 
+Escreva a mensagem no idioma {{languageName}}, independentemente do idioma destas instruções ou das mensagens anteriores.
+
 Gere uma mensagem de encerramento para esta conversa:
 
 {{conversationContext}}
