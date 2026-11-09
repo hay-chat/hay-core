@@ -42,6 +42,7 @@
     "@google/genai": "^2.32.0",
     "@hay/form-schema": "*",
     "@mozilla/readability": "^0.6.0",
+    "@node-saml/node-saml": "^5.2.0",
     "@opentelemetry/api": "1.9.0",
     "@opentelemetry/context-async-hooks": "2.1.0",
     "@opentelemetry/core": "2.1.0",
@@ -121,6 +122,7 @@
     "@types/web-push": "^3.6.4",
     "@types/ws": "^8.18.2",
     "@types/xml2js": "^0.4.14",
+    "@xmldom/xmldom": "^0.8.15",
     "jest": "^30.2.0",
     "nodemon": "^3.1.14",
     "pino-pretty": "^13.2.0",
@@ -128,6 +130,7 @@
     "ts-node": "^10.9.2",
     "tsc-alias": "^1.9.9",
     "tsx": "^4.23.15",
-    "typescript": "^5.3.3"
+    "typescript": "^5.3.3",
+    "xml-crypto": "^6.4.0"
   }
 }

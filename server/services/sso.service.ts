@@ -29,6 +29,21 @@ import {
   verifyIdToken,
   type IdTokenClaims,
 } from "@server/lib/auth/sso/oidc";
+import {
+  RedisSamlCache,
+  SamlError,
+  assertAcceptableSamlUrl,
+  buildSamlRedirect,
+  newSamlRequestId,
+  normalizeIdpCertificates,
+  samlAcsUrl,
+  samlMetadataUrl,
+  samlServiceProviderMetadata,
+  samlSpEntityId,
+  validateSamlResponse,
+  type SamlConnectionConfig,
+  type SamlIdentity,
+} from "@server/lib/auth/sso/saml";
 import { createLogger } from "@server/lib/logger";
 import { auditLogService } from "@server/services/audit-log.service";
 import { mfaService } from "@server/services/mfa.service";
@@ -70,15 +85,35 @@ export class SsoLoginError extends Error {
   }
 }
 
-interface LoginState {
+interface LoginStateBase {
   connectionId: string;
   organizationId: string;
   issuer: string;
+  /** sha256 of the cookie set on the browser that started the sign-in. */
+  bindingHash: string;
+}
+
+interface OidcLoginState extends LoginStateBase {
+  protocol: "oidc";
   clientId: string;
   nonce: string;
   codeVerifier: string;
-  /** sha256 of the cookie set on the browser that started the sign-in. */
+}
+
+interface SamlLoginState extends LoginStateBase {
+  protocol: "saml";
+  /** The `ID` of the AuthnRequest; the response must answer exactly this. */
+  requestId: string;
+}
+
+type LoginState = OidcLoginState | SamlLoginState;
+
+/** A verified SAML response waiting for the browser that started the sign-in to come back for it. */
+interface SamlPendingLogin {
+  connectionId: string;
+  organizationId: string;
   bindingHash: string;
+  identity: SamlIdentity;
 }
 
 interface LoginTicket {
@@ -92,16 +127,31 @@ export interface SsoActor {
   userAgent?: string;
 }
 
-export interface SsoConnectionInput {
-  issuer: string;
-  clientId: string;
-  /** Required when creating; omitted to keep the stored secret. */
-  clientSecret?: string;
+interface SsoConnectionCommon {
   defaultRole: SsoAssignableRole;
   roleClaim?: string | null;
   roleMapping: Record<string, SsoAssignableRole>;
   enabled: boolean;
 }
+
+export interface OidcConnectionInput extends SsoConnectionCommon {
+  protocol: "oidc";
+  issuer: string;
+  clientId: string;
+  /** Required when creating; omitted to keep the stored secret. */
+  clientSecret?: string;
+}
+
+export interface SamlConnectionInput extends SsoConnectionCommon {
+  protocol: "saml";
+  /** The provider's entity ID. */
+  idpEntityId: string;
+  ssoUrl: string;
+  /** PEM certificate(s) the provider signs assertions with. */
+  certificate: string;
+}
+
+export type SsoConnectionInput = OidcConnectionInput | SamlConnectionInput;
 
 function sha256(value: string): string {
   return crypto.createHash("sha256").update(value).digest("hex");
@@ -123,6 +173,22 @@ function requireRedis() {
     });
   }
   return client;
+}
+
+/** The sign-in must come back in the browser that started it. */
+function assertSameBrowser(
+  started: { bindingHash: string; organizationId: string },
+  binding: string | undefined,
+): void {
+  const expected = Buffer.from(started.bindingHash);
+  const given = Buffer.from(sha256(binding ?? ""));
+  if (expected.length !== given.length || !crypto.timingSafeEqual(expected, given)) {
+    throw new SsoLoginError(
+      "state_invalid",
+      "Sign-in did not start in this browser",
+      started.organizationId,
+    );
+  }
 }
 
 export function ssoRedirectUri(): string {
@@ -181,43 +247,94 @@ export class SsoService {
   async getConnection(organizationId: string) {
     const connection = await this.connections.findOne({ where: { organizationId } });
     if (!connection) return null;
-    const { clientSecret: _secret, ...rest } = connection;
-    return { ...rest, hasClientSecret: true as const, redirectUri: ssoRedirectUri() };
+    const { clientSecret, ...rest } = connection;
+    return { ...rest, hasClientSecret: !!clientSecret, redirectUri: ssoRedirectUri() };
+  }
+
+  /** What an owner pastes into the identity provider when setting up SAML. */
+  samlServiceProviderDetails(organizationId: string) {
+    return {
+      acsUrl: samlAcsUrl(),
+      entityId: samlSpEntityId(organizationId),
+      metadataUrl: samlMetadataUrl(organizationId),
+    };
   }
 
   async saveConnection(organizationId: string, input: SsoConnectionInput, actor: SsoActor) {
-    const issuer = normalizeIssuer(input.issuer);
-    assertAcceptableProviderUrl(issuer);
     const existing = await this.connections.findOne({ where: { organizationId } });
-    if (!existing && !input.clientSecret) {
-      throw new TRPCError({ code: "BAD_REQUEST", message: "A client secret is required" });
-    }
-
-    // A provider that cannot be reached or that names another issuer is refused now,
-    // not discovered by the first person who tries to sign in.
-    try {
-      await discoverProvider(issuer);
-    } catch (error) {
-      throw new TRPCError({
-        code: "BAD_REQUEST",
-        message:
-          error instanceof OidcError
-            ? `The provider could not be verified: ${error.message}`
-            : "The provider could not be verified",
-      });
-    }
-
-    const credentialsChanged =
-      !existing ||
-      existing.issuer !== issuer ||
-      existing.clientId !== input.clientId ||
-      (input.clientSecret !== undefined &&
-        input.clientSecret !== decryptValue(existing.clientSecret));
-
     const connection = existing ?? this.connections.create({ organizationId });
-    connection.issuer = issuer;
-    connection.clientId = input.clientId;
-    if (input.clientSecret) connection.clientSecret = encryptValue(input.clientSecret);
+    const previousIssuer = existing?.issuer;
+    const previousProtocol = existing?.protocol;
+    let credentialsChanged: boolean;
+    const audited: Record<string, unknown> = { protocol: input.protocol };
+
+    if (input.protocol === "oidc") {
+      const issuer = normalizeIssuer(input.issuer);
+      assertAcceptableProviderUrl(issuer);
+      if ((!existing || existing.protocol !== "oidc") && !input.clientSecret) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "A client secret is required" });
+      }
+
+      // A provider that cannot be reached or that names another issuer is refused now,
+      // not discovered by the first person who tries to sign in.
+      try {
+        await discoverProvider(issuer);
+      } catch (error) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message:
+            error instanceof OidcError
+              ? `The provider could not be verified: ${error.message}`
+              : "The provider could not be verified",
+        });
+      }
+
+      credentialsChanged =
+        !existing ||
+        existing.protocol !== "oidc" ||
+        existing.issuer !== issuer ||
+        existing.clientId !== input.clientId ||
+        (input.clientSecret !== undefined &&
+          input.clientSecret !== decryptValue(existing.clientSecret ?? ""));
+      connection.protocol = "oidc";
+      connection.issuer = issuer;
+      connection.clientId = input.clientId;
+      if (input.clientSecret) connection.clientSecret = encryptValue(input.clientSecret);
+      connection.samlEntryPoint = null;
+      connection.samlCertificate = null;
+      audited.issuer = issuer;
+      audited.clientId = input.clientId;
+      audited.clientSecretChanged = !!input.clientSecret;
+    } else {
+      let entryPoint: string;
+      let certificate: string;
+      try {
+        entryPoint = assertAcceptableSamlUrl(input.ssoUrl);
+        certificate = normalizeIdpCertificates(input.certificate);
+      } catch (error) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: error instanceof SamlError ? error.message : "The SAML settings are not valid",
+        });
+      }
+      const issuer = input.idpEntityId.trim();
+      credentialsChanged =
+        !existing ||
+        existing.protocol !== "saml" ||
+        existing.issuer !== issuer ||
+        existing.samlEntryPoint !== entryPoint ||
+        existing.samlCertificate !== certificate;
+      connection.protocol = "saml";
+      connection.issuer = issuer;
+      connection.samlEntryPoint = entryPoint;
+      connection.samlCertificate = certificate;
+      connection.clientId = null;
+      connection.clientSecret = null;
+      audited.issuer = issuer;
+      audited.ssoUrl = entryPoint;
+      audited.certificateChanged = existing?.samlCertificate !== certificate;
+    }
+
     connection.defaultRole = input.defaultRole;
     connection.roleClaim = input.roleClaim || null;
     connection.roleMapping = input.roleMapping;
@@ -226,6 +343,19 @@ export class SsoService {
     if (credentialsChanged) connection.lastLoginAt = null;
     connection.updatedBy = actor.userId;
     await this.connections.save(connection);
+
+    // Links made through another provider would otherwise block the same people
+    // from linking to this one; they link again by email as active members.
+    if (existing && (previousIssuer !== connection.issuer || previousProtocol !== input.protocol)) {
+      await AppDataSource.getRepository(SsoIdentity)
+        .createQueryBuilder()
+        .delete()
+        .where("organization_id = :organizationId AND issuer <> :issuer", {
+          organizationId,
+          issuer: connection.issuer,
+        })
+        .execute();
+    }
 
     // Editing the provider must never leave the organization enforcing a login that may not work.
     const liftEnforcement =
@@ -238,12 +368,10 @@ export class SsoService {
       action: "sso.config.update",
       resource: "sso_connection",
       changes: {
-        issuer,
-        clientId: input.clientId,
+        ...audited,
         defaultRole: input.defaultRole,
         roleClaim: connection.roleClaim,
         enabled: input.enabled,
-        clientSecretChanged: !!input.clientSecret,
         enforcementLifted: liftEnforcement,
       },
       ipAddress: actor.ipAddress,
@@ -477,17 +605,53 @@ export class SsoService {
       throw new SsoLoginError("unavailable", "No identity provider for this address");
 
     const redis = requireRedis();
-    const provider = await this.discover(connection);
     const state = randomToken();
     const binding = randomToken();
-    const loginState: LoginState = {
+    const base = {
       connectionId: connection.id,
       organizationId: connection.organizationId,
       issuer: connection.issuer,
-      clientId: connection.clientId,
+      bindingHash: sha256(binding),
+    };
+
+    if (connection.protocol === "saml") {
+      const requestId = newSamlRequestId();
+      const loginState: SamlLoginState = { ...base, protocol: "saml", requestId };
+      let url: string;
+      try {
+        url = await buildSamlRedirect(
+          this.samlConfig(connection),
+          new RedisSamlCache(redis, connection.id),
+          requestId,
+          state,
+        );
+      } catch (error) {
+        logger.warn(
+          { err: error, organizationId: connection.organizationId },
+          "SAML request failed",
+        );
+        throw new SsoLoginError(
+          "provider_error",
+          "The sign-in request could not be built",
+          connection.organizationId,
+        );
+      }
+      await redis.set(
+        `sso:state:${sha256(state)}`,
+        JSON.stringify(loginState),
+        "EX",
+        STATE_TTL_SECONDS,
+      );
+      return { binding, url };
+    }
+
+    const provider = await this.discover(connection);
+    const loginState: OidcLoginState = {
+      ...base,
+      protocol: "oidc",
+      clientId: connection.clientId ?? "",
       nonce: randomToken(),
       codeVerifier: randomToken(48),
-      bindingHash: sha256(binding),
     };
     await redis.set(
       `sso:state:${sha256(state)}`,
@@ -499,7 +663,7 @@ export class SsoService {
       binding,
       url: buildAuthorizationUrl({
         provider,
-        clientId: connection.clientId,
+        clientId: loginState.clientId,
         redirectUri: ssoRedirectUri(),
         state,
         nonce: loginState.nonce,
@@ -507,6 +671,36 @@ export class SsoService {
         loginHint: email,
       }),
     };
+  }
+
+  private samlConfig(connection: SsoConnection): SamlConnectionConfig {
+    if (!connection.samlEntryPoint || !connection.samlCertificate) {
+      throw new SsoLoginError(
+        "unavailable",
+        "The SAML connection is incomplete",
+        connection.organizationId,
+      );
+    }
+    return {
+      organizationId: connection.organizationId,
+      connectionId: connection.id,
+      idpEntityId: connection.issuer,
+      entryPoint: connection.samlEntryPoint,
+      certificate: connection.samlCertificate,
+    };
+  }
+
+  /** SP metadata for a SAML connection, for owners who import it at the provider. */
+  async samlMetadata(organizationId: string): Promise<string | null> {
+    try {
+      const connection = await this.connections.findOne({
+        where: { organizationId, protocol: "saml" },
+      });
+      return connection ? samlServiceProviderMetadata(this.samlConfig(connection)) : null;
+    } catch (error) {
+      if (isPgError(error, POSTGRES_UNDEFINED_TABLE)) return null;
+      throw error;
+    }
   }
 
   private async discover(connection: SsoConnection) {
@@ -539,20 +733,17 @@ export class SsoService {
     const raw = await redis.getdel(`sso:state:${sha256(params.state)}`);
     if (!raw) throw new SsoLoginError("state_invalid", "Unknown or already used state");
     const state = JSON.parse(raw) as LoginState;
-
-    const expected = Buffer.from(state.bindingHash);
-    const given = Buffer.from(sha256(params.binding ?? ""));
-    if (expected.length !== given.length || !crypto.timingSafeEqual(expected, given)) {
-      throw new SsoLoginError(
-        "state_invalid",
-        "Sign-in did not start in this browser",
-        state.organizationId,
-      );
+    if (state.protocol !== "oidc") {
+      throw new SsoLoginError("state_invalid", "Unknown or already used state");
     }
+    assertSameBrowser(state, params.binding);
 
     const connection = await this.connections.findOne({ where: { id: state.connectionId } });
     if (
       !connection?.enabled ||
+      connection.protocol !== "oidc" ||
+      !connection.clientId ||
+      !connection.clientSecret ||
       connection.issuer !== state.issuer ||
       connection.clientId !== state.clientId
     ) {
@@ -596,15 +787,125 @@ export class SsoService {
     }
 
     const user = await this.provision(connection, claims);
+    return this.issueTicket(user, connection.organizationId);
+  }
+
+  private async issueTicket(user: User, organizationId: string): Promise<string> {
     const ticket = randomToken();
-    const payload: LoginTicket = { userId: user.id, organizationId: connection.organizationId };
-    await redis.set(
+    const payload: LoginTicket = { userId: user.id, organizationId };
+    await requireRedis().set(
       `sso:ticket:${sha256(ticket)}`,
       JSON.stringify(payload),
       "EX",
       TICKET_TTL_SECONDS,
     );
     return ticket;
+  }
+
+  /**
+   * First half of a SAML sign-in, run when the provider POSTs the response to
+   * the ACS endpoint. That POST is cross-site, so the browser binding cookie
+   * (SameSite=Lax, like the OpenID Connect one) is not sent with it. The
+   * response is therefore fully verified here against the request this
+   * sign-in started, then parked under a one-use handle; the browser is
+   * redirected to a same-site GET (`finishSamlLogin`) where the cookie
+   * arrives and the person is provisioned. Nothing is created before then.
+   *
+   * Only SP-initiated sign-ins exist: a response whose RelayState is not a
+   * pending request of ours is refused, whatever it carries.
+   */
+  async handleSamlResponse(params: { samlResponse: string; relayState: string }): Promise<string> {
+    const redis = requireRedis();
+    const raw = await redis.getdel(`sso:state:${sha256(params.relayState)}`);
+    if (!raw) throw new SsoLoginError("state_invalid", "Unknown or already used state");
+    const state = JSON.parse(raw) as LoginState;
+    if (state.protocol !== "saml") {
+      throw new SsoLoginError("state_invalid", "Unknown or already used state");
+    }
+
+    const connection = await this.connections.findOne({ where: { id: state.connectionId } });
+    if (
+      !connection?.enabled ||
+      connection.protocol !== "saml" ||
+      connection.issuer !== state.issuer
+    ) {
+      throw new SsoLoginError(
+        "unavailable",
+        "The connection changed during sign-in",
+        state.organizationId,
+      );
+    }
+
+    let identity: SamlIdentity;
+    try {
+      identity = await validateSamlResponse(
+        this.samlConfig(connection),
+        new RedisSamlCache(redis, connection.id),
+        {
+          samlResponse: params.samlResponse,
+          requestId: state.requestId,
+          roleAttribute: connection.roleClaim,
+        },
+      );
+    } catch (error) {
+      if (error instanceof SamlError) {
+        logger.warn(
+          { organizationId: connection.organizationId, reason: error.code },
+          "SAML response refused",
+        );
+        throw new SsoLoginError("token_invalid", error.message, connection.organizationId);
+      }
+      throw error;
+    }
+
+    const handle = randomToken();
+    const pending: SamlPendingLogin = {
+      connectionId: connection.id,
+      organizationId: connection.organizationId,
+      bindingHash: state.bindingHash,
+      identity,
+    };
+    await redis.set(
+      `sso:saml:pending:${sha256(handle)}`,
+      JSON.stringify(pending),
+      "EX",
+      TICKET_TTL_SECONDS,
+    );
+    return handle;
+  }
+
+  /** Second half: the same browser comes back, the cookie is checked, the person is provisioned. */
+  async finishSamlLogin(params: { handle: string; binding: string | undefined }): Promise<string> {
+    const raw = await requireRedis().getdel(`sso:saml:pending:${sha256(params.handle)}`);
+    if (!raw) throw new SsoLoginError("state_invalid", "Unknown or already used sign-in");
+    const pending = JSON.parse(raw) as SamlPendingLogin;
+    assertSameBrowser(pending, params.binding);
+
+    const connection = await this.connections.findOne({ where: { id: pending.connectionId } });
+    if (!connection?.enabled || connection.protocol !== "saml") {
+      throw new SsoLoginError(
+        "unavailable",
+        "The connection changed during sign-in",
+        pending.organizationId,
+      );
+    }
+    const { identity } = pending;
+    const claims: IdTokenClaims = {
+      ...(connection.roleClaim && identity.roleValues.length
+        ? { [connection.roleClaim]: identity.roleValues }
+        : {}),
+      iss: connection.issuer,
+      sub: identity.nameId,
+      aud: samlSpEntityId(connection.organizationId),
+      exp: Math.floor(Date.now() / 1000) + TICKET_TTL_SECONDS,
+      email: identity.email,
+      // The assertion is signed by the provider the owner configured; the domain check still applies.
+      email_verified: true,
+      given_name: identity.firstName,
+      family_name: identity.lastName,
+    };
+    const user = await this.provision(connection, claims);
+    return this.issueTicket(user, connection.organizationId);
   }
 
   /** Spends a ticket. The person must still be active and a member when it is redeemed. */

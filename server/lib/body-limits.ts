@@ -12,6 +12,9 @@ export const DEFAULT_BODY_LIMIT = "1mb";
 export const UPLOAD_BODY_LIMIT = "50mb";
 const WIDGET_BODY_LIMIT = "15mb"; // one 10 MB attachment as base64 + message
 const PLUGIN_BODY_LIMIT = "10mb";
+/** The SAML response form post: a base64 assertion of at most 128 KiB, URL-encoded (up to 3x). */
+export const SAML_ACS_PATH = "/sso/saml/acs";
+const SAML_ACS_BODY_LIMIT = "400kb";
 /** Bodies up to this size never need the upload check. */
 export const DEFAULT_BODY_LIMIT_BYTES = 1024 * 1024;
 
@@ -34,6 +37,9 @@ function procedureMatches(procedure: string, prefixes: string[]): boolean {
 
 /** Body limit for a request path (Express `req.path`). */
 export function bodyLimitForPath(path: string): string {
+  if (path === SAML_ACS_PATH) {
+    return SAML_ACS_BODY_LIMIT;
+  }
   if (path.startsWith("/v1/plugin-api/")) {
     return UPLOAD_BODY_LIMIT;
   }

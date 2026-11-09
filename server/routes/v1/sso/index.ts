@@ -22,17 +22,31 @@ const ownerProcedure = scopedProcedure(RESOURCES.ORGANIZATION_SETTINGS, ACTIONS.
 
 const roleSchema = z.enum(SSO_ASSIGNABLE_ROLES);
 
-const connectionSchema = z.object({
-  issuer: z.string().trim().url().max(512),
-  clientId: z.string().trim().min(1).max(255),
-  clientSecret: z.string().min(1).max(1024).optional(),
+const commonSchema = {
   defaultRole: roleSchema,
   roleClaim: z.string().trim().max(100).nullish(),
   roleMapping: z
     .record(z.string().max(255), roleSchema)
     .refine((map) => Object.keys(map).length <= 50),
   enabled: z.boolean(),
-});
+};
+
+const connectionSchema = z.discriminatedUnion("protocol", [
+  z.object({
+    protocol: z.literal("oidc"),
+    issuer: z.string().trim().url().max(512),
+    clientId: z.string().trim().min(1).max(255),
+    clientSecret: z.string().min(1).max(1024).optional(),
+    ...commonSchema,
+  }),
+  z.object({
+    protocol: z.literal("saml"),
+    idpEntityId: z.string().trim().min(1).max(512),
+    ssoUrl: z.string().trim().url().max(1024),
+    certificate: z.string().trim().min(1).max(12_000),
+    ...commonSchema,
+  }),
+]);
 
 function actor(ctx: { user: { id: string }; ipAddress?: string; userAgent?: string }) {
   return { userId: ctx.user.id, ipAddress: ctx.ipAddress, userAgent: ctx.userAgent };
@@ -42,6 +56,7 @@ export const ssoRouter = t.router({
   getSettings: ownerProcedure.query(async ({ ctx }) => {
     return {
       connection: await ssoService.getConnection(ctx.organizationId!),
+      saml: ssoService.samlServiceProviderDetails(ctx.organizationId!),
       domains: await ssoService.listDomains(ctx.organizationId!),
       enforced: ctx.user.userOrganization?.organization?.settings?.ssoEnforced === true,
       assignableRoles: SSO_ASSIGNABLE_ROLES,

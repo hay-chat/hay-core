@@ -31,6 +31,8 @@ export type RateLimitScope =
   | "mfa-verify"
   | "sso-start"
   | "sso-callback"
+  | "sso-saml-acs"
+  | "sso-saml-finish"
   | "sso-discover"
   | "internal-api";
 

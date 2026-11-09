@@ -6,7 +6,10 @@ import { Organization } from "@server/entities/organization.entity";
 export const SSO_ASSIGNABLE_ROLES = ["admin", "member", "viewer", "contributor", "agent"] as const;
 export type SsoAssignableRole = (typeof SSO_ASSIGNABLE_ROLES)[number];
 
-/** An organization's OpenID Connect identity provider. One per organization. */
+export const SSO_PROTOCOLS = ["oidc", "saml"] as const;
+export type SsoProtocol = (typeof SSO_PROTOCOLS)[number];
+
+/** An organization's identity provider, OpenID Connect or SAML. One per organization. */
 @Entity("sso_connections")
 @Index("uq_sso_connections_organization", ["organizationId"], { unique: true })
 export class SsoConnection extends OrganizationScopedEntity {
@@ -14,22 +17,34 @@ export class SsoConnection extends OrganizationScopedEntity {
   @JoinColumn()
   organization?: Organization;
 
-  /** Exact `iss` the provider issues, without a trailing slash. */
+  @Column({ type: "varchar", length: 10, default: "oidc" })
+  protocol!: SsoProtocol;
+
+  /** OIDC: exact `iss` the provider issues, without a trailing slash. SAML: the provider's entity ID. */
   @Column({ type: "varchar", length: 512 })
   issuer!: string;
 
-  @Column({ type: "varchar", length: 255 })
-  clientId!: string;
+  /** OIDC only. */
+  @Column({ type: "varchar", length: 255, nullable: true })
+  clientId?: string | null;
 
-  /** Encrypted with encryptValue; never returned to the dashboard. */
-  @Column({ type: "text" })
-  clientSecret!: string;
+  /** OIDC only. Encrypted with encryptValue; never returned to the dashboard. */
+  @Column({ type: "text", nullable: true })
+  clientSecret?: string | null;
+
+  /** SAML only: the provider's single sign-on URL (HTTP-Redirect binding). */
+  @Column({ type: "varchar", length: 1024, nullable: true })
+  samlEntryPoint?: string | null;
+
+  /** SAML only: PEM certificate(s) the provider signs assertions with. Public, so stored as is. */
+  @Column({ type: "text", nullable: true })
+  samlCertificate?: string | null;
 
   /** Role of a newly provisioned member when no mapping applies. */
   @Column({ type: "varchar", length: 50, default: "member" })
   defaultRole!: SsoAssignableRole;
 
-  /** Name of the ID token claim holding groups or roles; empty means the default role always applies. */
+  /** Name of the ID token claim (OIDC) or assertion attribute (SAML) holding groups or roles; empty means the default role always applies. */
   @Column({ type: "varchar", length: 100, nullable: true })
   roleClaim?: string | null;
 

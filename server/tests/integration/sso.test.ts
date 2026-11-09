@@ -60,7 +60,7 @@ import { verifyToken } from "../../lib/auth/utils/jwt";
 import { authRouter } from "../../routes/v1/auth";
 import { ssoRouter } from "../../routes/v1/sso";
 import { mfaService } from "../../services/mfa.service";
-import { SsoLoginError, ssoService } from "../../services/sso.service";
+import { SsoLoginError, ssoService, type OidcConnectionInput } from "../../services/sso.service";
 import type { Context } from "../../trpc/context";
 import { FakeOidcProvider, type FakeLoginOverrides } from "../helpers/fake-oidc-provider";
 
@@ -135,10 +135,11 @@ async function verifiedDomain(organizationId: string, domain: string): Promise<S
   return verified;
 }
 
-async function configure(overrides: Partial<Parameters<typeof ssoService.saveConnection>[1]> = {}) {
+async function configure(overrides: Partial<OidcConnectionInput> = {}) {
   await ssoService.saveConnection(
     ORG_ID,
     {
+      protocol: "oidc",
       issuer: idp.issuer,
       clientId: idp.clientId,
       clientSecret: idp.clientSecret,
@@ -585,6 +586,7 @@ describe("single sign-on (OpenID Connect)", () => {
       expect(await roleOf(`root@${DOMAIN}`)).toBe("member");
       await expect(
         ssoRouter.createCaller(await ownerCtx(await ownerUser())).saveConnection({
+          protocol: "oidc",
           issuer: idp.issuer,
           clientId: idp.clientId,
           defaultRole: "member",
@@ -631,7 +633,7 @@ describe("single sign-on (OpenID Connect)", () => {
       const row = await AppDataSource.getRepository(SsoConnection).findOneOrFail({
         where: { organizationId: ORG_ID },
       });
-      expect(row.clientSecret.startsWith("enc:v3:")).toBe(true);
+      expect(row.clientSecret?.startsWith("enc:v3:")).toBe(true);
       expect(row.clientSecret).not.toContain(idp.clientSecret);
       const view = await ssoService.getConnection(ORG_ID);
       expect(JSON.stringify(view)).not.toContain('clientSecret":"');
