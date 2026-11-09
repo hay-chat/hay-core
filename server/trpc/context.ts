@@ -22,6 +22,8 @@ export interface Context {
 interface RequestWithAuthError extends Request {
   authError?: string;
   authDenied?: TRPCError;
+  /** Who signed in when the requested organization was refused. */
+  userWithoutOrganization?: AuthUser | null;
 }
 
 export const createContext = async ({
@@ -38,6 +40,10 @@ export const createContext = async ({
     if (error instanceof TRPCError && error.code === "FORBIDDEN") {
       // Valid credentials, wrong organization: procedures that need a user report this.
       (req as RequestWithAuthError).authDenied = error;
+      const signedInUser = await authenticate(req, { ignoreOrganization: true }).catch(() => null);
+      if (signedInUser?.authMethod !== "apikey") {
+        (req as RequestWithAuthError).userWithoutOrganization = signedInUser;
+      }
     } else if (error instanceof Error) {
       logger.error({ err: error }, "Authentication error");
 

@@ -93,7 +93,10 @@ async function enhanceWithOrgContext(baseAuthUser: AuthUser, req: Request): Prom
  * Main authentication middleware that tries all authentication methods
  * Returns AuthUser if authenticated, null otherwise
  */
-export async function authenticate(req: Request): Promise<AuthUser | null> {
+export async function authenticate(
+  req: Request,
+  options: { ignoreOrganization?: boolean } = {},
+): Promise<AuthUser | null> {
   const authHeader = req.headers.authorization;
 
   if (!authHeader) {
@@ -127,6 +130,8 @@ export async function authenticate(req: Request): Promise<AuthUser | null> {
     if (!baseAuthUser) {
       return null;
     }
+
+    if (options.ignoreOrganization) return baseAuthUser;
 
     // Enhance with organization context if organizationId header is present
     return await enhanceWithOrgContext(baseAuthUser, req);

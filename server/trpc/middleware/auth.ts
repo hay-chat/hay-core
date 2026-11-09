@@ -17,6 +17,7 @@ const logger = createLogger("trpc-auth");
 interface RequestWithAuthError extends Request {
   authError?: string;
   authDenied?: TRPCError;
+  userWithoutOrganization?: AuthUser | null;
 }
 
 /** Report what `createContext` caught, so the caller gets the real reason. */
@@ -119,6 +120,14 @@ const hasScope = (resource: string, action: string) => {
  * Used for endpoints that need to work before organization context is established
  */
 export const isAuthedWithoutOrg = t.middleware<{ ctx: Context }>(({ ctx, next }) => {
+  // A stale organization header must not lock someone out of what needs no
+  // organization: auth.me is how the dashboard learns which ones they still have.
+  // @ts-ignore - Express type definition mismatch between root and server node_modules
+  const { userWithoutOrganization } = ctx.req as RequestWithAuthError;
+  if (userWithoutOrganization) {
+    return next({ ctx: { ...ctx, user: userWithoutOrganization, organizationId: null } });
+  }
+
   throwStoredAuthFailure(ctx);
 
   if (!ctx.user) {
