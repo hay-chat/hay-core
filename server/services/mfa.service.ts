@@ -7,6 +7,7 @@ import { UserWebauthnCredential } from "@server/database/entities/user-webauthn-
 import type { Organization } from "@server/entities/organization.entity";
 import { UserOrganization } from "@server/entities/user-organization.entity";
 import type { AuthUser } from "@server/lib/auth/AuthUser";
+import { organizationEnforcesSso } from "@server/lib/auth/sso/enforcement";
 import { decryptValue, encryptValue } from "@server/lib/auth/utils/encryption";
 import {
   base32Encode,
@@ -45,6 +46,21 @@ export function organizationRequiresMfa(
   organization: Pick<Organization, "settings"> | undefined | null,
 ): boolean {
   return organization?.settings?.mfaRequired === true;
+}
+
+/**
+ * Where the organization enforces single sign-on, its identity provider is
+ * trusted to ask for the second factor, so a session it started needs no
+ * Hay-side enrolment. Password (break-glass) sessions and organizations that do
+ * not enforce SSO are unchanged.
+ */
+function ssoCoversMfa(user: AuthUser): boolean {
+  const organization = user.userOrganization?.organization;
+  return (
+    !!user.ssoOrganizationId &&
+    user.ssoOrganizationId === user.userOrganization?.organizationId &&
+    organizationEnforcesSso(organization)
+  );
 }
 
 function mfaError(code: "FORBIDDEN" | "BAD_REQUEST", message: string, type: string): TRPCError {
@@ -128,16 +144,30 @@ export class MfaService {
   }
 
   /** Whether one of the user's organizations requires MFA and the user has not enrolled. */
-  async enrolmentRequired(userId: string): Promise<boolean> {
-    return (await this.requiredByOrganization(userId)) && !(await this.hasSecondFactor(userId));
+  async enrolmentRequired(userId: string, ssoOrganizationId?: string): Promise<boolean> {
+    return (
+      (await this.requiredByOrganization(userId, ssoOrganizationId)) &&
+      !(await this.hasSecondFactor(userId))
+    );
   }
 
-  private async requiredByOrganization(userId: string): Promise<boolean> {
+  /** `ssoOrganizationId`: the session came from that organization's provider (see ssoCoversMfa). */
+  private async requiredByOrganization(
+    userId: string,
+    ssoOrganizationId?: string,
+  ): Promise<boolean> {
     const memberships = await AppDataSource.getRepository(UserOrganization).find({
       where: { userId, isActive: true },
       relations: ["organization"],
     });
-    return memberships.some((membership) => organizationRequiresMfa(membership.organization));
+    return memberships.some(
+      (membership) =>
+        organizationRequiresMfa(membership.organization) &&
+        !(
+          ssoOrganizationId === membership.organizationId &&
+          organizationEnforcesSso(membership.organization)
+        ),
+    );
   }
 
   /** Refuses to take away the last factor of someone whose organization requires one. */
@@ -385,7 +415,7 @@ export class MfaService {
 
     const { row, totp, webauthn } = await this.factors(user.id);
     if (!totp && webauthn === 0) {
-      if (organizationRequiresMfa(user.userOrganization?.organization)) {
+      if (organizationRequiresMfa(user.userOrganization?.organization) && !ssoCoversMfa(user)) {
         throw mfaError(
           "FORBIDDEN",
           "This organization requires two-factor authentication",
@@ -413,6 +443,7 @@ export class MfaService {
   async assertEnrolledIfRequired(user: AuthUser): Promise<void> {
     if (user.authMethod !== "jwt") return;
     if (!organizationRequiresMfa(user.userOrganization?.organization)) return;
+    if (ssoCoversMfa(user)) return;
     if (await this.hasSecondFactor(user.id)) return;
     throw mfaError(
       "FORBIDDEN",

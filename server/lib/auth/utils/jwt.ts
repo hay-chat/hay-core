@@ -14,6 +14,7 @@ export const ACCESS_TOKEN_TTL_SECONDS = parseExpiresIn(authConfig.jwt.expiresIn)
 export function generateAccessToken(
   user: Pick<User, "id" | "email" | "tokenVersion">,
   sessionId: string,
+  ssoOrganizationId?: string,
 ): string {
   const payload: JWTPayload = {
     userId: user.id,
@@ -21,6 +22,7 @@ export function generateAccessToken(
     type: "access",
     tokenVersion: user.tokenVersion ?? 0,
     sid: sessionId,
+    ...(ssoOrganizationId ? { sso: ssoOrganizationId } : {}),
   };
 
   return jwt.sign(payload, authConfig.jwt.secret, {
@@ -86,9 +88,18 @@ function mfaChallengeKey(): string {
   return crypto.createHmac("sha256", authConfig.jwt.secret).update("mfa-challenge").digest("hex");
 }
 
-export function generateMfaChallengeToken(user: Pick<User, "id" | "tokenVersion">): string {
+/** `ssoOrganizationId`: the first step was a sign-in through that organization's provider. */
+export function generateMfaChallengeToken(
+  user: Pick<User, "id" | "tokenVersion">,
+  ssoOrganizationId?: string,
+): string {
   return jwt.sign(
-    { userId: user.id, tokenVersion: user.tokenVersion ?? 0, type: "mfa-challenge" },
+    {
+      userId: user.id,
+      tokenVersion: user.tokenVersion ?? 0,
+      type: "mfa-challenge",
+      ...(ssoOrganizationId ? { sso: ssoOrganizationId } : {}),
+    },
     mfaChallengeKey(),
     { expiresIn: MFA_CHALLENGE_TTL_SECONDS, algorithm: "HS256" },
   );
@@ -97,11 +108,12 @@ export function generateMfaChallengeToken(user: Pick<User, "id" | "tokenVersion"
 /** The challenge's claims, or null when it is invalid or expired. */
 export function verifyMfaChallengeToken(
   token: string,
-): { userId: string; tokenVersion: number } | null {
+): { userId: string; tokenVersion: number; sso?: string } | null {
   try {
     const decoded = jwt.verify(token, mfaChallengeKey(), { algorithms: ["HS256"] }) as {
       userId: string;
       tokenVersion: number;
+      sso?: string;
       type: string;
     };
     return decoded.type === "mfa-challenge" ? decoded : null;
