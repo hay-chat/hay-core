@@ -76,22 +76,31 @@ export class MfaService {
   }
 
   /**
-   * What the person has enrolled. Migrations run after deploy: until the
-   * tables exist nobody can have enrolled, and login has to keep working.
+   * What the person has enrolled. Migrations run after deploy: until a table
+   * exists nobody can have enrolled in it, and login has to keep working. Each
+   * table is read on its own, so a missing one never hides the other's factor.
    */
   async factors(userId: string): Promise<{ row: UserMfa | null; totp: boolean; webauthn: number }> {
+    const row = await this.unlessTableMissing(
+      () => this.repository.findOne({ where: { userId } }),
+      null,
+    );
+    const webauthn = await this.unlessTableMissing(
+      () => AppDataSource.getRepository(UserWebauthnCredential).count({ where: { userId } }),
+      0,
+    );
+    return { row, totp: !!row?.confirmedAt && !!row.secret, webauthn };
+  }
+
+  private async unlessTableMissing<T>(query: () => Promise<T>, fallback: T): Promise<T> {
     try {
-      const row = await this.repository.findOne({ where: { userId } });
-      const webauthn = await AppDataSource.getRepository(UserWebauthnCredential).count({
-        where: { userId },
-      });
-      return { row, totp: !!row?.confirmedAt && !!row.secret, webauthn };
+      return await query();
     } catch (error) {
       const driverCode =
         error instanceof QueryFailedError
           ? (error.driverError as { code?: string } | undefined)?.code
           : undefined;
-      if (driverCode === POSTGRES_UNDEFINED_TABLE) return { row: null, totp: false, webauthn: 0 };
+      if (driverCode === POSTGRES_UNDEFINED_TABLE) return fallback;
       throw error;
     }
   }

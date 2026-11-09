@@ -27,7 +27,7 @@ export const mfaRouter = t.router({
     return mfaService.status(requireSessionUser(ctx).id);
   }),
 
-  /** Needs the password as well as the session. */
+  /** Needs the password as well as the session, and a step-up when a security key is active. */
   beginEnrolment: protectedProcedureWithoutOrg
     .use(rateLimitMiddleware(PASSWORD_CHECK_RATE_LIMIT))
     .input(z.object({ password: z.string().min(1).max(128) }))
@@ -39,6 +39,9 @@ export const mfaRouter = t.router({
       if (!user || !(await verifyPassword(input.password, user.password))) {
         throw new TRPCError({ code: "BAD_REQUEST", message: "Password is incorrect" });
       }
+      // A confirmed authenticator app is refused by beginEnrolment itself.
+      const { totp, webauthn } = await mfaService.factors(sessionUser.id);
+      if (!totp && webauthn > 0) await mfaService.assertStepUp(sessionUser);
       return mfaService.beginEnrolment(user);
     }),
 

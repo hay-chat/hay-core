@@ -560,6 +560,7 @@ describe("security keys and passkeys", () => {
 
     it("allows removing a key while an authenticator app remains, but not then the app", async () => {
       const { credential } = await enrolKey(owner, authenticator);
+      await stepUpWithKey(owner.id, authenticator);
       const caller = authRouter.createCaller(await jwtCtx(owner.id));
       const { secret } = await caller.mfa.beginEnrolment({ password: PASSWORD });
       const step = totpStepAt(Date.now());
@@ -584,6 +585,7 @@ describe("security keys and passkeys", () => {
 
     it("turning the app off leaves the keys working", async () => {
       await enrolKey(owner, authenticator);
+      await stepUpWithKey(owner.id, authenticator);
       const caller = authRouter.createCaller(await jwtCtx(owner.id));
       const { secret } = await caller.mfa.beginEnrolment({ password: PASSWORD });
       const step = totpStepAt(Date.now());
@@ -596,6 +598,50 @@ describe("security keys and passkeys", () => {
         webauthnCount: 1,
       });
       expect(await login()).toMatchObject({ methods: { totp: false, webauthn: true } });
+    });
+  });
+
+  describe("adding an authenticator app", () => {
+    it("needs a step-up when a security key is already active", async () => {
+      await enrolKey(owner, authenticator);
+      const caller = authRouter.createCaller(await jwtCtx(owner.id));
+      await expect(caller.mfa.beginEnrolment({ password: PASSWORD })).rejects.toMatchObject({
+        code: "FORBIDDEN",
+        cause: expect.objectContaining({ type: "MFA_STEP_UP_REQUIRED" }),
+      });
+
+      await stepUpWithKey(owner.id, authenticator);
+      await expect(caller.mfa.beginEnrolment({ password: PASSWORD })).resolves.toHaveProperty(
+        "secret",
+      );
+    });
+
+    it("needs only the password as the first factor", async () => {
+      const caller = authRouter.createCaller(await jwtCtx(owner.id));
+      await expect(caller.mfa.beginEnrolment({ password: PASSWORD })).resolves.toHaveProperty(
+        "secret",
+      );
+    });
+  });
+
+  describe("before the security key migration has run", () => {
+    const table = "user_webauthn_credentials";
+    const hidden = "user_webauthn_credentials_hidden";
+
+    it("still asks for the authenticator app at sign-in", async () => {
+      const caller = authRouter.createCaller(await jwtCtx(owner.id));
+      const { secret } = await caller.mfa.beginEnrolment({ password: PASSWORD });
+      await caller.mfa.confirmEnrolment({
+        code: totpCode(base32Decode(secret), totpStepAt(Date.now())),
+      });
+
+      await AppDataSource.query(`ALTER TABLE "${table}" RENAME TO "${hidden}"`);
+      try {
+        expect(await mfaService.factors(owner.id)).toMatchObject({ totp: true, webauthn: 0 });
+        expect(await login()).toMatchObject({ methods: { totp: true, webauthn: false } });
+      } finally {
+        await AppDataSource.query(`ALTER TABLE "${hidden}" RENAME TO "${table}"`);
+      }
     });
   });
 });
