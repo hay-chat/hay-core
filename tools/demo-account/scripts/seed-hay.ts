@@ -87,7 +87,7 @@ function parseQuickCheck(value: string | undefined): boolean | undefined {
 }
 
 /** An API client for one org: env API key / base URL in memory, else the hay CLI's session. */
-function buildApi(
+export function buildApi(
   args: ParsedArgs,
   organizationId: string | undefined,
 ): { api: HayApi; org: string | undefined } {

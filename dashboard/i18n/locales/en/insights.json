@@ -29,7 +29,7 @@
       },
       "list": {
         "title": "Feedback History",
-        "count": "{count} feedback entries",
+        "count": "{count} feedback entry | {count} feedback entries",
         "loading": "Loading feedback...",
         "empty": "No feedback matches these filters",
         "reviewer": "Rated by {email}",
@@ -96,7 +96,7 @@
         "docs_audit": "Docs audit"
       },
       "list": {
-        "count": "{count} insights",
+        "count": "{count} insight | {count} insights",
         "empty": "No insights match these filters",
         "emptyDescription": "Insights appear after the nightly analysis once a pattern shows up in at least {min} conversations. Positive patterns show up here too.",
         "periodSize": "{count} in this period",
