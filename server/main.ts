@@ -11,6 +11,7 @@ import { createContext } from "@server/trpc/context";
 import { AppDataSource, initializeDatabase } from "@server/database/data-source";
 import { createLogger } from "@server/lib/logger";
 import { initTelemetry, captureException, shutdownTelemetry } from "@server/lib/telemetry";
+import { initTracing, shutdownTracing } from "@server/lib/tracing";
 import { requestContext } from "@server/lib/request-context";
 import { startMetricsServer } from "@server/lib/metrics-server";
 import { isPublicUploadPath, setPublicUploadHeaders } from "@server/services/media-url.service";
@@ -60,6 +61,9 @@ async function startServer() {
 
   // No-op unless POSTHOG_KEY is set.
   initTelemetry();
+
+  // No-op unless OTEL_EXPORTER_OTLP_ENDPOINT is set; loads no tracing code otherwise.
+  await initTracing();
 
   // Initialize database connection (required - will retry 3 times with 2s delay)
   await initializeDatabase();
@@ -666,6 +670,7 @@ async function startServer() {
     await step("database", () =>
       AppDataSource.isInitialized ? AppDataSource.destroy() : undefined,
     );
+    await step("tracing", () => shutdownTracing());
     await step("telemetry", () => shutdownTelemetry());
     process.exit(0);
   };

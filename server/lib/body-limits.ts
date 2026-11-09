@@ -64,6 +64,8 @@ export function isPublicWidgetPath(path: string): boolean {
     .split(",")
     .every(
       (procedure) =>
-        procedure.startsWith("publicConversations.") || procedure === "webchat.getPublicConfig",
+        procedure.startsWith("publicConversations.") ||
+        procedure === "webchat.getPublicConfig" ||
+        procedure === "webchat.getAvailability",
     );
 }

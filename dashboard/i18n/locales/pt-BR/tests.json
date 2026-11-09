@@ -152,8 +152,8 @@
     },
     "readiness": {
       "title": "Prontidão para o lançamento",
-      "description": "Como sua equipe revisou as respostas deste agente enquanto a Aprovação obrigatória estava ativa. A Aprovação obrigatória segura apenas as respostas da IA; ações que alteram dados da loja seguem as aprovações de ações.",
-      "approvalOff": "A Aprovação obrigatória está desativada para este agente, então as respostas são enviadas sem revisão.",
+      "description": "Como sua equipe revisou as respostas do assistente enquanto \"Exigir aprovação para mensagens de IA por padrão\" estava ativo em Configurações > Geral. Essa configuração segura apenas as respostas do assistente; ações que alteram dados da loja seguem as aprovações de ações.",
+      "approvalOff": "\"Exigir aprovação para mensagens de IA por padrão\" está desativado em Configurações > Geral, então as respostas do assistente são enviadas sem revisão.",
       "week": "Semana de {date}",
       "approved": "Aprovadas como escritas",
       "edited": "Editadas antes do envio",
@@ -163,9 +163,9 @@
       "waiting": "{count} respostas aguardando revisão.",
       "hints": {
         "approval_off": "Nada a decidir: as respostas já são enviadas automaticamente.",
-        "not_enough_reviews": "Continue revisando. Com pelo menos {min} respostas revisadas em {days} dias você verá se é seguro enviar automaticamente.",
+        "not_enough_reviews": "Continue revisando. Com pelo menos {min} respostas revisadas em {days} dias você verá se é seguro enviar respostas sem aprovação.",
         "too_many_changes": "Sua equipe ainda altera mais de 1 em cada 20 respostas. Melhore os playbooks ou o conhecimento a partir das respostas editadas primeiro.",
-        "ready": "Sua equipe alterou menos de 1 em cada 20 respostas nos últimos {days} dias. Pode ser seguro mudar este agente para Envio automático. As ações continuam seguindo as aprovações de ações."
+        "ready": "Sua equipe alterou menos de 1 em cada 20 respostas nos últimos {days} dias. Pode ser seguro desativar \"Exigir aprovação para mensagens de IA por padrão\" em Configurações > Geral. As ações continuam seguindo as aprovações de ações."
       }
     },
     "insight": {

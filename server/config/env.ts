@@ -85,6 +85,17 @@ export const config = {
     token: process.env.METRICS_TOKEN || "",
   },
 
+  // Trace export over OTLP/HTTP to a collector. Off unless an endpoint is set.
+  // Request headers for the collector come from OTEL_EXPORTER_OTLP_HEADERS.
+  otel: {
+    endpoint: process.env.OTEL_EXPORTER_OTLP_ENDPOINT || "",
+    sampleRatio: Math.min(
+      1,
+      Math.max(0, Number.parseFloat(process.env.OTEL_TRACES_SAMPLE_RATIO || "0.05") || 0),
+    ),
+    serviceName: process.env.OTEL_SERVICE_NAME || "hay-server",
+  },
+
   cors: {
     origin:
       process.env.CORS_ORIGIN?.split(",") ||

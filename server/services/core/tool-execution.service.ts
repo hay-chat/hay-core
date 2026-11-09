@@ -1,3 +1,4 @@
+import { withSpan } from "@server/lib/tracing";
 import { Conversation } from "@server/database/entities/conversation.entity";
 import { ConversationRepository } from "@server/repositories/conversation.repository";
 import type { ConversationContext } from "@server/orchestrator/types";
@@ -941,9 +942,17 @@ export class ToolExecutionService {
       const client = await MCPClientFactory.createClient(organizationId, pluginId);
 
       // Call the tool
-      const result = await client.callTool(toolName, toolArgs, {
-        [CUSTOMER_IDENTITY_META_KEY]: identity,
-      });
+      const result = await withSpan(
+        "plugin tool call",
+        { "hay.plugin_id": pluginId, "hay.tool": toolName },
+        (span) =>
+          client
+            .callTool(toolName, toolArgs, { [CUSTOMER_IDENTITY_META_KEY]: identity })
+            .then((callResult) => {
+              span.setAttributes({ "hay.tool_error": Boolean(callResult.isError) });
+              return callResult;
+            }),
+      );
 
       logger.debug(
         { pluginId, toolName, isError: Boolean(result.isError), resultSize: jsonSize(result) },
