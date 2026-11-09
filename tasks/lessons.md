@@ -378,3 +378,9 @@
 - **Failure:** the stream of worker events used undici's default 5-minute body timeout, so core treated an idle worker as exited.
 - **Signal:** a healthy process reported as stopped after exactly the client's default timeout, with no output before it.
 - **Rule:** when a request stays open for a process lifetime, set its body and headers timeouts explicitly and test it idle past the default.
+
+## Check the UI gate before saying a capability exists (2026-11-09)
+
+- **Failure:** told Roger that setup answers were editable in Knowledge, when the Edit action only appears for documents with `importMethod === "editor"` and those answers were not.
+- **Signal:** the Edit gate in `dashboard/pages/documents/[id].vue` did not match what had been claimed.
+- **Rule:** before saying a user can do something in the product, read the condition that shows the control and check the real data meets it.
