@@ -108,6 +108,7 @@ export interface MessageAttachment {
 }
 
 @Entity("messages")
+@Index("idx_messages_conversation_created", ["conversation_id", "created_at"])
 export class Message {
   @PrimaryGeneratedColumn("uuid")
   id!: string;
