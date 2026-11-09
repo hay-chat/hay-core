@@ -419,7 +419,6 @@ const response = await Hay.conversations.create();
    - `auth.ts` - Authentication state and tokens
    - `user.ts` - User profile and organization
    - `app.ts` - Application-level state
-   - `analytics.ts` - Analytics data
    - `organization.ts` - Organization settings
 
 4. **Components**: Auto-imported from `/components` subdirectories
