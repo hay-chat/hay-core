@@ -96,7 +96,7 @@
         "docs_audit": "Auditoria da documentação"
       },
       "list": {
-        "count": "{count} insights",
+        "count": "{count} insight | {count} insights",
         "empty": "Nenhum insight com esses filtros",
         "emptyDescription": "Os insights aparecem depois da análise noturna, quando um padrão surge em pelo menos {min} conversas. Padrões positivos também aparecem aqui.",
         "periodSize": "{count} neste período",
