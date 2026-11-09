@@ -5,6 +5,7 @@ import { AppDataSource } from "../database/data-source";
 import { BaseRepository, assertSafeIdentifier } from "./base.repository";
 import type { ListParams } from "../trpc/middleware/pagination";
 import { createLogger } from "@server/lib/logger";
+import { escapeLike } from "@server/lib/sql-like";
 
 const logger = createLogger("customer-repo");
 
@@ -258,11 +259,12 @@ export class CustomerRepository extends BaseRepository<Customer> {
       .join(" OR ");
 
     if (searchConditions) {
+      const searchPattern = `%${escapeLike(search.query)}%`;
       queryBuilder.andWhere(
         `(${searchConditions})`,
         searchFields.reduce(
           (params, _, index) => {
-            params[`searchQuery${index}`] = `%${search.query}%`;
+            params[`searchQuery${index}`] = searchPattern;
             return params;
           },
           {} as Record<string, unknown>,

@@ -1,6 +1,7 @@
 import { Document } from "../entities/document.entity";
 import { BaseRepository, assertSafeIdentifier } from "./base.repository";
 import { SelectQueryBuilder } from "typeorm";
+import { escapeLike } from "@server/lib/sql-like";
 
 export class DocumentRepository extends BaseRepository<Document> {
   constructor() {
@@ -64,11 +65,12 @@ export class DocumentRepository extends BaseRepository<Document> {
       .join(" OR ");
 
     if (searchConditions) {
+      const searchPattern = `%${escapeLike(search.query)}%`;
       queryBuilder.andWhere(
         `(${searchConditions})`,
         searchFields.reduce(
           (params, _, index) => {
-            params[`searchQuery${index}`] = `%${search.query}%`;
+            params[`searchQuery${index}`] = searchPattern;
             return params;
           },
           {} as Record<string, string>,

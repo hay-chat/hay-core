@@ -12,6 +12,7 @@ import { createLogger } from "@server/lib/logger";
 import { AGENT_SYSTEM_EVENTS } from "@server/services/webchat/public-message";
 import { notPlaygroundSql } from "../services/core/dry-run";
 import { notSimulationSql } from "../services/simulation/simulation-kind";
+import { escapeLike } from "@server/lib/sql-like";
 
 const LOCK_DURATION_MS = 15_000;
 
@@ -458,11 +459,12 @@ export class ConversationRepository extends BaseRepository<Conversation> {
       .join(" OR ");
 
     if (searchConditions) {
+      const searchPattern = `%${escapeLike(search.query)}%`;
       queryBuilder.andWhere(
         `(${searchConditions})`,
         searchFields.reduce(
           (params, _, index) => {
-            params[`searchQuery${index}`] = `%${search.query}%`;
+            params[`searchQuery${index}`] = searchPattern;
             return params;
           },
           {} as Record<string, string>,

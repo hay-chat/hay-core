@@ -44,6 +44,7 @@ import {
   KnowledgeSuggestionService,
 } from "@server/services/knowledge-suggestion.service";
 import { TRPCError } from "@trpc/server";
+import { escapeLike } from "@server/lib/sql-like";
 
 const logger = createLogger("documents");
 
@@ -145,7 +146,7 @@ export const documentsRouter = t.router({
               CASE WHEN title ILIKE $3 THEN 0 ELSE 1 END
             LIMIT $4
           `;
-          const escapedQuery = query.replace(/%/g, "\\%").replace(/_/g, "\\_");
+          const escapedQuery = escapeLike(query);
           return AppDataSource.query(keywordQuery, [
             organizationId,
             escapedQuery, // exact title match
