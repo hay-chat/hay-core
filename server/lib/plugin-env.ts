@@ -29,6 +29,7 @@ const CORE_RESERVED_ENV_PATTERNS = [
   /^STRIPE_SECRET_KEY$/i,
   /^STRIPE_WEBHOOK_SECRET$/i,
   /^RESEND_EVENTS_WEBHOOK_SECRET$/i,
+  /^OTEL_/i, // Collector endpoint and credentials
   /^HAY_/i, // Prevent plugins from overriding SDK internals
 ];
 
