@@ -1,5 +1,7 @@
 import { ConversationRepository } from "@server/repositories/conversation.repository";
 import { Conversation } from "@server/database/entities/conversation.entity";
+import { metrics } from "@server/lib/metrics";
+import { withSpan } from "@server/lib/tracing";
 import { config } from "@server/config/env";
 import { runApprovalFollowUp, runConversation } from "./run";
 import {
@@ -51,9 +53,14 @@ export class Orchestrator {
   }
 
   async processConversation(conversationId: string) {
+    const startedAt = Date.now();
     try {
-      await runConversation(conversationId);
+      await withSpan("orchestrator turn", { "hay.layer": "turn" }, () =>
+        runConversation(conversationId),
+      );
+      metrics.replyTurnSeconds.observe({ outcome: "ok" }, (Date.now() - startedAt) / 1000);
     } catch (error) {
+      metrics.replyTurnSeconds.observe({ outcome: "error" }, (Date.now() - startedAt) / 1000);
       logger.error({ err: error, conversationId }, "Error processing conversation");
       throw error;
     }
