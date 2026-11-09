@@ -36,6 +36,7 @@ import { NO_RECIPIENT_ERROR, organizationAdminEmails } from "./provider-privacy.
 import { storageService } from "@server/services/storage.service";
 import { deleteConversationMedia } from "@server/services/conversation-media.service";
 import { anonymizeConversations } from "@server/services/conversation-anonymizer";
+import { recordErasure } from "@server/services/erasure-ledger";
 import { isUuid } from "@server/services/media-url.service";
 import { fetchPublicFile } from "@server/utils/fetch-public-file";
 
@@ -57,6 +58,17 @@ const MAX_EXPORT_BYTES = 1024 * 1024 * 1024;
 const MAX_ATTACHMENT_BYTES = 512 * 1024 * 1024;
 const REMOTE_ATTACHMENT_FETCH = { maxBytes: 25 * 1024 * 1024, timeoutMs: 15_000 };
 const DAY_MS = 24 * 60 * 60 * 1000;
+
+/** An email or phone shorter than this would match unrelated text. */
+const MIN_IDENTITY_NEEDLE_LENGTH = 7;
+
+/** $2 holds lowercase needles; `text` is SQL built from fixed column names only. */
+const TEXT_MATCHES = (text: string): string =>
+  `EXISTS (SELECT 1 FROM unnest($2::text[]) AS needle WHERE position(needle IN lower(${text})) > 0)`;
+
+/** $3 holds conversation and message ids; a replay ref is `conversation:<id>:<turn>`. */
+const SOURCE_REF_MATCHES = `(source_ref = ANY($3::text[])
+  OR substring(source_ref from '^conversation:([0-9a-f-]{36}):') = ANY($3::text[]))`;
 
 const CANCELLABLE_STATUSES = ["pending_verification", "verified", "processing"];
 
@@ -430,7 +442,6 @@ export class PrivacyService {
     jobId?: string;
     jobStatus?: string;
     downloadAvailable: boolean;
-    errorMessage?: string;
   }> {
     const requestRepository = AppDataSource.getRepository(PrivacyRequest);
     const request = await requestRepository.findOne({
@@ -451,7 +462,6 @@ export class PrivacyService {
       jobId: request.jobId,
       jobStatus: request.job?.status,
       downloadAvailable: this.isDownloadAvailable(request),
-      errorMessage: request.errorMessage,
     };
   }
 
@@ -809,6 +819,7 @@ export class PrivacyService {
       // Access tokens already issued stop working.
       user.tokenVersion = (user.tokenVersion ?? 0) + 1;
       await userRepository.save(user);
+      await recordErasure(manager, { subjectType: "user", subjectId: userId });
 
       logger.debug({ userId }, "User data deleted");
     });
@@ -1119,6 +1130,14 @@ export class PrivacyService {
     return { requestId: request.id, expiresAt };
   }
 
+  /** Erase a staff user outside a request, when an erasure is replayed after a restore. */
+  async eraseUser(userId: string): Promise<void> {
+    const user = await AppDataSource.getRepository(User).findOneOrFail({ where: { id: userId } });
+    const email = user.email;
+    await this.executeDataDeletion(userId);
+    await this.anonymizeRequests(AppDataSource.manager, { userId, email });
+  }
+
   /**
    * Erase a customer from the dashboard (Customers → Delete): the same erasure
    * a verified customer deletion request runs. Returns false when the customer
@@ -1293,6 +1312,12 @@ export class PrivacyService {
       // Continue without embeddings - they might not exist
     }
 
+    const linkedRecords = await this.collectLinkedCustomerRecords(
+      organizationId,
+      conversationIds,
+      customer,
+    );
+
     return {
       exportDate: new Date().toISOString(),
       exportVersion: "2.0",
@@ -1312,6 +1337,7 @@ export class PrivacyService {
           updatedAt: customer.updated_at,
         },
         conversations: conversationsWithMessages,
+        ...linkedRecords,
         embeddings: embeddings.map((e) => ({
           id: e.id,
           content: e.content,
@@ -1707,6 +1733,7 @@ please contact ${supportContact}.
         throw new Error("Customer not found");
       }
 
+      await this.eraseTestData(manager, organizationId, conversationIds, customer);
       await anonymizeConversations(manager, organizationId, conversationIds, {
         title: "[deleted]",
         deleteInsightIssues: true,
@@ -1714,12 +1741,171 @@ please contact ${supportContact}.
 
       // Merge dismissals cascade with the customer row.
       await customerRepository.delete({ id: customerId, organization_id: organizationId });
+      await recordErasure(manager, {
+        subjectType: "customer",
+        subjectId: customerId,
+        organizationId,
+      });
 
       logger.debug(
         { customerId, organizationId, conversationsAffected: conversationIds.length },
         "Customer data deleted",
       );
     });
+  }
+
+  /**
+   * Simulation data has no customer link: transcripts, test cases and run seeds
+   * are found by the conversations and messages they came from, and by the
+   * customer's email or phone appearing in their text.
+   */
+  private async eraseTestData(
+    manager: EntityManager,
+    organizationId: string,
+    conversationIds: string[],
+    customer: Customer,
+  ): Promise<void> {
+    const { sourceRefs, needles } = await this.testDataMatchers(manager, conversationIds, customer);
+    const params = [organizationId, needles];
+
+    await manager.query(
+      `DELETE FROM test_transcripts
+       WHERE organization_id = $1 AND ${TEXT_MATCHES("turns::text || COALESCE(title, '')")}`,
+      params,
+    );
+    await manager.query(
+      `DELETE FROM test_cases
+       WHERE organization_id = $1
+         AND (${SOURCE_REF_MATCHES} OR ${TEXT_MATCHES("seed::text || title || expectations::text")})`,
+      [...params, sourceRefs],
+    );
+    // Run items stay for the run's totals; one not finished yet can't run without its seed.
+    await manager.query(
+      `UPDATE simulation_run_items
+       SET seed = '[]'::jsonb, expectations = NULL, verdict = NULL, source_ref = NULL, error = NULL,
+           status = CASE WHEN status IN ('pending', 'running') THEN 'failed' ELSE status END,
+           updated_at = now()
+       WHERE organization_id = $1
+         AND (conversation_id = ANY($4::uuid[]) OR ${SOURCE_REF_MATCHES} OR ${TEXT_MATCHES("seed::text")})`,
+      [...params, sourceRefs, conversationIds],
+    );
+  }
+
+  private async testDataMatchers(
+    manager: EntityManager,
+    conversationIds: string[],
+    customer: Customer,
+  ): Promise<{ sourceRefs: string[]; needles: string[] }> {
+    const messages: Array<{ id: string }> = await manager.query(
+      `SELECT id FROM messages WHERE conversation_id = ANY($1::uuid[])`,
+      [conversationIds],
+    );
+    return {
+      sourceRefs: [...conversationIds, ...messages.map((message) => message.id)],
+      needles: [customer.email, customer.phone]
+        .filter((value): value is string => !!value && value.length >= MIN_IDENTITY_NEEDLE_LENGTH)
+        .map((value) => value.toLowerCase()),
+    };
+  }
+
+  /** Records outside the conversation itself that quote or concern the customer. */
+  private async collectLinkedCustomerRecords(
+    organizationId: string,
+    conversationIds: string[],
+    customer: Customer,
+  ): Promise<Record<string, unknown[]>> {
+    const { sourceRefs, needles } = await this.testDataMatchers(
+      AppDataSource.manager,
+      conversationIds,
+      customer,
+    );
+    const query = (sql: string, params: unknown[]): Promise<unknown[]> =>
+      AppDataSource.query(sql, params);
+    const inConversations = [organizationId, conversationIds];
+    const matchers = [organizationId, needles, sourceRefs];
+
+    // Who at the organization decided or answered is staff data and stays out.
+    const [
+      teamQuestions,
+      pendingActions,
+      actionLog,
+      disputes,
+      uploads,
+      consentRecords,
+      testTranscripts,
+      testCases,
+      simulationItems,
+    ] = await Promise.all([
+      query(
+        `SELECT question, customer_message AS "customerMessage", answer, status,
+                asked_at AS "askedAt", answered_at AS "answeredAt"
+         FROM team_questions WHERE organization_id = $1 AND conversation_id = ANY($2::uuid[])`,
+        inConversations,
+      ),
+      query(
+        `SELECT tool_name AS "toolName", category, args, status, created_at AS "createdAt"
+         FROM pending_actions WHERE organization_id = $1 AND conversation_id = ANY($2::uuid[])`,
+        inConversations,
+      ),
+      query(
+        `SELECT tool_name AS "toolName", category, args, outcome, created_at AS "createdAt"
+         FROM action_log WHERE organization_id = $1 AND conversation_id = ANY($2::uuid[])`,
+        inConversations,
+      ),
+      query(
+        `SELECT d.status, d.amount, d.currency, d.reason, d.order_label AS "orderLabel",
+                d.initiated_at AS "initiatedAt"
+         FROM disputes d
+         WHERE d.organization_id = $1 AND d.order_key IN (
+           SELECT l.order_key FROM order_conversation_links l
+           WHERE l.organization_id = $1 AND l.conversation_id = ANY($2::uuid[]))`,
+        inConversations,
+      ),
+      query(
+        `SELECT id, original_name AS "originalName", mime_type AS "mimeType", size,
+                created_at AS "createdAt"
+         FROM uploads WHERE organization_id = $1 AND customer_id = $2`,
+        [organizationId, customer.id],
+      ),
+      query(
+        `SELECT conversation_id AS "conversationId", action, mode, created_at AS "createdAt"
+         FROM webchat_consent_events
+         WHERE organization_id = $1 AND conversation_id = ANY($2::uuid[])`,
+        inConversations,
+      ),
+      query(
+        `SELECT source, title, turns, started_at AS "startedAt"
+         FROM test_transcripts
+         WHERE organization_id = $1 AND ${TEXT_MATCHES("turns::text || COALESCE(title, '')")}`,
+        [organizationId, needles],
+      ),
+      query(
+        `SELECT title, seed, created_at AS "createdAt"
+         FROM test_cases
+         WHERE organization_id = $1
+           AND (${SOURCE_REF_MATCHES} OR ${TEXT_MATCHES("seed::text || title || expectations::text")})`,
+        matchers,
+      ),
+      query(
+        `SELECT seed, created_at AS "createdAt"
+         FROM simulation_run_items
+         WHERE organization_id = $1
+           AND (conversation_id = ANY($4::uuid[]) OR ${SOURCE_REF_MATCHES} OR ${TEXT_MATCHES("seed::text")})`,
+        [...matchers, conversationIds],
+      ),
+    ]);
+
+    return {
+      teamQuestions,
+      pendingActions,
+      actionLog,
+      disputes,
+      uploads,
+      consentRecords,
+      testTranscripts,
+      testCases,
+      simulationItems,
+    };
   }
 
   /**

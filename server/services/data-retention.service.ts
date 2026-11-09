@@ -10,6 +10,8 @@ const logger = createLogger("data-retention");
 /** Rows handled per transaction, and transactions per organization per run. */
 const RETENTION_BATCH_SIZE = 200;
 const RETENTION_MAX_BATCHES = 100;
+/** Insight text outlives conversations by this factor (RETENTION.md gives the basis). */
+const INSIGHT_RETENTION_MULTIPLIER = 2;
 
 interface RetentionOrganization {
   id: string;
@@ -229,6 +231,46 @@ export class DataRetentionService {
       totals.mediaDeleted += mediaDeleted;
       return customerIds.length;
     });
+  }
+
+  /**
+   * Insight issues are redacted, but by regex and an instruction to the model,
+   * so they don't stay forever: gone at twice the organization's retention.
+   * Cluster text is copied from them, so clusters quiet that long lose theirs.
+   */
+  async expireInsightText(): Promise<{ issuesDeleted: number; clustersCleared: number }> {
+    const totals = { issuesDeleted: 0, clustersCleared: 0 };
+
+    for (const organization of await organizationsWithRetention()) {
+      const cutoff = cutoffFor(organization.retentionDays * INSIGHT_RETENTION_MULTIPLIER);
+      try {
+        for (let batch = 0; batch < RETENTION_MAX_BATCHES; batch++) {
+          const [, deleted] = (await AppDataSource.query(
+            `DELETE FROM insight_issues WHERE id IN (
+               SELECT i.id FROM insight_issues i
+               LEFT JOIN conversations c ON c.id = i.conversation_id
+               WHERE i.organization_id = $1 AND i.created_at < $2
+                 AND c.legal_hold IS NOT TRUE
+               LIMIT $3)`,
+            [organization.id, cutoff, RETENTION_BATCH_SIZE],
+          )) as [unknown, number];
+          totals.issuesDeleted += deleted;
+          if (deleted < RETENTION_BATCH_SIZE) break;
+        }
+        const [, cleared] = (await AppDataSource.query(
+          `UPDATE insight_clusters SET snippets = '[]'::jsonb, paraphrases = '[]'::jsonb
+           WHERE organization_id = $1 AND last_seen_at < $2
+             AND (snippets <> '[]'::jsonb OR paraphrases <> '[]'::jsonb)`,
+          [organization.id, cutoff],
+        )) as [unknown, number];
+        totals.clustersCleared += cleared;
+      } catch (error) {
+        await this.recordFailure(organization, "retention.cleanup", error);
+      }
+    }
+
+    logger.debug(totals, "Insight text expiry complete");
+    return totals;
   }
 
   /** Log a failed run for one organization; the others carry on. */

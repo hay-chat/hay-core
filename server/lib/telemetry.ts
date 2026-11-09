@@ -1,6 +1,7 @@
 import { PostHog } from "posthog-node";
 import { config } from "@server/config/env";
 import { createLogger } from "@server/lib/logger";
+import { redactString } from "@server/lib/logger/redaction";
 
 const logger = createLogger("telemetry");
 
@@ -47,6 +48,20 @@ export interface ExceptionContext {
 }
 
 /**
+ * An error safe to send to a third party: messages and stacks can quote input
+ * (an email in a database error, a token in a failed request).
+ */
+export function redactedError(error: unknown): Error {
+  if (!(error instanceof Error)) {
+    return new Error(typeof error === "string" ? redactString(error) : "Non-Error exception");
+  }
+  const redacted = new Error(redactString(error.message));
+  redacted.name = error.name;
+  redacted.stack = error.stack ? redactString(error.stack) : undefined;
+  return redacted;
+}
+
+/**
  * Report a server-side error to PostHog.
  *
  * Never throws and never blocks the caller: telemetry must not be able to turn a
@@ -59,7 +74,7 @@ export function captureException(error: unknown, context: ExceptionContext = {})
   }
 
   try {
-    client.captureException(error, context.userId ?? undefined, {
+    client.captureException(redactedError(error), context.userId ?? undefined, {
       ...context.properties,
       // Distinguishes backend issues from browser ones in the shared project.
       source: "server",

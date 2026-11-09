@@ -4,7 +4,12 @@
 import { createApp } from "vue";
 import Widget from "./Widget.vue";
 import { addContext } from "./composables/useWidgetContext";
-import { initConsent, grantConsent, revokeConsent } from "./composables/useConsent";
+import {
+  initConsent,
+  configureConsentRecording,
+  grantConsent,
+  revokeConsent,
+} from "./composables/useConsent";
 import { registerTool, unregisterTool, provideContext } from "./composables/usePageTools";
 import { highlight } from "./utils/agentActivity";
 import { loadTranslations } from "./i18n";
@@ -43,6 +48,7 @@ export async function mountChat(options: ChatMountOptions): Promise<ChatHandle> 
   // Initialize ePrivacy consent gate before any composable touches storage,
   // then apply what the host page asked for while the chat was loading.
   initConsent(config.consent);
+  configureConsentRecording(config.baseUrl, config.organizationId);
   options.hostCalls.forEach(replay);
   // From now on the host page talks to the chat directly.
   if (window.HayChat) Object.assign(window.HayChat, hostApi);

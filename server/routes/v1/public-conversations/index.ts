@@ -19,6 +19,7 @@ import { CustomerRepository } from "../../../repositories/customer.repository";
 import { OrganizationRepository } from "../../../repositories/organization.repository";
 import { createLogger } from "@server/lib/logger";
 import { webchatSettingsService } from "../../../services/webchat/webchat-settings.service";
+import { recordWebchatConsent } from "../../../services/webchat/consent-record.service";
 import { verifiedCustomerExternalId } from "../../../services/webchat/webchat-identity.service";
 import { toPublicAttachments, toPublicMessage } from "../../../services/webchat/public-message";
 import {
@@ -122,6 +123,13 @@ const submitCsatSchema = z.object({
   proof: z.string(), // DPoP proof
   method: z.string(),
   url: z.string(),
+});
+
+const recordConsentSchema = z.object({
+  organizationId: z.string().uuid(),
+  action: z.enum(["grant", "revoke"]),
+  mode: z.enum(["strict", "implicit"]),
+  conversationId: z.string().uuid().optional(),
 });
 
 // Schema for getting messages
@@ -742,6 +750,15 @@ export const publicConversationsRouter = t.router({
 
   // The shopper rates the support once the conversation has ended (requires
   // DPoP proof). One rating per conversation; a re-submit overwrites it.
+  /** The host page's consent decision, kept so it can be demonstrated later. */
+  recordConsent: publicProcedure.input(recordConsentSchema).mutation(async ({ input, ctx }) => {
+    if (await isPublicWidgetRateLimited([{ rule: "messagePerIp", id: clientIp(ctx.ipAddress) }])) {
+      throw tooManyRequests();
+    }
+    await recordWebchatConsent(input);
+    return { recorded: true };
+  }),
+
   submitCsat: publicProcedure.input(submitCsatSchema).mutation(async ({ input, ctx }) => {
     if (await isPublicWidgetRateLimited([{ rule: "messagePerIp", id: clientIp(ctx.ipAddress) }])) {
       throw tooManyRequests();

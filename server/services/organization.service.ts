@@ -6,6 +6,7 @@ import { vectorStoreService } from "./vector-store.service";
 import { createLogger } from "@server/lib/logger";
 import { AuditLog } from "@server/entities/audit-log.entity";
 import { queueOrganizationUploadsForPurge } from "./storage-purge.service";
+import { recordErasure } from "./erasure-ledger";
 
 const logger = createLogger("organization-service");
 
@@ -128,6 +129,12 @@ class OrganizationService {
          WHERE organization_id = $1`,
         [orgId],
       );
+
+      await recordErasure(manager, {
+        subjectType: "organization",
+        subjectId: orgId,
+        organizationId: orgId,
+      });
 
       // Delete organization logo from storage if exists
       if (organization.logoUploadId) {

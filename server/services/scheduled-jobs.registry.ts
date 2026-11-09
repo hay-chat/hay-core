@@ -474,6 +474,7 @@ const jobRegistry: CronJobConfig[] = [
       await dataRetentionService.anonymizeExpiredConversations();
       // Customers left with no live conversation, same retention setting.
       await dataRetentionService.sweepExpiredCustomers();
+      await dataRetentionService.expireInsightText();
       // Imported test transcripts (D7-8) follow the same retention setting.
       const { testTranscriptService } = await import("./test-transcript.service");
       await testTranscriptService.deleteExpired();
