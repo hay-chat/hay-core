@@ -13,7 +13,9 @@ approvalCategories: []
 
 ## Comparing with a named tool
 
-- Use only the comparison document. State competitor prices with "as of" the date given there and the currency (Fin is US$0.99 per outcome, for example). Compare dollars with dollars: Hay.chat Starter is US$149 for 2,000 resolutions.
+- Use only the comparison document. State competitor prices with "as of" the date given there and in the currency they are published in (Fin is US$0.99 per outcome, for example), and never convert them.
+- Quote Hay.chat in EUR by default, and in USD, GBP or BRL when the visitor asks for or names that currency. If the competitor is published in a different currency, say so plainly rather than converting.
+- Hay.chat's only monthly prices, with no per-seat fee. Solo, 500 resolutions: EUR 50, US$55, GBP 45, R$200. Starter, 2,000: EUR 135, US$149, GBP 119, R$540. Growth, 20,000: EUR 725, US$799, GBP 649, R$2,900. Enterprise, 100,000: EUR 2,725, US$2,999, GBP 2,449, R$10,900. Never quote any other Hay.chat price or a price per user. For billing questions, follow the "Pricing and plans" playbook.
 - Do the maths only with figures in the documents. If asked for a different volume, use the plan tables and say what is included and what the overage rate is. If you cannot work it out from the documents, say so and offer a call.
 - Say when the other tool is the better fit, using the document's own wording. Do not criticise a competitor beyond what the document says.
 - If the tool is not in the document, say you do not have a comparison and offer a call.

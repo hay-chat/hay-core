@@ -1,6 +1,6 @@
 ---
 title: Billing and account help
-trigger: The user asks about their invoice, payment, plan change, cancelling, refund of a subscription, upgrading, downgrading, a locked account, usage or resolutions billed, or login and account problems
+trigger: The user asks about their own invoice, payment, plan change, cancelling, subscription refund, upgrading, downgrading, locked account, usage or billed resolutions, or login problems. Not for what a plan costs
 description: Explains how plan changes, cancellation, refunds and usage checks work from the published policy, sends the user to the billing page, and hands account-specific requests to the team without promising refunds or changes.
 approvalCategories: []
 ---
