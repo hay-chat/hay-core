@@ -187,6 +187,27 @@ describe("GET /v1/media/:id", () => {
     expect(mockDownload).not.toHaveBeenCalled();
   });
 
+  it.each(["privacy-exports", "plugin-zips", "organization-exports", "documents-private"])(
+    "keeps %s out of direct staff access, even with full scope",
+    async (folder) => {
+      mockFindOne.mockResolvedValue(upload({ folder }));
+      mockRequireAuth.mockResolvedValue(staff());
+
+      const response = await fetch(`${baseUrl}/v1/media/${UPLOAD_ID}`, { headers: staffHeaders() });
+
+      expect(response.status).toBe(404);
+      expect(mockDownload).not.toHaveBeenCalled();
+    },
+  );
+
+  it("still serves those folders through a signed link", async () => {
+    mockFindOne.mockResolvedValue(upload({ folder: "organization-exports" }));
+
+    const response = await fetch(`${baseUrl}${signedPath()}`);
+
+    expect(response.status).toBe(200);
+  });
+
   it("answers 401 for an invalid session token", async () => {
     mockRequireAuth.mockRejectedValue(new TRPCError({ code: "UNAUTHORIZED", message: "bad" }));
 
