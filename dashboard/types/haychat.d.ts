@@ -30,6 +30,7 @@ declare global {
         theme?: string;
         showGreeting?: boolean;
         greetingMessage?: string;
+        context?: Record<string, unknown>;
       };
       addContext?: (key: string, value: unknown) => void;
       registerTool?: (tool: HayPageTool) => void;
