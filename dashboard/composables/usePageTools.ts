@@ -87,7 +87,7 @@ export function usePageTools() {
     {
       name: "navigate",
       description:
-        "Open a page of the Hay dashboard for the user. Paths: /dashboard, /inbox, /conversations, /customers, /documents, /playbooks, /tests, /actions, /evidence, /insights, /insights/feedback, /products, /integrations, /channels, /queue, /settings/<section>.",
+        "Open a page of the Hay dashboard for the user. Paths: /dashboard, /inbox, /conversations, /customers, /documents, /playbooks, /tests, /actions, /evidence, /insights, /insights/feedback, /products, /integrations, /channels, /settings/<section>.",
       inputSchema: {
         type: "object",
         properties: { path: { type: "string", description: "Dashboard path, e.g. /playbooks" } },
