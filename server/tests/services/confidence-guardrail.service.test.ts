@@ -99,6 +99,14 @@ describe("ConfidenceGuardrailService grounding", () => {
     expect(vars.retrievedDocuments).not.toContain(NO_DOCUMENTS_PLACEHOLDER);
   });
 
+  it("gives the fact check enough tokens to list every claim of a long reply", async () => {
+    invoke.mockResolvedValue(JSON.stringify({ claims: [], reasoning: "ok", score: 1 }));
+
+    await service.assessGrounding(context());
+
+    expect(invoke).toHaveBeenCalledWith(expect.objectContaining({ max_tokens: 4000 }));
+  });
+
   it("reuses a precomputed grounding score in the full assessment", async () => {
     // Only the certainty call should reach the LLM.
     invoke.mockResolvedValue(JSON.stringify({ score: 0.5, reasoning: "certainty" }));

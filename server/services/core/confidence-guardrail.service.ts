@@ -237,6 +237,8 @@ export class ConfidenceGuardrailService {
         temperature: 0.2, // Low temperature for consistent evaluation
         tier: "medium",
         organizationId: context.organizationId,
+        // Listing every claim of a long reply overran the 2000 default on reasoning models.
+        max_tokens: 4000,
       });
 
       const parsed = JSON.parse(result);
