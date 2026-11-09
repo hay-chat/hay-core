@@ -708,8 +708,15 @@ const emit = defineEmits<{
 // pending approval, so those keep their single-bubble layout.
 // Customers can't embed images in their text: an <img> would load from any
 // host the moment staff open the conversation. Their files come as attachments.
+// AI replies keep only the images the server cleared when it sent them.
 const renderMarkdown = (markdown: string): string =>
-  markdownToHtml(markdown, { allowImages: props.message.type !== "Customer" });
+  markdownToHtml(markdown, {
+    allowImages: props.message.type !== "Customer",
+    allowedImageUrls:
+      props.message.type === "BotAgent"
+        ? ((props.message.metadata?.approvedImages as string[] | undefined) ?? [])
+        : undefined,
+  });
 
 const SPLIT_EXCLUDED_TYPES = ["Playbook", "Document", "Tool", "ProductRecommendation", "System"];
 const contentSegments = computed(() => splitMarkdownImages(props.message.content || ""));

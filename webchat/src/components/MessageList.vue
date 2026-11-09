@@ -83,9 +83,9 @@
               v-if="
                 animatingIds.has(message.id) && splitMarkdownImages(message.content).length === 1
               "
-              v-html="getAnimatedHtml(segment)"
+              v-html="getAnimatedHtml(segment, approvedImages(message))"
             ></div>
-            <div v-else v-html="renderMarkdown(segment)"></div>
+            <div v-else v-html="renderMarkdown(segment, approvedImages(message))"></div>
           </div>
         </template>
         <!-- User messages: plain text -->
@@ -236,15 +236,21 @@ const showsText = (message: Message): boolean => {
   return !(message.metadata?.mediaPlaceholder === true && message.attachments?.length);
 };
 
-const renderMarkdown = (content: string): string => {
-  return parseMarkdown(content);
+// The images the server cleared for this reply; anything else is shown as a link.
+const approvedImages = (message: Message): string[] => {
+  const approved = message.metadata?.approvedImages;
+  return Array.isArray(approved) ? approved.filter((url) => typeof url === "string") : [];
+};
+
+const renderMarkdown = (content: string, approved: readonly string[]): string => {
+  return parseMarkdown(content, approved);
 };
 
 const isImageSegment = (segment: string): boolean =>
   /^!\[[^\]]*\]\([^)]*\)\s*$/.test(segment.trim());
 
-const getAnimatedHtml = (content: string): string => {
-  const parsed = parseMarkdown(content);
+const getAnimatedHtml = (content: string, approved: readonly string[]): string => {
+  const parsed = parseMarkdown(content, approved);
   return wrapWordsForAnimation(parsed).html;
 };
 

@@ -61,6 +61,14 @@ describe("sanitizeHtml", () => {
 });
 
 describe("markdownToHtml", () => {
+  it("keeps only the listed images when a list is given", () => {
+    const md = "![a](https://cdn.test/a.png?v=1) ![b](https://evil.test/b.png)";
+    const html = markdownToHtml(md, { allowedImageUrls: ["https://cdn.test/a.png?v=1"] });
+    expect(html).toContain("cdn.test/a.png");
+    expect(html).not.toContain("evil.test");
+    expect(markdownToHtml(md, { allowedImageUrls: [] })).not.toContain("<img");
+  });
+
   it("escapes link titles and URLs instead of inserting them raw", () => {
     const html = markdownToHtml('[x](https://ok.example "a\\" onmouseover=\\"alert(1)")');
     const link = new DOMParser().parseFromString(html, "text/html").querySelector("a")!;

@@ -59,6 +59,16 @@ const ALLOWED_ATTR = [
 let purifier: ReturnType<typeof DOMPurify> | null = null;
 // Classes the current sanitizeHtml call keeps (sanitize runs synchronously).
 let keptClasses: ReadonlySet<string> = new Set();
+// Images the current call may keep, as absolute URLs. null keeps all of them.
+let keptImages: ReadonlySet<string> | null = null;
+
+function absoluteUrl(url: string): string | null {
+  try {
+    return new URL(url).href;
+  } catch {
+    return null;
+  }
+}
 
 function getPurifier(): ReturnType<typeof DOMPurify> {
   if (!purifier) {
@@ -68,6 +78,10 @@ function getPurifier(): ReturnType<typeof DOMPurify> {
       if (node.tagName === "A") {
         node.setAttribute("target", "_blank");
         node.setAttribute("rel", "noopener noreferrer");
+      }
+      if (node.tagName === "IMG" && keptImages) {
+        const src = absoluteUrl(node.getAttribute("src") ?? "");
+        if (!src || !keptImages.has(src)) node.remove();
       }
       const classes = node.getAttribute("class");
       if (classes !== null) {
@@ -83,6 +97,8 @@ function getPurifier(): ReturnType<typeof DOMPurify> {
 export interface SanitizeOptions {
   /** Keep `<img>` tags. Off for content a customer wrote. */
   allowImages?: boolean;
+  /** Keep only these images, by URL. Takes effect when images are allowed at all. */
+  allowedImageUrls?: readonly string[];
   /** Class names to keep (all others are dropped). Styling hooks for our own markup. */
   allowedClasses?: readonly string[];
 }
@@ -97,6 +113,9 @@ export function sanitizeHtml(html: string, options: SanitizeOptions = {}): strin
   const allowedClasses = options.allowedClasses ?? [];
   const sanitizer = getPurifier();
   keptClasses = new Set(allowedClasses);
+  keptImages = options.allowedImageUrls
+    ? new Set(options.allowedImageUrls.flatMap((url) => absoluteUrl(url) ?? []))
+    : null;
   try {
     return sanitizer.sanitize(html, {
       ALLOWED_TAGS: allowImages ? ALLOWED_TAGS : ALLOWED_TAGS.filter((tag) => tag !== "img"),
@@ -107,6 +126,7 @@ export function sanitizeHtml(html: string, options: SanitizeOptions = {}): strin
     });
   } finally {
     keptClasses = new Set();
+    keptImages = null;
   }
 }
 

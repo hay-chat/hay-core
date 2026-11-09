@@ -22,7 +22,7 @@ export function safeHttpUrl(url: unknown): string | undefined {
   }
 }
 
-export function parseMarkdown(text: string): string {
+export function parseMarkdown(text: string, approvedImages?: readonly string[]): string {
   // Escape HTML to prevent XSS
   let html = escapeHtml(text);
 
@@ -36,10 +36,12 @@ export function parseMarkdown(text: string): string {
   html = html.replace(/(?<![*\\])\*([^*]+)\*(?!\*)/g, "<em>$1</em>");
 
   // Images ![alt](url) — must run BEFORE links (an image contains link syntax).
-  // Only allow http/https; drop anything else.
+  // Only allow http/https; drop anything else. An image the server did not
+  // approve stays a link, so opening the chat doesn't request it.
   html = html.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, (_, alt, url) => {
     const safeUrl = url.replace(/&amp;/g, "&");
     if (!/^https?:\/\//i.test(safeUrl)) return "";
+    if (approvedImages && !approvedImages.includes(safeUrl)) return `[${alt || safeUrl}](${url})`;
     return `<img src="${safeUrl}" alt="${alt}" loading="lazy" />`;
   });
 

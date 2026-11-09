@@ -32,8 +32,10 @@ import {
 import {
   LinkGuardrailService,
   extractUrls,
+  removeLinks,
   type BadLink,
 } from "@server/services/core/link-guardrail.service";
+import { messageLinkText } from "./reply-media";
 import { MessageIntent, MessageType, Message } from "@server/database/entities/message.entity";
 import { isPageToolResult } from "@server/services/webchat/page-tools.service";
 import { Document } from "@server/entities/document.entity";
@@ -46,6 +48,12 @@ import {
 } from "@server/types/organization-settings.types";
 import type { FormSchema } from "@hay/form-schema";
 import { formSchemaSchema } from "@hay/form-schema";
+
+const BAD_LINK_NOTE: Record<BadLink["reason"], string> = {
+  dead: "does not exist",
+  unlisted: "not a known page of the website",
+  unverified: "not a link from this conversation or the website",
+};
 
 /**
  * Minimal shape of a retrieved document needed for confidence assessment.
@@ -1072,10 +1080,7 @@ export class ExecutionLayer {
       const { website, siteUrls } = await this.getLinkContext(conversation);
       badLinks = await this.linkService.assessLinks({
         response,
-        // Metadata carries tool outputs; the playbook and documents are messages.
-        contextTexts: messages.map(
-          (msg) => `${msg.content ?? ""}\n${JSON.stringify(msg.metadata ?? {})}`,
-        ),
+        contextTexts: messages.map(messageLinkText),
         siteUrls,
         website,
       });
@@ -1094,13 +1099,7 @@ export class ExecutionLayer {
     if (options.turnGuardrailState && retriesUsed < 1) {
       options.turnGuardrailState.linkRetries++;
 
-      const list = badLinks
-        .map((link) =>
-          link.reason === "dead"
-            ? `${link.url} (does not exist)`
-            : `${link.url} (not a known page of the website)`,
-        )
-        .join("; ");
+      const list = badLinks.map((link) => `${link.url} (${BAD_LINK_NOTE[link.reason]})`).join("; ");
       const plannerFeedback =
         `Your previous response linked to: ${list}. Do not share a URL you did not find in ` +
         `this conversation or get from find_page_url. Use find_page_url if it is available to ` +
@@ -1120,15 +1119,22 @@ export class ExecutionLayer {
       }
     }
 
-    // After the re-plan only a proven dead link stops the reply: an unlisted
-    // page the planner kept on purpose may simply be missing from the sitemap.
+    // After the re-plan a proven dead link stops the reply. Any other link
+    // nothing vouches for is taken out, and the rest of the answer still goes.
     const deadLinks = badLinks.filter((link) => link.reason === "dead");
     if (deadLinks.length === 0) {
-      log.debug({ badLinks }, "Link check: keeping unlisted links after the re-plan");
-      return null;
+      const withoutLinks = removeLinks(
+        response,
+        badLinks.map((link) => link.url),
+      );
+      if (withoutLinks) {
+        log.debug({ badLinks }, "Link check: removed unverified links after the re-plan");
+        result.userMessage = withoutLinks;
+        return null;
+      }
     }
 
-    log.warn({ deadLinks }, "Link check: dead link after the re-plan, handing off");
+    log.warn({ badLinks }, "Link check: bad link after the re-plan, handing off");
     const confidenceConfig = await this.getConfidenceConfig(conversation);
     const fallbackMessage = await this.composeContextualFallbackMessage(
       conversation,
@@ -1140,7 +1146,7 @@ export class ExecutionLayer {
       userMessage: fallbackMessage,
       handoff: {
         reason: "Reply linked to a page that does not exist",
-        fields: { deadLinks: deadLinks.map((link) => link.url) },
+        fields: { deadLinks: badLinks.map((link) => link.url) },
       },
       badLinks,
       linkRetryAttempted: retriesUsed > 0 || undefined,
